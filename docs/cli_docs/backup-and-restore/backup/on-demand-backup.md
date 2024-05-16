@@ -17,9 +17,7 @@ KubeBlocks supports on-demand backups. You can customize your backup method by s
 
 The following command uses the `xtrabackup` backup method to create a backup named `mybackup`.
 
-<Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
 
 ```bash
 # Create a backup
@@ -34,42 +32,6 @@ kbcli cluster list-backups --name=mybackup -n default
 NAME       NAMESPACE   SOURCE-CLUSTER   METHOD       STATUS      TOTAL-SIZE   DURATION   CREATE-TIME                  COMPLETION-TIME              EXPIRATION
 mybackup   default     mysql-cluster    xtrabackup   Completed   4426858      2m8s       Oct 30,2023 15:19 UTC+0800   Oct 30,2023 15:21 UTC+0800
 ```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
-
-```bash
-# Create a backup
-kubectl apply -f - <<-'EOF'
-apiVersion: dataprotection.kubeblocks.io/v1alpha1
-kind: Backup
-metadata:
-  name: mybackup
-  namespace: default
-  annotations:
-    dataprotection.kubeblocks.io/connection-password: Bw1cR15mzfldc9hzGuK4m1BZQOzha6aBb1i9nlvoBdoE9to4
-spec:
-  backupMethod: xtrabackup
-  backupPolicyName: mysql-cluster-mysql-backup-policy
-EOF
-
-# View the backup
-kubectl get backup mybackup
->
-NAME       POLICY                              METHOD       REPO      STATUS      TOTAL-SIZE   DURATION   CREATION-TIME          COMPLETION-TIME        EXPIRATION-TIME
-mybackup   mysql-cluster-mysql-backup-policy   xtrabackup   my-repo   Completed   4426858      2m8s       2023-10-30T07:19:21Z   2023-10-30T07:21:28Z
-```
-
-:::note
-
-The `dataprotection.kubeblocks.io/connection-password` in annotations uses the password of the original cluster.
-
-:::
-
-</TabItem>
-
-</Tabs>
 
 ## Volume snapshot backup
 
@@ -125,6 +87,6 @@ mybackup   mysql-cluster-mysql-backup-policy   volume-snapshot   my-repo   Compl
 
 1. When creating backups using snapshots, ensure that the storage used supports the snapshot feature; otherwise, the backup may fail.
 
-2. Backups created manually using kubectl or kbcli will not be automatically deleted. You need to manually delete them.
+2. Backups created manually using `kbcli` will not be automatically deleted. You need to manually delete them.
 
 :::

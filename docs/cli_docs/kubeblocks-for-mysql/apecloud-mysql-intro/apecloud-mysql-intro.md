@@ -6,6 +6,7 @@ sidebar_position: 1
 ---
 
 # MySQL introduction
+
 MySQL is the world’s most popular open-source database and the second-most-popular database overall. It is used by many of the most accessed applications, such as Facebook, Twitter, Netflix, Uber, Airbnb, Shopify, and Booking.com. 
 KubeBlocks adopts the MySQL distribution provided by ApeCloud, which includes data compression and high availability improvements.
 

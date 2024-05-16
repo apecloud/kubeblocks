@@ -108,10 +108,6 @@ kbcli backuprepo list
 
 After creating a database cluster, a BackupPolicy is created automatically for databases that support backup. Execute the following command to view the BackupPolicy of the cluster.
 
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
 ```bash
 kbcli cluster list-backup-policy mysql-cluster
 >
@@ -120,26 +116,10 @@ mysql-cluster-mysql-backup-policy          default     true      mysql-cluster  
 mysql-cluster-mysql-backup-policy-hscale   default     false     mysql-cluster   Oct 30,2023 14:34 UTC+0800   Available
 ```
 
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
-
-```bash
-kubectl get backuppolicy | grep mysql-cluster
->
-mysql-cluster-mysql-backup-policy                            Available   35m
-mysql-cluster-mysql-backup-policy-hscale                     Available   35m
-```
-
-</TabItem>
-
-</Tabs>
 
 The backup policy includes the backup methods supported by the cluster. Execute the following command to view the backup methods.
 
-<Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
 
 ```bash
 kbcli cluster describe-backup-policy mysql-cluster
@@ -157,16 +137,6 @@ xtrabackup        xtrabackup-for-apecloud-mysql       false
 volume-snapshot   volumesnapshot-for-apecloud-mysql   true
 ```
 
-</TabItem>
 
-<TabItem value="kubectl" label="kubectl">
-
-```bash
-kubectl get backuppolicy mysql-cluster-mysql-backup-policy -o yaml
-```
-
-</TabItem>
-
-</Tabs>
 
 For a MySQL cluster, two default backup methods are supported: `xtrabackup` and `volume-snapshot`. The former uses the backup tool `xtrabackup` to backup MySQL data to an object storage, while the latter utilizes the volume snapshot capability of cloud storage to backup data through snapshots. When creating a backup, you can specify which backup method to use.

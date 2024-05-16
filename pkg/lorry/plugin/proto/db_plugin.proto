@@ -33,10 +33,10 @@ message GetPluginInfoResponse {
   // alphanumerics between. This field is REQUIRED.
   string name = 1;
 
-  string  db_type = 2;
+  string db_type = 2;
 
   // This field is REQUIRED. 
-  string vendor_version = 3;
+  string version = 3;
 
   // This field is OPTIONAL. 
   map<string, string> metadata = 4;

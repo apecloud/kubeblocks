@@ -33,7 +33,7 @@ To check the termination policy, execute the following command.
 <TabItem value="kbcli" label="kbcli" default>
 
 ```bash
-kbcli cluster list kafka
+kbcli cluster list cluster-name
 ```
 
 </TabItem>
@@ -59,7 +59,7 @@ Run the command below to delete a specified cluster.
 <TabItem value="kbcli" label="kbcli" default>
 
 ```bash
-kbcli cluster delete kafka
+kbcli cluster delete cluster-name
 ```
 
 </TabItem>

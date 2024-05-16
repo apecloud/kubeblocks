@@ -6,8 +6,6 @@ sidebar_position: 6
 sidebar_label: Switchover
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
 
 # Switch over a MongoDB cluster
 
@@ -32,10 +30,6 @@ You can initiate a switchover for a MongoDB ReplicaSet by executing the kbcli or
 
 You can switch over a secondary of a MongoDB ReplicaSet to the primary role, and the former primary instance to a secondary.
 
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
 * Switchover with no primary instance specified
 
     ```bash
@@ -54,49 +48,7 @@ You can switch over a secondary of a MongoDB ReplicaSet to the primary role, and
     kbcli cluster promote mycluster --instance='mycluster-mongodb-2' --component='mongodb'
     ```
 
-</TabItem>
 
-<TabItem value="kubectl" label="kubectl">
-
-The value of `instanceName` decides whether a new primary instance is specified for the switchover.
-
-* Switchover with no specified primary instance
-
-  ```yaml
-  kubectl apply -f -<<EOF
-  apiVersion: apps.kubeblocks.io/v1alpha1
-  kind: OpsRequest
-  metadata:
-    name: mycluster-switchover-jhkgl
-  spec:
-    clusterRef: mycluster
-    type: Switchover
-    switchover:
-    - componentName: mongodb
-      instanceName: '*'
-  >>
-  ```
-
-* Switchover with a specified new primary instance
-
-  ```yaml
-  kubectl apply -f -<<EOF
-  apiVersion: apps.kubeblocks.io/v1alpha1
-  kind: OpsRequest
-  metadata:
-    name: mycluster-switchover-jhkgl
-  spec:
-    clusterRef: mycluster
-    type: Switchover
-    switchover:
-    - componentName: mongodb
-      instanceName: 'mycluster-mongodb-2'
-  >>
-  ```
-
-</TabItem>
-
-</Tabs>
 
 ## Verify the switchover
 

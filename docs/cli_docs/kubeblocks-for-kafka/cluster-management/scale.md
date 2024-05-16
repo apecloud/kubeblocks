@@ -35,8 +35,6 @@ ivy85   default     kafka                kafka-3.3.2   Delete               Runn
 
 1. Change configuration. There are 3 ways to apply vertical scaling.
 
-   **Option 1.** (**Recommended**) Use kbcli
-
    Configure the parameters `--components`, `--memory`, and `--cpu` and run the command.
 
    ```bash
@@ -49,66 +47,6 @@ ivy85   default     kafka                kafka-3.3.2   Delete               Runn
    - `--memory` describes the requested and limited size of the component memory.
    - `--cpu` describes the requested and limited size of the component CPU.
 
-   **Option 2.** Create an OpsRequest
-  
-   Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
-
-   ```bash
-   kubectl apply -f - <<EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: OpsRequest
-   metadata:
-     name: ops-vertical-scaling
-   spec:
-     clusterRef: ivy85
-     type: VerticalScaling 
-     verticalScaling:
-     - componentName: broker
-       requests:
-         memory: "2Gi"
-         cpu: "1000m"
-       limits:
-         memory: "4Gi"
-         cpu: "2000m"
-   EOF
-   ```
-  
-   **Option 3.** Change the YAML file of the cluster
-
-   Change the configuration of `spec.componentSpecs.resources` in the YAML file. `spec.componentSpecs.resources` controls the requirement and limit of resources and changing them triggers a vertical scaling.
-
-   ***Example***
-
-   ```yaml
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: ivy85
-     namespace: default
-   spec:
-     clusterDefinitionRef: kafka
-     clusterVersionRef: kafka-3.3.2
-     componentSpecs:
-     - name: broker
-       componentDefRef: broker
-       replicas: 1
-       resources: # Change the values of resources.
-         requests:
-           memory: "2Gi"
-           cpu: "1000m"
-         limits:
-           memory: "4Gi"
-           cpu: "2000m"
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 1Gi
-     terminationPolicy: Halt
-   ```
   
 2. Check the cluster status to validate the vertical scaling.
 
@@ -157,8 +95,6 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
 
 1. Change configuration. There are 3 ways to apply horizontal scaling.
 
-   **Option 1.** (**Recommended**) Use kbcli
-
    Configure the parameters `--components` and `--replicas`, and run the command.
 
    ```bash
@@ -173,57 +109,6 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
    - `--memory` describes the requested and limited size of the component memory.
    - `--cpu` describes the requested and limited size of the component CPU.
 
-   **Option 2.** Create an OpsRequest
-
-   Apply an OpsRequest to a specified cluster. Configure the parameters according to your needs.
-
-   ```bash
-   kubectl apply -f - <<EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: OpsRequest
-   metadata:
-     name: ops-horizontal-scaling
-   spec:
-     clusterRef: ivy85
-     type: HorizontalScaling
-     horizontalScaling:
-     - componentName: broker
-       replicas: 3
-   EOF
-   ```
-
-   **Option 3.** Change the YAML file of the cluster
-
-   Change the configuration of `spec.componentSpecs.replicas` in the YAML file. `spec.componentSpecs.replicas` stands for the pod amount and changing this value triggers a horizontal scaling of a cluster.
-
-   ***Example***
-
-   ```yaml
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-    apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: ivy85
-     namespace: default
-   spec:
-     clusterDefinitionRef: kafka
-     clusterVersionRef: kafka-3.3.2 
-     componentSpecs:
-     - name: broker
-       componentDefRef: broker
-       replicas: 1 # Change the pod amount.
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 1Gi
-    terminationPolicy: Halt
-   ```
 
 2. Validate the horizontal scaling operation.
 

@@ -32,9 +32,7 @@ kbcli cluster list mongodb-cluster
 
 1. Change configuration. There are 3 ways to apply vertical scaling.
 
-   **Option 1.** (**Recommended**) Use kbcli
-
-   1. Use `kbcli cluster vscale` and configure the resources required.
+   1.1 Use `kbcli cluster vscale` and configure the resources required.
 
       ***Example***
 
@@ -49,7 +47,7 @@ kbcli cluster list mongodb-cluster
    - `--memory` describes the requested and limited size of the component memory.
    - `--cpu` describes the requested and limited size of the component CPU.
 
-   2. Validate the scaling with `kbcli cluster describe-ops mongodb-cluster-verticalscaling-thglk -n default`.
+   1.2. Validate the scaling with `kbcli cluster describe-ops mongodb-cluster-verticalscaling-thglk -n default`.
 
      :::note
 
@@ -57,43 +55,6 @@ kbcli cluster list mongodb-cluster
 
      :::
   
-   **Option 2.** Change the YAML file of the cluster
-
-   Change the configuration of `spec.components.resources` in the YAML file. `spec.components.resources` controls the requirement and limit of resources and changing them triggers a vertical scaling.
-
-   ***Example***
-
-   ```YAML
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mongodb-cluster
-     namespace: default
-   spec:
-     clusterDefinitionRef: mongodb
-     clusterVersionRef: mongodb-5.0
-     componentSpecs:
-     - name: mongodb
-       componentDefRef: mongodb
-       replicas: 1
-       resources: # Change the values of resources.
-         requests:
-           memory: "2Gi"
-           cpu: "1000m"
-         limits:
-           memory: "4Gi"
-           cpu: "2000m"
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 1Gi
-     terminationPolicy: Halt
-   ```
-
 2. Validate the vertical scaling.
 
     ```bash

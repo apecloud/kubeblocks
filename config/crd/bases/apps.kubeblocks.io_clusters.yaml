@@ -5951,6 +5951,8 @@ spec:
                         cluster-level services - CLUSTER_NAME-COMPONENT_NAME: for
                         component-level services \n Only one default service name
                         is allowed. Cannot be updated."
+                      maxLength: 25
+                      pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
                     shardingSelector:
                       description: Extends the ServiceSpec.Selector by allowing the

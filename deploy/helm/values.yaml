@@ -1936,6 +1936,12 @@ controllers:
   experimental:
     enabled: false
 
+featureGates:
+  ignoreConfigTemplateDefaultMode:
+    enabled: false
+  ignorePodVerticalScaling:
+    enabled: false
+
 vmagent:
 
   ## overwrite vmagent scrape_configs

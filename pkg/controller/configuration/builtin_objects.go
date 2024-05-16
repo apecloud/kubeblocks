@@ -24,7 +24,6 @@ import (
 
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -50,24 +49,22 @@ type componentTemplateValues struct {
 }
 
 type builtInObjects struct {
-	cluster          *appsv1alpha1.Cluster
-	podSpec          *corev1.PodSpec
-	component        *component.SynthesizedComponent
-	dynamicCompInfos *[]DynamicComponentInfo
-	componentValues  *componentTemplateValues
+	cluster         *appsv1alpha1.Cluster
+	podSpec         *corev1.PodSpec
+	component       *component.SynthesizedComponent
+	componentValues *componentTemplateValues
 }
 
 // General built-in objects
 const (
 	builtinClusterObject           = "cluster"
 	builtinComponentObject         = "component"
-	builtinDynamicCompInfosObject  = "dynamicCompInfos"
 	builtinPodObject               = "podSpec"
 	builtinComponentResourceObject = "componentResource"
 	builtinClusterDomainObject     = "clusterDomain"
 )
 
-func buildInComponentObjects(cache []client.Object, podSpec *corev1.PodSpec, component *component.SynthesizedComponent, configSpecs []appsv1alpha1.ComponentConfigSpec, cluster *appsv1alpha1.Cluster) *builtInObjects {
+func buildInComponentObjects(podSpec *corev1.PodSpec, component *component.SynthesizedComponent, configSpecs []appsv1alpha1.ComponentConfigSpec, cluster *appsv1alpha1.Cluster) *builtInObjects {
 	var resource *ResourceDefinition
 
 	container := intctrlutil.GetContainerByConfigSpec(podSpec, configSpecs)
@@ -85,10 +82,9 @@ func buildInComponentObjects(cache []client.Object, podSpec *corev1.PodSpec, com
 			Resource:    resource,
 			ConfigSpecs: configSpecs,
 		},
-		podSpec:          podSpec,
-		component:        component,
-		cluster:          cluster,
-		dynamicCompInfos: buildDynamicCompInfos(cache, podSpec, component),
+		podSpec:   podSpec,
+		component: component,
+		cluster:   cluster,
 	}
 }
 
@@ -113,7 +109,6 @@ func builtinCustomObjects(builtin *builtInObjects) map[string]any {
 	return map[string]any{
 		builtinClusterObject:           builtin.cluster,
 		builtinComponentObject:         builtin.component,
-		builtinDynamicCompInfosObject:  builtin.dynamicCompInfos,
 		builtinPodObject:               builtin.podSpec,
 		builtinComponentResourceObject: builtin.componentValues.Resource,
 		builtinClusterDomainObject:     viper.GetString(constant.KubernetesClusterDomainEnv),

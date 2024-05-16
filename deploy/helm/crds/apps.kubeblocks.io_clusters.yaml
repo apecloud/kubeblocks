@@ -5929,6 +5929,7 @@ spec:
                         this service by its name. (e.g., connection credential) Cannot
                         be updated.
                       maxLength: 25
+                      pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
                     roleSelector:
                       description: "Extends the above `serviceSpec.selector` by allowing

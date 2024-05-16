@@ -168,6 +168,14 @@ spec:
             - name: ENABLED_RUNTIME_METRICS
               value: "true"
             {{- end }}
+            {{- if .Values.featureGates.ignoreConfigTemplateDefaultMode.enabled }}
+            - name: IGNORE_CONFIG_TEMPLATE_DEFAULT_MODE
+              value: "true"
+            {{- end }}
+            {{- if .Values.featureGates.ignorePodVerticalScaling.enabled }}
+            - name: IGNORE_POD_VERTICAL_SCALING
+              value: "true"
+            {{- end }}
           {{- with .Values.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}

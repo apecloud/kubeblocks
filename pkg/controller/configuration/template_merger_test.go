@@ -108,7 +108,7 @@ max_connections=666
 			testClusterName,
 			"default", nil, nil)
 		templateBuilder.injectBuiltInObjectsAndFunctions(
-			&corev1.PodSpec{}, nil, &component.SynthesizedComponent{}, nil,
+			&corev1.PodSpec{}, &component.SynthesizedComponent{}, nil,
 			&appsv1alpha1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testClusterName,

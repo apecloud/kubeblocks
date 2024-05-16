@@ -69,8 +69,9 @@ spec:
             - "--zap-encoder={{ . }}"
             {{- end }}
             - "--extensions={{- default "true" ( include "kubeblocks.addonControllerEnabled" . ) }}"
-            - "--apps=true"
-            - "--workloads=true"
+            - "--apps={{- default "true" .Values.controllers.apps.enabled }}"
+            - "--workloads={{- default "true" .Values.controllers.workloads.enabled }}"
+            - "--experimental={{- default "false" .Values.controllers.experimental.enabled }}"
             {{- with .Values.managedNamespaces }}
             - "--managed-namespaces={{ . }}"
             {{- end }}
@@ -165,10 +166,6 @@ spec:
               value: {{ include "kubeblocks.fullname" . }}-host-ports
             {{- if .Values.serviceMonitor.goRuntime.enabled }}
             - name: ENABLED_RUNTIME_METRICS
-              value: "true"
-            {{- end }}
-            {{- if .Values.controllers.experimental.enabled }}
-            - name: experimental
               value: "true"
             {{- end }}
           {{- with .Values.securityContext }}

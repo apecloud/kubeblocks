@@ -6,9 +6,6 @@ sidebar_position: 2
 sidebar_label: Configure BackupPolicy
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 # Configure BackupPolicy
 
 ## Configure encryption key
@@ -38,9 +35,9 @@ helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-nam
 
 ### Create a new key
 
-If you do not need to enable backup encryption by default, or if you need to use a separate `encryptionKey`, just create a Secret and manually enable backup encryption by following the steps below.
+If you do not need to enable backup encryption by default, or if you need to use a separate `encryptionKey`, just create a secret and manually enable backup encryption by following the steps below.
 
-1. Create a Secret to store the encryption key.
+1. Create a secret to store the encryption key.
 
     ```bash
     kubectl create secret generic backup-encryption \
@@ -63,7 +60,7 @@ The secret created in Step 1 should not be modified or deleted; otherwise, decry
 
 :::
 
-By default, the `encrytpionKey` is only used for encrypting the connection password, if you want to use it to encrypt backup data as well, add `--set dataProtection.enableBackupEncryption=true` to the above command. After that, all newly-created clusters are enabled for backup encryption by default.
+By default, the `encrytpionKey` is only used for encrypting the connection password, if you want to use it to encrypt backup data as well, add `--set dataProtection.enableBackupEncryption=true` to the above command. After that, backup encryption will be enabled by default for all newly created clusters.
 
 ## Create cluster
 

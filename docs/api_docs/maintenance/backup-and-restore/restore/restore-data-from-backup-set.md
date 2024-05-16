@@ -24,7 +24,7 @@ KubeBlocks supports restoring clusters from backups with the following instructi
     You can set the `connectionPassword.annotations` of the restored cluster as that of the original cluster. The password of the original cluster can be accessed by viewing the annotation of `dataprotection.kubeblocks.io/connection-password` in the backup YAML file.
 
     ```bash
-    $ kubectl apply -f - <<-'EOF'
+    kubectl apply -f - <<-'EOF'
     apiVersion: apps.kubeblocks.io/v1alpha1
     kind: Cluster
     metadata:

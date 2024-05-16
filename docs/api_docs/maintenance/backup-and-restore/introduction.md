@@ -21,6 +21,7 @@ KubeBlocks adopts physical backup which takes the physical files in a database a
 As for the restore function, KubeBlocks supports restoring data from the backup set.
 
 * Restore
+  * [PITR](./restore/pitr.md).
   * [Restore data from the backup set](./restore/restore-data-from-backup-set.md).
 
 Follow the steps below to back up and restore your cluster.
@@ -28,4 +29,4 @@ Follow the steps below to back up and restore your cluster.
 1. [Configure BackupRepo](./backup/backup-repo.md).
 2. [Configure BackupPolicy](./backup/configure-backuppolicy.md).
 3. Backup your cluster [on demand](./backup/on-demand-backup.md) or [by schedule](./backup/scheduled-backup.md).
-4. [Restore your data](./restore/restore-data-from-backup-set.md) from the backup set.
+4. Restore your data by [PITR](./restore/pitr.md) or from the [backup set](./restore/restore-data-from-backup-set.md).

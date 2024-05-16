@@ -116,7 +116,7 @@ spec:
     topologyKeys:
     - kubernetes.io/hostname
     nodeLabels:
-      databa: true
+      database: true
     tenancy: SharedNode
   tolerations:
   - key: database

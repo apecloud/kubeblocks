@@ -159,9 +159,7 @@ KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of
         replicas: 1
         enabledLogs:
           - running
-        serviceAccountName: kb-pg
-        switchPolicy:
-          type: Noop      
+        serviceAccountName: kb-pg      
         resources:
           limits:
             cpu: "0.5"
@@ -213,7 +211,7 @@ kind: Cluster
 metadata:
   annotations:
     kubectl.kubernetes.io/last-applied-configuration: |
-      {"apiVersion":"apps.kubeblocks.io/v1alpha1","kind":"Cluster","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"pg","app.kubernetes.io/version":"14.8.0","helm.sh/chart":"postgresql-cluster-0.6.0-alpha.36"},"name":"pg-cluster","namespace":"demo"},"spec":{"affinity":{"podAntiAffinity":"Preferred","tenancy":"SharedNode","topologyKeys":["kubernetes.io/hostname"]},"clusterDefinitionRef":"postgresql","clusterVersionRef":"postgresql-14.8.0","componentSpecs":[{"componentDefRef":"postgresql","enabledLogs":["running"],"monitor":false,"name":"postgresql","replicas":1,"resources":{"limits":{"cpu":"0.5","memory":"0.5Gi"},"requests":{"cpu":"0.5","memory":"0.5Gi"}},"serviceAccountName":"kb-pg","services":null,"switchPolicy":{"type":"Noop"},"volumeClaimTemplates":[{"name":"data","spec":{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"20Gi"}}}}]}],"terminationPolicy":"Delete"}}
+      {"apiVersion":"apps.kubeblocks.io/v1alpha1","kind":"Cluster","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"pg","app.kubernetes.io/version":"14.8.0","helm.sh/chart":"postgresql-cluster-0.6.0-alpha.36"},"name":"pg-cluster","namespace":"demo"},"spec":{"affinity":{"podAntiAffinity":"Preferred","tenancy":"SharedNode","topologyKeys":["kubernetes.io/hostname"]},"clusterDefinitionRef":"postgresql","clusterVersionRef":"postgresql-14.8.0","componentSpecs":[{"componentDefRef":"postgresql","enabledLogs":["running"],"monitor":false,"name":"postgresql","replicas":1,"resources":{"limits":{"cpu":"0.5","memory":"0.5Gi"},"requests":{"cpu":"0.5","memory":"0.5Gi"}},"serviceAccountName":"kb-pg","services":null,"volumeClaimTemplates":[{"name":"data","spec":{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"20Gi"}}}}]}],"terminationPolicy":"Delete"}}
   creationTimestamp: "2023-07-19T07:53:07Z"
   finalizers:
   - cluster.kubeblocks.io/finalizer
@@ -252,8 +250,6 @@ spec:
         cpu: "0.5"
         memory: 0.5Gi
     serviceAccountName: kb-pg
-    switchPolicy:
-      type: Noop
     volumeClaimTemplates:
     - name: data
       spec:

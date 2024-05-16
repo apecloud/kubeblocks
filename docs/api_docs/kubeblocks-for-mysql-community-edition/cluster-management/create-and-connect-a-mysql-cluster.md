@@ -51,44 +51,53 @@ KubeBlocks supports the Standalone and Replication MySQL cluster. Below is an ex
 
 KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a Replication Cluster.
 
-   ```yaml
-   cat <<EOF | kubectl apply -f -
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
-     labels:
-       helm.sh/chart: mysql-cluster-0.9.0
-       app.kubernetes.io/version: "8.0.33"
-       app.kubernetes.io/instance: mycluster
-     annotations:
-       kubeblocks.io/extra-env: '{ "MYSQL_TOPOLOGY_MODE": "replication" }'
-   spec:
-     clusterVersionRef: mysql-8.0.33
-     terminationPolicy: Delete
-     affinity:
-       podAntiAffinity: Preferred
-       topologyKeys:
-         - kubernetes.io/hostname
-       tenancy: SharedNode
-     clusterDefinitionRef: mysql # ref clusterdefinition.name
-     componentSpecs:
-       - name: mysql
-         componentDefRef: mysql # ref clusterdefinition componentDefs.name
-         monitor: false
-         replicas: 1
-         serviceAccountName:
-         resources:
-           limits:
-             cpu: "1"
-             memory: "1Gi"
-           requests:
-             cpu: "1"
-             memory: "1Gi"
-         services:
-   EOF
-   ```
+```yaml
+cat <<EOF | kubectl apply -f -
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: mysql-cluster
+  namespace: demo
+spec:
+  clusterDefinitionRef: mysql
+  clusterVersionRef: mysql-8.0.33
+  terminationPolicy: Delete
+  affinity:
+    podAntiAffinity: Preferred
+    topologyKeys:
+    - kubernetes.io/hostname
+    tenancy: SharedNode
+  tolerations:
+    - key: kb-data
+      operator: Equal
+      value: 'true'
+      effect: NoSchedule
+  componentSpecs:
+  - name: mysql
+    componentDefRef: mysql
+    enabledLogs:
+    - error
+    - slow
+    monitor: false
+    replicas: 2
+    serviceAccountName: kb-mysql-cluster
+    resources:
+      limits:
+        cpu: '0.5'
+        memory: 0.5Gi
+      requests:
+        cpu: '0.5'
+        memory: 0.5Gi
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+EOF
+```
 
 * `kubeblocks.io/extra-env` in `metadata.annotations` defines the topology mode of a MySQL cluster. If you want to create a Standalone cluster, you can change the value to `standalone`.
 * `spec.clusterVersionRef` is the name of the cluster version CRD that defines the cluster version.
@@ -98,6 +107,55 @@ KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of
 * `spec.componentSpecs.name` is the name of the component.
 * `spec.componentSpecs.replicas` is the number of replicas of the component.
 * `spec.componentSpecs.resources` is the resource requirements of the component.
+
+If you only have one node for deploying a RaftGroup Cluster, set `spec.affinity.topologyKeys` as `null`.
+
+```yaml
+cat <<EOF | kubectl apply -f -
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: mycluster
+  namespace: demo
+spec:
+  clusterDefinitionRef: mysql
+  clusterVersionRef: mysql-8.0.33
+  terminationPolicy: Delete
+  affinity:
+    podAntiAffinity: Preferred
+    topologyKeys: null
+    tenancy: SharedNode
+  tolerations:
+    - key: kb-data
+      operator: Equal
+      value: 'true'
+      effect: NoSchedule
+  componentSpecs:
+  - name: mysql
+    componentDefRef: mysql
+    enabledLogs:
+    - error
+    - slow
+    monitor: false
+    replicas: 2
+    serviceAccountName: kb-mysql-cluster
+    resources:
+      limits:
+        cpu: '0.5'
+        memory: 0.5Gi
+      requests:
+        cpu: '0.5'
+        memory: 0.5Gi
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+EOF
+```
 
 For the details of different parameters, you can refer to API docs.
 
@@ -147,8 +205,6 @@ spec:
         cpu: "1"
         memory: 1Gi
     serviceAccountName: kb-mycluster
-    switchPolicy:
-      type: Noop
     volumeClaimTemplates:
     - name: data
       spec:

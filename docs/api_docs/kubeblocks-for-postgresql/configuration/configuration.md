@@ -98,7 +98,7 @@ But it's also important to note that the dynamic parameter configuration doesn't
        componentName: postgresql
        configurations:
        - keys:
-         - key: my.cnf
+         - key: postgresql.conf
            parameters:
            - key: max_connections
              value: "600"
@@ -154,7 +154,7 @@ Just in case you cannot find the configuration file of your cluster, you can use
 kbcli cluster describe-config mycluster -n demo
 ```
 
-From the meta information, the cluster `mycluster` has a configuration file named `postgresql.cnf`.
+From the meta information, the cluster `mycluster` has a configuration file named `postgresql.conf`.
 
 You can also view the details of this configuration file and parameters.
 

@@ -42,13 +42,13 @@ sidebar_label: ApeCloud MySQL Proxy Cluster
 5. (Optional) If you disable the `apecloud-mysql` add-on when installing KuebBlocks, run the command below to specify a version and install the cluster definition of ApeCloud MySQL. Skip this step if you install KubeBlocks with the default settings.
 
    ```bash
-   helm install myproxy kubeblocks/apecloud-mysql --version=v0.6.0
+   helm install myproxy kubeblocks/apecloud-mysql --version=v0.9.0
    ```
 
 6. Create an ApeCloud MySQL Proxy Cluster.
 
    ```bash
-   helm install myproxy kubeblocks/apecloud-mysql-cluster --version=v0.6.0 --set mode=raftGroup,proxyEnabled=true 
+   helm install myproxy kubeblocks/apecloud-mysql-cluster --version=v0.9.0 --set mode=raftGroup,proxyEnabled=true 
    ```
 
 :::note
@@ -56,17 +56,23 @@ sidebar_label: ApeCloud MySQL Proxy Cluster
 If you only have one node for deploying a RaftGroup, set the `availability-policy` as `none` when creating a RaftGroup.
 
 ```bash
-helm install myproxy kubeblocks/apecloud-mysql-cluster --version=v0.6.0 --set mode=raftGroup,proxyEnabled=true --set extra.availabilityPolicy=none
+helm install myproxy kubeblocks/apecloud-mysql-cluster --version=v0.9.0 --set mode=raftGroup,proxyEnabled=true --set extra.availabilityPolicy=none
 ```
 
 :::
 
-## Enable Proxy dynamically
+## Enable/Disable Proxy dynamically
 
-As its name suggests, ApeCloud MySQL Proxy in nature is a database proxy. An ApeCloud MySQL RaftGroup Cluster can be switched to an ApeCloud MySQL Proxy Cluster by setting `proxyEnabled=true`.
+As its name suggests, ApeCloud MySQL Proxy in nature is a database proxy. An ApeCloud MySQL RaftGroup Cluster that already exists can be switched to an ApeCloud MySQL Proxy Cluster by setting `proxyEnabled=true`.
 
 ```bash
 helm upgrade mycluster kubeblocks/apecloud-mysql-cluster --set mode=raftGroup,proxyEnabled=true
+```
+
+If you want to disable proxy, run the command below.
+
+```bash
+helm upgrade mycluster kubeblocks/apecloud-mysql-cluster --set mode=raftGroup
 ```
 
 ## Connect Proxy Cluster
@@ -121,129 +127,63 @@ while true; do date; kubectl port-forward svc/vt-mysql 3306:3306; sleep 0.5; don
 
 ## Configure Proxy Cluster parameters
 
-VTGate, VTConsensus, and VTTablet support parameter configuration. You can configure VTGate and VTConsensus by using `--component` to specify a component and configure VTTablet by using `--component=mysql --config-specs=vttablet-config` to specify both a component and a configuration file template since VTTablet is the sidecar of the MySQL component.
+VTGate, VTConsensus, and VTTablet support parameter configuration.
 
-### View parameter details
+You can configure VTGate and VTConsensus by using `--component` to specify a component and configure VTTablet by using `--component=mysql --config-specs=vttablet-config` to specify both a component and a configuration file template since VTTablet is the sidecar of the MySQL component.
 
-* View the details of the current configuration file.
-
-   ```bash
-   # vtgate
-   kbcli cluster describe-config myproxy --component vtgate --show-detai
-   
-   # vtcontroller
-   kbcli cluster describe-config myproxy --component vtcontroller --show-detail
-   
-   # vttablet
-   kbcli cluster describe-config myproxy --component mysql --show-detail --config-specs vttablet-config
-   ```
-
-* View the parameter descriptions.
+1. Get the configuration file of this cluster.
 
    ```bash
-   # vtgate
-   kbcli cluster explain-config myproxy --component vtgate
-
-   # vttablet
-   kbcli cluster explain-config myproxy --component mysql --config-specs=vttablet-config
+   kubectl edit configurations.apps.kubeblocks.io myproxy-vtgate
    ```
 
-* View the definition of a specified parameter.
+2. Configure parameters according to your needs. The example below adds the `- configFileParams` part to configure `max_connections`.
 
-   ```bash
-   kbcli cluster explain-config myproxy --component vtgate --param=healthcheck_timeout
+   ```yaml
+   spec:
+     clusterRef: myproxy
+     componentName: vtgate
+     configItemDetails:
+     - configFileParams:
+         vtgate.cnf:
+           parameters:
+             healthcheck_timeout: "5s"
+       configSpec:
+         constraintRef: mysql-scale-vtgate-config-constraints
+         name: vtgate-config
+         namespace: kb-system
+         templateRef: vtgate-config-template
+         volumeName: mysql-scale-config
+       name: vtgate-config
+       payload: {}
    ```
 
-### Reconfigure parameters
+3. Connect to this cluster to verify whether the configuration takes effect.
 
-1. View the current values in the MySQL Server.
-
-   ```bash
-   kbcli cluster connect myproxy --component=vtgate
-   ```
-
-   ```bash
-   mysql> show variables like '%healthcheck_timeout%';
-   ```
-
-   ```bash
-   mysql> show variables like '%health_check_interval%';
-   ```
-
-2. Configure the `healthcheck_timeout` for VTGate and the `health_check_interval` for VTTablet.
-
-   You can use `--set` flag or edit the parameter configuration file to edit values.
-
-   * By using `--set` flag
+   1. Expose the port of the MySQL Server to the localhost so that the localhost can access the MySQL Server.
 
       ```bash
-      # vtgate
-      kbcli cluster configure myproxy --component vtgate --set=healthcheck_timeout=2s
-
-      # vttablet
-      kbcli cluster configure myproxy --set=health_check_interval=4s --component=mysql --config-spec=vttablet-config
+      kubectl port-forward svc/vt-vtgate-headless 15306:15306
       ```
 
-   * By editing the parameter configuration file
+   2. Connect to this cluster and verify whether the parameters are configured as expected.
 
       ```bash
-      kbcli cluster edit-config myproxy --component vtgate
+      mysql -h 127.0.0.1 -P 3306
+
+      >
+      mysql> show variables like 'healthcheck_timeout';
+      +---------------------+-------+
+      | Variable_name       | Value |
+      +---------------------+-------+
+      | healthcheck_timeout |  5s   |
+      +---------------------+-------+
+      1 row in set (0.00 sec)
       ```
-
-    :::note
-
-    After the `vtgate` parameter values configuration command is executed, a new vtgate Pod is started and the old vtgate Pod is terminated. You can run the command below to monitor whether the old Pod is terminated.
-
-    ```bash
-    kubectl get pod <vtgate-pod-name> -w
-    ```
-
-    :::
-
-3. Use the output command to view the configuration status. For example,
-
-   ```bash
-   kbcli cluster describe-ops myproxy -reconfiguring-lth8d -n default
-   ```
-
-   :::note
-
-   For more information about parameter configuration, refer to [Configuration](./../configuration/configuration.md).
-
-   :::
 
 ## Log
 
-You can view the log files of components, Pods, and containers by both kbcli and kubectl.
-
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
-View the log of different components.
-
-```bash
-kbcli cluster list-logs myproxy
-kbcli cluster list-logs myproxy --component vtgate
-kbcli cluster list-logs myproxy --component vtcontroller
-kbcli cluster list-logs myproxy --component mysql
-```
-
-View the log of a Pod.
-
-```bash
-kbcli cluster logs myproxy --instance myproxy-vtgate-85bdcf99df-wbmnl
-```
-
-View the log of a container in a Pod.
-
-```bash
-kbcli cluster logs myproxy --instance myproxy-mysql-0 -c vttablet
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl" default>
+You can view the log files of components, Pods, and containers.
 
 View the log of VTGate.
 
@@ -271,68 +211,89 @@ kubectl exec -it myproxy-cluster-mysql-0  -c vttablet -- bash
 ls /vtdataroot
 ```
 
-</TabItem>
-
-</Tabs>
-
 ## Monitoring
 
-:::note
-
-In the production environment, all monitoring add-ons are disabled by default when installing KubeBlocks. You can enable these add-ons but it is highly recommended to build your monitoring system or purchase a third-party monitoring service. For details, refer to [Monitoring](./../../observability/monitor-database.md).
-
-:::
-
-1. Enable the monitoring function.
-
-   ```bash
-   kbcli cluster update myproxy --monitor=true
-   ```
-
-2. View the add-on list and enable the Grafana add-on.
-
-   ```bash
-   kbcli addon list 
-   
-   kbcli addon enable grafana
-   ```
-
-3. View the dashboard list.
-
-   ```bash
-   kbcli dashboard list
-   ```
-
-4. Open the Grafana dashboard.
-
-   ```bash
-   kbcli dashboard open kubeblocks-grafana
-   ```
+kubectl TBD
 
 ## Read-write splitting
 
 You can enable the read-write splitting function.
 
-```bash
-kbcli cluster configure myproxy --component vtgate --set=read_write_splitting_policy=random
-```
+1. Get the configuration file of this cluster.
+
+   ```bash
+   kubectl edit configurations.apps.kubeblocks.io myproxy-vtgate
+   ```
+
+2. Configure `read_write_splitting_policy` as `random`. 
+
+   ```yaml
+   spec:
+     clusterRef: myproxy
+     componentName: vtgate
+     configItemDetails:
+     - configFileParams:
+         vtgate.cnf:
+           parameters:
+             read_write_splitting_policy: "random"
+       configSpec:
+         constraintRef: mysql-scale-vtgate-config-constraints
+         name: vtgate-config
+         namespace: kb-system
+         templateRef: vtgate-config-template
+         volumeName: mysql-scale-config
+       name: vtgate-config
+       payload: {}
+   ```
 
 You can also set the ratio for read-write splitting and here is an example of directing 70% flow to the read-only node.
 
-```bash
-kbcli cluster configure myproxy --component vtgate --set=read_write_splitting_ratio=70
-```
-
-Moreover, you can [use Grafana](#monitoring) or run `show workload` to view the flow distribution.
-
-```bash
-show workload;
+```yaml
+spec:
+   clusterRef: myproxy
+   componentName: vtgate
+   configItemDetails:
+   - configFileParams:
+      vtgate.cnf:
+         parameters:
+            read_write_splitting_rati: "70"
+      configSpec:
+      constraintRef: mysql-scale-vtgate-config-constraints
+      name: vtgate-config
+      namespace: kb-system
+      templateRef: vtgate-config-template
+      volumeName: mysql-scale-config
+      name: vtgate-config
+      payload: {}
 ```
 
 ## Transparent failover
 
 Run the command below to implement transparent failover.
 
-```bash
-kbcli cluster configure myproxy --component vtgate --set=enable_buffer=true
-```
+1. Get the configuration file of this cluster.
+
+   ```bash
+   kubectl edit configurations.apps.kubeblocks.io myproxy-vtgate
+   ```
+
+2. Configure `enable_buffer` as `true`.
+
+   ```yaml
+   spec:
+     clusterRef: myproxy
+     componentName: vtgate
+     configItemDetails:
+     - configFileParams:
+         vtgate.cnf:
+           parameters:
+             enable_buffer: "true"
+       configSpec:
+         constraintRef: mysql-scale-vtgate-config-constraints
+         name: vtgate-config
+         namespace: kb-system
+         templateRef: vtgate-config-template
+         volumeName: mysql-scale-config
+       name: vtgate-config
+       payload: {}
+   ```

@@ -14,21 +14,7 @@ KubeBlocks integrates [the open-source Patroni solution](https://patroni.readthe
 * [Install kbcli](./../../installation/install-with-kbcli/install-kbcli.md).
 * Install KubeBlocks: You can install KubeBlocks by [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or by [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
 * [Create a PostgreSQL Replication Cluster](./../cluster-management/create-and-connect-a-postgresql-cluster.md#create-a-postgresql-cluster).
-* Check the Switch Policy and the role probe.
-  * Check whether the switch policy is `Noop`.
-
-    ```bash
-    kubectl get cluster pg-cluster -o yaml
-    >
-    spec:
-      componentSpecs:
-      - name: postgresql
-        componentDefRef: postgresql
-        switchPolicy:
-          type: Noop
-    ```
-
-  * Check whether the following role probe parameters exist to verify the role probe is enabled.
+* Check whether the following role probe parameters exist to verify the role probe is enabled.
 
     ```bash
     kubectl get cd postgresql -o yaml

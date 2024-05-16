@@ -55,7 +55,7 @@ Using kubectl to configure pulsar cluster requires modifying the configuration f
    2. Check whether the configuration is done.
 
       ```bash
-      kubectl get pod -l app.kubernetes.io/name=pulsar
+      kubectl get pod -l app.kubernetes.io/name=pulsar-broker
       ```
 
 ## Configure cluster parameters with OpsRequest
@@ -71,14 +71,14 @@ Using kubectl to configure pulsar cluster requires modifying the configuration f
    spec:
      clusterName: mycluster
      reconfigure:
-       componentName: kafka
+       componentName: pulsar-broker
        configurations:
        - keys:
-         - key: kafka.conf
+         - key: broker.conf
            parameters:
            - key: log.cleanup.policy
              value: "compact"
-         name: kafka-config
+         name: pulsar-broker-broker-config
      ttlSecondBeforeAbort: 0
      type: Reconfiguring
    EOF
@@ -117,7 +117,7 @@ Just in case you cannot find the configuration file of your cluster, you can use
 kbcli cluster describe-config mycluster -n demo
 ```
 
-From the meta information, the cluster `mycluster` has a configuration file named `my.cnf`.
+From the meta information, the cluster `mycluster` has a configuration file named `broker.conf`.
 
 You can also view the details of this configuration file and parameters.
 

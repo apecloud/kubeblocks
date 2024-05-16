@@ -76,13 +76,11 @@ spec:
   componentSpecs:
     - name: postgresql
       componentDefRef: postgresql
-      monitor: false
+      monitorEnabled: false
       replicas: 2
       enabledLogs:
         - running
       serviceAccountName:
-      switchPolicy:
-        type: Noop
       resources:
         limits:
           cpu: "0.5"
@@ -170,8 +168,6 @@ spec:
       requests:
         cpu: "0.5"
         memory: 0.5Gi
-    switchPolicy:
-      type: Noop
     volumeClaimTemplates:
     - name: data
       spec:

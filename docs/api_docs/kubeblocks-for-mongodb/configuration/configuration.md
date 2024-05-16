@@ -114,7 +114,7 @@ Just in case you cannot find the configuration file of your cluster, you can use
 kbcli cluster describe-config mycluster -n demo
 ```
 
-From the meta information, the cluster `mycluster` has a configuration file named `my.cnf`.
+From the meta information, the cluster `mycluster` has a configuration file named `mongodb.conf`.
 
 You can also view the details of this configuration file and parameters.
 

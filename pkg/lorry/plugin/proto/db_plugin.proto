@@ -139,8 +139,11 @@ message LeaveMemberResponse {
 message ReadonlyRequest {
   DBInfo db_info = 1;
 
+  // The reason for setting the replica as read-only.
+  string Reason = 2;
+
   // Common metadata property for extention
-  map<string, string> metadata = 2;
+  map<string, string> metadata = 3;
 }
 
 message ReadonlyResponse {

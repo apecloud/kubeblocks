@@ -21,6 +21,7 @@ package constant
 
 import (
 	"fmt"
+	"strings"
 )
 
 // GenerateClusterComponentName generates the cluster component name.
@@ -30,7 +31,8 @@ func GenerateClusterComponentName(clusterName, compName string) string {
 
 // GenerateAccountSecretName generates the secret name of system accounts.
 func GenerateAccountSecretName(clusterName, compName, name string) string {
-	return fmt.Sprintf("%s-%s-account-%s", clusterName, compName, name)
+	replacedName := strings.ReplaceAll(name, "_", "-")
+	return fmt.Sprintf("%s-%s-account-%s", clusterName, compName, replacedName)
 }
 
 // GenerateClusterServiceName generates the service name for cluster.

@@ -31,8 +31,8 @@ func GenerateClusterComponentName(clusterName, compName string) string {
 
 // GenerateAccountSecretName generates the secret name of system accounts.
 func GenerateAccountSecretName(clusterName, compName, name string) string {
-	nameFormat := strings.ReplaceAll(name, "_", "-")
-	return fmt.Sprintf("%s-%s-account-%s", clusterName, compName, nameFormat)
+	replacedName := strings.ReplaceAll(name, "_", "-")
+	return fmt.Sprintf("%s-%s-account-%s", clusterName, compName, replacedName)
 }
 
 // GenerateClusterServiceName generates the service name for cluster.

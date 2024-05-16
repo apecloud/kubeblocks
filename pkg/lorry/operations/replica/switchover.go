@@ -81,11 +81,6 @@ func (s *Switchover) PreCheck(ctx context.Context, req *operations.OpsRequest) e
 			message := fmt.Sprintf("primary %s not exists", primary)
 			return errors.New(message)
 		}
-
-		if ok, err := s.DBManager.IsLeaderMember(ctx, cluster, leaderMember); err != nil || !ok {
-			message := fmt.Sprintf("%s is not the primary", primary)
-			return errors.New(message)
-		}
 	}
 
 	if candidate != "" {
@@ -94,15 +89,7 @@ func (s *Switchover) PreCheck(ctx context.Context, req *operations.OpsRequest) e
 			message := fmt.Sprintf("candidate %s not exists", candidate)
 			return errors.New(message)
 		}
-
-		if !s.DBManager.IsMemberHealthy(ctx, cluster, candidateMember) {
-			message := fmt.Sprintf("candidate %s is unhealthy", candidate)
-			return errors.New(message)
-		}
-	} else if len(s.DBManager.HasOtherHealthyMembers(ctx, cluster, primary)) == 0 {
-		return errors.New("candidate is not set and has no other healthy members")
 	}
-
 	return nil
 }
 

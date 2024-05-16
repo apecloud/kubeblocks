@@ -1,4 +1,5 @@
-name: PR-TIMER
+name: Pull Request Timer
+
 on:
   schedule:
     - cron: '55 1 * * 3' #Runs at 06:06 UTC on Mon

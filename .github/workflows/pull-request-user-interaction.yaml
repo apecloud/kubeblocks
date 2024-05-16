@@ -1,8 +1,11 @@
-name: PULL-REQUEST-USER-INTERACT
+name: Pull Request User Interact
 
 on:
   pull_request_target:
     types: [ edited, opened ]
+    branches:
+      - main
+      - release-*
 
 env:
   GITHUB_TOKEN: ${{ secrets.KUBEBLOCKS_TOKEN }}

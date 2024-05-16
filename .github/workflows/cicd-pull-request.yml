@@ -1,8 +1,11 @@
-name: CICD-PULL-REQUEST
+name: Pull Request
 
 on:
   pull_request:
     types: [ labeled ]
+    branches:
+      - main
+      - release-*
 
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}

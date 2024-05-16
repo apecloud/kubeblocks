@@ -89,8 +89,6 @@ mycluster   redis                redis-7.0.6    Delete               Running   4
             cpu: "0.5"
             memory: 0.5Gi
         serviceAccountName: kb-redis
-        switchPolicy:
-          type: Noop
         volumeClaimTemplates:
         - name: data
           spec:

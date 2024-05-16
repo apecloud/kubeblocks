@@ -17,20 +17,7 @@ In the RedisReplication Cluster provided by KubeBlocks, Sentinel is deployed as 
 
 * [Install KubeBlocks](./../../installation/install-kubeblocks.md).
 * [Create a Redis Replication Cluster](./../cluster-management/create-and-connect-a-redis-cluster.md#create-a-redis-cluster).
-* Check the Switch Policy and the role probe.
-  * Check whether the switch policy is `Noop`.
-
-    ```bash
-    kubectl get cluster mycluster -n demo -o yaml
-    >
-    spec:
-      componentSpecs:
-      - name: redis
-        componentDefRef: redis
-        switchPolicy:
-          type: Noop
-    ```
-
+* Check the role probe.
   * Check whether the following role probe parameters exist to verify the role probe is enabled.
 
     ```bash

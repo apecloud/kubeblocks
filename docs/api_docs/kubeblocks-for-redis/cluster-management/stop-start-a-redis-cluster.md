@@ -57,8 +57,6 @@ spec:
         cpu: "0.5"
         memory: 0.5Gi
     serviceAccountName: kb-redis
-    switchPolicy:
-      type: Noop
     volumeClaimTemplates:
     - name: data
       spec:
@@ -117,8 +115,6 @@ spec:
         cpu: "0.5"
         memory: 0.5Gi
     serviceAccountName: kb-redis
-    switchPolicy:
-      type: Noop
     volumeClaimTemplates:
     - name: data
       spec:

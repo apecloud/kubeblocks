@@ -32,13 +32,13 @@ Below is a brief introduction to the basic operations of Redis Cluster Mode.
 * Make sure the add-on is enabled.
 * View all the database types and versions available for creating a cluster.
 
-  Make sure the `redis` cluster definition is installed with `kubectl get clusterdefinitions redis`.
+  Make sure you can get the redis `componentdefinition`. It is used to describe and define the components in a database cluster, and usually presents basic information such as the name, type, version, status, etc.
 
   ```bash
-  kubectl get componentdefinition redis-cluster
+  kubectl get componentdefinition redis-cluster-7.0
   >
-  NAME            SERVICE         SERVICE-VERSION   STATUS      AGE
-  redis-cluster   redis-cluster   7.0.6             Available   27h
+  NAME                SERVICE         SERVICE-VERSION   STATUS      AGE
+  redis-cluster-7.0   redis-cluster   7.0.6             Available   33m
   ```
 
 * To keep things isolated, create a separate namespace called `demo` throughout this tutorial.
@@ -95,7 +95,7 @@ spec:
     # Specify the number of shards, which cannot be less than 3
     shards: 3
     template:
-      componentDef: redis-cluster
+      componentDef: redis-cluster-7.0
       name: redis
       replicas: 2
       # Specify resources for a single shard
@@ -138,7 +138,7 @@ spec:
     # Specify the number of shards, which cannot be less than 3
     shards: 3
     template:
-      componentDef: redis-cluster
+      componentDef: redis-cluster-7.0
       name: redis
       replicas: 2
       # Specify resources for a single shard

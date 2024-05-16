@@ -317,7 +317,7 @@ dataPlane:
             - "true"
 
 # Add extra pod labels to KubeBlocks Deployment
-extraLables: []
+extraLabels: {}
 
 ## AdmissionWebhooks settings
 ##
@@ -394,7 +394,7 @@ dataProtection:
   topologySpreadConstraints: []
 
   # Add extra pod labels to KubeBlocks-DataProtection Deployment
-  extraLables: []
+  extraLabels: {}
 
 ## BackupRepo settings
 ##

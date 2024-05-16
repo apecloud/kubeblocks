@@ -48,9 +48,8 @@ type insClassType struct {
 var _ = Describe("tpl template", func() {
 
 	var (
-		podSpec     *corev1.PodSpec
-		cfgTemplate []appsv1alpha1.ComponentConfigSpec
-		component   *ctrlcomp.SynthesizedComponent
+		podSpec   *corev1.PodSpec
+		component *ctrlcomp.SynthesizedComponent
 	)
 
 	const (
@@ -63,11 +62,6 @@ cluster_namespace = {{ $.cluster.metadata.namespace }}
 component_name = {{ $.component.name }}
 component_replica = {{ $.component.replicas }}
 containers = {{ (index $.podSpec.containers 0 ).name }}
-{{- $buffer_pool_size_tmp := 2147483648 -}}
-{{- if $.componentResource -}}
-{{- $buffer_pool_size_tmp = $.componentResource.memorySize }}
-{{- end }}
-innodb_buffer_pool_size = {{ $buffer_pool_size_tmp | int64 }}
 {{- $thread_stack := 262144 }}
 {{- $binlog_cache_size := 32768 }}
 {{- $single_thread_memory := add $thread_stack $binlog_cache_size }}
@@ -80,7 +74,6 @@ cluster_namespace = default
 component_name = replicasets
 component_replica = 5
 containers = mytest
-innodb_buffer_pool_size = 8589934592
 single_thread_memory = 294912
 `
 	)
@@ -175,14 +168,6 @@ single_thread_memory = 294912
 				},
 			},
 		}
-		cfgTemplate = []appsv1alpha1.ComponentConfigSpec{{
-			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-				Name:        "mysql-config-8.0.2",
-				TemplateRef: "mysql-config-8.0.2-tpl",
-				VolumeName:  "config1",
-			},
-			ConfigConstraintRef: "mysql-config-8.0.2-constraint",
-		}}
 	})
 
 	// for test GetContainerWithVolumeMount
@@ -193,17 +178,12 @@ single_thread_memory = 294912
 				"default",
 				nil, nil)
 
-			cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, cfgTemplate, component, nil, &appsv1alpha1.Cluster{
+			cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, component, nil, &appsv1alpha1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "my_test",
 					Namespace: "default",
 				},
 			})
-
-			cfgBuilder.builtInObjects.componentValues.Resource = &ResourceDefinition{
-				MemorySize: 8 * 1024 * 1024 * 1024,
-				CoreNum:    4,
-			}
 
 			cfgBuilder.setTemplateName("for_test")
 			rendered, err := cfgBuilder.render(map[string]string{
@@ -222,7 +202,7 @@ single_thread_memory = 294912
 
 			viper.Set(constant.KubernetesClusterDomainEnv, "test-domain")
 
-			cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, cfgTemplate, component, nil,
+			cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, component, nil,
 				&appsv1alpha1.Cluster{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "my_test",
@@ -289,7 +269,7 @@ single_thread_memory = 294912
 				nil, nil,
 			)
 
-			cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, cfgTemplate, component, nil,
+			cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, component, nil,
 				&appsv1alpha1.Cluster{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "my_test",

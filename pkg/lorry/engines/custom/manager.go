@@ -41,7 +41,7 @@ import (
 type Manager struct {
 	engines.DBManagerBase
 
-	// For ASM Actions
+	// For InstanceSet Actions
 	actionSvcPorts *[]int
 	client         *http.Client
 

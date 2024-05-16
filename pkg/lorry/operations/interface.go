@@ -31,10 +31,9 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/grpc"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
-	"github.com/apecloud/kubeblocks/pkg/lorry/plugin"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
@@ -51,9 +50,8 @@ type Base struct {
 	Action  string
 	Timeout time.Duration
 
-	Command        []string
-	DBPluginClient *plugin.DBClient
-	DBManager      engines.DBManager
+	Command   []string
+	DBManager engines.DBManager
 
 	Logger logr.Logger
 }
@@ -74,23 +72,28 @@ func init() {
 }
 
 func (b *Base) Init(ctx context.Context) error {
-	handlers := actionHandlers[b.Action]
-	if len(handlers.Command) != 0 {
+	var handlers util.Handlers
+	if b.Action != "" {
+		handlers = actionHandlers[b.Action]
+	}
+
+	switch {
+	case len(handlers.Command) != 0:
 		b.Command = handlers.Command
-	} else if len(handlers.GPRC) != 0 {
-		host := "127.0.0.1"
-		if h, ok := handlers.GPRC["host"]; ok {
-			host = h
-		}
-		port, ok := handlers.GPRC["port"]
-		if !ok || port == "" {
-			return errors.New("grpc port is not set")
-		}
-		client, err := plugin.NewPluginClient(host + ":" + port)
+		b.DBManager = register.GetCustomManager()
+	case len(handlers.GPRC) != 0:
+		dbManager, err := grpc.NewManager(engines.Properties(handlers.GPRC))
 		if err != nil {
-			return errors.Wrap(err, "new grpc client failed")
+			return errors.Wrap(err, "new grpc manager failed")
 		}
-		b.DBPluginClient = client
+
+		b.DBManager = dbManager
+	default:
+		dbManager, err := register.GetDBManager()
+		if err != nil {
+			return errors.Wrap(err, "get builtin manager failed")
+		}
+		b.DBManager = dbManager
 	}
 	return nil
 }
@@ -117,19 +120,4 @@ func (b *Base) ExecCommand(ctx context.Context) error {
 		b.Logger.Info(b.Action, "output", output)
 	}
 	return err
-}
-
-func (b *Base) GetDBManager() (engines.DBManager, error) {
-	if !controllerutil.IsNil(b.DBManager) {
-		return b.DBManager, nil
-	}
-	dbManager, err := register.GetDBManager(b.Command)
-	if err != nil {
-		return nil, errors.Wrap(err, "get manager failed")
-	}
-	if controllerutil.IsNil(dbManager) {
-		return nil, errors.New("not implemented")
-	}
-	b.DBManager = dbManager
-	return dbManager, nil
 }

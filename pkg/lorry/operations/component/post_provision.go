@@ -24,12 +24,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
@@ -68,15 +66,10 @@ func (s *PostProvision) Do(ctx context.Context, req *operations.OpsRequest) (*op
 	podIPs := req.GetString("podIPs")
 	podHostNames := req.GetString("podHostNames")
 	podHostIPs := req.GetString("podHostIPs")
-	manager, err := register.GetDBManager(s.Command)
-	if err != nil {
-		return nil, errors.Wrap(err, "get manager failed")
-	}
-
-	ppManager, ok := manager.(PostProvisionManager)
+	ppManager, ok := s.DBManager.(PostProvisionManager)
 	if !ok {
 		return nil, models.ErrNoImplemented
 	}
-	err = ppManager.PostProvision(ctx, componentNames, podNames, podIPs, podHostNames, podHostIPs)
+	err := ppManager.PostProvision(ctx, componentNames, podNames, podIPs, podHostNames, podHostIPs)
 	return nil, err
 }

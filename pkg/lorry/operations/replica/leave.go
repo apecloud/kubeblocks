@@ -60,25 +60,20 @@ func (s *Leave) Init(ctx context.Context) error {
 }
 
 func (s *Leave) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
-	manager, err := s.GetDBManager()
-	if err != nil {
-		return nil, errors.Wrap(err, "get manager failed")
-	}
-
 	cluster, err := s.dcsStore.GetCluster()
 	if err != nil {
 		s.Logger.Error(err, "get cluster failed")
 		return nil, err
 	}
 
-	currentMember := cluster.GetMemberWithName(manager.GetCurrentMemberName())
+	currentMember := cluster.GetMemberWithName(s.DBManager.GetCurrentMemberName())
 	if !cluster.HaConfig.IsDeleting(currentMember) {
 		cluster.HaConfig.AddMemberToDelete(currentMember)
 		_ = s.dcsStore.UpdateHaConfig()
 	}
 
 	// remove current member from db cluster
-	err = manager.LeaveMemberFromCluster(ctx, cluster, manager.GetCurrentMemberName())
+	err = s.DBManager.LeaveMemberFromCluster(ctx, cluster, s.DBManager.GetCurrentMemberName())
 	if err != nil {
 		s.Logger.Error(err, "Leave member from cluster failed")
 		return nil, err

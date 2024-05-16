@@ -22,9 +22,9 @@ package user
 import (
 	"context"
 
-	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
@@ -44,7 +44,8 @@ func init() {
 
 func (s *ListSystemAccounts) Init(ctx context.Context) error {
 	s.Logger = ctrl.Log.WithName("listSystemAccounts")
-	return nil
+	s.Action = constant.ListSystemAccountsAction
+	return s.Base.Init(ctx)
 }
 
 func (s *ListSystemAccounts) IsReadonly(ctx context.Context) bool {
@@ -54,12 +55,7 @@ func (s *ListSystemAccounts) IsReadonly(ctx context.Context) bool {
 func (s *ListSystemAccounts) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
 	resp := operations.NewOpsResponse(util.ListSystemAccountsOp)
 
-	dbManager, err := s.GetDBManager()
-	if err != nil {
-		return resp, errors.Wrap(err, "get manager failed")
-	}
-
-	result, err := dbManager.ListSystemAccounts(ctx)
+	result, err := s.DBManager.ListSystemAccounts(ctx)
 	if err != nil {
 		s.Logger.Info("executing ListSystemAccounts error", "error", err)
 		return resp, err

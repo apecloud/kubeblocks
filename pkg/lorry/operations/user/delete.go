@@ -22,9 +22,9 @@ package user
 import (
 	"context"
 
-	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
@@ -44,7 +44,8 @@ func init() {
 
 func (s *DeleteUser) Init(ctx context.Context) error {
 	s.Logger = ctrl.Log.WithName("DeleteUser")
-	return nil
+	s.Action = constant.DeleteUserAction
+	return s.Base.Init(ctx)
 }
 
 func (s *DeleteUser) IsReadonly(ctx context.Context) bool {
@@ -64,11 +65,7 @@ func (s *DeleteUser) Do(ctx context.Context, req *operations.OpsRequest) (*opera
 	userInfo, _ := UserInfoParser(req)
 	resp := operations.NewOpsResponse(util.DeleteUserOp)
 
-	dbManager, err := s.GetDBManager()
-	if err != nil {
-		return resp, errors.Wrap(err, "get manager failed")
-	}
-	err = dbManager.DeleteUser(ctx, userInfo.UserName)
+	err := s.DBManager.DeleteUser(ctx, userInfo.UserName)
 	if err != nil {
 		s.Logger.Info("executing DeleteUser error", "error", err)
 		return resp, err

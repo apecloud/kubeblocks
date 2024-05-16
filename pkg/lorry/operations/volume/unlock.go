@@ -53,12 +53,7 @@ func (s *Unlock) Init(ctx context.Context) error {
 }
 
 func (s *Unlock) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
-	dbManager, err := s.GetDBManager()
-	if err != nil {
-		return nil, errors.Wrap(err, "get manager failed")
-	}
-
-	err = dbManager.Unlock(ctx)
+	err := s.DBManager.Unlock(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "Unlock DB failed")
 	}

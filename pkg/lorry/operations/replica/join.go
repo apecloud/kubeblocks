@@ -60,11 +60,6 @@ func (s *Join) Init(ctx context.Context) error {
 }
 
 func (s *Join) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
-	manager, err := s.GetDBManager()
-	if err != nil {
-		return nil, errors.Wrap(err, "get manager failed")
-	}
-
 	cluster, err := s.dcsStore.GetCluster()
 	if err != nil {
 		s.Logger.Error(err, "get cluster failed")
@@ -72,7 +67,7 @@ func (s *Join) Do(ctx context.Context, req *operations.OpsRequest) (*operations.
 	}
 
 	// join current member to db cluster
-	err = manager.JoinCurrentMemberToCluster(ctx, cluster)
+	err = s.DBManager.JoinCurrentMemberToCluster(ctx, cluster)
 	if err != nil {
 		s.Logger.Error(err, "join member to cluster failed")
 		return nil, err

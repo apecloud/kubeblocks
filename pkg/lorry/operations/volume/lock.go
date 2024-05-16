@@ -53,12 +53,7 @@ func (s *Lock) Init(ctx context.Context) error {
 }
 
 func (s *Lock) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
-	dbManager, err := s.GetDBManager()
-	if err != nil {
-		return nil, errors.Wrap(err, "get manager failed")
-	}
-
-	err = dbManager.Lock(ctx, "disk full")
+	err := s.DBManager.Lock(ctx, "disk full")
 	if err != nil {
 		return nil, errors.Wrap(err, "Lock DB failed")
 	}

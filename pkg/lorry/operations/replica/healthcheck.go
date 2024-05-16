@@ -29,7 +29,6 @@ import (
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
@@ -39,7 +38,6 @@ type CheckStatus struct {
 	LeaderFailedCount          int
 	FailureThreshold           int
 	dcsStore                   dcs.DCS
-	dbManager                  engines.DBManager
 	checkFailedCount           int
 	failedEventReportFrequency int
 }
@@ -89,17 +87,12 @@ func (s *CheckStatus) Do(ctx context.Context, req *operations.OpsRequest) (*oper
 	k8sStore := s.dcsStore.(*dcs.KubernetesStore)
 	cluster := k8sStore.GetClusterFromCache()
 
-	dbManager, err := s.GetDBManager()
-	if err != nil {
-		return resp, errors.Wrap(err, "get manager failed")
-	}
-
-	err = dbManager.CurrentMemberHealthyCheck(ctx, cluster)
+	err := s.DBManager.CurrentMemberHealthyCheck(ctx, cluster)
 	if err != nil {
 		return s.handlerError(ctx, err)
 	}
 
-	isLeader, err := s.dbManager.IsLeader(ctx, cluster)
+	isLeader, err := s.DBManager.IsLeader(ctx, cluster)
 	if err != nil {
 		return s.handlerError(ctx, err)
 	}
@@ -110,7 +103,7 @@ func (s *CheckStatus) Do(ctx context.Context, req *operations.OpsRequest) (*oper
 		resp.Data["event"] = util.OperationSuccess
 		return resp, nil
 	}
-	err = s.dbManager.LeaderHealthyCheck(ctx, cluster)
+	err = s.DBManager.LeaderHealthyCheck(ctx, cluster)
 	if err != nil {
 		s.LeaderFailedCount++
 		if s.LeaderFailedCount > s.FailureThreshold {
@@ -128,11 +121,11 @@ func (s *CheckStatus) Do(ctx context.Context, req *operations.OpsRequest) (*oper
 }
 
 func (s *CheckStatus) failover(ctx context.Context, cluster *dcs.Cluster) error {
-	failoverManger, ok := s.dbManager.(FailoverManager)
+	failoverManger, ok := s.DBManager.(FailoverManager)
 	if !ok {
 		return errors.New("failover manager not found")
 	}
-	err := failoverManger.Failover(ctx, cluster, s.dbManager.GetCurrentMemberName())
+	err := failoverManger.Failover(ctx, cluster, s.DBManager.GetCurrentMemberName())
 	if err != nil {
 		return errors.Wrap(err, "failover failed")
 	}

@@ -41,6 +41,18 @@ const (
 	PreTerminateAction  = "preTerminate"
 	DataDumpAction      = "dataDump"
 	DataLoadAction      = "dataLoad"
+	SwitchoverAction    = "switchover"
+	GetLagAction        = "getLag"
+	ExecSQLAction       = "execSQL"
+	QuerySQLAction      = "querySQL"
+
+	CreateUserAction         = "createUser"
+	DeleteUserAction         = "deleteUser"
+	DescribeUserAction       = "describeUser"
+	GrantRoleAction          = "grantRole"
+	RevokeRoleAction         = "revokeRole"
+	ListUsersAction          = "listUsers"
+	ListSystemAccountsAction = "listSystemAccounts"
 )
 
 // action envs

@@ -23,9 +23,9 @@ import (
 	"context"
 	"strings"
 
-	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
@@ -45,11 +45,8 @@ func init() {
 
 func (s *RevokeRole) Init(ctx context.Context) error {
 	s.Logger = ctrl.Log.WithName("revokeRole")
-	return nil
-}
-
-func (s *RevokeRole) IsReadonly(ctx context.Context) bool {
-	return false
+	s.Action = constant.RevokeRoleAction
+	return s.Base.Init(ctx)
 }
 
 func (s *RevokeRole) PreCheck(ctx context.Context, req *operations.OpsRequest) error {
@@ -65,12 +62,7 @@ func (s *RevokeRole) Do(ctx context.Context, req *operations.OpsRequest) (*opera
 	userInfo, _ := UserInfoParser(req)
 	resp := operations.NewOpsResponse(util.RevokeUserRoleOp)
 
-	dbManager, err := s.GetDBManager()
-	if err != nil {
-		return resp, errors.Wrap(err, "get manager failed")
-	}
-
-	err = dbManager.RevokeUserRole(ctx, userInfo.UserName, userInfo.RoleName)
+	err := s.DBManager.RevokeUserRole(ctx, userInfo.UserName, userInfo.RoleName)
 	if err != nil {
 		s.Logger.Info("executing RevokeRole error", "error", err)
 		return resp, err

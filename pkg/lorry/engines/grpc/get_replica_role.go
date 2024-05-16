@@ -17,37 +17,24 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package highavailability
+package grpc
 
 import (
-	"strings"
+	"context"
 
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
+	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
+	"github.com/apecloud/kubeblocks/pkg/lorry/plugin"
 )
 
-const (
-	WorkloadTypeKey = "workloadType"
-	Replication     = "Replication"
-	Consensus       = "Consensus"
-)
-
-func IsHAAvailable(characterType, workloadType string) bool {
-	switch models.EngineType(strings.ToLower(characterType)) {
-	case models.MongoDB:
-		return false
-	case models.MySQL:
-		return false
-	case models.WeSQL:
-		return true
-	case models.PostgreSQL:
-		if strings.EqualFold(workloadType, Consensus) {
-			return false
-		}
-	case models.ApecloudPostgreSQL:
-		// apecloud-pg use syncer to support ha
-		return false
-	case models.OfficialPostgreSQL:
-		return true
+func (mgr *Manager) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (string, error) {
+	getRoleRequest := &plugin.GetRoleRequest{
+		DbInfo: plugin.GetDBInfo(),
 	}
-	return false
+
+	resp, err := mgr.dbClient.GetRole(ctx, getRoleRequest)
+	if err != nil {
+		return "", err
+	}
+
+	return resp.Role, nil
 }

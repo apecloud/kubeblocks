@@ -68,13 +68,8 @@ func (s *Rebuild) Do(ctx context.Context, req *operations.OpsRequest) (*operatio
 		Data: map[string]any{},
 	}
 	resp.Data["operation"] = constant.RebuildAction
-	dbManager, err := s.GetDBManager()
-	if err != nil {
-		return resp, errors.Wrap(err, "get manager failed")
-	}
-
 	cluster := s.dcsStore.GetClusterFromCache()
-	currentMember := cluster.GetMemberWithName(dbManager.GetCurrentMemberName())
+	currentMember := cluster.GetMemberWithName(s.DBManager.GetCurrentMemberName())
 	if currentMember == nil || currentMember.HAPort == "" {
 		return nil, errors.Errorf("current node does not support rebuild, there is no ha service yet")
 	}

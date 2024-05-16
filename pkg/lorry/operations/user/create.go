@@ -23,9 +23,9 @@ import (
 	"context"
 	"strings"
 
-	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
@@ -45,11 +45,8 @@ func init() {
 
 func (s *CreateUser) Init(ctx context.Context) error {
 	s.Logger = ctrl.Log.WithName("CreateUser")
-	return nil
-}
-
-func (s *CreateUser) IsReadonly(ctx context.Context) bool {
-	return false
+	s.Action = constant.CreateUserAction
+	return s.Base.Init(ctx)
 }
 
 func (s *CreateUser) PreCheck(ctx context.Context, req *operations.OpsRequest) error {
@@ -65,18 +62,14 @@ func (s *CreateUser) Do(ctx context.Context, req *operations.OpsRequest) (*opera
 	userInfo, _ := UserInfoParser(req)
 	resp := operations.NewOpsResponse(util.CreateUserOp)
 
-	dbManager, err := s.GetDBManager()
-	if err != nil {
-		return resp, errors.Wrap(err, "get manager failed")
-	}
-	err = dbManager.CreateUser(ctx, userInfo.UserName, userInfo.Password)
+	err := s.DBManager.CreateUser(ctx, userInfo.UserName, userInfo.Password)
 	if err != nil {
 		s.Logger.Info("executing CreateUser error", "error", err)
 		return resp, err
 	}
 
 	if userInfo.RoleName != "" {
-		err := dbManager.GrantUserRole(ctx, userInfo.UserName, userInfo.RoleName)
+		err := s.DBManager.GrantUserRole(ctx, userInfo.UserName, userInfo.RoleName)
 		if err != nil {
 			s.Logger.Info("executing grantRole error", "error", err)
 			return resp, err

@@ -25,6 +25,7 @@ import (
 	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
@@ -42,8 +43,10 @@ func init() {
 	}
 }
 
-func (s *Exec) Init(context.Context) error {
+func (s *Exec) Init(ctx context.Context) error {
 	s.Logger = ctrl.Log.WithName("exec")
+	s.Action = constant.ExecSQLAction
+	s.Base.Init(ctx)
 	return nil
 }
 
@@ -57,16 +60,12 @@ func (s *Exec) Do(ctx context.Context, req *operations.OpsRequest) (*operations.
 		return nil, errors.New("no sql provided")
 	}
 
-	dbManager, err := s.GetDBManager()
-	if err != nil {
-		return nil, errors.Wrap(err, "get manager failed")
-	}
 	resp := &operations.OpsResponse{
 		Data: map[string]any{},
 	}
 	resp.Data["operation"] = util.ExecOperation
 
-	count, err := dbManager.Exec(ctx, sql)
+	count, err := s.DBManager.Exec(ctx, sql)
 	if err != nil {
 		s.Logger.Info("executing exec error", "error", err)
 		return resp, err

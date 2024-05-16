@@ -31,7 +31,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
@@ -77,16 +76,11 @@ func (s *CheckRunning) Init(ctx context.Context) error {
 }
 
 func (s *CheckRunning) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
-	manager, err := register.GetDBManager(nil)
-	if err != nil {
-		return nil, errors.Wrap(err, "get manager failed")
-	}
-
 	var message string
 	opsRsp := &operations.OpsResponse{}
 	opsRsp.Data["operation"] = util.CheckRunningOperation
 
-	dbPort, err := manager.GetPort()
+	dbPort, err := s.DBManager.GetPort()
 	if err != nil {
 		return nil, errors.Wrap(err, "get db port failed")
 	}

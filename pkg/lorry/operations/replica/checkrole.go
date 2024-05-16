@@ -31,7 +31,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
@@ -49,6 +48,7 @@ type CheckRole struct {
 	FailedEventReportFrequency int
 	Timeout                    time.Duration
 	DBRoles                    map[string]AccessMode
+	IsDBStartupReady           bool
 }
 
 var checkrole operations.Operation = &CheckRole{}
@@ -107,29 +107,14 @@ func (s *CheckRole) Do(ctx context.Context, _ *operations.OpsRequest) (*operatio
 
 	ctx1, cancel := context.WithTimeout(ctx, s.Timeout)
 	defer cancel()
-	switch {
-	case !intctrlutil.IsNil(s.DBPluginClient):
-		if !s.DBPluginClient.IsDBStartupReady(ctx1) {
-			resp.Data["message"] = "db not ready"
-			return resp, nil
-		}
-
-		role, err = s.DBPluginClient.GetReplicaRole(ctx1)
-	default:
-		manager, err1 := s.GetDBManager()
-		if err1 != nil {
-			return nil, errors.Wrap(err1, "get manager failed")
-		}
-
-		if !manager.IsDBStartupReady() {
-			resp.Data["message"] = "db not ready"
-			return resp, nil
-		}
-
-		cluster := s.dcsStore.GetClusterFromCache()
-
-		role, err = manager.GetReplicaRole(ctx1, cluster)
+	if !s.DBManager.IsDBStartupReady() {
+		resp.Data["message"] = "db not ready"
+		return resp, nil
 	}
+
+	cluster := s.dcsStore.GetClusterFromCache()
+
+	role, err = s.DBManager.GetReplicaRole(ctx1, cluster)
 
 	if err != nil {
 		s.Logger.Info("executing checkRole error", "error", err.Error())

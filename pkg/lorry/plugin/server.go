@@ -74,7 +74,6 @@ func (s *nonBlockingGRPCServer) ForceStop() {
 }
 
 func (s *nonBlockingGRPCServer) serve(endpoint string, dbPlugin DBPluginServer) {
-
 	proto, addr, err := ParseEndpoint(endpoint)
 	if err != nil {
 		panic(err.Error())

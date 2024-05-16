@@ -25,6 +25,7 @@ import (
 	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
@@ -42,9 +43,10 @@ func init() {
 	}
 }
 
-func (s *Query) Init(context.Context) error {
+func (s *Query) Init(ctx context.Context) error {
 	s.Logger = ctrl.Log.WithName("query")
-	return nil
+	s.Action = constant.QuerySQLAction
+	return s.Base.Init(ctx)
 }
 
 func (s *Query) IsReadonly(context.Context) bool {
@@ -57,13 +59,9 @@ func (s *Query) Do(ctx context.Context, req *operations.OpsRequest) (*operations
 		return nil, errors.New("no sql provided")
 	}
 
-	dbManager, err := s.GetDBManager()
-	if err != nil {
-		return nil, errors.Wrap(err, "get manager failed")
-	}
 	resp := operations.NewOpsResponse(util.QueryOperation)
 
-	result, err := dbManager.Query(ctx, sql)
+	result, err := s.DBManager.Query(ctx, sql)
 	if err != nil {
 		s.Logger.Info("executing query error", "error", err)
 		return resp, err

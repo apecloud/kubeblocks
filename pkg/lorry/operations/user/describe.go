@@ -25,9 +25,9 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
@@ -49,7 +49,8 @@ func init() {
 
 func (s *DescribeUser) Init(ctx context.Context) error {
 	s.Logger = ctrl.Log.WithName("describeUser")
-	return nil
+	s.Action = constant.DescribeUserAction
+	return s.Base.Init(ctx)
 }
 
 func (s *DescribeUser) IsReadonly(ctx context.Context) bool {
@@ -69,11 +70,7 @@ func (s *DescribeUser) Do(ctx context.Context, req *operations.OpsRequest) (*ope
 	userInfo, _ := UserInfoParser(req)
 	resp := operations.NewOpsResponse(util.DescribeUserOp)
 
-	dbManager, err := s.GetDBManager()
-	if err != nil {
-		return resp, errors.Wrap(err, "get manager failed")
-	}
-	result, err := dbManager.DescribeUser(ctx, userInfo.UserName)
+	result, err := s.DBManager.DescribeUser(ctx, userInfo.UserName)
 	if err != nil {
 		s.Logger.Info("executing describeUser error", "error", err)
 		return resp, err

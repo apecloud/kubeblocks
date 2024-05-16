@@ -26,7 +26,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
@@ -66,20 +65,8 @@ func (s *GetRole) Do(ctx context.Context, req *operations.OpsRequest) (*operatio
 		Data: map[string]any{},
 	}
 	resp.Data["operation"] = util.GetRoleOperation
-	var role string
-	var err error
-	switch {
-	case intctrlutil.IsNil(s.DBPluginClient):
-		role, err = s.DBPluginClient.GetReplicaRole(ctx)
-	default:
-		dbManager, err1 := s.GetDBManager()
-		if err1 != nil {
-			return nil, errors.Wrap(err1, "get manager failed")
-		}
-
-		cluster := s.dcsStore.GetClusterFromCache()
-		role, err = dbManager.GetReplicaRole(ctx, cluster)
-	}
+	cluster := s.dcsStore.GetClusterFromCache()
+	role, err := s.DBManager.GetReplicaRole(ctx, cluster)
 
 	if err != nil {
 		s.Logger.Info("executing getrole error", "error", err.Error())

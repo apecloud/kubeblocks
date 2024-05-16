@@ -656,10 +656,14 @@ func (r *clusterBackupPolicyTransformer) mergeClusterBackup(
 
 // getClusterComponentSpec returns the component which matches the componentDef or componentDefRef.
 func (r *clusterBackupPolicyTransformer) getClusterComponentItems() []componentItem {
+	matchedCompDef := func(compSpec appsv1alpha1.ClusterComponentSpec) bool {
+		// TODO: support to create bp when using cluster topology and componentDef is empty
+		return (compSpec.ComponentDefRef != "" && compSpec.ComponentDefRef == r.backupPolicy.ComponentDefRef) ||
+			(compSpec.ComponentDef != "" && slices.Contains(r.backupPolicy.ComponentDefs, compSpec.ComponentDef))
+	}
 	var compSpecItems []componentItem
 	for i, v := range r.clusterTransformContext.Cluster.Spec.ComponentSpecs {
-		if v.ComponentDefRef == r.backupPolicy.ComponentDefRef ||
-			(len(v.ComponentDef) > 0 && slices.Contains(r.backupPolicy.ComponentDefs, v.ComponentDef)) {
+		if matchedCompDef(v) {
 			compSpecItems = append(compSpecItems, componentItem{
 				compSpec:          &r.clusterTransformContext.Cluster.Spec.ComponentSpecs[i],
 				componentName:     v.Name,
@@ -668,8 +672,7 @@ func (r *clusterBackupPolicyTransformer) getClusterComponentItems() []componentI
 		}
 	}
 	for i, v := range r.clusterTransformContext.Cluster.Spec.ShardingSpecs {
-		if v.Template.ComponentDefRef == r.backupPolicy.ComponentDefRef ||
-			(len(v.Template.ComponentDef) > 0 && slices.Contains(r.backupPolicy.ComponentDefs, v.Template.ComponentDef)) {
+		if matchedCompDef(v.Template) {
 			compSpecItems = append(compSpecItems, componentItem{
 				compSpec:      &r.clusterTransformContext.Cluster.Spec.ShardingSpecs[i].Template,
 				componentName: v.Name,

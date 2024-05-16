@@ -1,4 +1,4 @@
-name: Closed Milestones
+name: Milestones Closed
 
 on:
   milestone:

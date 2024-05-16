@@ -1,4 +1,4 @@
-name: Set Milestone
+name: Milestone Set
 
 on:
   workflow_dispatch:

@@ -1,4 +1,4 @@
-name: E2E Performance Test
+name: Test E2E Performance
 
 on:
   workflow_dispatch:

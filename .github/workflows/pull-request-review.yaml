@@ -3,6 +3,9 @@ name: PR Label Approved Add
 on:
   pull_request_review:
     types: [submitted]
+    branches:
+      - main
+      - release-*
 
 env:
   GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}

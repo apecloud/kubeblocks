@@ -3,6 +3,9 @@ name: PR Label Approved Remove
 on:
   pull_request_target:
     types: [ opened, synchronize, reopened ]
+    branches:
+      - main
+      - release-*
 
 env:
   GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}

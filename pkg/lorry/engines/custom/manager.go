@@ -206,7 +206,7 @@ func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Clu
 // - KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
 // - KB_SERVICE_PASSWORD: The password of the user used to access the DB service .
 func (mgr *Manager) CurrentMemberHealthCheck(ctx context.Context, cluster *dcs.Cluster) error {
-	healthyCheckCmd, ok := mgr.actionCommands[constant.HealthyCheckAction]
+	healthyCheckCmd, ok := mgr.actionCommands[constant.CheckHealthyAction]
 	if !ok || len(healthyCheckCmd) == 0 {
 		return errors.New("member healthyCheck command is empty!")
 	}

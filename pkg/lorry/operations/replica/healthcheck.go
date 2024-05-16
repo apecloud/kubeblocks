@@ -70,7 +70,7 @@ func (s *CheckStatus) Init(ctx context.Context) error {
 
 	s.FailureThreshold = 3
 	s.Logger = ctrl.Log.WithName("CheckStatus")
-	s.Action = constant.HealthyCheckAction
+	s.Action = constant.CheckHealthyAction
 	return s.Base.Init(ctx)
 }
 

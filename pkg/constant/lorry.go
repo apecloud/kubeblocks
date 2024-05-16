@@ -32,7 +32,8 @@ const (
 const (
 	RoleProbeAction     = "roleProbe"
 	RebuildAction       = "rebuild"
-	HealthyCheckAction  = "healthyCheck"
+	CheckHealthyAction  = "checkHealthy"
+	CheckRunningAction  = "checkRunning"
 	MemberJoinAction    = "memberJoin"
 	MemberLeaveAction   = "memberLeave"
 	ReadonlyAction      = "readonly"

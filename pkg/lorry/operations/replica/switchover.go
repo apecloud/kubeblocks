@@ -56,9 +56,7 @@ func (s *Switchover) Init(ctx context.Context) error {
 		return errors.New("dcs store init failed")
 	}
 	s.Action = constant.SwitchoverAction
-	s.Base.Init(ctx)
-
-	return nil
+	return s.Base.Init(ctx)
 }
 
 func (s *Switchover) PreCheck(ctx context.Context, req *operations.OpsRequest) error {

@@ -53,8 +53,7 @@ func (s *GetLag) Init(ctx context.Context) error {
 
 	s.Logger = ctrl.Log.WithName("GetLag")
 	s.Action = constant.GetLagAction
-	s.Base.Init(ctx)
-	return nil
+	return s.Base.Init(ctx)
 }
 
 func (s *GetLag) IsReadonly(context.Context) bool {

@@ -71,8 +71,8 @@ func (s *CheckRunning) Init(ctx context.Context) error {
 	s.Timeout = time.Duration(timeoutSeconds) * (800 * time.Millisecond)
 	s.DBAddress = s.getAddress()
 	s.Logger = ctrl.Log.WithName("CheckRunning")
-
-	return nil
+	s.Action = constant.CheckRunningAction
+	return s.Base.Init(ctx)
 }
 
 func (s *CheckRunning) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {

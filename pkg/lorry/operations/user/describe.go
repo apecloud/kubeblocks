@@ -24,7 +24,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/go-logr/logr"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -35,7 +34,6 @@ import (
 
 type DescribeUser struct {
 	operations.Base
-	Logger logr.Logger
 }
 
 var describeUser operations.Operation = &DescribeUser{}

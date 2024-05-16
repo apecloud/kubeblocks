@@ -46,8 +46,7 @@ func init() {
 func (s *Exec) Init(ctx context.Context) error {
 	s.Logger = ctrl.Log.WithName("exec")
 	s.Action = constant.ExecSQLAction
-	s.Base.Init(ctx)
-	return nil
+	return s.Base.Init(ctx)
 }
 
 func (s *Exec) IsReadonly(context.Context) bool {

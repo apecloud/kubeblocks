@@ -34,23 +34,7 @@ All pods restart in the order of learner -> follower -> leader and the leader ma
    - `components` describes the component name that needs to be restarted.
    - `ttlSecondsAfterSucceed` describes the time to live of an OpsRequest job after the restarting succeeds.
 
-   **Option 2.** Create an OpsRequest
-
-   Run the command below to restart a cluster.
-
-   ```bash
-   kubectl apply -f - <<EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: OpsRequest
-   metadata:
-     name: ops-restart
-   spec:
-     clusterRef: mysql-cluster
-     type: Restart 
-     restart:
-     - componentName: mysql
-   EOF
-   ```
+  
 
 2. Check the cluster status to validate the restarting.
 

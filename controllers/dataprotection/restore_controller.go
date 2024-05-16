@@ -207,7 +207,6 @@ func (r *RestoreReconciler) newAction(reqCtx intctrlutil.RequestCtx, restore *dp
 	switch {
 	case intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal):
 		dprestore.SetRestoreCheckBackupRepoCondition(restore, dprestore.ReasonCheckBackupRepoFailed, err.Error())
-		r.Recorder.Event(restore, corev1.EventTypeWarning, dprestore.ReasonCheckBackupRepoFailed, err.Error())
 		restore.Status.Phase = dpv1alpha1.RestorePhaseFailed
 		restore.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
 		r.Recorder.Event(restore, corev1.EventTypeWarning, dprestore.ReasonRestoreFailed, err.Error())

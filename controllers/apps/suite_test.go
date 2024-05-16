@@ -72,7 +72,6 @@ var ctx context.Context
 var cancel context.CancelFunc
 var testCtx testutil.TestContext
 var clusterRecorder record.EventRecorder
-var systemAccountReconciler *SystemAccountReconciler
 var logger logr.Logger
 
 func init() {
@@ -241,15 +240,6 @@ var _ = BeforeSuite(func() {
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("event-controller"),
 	}).SetupWithManager(k8sManager, nil)
-	Expect(err).ToNot(HaveOccurred())
-
-	// add SystemAccountReconciler
-	systemAccountReconciler = &SystemAccountReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("system-account-controller"),
-	}
-	err = systemAccountReconciler.SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&configuration.ConfigConstraintReconciler{

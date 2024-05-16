@@ -183,6 +183,30 @@ message AccountProvisionResponse {
   map<string, string> metadata = 1;
 }
 
+message SwitchoverRequest {
+  DBInfo db_info = 1;
+
+  // The pod FQDN of the primary replica.
+  string primary_fqdn = 2;
+
+  // The port on which the primary DB service listens.
+  string primary_port = 3;
+
+  // The Name of the old primary replica to demote.
+  string primary = 4;
+
+  // The Name of the new primary replica.
+  string candidate = 5;
+
+  // Common metadata property for extention
+  map<string, string> metadata = 6;
+}
+
+message SwitchoverResponse {
+  // Common metadata property for extention
+  map<string, string> metadata = 1;
+}
+
 // DBPlugin service provides APIs to kubeblocks operator to exec component operation.
 service DBPlugin {
   rpc GetPluginInfo(GetPluginInfoRequest) returns (GetPluginInfoResponse) {}
@@ -214,4 +238,7 @@ service DBPlugin {
 
   // AccountProvision Defines the procedure to generate a new database account.
   rpc AccountProvision(AccountProvisionRequest) returns (AccountProvisionResponse) {}
+
+  // Switchover defines the procedure to switch roles of the primary and candidate.
+  rpc Switchover(SwitchoverRequest) returns (SwitchoverResponse) {}
 }

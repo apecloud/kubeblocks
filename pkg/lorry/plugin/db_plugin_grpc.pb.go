@@ -44,6 +44,8 @@ type DBPluginClient interface {
 	Readwrite(ctx context.Context, in *ReadwriteRequest, opts ...grpc.CallOption) (*ReadwriteResponse, error)
 	// AccountProvision Defines the procedure to generate a new database account.
 	AccountProvision(ctx context.Context, in *AccountProvisionRequest, opts ...grpc.CallOption) (*AccountProvisionResponse, error)
+	// Switchover defines the procedure to switch roles of the primary and candidate.
+	Switchover(ctx context.Context, in *SwitchoverRequest, opts ...grpc.CallOption) (*SwitchoverResponse, error)
 }
 
 type dBPluginClient struct {
@@ -126,6 +128,15 @@ func (c *dBPluginClient) AccountProvision(ctx context.Context, in *AccountProvis
 	return out, nil
 }
 
+func (c *dBPluginClient) Switchover(ctx context.Context, in *SwitchoverRequest, opts ...grpc.CallOption) (*SwitchoverResponse, error) {
+	out := new(SwitchoverResponse)
+	err := c.cc.Invoke(ctx, "/plugin.v1.DBPlugin/Switchover", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DBPluginServer is the server API for DBPlugin service.
 // All implementations must embed UnimplementedDBPluginServer
 // for forward compatibility
@@ -152,6 +163,8 @@ type DBPluginServer interface {
 	Readwrite(context.Context, *ReadwriteRequest) (*ReadwriteResponse, error)
 	// AccountProvision Defines the procedure to generate a new database account.
 	AccountProvision(context.Context, *AccountProvisionRequest) (*AccountProvisionResponse, error)
+	// Switchover defines the procedure to switch roles of the primary and candidate.
+	Switchover(context.Context, *SwitchoverRequest) (*SwitchoverResponse, error)
 	mustEmbedUnimplementedDBPluginServer()
 }
 
@@ -182,6 +195,9 @@ func (UnimplementedDBPluginServer) Readwrite(context.Context, *ReadwriteRequest)
 }
 func (UnimplementedDBPluginServer) AccountProvision(context.Context, *AccountProvisionRequest) (*AccountProvisionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AccountProvision not implemented")
+}
+func (UnimplementedDBPluginServer) Switchover(context.Context, *SwitchoverRequest) (*SwitchoverResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Switchover not implemented")
 }
 func (UnimplementedDBPluginServer) mustEmbedUnimplementedDBPluginServer() {}
 
@@ -340,6 +356,24 @@ func _DBPlugin_AccountProvision_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DBPlugin_Switchover_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SwitchoverRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DBPluginServer).Switchover(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/plugin.v1.DBPlugin/Switchover",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DBPluginServer).Switchover(ctx, req.(*SwitchoverRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // DBPlugin_ServiceDesc is the grpc.ServiceDesc for DBPlugin service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -378,6 +412,10 @@ var DBPlugin_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "AccountProvision",
 			Handler:    _DBPlugin_AccountProvision_Handler,
+		},
+		{
+			MethodName: "Switchover",
+			Handler:    _DBPlugin_Switchover_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -339,6 +339,27 @@ func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent 
 	return inst, nil
 }
 
+func buildInstancePVCByTemplate(name string, template *instanceTemplateExt, parent *workloads.InstanceSet) []*corev1.PersistentVolumeClaim {
+	// 2. build pvcs from template
+	var pvcs []*corev1.PersistentVolumeClaim
+	labels := getMatchLabels(parent.Name)
+	for _, claimTemplate := range template.VolumeClaimTemplates {
+		pvcName := fmt.Sprintf("%s-%s", claimTemplate.Name, name)
+		pvc := builder.NewPVCBuilder(parent.Namespace, pvcName).
+			AddLabelsInMap(template.Labels).
+			AddLabelsInMap(labels).
+			AddLabels(constant.VolumeClaimTemplateNameLabelKey, claimTemplate.Name).
+			SetSpec(*claimTemplate.Spec.DeepCopy()).
+			GetObject()
+		if template.Name != "" {
+			pvc.Labels[constant.KBAppComponentInstanceTemplatelabelKey] = template.Name
+		}
+		pvcs = append(pvcs, pvc)
+	}
+
+	return pvcs
+}
+
 // copyAndMerge merges two objects for updating:
 // 1. new an object targetObj by copying from oldObj
 // 2. merge all fields can be updated from newObj into targetObj
@@ -377,10 +398,21 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		// resources.request.storage only supports volume expansion.
 		if reflect.DeepEqual(oldPVC.Spec.AccessModes, newPVC.Spec.AccessModes) &&
 			oldPVC.Spec.Resources.Requests.Storage().Cmp(*newPVC.Spec.Resources.Requests.Storage()) >= 0 {
-			return nil
+			return oldPVC
 		}
 		oldPVC.Spec.AccessModes = newPVC.Spec.AccessModes
-		oldPVC.Spec.Resources.Requests[corev1.ResourceStorage] = *newPVC.Spec.Resources.Requests.Storage()
+		if newPVC.Spec.Resources.Requests == nil {
+			return oldPVC
+		}
+		if _, ok := newPVC.Spec.Resources.Requests[corev1.ResourceStorage]; !ok {
+			return oldPVC
+		}
+		requests := oldPVC.Spec.Resources.Requests
+		if requests == nil {
+			requests = make(corev1.ResourceList)
+		}
+		requests[corev1.ResourceStorage] = *newPVC.Spec.Resources.Requests.Storage()
+		oldPVC.Spec.Resources.Requests = requests
 		return oldPVC
 	}
 

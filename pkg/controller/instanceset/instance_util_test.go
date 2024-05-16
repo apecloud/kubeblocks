@@ -187,26 +187,44 @@ var _ = Describe("instance util test", func() {
 			name := name + "-0"
 			Expect(nameTemplate).Should(HaveKey(name))
 			template := nameTemplate[name]
-			replica, err := buildInstanceByTemplate(name, template, its, "")
+			instance, err := buildInstanceByTemplate(name, template, its, "")
 			Expect(err).Should(BeNil())
-			Expect(replica.pod).ShouldNot(BeNil())
-			Expect(replica.pvcs).ShouldNot(BeNil())
-			Expect(replica.pvcs).Should(HaveLen(1))
-			Expect(replica.pod.Name).Should(Equal(name))
-			Expect(replica.pod.Namespace).Should(Equal(its.Namespace))
-			Expect(replica.pod.Spec.Volumes).Should(HaveLen(1))
-			Expect(replica.pod.Spec.Volumes[0].Name).Should(Equal(volumeClaimTemplates[0].Name))
+			Expect(instance.pod).ShouldNot(BeNil())
+			Expect(instance.pvcs).ShouldNot(BeNil())
+			Expect(instance.pvcs).Should(HaveLen(1))
+			Expect(instance.pod.Name).Should(Equal(name))
+			Expect(instance.pod.Namespace).Should(Equal(its.Namespace))
+			Expect(instance.pod.Spec.Volumes).Should(HaveLen(1))
+			Expect(instance.pod.Spec.Volumes[0].Name).Should(Equal(volumeClaimTemplates[0].Name))
 			envConfigName := GetEnvConfigMapName(its.Name)
 			expectedTemplate := BuildPodTemplate(its, envConfigName)
-			Expect(replica.pod.Spec).ShouldNot(Equal(expectedTemplate.Spec))
+			Expect(instance.pod.Spec).ShouldNot(Equal(expectedTemplate.Spec))
 			// reset pod.volumes, pod.hostname and pod.subdomain
-			replica.pod.Spec.Volumes = nil
-			replica.pod.Spec.Hostname = ""
-			replica.pod.Spec.Subdomain = ""
-			Expect(replica.pod.Spec).Should(Equal(expectedTemplate.Spec))
-			Expect(replica.pvcs[0].Name).Should(Equal(fmt.Sprintf("%s-%s", volumeClaimTemplates[0].Name, replica.pod.Name)))
-			Expect(replica.pvcs[0].Labels[constant.VolumeClaimTemplateNameLabelKey]).Should(Equal(volumeClaimTemplates[0].Name))
-			Expect(replica.pvcs[0].Spec.Resources).Should(Equal(volumeClaimTemplates[0].Spec.Resources))
+			instance.pod.Spec.Volumes = nil
+			instance.pod.Spec.Hostname = ""
+			instance.pod.Spec.Subdomain = ""
+			Expect(instance.pod.Spec).Should(Equal(expectedTemplate.Spec))
+			Expect(instance.pvcs[0].Name).Should(Equal(fmt.Sprintf("%s-%s", volumeClaimTemplates[0].Name, instance.pod.Name)))
+			Expect(instance.pvcs[0].Labels[constant.VolumeClaimTemplateNameLabelKey]).Should(Equal(volumeClaimTemplates[0].Name))
+			Expect(instance.pvcs[0].Spec.Resources).Should(Equal(volumeClaimTemplates[0].Spec.Resources))
+		})
+	})
+
+	Context("buildInstancePVCByTemplate", func() {
+		It("should work well", func() {
+			itsExt, err := buildInstanceSetExt(its, nil)
+			Expect(err).Should(BeNil())
+			nameTemplate, err := buildInstanceName2TemplateMap(itsExt)
+			Expect(err).Should(BeNil())
+			Expect(nameTemplate).Should(HaveLen(3))
+			name := name + "-0"
+			Expect(nameTemplate).Should(HaveKey(name))
+			template := nameTemplate[name]
+			pvcs := buildInstancePVCByTemplate(name, template, its)
+			Expect(pvcs).Should(HaveLen(1))
+			Expect(pvcs[0].Name).Should(Equal(fmt.Sprintf("%s-%s", volumeClaimTemplates[0].Name, name)))
+			Expect(pvcs[0].Labels[constant.VolumeClaimTemplateNameLabelKey]).Should(Equal(volumeClaimTemplates[0].Name))
+			Expect(pvcs[0].Spec.Resources).Should(Equal(volumeClaimTemplates[0].Spec.Resources))
 		})
 	})
 

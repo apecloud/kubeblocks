@@ -12,7 +12,7 @@ spec:
   selector:
     matchLabels:
       {{- include "kubeblocks.selectorLabels" . | nindent 6 }}
-      {{- with .Values.extraLables }}
+      {{- with .Values.extraLabels }}
         {{- toYaml . | nindent 6 }}
       {{- end }}
   {{- if .Values.updateStrategy }}
@@ -27,7 +27,7 @@ spec:
       {{- end }}
       labels:
         {{- include "kubeblocks.selectorLabels" . | nindent 8 }}
-        {{- with .Values.extraLables }}
+        {{- with .Values.extraLabels }}
           {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:

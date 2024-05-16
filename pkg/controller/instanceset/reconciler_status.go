@@ -170,7 +170,7 @@ func buildFailureCondition(its *workloads.InstanceSet, pods []*corev1.Pod) (*met
 			continue
 		}
 		// KubeBlocks says the Pod is 'Failed'
-		isFailed, isTimedOut, _ := intctrlutil.IsPodFailedAndTimedOut(pod)
+		isFailed, isTimedOut, _ := intctrlutil.IsPodFailedAndTimedOut(pod, false)
 		if isFailed && isTimedOut {
 			failureNames = append(failureNames, pod.Name)
 		}

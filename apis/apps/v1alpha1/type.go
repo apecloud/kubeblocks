@@ -925,6 +925,9 @@ type Service struct {
 	// Only one default service name is allowed.
 	// Cannot be updated.
 	//
+	// +kubebuilder:validation:MaxLength=25
+	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
+	//
 	// +optional
 	ServiceName string `json:"serviceName,omitempty"`
 
@@ -980,7 +983,8 @@ type Service struct {
 // EnvVar represents a variable present in the env of Pod/Action or the template of config/script.
 type EnvVar struct {
 	// Name of the variable. Must be a C_IDENTIFIER.
-	// +required
+	//
+	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
 	// Optional: no more than one of the following may be specified.
@@ -999,6 +1003,7 @@ type EnvVar struct {
 	Value string `json:"value,omitempty"`
 
 	// Source for the variable's value. Cannot be used if value is not empty.
+	//
 	// +optional
 	ValueFrom *VarSource `json:"valueFrom,omitempty"`
 }
@@ -1055,10 +1060,12 @@ type NamedVar struct {
 // ContainerVars defines the vars that can be referenced from a Container.
 type ContainerVars struct {
 	// The name of the container.
-	// +required
+	//
+	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
 	// Container port to reference.
+	//
 	// +optional
 	Port *NamedVar `json:"port,omitempty"`
 }
@@ -1174,14 +1181,17 @@ type ComponentVars struct {
 type ClusterObjectReference struct {
 	// CompDef specifies the definition used by the component that the referent object resident in.
 	// If not specified, the component itself will be used.
+	//
 	// +optional
 	CompDef string `json:"compDef,omitempty"`
 
 	// Name of the referent object.
+	//
 	// +optional
 	Name string `json:"name,omitempty"`
 
 	// Specify whether the object must be defined.
+	//
 	// +optional
 	Optional *bool `json:"optional,omitempty"`
 
@@ -1195,7 +1205,8 @@ type ClusterObjectReference struct {
 // MultipleClusterObjectOption defines the options for handling multiple cluster objects matched.
 type MultipleClusterObjectOption struct {
 	// Define the strategy for handling multiple cluster objects.
-	// +required
+	//
+	// +kubebuilder:validation:Required
 	Strategy MultipleClusterObjectStrategy `json:"strategy"`
 
 	// Define the options for handling combined variables.
@@ -1255,13 +1266,13 @@ type MultipleClusterObjectValueFormatFlatten struct {
 	// Pair delimiter.
 	//
 	// +kubebuilder:default=","
-	// +required
+	// +kubebuilder:validation:Required
 	Delimiter string `json:"delimiter"`
 
 	// Key-value delimiter.
 	//
 	// +kubebuilder:default=":"
-	// +required
+	// +kubebuilder:validation:Required
 	KeyValueDelimiter string `json:"keyValueDelimiter"`
 }
 

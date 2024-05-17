@@ -94,5 +94,5 @@ func (c *configTemplateBuilder) injectBuiltInObjectsAndFunctions(
 	cluster *appsv1alpha1.Cluster) {
 	c.podSpec = podSpec
 	c.builtInFunctions = BuiltInCustomFunctions(c, component, localObjs)
-	c.builtInObjects = buildInComponentObjects(localObjs, podSpec, component, cluster)
+	c.builtInObjects = buildInComponentObjects(podSpec, component, cluster)
 }

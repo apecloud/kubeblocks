@@ -103,7 +103,10 @@ func (s *nonBlockingGRPCServer) serve(endpoint string, dbPlugin DBPluginServer) 
 
 	s.logger.Info("Listening for connections on address", "addr", listener.Addr())
 
-	server.Serve(listener)
+	err = server.Serve(listener)
+	if err != nil {
+		panic(err.Error())
+	}
 
 }
 

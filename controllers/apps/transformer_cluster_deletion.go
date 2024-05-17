@@ -140,7 +140,7 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	// TODO release ports if scale in the components
 	// TODO release ports one by one without using prefix
 	pm := intctrlutil.GetPortManager()
-	for _, comp := range transCtx.Cluster.Spec.ComponentSpecs {
+	for _, comp := range transCtx.ComponentSpecs {
 		if err = pm.ReleaseByPrefix(fmt.Sprintf("%s-%s", transCtx.Cluster.Name, comp.Name)); err != nil {
 			return newRequeueError(time.Second*1, "release host ports failed")
 		}

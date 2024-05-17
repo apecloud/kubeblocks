@@ -587,16 +587,14 @@ spec:
                                   IP address. Defaults to the Pod's IP.
                                 type: string
                               port:
+                                anyOf:
+                                - type: integer
+                                - type: string
                                 description: Specifies the target port for the GRPC
                                   request. It can be specified either as a numeric
-                                  value in the range of 1 to 65535.
-                                type: string
-                              service:
-                                description: Service is the name of the service to
-                                  place in the gRPC HealthCheckRequest If this is
-                                  not specified, the default behavior is defined by
-                                  gRPC.
-                                type: string
+                                  value in the range of 1 to 65535. or as a named
+                                  port that meets the IANA_SVC_NAME specification.
+                                x-kubernetes-int-or-string: true
                             required:
                             - port
                             type: object
@@ -978,16 +976,14 @@ spec:
                                   IP address. Defaults to the Pod's IP.
                                 type: string
                               port:
+                                anyOf:
+                                - type: integer
+                                - type: string
                                 description: Specifies the target port for the GRPC
                                   request. It can be specified either as a numeric
-                                  value in the range of 1 to 65535.
-                                type: string
-                              service:
-                                description: Service is the name of the service to
-                                  place in the gRPC HealthCheckRequest If this is
-                                  not specified, the default behavior is defined by
-                                  gRPC.
-                                type: string
+                                  value in the range of 1 to 65535. or as a named
+                                  port that meets the IANA_SVC_NAME specification.
+                                x-kubernetes-int-or-string: true
                             required:
                             - port
                             type: object
@@ -1368,16 +1364,14 @@ spec:
                                   IP address. Defaults to the Pod's IP.
                                 type: string
                               port:
+                                anyOf:
+                                - type: integer
+                                - type: string
                                 description: Specifies the target port for the GRPC
                                   request. It can be specified either as a numeric
-                                  value in the range of 1 to 65535.
-                                type: string
-                              service:
-                                description: Service is the name of the service to
-                                  place in the gRPC HealthCheckRequest If this is
-                                  not specified, the default behavior is defined by
-                                  gRPC.
-                                type: string
+                                  value in the range of 1 to 65535. or as a named
+                                  port that meets the IANA_SVC_NAME specification.
+                                x-kubernetes-int-or-string: true
                             required:
                             - port
                             type: object
@@ -1773,16 +1767,14 @@ spec:
                                   IP address. Defaults to the Pod's IP.
                                 type: string
                               port:
+                                anyOf:
+                                - type: integer
+                                - type: string
                                 description: Specifies the target port for the GRPC
                                   request. It can be specified either as a numeric
-                                  value in the range of 1 to 65535.
-                                type: string
-                              service:
-                                description: Service is the name of the service to
-                                  place in the gRPC HealthCheckRequest If this is
-                                  not specified, the default behavior is defined by
-                                  gRPC.
-                                type: string
+                                  value in the range of 1 to 65535. or as a named
+                                  port that meets the IANA_SVC_NAME specification.
+                                x-kubernetes-int-or-string: true
                             required:
                             - port
                             type: object
@@ -2180,16 +2172,14 @@ spec:
                                   IP address. Defaults to the Pod's IP.
                                 type: string
                               port:
+                                anyOf:
+                                - type: integer
+                                - type: string
                                 description: Specifies the target port for the GRPC
                                   request. It can be specified either as a numeric
-                                  value in the range of 1 to 65535.
-                                type: string
-                              service:
-                                description: Service is the name of the service to
-                                  place in the gRPC HealthCheckRequest If this is
-                                  not specified, the default behavior is defined by
-                                  gRPC.
-                                type: string
+                                  value in the range of 1 to 65535. or as a named
+                                  port that meets the IANA_SVC_NAME specification.
+                                x-kubernetes-int-or-string: true
                             required:
                             - port
                             type: object
@@ -2590,16 +2580,14 @@ spec:
                                   IP address. Defaults to the Pod's IP.
                                 type: string
                               port:
+                                anyOf:
+                                - type: integer
+                                - type: string
                                 description: Specifies the target port for the GRPC
                                   request. It can be specified either as a numeric
-                                  value in the range of 1 to 65535.
-                                type: string
-                              service:
-                                description: Service is the name of the service to
-                                  place in the gRPC HealthCheckRequest If this is
-                                  not specified, the default behavior is defined by
-                                  gRPC.
-                                type: string
+                                  value in the range of 1 to 65535. or as a named
+                                  port that meets the IANA_SVC_NAME specification.
+                                x-kubernetes-int-or-string: true
                             required:
                             - port
                             type: object
@@ -3006,16 +2994,14 @@ spec:
                                   IP address. Defaults to the Pod's IP.
                                 type: string
                               port:
+                                anyOf:
+                                - type: integer
+                                - type: string
                                 description: Specifies the target port for the GRPC
                                   request. It can be specified either as a numeric
-                                  value in the range of 1 to 65535.
-                                type: string
-                              service:
-                                description: Service is the name of the service to
-                                  place in the gRPC HealthCheckRequest If this is
-                                  not specified, the default behavior is defined by
-                                  gRPC.
-                                type: string
+                                  value in the range of 1 to 65535. or as a named
+                                  port that meets the IANA_SVC_NAME specification.
+                                x-kubernetes-int-or-string: true
                             required:
                             - port
                             type: object
@@ -3397,16 +3383,14 @@ spec:
                                   IP address. Defaults to the Pod's IP.
                                 type: string
                               port:
+                                anyOf:
+                                - type: integer
+                                - type: string
                                 description: Specifies the target port for the GRPC
                                   request. It can be specified either as a numeric
-                                  value in the range of 1 to 65535.
-                                type: string
-                              service:
-                                description: Service is the name of the service to
-                                  place in the gRPC HealthCheckRequest If this is
-                                  not specified, the default behavior is defined by
-                                  gRPC.
-                                type: string
+                                  value in the range of 1 to 65535. or as a named
+                                  port that meets the IANA_SVC_NAME specification.
+                                x-kubernetes-int-or-string: true
                             required:
                             - port
                             type: object
@@ -3790,16 +3774,14 @@ spec:
                                   IP address. Defaults to the Pod's IP.
                                 type: string
                               port:
+                                anyOf:
+                                - type: integer
+                                - type: string
                                 description: Specifies the target port for the GRPC
                                   request. It can be specified either as a numeric
-                                  value in the range of 1 to 65535.
-                                type: string
-                              service:
-                                description: Service is the name of the service to
-                                  place in the gRPC HealthCheckRequest If this is
-                                  not specified, the default behavior is defined by
-                                  gRPC.
-                                type: string
+                                  value in the range of 1 to 65535. or as a named
+                                  port that meets the IANA_SVC_NAME specification.
+                                x-kubernetes-int-or-string: true
                             required:
                             - port
                             type: object
@@ -4171,16 +4153,14 @@ spec:
                                   IP address. Defaults to the Pod's IP.
                                 type: string
                               port:
+                                anyOf:
+                                - type: integer
+                                - type: string
                                 description: Specifies the target port for the GRPC
                                   request. It can be specified either as a numeric
-                                  value in the range of 1 to 65535.
-                                type: string
-                              service:
-                                description: Service is the name of the service to
-                                  place in the gRPC HealthCheckRequest If this is
-                                  not specified, the default behavior is defined by
-                                  gRPC.
-                                type: string
+                                  value in the range of 1 to 65535. or as a named
+                                  port that meets the IANA_SVC_NAME specification.
+                                x-kubernetes-int-or-string: true
                             required:
                             - port
                             type: object
@@ -4574,16 +4554,14 @@ spec:
                                   IP address. Defaults to the Pod's IP.
                                 type: string
                               port:
+                                anyOf:
+                                - type: integer
+                                - type: string
                                 description: Specifies the target port for the GRPC
                                   request. It can be specified either as a numeric
-                                  value in the range of 1 to 65535.
-                                type: string
-                              service:
-                                description: Service is the name of the service to
-                                  place in the gRPC HealthCheckRequest If this is
-                                  not specified, the default behavior is defined by
-                                  gRPC.
-                                type: string
+                                  value in the range of 1 to 65535. or as a named
+                                  port that meets the IANA_SVC_NAME specification.
+                                x-kubernetes-int-or-string: true
                             required:
                             - port
                             type: object
@@ -4962,16 +4940,14 @@ spec:
                                   IP address. Defaults to the Pod's IP.
                                 type: string
                               port:
+                                anyOf:
+                                - type: integer
+                                - type: string
                                 description: Specifies the target port for the GRPC
                                   request. It can be specified either as a numeric
-                                  value in the range of 1 to 65535.
-                                type: string
-                              service:
-                                description: Service is the name of the service to
-                                  place in the gRPC HealthCheckRequest If this is
-                                  not specified, the default behavior is defined by
-                                  gRPC.
-                                type: string
+                                  value in the range of 1 to 65535. or as a named
+                                  port that meets the IANA_SVC_NAME specification.
+                                x-kubernetes-int-or-string: true
                             required:
                             - port
                             type: object
@@ -5291,16 +5267,14 @@ spec:
                                   IP address. Defaults to the Pod's IP.
                                 type: string
                               port:
+                                anyOf:
+                                - type: integer
+                                - type: string
                                 description: Specifies the target port for the GRPC
                                   request. It can be specified either as a numeric
-                                  value in the range of 1 to 65535.
-                                type: string
-                              service:
-                                description: Service is the name of the service to
-                                  place in the gRPC HealthCheckRequest If this is
-                                  not specified, the default behavior is defined by
-                                  gRPC.
-                                type: string
+                                  value in the range of 1 to 65535. or as a named
+                                  port that meets the IANA_SVC_NAME specification.
+                                x-kubernetes-int-or-string: true
                             required:
                             - port
                             type: object

@@ -95,7 +95,10 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 	}
 
 	buildLorryServiceContainer(synthesizeComp, &lorryContainers[0], int(lorryHTTPPort), int(lorryGRPCPort), clusterCompSpec)
-	adaptLorryIfCustomHandlerDefined(synthesizeComp, &lorryContainers[0], int(lorryHTTPPort), int(lorryGRPCPort))
+	err = adaptLorryIfCustomHandlerDefined(synthesizeComp, &lorryContainers[0], int(lorryHTTPPort), int(lorryGRPCPort))
+	if err != nil {
+		return err
+	}
 
 	reqCtx.Log.V(1).Info("lorry", "containers", lorryContainers)
 	synthesizeComp.PodSpec.Containers = append(synthesizeComp.PodSpec.Containers, lorryContainers...)
@@ -104,10 +107,14 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 }
 
 func adaptLorryIfCustomHandlerDefined(synthesizeComp *SynthesizedComponent, lorryContainer *corev1.Container,
-	lorryHTTPPort, lorryGRPCPort int) {
-	actions, execImage, execContainer := getActionsWithExecImageOrContainer(synthesizeComp)
+	lorryHTTPPort, lorryGRPCPort int) error {
+	actions, execImage, execContainer, err := getActionsWithExecImageOrContainer(synthesizeComp)
+	if err != nil {
+		return err
+	}
+
 	if len(actions) == 0 {
-		return
+		return nil
 	}
 	actionJSON, _ := json.Marshal(actions)
 	lorryContainer.Env = append(lorryContainer.Env, corev1.EnvVar{
@@ -116,7 +123,7 @@ func adaptLorryIfCustomHandlerDefined(synthesizeComp *SynthesizedComponent, lorr
 	})
 
 	if execImage == "" {
-		return
+		return nil
 	}
 	initContainer := buildLorryInitContainer()
 	synthesizeComp.PodSpec.InitContainers = append(synthesizeComp.PodSpec.InitContainers, *initContainer)
@@ -128,7 +135,7 @@ func adaptLorryIfCustomHandlerDefined(synthesizeComp *SynthesizedComponent, lorr
 		"--config-path", "/kubeblocks/config/lorry/components/",
 	}
 	if execContainer == nil {
-		return
+		return nil
 	}
 
 	envSet := sets.New([]string{}...)
@@ -142,6 +149,7 @@ func adaptLorryIfCustomHandlerDefined(synthesizeComp *SynthesizedComponent, lorr
 		}
 		lorryContainer.Env = append(lorryContainer.Env, env)
 	}
+	return nil
 }
 
 func buildBasicContainer(lorryHTTPPort int) *corev1.Container {
@@ -427,9 +435,9 @@ func getBuiltinActionHandler(synthesizeComp *SynthesizedComponent) appsv1alpha1.
 	return appsv1alpha1.UnknownBuiltinActionHandler
 }
 
-func getActionsWithExecImageOrContainer(synthesizeComp *SynthesizedComponent) (map[string]util.Handlers, string, *corev1.Container) {
+func getActionsWithExecImageOrContainer(synthesizeComp *SynthesizedComponent) (map[string]util.Handlers, string, *corev1.Container, error) {
 	if synthesizeComp.LifecycleActions == nil {
-		return nil, "", nil
+		return nil, "", nil, nil
 	}
 
 	actions := map[string]*appsv1alpha1.LifecycleActionHandler{
@@ -476,25 +484,48 @@ func getActionsWithExecImageOrContainer(synthesizeComp *SynthesizedComponent) (m
 				containerName = handler.CustomHandler.Container
 			}
 		} else if handler.CustomHandler.GRPC != nil {
+			port, err := getPort(synthesizeComp.PodSpec.Containers, handler.CustomHandler.GRPC.Port)
+			if err != nil {
+				return nil, "", nil, err
+			}
 			handlers.GPRC = map[string]string{}
-			handlers.GPRC["host"] = handler.CustomHandler.GRPC.Host
-			handlers.GPRC["port"] = handler.CustomHandler.GRPC.Port
-			handlers.GPRC["service"] = handler.CustomHandler.GRPC.Service
+			handlers.GPRC["port"] = strconv.Itoa(int(port))
+			if handler.CustomHandler.GRPC.Host != "" {
+				handlers.GPRC["host"] = handler.CustomHandler.GRPC.Host
+			}
 		}
 		actionHandlers[name] = handlers
 	}
 	if !hasCommand {
-		return actionHandlers, "", nil
+		return actionHandlers, "", nil, nil
 	}
 
 	execContainer := getExecContainer(synthesizeComp.PodSpec.Containers, containerName)
 	if toolImage == "" {
 		if execContainer == nil {
-			return actionHandlers, "", nil
+			return actionHandlers, "", nil, nil
 		}
 		toolImage = execContainer.Image
 	}
-	return actionHandlers, toolImage, execContainer
+	return actionHandlers, toolImage, execContainer, nil
+}
+
+func getPort(containers []corev1.Container, port intstr.IntOrString) (int32, error) {
+	var portValue int32
+	var err error
+	if port.Type == intstr.Int {
+		portValue = port.IntVal
+	} else {
+		portValue, err = intctrlutil.GetPortByPortName(containers, port.StrVal)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	if portValue < 1 || portValue > 65535 {
+		return 0, fmt.Errorf("invalid port value: %d", portValue)
+	}
+	return portValue, nil
 }
 
 func getExecContainer(containers []corev1.Container, name string) *corev1.Container {

@@ -5335,17 +5335,6 @@ spec:
                 - message: the minimum replicas limit should be no greater than the
                     maximum
                   rule: self.minReplicas <= self.maxReplicas
-              roleArbitrator:
-                default: External
-                description: "This field has been deprecated since v0.9. This field
-                  is maintained for backward compatibility and its use is discouraged.
-                  Existing usage should be updated to the current preferred approach
-                  to avoid compatibility issues in future releases. \n This field
-                  is immutable."
-                enum:
-                - External
-                - Lorry
-                type: string
               roles:
                 description: "Enumerate all possible roles assigned to each replica
                   of the Component, influencing its behavior. \n A replica can have

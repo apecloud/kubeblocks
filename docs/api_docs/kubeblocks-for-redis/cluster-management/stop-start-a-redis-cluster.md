@@ -46,7 +46,7 @@ spec:
   - componentDefRef: redis
     enabledLogs:
     - running
-    monitorEnabled: false
+    monitor: false
     name: redis
     replicas: 0
     resources:
@@ -104,7 +104,7 @@ spec:
   - componentDefRef: redis
     enabledLogs:
     - running
-    monitorEnabled: false
+    monitor: false
     name: redis
     replicas: 1
     resources:

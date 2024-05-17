@@ -78,7 +78,7 @@ mycluster   redis                redis-7.0.6    Delete               Running   4
       - componentDefRef: redis
         enabledLogs:
         - running
-        monitorEnabled: false
+        monitor: false
         name: redis
         replicas: 1
         resources:

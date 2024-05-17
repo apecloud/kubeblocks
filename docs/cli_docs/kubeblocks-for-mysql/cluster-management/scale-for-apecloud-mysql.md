@@ -35,7 +35,6 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
 
 1. Change configuration. There are 3 ways to apply vertical scaling.
 
-   **Option 1.** (**Recommended**) Use kbcli
 
    Configure the parameters `--components`, `--memory`, and `--cpu` and run the command.
 
@@ -49,66 +48,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    - `--memory` describes the requested and limited size of the component memory.
    - `--cpu` describes the requested and limited size of the component CPU.
 
-   **Option 2.** Create an OpsRequest
-  
-   Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
-
-   ```bash
-   kubectl apply -f - <<EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: OpsRequest
-   metadata:
-     name: ops-vertical-scaling
-   spec:
-     clusterRef: mysql-cluster
-     type: VerticalScaling 
-     verticalScaling:
-     - componentName: mysql
-       requests:
-         memory: "2Gi"
-         cpu: "1000m"
-       limits:
-         memory: "4Gi"
-         cpu: "2000m"
-   EOF
-   ```
-  
-   **Option 3.** Change the YAML file of the cluster
-
-   Change the configuration of `spec.componentSpecs.resources` in the YAML file. `spec.componentSpecs.resources` controls the requirement and limit of resources and changing them triggers a vertical scaling.
-
-   ***Example***
-
-   ```yaml
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mysql-cluster
-     namespace: default
-   spec:
-     clusterDefinitionRef: apecloud-mysql
-     clusterVersionRef: ac-mysql-8.0.30
-     componentSpecs:
-     - name: mysql
-       componentDefRef: mysql
-       replicas: 1
-       resources: # Change the values of resources.
-         requests:
-           memory: "2Gi"
-           cpu: "1000m"
-         limits:
-           memory: "4Gi"
-           cpu: "2000m"
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 1Gi
-     terminationPolicy: Halt
-   ```
+   
 
 2. Check the cluster status to validate the vertical scaling.
 
@@ -155,8 +95,6 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
 
 1. Change configuration. There are 3 ways to apply horizontal scaling.
 
-   **Option 1.** (**Recommended**) Use kbcli
-
    Configure the parameters `--components` and `--replicas`, and run the command.
 
    ```bash
@@ -167,57 +105,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    - `--components` describes the component name ready for horizontal scaling.
    - `--replicas` describes the replica amount of the specified components.
 
-   **Option 2.** Create an OpsRequest
-
-   Apply an OpsRequest to a specified cluster. Configure the parameters according to your needs.
-
-   ```bash
-   kubectl apply -f - <<EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: OpsRequest
-   metadata:
-     name: ops-horizontal-scaling
-   spec:
-     clusterRef: mysql-cluster
-     type: HorizontalScaling
-     horizontalScaling:
-     - componentName: mysql
-       replicas: 3
-   EOF
-   ```
-
-   **Option 3.** Change the YAML file of the cluster
-
-   Change the configuration of `spec.componentSpecs.replicas` in the YAML file. `spec.componentSpecs.replicas` stands for the pod amount and changing this value triggers a horizontal scaling of a cluster.
-
-   ***Example***
-
-   ```yaml
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-    apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mysql-cluster
-     namespace: default
-   spec:
-     clusterDefinitionRef: apecloud-mysql
-     clusterVersionRef: ac-mysql-8.0.30
-     componentSpecs:
-     - name: mysql
-       componentDefRef: mysql
-       replicas: 1 # Change the pod amount.
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 1Gi
-    terminationPolicy: Halt
-   ```
+   
 
 2. Validate the horizontal scaling operation.
 

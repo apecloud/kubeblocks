@@ -30,69 +30,11 @@ import TabItem from '@theme/TabItem';
 
 ## Create a Proxy Cluster
 
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
 It is recommended to use kbcli to create an ApeCloud MySQL Proxy Cluster.
 
 ```bash
 kbcli cluster create mysql myproxy --mode raftGroup --availability-policy none --proxy-enabled true
 ```
-
-</TabItem>
-
-<TabItem value="Helm" label="Helm">
-
-1. Add the KubeBlocks repository.
-
-   ```bash
-   helm repo add kubeblocks https://apecloud.github.io/helm-charts
-   ```
-
-2. View the repository list to verify whether the KubeBlocks repository is added successfully.
-
-   ```bash
-   helm repo list
-   ```
-
-3. Run the update command to make sure you have added the latest version.
-
-   ```bash
-   helm repo update
-   ```
-
-4. View all versions of ApeCloud MySQL Proxy.
-
-   ```bash
-   helm search repo kubeblocks/apecloud-mysql --devel --versions
-   ```
-
-5. (Optional) If you disable the `apecloud-mysql` add-on when installing KuebBlocks, run the command below to specify a version and install the cluster definition of ApeCloud MySQL. Skip this step if you install KubeBlocks with the default settings.
-
-   ```bash
-   helm install myproxy kubeblocks/apecloud-mysql --version=v0.6.0
-   ```
-
-6. Create an ApeCloud MySQL Proxy Cluster.
-
-   ```bash
-   helm install myproxy kubeblocks/apecloud-mysql-cluster --version=v0.6.0 --set mode=raftGroup,proxyEnabled=true 
-   ```
-
-:::note
-
-If you only have one node for deploying a RaftGroup, set the `availability-policy` as `none` when creating a RaftGroup.
-
-```bash
-helm install myproxy kubeblocks/apecloud-mysql-cluster --version=v0.6.0 --set mode=raftGroup,proxyEnabled=true --set extra.availabilityPolicy=none
-```
-
-:::
-
-</TabItem>
-
-</Tabs>
 
 ## Enable Proxy dynamically
 
@@ -121,8 +63,6 @@ ApeCloud MySQL Proxy is routed through the `vtgate` component, and the way the M
 
 ### Connect Proxy Cluster by VTGate
 
-<Tabs>
-<TabItem value="kbcli" label="kbcli" default>
 
 Run the command below to connect to the Proxy Cluster.
 
@@ -130,30 +70,8 @@ Run the command below to connect to the Proxy Cluster.
 kbcli cluster connect myproxy --component vtgate
 ```
 
-</TabItem>
-
-<TabItem value="port-forward" label="port-forward">
-
-1. Expose the port of VTGate to the localhost so that the localhost can access the Proxy.
-
-   ```bash
-   kubectl port-forward svc/vt-vtgate-headless 15306:15306
-   ```
-
-2. Connect to the cluster.
-
-   ```bash
-   mysql -h 127.0.0.1 -P 15306
-   ```
-
-</TabItem>
-</Tabs>
-
 ### Connect Proxy Cluster by MySQL Server
 
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
 
 Run the command below to connect to the MySQL Server.
 
@@ -161,24 +79,6 @@ Run the command below to connect to the MySQL Server.
 kbcli cluster connect myproxy
 ```
 
-</TabItem>
-
-<TabItem value="port-forward" label="port-forward">
-
-1. Expose the port of the MySQL Server to the localhost so that the localhost can access the MySQL Server.
-
-   ```bash
-   kubectl port-forward svc/vt-mysql 3306:3306
-   ```
-
-2. Connect to the cluster.
-
-   ```bash
-   mysql -h 127.0.0.1 -P 3306
-   ```
-
-</TabItem>
-</Tabs>
 
 :::note
 
@@ -295,10 +195,6 @@ VTGate, VTConsensus, and VTTablet support parameter configuration. You can confi
 
 You can view the log files of components, Pods, and containers by both kbcli and kubectl.
 
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
 View the log of different components.
 
 ```bash
@@ -320,39 +216,6 @@ View the log of a container in a Pod.
 kbcli cluster logs myproxy --instance myproxy-mysql-0 -c vttablet
 ```
 
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl" default>
-
-View the log of VTGate.
-
-```bash
-kubectl logs myproxy-cluster-vtgate-8659d5db95-4dzt5
-```
-
-View the log of VTTablet and `-c` is required.
-
-```bash
-kubectl logs myproxy-cluster-mysql-0 -c vttablet
-```
-
-Enter the container and view more logs of VTGate.
-
-```bash
-kubectl exec -it myproxy-cluster-vtgate-8659d5db95-4dzt5 -- bash
-ls /vtdataroot
-```
-
-Enter the container and view more logs of VTTable.
-
-```bash
-kubectl exec -it myproxy-cluster-mysql-0  -c vttablet -- bash
-ls /vtdataroot
-```
-
-</TabItem>
-
-</Tabs>
 
 ## Monitoring
 

@@ -30,8 +30,6 @@ kbcli cluster list pulsar
 
 1. Change configuration. There are 3 ways to apply vertical scaling.
 
-   **Option 1.** (**Recommended**) Use kbcli
-
    Configure the parameters `--components`, `--memory`, and `--cpu` and run the command.
 
    ```bash
@@ -41,43 +39,6 @@ kbcli cluster list pulsar
    - `--components` describes the component name ready for vertical scaling.
    - `--memory` describes the requested and limited size of the component memory.
    - `--cpu` describes the requested and limited size of the component CPU.
-
-   **Option 2.** Create an OpsRequest
-  
-   Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
-
-   ```bash
-   kubectl create -f -<< EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: OpsRequest
-   metadata:
-     generateName: pulsar-vscale-
-   spec:
-     clusterRef: pulsar
-     type: VerticalScaling
-     verticalScaling:
-     - componentName: broker
-       requests:
-         memory: "10Gi"
-         cpu: 3
-       limits:
-         memory: "10Gi"
-         cpu: 3
-     - componentName: bookies
-       requests:
-         memory: "10Gi"
-         cpu: 3
-       limits:
-         memory: "10Gi"
-         cpu: 3      
-   EOF
-   ```
-  
-   **Option 3.** Edit Pulsar cluster with `kubectl`.
-
-   ```bash
-   kubectl edit cluster pulsar
-   ```
 
 2. Check the cluster status to validate the vertical scaling.
 
@@ -115,8 +76,6 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
 
 1. Change configuration. There are 3 ways to apply horizontal scaling.
 
-   **Option 1.** (**Recommended**) Use kbcli
-
    Configure the parameters `--components` and `--replicas`, and run the command.
 
    ```bash
@@ -126,33 +85,7 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
    - `--components` describes the component name ready for horizontal scaling.
    - `--replicas` describes the replicas with the specified components.
 
-   **Option 2.** Create an OpsRequest
-
-   Apply an OpsRequest to a specified cluster. Configure the parameters according to your needs.
-
-    ```bash
-    kubectl create -f -<< EOF
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: OpsRequest
-    metadata:
-      generateName: pulsar-horizontalscaling-
-    spec:
-      clusterRef: pulsar
-      type: HorizontalScaling  
-      horizontalScaling:
-      - componentName: broker
-        replicas: 5
-      - componentName: bookies
-        replicas: 5
-    EOF
-    ```
-
-   **Option 3.** Edit cluster with `kubectl`.
-
-   ```bash
-   kubectl edit cluster pulsar
-   ```
-  
+   
 2. Validate the horizontal scaling operation.
 
    Check the cluster STATUS to identify the horizontal scaling status.

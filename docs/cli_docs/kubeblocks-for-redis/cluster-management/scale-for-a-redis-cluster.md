@@ -41,8 +41,6 @@ redis-cluster        default          redis                     redis-7.0.6     
 
 1. Change configuration. There are 3 ways to apply vertical scaling.
 
-   **Option 1.** (**Recommended**) Use kbcli
-
    Configure the parameters `--components`, `--memory`, and `--cpu` and run the command.
 
    ***Example***
@@ -56,69 +54,6 @@ redis-cluster        default          redis                     redis-7.0.6     
    - `--components` describes the component name ready for vertical scaling.
    - `--memory` describes the requested and limited size of the component memory.
    - `--cpu` describes the requested and limited size of the component CPU.
-  
-   **Option 2.** Create an OpsRequest
-  
-   Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
-
-   ```bash
-   kubectl apply -f - <<EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: OpsRequest
-   metadata:
-     name: ops-vertical-scaling
-   spec:
-     clusterRef: redis-cluster
-     type: VerticalScaling 
-     verticalScaling:
-     - componentName: redis
-       requests:
-         memory: "2Gi"
-         cpu: "1"
-       limits:
-         memory: "4Gi"
-         cpu: "2"
-   EOF
-   ```
-  
-   **Option 3.** Change the YAML file of the cluster
-
-   Change the configuration of `spec.componentSpecs.resources` in the YAML file.
-
-   `spec.componentSpecs.resources` controls the requests and limits of resources and changing them triggers a vertical scaling.
-
-   ***Example***
-
-   ```YAML
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: redis-cluster
-     namespace: default
-   spec:
-     clusterDefinitionRef: redis
-     clusterVersionRef: redis-7.0.6
-     componentSpecs:
-     - name: redis
-       componentDefRef: redis
-       replicas: 1
-       resources: # Change values of resources
-         requests:
-           memory: "2Gi"
-           cpu: "1"
-         limits:
-           memory: "4Gi"
-           cpu: "2"
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 1Gi
-     terminationPolicy: Delete
-   ```
 
 2. Validate the vertical scaling.
 
@@ -179,8 +114,6 @@ redis-cluster        default          redis                     redis-7.0.6     
 
 1. Change configuration. There are 3 ways to apply horizontal scaling.
 
-   **Option 1.** (**Recommended**) Use kbcli
-
    Configure the parameters `--components` and `--replicas`, and run the command.
 
    ***Example***
@@ -193,54 +126,6 @@ redis-cluster        default          redis                     redis-7.0.6     
    - `--components` describes the component name ready for vertical scaling.
    - `--replicas` describes the replica amount of a specified component.
 
-   **Option 2.** Create an OpsRequest
-
-   Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
-
-   ```bash
-   kubectl apply -f - <<EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: OpsRequest
-   metadata:
-     name: ops-horizontal-scaling
-   spec:
-     clusterRef: redis-cluster
-     type: HorizontalScaling
-     horizontalScaling:
-     - componentName: redis
-       replicas: 2
-   EOF
-   ```
-
-   **Option 3.** Change the YAML file of the cluster
-
-   Change the value of `spec.componentSpecs.replicas` in the YAML file. `spec.componentSpecs.replicas` stands for the pod amount and changing this value triggers a horizontal scaling of a cluster.
-
-   ***Example***
-
-   ```yaml
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: redis-cluster
-     namespace: default
-   spec:
-     clusterDefinitionRef: redis
-     clusterVersionRef: redis-7.0.6
-     componentSpecs:
-     - name: redis
-       componentDefRef: redis
-       replicas: 2 # Change the pod amount.
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-           - ReadWriteOnce
-           resources:
-             requests:
-               storage: 1Gi
-    terminationPolicy: Delete
-   ```
 
 2. Validate the horizontal scaling operation.
 

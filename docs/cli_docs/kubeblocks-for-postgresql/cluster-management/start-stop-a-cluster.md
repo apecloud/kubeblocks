@@ -12,8 +12,6 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
 ## Stop a cluster
 
-### Option 1. (Recommended) Use kbcli
-
 Configure the name of your cluster and run the command below to stop this cluster.
 
 ```bash
@@ -26,56 +24,8 @@ kbcli cluster stop <name>
 kbcli cluster stop pg-cluster
 ```
 
-### Option 2. Create an OpsRequest
-
-Run the command below to stop a cluster.
-
-```bash
-kubectl apply -f - <<EOF
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: OpsRequest
-metadata:
-  name: pg-cluster
-  generateName: stop-
-spec:
-  # cluster ref
-  clusterRef: pg-cluster
-  type: Stop
-EOF
-```
-
-### Option 3. Change the YAML file of the cluster
-
-Configure replicas as 0 to delete pods.
-
-```yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: Cluster
-metadata:
-    name: pg-cluster
-spec:
-  clusterDefinitionRef: postgresql
-  clusterVersionRef: postgresql-14.7.0
-  terminationPolicy: WipeOut
-  componentSpecs:
-  - name: pg-replication
-    componentDefRef: postgresql
-    monitor: false  
-    replicas: 0
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        storageClassName: standard
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi
-```
-
 ## Start a cluster
   
-### Option 1. (Recommended) Use kbcli
 
 Configure the name of your cluster and run the command below to start this cluster.
 
@@ -87,51 +37,4 @@ kbcli cluster start <name>
 
 ```bash
 kbcli cluster start pg-cluster
-```
-
-### Option 2. Create an OpsRequest
-
-Run the command below to start a cluster.
-
-```bash
-kubectl apply -f - <<EOF
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: OpsRequest
-metadata:
-  name: pg-cluster
-  generateName: start-
-spec:
-  # cluster ref
-  clusterRef: pg-cluster
-  type: Start
-EOF 
-```
-
-### Option 3. Change the YAML file of the cluster
-
-Change replicas back to the original amount to start this cluster again.
-
-```yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: Cluster
-metadata:
-    name: pg-cluster
-spec:
-  clusterDefinitionRef: postgresql
-  clusterVersionRef: postgresql-14.7.0
-  terminationPolicy: WipeOut
-  componentSpecs:
-  - name: pg-replication
-    componentDefRef: postgresql
-    monitor: false  
-    replicas: 1
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        storageClassName: standard
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi
 ```

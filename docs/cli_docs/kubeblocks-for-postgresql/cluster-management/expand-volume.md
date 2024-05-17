@@ -37,7 +37,6 @@ pg-cluster        default          postgresql            postgresql-14.7.0      
 
 1. Change configuration. There are 3 ways to apply volume expansion.
 
-  **Option 1.** (**Recommended**) Use kbcli
 
   Configure the values of `--components`, `--volume-claim-templates`, and `--storage`, and run the command below to expand the volume.
 
@@ -50,54 +49,7 @@ pg-cluster        default          postgresql            postgresql-14.7.0      
    - `--volume-claim-templates` describes the VolumeClaimTemplate names in components.
    - `--storage` describes the volume storage size.
 
-  **Option 2.** Create an OpsRequest
-
-  Run the command below to expand the volume of a cluster.
-
-  ```bash
-  kubectl apply -f - <<EOF
-  apiVersion: apps.kubeblocks.io/v1alpha1
-  kind: OpsRequest
-  metadata:
-    name: ops-volume-expansion
-  spec:
-    clusterRef: pg-cluster
-    type: VolumeExpansion
-    volumeExpansion:
-    - componentName: pg-replication
-      volumeClaimTemplates:
-      - name: data
-        storage: "2Gi"
-  EOF
-  ```
-
-  **Option 3.** Change the YAML file of the cluster
-
-  Change the value of `spec.components.volumeClaimTemplates.spec.resources` in the cluster YAML file. `spec.components.volumeClaimTemplates.spec.resources` is the storage resource information of the pod and changing this value triggers the volume expansion of a cluster.
-
-  ```yaml
-  apiVersion: apps.kubeblocks.io/v1alpha1
-  kind: Cluster
-  metadata:
-    name: pg-cluster
-    namespace: default
-  spec:
-    clusterDefinitionRef: postgresql
-    clusterVersionRef: postgresql-14.7.0
-    componentSpecs:
-    - name: pg-replication
-      componentDefRef: postgresql
-      replicas: 1
-      volumeClaimTemplates:
-      - name: data
-        spec:
-          accessModes:
-            - ReadWriteOnce
-          resources:
-            requests:
-              storage: 1Gi # Change the volume storage size.
-    terminationPolicy: Halt
-  ```
+ 
 
 2. Validate the volume expansion.
 

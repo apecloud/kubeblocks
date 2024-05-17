@@ -21,8 +21,6 @@ kbcli cluster list pulsar
 
 1. Change configuration. There are 3 ways to apply volume expansion.
 
-    **Option 1.** (**Recommended**) Use kbcli
-
     Configure the values of `--components`, `--volume-claim-templates`, and `--storage`, and run the command below to expand the volume.
 
     :::note
@@ -47,34 +45,6 @@ kbcli cluster list pulsar
       kbcli cluster volume-expand pulsar --storage=200Gi --components=bookies -t ledgers  
       ```
 
-    **Option 2.** Create an OpsRequest
-
-    Change the value of storage according to your need and run the command below to expand the volume of a cluster.
-
-    ```bash
-    kubectl apply -f - <<EOF
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: OpsRequest
-    metadata:
-      generateName: pulsar-volume-expand-
-    spec:
-      clusterRef: pulsar
-      type: VolumeExpansion
-      volumeExpansion:
-      - componentName: bookies
-        volumeClaimTemplates:
-        - name: ledgers
-          storage: "200Gi"
-        - name: journal
-          storage: "40Gi"      
-    EOF
-    ```
-
-    **Option 3.** Edit cluster with `kubectl`.
-
-    ```bash
-    kubectl edit cluster pulsar
-    ```
 
 2. Validate the volume expansion operation.
 

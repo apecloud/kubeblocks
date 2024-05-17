@@ -22,8 +22,6 @@ Restarting a Redis cluster triggers a concurrent restart and the leader may chan
 
    You can use `kbcli` or create an OpsRequest to restart a cluster.
   
-   **Option 1.** (**Recommended**) Use kbcli
-
    Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
 
    ```bash
@@ -34,23 +32,6 @@ Restarting a Redis cluster triggers a concurrent restart and the leader may chan
    - `components` describes the component name that needs to be restarted.
    - `ttlSecondsAfterSucceed` describes the time to live of an OpsRequest job after the restarting succeeds.
 
-   **Option 2.** Create an OpsRequest
-
-   Run the command below to restart a cluster.
-
-   ```bash
-   kubectl apply -f - <<EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: OpsRequest
-   metadata:
-     name: ops-restart
-   spec:
-     clusterRef: redis-cluster
-     type: Restart 
-     restart:
-     - componentName: redis
-   EOF
-   ```
 
 2. Validate the restart operation.
 

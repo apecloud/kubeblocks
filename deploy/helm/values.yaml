@@ -1929,7 +1929,17 @@ hostPorts:
   - "30000-32767"
 
 controllers:
+  apps:
+    enabled: true
+  workloads:
+    enabled: true
   experimental:
+    enabled: false
+
+featureGates:
+  ignoreConfigTemplateDefaultMode:
+    enabled: false
+  ignorePodVerticalScaling:
     enabled: false
 
 vmagent:

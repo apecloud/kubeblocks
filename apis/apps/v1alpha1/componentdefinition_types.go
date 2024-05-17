@@ -461,16 +461,6 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	Roles []ReplicaRole `json:"roles,omitempty"`
 
-	// This field has been deprecated since v0.9.
-	// This field is maintained for backward compatibility and its use is discouraged.
-	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
-	//
-	// This field is immutable.
-	//
-	// +kubebuilder:default=External
-	// +optional
-	RoleArbitrator *RoleArbitrator `json:"roleArbitrator,omitempty"`
-
 	// Defines a set of hooks and procedures that customize the behavior of a Component throughout its lifecycle.
 	// Actions are triggered at specific lifecycle stages:
 	//
@@ -649,18 +639,6 @@ type Exporter struct {
 	// +optional
 	ScrapeScheme PrometheusScheme `json:"scrapeScheme,omitempty"`
 }
-
-// RoleArbitrator defines how to arbitrate the role of replicas.
-//
-// Deprecated since v0.9
-// +enum
-// +kubebuilder:validation:Enum={External,Lorry}
-type RoleArbitrator string
-
-const (
-	ExternalRoleArbitrator RoleArbitrator = "External"
-	LorryRoleArbitrator    RoleArbitrator = "Lorry"
-)
 
 // ReplicaRole represents a role that can be assumed by a component instance.
 type ReplicaRole struct {

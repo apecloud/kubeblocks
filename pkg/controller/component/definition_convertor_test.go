@@ -620,7 +620,6 @@ var _ = Describe("Component Definition Convertor", func() {
 			Expect(res).Should(BeNil())
 		})
 
-		// TODO(component)
 		It("labels", func() {
 			convertor := &compDefLabelsConvertor{}
 			res, err := convertor.convert(clusterCompDef)
@@ -773,14 +772,6 @@ var _ = Describe("Component Definition Convertor", func() {
 			})
 		})
 
-		It("role arbitrator", func() {
-			convertor := &compDefRoleArbitratorConvertor{}
-			res, err := convertor.convert(clusterCompDef)
-			Expect(err).Should(Succeed())
-			Expect(res).Should(BeNil())
-		})
-
-		// TODO(component)
 		Context("lifecycle actions", func() {
 			It("w/o comp version", func() {
 				clusterCompDef.Probes.RoleProbe = nil

@@ -1691,23 +1691,6 @@ role is updated last. This helps minimize the number of leader changes during th
 </tr>
 <tr>
 <td>
-<code>roleArbitrator</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.RoleArbitrator">
-RoleArbitrator
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>This field has been deprecated since v0.9.
-This field is maintained for backward compatibility and its use is discouraged.
-Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
-<p>This field is immutable.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>lifecycleActions</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ComponentLifecycleActions">
@@ -7692,23 +7675,6 @@ This action returns a list of roles for each replica, and the returned roles mus
 For instance, replicas with a &ldquo;follower&rdquo; role can be updated first, while the replica with the &ldquo;leader&rdquo;
 role is updated last. This helps minimize the number of leader changes during the update process.</li>
 </ul>
-<p>This field is immutable.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>roleArbitrator</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.RoleArbitrator">
-RoleArbitrator
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>This field has been deprecated since v0.9.
-This field is maintained for backward compatibility and its use is discouraged.
-Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
 <p>This field is immutable.</p>
 </td>
 </tr>
@@ -16825,28 +16791,6 @@ This value is set to 0 by default, indicating that there will be no delay betwee
 </td>
 </tr>
 </tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.RoleArbitrator">RoleArbitrator
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
-</p>
-<div>
-<p>RoleArbitrator defines how to arbitrate the role of replicas.</p>
-<p>Deprecated since v0.9</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;External&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;Lorry&#34;</p></td>
-<td></td>
-</tr></tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.RoleProbe">RoleProbe
 </h3>

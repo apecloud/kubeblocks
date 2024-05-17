@@ -69,8 +69,9 @@ spec:
             - "--zap-encoder={{ . }}"
             {{- end }}
             - "--extensions={{- default "true" ( include "kubeblocks.addonControllerEnabled" . ) }}"
-            - "--apps=true"
-            - "--workloads=true"
+            - "--apps={{- default "true" .Values.controllers.apps.enabled }}"
+            - "--workloads={{- default "true" .Values.controllers.workloads.enabled }}"
+            - "--experimental={{- default "false" .Values.controllers.experimental.enabled }}"
             {{- with .Values.managedNamespaces }}
             - "--managed-namespaces={{ . }}"
             {{- end }}
@@ -167,8 +168,12 @@ spec:
             - name: ENABLED_RUNTIME_METRICS
               value: "true"
             {{- end }}
-            {{- if .Values.controllers.experimental.enabled }}
-            - name: experimental
+            {{- if .Values.featureGates.ignoreConfigTemplateDefaultMode.enabled }}
+            - name: IGNORE_CONFIG_TEMPLATE_DEFAULT_MODE
+              value: "true"
+            {{- end }}
+            {{- if .Values.featureGates.ignorePodVerticalScaling.enabled }}
+            - name: IGNORE_POD_VERTICAL_SCALING
               value: "true"
             {{- end }}
           {{- with .Values.securityContext }}

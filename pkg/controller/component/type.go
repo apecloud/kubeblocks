@@ -64,7 +64,6 @@ type SynthesizedComponent struct {
 	PolicyRules         []rbacv1.PolicyRule                 `json:"policyRules,omitempty"`
 	LifecycleActions    *v1alpha1.ComponentLifecycleActions `json:"lifecycleActions,omitempty"`
 	SystemAccounts      []v1alpha1.SystemAccount            `json:"systemAccounts,omitempty"`
-	RoleArbitrator      *v1alpha1.RoleArbitrator            `json:"roleArbitrator,omitempty"`
 	Volumes             []v1alpha1.ComponentVolume          `json:"volumes,omitempty"`
 	HostNetwork         *v1alpha1.HostNetwork               `json:"hostNetwork,omitempty"`
 	ComponentServices   []v1alpha1.ComponentService         `json:"componentServices,omitempty"`

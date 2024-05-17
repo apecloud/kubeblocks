@@ -70,9 +70,6 @@ func ReconcileCompPostProvision(ctx context.Context,
 
 	err = job.CheckJobSucceed(ctx, cli, actionCtx.cluster, actionJob.Name)
 	if err != nil {
-		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeExpectedInProcess) {
-			return nil
-		}
 		return err
 	}
 
@@ -125,4 +122,18 @@ func NeedDoPostProvision(ctx context.Context, cli client.Reader, actionCtx *Acti
 	}
 
 	return needDoActionByCheckingJobNAnnotation(ctx, cli, actionCtx)
+}
+
+func IsImmediatelyOrRuntimeReadyPreCondition(action *appsv1alpha1.Action) bool {
+	if action == nil {
+		return false
+	}
+	actionPreCondition := action.PreCondition
+	if actionPreCondition != nil {
+		switch *actionPreCondition {
+		case appsv1alpha1.ImmediatelyPreConditionType, appsv1alpha1.RuntimeReadyPreConditionType:
+			return true
+		}
+	}
+	return false
 }

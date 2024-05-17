@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"time"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -59,12 +57,29 @@ func (t *componentPostProvisionTransformer) Transform(ctx graph.TransformContext
 	}
 
 	if err := component.ReconcileCompPostProvision(reqCtx.Ctx, transCtx.Client, graphCli, actionCtx, dag); err != nil {
-		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeRequeue) {
+		// When postProvision action's preCondition is Immediately or RuntimeReady, only the task success will be component status become Ready.
+		if postProvisionPrematureStopCondition(synthesizeComp.LifecycleActions) {
 			comp.Status.Phase = appsv1alpha1.CreatingClusterCompPhase
 			graphCli.Status(dag, comp, transCtx.Component)
-			return newRequeueError(time.Second*1, "requeue for component post-provision action")
+			reqCtx.Log.Info("Component postProvision prematurely stopped", "component", comp.Name, "err", err)
+			return graph.ErrPrematureStop
+		}
+		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeExpectedInProcess) {
+			return nil
 		}
 		return err
 	}
 	return nil
+}
+
+// postProvisionPrematureStopCondition checks if the component postProvision action should stop prematurely.
+func postProvisionPrematureStopCondition(lifecycleActions *appsv1alpha1.ComponentLifecycleActions) bool {
+	if lifecycleActions == nil || lifecycleActions.PostProvision == nil ||
+		lifecycleActions.PostProvision.CustomHandler == nil {
+		return false
+	}
+	if component.IsImmediatelyOrRuntimeReadyPreCondition(lifecycleActions.PostProvision.CustomHandler) {
+		return true
+	}
+	return false
 }

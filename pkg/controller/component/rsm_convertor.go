@@ -268,7 +268,8 @@ func (c *itsRoleProbeConvertor) convert(args ...any) (any, error) {
 		return nil, err
 	}
 
-	if synthesizeComp.LifecycleActions == nil || synthesizeComp.LifecycleActions.RoleProbe == nil {
+	if synthesizeComp.LifecycleActions == nil || synthesizeComp.LifecycleActions.RoleProbe == nil ||
+		synthesizeComp.LifecycleActions.RoleProbe.CustomHandler.Exec == nil {
 		return nil, nil
 	}
 

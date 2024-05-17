@@ -21,11 +21,14 @@ package component
 
 import (
 	"context"
+	"errors"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/job"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -92,10 +95,19 @@ func NeedDoPostProvision(ctx context.Context, cli client.Reader, actionCtx *Acti
 		return false, nil
 	}
 
-	// TODO(xingran): The PostProvision handling for the ComponentReady & ClusterReady condition has been implemented. The PostProvision for other conditions is currently pending implementation.
 	actionPreCondition := actionCtx.lifecycleActions.PostProvision.CustomHandler.PreCondition
 	if actionPreCondition != nil {
 		switch *actionPreCondition {
+		case appsv1alpha1.ImmediatelyPreConditionType:
+			return needDoActionByCheckingJobNAnnotation(ctx, cli, actionCtx)
+		case appsv1alpha1.RuntimeReadyPreConditionType:
+			if actionCtx.workload == nil {
+				return false, intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "runtime is nil when checking RuntimeReady preCondition in postProvision action")
+			}
+			runningITS, _ := actionCtx.workload.(*workloads.InstanceSet)
+			if !instanceset.IsInstancesReady(runningITS) {
+				return false, intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "runtime is not ready when checking RuntimeReady preCondition in postProvision action")
+			}
 		case appsv1alpha1.ComponentReadyPreConditionType:
 			if actionCtx.component.Status.Phase != appsv1alpha1.RunningClusterCompPhase {
 				return false, nil
@@ -105,7 +117,7 @@ func NeedDoPostProvision(ctx context.Context, cli client.Reader, actionCtx *Acti
 				return false, nil
 			}
 		default:
-			return false, nil
+			return false, errors.New("unsupported postProvision preCondition type")
 		}
 	} else if actionCtx.component.Status.Phase != appsv1alpha1.RunningClusterCompPhase {
 		// if the PreCondition is not set, the default preCondition is ComponentReady

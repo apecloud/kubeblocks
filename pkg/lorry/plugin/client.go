@@ -28,7 +28,7 @@ import (
 )
 
 func NewPluginClient(host, port string) (DBPluginClient, error) {
-	addr := fmt.Sprintf("tcp://%s:%s", host, port)
+	addr := fmt.Sprintf("%s:%s", host, port)
 	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, errors.Wrap(err, "grpc: failed to dial")

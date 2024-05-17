@@ -109,6 +109,15 @@ func adaptLorryIfCustomHandlerDefined(synthesizeComp *SynthesizedComponent, lorr
 	if len(actions) == 0 {
 		return
 	}
+	actionJSON, _ := json.Marshal(actions)
+	lorryContainer.Env = append(lorryContainer.Env, corev1.EnvVar{
+		Name:  constant.KBEnvActionHandlers,
+		Value: string(actionJSON),
+	})
+
+	if execImage == "" {
+		return
+	}
 	initContainer := buildLorryInitContainer()
 	synthesizeComp.PodSpec.InitContainers = append(synthesizeComp.PodSpec.InitContainers, *initContainer)
 	lorryContainer.Image = execImage
@@ -118,12 +127,6 @@ func adaptLorryIfCustomHandlerDefined(synthesizeComp *SynthesizedComponent, lorr
 		"--grpcport", strconv.Itoa(lorryGRPCPort),
 		"--config-path", "/kubeblocks/config/lorry/components/",
 	}
-	actionJSON, _ := json.Marshal(actions)
-	lorryContainer.Env = append(lorryContainer.Env, corev1.EnvVar{
-		Name:  constant.KBEnvActionHandlers,
-		Value: string(actionJSON),
-	})
-
 	if execContainer == nil {
 		return
 	}

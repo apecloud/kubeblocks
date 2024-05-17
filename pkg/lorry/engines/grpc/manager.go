@@ -26,9 +26,11 @@ import (
 	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
 	"github.com/apecloud/kubeblocks/pkg/lorry/plugin"
+	"github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type Manager struct {
@@ -46,8 +48,8 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 
 	managerBase.DBStartupReady = false
 
-	host := "127.0.0.1"
-	if h, ok := properties["host"]; ok {
+	host := viperx.GetString(constant.KBEnvPodIP)
+	if h, ok := properties["host"]; ok && h != "" {
 		host = h
 	}
 	port, ok := properties["port"]

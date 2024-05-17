@@ -59,6 +59,7 @@ type Base struct {
 var actionHandlers = map[string]util.Handlers{}
 
 func init() {
+	viper.AutomaticEnv()
 	actionJSON := viper.GetString(constant.KBEnvActionHandlers)
 	if actionJSON == "" {
 		return

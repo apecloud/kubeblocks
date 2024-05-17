@@ -12557,22 +12557,6 @@ string
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.KBAccountType">KBAccountType
-(<code>byte</code> alias)</h3>
-<div>
-<p>KBAccountType is used for bitwise operation.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>0</p></td>
-<td></td>
-</tr></tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.LastComponentConfiguration">LastComponentConfiguration
 </h3>
 <p>

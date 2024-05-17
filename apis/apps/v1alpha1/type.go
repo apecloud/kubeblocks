@@ -641,20 +641,6 @@ const (
 	AnyPods ProvisionScope = "AnyPods"
 )
 
-// KBAccountType is used for bitwise operation.
-type KBAccountType uint8
-
-// System accounts represented in bit.
-const (
-	KBAccountInvalid        KBAccountType = 0
-	KBAccountAdmin                        = 1
-	KBAccountDataprotection               = 1 << 1
-	KBAccountProbe                        = 1 << 2
-	KBAccountMonitor                      = 1 << 3
-	KBAccountReplicator                   = 1 << 4
-	KBAccountMAX                          = KBAccountReplicator // KBAccountMAX indicates the max value of KBAccountType, used for validation.
-)
-
 // AccountName defines system account names.
 // +enum
 // +kubebuilder:validation:Enum={kbadmin,kbdataprotection,kbprobe,kbmonitoring,kbreplicator}
@@ -667,22 +653,6 @@ const (
 	MonitorAccount        AccountName = "kbmonitoring"
 	ReplicatorAccount     AccountName = "kbreplicator"
 )
-
-func (r AccountName) GetAccountID() KBAccountType {
-	switch r {
-	case AdminAccount:
-		return KBAccountAdmin
-	case DataprotectionAccount:
-		return KBAccountDataprotection
-	case ProbeAccount:
-		return KBAccountProbe
-	case MonitorAccount:
-		return KBAccountMonitor
-	case ReplicatorAccount:
-		return KBAccountReplicator
-	}
-	return KBAccountInvalid
-}
 
 // LetterCase defines the available cases to be used in password generation.
 //

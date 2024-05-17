@@ -96,7 +96,10 @@ func (p *Protection) Init(ctx context.Context) error {
 	}
 	p.SendEvent = true
 
-	p.Base.Init(ctx)
+	if err := p.Base.Init(ctx); err != nil {
+		return err
+	}
+
 	if err := p.Requester.init(ctx); err != nil {
 		return err
 	}

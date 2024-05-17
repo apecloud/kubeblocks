@@ -20,7 +20,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 syntax = "proto3";
 package plugin.v1;
 
+import "google/protobuf/descriptor.proto";
+
 option go_package = "github.com/apecloud/kubeblocks/pkg/lorry/plugin";
+
+extend google.protobuf.FieldOptions {
+  // Indicates that a field MAY contain information that is sensitive
+  // and MUST be treated as such (e.g. not logged).
+  bool kb_secret = 1059;
+}
 
 message GetPluginInfoRequest {
   map<string, string> metadata = 1;
@@ -65,7 +73,7 @@ message DBInfo {
   string admin_user = 3;
 
   // The admin password of the user used to access the DB service.
-  string admin_password = 4;
+  string admin_password = 4 [(kb_secret) = true];
 }
 
 message GetRoleRequest {
@@ -170,7 +178,7 @@ message AccountProvisionRequest {
   string user_name = 2;
 
   // the password of the new account.
-  string password = 3;
+  string password = 3 [(kb_secret) = true];
 
   // the role of the new account.
   string role = 4;

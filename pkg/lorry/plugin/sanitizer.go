@@ -28,29 +28,21 @@ import (
 	"github.com/golang/protobuf/descriptor"
 	"github.com/golang/protobuf/proto"
 	protobufdescriptor "github.com/golang/protobuf/protoc-gen-go/descriptor"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	descriptorpb "google.golang.org/protobuf/types/descriptorpb"
 )
 
-// StripSecrets returns a wrapper around the original CSI gRPC message
+// StripSecrets returns a wrapper around the original lorry gRPC message
 // which has a Stringer implementation that serializes the message
 // as one-line JSON, but without including secret information.
 // Instead of the secret value(s), the string "***stripped***" is
 // included in the result.
 //
-// StripSecrets relies on an extension in CSI 1.0 and thus can only
-// be used for messages based on that or a more recent spec!
-//
 // StripSecrets itself is fast and therefore it is cheap to pass the
 // result to logging functions which may or may not end up serializing
 // the parameter depending on the current log level.
 func StripSecrets(msg interface{}) fmt.Stringer {
-	return &stripSecrets{msg, isCSI1Secret}
-}
-
-// StripSecretsCSI03 is like StripSecrets, except that it works
-// for messages based on CSI 0.3 and older. It does not work
-// for CSI 1.0, use StripSecrets for that.
-func StripSecretsCSI03(msg interface{}) fmt.Stringer {
-	return &stripSecrets{msg, isCSI03Secret}
+	return &stripSecrets{msg, isKBSecret}
 }
 
 type stripSecrets struct {
@@ -144,30 +136,24 @@ func (s *stripSecrets) strip(parsed interface{}, msg interface{}) {
 	}
 }
 
-// isCSI1Secret uses the csi.E_CsiSecret extension from CSI 1.0 to
+// isKBSecret uses the kb_secret extension to
 // determine whether a field contains secrets.
-func isCSI1Secret(field *protobufdescriptor.FieldDescriptorProto) bool {
-	ex, err := proto.GetExtension(field.Options, e_CsiSecret)
+func isKBSecret(field *protobufdescriptor.FieldDescriptorProto) bool {
+	ex, err := proto.GetExtension(field.Options, kbSecret)
 	return err == nil && ex != nil && *ex.(*bool)
 }
 
-// Copied from the CSI 1.0 spec (https://github.com/container-storage-interface/spec/blob/37e74064635d27c8e33537c863b37ccb1182d4f8/lib/go/csi/csi.pb.go#L4520-L4527)
+// Copied from the dbplugin spec db_plugin.pb.go
 // to avoid a package dependency that would prevent usage of this package
 // in repos using an older version of the spec.
 //
-// Future revision of the CSI spec must not change this extensions, otherwise
+// Future revision of the DB plugin spec must not change this extensions, otherwise
 // they will break filtering in binaries based on the 1.0 version of the spec.
-var e_CsiSecret = &proto.ExtensionDesc{
-	ExtendedType:  (*protobufdescriptor.FieldOptions)(nil),
+var kbSecret = &protoimpl.ExtensionInfo{
+	ExtendedType:  (*descriptorpb.FieldOptions)(nil),
 	ExtensionType: (*bool)(nil),
 	Field:         1059,
-	Name:          "csi.v1.csi_secret",
-	Tag:           "varint,1059,opt,name=csi_secret,json=csiSecret",
-	Filename:      "github.com/container-storage-interface/spec/csi.proto",
-}
-
-// isCSI03Secret relies on the naming convention in CSI <= 0.3
-// to determine whether a field contains secrets.
-func isCSI03Secret(field *protobufdescriptor.FieldDescriptorProto) bool {
-	return strings.HasSuffix(field.GetName(), "_secrets")
+	Name:          "plugin.v1.kb_secret",
+	Tag:           "varint,1059,opt,name=kb_secret",
+	Filename:      "db_plugin.proto",
 }

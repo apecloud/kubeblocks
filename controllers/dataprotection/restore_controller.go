@@ -217,10 +217,13 @@ func (r *RestoreReconciler) newAction(reqCtx intctrlutil.RequestCtx, restore *dp
 		restore.Labels[dataProtectionWaitRepoPreparationKey] = trueVal
 	case err != nil:
 		dprestore.SetRestoreCheckBackupRepoCondition(restore, ReasonUnknownError, err.Error())
-		return RecorderEventAndRequeue(reqCtx, r.Recorder, restore, err)
+		sendWarningEventForError(r.Recorder, restore, err)
+		if patchErr := r.Client.Status().Patch(reqCtx.Ctx, restore, patch); patchErr != nil {
+			return intctrlutil.CheckedRequeueWithError(patchErr, reqCtx.Log, "")
+		}
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	default:
 		dprestore.SetRestoreCheckBackupRepoCondition(restore, dprestore.ReasonCheckBackupRepoSuccessfully, "")
-		// no error, fallthrough
 	}
 	if !reflect.DeepEqual(restore.ObjectMeta, oldRestore.ObjectMeta) {
 		if err := r.Client.Patch(reqCtx.Ctx, restore, patch); err != nil {

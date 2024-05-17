@@ -51,10 +51,9 @@ bootstrap:
 	)
 
 	var (
-		podSpec     *corev1.PodSpec
-		cfgTemplate []appsv1alpha1.ComponentConfigSpec
-		component   *ctrlcomp.SynthesizedComponent
-		cluster     *appsv1alpha1.Cluster
+		podSpec   *corev1.PodSpec
+		component *ctrlcomp.SynthesizedComponent
+		cluster   *appsv1alpha1.Cluster
 
 		mockClient *testutil.K8sClientMockHelper
 	)
@@ -209,14 +208,6 @@ bootstrap:
 			Name:        "mysql",
 			ClusterName: cluster.Name,
 		}
-		cfgTemplate = []appsv1alpha1.ComponentConfigSpec{{
-			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-				Name:        "mysql-config-8.0.2",
-				TemplateRef: "mysql-config",
-				VolumeName:  "config1",
-			},
-			ConfigConstraintRef: "mysql-config-8.0.2-constraint",
-		}}
 	})
 
 	AfterEach(func() {
@@ -242,7 +233,7 @@ bootstrap:
 						cmConfigFileName: patroniTemplate,
 					}},
 			}
-			cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, cfgTemplate, component, localObjs,
+			cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, component, localObjs,
 				&appsv1alpha1.Cluster{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "my_test",

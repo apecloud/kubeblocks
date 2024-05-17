@@ -28,7 +28,6 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/gotemplate"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -38,50 +37,22 @@ type ResourceDefinition struct {
 	CoreNum    int64 `json:"coreNum,omitempty"`
 }
 
-type componentTemplateValues struct {
-	TypeName    string
-	ServiceName string
-	Replicas    int32
-
-	// Container *corev1.Container
-	Resource    *ResourceDefinition
-	ConfigSpecs []appsv1alpha1.ComponentConfigSpec
-}
-
 type builtInObjects struct {
-	cluster         *appsv1alpha1.Cluster
-	podSpec         *corev1.PodSpec
-	component       *component.SynthesizedComponent
-	componentValues *componentTemplateValues
+	cluster   *appsv1alpha1.Cluster
+	podSpec   *corev1.PodSpec
+	component *component.SynthesizedComponent
 }
 
 // General built-in objects
 const (
-	builtinClusterObject           = "cluster"
-	builtinComponentObject         = "component"
-	builtinPodObject               = "podSpec"
-	builtinComponentResourceObject = "componentResource"
-	builtinClusterDomainObject     = "clusterDomain"
+	builtinClusterObject       = "cluster"
+	builtinComponentObject     = "component"
+	builtinPodObject           = "podSpec"
+	builtinClusterDomainObject = "clusterDomain"
 )
 
-func buildInComponentObjects(podSpec *corev1.PodSpec, component *component.SynthesizedComponent, configSpecs []appsv1alpha1.ComponentConfigSpec, cluster *appsv1alpha1.Cluster) *builtInObjects {
-	var resource *ResourceDefinition
-
-	container := intctrlutil.GetContainerByConfigSpec(podSpec, configSpecs)
-	if container != nil && len(container.Resources.Limits) > 0 {
-		resource = &ResourceDefinition{
-			MemorySize: intctrlutil.GetMemorySize(*container),
-			CoreNum:    intctrlutil.GetCoreNum(*container),
-		}
-	}
-
+func buildInComponentObjects(podSpec *corev1.PodSpec, component *component.SynthesizedComponent, cluster *appsv1alpha1.Cluster) *builtInObjects {
 	return &builtInObjects{
-		componentValues: &componentTemplateValues{
-			TypeName:    component.ClusterCompDefName,
-			Replicas:    component.Replicas,
-			Resource:    resource,
-			ConfigSpecs: configSpecs,
-		},
 		podSpec:   podSpec,
 		component: component,
 		cluster:   cluster,
@@ -107,10 +78,9 @@ func builtinObjectsAsValues(builtin *builtInObjects) (*gotemplate.TplValues, err
 
 func builtinCustomObjects(builtin *builtInObjects) map[string]any {
 	return map[string]any{
-		builtinClusterObject:           builtin.cluster,
-		builtinComponentObject:         builtin.component,
-		builtinPodObject:               builtin.podSpec,
-		builtinComponentResourceObject: builtin.componentValues.Resource,
-		builtinClusterDomainObject:     viper.GetString(constant.KubernetesClusterDomainEnv),
+		builtinClusterObject:       builtin.cluster,
+		builtinComponentObject:     builtin.component,
+		builtinPodObject:           builtin.podSpec,
+		builtinClusterDomainObject: viper.GetString(constant.KubernetesClusterDomainEnv),
 	}
 }

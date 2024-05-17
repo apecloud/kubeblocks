@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package plugin
 
 import (
+	context "context"
 	"fmt"
 	"net"
 	"os"
@@ -92,7 +93,7 @@ func (s *nonBlockingGRPCServer) serve(endpoint string, dbPlugin DBPluginServer) 
 	}
 
 	opts := []grpc.ServerOption{
-		grpc.UnaryInterceptor(logGRPC),
+		grpc.UnaryInterceptor(s.logGRPC),
 	}
 	server := grpc.NewServer(opts...)
 	s.server = server
@@ -103,4 +104,16 @@ func (s *nonBlockingGRPCServer) serve(endpoint string, dbPlugin DBPluginServer) 
 
 	server.Serve(listener)
 
+}
+
+func (s *nonBlockingGRPCServer) logGRPC(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	s.logger.V(1).Info("GRPC call", "fullMethod", info.FullMethod)
+	s.logger.V(2).Info("GRPC call", "request", StripSecrets(req))
+	resp, err := handler(ctx, req)
+	if err != nil {
+		s.logger.Info("GRPC call failed", "error", err.Error())
+	} else {
+		s.logger.V(2).Info("GRPC call", "response", StripSecrets(resp))
+	}
+	return resp, err
 }

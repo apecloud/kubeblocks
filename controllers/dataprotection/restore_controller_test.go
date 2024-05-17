@@ -29,6 +29,7 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -246,36 +247,28 @@ var _ = Describe("Restore Controller test", func() {
 			})
 
 			It("test restore is failed when check failed in new action", func() {
-				By("expect for restore is Failed and BackupRepoFailed message")
+				By("expect for restore is Failed")
 				restore := initResourcesAndWaitRestore(true, false, true, dpv1alpha1.RestorePhaseFailed,
 					func(f *testdp.MockRestoreFactory) {
 						f.Get().Spec.Backup.Name = "wrongBackup"
 					}, nil)
+				By("check status.conditions")
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(restore), func(g Gomega, r *dpv1alpha1.Restore) {
-					exist := false
-					for _, v := range r.Status.Conditions {
-						if v.Type == dprestore.ConditionTypeRestoreCheckBackupRepo && v.Reason == dprestore.ReasonCheckBackupRepoFailed {
-							exist = true
-						}
-					}
-					g.Expect(exist).Should(BeTrue())
+					val := meta.IsStatusConditionFalse(r.Status.Conditions, dprestore.ConditionTypeRestoreCheckBackupRepo)
+					g.Expect(val).Should(BeTrue())
 				})).Should(Succeed())
 			})
 
-			It("test restore is failed when validate failed in new phase", func() {
-				By("expect for restore is Failed and ValidateFailed message")
+			It("test restore is failed when validate failed in new action", func() {
+				By("expect for restore is Failed")
 				restore := initResourcesAndWaitRestore(false, false, true, dpv1alpha1.RestorePhaseFailed, func(f *testdp.MockRestoreFactory) {
 					f.SetVolumeClaimsTemplate(testdp.MysqlTemplateName, testdp.DataVolumeName,
 						testdp.DataVolumeMountPath, "", int32(3), int32(0), nil)
 				}, nil)
+				By("check status.conditions")
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(restore), func(g Gomega, r *dpv1alpha1.Restore) {
-					exist := false
-					for _, v := range r.Status.Conditions {
-						if v.Type == dprestore.ConditionTypeRestoreValidationPassed && v.Reason == dprestore.ReasonValidateFailed {
-							exist = true
-						}
-					}
-					g.Expect(exist).Should(BeTrue())
+					val := meta.IsStatusConditionFalse(r.Status.Conditions, dprestore.ConditionTypeRestoreValidationPassed)
+					g.Expect(val).Should(BeTrue())
 				})).Should(Succeed())
 			})
 

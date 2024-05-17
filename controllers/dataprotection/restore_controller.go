@@ -216,6 +216,7 @@ func (r *RestoreReconciler) newAction(reqCtx intctrlutil.RequestCtx, restore *dp
 		restore.Labels[dataProtectionBackupRepoKey] = repoName
 		restore.Labels[dataProtectionWaitRepoPreparationKey] = trueVal
 	case err != nil:
+		dprestore.SetRestoreCheckBackupRepoCondition(restore, ReasonUnknownError, err.Error())
 		return RecorderEventAndRequeue(reqCtx, r.Recorder, restore, err)
 	default:
 		dprestore.SetRestoreCheckBackupRepoCondition(restore, dprestore.ReasonCheckBackupRepoSuccessfully, "")

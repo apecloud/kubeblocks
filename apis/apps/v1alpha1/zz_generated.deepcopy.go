@@ -1688,11 +1688,6 @@ func (in *ComponentDefinitionSpec) DeepCopyInto(out *ComponentDefinitionSpec) {
 		*out = make([]ReplicaRole, len(*in))
 		copy(*out, *in)
 	}
-	if in.RoleArbitrator != nil {
-		in, out := &in.RoleArbitrator, &out.RoleArbitrator
-		*out = new(RoleArbitrator)
-		**out = **in
-	}
 	if in.LifecycleActions != nil {
 		in, out := &in.LifecycleActions, &out.LifecycleActions
 		*out = new(ComponentLifecycleActions)

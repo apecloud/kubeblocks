@@ -677,7 +677,7 @@ type OpsService struct {
 	// Specifies a role to target with the service.
 	// If specified, the service will only be exposed to pods with the matching role.
 	//
-	// Note: At least one of 'roleSelector' or 'selector' must be specified.
+	// Note: At least one of 'roleSelector' or 'podSelector' must be specified.
 	// If both are specified, a pod must match both conditions to be selected.
 	//
 	// +optional
@@ -686,12 +686,12 @@ type OpsService struct {
 	// Routes service traffic to pods with matching label keys and values.
 	// If specified, the service will only be exposed to pods matching the selector.
 	//
-	// Note: At least one of 'roleSelector' or 'selector' must be specified.
+	// Note: At least one of 'roleSelector' or 'podSelector' must be specified.
 	// If both are specified, a pod must match both conditions to be selected.
 	//
 	// +optional
 	// +mapType=atomic
-	PodSelector map[string]string `json:"podSelector,omitempty" protobuf:"bytes,2,rep,name=selector"`
+	PodSelector map[string]string `json:"podSelector,omitempty"`
 
 	// Determines how the Service is exposed. Defaults to 'ClusterIP'.
 	// Valid options are `ClusterIP`, `NodePort`, and `LoadBalancer`.
@@ -870,7 +870,6 @@ type Backup struct {
 	// - `Retain` means that the backup content and its physical snapshot on backup repository are kept.
 	// - `Delete` means that the backup content and its physical snapshot on backup repository are deleted.
 	// +kubebuilder:validation:Enum=Delete;Retain
-	// +kubebuilder:validation:Required
 	// +kubebuilder:default=Delete
 	// +optional
 	DeletionPolicy string `json:"deletionPolicy,omitempty"`

@@ -57,7 +57,7 @@ func (t *componentPostProvisionTransformer) Transform(ctx graph.TransformContext
 	}
 
 	if err := component.ReconcileCompPostProvision(reqCtx.Ctx, transCtx.Client, graphCli, actionCtx, dag); err != nil {
-		// When postProvision action's preCondition is Immediately or RuntimeReady, only the task success will be component status become Ready.
+		// When postProvision action's preCondition is Immediately or RuntimeReady, the Component's status will become Ready only after the task succeed.
 		if postProvisionPrematureStopCondition(synthesizeComp.LifecycleActions) {
 			comp.Status.Phase = appsv1alpha1.CreatingClusterCompPhase
 			graphCli.Status(dag, comp, transCtx.Component)

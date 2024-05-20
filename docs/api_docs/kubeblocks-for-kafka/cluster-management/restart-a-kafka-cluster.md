@@ -29,10 +29,10 @@ Restarting a Kafka cluster triggers a concurrent restart and the leader may chan
     name: ops-restart
     namespace: demo
   spec:
-    clusterName: 
+    clusterName: mycluster
     type: Restart 
     restart:
-    - componentName: kafka
+    - componentName: broker
   EOF
   ```
 

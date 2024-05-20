@@ -37,7 +37,7 @@ The faults here are all simulated by deleting a pod. When there are sufficient r
 
 ***Steps:***
 
-1. View the pod role of the ApeCloud MySQL RaftGroup. In this example, the leader pod's name is mysql-cluster-1.
+1. View the pod role of the ApeCloud MySQL RaftGroup. In this example, the leader pod's name is `mysql-cluster-1`.
 
     ```bash
     kubectl get pods --show-labels -n demo | grep role

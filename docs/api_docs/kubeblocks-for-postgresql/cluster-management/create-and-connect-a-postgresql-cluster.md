@@ -53,50 +53,49 @@ KubeBlocks supports creating two types of PostgreSQL clusters: Standalone and Re
 
 KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a Standalone.
 
-```bash
+```yaml
 cat <<EOF | kubectl apply -f -
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   name: mycluster
   namespace: demo
-  labels:
-    helm.sh/chart: postgresql-cluster-0.8.0
-    app.kubernetes.io/version: "14.8.0"
-    app.kubernetes.io/instance: mycluster
 spec:
-  clusterVersionRef: postgresql-14.8.0
+  clusterDefinitionRef: postgresql
+  clusterVersionRef: postgresql-12.14.0
   terminationPolicy: Delete
   affinity:
     podAntiAffinity: Preferred
     topologyKeys:
-      - kubernetes.io/hostname
+    - kubernetes.io/hostname
     tenancy: SharedNode
-  clusterDefinitionRef: postgresql
+  tolerations:
+    - key: kb-data
+      operator: Equal
+      value: 'true'
+      effect: NoSchedule
   componentSpecs:
-    - name: postgresql
-      componentDefRef: postgresql
-      monitorEnabled: false
-      replicas: 2
-      enabledLogs:
-        - running
-      serviceAccountName:
-      resources:
-        limits:
-          cpu: "0.5"
-          memory: "0.5Gi"
-        requests:
-          cpu: "0.5"
-          memory: "0.5Gi"
-      volumeClaimTemplates:
-        - name: data # ref clusterDefinition components.containers.volumeMounts.name
-          spec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 20Gi
-      services:
+  - name: postgresql
+    componentDefRef: postgresql
+    enabledLogs:
+    - running
+    monitor: false
+    replicas: 1
+    resources:
+      limits:
+        cpu: '0.5'
+        memory: 0.5Gi
+      requests:
+        cpu: '0.5'
+        memory: 0.5Gi
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
 EOF
 ```
 
@@ -109,7 +108,54 @@ EOF
 * `spec.componentSpecs.replicas` is the number of replicas of the component.
 * `spec.componentSpecs.resources` is the resource requirements of the component.
 
-KubeBlocks operator watches for the `Cluster` CRD and creates the cluster and all dependent resources. You can get all the resources created by the cluster with `kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=pg-cluster -n demo`.
+If you only have one node for deploying a Replication Cluster, set `spec.affinity.topologyKeys` as `null`.
+
+```yaml
+cat <<EOF | kubectl apply -f -
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: mycluster
+  namespace: demo
+spec:
+  clusterDefinitionRef: postgresql
+  clusterVersionRef: postgresql-12.14.0
+  terminationPolicy: Delete
+  affinity:
+    podAntiAffinity: Preferred
+    topologyKeys: null
+    tenancy: SharedNode
+  tolerations:
+    - key: kb-data
+      operator: Equal
+      value: 'true'
+      effect: NoSchedule
+  componentSpecs:
+  - name: postgresql
+    componentDefRef: postgresql
+    enabledLogs:
+    - running
+    monitor: false
+    replicas: 1
+    resources:
+      limits:
+        cpu: '0.5'
+        memory: 0.5Gi
+      requests:
+        cpu: '0.5'
+        memory: 0.5Gi
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+EOF
+```
+
+KubeBlocks operator watches for the `Cluster` CRD and creates the cluster and all dependent resources. You can get all the resources created by the cluster with `kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=mycluster -n demo`.
 
 ```bash
 kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=mycluster -n demo
@@ -130,30 +176,26 @@ apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   annotations:
+    kubeblocks.io/reconcile: "2024-05-17T03:17:08.617771416Z"
     kubectl.kubernetes.io/last-applied-configuration: |
-      {"apiVersion":"apps.kubeblocks.io/v1alpha1","kind":"Cluster","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"mycluster","app.kubernetes.io/version":"14.8.0","helm.sh/chart":"postgresql-cluster-0.8.0"},"name":"mycluster","namespace":"demo"},"spec":{"affinity":{"podAntiAffinity":"Preferred","tenancy":"SharedNode","topologyKeys":["kubernetes.io/hostname"]},"clusterDefinitionRef":"postgresql","clusterVersionRef":"postgresql-14.8.0","componentSpecs":[{"componentDefRef":"postgresql","enabledLogs":["running"],"monitor":false,"name":"postgresql","replicas":2,"resources":{"limits":{"cpu":"0.5","memory":"0.5Gi"},"requests":{"cpu":"0.5","memory":"0.5Gi"}},"serviceAccountName":null,"services":null,"switchPolicy":{"type":"Noop"},"volumeClaimTemplates":[{"name":"data","spec":{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"20Gi"}}}}]}],"terminationPolicy":"Delete"}}
-  creationTimestamp: "2024-04-28T07:35:17Z"
+      {"apiVersion":"apps.kubeblocks.io/v1alpha1","kind":"Cluster","metadata":{"annotations":{},"name":"mycluster","namespace":"demo"},"spec":{"affinity":{"podAntiAffinity":"Preferred","tenancy":"SharedNode","topologyKeys":null},"clusterDefinitionRef":"postgresql","clusterVersionRef":"postgresql-12.14.0","componentSpecs":[{"componentDefRef":"postgresql","enabledLogs":["running"],"monitor":false,"name":"postgresql","replicas":2,"resources":{"limits":{"cpu":"0.5","memory":"0.5Gi"},"requests":{"cpu":"0.5","memory":"0.5Gi"}},"volumeClaimTemplates":[{"name":"data","spec":{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"20Gi"}}}}]}],"terminationPolicy":"Delete","tolerations":[{"effect":"NoSchedule","key":"kb-data","operator":"Equal","value":"true"}]}}
+  creationTimestamp: "2024-05-17T02:36:28Z"
   finalizers:
   - cluster.kubeblocks.io/finalizer
   generation: 1
   labels:
-    app.kubernetes.io/instance: mycluster
-    app.kubernetes.io/version: 14.8.0
     clusterdefinition.kubeblocks.io/name: postgresql
-    clusterversion.kubeblocks.io/name: postgresql-14.8.0
-    helm.sh/chart: postgresql-cluster-0.8.0
+    clusterversion.kubeblocks.io/name: postgresql-12.14.0
   name: mycluster
   namespace: demo
-  resourceVersion: "479970"
-  uid: 3ff69576-b425-4672-8b5d-9706e2509611
+  resourceVersion: "1019716"
+  uid: 8123622e-2fd4-4d13-8836-61c4e2dc8df4
 spec:
   affinity:
     podAntiAffinity: Preferred
     tenancy: SharedNode
-    topologyKeys:
-    - kubernetes.io/hostname
   clusterDefinitionRef: postgresql
-  clusterVersionRef: postgresql-14.8.0
+  clusterVersionRef: postgresql-12.14.0
   componentSpecs:
   - componentDefRef: postgresql
     enabledLogs:
@@ -177,32 +219,37 @@ spec:
           requests:
             storage: 20Gi
   terminationPolicy: Delete
+  tolerations:
+  - effect: NoSchedule
+    key: kb-data
+    operator: Equal
+    value: "true"
 status:
-  clusterDefGeneration: 3
+  clusterDefGeneration: 2
   components:
     postgresql:
       phase: Running
       podsReady: true
-      podsReadyTime: "2024-04-28T07:36:50Z"
+      podsReadyTime: "2024-05-17T02:37:50Z"
   conditions:
-  - lastTransitionTime: "2024-04-28T07:35:18Z"
+  - lastTransitionTime: "2024-05-17T02:36:28Z"
     message: 'The operator has started the provisioning of Cluster: mycluster'
     observedGeneration: 1
     reason: PreCheckSucceed
     status: "True"
     type: ProvisioningStarted
-  - lastTransitionTime: "2024-04-28T07:35:18Z"
+  - lastTransitionTime: "2024-05-17T02:36:28Z"
     message: Successfully applied for resources
     observedGeneration: 1
     reason: ApplyResourcesSucceed
     status: "True"
     type: ApplyResources
-  - lastTransitionTime: "2024-04-28T07:36:50Z"
+  - lastTransitionTime: "2024-05-17T02:37:50Z"
     message: all pods of components are ready, waiting for the probe detection successful
     reason: AllReplicasReady
     status: "True"
     type: ReplicasReady
-  - lastTransitionTime: "2024-04-28T07:36:50Z"
+  - lastTransitionTime: "2024-05-17T02:37:50Z"
     message: 'Cluster: mycluster is ready, current phase is Running'
     reason: ClusterReady
     status: "True"

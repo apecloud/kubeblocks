@@ -56,7 +56,7 @@ cat <<EOF | kubectl apply -f -
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: mysql-cluster
+  name: mycluster
   namespace: demo
 spec:
   clusterDefinitionRef: mysql

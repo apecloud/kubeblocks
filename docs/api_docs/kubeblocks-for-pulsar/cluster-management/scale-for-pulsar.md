@@ -178,7 +178,7 @@ In the example below, a snapshot exception occurs.
 Status:
   conditions: 
   - lastTransitionTime: "2023-02-08T04:20:26Z"
-    message: VolumeSnapshot/mysql-cluster-mysql-scaling-dbqgp: Failed to set default snapshot
+    message: VolumeSnapshot/mycluster-pulsar-scaling-dbqgp: Failed to set default snapshot
       class with error cannot find default snapshot class
     reason: ApplyResourcesFailed
     status: "False"

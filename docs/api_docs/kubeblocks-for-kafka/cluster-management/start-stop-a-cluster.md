@@ -25,7 +25,7 @@ kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: opsa-stop
+  name: ops-stop
   namespace: demo
 spec:
   clusterName: mycluster

@@ -38,7 +38,7 @@ But it's also important to note that the dynamic parameter configuration doesn't
      - configFileParams:
          mongodb.cnf:
            parameters:
-             log.cleanup.policy: "compact"
+             log.flush.interval.ms: "2000"
        configSpec:
          constraintRef: kafka-config-constraints
          name: kafka-configuration
@@ -75,11 +75,11 @@ But it's also important to note that the dynamic parameter configuration doesn't
        componentName: kafka
        configurations:
        - keys:
-         - key: kafka.conf
+         - key: server.properties
            parameters:
-           - key: log.cleanup.policy
-             value: "compact"
-         name: kafka-config
+           - key: log.flush.interval.ms
+             value: "2000"
+         name: kafka-configuration-tpl
      ttlSecondBeforeAbort: 0
      type: Reconfiguring
    EOF

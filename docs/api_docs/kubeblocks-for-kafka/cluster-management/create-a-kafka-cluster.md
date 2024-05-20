@@ -46,91 +46,192 @@ This document shows how to create a Kafka cluster.
 * The controller number suggested ranges from 3 to 5, out of complexity and availability.
 
 :::
+
 ## Create a Kafka cluster
 
 * Create a Kafka cluster in combined mode.
 
-    ```bash
+    ```yaml
     # create kafka in combined mode 
     kubectl apply -f - <<EOF
     apiVersion: apps.kubeblocks.io/v1alpha1
     kind: Cluster
     metadata:
-      name: mycluster-combined
+      name: kafka-cluster
       namespace: demo
+      annotations:
+        "kubeblocks.io/extra-env": '{"KB_KAFKA_ENABLE_SASL":"false","KB_KAFKA_BROKER_HEAP":"-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64","KB_KAFKA_CONTROLLER_HEAP":"-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64","KB_KAFKA_PUBLIC_ACCESS":"false", "KB_KAFKA_BROKER_NODEPORT": "false"}'
+        kubeblocks.io/enabled-pod-ordinal-svc: broker
     spec:
-      affinity:
-        podAntiAffinity: Preferred
-        tenancy: SharedNode
-        topologyKeys:
-        - kubernetes.io/hostname
       clusterDefinitionRef: kafka
       clusterVersionRef: kafka-3.3.2
+      terminationPolicy: Delete
+      affinity:
+        podAntiAffinity: Preferred
+        topologyKeys:
+        - kubernetes.io/hostname
+        tenancy: SharedNode
+      tolerations:
+        - key: kb-data
+          operator: Equal
+          value: "true"
+          effect: NoSchedule
+      services:
+      - name: bootstrap
+        serviceName: bootstrap
+        componentSelector: broker
+        spec:
+          type: ClusterIP
+          ports:
+          - name: kafka-client
+            targetPort: 9092
+            port: 9092
       componentSpecs:
-      - componentDefRef: kafka-server
-        monitor: false
-        name: broker
-        noCreatePDB: false
+      - name: broker
+        componentDef: kafka-combine
+        tls: false
+        replicas: 1
+        serviceAccountName: kb-kafka-cluster
+        resources:
+          limits:
+            cpu: '0.5'
+            memory: 0.5Gi
+          requests:
+            cpu: '0.5'
+            memory: 0.5Gi
+        volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+            - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi
+        - name: metadata
+          spec:
+            accessModes:
+            - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi
+      - name: metrics-exp
+        componentDefRef: kafka-exporter
+        componentDef: kafka-exporter
         replicas: 1
         resources:
           limits:
-            cpu: "0.5"
+            cpu: '0.5'
             memory: 0.5Gi
           requests:
-            cpu: "0.5"
+            cpu: '0.5'
             memory: 0.5Gi
-        serviceAccountName: kb-kafka-sa
-      terminationPolicy: Delete
     EOF
     ```
 
 * Create a Kafka cluster in separated mode.
 
-    ```bash
+    ```yaml
     # Create kafka cluster in separated mode
     kubectl apply -f - <<EOF
     apiVersion: apps.kubeblocks.io/v1alpha1
     kind: Cluster
     metadata:
-      name: mycluster-separated
+      name: kafka-cluster
       namespace: demo
+      annotations:
+        "kubeblocks.io/extra-env": '{"KB_KAFKA_ENABLE_SASL":"false","KB_KAFKA_BROKER_HEAP":"-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64","KB_KAFKA_CONTROLLER_HEAP":"-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64","KB_KAFKA_PUBLIC_ACCESS":"false", "KB_KAFKA_BROKER_NODEPORT": "false"}'
+        kubeblocks.io/enabled-pod-ordinal-svc: broker
     spec:
-      affinity:
-        podAntiAffinity: Preferred
-        tenancy: SharedNode
-        topologyKeys:
-        - kubernetes.io/hostname
       clusterDefinitionRef: kafka
       clusterVersionRef: kafka-3.3.2
-      componentSpecs:
-      - componentDefRef: controller
-        monitor: false
-        name: controller
-        noCreatePDB: false
-        replicas: 1
-        resources:
-          limits:
-            cpu: "0.5"
-            memory: 0.5Gi
-          requests:
-            cpu: "0.5"
-            memory: 0.5Gi
-        serviceAccountName: kb-kafka-sa
-        tls: false
-      - componentDefRef: kafka-broker
-        monitor: false
-        name: broker
-        noCreatePDB: false
-        replicas: 1
-        resources:
-          limits:
-            cpu: "0.5"
-            memory: 0.5Gi
-          requests:
-            cpu: "0.5"
-            memory: 0.5Gi
-        serviceAccountName: kb-kafka-sa
-        tls: false
       terminationPolicy: Delete
+      affinity:
+        podAntiAffinity: Preferred
+        topologyKeys:
+        - kubernetes.io/hostname
+        tenancy: SharedNode
+        tolerations:
+          - key: kb-data
+            operator: Equal
+            value: "true"
+            effect: NoSchedule
+        services:
+          - name: bootstrap
+            serviceName: bootstrap
+            componentSelector: broker
+        spec:
+            type: ClusterIP
+            ports:
+            - name: kafka-client
+              targetPort: 9092
+              port: 9092
+    componentSpecs:
+    - name: broker
+      componentDef: kafka-broker
+      tls: false
+      replicas: 1
+      serviceAccountName: kb-kafka-cluster
+      resources:
+        limits:
+          cpu: '0.5'
+          memory: 0.5Gi
+        requests:
+          cpu: '0.5'
+          memory: 0.5Gi
+      volumeClaimTemplates:
+      - name: data
+        spec:
+          accessModes:
+          - ReadWriteOnce
+          resources:
+            requests:
+              storage: 20Gi
+      - name: metadata
+        spec:
+          storageClassName: null
+          accessModes:
+          - ReadWriteOnce
+          resources:
+            requests:
+              storage: 5Gi
+    - name: controller
+      componentDefRef: controller
+      componentDef: kafka-controller
+      tls: false
+      replicas: 1
+      serviceAccountName: kb-kafka-cluster
+      resources:
+        limits:
+          cpu: '0.5'
+          memory: 0.5Gi
+        requests:
+          cpu: '0.5'
+          memory: 0.5Gi
+      volumeClaimTemplates:
+      - name: metadata
+        spec:
+          storageClassName: null
+          accessModes:
+          - ReadWriteOnce
+          resources:
+            requests:
+              storage: 20Gi
+    - name: metrics-exp
+      componentDefRef: kafka-exporter
+      componentDef: kafka-exporter
+      replicas: 1
+      resources:
+        limits:
+          cpu: '0.5'
+          memory: 0.5Gi
+        requests:
+          cpu: '0.5'
+          memory: 0.5Gi
     EOF
     ```
+
+:::note
+
+If you only have one node for deploying a RaftGroup Cluster, set `spec.affinity.topologyKeys` as `null`.
+
+:::

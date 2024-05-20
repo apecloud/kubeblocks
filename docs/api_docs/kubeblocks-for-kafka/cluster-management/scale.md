@@ -192,9 +192,6 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
    metadata:
-    apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
      name: mycluster
      namespace: demo
    spec:
@@ -250,7 +247,7 @@ In the example below, a snapshot exception occurs.
 Status:
   conditions: 
   - lastTransitionTime: "2023-02-08T04:20:26Z"
-    message: VolumeSnapshot/ivy85-kafka-scaling-dbqgp: Failed to set default snapshot
+    message: VolumeSnapshot/mycluster-kafka-scaling-dbqgp: Failed to set default snapshot
       class with error cannot find default snapshot class
     reason: ApplyResourcesFailed
     status: "False"

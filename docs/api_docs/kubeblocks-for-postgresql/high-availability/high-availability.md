@@ -21,82 +21,97 @@ KubeBlocks integrates [the open-source Patroni solution](https://patroni.readthe
     >
     probes:
       roleProbe:
-        failureThreshold: 3
-        periodSeconds: 2
+        failureThreshold: 2
+        periodSeconds: 1
         timeoutSeconds: 1
     ```
 
 ## Steps
 
-1. View the initial status of the PostgreSQL cluster.
+1. View the initial status of the PostgreSQL cluster and pods.
 
    ```bash
-   kbcli cluster describe pg-cluster
+   kubectl get cluster mycluster -n demo
+
+   kubectl -n demo get pod -L kubeblocks.io/role
    ```
 
-   ![PostgreSQL cluster original status](../../../img/pgsql-ha-before.png)
+   ![PostgreSQL cluster original status](./../../../img/api-ha-pg-original-status.png)
 
-   Currently, `pg-cluster-postgresql-0` is the primary pod and `pg-cluster-postgresql-1` is the secondary pod.
+   Currently, `mycluster-postgresql-0` is the primary pod and `mycluster-postgresql-1` is the secondary pod.
 
 2. Simulate a primary pod exception.
 
    ```bash
    # Enter the primary pod
-   kubectl exec -it pg-cluster-postgresql-0  -- bash
+   kubectl exec -it mycluster-postgresql-0 -n demo -- bash
 
    # Delete the data directory of PostgreSQL to simulate an exception
-   root@postgres-postgresql-0:/home/postgres# rm -fr /home/postgres/pgdata/pgroot/data
+   root@mycluster-postgresql-0:/home/postgres# rm -fr /home/postgres/pgdata/pgroot/data
    ```
 
 3. View logs to observe how the roles of pods switch  when an exception occurs.
 
    ```bash
    # View the primary pod logs
-   kubectl logs pg-cluster-postgresql-0
+   kubectl logs mycluster-postgresql-0 -n demo
    ```
 
    In the logs, the leader lock is released from the primary pod and an HA switch occurs.
 
    ```bash
-   2023-04-18 08:06:52,338 INFO: Lock owner: pg-cluster-postgresql-0; I am pg-cluster-postgresql-0
-   2023-04-18 08:06:52,460 INFO: Leader key released
-   2023-04-18 08:06:52,552 INFO: released leader key voluntarily as data dir empty and currently leader
-   2023-04-18 08:06:52,553 INFO: Lock owner: pg-cluster-postgresql-1; I am pg-cluster-postgresql-0
-   2023-04-18 08:06:52,553 INFO: trying to bootstrap from leader 'pg-cluster-postgresql-1'
+   2024-05-17 02:41:23,523 INFO: Lock owner: mycluster-postgresql-0; I am mycluster-postgresql-0
+   2024-05-17 02:41:23,702 INFO: Leader key released
+   2024-05-17 02:41:23,904 INFO: released leader key voluntarily as data dir empty and currently leader
+   2024-05-17 02:41:23,905 INFO: Lock owner: mycluster-postgresql-1; I am mycluster-postgresql-0
+   2024-05-17 02:41:23,906 INFO: trying to bootstrap from leader 'mycluster-postgresql-1'
    ```
 
    ```bash
    # View secondary pod logs
-   kubectl logs pg-cluster-postgresql-1
+   kubectl logs mycluster-postgresql-1 -n demo
    ```
 
    In the logs, the original secondary pod has obtained the lock and become the leader.
 
    ```bash
-   2023-04-18 08:07:14,441 INFO: no action. I am (pg-cluster-postgresql-1), the leader with the lock
-   2023-04-18 08:07:24,354 INFO: no action. I am (pg-cluster-postgresql-1), the leader with the lock
+   2024-05-17 02:41:35,806 INFO: no action. I am (mycluster-postgresql-1), the leader with the lock
+   2024-05-17 02:41:45,804 INFO: no action. I am (mycluster-postgresql-1), the leader with the lock
    ```
 
 4. Connect to the PostgreSQL cluster to view the replication information.
 
    ```bash
-   kbcli cluster connect pg-cluster
+   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+   >
+   postgres
+
+   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+   >
+   shgkz4z9
+
+   kubectl exec -ti -n demo mycluster-postgresql-1 -- bash
+
+   root@mycluster-postgresql-0:/home/postgres# psql -U postgres -W
+   Password: shgkz4z9
    ```
 
    ```bash
    postgres=# select * from pg_stat_replication;
    ```
 
-   ![PostgreSQL replication info](../../../img/pgsql-ha-pg_stat_replication.png)
+   ![PostgreSQL replication info](./../../../img/api-ha-pg-replication-info.png)
 
    From the output, `pg-cluster-postgresql-0` has been assigned as the secondary's pod.
 
-5. Describe the cluster and check the instance role.
+5. View the status of the PostgreSQL cluster and pods again.
 
    ```bash
-   kbcli cluster describe pg-cluster
+   kubectl get cluster mycluster -n demo
+
+   kubectl -n demo get pod -L kubeblocks.io/role
    ```
 
-   ![PostgreSQL cluster status after HA](../../../img/pgsql-ha-after.png)
+   ![PostgreSQL cluster status after HA](./../../../img/api-ha-pg-after.png)
 
    After the failover, `pg-cluster-postgresql-0` becomes the secondary pod and `pg-cluster-postgresql-1` becomes the primary pod.

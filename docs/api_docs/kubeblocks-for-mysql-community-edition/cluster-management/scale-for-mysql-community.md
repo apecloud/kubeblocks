@@ -185,9 +185,6 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   4
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
    metadata:
-    apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
      name: mycluster
      namespace: demo
    spec:

@@ -17,44 +17,45 @@ When creating a PostgreSQL cluster with KubeBlocks, PgBouncer is installed by de
 1. View the status of the created PostgreSQL cluster and ensure this cluster is `Running`.
 
    ```bash
-   kbcli cluster list mycluster
+   kubectl get cluster mycluster -n demo
    ```
 
-2. Describe this cluster and there are two connection links in Endpoints.
+2. Describe the services and there are two connection links in Endpoints.
 
     Port `5432` is used to connect to the primary pod of this database and port `6432` is used to connect to PgBouncer.
 
     ```bash
-    kbcli cluster describe mycluster
+    kubectl get services mycluster-postgresql -n demo
     >
-    Endpoints:
-    COMPONENT    MODE        INTERNAL                                              EXTERNAL   
-    postgresql   ReadWrite   mycluster-postgresql.default.svc.cluster.local:5432   <none>     
-                             mycluster-postgresql.default.svc.cluster.local:6432         
+    NAME                   TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)             AGE
+    mycluster-postgresql   ClusterIP   10.97.123.178   <none>        5432/TCP,6432/TCP   39m       
     ```
 
-3. Connect the cluster with PgBouncer.
-
-   This command shows how to connect to a cluster with CLI. The default example uses port `5432` and you can replace it with port `6432`.
+3. Run the command below to get the `username` and `password` for the `kubectl exec` command.
 
     ```bash
-    kbcli cluster connect --client=cli --show-example mycluster
+    kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
     >
-    kubectl port-forward service/mycluster-postgresql 6432:6432
-    PGPASSWORD=***** psql -h127.0.0.1 -p 6432 -U postgres postgres
-    ```
+    postgres
 
-4. Run `port-forward`.
-
-   ```bash
-   kubectl port-forward service/mycluster-postgresql 6432:6432
+    kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+    >
+    shgkz4z9
    ```
+
+4. Connect the cluster with PgBouncer. The default example uses port `5432` and you can replace it with port `6432`.
+
+    ```bash
+    kubectl -n demo port-forward service/mycluster-postgresql 6432:6432
+    ```
 
 5. Open a new terminal window and run the `psql` command to connect to PgBouncer.
 
-   ```bash
-   PGPASSWORD=***** psql -h127.0.0.1 -p 6432 -U postgres postgres
-   ```
+    Fill the password obtained from step 3 into the `PGPASSWORD`.
+
+    ```bash
+    PGPASSWORD=shgkz4z9 psql -h127.0.0.1 -p 6432 -U postgres postgres
+    ```
 
 6. Run the following command in `psgl` to verify the connection.
 

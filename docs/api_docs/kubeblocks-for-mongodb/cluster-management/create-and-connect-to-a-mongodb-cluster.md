@@ -56,39 +56,42 @@ KubeBlocks supports creating two types of MongoDB clusters: Standalone and Repli
 
 KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a MongoDB Standalone.
 
-```bash
+```yaml
 cat <<EOF | kubectl apply -f -
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  labels:
-    app.kubernetes.io/instance: mycluster
-    app.kubernetes.io/version: 5.0.14
-    helm.sh/chart: mongodb-cluster-0.8.0
-  name: mydemo
+  name: mycluster
   namespace: demo
 spec:
+  clusterDefinitionRef: mongodb
+  clusterVersionRef: mongodb-6.0
+  terminationPolicy: Delete
   affinity:
     podAntiAffinity: Preferred
-    tenancy: SharedNode
     topologyKeys:
     - kubernetes.io/hostname
-  clusterDefinitionRef: mongodb
-  clusterVersionRef: mongodb-5.0
+    tenancy: SharedNode
+  tolerations:
+    - key: kb-data
+      operator: Equal
+      value: 'true'
+      effect: NoSchedule
   componentSpecs:
-  - componentDefRef: mongodb
-    monitor: false
-    name: mongodb
-    replicas: 1
+  - name: mongodb
+    componentDefRef: mongodb
+    enabledLogs:
+    - running
+    monitorEnabled: false
+    serviceAccountName: kb-mongo-cluster
+    replicas: 3
     resources:
       limits:
-        cpu: "0.5"
+        cpu: '0.5'
         memory: 0.5Gi
       requests:
-        cpu: "0.5"
+        cpu: '0.5'
         memory: 0.5Gi
-    serviceAccountName: null
-    services: null
     volumeClaimTemplates:
     - name: data
       spec:
@@ -97,7 +100,6 @@ spec:
         resources:
           requests:
             storage: 20Gi
-  terminationPolicy: Delete
 EOF
 ```
 
@@ -109,6 +111,12 @@ EOF
 * `spec.componentSpecs.name` is the name of the component.
 * `spec.componentSpecs.replicas` is the number of replicas of the component.
 * `spec.componentSpecs.resources` is the resource requirements of the component.
+
+:::note
+
+If you only have one node for deploying a RaftGroup Cluster, set `spec.affinity.topologyKeys` as `null`.
+
+:::
 
 KubeBlocks operator watches for the `Cluster` CRD and creates the cluster and all dependent resources. You can get all the resources created by the cluster with `kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=mongodb-cluster -n demo`.
 

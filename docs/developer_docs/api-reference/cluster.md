@@ -2140,7 +2140,7 @@ When set, the controller executes the method defined here to execute hot paramet
 <p>Dynamic reloading is triggered only if both of the following conditions are met:</p>
 <ol>
 <li>The modified parameters are listed in the <code>dynamicParameters</code> field.
-If <code>dynamicParameterSelectedPolicy</code> is set to &ldquo;all&rdquo;, modifications to <code>staticParameters</code>
+If <code>reloadStaticParamsBeforeRestart</code> is set to true, modifications to <code>staticParameters</code>
 can also trigger a reload.</li>
 <li><code>reloadOptions</code> is set.</li>
 </ol>
@@ -2189,7 +2189,7 @@ to all parameters (including static parameters).</p>
 will trigger a dynamic reload.</li>
 <li>true: Modifications to both dynamic parameters listed in <code>dynamicParameters</code> and static parameters
 listed in <code>staticParameters</code> will trigger a dynamic reload.
-The &ldquo;all&rdquo; option is for certain engines that require static parameters to be set
+The &ldquo;true&rdquo; option is for certain engines that require static parameters to be set
 via SQL statements before they can take effect on restart.</li>
 </ul>
 </td>
@@ -10193,7 +10193,7 @@ When set, the controller executes the method defined here to execute hot paramet
 <p>Dynamic reloading is triggered only if both of the following conditions are met:</p>
 <ol>
 <li>The modified parameters are listed in the <code>dynamicParameters</code> field.
-If <code>dynamicParameterSelectedPolicy</code> is set to &ldquo;all&rdquo;, modifications to <code>staticParameters</code>
+If <code>reloadStaticParamsBeforeRestart</code> is set to true, modifications to <code>staticParameters</code>
 can also trigger a reload.</li>
 <li><code>reloadOptions</code> is set.</li>
 </ol>
@@ -10242,7 +10242,7 @@ to all parameters (including static parameters).</p>
 will trigger a dynamic reload.</li>
 <li>true: Modifications to both dynamic parameters listed in <code>dynamicParameters</code> and static parameters
 listed in <code>staticParameters</code> will trigger a dynamic reload.
-The &ldquo;all&rdquo; option is for certain engines that require static parameters to be set
+The &ldquo;true&rdquo; option is for certain engines that require static parameters to be set
 via SQL statements before they can take effect on restart.</li>
 </ul>
 </td>

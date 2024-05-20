@@ -2043,3 +2043,6 @@ vmagent:
           - source_labels: [ __meta_kubernetes_pod_phase ]
             regex: Pending|Succeeded|Failed|Completed
             action: drop
+
+crd:
+  enabled: true

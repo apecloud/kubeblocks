@@ -19,6 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package models
 
+import (
+	"errors"
+	"fmt"
+)
+
 const (
 	PRIMARY   = "primary"
 	SECONDARY = "secondary"
@@ -29,3 +34,20 @@ const (
 	LEARNER   = "Learner"
 	CANDIDATE = "Candidate"
 )
+
+func IsLeaderOrPrimaryOrMaster(role string) bool {
+	return role == LEADER || role == PRIMARY || role == MASTER
+}
+
+func GetRelatedSecondaryRole(role string) (string, error) {
+	switch role {
+	case PRIMARY:
+		return SECONDARY, nil
+	case LEADER:
+		return FOLLOWER, nil
+	case MASTER:
+		return SLAVE, nil
+	default:
+		return "", errors.New(fmt.Sprintf("unknown role %s", role))
+	}
+}

@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
 	"strings"
 	"time"
 
@@ -31,8 +32,10 @@ import (
 	"github.com/spf13/viper"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
@@ -155,10 +158,22 @@ func (s *CheckRole) Do(ctx context.Context, _ *operations.OpsRequest) (*operatio
 		return resp, nil
 	}
 
-	resp.Data["role"] = role
 	if s.OriRole == role {
 		return nil, nil
 	}
+
+	// When network partition occurs, the new primary needs to send global role change information to the controller.
+	if models.IsLeaderOrPrimaryOrMaster(role) {
+		// we need to get latest member info to build global role snapshot
+		cluster, err = s.dcsStore.GetCluster()
+		if err != nil {
+			return nil, err
+		}
+		resp.Data["role"] = s.buildGlobalRoleSnapshot(cluster, manager, role)
+	} else {
+		resp.Data["role"] = role
+	}
+
 	resp.Data["event"] = util.OperationSuccess
 	s.OriRole = role
 	err = util.SentEventForProbe(ctx, resp.Data)
@@ -190,4 +205,39 @@ func (s *CheckRole) roleValidate(role string) (bool, string) {
 		msg = fmt.Sprintf("role %s is not configured in cluster definition %v", role, s.DBRoles)
 	}
 	return isValid, msg
+}
+
+func (s *CheckRole) buildGlobalRoleSnapshot(cluster *dcs.Cluster, mgr engines.DBManager, role string) string {
+	currentMemberName := mgr.GetCurrentMemberName()
+	roleSnapshot := &common.GlobalRoleSnapshot{
+		Version: time.Now().Format(time.RFC3339Nano),
+		PodRoleNamePairs: []common.PodRoleNamePair{
+			{
+				PodName:  currentMemberName,
+				RoleName: role,
+				PodUID:   cluster.GetMemberWithName(currentMemberName).UID,
+			},
+		},
+	}
+
+	for _, member := range cluster.Members {
+		if member.Name != currentMemberName {
+			// get old primary and set it secondary
+			if models.IsLeaderOrPrimaryOrMaster(member.Role) {
+				relatedSecondaryRole, err := models.GetRelatedSecondaryRole(member.Role)
+				if err != nil {
+					s.logger.Error(err, "get related secondary role failed")
+					continue
+				}
+				roleSnapshot.PodRoleNamePairs = append(roleSnapshot.PodRoleNamePairs, common.PodRoleNamePair{
+					PodName:  member.Name,
+					RoleName: relatedSecondaryRole,
+					PodUID:   cluster.GetMemberWithName(member.Name).UID,
+				})
+			}
+		}
+	}
+
+	b, _ := json.Marshal(roleSnapshot)
+	return string(b)
 }

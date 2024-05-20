@@ -71,7 +71,7 @@ func (mgr *Manager) GetReplicaRole(ctx context.Context, _ *dcs.Cluster) (string,
 	return models.PRIMARY, nil
 }
 
-func (mgr *Manager) SubscribeRoleChange(ctx context.Context, cluster *dcs.Cluster) {
+func (mgr *Manager) SubscribeRoleChange(ctx context.Context) {
 	pubSub := mgr.sentinelClient.Subscribe(ctx, "+switch-master")
 
 	// go-redis periodically sends ping messages to test connection health
@@ -85,6 +85,7 @@ func (mgr *Manager) SubscribeRoleChange(ctx context.Context, cluster *dcs.Cluste
 
 		// When network partition occurs, the new primary needs to send global role change information to the controller.
 		if masterName == mgr.CurrentMemberName {
+			cluster := dcs.GetStore().GetClusterFromCache()
 			roleSnapshot := &common.GlobalRoleSnapshot{}
 			oldMasterName := strings.Split(masterAddr[1], ".")[0]
 			roleSnapshot.PodRoleNamePairs = []common.PodRoleNamePair{

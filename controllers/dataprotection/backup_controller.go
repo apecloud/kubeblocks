@@ -710,6 +710,16 @@ func getClusterObjectString(cluster *appsv1alpha1.Cluster) (*string, error) {
 			constant.ExtraEnvAnnotationKey: v,
 		}
 	}
+
+	for _, key := range getServiceFeatureGatesAnnotationKeys() {
+		if v, ok := cluster.Annotations[key]; ok {
+			if newCluster.Annotations == nil {
+				newCluster.Annotations = map[string]string{}
+			}
+			newCluster.Annotations[key] = v
+		}
+	}
+
 	clusterBytes, err := json.Marshal(newCluster)
 	if err != nil {
 		return nil, err
@@ -732,4 +742,14 @@ func setClusterSnapshotAnnotation(backup *dpv1alpha1.Backup, cluster *appsv1alph
 	}
 	backup.Annotations[constant.ClusterSnapshotAnnotationKey] = *clusterString
 	return nil
+}
+
+// getServiceFeatureGatesAnnotationKeys returns the keys of the annotations that are used to enable or disable certain service features.
+func getServiceFeatureGatesAnnotationKeys() []string {
+	return []string{
+		constant.EnabledNodePortSvcAnnotationKey,
+		constant.EnabledPodOrdinalSvcAnnotationKey,
+		constant.DisabledClusterIPSvcAnnotationKey,
+		constant.ShardSvcAnnotationKey,
+	}
 }

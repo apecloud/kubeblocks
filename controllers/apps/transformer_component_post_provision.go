@@ -78,8 +78,5 @@ func postProvisionPrematureStopCondition(lifecycleActions *appsv1alpha1.Componen
 		lifecycleActions.PostProvision.CustomHandler == nil {
 		return false
 	}
-	if component.IsImmediatelyOrRuntimeReadyPreCondition(lifecycleActions.PostProvision.CustomHandler) {
-		return true
-	}
-	return false
+	return component.IsImmediatelyOrRuntimeReadyPreCondition(lifecycleActions.PostProvision.CustomHandler)
 }

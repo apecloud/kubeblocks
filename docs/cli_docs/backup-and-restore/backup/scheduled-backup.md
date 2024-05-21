@@ -6,9 +6,6 @@ sidebar_position: 3
 sidebar_label: Scheduled backup
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 # Scheduled backup
 
 KubeBlocks supports configuring scheduled backups for clusters.

@@ -11964,6 +11964,7 @@ int32
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Specifies the number of the replicas.</p>
 </td>
 </tr>

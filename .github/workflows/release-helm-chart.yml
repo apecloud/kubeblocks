@@ -41,7 +41,7 @@ jobs:
       VERSION: "${{ needs.release-version.outputs.release-version }}"
       CHART_NAME: "kubeblocks"
       CHART_DIR: "deploy/helm"
-      APECD_REF: "v0.1.43"
+      APECD_REF: "v0.1.62"
       MAKE_OPS_POST: "install"
       GO_VERSION: "1.21"
     secrets: inherit
@@ -53,7 +53,7 @@ jobs:
       GITHUB_REPO: "apecloud/kubeblocks-addons"
       GITHUB_REF: ${{ github.ref }}
       CHART_DIR: "addons"
-      APECD_REF: "v0.1.52"
+      APECD_REF: "v0.1.62"
       ENABLE_JIHU: false
     secrets: inherit
 

@@ -152,9 +152,9 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 				// if it exists.
 				if needMergeClusterBackup {
 					newBackupSchedule = r.mergeClusterBackup(comp, backupPolicy, newBackupSchedule)
-					if newBackupSchedule == nil {
-						return
-					}
+				}
+				if newBackupSchedule == nil {
+					return
 				}
 				// if exist multiple backup policy templates and duplicate spec.identifier,
 				// the backupSchedule that may be generated may have duplicate names,

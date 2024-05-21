@@ -26,11 +26,13 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/exp/maps"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -119,18 +121,20 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 		}
 	}
 	delObjs = append(delObjs, toDeleteObjs(nonNamespacedObjs)...)
-
+	delKindMap := map[string]sets.Empty{}
 	for _, o := range delObjs {
 		// skip the objects owned by the component and InstanceSet controller
 		if shouldSkipObjOwnedByComp(o, *cluster) || isOwnedByInstanceSet(o) {
 			continue
 		}
 		graphCli.Delete(dag, o, inUniversalContext4G())
+		delKindMap[o.GetObjectKind().GroupVersionKind().Kind] = sets.Empty{}
 	}
 	// set cluster action to noop until all the sub-resources deleted
 	if len(delObjs) == 0 {
 		graphCli.Delete(dag, cluster)
 	} else {
+		transCtx.Logger.Info(fmt.Sprintf("deleting the sub-resource kinds: %v", maps.Keys(delKindMap)))
 		graphCli.Status(dag, cluster, transCtx.Cluster)
 		// requeue since pvc isn't owned by cluster, and deleting it won't trigger event
 		return newRequeueError(time.Second*1, "not all sub-resources deleted")

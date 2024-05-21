@@ -479,6 +479,11 @@ spec:
                   description: HorizontalScaling defines the parameters of a horizontal
                     scaling operation.
                   properties:
+                    autoSyncReplicas:
+                      description: Replicas will be automatically synchronized based
+                        on the offline instances when it is set to true and no any
+                        replicas are specified.
+                      type: boolean
                     componentName:
                       description: Specifies the name of the Component.
                       type: string
@@ -2740,20 +2745,9 @@ spec:
                     offlineInstances:
                       description: Scale out or in the specified instances based on
                         the operator.
-                      properties:
-                        autoSyncReplicas:
-                          description: Replicas will be automatically synchronized
-                            based on the offline instances when it is set to true
-                            and no any replicas are specified.
-                          type: boolean
-                        instanceNames:
-                          description: Specifies the instance name.
-                          items:
-                            type: string
-                          type: array
-                      required:
-                      - instanceNames
-                      type: object
+                      items:
+                        type: string
+                      type: array
                     operator:
                       default: Overwrite
                       description: "Specifies the operator for this HorizontalScaling

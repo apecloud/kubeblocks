@@ -309,11 +309,9 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 					{Name: insTplName, Replicas: pointer.Int32(1)},
 				}, nil)
 			}, appsv1alpha1.HorizontalScaling{
-				Operator: appsv1alpha1.HScaleOverwriteOP,
-				Replicas: pointer.Int32(2),
-				OfflineInstance: &appsv1alpha1.OfflineInstance{
-					InstanceNames: offlineInstances,
-				},
+				Operator:         appsv1alpha1.HScaleOverwriteOP,
+				Replicas:         pointer.Int32(2),
+				OfflineInstances: offlineInstances,
 			}, offlineInstances, func(podList []*corev1.Pod) {
 				By(fmt.Sprintf(`delete the specified pod "%s"`, toDeletePodName))
 				deletePods(podList[2])
@@ -330,11 +328,9 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 					{Name: insTplName, Replicas: pointer.Int32(1)},
 				}, []string{toAddPodName})
 			}, appsv1alpha1.HorizontalScaling{
-				Operator: appsv1alpha1.HScaleOverwriteOP,
-				OfflineInstance: &appsv1alpha1.OfflineInstance{
-					InstanceNames:    offlineInstances,
-					AutoSyncReplicas: true,
-				},
+				Operator:         appsv1alpha1.HScaleOverwriteOP,
+				AutoSyncReplicas: true,
+				OfflineInstances: offlineInstances,
 			}, offlineInstances, func(podList []*corev1.Pod) {
 				By(fmt.Sprintf(`delete the specified pod"%s"`, toDeletePodName))
 				deletePods(podList[0])
@@ -355,10 +351,8 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 					{Name: insTplName, Replicas: pointer.Int32(1)},
 				}, nil)
 			}, appsv1alpha1.HorizontalScaling{
-				Operator: appsv1alpha1.HScaleAddOP,
-				OfflineInstance: &appsv1alpha1.OfflineInstance{
-					InstanceNames: offlineInstances,
-				},
+				Operator:         appsv1alpha1.HScaleAddOP,
+				OfflineInstances: offlineInstances,
 			}, offlineInstances, func(podList []*corev1.Pod) {
 				By(fmt.Sprintf(`delete the specified pod "%s"`, toDeletePodName))
 				deletePods(podList[2])
@@ -376,11 +370,9 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 					{Name: insTplName, Replicas: pointer.Int32(1)},
 				}, nil)
 			}, appsv1alpha1.HorizontalScaling{
-				Operator: appsv1alpha1.HScaleAddOP,
-				OfflineInstance: &appsv1alpha1.OfflineInstance{
-					InstanceNames:    offlineInstances,
-					AutoSyncReplicas: true,
-				},
+				Operator:         appsv1alpha1.HScaleAddOP,
+				OfflineInstances: offlineInstances,
+				AutoSyncReplicas: true,
 			}, offlineInstances, func(podList []*corev1.Pod) {
 				By("delete the specified pod " + toDeletePodName)
 				deletePods(podList[0])
@@ -397,10 +389,8 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			opsRes := testHScaleWithSpecifiedPod(func(cluster *appsv1alpha1.Cluster) {
 				setClusterCompSpec(cluster, nil, offlineInstances)
 			}, appsv1alpha1.HorizontalScaling{
-				Operator: appsv1alpha1.HScaleDeleteOP,
-				OfflineInstance: &appsv1alpha1.OfflineInstance{
-					InstanceNames: offlineInstances,
-				},
+				Operator:         appsv1alpha1.HScaleDeleteOP,
+				OfflineInstances: offlineInstances,
 			}, []string{}, func(podList []*corev1.Pod) {
 				// Delete the pod with the maximum ordinal.
 				By("delete the specified pod(ordinal:3)")
@@ -419,11 +409,9 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 					{Name: insTplName, Replicas: pointer.Int32(1)},
 				}, offlineInstances)
 			}, appsv1alpha1.HorizontalScaling{
-				Operator: appsv1alpha1.HScaleDeleteOP,
-				OfflineInstance: &appsv1alpha1.OfflineInstance{
-					InstanceNames:    offlineInstances,
-					AutoSyncReplicas: true,
-				},
+				Operator:         appsv1alpha1.HScaleDeleteOP,
+				OfflineInstances: offlineInstances,
+				AutoSyncReplicas: true,
 			}, []string{}, func(podList []*corev1.Pod) {
 				By("create the specified pod " + toAddPodName)
 				testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp, toAddPodName, "follower", "Readonly")
@@ -510,10 +498,8 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			By("create third opsRequest to offline a pod which is creating by running opsRequest with `Add` operator and expect it to fail")
 			offlineInsName := fmt.Sprintf("%s-%s-3", clusterName, consensusComp)
 			_ = createOpsAndToCreatingPhase(appsv1alpha1.HorizontalScaling{
-				Operator: appsv1alpha1.HScaleAddOP,
-				OfflineInstance: &appsv1alpha1.OfflineInstance{
-					InstanceNames: []string{offlineInsName},
-				},
+				Operator:         appsv1alpha1.HScaleAddOP,
+				OfflineInstances: []string{offlineInsName},
 			})
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsFailedPhase))
 			conditions := opsRes.OpsRequest.Status.Conditions

@@ -11998,14 +11998,24 @@ New instances are created based on the provided InstanceTemplate.</li>
 <td>
 <code>offlineInstances</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.OfflineInstance">
-OfflineInstance
-</a>
+[]string
 </em>
 </td>
 <td>
 <em>(Optional)</em>
 <p>Scale out or in the specified instances based on the operator.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>autoSyncReplicas</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Replicas will be automatically synchronized based on the offline instances when it is set to true and no any replicas are specified.</p>
 </td>
 </tr>
 <tr>
@@ -13361,46 +13371,6 @@ VarOption
 </td>
 <td>
 <em>(Optional)</em>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.OfflineInstance">OfflineInstance
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>instanceNames</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<p>Specifies the instance name.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>autoSyncReplicas</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Replicas will be automatically synchronized based on the offline instances when it is set to true and no any replicas are specified.</p>
 </td>
 </tr>
 </tbody>

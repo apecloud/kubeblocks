@@ -451,7 +451,11 @@ type HorizontalScaling struct {
 	// Scale out or in the specified instances based on the operator.
 	//
 	// +optional
-	OfflineInstance *OfflineInstance `json:"offlineInstances,omitempty"`
+	OfflineInstances []string `json:"offlineInstances,omitempty"`
+
+	// Replicas will be automatically synchronized based on the offline instances when it is set to true and no any replicas are specified.
+	// +optional
+	AutoSyncReplicas bool `json:"autoSyncReplicas,omitempty"`
 
 	// Specifies the operator for this HorizontalScaling operation.
 	// Valid options are `Overwrite`, `Add`, and `Delete`.
@@ -464,17 +468,6 @@ type HorizontalScaling struct {
 	// +kubebuilder:default=Overwrite
 	// +optional
 	Operator HScaleOperator `json:"operator"`
-}
-
-type OfflineInstance struct {
-
-	// Specifies the instance name.
-	// +kubebuilder:validation:Required
-	InstanceNames []string `json:"instanceNames"`
-
-	// Replicas will be automatically synchronized based on the offline instances when it is set to true and no any replicas are specified.
-	// +optional
-	AutoSyncReplicas bool `json:"autoSyncReplicas,omitempty"`
 }
 
 // Reconfigure defines the parameters for updating a Component's configuration.
@@ -1384,8 +1377,4 @@ func (r OpsRequestSpec) GetRestore() *Restore {
 func (p *ProgressStatusDetail) SetStatusAndMessage(status ProgressStatus, message string) {
 	p.Message = message
 	p.Status = status
-}
-
-func (h HorizontalScaling) AutoSyncReplicas() bool {
-	return h.OfflineInstance != nil && h.OfflineInstance.AutoSyncReplicas
 }

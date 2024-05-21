@@ -442,7 +442,7 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 	if hScale.ComponentName != componentName {
 		return nil
 	}
-	if hScale.AutoSyncReplicas() {
+	if hScale.AutoSyncReplicas {
 		if isSharding {
 			return fmt.Errorf("can not auto-sync replicas when the specified component is a sharding component")
 		}
@@ -472,11 +472,11 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 				v.Name, *v.Replicas)
 		}
 	}
-	if hScale.OfflineInstance == nil || hScale.Operator != HScaleDeleteOP {
+	if len(hScale.OfflineInstances) == 0 || hScale.Operator != HScaleDeleteOP {
 		return nil
 	}
 	offlineInstanceSet := sets.New(compSpec.OfflineInstances...)
-	for _, offlineInsName := range hScale.OfflineInstance.InstanceNames {
+	for _, offlineInsName := range hScale.OfflineInstances {
 		if _, ok := offlineInstanceSet[offlineInsName]; !ok {
 			return fmt.Errorf(`can not found the offlined instance "%s" in component "%s"`, offlineInsName, componentName)
 		}

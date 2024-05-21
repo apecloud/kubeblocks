@@ -92,12 +92,12 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 					return false, intctrlutil.NewFatalError(errMsg)
 				}
 				// check if the instance that needs to be offline was created by another opsRequest
-				if currHorizontalScaling.Operator == appsv1alpha1.HScaleAddOP && currHorizontalScaling.OfflineInstance != nil {
+				if currHorizontalScaling.Operator == appsv1alpha1.HScaleAddOP && len(currHorizontalScaling.OfflineInstances) > 0 {
 					// TODO: check for sharding spec?
 					lastCompConfiguration := earlierOps.Status.LastConfiguration.Components[v.ComponentName]
 					compSpec := opsRes.Cluster.Spec.GetComponentByName(v.ComponentName)
 					createdPodSet, _ := hs.getCreateAndDeletePodSet(opsRes, lastCompConfiguration, *compSpec, v, v.ComponentName)
-					for _, offlineIns := range currHorizontalScaling.OfflineInstance.InstanceNames {
+					for _, offlineIns := range currHorizontalScaling.OfflineInstances {
 						if _, ok = createdPodSet[offlineIns]; ok {
 							errMsg := fmt.Sprintf(`instance "%s" cannot be taken offline as it has been created by another running opsRequest "%s"`,
 								offlineIns, earlierOps.Name)
@@ -151,7 +151,7 @@ func (hs horizontalScalingOpsHandler) autoSyncReplicas(
 	compOfflineInstances,
 	expectCompOfflineInstances []string,
 	clusterName string) (int32, []appsv1alpha1.InstanceTemplate) {
-	if !horizontalScaling.AutoSyncReplicas() {
+	if !horizontalScaling.AutoSyncReplicas {
 		return compReplicas, compInstanceTpls
 	}
 	var (
@@ -162,11 +162,11 @@ func (hs horizontalScalingOpsHandler) autoSyncReplicas(
 	)
 	switch horizontalScaling.Operator {
 	case appsv1alpha1.HScaleAddOP:
-		toAddOfflineInstances = horizontalScaling.OfflineInstance.InstanceNames
+		toAddOfflineInstances = horizontalScaling.OfflineInstances
 	case appsv1alpha1.HScaleDeleteOP:
-		toDeleteOfflineInstances = horizontalScaling.OfflineInstance.InstanceNames
+		toDeleteOfflineInstances = horizontalScaling.OfflineInstances
 	default:
-		currOfflineInsSet := sets.New(horizontalScaling.OfflineInstance.InstanceNames...)
+		currOfflineInsSet := sets.New(horizontalScaling.OfflineInstances...)
 		oldOfflineInsSet := sets.New(compOfflineInstances...)
 		toDeleteOfflineInstances = maps.Keys(oldOfflineInsSet.Difference(currOfflineInsSet))
 		toAddOfflineInstances = maps.Keys(currOfflineInsSet.Difference(oldOfflineInsSet))
@@ -274,12 +274,12 @@ func (hs horizontalScalingOpsHandler) getCompExpectedOfflineInstances(
 	compOfflineInstances []string,
 	horizontalScaling appsv1alpha1.HorizontalScaling,
 ) []string {
-	if horizontalScaling.OfflineInstance == nil {
+	if len(horizontalScaling.OfflineInstances) == 0 {
 		return compOfflineInstances
 	}
 	handleOfflineInstances := func(compOfflineInstances, hScaleOfflineInstances, newOfflineInstances []string) []string {
 		compOfflineInsSet := sets.New(compOfflineInstances...)
-		for _, offlineIns := range horizontalScaling.OfflineInstance.InstanceNames {
+		for _, offlineIns := range horizontalScaling.OfflineInstances {
 			if _, ok := compOfflineInsSet[offlineIns]; !ok {
 				newOfflineInstances = append(newOfflineInstances, offlineIns)
 			}
@@ -288,11 +288,11 @@ func (hs horizontalScalingOpsHandler) getCompExpectedOfflineInstances(
 	}
 	switch horizontalScaling.Operator {
 	case appsv1alpha1.HScaleAddOP:
-		return handleOfflineInstances(compOfflineInstances, horizontalScaling.OfflineInstance.InstanceNames, compOfflineInstances)
+		return handleOfflineInstances(compOfflineInstances, horizontalScaling.OfflineInstances, compOfflineInstances)
 	case appsv1alpha1.HScaleDeleteOP:
-		return handleOfflineInstances(compOfflineInstances, horizontalScaling.OfflineInstance.InstanceNames, make([]string, 0))
+		return handleOfflineInstances(compOfflineInstances, horizontalScaling.OfflineInstances, make([]string, 0))
 	default:
-		return horizontalScaling.OfflineInstance.InstanceNames
+		return horizontalScaling.OfflineInstances
 	}
 }
 

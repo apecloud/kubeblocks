@@ -448,7 +448,7 @@ type HorizontalScaling struct {
 	// +optional
 	Instances []InstanceTemplate `json:"instances,omitempty"`
 
-	// Scale down or up the specified instances based on the operator.
+	// Scale out or in the specified instances based on the operator.
 	//
 	// +optional
 	OfflineInstance *OfflineInstance `json:"offlineInstances,omitempty"`
@@ -457,9 +457,9 @@ type HorizontalScaling struct {
 	// Valid options are `Overwrite`, `Add`, and `Delete`.
 	//
 	// - `Overwrite`: Overwrite the replicas, instances, offlineInstances to the specified component. This is the default option.
-	// - `Add`: Create the specified number of replicas and instances, and scale down the specified instances.
+	// - `Add`: Create the specified number of replicas and instances, and scale in the specified instances.
 	//    This is the 'Add' operation at the data structure level of replicas, instances, and offlineInstances.
-	// - `Delete`: Delete the specified number of replicas and instances, and scale up the specified instances.
+	// - `Delete`: Delete the specified number of replicas and instances, and scale out the specified instances.
 	//    This is the 'Delete' operation at the data structure level of replicas, instances, and offlineInstances.
 	// +kubebuilder:default=Overwrite
 	// +optional

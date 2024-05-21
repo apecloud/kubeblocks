@@ -2738,8 +2738,8 @@ spec:
                         type: object
                       type: array
                     offlineInstances:
-                      description: Scale down or up the specified instances based
-                        on the operator.
+                      description: Scale out or in the specified instances based on
+                        the operator.
                       properties:
                         autoSyncReplicas:
                           description: Replicas will be automatically synchronized
@@ -2761,12 +2761,12 @@ spec:
                         \n - `Overwrite`: Overwrite the replicas, instances, offlineInstances
                         to the specified component. This is the default option. -
                         `Add`: Create the specified number of replicas and instances,
-                        and scale down the specified instances. This is the 'Add'
+                        and scale in the specified instances. This is the 'Add' operation
+                        at the data structure level of replicas, instances, and offlineInstances.
+                        - `Delete`: Delete the specified number of replicas and instances,
+                        and scale out the specified instances. This is the 'Delete'
                         operation at the data structure level of replicas, instances,
-                        and offlineInstances. - `Delete`: Delete the specified number
-                        of replicas and instances, and scale up the specified instances.
-                        This is the 'Delete' operation at the data structure level
-                        of replicas, instances, and offlineInstances."
+                        and offlineInstances."
                       enum:
                       - Overwrite
                       - Add

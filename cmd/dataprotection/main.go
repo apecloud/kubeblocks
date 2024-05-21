@@ -129,8 +129,8 @@ func main() {
 		multiClusterContextsDisabled string
 	)
 
-	flag.String(metricsAddrFlagKey.String(), ":8080", "The address the metric endpoint binds to.")
-	flag.String(probeAddrFlagKey.String(), ":8081", "The address the probe endpoint binds to.")
+	flag.String(metricsAddrFlagKey.String(), ":8082", "The address the metric endpoint binds to.")
+	flag.String(probeAddrFlagKey.String(), ":8083", "The address the probe endpoint binds to.")
 	flag.Bool(leaderElectFlagKey.String(), false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")

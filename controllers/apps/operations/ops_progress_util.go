@@ -425,11 +425,11 @@ func handleComponentProgressForScalingReplicas(reqCtx intctrlutil.RequestCtx,
 		completedCount += scaleOutCompletedCount
 	}
 	if len(pgRes.deletedPodSet) > 0 {
-		scaleDownCompletedCount, scaleDownErr := handleScaleDownProgress(opsRes, pgRes, pods, compStatus)
-		if scaleDownErr != nil {
-			err = fmt.Errorf(scaleDownErr.Error(), err)
+		scaleInCompletedCount, scaleInErr := handleScaleInProgress(opsRes, pgRes, pods, compStatus)
+		if scaleInErr != nil {
+			err = fmt.Errorf(scaleInErr.Error(), err)
 		}
-		completedCount += scaleDownCompletedCount
+		completedCount += scaleInCompletedCount
 	}
 	return updatedPodCount, completedCount, err
 }
@@ -468,8 +468,8 @@ func handleScaleOutProgress(reqCtx intctrlutil.RequestCtx,
 	return completedCount, nil
 }
 
-// handleScaleDownProgress handles the progressDetails of scaled down replicas.
-func handleScaleDownProgress(
+// handleScaleInProgress handles the progressDetails of scaled in replicas.
+func handleScaleInProgress(
 	opsRes *OpsResource,
 	pgRes *progressResource,
 	pods []*corev1.Pod,

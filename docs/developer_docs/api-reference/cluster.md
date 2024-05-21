@@ -12005,7 +12005,7 @@ OfflineInstance
 </td>
 <td>
 <em>(Optional)</em>
-<p>Scale down or up the specified instances based on the operator.</p>
+<p>Scale out or in the specified instances based on the operator.</p>
 </td>
 </tr>
 <tr>
@@ -12023,9 +12023,9 @@ HScaleOperator
 Valid options are <code>Overwrite</code>, <code>Add</code>, and <code>Delete</code>.</p>
 <ul>
 <li><code>Overwrite</code>: Overwrite the replicas, instances, offlineInstances to the specified component. This is the default option.</li>
-<li><code>Add</code>: Create the specified number of replicas and instances, and scale down the specified instances.
+<li><code>Add</code>: Create the specified number of replicas and instances, and scale in the specified instances.
 This is the &lsquo;Add&rsquo; operation at the data structure level of replicas, instances, and offlineInstances.</li>
-<li><code>Delete</code>: Delete the specified number of replicas and instances, and scale up the specified instances.
+<li><code>Delete</code>: Delete the specified number of replicas and instances, and scale out the specified instances.
 This is the &lsquo;Delete&rsquo; operation at the data structure level of replicas, instances, and offlineInstances.</li>
 </ul>
 </td>

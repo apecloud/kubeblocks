@@ -22,6 +22,8 @@ import (
 )
 
 func Log(format string, a ...any) {
+	// TODO: using zaplog
+
 	fmt.Printf(format, a...)
 	if !strings.HasSuffix(format, "\n") {
 		fmt.Println("")

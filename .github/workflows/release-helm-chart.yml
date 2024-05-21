@@ -35,7 +35,7 @@ jobs:
 
   release-chart:
     needs: [ release-version ]
-    uses: apecloud/apecloud-cd/.github/workflows/release-charts.yml@v0.1.43
+    uses: apecloud/apecloud-cd/.github/workflows/release-charts.yml@v0.1.62
     with:
       MAKE_OPS: "bump-chart-ver"
       VERSION: "${{ needs.release-version.outputs.release-version }}"
@@ -48,7 +48,7 @@ jobs:
 
   release-addons-chart:
     needs: [ release-chart ]
-    uses: apecloud/apecloud-cd/.github/workflows/release-charts.yml@v0.1.52
+    uses: apecloud/apecloud-cd/.github/workflows/release-charts.yml@v0.1.62
     with:
       GITHUB_REPO: "apecloud/kubeblocks-addons"
       GITHUB_REF: ${{ github.ref }}

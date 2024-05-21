@@ -21,8 +21,10 @@ package component
 
 import (
 	"encoding/json"
+	"sort"
 	"strings"
 
+	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -108,8 +110,11 @@ func buildNewAffinity(clusterName, compName string, compAffinity *appsv1alpha1.A
 	affinity := new(corev1.Affinity)
 	// Build NodeAffinity
 	var matchExpressions []corev1.NodeSelectorRequirement
-	for key, value := range compAffinity.NodeLabels {
-		values := strings.Split(value, ",")
+	nodeLabelKeys := maps.Keys(compAffinity.NodeLabels)
+	// NodeLabels must be ordered
+	sort.Strings(nodeLabelKeys)
+	for _, key := range nodeLabelKeys {
+		values := strings.Split(compAffinity.NodeLabels[key], ",")
 		matchExpressions = append(matchExpressions, corev1.NodeSelectorRequirement{
 			Key:      key,
 			Operator: corev1.NodeSelectorOpIn,

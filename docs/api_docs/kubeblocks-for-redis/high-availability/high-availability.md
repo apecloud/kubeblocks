@@ -55,7 +55,6 @@ In the RedisReplication Cluster provided by KubeBlocks, Sentinel is deployed as 
    ```bash
    kubectl get pods  -o custom-columns=NAME:.metadata.name,ROLE_LABEL:.metadata.labels."kubeblocks\.io/role"
    ```
-   ![redis-high-availability-get-pod](./../../../img/redis-high-availability-get-pod.jpg)
 
    :::
 

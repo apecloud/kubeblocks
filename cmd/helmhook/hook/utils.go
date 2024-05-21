@@ -19,6 +19,7 @@ package hook
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -108,4 +109,27 @@ func addonSelectorLabels() map[string]string {
 		constant.AppInstanceLabelKey: constant.AppName,
 		constant.AppNameLabelKey:     constant.AppName,
 	}
+}
+
+func NewNoVersion(major, minor int32) Version {
+	return Version{
+		Major: major,
+		Minor: minor,
+	}
+}
+
+func NewVersion(version string) (*Version, error) {
+	vs := strings.Split(version, ".")
+	if len(vs) < 2 {
+		return nil, fmt.Errorf("invalid version: %s", version)
+	}
+
+	major, err := strconv.ParseInt(vs[0], 10, 32)
+	CheckErr(err)
+	minor, err := strconv.ParseInt(vs[1], 10, 32)
+	CheckErr(err)
+	return &Version{
+		Major: int32(major),
+		Minor: int32(minor),
+	}, nil
 }

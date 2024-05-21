@@ -20,22 +20,31 @@ import (
 	"context"
 
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-
 	restclient "k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/pkg/client/clientset/versioned"
 )
 
 type UpgradeMetaContext struct {
 	context.Context
-	Client    *versioned.Clientset
-	K8sClient *kubernetes.Clientset
-	CRDClient *clientset.Clientset
 
 	CRDPath   string
 	Version   string
 	Namespace string
+
+	CRClient
+}
+
+type CRClient struct {
+	*dynamic.DynamicClient
+
+	KBClient  *versioned.Clientset
+	K8sClient *kubernetes.Clientset
+	CRDClient *clientset.Clientset
 }
 
 type UpgradeContext struct {
@@ -43,17 +52,34 @@ type UpgradeContext struct {
 
 	From *Version
 	To   Version
+
+	UpdatedObjects map[schema.GroupVersionResource][]client.Object
 }
 
 type Version struct {
+	Major int32
+	Minor int32
 }
 
 // ContextHandler is the interface for a "chunk" of reconciliation. It either
 // returns, often by adjusting the current key's place in the queue (i.e. via
 // requeue or done) or calls another handler in the chain.
 type ContextHandler interface {
+	IsSkip(*UpgradeContext) (bool, error)
 	Handle(*UpgradeContext) error
 }
+
+type BasedHandler struct {
+	ContextHandler
+}
+
+func (b *BasedHandler) IsSkip(*UpgradeContext) (bool, error) {
+	return false, nil
+}
+
+// func (b *BasedHandler) Handle(*UpgradeContext) error {
+// 	return nil
+// }
 
 // ContextHandlerFunc is a function type that implements ContextHandler
 type ContextHandlerFunc func(ctx *UpgradeContext) error
@@ -75,8 +101,19 @@ func (w Workflow) Do(ctx *UpgradeContext) error {
 
 func (w Workflow) AddStage(stage ContextHandler) Workflow {
 	return append(w, func(ctx *UpgradeContext) error {
-		return stage.Handle(ctx)
+		skip, err := stage.IsSkip(ctx)
+		if err != nil {
+			return err
+		}
+		if !skip {
+			err = stage.Handle(ctx)
+		}
+		return err
 	})
+}
+
+func (w Workflow) WrapStage(stageFn ContextHandlerFunc) Workflow {
+	return append(w, stageFn)
 }
 
 func NewUpgradeWorkflow() Workflow {
@@ -84,27 +121,23 @@ func NewUpgradeWorkflow() Workflow {
 }
 
 func NewUpgradeContext(ctx context.Context, config *restclient.Config, version string, crd string, ns string) *UpgradeContext {
-	client, err := versioned.NewForConfig(config)
-	CheckErr(err)
-	k8sClient, err := kubernetes.NewForConfig(config)
-	CheckErr(err)
-	apiextensions, err := clientset.NewForConfig(config)
+	nVersion, err := NewVersion(version)
 	CheckErr(err)
 
-	upgradeMeta := UpgradeMetaContext{
-		Context:   ctx,
-		Client:    client,
-		CRDClient: apiextensions,
-		K8sClient: k8sClient,
-		Version:   version,
-		CRDPath:   crd,
-		Namespace: ns,
+	return &UpgradeContext{
+		UpgradeMetaContext: UpgradeMetaContext{
+			CRClient: CRClient{
+				DynamicClient: dynamic.NewForConfigOrDie(config),
+				KBClient:      versioned.NewForConfigOrDie(config),
+				K8sClient:     kubernetes.NewForConfigOrDie(config),
+				CRDClient:     clientset.NewForConfigOrDie(config),
+			},
+			Context:   ctx,
+			Version:   version,
+			CRDPath:   crd,
+			Namespace: ns,
+		},
+		UpdatedObjects: make(map[schema.GroupVersionResource][]client.Object),
+		To:             *nVersion,
 	}
-	return &UpgradeContext{UpgradeMetaContext: upgradeMeta,
-		To: *NewVersion(version),
-	}
-}
-
-func NewVersion(v string) *Version {
-	return &Version{}
 }

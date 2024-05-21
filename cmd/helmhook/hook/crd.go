@@ -25,14 +25,14 @@ import (
 	"path/filepath"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	k8syaml "k8s.io/apimachinery/pkg/util/yaml"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	"k8s.io/apimachinery/pkg/util/sets"
+	k8syaml "k8s.io/apimachinery/pkg/util/yaml"
 )
 
 type UpdateCRD struct {
+	BasedHandler
 }
 
 func (p *UpdateCRD) Handle(ctx *UpgradeContext) (err error) {
@@ -42,18 +42,15 @@ func (p *UpdateCRD) Handle(ctx *UpgradeContext) (err error) {
 	}
 
 	for _, crd := range crdList {
-		_, err = ctx.CRDClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, crd.GetName(), metav1.GetOptions{})
-		if err == nil {
+		Log("create/update CRD: %s", crd.GetName())
+		existing, err := ctx.CRDClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, crd.GetName(), metav1.GetOptions{})
+		switch {
+		case err == nil:
+			crd.SetResourceVersion(existing.GetResourceVersion())
+			_, err = ctx.CRDClient.ApiextensionsV1().CustomResourceDefinitions().Update(ctx, &crd, metav1.UpdateOptions{})
+		case apierrors.IsNotFound(err):
 			_, err = ctx.CRDClient.ApiextensionsV1().CustomResourceDefinitions().Create(ctx, &crd, metav1.CreateOptions{})
-			if err != nil {
-				return err
-			}
-			continue
 		}
-		if client.IgnoreNotFound(err) != nil {
-			return err
-		}
-		_, err = ctx.CRDClient.ApiextensionsV1().CustomResourceDefinitions().Update(ctx, &crd, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
@@ -74,7 +71,7 @@ func parseCRDs(path string) ([]apiextensionsv1.CustomResourceDefinition, error) 
 		return nil, err
 	}
 	if !info.IsDir() {
-		return nil, fmt.Errorf("require path[%] is directory", path)
+		return nil, fmt.Errorf("require path[%s] is directory", path)
 	}
 
 	entries, err := os.ReadDir(path)
@@ -85,7 +82,7 @@ func parseCRDs(path string) ([]apiextensionsv1.CustomResourceDefinition, error) 
 		files = append(files, e.Name())
 	}
 
-	fmt.Printf("reading CRDs from path: %s", path)
+	Log("reading CRDs from path: %s", path)
 	crdList, err := readCRDs(filePath, files)
 	if err != nil {
 		return nil, err
@@ -106,20 +103,20 @@ func readCRDs(basePath string, files []string) ([]apiextensionsv1.CustomResource
 			return nil, err
 		}
 		crds = append(crds, docs...)
-		fmt.Sprintf("read CRDs from file: %s", file)
+		Log("read CRDs from file: %s", file)
 	}
 	return crds, nil
 }
 
 func readDocuments(fp string) ([]apiextensionsv1.CustomResourceDefinition, error) {
+	var objs []apiextensionsv1.CustomResourceDefinition
+
 	b, err := os.ReadFile(fp)
 	if err != nil {
 		return nil, err
 	}
 
 	reader := k8syaml.NewYAMLToJSONDecoder(bufio.NewReader(bytes.NewReader(b)))
-
-	var objs []apiextensionsv1.CustomResourceDefinition
 	for {
 		var obj apiextensionsv1.CustomResourceDefinition
 		if err = reader.Decode(&obj); err != nil {

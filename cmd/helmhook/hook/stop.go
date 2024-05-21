@@ -27,7 +27,9 @@ const (
 	dataprotectionAppComponent = "dataprotection"
 )
 
-type StopOperator struct{}
+type StopOperator struct {
+	BasedHandler
+}
 
 func (p *StopOperator) Handle(ctx *UpgradeContext) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {

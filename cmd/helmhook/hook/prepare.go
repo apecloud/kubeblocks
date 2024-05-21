@@ -23,11 +23,9 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-type Prepare struct{}
-
 const kubeblocksVersionLabelName = "app.kubernetes.io/version"
 
-func (p *Prepare) Handle(ctx *UpgradeContext) (err error) {
+func PrepareFor(ctx *UpgradeContext) (err error) {
 	ctx.From, err = getVersionInfo(ctx, ctx.K8sClient, ctx.Namespace)
 	return
 }
@@ -43,8 +41,8 @@ func getVersionInfo(ctx context.Context, client *kubernetes.Clientset, namespace
 		return nil, fmt.Errorf("KubeBlocks deployment has no labels")
 	}
 
-	if v, ok := labels[kubeblocksVersionLabelName]; !ok {
-		return NewVersion(v), nil
+	if v, ok := labels[kubeblocksVersionLabelName]; ok {
+		return NewVersion(v)
 	}
 	return nil, fmt.Errorf("KubeBlocks deployment has no version label")
 }

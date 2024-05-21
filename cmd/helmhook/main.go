@@ -21,26 +21,38 @@ package main
 
 import (
 	"context"
+	"flag"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/spf13/pflag"
-	"k8s.io/client-go/tools/clientcmd"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/apecloud/kubeblocks/cmd/helmhook/hook"
+	_ "github.com/apecloud/kubeblocks/cmd/helmhook/hook/multiversion"
 )
 
 var (
-	crdPath   string
-	version   string
-	namespace string
+	crdPath      string
+	version      string
+	namespace    string
+	addonEnabled bool
 )
 
 func setupFlags() {
 	pflag.StringVar(&crdPath, "crd", "/kubeblocks/crd", "CRD directory for the kubeblocks")
 	pflag.StringVar(&version, "version", "", "KubeBlocks version")
 	pflag.StringVar(&namespace, "namespace", "default", "The namespace scope for this request")
+	pflag.BoolVar(&addonEnabled, "addon-enabled", false, "Whether to allow addon updates")
+
+	opts := zap.Options{
+		Development: true,
+	}
+	opts.BindFlags(flag.CommandLine)
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+	pflag.Parse()
 }
 
 func main() {
@@ -54,14 +66,16 @@ func main() {
 		cancel()
 	}()
 
-	config, err := clientcmd.BuildConfigFromFlags("", "")
+	config, err := ctrl.GetConfig()
 	hook.CheckErr(err)
 
 	upgradeContext := hook.NewUpgradeContext(ctx, config, version, crdPath, namespace)
 	hook.CheckErr(hook.NewUpgradeWorkflow().
-		AddStage(&hook.Prepare{}).
+		WrapStage(hook.PrepareFor).
 		AddStage(&hook.StopOperator{}).
-		AddStage(&hook.Addon{}).
+		AddStage(&hook.Addon{AddonEnabledUpdated: addonEnabled}).
+		AddStage(&hook.Conversion{}).
 		AddStage(&hook.UpdateCRD{}).
+		AddStage(&hook.UpdateCR{}).
 		Do(upgradeContext))
 }

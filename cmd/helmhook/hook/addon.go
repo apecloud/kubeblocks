@@ -29,15 +29,23 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/client/clientset/versioned"
 )
 
-type Addon struct{}
+type Addon struct {
+	BasedHandler
+
+	AddonEnabledUpdated bool
+}
 
 const (
 	helmResourcePolicyKey  = "helm.sh/resource-policy"
 	helmResourcePolicyKeep = "keep"
 )
 
+func (p *Addon) IsSkip(*UpgradeContext) (bool, error) {
+	return p.AddonEnabledUpdated, nil
+}
+
 func (p *Addon) Handle(ctx *UpgradeContext) (err error) {
-	addons, err := ctx.Client.ExtensionsV1alpha1().Addons().List(ctx, metav1.ListOptions{
+	addons, err := ctx.KBClient.ExtensionsV1alpha1().Addons().List(ctx, metav1.ListOptions{
 		LabelSelector: toLabelSelector(addonSelectorLabels()),
 	})
 
@@ -50,7 +58,7 @@ func (p *Addon) Handle(ctx *UpgradeContext) (err error) {
 			continue
 		}
 		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			return patchAddon(ctx, ctx.Client, addon)
+			return patchDisableUpdateAddon(ctx, ctx.KBClient, addon)
 		})
 		if err != nil {
 			return err
@@ -59,7 +67,7 @@ func (p *Addon) Handle(ctx *UpgradeContext) (err error) {
 	return nil
 }
 
-func patchAddon(ctx context.Context, client *versioned.Clientset, addon extensionsv1alpha1.Addon) error {
+func patchDisableUpdateAddon(ctx context.Context, client *versioned.Clientset, addon extensionsv1alpha1.Addon) error {
 	annotations := addon.GetAnnotations()
 	if annotations == nil {
 		annotations = make(map[string]string)

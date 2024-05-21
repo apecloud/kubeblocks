@@ -48,7 +48,7 @@ metadata:
 spec:
   clusterDefinitionRef: mysql
   clusterVersionRef: mysql-8.0.33
-  terminationPolicy: WipeOut
+  terminationPolicy: Delete
   componentSpecs:
   - name: mysql
     componentDefRef: mysql
@@ -107,7 +107,7 @@ metadata:
 spec:
   clusterDefinitionRef: mysql
   clusterVersionRef: mysql-8.0.33
-  terminationPolicy: WipeOut
+  terminationPolicy: Delete
   componentSpecs:
   - name: mysql
     componentDefRef: mysql

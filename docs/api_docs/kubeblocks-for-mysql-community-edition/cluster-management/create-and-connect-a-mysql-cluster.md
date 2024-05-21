@@ -6,9 +6,6 @@ sidebar_position: 1
 sidebar_label: Create and connect
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 # Create and connect to a MySQL cluster
 
 This tutorial shows how to create and connect to a MySQL cluster.
@@ -44,10 +41,6 @@ This tutorial shows how to create and connect to a MySQL cluster.
 ### Create a cluster
 
 KubeBlocks supports the Standalone and Replication MySQL cluster. Below is an example of creating a Replication MySQL cluster in the namespace `demo`.
-
-<Tabs>
-
-<TabItem value="kubectl" label="kubectl" default>
 
 KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a Replication Cluster.
 
@@ -101,14 +94,14 @@ EOF
 
 * `kubeblocks.io/extra-env` in `metadata.annotations` defines the topology mode of a MySQL cluster. If you want to create a Standalone cluster, you can change the value to `standalone`.
 * `spec.clusterVersionRef` is the name of the cluster version CRD that defines the cluster version.
-* * `spec.terminationPolicy` is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Halt`, `Delete`, `WipeOut`. `DoNotTerminate` blocks deletion operation. `Halt` deletes workload resources such as statefulset and deployment workloads but keep PVCs. `Delete` is based on Halt and deletes PVCs. `WipeOut` is based on Delete and wipe out all volume snapshots and snapshot data from a backup storage location.
+* `spec.terminationPolicy` is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Halt`, `Delete`, `WipeOut`. `DoNotTerminate` blocks deletion operation. `Halt` deletes workload resources such as statefulset and deployment workloads but keep PVCs. `Delete` is based on Halt and deletes PVCs. `WipeOut` is based on Delete and wipe out all volume snapshots and snapshot data from a backup storage location.
 * `spec.componentSpecs` is the list of components that define the cluster components.
 * `spec.componentSpecs.componentDefRef` is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition apecloud-mysql -o json | jq '.spec.componentDefs[].name'`.
 * `spec.componentSpecs.name` is the name of the component.
 * `spec.componentSpecs.replicas` is the number of replicas of the component.
 * `spec.componentSpecs.resources` is the resource requirements of the component.
 
-If you only have one node for deploying a RaftGroup Cluster, set `spec.affinity.topologyKeys` as `null`.
+If you only have one node for deploying a Replication Cluster, set `spec.affinity.topologyKeys` as `null`.
 
 ```yaml
 cat <<EOF | kubectl apply -f -
@@ -256,56 +249,6 @@ status:
 
 </details>
 
-</TabItem>
-
-<TabItem value="helm" label="Helm">
-
-This tutorial takes creating a MySQL cluster from the addon repository cloned from the [KubeBlocks addons repository](https://github.com/apecloud/kubeblocks-addons/tree/main) as an example.
-
-1. Clone the KubeBlocks addon repository.
-
-   ```bash
-   git clone https://github.com/apecloud/kubeblocks-addons.git
-   ```
-
-2. (Optional) If you want to create a cluster with custom specifications, you can view the values available for configuring.
-
-   ```bash
-   helm show values ./addons/mysql-cluster
-   ```
-
-3. Create a MySQL cluster.
-
-   ```bash
-   helm install mycluster ./addons/myql-cluster --namespace=demo
-   ```
-
-   If you need to customize the cluster specifications, use `--set` to specify the parameters. But only part of the parameters can be customized and you can view these parameters by running the command in step 2.
-
-   ```bash
-   helm install mycluster ./addons/mysql-cluster --namespace=demo --set cpu=4,mode=replication
-   ```
-
-4. Verify whether this cluster is created successfully.
-
-   ```bash
-   helm list -n demo
-   >
-   NAME   	   NAMESPACE	 REVISION	  UPDATED                             	STATUS  	CHART              	APP VERSION
-   mycluster   demo     	 1       	  2024-04-12 15:23:44.063714 +0800 CST	deployed	mysql-cluster-0.9.0	8.0.33
-   ```
-
-   ```bash
-   kubectl get cluster -n demo
-   >
-   NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
-   mycluster   mysql                mysql-8.0.33   Delete               Running   5m34s
-   ```
-
-</TabItem>
-
-</Tabs>
-
 ## Connect to a MySQL Cluster
 
 <Tabs>
@@ -343,14 +286,6 @@ KubeBlocks operator creates a new Secret called `mycluster-conn-credential` to s
 
    mysql -u root -p b8wvrwlm
    ```
-
-</TabItem>
-
-<TabItem value="kbcli" label="kbcli" default>
-
-```bash
-kbcli cluster connect <clustername>  --namespace <name>
-```
 
 </TabItem>
 

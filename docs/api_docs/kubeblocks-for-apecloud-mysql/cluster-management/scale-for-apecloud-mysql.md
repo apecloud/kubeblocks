@@ -13,6 +13,12 @@ import TabItem from '@theme/TabItem';
 
 You can scale a MySQL cluster in two ways, vertical scaling and horizontal scaling.
 
+:::note
+
+After vertical scaling or horizontal scaling is performed, KubeBlocks automatically matches the appropriate configuration template based on the new specification. This is the KubeBlocks dynamic configuration feeature. This feature simplifies the process of configuring parameters, saves time and effort and reduces performance issues caused by incorrect configuration.  For detailed instructions, refer to [Configuration](./../configuration/configuration.md).
+
+:::
+
 ## Vertical scaling
 
 You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, if you need to change the resource class from 1C2G to 2C4G, vertical scaling is what you need.
@@ -123,11 +129,6 @@ mycluster   apecloud-mysql       ac-mysql-8.0.30   Halt                 Running 
     kubectl describe cluster mycluster -n demo
     ```
 
-:::note
-
-Vertical scaling does not synchronize the configuration related to CPU and memory and it is required to manually call the OpsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
-
-:::
 
 ## Horizontal scaling
 

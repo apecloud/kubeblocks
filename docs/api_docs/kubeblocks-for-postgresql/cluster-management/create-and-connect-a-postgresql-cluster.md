@@ -15,7 +15,7 @@ This tutorial shows how to create and connect to a PostgreSQL cluster.
 ### Before you start
 
 * Install KubeBlocks: You can install KubeBlocks by [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
-* Make sure the PostgreSQL add-on is enabled.
+* Make sure the PostgreSQL addon is enabled.
 
   ```bash
   kubectl get addons.extensions.kubeblocks.io postgresql
@@ -62,7 +62,7 @@ metadata:
   namespace: demo
 spec:
   clusterDefinitionRef: postgresql
-  clusterVersionRef: postgresql-12.14.0
+  clusterVersionRef: postgresql-14.8.0
   terminationPolicy: Delete
   affinity:
     podAntiAffinity: Preferred
@@ -101,7 +101,7 @@ EOF
 
 * `kubeblocks.io/extra-env` in `metadata.annotations` defines the topology mode of a MySQL cluster. If you want to create a Standalone cluster, you can change the value to `standalone`.
 * `spec.clusterVersionRef` is the name of the cluster version CRD that defines the cluster version.
-* * `spec.terminationPolicy` is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Halt`, `Delete`, `WipeOut`. `DoNotTerminate` blocks deletion operation. `Halt` deletes workload resources such as statefulset and deployment workloads but keep PVCs. `Delete` is based on Halt and deletes PVCs. `WipeOut` is based on Delete and wipe out all volume snapshots and snapshot data from a backup storage location.
+* `spec.terminationPolicy` is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Halt`, `Delete`, `WipeOut`. `DoNotTerminate` blocks deletion operation. `Halt` deletes workload resources such as statefulset and deployment workloads but keep PVCs. `Delete` is based on Halt and deletes PVCs. `WipeOut` is based on Delete and wipe out all volume snapshots and snapshot data from a backup storage location.
 * `spec.componentSpecs` is the list of components that define the cluster components.
 * `spec.componentSpecs.componentDefRef` is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition apecloud-mysql -o json | jq '.spec.componentDefs[].name'`.
 * `spec.componentSpecs.name` is the name of the component.
@@ -119,7 +119,7 @@ metadata:
   namespace: demo
 spec:
   clusterDefinitionRef: postgresql
-  clusterVersionRef: postgresql-12.14.0
+  clusterVersionRef: postgresql-14.8.0
   terminationPolicy: Delete
   affinity:
     podAntiAffinity: Preferred
@@ -178,14 +178,14 @@ metadata:
   annotations:
     kubeblocks.io/reconcile: "2024-05-17T03:17:08.617771416Z"
     kubectl.kubernetes.io/last-applied-configuration: |
-      {"apiVersion":"apps.kubeblocks.io/v1alpha1","kind":"Cluster","metadata":{"annotations":{},"name":"mycluster","namespace":"demo"},"spec":{"affinity":{"podAntiAffinity":"Preferred","tenancy":"SharedNode","topologyKeys":null},"clusterDefinitionRef":"postgresql","clusterVersionRef":"postgresql-12.14.0","componentSpecs":[{"componentDefRef":"postgresql","enabledLogs":["running"],"monitor":false,"name":"postgresql","replicas":2,"resources":{"limits":{"cpu":"0.5","memory":"0.5Gi"},"requests":{"cpu":"0.5","memory":"0.5Gi"}},"volumeClaimTemplates":[{"name":"data","spec":{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"20Gi"}}}}]}],"terminationPolicy":"Delete","tolerations":[{"effect":"NoSchedule","key":"kb-data","operator":"Equal","value":"true"}]}}
+      {"apiVersion":"apps.kubeblocks.io/v1alpha1","kind":"Cluster","metadata":{"annotations":{},"name":"mycluster","namespace":"demo"},"spec":{"affinity":{"podAntiAffinity":"Preferred","tenancy":"SharedNode","topologyKeys":null},"clusterDefinitionRef":"postgresql","clusterVersionRef":"postgresql-14.8.0","componentSpecs":[{"componentDefRef":"postgresql","enabledLogs":["running"],"monitor":false,"name":"postgresql","replicas":2,"resources":{"limits":{"cpu":"0.5","memory":"0.5Gi"},"requests":{"cpu":"0.5","memory":"0.5Gi"}},"volumeClaimTemplates":[{"name":"data","spec":{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"20Gi"}}}}]}],"terminationPolicy":"Delete","tolerations":[{"effect":"NoSchedule","key":"kb-data","operator":"Equal","value":"true"}]}}
   creationTimestamp: "2024-05-17T02:36:28Z"
   finalizers:
   - cluster.kubeblocks.io/finalizer
   generation: 1
   labels:
     clusterdefinition.kubeblocks.io/name: postgresql
-    clusterversion.kubeblocks.io/name: postgresql-12.14.0
+    clusterversion.kubeblocks.io/name: postgresql-14.8.0
   name: mycluster
   namespace: demo
   resourceVersion: "1019716"
@@ -195,7 +195,7 @@ spec:
     podAntiAffinity: Preferred
     tenancy: SharedNode
   clusterDefinitionRef: postgresql
-  clusterVersionRef: postgresql-12.14.0
+  clusterVersionRef: postgresql-14.8.0
   componentSpecs:
   - componentDefRef: postgresql
     enabledLogs:

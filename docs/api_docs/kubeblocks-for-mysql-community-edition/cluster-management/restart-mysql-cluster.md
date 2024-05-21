@@ -20,10 +20,6 @@ All pods restart in the order of learner -> follower -> leader and the leader ma
 
 1. Restart a cluster.
 
-   You can use `kbcli` or create an OpsRequest to restart a cluster.
-
-   Run the command below to restart a cluster.
-
    ```bash
    kubectl apply -f - <<EOF
    apiVersion: apps.kubeblocks.io/v1alpha1

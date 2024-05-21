@@ -43,7 +43,7 @@ When creating a PostgreSQL cluster with KubeBlocks, PgBouncer is installed by de
     shgkz4z9
    ```
 
-4. Connect the cluster with PgBouncer. The default example uses port `5432` and you can replace it with port `6432`.
+4. Connect the cluster with PgBouncer. The default example uses port `6432` and you can replace it with port `5432`.
 
     ```bash
     kubectl -n demo port-forward service/mycluster-postgresql 6432:6432

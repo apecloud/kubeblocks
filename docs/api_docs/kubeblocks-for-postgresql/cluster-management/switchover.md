@@ -69,10 +69,12 @@ The value of `instanceName` decides whether a new primary instance is specified 
 
 ## Verify the switchover
 
-Check the instance status to verify whether the switchover is performed successfully.
+Check the cluster and instance status to verify whether the switchover is performed successfully.
 
 ```bash
-kbcli cluster list-instances
+kubectl get cluster mycluster -n demo
+
+kubectl -n demo get po -L kubeblocks.io/role 
 ```
 
 ## Handle an exception

@@ -49,7 +49,7 @@ metadata:
 spec:
   clusterDefinitionRef: postgresql
   clusterVersionRef: postgresql-14.8.0
-  terminationPolicy: WipeOut
+  terminationPolicy: Delete
   componentSpecs:
   - name: postgresql
     componentDefRef: postgresql
@@ -106,7 +106,7 @@ metadata:
 spec:
   clusterDefinitionRef: postgresql
   clusterVersionRef: postgresql-14.8.0
-  terminationPolicy: WipeOut
+  terminationPolicy: Delete
   componentSpecs:
   - name: postgresql
     componentDefRef: postgresql

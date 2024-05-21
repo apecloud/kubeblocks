@@ -14,7 +14,7 @@ In this chapter, we take Qdrant as an example to show how to manage vector datab
 ## Before you start
 
 * Install KubeBlocks: You can install KubeBlocks by [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
-* Make sure the PostgreSQL add-on is enabled.
+* Make sure the Qdrant addon is enabled.
 
   ```bash
   kubectl get addons.extensions.kubeblocks.io qdrant
@@ -25,7 +25,7 @@ In this chapter, we take Qdrant as an example to show how to manage vector datab
 
 * View all the database types and versions available for creating a cluster.
   
-  Make sure the `postgresql` cluster definition is installed with `kubectl get clusterdefinitions postgresql`.
+  Make sure the `qdrant` cluster definition is installed with `kubectl get clusterdefinitions postgresql`.
 
   ```bash
   kubectl get clusterdefinition qdrant
@@ -97,7 +97,7 @@ EOF
 
 * `kubeblocks.io/extra-env` in `metadata.annotations` defines the topology mode of a MySQL cluster. If you want to create a Standalone cluster, you can change the value to `standalone`.
 * `spec.clusterVersionRef` is the name of the cluster version CRD that defines the cluster version.
-* * `spec.terminationPolicy` is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Halt`, `Delete`, `WipeOut`. `DoNotTerminate` blocks deletion operation. `Halt` deletes workload resources such as statefulset and deployment workloads but keep PVCs. `Delete` is based on Halt and deletes PVCs. `WipeOut` is based on Delete and wipe out all volume snapshots and snapshot data from a backup storage location.
+* `spec.terminationPolicy` is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Halt`, `Delete`, `WipeOut`. `DoNotTerminate` blocks deletion operation. `Halt` deletes workload resources such as statefulset and deployment workloads but keep PVCs. `Delete` is based on Halt and deletes PVCs. `WipeOut` is based on Delete and wipe out all volume snapshots and snapshot data from a backup storage location.
 * `spec.componentSpecs` is the list of components that define the cluster components.
 * `spec.componentSpecs.componentDefRef` is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition apecloud-mysql -o json | jq '.spec.componentDefs[].name'`.
 * `spec.componentSpecs.name` is the name of the component.
@@ -369,7 +369,7 @@ mycluster   qdrant               qdrant-1.5.0   Halt                 Running   4
      clusterName: mycluster
      type: VerticalScaling
      verticalScaling:
-     - componentName: mysql
+     - componentName: qdrant
        requests:
          memory: "2Gi"
          cpu: "1"
@@ -453,7 +453,7 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    AGE
-mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running   4m29s
+mycluster   qdrant               qdrant-1.5.0      Delete               Running   4m29s
 ```
 
 ### Steps
@@ -477,7 +477,7 @@ mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running 
       clusterName: mycluster
       type: VolumeExpansion
       volumeExpansion:
-      - componentName: mysql
+      - componentName: qdrant
         volumeClaimTemplates:
         - name: data
           storage: "40Gi"
@@ -499,11 +499,11 @@ mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running 
       name: mycluster
       namespace: demo
     spec:
-      clusterDefinitionRef: apecloud-mysql
-      clusterVersionRef: ac-mysql-8.0.30
+      clusterDefinitionRef: qdrant
+      clusterVersionRef: qdrant-1.5.0
       componentSpecs:
-      - name: mysql
-        componentDefRef: mysql
+      - name: qdrant
+        componentDefRef: qdrant
         replicas: 1
         volumeClaimTemplates:
         - name: data
@@ -537,6 +537,6 @@ mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running 
 
 ## Backup and restore
 
-The backup and restore operations for qdrant are the same with those of other clusters.
+The backup and restore operations for Qdrant are the same with those of other clusters.
 
 You can refer to the [backup and restore docs](./../maintenance/backup-and-restore/introduction.md) for details.

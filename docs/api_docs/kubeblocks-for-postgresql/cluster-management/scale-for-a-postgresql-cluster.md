@@ -11,7 +11,13 @@ import TabItem from '@theme/TabItem';
 
 # Scale for a PostgreSQL cluster
 
-Currently, only vertical scaling for PostgreSQL is supported.
+You can scale a PostgreSQL cluster in two ways, vertical scaling and horizontal scaling.
+
+:::note
+
+After vertical scaling or horizontal scaling is performed, KubeBlocks automatically matches the appropriate configuration template based on the new specification. This is the KubeBlocks dynamic configuration feeature. This feature simplifies the process of configuring parameters, saves time and effort, and reduces performance issues caused by incorrect configuration.  For detailed instructions, refer to [Configuration](./../configuration/configuration.md).
+
+:::
 
 ## Vertical scaling
 
@@ -49,7 +55,7 @@ mycluster   postgresql           postgresql-14.8.0   Delete               Runnin
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: OpsRequest
    metadata:
-     name: ops-vertical-scalin
+     name: ops-vertical-scaling
      namespace: demo
    spec:
      clusterName: mycluster
@@ -136,12 +142,6 @@ mycluster   postgresql           postgresql-14.8.0   Delete               Runnin
         Memory:  2Gi
    ```
 
-:::note
-
-Vertical scaling does not synchronize parameters related to CPU and memory and it is required to manually call the OpsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
-
-:::
-
 ## Horizontal scaling
 
 Horizontal scaling changes the amount of pods. For example, you can apply horizontal scaling to scale pods up from three to five. The scaling process includes the backup and restore of data.
@@ -197,7 +197,7 @@ mycluster   postgresql           postgresql-12.14.0   Delete                 Run
      namespace: demo
    spec:
      clusterDefinitionRef: postgresql
-     clusterVersionRef: postgresql-12.14.0
+     clusterVersionRef: postgresql-14.8.0
      componentSpecs:
      - name: postgresql
        componentDefRef: postgresql

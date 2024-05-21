@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 
 # Scale for a MongoDB cluster
 
-For MongoDB, vertical scaling is supported.
+You can scale a MongoDB cluster in two ways, vertical scaling and horizontal scaling.
 
 ## Vertical scaling
 

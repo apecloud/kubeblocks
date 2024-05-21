@@ -11,6 +11,8 @@ import TabItem from '@theme/TabItem';
 
 # Scale for a Pulsar cluster
 
+You can scale a Pulsar cluster in two ways, vertical scaling and horizontal scaling.
+
 ## Vertical scaling
 
 You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, if you need to change the resource class from 1C2G to 2C4G, vertical scaling is what you need.

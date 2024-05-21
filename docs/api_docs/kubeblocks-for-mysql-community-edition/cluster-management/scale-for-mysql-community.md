@@ -10,6 +10,12 @@ sidebar_label: Scale
 
 You can scale a MySQL cluster in two ways, vertical scaling and horizontal scaling.
 
+:::note
+
+After vertical scaling or horizontal scaling is performed, KubeBlocks automatically matches the appropriate configuration template based on the new specification. This is the KubeBlocks dynamic configuration feeature. This feature simplifies the process of configuring parameters, saves time and effort and reduces performance issues caused by incorrect configuration.  For detailed instructions, refer to [Configuration](./../configuration/configuration.md).
+
+:::
+
 ## Vertical scaling
 
 You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, if you need to change the resource class from 1C2G to 2C4G, vertical scaling is what you need.
@@ -29,7 +35,7 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 kubectl get cluster mycluster
 >
 NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
-mycluster   mysql                mysql-8.0.33   Delete               Running   4d18h
+mycluster   mysql                mysql-8.0.33   Delete               Running   18m
 ```
 
 ### Steps
@@ -56,10 +62,10 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   4
      - componentName: mysql
        requests:
          memory: "2Gi"
-         cpu: "1000m"
+         cpu: "1"
        limits:
          memory: "4Gi"
-         cpu: "2000m"
+         cpu: "2"
    EOF
    ```
 
@@ -85,10 +91,10 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   4
        resources: # Change the values of resources.
          requests:
            memory: "2Gi"
-           cpu: "1000m"
+           cpu: "1"
          limits:
            memory: "4Gi"
-           cpu: "2000m"
+           cpu: "2"
        volumeClaimTemplates:
        - name: data
          spec:
@@ -97,7 +103,7 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   4
            resources:
              requests:
                storage: 1Gi
-     terminationPolicy: Halt
+     terminationPolicy: Delete
    ```
 
    </TabItem>
@@ -145,7 +151,7 @@ Check whether the cluster STATUS is `Running`. Otherwise, the following operatio
 kubectl get cluster mycluster
 >
 NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
-mycluster   mysql                mysql-8.0.33   Delete               Running   4d19h
+mycluster   mysql                mysql-8.0.33   Delete               Running   19m
 
 ```
 
@@ -202,14 +208,14 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   4
            resources:
              requests:
                storage: 1Gi
-    terminationPolicy: Halt
+    terminationPolicy: Delete
    ```
 
    </TabItem>
   
   </Tabs>
 
-2. Check whether the corresponding resources change..
+2. Check whether the corresponding resources change.
 
    ```bash
    kubectl describe cluster mycluster -n demo
@@ -223,7 +229,7 @@ In the example below, a snapshot exception occurs.
 ```bash
 Status:
   conditions: 
-  - lastTransitionTime: "2023-02-08T04:20:26Z"
+  - lastTransitionTime: "2024-04-28T04:20:26Z"
     message: VolumeSnapshot/mycluster-mysql-scaling-dbqgp: Failed to set default snapshot
       class with error cannot find default snapshot class
     reason: ApplyResourcesFailed

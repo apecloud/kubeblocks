@@ -117,7 +117,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
 			podList := initInstanceSetPods(ctx, k8sClient, opsRes)
 
-			By("create horizontalScaling operation to test the progressDetails when scaling down the replicas")
+			By("create horizontalScaling operation to test the progressDetails when scaling in the replicas")
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, appsv1alpha1.HorizontalScaling{
 				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
 				Operator:     appsv1alpha1.HScaleOverwriteOP,

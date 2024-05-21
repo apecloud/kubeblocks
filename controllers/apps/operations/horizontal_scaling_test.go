@@ -214,8 +214,8 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 				getProgressObjectKey(constant.PodKind, pod.Name)).Status).Should(Equal(appsv1alpha1.SucceedProgressStatus))
 		}
 
-		It("test to scale down replicas with `Overwrite` operator", func() {
-			By("scale down replicas from 3 to 1 ")
+		It("test to scale in replicas with `Overwrite` operator", func() {
+			By("scale in replicas from 3 to 1 ")
 			horizontalScaling := appsv1alpha1.HorizontalScaling{Operator: appsv1alpha1.HScaleOverwriteOP, Replicas: pointer.Int32(1)}
 			testHScaleReplicas(nil, horizontalScaling, func(podList []*corev1.Pod) {
 				By("delete the pods")
@@ -223,8 +223,8 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			})
 		})
 
-		It("test to scale up replicas with `Overwrite` operator", func() {
-			By("scale up replicas from 3 to 5")
+		It("test to scale out replicas with `Overwrite` operator", func() {
+			By("scale out replicas from 3 to 5")
 			horizontalScaling := appsv1alpha1.HorizontalScaling{Operator: appsv1alpha1.HScaleOverwriteOP, Replicas: pointer.Int32(5)}
 			testHScaleReplicas(nil, horizontalScaling, func(podList []*corev1.Pod) {
 				By("create the pods(ordinal:[3,4])")
@@ -232,8 +232,8 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			})
 		})
 
-		It("test to scale up replicas with `Add` operator", func() {
-			By("scale up replicas from 3 to 5 with `Add` operator")
+		It("test to scale out replicas with `Add` operator", func() {
+			By("scale out replicas from 3 to 5 with `Add` operator")
 			horizontalScaling := appsv1alpha1.HorizontalScaling{Operator: appsv1alpha1.HScaleAddOP, Replicas: pointer.Int32(2)}
 			testHScaleReplicas(nil, horizontalScaling, func(podList []*corev1.Pod) {
 				By("delete the pods(ordinal:[3,4])")
@@ -241,8 +241,8 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			})
 		})
 
-		It("test to scale down replicas with `Delete` operator", func() {
-			By("scale up replicas from 3 to 1")
+		It("test to scale in replicas with `Delete` operator", func() {
+			By("scale in replicas from 3 to 1")
 			horizontalScaling := appsv1alpha1.HorizontalScaling{Operator: appsv1alpha1.HScaleDeleteOP, Replicas: pointer.Int32(2)}
 			testHScaleReplicas(nil, horizontalScaling, func(podList []*corev1.Pod) {
 				By("delete the pods")
@@ -250,23 +250,23 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			})
 		})
 
-		It("cancel the opsRequest which scaling down replicas with `Overwrite` operator", func() {
-			By("scale down replicas of component from 3 to 1")
+		It("cancel the opsRequest which scaling in replicas with `Overwrite` operator", func() {
+			By("scale in replicas of component from 3 to 1")
 			testCancelHScale(appsv1alpha1.HorizontalScaling{Operator: appsv1alpha1.HScaleOverwriteOP, Replicas: pointer.Int32(1)}, true)
 		})
 
 		It("cancel the opsRequest which scaling up replicas with `Overwrite` operator", func() {
-			By("scale up replicas of component from 3 to 5")
+			By("scale out replicas of component from 3 to 5")
 			testCancelHScale(appsv1alpha1.HorizontalScaling{Operator: appsv1alpha1.HScaleOverwriteOP, Replicas: pointer.Int32(5)}, false)
 		})
 
 		It("cancel the opsRequest which scaling up replicas with `Add` operator", func() {
-			By("scale up replicas of component from 3 to 5")
+			By("scale out replicas of component from 3 to 5")
 			testCancelHScale(appsv1alpha1.HorizontalScaling{Operator: appsv1alpha1.HScaleAddOP, Replicas: pointer.Int32(2)}, false)
 		})
 
-		It("cancel the opsRequest which scaling down replicas with `Delete` operator", func() {
-			By("scale down replicas of component from 3 to 1")
+		It("cancel the opsRequest which scaling in replicas with `Delete` operator", func() {
+			By("scale in replicas of component from 3 to 1")
 			testCancelHScale(appsv1alpha1.HorizontalScaling{Operator: appsv1alpha1.HScaleDeleteOP, Replicas: pointer.Int32(2)}, true)
 		})
 
@@ -301,7 +301,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			return opsRes
 		}
 
-		It("test scale down the specified pod with `Overwrite` operator", func() {
+		It("test scale in the specified pod with `Overwrite` operator", func() {
 			toDeletePodName := fmt.Sprintf("%s-%s-1", clusterName, consensusComp)
 			offlineInstances := []string{toDeletePodName}
 			opsRes := testHScaleWithSpecifiedPod(func(cluster *appsv1alpha1.Cluster) {
@@ -347,7 +347,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			Expect(opsRes.Cluster.Spec.GetComponentByName(consensusComp).Replicas).Should(BeEquivalentTo(3))
 		})
 
-		It("test scale down the specified pod with `Add` operator and keep replicas unchanged ", func() {
+		It("test scale in the specified pod with `Add` operator and keep replicas unchanged ", func() {
 			toDeletePodName := fmt.Sprintf("%s-%s-1", clusterName, consensusComp)
 			offlineInstances := []string{toDeletePodName}
 			opsRes := testHScaleWithSpecifiedPod(func(cluster *appsv1alpha1.Cluster) {
@@ -368,7 +368,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("2/2"))
 		})
 
-		It("test scale down the specified pod with `Add` operator and auto-sync replicas ", func() {
+		It("test scale in the specified pod with `Add` operator and auto-sync replicas ", func() {
 			toDeletePodName := fmt.Sprintf("%s-%s-%s-0", clusterName, consensusComp, insTplName)
 			offlineInstances := []string{toDeletePodName}
 			opsRes := testHScaleWithSpecifiedPod(func(cluster *appsv1alpha1.Cluster) {
@@ -392,7 +392,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			Expect(*compSpec.Instances[0].Replicas).Should(BeEquivalentTo(0))
 		})
 
-		It("test scale up the specified pod with `Delete` operator and keep replicas unchanged", func() {
+		It("test scale out the specified pod with `Delete` operator and keep replicas unchanged", func() {
 			offlineInstances := []string{fmt.Sprintf("%s-%s-1", clusterName, consensusComp)}
 			opsRes := testHScaleWithSpecifiedPod(func(cluster *appsv1alpha1.Cluster) {
 				setClusterCompSpec(cluster, nil, offlineInstances)
@@ -411,7 +411,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("2/2"))
 		})
 
-		It("test scale up the specified pod and auto-sync the replicas", func() {
+		It("test scale out the specified pod and auto-sync the replicas", func() {
 			toAddPodName := fmt.Sprintf("%s-%s-%s-0", clusterName, consensusComp, insTplName)
 			offlineInstances := []string{toAddPodName}
 			opsRes := testHScaleWithSpecifiedPod(func(cluster *appsv1alpha1.Cluster) {

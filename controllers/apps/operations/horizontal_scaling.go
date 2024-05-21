@@ -96,14 +96,12 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 					// TODO: check for sharding spec?
 					lastCompConfiguration := earlierOps.Status.LastConfiguration.Components[v.ComponentName]
 					compSpec := opsRes.Cluster.Spec.GetComponentByName(v.ComponentName)
-					if compSpec != nil {
-						createdPodSet, _ := hs.getCreateAndDeletePodSet(opsRes, lastCompConfiguration, *compSpec, v, v.ComponentName)
-						for _, offlineIns := range currHorizontalScaling.OfflineInstance.InstanceNames {
-							if _, ok = createdPodSet[offlineIns]; ok {
-								errMsg := fmt.Sprintf(`instance "%s" cannot be taken offline as it has been created by another running opsRequest "%s"`,
-									offlineIns, earlierOps.Name)
-								return false, intctrlutil.NewFatalError(errMsg)
-							}
+					createdPodSet, _ := hs.getCreateAndDeletePodSet(opsRes, lastCompConfiguration, *compSpec, v, v.ComponentName)
+					for _, offlineIns := range currHorizontalScaling.OfflineInstance.InstanceNames {
+						if _, ok = createdPodSet[offlineIns]; ok {
+							errMsg := fmt.Sprintf(`instance "%s" cannot be taken offline as it has been created by another running opsRequest "%s"`,
+								offlineIns, earlierOps.Name)
+							return false, intctrlutil.NewFatalError(errMsg)
 						}
 					}
 				}

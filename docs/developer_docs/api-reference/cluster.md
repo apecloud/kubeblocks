@@ -12003,7 +12003,16 @@ New instances are created based on the provided InstanceTemplate.</li>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Scale out or in the specified instances based on the operator.</p>
+<p>Specifies the names of instances to be started or terminated during the scaling operation, based on the operator field.</p>
+<p>&ldquo;Add&rdquo;:
+- Adds the specified instances to the Component&rsquo;s clusterComponentSpec.offlineInstances array.
+- Instances are expected to be online and will be moved to offline status.</p>
+<p>&ldquo;Delete&rdquo;:
+- Removes the specified instances from the Component&rsquo;s clusterComponentSpec.offlineInstances array.
+- Instances should be offline and will be moved to online status.</p>
+<p>&ldquo;Overwrite&rdquo;:
+- Replaces the existing instances in the Component&rsquo;s clusterComponentSpec.offlineInstances array with the specified instances.</p>
+<p>This field determines which instances are included in clusterComponentSpec.offlineInstances field, targeted for termination during replica count adjustment.</p>
 </td>
 </tr>
 <tr>
@@ -12015,7 +12024,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Replicas will be automatically synchronized based on the offline instances when it is set to true and no any replicas are specified.</p>
+<p>When autoSyncReplicas is specified, replicas must be empty.</p>
 </td>
 </tr>
 <tr>
@@ -12029,15 +12038,13 @@ HScaleOperator
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the operator for this HorizontalScaling operation.
-Valid options are <code>Overwrite</code>, <code>Add</code>, and <code>Delete</code>.</p>
-<ul>
-<li><code>Overwrite</code>: Overwrite the replicas, instances, offlineInstances to the specified component. This is the default option.</li>
-<li><code>Add</code>: Create the specified number of replicas and instances, and scale in the specified instances.
-This is the &lsquo;Add&rsquo; operation at the data structure level of replicas, instances, and offlineInstances.</li>
-<li><code>Delete</code>: Delete the specified number of replicas and instances, and scale out the specified instances.
-This is the &lsquo;Delete&rsquo; operation at the data structure level of replicas, instances, and offlineInstances.</li>
-</ul>
+<p>Specifies the operator for this HorizontalScaling operation.</p>
+<p>Valid values:
+- &ldquo;Overwrite&rdquo; (default): Replaces the replicas, instances, offlineInstances with those specified for the component.
+- &ldquo;Add&rdquo;: Adds replicas for the specified component and existing instance template.
+   Appends any non-existent instance templates to the instances array and the specified instances to the offlineInstances array.
+- &ldquo;Delete&rdquo;: Deletes replicas for the specified component and existing instance template.
+Appends the specified instances to the offlineInstances array.</p>
 </td>
 </tr>
 </tbody>

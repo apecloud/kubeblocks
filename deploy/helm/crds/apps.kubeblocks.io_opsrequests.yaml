@@ -480,9 +480,8 @@ spec:
                     scaling operation.
                   properties:
                     autoSyncReplicas:
-                      description: Replicas will be automatically synchronized based
-                        on the offline instances when it is set to true and no any
-                        replicas are specified.
+                      description: When autoSyncReplicas is specified, replicas must
+                        be empty.
                       type: boolean
                     componentName:
                       description: Specifies the name of the Component.
@@ -2743,24 +2742,34 @@ spec:
                         type: object
                       type: array
                     offlineInstances:
-                      description: Scale out or in the specified instances based on
-                        the operator.
+                      description: "Specifies the names of instances to be started
+                        or terminated during the scaling operation, based on the operator
+                        field. \n \"Add\": - Adds the specified instances to the Component's
+                        clusterComponentSpec.offlineInstances array. - Instances are
+                        expected to be online and will be moved to offline status.
+                        \n \"Delete\": - Removes the specified instances from the
+                        Component's clusterComponentSpec.offlineInstances array. -
+                        Instances should be offline and will be moved to online status.
+                        \n \"Overwrite\": - Replaces the existing instances in the
+                        Component's clusterComponentSpec.offlineInstances array with
+                        the specified instances. \n This field determines which instances
+                        are included in clusterComponentSpec.offlineInstances field,
+                        targeted for termination during replica count adjustment."
                       items:
                         type: string
                       type: array
                     operator:
                       default: Overwrite
                       description: "Specifies the operator for this HorizontalScaling
-                        operation. Valid options are `Overwrite`, `Add`, and `Delete`.
-                        \n - `Overwrite`: Overwrite the replicas, instances, offlineInstances
-                        to the specified component. This is the default option. -
-                        `Add`: Create the specified number of replicas and instances,
-                        and scale in the specified instances. This is the 'Add' operation
-                        at the data structure level of replicas, instances, and offlineInstances.
-                        - `Delete`: Delete the specified number of replicas and instances,
-                        and scale out the specified instances. This is the 'Delete'
-                        operation at the data structure level of replicas, instances,
-                        and offlineInstances."
+                        operation. \n Valid values: - \"Overwrite\" (default): Replaces
+                        the replicas, instances, offlineInstances with those specified
+                        for the component. - \"Add\": Adds replicas for the specified
+                        component and existing instance template. Appends any non-existent
+                        instance templates to the instances array and the specified
+                        instances to the offlineInstances array. - \"Delete\": Deletes
+                        replicas for the specified component and existing instance
+                        template. Appends the specified instances to the offlineInstances
+                        array."
                       enum:
                       - Overwrite
                       - Add

@@ -416,32 +416,33 @@ func (r *OpsRequest) validateHorizontalScaling(_ context.Context, _ client.Clien
 	if len(horizontalScalingList) == 0 {
 		return notEmptyError("spec.horizontalScaling")
 	}
-	for _, v := range r.Spec.HorizontalScalingList {
-		if v.Operator != HScaleDeleteOP {
-			continue
-		}
-		for _, comSpec := range cluster.Spec.ComponentSpecs {
-			if err := r.validateHorizontalScalingSpec(v, comSpec, comSpec.Name, false); err != nil {
-				return err
-			}
-		}
-		for _, shardingSpec := range cluster.Spec.ShardingSpecs {
-			if err := r.validateHorizontalScalingSpec(v, shardingSpec.Template, shardingSpec.Name, true); err != nil {
-				return err
-			}
-		}
-	}
 	compOpsList := make([]ComponentOps, len(horizontalScalingList))
+	hScaleMap := map[string]HorizontalScaling{}
 	for i, v := range horizontalScalingList {
 		compOpsList[i] = v.ComponentOps
+		hScaleMap[v.ComponentName] = horizontalScalingList[i]
 	}
-	return r.checkComponentExistence(cluster, compOpsList)
+	if err := r.checkComponentExistence(cluster, compOpsList); err != nil {
+		return err
+	}
+	for _, comSpec := range cluster.Spec.ComponentSpecs {
+		if hScale, ok := hScaleMap[comSpec.Name]; ok {
+			if err := r.validateHorizontalScalingSpec(hScale, comSpec, comSpec.Name, false); err != nil {
+				return err
+			}
+		}
+	}
+	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
+		if hScale, ok := hScaleMap[shardingSpec.Name]; ok {
+			if err := r.validateHorizontalScalingSpec(hScale, shardingSpec.Template, shardingSpec.Name, true); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, compSpec ClusterComponentSpec, componentName string, isSharding bool) error {
-	if hScale.ComponentName != componentName {
-		return nil
-	}
 	if hScale.AutoSyncReplicas {
 		if isSharding {
 			return fmt.Errorf("can not auto-sync replicas when the specified component is a sharding component")
@@ -450,10 +451,12 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 			return fmt.Errorf("replicas and instances must be empty when offlineInstance.autoSyncReplicas is true")
 		}
 	}
+	if hScale.Operator != HScaleDeleteOP {
+		return nil
+	}
 	if hScale.Replicas != nil && *hScale.Replicas > compSpec.Replicas {
 		return fmt.Errorf("replicas can not greater than %d when operator is Delete", hScale.Replicas)
 	}
-
 	insTplMap := map[string]int32{}
 	for _, v := range compSpec.Instances {
 		if v.Replicas == nil {
@@ -472,7 +475,7 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 				v.Name, *v.Replicas)
 		}
 	}
-	if len(hScale.OfflineInstances) == 0 || hScale.Operator != HScaleDeleteOP {
+	if len(hScale.OfflineInstances) == 0 {
 		return nil
 	}
 	offlineInstanceSet := sets.New(compSpec.OfflineInstances...)

@@ -448,23 +448,49 @@ type HorizontalScaling struct {
 	// +optional
 	Instances []InstanceTemplate `json:"instances,omitempty"`
 
-	// Scale out or in the specified instances based on the operator.
+	// Specifies the names of instances to be started or terminated during the scaling operation, based on the operator field.
 	//
+	// "Add":
+	// - Adds the specified instances to the Component's clusterComponentSpec.offlineInstances array.
+	// - Instances are expected to be online and will be moved to offline status.
+	//
+	// "Delete":
+	// - Removes the specified instances from the Component's clusterComponentSpec.offlineInstances array.
+	// - Instances should be offline and will be moved to online status.
+	//
+	// "Overwrite":
+	// - Replaces the existing instances in the Component's clusterComponentSpec.offlineInstances array with the specified instances.
+	//
+	// This field determines which instances are included in clusterComponentSpec.offlineInstances field, targeted for termination during replica count adjustment.
 	// +optional
 	OfflineInstances []string `json:"offlineInstances,omitempty"`
 
-	// Replicas will be automatically synchronized based on the offline instances when it is set to true and no any replicas are specified.
+	// Controls whether changes in offlineInstances automatically trigger replicas adjustments.
+	//
+	// When operator is "Add" and an instance is added to offlineInstances:
+	// - If true, replicas will be automatically decreased by the number of added instances.
+	// - If false, replicas will remain unchanged, and new instances will be created by the reconciliation controller loop.
+	//
+	// When operator is "Delete" and an instance is removed from offlineInstances:
+	// - If true, replicas will be automatically increased by the number of removed instances.
+	// - If false, replicas will remain unchanged, and the reconciliation controller loop will handle the instance deletion.
+
+	// When operator is "Overwrite" and replaces the existing offlineInstances:
+	// - If true, replicas will automatically adjust based on the added or removed instances.
+	// - If false, replicas will remain unchanged, and the reconciliation controller loop will handle instance deletion or creation.
+
+	// When autoSyncReplicas is specified, replicas must be empty.
 	// +optional
 	AutoSyncReplicas bool `json:"autoSyncReplicas,omitempty"`
 
 	// Specifies the operator for this HorizontalScaling operation.
-	// Valid options are `Overwrite`, `Add`, and `Delete`.
 	//
-	// - `Overwrite`: Overwrite the replicas, instances, offlineInstances to the specified component. This is the default option.
-	// - `Add`: Create the specified number of replicas and instances, and scale in the specified instances.
-	//    This is the 'Add' operation at the data structure level of replicas, instances, and offlineInstances.
-	// - `Delete`: Delete the specified number of replicas and instances, and scale out the specified instances.
-	//    This is the 'Delete' operation at the data structure level of replicas, instances, and offlineInstances.
+	// Valid values:
+	// - "Overwrite" (default): Replaces the replicas, instances, offlineInstances with those specified for the component.
+	// - "Add": Adds replicas for the specified component and existing instance template.
+	//    Appends any non-existent instance templates to the instances array and the specified instances to the offlineInstances array.
+	// - "Delete": Deletes replicas for the specified component and existing instance template.
+	//    Appends the specified instances to the offlineInstances array.
 	// +kubebuilder:default=Overwrite
 	// +optional
 	Operator HScaleOperator `json:"operator"`

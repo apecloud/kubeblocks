@@ -1010,6 +1010,8 @@ func resolveComponentVarRef(ctx context.Context, cli client.Reader, synthesizedC
 		resolveFunc = resolveComponentReplicasRef
 	case selector.InstanceNames != nil:
 		resolveFunc = resolveComponentInstanceNamesRef
+	case selector.PodFQDNs != nil:
+		resolveFunc = resolveComponentPodFQDNsRef
 	default:
 		return nil, nil, nil
 	}
@@ -1046,6 +1048,26 @@ func resolveComponentInstanceNamesRef(ctx context.Context, cli client.Reader, sy
 		return &corev1.EnvVar{Name: defineKey, Value: strings.Join(instanceNameList, ",")}, nil
 	}
 	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector, selector.InstanceNames, resolveInstanceNames)
+}
+
+func resolveComponentPodFQDNsRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+	defineKey string, selector appsv1alpha1.ComponentVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
+	resolveFQDNList := func(obj any) (*corev1.EnvVar, *corev1.EnvVar) {
+		comp := obj.(*appsv1alpha1.Component)
+		var templates []instanceset.InstanceTemplate
+		for i := range comp.Spec.Instances {
+			templates = append(templates, &comp.Spec.Instances[i])
+		}
+		names := instanceset.GenerateAllInstanceNames(comp.Name, comp.Spec.Replicas, templates, comp.Spec.OfflineInstances)
+		fqdn := func(name string) string {
+			return fmt.Sprintf("%s.%s-headless.%s.svc", name, comp.Name, synthesizedComp.Namespace)
+		}
+		for i := range names {
+			names[i] = fqdn(names[i])
+		}
+		return &corev1.EnvVar{Name: defineKey, Value: strings.Join(names, ",")}, nil
+	}
+	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector, selector.PodFQDNs, resolveFQDNList)
 }
 
 func resolveComponentVarRefLow(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,

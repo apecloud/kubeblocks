@@ -9240,7 +9240,22 @@ VarOption
 <td>
 <em>(Optional)</em>
 <p>Reference to the instanceName list of the component.
-and the value will be presented in the following format: instanceName1,instanceName2&hellip;</p>
+and the value will be presented in the following format: instanceName1,instanceName2,&hellip;</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podFQDNs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reference to the pod FQDN list of the component.
+The value will be presented in the following format: FQDN1,FQDN2,&hellip;</p>
 </td>
 </tr>
 </tbody>

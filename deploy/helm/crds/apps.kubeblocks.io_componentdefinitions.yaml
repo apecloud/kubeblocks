@@ -13374,7 +13374,7 @@ spec:
                             instanceNames:
                               description: 'Reference to the instanceName list of
                                 the component. and the value will be presented in
-                                the following format: instanceName1,instanceName2...'
+                                the following format: instanceName1,instanceName2,...'
                               enum:
                               - Required
                               - Optional
@@ -13438,6 +13438,14 @@ spec:
                             optional:
                               description: Specify whether the object must be defined.
                               type: boolean
+                            podFQDNs:
+                              description: 'Reference to the pod FQDN list of the
+                                component. The value will be presented in the following
+                                format: FQDN1,FQDN2,...'
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
                             replicas:
                               description: Reference to the replicas of the component.
                               enum:

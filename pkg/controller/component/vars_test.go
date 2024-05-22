@@ -1414,7 +1414,7 @@ var _ = Describe("vars", func() {
 			By("ok")
 			vars = []appsv1alpha1.EnvVar{
 				{
-					Name: "component-name",
+					Name: "name",
 					ValueFrom: &appsv1alpha1.VarSource{
 						ComponentVarRef: &appsv1alpha1.ComponentVarSelector{
 							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
@@ -1428,7 +1428,7 @@ var _ = Describe("vars", func() {
 					},
 				},
 				{
-					Name: "component-replicas",
+					Name: "replicas",
 					ValueFrom: &appsv1alpha1.VarSource{
 						ComponentVarRef: &appsv1alpha1.ComponentVarSelector{
 							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
@@ -1442,7 +1442,7 @@ var _ = Describe("vars", func() {
 					},
 				},
 				{
-					Name: "component-instanceNames",
+					Name: "instanceNames",
 					ValueFrom: &appsv1alpha1.VarSource{
 						ComponentVarRef: &appsv1alpha1.ComponentVarSelector{
 							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
@@ -1451,6 +1451,20 @@ var _ = Describe("vars", func() {
 							},
 							ComponentVars: appsv1alpha1.ComponentVars{
 								InstanceNames: &appsv1alpha1.VarRequired,
+							},
+						},
+					},
+				},
+				{
+					Name: "podFQDNs",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ComponentVarRef: &appsv1alpha1.ComponentVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								CompDef:  synthesizedComp.CompDefName,
+								Optional: required(),
+							},
+							ComponentVars: appsv1alpha1.ComponentVars{
+								PodFQDNs: &appsv1alpha1.VarRequired,
 							},
 						},
 					},
@@ -1478,9 +1492,18 @@ var _ = Describe("vars", func() {
 			}
 			_, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 			Expect(err).Should(Succeed())
-			checkEnvVarWithValue(envVars, "component-name", constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name))
-			checkEnvVarWithValue(envVars, "component-replicas", fmt.Sprintf("%d", 3))
-			checkEnvVarWithValue(envVars, "component-instanceNames", strings.Join(mockInstanceList, ","))
+			compName := constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name)
+			checkEnvVarWithValue(envVars, "name", compName)
+			checkEnvVarWithValue(envVars, "replicas", fmt.Sprintf("%d", 3))
+			checkEnvVarWithValue(envVars, "instanceNames", strings.Join(mockInstanceList, ","))
+			fqdnList := func() []string {
+				l := make([]string, 0)
+				for _, i := range mockInstanceList {
+					l = append(l, fmt.Sprintf("%s.%s-headless.%s.svc", i, compName, testCtx.DefaultNamespace))
+				}
+				return l
+			}
+			checkEnvVarWithValue(envVars, "podFQDNs", strings.Join(fqdnList(), ","))
 		})
 
 		It("resolve component", func() {

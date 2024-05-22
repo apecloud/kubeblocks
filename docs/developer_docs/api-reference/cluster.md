@@ -12044,7 +12044,7 @@ HScaleOperator
 - &ldquo;Add&rdquo;: Adds replicas for the specified component and existing instance template.
    Appends any non-existent instance templates to the instances array and the specified instances to the offlineInstances array.
 - &ldquo;Delete&rdquo;: Deletes replicas for the specified component and existing instance template.
-Appends the specified instances to the offlineInstances array.</p>
+Removes the specified instances from the offlineInstances array.</p>
 </td>
 </tr>
 </tbody>

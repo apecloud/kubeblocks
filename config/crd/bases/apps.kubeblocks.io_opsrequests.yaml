@@ -2768,7 +2768,7 @@ spec:
                         instance templates to the instances array and the specified
                         instances to the offlineInstances array. - \"Delete\": Deletes
                         replicas for the specified component and existing instance
-                        template. Appends the specified instances to the offlineInstances
+                        template. Removes the specified instances from the offlineInstances
                         array."
                       enum:
                       - Overwrite

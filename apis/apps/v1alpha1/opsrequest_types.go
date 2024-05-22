@@ -490,7 +490,7 @@ type HorizontalScaling struct {
 	// - "Add": Adds replicas for the specified component and existing instance template.
 	//    Appends any non-existent instance templates to the instances array and the specified instances to the offlineInstances array.
 	// - "Delete": Deletes replicas for the specified component and existing instance template.
-	//    Appends the specified instances to the offlineInstances array.
+	//    Removes the specified instances from the offlineInstances array.
 	// +kubebuilder:default=Overwrite
 	// +optional
 	Operator HScaleOperator `json:"operator"`

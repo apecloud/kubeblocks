@@ -80,6 +80,7 @@ type ActionContext struct {
 	compShortName    string
 	cluster          *appsv1alpha1.Cluster
 	component        *appsv1alpha1.Component
+	workload         client.Object
 	actionType       LifeCycleActionType
 	lifecycleActions *appsv1alpha1.ComponentLifecycleActions
 	scriptTemplates  []appsv1alpha1.ComponentTemplateSpec
@@ -564,6 +565,7 @@ func getActionCmdJobLabels(clusterName, componentName string, actionType LifeCyc
 
 func NewActionContext(cluster *appsv1alpha1.Cluster,
 	component *appsv1alpha1.Component,
+	workload client.Object,
 	lifecycleActions *appsv1alpha1.ComponentLifecycleActions,
 	scriptTemplates []appsv1alpha1.ComponentTemplateSpec,
 	actionType LifeCycleActionType) (*ActionContext, error) {
@@ -575,6 +577,7 @@ func NewActionContext(cluster *appsv1alpha1.Cluster,
 		compShortName:    compShortName,
 		cluster:          cluster,
 		component:        component,
+		workload:         workload,
 		lifecycleActions: lifecycleActions,
 		scriptTemplates:  scriptTemplates,
 		actionType:       actionType,

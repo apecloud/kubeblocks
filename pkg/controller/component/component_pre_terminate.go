@@ -63,7 +63,7 @@ func ReconcileCompPreTerminate(reqCtx intctrlutil.RequestCtx,
 		return err
 	}
 
-	actionCtx, err := NewActionContext(cluster, comp, compDef.Spec.LifecycleActions, compDef.Spec.Scripts, PreTerminateAction)
+	actionCtx, err := NewActionContext(cluster, comp, nil, compDef.Spec.LifecycleActions, compDef.Spec.Scripts, PreTerminateAction)
 	if err != nil {
 		return err
 	}

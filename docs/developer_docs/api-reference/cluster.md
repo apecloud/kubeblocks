@@ -3252,11 +3252,9 @@ Currently, this is only applicable to the <code>postProvision</code> action.</p>
 <p>The conditions are as follows:</p>
 <ul>
 <li><code>Immediately</code>: Executed right after the Component object is created.
-The readiness of the Component and its resources is not guaranteed at this stage.
-The Component&rsquo;s state can not be marked as ready until the Action completes successfully.</li>
+The readiness of the Component and its resources is not guaranteed at this stage.</li>
 <li><code>RuntimeReady</code>: The Action is triggered after the Component object has been created and all associated
-runtime resources (e.g. Pods) are in a ready state.
-The Component&rsquo;s state can not be marked as ready until the Action completes successfully.</li>
+runtime resources (e.g. Pods) are in a ready state.</li>
 <li><code>ComponentReady</code>: The Action is triggered after the Component itself is in a ready state.
 This process does not affect the readiness state of the Component or the Cluster.</li>
 <li><code>ClusterReady</code>: The Action is executed after the Cluster is in a ready state.

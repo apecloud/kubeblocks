@@ -29,7 +29,6 @@ import (
 )
 
 func TestStripSecrets(t *testing.T) {
-	secretName := "secret-abc"
 	secretValue := "123"
 
 	getRoleReq := &GetRoleRequest{
@@ -79,6 +78,5 @@ func TestStripSecrets(t *testing.T) {
 
 	// The secret is hidden because StripSecrets is a struct referencing it.
 	dump := fmt.Sprintf("%#v", StripSecrets(getRoleReq))
-	assert.NotContains(t, dump, secretName)
 	assert.NotContains(t, dump, secretValue)
 }

@@ -12024,7 +12024,8 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>When autoSyncReplicas is specified, replicas must be empty.</p>
+<p>Effective only when replicas of the component and instance templates are empty and the component is not a sharding component;
+otherwise it will be ignored.</p>
 </td>
 </tr>
 <tr>

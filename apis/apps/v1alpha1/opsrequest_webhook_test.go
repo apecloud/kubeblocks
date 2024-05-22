@@ -394,17 +394,6 @@ var _ = Describe("OpsRequest webhook", func() {
 		opsRequest.Spec.HorizontalScalingList[0].Replicas = pointer.Int32(5)
 		Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(Succeed())
 
-		By("expect an error when replicas is not empty and autoSyncReplicas is true")
-		opsRequest = createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
-		opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{{
-			ComponentOps:     ComponentOps{ComponentName: componentName},
-			Replicas:         pointer.Int32(1),
-			Operator:         HScaleAddOP,
-			OfflineInstances: []string{fmt.Sprintf("%s-%s-0", clusterName, componentName)},
-			AutoSyncReplicas: true,
-		}}
-		Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).Should(ContainSubstring("replicas and instances must be empty when autoSyncReplicas is true"))
-
 		By("expect an error when replicas is greater than component's replicas and operator is Delete")
 		opsRequest = createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
 		opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{{
@@ -449,18 +438,6 @@ var _ = Describe("OpsRequest webhook", func() {
 		}}
 		Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).Should(ContainSubstring(
 			fmt.Sprintf(`replicas of instanceTemplate "%s" can not greater than %d when operator is Delete`, insTplName, 2)))
-
-		By("expect an error when autoSyncReplicas is true but component is a sharding component")
-		clusterObj.Spec.ShardingSpecs = []ShardingSpec{{Name: shardingComponentName, Template: clusterObj.Spec.ComponentSpecs[0], Shards: 1}}
-		Expect(k8sClient.Update(context.Background(), clusterObj)).Should(Succeed())
-		opsRequest = createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
-		opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{{
-			ComponentOps:     ComponentOps{ComponentName: shardingComponentName},
-			Operator:         HScaleAddOP,
-			OfflineInstances: []string{fmt.Sprintf("%s-%s-0", clusterName, shardingComponentName)},
-			AutoSyncReplicas: true,
-		}}
-		Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).Should(ContainSubstring("can not auto-sync replicas when the specified component is a sharding component"))
 	}
 
 	testSwitchover := func(clusterDef *ClusterDefinition, cluster *Cluster) {

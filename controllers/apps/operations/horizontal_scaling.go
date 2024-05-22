@@ -114,18 +114,18 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 	compOpsSet.updateClusterComponentsAndShardings(opsRes.Cluster, func(compSpec *appsv1alpha1.ClusterComponentSpec, obj ComponentOpsInteface) {
 		horizontalScaling := obj.(appsv1alpha1.HorizontalScaling)
 		lastCompConfiguration := opsRes.OpsRequest.Status.LastConfiguration.Components[obj.GetComponentName()]
-		compSpec.Replicas, compSpec.Instances, compSpec.OfflineInstances = hs.getExpectedCompValues(compSpec,
-			lastCompConfiguration, horizontalScaling, opsRes.Cluster.Name)
+		compSpec.Replicas, compSpec.Instances, compSpec.OfflineInstances = hs.getExpectedCompValues(opsRes.Cluster, compSpec,
+			lastCompConfiguration, horizontalScaling)
 	})
 	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
 }
 
 // getExpectedCompValues gets the expected replicas, instances, offlineInstances.
 func (hs horizontalScalingOpsHandler) getExpectedCompValues(
+	cluster *appsv1alpha1.Cluster,
 	compSpec *appsv1alpha1.ClusterComponentSpec,
 	lastCompConfiguration appsv1alpha1.LastComponentConfiguration,
-	horizontalScaling appsv1alpha1.HorizontalScaling,
-	clusterName string) (int32, []appsv1alpha1.InstanceTemplate, []string) {
+	horizontalScaling appsv1alpha1.HorizontalScaling) (int32, []appsv1alpha1.InstanceTemplate, []string) {
 	compReplicas := compSpec.Replicas
 	compInstanceTpls := compSpec.Instances
 	compOfflineInstances := compSpec.OfflineInstances
@@ -136,8 +136,8 @@ func (hs horizontalScalingOpsHandler) getExpectedCompValues(
 		compOfflineInstances = lastCompConfiguration.OfflineInstances
 	}
 	expectOfflineInstances := hs.getCompExpectedOfflineInstances(compOfflineInstances, horizontalScaling)
-	compReplicas, compInstanceTpls = hs.autoSyncReplicas(horizontalScaling, compReplicas,
-		compInstanceTpls, compOfflineInstances, expectOfflineInstances, clusterName)
+	compReplicas, compInstanceTpls = hs.autoSyncReplicas(cluster, horizontalScaling, compReplicas,
+		compInstanceTpls, compOfflineInstances, expectOfflineInstances)
 	return hs.getCompExpectReplicas(horizontalScaling, compReplicas),
 		hs.getCompExpectedInstances(compInstanceTpls, horizontalScaling),
 		expectOfflineInstances
@@ -145,13 +145,13 @@ func (hs horizontalScalingOpsHandler) getExpectedCompValues(
 
 // autoSyncReplicas auto-sync the replicas of the component and instance templates.
 func (hs horizontalScalingOpsHandler) autoSyncReplicas(
+	cluster *appsv1alpha1.Cluster,
 	horizontalScaling appsv1alpha1.HorizontalScaling,
 	compReplicas int32,
 	compInstanceTpls []appsv1alpha1.InstanceTemplate,
 	compOfflineInstances,
-	expectCompOfflineInstances []string,
-	clusterName string) (int32, []appsv1alpha1.InstanceTemplate) {
-	if !horizontalScaling.AutoSyncReplicas {
+	expectCompOfflineInstances []string) (int32, []appsv1alpha1.InstanceTemplate) {
+	if !hs.effectiveAutoSyncReplicas(cluster, horizontalScaling) {
 		return compReplicas, compInstanceTpls
 	}
 	var (
@@ -202,13 +202,13 @@ func (hs horizontalScalingOpsHandler) autoSyncReplicas(
 	if len(toDeleteOfflineInstances) > 0 {
 		// scale out the specified instances by removing the instance from offlineInstances slice.
 		podSet := getPodSetForComponent(compInstanceTpls, expectCompOfflineInstances,
-			clusterName, horizontalScaling.ComponentName, compReplicas)
+			cluster.Name, horizontalScaling.ComponentName, compReplicas)
 		handleAutoSyncReplicas(podSet, toDeleteOfflineInstances, true)
 	}
 	if len(toAddOfflineInstances) > 0 {
 		// cale in the specified instances by adding the instance to offlineInstances slice.
 		podSet := getPodSetForComponent(compInstanceTpls, compOfflineInstances,
-			clusterName, horizontalScaling.ComponentName, compReplicas)
+			cluster.Name, horizontalScaling.ComponentName, compReplicas)
 		handleAutoSyncReplicas(podSet, toAddOfflineInstances, false)
 	}
 
@@ -340,7 +340,7 @@ func (hs horizontalScalingOpsHandler) getCreateAndDeletePodSet(opsRes *OpsResour
 	fullCompName string) (map[string]string, map[string]string) {
 	clusterName := opsRes.Cluster.Name
 	lastPodSet := getPodSetForComponent(lastCompConfiguration.Instances, lastCompConfiguration.OfflineInstances, clusterName, fullCompName, *lastCompConfiguration.Replicas)
-	expectReplicas, expectInstanceTpls, expectOfflineInstances := hs.getExpectedCompValues(&currCompSpec, lastCompConfiguration, horizontalScaling, clusterName)
+	expectReplicas, expectInstanceTpls, expectOfflineInstances := hs.getExpectedCompValues(opsRes.Cluster, &currCompSpec, lastCompConfiguration, horizontalScaling)
 	currPodSet := getPodSetForComponent(expectInstanceTpls, expectOfflineInstances, clusterName, fullCompName, expectReplicas)
 	createPodSet := map[string]string{}
 	deletePodSet := map[string]string{}
@@ -369,4 +369,27 @@ func (hs horizontalScalingOpsHandler) Cancel(reqCtx intctrlutil.RequestCtx, cli 
 		comp.Instances = lastConfig.Instances
 		comp.OfflineInstances = lastConfig.OfflineInstances
 	})
+}
+
+// effectiveAutoSyncReplicas it is effective when replicas of the component and instance templates are empty, autoSyncReplicas is true and component is not a sharding component.
+func (hs horizontalScalingOpsHandler) effectiveAutoSyncReplicas(cluster *appsv1alpha1.Cluster, horizontalScaling appsv1alpha1.HorizontalScaling) bool {
+	if !horizontalScaling.AutoSyncReplicas {
+		return false
+	}
+	// all replicas must be empty.
+	if horizontalScaling.Replicas != nil {
+		return false
+	}
+	for _, v := range horizontalScaling.Instances {
+		if v.Replicas != nil {
+			return false
+		}
+	}
+	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
+		// component can not be a sharding component.
+		if shardingSpec.Name == horizontalScaling.ComponentName {
+			return false
+		}
+	}
+	return true
 }

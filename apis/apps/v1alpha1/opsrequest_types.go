@@ -479,7 +479,9 @@ type HorizontalScaling struct {
 	// - If true, replicas will automatically adjust based on the added or removed instances.
 	// - If false, replicas will remain unchanged, and the reconciliation controller loop will handle instance deletion or creation.
 
-	// When autoSyncReplicas is specified, replicas must be empty.
+	// Effective only when replicas of the component and instance templates are empty and the component is not a sharding component;
+	// otherwise it will be ignored.
+	// +kubebuilder:default=true
 	// +optional
 	AutoSyncReplicas bool `json:"autoSyncReplicas,omitempty"`
 

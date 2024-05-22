@@ -427,14 +427,14 @@ func (r *OpsRequest) validateHorizontalScaling(_ context.Context, _ client.Clien
 	}
 	for _, comSpec := range cluster.Spec.ComponentSpecs {
 		if hScale, ok := hScaleMap[comSpec.Name]; ok {
-			if err := r.validateHorizontalScalingSpec(hScale, comSpec, comSpec.Name, false); err != nil {
+			if err := r.validateHorizontalScalingSpec(hScale, comSpec, comSpec.Name); err != nil {
 				return err
 			}
 		}
 	}
 	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
 		if hScale, ok := hScaleMap[shardingSpec.Name]; ok {
-			if err := r.validateHorizontalScalingSpec(hScale, shardingSpec.Template, shardingSpec.Name, true); err != nil {
+			if err := r.validateHorizontalScalingSpec(hScale, shardingSpec.Template, shardingSpec.Name); err != nil {
 				return err
 			}
 		}
@@ -442,15 +442,7 @@ func (r *OpsRequest) validateHorizontalScaling(_ context.Context, _ client.Clien
 	return nil
 }
 
-func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, compSpec ClusterComponentSpec, componentName string, isSharding bool) error {
-	if hScale.AutoSyncReplicas {
-		if isSharding {
-			return fmt.Errorf("can not auto-sync replicas when the specified component is a sharding component")
-		}
-		if hScale.Replicas != nil || len(hScale.Instances) > 0 {
-			return fmt.Errorf("replicas and instances must be empty when autoSyncReplicas is true")
-		}
-	}
+func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, compSpec ClusterComponentSpec, componentName string) error {
 	if hScale.Operator != HScaleDeleteOP {
 		return nil
 	}

@@ -480,8 +480,10 @@ spec:
                     scaling operation.
                   properties:
                     autoSyncReplicas:
-                      description: When autoSyncReplicas is specified, replicas must
-                        be empty.
+                      default: true
+                      description: Effective only when replicas of the component and
+                        instance templates are empty and the component is not a sharding
+                        component; otherwise it will be ignored.
                       type: boolean
                     componentName:
                       description: Specifies the name of the Component.

@@ -37,8 +37,9 @@ import (
 
 var _ = Describe("OpsRequest webhook", func() {
 	const (
-		componentName      = "replicasets"
-		proxyComponentName = "proxy"
+		componentName         = "replicasets"
+		proxyComponentName    = "proxy"
+		shardingComponentName = "sharding"
 	)
 	var (
 		randomStr                    = testCtx.GetRandomStr()
@@ -340,7 +341,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		Expect(k8sClient.Status().Patch(ctx, opsRequest, patch)).ShouldNot(HaveOccurred())
 	}
 
-	testHorizontalScaling := func(clusterDef *ClusterDefinition, _ *Cluster) {
+	testHorizontalScaling := func(clusterDef *ClusterDefinition, clusterObj *Cluster) {
 		hScalingList := []HorizontalScaling{
 			{
 				ComponentOps: ComponentOps{ComponentName: "hs-not-exist"},
@@ -427,14 +428,39 @@ var _ = Describe("OpsRequest webhook", func() {
 
 		By("expect an error when the offlineInstance is not exist in the component and operator is Delete")
 		opsRequest = createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
-		opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{
-
-			{
-				ComponentOps:     ComponentOps{ComponentName: componentName},
-				Operator:         HScaleDeleteOP,
-				OfflineInstances: []string{fmt.Sprintf("%s-%s-0", clusterName, componentName)},
-			}}
+		opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{{
+			ComponentOps:     ComponentOps{ComponentName: componentName},
+			Operator:         HScaleDeleteOP,
+			OfflineInstances: []string{fmt.Sprintf("%s-%s-0", clusterName, componentName)},
+		}}
 		Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).Should(ContainSubstring("can not found the offline instance"))
+
+		By("expect an error when the replicas is greater than instance's replicas and operator is Delete")
+		insTplName := "test"
+		clusterObj.Spec.ComponentSpecs[0].Instances = []InstanceTemplate{{Name: insTplName, Replicas: pointer.Int32(1)}}
+		Expect(k8sClient.Update(context.Background(), clusterObj)).Should(Succeed())
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
+		opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{{
+			ComponentOps: ComponentOps{ComponentName: componentName},
+			Operator:     HScaleDeleteOP,
+			Instances: []InstanceTemplate{
+				{Name: insTplName, Replicas: pointer.Int32(2)},
+			},
+		}}
+		Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).Should(ContainSubstring(
+			fmt.Sprintf(`replicas of instanceTemplate "%s" can not greater than %d when operator is Delete`, insTplName, 2)))
+
+		By("expect an error when autoSyncReplicas is true but component is a sharding component")
+		clusterObj.Spec.ShardingSpecs = []ShardingSpec{{Name: shardingComponentName, Template: clusterObj.Spec.ComponentSpecs[0], Shards: 1}}
+		Expect(k8sClient.Update(context.Background(), clusterObj)).Should(Succeed())
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
+		opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{{
+			ComponentOps:     ComponentOps{ComponentName: shardingComponentName},
+			Operator:         HScaleAddOP,
+			OfflineInstances: []string{fmt.Sprintf("%s-%s-0", clusterName, shardingComponentName)},
+			AutoSyncReplicas: true,
+		}}
+		Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).Should(ContainSubstring("can not auto-sync replicas when the specified component is a sharding component"))
 	}
 
 	testSwitchover := func(clusterDef *ClusterDefinition, cluster *Cluster) {

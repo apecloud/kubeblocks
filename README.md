@@ -65,7 +65,7 @@ KubeBlocks integrates the most popular database/message-queue/data-processing en
 
 ## Community
 
-- KubeBlocks [Slack Channel](https://join.slack.com/t/kubeblocks/shared_invite/zt-2hgvigyfl-~PB8vwXqQV1v7uur~qFaxQ)
+- KubeBlocks [Slack Channel](https://join.slack.com/t/kubeblocks/shared_invite/zt-2j48svoqv-l8KrrqT8Ah2uRDjYuu3FvA)
 - KubeBlocks Github [Discussions](https://github.com/apecloud/kubeblocks/discussions)
 
 ## Contributing to KubeBlocks

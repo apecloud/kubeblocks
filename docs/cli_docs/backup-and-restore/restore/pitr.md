@@ -8,9 +8,9 @@ sidebar_label: PITR
 
 # PITR
 
-## What is PITR?
+## What is PITR (Point-in-Time Recovery)?
 
-PITR is a database backup and restore technique commonly used in relational database management systems (RDBMS). It allows to restore data changes starting from a specific point in time, rolling back the database to a state prior to that specific point. In PITR, the database system regularly creates full backups and maintains a record of all transaction logs occurring after each backup point, including insertions, updates, deletions, and other operations. During recovery, the system first restores the most recent full backup and then applies the transaction logs recorded after the backup to bring the database to the desired state.
+PITR (Point-in-Time Recovery) is a database backup and recovery technique commonly used in Relational Database Management Systems (RDBMS). It allows for the recovery of data changes to a specific point in time, restoring the database to a state prior to that point. In PITR, the database system regularly creates full backups and logs all transactions thereafter, including insert, update, and delete operations. During recovery, the system first restores the most recent full backup, and then applies the transaction logs recorded after the backup, bringing the database back to the desired state.
 
 KubeBlocks supports PITR for databases such as MySQL and PostgreSQL. This documentation takes PostgreSQL PITR as an example.
 

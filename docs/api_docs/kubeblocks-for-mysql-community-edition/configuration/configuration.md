@@ -29,7 +29,7 @@ But it's also important to note that the dynamic parameter configuration doesn't
    kubectl edit configurations.apps.kubeblocks.io mycluster-mysql -n demo
    ```
 
-2. Configure parameters according to your needs. The example below adds the `- configFileParams` part to configure `max_connections`.
+2. Configure parameters according to your needs. The example below adds the `spec.configFileParams` part to configure `max_connections`.
 
    ```yaml
    spec:

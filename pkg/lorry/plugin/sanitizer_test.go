@@ -23,8 +23,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/golang/protobuf/proto"
+	// "github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestStripSecrets(t *testing.T) {
@@ -34,7 +35,7 @@ func TestStripSecrets(t *testing.T) {
 	getRoleReq := &GetRoleRequest{
 		DbInfo: &DBInfo{
 			Fqdn:          "fqdn",
-			Port:          123,
+			Port:          "1024",
 			AdminUser:     "admin",
 			AdminPassword: "123",
 		},
@@ -51,7 +52,7 @@ func TestStripSecrets(t *testing.T) {
 		{true, "true"},
 		{false, "false"},
 		{&GetRoleRequest{}, `{}`},
-		{getRoleReq, `{"db_info":{"admin_password":"***stripped***","admin_user":"admin","}`},
+		{getRoleReq, `{"db_info":{"admin_password":"***stripped***","admin_user":"admin","fqdn":"fqdn","port":"1024"}}`},
 	}
 
 	// Message from revised spec as received by a sidecar based on the current spec.
@@ -61,14 +62,13 @@ func TestStripSecrets(t *testing.T) {
 	if assert.NoError(t, err, "marshall future message") &&
 		assert.NoError(t, proto.Unmarshal(data, unknownFields), "unmarshal with unknown fields") {
 		cases = append(cases, testcase{unknownFields,
-			`{"capacity_range":{"required_bytes":1024},"name":"foo","secrets":"***stripped***","volume_capabilities":[{"AccessType":{"Mount":{"fs_type":"ext4"}}},{"AccessType":null}],"volume_content_source":{"Type":{"Volume":{"volume_id":"abc"}}}}`,
+			`{"db_info":{"admin_password":"***stripped***","admin_user":"admin","fqdn":"fqdn","port":"1024"}}`,
 		})
 	}
 
 	for _, c := range cases {
 		before := fmt.Sprint(c.original)
-		var stripped fmt.Stringer
-		stripped = StripSecrets(c.original)
+		var stripped = StripSecrets(c.original)
 		if assert.Equal(t, c.stripped, stripped.String(), "unexpected result for fmt s of %s", c.original) {
 			if assert.Equal(t, c.stripped, fmt.Sprintf("%v", stripped), "unexpected result for fmt v of %s", c.original) {
 				assert.Equal(t, c.stripped, fmt.Sprintf("%+v", stripped), "unexpected result for fmt +v of %s", c.original)
@@ -78,7 +78,7 @@ func TestStripSecrets(t *testing.T) {
 	}
 
 	// The secret is hidden because StripSecrets is a struct referencing it.
-	dump := fmt.Sprintf("%#v", StripSecrets(createVolume))
+	dump := fmt.Sprintf("%#v", StripSecrets(getRoleReq))
 	assert.NotContains(t, dump, secretName)
 	assert.NotContains(t, dump, secretValue)
 }

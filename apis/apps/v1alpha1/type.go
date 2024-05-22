@@ -68,7 +68,6 @@ type ComponentTemplateSpec struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	VolumeName string `json:"volumeName"`
 
-	// Deprecated: DefaultMode is deprecated since 0.9.0 and will be removed in 0.10.0
 	// for scripts, auto set 0555
 	// for configs, auto set 0444
 	// Refers to the mode bits used to set permissions on created files by default.
@@ -81,7 +80,6 @@ type ComponentTemplateSpec struct {
 	// This might be in conflict with other options that affect the file
 	// mode, like fsGroup, and the result can be other mode bits set.
 	//
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0 and will be removed in 0.10.0"
 	// +optional
 	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,3,opt,name=defaultMode"`
 }

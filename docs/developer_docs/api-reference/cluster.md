@@ -9015,8 +9015,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>Deprecated: DefaultMode is deprecated since 0.9.0 and will be removed in 0.10.0
-for scripts, auto set 0555
+<p>for scripts, auto set 0555
 for configs, auto set 0444
 Refers to the mode bits used to set permissions on created files by default.</p>
 <p>Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.

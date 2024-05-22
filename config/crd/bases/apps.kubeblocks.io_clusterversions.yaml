@@ -107,18 +107,16 @@ spec:
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           defaultMode:
-                            description: "Deprecated: DefaultMode is deprecated since
-                              0.9.0 and will be removed in 0.10.0 for scripts, auto
-                              set 0555 for configs, auto set 0444 Refers to the mode
-                              bits used to set permissions on created files by default.
-                              \n Must be an octal value between 0000 and 0777 or a
-                              decimal value between 0 and 511. YAML accepts both octal
-                              and decimal values, JSON requires decimal values for
-                              mode bits. Defaults to 0644. \n Directories within the
-                              path are not affected by this setting. This might be
-                              in conflict with other options that affect the file
-                              mode, like fsGroup, and the result can be other mode
-                              bits set."
+                            description: "for scripts, auto set 0555 for configs,
+                              auto set 0444 Refers to the mode bits used to set permissions
+                              on created files by default. \n Must be an octal value
+                              between 0000 and 0777 or a decimal value between 0 and
+                              511. YAML accepts both octal and decimal values, JSON
+                              requires decimal values for mode bits. Defaults to 0644.
+                              \n Directories within the path are not affected by this
+                              setting. This might be in conflict with other options
+                              that affect the file mode, like fsGroup, and the result
+                              can be other mode bits set."
                             format: int32
                             type: integer
                           injectEnvTo:

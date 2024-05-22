@@ -84,10 +84,8 @@ func getRoleName(pod *corev1.Pod) string {
 	return strings.ToLower(pod.Labels[constant.RoleLabelKey])
 }
 
-// IsInstanceSetReady gives InstanceSet level 'ready' state:
-// 1. all instances are available
-// 2. and all members have role set (if they are role-ful)
-func IsInstanceSetReady(its *workloads.InstanceSet) bool {
+// IsInstancesReady gives Instance level 'ready' state when all instances are available
+func IsInstancesReady(its *workloads.InstanceSet) bool {
 	if its == nil {
 		return false
 	}
@@ -113,6 +111,19 @@ func IsInstanceSetReady(its *workloads.InstanceSet) bool {
 	if its.Spec.MinReadySeconds > 0 && its.Status.AvailableReplicas != replicas {
 		return false
 	}
+
+	return true
+}
+
+// IsInstanceSetReady gives InstanceSet level 'ready' state:
+// 1. all instances are available
+// 2. and all members have role set (if they are role-ful)
+func IsInstanceSetReady(its *workloads.InstanceSet) bool {
+	instancesReady := IsInstancesReady(its)
+	if !instancesReady {
+		return false
+	}
+
 	// check whether role probe has done
 	if its.Spec.Roles == nil || its.Spec.RoleProbe == nil {
 		return true

@@ -129,7 +129,7 @@ var _ = Describe("Component PostProvision Test", func() {
 			dag := graph.NewDAG()
 			dag.AddVertex(&model.ObjectVertex{Obj: cluster, Action: model.ActionUpdatePtr()})
 
-			actionCtx, err := NewActionContext(cluster, comp, synthesizeComp.LifecycleActions, synthesizeComp.ScriptTemplates, PostProvisionAction)
+			actionCtx, err := NewActionContext(cluster, comp, nil, synthesizeComp.LifecycleActions, synthesizeComp.ScriptTemplates, PostProvisionAction)
 			Expect(err).Should(Succeed())
 			err = ReconcileCompPostProvision(testCtx.Ctx, k8sClient, graphCli, actionCtx, dag)
 			Expect(err).Should(Succeed())
@@ -148,7 +148,7 @@ var _ = Describe("Component PostProvision Test", func() {
 				},
 			}
 			synthesizeComp.LifecycleActions.PostProvision = &postProvision
-			actionCtx, err = NewActionContext(cluster, comp, synthesizeComp.LifecycleActions, synthesizeComp.ScriptTemplates, PostProvisionAction)
+			actionCtx, err = NewActionContext(cluster, comp, nil, synthesizeComp.LifecycleActions, synthesizeComp.ScriptTemplates, PostProvisionAction)
 			Expect(err).Should(Succeed())
 			need, err := NeedDoPostProvision(testCtx.Ctx, k8sClient, actionCtx)
 			Expect(err).Should(Succeed())

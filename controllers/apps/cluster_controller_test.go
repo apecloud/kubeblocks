@@ -1538,7 +1538,7 @@ func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition, compDe
 	By("Creating a BackupPolicyTemplate")
 	bpt := testapps.NewBackupPolicyTemplateFactory(backupPolicyTPLName).
 		AddLabels(constant.ClusterDefLabelKey, clusterDefObj.Name).
-		AddLabels(fmt.Sprintf("%s/%s", serviceKindLabelPrefix, "mysql"), "true").
+		AddLabels(compDef, compDef).
 		SetClusterDefRef(clusterDefObj.Name)
 	ttl := "7d"
 	for _, v := range clusterDefObj.Spec.ComponentDefs {

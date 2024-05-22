@@ -44,8 +44,7 @@ import (
 )
 
 const (
-	defaultCronExpression  = "0 18 * * *"
-	serviceKindLabelPrefix = "service-kind"
+	defaultCronExpression = "0 18 * * *"
 )
 
 // clusterBackupPolicyTransformer transforms the backup policy template to the data protection backup policy and backup schedule.
@@ -198,9 +197,8 @@ func (r *clusterBackupPolicyTransformer) getBackupPolicyTemplates() (*appsv1alph
 	// get the backupPolicyTemplate if not exists spec.clusterDefRef
 	tplMap := map[string]sets.Empty{}
 	for _, v := range r.ComponentDefs {
-		serviceKindLabel := fmt.Sprintf("%s/%s", serviceKindLabelPrefix, v.Spec.ServiceKind)
 		tmpTPLs := &appsv1alpha1.BackupPolicyTemplateList{}
-		if err := r.Client.List(r.Context, tmpTPLs, client.MatchingLabels{serviceKindLabel: "true"}); err != nil {
+		if err := r.Client.List(r.Context, tmpTPLs, client.MatchingLabels{v.Name: v.Name}); err != nil {
 			return nil, err
 		}
 		for i := range tmpTPLs.Items {

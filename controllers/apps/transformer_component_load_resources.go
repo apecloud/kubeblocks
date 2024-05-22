@@ -59,7 +59,12 @@ func (t *componentLoadResourcesTransformer) Transform(ctx graph.TransformContext
 	if component.IsGenerated(transCtx.ComponentOrig) {
 		return t.transformForGeneratedComponent(transCtx)
 	}
-	return t.transformForNativeComponent(transCtx)
+
+	err = t.transformForNativeComponent(transCtx)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (t *componentLoadResourcesTransformer) transformForGeneratedComponent(transCtx *componentTransformContext) error {

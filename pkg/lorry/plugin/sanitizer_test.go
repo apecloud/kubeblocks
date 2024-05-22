@@ -23,9 +23,9 @@ import (
 	"fmt"
 	"testing"
 
-	// "github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protodesc"
 )
 
 func TestStripSecrets(t *testing.T) {
@@ -57,6 +57,23 @@ func TestStripSecrets(t *testing.T) {
 	// Message from revised spec as received by a sidecar based on the current spec.
 	// The XXX_unrecognized field contains secrets and must not get logged.
 	unknownFields := &GetRoleRequest{}
+	dbinfo := &DBInfo{
+		Fqdn:          "fqdn",
+		Port:          "1024",
+		AdminUser:     "admin",
+		AdminPassword: secretValue,
+	}
+	m := dbinfo.ProtoReflect()
+	md := m.Descriptor()
+	fields := md.Fields()
+	for i := 0; i < fields.Len(); i++ {
+		field := fields.Get(i)
+		fieldProto := protodesc.ToFieldDescriptorProto(field)
+		a := proto.GetExtension(fieldProto.Options, kbSecret)
+		if a != nil {
+			continue
+		}
+	}
 	data, err := proto.Marshal(getRoleReq)
 	if assert.NoError(t, err, "marshall future message") &&
 		assert.NoError(t, proto.Unmarshal(data, unknownFields), "unmarshal with unknown fields") {

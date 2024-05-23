@@ -157,7 +157,7 @@ func resolveBuiltinNObjectRefVars(ctx context.Context, cli client.Reader, synthe
 		return nil, nil, err
 	}
 	vars = append(vars, vars1...)
-	if err = evaluateObjectVarsExpression(definedVars, vars); err != nil {
+	if err = evaluateObjectVarsExpression(definedVars, vars2, &vars); err != nil {
 		return nil, nil, err
 	}
 	return vars, vars2, nil
@@ -379,17 +379,22 @@ func buildEnv4UserDefined(annotations map[string]string) ([]corev1.EnvVar, error
 	return vars, nil
 }
 
-func evaluateObjectVarsExpression(definedVars []appsv1alpha1.EnvVar, vars []corev1.EnvVar) error {
+func evaluateObjectVarsExpression(definedVars []appsv1alpha1.EnvVar, credentialVars []corev1.EnvVar, vars *[]corev1.EnvVar) error {
 	var (
 		isValues = make(map[string]bool)
 		values   = make(map[string]string)
 	)
-	for _, v := range vars {
-		if v.ValueFrom == nil {
-			isValues[v.Name] = true
-			values[v.Name] = v.Value
-		} else {
-			isValues[v.Name] = false
+	normalize := func(name string) string {
+		return strings.ReplaceAll(name, "-", "_")
+	}
+	for _, v := range [][]corev1.EnvVar{*vars, credentialVars} {
+		for _, vv := range v {
+			if vv.ValueFrom == nil {
+				isValues[vv.Name] = true
+				values[normalize(vv.Name)] = vv.Value
+			} else {
+				isValues[vv.Name] = false
+			}
 		}
 	}
 
@@ -398,24 +403,25 @@ func evaluateObjectVarsExpression(definedVars []appsv1alpha1.EnvVar, vars []core
 			return false
 		}
 		isValue, ok := isValues[v.Name]
+		// !ok is for vars that defined and resolved successfully, but have nil value.
 		return !ok || isValue
 	}
 
 	update := func(name, value string) {
-		if val, exist := values[name]; exist {
+		if val, exist := values[normalize(name)]; exist {
 			if val != value {
-				for i := range vars {
-					if vars[i].Name == name {
-						vars[i].Value = value
+				for i := range *vars {
+					if (*vars)[i].Name == name {
+						(*vars)[i].Value = value
 						break
 					}
 				}
 			}
 		} else {
 			// TODO: insert the var to keep orders?
-			vars = append(vars, corev1.EnvVar{Name: name, Value: value})
+			*vars = append(*vars, corev1.EnvVar{Name: name, Value: value})
 		}
-		values[name] = value
+		values[normalize(name)] = value
 	}
 
 	eval := func(v appsv1alpha1.EnvVar) error {

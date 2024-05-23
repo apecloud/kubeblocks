@@ -231,6 +231,7 @@ func (s *CheckRole) buildGlobalRoleSnapshot(cluster *dcs.Cluster, mgr engines.DB
 			if member.Role == role {
 				_, err := mgr.IsLeaderMember(context.Background(), cluster, &member)
 				if err == nil {
+					// old leader member is still healthy, just ignore it, and let it's lorry to handle the role change
 					continue
 				}
 				s.logger.Info("old leader member access failed and reset it's role", "member", member.Name, "error", err.Error())

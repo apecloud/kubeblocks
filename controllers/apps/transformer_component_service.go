@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -256,4 +257,12 @@ func generatePodNames(synthesizeComp *component.SynthesizedComponent) []string {
 		templates = append(templates, &synthesizeComp.Instances[i])
 	}
 	return instanceset.GenerateAllInstanceNames(workloadName, synthesizeComp.Replicas, templates, synthesizeComp.OfflineInstances)
+}
+
+func generatePodNamesByITS(its *workloads.InstanceSet) []string {
+	var templates []instanceset.InstanceTemplate
+	for i := range its.Spec.Instances {
+		templates = append(templates, &its.Spec.Instances[i])
+	}
+	return instanceset.GenerateAllInstanceNames(its.Name, *its.Spec.Replicas, templates, its.Spec.OfflineInstances)
 }

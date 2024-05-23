@@ -50,19 +50,11 @@ func (u *UpdateCR) Handle(context *UpgradeContext) error {
 }
 
 func updateOrCreate(context *UpgradeContext, gvr schema.GroupVersionResource, cr *unstructured.Unstructured) error {
-	existing, err := context.Resource(gvr).Get(context, cr.GetName(), metav1.GetOptions{})
-	if err != nil && !apierrors.IsNotFound(err) {
-		return err
+	_, err := context.Resource(gvr).Update(context, cr, metav1.UpdateOptions{})
+	if err != nil && apierrors.IsNotFound(err) {
+		Log("resource not found and create: %s", cr.GetName())
+		cr.SetResourceVersion("")
+		_, err = context.Resource(gvr).Create(context, cr, metav1.CreateOptions{})
 	}
-	err = context.Resource(gvr).Delete(context, existing.GetName(), metav1.DeleteOptions{})
-	if err != nil {
-		return err
-	}
-	// _, err = context.Resource(gvr).Create(context, cr, metav1.CreateOptions{})
-	// _, err := context.Resource(gvr).Update(context, cr, metav1.UpdateOptions{})
-	// if err != nil && apierrors.IsNotFound(err) {
-	Log("resource not found and create: %s", cr.GetName())
-	_, err = context.Resource(gvr).Create(context, cr, metav1.CreateOptions{})
-	// }
 	return err
 }

@@ -704,6 +704,9 @@ func TestManager_Follow(t *testing.T) {
 		mysqlConfig.User = config.Username
 		mysqlConfig.Passwd = config.Password
 		mysqlConfig.Addr = addr
+		mysqlConfig.Timeout = time.Second * 5
+		mysqlConfig.ReadTimeout = time.Second * 5
+		mysqlConfig.WriteTimeout = time.Second * 5
 		connectionPoolCache[mysqlConfig.FormatDSN()] = manager.DB
 
 		err = manager.Follow(ctx, cluster)

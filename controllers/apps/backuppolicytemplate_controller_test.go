@@ -61,9 +61,12 @@ var _ = Describe("", func() {
 
 	Context("create a backuppolicytemplate", func() {
 		It("should be available", func() {
+			compDef1 := "compDef1"
+			compDef2 := "compDef2"
 			bpt := testapps.NewBackupPolicyTemplateFactory(BackupPolicyTemplateName).
 				SetClusterDefRef(ClusterDefName).
 				AddBackupPolicy(BackupPolicyName).
+				SetComponentDef(compDef1, compDef2).
 				AddBackupMethod(BackupMethod, false, ActionSetName).
 				SetBackupMethodVolumeMounts("data", "/data").
 				AddBackupMethod(VsBackupMethodName, true, VsActionSetName).
@@ -74,6 +77,8 @@ var _ = Describe("", func() {
 			key := client.ObjectKeyFromObject(bpt)
 			Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, pobj *v1alpha1.BackupPolicyTemplate) {
 				g.Expect(pobj.GetLabels()[constant.ClusterDefLabelKey]).To(Equal(bpt.Spec.ClusterDefRef))
+				g.Expect(pobj.GetLabels()[compDef1]).To(Equal(compDef1))
+				g.Expect(pobj.GetLabels()[compDef2]).To(Equal(compDef2))
 			})).Should(Succeed())
 		})
 	})

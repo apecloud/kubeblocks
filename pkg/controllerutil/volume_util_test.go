@@ -20,6 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package controllerutil
 
 import (
+	"reflect"
+	"testing"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -27,6 +30,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("lifecycle_utils", func() {
@@ -160,3 +166,61 @@ var _ = Describe("lifecycle_utils", func() {
 
 	})
 })
+
+func Test_buildVolumeMode(t *testing.T) {
+	type args struct {
+		configs    []string
+		configSpec appsv1alpha1.ComponentTemplateSpec
+	}
+	tests := []struct {
+		name string
+		args args
+		want *int32
+	}{{
+		name: "config_test",
+		args: args{
+			configs: []string{"config1", "config2"},
+			configSpec: appsv1alpha1.ComponentTemplateSpec{
+				Name:        "config1",
+				DefaultMode: cfgutil.ToPointer(int32(0777)),
+			},
+		},
+		want: cfgutil.ToPointer(int32(0777)),
+	}, {
+		name: "config_test2",
+		args: args{
+			configs: []string{"config1", "config2"},
+			configSpec: appsv1alpha1.ComponentTemplateSpec{
+				Name: "config1",
+			},
+		},
+		want: cfgutil.ToPointer(configsDefaultMode),
+	}, {
+		name: "script_test",
+		args: args{
+			configs: []string{"config1", "config2"},
+			configSpec: appsv1alpha1.ComponentTemplateSpec{
+				Name:        "script",
+				DefaultMode: cfgutil.ToPointer(int32(0777)),
+			},
+		},
+		want: cfgutil.ToPointer(int32(0777)),
+	}, {
+		name: "script_test2",
+		args: args{
+			configs: []string{"config1", "config2"},
+			configSpec: appsv1alpha1.ComponentTemplateSpec{
+				Name: "script",
+			},
+		},
+		want: cfgutil.ToPointer(scriptsDefaultMode),
+	}}
+	viper.Set(constant.FeatureGateIgnoreConfigTemplateDefaultMode, false)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := buildVolumeMode(tt.args.configs, tt.args.configSpec); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("buildVolumeMode() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

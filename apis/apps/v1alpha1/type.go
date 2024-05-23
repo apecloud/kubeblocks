@@ -66,20 +66,21 @@ type ComponentTemplateSpec struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	VolumeName string `json:"volumeName"`
 
-	// Deprecated: DefaultMode is deprecated since 0.9.0 and will be removed in 0.10.0
-	// for scripts, auto set 0555
-	// for configs, auto set 0444
-	// Refers to the mode bits used to set permissions on created files by default.
+	// The operator attempts to set default file permissions for scripts (0555) and configurations (0444).
+	// However, certain database engines may require different file permissions.
+	// You can specify the desired file permissions here.
 	//
-	// Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
-	// YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
-	// Defaults to 0644.
+	// Must be specified as an octal value between 0000 and 0777 (inclusive),
+	// or as a decimal value between 0 and 511 (inclusive).
+	// YAML supports both octal and decimal values for file permissions.
 	//
-	// Directories within the path are not affected by this setting.
-	// This might be in conflict with other options that affect the file
-	// mode, like fsGroup, and the result can be other mode bits set.
+	// Please note that this setting only affects the permissions of the files themselves.
+	// Directories within the specified path are not impacted by this setting.
+	// It's important to be aware that this setting might conflict with other options
+	// that influence the file mode, such as fsGroup.
+	// In such cases, the resulting file mode may have additional bits set.
+	// Refers to documents of k8s.ConfigMapVolumeSource.defaultMode for more information.
 	//
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0 and will be removed in 0.10.0"
 	// +optional
 	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,3,opt,name=defaultMode"`
 }

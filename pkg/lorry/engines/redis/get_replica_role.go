@@ -54,7 +54,7 @@ func (mgr *Manager) GetReplicaRole(ctx context.Context, _ *dcs.Cluster) (string,
 				}
 			}
 		}
-		if role == models.MASTER {
+		if role == models.PRIMARY {
 			return models.PRIMARY, nil
 		} else {
 			return models.SECONDARY, nil
@@ -82,7 +82,7 @@ func (mgr *Manager) SubscribeRoleChange(ctx context.Context) {
 		masterName := strings.Split(masterAddr[3], ".")[0]
 
 		if masterName == mgr.CurrentMemberName {
-			mgr.role = models.MASTER
+			mgr.role = models.PRIMARY
 		} else {
 			mgr.role = models.SECONDARY
 		}

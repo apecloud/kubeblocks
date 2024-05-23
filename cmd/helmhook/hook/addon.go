@@ -57,6 +57,7 @@ func (p *Addon) Handle(ctx *UpgradeContext) (err error) {
 		if addon.GetDeletionTimestamp() != nil {
 			continue
 		}
+		// Allow unused addons to be updated or deleted
 		if addon.Spec.InstallSpec == nil || !addon.Spec.InstallSpec.Enabled {
 			Log("addon[%s] is not installed and pass", addon.GetName())
 			continue

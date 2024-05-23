@@ -73,7 +73,7 @@ func (s *CheckRole) Init(ctx context.Context) error {
 	val := viper.GetString(constant.KBEnvServiceRoles)
 	if val != "" {
 		if err := json.Unmarshal([]byte(val), &s.DBRoles); err != nil {
-			s.logger.Info("KB_DB_ROLES env format error", "error", err)
+			s.logger.Info("env format error", "env", constant.KBEnvServiceRoles, "value", val, "error", err.Error())
 		}
 	}
 

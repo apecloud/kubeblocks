@@ -219,6 +219,7 @@ func goTypeForField(fd protoreflect.FieldDescriptor) reflect.Type {
 func enumGoType(et protoreflect.EnumType) reflect.Type {
 	return reflect.TypeOf(et.New(0))
 }
+
 func messageGoType(mt protoreflect.MessageType) reflect.Type {
 	return reflect.TypeOf(protoimpl.X.ProtoMessageV1Of(mt.Zero().Interface()))
 }

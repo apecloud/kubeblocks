@@ -11318,6 +11318,25 @@ VarSource
 <p>Source for the variable&rsquo;s value. Cannot be used if value is not empty.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>expression</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Expression is a Go template expression that will be applied to the resolved value of the var.</p>
+<p>The expression will only be evaluated if the var is successfully resolved to a non-credential value.
+The resolved value can be accessed by its name within the expression, and other non-credential vars can be used
+within the expression in the same way.
+All expressions are evaluated in the order the vars are defined. If a var has a dependent var that also has
+an expression defined, be mindful of the evaluation order as it may use an intermediate value.</p>
+<p>The result of evaluating the expression will be used as the final value of the var. If the expression
+evaluation fails, an error will be returned.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.EnvVarRef">EnvVarRef

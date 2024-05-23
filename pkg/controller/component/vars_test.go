@@ -48,6 +48,10 @@ var _ = Describe("vars", func() {
 		return &o
 	}
 
+	expp := func(exp string) *string {
+		return &exp
+	}
+
 	checkTemplateVars := func(templateVars map[string]any, targetVars []corev1.EnvVar) {
 		templateVarsMapping := make(map[string]corev1.EnvVar)
 		for k, v := range templateVars {
@@ -2214,6 +2218,100 @@ var _ = Describe("vars", func() {
 			Expect(err).Should(Succeed())
 			Expect(templateVars).Should(HaveKeyWithValue("fb", "abc~$(fa)$(fa)$(credential-username)~$(x)$(x)xyz"))
 			checkEnvVarWithValue(envVars, "fb", "abc~$(fa)$(fa)$(credential-username)~$(x)$(x)xyz")
+		})
+
+		Context("vars expression", func() {
+			It("simple format", func() {
+				vars := []appsv1alpha1.EnvVar{
+					{
+						Name:       "port",
+						Value:      "12345",
+						Expression: expp("0{{ .port }}"),
+					},
+				}
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, nil, synthesizedComp, vars)
+				Expect(err).Should(Succeed())
+				Expect(templateVars).Should(HaveKeyWithValue("port", "012345"))
+				checkEnvVarWithValue(envVars, "port", "012345")
+			})
+
+			It("condition exp", func() {
+				vars := []appsv1alpha1.EnvVar{
+					{
+						Name:       "port",
+						Value:      "12345",
+						Expression: expp("{{ if eq .port \"12345\" }}54321{{ else }}0{{ end }}"),
+					},
+				}
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, nil, synthesizedComp, vars)
+				Expect(err).Should(Succeed())
+				Expect(templateVars).Should(HaveKeyWithValue("port", "54321"))
+				checkEnvVarWithValue(envVars, "port", "54321")
+			})
+
+			It("exp only", func() {
+				vars := []appsv1alpha1.EnvVar{
+					{
+						Name:       "port",
+						Expression: expp("12345"),
+					},
+				}
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, nil, synthesizedComp, vars)
+				Expect(err).Should(Succeed())
+				Expect(templateVars).Should(HaveKeyWithValue("port", "12345"))
+				checkEnvVarWithValue(envVars, "port", "12345")
+			})
+
+			It("exp error", func() {
+				vars := []appsv1alpha1.EnvVar{
+					{
+						Name:       "port",
+						Expression: expp("{{ if eq .port 12345 }}54321{{ end }}"),
+					},
+				}
+				_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, nil, synthesizedComp, vars)
+				Expect(err).ShouldNot(Succeed())
+				Expect(err.Error()).Should(ContainSubstring("incompatible types for comparison"))
+			})
+
+			It("access another vars", func() {
+				vars := []appsv1alpha1.EnvVar{
+					{
+						Name:  "host",
+						Value: "localhost",
+					},
+					{
+						Name:  "port",
+						Value: "12345",
+					},
+					{
+						Name:       "endpoint",
+						Expression: expp("{{ .host }}:{{ .port }}"),
+					},
+				}
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, nil, synthesizedComp, vars)
+				Expect(err).Should(Succeed())
+				Expect(templateVars).Should(HaveKeyWithValue("endpoint", "localhost:12345"))
+				checkEnvVarWithValue(envVars, "endpoint", "localhost:12345")
+			})
+
+			It("access generated vars", func() {
+			})
+
+			It("exp for resolved but not-exist vars", func() {
+			})
+
+			It("exp for credential-vars", func() {
+			})
+
+			It("depends on credential-vars", func() {
+			})
+
+			It("depends on intermediate values", func() {
+			})
+
+			It("missing keys", func() {
+			})
 		})
 	})
 })

@@ -28,7 +28,9 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"text/template"
 
+	"github.com/Masterminds/sprig/v3"
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -45,6 +47,7 @@ import (
 
 var (
 	varReferenceRegExp = regexp.MustCompile(`\$\(([^)]+)\)`)
+	varTemplate        = template.New("vars").Option("missingkey=error").Funcs(sprig.TxtFuncMap())
 )
 
 func VarReferenceRegExp() *regexp.Regexp {
@@ -154,6 +157,9 @@ func resolveBuiltinNObjectRefVars(ctx context.Context, cli client.Reader, synthe
 		return nil, nil, err
 	}
 	vars = append(vars, vars1...)
+	if err = evaluateObjectVarsExpression(definedVars, vars); err != nil {
+		return nil, nil, err
+	}
 	return vars, vars2, nil
 }
 
@@ -371,6 +377,69 @@ func buildEnv4UserDefined(annotations map[string]string) ([]corev1.EnvVar, error
 		vars = append(vars, corev1.EnvVar{Name: k, Value: udeMap[k]})
 	}
 	return vars, nil
+}
+
+func evaluateObjectVarsExpression(definedVars []appsv1alpha1.EnvVar, vars []corev1.EnvVar) error {
+	var (
+		isValues = make(map[string]bool)
+		values   = make(map[string]string)
+	)
+	for _, v := range vars {
+		if v.ValueFrom == nil {
+			isValues[v.Name] = true
+			values[v.Name] = v.Value
+		} else {
+			isValues[v.Name] = false
+		}
+	}
+
+	evaluable := func(v appsv1alpha1.EnvVar) bool {
+		if v.Expression == nil || len(*v.Expression) == 0 {
+			return false
+		}
+		isValue, ok := isValues[v.Name]
+		return !ok || isValue
+	}
+
+	update := func(name, value string) {
+		if val, exist := values[name]; exist {
+			if val != value {
+				for i := range vars {
+					if vars[i].Name == name {
+						vars[i].Value = value
+						break
+					}
+				}
+			}
+		} else {
+			// TODO: insert the var to keep orders?
+			vars = append(vars, corev1.EnvVar{Name: name, Value: value})
+		}
+		values[name] = value
+	}
+
+	eval := func(v appsv1alpha1.EnvVar) error {
+		if !evaluable(v) {
+			return nil
+		}
+		tpl, err := varTemplate.Parse(*v.Expression)
+		if err != nil {
+			return err
+		}
+		var buf strings.Builder
+		if err = tpl.Execute(&buf, values); err != nil {
+			return err
+		}
+		update(v.Name, buf.String())
+		return nil
+	}
+
+	for _, v := range definedVars {
+		if err := eval(v); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func resolveClusterObjectRefVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,

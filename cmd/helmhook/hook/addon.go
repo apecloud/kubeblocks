@@ -32,7 +32,7 @@ import (
 type Addon struct {
 	BasedHandler
 
-	AddonEnabledUpdated bool
+	KeepAddons bool
 }
 
 const (
@@ -41,7 +41,7 @@ const (
 )
 
 func (p *Addon) IsSkip(*UpgradeContext) (bool, error) {
-	return p.AddonEnabledUpdated, nil
+	return !p.KeepAddons, nil
 }
 
 func (p *Addon) Handle(ctx *UpgradeContext) (err error) {
@@ -55,6 +55,10 @@ func (p *Addon) Handle(ctx *UpgradeContext) (err error) {
 
 	for _, addon := range addons.Items {
 		if addon.GetDeletionTimestamp() != nil {
+			continue
+		}
+		if addon.Spec.InstallSpec == nil || !addon.Spec.InstallSpec.Enabled {
+			Log("addon[%s] is not installed and pass", addon.GetName())
 			continue
 		}
 		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {

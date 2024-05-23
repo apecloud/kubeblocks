@@ -35,17 +35,17 @@ import (
 )
 
 var (
-	crdPath      string
-	version      string
-	namespace    string
-	addonEnabled bool
+	crdPath    string
+	version    string
+	namespace  string
+	keepAddons bool
 )
 
 func setupFlags() {
 	pflag.StringVar(&crdPath, "crd", "/kubeblocks/crd", "CRD directory for the kubeblocks")
 	pflag.StringVar(&version, "version", "", "KubeBlocks version")
 	pflag.StringVar(&namespace, "namespace", "default", "The namespace scope for this request")
-	pflag.BoolVar(&addonEnabled, "addon-enabled", false, "Whether to allow addon updates")
+	pflag.BoolVar(&keepAddons, "keep-addons", true, "Whether to allow addon updates")
 
 	opts := zap.Options{
 		Development: true,
@@ -73,7 +73,7 @@ func main() {
 	hook.CheckErr(hook.NewUpgradeWorkflow().
 		WrapStage(hook.PrepareFor).
 		AddStage(&hook.StopOperator{}).
-		AddStage(&hook.Addon{AddonEnabledUpdated: addonEnabled}).
+		AddStage(&hook.Addon{KeepAddons: keepAddons}).
 		AddStage(&hook.Conversion{}).
 		AddStage(&hook.UpdateCRD{}).
 		AddStage(&hook.UpdateCR{}).

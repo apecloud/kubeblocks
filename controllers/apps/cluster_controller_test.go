@@ -58,7 +58,7 @@ var _ = Describe("Cluster Controller", func() {
 		multiConsensusCompName = "consensus1"
 		defaultServiceVersion  = "8.0.31-r0"
 		latestServiceVersion   = "8.0.31-r1"
-		defaultShardCount      = 2
+		defaultShardCount      = 5
 	)
 
 	var (

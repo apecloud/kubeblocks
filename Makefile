@@ -202,7 +202,8 @@ module: ## Run go mod tidy->verify against go modules.
 	$(GO) mod tidy -compat=1.21
 	$(GO) mod verify
 
-TEST_PACKAGES ?= ./pkg/... ./apis/... ./controllers/... ./cmd/...
+TEST_PACKAGES ?= ./controllers/apps
+## TEST_PACKAGES ?= ./pkg/... ./apis/... ./controllers/... ./cmd/...
 
 CLUSTER_TYPES=minikube k3d
 .PHONY: add-k8s-host

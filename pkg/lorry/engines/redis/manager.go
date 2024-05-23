@@ -28,7 +28,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -89,7 +88,7 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 
 	mgr.ctx, mgr.cancel = context.WithCancel(context.Background())
 
-	go mgr.SubscribeRoleChange(mgr.ctx, dcs.GetStore().GetClusterFromCache())
+	go mgr.SubscribeRoleChange(mgr.ctx)
 	return mgr, nil
 }
 

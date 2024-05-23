@@ -33,29 +33,11 @@ type ConversionHandler interface {
 
 type ConversionMeta struct {
 	ConversionHandler
-	FromVersion Version
+	FromVersion []Version
 	ToVersion   Version
 }
 
 var crConversionMaps = map[schema.GroupVersionResource]ConversionMeta{}
-
-func (p *Conversion) IsSkip(ctx *UpgradeContext) (bool, error) {
-	fromVersion := ctx.From
-	toVersion := ctx.To
-
-	if fromVersion == nil || *fromVersion == toVersion {
-		Log("not support resource conversion and pass, oldVersion: %v, newVersion: %v", fromVersion, toVersion)
-		return true, nil
-	}
-
-	for _, meta := range crConversionMaps {
-		if matchVersion(meta, *fromVersion, toVersion) && meta.ConversionHandler != nil {
-			return false, nil
-		}
-	}
-	Log("no gvr to convert and pass, oldVersion: %v, newVersion: %v", fromVersion, toVersion)
-	return true, nil
-}
 
 func (p *Conversion) Handle(ctx *UpgradeContext) (err error) {
 	var (
@@ -65,6 +47,7 @@ func (p *Conversion) Handle(ctx *UpgradeContext) (err error) {
 
 	for gvr, meta := range crConversionMaps {
 		if !matchVersion(meta, *fromVersion, toVersion) || meta.ConversionHandler == nil {
+			Log("no gvr to convert and pass, oldVersion: %v, newVersion: %v", fromVersion, toVersion)
 			continue
 		}
 		objs, err := meta.Convert(ctx, ctx.CRClient)
@@ -79,12 +62,20 @@ func (p *Conversion) Handle(ctx *UpgradeContext) (err error) {
 }
 
 func matchVersion(meta ConversionMeta, oldVersion Version, newVersion Version) bool {
-	return meta.FromVersion == oldVersion && meta.ToVersion == newVersion
+	if meta.ToVersion != newVersion {
+		return false
+	}
+	for _, version := range meta.FromVersion {
+		if version == oldVersion {
+			return true
+		}
+	}
+	return true
 }
 
-func RegisterCRDConversion(oldVersion Version, newVersion Version, gvr schema.GroupVersionResource, handler ConversionHandler) {
+func RegisterCRDConversion(gvr schema.GroupVersionResource, newVersion Version, handler ConversionHandler, oldVersions ...Version) {
 	crConversionMaps[gvr] = ConversionMeta{
-		FromVersion:       oldVersion,
+		FromVersion:       oldVersions,
 		ToVersion:         newVersion,
 		ConversionHandler: handler,
 	}

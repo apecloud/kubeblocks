@@ -34,7 +34,10 @@ const ccResource = "configconstraints"
 var configConstraintBeta1GVR = appsv1beta1.SchemeGroupVersion.WithResource(ccResource)
 
 func init() {
-	hook.RegisterCRDConversion(hook.NewNoVersion(0, 8), hook.NewNoVersion(0, 9), configConstraintBeta1GVR, &ccConversion{})
+	// Upgrade from version 0.7/8.x  to version 0.9.x
+	hook.RegisterCRDConversion(configConstraintBeta1GVR, hook.NewNoVersion(0, 9), &ccConversion{},
+		hook.NewNoVersion(0, 7),
+		hook.NewNoVersion(0, 8))
 }
 
 type ccConversion struct {

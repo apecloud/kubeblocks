@@ -72,7 +72,7 @@ func patchDisableUpdateAddon(ctx context.Context, client *versioned.Clientset, a
 	if annotations == nil {
 		annotations = make(map[string]string)
 	}
-	if addon.GetAnnotations()[helmResourcePolicyKey] == helmResourcePolicyKeep {
+	if annotations[helmResourcePolicyKey] == helmResourcePolicyKeep {
 		return nil
 	}
 	annotations[helmResourcePolicyKey] = helmResourcePolicyKeep

@@ -404,8 +404,11 @@ func serviceVersionToCompDefinitions(ctx context.Context, cli client.Reader,
 			return nil, err
 		}
 
+		serviceVersions := sets.New[string]()
 		// add definition's service version as default, in case there is no component versions provided
-		serviceVersions := sets.New[string](compDef.Spec.ServiceVersion)
+		if compDef.Spec.ServiceVersion != "" {
+			serviceVersions.Insert(compDef.Spec.ServiceVersion)
+		}
 		for _, compVersion := range compVersions {
 			serviceVersions = serviceVersions.Union(compatibleServiceVersions4Definition(compDef, compVersion))
 		}

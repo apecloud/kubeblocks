@@ -23,9 +23,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
 	"strings"
 	"time"
+
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
@@ -35,7 +36,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
@@ -163,12 +163,17 @@ func (s *CheckRole) Do(ctx context.Context, _ *operations.OpsRequest) (*operatio
 	}
 
 	// When network partition occurs, the new primary needs to send global role change information to the controller.
-	if models.IsLeaderOrPrimaryOrMaster(role) {
+	isLeader, err := manager.IsLeader(ctx, cluster)
+	if err != nil {
+		return nil, err
+	}
+	if isLeader {
 		// we need to get latest member info to build global role snapshot
-		cluster, err = s.dcsStore.GetCluster()
+		members, err := s.dcsStore.GetMembers()
 		if err != nil {
 			return nil, err
 		}
+		cluster.Members = members
 		resp.Data["role"] = s.buildGlobalRoleSnapshot(cluster, manager, role)
 	} else {
 		resp.Data["role"] = role
@@ -223,15 +228,10 @@ func (s *CheckRole) buildGlobalRoleSnapshot(cluster *dcs.Cluster, mgr engines.DB
 	for _, member := range cluster.Members {
 		if member.Name != currentMemberName {
 			// get old primary and set it secondary
-			if models.IsLeaderOrPrimaryOrMaster(member.Role) {
-				relatedSecondaryRole, err := models.GetRelatedSecondaryRole(member.Role)
-				if err != nil {
-					s.logger.Error(err, "get related secondary role failed")
-					continue
-				}
+			if member.Role == role {
 				roleSnapshot.PodRoleNamePairs = append(roleSnapshot.PodRoleNamePairs, common.PodRoleNamePair{
 					PodName:  member.Name,
-					RoleName: relatedSecondaryRole,
+					RoleName: s.OriRole,
 					PodUID:   cluster.GetMemberWithName(member.Name).UID,
 				})
 			}

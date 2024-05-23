@@ -32,7 +32,6 @@ import (
 const ccResource = "configconstraints"
 
 var configConstraintBeta1GVR = appsv1beta1.SchemeGroupVersion.WithResource(ccResource)
-var configConstraintAlpha1GVR = appsv1alpha1.SchemeGroupVersion.WithResource(ccResource)
 
 func init() {
 	// Upgrade from version 0.7/8.x  to version 0.9.x

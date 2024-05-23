@@ -227,11 +227,16 @@ func (s *CheckRole) buildGlobalRoleSnapshot(cluster *dcs.Cluster, mgr engines.DB
 
 	for _, member := range cluster.Members {
 		if member.Name != currentMemberName {
-			// get old primary and set it secondary
+			// get old primary and set it's role to none
 			if member.Role == role {
+				_, err := mgr.IsLeaderMember(context.Background(), cluster, &member)
+				if err == nil {
+					continue
+				}
+				s.logger.Info("old leader member access failed and reset it's role", "member", member.Name, "error", err.Error())
 				roleSnapshot.PodRoleNamePairs = append(roleSnapshot.PodRoleNamePairs, common.PodRoleNamePair{
 					PodName:  member.Name,
-					RoleName: s.OriRole,
+					RoleName: "",
 					PodUID:   cluster.GetMemberWithName(member.Name).UID,
 				})
 			}

@@ -54,7 +54,7 @@ func (mgr *Manager) GetReplicaRole(ctx context.Context, _ *dcs.Cluster) (string,
 				}
 			}
 		}
-		if role == models.PRIMARY {
+		if role == models.MASTER {
 			return models.PRIMARY, nil
 		} else {
 			return models.SECONDARY, nil

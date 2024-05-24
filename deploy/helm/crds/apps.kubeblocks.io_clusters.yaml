@@ -445,6 +445,15 @@ spec:
                             type: string
                         type: object
                       type: array
+                    disableExporter:
+                      description: "Determines whether metrics exporter information
+                        is annotated on the Component's headless Service. \n If set
+                        to true, the following annotations will not be patched into
+                        the Service: \n - \"monitor.kubeblocks.io/path\" - \"monitor.kubeblocks.io/port\"
+                        - \"monitor.kubeblocks.io/scheme\" \n These annotations allow
+                        the Prometheus installed by KubeBlocks to discover and scrape
+                        metrics from the exporter."
+                      type: boolean
                     enabledLogs:
                       description: "Specifies which types of logs should be collected
                         for the Component. The log types are defined in the `componentDefinition.spec.logConfigs`
@@ -2777,14 +2786,14 @@ spec:
                       required:
                       - name
                       type: object
-                    monitorEnabled:
-                      description: "Determines whether metrics exporter information
-                        is annotated on the Component's headless Service. \n If set
-                        to true, the following annotations will be patched into the
-                        Service: \n - \"monitor.kubeblocks.io/path\" - \"monitor.kubeblocks.io/port\"
-                        - \"monitor.kubeblocks.io/scheme\" \n These annotations allow
-                        the Prometheus installed by KubeBlocks to discover and scrape
-                        metrics from the exporter."
+                    monitor:
+                      description: "Deprecated since v0.9 Determines whether metrics
+                        exporter information is annotated on the Component's headless
+                        Service. \n If set to true, the following annotations will
+                        be patched into the Service: \n - \"monitor.kubeblocks.io/path\"
+                        - \"monitor.kubeblocks.io/port\" - \"monitor.kubeblocks.io/scheme\"
+                        \n These annotations allow the Prometheus installed by KubeBlocks
+                        to discover and scrape metrics from the exporter."
                       type: boolean
                     name:
                       description: "Specifies the Component's name. It's part of the
@@ -4271,15 +4280,6 @@ spec:
                         - name
                         type: object
                       type: array
-                    sidecars:
-                      description: Defines the sidecar containers that will be attached
-                        to the Component's main container.
-                      items:
-                        type: string
-                      maxItems: 32
-                      minItems: 1
-                      type: array
-                      x-kubernetes-list-type: set
                     switchPolicy:
                       description: "Defines the strategy for switchover and failover
                         when workloadType is Replication. \n Deprecated since v0.9.
@@ -5951,6 +5951,8 @@ spec:
                         cluster-level services - CLUSTER_NAME-COMPONENT_NAME: for
                         component-level services \n Only one default service name
                         is allowed. Cannot be updated."
+                      maxLength: 25
+                      pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
                     shardingSelector:
                       description: Extends the ServiceSpec.Selector by allowing the
@@ -6579,6 +6581,15 @@ spec:
                                 type: string
                             type: object
                           type: array
+                        disableExporter:
+                          description: "Determines whether metrics exporter information
+                            is annotated on the Component's headless Service. \n If
+                            set to true, the following annotations will not be patched
+                            into the Service: \n - \"monitor.kubeblocks.io/path\"
+                            - \"monitor.kubeblocks.io/port\" - \"monitor.kubeblocks.io/scheme\"
+                            \n These annotations allow the Prometheus installed by
+                            KubeBlocks to discover and scrape metrics from the exporter."
+                          type: boolean
                         enabledLogs:
                           description: "Specifies which types of logs should be collected
                             for the Component. The log types are defined in the `componentDefinition.spec.logConfigs`
@@ -9039,11 +9050,11 @@ spec:
                           required:
                           - name
                           type: object
-                        monitorEnabled:
-                          description: "Determines whether metrics exporter information
-                            is annotated on the Component's headless Service. \n If
-                            set to true, the following annotations will be patched
-                            into the Service: \n - \"monitor.kubeblocks.io/path\"
+                        monitor:
+                          description: "Deprecated since v0.9 Determines whether metrics
+                            exporter information is annotated on the Component's headless
+                            Service. \n If set to true, the following annotations
+                            will be patched into the Service: \n - \"monitor.kubeblocks.io/path\"
                             - \"monitor.kubeblocks.io/port\" - \"monitor.kubeblocks.io/scheme\"
                             \n These annotations allow the Prometheus installed by
                             KubeBlocks to discover and scrape metrics from the exporter."
@@ -10620,15 +10631,6 @@ spec:
                             - name
                             type: object
                           type: array
-                        sidecars:
-                          description: Defines the sidecar containers that will be
-                            attached to the Component's main container.
-                          items:
-                            type: string
-                          maxItems: 32
-                          minItems: 1
-                          type: array
-                          x-kubernetes-list-type: set
                         switchPolicy:
                           description: "Defines the strategy for switchover and failover
                             when workloadType is Replication. \n Deprecated since

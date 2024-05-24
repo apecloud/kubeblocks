@@ -126,19 +126,19 @@ var _ = Describe("Switchover Util", func() {
 		Expect(synthesizedComp).ShouldNot(BeNil())
 
 		By("Test opsSwitchover.Instance is already primary, and do not need to do switchover.")
-		needSwitchover, err := needDoSwitchover(testCtx.Ctx, k8sClient, clusterObj, synthesizedComp, opsSwitchover)
+		needSwitchover, err := needDoSwitchover(testCtx.Ctx, k8sClient, synthesizedComp, opsSwitchover)
 		Expect(err).Should(Succeed())
 		Expect(needSwitchover).Should(BeFalse())
 
 		By("Test opsSwitchover.Instance is not primary, and need to do switchover.")
 		opsSwitchover.InstanceName = fmt.Sprintf("%s-%s-%d", clusterObj.Name, testapps.DefaultRedisCompSpecName, 1)
-		needSwitchover, err = needDoSwitchover(testCtx.Ctx, k8sClient, clusterObj, synthesizedComp, opsSwitchover)
+		needSwitchover, err = needDoSwitchover(testCtx.Ctx, k8sClient, synthesizedComp, opsSwitchover)
 		Expect(err).Should(Succeed())
 		Expect(needSwitchover).Should(BeTrue())
 
 		By("Test opsSwitchover.Instance is *, and need to do switchover.")
 		opsSwitchover.InstanceName = "*"
-		needSwitchover, err = needDoSwitchover(testCtx.Ctx, k8sClient, clusterObj, synthesizedComp, opsSwitchover)
+		needSwitchover, err = needDoSwitchover(testCtx.Ctx, k8sClient, synthesizedComp, opsSwitchover)
 		Expect(err).Should(Succeed())
 		Expect(needSwitchover).Should(BeTrue())
 	}

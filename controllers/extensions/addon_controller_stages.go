@@ -40,6 +40,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -177,6 +178,19 @@ func (r *fetchNDeletionCheckStage) Handle(ctx context.Context) {
 	}
 	r.reqCtx.Log.V(1).Info("get addon", "generation", addon.Generation, "observedGeneration", addon.Status.ObservedGeneration)
 	r.reqCtx.UpdateCtxValue(operandValueKey, addon)
+
+	// CheckIfAddonUsedByCluster, if err, skip the deletion stage
+	if !addon.GetDeletionTimestamp().IsZero() || !addon.Spec.InstallSpec.GetEnabled() {
+		recordEvent := func() {
+			r.reconciler.Event(addon, corev1.EventTypeWarning, "Addon is used by some clusters",
+				"Addon is used by cluster, please check")
+		}
+		if res, err := intctrlutil.ValidateReferenceCR(*r.reqCtx, r.reconciler.Client, addon, constant.ClusterDefLabelKey,
+			recordEvent, &appsv1alpha1.ClusterList{}); res != nil || err != nil {
+			r.updateResultNErr(res, err)
+			return
+		}
+	}
 	res, err := intctrlutil.HandleCRDeletion(*r.reqCtx, r.reconciler, addon, addonFinalizerName, func() (*ctrl.Result, error) {
 		r.deletionStage.Handle(ctx)
 		return r.deletionStage.doReturn()

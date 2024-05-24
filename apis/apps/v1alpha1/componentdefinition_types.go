@@ -193,23 +193,17 @@ type ComponentDefinitionSpec struct {
 	// +kubebuilder:validation:Required
 	Runtime corev1.PodSpec `json:"runtime"`
 
-	// Defines the sidecar containers that will be attached to the component's main container.
+	// Deprecated since v0.9
+	// monitor is monitoring config which provided by provider.
 	//
-	// +kubebuilder:pruning:PreserveUnknownFields
-	// +kubebuilder:validation:MinItems:= 1
-	// +kubebuilder:validation:MaxItems:= 32
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.10.0"
 	// +optional
-	// +optional
-	SidecarContainerSpecs []SidecarContainerSpec `json:"sidecarContainerSpecs,omitempty"`
+	Monitor *MonitorConfig `json:"monitor,omitempty"`
 
 	// Defines the built-in metrics exporter container.
 	//
 	// +optional
-	BuiltinMonitorContainer *BuiltinMonitorContainerRef `json:"builtinMonitorContainer,omitempty"`
+	Exporter *Exporter `json:"exporter,omitempty"`
 
 	// Defines variables which are determined after Cluster instantiation and reflect
 	// dynamic or runtime attributes of instantiated Clusters.
@@ -223,7 +217,7 @@ type ComponentDefinitionSpec struct {
 	//
 	// - ConfigMap: Select and extract a value from a specific key within a ConfigMap.
 	// - Secret: Select and extract a value from a specific key within a Secret.
-	// - Pod: Retrieves values (including ports) from a selected Pod.
+	// - HostNetwork: Retrieves values (including ports) from host-network resources.
 	// - Service: Retrieves values (including address, port, NodePort) from a selected Service.
 	//   Intended to obtain the address of a ComponentService within the same Cluster.
 	// - Credential: Retrieves account name and password from a SystemAccount variable.
@@ -467,16 +461,6 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	Roles []ReplicaRole `json:"roles,omitempty"`
 
-	// This field has been deprecated since v0.9.
-	// This field is maintained for backward compatibility and its use is discouraged.
-	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
-	//
-	// This field is immutable.
-	//
-	// +kubebuilder:default=External
-	// +optional
-	RoleArbitrator *RoleArbitrator `json:"roleArbitrator,omitempty"`
-
 	// Defines a set of hooks and procedures that customize the behavior of a Component throughout its lifecycle.
 	// Actions are triggered at specific lifecycle stages:
 	//
@@ -629,17 +613,32 @@ type SystemAccount struct {
 	SecretRef *ProvisionSecretRef `json:"secretRef,omitempty"`
 }
 
-// RoleArbitrator defines how to arbitrate the role of replicas.
-//
-// Deprecated since v0.9
-// +enum
-// +kubebuilder:validation:Enum={External,Lorry}
-type RoleArbitrator string
+type Exporter struct {
+	// Specifies the name of the built-in metrics exporter container.
+	//
+	// +optional
+	ContainerName string `json:"containerName,omitempty"`
 
-const (
-	ExternalRoleArbitrator RoleArbitrator = "External"
-	LorryRoleArbitrator    RoleArbitrator = "Lorry"
-)
+	// Specifies the http/https url path to scrape for metrics.
+	// If empty, Prometheus uses the default value (e.g. `/metrics`).
+	//
+	// +kubebuilder:validation:default="/metrics"
+	// +optional
+	ScrapePath string `json:"scrapePath,omitempty"`
+
+	// Specifies the port name to scrape for metrics.
+	//
+	// +optional
+	ScrapePort string `json:"scrapePort,omitempty"`
+
+	// Specifies the schema to use for scraping.
+	// `http` and `https` are the expected values unless you rewrite the `__scheme__` label via relabeling.
+	// If empty, Prometheus uses the default value `http`.
+	//
+	// +kubebuilder:validation:default="http"
+	// +optional
+	ScrapeScheme PrometheusScheme `json:"scrapeScheme,omitempty"`
+}
 
 // ReplicaRole represents a role that can be assumed by a component instance.
 type ReplicaRole struct {
@@ -946,10 +945,8 @@ type Action struct {
 	//
 	// - `Immediately`: Executed right after the Component object is created.
 	//   The readiness of the Component and its resources is not guaranteed at this stage.
-	//   The Component's state can not be marked as ready until the Action completes successfully.
 	// - `RuntimeReady`: The Action is triggered after the Component object has been created and all associated
 	//   runtime resources (e.g. Pods) are in a ready state.
-	//   The Component's state can not be marked as ready until the Action completes successfully.
 	// - `ComponentReady`: The Action is triggered after the Component itself is in a ready state.
 	//   This process does not affect the readiness state of the Component or the Cluster.
 	// - `ClusterReady`: The Action is executed after the Cluster is in a ready state.

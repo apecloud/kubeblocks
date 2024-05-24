@@ -87,7 +87,7 @@ func CreateOrUpdatePodVolumes(podSpec *corev1.PodSpec, volumes map[string]appsv1
 					ConfigMap: &corev1.ConfigMapVolumeSource{
 						LocalObjectReference: corev1.LocalObjectReference{Name: cmName},
 						// TODO: remove ComponentTemplateSpec.DefaultMode
-						DefaultMode: buildVolumeMode(configSet, templateSpec.Name, templateSpec),
+						DefaultMode: buildVolumeMode(configSet, templateSpec),
 					},
 				},
 			}
@@ -106,11 +106,12 @@ func CreateOrUpdatePodVolumes(podSpec *corev1.PodSpec, volumes map[string]appsv1
 	return nil
 }
 
-func buildVolumeMode(configs []string, name string, configSpec appsv1alpha1.ComponentTemplateSpec) *int32 {
-	if !viper.GetBool(constant.FeatureGateIgnoreConfigTemplateDefaultMode) {
+func buildVolumeMode(configs []string, configSpec appsv1alpha1.ComponentTemplateSpec) *int32 {
+	// If the defaultMode is not set, permissions are automatically set based on the template type.
+	if !viper.GetBool(constant.FeatureGateIgnoreConfigTemplateDefaultMode) && configSpec.DefaultMode != nil {
 		return configSpec.DefaultMode
 	}
-	if slices.Contains(configs, name) {
+	if slices.Contains(configs, configSpec.Name) {
 		return &configsDefaultMode
 	}
 	return &scriptsDefaultMode

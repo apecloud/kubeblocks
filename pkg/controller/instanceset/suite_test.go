@@ -70,8 +70,6 @@ var (
 
 	uid = types.UID("its-mock-uid")
 
-	headlessSvcName = name + "-headless"
-
 	selectors = map[string]string{
 		constant.AppInstanceLabelKey: name,
 		WorkloadsManagedByLabelKey:   workloads.Kind,

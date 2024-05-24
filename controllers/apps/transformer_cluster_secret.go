@@ -28,12 +28,12 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
-// SecretTransformer puts all the secrets at the beginning of the DAG
-type secretTransformer struct{}
+// clusterSecretTransformer puts all the secrets at the beginning of the DAG
+type clusterSecretTransformer struct{}
 
-var _ graph.Transformer = &secretTransformer{}
+var _ graph.Transformer = &clusterSecretTransformer{}
 
-func (c *secretTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (c *clusterSecretTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*clusterTransformContext)
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 

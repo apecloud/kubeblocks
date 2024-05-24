@@ -30,6 +30,7 @@ import (
 	"github.com/spf13/viper"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
@@ -70,7 +71,7 @@ func (s *CheckRole) Init(ctx context.Context) error {
 	val := viper.GetString(constant.KBEnvServiceRoles)
 	if val != "" {
 		if err := json.Unmarshal([]byte(val), &s.DBRoles); err != nil {
-			s.Logger.Info("KB_DB_ROLES env format error", "error", err)
+			s.Logger.Info("env format error", "env", constant.KBEnvServiceRoles, "value", val, "error", err.Error())
 		}
 	}
 
@@ -135,10 +136,27 @@ func (s *CheckRole) Do(ctx context.Context, _ *operations.OpsRequest) (*operatio
 		return resp, nil
 	}
 
-	resp.Data["role"] = role
 	if s.OriRole == role {
 		return nil, nil
 	}
+
+	// When network partition occurs, the new primary needs to send global role change information to the controller.
+	isLeader, err := s.DBManager.IsLeader(ctx, cluster)
+	if err != nil {
+		return nil, err
+	}
+	if isLeader {
+		// we need to get latest member info to build global role snapshot
+		members, err := s.dcsStore.GetMembers()
+		if err != nil {
+			return nil, err
+		}
+		cluster.Members = members
+		resp.Data["role"] = s.buildGlobalRoleSnapshot(cluster, role)
+	} else {
+		resp.Data["role"] = role
+	}
+
 	resp.Data["event"] = util.OperationSuccess
 	s.OriRole = role
 	err = util.SentEventForProbe(ctx, resp.Data)
@@ -170,4 +188,40 @@ func (s *CheckRole) roleValidate(role string) (bool, string) {
 		msg = fmt.Sprintf("role %s is not configured in cluster definition %v", role, s.DBRoles)
 	}
 	return isValid, msg
+}
+
+func (s *CheckRole) buildGlobalRoleSnapshot(cluster *dcs.Cluster, role string) string {
+	currentMemberName := s.DBManager.GetCurrentMemberName()
+	roleSnapshot := &common.GlobalRoleSnapshot{
+		Version: time.Now().Format(time.RFC3339Nano),
+		PodRoleNamePairs: []common.PodRoleNamePair{
+			{
+				PodName:  currentMemberName,
+				RoleName: role,
+				PodUID:   cluster.GetMemberWithName(currentMemberName).UID,
+			},
+		},
+	}
+
+	for _, member := range cluster.Members {
+		if member.Name != currentMemberName {
+			// get old primary and set it's role to none
+			if member.Role == role {
+				_, err := s.DBManager.IsLeaderMember(context.Background(), cluster, &member)
+				if err == nil {
+					// old leader member is still healthy, just ignore it, and let it's lorry to handle the role change
+					continue
+				}
+				s.Logger.Info("old leader member access failed and reset it's role", "member", member.Name, "error", err.Error())
+				roleSnapshot.PodRoleNamePairs = append(roleSnapshot.PodRoleNamePairs, common.PodRoleNamePair{
+					PodName:  member.Name,
+					RoleName: "",
+					PodUID:   cluster.GetMemberWithName(member.Name).UID,
+				})
+			}
+		}
+	}
+
+	b, _ := json.Marshal(roleSnapshot)
+	return string(b)
 }

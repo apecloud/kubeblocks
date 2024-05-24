@@ -326,9 +326,9 @@ spec:
                             description: "Routes service traffic to pods with matching
                               label keys and values. If specified, the service will
                               only be exposed to pods matching the selector. \n Note:
-                              At least one of 'roleSelector' or 'selector' must be
-                              specified. If both are specified, a pod must match both
-                              conditions to be selected."
+                              At least one of 'roleSelector' or 'podSelector' must
+                              be specified. If both are specified, a pod must match
+                              both conditions to be selected."
                             type: object
                             x-kubernetes-map-type: atomic
                           ports:
@@ -419,7 +419,7 @@ spec:
                             description: "Specifies a role to target with the service.
                               If specified, the service will only be exposed to pods
                               with the matching role. \n Note: At least one of 'roleSelector'
-                              or 'selector' must be specified. If both are specified,
+                              or 'podSelector' must be specified. If both are specified,
                               a pod must match both conditions to be selected."
                             type: string
                           serviceType:
@@ -3472,12 +3472,53 @@ spec:
                   Note: This field is immutable once set."
                 properties:
                   clusterVersionRef:
-                    description: "Specifies the name of the target ClusterVersion
-                      for the upgrade. \n This field is deprecated since v0.9 because
-                      ClusterVersion is deprecated."
+                    description: 'Deprecated: since v0.9 because ClusterVersion is
+                      deprecated. Specifies the name of the target ClusterVersion
+                      for the upgrade.'
                     type: string
-                required:
-                - clusterVersionRef
+                  components:
+                    description: 'Lists components to be upgrade based on desired
+                      ComponentDefinition and ServiceVersion. From the perspective
+                      of cluster API, the reasonable combinations should be: 1. (comp-def,
+                      service-ver) - upgrade to the specified service version and
+                      component definition, the user takes the responsibility to ensure
+                      that they are compatible. 2. ("", service-ver) - upgrade to
+                      the specified service version, let the operator choose the latest
+                      compatible component definition. 3. (comp-def, "") - upgrade
+                      to the specified component definition, let the operator choose
+                      the latest compatible service version. 4. ("", "") - upgrade
+                      to the latest service version and component definition, the
+                      operator will ensure the compatibility between the selected
+                      versions.'
+                    items:
+                      properties:
+                        componentDefinitionName:
+                          description: Specifies the name of the ComponentDefinition.
+                          maxLength: 64
+                          type: string
+                        componentName:
+                          description: Specifies the name of the Component.
+                          type: string
+                        serviceVersion:
+                          description: Specifies the version of the Service expected
+                            to be provisioned by this Component. Referring to the
+                            ServiceVersion defined by the ComponentDefinition and
+                            ComponentVersion. And ServiceVersion in ClusterComponentSpec
+                            is optional, when no version is specified, use the latest
+                            available version in ComponentVersion.
+                          maxLength: 32
+                          type: string
+                      required:
+                      - componentName
+                      type: object
+                      x-kubernetes-validations:
+                      - message: at least one componentDefinitionName or serviceVersion
+                        rule: has(self.componentDefinitionName) || has(self.serviceVersion)
+                    maxItems: 1024
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - componentName
+                    x-kubernetes-list-type: map
                 type: object
                 x-kubernetes-validations:
                 - message: forbidden to update spec.upgrade
@@ -3487,7 +3528,7 @@ spec:
                   and its desired compute resources for vertical scaling.
                 items:
                   description: VerticalScaling refers to the process of adjusting
-                    the compute resources (e.g., CPU, memory) allocated to a Component.
+                    compute resources (e.g., CPU, memory) allocated to a Component.
                     It defines the parameters required for the operation.
                   properties:
                     claims:
@@ -3979,6 +4020,10 @@ spec:
                           x-kubernetes-list-map-keys:
                           - name
                           x-kubernetes-list-type: map
+                        componentDefinitionName:
+                          description: Records the name of the ComponentDefinition
+                            prior to any changes.
+                          type: string
                         instances:
                           description: Records the InstanceTemplate list of the Component
                             prior to any changes.
@@ -6381,6 +6426,10 @@ spec:
                             otherwise to an implementation-defined value. Requests
                             cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                           type: object
+                        serviceVersion:
+                          description: Records the version of the Service expected
+                            to be provisioned by this Component prior to any changes.
+                          type: string
                         services:
                           description: Records the ClusterComponentService list of
                             the Component prior to any changes.

@@ -28,6 +28,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -37,7 +38,9 @@ import (
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
-var _ = Describe("Component PreTerminate Test", func() {
+var tlog = ctrl.Log.WithName("component_testing")
+
+var _ = Describe("Component LifeCycle Action Utils Test", func() {
 	Context("has the BuildComponent function", func() {
 		const (
 			clusterDefName     = "test-clusterdef"
@@ -102,7 +105,7 @@ var _ = Describe("Component PreTerminate Test", func() {
 		}
 
 		It("should work as expected with various inputs", func() {
-			By("test component definition without pre terminate")
+			By("test component definition without post provision")
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx: ctx,
 				Log: tlog,
@@ -117,24 +120,34 @@ var _ = Describe("Component PreTerminate Test", func() {
 			Expect(err).Should(Succeed())
 			Expect(synthesizeComp).ShouldNot(BeNil())
 			Expect(synthesizeComp.LifecycleActions).ShouldNot(BeNil())
-			Expect(synthesizeComp.LifecycleActions.PreTerminate).Should(BeNil())
+			Expect(synthesizeComp.LifecycleActions.PostProvision).Should(BeNil())
 
 			comp, err := BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
 			comp.UID = cluster.UID
 			Expect(err).Should(Succeed())
 			Expect(comp).ShouldNot(BeNil())
-			// graphCli := model.NewGraphClient(k8sClient)
 
-			By("test component without preTerminate action and no need to do PreTerminate action")
 			dag := graph.NewDAG()
 			dag.AddVertex(&model.ObjectVertex{Obj: cluster, Action: model.ActionUpdatePtr()})
-			need, err := needDoPreTerminate(testCtx.Ctx, testCtx.Cli, cluster, comp, synthesizeComp)
+			actionCtx, err := NewActionContext(cluster, comp, nil, synthesizeComp.LifecycleActions, synthesizeComp.ScriptTemplates, PostProvisionAction)
 			Expect(err).Should(Succeed())
-			Expect(need).Should(BeFalse())
-			err = reconcileCompPreTerminate(testCtx.Ctx, testCtx.Cli, graphCli, cluster, comp, synthesizeComp, dag)
+			err = ReconcileCompPostProvision(testCtx.Ctx, testCtx.Cli, graphCli, actionCtx, dag)
 			Expect(err).Should(Succeed())
 
-			By("build component with preTerminate action and should do PreTerminate action")
+			By("build component with preTerminate without PodList, check the built-in envs of cluster component available in action job")
+			synthesizeComp.LifecycleActions = &appsv1alpha1.ComponentLifecycleActions{}
+			preTerminate := appsv1alpha1.LifecycleActionHandler{
+				CustomHandler: &appsv1alpha1.Action{
+					Image: constant.KBToolsImage,
+					Exec: &appsv1alpha1.ExecAction{
+						Command: []string{"echo", "mock"},
+						Args:    []string{},
+					},
+				},
+			}
+			synthesizeComp.LifecycleActions.PreTerminate = &preTerminate
+
+			By("check built-in envs of cluster component available in action job")
 			pods := mockPodsForTest(cluster, 1)
 			for _, pod := range pods {
 				Expect(testCtx.CheckedCreateObj(testCtx.Ctx, &pod)).Should(Succeed())
@@ -144,30 +157,60 @@ var _ = Describe("Component PreTerminate Test", func() {
 				}}
 				Expect(k8sClient.Status().Update(ctx, &pod)).Should(Succeed())
 			}
-			synthesizeComp.LifecycleActions = &appsv1alpha1.ComponentLifecycleActions{}
-			PreTerminate := appsv1alpha1.LifecycleActionHandler{
-				CustomHandler: &appsv1alpha1.Action{
-					Image: constant.KBToolsImage,
-					Exec: &appsv1alpha1.ExecAction{
-						Command: []string{"echo", "mock"},
-						Args:    []string{},
-					},
-				},
-			}
-			synthesizeComp.LifecycleActions.PreTerminate = &PreTerminate
-			need, err = needDoPreTerminate(testCtx.Ctx, k8sClient, cluster, comp, synthesizeComp)
+			actionCtx, err = NewActionContext(cluster, comp, nil, synthesizeComp.LifecycleActions, synthesizeComp.ScriptTemplates, PreTerminateAction)
 			Expect(err).Should(Succeed())
-			Expect(need).Should(BeTrue())
-
-			err = reconcileCompPreTerminate(testCtx.Ctx, k8sClient, graphCli, cluster, comp, synthesizeComp, dag)
-			Expect(err).ShouldNot(Succeed())
-			Expect(err.Error()).Should(ContainSubstring("job not exist, pls check"))
-
-			By("requeue to waiting for job")
-			jobName, _ := genActionJobName(cluster.Name, synthesizeComp.Name, PreTerminateAction)
-			err = CheckJobSucceed(testCtx.Ctx, testCtx.Cli, cluster, jobName)
-			Expect(err).ShouldNot(Succeed())
-			Expect(err.Error()).Should(ContainSubstring("job not exist, pls check"))
+			renderJob, err := renderActionCmdJob(testCtx.Ctx, testCtx.Cli, actionCtx)
+			Expect(err).Should(Succeed())
+			Expect(renderJob).ShouldNot(BeNil())
+			Expect(len(renderJob.Spec.Template.Spec.Containers[0].Env) == 11).Should(BeTrue())
+			compListExist := false
+			deletingCompListExist := false
+			undeletedCompListExist := false
+			compPodNameListExist := false
+			compPodIPListExist := false
+			compPodHostNameListExist := false
+			compPodHostIPListExist := false
+			clusterPodNameListExist := false
+			clusterPodIPListExist := false
+			clusterPodHostNameListExist := false
+			clusterPodHostIPListExist := false
+			for _, env := range renderJob.Spec.Template.Spec.Containers[0].Env {
+				switch env.Name {
+				case kbLifecycleActionClusterCompList:
+					compListExist = true
+				case kbLifecycleActionClusterCompDeletingList:
+					deletingCompListExist = true
+				case kbLifecycleActionClusterCompUndeletedList:
+					undeletedCompListExist = true
+				case kbLifecycleActionClusterCompPodHostIPList:
+					compPodHostIPListExist = true
+				case kbLifecycleActionClusterCompPodHostNameList:
+					compPodHostNameListExist = true
+				case kbLifecycleActionClusterCompPodIPList:
+					compPodIPListExist = true
+				case kbLifecycleActionClusterCompPodNameList:
+					compPodNameListExist = true
+				case kbLifecycleActionClusterPodHostIPList:
+					clusterPodHostIPListExist = true
+				case kbLifecycleActionClusterPodHostNameList:
+					clusterPodHostNameListExist = true
+				case kbLifecycleActionClusterPodIPList:
+					clusterPodIPListExist = true
+				case kbLifecycleActionClusterPodNameList:
+					clusterPodNameListExist = true
+				}
+			}
+			Expect(compListExist).Should(BeTrue())
+			Expect(deletingCompListExist).Should(BeTrue())
+			Expect(undeletedCompListExist).Should(BeTrue())
+			Expect(compPodNameListExist).Should(BeTrue())
+			Expect(compPodIPListExist).Should(BeTrue())
+			Expect(compPodHostNameListExist).Should(BeTrue())
+			Expect(compPodHostIPListExist).Should(BeTrue())
+			Expect(clusterPodNameListExist).Should(BeTrue())
+			Expect(clusterPodIPListExist).Should(BeTrue())
+			Expect(clusterPodHostNameListExist).Should(BeTrue())
+			Expect(clusterPodHostIPListExist).Should(BeTrue())
 		})
 	})
 })

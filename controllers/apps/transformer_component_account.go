@@ -125,7 +125,7 @@ func (t *componentAccountTransformer) buildPassword(ctx *componentTransformConte
 		return t.generatePassword(account)
 	}
 	// get restore password if exists during recovery.
-	password := factory.GetRestorePassword(ctx.Cluster, ctx.SynthesizeComponent)
+	password := factory.GetRestorePassword(ctx.SynthesizeComponent)
 	if password == "" {
 		return t.generatePassword(account)
 	}

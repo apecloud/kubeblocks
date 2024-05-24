@@ -23,7 +23,6 @@ import (
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
@@ -39,7 +38,7 @@ type Task struct {
 	Status *appsv1alpha1.ConfigurationItemDetailStatus
 	Name   string
 
-	Do func(fetcher *Task, component *component.SynthesizedComponent, dependOnObjs []client.Object, revision string) error
+	Do func(fetcher *Task, component *component.SynthesizedComponent, revision string) error
 }
 
 type TaskContext struct {
@@ -51,7 +50,7 @@ type TaskContext struct {
 func NewTask(item appsv1alpha1.ConfigurationItemDetail, status *appsv1alpha1.ConfigurationItemDetailStatus) Task {
 	return Task{
 		Name: item.Name,
-		Do: func(fetcher *Task, synComponent *component.SynthesizedComponent, dependOnObjs []client.Object, revision string) error {
+		Do: func(fetcher *Task, synComponent *component.SynthesizedComponent, revision string) error {
 			configSpec := item.ConfigSpec
 			if configSpec == nil {
 				return core.MakeError("not found config spec: %s", item.Name)
@@ -66,7 +65,7 @@ func NewTask(item appsv1alpha1.ConfigurationItemDetail, status *appsv1alpha1.Con
 				return syncStatus(configMap, status)
 			case appsv1alpha1.CPendingPhase,
 				appsv1alpha1.CMergeFailedPhase:
-				return syncImpl(fetcher, item, status, synComponent, revision, configSpec, dependOnObjs)
+				return syncImpl(fetcher, item, status, synComponent, revision, configSpec)
 			case appsv1alpha1.CCreatingPhase:
 				return nil
 			}
@@ -80,15 +79,13 @@ func syncImpl(fetcher *Task,
 	status *appsv1alpha1.ConfigurationItemDetailStatus,
 	synthesizedComponent *component.SynthesizedComponent,
 	revision string,
-	configSpec *appsv1alpha1.ComponentConfigSpec,
-	dependOnObjs []client.Object) (err error) {
+	configSpec *appsv1alpha1.ComponentConfigSpec) (err error) {
 	err = configctrl.NewReconcilePipeline(configctrl.ReconcileCtx{
 		ResourceCtx:          fetcher.ResourceCtx,
 		Cluster:              fetcher.ClusterObj,
 		Component:            fetcher.ComponentObj,
 		SynthesizedComponent: synthesizedComponent,
 		PodSpec:              synthesizedComponent.PodSpec,
-		Cache:                dependOnObjs,
 	}, item, status, configSpec).
 		ConfigMap(item.Name).
 		ConfigConstraints(configSpec.ConfigConstraintRef).

@@ -24,12 +24,15 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	sync "sync"
 
-	"github.com/golang/protobuf/descriptor"
-	"github.com/golang/protobuf/proto"
 	protobufdescriptor "github.com/golang/protobuf/protoc-gen-go/descriptor"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	descriptorpb "google.golang.org/protobuf/types/descriptorpb"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protodesc"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
+	"google.golang.org/protobuf/runtime/protoimpl"
+	"google.golang.org/protobuf/types/descriptorpb"
 )
 
 // StripSecrets returns a wrapper around the original lorry gRPC message
@@ -75,7 +78,7 @@ func (s *stripSecrets) String() string {
 }
 
 func (s *stripSecrets) strip(parsed interface{}, msg interface{}) {
-	protobufMsg, ok := msg.(descriptor.Message)
+	protobufMsg, ok := msg.(proto.Message)
 	if !ok {
 		// Not a protobuf message, so we are done.
 		return
@@ -93,9 +96,11 @@ func (s *stripSecrets) strip(parsed interface{}, msg interface{}) {
 	// on each field where the name matches the field name in the protobuf
 	// spec (like volume_capabilities). The field.GetJsonName() method returns
 	// a different name (volumeCapabilities) which we don't use.
-	_, md := descriptor.ForMessage(protobufMsg)
-	fields := md.GetField()
-	for _, field := range fields {
+	md := protobufMsg.ProtoReflect().Descriptor()
+	// _, md := descriptor.ForMessage(protobufMsg)
+	fields := md.Fields()
+	for i := 0; i < fields.Len(); i++ {
+		field := protodesc.ToFieldDescriptorProto(fields.Get(i))
 		if s.isSecretField(field) {
 			// Overwrite only if already set.
 			if _, ok := parsedFields[field.GetName()]; ok {
@@ -110,7 +115,7 @@ func (s *stripSecrets) strip(parsed interface{}, msg interface{}) {
 			// a value for recursive stripping.
 			typeName := field.GetTypeName()
 			typeName = strings.TrimPrefix(typeName, ".")
-			t := proto.MessageType(typeName)
+			t := MessageType(typeName)
 			if t == nil || t.Kind() != reflect.Ptr {
 				// Shouldn't happen, but
 				// better check anyway instead
@@ -139,8 +144,8 @@ func (s *stripSecrets) strip(parsed interface{}, msg interface{}) {
 // isKBSecret uses the kb_secret extension to
 // determine whether a field contains secrets.
 func isKBSecret(field *protobufdescriptor.FieldDescriptorProto) bool {
-	ex, err := proto.GetExtension(field.Options, kbSecret)
-	return err == nil && ex != nil && *ex.(*bool)
+	ex := proto.GetExtension(field.Options, kbSecret)
+	return ex != nil && ex.(bool)
 }
 
 // Copied from the dbplugin spec db_plugin.pb.go
@@ -156,4 +161,65 @@ var kbSecret = &protoimpl.ExtensionInfo{
 	Name:          "plugin.v1.kb_secret",
 	Tag:           "varint,1059,opt,name=kb_secret",
 	Filename:      "db_plugin.proto",
+}
+
+var messageTypeCache sync.Map
+
+// MessageType returns the message type for a named message.
+// It returns nil if not found.
+//
+// Deprecated: Use protoregistry.GlobalTypes.FindMessageByName instead.
+func MessageType(s string) reflect.Type {
+	if v, ok := messageTypeCache.Load(s); ok {
+		return v.(reflect.Type)
+	}
+
+	// Derive the message type from the v2 registry.
+	var t reflect.Type
+	if mt, _ := protoregistry.GlobalTypes.FindMessageByName(protoreflect.FullName(s)); mt != nil {
+		t = messageGoType(mt)
+	}
+
+	// If we could not get a concrete type, it is possible that it is a
+	// pseudo-message for a map entry.
+	if t == nil {
+		d, _ := protoregistry.GlobalFiles.FindDescriptorByName(protoreflect.FullName(s))
+		if md, _ := d.(protoreflect.MessageDescriptor); md != nil && md.IsMapEntry() {
+			kt := goTypeForField(md.Fields().ByNumber(1))
+			vt := goTypeForField(md.Fields().ByNumber(2))
+			t = reflect.MapOf(kt, vt)
+		}
+	}
+
+	// Locally cache the message type for the given name.
+	if t != nil {
+		v, _ := messageTypeCache.LoadOrStore(s, t)
+		return v.(reflect.Type)
+	}
+	return nil
+}
+
+func goTypeForField(fd protoreflect.FieldDescriptor) reflect.Type {
+	switch k := fd.Kind(); k {
+	case protoreflect.EnumKind:
+		if et, _ := protoregistry.GlobalTypes.FindEnumByName(fd.Enum().FullName()); et != nil {
+			return enumGoType(et)
+		}
+		return reflect.TypeOf(protoreflect.EnumNumber(0))
+	case protoreflect.MessageKind, protoreflect.GroupKind:
+		if mt, _ := protoregistry.GlobalTypes.FindMessageByName(fd.Message().FullName()); mt != nil {
+			return messageGoType(mt)
+		}
+		return reflect.TypeOf((*protoreflect.Message)(nil)).Elem()
+	default:
+		return reflect.TypeOf(fd.Default().Interface())
+	}
+}
+
+func enumGoType(et protoreflect.EnumType) reflect.Type {
+	return reflect.TypeOf(et.New(0))
+}
+
+func messageGoType(mt protoreflect.MessageType) reflect.Type {
+	return reflect.TypeOf(protoimpl.X.ProtoMessageV1Of(mt.Zero().Interface()))
 }

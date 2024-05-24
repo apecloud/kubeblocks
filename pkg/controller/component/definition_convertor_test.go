@@ -380,11 +380,11 @@ var _ = Describe("Component Definition Convertor", func() {
 				expectedVar := appsv1alpha1.EnvVar{
 					Name: apiutil.HostNetworkDynamicPortVarName(container.Name, container.Ports[0].Name),
 					ValueFrom: &appsv1alpha1.VarSource{
-						PodVarRef: &appsv1alpha1.PodVarSelector{
+						HostNetworkVarRef: &appsv1alpha1.HostNetworkVarSelector{
 							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
 								Optional: func() *bool { optional := false; return &optional }(),
 							},
-							PodVars: appsv1alpha1.PodVars{
+							HostNetworkVars: appsv1alpha1.HostNetworkVars{
 								Container: &appsv1alpha1.ContainerVars{
 									Name: container.Name,
 									Port: &appsv1alpha1.NamedVar{
@@ -620,7 +620,6 @@ var _ = Describe("Component Definition Convertor", func() {
 			Expect(res).Should(BeNil())
 		})
 
-		// TODO(component)
 		It("labels", func() {
 			convertor := &compDefLabelsConvertor{}
 			res, err := convertor.convert(clusterCompDef)
@@ -773,14 +772,6 @@ var _ = Describe("Component Definition Convertor", func() {
 			})
 		})
 
-		It("role arbitrator", func() {
-			convertor := &compDefRoleArbitratorConvertor{}
-			res, err := convertor.convert(clusterCompDef)
-			Expect(err).Should(Succeed())
-			Expect(res).Should(BeNil())
-		})
-
-		// TODO(component)
 		Context("lifecycle actions", func() {
 			It("w/o comp version", func() {
 				clusterCompDef.Probes.RoleProbe = nil

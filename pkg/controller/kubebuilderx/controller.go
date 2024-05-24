@@ -24,9 +24,13 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
 
 // TODO(free6om): this is a new reconciler framework in the very early stage leaving the following tasks to do:
@@ -94,6 +98,8 @@ func (c *controller) Do(reconcilers ...Reconciler) Controller {
 }
 
 func (c *controller) Commit() error {
+	defer c.emitFailureEvent()
+
 	if c.err != nil {
 		return c.err
 	}
@@ -101,15 +107,37 @@ func (c *controller) Commit() error {
 		return nil
 	}
 	builder := NewPlanBuilder(c.ctx, c.cli, c.oldTree, c.tree, c.recorder, c.logger)
-	if err := builder.Init(); err != nil {
-		return err
+	if c.err = builder.Init(); c.err != nil {
+		return c.err
 	}
-	plan, err := builder.Build()
-	if err != nil {
-		return err
+	var plan graph.Plan
+	plan, c.err = builder.Build()
+	if c.err != nil {
+		return c.err
 	}
-	err = plan.Execute()
-	return err
+	c.err = plan.Execute()
+	return c.err
+}
+
+func (c *controller) emitFailureEvent() {
+	if c.err == nil {
+		return
+	}
+	if c.tree == nil {
+		return
+	}
+	if c.tree.EventRecorder == nil {
+		return
+	}
+	if c.tree.GetRoot() == nil {
+		return
+	}
+	// ignore object update optimistic lock conflict
+	if apierrors.IsConflict(c.err) {
+		return
+	}
+	// TODO(free6om): make error message user-friendly
+	c.tree.EventRecorder.Eventf(c.tree.GetRoot(), corev1.EventTypeWarning, "FailedReconcile", "reconcile failed: %s", c.err.Error())
 }
 
 func NewController(ctx context.Context, cli client.Client, req ctrl.Request, recorder record.EventRecorder, logger logr.Logger) Controller {

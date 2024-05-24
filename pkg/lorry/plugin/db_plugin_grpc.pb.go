@@ -44,7 +44,8 @@ type DBPluginClient interface {
 	Readwrite(ctx context.Context, in *ReadwriteRequest, opts ...grpc.CallOption) (*ReadwriteResponse, error)
 	// AccountProvision Defines the procedure to generate a new database account.
 	AccountProvision(ctx context.Context, in *AccountProvisionRequest, opts ...grpc.CallOption) (*AccountProvisionResponse, error)
-	// Switchover defines the procedure to switch roles of the primary and candidate.
+	// Switchover defines the procedure to switch replica roles in a primary-secondary
+	// HA DBEngine by promoting the secondary to primary and demoting the current primary to secondary.
 	Switchover(ctx context.Context, in *SwitchoverRequest, opts ...grpc.CallOption) (*SwitchoverResponse, error)
 }
 
@@ -163,7 +164,8 @@ type DBPluginServer interface {
 	Readwrite(context.Context, *ReadwriteRequest) (*ReadwriteResponse, error)
 	// AccountProvision Defines the procedure to generate a new database account.
 	AccountProvision(context.Context, *AccountProvisionRequest) (*AccountProvisionResponse, error)
-	// Switchover defines the procedure to switch roles of the primary and candidate.
+	// Switchover defines the procedure to switch replica roles in a primary-secondary
+	// HA DBEngine by promoting the secondary to primary and demoting the current primary to secondary.
 	Switchover(context.Context, *SwitchoverRequest) (*SwitchoverResponse, error)
 	mustEmbedUnimplementedDBPluginServer()
 }

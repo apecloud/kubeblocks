@@ -21,7 +21,6 @@ package apps
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -29,7 +28,6 @@ import (
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -75,19 +73,6 @@ func (t *componentWorkloadUpgradeTransformer) Transform(ctx graph.TransformConte
 		} else if !apierrors.IsNotFound(err) {
 			return err
 		}
-
-		// remove xxx-rsm-env configmap
-		env := &corev1.ConfigMap{}
-		key := types.NamespacedName{
-			Namespace: comp.Namespace,
-			Name:      fmt.Sprintf("%s-rsm-env", comp.Name),
-		}
-		if err := graphCli.Get(transCtx.Context, key, env); err == nil {
-			legacyFound = true
-			parent = graphCli.Do(dag, nil, env, model.ActionDeletePtr(), parent)
-		} else if !apierrors.IsNotFound(err) {
-			return err
-		}
 	}
 
 	// remove the StatefulSet object if found
@@ -101,9 +86,9 @@ func (t *componentWorkloadUpgradeTransformer) Transform(ctx graph.TransformConte
 
 	// update pod & pvc & svc labels
 	objectList := []client.ObjectList{&corev1.PersistentVolumeClaimList{}, &corev1.ServiceList{}, &corev1.PodList{}}
-	ml := constant.GetComponentWellKnownLabels(transCtx.Cluster.Name, synthesizeComp.Name)
+	ml := constant.GetComponentWellKnownLabels(synthesizeComp.ClusterName, synthesizeComp.Name)
 	inNS := client.InNamespace(comp.Namespace)
-	defaultHeadlessSvc := constant.GenerateDefaultComponentHeadlessServiceName(transCtx.Cluster.Name, synthesizeComp.Name)
+	defaultHeadlessSvc := constant.GenerateDefaultComponentHeadlessServiceName(synthesizeComp.ClusterName, synthesizeComp.Name)
 	var revision string
 	for _, list := range objectList {
 		if err := graphCli.List(transCtx.Context, list, client.MatchingLabels(ml), inNS); err == nil {

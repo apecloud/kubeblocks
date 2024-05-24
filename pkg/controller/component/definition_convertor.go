@@ -59,10 +59,10 @@ func buildComponentDefinitionByConversion(clusterCompDef *appsv1alpha1.ClusterCo
 		"systemaccounts":         &compDefSystemAccountsConvertor{},
 		"updatestrategy":         &compDefUpdateStrategyConvertor{},
 		"roles":                  &compDefRolesConvertor{},
-		"rolearbitrator":         &compDefRoleArbitratorConvertor{},
 		"lifecycleactions":       &compDefLifecycleActionsConvertor{},
 		"servicerefdeclarations": &compDefServiceRefDeclarationsConvertor{},
-		"sidecarcontainerspecs":  &compDefSidecarContainersConvertor{},
+		"monitor":                &compDefMonitorConvertor{},
+		"exporter":               &compDefExporterConvertor{},
 	}
 	compDef := &appsv1alpha1.ComponentDefinition{}
 	if err := covertObject(convertors, &compDef.Spec, clusterCompDef, clusterCompVer); err != nil {
@@ -144,11 +144,11 @@ func (c *compDefVarsConvertor) convertHostNetworkVars(clusterCompDef *appsv1alph
 			vars = append(vars, appsv1alpha1.EnvVar{
 				Name: apiutil.HostNetworkDynamicPortVarName(cc.Container, port),
 				ValueFrom: &appsv1alpha1.VarSource{
-					PodVarRef: &appsv1alpha1.PodVarSelector{
+					HostNetworkVarRef: &appsv1alpha1.HostNetworkVarSelector{
 						ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
 							Optional: func() *bool { optional := false; return &optional }(),
 						},
-						PodVars: appsv1alpha1.PodVars{
+						HostNetworkVars: appsv1alpha1.HostNetworkVars{
 							Container: &appsv1alpha1.ContainerVars{
 								Name: cc.Container,
 								Port: &appsv1alpha1.NamedVar{
@@ -485,21 +485,6 @@ func (c *compDefRolesConvertor) convertConsensusRole(clusterCompDef *appsv1alpha
 	return roles, nil
 }
 
-// compDefRoleArbitratorConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.RoleArbitrator.
-type compDefRoleArbitratorConvertor struct{}
-
-func (c *compDefRoleArbitratorConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-
-	// TODO(xingran): it is hacky, should be refactored
-	if clusterCompDef.WorkloadType == appsv1alpha1.Replication && clusterCompDef.CharacterType == constant.RedisCharacterType {
-		roleArbitrator := appsv1alpha1.LorryRoleArbitrator
-		return &roleArbitrator, nil
-	}
-
-	return nil, nil
-}
-
 // compDefServiceRefDeclarationsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.ServiceRefDeclarations.
 type compDefServiceRefDeclarationsConvertor struct{}
 
@@ -701,9 +686,16 @@ func (c *compDefLifecycleActionsConvertor) convertSwitchover(switchover *appsv1a
 	}
 }
 
-type compDefSidecarContainersConvertor struct{}
+type compDefMonitorConvertor struct{}
 
-func (c *compDefSidecarContainersConvertor) convert(args ...any) (any, error) {
+func (c *compDefMonitorConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	return clusterCompDef.SidecarContainerSpecs, nil
+	return clusterCompDef.Monitor, nil
+}
+
+type compDefExporterConvertor struct{}
+
+func (c *compDefExporterConvertor) convert(args ...any) (any, error) {
+	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
+	return clusterCompDef.Exporter, nil
 }

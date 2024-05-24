@@ -21,11 +21,9 @@ package redis
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 	"time"
 
-	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 )
@@ -71,7 +69,7 @@ func (mgr *Manager) GetReplicaRole(ctx context.Context, _ *dcs.Cluster) (string,
 	return models.PRIMARY, nil
 }
 
-func (mgr *Manager) SubscribeRoleChange(ctx context.Context, cluster *dcs.Cluster) {
+func (mgr *Manager) SubscribeRoleChange(ctx context.Context) {
 	pubSub := mgr.sentinelClient.Subscribe(ctx, "+switch-master")
 
 	// go-redis periodically sends ping messages to test connection health
@@ -83,26 +81,8 @@ func (mgr *Manager) SubscribeRoleChange(ctx context.Context, cluster *dcs.Cluste
 		masterAddr := strings.Split(msg.Payload, " ")
 		masterName := strings.Split(masterAddr[3], ".")[0]
 
-		// When network partition occurs, the new primary needs to send global role change information to the controller.
 		if masterName == mgr.CurrentMemberName {
-			roleSnapshot := &common.GlobalRoleSnapshot{}
-			oldMasterName := strings.Split(masterAddr[1], ".")[0]
-			roleSnapshot.PodRoleNamePairs = []common.PodRoleNamePair{
-				{
-					PodName:  oldMasterName,
-					RoleName: models.SECONDARY,
-					PodUID:   cluster.GetMemberWithName(oldMasterName).UID,
-				},
-				{
-					PodName:  masterName,
-					RoleName: models.PRIMARY,
-					PodUID:   cluster.GetMemberWithName(masterName).UID,
-				},
-			}
-			roleSnapshot.Version = time.Now().Format(time.RFC3339Nano)
-
-			b, _ := json.Marshal(roleSnapshot)
-			mgr.role = string(b)
+			mgr.role = models.PRIMARY
 		} else {
 			mgr.role = models.SECONDARY
 		}

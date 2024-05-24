@@ -31,7 +31,7 @@ type ConfigConstraintSpec struct {
 	// Dynamic reloading is triggered only if both of the following conditions are met:
 	//
 	// 1. The modified parameters are listed in the `dynamicParameters` field.
-	//    If `dynamicParameterSelectedPolicy` is set to "all", modifications to `staticParameters`
+	//    If `reloadStaticParamsBeforeRestart` is set to true, modifications to `staticParameters`
 	//    can also trigger a reload.
 	// 2. `reloadOptions` is set.
 	//
@@ -67,7 +67,7 @@ type ConfigConstraintSpec struct {
 	//   will trigger a dynamic reload.
 	// - true: Modifications to both dynamic parameters listed in `dynamicParameters` and static parameters
 	//   listed in `staticParameters` will trigger a dynamic reload.
-	//   The "all" option is for certain engines that require static parameters to be set
+	//   The "true" option is for certain engines that require static parameters to be set
 	//   via SQL statements before they can take effect on restart.
 	//
 	// +optional
@@ -97,7 +97,7 @@ type ConfigConstraintSpec struct {
 	//   to reflect the new role.
 	//
 	// +optional
-	DownwardAPIOptions []appsv1beta1.DownwardAPITriggeredAction `json:"downwardAPIOptions,omitempty"`
+	DownwardAPIOptions []appsv1beta1.DownwardAPIChangeTriggeredAction `json:"downwardAPIOptions,omitempty"`
 
 	// A list of ScriptConfig Object.
 	//

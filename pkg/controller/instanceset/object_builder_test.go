@@ -40,7 +40,6 @@ var _ = Describe("object generation transformer test.", func() {
 			AddLabels(constant.AppComponentLabelKey, name).
 			SetReplicas(3).
 			AddMatchLabelsInMap(selectors).
-			SetServiceName(headlessSvcName).
 			SetRoles(roles).
 			SetService(service).
 			SetCredential(credential).
@@ -96,7 +95,7 @@ var _ = Describe("object generation transformer test.", func() {
 				getPodName(its.Name, 1),
 			}
 			hostname := func(i int) string {
-				return fmt.Sprintf("%s.%s", getPodName(its.Name, i), getHeadlessSvcName(*its))
+				return fmt.Sprintf("%s.%s", getPodName(its.Name, i), getHeadlessSvcName(its.Name))
 			}
 			requiredKeys := map[string]string{
 				"KB_REPLICA_COUNT": "3",
@@ -226,7 +225,7 @@ var _ = Describe("object generation transformer test.", func() {
 
 	Context("getHeadlessSvcName function", func() {
 		It("should work well", func() {
-			Expect(getHeadlessSvcName(*its)).Should(Equal("bar-headless"))
+			Expect(getHeadlessSvcName(its.Name)).Should(Equal("bar-headless"))
 		})
 	})
 

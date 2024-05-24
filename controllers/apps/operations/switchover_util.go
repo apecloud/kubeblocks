@@ -36,6 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	"github.com/apecloud/kubeblocks/pkg/controller/job"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -72,11 +73,10 @@ const (
 // needDoSwitchover checks whether we need to perform a switchover.
 func needDoSwitchover(ctx context.Context,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
 	synthesizedComp *component.SynthesizedComponent,
 	switchover *appsv1alpha1.Switchover) (bool, error) {
 	// get the Pod object whose current role label is primary
-	pod, err := getServiceableNWritablePod(ctx, cli, *cluster, *synthesizedComp)
+	pod, err := getServiceableNWritablePod(ctx, cli, *synthesizedComp)
 	if err != nil {
 		return false, err
 	}
@@ -87,13 +87,13 @@ func needDoSwitchover(ctx context.Context,
 	case KBSwitchoverCandidateInstanceForAnyPod:
 		return true, nil
 	default:
-		podList, err := component.GetComponentPodList(ctx, cli, *cluster, synthesizedComp.Name)
+		pods, err := component.ListOwnedPods(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
 		if err != nil {
 			return false, err
 		}
 		podParent, _ := instanceset.ParseParentNameAndOrdinal(pod.Name)
 		siParent, o := instanceset.ParseParentNameAndOrdinal(switchover.InstanceName)
-		if podParent != siParent || o < 0 || o >= len(podList.Items) {
+		if podParent != siParent || o < 0 || o >= len(pods) {
 			return false, errors.New("switchover.InstanceName is invalid")
 		}
 		// If the current instance is already the primary, then no switchover will be performed.
@@ -120,14 +120,14 @@ func createSwitchoverJob(reqCtx intctrlutil.RequestCtx,
 	if !exists {
 		// check the previous generation switchoverJob whether exist
 		ml := getSwitchoverCmdJobLabel(cluster.Name, synthesizedComp.Name)
-		previousJobs, err := component.GetJobWithLabels(reqCtx.Ctx, cli, cluster, ml)
+		previousJobs, err := job.GetJobWithLabels(reqCtx.Ctx, cli, cluster, ml)
 		if err != nil {
 			return err
 		}
 		if len(previousJobs) > 0 {
 			// delete the previous generation switchoverJob
 			reqCtx.Log.V(1).Info("delete previous generation switchoverJob", "job", previousJobs[0].Name)
-			if err := component.CleanJobWithLabels(reqCtx.Ctx, cli, cluster, ml); err != nil {
+			if err := job.CleanJobWithLabels(reqCtx.Ctx, cli, cluster, ml); err != nil {
 				return err
 			}
 		}
@@ -143,14 +143,13 @@ func createSwitchoverJob(reqCtx intctrlutil.RequestCtx,
 // checkPodRoleLabelConsistency checks whether the pod role label is consistent with the specified role label after switchover.
 func checkPodRoleLabelConsistency(ctx context.Context,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
 	synthesizedComp component.SynthesizedComponent,
 	switchover *appsv1alpha1.Switchover,
 	switchoverCondition *metav1.Condition) (bool, error) {
 	if switchover == nil || switchoverCondition == nil {
 		return false, nil
 	}
-	pod, err := getServiceableNWritablePod(ctx, cli, *cluster, synthesizedComp)
+	pod, err := getServiceableNWritablePod(ctx, cli, synthesizedComp)
 	if err != nil {
 		return false, err
 	}
@@ -189,7 +188,7 @@ func renderSwitchoverCmdJob(ctx context.Context,
 	if synthesizedComp.LifecycleActions == nil || synthesizedComp.LifecycleActions.Switchover == nil || switchover == nil {
 		return nil, errors.New("switchover spec not found")
 	}
-	pod, err := getServiceableNWritablePod(ctx, cli, *cluster, *synthesizedComp)
+	pod, err := getServiceableNWritablePod(ctx, cli, *synthesizedComp)
 	if err != nil {
 		return nil, err
 	}
@@ -376,7 +375,7 @@ func buildSwitchoverEnvs(ctx context.Context,
 	}
 
 	// inject the old primary info into the environment variable
-	workloadEnvs, err := buildSwitchoverWorkloadEnvs(ctx, cli, cluster, synthesizeComp)
+	workloadEnvs, err := buildSwitchoverWorkloadEnvs(ctx, cli, synthesizeComp)
 	if err != nil {
 		return nil, err
 	}
@@ -406,17 +405,16 @@ func replaceSwitchoverConnCredentialEnv(switchoverSpec *appsv1alpha1.ComponentSw
 // buildSwitchoverWorkloadEnvs builds the replication or consensus workload environment variables for the switchover job.
 func buildSwitchoverWorkloadEnvs(ctx context.Context,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
 	synthesizeComp *component.SynthesizedComponent) ([]corev1.EnvVar, error) {
 	var workloadEnvs []corev1.EnvVar
-	pod, err := getServiceableNWritablePod(ctx, cli, *cluster, *synthesizeComp)
+	pod, err := getServiceableNWritablePod(ctx, cli, *synthesizeComp)
 	if err != nil {
 		return nil, err
 	}
 	if pod == nil {
 		return nil, errors.New("serviceable and writable pod not found")
 	}
-	svcName := strings.Join([]string{cluster.Name, synthesizeComp.Name, "headless"}, "-")
+	svcName := strings.Join([]string{synthesizeComp.ClusterName, synthesizeComp.Name, "headless"}, "-")
 
 	workloadEnvs = append(workloadEnvs, []corev1.EnvVar{
 		{
@@ -467,7 +465,7 @@ func buildSwitchoverWorkloadEnvs(ctx context.Context,
 }
 
 // getServiceableNWritablePod returns the serviceable and writable pod of the component.
-func getServiceableNWritablePod(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, synthesizeComp component.SynthesizedComponent) (*corev1.Pod, error) {
+func getServiceableNWritablePod(ctx context.Context, cli client.Client, synthesizeComp component.SynthesizedComponent) (*corev1.Pod, error) {
 	if synthesizeComp.Roles == nil {
 		return nil, errors.New("component does not support switchover")
 	}
@@ -485,12 +483,12 @@ func getServiceableNWritablePod(ctx context.Context, cli client.Client, cluster 
 		return nil, errors.New("component has no role is serviceable and writable, does not support switchover")
 	}
 
-	podList, err := component.GetComponentPodListWithRole(ctx, cli, cluster, synthesizeComp.Name, targetRole)
+	pods, err := component.ListOwnedPodsWithRole(ctx, cli, synthesizeComp.Namespace, synthesizeComp.ClusterName, synthesizeComp.Name, targetRole)
 	if err != nil {
 		return nil, err
 	}
-	if len(podList.Items) != 1 {
+	if len(pods) != 1 {
 		return nil, errors.New("component pod list is empty or has more than one serviceable and writable pod")
 	}
-	return &podList.Items[0], nil
+	return pods[0], nil
 }

@@ -32,12 +32,13 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/job"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
-var _ = Describe("Component PostProvision Test", func() {
+var _ = Describe("Component PreTerminate Test", func() {
 	Context("has the BuildComponent function", func() {
 		const (
 			clusterDefName     = "test-clusterdef"
@@ -102,7 +103,7 @@ var _ = Describe("Component PostProvision Test", func() {
 		}
 
 		It("should work as expected with various inputs", func() {
-			By("test component definition without post provision")
+			By("test component definition without pre terminate")
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx: ctx,
 				Log: tlog,
@@ -117,46 +118,26 @@ var _ = Describe("Component PostProvision Test", func() {
 			Expect(err).Should(Succeed())
 			Expect(synthesizeComp).ShouldNot(BeNil())
 			Expect(synthesizeComp.LifecycleActions).ShouldNot(BeNil())
-			Expect(synthesizeComp.LifecycleActions.PostProvision).Should(BeNil())
-			// graphCli := model.NewGraphClient(k8sClient)
+			Expect(synthesizeComp.LifecycleActions.PreTerminate).Should(BeNil())
 
 			comp, err := BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
 			comp.UID = cluster.UID
 			Expect(err).Should(Succeed())
 			Expect(comp).ShouldNot(BeNil())
+			// graphCli := model.NewGraphClient(k8sClient)
 
+			By("test component without preTerminate action and no need to do PreTerminate action")
 			dag := graph.NewDAG()
 			dag.AddVertex(&model.ObjectVertex{Obj: cluster, Action: model.ActionUpdatePtr()})
-			err = ReconcileCompPostProvision(testCtx.Ctx, k8sClient, graphCli, cluster, comp, synthesizeComp, dag)
+			actionCtx, err := NewActionContext(cluster, comp, nil, synthesizeComp.LifecycleActions, synthesizeComp.ScriptTemplates, PreTerminateAction)
 			Expect(err).Should(Succeed())
-
-			By("build component with postProvision without PodList, do not need to do PostProvision action")
-			synthesizeComp.LifecycleActions = &appsv1alpha1.ComponentLifecycleActions{}
-			defaultPreCondition := appsv1alpha1.ComponentReadyPreConditionType
-			postProvision := appsv1alpha1.LifecycleActionHandler{
-				CustomHandler: &appsv1alpha1.Action{
-					Image: constant.KBToolsImage,
-					Exec: &appsv1alpha1.ExecAction{
-						Command: []string{"echo", "mock"},
-						Args:    []string{},
-					},
-					PreCondition: &defaultPreCondition,
-				},
-			}
-			synthesizeComp.LifecycleActions.PostProvision = &postProvision
-			need, err := NeedDoPostProvision(testCtx.Ctx, k8sClient, cluster, comp, synthesizeComp)
+			need, err := needDoPreTerminate(testCtx.Ctx, testCtx.Cli, actionCtx)
 			Expect(err).Should(Succeed())
 			Expect(need).Should(BeFalse())
-			err = ReconcileCompPostProvision(testCtx.Ctx, k8sClient, graphCli, cluster, comp, synthesizeComp, dag)
+			err = reconcileCompPreTerminate(testCtx.Ctx, testCtx.Cli, graphCli, actionCtx, dag)
 			Expect(err).Should(Succeed())
 
-			By("mock component status ready, should do postProvision action")
-			comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
-			need, err = NeedDoPostProvision(testCtx.Ctx, k8sClient, cluster, comp, synthesizeComp)
-			Expect(err).Should(Succeed())
-			Expect(need).Should(BeTrue())
-
-			By("build component with postProvision with PodList, do postProvision action and requeue waiting job")
+			By("build component with preTerminate action and should do PreTerminate action")
 			pods := mockPodsForTest(cluster, 1)
 			for _, pod := range pods {
 				Expect(testCtx.CheckedCreateObj(testCtx.Ctx, &pod)).Should(Succeed())
@@ -166,12 +147,30 @@ var _ = Describe("Component PostProvision Test", func() {
 				}}
 				Expect(k8sClient.Status().Update(ctx, &pod)).Should(Succeed())
 			}
-			err = ReconcileCompPostProvision(testCtx.Ctx, k8sClient, graphCli, cluster, comp, synthesizeComp, dag)
+			synthesizeComp.LifecycleActions = &appsv1alpha1.ComponentLifecycleActions{}
+			PreTerminate := appsv1alpha1.LifecycleActionHandler{
+				CustomHandler: &appsv1alpha1.Action{
+					Image: constant.KBToolsImage,
+					Exec: &appsv1alpha1.ExecAction{
+						Command: []string{"echo", "mock"},
+						Args:    []string{},
+					},
+				},
+			}
+			synthesizeComp.LifecycleActions.PreTerminate = &PreTerminate
+			actionCtx, err = NewActionContext(cluster, comp, nil, synthesizeComp.LifecycleActions, synthesizeComp.ScriptTemplates, PreTerminateAction)
+			Expect(err).Should(Succeed())
+			need, err = needDoPreTerminate(testCtx.Ctx, k8sClient, actionCtx)
+			Expect(err).Should(Succeed())
+			Expect(need).Should(BeTrue())
+
+			err = reconcileCompPreTerminate(testCtx.Ctx, k8sClient, graphCli, actionCtx, dag)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("job not exist, pls check"))
 
-			jobName, _ := genActionJobName(cluster.Name, synthesizeComp.Name, PostProvisionAction)
-			err = CheckJobSucceed(testCtx.Ctx, testCtx.Cli, cluster, jobName)
+			By("requeue to waiting for job")
+			jobName, _ := genActionJobName(synthesizeComp.FullCompName, PreTerminateAction)
+			err = job.CheckJobSucceed(testCtx.Ctx, testCtx.Cli, cluster, jobName)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("job not exist, pls check"))
 		})

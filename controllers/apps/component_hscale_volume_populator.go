@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 
+	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -217,12 +218,17 @@ func (d *baseDataClone) excludeBackupVCTs() []*corev1.PersistentVolumeClaimTempl
 }
 
 func (d *baseDataClone) createPVCs(vcts []*corev1.PersistentVolumeClaimTemplate) ([]client.Object, error) {
+	currentPodNames := generatePodNamesByITS(d.itsObj)
+	desiredPodNames := generatePodNames(d.component)
 	objs := make([]client.Object, 0)
-	for i := *d.itsObj.Spec.Replicas; i < d.component.Replicas; i++ {
+	for _, podName := range desiredPodNames {
+		if slices.Contains(currentPodNames, podName) {
+			continue
+		}
 		for _, vct := range vcts {
 			pvcKey := types.NamespacedName{
 				Namespace: d.itsObj.Namespace,
-				Name:      fmt.Sprintf("%s-%s-%d", vct.Name, d.itsObj.Name, i),
+				Name:      fmt.Sprintf("%s-%s", vct.Name, podName),
 			}
 			if exist, err := d.isPVCExists(pvcKey); err != nil {
 				return nil, err

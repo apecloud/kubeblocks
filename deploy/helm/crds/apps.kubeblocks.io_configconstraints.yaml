@@ -94,10 +94,10 @@ spec:
                   (e.g., from secondary to primary), some changes in configuration
                   are needed to reflect the new role."
                 items:
-                  description: DownwardAPITriggeredAction defines an action that triggers
-                    specific commands in response to changes in Pod labels. For example,
-                    a command might be executed when the 'role' label of the Pod is
-                    updated.
+                  description: DownwardAPIChangeTriggeredAction defines an action
+                    that triggers specific commands in response to changes in Pod
+                    labels. For example, a command might be executed when the 'role'
+                    label of the Pod is updated.
                   properties:
                     command:
                       description: Specifies the command to be triggered when changes
@@ -290,10 +290,10 @@ spec:
                   engine. When set, the controller executes the method defined here
                   to execute hot parameter updates. \n Dynamic reloading is triggered
                   only if both of the following conditions are met: \n 1. The modified
-                  parameters are listed in the `dynamicParameters` field. If `dynamicParameterSelectedPolicy`
-                  is set to \"all\", modifications to `staticParameters` can also
-                  trigger a reload. 2. `reloadOptions` is set. \n If `reloadOptions`
-                  is not set or the modified parameters are not listed in `dynamicParameters`,
+                  parameters are listed in the `dynamicParameters` field. If `reloadStaticParamsBeforeRestart`
+                  is set to true, modifications to `staticParameters` can also trigger
+                  a reload. 2. `reloadOptions` is set. \n If `reloadOptions` is not
+                  set or the modified parameters are not listed in `dynamicParameters`,
                   dynamic reloading will not be triggered. \n Example: ```yaml reloadOptions:
                   tplScriptTrigger: namespace: kb-system scriptConfigMapRef: mysql-reload-script
                   sync: true ```"
@@ -515,7 +515,7 @@ spec:
                   the dynamic parameters listed in `dynamicParameters` will trigger
                   a dynamic reload. - true: Modifications to both dynamic parameters
                   listed in `dynamicParameters` and static parameters listed in `staticParameters`
-                  will trigger a dynamic reload. The \"all\" option is for certain
+                  will trigger a dynamic reload. The \"true\" option is for certain
                   engines that require static parameters to be set via SQL statements
                   before they can take effect on restart."
                 type: boolean
@@ -730,35 +730,7 @@ spec:
           spec:
             description: ConfigConstraintSpec defines the desired state of ConfigConstraint
             properties:
-              configSchema:
-                description: Defines a list of parameters including their names, default
-                  values, descriptions, types, and constraints (permissible values
-                  or the range of valid values).
-                properties:
-                  cue:
-                    description: "Hold a string that contains a script written in
-                      CUE language that defines a list of configuration items. Each
-                      item is detailed with its name, default value, description,
-                      type (e.g. string, integer, float), and constraints (permissible
-                      values or the valid range of values). \n CUE (Configure, Unify,
-                      Execute) is a declarative language designed for defining and
-                      validating complex data configurations. It is particularly useful
-                      in environments like K8s where complex configurations and validation
-                      rules are common. \n This script functions as a validator for
-                      user-provided configurations, ensuring compliance with the established
-                      specifications and constraints."
-                    type: string
-                  schemaInJSON:
-                    description: Generated from the 'cue' field and transformed into
-                      a JSON format.
-                    x-kubernetes-preserve-unknown-fields: true
-                  topLevelKey:
-                    description: Specifies the top-level key in the 'configSchema.cue'
-                      that organizes the validation rules for parameters. This key
-                      must exist within the CUE script defined in 'configSchema.cue'.
-                    type: string
-                type: object
-              downwardAPITriggeredActions:
+              downwardAPIChangeTriggeredActions:
                 description: "TODO: migrate DownwardAPITriggeredActions to ComponentDefinition.spec.lifecycleActions
                   Specifies a list of actions to execute specified commands based
                   on Pod labels. \n It utilizes the K8s Downward API to mount label
@@ -771,10 +743,10 @@ spec:
                   (e.g., from secondary to primary), some changes in configuration
                   are needed to reflect the new role."
                 items:
-                  description: DownwardAPITriggeredAction defines an action that triggers
-                    specific commands in response to changes in Pod labels. For example,
-                    a command might be executed when the 'role' label of the Pod is
-                    updated.
+                  description: DownwardAPIChangeTriggeredAction defines an action
+                    that triggers specific commands in response to changes in Pod
+                    labels. For example, a command might be executed when the 'role'
+                    label of the Pod is updated.
                   properties:
                     command:
                       description: Specifies the command to be triggered when changes
@@ -962,6 +934,34 @@ spec:
                   efficient handling of configuration changes by potentially eliminating
                   an unnecessary reload step."
                 type: boolean
+              parametersSchema:
+                description: Defines a list of parameters including their names, default
+                  values, descriptions, types, and constraints (permissible values
+                  or the range of valid values).
+                properties:
+                  cue:
+                    description: "Hold a string that contains a script written in
+                      CUE language that defines a list of configuration items. Each
+                      item is detailed with its name, default value, description,
+                      type (e.g. string, integer, float), and constraints (permissible
+                      values or the valid range of values). \n CUE (Configure, Unify,
+                      Execute) is a declarative language designed for defining and
+                      validating complex data configurations. It is particularly useful
+                      in environments like K8s where complex configurations and validation
+                      rules are common. \n This script functions as a validator for
+                      user-provided configurations, ensuring compliance with the established
+                      specifications and constraints."
+                    type: string
+                  schemaInJSON:
+                    description: Generated from the 'cue' field and transformed into
+                      a JSON format.
+                    x-kubernetes-preserve-unknown-fields: true
+                  topLevelKey:
+                    description: Specifies the top-level key in the 'configSchema.cue'
+                      that organizes the validation rules for parameters. This key
+                      must exist within the CUE script defined in 'configSchema.cue'.
+                    type: string
+                type: object
               reloadAction:
                 description: "Specifies the dynamic reload (dynamic reconfiguration)
                   actions supported by the engine. When set, the controller executes
@@ -1110,6 +1110,58 @@ spec:
                     required:
                     - command
                     type: object
+                  targetPodSelector:
+                    description: "Used to match labels on the pod to determine whether
+                      a dynamic reload should be performed. \n In some scenarios,
+                      only specific pods (e.g., primary replicas) need to undergo
+                      a dynamic reload. The `reloadedPodSelector` allows you to specify
+                      label selectors to target the desired pods for the reload process.
+                      \n If the `reloadedPodSelector` is not specified or is nil,
+                      all pods managed by the workload will be considered for the
+                      dynamic reload."
+                    properties:
+                      matchExpressions:
+                        description: matchExpressions is a list of label selector
+                          requirements. The requirements are ANDed.
+                        items:
+                          description: A label selector requirement is a selector
+                            that contains values, a key, and an operator that relates
+                            the key and values.
+                          properties:
+                            key:
+                              description: key is the label key that the selector
+                                applies to.
+                              type: string
+                            operator:
+                              description: operator represents a key's relationship
+                                to a set of values. Valid operators are In, NotIn,
+                                Exists and DoesNotExist.
+                              type: string
+                            values:
+                              description: values is an array of string values. If
+                                the operator is In or NotIn, the values array must
+                                be non-empty. If the operator is Exists or DoesNotExist,
+                                the values array must be empty. This array is replaced
+                                during a strategic merge patch.
+                              items:
+                                type: string
+                              type: array
+                          required:
+                          - key
+                          - operator
+                          type: object
+                        type: array
+                      matchLabels:
+                        additionalProperties:
+                          type: string
+                        description: matchLabels is a map of {key,value} pairs. A
+                          single {key,value} in the matchLabels map is equivalent
+                          to an element of matchExpressions, whose key field is "key",
+                          the operator is "In", and the values array contains only
+                          "value". The requirements are ANDed.
+                        type: object
+                    type: object
+                    x-kubernetes-map-type: atomic
                   tplScriptTrigger:
                     description: Enables reloading process using a Go template script.
                     properties:
@@ -1197,57 +1249,6 @@ spec:
                   engines that require static parameters to be set via SQL statements
                   before they can take effect on restart."
                 type: boolean
-              reloadedPodSelector:
-                description: "Used to match labels on the pod to determine whether
-                  a dynamic reload should be performed. \n In some scenarios, only
-                  specific pods (e.g., primary replicas) need to undergo a dynamic
-                  reload. The `reloadedPodSelector` allows you to specify label selectors
-                  to target the desired pods for the reload process. \n If the `reloadedPodSelector`
-                  is not specified or is nil, all pods managed by the workload will
-                  be considered for the dynamic reload."
-                properties:
-                  matchExpressions:
-                    description: matchExpressions is a list of label selector requirements.
-                      The requirements are ANDed.
-                    items:
-                      description: A label selector requirement is a selector that
-                        contains values, a key, and an operator that relates the key
-                        and values.
-                      properties:
-                        key:
-                          description: key is the label key that the selector applies
-                            to.
-                          type: string
-                        operator:
-                          description: operator represents a key's relationship to
-                            a set of values. Valid operators are In, NotIn, Exists
-                            and DoesNotExist.
-                          type: string
-                        values:
-                          description: values is an array of string values. If the
-                            operator is In or NotIn, the values array must be non-empty.
-                            If the operator is Exists or DoesNotExist, the values
-                            array must be empty. This array is replaced during a strategic
-                            merge patch.
-                          items:
-                            type: string
-                          type: array
-                      required:
-                      - key
-                      - operator
-                      type: object
-                    type: array
-                  matchLabels:
-                    additionalProperties:
-                      type: string
-                    description: matchLabels is a map of {key,value} pairs. A single
-                      {key,value} in the matchLabels map is equivalent to an element
-                      of matchExpressions, whose key field is "key", the operator
-                      is "In", and the values array contains only "value". The requirements
-                      are ANDed.
-                    type: object
-                type: object
-                x-kubernetes-map-type: atomic
               staticParameters:
                 description: List static parameters. Modifications to any of these
                   parameters require a restart of the process to take effect.

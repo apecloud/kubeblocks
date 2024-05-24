@@ -281,11 +281,6 @@ func (f *MockComponentDefinitionFactory) AddRole(name string, serviceable, writa
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) SetRoleArbitrator(arbitrator *appsv1alpha1.RoleArbitrator) *MockComponentDefinitionFactory {
-	f.Get().Spec.RoleArbitrator = arbitrator
-	return f
-}
-
 func (f *MockComponentDefinitionFactory) SetLifecycleAction(name string, val interface{}) *MockComponentDefinitionFactory {
 	if f.Get().Spec.LifecycleActions == nil {
 		f.Get().Spec.LifecycleActions = &appsv1alpha1.ComponentLifecycleActions{}

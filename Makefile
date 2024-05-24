@@ -22,6 +22,7 @@ TEST_TYPE ?= wesql
 GIT_COMMIT  = $(shell git rev-list -1 HEAD)
 GIT_VERSION = $(shell git describe --always --abbrev=0 --tag)
 GENERATED_CLIENT_PKG = "pkg/client"
+GENERATED_DEEP_COPY_FILE = "zz_generated.deepcopy.go"
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # This is a requirement for 'setup-envtest.sh' in the test target.
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
@@ -159,7 +160,7 @@ test-go-generate: ## Run go generate against test code.
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
-	$(GOFMT) -l -w -s $$(git ls-files --exclude-standard | grep "\.go$$" | grep -v $(GENERATED_CLIENT_PKG))
+	$(GOFMT) -l -w -s $$(git ls-files --exclude-standard | grep "\.go$$" | grep -v $(GENERATED_CLIENT_PKG) | grep -v $(GENERATED_DEEP_COPY_FILE))
 
 .PHONY: vet
 vet: test-go-generate ## Run go vet against code.
@@ -248,7 +249,7 @@ endif
 
 .PHONY: goimports
 goimports: goimportstool ## Run goimports against code.
-	$(GOIMPORTS) -local github.com/apecloud/kubeblocks -w $$(git ls-files|grep "\.go$$" | grep -v $(GENERATED_CLIENT_PKG))
+	$(GOIMPORTS) -local github.com/apecloud/kubeblocks -w $$(git ls-files|grep "\.go$$" | grep -v $(GENERATED_CLIENT_PKG) | grep -v $(GENERATED_DEEP_COPY_FILE))
 
 
 .PHONY: lorryctl-doc

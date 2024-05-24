@@ -211,6 +211,6 @@ func (s *StatefulSetAction) stsIsFailed(ctx ActionContext) bool {
 		Namespace: s.ObjectMeta.Namespace}, pod); err != nil {
 		return false
 	}
-	isFailed, isTimeout, _ := intctrlutil.IsPodFailedAndTimedOut(pod)
+	isFailed, isTimeout, _ := intctrlutil.IsPodFailedAndTimedOut(pod, false)
 	return isFailed && isTimeout
 }

@@ -14,7 +14,9 @@ spec:
   selector:
     matchLabels:
       {{- include "kubeblocks.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: "dataprotection"
+      {{- with .Values.dataProtection.extraLabels }}
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
   {{- if .Values.updateStrategy }}
   strategy:
     {{ toYaml .Values.updateStrategy | nindent 4 | trim }}
@@ -27,7 +29,9 @@ spec:
       {{- end }}
       labels:
         {{- include "kubeblocks.selectorLabels" . | nindent 8 }}
-        app.kubernetes.io/component: "dataprotection"
+        {{- with .Values.dataProtection.extraLabels }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       priorityClassName: {{ template "kubeblocks.priorityClassName" . }}
       {{- with .Values.dataProtection.image.imagePullSecrets }}
@@ -75,7 +79,7 @@ spec:
           env:
             - name: CM_NAMESPACE
               value: {{ .Release.Namespace }}
-            {{- with .Values.affinity }}
+            {{- with .Values.dataProtection.affinity }}
             - name: CM_AFFINITY
               value: {{ toJson . | quote }}
             {{- end }}
@@ -83,7 +87,7 @@ spec:
             - name: CM_NODE_SELECTOR
               value: {{ toJson . | quote }}
             {{- end }}
-            {{- with .Values.tolerations }}
+            {{- with .Values.dataProtection.tolerations }}
             - name: CM_TOLERATIONS
               value: {{ toJson . | quote }}
             {{- end }}
@@ -181,11 +185,11 @@ spec:
       {{- if .Values.dnsPolicy }}
       dnsPolicy: {{ .Values.dnsPolicy }}
       {{- end }}
-      {{- with .Values.topologySpreadConstraints }}
+      {{- with .Values.dataProtection.topologySpreadConstraints }}
       topologySpreadConstraints:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.affinity }}
+      {{- with .Values.dataProtection.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
@@ -193,7 +197,7 @@ spec:
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.tolerations }}
+      {{- with .Values.dataProtection.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}

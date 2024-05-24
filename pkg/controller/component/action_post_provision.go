@@ -21,11 +21,15 @@ package component
 
 import (
 	"context"
+	"errors"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	"github.com/apecloud/kubeblocks/pkg/controller/job"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -46,11 +50,9 @@ const (
 func ReconcileCompPostProvision(ctx context.Context,
 	cli client.Reader,
 	graphCli model.GraphClient,
-	cluster *appsv1alpha1.Cluster,
-	comp *appsv1alpha1.Component,
-	synthesizeComp *SynthesizedComponent,
+	actionCtx *ActionContext,
 	dag *graph.DAG) error {
-	needPostProvision, err := NeedDoPostProvision(ctx, cli, cluster, comp, synthesizeComp)
+	needPostProvision, err := NeedDoPostProvision(ctx, cli, actionCtx)
 	if err != nil {
 		return err
 	}
@@ -58,62 +60,66 @@ func ReconcileCompPostProvision(ctx context.Context,
 		return nil
 	}
 
-	job, err := createActionJobIfNotExist(ctx, cli, graphCli, dag, cluster, comp, synthesizeComp, PostProvisionAction)
+	actionJob, err := createActionJobIfNotExist(ctx, cli, graphCli, dag, actionCtx)
 	if err != nil {
 		return err
 	}
-	if job == nil {
+	if actionJob == nil {
 		return nil
 	}
 
-	err = CheckJobSucceed(ctx, cli, cluster, job.Name)
+	err = job.CheckJobSucceed(ctx, cli, actionCtx.cluster, actionJob.Name)
 	if err != nil {
-		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeExpectedInProcess) {
-			return nil
-		}
 		return err
 	}
 
 	// job executed successfully, add the annotation to indicate that the postProvision has been executed and delete the job
-	compOrig := comp.DeepCopy()
-	if err := setActionDoneAnnotation(graphCli, comp, dag, PostProvisionAction); err != nil {
+	if err := setActionDoneAnnotation(graphCli, actionCtx, dag); err != nil {
 		return err
 	}
 
-	if err := cleanActionJob(ctx, cli, dag, cluster, *compOrig, *synthesizeComp, PostProvisionAction, job.Name); err != nil {
+	if err := cleanActionJob(ctx, cli, dag, actionCtx, actionJob.Name); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func NeedDoPostProvision(ctx context.Context, cli client.Reader,
-	cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component, synthesizeComp *SynthesizedComponent) (bool, error) {
+func NeedDoPostProvision(ctx context.Context, cli client.Reader, actionCtx *ActionContext) (bool, error) {
 	// if the component does not have a custom postProvision, skip it
-	actionExist, _ := checkLifeCycleAction(synthesizeComp, PostProvisionAction)
+	actionExist, _ := checkLifeCycleAction(actionCtx)
 	if !actionExist {
 		return false, nil
 	}
 
-	// TODO(xingran): The PostProvision handling for the ComponentReady & ClusterReady condition has been implemented. The PostProvision for other conditions is currently pending implementation.
-	actionPreCondition := synthesizeComp.LifecycleActions.PostProvision.CustomHandler.PreCondition
+	actionPreCondition := actionCtx.lifecycleActions.PostProvision.CustomHandler.PreCondition
 	if actionPreCondition != nil {
 		switch *actionPreCondition {
+		case appsv1alpha1.ImmediatelyPreConditionType:
+			return needDoActionByCheckingJobNAnnotation(ctx, cli, actionCtx)
+		case appsv1alpha1.RuntimeReadyPreConditionType:
+			if actionCtx.workload == nil {
+				return false, intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "runtime is nil when checking RuntimeReady preCondition in postProvision action")
+			}
+			runningITS, _ := actionCtx.workload.(*workloads.InstanceSet)
+			if !instanceset.IsInstancesReady(runningITS) {
+				return false, intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "runtime is not ready when checking RuntimeReady preCondition in postProvision action")
+			}
 		case appsv1alpha1.ComponentReadyPreConditionType:
-			if comp.Status.Phase != appsv1alpha1.RunningClusterCompPhase {
+			if actionCtx.component.Status.Phase != appsv1alpha1.RunningClusterCompPhase {
 				return false, nil
 			}
 		case appsv1alpha1.ClusterReadyPreConditionType:
-			if cluster.Status.Phase != appsv1alpha1.RunningClusterPhase {
+			if actionCtx.cluster.Status.Phase != appsv1alpha1.RunningClusterPhase {
 				return false, nil
 			}
 		default:
-			return false, nil
+			return false, errors.New("unsupported postProvision preCondition type")
 		}
-	} else if comp.Status.Phase != appsv1alpha1.RunningClusterCompPhase {
+	} else if actionCtx.component.Status.Phase != appsv1alpha1.RunningClusterCompPhase {
 		// if the PreCondition is not set, the default preCondition is ComponentReady
 		return false, nil
 	}
 
-	return needDoActionByCheckingJobNAnnotation(ctx, cli, cluster, comp, synthesizeComp, PostProvisionAction)
+	return needDoActionByCheckingJobNAnnotation(ctx, cli, actionCtx)
 }

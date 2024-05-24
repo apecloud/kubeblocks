@@ -89,11 +89,10 @@ func (c *configTemplateBuilder) render(configs map[string]string) (map[string]st
 
 func (c *configTemplateBuilder) injectBuiltInObjectsAndFunctions(
 	podSpec *corev1.PodSpec,
-	configs []appsv1alpha1.ComponentConfigSpec,
 	component *component.SynthesizedComponent,
 	localObjs []client.Object,
 	cluster *appsv1alpha1.Cluster) {
 	c.podSpec = podSpec
 	c.builtInFunctions = BuiltInCustomFunctions(c, component, localObjs)
-	c.builtInObjects = buildInComponentObjects(localObjs, podSpec, component, configs, cluster)
+	c.builtInObjects = buildInComponentObjects(podSpec, component, cluster)
 }

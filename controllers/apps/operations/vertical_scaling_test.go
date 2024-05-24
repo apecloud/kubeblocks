@@ -155,7 +155,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			}
 
 			By("mock podList[0] rolling update successfully by re-creating it")
-			reCreatePod(&podList[0])
+			reCreatePod(podList[0])
 
 			By("reconcile opsRequest status")
 			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
@@ -170,7 +170,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			cancelOpsRequest(reqCtx, opsRes, opsRes.OpsRequest.Status.StartTimestamp.Time)
 
 			By("mock podList[0] rolled back successfully by re-creating it")
-			reCreatePod(&podList[0])
+			reCreatePod(podList[0])
 
 			By("reconcile opsRequest status after canceling opsRequest and component is Running after rolling update")
 			mockConsensusCompToRunning(opsRes)

@@ -77,6 +77,7 @@ var _ = Describe("Event Controller", func() {
 			Namespace:  testCtx.DefaultNamespace,
 			Name:       podName,
 			UID:        podUid,
+			FieldPath:  lorryutil.LorryEventFieldPath,
 		}
 		eventName := strings.Join([]string{podName, seq}, ".")
 		return builder.NewEventBuilder(testCtx.DefaultNamespace, eventName).

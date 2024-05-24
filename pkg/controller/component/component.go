@@ -24,14 +24,13 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/apiconversion"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -85,8 +84,7 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluste
 		AddLabels(constant.KBAppClusterUIDLabelKey, string(cluster.UID)).
 		SetServiceVersion(compSpec.ServiceVersion).
 		SetSchedulingPolicy(schedulingPolicy).
-		SetSidecarContainers(compSpec.Sidecars).
-		SetMonitor(compSpec.MonitorEnabled).
+		DisableExporter(compSpec.GetDisableExporter()).
 		SetReplicas(compSpec.Replicas).
 		SetResources(compSpec.Resources).
 		SetServiceAccountName(compSpec.ServiceAccountName).
@@ -235,28 +233,6 @@ func GetCompDefByName(reqCtx intctrlutil.RequestCtx, cli client.Client, compDefN
 	return compDef, nil
 }
 
-// CheckAndGetClusterComponents checks if all components have created and gets the created components.
-func CheckAndGetClusterComponents(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster) ([]client.Object, error) {
-	compList := &appsv1alpha1.ComponentList{}
-	if err := cli.List(ctx, compList, client.InNamespace(cluster.Namespace), client.MatchingLabels{constant.AppInstanceLabelKey: cluster.Name}); err != nil {
-		return nil, err
-	}
-	compMap := map[string]client.Object{}
-	for i := range compList.Items {
-		compMap[compList.Items[i].Name] = &compList.Items[i]
-	}
-	var components []client.Object
-	for _, compSpec := range cluster.Spec.ComponentSpecs {
-		compName := constant.GenerateClusterComponentName(cluster.Name, compSpec.Name)
-		v, ok := compMap[compName]
-		if !ok {
-			return nil, intctrlutil.NewRequeueError(time.Second, "waiting for all component creations to be completed")
-		}
-		components = append(components, v)
-	}
-	return components, nil
-}
-
 // ListClusterComponents lists the components of the cluster.
 func ListClusterComponents(ctx context.Context, cli client.Reader, cluster *appsv1alpha1.Cluster) ([]appsv1alpha1.Component, error) {
 	compList := &appsv1alpha1.ComponentList{}
@@ -283,10 +259,20 @@ func GetClusterComponentShortNameSet(ctx context.Context, cli client.Reader, clu
 	return compSet, nil
 }
 
-// GetHostNetworkRelatedComponents checks if it is necessary to wait for the completion of relevant conditions.
-func GetHostNetworkRelatedComponents(podSpec *corev1.PodSpec, ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster) ([]client.Object, error) {
-	if !podSpec.HostNetwork {
-		return nil, nil
+func GetExporter(componentDef appsv1alpha1.ComponentDefinitionSpec) *common.Exporter {
+	if componentDef.Exporter != nil {
+		return &common.Exporter{Exporter: *componentDef.Exporter}
 	}
-	return CheckAndGetClusterComponents(ctx, cli, cluster)
+
+	// Compatible with previous versions of kb
+	if componentDef.Monitor == nil || componentDef.Monitor.Exporter == nil {
+		return nil
+	}
+
+	return &common.Exporter{
+		TargetPort: &componentDef.Monitor.Exporter.ScrapePort,
+		Exporter: appsv1alpha1.Exporter{
+			ScrapePath: componentDef.Monitor.Exporter.ScrapePath,
+		},
+	}
 }

@@ -20,68 +20,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"context"
 	"strings"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-// GetClusterByObject gets cluster by related k8s workloads.
-func GetClusterByObject(ctx context.Context,
-	cli client.Client,
-	obj client.Object) (*appsv1alpha1.Cluster, error) {
-	labels := obj.GetLabels()
-	if labels == nil {
-		return nil, nil
-	}
-	cluster := &appsv1alpha1.Cluster{}
-	if err := cli.Get(ctx, client.ObjectKey{
-		Name:      labels[constant.AppInstanceLabelKey],
-		Namespace: obj.GetNamespace(),
-	}, cluster); err != nil {
-		return nil, err
-	}
-	return cluster, nil
-}
-
-// IsProbeTimeout checks if the application of the pod is probe timed out.
-func IsProbeTimeout(probes *appsv1alpha1.ClusterDefinitionProbes, podsReadyTime *metav1.Time) bool {
-	if podsReadyTime == nil {
-		return false
-	}
-	if probes == nil || probes.RoleProbe == nil {
-		return false
-	}
-	roleProbeTimeout := time.Duration(appsv1alpha1.DefaultRoleProbeTimeoutAfterPodsReady) * time.Second
-	if probes.RoleProbeTimeoutAfterPodsReady != 0 {
-		roleProbeTimeout = time.Duration(probes.RoleProbeTimeoutAfterPodsReady) * time.Second
-	}
-	return time.Now().After(podsReadyTime.Add(roleProbeTimeout))
-}
-
-// getObjectListByCustomLabels gets k8s workload list with custom labels
-func getObjectListByCustomLabels(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster,
-	objectList client.ObjectList, matchLabels client.ListOption, opts ...client.ListOption) error {
-	inNamespace := client.InNamespace(cluster.Namespace)
-	if opts == nil {
-		opts = []client.ListOption{matchLabels, inNamespace}
-	} else {
-		opts = append(opts, matchLabels, inNamespace)
-	}
-	return cli.List(ctx, objectList, opts...)
-}
-
-func DelayUpdateInstanceSetSystemFields(obj v1alpha1.InstanceSetSpec, pobj *v1alpha1.InstanceSetSpec) {
-	DelayUpdatePodSpecSystemFields(obj.Template.Spec, &pobj.Template.Spec)
+func delayUpdateInstanceSetSystemFields(obj v1alpha1.InstanceSetSpec, pobj *v1alpha1.InstanceSetSpec) {
+	delayUpdatePodSpecSystemFields(obj.Template.Spec, &pobj.Template.Spec)
 
 	if pobj.RoleProbe != nil && obj.RoleProbe != nil {
 		pobj.RoleProbe.FailureThreshold = obj.RoleProbe.FailureThreshold
@@ -89,8 +39,8 @@ func DelayUpdateInstanceSetSystemFields(obj v1alpha1.InstanceSetSpec, pobj *v1al
 	}
 }
 
-// DelayUpdatePodSpecSystemFields to delay the updating to system fields in pod spec.
-func DelayUpdatePodSpecSystemFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
+// delayUpdatePodSpecSystemFields to delay the updating to system fields in pod spec.
+func delayUpdatePodSpecSystemFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 	for i := range pobj.Containers {
 		delayUpdateKubeBlocksToolsImage(obj.Containers, &pobj.Containers[i])
 	}
@@ -100,16 +50,16 @@ func DelayUpdatePodSpecSystemFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 	updateLorryContainer(obj.Containers, pobj.Containers)
 }
 
-func UpdateInstanceSetSystemFields(obj v1alpha1.InstanceSetSpec, pobj *v1alpha1.InstanceSetSpec) {
-	UpdatePodSpecSystemFields(obj.Template.Spec, &pobj.Template.Spec)
+func updateInstanceSetSystemFields(obj v1alpha1.InstanceSetSpec, pobj *v1alpha1.InstanceSetSpec) {
+	updatePodSpecSystemFields(obj.Template.Spec, &pobj.Template.Spec)
 	if pobj.RoleProbe != nil && obj.RoleProbe != nil {
 		pobj.RoleProbe.FailureThreshold = obj.RoleProbe.FailureThreshold
 		pobj.RoleProbe.SuccessThreshold = obj.RoleProbe.SuccessThreshold
 	}
 }
 
-// UpdatePodSpecSystemFields to update system fields in pod spec.
-func UpdatePodSpecSystemFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
+// updatePodSpecSystemFields to update system fields in pod spec.
+func updatePodSpecSystemFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 	for i := range pobj.Containers {
 		updateKubeBlocksToolsImage(&pobj.Containers[i])
 	}
@@ -162,13 +112,4 @@ func getImageName(image string) string {
 	default:
 		return ""
 	}
-}
-
-func HasSidecar(compDef *appsv1alpha1.ComponentDefinition, sidecar string) bool {
-	for _, spec := range compDef.Spec.SidecarContainerSpecs {
-		if spec.Name == sidecar {
-			return true
-		}
-	}
-	return false
 }

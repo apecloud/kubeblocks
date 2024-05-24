@@ -1080,19 +1080,7 @@ string
 </tr>
 <tr>
 <td>
-<code>sidecars</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the sidecar containers that will be attached to the Component&rsquo;s main container.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>monitorEnabled</code><br/>
+<code>disableExporter</code><br/>
 <em>
 bool
 </em>
@@ -1100,7 +1088,7 @@ bool
 <td>
 <em>(Optional)</em>
 <p>Determines whether metrics exporter information is annotated on the Component&rsquo;s headless Service.</p>
-<p>If set to true, the following annotations will be patched into the Service:</p>
+<p>If set to true, the following annotations will not be patched into the Service:</p>
 <ul>
 <li>&ldquo;monitor.kubeblocks.io/path&rdquo;</li>
 <li>&ldquo;monitor.kubeblocks.io/port&rdquo;</li>
@@ -1341,24 +1329,25 @@ These instance-specific overrides can be specified in <code>cluster.spec.compone
 </tr>
 <tr>
 <td>
-<code>sidecarContainerSpecs</code><br/>
+<code>monitor</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.SidecarContainerSpec">
-[]SidecarContainerSpec
+<a href="#apps.kubeblocks.io/v1alpha1.MonitorConfig">
+MonitorConfig
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the sidecar containers that will be attached to the component&rsquo;s main container.</p>
+<p>Deprecated since v0.9
+monitor is monitoring config which provided by provider.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>builtinMonitorContainer</code><br/>
+<code>exporter</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.BuiltinMonitorContainerRef">
-BuiltinMonitorContainerRef
+<a href="#apps.kubeblocks.io/v1alpha1.Exporter">
+Exporter
 </a>
 </em>
 </td>
@@ -1388,7 +1377,7 @@ environment variables.</p>
 <ul>
 <li>ConfigMap: Select and extract a value from a specific key within a ConfigMap.</li>
 <li>Secret: Select and extract a value from a specific key within a Secret.</li>
-<li>Pod: Retrieves values (including ports) from a selected Pod.</li>
+<li>HostNetwork: Retrieves values (including ports) from host-network resources.</li>
 <li>Service: Retrieves values (including address, port, NodePort) from a selected Service.
 Intended to obtain the address of a ComponentService within the same Cluster.</li>
 <li>Credential: Retrieves account name and password from a SystemAccount variable.</li>
@@ -1702,23 +1691,6 @@ role is updated last. This helps minimize the number of leader changes during th
 </tr>
 <tr>
 <td>
-<code>roleArbitrator</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.RoleArbitrator">
-RoleArbitrator
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>This field has been deprecated since v0.9.
-This field is maintained for backward compatibility and its use is discouraged.
-Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
-<p>This field is immutable.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>lifecycleActions</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ComponentLifecycleActions">
@@ -1974,7 +1946,7 @@ When set, the controller executes the method defined here to execute hot paramet
 <p>Dynamic reloading is triggered only if both of the following conditions are met:</p>
 <ol>
 <li>The modified parameters are listed in the <code>dynamicParameters</code> field.
-If <code>dynamicParameterSelectedPolicy</code> is set to &ldquo;all&rdquo;, modifications to <code>staticParameters</code>
+If <code>reloadStaticParamsBeforeRestart</code> is set to true, modifications to <code>staticParameters</code>
 can also trigger a reload.</li>
 <li><code>reloadOptions</code> is set.</li>
 </ol>
@@ -2023,7 +1995,7 @@ to all parameters (including static parameters).</p>
 will trigger a dynamic reload.</li>
 <li>true: Modifications to both dynamic parameters listed in <code>dynamicParameters</code> and static parameters
 listed in <code>staticParameters</code> will trigger a dynamic reload.
-The &ldquo;all&rdquo; option is for certain engines that require static parameters to be set
+The &ldquo;true&rdquo; option is for certain engines that require static parameters to be set
 via SQL statements before they can take effect on restart.</li>
 </ul>
 </td>
@@ -2051,8 +2023,8 @@ This ensures that the tools are available to the &lsquo;config-manager&rsquo; si
 <td>
 <code>downwardAPIOptions</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1beta1.DownwardAPITriggeredAction">
-[]DownwardAPITriggeredAction
+<a href="#apps.kubeblocks.io/v1beta1.DownwardAPIChangeTriggeredAction">
+[]DownwardAPIChangeTriggeredAction
 </a>
 </em>
 </td>
@@ -3086,11 +3058,9 @@ Currently, this is only applicable to the <code>postProvision</code> action.</p>
 <p>The conditions are as follows:</p>
 <ul>
 <li><code>Immediately</code>: Executed right after the Component object is created.
-The readiness of the Component and its resources is not guaranteed at this stage.
-The Component&rsquo;s state can not be marked as ready until the Action completes successfully.</li>
+The readiness of the Component and its resources is not guaranteed at this stage.</li>
 <li><code>RuntimeReady</code>: The Action is triggered after the Component object has been created and all associated
-runtime resources (e.g. Pods) are in a ready state.
-The Component&rsquo;s state can not be marked as ready until the Action completes successfully.</li>
+runtime resources (e.g. Pods) are in a ready state.</li>
 <li><code>ComponentReady</code>: The Action is triggered after the Component itself is in a ready state.
 This process does not affect the readiness state of the Component or the Cluster.</li>
 <li><code>ClusterReady</code>: The Action is executed after the Cluster is in a ready state.
@@ -3891,49 +3861,6 @@ RefNamespaceName
 <td></td>
 </tr></tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.BuiltinMonitorContainerRef">BuiltinMonitorContainerRef
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies the name of the built-in metrics exporter container.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>PrometheusScrapeConfig</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.PrometheusScrapeConfig">
-PrometheusScrapeConfig
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>PrometheusScrapeConfig</code> are embedded into this type.)
-</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterBackup">ClusterBackup
 </h3>
 <p>
@@ -4496,30 +4423,31 @@ configmap and mounted to the current component.</p>
 </tr>
 <tr>
 <td>
-<code>sidecarContainerSpecs</code><br/>
+<code>exporter</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.SidecarContainerSpec">
-[]SidecarContainerSpec
+<a href="#apps.kubeblocks.io/v1alpha1.Exporter">
+Exporter
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the sidecar containers that will be attached to the component&rsquo;s main container.</p>
+<p>Defines the metrics exporter.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>builtinMonitorContainer</code><br/>
+<code>monitor</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.BuiltinMonitorContainerRef">
-BuiltinMonitorContainerRef
+<a href="#apps.kubeblocks.io/v1alpha1.MonitorConfig">
+MonitorConfig
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the built-in metrics exporter container.</p>
+<p>Deprecated since v0.9
+monitor is monitoring config which provided by provider.</p>
 </td>
 </tr>
 </tbody>
@@ -5068,19 +4996,7 @@ The administrator must manually manage the cleanup and removal of these resource
 </tr>
 <tr>
 <td>
-<code>sidecars</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the sidecar containers that will be attached to the Component&rsquo;s main container.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>monitorEnabled</code><br/>
+<code>disableExporter</code><br/>
 <em>
 bool
 </em>
@@ -5088,6 +5004,26 @@ bool
 <td>
 <em>(Optional)</em>
 <p>Determines whether metrics exporter information is annotated on the Component&rsquo;s headless Service.</p>
+<p>If set to true, the following annotations will not be patched into the Service:</p>
+<ul>
+<li>&ldquo;monitor.kubeblocks.io/path&rdquo;</li>
+<li>&ldquo;monitor.kubeblocks.io/port&rdquo;</li>
+<li>&ldquo;monitor.kubeblocks.io/scheme&rdquo;</li>
+</ul>
+<p>These annotations allow the Prometheus installed by KubeBlocks to discover and scrape metrics from the exporter.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>monitor</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Deprecated since v0.9
+Determines whether metrics exporter information is annotated on the Component&rsquo;s headless Service.</p>
 <p>If set to true, the following annotations will be patched into the Service:</p>
 <ul>
 <li>&ldquo;monitor.kubeblocks.io/path&rdquo;</li>
@@ -5797,7 +5733,7 @@ bool
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterObjectReference">ClusterObjectReference
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentVarSelector">ComponentVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.CredentialVarSelector">CredentialVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.PodVarSelector">PodVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVarSelector">ServiceRefVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVarSelector">ServiceVarSelector</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentVarSelector">ComponentVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.CredentialVarSelector">CredentialVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.HostNetworkVarSelector">HostNetworkVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVarSelector">ServiceRefVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVarSelector">ServiceVarSelector</a>)
 </p>
 <div>
 <p>ClusterObjectReference defines information to let you locate the referenced object inside the same Cluster.</p>
@@ -7380,24 +7316,25 @@ These instance-specific overrides can be specified in <code>cluster.spec.compone
 </tr>
 <tr>
 <td>
-<code>sidecarContainerSpecs</code><br/>
+<code>monitor</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.SidecarContainerSpec">
-[]SidecarContainerSpec
+<a href="#apps.kubeblocks.io/v1alpha1.MonitorConfig">
+MonitorConfig
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the sidecar containers that will be attached to the component&rsquo;s main container.</p>
+<p>Deprecated since v0.9
+monitor is monitoring config which provided by provider.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>builtinMonitorContainer</code><br/>
+<code>exporter</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.BuiltinMonitorContainerRef">
-BuiltinMonitorContainerRef
+<a href="#apps.kubeblocks.io/v1alpha1.Exporter">
+Exporter
 </a>
 </em>
 </td>
@@ -7427,7 +7364,7 @@ environment variables.</p>
 <ul>
 <li>ConfigMap: Select and extract a value from a specific key within a ConfigMap.</li>
 <li>Secret: Select and extract a value from a specific key within a Secret.</li>
-<li>Pod: Retrieves values (including ports) from a selected Pod.</li>
+<li>HostNetwork: Retrieves values (including ports) from host-network resources.</li>
 <li>Service: Retrieves values (including address, port, NodePort) from a selected Service.
 Intended to obtain the address of a ComponentService within the same Cluster.</li>
 <li>Credential: Retrieves account name and password from a SystemAccount variable.</li>
@@ -7736,23 +7673,6 @@ This action returns a list of roles for each replica, and the returned roles mus
 For instance, replicas with a &ldquo;follower&rdquo; role can be updated first, while the replica with the &ldquo;leader&rdquo;
 role is updated last. This helps minimize the number of leader changes during the update process.</li>
 </ul>
-<p>This field is immutable.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>roleArbitrator</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.RoleArbitrator">
-RoleArbitrator
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>This field has been deprecated since v0.9.
-This field is maintained for backward compatibility and its use is discouraged.
-Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
 <p>This field is immutable.</p>
 </td>
 </tr>
@@ -8338,7 +8258,7 @@ and other administrative tasks.</p>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentOps">ComponentOps
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CustomOpsComponent">CustomOpsComponent</a>, <a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.RebuildInstance">RebuildInstance</a>, <a href="#apps.kubeblocks.io/v1alpha1.Reconfigure">Reconfigure</a>, <a href="#apps.kubeblocks.io/v1alpha1.ScriptSpec">ScriptSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">SpecificOpsRequest</a>, <a href="#apps.kubeblocks.io/v1alpha1.Switchover">Switchover</a>, <a href="#apps.kubeblocks.io/v1alpha1.VerticalScaling">VerticalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CustomOpsComponent">CustomOpsComponent</a>, <a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.RebuildInstance">RebuildInstance</a>, <a href="#apps.kubeblocks.io/v1alpha1.Reconfigure">Reconfigure</a>, <a href="#apps.kubeblocks.io/v1alpha1.ScriptSpec">ScriptSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">SpecificOpsRequest</a>, <a href="#apps.kubeblocks.io/v1alpha1.Switchover">Switchover</a>, <a href="#apps.kubeblocks.io/v1alpha1.UpgradeComponent">UpgradeComponent</a>, <a href="#apps.kubeblocks.io/v1alpha1.VerticalScaling">VerticalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
 </p>
 <div>
 <p>ComponentOps specifies the Component to be operated on.</p>
@@ -8848,19 +8768,7 @@ string
 </tr>
 <tr>
 <td>
-<code>sidecars</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the sidecar containers that will be attached to the Component&rsquo;s main container.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>monitorEnabled</code><br/>
+<code>disableExporter</code><br/>
 <em>
 bool
 </em>
@@ -8868,7 +8776,7 @@ bool
 <td>
 <em>(Optional)</em>
 <p>Determines whether metrics exporter information is annotated on the Component&rsquo;s headless Service.</p>
-<p>If set to true, the following annotations will be patched into the Service:</p>
+<p>If set to true, the following annotations will not be patched into the Service:</p>
 <ul>
 <li>&ldquo;monitor.kubeblocks.io/path&rdquo;</li>
 <li>&ldquo;monitor.kubeblocks.io/port&rdquo;</li>
@@ -9107,16 +9015,18 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>Deprecated: DefaultMode is deprecated since 0.9.0 and will be removed in 0.10.0
-for scripts, auto set 0555
-for configs, auto set 0444
-Refers to the mode bits used to set permissions on created files by default.</p>
-<p>Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
-YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
-Defaults to 0644.</p>
-<p>Directories within the path are not affected by this setting.
-This might be in conflict with other options that affect the file
-mode, like fsGroup, and the result can be other mode bits set.</p>
+<p>The operator attempts to set default file permissions for scripts (0555) and configurations (0444).
+However, certain database engines may require different file permissions.
+You can specify the desired file permissions here.</p>
+<p>Must be specified as an octal value between 0000 and 0777 (inclusive),
+or as a decimal value between 0 and 511 (inclusive).
+YAML supports both octal and decimal values for file permissions.</p>
+<p>Please note that this setting only affects the permissions of the files themselves.
+Directories within the specified path are not impacted by this setting.
+It&rsquo;s important to be aware that this setting might conflict with other options
+that influence the file mode, such as fsGroup.
+In such cases, the resulting file mode may have additional bits set.
+Refers to documents of k8s.ConfigMapVolumeSource.defaultMode for more information.</p>
 </td>
 </tr>
 </tbody>
@@ -9330,7 +9240,22 @@ VarOption
 <td>
 <em>(Optional)</em>
 <p>Reference to the instanceName list of the component.
-and the value will be presented in the following format: instanceName1,instanceName2&hellip;</p>
+and the value will be presented in the following format: instanceName1,instanceName2,&hellip;</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podFQDNs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reference to the pod FQDN list of the component.
+The value will be presented in the following format: FQDN1,FQDN2,&hellip;</p>
 </td>
 </tr>
 </tbody>
@@ -9655,7 +9580,7 @@ When set, the controller executes the method defined here to execute hot paramet
 <p>Dynamic reloading is triggered only if both of the following conditions are met:</p>
 <ol>
 <li>The modified parameters are listed in the <code>dynamicParameters</code> field.
-If <code>dynamicParameterSelectedPolicy</code> is set to &ldquo;all&rdquo;, modifications to <code>staticParameters</code>
+If <code>reloadStaticParamsBeforeRestart</code> is set to true, modifications to <code>staticParameters</code>
 can also trigger a reload.</li>
 <li><code>reloadOptions</code> is set.</li>
 </ol>
@@ -9704,7 +9629,7 @@ to all parameters (including static parameters).</p>
 will trigger a dynamic reload.</li>
 <li>true: Modifications to both dynamic parameters listed in <code>dynamicParameters</code> and static parameters
 listed in <code>staticParameters</code> will trigger a dynamic reload.
-The &ldquo;all&rdquo; option is for certain engines that require static parameters to be set
+The &ldquo;true&rdquo; option is for certain engines that require static parameters to be set
 via SQL statements before they can take effect on restart.</li>
 </ul>
 </td>
@@ -9732,8 +9657,8 @@ This ensures that the tools are available to the &lsquo;config-manager&rsquo; si
 <td>
 <code>downwardAPIOptions</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1beta1.DownwardAPITriggeredAction">
-[]DownwardAPITriggeredAction
+<a href="#apps.kubeblocks.io/v1beta1.DownwardAPIChangeTriggeredAction">
+[]DownwardAPIChangeTriggeredAction
 </a>
 </em>
 </td>
@@ -10894,7 +10819,7 @@ ConsensusMember
 <h3 id="apps.kubeblocks.io/v1alpha1.ContainerVars">ContainerVars
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.PodVars">PodVars</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.HostNetworkVars">HostNetworkVars</a>)
 </p>
 <div>
 <p>ContainerVars defines the vars that can be referenced from a Container.</p>
@@ -11410,6 +11335,27 @@ VarSource
 <p>Source for the variable&rsquo;s value. Cannot be used if value is not empty.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>expression</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A Go template expression that will be applied to the resolved value of the var.</p>
+<p>The expression will only be evaluated if the var is successfully resolved to a non-credential value.</p>
+<p>The resolved value can be accessed by its name within the expression, system vars and other user-defined
+non-credential vars can be used within the expression in the same way.
+Notice that, when accessing vars by its name, you should replace all the &ldquo;-&rdquo; in the name with &ldquo;_&rdquo;, because of
+that &ldquo;-&rdquo; is not a valid identifier in Go.</p>
+<p>All expressions are evaluated in the order the vars are defined. If a var depends on any vars that also
+have expressions defined, be careful about the evaluation order as it may use intermediate values.</p>
+<p>The result of evaluation will be used as the final value of the var. If the expression fails to evaluate,
+the resolving of var will also be considered failed.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.EnvVarRef">EnvVarRef
@@ -11498,6 +11444,118 @@ If the shell is required, it must be explicitly invoked in the command.</p>
 <td>
 <em>(Optional)</em>
 <p>Args represents the arguments that are passed to the <code>command</code> for execution.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.Exporter">Exporter
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>containerName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the name of the built-in metrics exporter container.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>scrapePath</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the http/https url path to scrape for metrics.
+If empty, Prometheus uses the default value (e.g. <code>/metrics</code>).</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>scrapePort</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the port name to scrape for metrics.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>scrapeScheme</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.PrometheusScheme">
+PrometheusScheme
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the schema to use for scraping.
+<code>http</code> and <code>https</code> are the expected values unless you rewrite the <code>__scheme__</code> label via relabeling.
+If empty, Prometheus uses the default value <code>http</code>.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ExporterConfig">ExporterConfig
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.MonitorConfig">MonitorConfig</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>scrapePort</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<p>scrapePort is exporter port for Time Series Database to scrape metrics.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>scrapePath</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>scrapePath is exporter url path for Time Series Database to scrape metrics.</p>
 </td>
 </tr>
 </tbody>
@@ -11998,6 +12056,86 @@ These container ports must be defined in the container for proper port allocatio
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.HostNetworkVarSelector">HostNetworkVarSelector
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.VarSource">VarSource</a>)
+</p>
+<div>
+<p>HostNetworkVarSelector selects a var from host-network resources.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ClusterObjectReference</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterObjectReference">
+ClusterObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ClusterObjectReference</code> are embedded into this type.)
+</p>
+<p>The component to select from.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>HostNetworkVars</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.HostNetworkVars">
+HostNetworkVars
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>HostNetworkVars</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.HostNetworkVars">HostNetworkVars
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.HostNetworkVarSelector">HostNetworkVarSelector</a>)
+</p>
+<div>
+<p>HostNetworkVars defines the vars that can be referenced from host-network resources.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>container</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ContainerVars">
+ContainerVars
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.Instance">Instance
 </h3>
 <p>
@@ -12455,22 +12593,6 @@ string
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.KBAccountType">KBAccountType
-(<code>byte</code> alias)</h3>
-<div>
-<p>KBAccountType is used for bitwise operation.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>0</p></td>
-<td></td>
-</tr></tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.LastComponentConfiguration">LastComponentConfiguration
 </h3>
 <p>
@@ -12582,6 +12704,30 @@ The &ldquo;pods&rdquo; key maps to a list of names of all Pods of the Component.
 <td>
 <em>(Optional)</em>
 <p>Records the offline instances of the Component prior to any changes.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Records the version of the Service expected to be provisioned by this Component prior to any changes.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>componentDefinitionName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Records the name of the ComponentDefinition prior to any changes.</p>
 </td>
 </tr>
 </tbody>
@@ -12893,18 +13039,10 @@ for example, using &lsquo;&#123;&#123; eq .spec.replicas 1 &#125;&#125;&rsquo;</
 <td></td>
 </tr></tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.MonitorKind">MonitorKind
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.MonitorSource">MonitorSource</a>)
-</p>
-<div>
-<p>MonitorKind defines the kind of monitor.</p>
-</div>
-<h3 id="apps.kubeblocks.io/v1alpha1.MonitorSource">MonitorSource
+<h3 id="apps.kubeblocks.io/v1alpha1.MonitorConfig">MonitorConfig
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SidecarContainerSource">SidecarContainerSource</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
 </p>
 <div>
 </div>
@@ -12918,29 +13056,31 @@ for example, using &lsquo;&#123;&#123; eq .spec.replicas 1 &#125;&#125;&rsquo;</
 <tbody>
 <tr>
 <td>
-<code>kind</code><br/>
+<code>builtIn</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.MonitorKind">
-MonitorKind
-</a>
+bool
 </em>
 </td>
 <td>
-<p>Defines the kind of monitor, such as metrics or logs.</p>
+<em>(Optional)</em>
+<p>builtIn is a switch to enable KubeBlocks builtIn monitoring.
+If BuiltIn is set to true, monitor metrics will be scraped automatically.
+If BuiltIn is set to false, the provider should set ExporterConfig and Sidecar container own.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>scrapeConfig</code><br/>
+<code>exporterConfig</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.PrometheusScrapeConfig">
-PrometheusScrapeConfig
+<a href="#apps.kubeblocks.io/v1alpha1.ExporterConfig">
+ExporterConfig
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the scrape configuration for the prometheus.</p>
+<p>exporterConfig provided by provider, which specify necessary information to Time Series Database.
+exporterConfig is valid when builtIn is false.</p>
 </td>
 </tr>
 </tbody>
@@ -14274,7 +14414,7 @@ string
 <em>(Optional)</em>
 <p>Specifies a role to target with the service.
 If specified, the service will only be exposed to pods with the matching role.</p>
-<p>Note: At least one of &lsquo;roleSelector&rsquo; or &lsquo;selector&rsquo; must be specified.
+<p>Note: At least one of &lsquo;roleSelector&rsquo; or &lsquo;podSelector&rsquo; must be specified.
 If both are specified, a pod must match both conditions to be selected.</p>
 </td>
 </tr>
@@ -14289,7 +14429,7 @@ map[string]string
 <em>(Optional)</em>
 <p>Routes service traffic to pods with matching label keys and values.
 If specified, the service will only be exposed to pods matching the selector.</p>
-<p>Note: At least one of &lsquo;roleSelector&rsquo; or &lsquo;selector&rsquo; must be specified.
+<p>Note: At least one of &lsquo;roleSelector&rsquo; or &lsquo;podSelector&rsquo; must be specified.
 If both are specified, a pod must match both conditions to be selected.</p>
 </td>
 </tr>
@@ -15186,86 +15326,6 @@ or &lsquo;All&rsquo; (select all pods that match the podSelector).</p>
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.PodVarSelector">PodVarSelector
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.VarSource">VarSource</a>)
-</p>
-<div>
-<p>PodVarSelector selects a var from a Pod.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>ClusterObjectReference</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterObjectReference">
-ClusterObjectReference
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>ClusterObjectReference</code> are embedded into this type.)
-</p>
-<p>The pod to select from.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>PodVars</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.PodVars">
-PodVars
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>PodVars</code> are embedded into this type.)
-</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.PodVars">PodVars
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.PodVarSelector">PodVarSelector</a>)
-</p>
-<div>
-<p>PodVars defines the vars that can be referenced from a Pod.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>container</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ContainerVars">
-ContainerVars
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.PointInTimeRefSpec">PointInTimeRefSpec
 </h3>
 <div>
@@ -15660,71 +15720,26 @@ Kubernetes meta/v1.Time
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.PrometheusProtocol">PrometheusProtocol
+<h3 id="apps.kubeblocks.io/v1alpha1.PrometheusScheme">PrometheusScheme
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.PrometheusScrapeConfig">PrometheusScrapeConfig</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.Exporter">Exporter</a>)
 </p>
 <div>
-<p>PrometheusProtocol defines the protocol of prometheus scrape metrics.</p>
-</div>
-<h3 id="apps.kubeblocks.io/v1alpha1.PrometheusScrapeConfig">PrometheusScrapeConfig
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.BuiltinMonitorContainerRef">BuiltinMonitorContainerRef</a>, <a href="#apps.kubeblocks.io/v1alpha1.MonitorSource">MonitorSource</a>)
-</p>
-<div>
+<p>PrometheusScheme defines the protocol of prometheus scrape metrics.</p>
 </div>
 <table>
 <thead>
 <tr>
-<th>Field</th>
+<th>Value</th>
 <th>Description</th>
 </tr>
 </thead>
-<tbody>
-<tr>
-<td>
-<code>metricsPath</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the http/https url path to scrape for metrics.
-If empty, Prometheus uses the default value (e.g. <code>/metrics</code>).</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>metricsPort</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the port name to scrape for metrics.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>protocol</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.PrometheusProtocol">
-PrometheusProtocol
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the schema to use for scraping.
-<code>http</code> and <code>https</code> are the expected values unless you rewrite the <code>__scheme__</code> label via relabeling.
-If empty, Prometheus uses the default value <code>http</code>.</p>
-</td>
-</tr>
-</tbody>
+<tbody><tr><td><p>&#34;http&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;https&#34;</p></td>
+<td></td>
+</tr></tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ProtectedVolume">ProtectedVolume
 </h3>
@@ -16796,28 +16811,6 @@ This value is set to 0 by default, indicating that there will be no delay betwee
 </td>
 </tr>
 </tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.RoleArbitrator">RoleArbitrator
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
-</p>
-<div>
-<p>RoleArbitrator defines how to arbitrate the role of replicas.</p>
-<p>Deprecated since v0.9</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;External&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;Lorry&#34;</p></td>
-<td></td>
-</tr></tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.RoleProbe">RoleProbe
 </h3>
@@ -18851,87 +18844,6 @@ Resources and data associated with the corresponding Component will also be dele
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.SidecarContainerSource">SidecarContainerSource
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SidecarContainerSpec">SidecarContainerSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>monitor</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.MonitorSource">
-MonitorSource
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the function or purpose of the container, such as the monitor type sidecar.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.SidecarContainerSpec">SidecarContainerSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>Container</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#container-v1-core">
-Kubernetes core/v1.Container
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>Container</code> are embedded into this type.)
-</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>SidecarContainerSource</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.SidecarContainerSource">
-SidecarContainerSource
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>SidecarContainerSource</code> are embedded into this type.)
-</p>
-<em>(Optional)</em>
-<p>Define the function or purpose of the container, such as the monitor type sidecar.
-In order to allow prometheus to scrape metrics from the sidecar container, the schema, port, and url will be injected into the annotation of the service.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">SpecificOpsRequest
 </h3>
 <p>
@@ -20215,8 +20127,87 @@ string
 </em>
 </td>
 <td>
-<p>Specifies the name of the target ClusterVersion for the upgrade.</p>
-<p>This field is deprecated since v0.9 because ClusterVersion is deprecated.</p>
+<p>Deprecated: since v0.9 because ClusterVersion is deprecated.
+Specifies the name of the target ClusterVersion for the upgrade.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>components</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.UpgradeComponent">
+[]UpgradeComponent
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Lists components to be upgrade based on desired ComponentDefinition and ServiceVersion.
+From the perspective of cluster API, the reasonable combinations should be:
+1. (comp-def, service-ver) - upgrade to the specified service version and component definition, the user takes the responsibility to ensure that they are compatible.
+2. (&ldquo;&rdquo;, service-ver) - upgrade to the specified service version, let the operator choose the latest compatible component definition.
+3. (comp-def, &ldquo;&rdquo;) - upgrade to the specified component definition, let the operator choose the latest compatible service version.
+4. (&ldquo;&rdquo;, &ldquo;&rdquo;) - upgrade to the latest service version and component definition, the operator will ensure the compatibility between the selected versions.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.UpgradeComponent">UpgradeComponent
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.Upgrade">Upgrade</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ComponentOps</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentOps">
+ComponentOps
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ComponentOps</code> are embedded into this type.)
+</p>
+<p>Specifies the name of the Component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>componentDefinitionName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the name of the ComponentDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the version of the Service expected to be provisioned by this Component.
+Referring to the ServiceVersion defined by the ComponentDefinition and ComponentVersion.
+And ServiceVersion in ClusterComponentSpec is optional, when no version is specified,
+use the latest available version in ComponentVersion.</p>
 </td>
 </tr>
 </tbody>
@@ -20439,16 +20430,16 @@ Kubernetes core/v1.SecretKeySelector
 </tr>
 <tr>
 <td>
-<code>podVarRef</code><br/>
+<code>hostNetworkVarRef</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.PodVarSelector">
-PodVarSelector
+<a href="#apps.kubeblocks.io/v1alpha1.HostNetworkVarSelector">
+HostNetworkVarSelector
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Selects a defined var of a Pod.</p>
+<p>Selects a defined var of host-network resources.</p>
 </td>
 </tr>
 <tr>
@@ -20564,7 +20555,7 @@ Typically used in scenarios such as updating application container images.</p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">SpecificOpsRequest</a>)
 </p>
 <div>
-<p>VerticalScaling refers to the process of adjusting the compute resources (e.g., CPU, memory) allocated to a Component.
+<p>VerticalScaling refers to the process of adjusting compute resources (e.g., CPU, memory) allocated to a Component.
 It defines the parameters required for the operation.</p>
 </div>
 <table>
@@ -20973,10 +20964,10 @@ via SQL statements before they can take effect on restart.</li>
 </tr>
 <tr>
 <td>
-<code>downwardAPITriggeredActions</code><br/>
+<code>downwardAPIChangeTriggeredActions</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1beta1.DownwardAPITriggeredAction">
-[]DownwardAPITriggeredAction
+<a href="#apps.kubeblocks.io/v1beta1.DownwardAPIChangeTriggeredAction">
+[]DownwardAPIChangeTriggeredAction
 </a>
 </em>
 </td>
@@ -20996,10 +20987,10 @@ to reflect the new role.</li>
 </tr>
 <tr>
 <td>
-<code>configSchema</code><br/>
+<code>parametersSchema</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1beta1.ConfigSchema">
-ConfigSchema
+<a href="#apps.kubeblocks.io/v1beta1.ParametersSchema">
+ParametersSchema
 </a>
 </em>
 </td>
@@ -21046,24 +21037,6 @@ Modifications to these parameters trigger a configuration reload without requiri
 <em>(Optional)</em>
 <p>Lists the parameters that cannot be modified once set.
 Attempting to change any of these parameters will be ignored.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>reloadedPodSelector</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#labelselector-v1-meta">
-Kubernetes meta/v1.LabelSelector
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Used to match labels on the pod to determine whether a dynamic reload should be performed.</p>
-<p>In some scenarios, only specific pods (e.g., primary replicas) need to undergo a dynamic reload.
-The <code>reloadedPodSelector</code> allows you to specify label selectors to target the desired pods for the reload process.</p>
-<p>If the <code>reloadedPodSelector</code> is not specified or is nil, all pods managed by the workload will be considered for the dynamic
-reload.</p>
 </td>
 </tr>
 <tr>
@@ -21283,10 +21256,10 @@ via SQL statements before they can take effect on restart.</li>
 </tr>
 <tr>
 <td>
-<code>downwardAPITriggeredActions</code><br/>
+<code>downwardAPIChangeTriggeredActions</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1beta1.DownwardAPITriggeredAction">
-[]DownwardAPITriggeredAction
+<a href="#apps.kubeblocks.io/v1beta1.DownwardAPIChangeTriggeredAction">
+[]DownwardAPIChangeTriggeredAction
 </a>
 </em>
 </td>
@@ -21306,10 +21279,10 @@ to reflect the new role.</li>
 </tr>
 <tr>
 <td>
-<code>configSchema</code><br/>
+<code>parametersSchema</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1beta1.ConfigSchema">
-ConfigSchema
+<a href="#apps.kubeblocks.io/v1beta1.ParametersSchema">
+ParametersSchema
 </a>
 </em>
 </td>
@@ -21356,24 +21329,6 @@ Modifications to these parameters trigger a configuration reload without requiri
 <em>(Optional)</em>
 <p>Lists the parameters that cannot be modified once set.
 Attempting to change any of these parameters will be ignored.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>reloadedPodSelector</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#labelselector-v1-meta">
-Kubernetes meta/v1.LabelSelector
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Used to match labels on the pod to determine whether a dynamic reload should be performed.</p>
-<p>In some scenarios, only specific pods (e.g., primary replicas) need to undergo a dynamic reload.
-The <code>reloadedPodSelector</code> allows you to specify label selectors to target the desired pods for the reload process.</p>
-<p>If the <code>reloadedPodSelector</code> is not specified or is nil, all pods managed by the workload will be considered for the dynamic
-reload.</p>
 </td>
 </tr>
 <tr>
@@ -21457,77 +21412,13 @@ int64
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1beta1.ConfigSchema">ConfigSchema
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1beta1.ConfigConstraintSpec">ConfigConstraintSpec</a>)
-</p>
-<div>
-<p>ConfigSchema Defines a list of configuration items with their names, default values, descriptions,
-types, and constraints.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>topLevelKey</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the top-level key in the &lsquo;configSchema.cue&rsquo; that organizes the validation rules for parameters.
-This key must exist within the CUE script defined in &lsquo;configSchema.cue&rsquo;.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>cue</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Hold a string that contains a script written in CUE language that defines a list of configuration items.
-Each item is detailed with its name, default value, description, type (e.g. string, integer, float),
-and constraints (permissible values or the valid range of values).</p>
-<p>CUE (Configure, Unify, Execute) is a declarative language designed for defining and validating
-complex data configurations.
-It is particularly useful in environments like K8s where complex configurations and validation rules are common.</p>
-<p>This script functions as a validator for user-provided configurations, ensuring compliance with
-the established specifications and constraints.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>schemaInJSON</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#jsonschemaprops-v1-apiextensions-k8s-io">
-Kubernetes api extensions v1.JSONSchemaProps
-</a>
-</em>
-</td>
-<td>
-<p>Generated from the &lsquo;cue&rsquo; field and transformed into a JSON format.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1beta1.DownwardAPITriggeredAction">DownwardAPITriggeredAction
+<h3 id="apps.kubeblocks.io/v1beta1.DownwardAPIChangeTriggeredAction">DownwardAPIChangeTriggeredAction
 </h3>
 <p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintSpec">ConfigConstraintSpec</a>, <a href="#apps.kubeblocks.io/v1beta1.ConfigConstraintSpec">ConfigConstraintSpec</a>)
 </p>
 <div>
-<p>DownwardAPITriggeredAction defines an action that triggers specific commands in response to changes in Pod labels.
+<p>DownwardAPIChangeTriggeredAction defines an action that triggers specific commands in response to changes in Pod labels.
 For example, a command might be executed when the &lsquo;role&rsquo; label of the Pod is updated.</p>
 </div>
 <table>
@@ -21773,6 +21664,70 @@ string
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1beta1.ParametersSchema">ParametersSchema
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1beta1.ConfigConstraintSpec">ConfigConstraintSpec</a>)
+</p>
+<div>
+<p>ParametersSchema Defines a list of configuration items with their names, default values, descriptions,
+types, and constraints.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>topLevelKey</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the top-level key in the &lsquo;configSchema.cue&rsquo; that organizes the validation rules for parameters.
+This key must exist within the CUE script defined in &lsquo;configSchema.cue&rsquo;.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>cue</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Hold a string that contains a script written in CUE language that defines a list of configuration items.
+Each item is detailed with its name, default value, description, type (e.g. string, integer, float),
+and constraints (permissible values or the valid range of values).</p>
+<p>CUE (Configure, Unify, Execute) is a declarative language designed for defining and validating
+complex data configurations.
+It is particularly useful in environments like K8s where complex configurations and validation rules are common.</p>
+<p>This script functions as a validator for user-provided configurations, ensuring compliance with
+the established specifications and constraints.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>schemaInJSON</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#jsonschemaprops-v1-apiextensions-k8s-io">
+Kubernetes api extensions v1.JSONSchemaProps
+</a>
+</em>
+</td>
+<td>
+<p>Generated from the &lsquo;cue&rsquo; field and transformed into a JSON format.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1beta1.ReloadAction">ReloadAction
 </h3>
 <p>
@@ -21846,12 +21801,30 @@ AutoTrigger
 <p>Automatically perform the reload when specified conditions are met.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>targetPodSelector</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#labelselector-v1-meta">
+Kubernetes meta/v1.LabelSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Used to match labels on the pod to determine whether a dynamic reload should be performed.</p>
+<p>In some scenarios, only specific pods (e.g., primary replicas) need to undergo a dynamic reload.
+The <code>reloadedPodSelector</code> allows you to specify label selectors to target the desired pods for the reload process.</p>
+<p>If the <code>reloadedPodSelector</code> is not specified or is nil, all pods managed by the workload will be considered for the dynamic
+reload.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1beta1.ScriptConfig">ScriptConfig
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintSpec">ConfigConstraintSpec</a>, <a href="#apps.kubeblocks.io/v1beta1.DownwardAPITriggeredAction">DownwardAPITriggeredAction</a>, <a href="#apps.kubeblocks.io/v1beta1.ShellTrigger">ShellTrigger</a>, <a href="#apps.kubeblocks.io/v1beta1.TPLScriptTrigger">TPLScriptTrigger</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraintSpec">ConfigConstraintSpec</a>, <a href="#apps.kubeblocks.io/v1beta1.DownwardAPIChangeTriggeredAction">DownwardAPIChangeTriggeredAction</a>, <a href="#apps.kubeblocks.io/v1beta1.ShellTrigger">ShellTrigger</a>, <a href="#apps.kubeblocks.io/v1beta1.TPLScriptTrigger">TPLScriptTrigger</a>)
 </p>
 <div>
 </div>
@@ -22462,20 +22435,6 @@ More info: <a href="https://kubernetes.io/docs/concepts/overview/working-with-ob
 </tr>
 <tr>
 <td>
-<code>serviceName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Refers to the name of the service that governs this StatefulSet.
-This service must exist before the StatefulSet and is responsible for
-the network identity of the set. Pods get DNS/hostnames that follow a specific pattern.</p>
-<p>Note: This field will be removed in future version.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>service</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#service-v1-core">
@@ -22488,21 +22447,6 @@ Kubernetes core/v1.Service
 <p>Defines the behavior of a service spec.
 Provides read-write service.
 <a href="https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status">https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status</a></p>
-<p>Note: This field will be removed in future version.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>alternativeServices</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#service-v1-core">
-[]Kubernetes core/v1.Service
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines Alternative Services selector pattern specifier.</p>
 <p>Note: This field will be removed in future version.</p>
 </td>
 </tr>
@@ -22977,20 +22921,6 @@ More info: <a href="https://kubernetes.io/docs/concepts/overview/working-with-ob
 </tr>
 <tr>
 <td>
-<code>serviceName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Refers to the name of the service that governs this StatefulSet.
-This service must exist before the StatefulSet and is responsible for
-the network identity of the set. Pods get DNS/hostnames that follow a specific pattern.</p>
-<p>Note: This field will be removed in future version.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>service</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#service-v1-core">
@@ -23003,21 +22933,6 @@ Kubernetes core/v1.Service
 <p>Defines the behavior of a service spec.
 Provides read-write service.
 <a href="https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status">https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status</a></p>
-<p>Note: This field will be removed in future version.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>alternativeServices</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#service-v1-core">
-[]Kubernetes core/v1.Service
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines Alternative Services selector pattern specifier.</p>
 <p>Note: This field will be removed in future version.</p>
 </td>
 </tr>

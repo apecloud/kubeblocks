@@ -38,13 +38,6 @@ import (
 // default reconcile requeue after duration
 var requeueDuration = time.Millisecond * 1000
 
-func getEnvReplacementMapForAccount(name, passwd string) map[string]string {
-	return map[string]string{
-		"$(USERNAME)": name,
-		"$(PASSWD)":   passwd,
-	}
-}
-
 // notifyClusterStatusChange notifies cluster changes occurred and triggers it to reconcile.
 func notifyClusterStatusChange(ctx context.Context, cli client.Client, recorder record.EventRecorder, obj client.Object, event *corev1.Event) error {
 	if obj == nil || !intctrlutil.WorkloadFilterPredicate(obj) {
@@ -54,7 +47,7 @@ func notifyClusterStatusChange(ctx context.Context, cli client.Client, recorder 
 	cluster, ok := obj.(*appsv1alpha1.Cluster)
 	if !ok {
 		var err error
-		if cluster, err = GetClusterByObject(ctx, cli, obj); err != nil {
+		if cluster, err = getClusterByObject(ctx, cli, obj); err != nil {
 			return err
 		}
 	}
@@ -72,6 +65,24 @@ func notifyClusterStatusChange(ctx context.Context, cli client.Client, recorder 
 		recorder.Eventf(cluster, corev1.EventTypeWarning, event.Reason, getFinalEventMessageForRecorder(event))
 	}
 	return nil
+}
+
+// getClusterByObject gets cluster by related k8s workloads.
+func getClusterByObject(ctx context.Context,
+	cli client.Client,
+	obj client.Object) (*appsv1alpha1.Cluster, error) {
+	labels := obj.GetLabels()
+	if labels == nil {
+		return nil, nil
+	}
+	cluster := &appsv1alpha1.Cluster{}
+	if err := cli.Get(ctx, client.ObjectKey{
+		Name:      labels[constant.AppInstanceLabelKey],
+		Namespace: obj.GetNamespace(),
+	}, cluster); err != nil {
+		return nil, err
+	}
+	return cluster, nil
 }
 
 // getFinalEventMessageForRecorder gets final event message by event involved object kind for recorded it

@@ -169,15 +169,13 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		PolicyRules:        compDefObj.Spec.PolicyRules,
 		LifecycleActions:   compDefObj.Spec.LifecycleActions,
 		SystemAccounts:     compDefObj.Spec.SystemAccounts,
-		RoleArbitrator:     compDefObj.Spec.RoleArbitrator,
 		Replicas:           comp.Spec.Replicas,
 		Resources:          comp.Spec.Resources,
 		TLSConfig:          comp.Spec.TLSConfig,
 		ServiceAccountName: comp.Spec.ServiceAccountName,
 		Instances:          comp.Spec.Instances,
 		OfflineInstances:   comp.Spec.OfflineInstances,
-		Sidecars:           comp.Spec.Sidecars,
-		MonitorEnabled:     buildMonitorEnabled(comp),
+		DisableExporter:    comp.Spec.DisableExporter,
 	}
 
 	// build backward compatible fields, including workload, services, componentRefEnvs, clusterDefName, clusterCompDefName, and clusterCompVer, etc.
@@ -250,13 +248,6 @@ func buildRuntimeClassName(synthesizeComp *SynthesizedComponent, comp *appsv1alp
 	synthesizeComp.PodSpec.RuntimeClassName = comp.Spec.RuntimeClassName
 }
 
-func buildMonitorEnabled(comp *appsv1alpha1.Component) bool {
-	if comp.Spec.MonitorEnabled != nil {
-		return *comp.Spec.MonitorEnabled
-	}
-	return false
-}
-
 func clusterGeneration(cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component) string {
 	if comp != nil && comp.Annotations != nil {
 		if generation, ok := comp.Annotations[constant.KubeBlocksGenerationKey]; ok {
@@ -288,7 +279,7 @@ func buildComp2CompDefs(ctx context.Context, cli client.Reader, cluster *appsv1a
 
 	// Build from ShardingSpecs
 	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
-		shardingComps, err := intctrlutil.ListShardingComponents(ctx, cli, cluster, &shardingSpec)
+		shardingComps, err := intctrlutil.ListShardingComponents(ctx, cli, cluster, shardingSpec.Name)
 		if err != nil {
 			return nil, err
 		}

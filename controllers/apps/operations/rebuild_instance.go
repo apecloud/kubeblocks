@@ -51,6 +51,8 @@ const (
 
 	waitingForInstanceReadyMessage   = "Waiting for the rebuilding instance to be ready"
 	waitingForPostReadyRestorePrefix = "Waiting for postReady Restore"
+
+	ignoreRoleCheckAnnotationKey = "kubeblocks.io/ignore-role-check"
 )
 
 type rebuildInstanceOpsHandler struct{}
@@ -113,7 +115,7 @@ func (r rebuildInstanceOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli cli
 			if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: ins.Name, Namespace: opsRes.Cluster.Namespace}, targetPod); err != nil {
 				return err
 			}
-			isAvailable, _ := r.instanceIsAvailable(synthesizedComp, targetPod)
+			isAvailable, _ := r.instanceIsAvailable(synthesizedComp, targetPod, "")
 			if isAvailable {
 				return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" is availabled, can not rebuild it`, ins.Name))
 			}
@@ -256,6 +258,8 @@ func (r rebuildInstanceOpsHandler) prepareInstanceHelper(reqCtx intctrlutil.Requ
 		return nil, err
 	}
 	synthesizedComp, err := component.BuildSynthesizedComponentWrapper(reqCtx, cli, opsRes.Cluster, comp)
+	// TODO: remove after v0.9
+	synthesizedComp.CompDefName = comp.ComponentDef
 	if err != nil {
 		return nil, err
 	}
@@ -297,7 +301,7 @@ func (r rebuildInstanceOpsHandler) rebuildInstanceWithNoBackup(reqCtx intctrluti
 	}
 
 	// 3. waiting for new instance is available.
-	return r.instanceIsAvailable(insHelper.synthesizedComp, insHelper.targetPod)
+	return r.instanceIsAvailable(insHelper.synthesizedComp, insHelper.targetPod, opsRes.OpsRequest.Annotations[ignoreRoleCheckAnnotationKey])
 }
 
 // rebuildPodWithBackup rebuild instance with backup.
@@ -326,7 +330,7 @@ func (r rebuildInstanceOpsHandler) rebuildInstanceWithBackup(reqCtx intctrlutil.
 			// create Restore CR
 			if stage == dpv1alpha1.PostReady {
 				//  waiting for the pod is available and do PostReady restore.
-				available, err := r.instanceIsAvailable(insHelper.synthesizedComp, insHelper.targetPod)
+				available, err := r.instanceIsAvailable(insHelper.synthesizedComp, insHelper.targetPod, opsRes.OpsRequest.Annotations[ignoreRoleCheckAnnotationKey])
 				if err != nil || !available {
 					return false, err
 				}
@@ -367,7 +371,7 @@ func (r rebuildInstanceOpsHandler) rebuildInstanceWithBackup(reqCtx intctrlutil.
 		// 3. do PostReady restore
 		return waitRestoreCompleted(dpv1alpha1.PostReady)
 	}
-	return r.instanceIsAvailable(insHelper.synthesizedComp, insHelper.targetPod)
+	return r.instanceIsAvailable(insHelper.synthesizedComp, insHelper.targetPod, opsRes.OpsRequest.Annotations[ignoreRoleCheckAnnotationKey])
 }
 
 // rebuildInstancePVByPod rebuilds the new instance pvs by a temp pod.
@@ -393,10 +397,10 @@ func (r rebuildInstanceOpsHandler) rebuildInstancePVByPod(reqCtx intctrlutil.Req
 }
 
 func (r rebuildInstanceOpsHandler) getWellKnownLabels(synthesizedComp *component.SynthesizedComponent) map[string]string {
-	if synthesizedComp.ClusterDefName != "" {
-		return constant.GetKBWellKnownLabels(synthesizedComp.ClusterDefName, synthesizedComp.ClusterName, synthesizedComp.Name)
+	if synthesizedComp.CompDefName != "" {
+		return constant.GetKBWellKnownLabelsWithCompDef(synthesizedComp.CompDefName, synthesizedComp.ClusterName, synthesizedComp.Name)
 	}
-	return constant.GetKBWellKnownLabelsWithCompDef(synthesizedComp.CompDefName, synthesizedComp.ClusterName, synthesizedComp.Name)
+	return constant.GetKBWellKnownLabels(synthesizedComp.ClusterDefName, synthesizedComp.ClusterName, synthesizedComp.Name)
 }
 
 // getPVCMapAndVolumes gets the pvc map and the volume infos.
@@ -765,11 +769,12 @@ func (r rebuildInstanceOpsHandler) removePVCFinalizer(reqCtx intctrlutil.Request
 // instanceIsAvailable checks if the instance is available.
 func (r rebuildInstanceOpsHandler) instanceIsAvailable(
 	synthesizedComp *component.SynthesizedComponent,
-	targetPod *corev1.Pod) (bool, error) {
+	targetPod *corev1.Pod,
+	ignoreRoleCheckAnnotation string) (bool, error) {
 	if !targetPod.DeletionTimestamp.IsZero() {
 		return false, nil
 	}
-	isFailed, isTimeout, _ := intctrlutil.IsPodFailedAndTimedOut(targetPod)
+	isFailed, isTimeout, _ := intctrlutil.IsPodFailedAndTimedOut(targetPod, true)
 	if isFailed && isTimeout {
 		return false, intctrlutil.NewFatalError(fmt.Sprintf(`the new instance "%s" is failed, please check it`, targetPod.Name))
 	}
@@ -777,7 +782,7 @@ func (r rebuildInstanceOpsHandler) instanceIsAvailable(
 		return false, nil
 	}
 	// If roleProbe is not defined, return true.
-	if len(synthesizedComp.Roles) == 0 {
+	if len(synthesizedComp.Roles) == 0 || ignoreRoleCheckAnnotation == "true" {
 		return true, nil
 	}
 	// check if the role detection is successfully.

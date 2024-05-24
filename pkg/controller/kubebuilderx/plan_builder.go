@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -248,6 +249,7 @@ func (b *PlanBuilder) createObject(ctx context.Context, vertex *model.ObjectVert
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
+	b.emitEvent(vertex.Obj, "SuccessfulCreate", model.CREATE)
 	return nil
 }
 
@@ -256,6 +258,7 @@ func (b *PlanBuilder) updateObject(ctx context.Context, vertex *model.ObjectVert
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
+	b.emitEvent(vertex.Obj, "SuccessfulUpdate", model.UPDATE)
 	return nil
 }
 
@@ -265,6 +268,7 @@ func (b *PlanBuilder) patchObject(ctx context.Context, vertex *model.ObjectVerte
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
+	b.emitEvent(vertex.Obj, "SuccessfulUpdate", model.UPDATE)
 	return nil
 }
 
@@ -282,6 +286,7 @@ func (b *PlanBuilder) deleteObject(ctx context.Context, vertex *model.ObjectVert
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
+		b.emitEvent(vertex.Obj, "SuccessfulDelete", model.DELETE)
 	}
 	return nil
 }
@@ -291,6 +296,24 @@ func (b *PlanBuilder) statusObject(ctx context.Context, vertex *model.ObjectVert
 		return err
 	}
 	return nil
+}
+
+func (b *PlanBuilder) emitEvent(obj client.Object, reason string, action model.Action) {
+	if b.currentTree == nil {
+		return
+	}
+	root := b.currentTree.GetRoot()
+	b.currentTree.EventRecorder.Eventf(root, corev1.EventTypeNormal, reason,
+		"%s %s %s in %s %s successful",
+		strings.ToLower(string(action)), getTypeName(obj), obj.GetName(), getTypeName(root), root.GetName())
+}
+
+func getTypeName(i any) string {
+	t := reflect.TypeOf(i)
+	if t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	return t.Name()
 }
 
 // NewPlanBuilder returns a PlanBuilder

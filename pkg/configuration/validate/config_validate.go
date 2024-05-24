@@ -132,7 +132,7 @@ func NewConfigValidator(configConstraint *appsv1beta1.ConfigConstraintSpec, opti
 
 	var (
 		validator    ConfigValidator
-		configSchema = configConstraint.ConfigSchema
+		configSchema = configConstraint.ParametersSchema
 	)
 
 	switch {

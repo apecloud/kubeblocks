@@ -50,9 +50,6 @@ func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 		return err
 	}
 
-	if len(c.Cluster.Spec.ShardingSpecs) == 0 {
-		return nil
-	}
 	// when restoring a sharded cluster, it is essential to specify the 'sourceTarget' from which data should be restored for each sharded component.
 	// to achieve this, we allocate the source target for each component using annotations.
 	for i := range c.Cluster.Spec.ShardingSpecs {
@@ -70,7 +67,7 @@ func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 				`the source targets count of the backup "%s" must be equal to or greater than the count of the shard components "%s"`,
 				backup.Name, shardingSpec.Name)
 		}
-		shardComponents, err := intctrlutil.ListShardingComponents(c.Context, c.Client, c.Cluster, &shardingSpec)
+		shardComponents, err := intctrlutil.ListShardingComponents(c.Context, c.Client, c.Cluster, shardingSpec.Name)
 		if err != nil {
 			return err
 		}

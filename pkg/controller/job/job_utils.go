@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package component
+package job
 
 import (
 	"context"
@@ -33,8 +33,11 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-const (
-	KBJobTTLSecondsAfterFinished = 5
+var (
+	jobTTLSecondsAfterFinished = func() *int32 {
+		ttl := int32(5)
+		return &ttl
+	}()
 )
 
 // GetJobWithLabels gets the job list with the specified labels.
@@ -59,9 +62,8 @@ func CleanJobWithLabels(ctx context.Context,
 		return err
 	}
 	for _, job := range jobList {
-		var ttl = int32(KBJobTTLSecondsAfterFinished)
 		patch := client.MergeFrom(job.DeepCopy())
-		job.Spec.TTLSecondsAfterFinished = &ttl
+		job.Spec.TTLSecondsAfterFinished = jobTTLSecondsAfterFinished
 		if err := cli.Patch(ctx, &job, patch); err != nil {
 			return err
 		}
@@ -79,9 +81,8 @@ func CleanJobByName(ctx context.Context,
 	if err := cli.Get(ctx, key, job); err != nil {
 		return err
 	}
-	var ttl = int32(KBJobTTLSecondsAfterFinished)
 	patch := client.MergeFrom(job.DeepCopy())
-	job.Spec.TTLSecondsAfterFinished = &ttl
+	job.Spec.TTLSecondsAfterFinished = jobTTLSecondsAfterFinished
 	if err := cli.Patch(ctx, job, patch); err != nil {
 		return err
 	}
@@ -99,9 +100,8 @@ func CleanJobByNameWithDAG(ctx context.Context,
 	if err := cli.Get(ctx, key, job); err != nil {
 		return err
 	}
-	var ttl = int32(KBJobTTLSecondsAfterFinished)
 	patch := job.DeepCopy()
-	job.Spec.TTLSecondsAfterFinished = &ttl
+	job.Spec.TTLSecondsAfterFinished = jobTTLSecondsAfterFinished
 	graphCli, _ := cli.(model.GraphClient)
 	graphCli.Update(dag, patch, job, &model.ReplaceIfExistingOption{})
 	return nil

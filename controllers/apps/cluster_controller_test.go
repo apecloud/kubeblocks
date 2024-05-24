@@ -160,6 +160,9 @@ var _ = Describe("Cluster Controller", func() {
 			Create(&testCtx).
 			GetObject()
 
+		By("Create a bpt obj")
+		createBackupPolicyTpl(clusterDefObj, compDefObj.Name, clusterVersionName)
+
 		By("Create a componentVersion obj")
 		compVersionObj = testapps.NewComponentVersionFactory(compVersionName).
 			SetSpec(appsv1alpha1.ComponentVersionSpec{
@@ -346,6 +349,19 @@ var _ = Describe("Cluster Controller", func() {
 		}
 		Eventually(testapps.List(&testCtx, generics.ComponentSignature,
 			ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(defaultShardCount))
+
+		By("checking backup policy")
+		backupPolicyName := generateBackupPolicyName(clusterKey.Name, compTplName, "")
+		backupPolicyKey := client.ObjectKey{Name: backupPolicyName, Namespace: clusterKey.Namespace}
+		Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, bp *dpv1alpha1.BackupPolicy) {
+			g.Expect(bp.Spec.Targets).Should(HaveLen(defaultShardCount))
+		})).Should(Succeed())
+
+		By("checking backup schedule")
+		backupScheduleName := generateBackupScheduleName(clusterKey.Name, compTplName, "")
+		backupScheduleKey := client.ObjectKey{Name: backupScheduleName, Namespace: clusterKey.Namespace}
+		Eventually(testapps.CheckObjExists(&testCtx, backupScheduleKey,
+			&dpv1alpha1.BackupSchedule{}, true)).Should(Succeed())
 	}
 
 	createLegacyClusterObjWithSharding := func(compTplName, compDefName string, processor func(*testapps.MockClusterFactory)) {
@@ -662,7 +678,8 @@ var _ = Describe("Cluster Controller", func() {
 			PodAntiAffinity: appsv1alpha1.Preferred,
 			TopologyKeys:    []string{compTopologyKey},
 			NodeLabels: map[string]string{
-				compLabelKey: compLabelValue,
+				compLabelKey:    compLabelValue,
+				clusterLabelKey: clusterLabelValue,
 			},
 			Tenancy: appsv1alpha1.DedicatedNode,
 		}
@@ -688,6 +705,10 @@ var _ = Describe("Cluster Controller", func() {
 		By("Checking the Affinity and Toleration")
 		schedulingPolicy, err := scheduling.BuildSchedulingPolicy4Component(clusterObj.Name, compName, &compAffinity, []corev1.Toleration{compToleration})
 		Expect(err).Should(BeNil())
+		// key of the MatchExpressions must be sorted.
+		MatchExpressions := schedulingPolicy.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions
+		Expect(MatchExpressions).Should(HaveLen(2))
+		Expect(MatchExpressions[0].Key).Should(Equal(clusterLabelKey))
 
 		compKey := types.NamespacedName{
 			Namespace: clusterObj.Namespace,
@@ -1269,7 +1290,6 @@ var _ = Describe("Cluster Controller", func() {
 		BeforeEach(func() {
 			cleanEnv()
 			createAllWorkloadTypesClusterDef()
-			createBackupPolicyTpl(clusterDefObj, clusterVersionName)
 		})
 
 		createClusterWithBackup := func(backup *appsv1alpha1.ClusterBackup) {
@@ -1389,14 +1409,14 @@ var _ = Describe("Cluster Controller", func() {
 				}
 
 				By("checking backup policy")
-				backupPolicyName := generateBackupPolicyName(clusterKey.Name, compDefName, "")
+				backupPolicyName := generateBackupPolicyName(clusterKey.Name, consensusCompName, "")
 				backupPolicyKey := client.ObjectKey{Name: backupPolicyName, Namespace: clusterKey.Namespace}
 				backupPolicy := &dpv1alpha1.BackupPolicy{}
 				Eventually(testapps.CheckObjExists(&testCtx, backupPolicyKey, backupPolicy, true)).Should(Succeed())
 				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, checkPolicy)).Should(Succeed())
 
 				By("checking backup schedule")
-				backupScheduleName := generateBackupScheduleName(clusterKey.Name, compDefName, "")
+				backupScheduleName := generateBackupScheduleName(clusterKey.Name, consensusCompName, "")
 				backupScheduleKey := client.ObjectKey{Name: backupScheduleName, Namespace: clusterKey.Namespace}
 				if backup == nil {
 					Eventually(testapps.CheckObjExists(&testCtx, backupScheduleKey,
@@ -1532,15 +1552,17 @@ var _ = Describe("Cluster Controller", func() {
 	})
 })
 
-func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition, mappingClusterVersions ...string) {
+func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition, compDef string, mappingClusterVersions ...string) {
 	By("Creating a BackupPolicyTemplate")
 	bpt := testapps.NewBackupPolicyTemplateFactory(backupPolicyTPLName).
 		AddLabels(constant.ClusterDefLabelKey, clusterDefObj.Name).
+		AddLabels(compDef, compDef).
 		SetClusterDefRef(clusterDefObj.Name)
 	ttl := "7d"
 	for _, v := range clusterDefObj.Spec.ComponentDefs {
 		bpt = bpt.AddBackupPolicy(v.Name).
 			AddBackupMethod(backupMethodName, false, actionSetName, mappingClusterVersions...).
+			SetComponentDef(compDef).
 			SetBackupMethodVolumeMounts("data", "/data").
 			AddBackupMethod(vsBackupMethodName, true, vsActionSetName).
 			SetBackupMethodVolumes([]string{"data"}).

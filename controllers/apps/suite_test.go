@@ -72,7 +72,6 @@ var ctx context.Context
 var cancel context.CancelFunc
 var testCtx testutil.TestContext
 var clusterRecorder record.EventRecorder
-var systemAccountReconciler *SystemAccountReconciler
 var logger logr.Logger
 
 func init() {
@@ -111,7 +110,8 @@ var _ = BeforeSuite(func() {
 			// use dependent external CRDs.
 			// resolved by ref: https://github.com/operator-framework/operator-sdk/issues/4434#issuecomment-786794418
 			filepath.Join(build.Default.GOPATH, "pkg", "mod", "github.com", "kubernetes-csi/external-snapshotter/",
-				"client/v6@v6.2.0", "config", "crd")},
+				"client/v6@v6.2.0", "config", "crd"),
+		},
 		ErrorIfCRDPathMissing: true,
 	}
 
@@ -240,15 +240,6 @@ var _ = BeforeSuite(func() {
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("event-controller"),
 	}).SetupWithManager(k8sManager, nil)
-	Expect(err).ToNot(HaveOccurred())
-
-	// add SystemAccountReconciler
-	systemAccountReconciler = &SystemAccountReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("system-account-controller"),
-	}
-	err = systemAccountReconciler.SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&configuration.ConfigConstraintReconciler{

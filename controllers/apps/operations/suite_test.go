@@ -179,15 +179,15 @@ func initOperationsResources(clusterDefinitionName,
 	return opsRes, clusterDef, clusterObject
 }
 
-func initInstanceSetPods(ctx context.Context, cli client.Client, opsRes *OpsResource, clusterName string) []corev1.Pod {
+func initInstanceSetPods(ctx context.Context, cli client.Client, opsRes *OpsResource, clusterName string) []*corev1.Pod {
 	// mock the pods of consensusSet component
 	testapps.MockInstanceSetPods(&testCtx, nil, clusterName, consensusComp)
-	podList, err := intctrlcomp.GetComponentPodList(ctx, cli, *opsRes.Cluster, consensusComp)
+	pods, err := intctrlcomp.ListOwnedPods(ctx, cli, opsRes.Cluster.Namespace, opsRes.Cluster.Name, consensusComp)
 	Expect(err).Should(Succeed())
 	// the opsRequest will use startTime to check some condition.
 	// if there is no sleep for 1 second, unstable error may occur.
 	time.Sleep(time.Second)
-	return podList.Items
+	return pods
 }
 
 func mockComponentIsOperating(cluster *appsv1alpha1.Cluster, expectPhase appsv1alpha1.ClusterComponentPhase, compNames ...string) {

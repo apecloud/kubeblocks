@@ -215,33 +215,7 @@ func getMemberUpdateStrategy(synthesizedComp *SynthesizedComponent) *workloads.M
 }
 
 // itsServiceConvertor converts the given object into InstanceSet.Spec.Service.
-// TODO(xingran): ComponentServices are not consistent with InstanceSet.Spec.Service, If it is based on the new ComponentDefinition API,
-// the services is temporarily handled in the component controller, and the corresponding InstanceSet.Spec.Service is temporarily set nil.
 func (c *itsServiceConvertor) convert(args ...any) (any, error) {
-	/*
-		var compService appsv1alpha1.ComponentService
-		_, synthesizeComp, err := parseITSConvertorArgs(args...)
-		if err != nil {
-			return nil, err
-		}
-		compServices := synthesizeComp.ComponentServices
-		if len(compServices) == 0 {
-			return nil, nil
-		}
-		// get the first component service as the ITS service
-		if len(compServices) > 0 {
-			compService = compServices[0]
-		}
-
-		// TODO(xingran): ComponentService.Name and ComponentService.RoleSelector are not used in InstanceSet.Spec.Service
-		itsService := &corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: string(compService.ServiceName),
-			},
-			Spec: compService.ServiceSpec,
-		}
-		return itsService, nil
-	*/
 	return nil, nil
 }
 

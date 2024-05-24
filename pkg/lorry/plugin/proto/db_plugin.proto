@@ -59,7 +59,7 @@ message IsDBReadyResponse {
   bool ready = 1;
 
   // This field is OPTIONAL. 
-  map<string, string> metadata = 3;
+  map<string, string> metadata = 2;
 }
 
 message DBInfo {
@@ -250,6 +250,7 @@ service DBPlugin {
   // AccountProvision Defines the procedure to generate a new database account.
   rpc AccountProvision(AccountProvisionRequest) returns (AccountProvisionResponse) {}
 
-  // Switchover defines the procedure to switch roles of the primary and candidate.
+  // Switchover defines the procedure to switch replica roles in a primary-secondary 
+  // HA DBEngine by promoting the secondary to primary and demoting the current primary to secondary.
   rpc Switchover(SwitchoverRequest) returns (SwitchoverResponse) {}
 }

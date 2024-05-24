@@ -1007,6 +1007,24 @@ type EnvVar struct {
 	//
 	// +optional
 	ValueFrom *VarSource `json:"valueFrom,omitempty"`
+
+	// A Go template expression that will be applied to the resolved value of the var.
+	//
+	// The expression will only be evaluated if the var is successfully resolved to a non-credential value.
+	//
+	// The resolved value can be accessed by its name within the expression, system vars and other user-defined
+	// non-credential vars can be used within the expression in the same way.
+	// Notice that, when accessing vars by its name, you should replace all the "-" in the name with "_", because of
+	// that "-" is not a valid identifier in Go.
+	//
+	// All expressions are evaluated in the order the vars are defined. If a var depends on any vars that also
+	// have expressions defined, be careful about the evaluation order as it may use intermediate values.
+	//
+	// The result of evaluation will be used as the final value of the var. If the expression fails to evaluate,
+	// the resolving of var will also be considered failed.
+	//
+	// +optional
+	Expression *string `json:"expression,omitempty"`
 }
 
 // VarSource represents a source for the value of an EnvVar.

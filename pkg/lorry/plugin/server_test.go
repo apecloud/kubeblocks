@@ -33,15 +33,15 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-type mockDBPluginServer struct {
-	UnimplementedDBPluginServer
+type mockServicePluginServer struct {
+	UnimplementedServicePluginServer
 }
 
-func (s *mockDBPluginServer) GetPluginInfo(ctx context.Context, in *GetPluginInfoRequest) (*GetPluginInfoResponse, error) {
+func (s *mockServicePluginServer) GetPluginInfo(ctx context.Context, in *GetPluginInfoRequest) (*GetPluginInfoResponse, error) {
 	return &GetPluginInfoResponse{
-		Name:    "mock",
-		Version: "1.0.0",
-		DbType:  "mockDB",
+		Name:        "mock",
+		Version:     "1.0.0",
+		ServiceType: "mockDB",
 	}, nil
 }
 
@@ -65,8 +65,8 @@ func TestServe(t *testing.T) {
 	// Generate a random Unix socket path
 	socketPath := filepath.Join(tmpDir, "test.sock")
 
-	// Create a new DBPluginServer
-	dbPlugin := &mockDBPluginServer{}
+	// Create a new ServicePluginServer
+	servicePlugin := &mockServicePluginServer{}
 
 	// Create a new nonBlockingGRPCServer
 	server := &nonBlockingGRPCServer{
@@ -74,7 +74,7 @@ func TestServe(t *testing.T) {
 	}
 
 	// Start serving on the Unix socket
-	go server.serve("unix:/"+socketPath, dbPlugin)
+	go server.serve("unix:/"+socketPath, servicePlugin)
 
 	// Wait for the server to start
 	time.Sleep(time.Millisecond * 100)
@@ -90,8 +90,8 @@ func TestServe(t *testing.T) {
 	}
 	defer conn.Close()
 
-	// Create a new DBPluginClient
-	client := NewDBPluginClient(conn)
+	// Create a new ServicePluginClient
+	client := NewServicePluginClient(conn)
 
 	// Call a gRPC method on the server
 	_, err = client.GetPluginInfo(context.Background(), &GetPluginInfoRequest{})

@@ -32,7 +32,7 @@ func TestStripSecrets(t *testing.T) {
 	secretValue := "123"
 
 	getRoleReq := &GetRoleRequest{
-		DbInfo: &DBInfo{
+		ServiceInfo: &ServiceInfo{
 			Fqdn:          "fqdn",
 			Port:          "1024",
 			AdminUser:     "admin",
@@ -57,13 +57,13 @@ func TestStripSecrets(t *testing.T) {
 	// Message from revised spec as received by a sidecar based on the current spec.
 	// The XXX_unrecognized field contains secrets and must not get logged.
 	unknownFields := &GetRoleRequest{}
-	dbinfo := &DBInfo{
+	serviceinfo := &ServiceInfo{
 		Fqdn:          "fqdn",
 		Port:          "1024",
 		AdminUser:     "admin",
 		AdminPassword: secretValue,
 	}
-	m := dbinfo.ProtoReflect()
+	m := serviceinfo.ProtoReflect()
 	md := m.Descriptor()
 	fields := md.Fields()
 	for i := 0; i < fields.Len(); i++ {

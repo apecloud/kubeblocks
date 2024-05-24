@@ -33,7 +33,7 @@ import (
 // NonBlockingGRPCServer Defines Non blocking GRPC server interfaces
 type NonBlockingGRPCServer interface {
 	// Start services at the endpoint
-	Start(endpoint string, dbPlugin DBPluginServer)
+	Start(endpoint string, servicePlugin ServicePluginServer)
 	// Waits for the service to stop
 	Wait()
 	// Stops the service gracefully
@@ -55,11 +55,11 @@ type nonBlockingGRPCServer struct {
 	logger logr.Logger
 }
 
-func (s *nonBlockingGRPCServer) Start(endpoint string, dbPlugin DBPluginServer) {
+func (s *nonBlockingGRPCServer) Start(endpoint string, servicePlugin ServicePluginServer) {
 
 	s.wg.Add(1)
 
-	go s.serve(endpoint, dbPlugin)
+	go s.serve(endpoint, servicePlugin)
 }
 
 func (s *nonBlockingGRPCServer) Wait() {
@@ -74,7 +74,7 @@ func (s *nonBlockingGRPCServer) ForceStop() {
 	s.server.Stop()
 }
 
-func (s *nonBlockingGRPCServer) serve(endpoint string, dbPlugin DBPluginServer) {
+func (s *nonBlockingGRPCServer) serve(endpoint string, servicePlugin ServicePluginServer) {
 
 	proto, addr, err := ParseEndpoint(endpoint)
 	if err != nil {
@@ -99,7 +99,7 @@ func (s *nonBlockingGRPCServer) serve(endpoint string, dbPlugin DBPluginServer) 
 	server := grpc.NewServer(opts...)
 	s.server = server
 
-	RegisterDBPluginServer(server, dbPlugin)
+	RegisterServicePluginServer(server, servicePlugin)
 
 	s.logger.Info("Listening for connections on address", "addr", listener.Addr())
 

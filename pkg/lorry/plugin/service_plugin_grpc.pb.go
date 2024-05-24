@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             v4.25.2
-// source: db_plugin.proto
+// source: service_plugin.proto
 
 package plugin
 
@@ -18,13 +18,13 @@ import (
 // Requires gRPC-Go v1.32.0 or later.
 const _ = grpc.SupportPackageIsVersion7
 
-// DBPluginClient is the client API for DBPlugin service.
+// ServicePluginClient is the client API for ServicePlugin service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type DBPluginClient interface {
+type ServicePluginClient interface {
 	GetPluginInfo(ctx context.Context, in *GetPluginInfoRequest, opts ...grpc.CallOption) (*GetPluginInfoResponse, error)
-	// IsDBReady defines the mechanism to probe the readiness of the database.
-	IsDBReady(ctx context.Context, in *IsDBReadyRequest, opts ...grpc.CallOption) (*IsDBReadyResponse, error)
+	// IsServiceReady defines the mechanism to probe the readiness of the database.
+	IsServiceReady(ctx context.Context, in *IsServiceReadyRequest, opts ...grpc.CallOption) (*IsServiceReadyResponse, error)
 	// GetRole defines the mechanism to probe the role of replicas. The return role
 	// must be one of the names defined in the componentdefinition roles.
 	GetRole(ctx context.Context, in *GetRoleRequest, opts ...grpc.CallOption) (*GetRoleResponse, error)
@@ -49,102 +49,102 @@ type DBPluginClient interface {
 	Switchover(ctx context.Context, in *SwitchoverRequest, opts ...grpc.CallOption) (*SwitchoverResponse, error)
 }
 
-type dBPluginClient struct {
+type servicePluginClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewDBPluginClient(cc grpc.ClientConnInterface) DBPluginClient {
-	return &dBPluginClient{cc}
+func NewServicePluginClient(cc grpc.ClientConnInterface) ServicePluginClient {
+	return &servicePluginClient{cc}
 }
 
-func (c *dBPluginClient) GetPluginInfo(ctx context.Context, in *GetPluginInfoRequest, opts ...grpc.CallOption) (*GetPluginInfoResponse, error) {
+func (c *servicePluginClient) GetPluginInfo(ctx context.Context, in *GetPluginInfoRequest, opts ...grpc.CallOption) (*GetPluginInfoResponse, error) {
 	out := new(GetPluginInfoResponse)
-	err := c.cc.Invoke(ctx, "/plugin.v1.DBPlugin/GetPluginInfo", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/plugin.v1.ServicePlugin/GetPluginInfo", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *dBPluginClient) IsDBReady(ctx context.Context, in *IsDBReadyRequest, opts ...grpc.CallOption) (*IsDBReadyResponse, error) {
-	out := new(IsDBReadyResponse)
-	err := c.cc.Invoke(ctx, "/plugin.v1.DBPlugin/IsDBReady", in, out, opts...)
+func (c *servicePluginClient) IsServiceReady(ctx context.Context, in *IsServiceReadyRequest, opts ...grpc.CallOption) (*IsServiceReadyResponse, error) {
+	out := new(IsServiceReadyResponse)
+	err := c.cc.Invoke(ctx, "/plugin.v1.ServicePlugin/IsServiceReady", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *dBPluginClient) GetRole(ctx context.Context, in *GetRoleRequest, opts ...grpc.CallOption) (*GetRoleResponse, error) {
+func (c *servicePluginClient) GetRole(ctx context.Context, in *GetRoleRequest, opts ...grpc.CallOption) (*GetRoleResponse, error) {
 	out := new(GetRoleResponse)
-	err := c.cc.Invoke(ctx, "/plugin.v1.DBPlugin/GetRole", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/plugin.v1.ServicePlugin/GetRole", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *dBPluginClient) JoinMember(ctx context.Context, in *JoinMemberRequest, opts ...grpc.CallOption) (*JoinMemberResponse, error) {
+func (c *servicePluginClient) JoinMember(ctx context.Context, in *JoinMemberRequest, opts ...grpc.CallOption) (*JoinMemberResponse, error) {
 	out := new(JoinMemberResponse)
-	err := c.cc.Invoke(ctx, "/plugin.v1.DBPlugin/JoinMember", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/plugin.v1.ServicePlugin/JoinMember", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *dBPluginClient) LeaveMember(ctx context.Context, in *LeaveMemberRequest, opts ...grpc.CallOption) (*LeaveMemberResponse, error) {
+func (c *servicePluginClient) LeaveMember(ctx context.Context, in *LeaveMemberRequest, opts ...grpc.CallOption) (*LeaveMemberResponse, error) {
 	out := new(LeaveMemberResponse)
-	err := c.cc.Invoke(ctx, "/plugin.v1.DBPlugin/LeaveMember", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/plugin.v1.ServicePlugin/LeaveMember", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *dBPluginClient) Readonly(ctx context.Context, in *ReadonlyRequest, opts ...grpc.CallOption) (*ReadonlyResponse, error) {
+func (c *servicePluginClient) Readonly(ctx context.Context, in *ReadonlyRequest, opts ...grpc.CallOption) (*ReadonlyResponse, error) {
 	out := new(ReadonlyResponse)
-	err := c.cc.Invoke(ctx, "/plugin.v1.DBPlugin/Readonly", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/plugin.v1.ServicePlugin/Readonly", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *dBPluginClient) Readwrite(ctx context.Context, in *ReadwriteRequest, opts ...grpc.CallOption) (*ReadwriteResponse, error) {
+func (c *servicePluginClient) Readwrite(ctx context.Context, in *ReadwriteRequest, opts ...grpc.CallOption) (*ReadwriteResponse, error) {
 	out := new(ReadwriteResponse)
-	err := c.cc.Invoke(ctx, "/plugin.v1.DBPlugin/Readwrite", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/plugin.v1.ServicePlugin/Readwrite", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *dBPluginClient) AccountProvision(ctx context.Context, in *AccountProvisionRequest, opts ...grpc.CallOption) (*AccountProvisionResponse, error) {
+func (c *servicePluginClient) AccountProvision(ctx context.Context, in *AccountProvisionRequest, opts ...grpc.CallOption) (*AccountProvisionResponse, error) {
 	out := new(AccountProvisionResponse)
-	err := c.cc.Invoke(ctx, "/plugin.v1.DBPlugin/AccountProvision", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/plugin.v1.ServicePlugin/AccountProvision", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *dBPluginClient) Switchover(ctx context.Context, in *SwitchoverRequest, opts ...grpc.CallOption) (*SwitchoverResponse, error) {
+func (c *servicePluginClient) Switchover(ctx context.Context, in *SwitchoverRequest, opts ...grpc.CallOption) (*SwitchoverResponse, error) {
 	out := new(SwitchoverResponse)
-	err := c.cc.Invoke(ctx, "/plugin.v1.DBPlugin/Switchover", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/plugin.v1.ServicePlugin/Switchover", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// DBPluginServer is the server API for DBPlugin service.
-// All implementations must embed UnimplementedDBPluginServer
+// ServicePluginServer is the server API for ServicePlugin service.
+// All implementations must embed UnimplementedServicePluginServer
 // for forward compatibility
-type DBPluginServer interface {
+type ServicePluginServer interface {
 	GetPluginInfo(context.Context, *GetPluginInfoRequest) (*GetPluginInfoResponse, error)
-	// IsDBReady defines the mechanism to probe the readiness of the database.
-	IsDBReady(context.Context, *IsDBReadyRequest) (*IsDBReadyResponse, error)
+	// IsServiceReady defines the mechanism to probe the readiness of the database.
+	IsServiceReady(context.Context, *IsServiceReadyRequest) (*IsServiceReadyResponse, error)
 	// GetRole defines the mechanism to probe the role of replicas. The return role
 	// must be one of the names defined in the componentdefinition roles.
 	GetRole(context.Context, *GetRoleRequest) (*GetRoleResponse, error)
@@ -167,259 +167,259 @@ type DBPluginServer interface {
 	// Switchover defines the procedure to switch replica roles in a primary-secondary
 	// HA DBEngine by promoting the secondary to primary and demoting the current primary to secondary.
 	Switchover(context.Context, *SwitchoverRequest) (*SwitchoverResponse, error)
-	mustEmbedUnimplementedDBPluginServer()
+	mustEmbedUnimplementedServicePluginServer()
 }
 
-// UnimplementedDBPluginServer must be embedded to have forward compatible implementations.
-type UnimplementedDBPluginServer struct {
+// UnimplementedServicePluginServer must be embedded to have forward compatible implementations.
+type UnimplementedServicePluginServer struct {
 }
 
-func (UnimplementedDBPluginServer) GetPluginInfo(context.Context, *GetPluginInfoRequest) (*GetPluginInfoResponse, error) {
+func (UnimplementedServicePluginServer) GetPluginInfo(context.Context, *GetPluginInfoRequest) (*GetPluginInfoResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetPluginInfo not implemented")
 }
-func (UnimplementedDBPluginServer) IsDBReady(context.Context, *IsDBReadyRequest) (*IsDBReadyResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method IsDBReady not implemented")
+func (UnimplementedServicePluginServer) IsServiceReady(context.Context, *IsServiceReadyRequest) (*IsServiceReadyResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method IsServiceReady not implemented")
 }
-func (UnimplementedDBPluginServer) GetRole(context.Context, *GetRoleRequest) (*GetRoleResponse, error) {
+func (UnimplementedServicePluginServer) GetRole(context.Context, *GetRoleRequest) (*GetRoleResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetRole not implemented")
 }
-func (UnimplementedDBPluginServer) JoinMember(context.Context, *JoinMemberRequest) (*JoinMemberResponse, error) {
+func (UnimplementedServicePluginServer) JoinMember(context.Context, *JoinMemberRequest) (*JoinMemberResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method JoinMember not implemented")
 }
-func (UnimplementedDBPluginServer) LeaveMember(context.Context, *LeaveMemberRequest) (*LeaveMemberResponse, error) {
+func (UnimplementedServicePluginServer) LeaveMember(context.Context, *LeaveMemberRequest) (*LeaveMemberResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method LeaveMember not implemented")
 }
-func (UnimplementedDBPluginServer) Readonly(context.Context, *ReadonlyRequest) (*ReadonlyResponse, error) {
+func (UnimplementedServicePluginServer) Readonly(context.Context, *ReadonlyRequest) (*ReadonlyResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Readonly not implemented")
 }
-func (UnimplementedDBPluginServer) Readwrite(context.Context, *ReadwriteRequest) (*ReadwriteResponse, error) {
+func (UnimplementedServicePluginServer) Readwrite(context.Context, *ReadwriteRequest) (*ReadwriteResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Readwrite not implemented")
 }
-func (UnimplementedDBPluginServer) AccountProvision(context.Context, *AccountProvisionRequest) (*AccountProvisionResponse, error) {
+func (UnimplementedServicePluginServer) AccountProvision(context.Context, *AccountProvisionRequest) (*AccountProvisionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AccountProvision not implemented")
 }
-func (UnimplementedDBPluginServer) Switchover(context.Context, *SwitchoverRequest) (*SwitchoverResponse, error) {
+func (UnimplementedServicePluginServer) Switchover(context.Context, *SwitchoverRequest) (*SwitchoverResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Switchover not implemented")
 }
-func (UnimplementedDBPluginServer) mustEmbedUnimplementedDBPluginServer() {}
+func (UnimplementedServicePluginServer) mustEmbedUnimplementedServicePluginServer() {}
 
-// UnsafeDBPluginServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to DBPluginServer will
+// UnsafeServicePluginServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to ServicePluginServer will
 // result in compilation errors.
-type UnsafeDBPluginServer interface {
-	mustEmbedUnimplementedDBPluginServer()
+type UnsafeServicePluginServer interface {
+	mustEmbedUnimplementedServicePluginServer()
 }
 
-func RegisterDBPluginServer(s grpc.ServiceRegistrar, srv DBPluginServer) {
-	s.RegisterService(&DBPlugin_ServiceDesc, srv)
+func RegisterServicePluginServer(s grpc.ServiceRegistrar, srv ServicePluginServer) {
+	s.RegisterService(&ServicePlugin_ServiceDesc, srv)
 }
 
-func _DBPlugin_GetPluginInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ServicePlugin_GetPluginInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetPluginInfoRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(DBPluginServer).GetPluginInfo(ctx, in)
+		return srv.(ServicePluginServer).GetPluginInfo(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/plugin.v1.DBPlugin/GetPluginInfo",
+		FullMethod: "/plugin.v1.ServicePlugin/GetPluginInfo",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DBPluginServer).GetPluginInfo(ctx, req.(*GetPluginInfoRequest))
+		return srv.(ServicePluginServer).GetPluginInfo(ctx, req.(*GetPluginInfoRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _DBPlugin_IsDBReady_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(IsDBReadyRequest)
+func _ServicePlugin_IsServiceReady_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IsServiceReadyRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(DBPluginServer).IsDBReady(ctx, in)
+		return srv.(ServicePluginServer).IsServiceReady(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/plugin.v1.DBPlugin/IsDBReady",
+		FullMethod: "/plugin.v1.ServicePlugin/IsServiceReady",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DBPluginServer).IsDBReady(ctx, req.(*IsDBReadyRequest))
+		return srv.(ServicePluginServer).IsServiceReady(ctx, req.(*IsServiceReadyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _DBPlugin_GetRole_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ServicePlugin_GetRole_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetRoleRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(DBPluginServer).GetRole(ctx, in)
+		return srv.(ServicePluginServer).GetRole(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/plugin.v1.DBPlugin/GetRole",
+		FullMethod: "/plugin.v1.ServicePlugin/GetRole",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DBPluginServer).GetRole(ctx, req.(*GetRoleRequest))
+		return srv.(ServicePluginServer).GetRole(ctx, req.(*GetRoleRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _DBPlugin_JoinMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ServicePlugin_JoinMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(JoinMemberRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(DBPluginServer).JoinMember(ctx, in)
+		return srv.(ServicePluginServer).JoinMember(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/plugin.v1.DBPlugin/JoinMember",
+		FullMethod: "/plugin.v1.ServicePlugin/JoinMember",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DBPluginServer).JoinMember(ctx, req.(*JoinMemberRequest))
+		return srv.(ServicePluginServer).JoinMember(ctx, req.(*JoinMemberRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _DBPlugin_LeaveMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ServicePlugin_LeaveMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(LeaveMemberRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(DBPluginServer).LeaveMember(ctx, in)
+		return srv.(ServicePluginServer).LeaveMember(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/plugin.v1.DBPlugin/LeaveMember",
+		FullMethod: "/plugin.v1.ServicePlugin/LeaveMember",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DBPluginServer).LeaveMember(ctx, req.(*LeaveMemberRequest))
+		return srv.(ServicePluginServer).LeaveMember(ctx, req.(*LeaveMemberRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _DBPlugin_Readonly_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ServicePlugin_Readonly_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ReadonlyRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(DBPluginServer).Readonly(ctx, in)
+		return srv.(ServicePluginServer).Readonly(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/plugin.v1.DBPlugin/Readonly",
+		FullMethod: "/plugin.v1.ServicePlugin/Readonly",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DBPluginServer).Readonly(ctx, req.(*ReadonlyRequest))
+		return srv.(ServicePluginServer).Readonly(ctx, req.(*ReadonlyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _DBPlugin_Readwrite_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ServicePlugin_Readwrite_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ReadwriteRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(DBPluginServer).Readwrite(ctx, in)
+		return srv.(ServicePluginServer).Readwrite(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/plugin.v1.DBPlugin/Readwrite",
+		FullMethod: "/plugin.v1.ServicePlugin/Readwrite",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DBPluginServer).Readwrite(ctx, req.(*ReadwriteRequest))
+		return srv.(ServicePluginServer).Readwrite(ctx, req.(*ReadwriteRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _DBPlugin_AccountProvision_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ServicePlugin_AccountProvision_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(AccountProvisionRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(DBPluginServer).AccountProvision(ctx, in)
+		return srv.(ServicePluginServer).AccountProvision(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/plugin.v1.DBPlugin/AccountProvision",
+		FullMethod: "/plugin.v1.ServicePlugin/AccountProvision",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DBPluginServer).AccountProvision(ctx, req.(*AccountProvisionRequest))
+		return srv.(ServicePluginServer).AccountProvision(ctx, req.(*AccountProvisionRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _DBPlugin_Switchover_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ServicePlugin_Switchover_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SwitchoverRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(DBPluginServer).Switchover(ctx, in)
+		return srv.(ServicePluginServer).Switchover(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/plugin.v1.DBPlugin/Switchover",
+		FullMethod: "/plugin.v1.ServicePlugin/Switchover",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DBPluginServer).Switchover(ctx, req.(*SwitchoverRequest))
+		return srv.(ServicePluginServer).Switchover(ctx, req.(*SwitchoverRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-// DBPlugin_ServiceDesc is the grpc.ServiceDesc for DBPlugin service.
+// ServicePlugin_ServiceDesc is the grpc.ServiceDesc for ServicePlugin service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var DBPlugin_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "plugin.v1.DBPlugin",
-	HandlerType: (*DBPluginServer)(nil),
+var ServicePlugin_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "plugin.v1.ServicePlugin",
+	HandlerType: (*ServicePluginServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "GetPluginInfo",
-			Handler:    _DBPlugin_GetPluginInfo_Handler,
+			Handler:    _ServicePlugin_GetPluginInfo_Handler,
 		},
 		{
-			MethodName: "IsDBReady",
-			Handler:    _DBPlugin_IsDBReady_Handler,
+			MethodName: "IsServiceReady",
+			Handler:    _ServicePlugin_IsServiceReady_Handler,
 		},
 		{
 			MethodName: "GetRole",
-			Handler:    _DBPlugin_GetRole_Handler,
+			Handler:    _ServicePlugin_GetRole_Handler,
 		},
 		{
 			MethodName: "JoinMember",
-			Handler:    _DBPlugin_JoinMember_Handler,
+			Handler:    _ServicePlugin_JoinMember_Handler,
 		},
 		{
 			MethodName: "LeaveMember",
-			Handler:    _DBPlugin_LeaveMember_Handler,
+			Handler:    _ServicePlugin_LeaveMember_Handler,
 		},
 		{
 			MethodName: "Readonly",
-			Handler:    _DBPlugin_Readonly_Handler,
+			Handler:    _ServicePlugin_Readonly_Handler,
 		},
 		{
 			MethodName: "Readwrite",
-			Handler:    _DBPlugin_Readwrite_Handler,
+			Handler:    _ServicePlugin_Readwrite_Handler,
 		},
 		{
 			MethodName: "AccountProvision",
-			Handler:    _DBPlugin_AccountProvision_Handler,
+			Handler:    _ServicePlugin_AccountProvision_Handler,
 		},
 		{
 			MethodName: "Switchover",
-			Handler:    _DBPlugin_Switchover_Handler,
+			Handler:    _ServicePlugin_Switchover_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "db_plugin.proto",
+	Metadata: "service_plugin.proto",
 }

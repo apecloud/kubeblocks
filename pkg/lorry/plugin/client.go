@@ -25,13 +25,13 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-func NewPluginClient(addr string) (DBPluginClient, error) {
+func NewPluginClient(addr string) (ServicePluginClient, error) {
 	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, errors.Wrap(err, "grpc: failed to dial")
 	}
 
-	client := NewDBPluginClient(conn)
+	client := NewServicePluginClient(conn)
 
 	return client, nil
 }

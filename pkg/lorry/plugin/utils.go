@@ -37,8 +37,8 @@ func ParseEndpoint(ep string) (string, string, error) {
 	return "", "", fmt.Errorf("invalid endpoint: %v", ep)
 }
 
-func GetDBInfo() *DBInfo {
-	return &DBInfo{
+func GetDBInfo() *ServiceInfo {
+	return &ServiceInfo{
 		Fqdn:          viper.GetString(constant.KBEnvPodFQDN),
 		Port:          viper.GetString(constant.KBEnvServicePort),
 		AdminUser:     viper.GetString(constant.KBEnvServiceUser),

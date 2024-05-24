@@ -23,18 +23,18 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
-	"google.golang.org/grpc"
+	grpc "google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-func NewPluginClient(host, port string) (DBPluginClient, error) {
+func NewPluginClient(host, port string) (ServicePluginClient, error) {
 	addr := fmt.Sprintf("%s:%s", host, port)
 	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, errors.Wrap(err, "grpc: failed to dial")
 	}
 
-	client := NewDBPluginClient(conn)
+	client := NewServicePluginClient(conn)
 
 	return client, nil
 }

@@ -24,8 +24,8 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -129,7 +129,7 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, _ 
 		lastSnapshotVersion, ok := pod.Annotations[constant.LastRoleSnapshotVersionAnnotationKey]
 		if ok {
 
-			if snapshot.Version <= lastSnapshotVersion {
+			if snapshot.Version <= lastSnapshotVersion && !strings.Contains(lastSnapshotVersion, ":") {
 				reqCtx.Log.Info("stale role snapshot received, ignore it", "snapshot", snapshot)
 				return pair.RoleName, nil
 			}
@@ -159,7 +159,7 @@ func parseGlobalRoleSnapshot(role string, event *corev1.Event) *common.GlobalRol
 	if err := json.Unmarshal([]byte(role), snapshot); err == nil {
 		return snapshot
 	}
-	snapshot.Version = event.EventTime.Time.Format(time.RFC3339Nano)
+	snapshot.Version = strconv.FormatInt(event.EventTime.UnixMicro(), 10)
 	pair := common.PodRoleNamePair{
 		PodName:  event.InvolvedObject.Name,
 		RoleName: role,

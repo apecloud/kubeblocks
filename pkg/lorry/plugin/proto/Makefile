@@ -73,9 +73,9 @@ export PATH := $(GOBIN):$(PATH)
 ########################################################################
 ##                              BUILD                                 ##
 ########################################################################
-DB_PLUGIN_PROTO := ./db_plugin.proto
+DB_PLUGIN_PROTO := ./service_plugin.proto
 DB_PLUGIN_PKG_SUB := ../../plugin
-DB_PLUGIN_GO := $(DB_PLUGIN_PKG_SUB)/db_plugin.pb.go
+DB_PLUGIN_GO := $(DB_PLUGIN_PKG_SUB)/service_plugin.pb.go
 DB_PLUGIN_GRPC := $(DB_PLUGIN_PKG_SUB)/db_plugin_grpc.pb.go
 
 # This recipe generates the go language bindings

@@ -36,7 +36,7 @@ import (
 type Manager struct {
 	engines.DBManagerBase
 
-	dbClient plugin.DBPluginClient
+	dbClient plugin.ServicePluginClient
 }
 
 func NewManager(properties engines.Properties) (engines.DBManager, error) {
@@ -76,8 +76,8 @@ func (mgr *Manager) IsDBStartupReady() bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 
-	req := &plugin.IsDBReadyRequest{}
-	resp, err := mgr.dbClient.IsDBReady(ctx, req)
+	req := &plugin.IsServiceReadyRequest{}
+	resp, err := mgr.dbClient.IsServiceReady(ctx, req)
 	if err != nil {
 		return false
 	}
@@ -98,14 +98,14 @@ func (mgr *Manager) IsDBStartupReady() bool {
 // - KB_NEW_MEMBER_POD_IP: The IP of the new member's Pod.
 func (mgr *Manager) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs.Cluster) error {
 	req := &plugin.JoinMemberRequest{
-		DbInfo:    &plugin.DBInfo{},
-		NewMember: mgr.CurrentMemberName,
-		Members:   cluster.GetMemberAddrs(),
+		ServiceInfo: &plugin.ServiceInfo{},
+		NewMember:   mgr.CurrentMemberName,
+		Members:     cluster.GetMemberAddrs(),
 	}
 
 	if cluster.Leader != nil && cluster.Leader.Name != "" {
 		leaderMember := cluster.GetMemberWithName(cluster.Leader.Name)
-		req.PrimaryFqdn = cluster.GetMemberAddr(*leaderMember)
+		req.ServiceInfo.Fqdn = cluster.GetMemberAddr(*leaderMember)
 	}
 
 	member := cluster.GetMemberWithName(mgr.CurrentMemberName)
@@ -128,14 +128,14 @@ func (mgr *Manager) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs
 // - KB_LEAVE_MEMBER_POD_IP: The IP of the leave member's Pod.
 func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Cluster, memberName string) error {
 	req := &plugin.LeaveMemberRequest{
-		DbInfo:      &plugin.DBInfo{},
+		ServiceInfo: &plugin.ServiceInfo{},
 		LeaveMember: memberName,
 		Members:     cluster.GetMemberAddrs(),
 	}
 
 	if cluster.Leader != nil && cluster.Leader.Name != "" {
 		leaderMember := cluster.GetMemberWithName(cluster.Leader.Name)
-		req.PrimaryFqdn = cluster.GetMemberAddr(*leaderMember)
+		req.ServiceInfo.Fqdn = cluster.GetMemberAddr(*leaderMember)
 	}
 
 	member := cluster.GetMemberWithName(memberName)
@@ -155,8 +155,8 @@ func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Clu
 // - KB_SERVICE_PASSWORD: The password of the user used to access the DB service .
 func (mgr *Manager) Lock(ctx context.Context, reason string) error {
 	req := &plugin.ReadonlyRequest{
-		DbInfo: &plugin.DBInfo{},
-		Reason: reason,
+		ServiceInfo: &plugin.ServiceInfo{},
+		Reason:      reason,
 	}
 	_, err := mgr.dbClient.Readonly(ctx, req)
 	return err
@@ -170,7 +170,7 @@ func (mgr *Manager) Lock(ctx context.Context, reason string) error {
 // - KB_SERVICE_PASSWORD: The password of the user used to access the DB service .
 func (mgr *Manager) Unlock(ctx context.Context) error {
 	req := &plugin.ReadwriteRequest{
-		DbInfo: &plugin.DBInfo{},
+		ServiceInfo: &plugin.ServiceInfo{},
 	}
 	_, err := mgr.dbClient.Readwrite(ctx, req)
 	return err

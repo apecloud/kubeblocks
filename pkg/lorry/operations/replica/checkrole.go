@@ -23,11 +23,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/common"
@@ -193,7 +195,7 @@ func (s *CheckRole) roleValidate(role string) (bool, string) {
 func (s *CheckRole) buildGlobalRoleSnapshot(cluster *dcs.Cluster, role string) string {
 	currentMemberName := s.DBManager.GetCurrentMemberName()
 	roleSnapshot := &common.GlobalRoleSnapshot{
-		Version: time.Now().Format(time.RFC3339Nano),
+		Version: strconv.FormatInt(metav1.NowMicro().UnixMicro(), 10),
 		PodRoleNamePairs: []common.PodRoleNamePair{
 			{
 				PodName:  currentMemberName,

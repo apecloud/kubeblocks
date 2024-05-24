@@ -28,7 +28,7 @@ import (
 
 func (mgr *Manager) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (string, error) {
 	getRoleRequest := &plugin.GetRoleRequest{
-		DbInfo: plugin.GetDBInfo(),
+		ServiceInfo: plugin.GetServiceInfo(),
 	}
 
 	resp, err := mgr.dbClient.GetRole(ctx, getRoleRequest)

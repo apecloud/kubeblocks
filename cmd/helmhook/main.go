@@ -45,7 +45,7 @@ func setupFlags() {
 	pflag.StringVar(&crdPath, "crd", "/kubeblocks/crd", "CRD directory for the kubeblocks")
 	pflag.StringVar(&version, "version", "", "KubeBlocks version")
 	pflag.StringVar(&namespace, "namespace", "default", "The namespace scope for this request")
-	pflag.BoolVar(&keepAddons, "keep-addons", true, "Whether to allow addon updates, if true, don't")
+	pflag.BoolVar(&keepAddons, "keep-addons", true, "Whether to allow addon updates. If set to true, the addons that KubeBlocks depends on will not be upgraded after KubeBlocks is upgrade")
 
 	opts := zap.Options{
 		Development: true,

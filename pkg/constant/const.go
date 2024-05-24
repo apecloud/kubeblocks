@@ -210,17 +210,11 @@ const (
 )
 
 const (
-	DeploymentKind            = "Deployment"
-	StatefulSetKind           = "StatefulSet"
-	PodKind                   = "Pod"
-	PersistentVolumeClaimKind = "PersistentVolumeClaim"
-	CronJobKind               = "CronJob"
-	JobKind                   = "Job"
-	ReplicaSetKind            = "ReplicaSet"
-	VolumeSnapshotKind        = "VolumeSnapshot"
-	ServiceKind               = "Service"
-	ConfigMapKind             = "ConfigMap"
-	DaemonSetKind             = "DaemonSet"
+	StatefulSetKind    = "StatefulSet"
+	PodKind            = "Pod"
+	JobKind            = "Job"
+	VolumeSnapshotKind = "VolumeSnapshot"
+	ServiceKind        = "Service"
 )
 
 const (

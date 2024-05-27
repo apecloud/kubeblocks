@@ -249,8 +249,10 @@ func (p *pipeline) updateConfiguration(expected *appsv1alpha1.Configuration, exi
 		}
 	}
 
+	labels := intctrlutil.MergeMetadataMaps(existing.GetLabels(), expected.GetLabels())
 	patch := client.MergeFrom(existing)
 	updated := existing.DeepCopy()
+	updated.Labels = labels
 	updated.Spec.ConfigItemDetails = newConfigItems
 	return p.Client.Patch(p.Context, updated, patch)
 }

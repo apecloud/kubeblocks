@@ -17,10 +17,14 @@ limitations under the License.
 package apps
 
 import (
+	"context"
+
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -43,29 +47,116 @@ func (c *clusterShardingConfigurationTransformer) Transform(ctx graph.TransformC
 	if len(cluster.Spec.ShardingSpecs) == 0 {
 		return nil
 	}
-	return c.createOrUpdateConfiguration(cluster, cluster.Spec.ShardingSpecs)
+	return c.reconcile(transCtx, cluster, dag)
 }
 
-func (c *clusterShardingConfigurationTransformer) createOrUpdateConfiguration(cluster *appsv1alpha1.Cluster, shardingComponents []appsv1alpha1.ShardingSpec) error {
-	var configs []appsv1alpha1.Configuration
-	for _, shardingComponent := range shardingComponents {
-		if len(shardingComponent.Template.ComponentConfigItems) != 0 {
-			configs = append(configs, buildShardingConfigurations(cluster.GetName(), cluster.GetNamespace(), shardingComponent)...)
-		}
+func (c *clusterShardingConfigurationTransformer) reconcile(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster, dag *graph.DAG) error {
+	existingConfigMap, err := c.runningShardingConfigurations(transCtx)
+	if err != nil {
+		return err
+	}
+	expectedConfigMap := createShardingConfigurations(transCtx, cluster)
+
+	existingConfigSet := sets.KeySet(existingConfigMap)
+	expectedConfigSet := sets.KeySet(expectedConfigMap)
+	createSet := expectedConfigSet.Difference(existingConfigSet)
+	updateSet := expectedConfigSet.Intersection(existingConfigSet)
+	deleteSet := existingConfigSet.Difference(expectedConfigSet)
+
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	for configName := range createSet {
+		graphCli.Create(dag, expectedConfigMap[configName], inDataContext4G())
 	}
 
+	for configName := range updateSet {
+		graphCli.Update(dag, existingConfigMap[configName], expectedConfigMap[configName], inDataContext4G())
+	}
+
+	for configName := range deleteSet {
+		graphCli.Delete(dag, existingConfigMap[configName], inDataContext4G())
+	}
+	return nil
 }
 
-func buildShardingConfigurations(name, ns string, shardingComponent appsv1alpha1.ShardingSpec) []appsv1alpha1.Configuration {
-	var configs []appsv1alpha1.Configuration
-	for i := int32(0); i < shardingComponent.Shards; i++ {
-		config := builder.NewConfigurationBuilder(ns,
-			core.GenerateComponentConfigurationName(name,
-				p.ComponentName))
-		configs = append(configs, buildConfiguration(shardingComponent, i, ns))
+func createShardingConfigurations(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) map[string]*appsv1alpha1.Configuration {
+	expectedObjects := make(map[string]*appsv1alpha1.Configuration)
+
+	for shardingName, shardingComponent := range transCtx.ShardingComponentSpecs {
+		if len(shardingComponent) != 0 {
+			configs := buildShardingConfigurations(transCtx, cluster.GetName(), cluster.GetNamespace(), shardingComponent, shardingName)
+			for _, config := range configs {
+				expectedObjects[config.Name] = config
+			}
+		}
+	}
+	return expectedObjects
+}
+
+func (c *clusterShardingConfigurationTransformer) runningShardingConfigurations(ctx *clusterTransformContext) (map[string]*appsv1alpha1.Configuration, error) {
+	ns := ctx.Cluster.Namespace
+	clusterName := ctx.Cluster.Name
+	configMaps := make(map[string]*appsv1alpha1.Configuration)
+
+	for shardingName := range ctx.ShardingComponentSpecs {
+		objects, err := listShardingConfigurations(ctx, ctx.GetClient(), ns, clusterName, shardingName)
+		if err != nil {
+			return nil, err
+		}
+		for _, object := range objects {
+			configMaps[object.Name] = object.DeepCopy()
+		}
+	}
+	return configMaps, nil
+}
+
+func listShardingConfigurations(ctx context.Context, cli client.Reader, ns, clusterName, shardingName string) ([]appsv1alpha1.Configuration, error) {
+	compList := &appsv1alpha1.ConfigurationList{}
+	ml := constant.GetClusterShardingNameLabel(clusterName, shardingName)
+	if err := cli.List(ctx, compList, client.InNamespace(ns), client.MatchingLabels(ml)); err != nil {
+		return nil, err
+	}
+	return compList.Items, nil
+}
+
+func buildShardingConfigurations(transCtx *clusterTransformContext, clusterName, ns string, shardingComponents []*appsv1alpha1.ClusterComponentSpec, shardingName string) []*appsv1alpha1.Configuration {
+	var configs []*appsv1alpha1.Configuration
+	for i := 0; i < len(shardingComponents); i++ {
+		configs = append(configs, buildConfiguration(transCtx, clusterName, ns, shardingComponents[i], shardingName))
 	}
 	return configs
 }
 
-func buildConfiguration(shardingComponent appsv1alpha1.ShardingSpec, index int32, ns string) appsv1alpha1.Configuration {
+func buildConfiguration(transCtx *clusterTransformContext, clusterName, ns string, shardingComponent *appsv1alpha1.ClusterComponentSpec, shardingName string) *appsv1alpha1.Configuration {
+	config := builder.NewConfigurationBuilder(ns,
+		core.GenerateComponentConfigurationName(clusterName,
+			shardingComponent.Name)).
+		AddLabelsInMap(constant.GetComponentWellKnownLabels(clusterName, shardingComponent.Name)).
+		AddLabelsInMap(constant.GetShardingNameLabel(shardingName)).
+		ClusterRef(clusterName).
+		Component(shardingComponent.Name).
+		GetObject()
+
+	var configSpec *appsv1alpha1.ComponentConfigSpec
+	for _, item := range shardingComponent.ComponentConfigItems {
+		compDef, ok := transCtx.ComponentDefs[shardingComponent.Name]
+		if ok {
+			configSpec = getConfigSpec(compDef, item.Name)
+		}
+		config.Spec.ConfigItemDetails = append(config.Spec.ConfigItemDetails, appsv1alpha1.ConfigurationItemDetail{
+			Name:              item.Name,
+			ConfigSpec:        configSpec,
+			ImportTemplateRef: item.ImportTemplateRef,
+			ConfigFileParams:  item.ParamsInFile,
+		})
+	}
+	return config
+}
+
+func getConfigSpec(compDef *appsv1alpha1.ComponentDefinition, name string) *appsv1alpha1.ComponentConfigSpec {
+	for _, config := range compDef.Spec.Configs {
+		if config.Name == name {
+			return config.DeepCopy()
+		}
+	}
+	return nil
 }

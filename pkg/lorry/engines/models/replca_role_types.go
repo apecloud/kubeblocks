@@ -32,9 +32,9 @@ const (
 	CANDIDATE = "Candidate"
 )
 
-// IsPrimaryForNormal returns true if the role is primary,
+// IsLikelyPrimaryRole returns true if the role is primary,
 // it is used for the case where db manager do not implemement the IsLeader method.
 // use it curefully, as it is for normal case, and may be wrong for some special cases.
-func IsPrimaryForNormal(role string) bool {
+func IsLikelyPrimaryRole(role string) bool {
 	return strings.EqualFold(role, PRIMARY) || strings.EqualFold(role, MASTER) || strings.EqualFold(role, LEADER)
 }

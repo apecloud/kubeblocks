@@ -171,7 +171,7 @@ func (s *CheckRole) Do(ctx context.Context, _ *operations.OpsRequest) (*operatio
 		if err != models.ErrNotImplemented {
 			return nil, err
 		}
-		isLeader = models.IsPrimaryForNormal(role)
+		isLeader = models.IsLikelyPrimaryRole(role)
 	}
 
 	if isLeader {

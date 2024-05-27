@@ -29,7 +29,8 @@ import (
 )
 
 func (mgr *Manager) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
-	return mgr.role == models.PRIMARY, nil
+	role, _ := mgr.GetReplicaRole(ctx, cluster)
+	return role == models.PRIMARY, nil
 }
 
 func (mgr *Manager) GetReplicaRole(ctx context.Context, _ *dcs.Cluster) (string, error) {

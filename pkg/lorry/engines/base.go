@@ -101,8 +101,9 @@ func (mgr *DBManagerBase) Recover(context.Context, *dcs.Cluster) error {
 	return nil
 }
 
-func (mgr *DBManagerBase) IsLeader(context.Context, *dcs.Cluster) (bool, error) {
-	return false, nil
+func (mgr *DBManagerBase) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
+	role, _ := mgr.GetReplicaRole(ctx, cluster)
+	return strings.EqualFold(role, models.PRIMARY) || strings.EqualFold(role, models.MASTER) || strings.EqualFold(role, models.LEADER), nil
 }
 
 func (mgr *DBManagerBase) IsLeaderMember(context.Context, *dcs.Cluster, *dcs.Member) (bool, error) {

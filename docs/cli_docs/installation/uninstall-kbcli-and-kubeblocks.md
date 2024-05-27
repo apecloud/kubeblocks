@@ -34,7 +34,8 @@ Uninstall KubeBlocks if you want to delete KubeBlocks after your trial.
 ```bash
 kbcli kubeblocks uninstall
 ```
-
+</TabItem>
+</Tabs>
 
 
 ## Uninstall kbcli

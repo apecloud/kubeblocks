@@ -81,6 +81,8 @@ kbcli cluster create postgresql --mode replication --availability-policy none <c
   ```
 :::
 
+</TabItem>
+</Tabs>
 
 ## Connect to a PostgreSQL Cluster
 

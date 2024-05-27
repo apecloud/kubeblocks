@@ -28,6 +28,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // clusterServiceTransformer handles cluster services.
@@ -69,13 +70,56 @@ func (c *clusterShardingConfigurationTransformer) reconcile(transCtx *clusterTra
 	}
 
 	for configName := range updateSet {
-		graphCli.Update(dag, existingConfigMap[configName], expectedConfigMap[configName], inDataContext4G())
+		graphCli.Patch(dag, existingConfigMap[configName],
+			c.mergeConfiguration(expectedConfigMap[configName], existingConfigMap[configName]), inDataContext4G())
 	}
 
+	// Clean configurations that are not being used by the sharding component, e.g: shards -> 100 and shards --> 20
 	for configName := range deleteSet {
 		graphCli.Delete(dag, existingConfigMap[configName], inDataContext4G())
 	}
 	return nil
+}
+
+func (c *clusterShardingConfigurationTransformer) mergeConfiguration(expected *appsv1alpha1.Configuration, existing *appsv1alpha1.Configuration) *appsv1alpha1.Configuration {
+	fromList := func(items []appsv1alpha1.ConfigurationItemDetail) sets.Set[string] {
+		sets := sets.New[string]()
+		for _, item := range items {
+			sets.Insert(item.Name)
+		}
+		return sets
+	}
+
+	// update cluster.spec.shardingSpecs[*].template.componentConfigItems.*
+	updateConfigSpec := func(item appsv1alpha1.ConfigurationItemDetail) appsv1alpha1.ConfigurationItemDetail {
+		if newItem := expected.Spec.GetConfigurationItem(item.Name); newItem != nil {
+			item.ImportTemplateRef = newItem.ImportTemplateRef
+			item.ConfigFileParams = newItem.ConfigFileParams
+		}
+		return item
+	}
+
+	oldSets := fromList(existing.Spec.ConfigItemDetails)
+	newSets := fromList(expected.Spec.ConfigItemDetails)
+	addSets := newSets.Difference(oldSets)
+	delSets := oldSets.Difference(newSets)
+
+	newConfigItems := make([]appsv1alpha1.ConfigurationItemDetail, 0)
+	for _, item := range existing.Spec.ConfigItemDetails {
+		if !delSets.Has(item.Name) {
+			newConfigItems = append(newConfigItems, updateConfigSpec(item))
+		}
+	}
+	for _, item := range expected.Spec.ConfigItemDetails {
+		if addSets.Has(item.Name) {
+			newConfigItems = append(newConfigItems, item)
+		}
+	}
+
+	updated := existing.DeepCopy()
+	updated.Labels = intctrlutil.MergeMetadataMaps(updated.GetLabels(), expected.GetLabels())
+	updated.Spec.ConfigItemDetails = newConfigItems
+	return updated
 }
 
 func createShardingConfigurations(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) map[string]*appsv1alpha1.Configuration {
@@ -83,7 +127,7 @@ func createShardingConfigurations(transCtx *clusterTransformContext, cluster *ap
 
 	for shardingName, shardingComponent := range transCtx.ShardingComponentSpecs {
 		if len(shardingComponent) != 0 {
-			configs := buildShardingConfigurations(transCtx, cluster.GetName(), cluster.GetNamespace(), shardingComponent, shardingName)
+			configs := buildShardingConfigurations(cluster.GetName(), cluster.GetNamespace(), shardingComponent, shardingName)
 			for _, config := range configs {
 				expectedObjects[config.Name] = config
 			}
@@ -118,15 +162,15 @@ func listShardingConfigurations(ctx context.Context, cli client.Reader, ns, clus
 	return compList.Items, nil
 }
 
-func buildShardingConfigurations(transCtx *clusterTransformContext, clusterName, ns string, shardingComponents []*appsv1alpha1.ClusterComponentSpec, shardingName string) []*appsv1alpha1.Configuration {
+func buildShardingConfigurations(clusterName, ns string, shardingComponents []*appsv1alpha1.ClusterComponentSpec, shardingName string) []*appsv1alpha1.Configuration {
 	var configs []*appsv1alpha1.Configuration
 	for i := 0; i < len(shardingComponents); i++ {
-		configs = append(configs, buildConfiguration(transCtx, clusterName, ns, shardingComponents[i], shardingName))
+		configs = append(configs, buildConfiguration(clusterName, ns, shardingComponents[i], shardingName))
 	}
 	return configs
 }
 
-func buildConfiguration(transCtx *clusterTransformContext, clusterName, ns string, shardingComponent *appsv1alpha1.ClusterComponentSpec, shardingName string) *appsv1alpha1.Configuration {
+func buildConfiguration(clusterName, ns string, shardingComponent *appsv1alpha1.ClusterComponentSpec, shardingName string) *appsv1alpha1.Configuration {
 	config := builder.NewConfigurationBuilder(ns,
 		core.GenerateComponentConfigurationName(clusterName,
 			shardingComponent.Name)).
@@ -136,27 +180,12 @@ func buildConfiguration(transCtx *clusterTransformContext, clusterName, ns strin
 		Component(shardingComponent.Name).
 		GetObject()
 
-	var configSpec *appsv1alpha1.ComponentConfigSpec
 	for _, item := range shardingComponent.ComponentConfigItems {
-		compDef, ok := transCtx.ComponentDefs[shardingComponent.Name]
-		if ok {
-			configSpec = getConfigSpec(compDef, item.Name)
-		}
 		config.Spec.ConfigItemDetails = append(config.Spec.ConfigItemDetails, appsv1alpha1.ConfigurationItemDetail{
 			Name:              item.Name,
-			ConfigSpec:        configSpec,
 			ImportTemplateRef: item.ImportTemplateRef,
 			ConfigFileParams:  item.ParamsInFile,
 		})
 	}
 	return config
-}
-
-func getConfigSpec(compDef *appsv1alpha1.ComponentDefinition, name string) *appsv1alpha1.ComponentConfigSpec {
-	for _, config := range compDef.Spec.Configs {
-		if config.Name == name {
-			return config.DeepCopy()
-		}
-	}
-	return nil
 }

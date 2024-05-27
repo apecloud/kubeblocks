@@ -49,7 +49,7 @@ KubeBlocks, as a cloud-native data infrastructure based on Kubernetes, provides 
 | risingwave      | RisingWave is a distributed SQL database for stream processing. It is designed to reduce the complexity and cost of building real-time applications. |
 | solr            | Solr is the popular, blazing-fast, open source enterprise search platform built on Apache Lucene™. |
 | starrocks       | StarRocks is a next-gen, high-performance analytical data warehouse that enables real-time, multi-dimensional, and highly concurrent data analysis. |
-| starrocks-ce    | It is the computing and storage seperation version of StarRocks. |
+| starrocks-ce    | It is the computing and storage separation version of StarRocks. |
 | tidb            | TiDB is an open-source, cloud-native, distributed, MySQL-Compatible database for elastic scale and real-time analytics. |
 | tdengine        | TDengine™ is an industrial data platform purpose-built for the Industrial IoT, combining a time series database with essential features like stream processing, data subscription, and caching.                  |
 | vllm            | vLLM is a fast and easy-to-use library for LLM inference and serving. |

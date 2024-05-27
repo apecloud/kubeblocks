@@ -98,3 +98,7 @@ kbcli cluster connect <clustername>  --namespace <name>
 
 
 For the detailed database connection guide, refer to [Connect database](./../../connect_database/overview-of-database-connection.md).
+
+</TabItem>
+
+</Tabs>

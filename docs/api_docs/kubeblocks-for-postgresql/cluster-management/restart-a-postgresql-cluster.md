@@ -27,7 +27,7 @@ Restarting a PostgreSQL cluster triggers a concurrent restart and the primary ma
    kind: OpsRequest
    metadata:
      name: ops-restart
-     namesapce: demo
+     namespace: demo
    spec:
      clusterName: mycluster
      type: Restart 

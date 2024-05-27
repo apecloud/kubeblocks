@@ -129,7 +129,7 @@ The faults here are all simulated by deleting pods. When there are sufficient re
 
 ### Two pods exception
 
-The availability of the cluster generally requires the majority of pods to be in a normal state. When exceptions occur to the marjority of pods, the original leader will be automatically downgraded to a follower. Therefore, the exceptions of any two pods result in only one follower pod remaining.
+The availability of the cluster generally requires the majority of pods to be in a normal state. When exceptions occur to the majority of pods, the original leader will be automatically downgraded to a follower. Therefore, the exceptions of any two pods result in only one follower pod remaining.
 
 In this way, whether exceptions occur to one leader and one follower or two followers, failure performance and automatic recovery are the same.
 

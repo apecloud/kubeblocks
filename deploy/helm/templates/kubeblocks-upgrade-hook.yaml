@@ -1,18 +1,18 @@
-{{- if and .Values.admissionWebhooks.enabled .Values.admissionWebhooks.conversionEnabled }}
+{{- if and .Release.IsUpgrade .Values.crd.enabled }}
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ .Release.Name }}-cc-patch
+  generateName: {{ .Release.Name }}-upgrade-job-
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
   annotations:
-    "helm.sh/hook": post-upgrade
+    "helm.sh/hook": pre-upgrade
     "helm.sh/hook-delete-policy": hook-succeeded
 spec:
   ttlSecondsAfterFinished: 0
   template:
     metadata:
-      name: {{ .Release.Name }}-cc-patch
+      name: {{ .Release.Name }}-upgrade
       labels:
         {{- include "kubeblocks.labels" . | nindent 8 }}
     spec:
@@ -25,19 +25,14 @@ spec:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       restartPolicy: OnFailure
       containers:
-        - name: post-install-job
-          image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.tools.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        - name: pre-upgrade-job
+          image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.tools.repository }}:{{ .Values.image.tag | default .Chart.Version }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command:
-            - kubectl
+            - /bin/helm_hook
           args:
-            - patch
-            - crd
-            - configconstraints.apps.kubeblocks.io
-            - --patch-file=/opt/conversion_webhook_patch.json
-          volumeMounts:
-            - mountPath: /opt
-              name: crd-multi-version-conversion
+            - --version={{ .Chart.Version }}
+            - --namespace={{ .Release.Namespace }}
       {{- with .Values.topologySpreadConstraints }}
       topologySpreadConstraints:
         {{- toYaml . | nindent 8 }}
@@ -54,8 +49,4 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      volumes:
-        - name: crd-multi-version-conversion
-          configMap:
-            name: {{ include "kubeblocks.fullname" . }}.{{ .Release.Namespace }}.crd.conversion.webhook
 {{- end }}

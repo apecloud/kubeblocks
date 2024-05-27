@@ -5033,6 +5033,20 @@ Determines whether metrics exporter information is annotated on the Component&rs
 <p>These annotations allow the Prometheus installed by KubeBlocks to discover and scrape metrics from the exporter.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>componentConfigItem</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentConfigItem">
+[]ComponentConfigItem
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the user-defined configuration template or parameters.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterComponentStatus">ClusterComponentStatus
@@ -6960,6 +6974,70 @@ MatchExpressions
 </td>
 <td>
 <p>Executes expressions regularly, based on the value of PeriodSeconds, to determine if the action has been completed.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ComponentConfigItem">ComponentConfigItem
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Defines the unique identifier of the configuration template.</p>
+<p>It must be a string of maximum 63 characters, and can only include lowercase alphanumeric characters,
+hyphens, and periods.
+The name must start and end with an alphanumeric character.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>importTemplateRef</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ConfigTemplateExtension">
+ConfigTemplateExtension
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the user-defined configuration template.</p>
+<p>When provided, the <code>importTemplateRef</code> overrides the default configuration template
+specified in <code>configSpec.templateRef</code>.
+This allows users to customize the configuration template according to their specific requirements.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>paramsInFile</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ParametersInFile">
+map[string]github.com/apecloud/kubeblocks/apis/apps/v1alpha1.ParametersInFile
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the user-defined configuration parameters.</p>
+<p>When provided, the parameter values in <code>configFileParams</code> override the default configuration parameters.
+This allows users to override the default configuration according to their specific needs.</p>
 </td>
 </tr>
 </tbody>
@@ -9905,53 +9983,10 @@ Kubernetes core/v1.ConfigMapVolumeSource
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ConfigParams">ConfigParams
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigurationItemDetail">ConfigurationItemDetail</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>content</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Holds the configuration keys and values. This field is a workaround for issues found in kubebuilder and code-generator.
-Refer to <a href="https://github.com/kubernetes-sigs/kubebuilder/issues/528">https://github.com/kubernetes-sigs/kubebuilder/issues/528</a> and <a href="https://github.com/kubernetes/code-generator/issues/50">https://github.com/kubernetes/code-generator/issues/50</a> for more details.</p>
-<p>Represents the content of the configuration file.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>parameters</code><br/>
-<em>
-map[string]*string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Represents the updated parameters for a single configuration file.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ConfigTemplateExtension">ConfigTemplateExtension
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigurationItemDetail">ConfigurationItemDetail</a>, <a href="#apps.kubeblocks.io/v1alpha1.LegacyRenderedTemplateSpec">LegacyRenderedTemplateSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentConfigItem">ComponentConfigItem</a>, <a href="#apps.kubeblocks.io/v1alpha1.ConfigurationItemDetail">ConfigurationItemDetail</a>, <a href="#apps.kubeblocks.io/v1alpha1.LegacyRenderedTemplateSpec">LegacyRenderedTemplateSpec</a>)
 </p>
 <div>
 </div>
@@ -10156,8 +10191,8 @@ This allows users to customize the configuration template according to their spe
 <td>
 <code>configFileParams</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.ConfigParams">
-map[string]github.com/apecloud/kubeblocks/apis/apps/v1alpha1.ConfigParams
+<a href="#apps.kubeblocks.io/v1alpha1.ParametersInFile">
+map[string]github.com/apecloud/kubeblocks/apis/apps/v1alpha1.ParametersInFile
 </a>
 </em>
 </td>
@@ -14892,6 +14927,49 @@ string
 <em>(Optional)</em>
 <p>Represents the parameter values that are to be updated.
 If set to nil, the parameter defined by the Key field will be removed from the configuration file.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ParametersInFile">ParametersInFile
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentConfigItem">ComponentConfigItem</a>, <a href="#apps.kubeblocks.io/v1alpha1.ConfigurationItemDetail">ConfigurationItemDetail</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>content</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Holds the configuration keys and values. This field is a workaround for issues found in kubebuilder and code-generator.
+Refer to <a href="https://github.com/kubernetes-sigs/kubebuilder/issues/528">https://github.com/kubernetes-sigs/kubebuilder/issues/528</a> and <a href="https://github.com/kubernetes/code-generator/issues/50">https://github.com/kubernetes/code-generator/issues/50</a> for more details.</p>
+<p>Represents the content of the configuration file.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>parameters</code><br/>
+<em>
+map[string]*string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents the updated parameters for a single configuration file.</p>
 </td>
 </tr>
 </tbody>

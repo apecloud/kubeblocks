@@ -58,7 +58,7 @@ spec:
   clusterVersionRef: postgresql-14.7.0
   terminationPolicy: WipeOut
   componentSpecs:
-  - name: pg-replication
+  - name: postgresql
     componentDefRef: postgresql
     monitor: false  
     replicas: 0
@@ -121,7 +121,7 @@ spec:
   clusterVersionRef: postgresql-14.7.0
   terminationPolicy: WipeOut
   componentSpecs:
-  - name: pg-replication
+  - name: postgresql
     componentDefRef: postgresql
     monitor: false  
     replicas: 1

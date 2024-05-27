@@ -55,49 +55,7 @@ For your better high-availability experience, KubeBlocks creates a Redis Replica
 
 KubeBlocks supports creating two types of Redis clusters: Standalone and Replication Cluster. Standalone only supports one replica and can be used in scenarios with lower requirements for availability. For scenarios with high availability requirements, it is recommended to create a Replication Cluster, which supports automatic failover.
 
-<<<<<<< HEAD
-<Tabs>
-
-<<<<<<< HEAD
-<TabItem value="kbcli" label="kbcli" default>
-
-Create a Standalone.
-
-```bash
-kbcli cluster create redis --mode standalone <clustername>
-```
-
-Create a Replication Cluster.
-
-```bash
-kbcli cluster create redis --mode replication <clustername>
-```
-
-If you only have one node for deploying a Replication, set the `availability-policy` as `none` when creating a Replication Cluster.
-
-```bash
-kbcli cluster create redis --mode replication --availability-policy none <clustername>
-```
-
-:::note
-
-* In the production environment, it is not recommended to deploy all replicas on one node, which may decrease cluster availability.
-* Run the command below to view the flags for creating a Redis cluster and the default values.
-  
-  ```bash
-  kbcli cluster create redis -h
-  ```
-
-:::
-
-</TabItem>
-
-=======
->>>>>>> 25dfea9eb (docs: update redis create docs)
-<TabItem value="kubectl" label="kubectl">
-=======
 To ensure high availability, Primary and Secondary are distributed on different nodes by default. If you only have one node for deploying a Replication Cluster, set `spec.affinity.topologyKeys` as `null`.
->>>>>>> b681bb302 (docs: update docs)
 
 KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a Standalone.
 

@@ -21,7 +21,6 @@ package engines
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -86,15 +85,15 @@ func (mgr *DBManagerBase) IsPromoted(context.Context) bool {
 }
 
 func (mgr *DBManagerBase) Promote(context.Context, *dcs.Cluster) error {
-	return errors.New("not implemented")
+	return models.ErrNotImplemented
 }
 
 func (mgr *DBManagerBase) Demote(context.Context) error {
-	return errors.New("not implemented")
+	return models.ErrNotImplemented
 }
 
 func (mgr *DBManagerBase) Follow(context.Context, *dcs.Cluster) error {
-	return errors.New("not implemented")
+	return models.ErrNotImplemented
 }
 
 func (mgr *DBManagerBase) Recover(context.Context, *dcs.Cluster) error {
@@ -102,12 +101,11 @@ func (mgr *DBManagerBase) Recover(context.Context, *dcs.Cluster) error {
 }
 
 func (mgr *DBManagerBase) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
-	role, _ := mgr.GetReplicaRole(ctx, cluster)
-	return strings.EqualFold(role, models.PRIMARY) || strings.EqualFold(role, models.MASTER) || strings.EqualFold(role, models.LEADER), nil
+	return false, models.ErrNotImplemented
 }
 
 func (mgr *DBManagerBase) IsLeaderMember(context.Context, *dcs.Cluster, *dcs.Member) (bool, error) {
-	return false, errors.New("not implemented")
+	return false, models.ErrNotImplemented
 }
 
 func (mgr *DBManagerBase) GetMemberAddrs(context.Context, *dcs.Cluster) []string {
@@ -172,7 +170,7 @@ func (mgr *DBManagerBase) IsMemberLagging(context.Context, *dcs.Cluster, *dcs.Me
 }
 
 func (mgr *DBManagerBase) GetLag(context.Context, *dcs.Cluster) (int64, error) {
-	return 0, errors.New("not implemented")
+	return 0, models.ErrNotImplemented
 }
 
 func (mgr *DBManagerBase) GetDBState(context.Context, *dcs.Cluster) *dcs.DBState {
@@ -185,19 +183,19 @@ func (mgr *DBManagerBase) MoveData(context.Context, *dcs.Cluster) error {
 }
 
 func (mgr *DBManagerBase) GetReplicaRole(context.Context, *dcs.Cluster) (string, error) {
-	return "", errors.New("not implemented")
+	return "", models.ErrNotImplemented
 }
 
 func (mgr *DBManagerBase) Exec(context.Context, string) (int64, error) {
-	return 0, errors.New("not implemented")
+	return 0, models.ErrNotImplemented
 }
 
 func (mgr *DBManagerBase) Query(context.Context, string) ([]byte, error) {
-	return []byte{}, errors.New("not implemented")
+	return []byte{}, models.ErrNotImplemented
 }
 
 func (mgr *DBManagerBase) GetPort() (int, error) {
-	return 0, errors.New("not implemented")
+	return 0, models.ErrNotImplemented
 }
 
 func (mgr *DBManagerBase) IsRootCreated(context.Context) (bool, error) {
@@ -205,31 +203,31 @@ func (mgr *DBManagerBase) IsRootCreated(context.Context) (bool, error) {
 }
 
 func (mgr *DBManagerBase) ListUsers(context.Context) ([]models.UserInfo, error) {
-	return nil, errors.New("not implemented")
+	return nil, models.ErrNotImplemented
 }
 
 func (mgr *DBManagerBase) ListSystemAccounts(context.Context) ([]models.UserInfo, error) {
-	return nil, errors.New("not implemented")
+	return nil, models.ErrNotImplemented
 }
 
 func (mgr *DBManagerBase) CreateUser(context.Context, string, string) error {
-	return errors.New("not implemented")
+	return models.ErrNotImplemented
 }
 
 func (mgr *DBManagerBase) DeleteUser(context.Context, string) error {
-	return errors.New("not implemented")
+	return models.ErrNotImplemented
 }
 
 func (mgr *DBManagerBase) DescribeUser(context.Context, string) (*models.UserInfo, error) {
-	return nil, errors.New("not implemented")
+	return nil, models.ErrNotImplemented
 }
 
 func (mgr *DBManagerBase) GrantUserRole(context.Context, string, string) error {
-	return errors.New("not implemented")
+	return models.ErrNotImplemented
 }
 
 func (mgr *DBManagerBase) RevokeUserRole(context.Context, string, string) error {
-	return errors.New("not implemented")
+	return models.ErrNotImplemented
 }
 
 func (mgr *DBManagerBase) IsRunning() bool {
@@ -237,11 +235,11 @@ func (mgr *DBManagerBase) IsRunning() bool {
 }
 
 func (mgr *DBManagerBase) Lock(context.Context, string) error {
-	return errors.New("not implemented")
+	return models.ErrNotImplemented
 }
 
 func (mgr *DBManagerBase) Unlock(context.Context) error {
-	return errors.New("not implemented")
+	return models.ErrNotImplemented
 }
 
 func (mgr *DBManagerBase) Start(context.Context, *dcs.Cluster) error {

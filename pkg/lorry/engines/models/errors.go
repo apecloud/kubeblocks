@@ -28,7 +28,7 @@ const (
 	errMsgNoRoleName      = "no rolename provided"
 	errMsgInvalidRoleName = "invalid rolename, should be one of [superuser, readwrite, readonly]"
 	errMsgNoSuchUser      = "no such user"
-	errMsgNotImplemented  = "no implemented"
+	errMsgNotImplemented  = "not implemented"
 )
 
 var (
@@ -38,5 +38,5 @@ var (
 	ErrNoRoleName      = fmt.Errorf(errMsgNoRoleName)
 	ErrInvalidRoleName = fmt.Errorf(errMsgInvalidRoleName)
 	ErrNoSuchUser      = fmt.Errorf(errMsgNoSuchUser)
-	ErrNoImplemented   = fmt.Errorf(errMsgNotImplemented)
+	ErrNotImplemented  = fmt.Errorf(errMsgNotImplemented)
 )

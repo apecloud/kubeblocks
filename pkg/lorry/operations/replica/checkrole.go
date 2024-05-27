@@ -38,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
@@ -167,8 +168,12 @@ func (s *CheckRole) Do(ctx context.Context, _ *operations.OpsRequest) (*operatio
 	// When network partition occurs, the new primary needs to send global role change information to the controller.
 	isLeader, err := manager.IsLeader(ctx, cluster)
 	if err != nil {
-		return nil, err
+		if err != models.ErrNotImplemented {
+			return nil, err
+		}
+		isLeader = models.IsPrimaryForNormal(role)
 	}
+
 	if isLeader {
 		// we need to get latest member info to build global role snapshot
 		members, err := s.dcsStore.GetMembers()

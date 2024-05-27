@@ -59,5 +59,6 @@ func InitMockDCSStore() {
 	ctrl := gomock.NewController(GinkgoT())
 	mockDCSStore := dcs.NewMockDCS(ctrl)
 	mockDCSStore.EXPECT().GetClusterFromCache().Return(&dcs.Cluster{}).AnyTimes()
+	mockDCSStore.EXPECT().GetMembers().Return([]dcs.Member{{Name: "pod-test", UID: "123"}}, nil).AnyTimes()
 	dcs.SetStore(mockDCSStore)
 }

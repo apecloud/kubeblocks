@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package util
 
 import (
+	"errors"
 	"strings"
 )
 
@@ -134,3 +135,5 @@ func NewProbeError(msg string) error {
 		message: msg,
 	}
 }
+
+var ErrNotImplemented = errors.New("not implemented")

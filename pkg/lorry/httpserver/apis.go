@@ -123,7 +123,7 @@ func OperationWrapper(op operations.Operation) fasthttp.RequestHandler {
 			if ok := errors.As(err, &util.ProbeError{}); ok {
 				statusCode = fasthttp.StatusUnavailableForLegalReasons
 			} else {
-				if errors.Is(err, models.ErrNoImplemented) {
+				if errors.Is(err, models.ErrNotImplemented) {
 					statusCode = fasthttp.StatusNotImplemented
 				} else {
 					statusCode = fasthttp.StatusInternalServerError

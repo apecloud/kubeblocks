@@ -38,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
@@ -167,8 +168,12 @@ func (s *CheckRole) Do(ctx context.Context, _ *operations.OpsRequest) (*operatio
 	// When network partition occurs, the new primary needs to send global role change information to the controller.
 	isLeader, err := manager.IsLeader(ctx, cluster)
 	if err != nil {
-		return nil, err
+		if err != models.ErrNotImplemented {
+			return nil, err
+		}
+		isLeader = models.IsLikelyPrimaryRole(role)
 	}
+
 	if isLeader {
 		// we need to get latest member info to build global role snapshot
 		members, err := s.dcsStore.GetMembers()
@@ -228,15 +233,23 @@ func (s *CheckRole) buildGlobalRoleSnapshot(cluster *dcs.Cluster, mgr engines.DB
 	}
 
 	for _, member := range cluster.Members {
+		s.logger.V(1).Info("check member", "member", member.Name, "role", member.Role)
 		if member.Name != currentMemberName {
 			// get old primary and set it's role to none
-			if member.Role == role {
-				_, err := mgr.IsLeaderMember(context.Background(), cluster, &member)
-				if err == nil {
+			if strings.EqualFold(member.Role, role) {
+				s.logger.Info("there is a another leader", "member", member.Name)
+				isLeader, err := mgr.IsLeaderMember(context.Background(), cluster, &member)
+				switch {
+				case err != nil:
+					s.logger.Info("old leader member access failed", "member", member.Name, "error", err.Error())
+				case isLeader:
 					// old leader member is still healthy, just ignore it, and let it's lorry to handle the role change
+					s.logger.Info("another leader access normally, just ignore", "member", member.Name)
 					continue
+				case !isLeader:
+					s.logger.Info("old leader member is not leader", "member", member.Name)
 				}
-				s.logger.Info("old leader member access failed and reset it's role", "member", member.Name, "error", err.Error())
+				s.logger.Info("reset old leader role to none", "member", member.Name)
 				roleSnapshot.PodRoleNamePairs = append(roleSnapshot.PodRoleNamePairs, common.PodRoleNamePair{
 					PodName:  member.Name,
 					RoleName: "",

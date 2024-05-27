@@ -63,7 +63,7 @@ func (mgr *Manager) GetReplicaRoleForMember(ctx context.Context, cluster *dcs.Cl
 
 	rows, err := db.QueryContext(ctx, sql)
 	if err != nil {
-		mgr.Logger.Error(err, fmt.Sprintf("error executing %s", sql))
+		mgr.Logger.Info("error executing", "sql", sql, "error", err.Error())
 		return "", errors.Wrapf(err, "error executing %s", sql)
 	}
 

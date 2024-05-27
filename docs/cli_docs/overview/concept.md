@@ -15,6 +15,18 @@ sidebar_position: 1
   - Resource requests define the minimum amount of resources that a Pod requires at runtime. The K8s scheduler selects nodes that can satisfy the Pod's resource requests, ensuring that the nodes have sufficient available resources to meet the Pod's needs.
   - Resource limits define the maximum amount of resources that a Pod can use at runtime. They are used to prevent the Pod from consuming excessive resources and protect nodes and other Pods from being affected.
 
+- Replication
+  To improve the availability and fault tolerance of data, distributed databases typically replicate data across multiple nodes, with each node having a complete or partial copy of the data. Through data replication and failover mechanisms, distributed databases can continue to provide service even when nodes fail, thereby increasing the system's availability. Common replication strategies include:
+  - Primary-Replica Replication:
+    - Each partition has a single primary node and multiple replica nodes.
+    - Write operations are executed on the primary node and then synchronized to the replica nodes.
+    - Common primary-replica replication protocols include strong synchronous, semi-synchronous, asynchronous, and Raft/Paxos-based replication protocols.
+  - Multi-Primary Replication:
+    - Each partition has multiple primary nodes.
+    - Write operations can be executed on any of the primary nodes, and then synchronized to the other primary nodes and replica nodes.
+    - Data consistency is maintained through the replication protocol, combined with global locks, optimistic locking, and other mechanisms.
+
+Overall, data replication is a key technology used by distributed databases to improve availability and fault tolerance. Different replication strategies involve different trade-offs between consistency, availability, and performance, and the choice should be made based on the specific application requirements.
 
 The management of containerized distributed database by KubeBlocks is mapped to objects at four levels: Cluster, Component, InstanceSet, and Instance, forming a layered architecture:
 

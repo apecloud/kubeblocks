@@ -6,9 +6,6 @@ sidebar_position: 2
 sidebar_label: Configure BackupPolicy
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 # Configure BackupPolicy
 
 ## Configure encryption key

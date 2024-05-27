@@ -91,11 +91,11 @@ EOF
 |---------------------------------------|--------------------------------------|
 | `spec.clusterDefinitionRef`           | It specifies the name of the ClusterDefinition for creating a specific type of cluster.  |
 | `spec.clusterVersionRef`              | It is the name of the cluster version CRD that defines the cluster version.  |
-| `spec.terminationPolicy`              | It is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Halt`, `Delete`, `WipeOut`.  </br> - `DoNotTerminate` blocks deletion operation. </br> - `Halt` deletes workload resources such as statefulset and deployment workloads but keep PVCs. </br> - `Delete` is based on Halt and deletes PVCs. </br> - `WipeOut` is based on Delete and wipe out all volume snapshots and snapshot data from a backup storage location. |
+| `spec.terminationPolicy`              | It is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Halt`, `Delete`, `WipeOut`.  <p> - `DoNotTerminate` blocks deletion operation. </p><p> - `Halt` deletes workload resources such as statefulset and deployment workloads but keep PVCs. </p><p> - `Delete` is based on Halt and deletes PVCs. </p> - `WipeOut` is based on Delete and wipe out all volume snapshots and snapshot data from a backup storage location. |
 | `spec.affinity`                       | It defines a set of node affinity scheduling rules for the cluster's Pods. This field helps control the placement of Pods on nodes within the cluster.  |
 | `spec.affinity.podAntiAffinity`       | It specifies the anti-affinity level of Pods within a component. It determines how pods should spread across nodes to improve availability and performance. |
 | `spec.affinity.topologyKeys`          | It represents the key of node labels used to define the topology domain for Pod anti-affinity and Pod spread constraints.   |
-| `spec.affinity.tenacy`                | It determines the level of resource isolation between Pods. It can have the following values: `SharedNode` and `DedicatedNode`. </br> - SharedNode: It allows that multiple Pods may share the same node, which is the default behavior of K8s. </br> - DedicatedNode: Each Pod runs on a dedicated node, ensuring that no two Pods share the same node.                                                                                                                |
+| `spec.affinity.tenacy`                | It determines the level of resource isolation between Pods. It can have the following values: `SharedNode` and `DedicatedNode`. <p> - SharedNode: It allows that multiple Pods may share the same node, which is the default behavior of K8s. </p> - DedicatedNode: Each Pod runs on a dedicated node, ensuring that no two Pods share the same node.                                                                                                                |
 | `spec.tolerations`                    | It is an array that specifies tolerations attached to the cluster's Pods, allowing them to be scheduled onto nodes with matching taints.  |
 | `spec.componentSpecs`                 | It is the list of components that define the cluster components. This field allows customized configuration of each component within a cluster.   |
 | `spec.componentSpecs.componentDefRef` | It is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition apecloud-mysql -o json \| jq '.spec.componentDefs[].name'`.   |
@@ -400,6 +400,9 @@ There are two ways to apply vertical scaling.
     ```bash
     kubectl describe cluster mycluster -n demo
     ```
+    
+</TabItem>
+</Tabs>
 
 ## Volume Expanding
 
@@ -413,6 +416,7 @@ kubectl get cluster mycluster -n demo
 NAME        CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    AGE
 mycluster   qdrant               qdrant-1.5.0      Delete               Running   4m29s
 ```
+
 
 ### Steps
 

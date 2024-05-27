@@ -26,7 +26,7 @@ apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
   name: ops-stop
-  namesapce: demo
+  namespace: demo
 spec:
   clusterName: mycluster
   type: Stop

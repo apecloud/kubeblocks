@@ -106,7 +106,7 @@ KubeBlocks, as a cloud-native data infrastructure based on Kubernetes, provides 
 | vllm                                  | N/A                               | N/A    | N/A    | N/A          | ✔️          | ✔️       | N/A            | N/A  | N/A    | N/A                         | N/A     | N/A      | N/A        | N/A     |
 | weaviate                              | 1.18.0                            | ✔️      | ✔️      | ✔️            | ✔️          | ✔️       | N/A            | N/A  | ✔️      | N/A                         | N/A     | N/A      | N/A        | ✔️       |
 | xinference                            | 1.16.0                            | ✔️      | N/A    | N/A          | ✔️          | ✔️       | N/A            | N/A  | N/A    | N/A                         | N/A     | N/A      | N/A        | N/A     |
-| yashandb                              | personal-23.1.1.100               | ✔️      | ✔️ (stanalone) | ✔️     | ✔️          | ✔️       | N/A            | N/A  | N/A    | N/A                         | N/A     | N/A      | N/A        | N/A     |
+| yashandb                              | personal-23.1.1.100               | ✔️      | ✔️ (standalone)| ✔️     | ✔️          | ✔️       | N/A            | N/A  | N/A    | N/A                         | N/A     | N/A      | N/A        | N/A     |
 | zookeeper                             | 3.7.1                             | ✔️      | ✔️      | ✔️            | ✔️          | ✔️       | N/A            | ✔️    | ✔️      | N/A                         | N/A     | N/A      | N/A        | N/A     |
 
 :::note

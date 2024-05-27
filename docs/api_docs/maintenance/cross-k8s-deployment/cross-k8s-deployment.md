@@ -8,7 +8,7 @@ sidebar_label: Deploy a Cluster across Multiple Kubernetes Clusters by KubeBlock
 
 # Deploy a Cluster across Multiple Kubernetes Clusters by KubeBlocks
 
-KubeBlocks supports managing multiple Kubernetes clusters to provide new options for instance disaster recovery and K8s cluster management. KubeBlocks introduces controle plane and data plane to support cross-K8s management.
+KubeBlocks supports managing multiple Kubernetes clusters to provide new options for instance disaster recovery and K8s cluster management. KubeBlocks introduces control plane and data plane to support cross-K8s management.
 
 * Control plane: An independent K8s cluster in which the KubeBlocks operator runs. And most of the objects defined by KubeBlocks, such as definition, cluster, backup, ops, are stored in this cluster. Users interact with the API of this cluster to manage multiple cluster instances.
 * Data plane: A K8s cluster used to run the actual workloads. There can be one or more clusters in the data plane. These clusters host resources such as pods, persistent volume claims (PVC), services, service accounts (SA), config maps (CM), secrets, jobs, etc., related to the instances. But in KubeBlocks v0.9.0, the KubeBlocks operator does not run in the data plane.
@@ -107,7 +107,7 @@ The CIDR mentioned here refers to the address of the Cilium Overlay network. Whe
 
 ***Steps:***
 
-The following steps can be performed separately in each cluster (without the `--context` parameter) or collectively in an environment with the information of three contexts (by specifying the `--contex`t parameter for each).
+The following steps can be performed separately in each cluster (without the `--context` parameter) or collectively in an environment with the information of three contexts (by specifying the `--context` parameter for each).
 
 1. Install Cilium, specifying the cluster ID/name and the cluster pool pod CIDR. Refer to the Cillium doc for details: [Specify the Cluster Name and ID](https://docs.cilium.io/en/stable/network/clustermesh/clustermesh/#specify-the-cluster-name-and-id).
 
@@ -224,7 +224,7 @@ metadata:
   namespace: default
   generateName: etcd
   annotations:
-    # optional：You can use this annotation to explictly specify the cluster where the current instance should be distributed
+    # optional：You can use this annotation to explicitly specify the cluster where the current instance should be distributed
     apps.kubeblocks.io/multi-cluster-placement: "k8s-1,k8s-2,k8s-3"
 spec:
   terminationPolicy: WipeOut
@@ -266,7 +266,7 @@ metadata:
   namespace: default
   generateName: etcd
   annotations:
-    # optional：You can use this annotation to explictly specify the cluster where the current instance should be distributed
+    # optional：You can use this annotation to explicitly specify the cluster where the current instance should be distributed
     apps.kubeblocks.io/multi-cluster-placement: "k8s-1,k8s-2,k8s-3"
 spec:
   terminationPolicy: WipeOut
@@ -314,7 +314,7 @@ metadata:
   namespace: default
   generateName: etcd
   annotations:
-    # optional：You can use this annotation to explictly specify the cluster where the current instance should be distributed
+    # optional：You can use this annotation to explicitly specify the cluster where the current instance should be distributed
     apps.kubeblocks.io/multi-cluster-placement: "k8s-1,k8s-2,k8s-3"
 spec:
   terminationPolicy: WipeOut

@@ -40,7 +40,7 @@ Run the command below to delete a specified cluster.
 kubectl delete -n demo cluster mycluster
 ```
 
-If you want to delete a cluster and its all related resources, you can modify the termination policy to `WipeOut`, then delete the cluster.
+If you want to delete a cluster and its all related resources, you can set the termination policy to `WipeOut`, then delete the cluster.
 
 ```bash
 kubectl patch -n demo cluster mycluster -p '{"spec":{"terminationPolicy":"WipeOut"}}' --type="merge"

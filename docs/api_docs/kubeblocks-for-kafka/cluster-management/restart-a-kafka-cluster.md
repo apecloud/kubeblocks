@@ -19,7 +19,7 @@ Restarting a Kafka cluster triggers a concurrent restart and the leader may chan
 
 ## Steps
 
-1. Restart a cluster.
+1. Create an OpsRequest to restart a cluster.
 
   ```bash
   kubectl apply -f - <<EOF

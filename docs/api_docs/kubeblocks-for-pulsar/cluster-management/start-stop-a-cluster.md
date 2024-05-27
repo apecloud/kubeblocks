@@ -1,18 +1,19 @@
 ---
-title: Stop/Start a MySQL cluster
-description: How to stop/start a MySQL cluster
-keywords: [mysql, stop a cluster, start a cluster]
+title: Stop/Start a Pulsar cluster
+description: How to start/stop a Pulsar cluster
+keywords: [postgresql, stop a cluster, start a cluster]
 sidebar_position: 5
 sidebar_label: Stop/Start
 ---
 
-# Stop/Start a MySQL cluster
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
-You can stop/start a cluster to save computing resources. When a cluster is stopped, the computing resources of this cluster are released, which means the pods of Kubernetes are released, but the storage resources are reserved. You can start this cluster again by snapshots if you want to restore the cluster resources.
+# Stop/Start PostgreSQL Cluster
+
+You can stop/start a cluster to save computing resources. When a cluster is stopped, the computing resources of this cluster are released, which means the pods of Kubernetes are released, but the storage resources are reserved. Start this cluster again if you want to restore the cluster resources from the original storage by snapshots.
 
 ## Stop a cluster
-
-You can stop a cluster by OpsRequest or changing the YAML file of the cluster.
 
 <Tabs>
 
@@ -43,15 +44,15 @@ Configure replicas as 0 to delete pods.
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: mycluster
-  namespace: demo
+    name: mycluster
+    namespace: demo
 spec:
-  clusterDefinitionRef: mysql
-  clusterVersionRef: mysql-8.0.33
+  clusterDefinitionRef: pulsar
+  clusterVersionRef: pulsar-3.0.2
   terminationPolicy: Delete
   componentSpecs:
-  - name: mysql
-    componentDefRef: mysql
+  - name: pulsar
+    componentDefRef: pulsar
     monitor: false  
     replicas: 0
     volumeClaimTemplates:
@@ -71,8 +72,6 @@ spec:
 
 ## Start a cluster
   
-You can stop a cluster by OpsRequest or changing the YAML file of the cluster.
-
 <Tabs>
 
 <TabItem value="OpsRequest" label="OpsRequest" default>
@@ -94,7 +93,7 @@ EOF
 
 </TabItem>
 
-<TabItem value="Edit cluster YAML file" label="Edit cluster YAML File">
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
 Change replicas back to the original amount to start this cluster again.
 
@@ -102,17 +101,17 @@ Change replicas back to the original amount to start this cluster again.
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: mycluster
-  namespace: demo
+    name: mycluster
+    namespace: demo
 spec:
-  clusterDefinitionRef: mysql
-  clusterVersionRef: mysql-8.0.33
+  clusterDefinitionRef: pulsar
+  clusterVersionRef: pulsar-3.0.2
   terminationPolicy: Delete
   componentSpecs:
-  - name: mysql
-    componentDefRef: mysql
+  - name: pulsar
+    componentDefRef: pulsar
     monitor: false  
-    replicas: 2
+    replicas: 1
     volumeClaimTemplates:
     - name: data
       spec:

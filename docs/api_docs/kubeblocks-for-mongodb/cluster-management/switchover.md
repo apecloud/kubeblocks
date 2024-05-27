@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 
 # Switch over a MongoDB cluster
 
-You can initiate a switchover for a MongoDB ReplicaSet by executing the kbcli or kubectl command. Then KubeBlocks modifies the instance roles.
+You can initiate a switchover for a MongoDB ReplicaSet. Then KubeBlocks modifies the instance roles.
 
 ## Before you start
 
@@ -23,7 +23,7 @@ You can initiate a switchover for a MongoDB ReplicaSet by executing the kbcli or
    >
    probes:
      roleProbe:
-       failureThreshold: 3
+       failureThreshold: 2
        periodSeconds: 2
        timeoutSeconds: 1
    ```

@@ -10,12 +10,6 @@ sidebar_label: Restart
 
 You can restart all pods of the cluster. When an exception occurs in a database, you can try to restart it.
 
-:::note
-
-All pods restart in the order of learner -> follower -> leader and the leader may change after the cluster restarts.
-
-:::
-
 ## Steps
 
 1. Restart a cluster.
@@ -40,10 +34,9 @@ All pods restart in the order of learner -> follower -> leader and the leader ma
    ```bash
    kubectl get pod -n demo
    >
-   NAME                READY   STATUS        RESTARTS   AGE
-   mycluster-mysql-0   4/4     Running       0          5m32s
-   mycluster-mysql-1   4/4     Running       0          6m36s
-   mycluster-mysql-2   3/4     Terminating   0          7m37s
+   NAME                READY   STATUS           RESTARTS   AGE
+   mycluster-mysql-0   4/4     Running          0          5m32s
+   mycluster-mysql-1   3/4     Terminating      0          6m36s
 
    kubectl get ops ops-restart -n demo
    >

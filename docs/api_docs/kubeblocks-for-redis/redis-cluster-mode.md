@@ -95,7 +95,7 @@ spec:
     # Specify the number of shards, which cannot be less than 3
     shards: 3
     template:
-      componentDef: redis-cluster-7.0
+      componentDef: redis-cluster-7
       name: redis
       replicas: 2
       # Specify resources for a single shard

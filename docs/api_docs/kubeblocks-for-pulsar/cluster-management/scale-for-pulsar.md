@@ -15,11 +15,11 @@ You can scale a Pulsar cluster in two ways, vertical scaling and horizontal scal
 
 ## Vertical scaling
 
-You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, if you need to change the resource class from 1C2G to 2C4G, vertical scaling is what you need.
+You can vertically scale a cluster by changing resource requirements and limits (e.g. CPU and storage). For example, you can change the resource class from 1C2G to 2C4G by performing vertical scaling.
 
 :::note
 
-During the vertical scaling process, all pods restart in the order of learner -> follower -> leader, and the leader pod may change after restarting.
+During the vertical scaling process, all pods restart and the primary pod may change after restarting.
 
 :::
 
@@ -28,18 +28,18 @@ During the vertical scaling process, all pods restart in the order of learner ->
 Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
 
 ```bash
-kbcli cluster list pulsar
+kubectl get cluster mycluster -n demo
 ```
 
 ### Steps
 
-1. Change configuration. There are 2 ways to apply vertical scaling.
+There are two ways to apply vertical scaling.
 
-   <Tabs>
+<Tabs>
 
-   <TabItem value="OpsRequest" label="OpsRequest" default>
-  
-   Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
+<TabItem value="OpsRequest" label="OpsRequest" default>
+
+1. Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
 
    ```bash
    kubectl create -f -<< EOF
@@ -49,10 +49,10 @@ kbcli cluster list pulsar
      name: ops-vscale
      namespace: demo
    spec:
-     clusterRef: pulsar
+     clusterName: mycluster
      type: VerticalScaling
      verticalScaling:
-     - componentName: broker
+     - componentName: pulsar-broker
        requests:
          memory: "10Gi"
          cpu: 3
@@ -68,18 +68,6 @@ kbcli cluster list pulsar
          cpu: 3      
    EOF
    ```
-  
-   </TabItem>
-
-   <TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
-
-   ```bash
-   kubectl edit cluster mycluster -n demo
-   ```
-
-   </TabItem>
-
-   </Tabs>
 
 2. Check the operation status to validate the vertical scaling.
 
@@ -90,7 +78,7 @@ kbcli cluster list pulsar
    demo        ops-vertical-scaling   VerticalScaling   mycluster   Succeed   3/3        6m
    ```
 
-   If an error occurs to the vertical scaling operation, you can troubleshoot with `kubectl describe` command to view the events of this operation.
+   If an error occurs to the vertical scaling operation, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
 
 3. Check whether the corresponding resources change.
 
@@ -98,11 +86,67 @@ kbcli cluster list pulsar
     kubectl describe cluster mycluster -n demo
     ```
 
-:::note
+</TabItem>
 
-Vertical scaling does not synchronize parameters related to CPU and memory and it is required to manually call the OpsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
-:::
+1. Change the configuration of `spec.components.resources` in the YAML file. 
+
+   `spec.components.resources` controls the requirement and limit of resources and changing them triggers a vertical scaling.
+
+   ```yaml
+   kubectl edit cluster mycluster -n demo
+   >
+   ......
+   spec:
+     affinity:
+       podAntiAffinity: Preferred
+       tenancy: SharedNode
+       topologyKeys:
+       - kubernetes.io/hostname
+     clusterDefinitionRef: pulsar
+     clusterVersionRef: pulsar-3.0.2
+     componentSpecs:
+     - componentDefRef: pulsar
+       enabledLogs:
+       - running
+       monitor: false
+       name: pulsar
+       replicas: 1
+       resources:
+         limits:
+           cpu: "2"
+           memory: 4Gi
+         requests:
+           cpu: "1"
+           memory: 2Gi
+   ```
+
+2. Check whether the corresponding resources change.
+
+   ```bash
+   kubectl describe cluster mycluster -n demo
+   >
+   ......
+   Component Specs:
+    Component Def Ref:  pulsar
+    Enabled Logs:
+      running
+    Monitor:   false
+    Name:      pulsar
+    Replicas:  1
+    Resources:
+      Limits:
+        Cpu:     2
+        Memory:  4Gi
+      Requests:
+        Cpu:     1
+        Memory:  2Gi
+   ```
+
+</TabItem>
+
+</Tabs>
 
 ## Horizontal scaling
 
@@ -115,13 +159,13 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
 
 ### Steps
 
-1. Change configuration. There are 2 ways to apply horizontal scaling.
+There are two ways to apply horizontal scaling.
 
-   <Tabs>
+<Tabs>
 
-   <TabItem value="OpsRequest" label="OpsRequest" default>
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
-   Apply an OpsRequest to a specified cluster. Configure the parameters according to your needs.
+1. Apply an OpsRequest to a specified cluster. Configure the parameters according to your needs.
 
     ```bash
     kubectl create -f -<< EOF
@@ -131,44 +175,65 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
       name: ops-horizontalscaling
       namespace: demo
     spec:
-      clusterRef: pulsar
+      clusterRef: mycluster
       type: HorizontalScaling  
       horizontalScaling:
-      - componentName: broker
-        replicas: 5
-      - componentName: bookies
-        replicas: 5
+      - componentName: pulsar-proxy
+        replicas: 2
     EOF
     ```
 
-   </TabItem>
-
-   <TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
+2. Check the operation status to validate the horizontal scaling.
 
    ```bash
-   kubectl edit cluster pulsar
-   ```
-
-   </TabItem>
-
-   </Tabs>
-  
-2. Validate the horizontal scaling operation.
-
-   Check the cluster STATUS to identify the horizontal scaling status.
-
-   ```bash
-   kubectl get ops
+   kubectl get ops -n demo
    >
-   NAME                             TYPE               CLUSTER   STATUS    PROGRESS   AGE
-   pulsar-horizontalscaling-9lfvc   HorizontalScaling  pulsar    Succeed   3/3        8m49s
+   NAMESPACE   NAME                     TYPE                CLUSTER     STATUS    PROGRESS   AGE
+   demo        ops-horizontal-scaling   HorizontalScaling   mycluster   Succeed   3/3        6m
    ```
+
+   If an error occurs to the horizontal scaling operation, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
 
 3. Check whether the corresponding resources change.
 
    ```bash
    kubectl describe cluster mycluster -n demo
    ```
+
+</TabItem>
+
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
+
+1. Change the configuration of `spec.componentSpecs.replicas` in the YAML file.
+
+   `spec.componentSpecs.replicas` stands for the pod amount and changing this value triggers a horizontal scaling of a cluster.
+
+   ```yaml
+   kubectl edit cluster mycluster -n demo
+   >
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: Cluster
+   metadata:
+     name: mycluster
+     namespace: demo
+   spec:
+     clusterDefinitionRef: pulsar
+     clusterVersionRef: pulsar-3.0.2
+     componentSpecs:
+     - name: pulsar
+       componentDefRef: pulsar-proxy
+       replicas: 2 # Change the amount
+   ```
+
+2. Check whether the corresponding resources change.
+
+    ```bash
+    kubectl describe cluster mycluster -n demo
+    ```
+
+</TabItem>
+
+</Tabs>
 
 ### Handle the snapshot exception
 

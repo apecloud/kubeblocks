@@ -12,7 +12,7 @@ You can expand the storage volume size of each pod.
 
 ## Before you start
 
-Run the command below to check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
+Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
 
 ```bash
 kubectl get cluster mycluster -n demo
@@ -20,66 +20,31 @@ kubectl get cluster mycluster -n demo
 
 ## Steps
 
-1. Change the value of `spec.components.volumeClaimTemplates.spec.resources` in the cluster YAML file. `spec.components.volumeClaimTemplates.spec.resources` is the storage resource information of the pod and changing this value triggers the volume expansion of a cluster.
+There are two ways to expan volume.
 
-   <Tabs>
+<Tabs>
 
-    <TabItem value="OpsRequest" label="OpsRequest" default>
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
-    Change the value of storage according to your need and run the command below to expand the volume of a cluster.
+1. Apply an OpsRequest. Change the value of storage according to your need and run the command below to expand the volume of a cluster.
 
-    ```bash
-    kubectl apply -f - <<EOF
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: OpsRequest
-    metadata:
-      name: ops-volumeexpansion
-      namespace: demo
-    spec:
-      clusterName: mycluster
-      type: VolumeExpansion
-      volumeExpansion:
-      - componentName: broker
-        volumeClaimTemplates:
-        - name: data
-          storage: 30Gi
-    EOF
-    ```
-
-    </TabItem>
-
-    <TabItem value="Change the cluster YAML file" label="Change the cluster YAML file">
-
-    Change the value of `spec.componentSpecs.volumeClaimTemplates.spec.resources` in the cluster YAML file.
-
-    `spec.componentSpecs.volumeClaimTemplates.spec.resources` is the storage resource information of the pod and changing this value triggers the volume expansion of a cluster.
-
-    ```yaml
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: Cluster
-    metadata:
-      name: mycluster
-      namespace: demo 
-    spec:
-      clusterDefinitionRef: kafka
-      clusterVersionRef: kafka-3.3.2
-      componentSpecs:
-      - name: kafka 
-        componentDefRef: kafka
-        volumeClaimTemplates:
-        - name: data
-          spec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 40Gi # Change the volume storage size.
-      terminationPolicy: Halt
-    ```
-
-    </TabItem>
-
-    </Tabs>
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: ops-volumeexpansion
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     type: VolumeExpansion
+     volumeExpansion:
+     - componentName: broker
+       volumeClaimTemplates:
+       - name: data
+         storage: 40Gi
+   EOF
+   ```
 
 2. Validate the volume expansion operation.
 
@@ -105,3 +70,54 @@ kubectl get cluster mycluster -n demo
          Requests:
            Storage:   40Gi
    ```
+
+</TabItem>
+
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
+
+1. Change the value of `spec.componentSpecs.volumeClaimTemplates.spec.resources` in the cluster YAML file.
+
+   `spec.componentSpecs.volumeClaimTemplates.spec.resources` is the storage resource information of the pod and changing this value triggers the volume expansion of a cluster.
+
+   ```yaml
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: Cluster
+   metadata:
+     name: mycluster
+     namespace: demo 
+   spec:
+     clusterDefinitionRef: kafka
+     clusterVersionRef: kafka-3.3.2
+     componentSpecs:
+     - name: kafka 
+       componentDefRef: kafka
+       volumeClaimTemplates:
+       - name: data
+         spec:
+           accessModes:
+             - ReadWriteOnce
+           resources:
+             requests:
+               storage: 40Gi # Change the volume storage size.
+     terminationPolicy: Delete
+   ```
+
+2. Check whether the corresponding cluster resources change.
+
+   ```bash
+   kubectl describe cluster mycluster -n demo
+   >
+   ......
+   Volume Claim Templates:
+     Name:  data
+     Spec:
+       Access Modes:
+         ReadWriteOnce
+       Resources:
+         Requests:
+           Storage:   40Gi
+   ```
+
+</TabItem>
+
+</Tabs>

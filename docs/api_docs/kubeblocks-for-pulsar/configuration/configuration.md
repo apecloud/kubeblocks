@@ -25,8 +25,8 @@ For Pulsar, there are 3 types of parameters:
 
 ## Before you start
 
-1. [Install KubeBlocks](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
-2. [Create a Kafka cluster](./../cluster-management/create-a-kafka-cluster.md).
+1. [Install KubeBlocks](./../../installation/install-kubeblocks.md).
+2. [Create a Pulsar cluster](./../cluster-management/create-pulsar-cluster-on-kubeblocks.md).
 
 ## Configure cluster parameters by configuration file
 
@@ -35,22 +35,14 @@ Using kubectl to configure pulsar cluster requires modifying the configuration f
 1. Modify the Pulsar `broker.conf` file, in this case, it is `pulsar-broker-broker-config`.
 
    ```bash
-   kubectl edit cm pulsar-broker-broker-config
+   kubectl edit cm pulsar-broker-broker-config -n demo
    ```
 
-2. Verify the configuration.
+2. Check whether the configuration is done.
 
-   1. Check the progress of configuration:
-
-      ```bash
-      kubectl get ops -n demo
-      ```
-
-   2. Check whether the configuration is done.
-
-      ```bash
-      kubectl get pod -l app.kubernetes.io/name=pulsar-broker
-      ```
+   ```bash
+   kubectl get pod -l app.kubernetes.io/name=pulsar-broker
+   ```
 
 ## Configure cluster parameters with OpsRequest
 
@@ -65,23 +57,33 @@ Using kubectl to configure pulsar cluster requires modifying the configuration f
    spec:
      clusterName: mycluster
      reconfigure:
-       componentName: pulsar-broker
+       componentName: bookies
        configurations:
        - keys:
-         - key: broker.conf
+         - key: bookkeeper.conf
            parameters:
-           - key: log.cleanup.policy
-             value: "compact"
-         name: pulsar-broker-broker-config
-     ttlSecondBeforeAbort: 0
+           - key: lostBookieRecoveryDelay
+             value: "1000"
+         name: bookies-config
+     preConditionDeadlineSeconds: 0
      type: Reconfiguring
    EOF
    ```
 
-   * `metadata.name` specifies the name of this OpsRequest.
-   * `metadata.namespace` specifies the namespace where this cluster is created.
-   * `spec.clusterName` specifies the cluster name.
-   * `spec.reconfigure` specifies the configuration information. `componentName` specifies the component name of this cluster. `configurations.keys.key` specifies the configuration file. `configurations.keys.parameters` specifies the parameters you want to edit. `configurations.keys.name` specifies the configuration spec name.
+   | Field                                                  | Definition     |
+   |--------------------------------------------------------|--------------------------------|
+   | `metadata.name`                                        | It specifies the name of this OpsRequest. |
+   | `metadata.namespace`                                   | It specifies the namespace where this cluster is created. |
+   | `spec.clusterName`                                     | It specifies the cluster name that this operation is targeted at. |
+   | `spec.reconfigure`                                     | It specifies a component and its configuration updates. |
+   | `spec.reconfigure.componentName`                       | It specifies the component name of this cluster.  |
+   | `spec.configurations`                                  | It contains a list of ConfigurationItem objects, specifying the component's configuration template name, upgrade policy, and parameter key-value pairs to be updated. |
+   | `spec.reconfigure.configurations.keys.key`             | It specifies the configuration map. |
+   | `spec.reconfigure.configurations.keys.parameters`      | It defines a list of key-value pairs for a single configuration file. |
+   | `spec.reconfigure.configurations.keys.parameter.key`   | It represents the name of the parameter you want to edit. |
+   | `spec.reconfigure.configurations.keys.parameter.value` | It represents the parameter values that are to be updated. If set to nil, the parameter defined by the Key field will be removed from the configuration file.  |
+   | `spec.reconfigure.configurations.name`                 | It specifies the configuration template name.  |
+   | `preConditionDeadlineSeconds`                          | It specifies the maximum number of seconds this OpsRequest will wait for its start conditions to be met before aborting. If set to 0 (default), the start conditions must be met immediately for the OpsRequest to proceed. |
 
 2. Apply the configuration opsRequest.
 

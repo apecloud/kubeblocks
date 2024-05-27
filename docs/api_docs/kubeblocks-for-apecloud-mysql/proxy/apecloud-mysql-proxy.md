@@ -6,6 +6,9 @@ sidebar_position: 2
 sidebar_label: ApeCloud MySQL Proxy Cluster
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # ApeCloud MySQL Proxy
 
 ## Before you start
@@ -39,7 +42,7 @@ sidebar_label: ApeCloud MySQL Proxy Cluster
    helm search repo kubeblocks/apecloud-mysql --devel --versions
    ```
 
-5. (Optional) If you disable the `apecloud-mysql` add-on when installing KuebBlocks, run the command below to specify a version and install the cluster definition of ApeCloud MySQL. Skip this step if you install KubeBlocks with the default settings.
+5. (Optional) If you disable the `apecloud-mysql` addon when installing KuebBlocks, run the command below to specify a version and install the cluster definition of ApeCloud MySQL. Skip this step if you install KubeBlocks with the default settings.
 
    ```bash
    helm install myproxy kubeblocks/apecloud-mysql --version=v0.9.0
@@ -53,7 +56,7 @@ sidebar_label: ApeCloud MySQL Proxy Cluster
 
 :::note
 
-If you only have one node for deploying a RaftGroup, set the `availability-policy` as `none` when creating a RaftGroup.
+If you only have one node for deploying a RaftGroup Cluster, set the `extra.availability-policy` as `none` when creating a RaftGroup Cluster.
 
 ```bash
 helm install myproxy kubeblocks/apecloud-mysql-cluster --version=v0.9.0 --set mode=raftGroup,proxyEnabled=true --set extra.availabilityPolicy=none
@@ -127,9 +130,11 @@ while true; do date; kubectl port-forward svc/vt-mysql 3306:3306; sleep 0.5; don
 
 ## Configure Proxy Cluster parameters
 
-VTGate, VTConsensus, and VTTablet support parameter configuration.
+VTGate, VTConsensus, and VTTablet support parameter configuration. You can configure the proxy cluster by editing the configuration file or by performing an OpsRequest.
 
-You can configure VTGate and VTConsensus by using `--component` to specify a component and configure VTTablet by using `--component=mysql --config-specs=vttablet-config` to specify both a component and a configuration file template since VTTablet is the sidecar of the MySQL component.
+<Tabs>
+
+<TabItem value="Edit config file" label="Edit config file" default>
 
 1. Get the configuration file of this cluster.
 
@@ -137,7 +142,7 @@ You can configure VTGate and VTConsensus by using `--component` to specify a com
    kubectl edit configurations.apps.kubeblocks.io myproxy-vtgate
    ```
 
-2. Configure parameters according to your needs. The example below adds the `- configFileParams` part to configure `max_connections`.
+2. Configure parameters according to your needs. The example below adds the `spec.configFileParams` part to configure `max_connections`.
 
    ```yaml
    spec:
@@ -180,6 +185,64 @@ You can configure VTGate and VTConsensus by using `--component` to specify a com
       +---------------------+-------+
       1 row in set (0.00 sec)
       ```
+
+</TabItem>
+
+<TabItem value="OpsRequest" label="OpsRequest">
+
+Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
+
+* An example for configuring VTTablet
+
+    ```yaml
+    apiVersion: apps.kubeblocks.io/v1alpha1
+    kind: OpsRequest
+    metadata:
+      name: acmysql-vttablet-reconfiguring
+      namespace: default
+    spec:
+      clusterName: acmysql-cluster
+      force: false
+      reconfigure:
+        componentName: mysql
+        configurations:
+          - keys:
+              - key: vttablet.cnf
+                parameters:
+                  - key: health_check_interval
+                    value: 4s
+            name: vttablet-config
+      preConditionDeadlineSeconds: 0
+      type: Reconfiguring
+    ```
+
+* An example for configuring VTGate
+
+    ```yaml
+    apiVersion: apps.kubeblocks.io/v1alpha1
+    kind: OpsRequest
+    metadata:
+      name: acmysql-vtgate-reconfiguring
+      namespace: default
+    spec:
+      clusterName: acmysql-cluster
+      force: false
+      reconfigure:
+        componentName: vtgate
+        configurations:
+        - keys:
+          - key: vtgate.cnf
+            parameters:
+            - key: healthcheck_timeout
+              value: 2s
+          name: vtgate-config
+      preConditionDeadlineSeconds: 0
+      type: Reconfiguring
+    ```
+
+</TabItem>
+
+</Tabs>
 
 ## Log
 
@@ -269,7 +332,7 @@ spec:
 
 ## Transparent failover
 
-Run the command below to implement transparent failover.
+Run the command below to perform transparent failover.
 
 1. Get the configuration file of this cluster.
 

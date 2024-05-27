@@ -8,7 +8,7 @@ sidebar_label: Switchover
 
 # Switch over a PostgreSQL cluster
 
-You can initiate a switchover for a PostgreSQL Replication Cluster by executing the kbcli or kubectl command. Then KubeBlocks modifies the instance roles.
+You can initiate a switchover for a PostgreSQL Replication Cluster. Then KubeBlocks modifies the instance roles.
 
 ## Before you start
 
@@ -18,16 +18,16 @@ You can initiate a switchover for a PostgreSQL Replication Cluster by executing 
    ```bash
    kubectl get cd postgresql -o yaml
    >
-   probes:
-     roleProbe:
-       failureThreshold: 3
-       periodSeconds: 2
-       timeoutSeconds: 1
+    probes:
+      roleProbe:
+        failureThreshold: 2
+        periodSeconds: 1
+        timeoutSeconds: 1
    ```
 
 ## Initiate the switchover
 
-You can switch over a secondary of a PostgreSQL PrimaeySecondary database to the primary role, and the former primary instance to a secondary.
+You can switch over a secondary Pod of a PostgreSQL PrimarySecondary cluster to the primary one, and the former primary instance to a secondary.
 
 The value of `instanceName` decides whether a new primary instance is specified for the switchover.
 
@@ -38,7 +38,7 @@ The value of `instanceName` decides whether a new primary instance is specified 
   apiVersion: apps.kubeblocks.io/v1alpha1
   kind: OpsRequest
   metadata:
-    name: mycluster-switchover-jhkgl
+    name: mycluster-switchover
     namespace: demo
   spec:
     clusterName: mycluster
@@ -56,7 +56,7 @@ The value of `instanceName` decides whether a new primary instance is specified 
   apiVersion: apps.kubeblocks.io/v1alpha1
   kind: OpsRequest
   metadata:
-    name: mycluster-switchover-jhkgl
+    name: mycluster-switchover
     namespace: demo
   spec:
     clusterName: mycluster

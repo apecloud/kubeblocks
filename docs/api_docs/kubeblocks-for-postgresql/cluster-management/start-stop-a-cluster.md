@@ -36,7 +36,7 @@ EOF
 
 </TabItem>
 
-<TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
 Configure replicas as 0 to delete pods.
 
@@ -63,7 +63,7 @@ spec:
           - ReadWriteOnce
         resources:
           requests:
-            storage: 1Gi
+            storage: 20Gi
 ```
 
 </TabItem>
@@ -93,7 +93,7 @@ EOF
 
 </TabItem>
 
-<TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
 Change replicas back to the original amount to start this cluster again.
 
@@ -120,7 +120,7 @@ spec:
           - ReadWriteOnce
         resources:
           requests:
-            storage: 1Gi
+            storage: 20Gi
 ```
 
 </TabItem>

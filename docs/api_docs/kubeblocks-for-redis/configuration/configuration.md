@@ -10,20 +10,14 @@ sidebar_label: Configuration
 
 This guide shows how to configure cluster parameters.
 
-KubeBlocks supports dynamic configuration. When the specification of a database instance changes (e.g., a user vertically scales a cluster), KubeBlocks automatically matches the appropriate configuration template based on the new specification. This is because different specifications of a database instance may require different optimal configurations to optimize performance and resource utilization. When you choose a different database instance specification, KubeBlocks automatically detects and determines the best database configuration for the new specification, ensuring optimal performance and configuration of the database under the new specifications.
-
-This feature simplifies the process of configuring parameters, which saves you from manually configuring database parameters as KubeBlocks handles the updates and configurations automatically to adapt to the new specifications. This saves time and effort and reduces performance issues caused by incorrect configuration.
-
-But it's also important to note that the dynamic parameter configuration doesn't apply to all parameters. Some parameters may require manual configuration. Additionally, if you have manually modified database parameters before, KubeBlocks may overwrite your customized configurations when refreshing the database configuration template. Therefore, when using the dynamic configuration feature, it is recommended to back up and record your custom configuration so that you can restore them if needed.
-
 ## Before you start
 
 1. [Install KubeBlocks](./../../installation/install-kubeblocks.md).
 2. [Create a Redis cluster](./../cluster-management/create-and-connect-a-redis-cluster.md).
 
-## Configure cluster parameters by configuration file
+## Configure cluster parameters by editing configuration file
 
-1. Get the configuration file of this cluster. 
+1. Get the configuration file of this cluster.
 
    ```bash
    kubectl edit configurations.apps.kubeblocks.io mycluster-redis -n demo
@@ -98,17 +92,24 @@ But it's also important to note that the dynamic parameter configuration doesn't
             - key: acllog-max-len
               value: "256"
           name: redis-replication-config
+      preConditionDeadlineSeconds: 0
       type: Reconfiguring
     ```
 
-   * `metadata.name` specifies the name of this OpsRequest.
-   * `metadata.namespace` specifies the namespace where this cluster is created.
-   * `spec.clusterName` specifies the cluster name.
-   * `spec.reconfigure` specifies the configuration information.
-   * `componentName` specifies the component name of this cluster.
-   * `configurations.keys.key` specifies the configuration file.
-   * `configurations.keys.parameters` specifies the parameters you want to edit.
-   * `configurations.keys.name` specifies the configuration spec name.
+   | Field                                                  | Definition     |
+   |--------------------------------------------------------|--------------------------------|
+   | `metadata.name`                                        | It specifies the name of this OpsRequest. |
+   | `metadata.namespace`                                   | It specifies the namespace where this cluster is created. |
+   | `spec.clusterName`                                     | It specifies the cluster name that this operation is targeted at. |
+   | `spec.reconfigure`                                     | It specifies a component and its configuration updates. |
+   | `spec.reconfigure.componentName`                       | It specifies the component name of this cluster.  |
+   | `spec.configurations`                                  | It contains a list of ConfigurationItem objects, specifying the component's configuration template name, upgrade policy, and parameter key-value pairs to be updated. |
+   | `spec.reconfigure.configurations.keys.key`             | It specifies the configuration map. |
+   | `spec.reconfigure.configurations.keys.parameters`      | It defines a list of key-value pairs for a single configuration file. |
+   | `spec.reconfigure.configurations.keys.parameter.key`   | It represents the name of the parameter you want to edit. |
+   | `spec.reconfigure.configurations.keys.parameter.value` | It represents the parameter values that are to be updated. If set to nil, the parameter defined by the Key field will be removed from the configuration file.  |
+   | `spec.reconfigure.configurations.name`                 | It specifies the configuration template name.  |
+   | `preConditionDeadlineSeconds`                          | It specifies the maximum number of seconds this OpsRequest will wait for its start conditions to be met before aborting. If set to 0 (default), the start conditions must be met immediately for the OpsRequest to proceed. |
 
 2. Apply the configuration opsRequest.
 

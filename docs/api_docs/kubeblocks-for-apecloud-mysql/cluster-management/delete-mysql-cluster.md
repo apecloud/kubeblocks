@@ -1,12 +1,12 @@
 ---
-title: Delete a MySQL Cluster
+title: Delete an ApeCloud MySQL Cluster
 description: How to delete a MySQL Cluster
-keywords: [mysql, delete a cluster]
+keywords: [apecloud mysql, delete a cluster]
 sidebar_position: 7
 sidebar_label: Delete protection
 ---
 
-# Delete a MySQL Cluster
+# Delete an ApeCloud MySQL Cluster
 
 ## Termination policy
 
@@ -40,7 +40,7 @@ Run the command below to delete a specified cluster.
 kubectl delete cluster mycluster -n demo
 ```
 
-If you want to delete a cluster and its all related resources, you can modify the termination policy to `WipeOut`, then delete the cluster.
+If you want to delete a cluster and its all related resources, you can set the termination policy as `WipeOut` and then delete the cluster.
 
 ```bash
 kubectl patch -n demo cluster mycluster -p '{"spec":{"terminationPolicy":"WipeOut"}}' --type="merge"

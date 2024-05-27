@@ -1,7 +1,7 @@
 ---
-title: Scale for a MySQL cluster
-description: How to scale a MySQL cluster, horizontal scaling, vertical scaling
-keywords: [mysql, horizontal scaling, vertical scaling]
+title: Scale for an ApeCloud MySQL Cluster
+description: How to scale an ApeCloud MySQL Cluster, horizontal scaling, vertical scaling
+keywords: [apecloud mysql, horizontal scaling, vertical scaling]
 sidebar_position: 2
 sidebar_label: Scale
 ---
@@ -11,17 +11,17 @@ import TabItem from '@theme/TabItem';
 
 # Scale for an ApeCloud MySQL cluster
 
-You can scale a MySQL cluster in two ways, vertical scaling and horizontal scaling.
+You can scale an ApeCloud MySQL Cluster cluster in two ways, vertical scaling and horizontal scaling.
 
 :::note
 
-After vertical scaling or horizontal scaling is performed, KubeBlocks automatically matches the appropriate configuration template based on the new specification. This is the KubeBlocks dynamic configuration feeature. This feature simplifies the process of configuring parameters, saves time and effort and reduces performance issues caused by incorrect configuration.  For detailed instructions, refer to [Configuration](./../configuration/configuration.md).
+After vertical scaling or horizontal scaling is performed, KubeBlocks automatically matches the appropriate configuration template based on the new specification. This is the KubeBlocks dynamic configuration feature. This feature simplifies the process of configuring parameters, saves time and effort and reduces performance issues caused by incorrect configuration. For detailed instructions, refer to [Configuration](./../configuration/configuration.md).
 
 :::
 
 ## Vertical scaling
 
-You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, if you need to change the resource class from 1C2G to 2C4G, vertical scaling is what you need.
+You can vertically scale a cluster by changing resource requirements and limits (e.g. CPU and storage). For example, you can change the resource class from 1C2G to 2C4G by performing vertical scaling.
 
 :::note
 
@@ -37,18 +37,18 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    AGE
-mycluster   apecloud-mysql       ac-mysql-8.0.30   Halt                 Running   47m
+mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running   47m
 ```
 
 ### Steps
 
-1. Change configuration. There are two ways to apply vertical scaling.
+There are two ways to apply vertical scaling.
 
-   <Tabs>
+<Tabs>
 
-   <TabItem value="OpsRequest" label="OpsRequest" default>
-  
-   Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
+<TabItem value="OpsRequest" label="OpsRequest" default>
+
+1. Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
 
    ```bash
    kubectl apply -f - <<EOF
@@ -71,13 +71,32 @@ mycluster   apecloud-mysql       ac-mysql-8.0.30   Halt                 Running 
    EOF
    ```
 
-   </TabItem>
-  
-   <TabItem value="Change the cluster YAML file" label="Change the cluster YAML file">
+2. Check the operation status to validate the vertical scaling.
 
-   Change the configuration of `spec.componentSpecs.resources` in the YAML file. `spec.componentSpecs.resources` controls the requirement and limit of resources and changing them triggers a vertical scaling.
+   ```bash
+   kubectl get ops -n demo
+   >
+   NAMESPACE   NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
+   demo        ops-vertical-scaling   VerticalScaling   mycluster   Succeed   3/3        6m
+   ```
+
+   If an error occurs to the vertical scaling operation, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
+
+3. Check whether the corresponding resources change.
+
+   ```bash
+   kubectl describe cluster mycluster -n demo
+   ```
+
+</TabItem>
+  
+<TabItem value="Edit the cluster YAML file" label="Edit the cluster YAML file">
+
+1. Change the configuration of `spec.componentSpecs.resources` in the YAML file. `spec.componentSpecs.resources` controls the requirement and limit of resources and changing them triggers a vertical scaling.
 
    ```yaml
+   kubectl edit cluster mycluster -n demo
+   >
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
    metadata:
@@ -89,7 +108,7 @@ mycluster   apecloud-mysql       ac-mysql-8.0.30   Halt                 Running 
      componentSpecs:
      - name: mysql
        componentDefRef: mysql
-       replicas: 1
+       replicas: 3
        resources: # Change the values of resources.
          requests:
            memory: "2Gi"
@@ -104,31 +123,19 @@ mycluster   apecloud-mysql       ac-mysql-8.0.30   Halt                 Running 
              - ReadWriteOnce
            resources:
              requests:
-               storage: 1Gi
-     terminationPolicy: Halt
+               storage: 20Gi
+     terminationPolicy: Delete
    ```
 
-   </TabItem>
-
-   </Tabs>
-
-2. Check the operation status to validate the vertical scaling.
+2. Check whether the corresponding resources change.
 
    ```bash
-   kubectl get ops -n demo
-   >
-   NAMESPACE   NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
-   demo        ops-vertical-scaling   VerticalScaling   mycluster   Succeed   3/3        6m
+   kubectl describe cluster mycluster -n demo
    ```
 
-   If an error occurs to the vertical scaling operation, you can troubleshoot with `kubectl describe` command to view the events of this operation.
+</TabItem>
 
-3. Check whether the corresponding resources change.
-
-    ```bash
-    kubectl describe cluster mycluster -n demo
-    ```
-
+</Tabs>
 
 ## Horizontal scaling
 
@@ -142,18 +149,18 @@ Check whether the cluster STATUS is `Running`. Otherwise, the following operatio
 kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    AGE
-mycluster   apecloud-mysql       ac-mysql-8.0.30   Halt                 Running   47m
+mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running   47m
 ```
 
 ### Steps
 
-1. Change configuration. There are two ways to apply horizontal scaling.
+There are two ways to apply horizontal scaling.
 
-   <Tabs>
+<Tabs>
 
-   <TabItem value="OpsRequest" label="OpsRequest" default>
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
-   Apply an OpsRequest to a specified cluster. Configure the parameters according to your needs.
+1. Apply an OpsRequest to a specified cluster. Configure the parameters according to your needs.
 
    ```bash
    kubectl apply -f - <<EOF
@@ -171,13 +178,34 @@ mycluster   apecloud-mysql       ac-mysql-8.0.30   Halt                 Running 
    EOF
    ```
 
-   </TabItem>
-  
-   <TabItem value="Change the cluster YAML file" label="Change the cluster YAML file">
+2. Check the operation status to validate the horizontal scaling.
 
-   Change the configuration of `spec.componentSpecs.replicas` in the YAML file. `spec.componentSpecs.replicas` stands for the pod amount and changing this value triggers a horizontal scaling of a cluster.
+   ```bash
+   kubectl get ops -n demo
+   >
+   NAMESPACE   NAME                     TYPE                CLUSTER     STATUS    PROGRESS   AGE
+   demo        ops-horizontal-scaling   HorizontalScaling   mycluster   Succeed   3/3        6m
+   ```
+
+   If an error occurs to the horizontal scaling operation, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
+
+3. Check whether the corresponding resources change.
+
+   ```bash
+   kubectl describe cluster mycluster -n demo
+   ```
+
+</TabItem>
+  
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
+
+1. Change the value of `spec.componentSpecs.replicas` in the YAML file.
+
+   `spec.componentSpecs.replicas` stands for the pod amount and changing this value triggers a horizontal scaling of a cluster.
 
    ```yaml
+   kubectl edit cluster mycluster -n demo
+   >
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
    metadata:
@@ -189,7 +217,7 @@ mycluster   apecloud-mysql       ac-mysql-8.0.30   Halt                 Running 
      componentSpecs:
      - name: mysql
        componentDefRef: mysql
-       replicas: 1 # Change the pod amount.
+       replicas: 1 # Change the amount
        volumeClaimTemplates:
        - name: data
          spec:
@@ -197,26 +225,19 @@ mycluster   apecloud-mysql       ac-mysql-8.0.30   Halt                 Running 
              - ReadWriteOnce
            resources:
              requests:
-               storage: 1Gi
-    terminationPolicy: Halt
+               storage: 20Gi
+    terminationPolicy: Delete
    ```
 
-2. Validate the horizontal scaling operation.
-
-   Check the cluster STATUS to identify the horizontal scaling status.
+2. Check whether the corresponding resources change.
 
    ```bash
-   kubectl get ops -n demo
-   >
-   NAMESPACE   NAME                     TYPE                CLUSTER     STATUS    PROGRESS   AGE
-   demo        ops-horizontal-scaling   HorizontalScaling   mycluster   Succeed   3/3        6m
+   kubectl describe cluster mycluster -n demo
    ```
 
-3. Check whether the corresponding resources change.
+</TabItem>
 
-    ```bash
-    kubectl describe cluster mycluster -n demo
-    ```
+</Tabs>
 
 ### Handle the snapshot exception
 

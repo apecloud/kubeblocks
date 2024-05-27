@@ -17,50 +17,38 @@ You can expand the storage volume size of each pod.
 Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
 
 ```bash
-kbcli cluster list pulsar
+kubectl get cluster mycluster -n demo
 ```
 
 ## Steps
 
-1. Change configuration. There are 2 ways to apply volume expansion.
+There are two ways to apply volume expansion.
 
-   <Tabs>
+<Tabs>
 
-   <TabItem value="OpsRequest" label="OpsRequest" default>
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
-    Change the value of storage according to your need and run the command below to expand the volume of a cluster.
+1. Apply an OpsRequest. Change the value of storage according to your need and run the command below to expand the volume of a cluster.
 
-    ```bash
-    kubectl apply -f - <<EOF
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: OpsRequest
-    metadata:
-      name: ops-volume-expand
-      namespace: demo
-    spec:
-      clusterRef: mycluster
-      type: VolumeExpansion
-      volumeExpansion:
-      - componentName: bookies
-        volumeClaimTemplates:
-        - name: ledgers
-          storage: "200Gi"
-        - name: journal
-          storage: "40Gi"      
-    EOF
-    ```
-
-   </TabItem>
-
-   <TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
-
-    ```bash
-    kubectl edit cluster mycluster -n demo
-    ```
-
-   </TabItem>
-
-   </Tabs>
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: ops-volume-expand
+     namespace: demo
+   spec:
+     clusterRef: mycluster
+     type: VolumeExpansion
+     volumeExpansion:
+     - componentName: bookies
+       volumeClaimTemplates:
+       - name: ledgers
+         storage: "200Gi"
+       - name: journal
+         storage: "40Gi"      
+   EOF
+   ```
 
 2. Validate the volume expansion operation.
 
@@ -76,3 +64,45 @@ kbcli cluster list pulsar
     ```bash
     kubectl describe cluster mycluster -n demo
     ```
+
+</TabItem>
+
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
+
+1. Change the value of `spec.components.volumeClaimTemplates.spec.resources` in the cluster YAML file. 
+
+   `spec.components.volumeClaimTemplates.spec.resources` is the storage resource information of the pod and changing this value triggers the volume expansion of a cluster.
+
+   ```yaml
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: Cluster
+   metadata:
+     name: mycluster
+     namespace: demo
+   spec:
+     clusterDefinitionRef: pulsar
+     clusterVersionRef: pulsar-3.0.2
+     componentSpecs:
+     - name: pulsar
+       componentDefRef: pulsar
+       replicas: 1
+       volumeClaimTemplates:
+       - name: data
+         spec:
+           accessModes:
+             - ReadWriteOnce
+           resources:
+             requests:
+               storage: 40Gi # Change the volume storage size.
+     terminationPolicy: Delete
+   ```
+
+2. Check whether the corresponding cluster resources change.
+
+    ```bash
+    kubectl describe cluster mycluster -n demo
+    ```
+
+</TabItem>
+
+</Tabs>

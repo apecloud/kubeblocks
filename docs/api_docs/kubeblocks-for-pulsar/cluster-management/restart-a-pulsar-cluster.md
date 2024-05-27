@@ -6,7 +6,6 @@ sidebar_position: 4
 sidebar_label: Restart
 ---
 
-
 # Restart a Pulsar cluster
 
 You can restart all pods of the cluster. When an exception occurs in a database, you can try to restart it.
@@ -29,14 +28,14 @@ Restarting a Kafka cluster triggers a concurrent restart and the leader may chan
      name: ops-restart
      namespace: demo
    spec:
-     clusterRef: pulsar
+     clusterRef: mycluster
      type: Restart 
      restart:
-     - componentName: pulsar
+     - componentName: bookies
    EOF
    ```
 
-2. 2. Check the pod and operation status to validate the restarting.
+2. Check the pod and operation status to validate the restarting.
 
    ```bash
    kubectl get pod -n demo

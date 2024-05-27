@@ -6,13 +6,18 @@ sidebar_position: 5
 sidebar_label: Stop/Start
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Stop/Start a Redis Cluster
 
 You can stop/start a cluster to save computing resources. When a cluster is stopped, the computing resources of this cluster are released, which means the pods of Kubernetes are released, but the storage resources are reserved. Start this cluster again if you want to restore the cluster resources from the original storage by snapshots.
 
 ## Stop a cluster
 
-### Option 1. Create an OpsRequest
+<Tabs>
+
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
 Run the command below to stop a cluster.
 
@@ -29,7 +34,9 @@ spec:
 EOF
 ```
 
-### Option 2. Change the YAML file of the cluster
+</TabItem>
+
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
 Configure replicas as 0 to delete pods.
 
@@ -68,9 +75,15 @@ spec:
   terminationPolicy: Delete
 ```
 
+</TabItem>
+
+</Tabs>
+
 ## Start a cluster
   
-### Option 1. Create an OpsRequest
+<Tabs>
+
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
 Run the command below to start a cluster.
 
@@ -87,7 +100,9 @@ spec:
 EOF 
 ```
 
-### Option 2. Change the YAML file of the cluster
+</TabItem>
+
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
 Change replicas back to the original amount to start this cluster again.
 
@@ -122,6 +137,10 @@ spec:
         - ReadWriteOnce
         resources:
           requests:
-            storage: 1Gi
+            storage: 20Gi
   terminationPolicy: Delete
 ```
+
+</TabItem>
+
+</Tabs>

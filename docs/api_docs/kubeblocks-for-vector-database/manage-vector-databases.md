@@ -13,7 +13,7 @@ In this chapter, we take Qdrant as an example to show how to manage vector datab
 
 ## Before you start
 
-* Install KubeBlocks: You can install KubeBlocks by [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
+* [Install KubeBlocks](./../installation/install-kubeblocks.md).
 * Make sure the Qdrant addon is enabled.
 
   ```bash
@@ -25,7 +25,7 @@ In this chapter, we take Qdrant as an example to show how to manage vector datab
 
 * View all the database types and versions available for creating a cluster.
   
-  Make sure the `qdrant` cluster definition is installed with `kubectl get clusterdefinitions postgresql`.
+  Make sure the `qdrant` cluster definition is installed with `kubectl get clusterdefinitions qdrant`.
 
   ```bash
   kubectl get clusterdefinition qdrant
@@ -34,7 +34,7 @@ In this chapter, we take Qdrant as an example to show how to manage vector datab
   qdrant                                  Available   30m
   ```
 
-  View all available versions for creating a cluster
+  View all available versions for creating a cluster.
 
   ```bash
   kubectl get clusterversions -l clusterdefinition.kubeblocks.io/name=qdrant
@@ -48,7 +48,7 @@ In this chapter, we take Qdrant as an example to show how to manage vector datab
 
 ## Create a cluster
 
-KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a Qdrant Replication cluster.
+KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a Qdrant Replication cluster. Primary and Secondary are distributed on different nodes by default. But if you only have one node for deploying a Replication Cluster, set `spec.affinity.topologyKeys` as `null`.
 
 ```yaml
 cat <<EOF | kubectl apply -f -
@@ -95,60 +95,21 @@ spec:
 EOF
 ```
 
-* `kubeblocks.io/extra-env` in `metadata.annotations` defines the topology mode of a MySQL cluster. If you want to create a Standalone cluster, you can change the value to `standalone`.
-* `spec.clusterVersionRef` is the name of the cluster version CRD that defines the cluster version.
-* `spec.terminationPolicy` is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Halt`, `Delete`, `WipeOut`. `DoNotTerminate` blocks deletion operation. `Halt` deletes workload resources such as statefulset and deployment workloads but keep PVCs. `Delete` is based on Halt and deletes PVCs. `WipeOut` is based on Delete and wipe out all volume snapshots and snapshot data from a backup storage location.
-* `spec.componentSpecs` is the list of components that define the cluster components.
-* `spec.componentSpecs.componentDefRef` is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition apecloud-mysql -o json | jq '.spec.componentDefs[].name'`.
-* `spec.componentSpecs.name` is the name of the component.
-* `spec.componentSpecs.replicas` is the number of replicas of the component.
-* `spec.componentSpecs.resources` is the resource requirements of the component.
-
-If you only have one node for deploying a Replication Cluster, set `spec.affinity.topologyKeys` as `null`.
-
-```yaml
-cat <<EOF | kubectl apply -f -
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: Cluster
-metadata:
-  name: mycluster
-  namespace: demo
-spec:
-  clusterDefinitionRef: qdrant
-  clusterVersionRef: qdrant-1.8.1
-  terminationPolicy: Delete
-  affinity:
-    podAntiAffinity: Preferred
-    topologyKeys: null
-    tenancy: SharedNode
-  tolerations:
-    - key: kb-data
-      operator: Equal
-      value: 'true'
-      effect: NoSchedule
-  componentSpecs:
-  - name: qdrant
-    componentDefRef: qdrant
-    monitor: false
-    serviceAccountName: kb-qdrant-cluster
-    replicas: 2
-    resources:
-      limits:
-        cpu: '0.5'
-        memory: 0.5Gi
-      requests:
-        cpu: '0.5'
-        memory: 0.5Gi
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
-EOF
-```
+| Field                                 | Definition  |
+|---------------------------------------|--------------------------------------|
+| `spec.clusterDefinitionRef`           | It specifies the name of the ClusterDefinition for creating a specific type of cluster.  |
+| `spec.clusterVersionRef`              | It is the name of the cluster version CRD that defines the cluster version.  |
+| `spec.terminationPolicy`              | It is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Halt`, `Delete`, `WipeOut`.  </br> - `DoNotTerminate` blocks deletion operation. </br> - `Halt` deletes workload resources such as statefulset and deployment workloads but keep PVCs. </br> - `Delete` is based on Halt and deletes PVCs. </br> - `WipeOut` is based on Delete and wipe out all volume snapshots and snapshot data from a backup storage location. |
+| `spec.affinity`                       | It defines a set of node affinity scheduling rules for the cluster's Pods. This field helps control the placement of Pods on nodes within the cluster.  |
+| `spec.affinity.podAntiAffinity`       | It specifies the anti-affinity level of Pods within a component. It determines how pods should spread across nodes to improve availability and performance. |
+| `spec.affinity.topologyKeys`          | It represents the key of node labels used to define the topology domain for Pod anti-affinity and Pod spread constraints.   |
+| `spec.affinity.tenacy`                | It determines the level of resource isolation between Pods. It can have the following values: `SharedNode` and `DedicatedNode`. </br> - SharedNode: It allows that multiple Pods may share the same node, which is the default behavior of K8s. </br> - DedicatedNode: Each Pod runs on a dedicated node, ensuring that no two Pods share the same node.                                                                                                                |
+| `spec.tolerations`                    | It is an array that specifies tolerations attached to the cluster's Pods, allowing them to be scheduled onto nodes with matching taints.  |
+| `spec.componentSpecs`                 | It is the list of components that define the cluster components. This field allows customized configuration of each component within a cluster.   |
+| `spec.componentSpecs.componentDefRef` | It is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition apecloud-mysql -o json \| jq '.spec.componentDefs[].name'`.   |
+| `spec.componentSpecs.name`            | It specifies the name of the component.     |
+| `spec.componentSpecs.replicas`        | It specifies the number of replicas of the component.  |
+| `spec.componentSpecs.resources`       | It specifies the resource requirements of the component.  |
 
 KubeBlocks operator watches for the `Cluster` CRD and creates the cluster and all dependent resources. You can get all the resources created by the cluster with `kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=mycluster -n demo`.
 
@@ -156,31 +117,29 @@ KubeBlocks operator watches for the `Cluster` CRD and creates the cluster and al
 kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=mycluster -n demo
 ```
 
-Run the following command to see the created PostgreSQL cluster object:
+Run the following command to see the created Qdrant cluster object:
 
 ```bash
 kubectl get cluster mycluster -n demo -o yaml
 ```
 
-<details>
-
-<summary>Output</summary>
-
-</details>
-
 ## Connect to a vector database cluster
 
-Qdrant provides both HTTP and gRPC protocols for client access on ports 6333 and 6334 respectively. Depending on where the client is, different connection options are offered to connect to the Qdrant cluster.
+Qdrant provides both HTTP and gRPC protocols for client access on ports 6333 and 6334 respectively. You can also port forward the service to connect to a database from your local machine.
 
-:::note
+1. Run the following command to port forward the service.
 
-If your cluster is on AWS, install the AWS Load Balancer Controller first.
+   ```bash
+   kubectl port-forward svc/mycluster-qdrant 6333:6333 -n demo
+   ```
 
-:::
+2. Open a new terminal and run the following command to connect to the database.
 
-- If your client is inside a K8s cluster, run `kbcli cluster describe qdrant` to get the ClusterIP address of the cluster or the corresponding K8s cluster domain name.
-- If your client is outside the K8s cluster but in the same VPC as the server, run `kbcli cluster expose qdant --enable=true --type=vpc` to get a VPC load balancer address for the database cluster.
-- If your client is outside the VPC, run `kbcli cluster expose qdant --enable=true --type=internet` to open a public network reachable address for the database cluster.
+   ```bash
+   curl http://127.0.0.1:6333/collections
+   ```
+
+   Refer to [the official Qdrant documents](https://qdrant.tech/documentation/) for the cluster operations.
 
 ## Monitor the vector database
 
@@ -207,13 +166,13 @@ mycluster   qdrant               qdrant-1.5.0   Halt                 Running   4
 
 #### Steps
 
-1. Change configuration. There are two ways to apply horizontal scaling.
+There are two ways to apply horizontal scaling.
 
-   <Tabs>
+<Tabs>
 
-   <TabItem value="OpsRequest" label="OpsRequest" default>
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
-   Apply an OpsRequest to a specified cluster. Configure the parameters according to your needs.
+1. Apply an OpsRequest to a specified cluster. Configure the parameters according to your needs.
 
    ```bash
    kubectl apply -f - <<EOF
@@ -231,13 +190,31 @@ mycluster   qdrant               qdrant-1.5.0   Halt                 Running   4
    EOF
    ```
 
-   </TabItem>
-  
-   <TabItem value="Change the cluster YAML file" label="Change the cluster YAML file">
+2. Check the operation status to validate the horizontal scaling status.
 
-   Change the configuration of `spec.componentSpecs.replicas` in the YAML file. `spec.componentSpecs.replicas` stands for the pod amount and changing this value triggers a horizontal scaling of a cluster.
+   ```bash
+   kubectl get ops -n demo
+   >
+   NAMESPACE   NAME                     TYPE                CLUSTER     STATUS    PROGRESS   AGE
+   demo        ops-horizontal-scaling   HorizontalScaling   mycluster   Succeed   3/3        6m
+   ```
+
+   If an error occurs to the horizontal scaling operation, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
+
+3. Check whether the corresponding resources change.
+
+    ```bash
+    kubectl describe cluster mycluster -n demo
+    ```
+
+</TabItem>
+  
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
+
+1. Change the configuration of `spec.componentSpecs.replicas` in the YAML file. `spec.componentSpecs.replicas` stands for the pod amount and changing this value triggers a horizontal scaling of a cluster.
 
    ```yaml
+   kubectl edit cluster mycluster -n demo
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
    metadata:
@@ -249,7 +226,7 @@ mycluster   qdrant               qdrant-1.5.0   Halt                 Running   4
      componentSpecs:
      - name: qdrant
        componentDefRef: qdrant
-       replicas: 1 # Change the pod amount.
+       replicas: 1 # Change the amount
        volumeClaimTemplates:
        - name: data
          spec:
@@ -261,22 +238,15 @@ mycluster   qdrant               qdrant-1.5.0   Halt                 Running   4
     terminationPolicy: Halt
    ```
 
-2. Validate the horizontal scaling operation.
-
-   Check the cluster STATUS to identify the horizontal scaling status.
-
-   ```bash
-   kubectl get ops -n demo
-   >
-   NAMESPACE   NAME                     TYPE                CLUSTER     STATUS    PROGRESS   AGE
-   demo        ops-horizontal-scaling   HorizontalScaling   mycluster   Succeed   3/3        6m
-   ```
-
-3. Check whether the corresponding resources change.
+2. Check whether the corresponding resources change.
 
     ```bash
     kubectl describe cluster mycluster -n demo
     ```
+
+</TabItem>
+
+</Tabs>
 
 #### Handle the snapshot exception
 
@@ -350,13 +320,13 @@ mycluster   qdrant               qdrant-1.5.0   Halt                 Running   4
 
 #### Steps
 
-1. Change configuration. There are two ways to apply vertical scaling.
+There are two ways to apply vertical scaling.
 
-   <Tabs>
+<Tabs>
 
-   <TabItem value="OpsRequest" label="OpsRequest" default>
-  
-   Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
+<TabItem value="OpsRequest" label="OpsRequest" default>
+
+1. Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
 
    ```bash
    kubectl apply -f - <<EOF
@@ -379,11 +349,28 @@ mycluster   qdrant               qdrant-1.5.0   Halt                 Running   4
    EOF
    ```
 
-   </TabItem>
-  
-   <TabItem value="Change the cluster YAML file" label="Change the cluster YAML file">
+2. Check the operation status to validate the vertical scaling.
 
-   Change the configuration of `spec.componentSpecs.resources` in the YAML file. `spec.componentSpecs.resources` controls the requirement and limit of resources and changing them triggers a vertical scaling.
+   ```bash
+   kubectl get ops -n demo
+   >
+   NAMESPACE   NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
+   demo        ops-vertical-scaling   VerticalScaling   mycluster   Succeed   3/3        6m
+   ```
+
+   If an error occurs to the vertical scaling operation, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
+
+3. Check whether the corresponding resources change.
+
+    ```bash
+    kubectl describe cluster mycluster -n demo
+    ```
+
+</TabItem>
+
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
+
+1. Change the configuration of `spec.componentSpecs.resources` in the YAML file. `spec.componentSpecs.resources` controls the requirement and limit of resources and changing them triggers a vertical scaling.
 
    ```yaml
    apiVersion: apps.kubeblocks.io/v1alpha1
@@ -416,32 +403,11 @@ mycluster   qdrant               qdrant-1.5.0   Halt                 Running   4
      terminationPolicy: Halt
    ```
 
-   </TabItem>
-
-   </Tabs>
-
-2. Check the operation status to validate the vertical scaling.
-
-   ```bash
-   kubectl get ops -n demo
-   >
-   NAMESPACE   NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
-   demo        ops-vertical-scaling   VerticalScaling   mycluster   Succeed   3/3        6m
-   ```
-
-   If an error occurs to the vertical scaling operation, you can troubleshoot with `kubectl describe` command to view the events of this operation.
-
-3. Check whether the corresponding resources change.
+2. Check whether the corresponding resources change.
 
     ```bash
     kubectl describe cluster mycluster -n demo
     ```
-
-:::note
-
-Vertical scaling does not synchronize the configuration related to CPU and memory and it is required to manually call the OpsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
-
-:::
 
 ## Volume Expanding
 
@@ -458,15 +424,15 @@ mycluster   qdrant               qdrant-1.5.0      Delete               Running 
 
 ### Steps
 
-1. Change configuration. There are two ways to apply volume expansion.
+There are two ways to apply volume expansion.
 
-    <Tabs>
+<Tabs>
 
-    <TabItem value="OpsRequest" label="OpsRequest" default>
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
-    Change the value of storage according to your need and run the command below to expand the volume of a cluster.
+1. Change the value of storage according to your need and run the command below to expand the volume of a cluster.
 
-    ```bash
+    ```yaml
     kubectl apply -f - <<EOF
     apiVersion: apps.kubeblocks.io/v1alpha1
     kind: OpsRequest
@@ -484,42 +450,6 @@ mycluster   qdrant               qdrant-1.5.0      Delete               Running 
     EOF
     ```
 
-    </TabItem>
-
-    <TabItem value="Change the cluster YAML file" label="Change the cluster YAML file">
-
-    Change the value of `spec.componentSpecs.volumeClaimTemplates.spec.resources` in the cluster YAML file.
-
-    `spec.componentSpecs.volumeClaimTemplates.spec.resources` is the storage resource information of the pod and changing this value triggers the volume expansion of a cluster.
-
-    ```yaml
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: Cluster
-    metadata:
-      name: mycluster
-      namespace: demo
-    spec:
-      clusterDefinitionRef: qdrant
-      clusterVersionRef: qdrant-1.5.0
-      componentSpecs:
-      - name: qdrant
-        componentDefRef: qdrant
-        replicas: 1
-        volumeClaimTemplates:
-        - name: data
-          spec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 1Gi # Change the volume storage size.
-      terminationPolicy: Halt
-    ```
-
-    </TabItem>
-
-    </Tabs>
-
 2. Validate the volume expansion operation.
 
     ```bash
@@ -529,11 +459,174 @@ mycluster   qdrant               qdrant-1.5.0      Delete               Running 
     demo        ops-volume-expansion   VolumeExpansion   mycluster   Succeed   3/3        6m
     ```
 
+    If an error occurs to the vertical scaling operation, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
+
 3. Check whether the corresponding cluster resources change.
 
     ```bash
     kubectl describe cluster mycluster -n demo
     ```
+
+</TabItem>
+
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML fil">
+
+1. Change the value of `spec.componentSpecs.volumeClaimTemplates.spec.resources` in the cluster YAML file.
+
+   `spec.componentSpecs.volumeClaimTemplates.spec.resources` is the storage resource information of the pod and changing this value triggers the volume expansion of a cluster.
+
+   ```yaml
+   kubectl edit cluster mycluster -n demo
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: Cluster
+   metadata:
+     name: mycluster
+     namespace: demo
+   spec:
+     clusterDefinitionRef: qdrant
+     clusterVersionRef: qdrant-1.5.0
+     componentSpecs:
+     - name: qdrant
+       componentDefRef: qdrant
+       replicas: 2
+       volumeClaimTemplates:
+       - name: data
+         spec:
+           accessModes:
+             - ReadWriteOnce
+           resources:
+             requests:
+               storage: 1Gi # Change the volume storage size.
+     terminationPolicy: Halt
+   ```
+
+2. Check whether the corresponding cluster resources change.
+
+    ```bash
+    kubectl describe cluster mycluster -n demo
+    ```
+
+</TabItem>
+
+</Tabs>
+
+## Stop/Start PostgreSQL Cluster
+
+You can stop/start a cluster to save computing resources. When a cluster is stopped, the computing resources of this cluster are released, which means the pods of Kubernetes are released, but the storage resources are reserved. Start this cluster again if you want to restore the cluster resources from the original storage by snapshots.
+
+### Stop a cluster
+
+<Tabs>
+
+<TabItem value="OpsRequest" label="OpsRequest" default>
+
+Run the command below to stop a cluster.
+
+```bash
+kubectl apply -f - <<EOF
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: ops-stop
+  namespace: demo
+spec:
+  clusterName: mycluster
+  type: Stop
+EOF
+```
+
+</TabItem>
+
+<TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
+
+Configure replicas as 0 to delete pods.
+
+```yaml
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+    name: mycluster
+    namespace: demo
+spec:
+  clusterDefinitionRef: qdrant
+  clusterVersionRef: qdrant-1.8.1
+  terminationPolicy: Delete
+  componentSpecs:
+  - name: qdrant
+    componentDefRef: qdrant
+    monitor: false  
+    replicas: 0
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        storageClassName: standard
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+```
+
+</TabItem>
+
+</Tabs>
+
+### Start a cluster
+  
+<Tabs>
+
+<TabItem value="OpsRequest" label="OpsRequest" default>
+
+Run the command below to start a cluster.
+
+```bash
+kubectl apply -f - <<EOF
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: ops-start
+  namespace: demo
+spec:
+  clusterName: mycluster
+  type: Start
+EOF 
+```
+
+</TabItem>
+
+<TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
+
+Change replicas back to the original amount to start this cluster again.
+
+```yaml
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+    name: mycluster
+    namespace: demo
+spec:
+  clusterDefinitionRef: qdrant
+  clusterVersionRef: qdrant-1.8.1
+  terminationPolicy: Delete
+  componentSpecs:
+  - name: postgresql
+    componentDefRef: qdrant
+    monitor: false  
+    replicas: 1
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        storageClassName: standard
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+```
+
+</TabItem>
+
+</Tabs>
 
 ## Backup and restore
 

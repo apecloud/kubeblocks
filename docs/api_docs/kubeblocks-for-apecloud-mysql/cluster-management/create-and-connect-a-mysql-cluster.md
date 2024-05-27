@@ -1,20 +1,20 @@
 ---
-title: Create and connect to a MySQL Cluster
-description: How to create and connect to a MySQL cluster
-keywords: [mysql, create a mysql cluster, connect to a mysql cluster]
+title: Create and connect to an ApeCloud MySQL Cluster
+description: How to create and connect to an ApeCloud MySQL Cluster
+keywords: [apecloud mysql, create an apecloud mysql cluster, connect to an apecloud mysql cluster]
 sidebar_position: 1
 sidebar_label: Create and connect
 ---
 
-# Create and connect to a MySQL cluster
+# Create and connect to an ApeCloud MySQL cluster
 
-This tutorial shows how to create and connect to a MySQL cluster.
+This tutorial shows how to create and connect to an ApeCloud MySQL cluster.
 
-## Create a MySQL cluster
+## Create an ApeCloud MySQL cluster
 
 ### Before you start
 
-* [Install KubeBlocks by Helm](./../../installation/install-kubeblocks.md).
+* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
 * Make sure the ApeCloud MySQL addon is enabled.
 
   ```bash
@@ -26,7 +26,7 @@ This tutorial shows how to create and connect to a MySQL cluster.
 
 * View all the database types and versions available for creating a cluster.
   
-  Make sure the `apecloud-mysql` cluster definition is installed with `kubectl get clusterdefinition apecloud-mysql`.
+  Make sure the `apecloud-mysql` cluster definition is installed.
 
   ```bash
   kubectl get clusterdefinition apecloud-mysql
@@ -49,104 +49,50 @@ This tutorial shows how to create and connect to a MySQL cluster.
 
 ### Create a cluster
 
-KubeBlocks supports creating three types of MySQL clusters: Standalone, Replication, and RaftGroup Cluster. Standalone only supports one replica and can be used in scenarios with lower requirements for availability. For scenarios with high availability requirements, it is recommended to create a RaftGroup Cluster, which creates a cluster with three replicas. To ensure high availability, all replicas are distributed on different nodes by default.
+KubeBlocks supports creating three types of ApeCloud MySQL clusters: Standalone, Replication, and RaftGroup. Standalone only supports one replica and can be used in scenarios with lower requirements for availability. For scenarios with high availability requirements, it is recommended to create a RaftGroup Cluster, which creates a cluster with three replicas.
+
+To ensure high availability, all replicas are distributed on different nodes by default. If you only have one node for deploying a RaftGroup Cluster, set `spec.affinity.topologyKeys` as `null`.
 
 KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a RaftGroup Cluster.
-
-```bash
-cat <<EOF | kubectl apply -f -
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: Cluster
-metadata:
-  labels:
-    app.kubernetes.io/instance: mycluster
-    app.kubernetes.io/version: 8.0.30
-    helm.sh/chart: apecloud-mysql-cluster-0.8.0
-  name: mycluster
-  namespace: demo
-spec:
-  affinity:
-    podAntiAffinity: Required
-    tenancy: SharedNode
-    topologyKeys:
-    - kubernetes.io/hostname
-  clusterDefinitionRef: apecloud-mysql
-  clusterVersionRef: ac-mysql-8.0.30
-  componentSpecs:
-  - componentDefRef: mysql
-    enabledLogs:
-    - slow
-    - error
-    monitor: false
-    name: mysql
-    replicas: 3
-    resources:
-      limits:
-        cpu: "0.5"
-        memory: 0.5Gi
-      requests:
-        cpu: "0.5"
-        memory: 0.5Gi
-    serviceAccountName: null
-    services: null
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
-  terminationPolicy: Delete
-EOF
-```
-
-* `kubeblocks.io/extra-env` in `metadata.annotations` defines the topology mode of a MySQL cluster. If you want to create a Standalone cluster, you can change the value to `standalone`.
-* `spec.clusterVersionRef` is the name of the cluster version CRD that defines the cluster version.
-* * `spec.terminationPolicy` is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Halt`, `Delete`, `WipeOut`. `DoNotTerminate` blocks deletion operation. `Halt` deletes workload resources such as statefulset and deployment workloads but keep PVCs. `Delete` is based on Halt and deletes PVCs. `WipeOut` is based on Delete and wipe out all volume snapshots and snapshot data from a backup storage location.
-* `spec.componentSpecs` is the list of components that define the cluster components.
-* `spec.componentSpecs.componentDefRef` is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition apecloud-mysql -o json | jq '.spec.componentDefs[].name'`.
-* `spec.componentSpecs.name` is the name of the component.
-* `spec.componentSpecs.replicas` is the number of replicas of the component.
-* `spec.componentSpecs.resources` is the resource requirements of the component.
-
-If you only have one node for deploying a RaftGroup Cluster, set `spec.affinity.topologyKeys` as `null`.
 
 ```yaml
 cat <<EOF | kubectl apply -f -
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  labels:
-    app.kubernetes.io/instance: mycluster
-    app.kubernetes.io/version: 8.0.30
-    helm.sh/chart: apecloud-mysql-cluster-0.8.0
-  name: mycluster
-  namespace: demo
+  name: acmysql-cluster
+  namespace: default
 spec:
-  affinity:
-    podAntiAffinity: Required
-    tenancy: SharedNode
-    topologyKeys: null
   clusterDefinitionRef: apecloud-mysql
   clusterVersionRef: ac-mysql-8.0.30
+  terminationPolicy: Delete
+  affinity:
+    podAntiAffinity: Preferred
+    topologyKeys:
+    - kubernetes.io/hostname
+    tenancy: SharedNode
+  tolerations:
+    - key: kb-data
+      operator: Equal
+      value: 'true'
+      effect: NoSchedule
   componentSpecs:
-  - componentDefRef: mysql
+  - name: mysql
+    componentDefRef: mysql
     enabledLogs:
-    - slow
     - error
+    - general
+    - slow
     monitor: false
-    name: mysql
     replicas: 3
+    serviceAccountName: kb-acmysql-cluster
     resources:
       limits:
-        cpu: "0.5"
+        cpu: '0.5'
         memory: 0.5Gi
       requests:
-        cpu: "0.5"
+        cpu: '0.5'
         memory: 0.5Gi
-    serviceAccountName: null
-    services: null
     volumeClaimTemplates:
     - name: data
       spec:
@@ -155,17 +101,32 @@ spec:
         resources:
           requests:
             storage: 20Gi
-  terminationPolicy: Delete
 EOF
 ```
 
-KubeBlocks operator watches for the `Cluster` CRD and creates the cluster and all dependent resources. You can get all the resources created by the cluster with `kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=mysql-cluster -n demo`.
+| Field                                 | Definition  |
+|---------------------------------------|--------------------------------------|
+| `spec.clusterDefinitionRef`           | It specifies the name of the ClusterDefinition for creating a specific type of cluster.  |
+| `spec.clusterVersionRef`              | It is the name of the cluster version CRD that defines the cluster version.  |
+| `spec.terminationPolicy`              | It is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Halt`, `Delete`, `WipeOut`.  </br> - `DoNotTerminate` blocks deletion operation. </br> - `Halt` deletes workload resources such as statefulset and deployment workloads but keep PVCs. </br> - `Delete` is based on Halt and deletes PVCs. </br> - `WipeOut` is based on Delete and wipe out all volume snapshots and snapshot data from a backup storage location. |
+| `spec.affinity`                       | It defines a set of node affinity scheduling rules for the cluster's Pods. This field helps control the placement of Pods on nodes within the cluster.  |
+| `spec.affinity.podAntiAffinity`       | It specifies the anti-affinity level of Pods within a component. It determines how pods should spread across nodes to improve availability and performance. |
+| `spec.affinity.topologyKeys`          | It represents the key of node labels used to define the topology domain for Pod anti-affinity and Pod spread constraints.   |
+| `spec.affinity.tenacy`                | It determines the level of resource isolation between Pods. It can have the following values: `SharedNode` and `DedicatedNode`. </br> - SharedNode: It allows that multiple Pods may share the same node, which is the default behavior of K8s. </br> - DedicatedNode: Each Pod runs on a dedicated node, ensuring that no two Pods share the same node.                                                                                                                |
+| `spec.tolerations`                    | It is an array that specifies tolerations attached to the cluster's Pods, allowing them to be scheduled onto nodes with matching taints.  |
+| `spec.componentSpecs`                 | It is the list of components that define the cluster components. This field allows customized configuration of each component within a cluster.   |
+| `spec.componentSpecs.componentDefRef` | It is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition apecloud-mysql -o json \| jq '.spec.componentDefs[].name'`.   |
+| `spec.componentSpecs.name`            | It specifies the name of the component.     |
+| `spec.componentSpecs.replicas`        | It specifies the number of replicas of the component.  |
+| `spec.componentSpecs.resources`       | It specifies the resource requirements of the component.  |
+
+KubeBlocks operator watches for the `Cluster` CRD and creates the cluster and all dependent resources. You can get all the resources created by the cluster by running the command below.
 
 ```bash
 kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=mycluster -n demo
 ```
 
-Run the following command to see the created MySQL cluster object:
+Run the following command to see the created ApeCloud MySQL cluster:
 
 ```bash
 kubectl get cluster mycluster -n demo -o yaml
@@ -206,7 +167,7 @@ spec:
     enabledLogs:
     - slow
     - error
-    monitorEnabled: false
+    monitor: false
     name: mysql
     replicas: 3
     resources:
@@ -259,7 +220,9 @@ status:
   phase: Running
 ```
 
-## Connect to a MySQL Cluster
+</details>
+
+## Connect to a cluster
 
 <Tabs>
 
@@ -267,15 +230,15 @@ status:
 
 You can use `kubectl exec` to exec into a Pod and connect to a database.
 
-KubeBlocks operator creates a new Secret called `mycluster-conn-credential` to store the connection credential of the MySQL cluster. This secret contains the following keys:
+KubeBlocks operator creates a new Secret called `mycluster-conn-credential` to store the connection credential of the AeCloud MySQL cluster. This secret contains the following keys:
 
-* `username`: the root username of the MySQL cluster.
+* `username`: the root username of thecluster.
 * `password`: the password of the root user.
-* `port`: the port of the MySQL cluster.
-* `host`: the host of the MySQL cluster.
-* `endpoint`: the endpoint of the MySQL cluster and it is the same as `host:port`.
+* `port`: the port of the cluster.
+* `host`: the host of the cluster.
+* `endpoint`: the endpoint of the cluster and it is the same as `host:port`.
 
-1. Run the command below to get the `username` and `password` for the `kubectl exec` command.
+1. Get the `username` and `password` for the `kubectl exec` command.
 
    ```bash
    kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
@@ -301,7 +264,7 @@ KubeBlocks operator creates a new Secret called `mycluster-conn-credential` to s
 
 You can also port forward the service to connect to a database from your local machine.
 
-1. Run the following command to port forward the service.
+1. Port forward the service.
 
    ```bash
    kubectl port-forward svc/mycluster-mysql 3306:3306 -n demo
@@ -317,4 +280,4 @@ You can also port forward the service to connect to a database from your local m
 
 </Tabs>
 
-For the detailed database connection guide, refer to [Connect database](./../../connect_database/overview-of-database-connection.md). 
+For the detailed database connection guide, refer to [Connect database](./../../connect_database/overview-of-database-connection.md).

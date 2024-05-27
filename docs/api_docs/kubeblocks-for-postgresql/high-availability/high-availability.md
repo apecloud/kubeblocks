@@ -11,8 +11,7 @@ KubeBlocks integrates [the open-source Patroni solution](https://patroni.readthe
 
 ## Before you start
 
-* [Install kbcli](./../../installation/install-with-kbcli/install-kbcli.md).
-* Install KubeBlocks: You can install KubeBlocks by [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or by [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md).
+* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
 * [Create a PostgreSQL Replication Cluster](./../cluster-management/create-and-connect-a-postgresql-cluster.md#create-a-postgresql-cluster).
 * Check whether the following role probe parameters exist to verify the role probe is enabled.
 
@@ -114,4 +113,4 @@ KubeBlocks integrates [the open-source Patroni solution](https://patroni.readthe
 
    ![PostgreSQL cluster status after HA](./../../../img/api-ha-pg-after.png)
 
-   After the failover, `pg-cluster-postgresql-0` becomes the secondary pod and `pg-cluster-postgresql-1` becomes the primary pod.
+   After the failover, `mycluster-postgresql-0` becomes the secondary pod and `pg-cluster-postgresql-1` becomes the primary pod.

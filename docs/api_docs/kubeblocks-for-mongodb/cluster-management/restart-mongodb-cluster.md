@@ -12,11 +12,7 @@ You can restart all pods of the cluster. When an exception occurs in a database,
 
 ## Steps
 
-1. Restart a cluster.
-
-   You can use `kbcli` or create an OpsRequest to restart a cluster.
-
-   Run the command below to restart a cluster.
+1. Create an OpsRequest to restart a cluster.
 
    ```bash
    kubectl apply -f - <<EOF

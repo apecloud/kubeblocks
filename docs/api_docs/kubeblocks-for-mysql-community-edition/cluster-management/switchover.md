@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 
 # Switch over a MySQL cluster
 
-You can initiate a switchover for an ApeCloud MySQL RaftGroup by executing the kbcli or kubectl command. Then KubeBlocks switches the instance roles.
+You can initiate a switchover for an MySQL Replication cluster. Then KubeBlocks switches the instance roles.
 
 ## Before you start
 
@@ -75,7 +75,7 @@ The value of `instanceName` decides whether a new leader instance is specified f
 Check the instance status to verify whether the switchover is performed successfully.
 
 ```bash
-kbcli cluster list-instances
+kubectl get pods -n demo
 ```
 
 ## Handle an exception

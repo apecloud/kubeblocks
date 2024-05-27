@@ -28,13 +28,17 @@ To check the termination policy, execute the following command.
 ```bash
 kubectl -n demo get cluster mycluster
 >
-NAME    CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    AGE
+NAME        CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    AGE
 mycluster   redis                redis-7.0.6   Delete               Running   10m
 ```
 
 ## Step
 
 Run the command below to delete a specified cluster.
+
+```bash
+kubectl delete cluster mycluster -n demo
+```
 
 If you want to delete a cluster and its all related resources, you can modify the termination policy to `WipeOut`, then delete the cluster.
 

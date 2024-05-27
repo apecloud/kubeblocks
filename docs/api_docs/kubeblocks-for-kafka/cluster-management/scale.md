@@ -15,13 +15,7 @@ You can scale a Kafka cluster in two ways, vertical scaling and horizontal scali
 
 ## Vertical scaling
 
-You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, if you need to change the resource class from 1C2G to 2C4G, vertical scaling is what you need.
-
-:::note
-
-During the vertical scaling process, all pods restart in the order of learner -> follower -> leader and the leader pod may change after the restarting.
-
-:::
+You can vertically scale a cluster by changing resource requirements and limits (e.g. CPU and storage). For example, you can change the resource class from 1C2G to 2C4G by performing vertical scaling.
 
 ### Before you start
 
@@ -33,15 +27,15 @@ kubectl get cluster mycluster -n demo
 
 ### Steps
 
-1. Change configuration. There are 2 ways to apply vertical scaling.
+There are two ways to apply vertical scaling.
 
-   <Tabs>
+<Tabs>
 
-   <TabItem value="OpsRequest" label="OpsRequest" default>
-  
-   Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
-   ```bash
+1. Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
+
+   ```yaml
    kubectl apply -f - <<EOF
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: OpsRequest
@@ -55,18 +49,51 @@ kubectl get cluster mycluster -n demo
      - componentName: broker
        requests:
          memory: "2Gi"
-         cpu: "1000m"
+         cpu: "1"
        limits:
          memory: "4Gi"
-         cpu: "2000m"
+         cpu: "2"
    EOF
    ```
-  
-   </TabItem>
 
-   <TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
+2. Check the operation status to validate the vertical scaling.
 
-   Change the configuration of `spec.componentSpecs.resources` in the YAML file. `spec.componentSpecs.resources` controls the requirement and limit of resources and changing them triggers a vertical scaling.
+   ```bash
+   kubectl get ops -n demo
+   >
+   NAMESPACE   NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
+   demo        ops-vertical-scaling   VerticalScaling   mycluster   Succeed   3/3        6m
+   ```
+
+   If an error occurs to the vertical scaling operation, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
+
+3. Check whether the corresponding resources change.
+
+   ```bash
+   kubectl describe cluster mycluster -n demo
+   >
+   ......
+   Component Specs:
+    Component Def Ref:  kafka
+    Enabled Logs:
+      running
+    Monitor:   false
+    Name:      kafka
+    Replicas:  2
+    Resources:
+      Limits:
+        Cpu:     2
+        Memory:  4Gi
+      Requests:
+        Cpu:     1
+        Memory:  2Gi
+   ```
+
+</TabItem>
+
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
+
+1. Change the configuration of `spec.componentSpecs.resources` in the YAML file. `spec.componentSpecs.resources` controls the requirement and limit of resources and changing them triggers a vertical scaling.
 
    ```yaml
    apiVersion: apps.kubeblocks.io/v1alpha1
@@ -96,25 +123,10 @@ kubectl get cluster mycluster -n demo
            resources:
              requests:
                storage: 1Gi
-     terminationPolicy: Halt
+     terminationPolicy: Delete
    ```
 
-   </TabItem>
-
-   </Tabs>
-  
-2. Check the operation status to validate the vertical scaling.
-
-   ```bash
-   kubectl get ops -n demo
-   >
-   NAMESPACE   NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
-   demo        ops-vertical-scaling   VerticalScaling   mycluster   Succeed   3/3        6m
-   ```
-
-   If an error occurs to the vertical scaling operation, you can troubleshoot with `kubectl describe` command to view the events of this operation.
-
-3. Check whether the corresponding resources change.
+2. Check whether the corresponding resources change.
 
    ```bash
    kubectl describe cluster mycluster -n demo
@@ -124,7 +136,7 @@ kubectl get cluster mycluster -n demo
     Component Def Ref:  kafka
     Enabled Logs:
       running
-    MonitorEnabled:   false
+    Monitor:   false
     Name:      kafka
     Replicas:  2
     Resources:
@@ -136,19 +148,17 @@ kubectl get cluster mycluster -n demo
         Memory:  2Gi
    ```
 
-:::note
+</TabItem>
 
-Vertical scaling does not synchronize parameters related to CPU and memory and it is required to manually call the OpsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
-
-:::
-
+</Tabs>
+  
 ## Horizontal scaling
 
 Horizontal scaling changes the amount of pods. For example, you can apply horizontal scaling to scale pods up from three to five. The scaling process includes the backup and restoration of data.
 
 ### Before you start
 
-- Check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
+- Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
 - You are not recommended to perform horizontal scaling on the controller node, including the controller node both in combined mode and separated node.
 - When scaling in horizontally, you must know the topic partition storage. If the topic has only one replication, data loss may caused when you scale in broker.
 
@@ -158,15 +168,15 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
 
 ### Steps
 
-1. Change configuration. There are 2 ways to apply horizontal scaling.
+There are two ways to apply horizontal scaling.
 
-   <Tabs>
+<Tabs>
 
-   <TabItem value="OpsRequest" label="OpsRequest" default>
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
-   Apply an OpsRequest to a specified cluster. Configure the parameters according to your needs.
+1. Apply an OpsRequest to a specified cluster. Configure the parameters according to your needs.
 
-   ```bash
+   ```yaml
    kubectl apply -f - <<EOF
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: OpsRequest
@@ -182,13 +192,48 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
    EOF
    ```
 
-   </TabItem>
+2. Check the operation status to validate the horizontal scaling.
 
-   <TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
+   ```bash
+   kubectl get ops -n demo
+   >
+   NAMESPACE   NAME                     TYPE                CLUSTER     STATUS    PROGRESS   AGE
+   demo        ops-horizontal-scaling   HorizontalScaling   mycluster   Succeed   3/3        6m
+   ```
 
-   Change the configuration of `spec.componentSpecs.replicas` in the YAML file. `spec.componentSpecs.replicas` stands for the pod amount and changing this value triggers a horizontal scaling of a cluster.
+   If an error occurs to the horizontal scaling operation, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
+
+3. Check whether the corresponding resources change.
+
+   ```bash
+   kubectl describe cluster mycluster -n demo
+   >
+   ......
+   Component Specs:
+    Component Def Ref:  kafka
+    Enabled Logs:
+      running
+    Monitor:   false
+    Name:      kafka
+    Replicas:  2
+    Resources:
+      Limits:
+        Cpu:     2
+        Memory:  4Gi
+      Requests:
+        Cpu:     1
+        Memory:  2Gi
+   ```
+
+</TabItem>
+
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
+
+1. Change the configuration of `spec.componentSpecs.replicas` in the YAML file. `spec.componentSpecs.replicas` stands for the pod amount and changing this value triggers a horizontal scaling of a cluster.
 
    ```yaml
+   kubectl edit cluster mycluster -n demo
+   >
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
    metadata:
@@ -200,7 +245,7 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
      componentSpecs:
      - name: broker
        componentDefRef: broker
-       replicas: 1 # Change the pod amount.
+       replicas: 2 # Change the amount
        volumeClaimTemplates:
        - name: data
          spec:
@@ -208,26 +253,23 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
              - ReadWriteOnce
            resources:
              requests:
-               storage: 1Gi
-    terminationPolicy: Halt
+               storage: 20Gi
+    terminationPolicy: Delete
    ```
 
-   </TabItem>
-
-   </Tabs>
-
-2. Validate the horizontal scaling operation.
+2. Check whether the corresponding resources change.
 
    ```bash
    kubectl describe cluster mycluster -n demo
+   >
    ......
    Component Specs:
     Component Def Ref:  kafka
     Enabled Logs:
       running
-    MonitorEnabled:   false
+    Monitor:   false
     Name:      kafka
-    Replicas:  1
+    Replicas:  2
     Resources:
       Limits:
         Cpu:     2
@@ -236,6 +278,10 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
         Cpu:     1
         Memory:  2Gi
    ```
+
+</TabItem>
+
+</Tabs>
 
 ### Handle the snapshot exception
 

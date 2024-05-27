@@ -8,9 +8,7 @@ sidebar_label: Create
 
 ## Introduction
 
-KubeBlocks can quickly integrate new engines through good abstraction. The functions tested in KubeBlocks include Pulsar cluster creation and deletion, vertical and horizontal scaling of Pulsar cluster components, storage expansion, restart, and configuration changes.
-
-KubeBlocks supports Pulsar's daily operations, including basic lifecycle operations such as cluster creation, deletion, and restart, as well as advanced operations such as horizontal and vertical scaling, storage expansion, configuration changes, and monitoring.
+KubeBlocks can quickly integrate new engines through good abstraction. KubeBlocks supports Pulsar operations, including basic lifecycle operations such as cluster creation, deletion, and restart, as well as advanced operations such as horizontal and vertical scaling, volume expansion, configuration changes, and monitoring.
 
 ## Environment Recommendation
 
@@ -84,7 +82,7 @@ Refer to the [Pulsar official document](https://pulsar.apache.org/docs/3.1.x/) f
      - zookeeper: 3 replicas
 
      ```bash
-     helm install pulsar kubeblocks/pulsar-cluster --version "x.x.x" -f values-production.yaml --set monitor.enabled=true
+     helm install mycluster kubeblocks/pulsar-cluster --version "x.x.x" -f values-production.yaml --set monitor.enabled=true --namespace=demo
      ```
 
    - **Option 2**: Create pulsar cluster with proxy.
@@ -95,7 +93,7 @@ Refer to the [Pulsar official document](https://pulsar.apache.org/docs/3.1.x/) f
      - zookeeper: 3 replicas
 
      ```bash
-     helm install pulsar kubeblocks/pulsar-cluster --version "x.x.x" -f values-production.yaml --set proxy.enable=true  --set monitor.enabled=true  
+     helm install mycluster kubeblocks/pulsar-cluster --version "x.x.x" -f values-production.yaml --set proxy.enable=true  --set monitor.enabled=true --namespace=demo
      ```
 
    - **Option 3**:  Create pulsar cluster with proxy and deploy `bookies-recovery` component.  
@@ -107,7 +105,7 @@ Refer to the [Pulsar official document](https://pulsar.apache.org/docs/3.1.x/) f
      - bookies-recovery: 3 replicas
 
      ```bash
-     helm install pulsar kubeblocks/pulsar-cluster --version "x.x.x" -f values-production.yaml --set proxy.enable=true --set bookiesRecovery.enable=true --set monitor.enabled=true 
+     helm install mycluster kubeblocks/pulsar-cluster --version "x.x.x" -f values-production.yaml --set proxy.enable=true --set bookiesRecovery.enable=true --set monitor.enabled=true --namespace=demo
      ```
 
    - **Option 4**: Create pulsar cluster and specify bookies and zookeeper storage parameters.
@@ -117,15 +115,15 @@ Refer to the [Pulsar official document](https://pulsar.apache.org/docs/3.1.x/) f
      - zookeeper: 3 replicas
 
      ```bash
-     helm install pulsar kubeblocks/pulsar-cluster --version "x.x.x" -f values-production.yaml --set bookies.persistence.data.storageClassName=<sc name>,bookies.persistence.log.storageClassName=<sc name>,zookeeper.persistence.data.storageClassName=<sc name>,zookeeper.persistence.log.storageClassName=<sc name> --set monitor.enabled=true
+     helm install mycluster kubeblocks/pulsar-cluster --namespace=demo --version "x.x.x" -f values-production.yaml --set bookies.persistence.data.storageClassName=<sc name>,bookies.persistence.log.storageClassName=<sc name>,zookeeper.persistence.data.storageClassName=<sc name>,zookeeper.persistence.log.storageClassName=<sc name> --set monitor.enabled=true
      ```
 
-   You can specify the storage name `<sc name>`.
+   You can specify the storage name by defining `<sc name>`.
 
 3. Verify the cluster created.
 
     ```bash
-    kubectl get cluster pulsar
+    kubectl get cluster mycluster --namespace=demo
     ```
 
     When the status is Running, the cluster is created successfully.

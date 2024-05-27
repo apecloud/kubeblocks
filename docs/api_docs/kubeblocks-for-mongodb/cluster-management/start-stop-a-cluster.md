@@ -35,7 +35,7 @@ EOF
 
 </TabItem>
 
-<TabItem value="Cluster YAML File" label="Cluster YAML File">
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
 Configure replicas as 0 to delete pods.
 
@@ -48,7 +48,7 @@ metadata:
 spec:
   clusterDefinitionRef: mongodb
   clusterVersionRef: mongodb-5.0
-  terminationPolicy: WipeOut
+  terminationPolicy: Delete
   componentSpecs:
   - name: mongodb
     componentDefRef: mongodb
@@ -62,7 +62,7 @@ spec:
           - ReadWriteOnce
         resources:
           requests:
-            storage: 1Gi
+            storage: 20Gi
 ```
 
 </TabItem>
@@ -107,7 +107,7 @@ metadata:
 spec:
   clusterDefinitionRef: mongodb
   clusterVersionRef: mongodb-5.0
-  terminationPolicy: WipeOut
+  terminationPolicy: Delete
   componentSpecs:
   - name: mongodb
     componentDefRef: mongodb
@@ -121,7 +121,7 @@ spec:
           - ReadWriteOnce
         resources:
           requests:
-            storage: 1Gi
+            storage: 20Gi
 ```
 
 </TabItem>

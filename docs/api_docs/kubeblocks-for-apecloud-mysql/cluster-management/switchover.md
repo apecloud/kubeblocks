@@ -1,18 +1,23 @@
 ---
-title: Switch over a MySQL cluster
-description: How to switch over a MySQL cluster
-keywords: [mysql, switch over a cluster, switchover]
+title: Switchover
+description: How to switch over an ApeCloud MySQL Cluster
+keywords: [apecloud mysql, switch over an apecloud mysql cluster, switchover]
 sidebar_position: 6
 sidebar_label: Switchover
 ---
 
-# Switch over a MySQL cluster
+# Switchover
 
-You can initiate a switchover for an ApeCloud MySQL RaftGroup by executing the kbcli or kubectl command. Then KubeBlocks switches the instance roles.
+You can initiate a switchover for an ApeCloud MySQL RaftGroup cluster. Then KubeBlocks switches the instance roles.
 
 ## Before you start
 
 * Make sure the cluster is running normally.
+  
+  ```bash
+  kubectl get cluster mycluster -n demo
+  ```
+
 * Check whether the following role probe parameters exist to verify whether the role probe is enabled.
 
    ```bash
@@ -27,7 +32,7 @@ You can initiate a switchover for an ApeCloud MySQL RaftGroup by executing the k
 
 ## Initiate the switchover
 
-You can switch over a follower of an ApeCloud MySQL RaftGroup to the leader role, and the former leader instance to a follower.
+You can switch a follower of an ApeCloud MySQL RaftGroup over to the leader role, and the former leader instance over to a follower.
 
 The value of `instanceName` decides whether a new leader instance is specified for the switchover.
 
@@ -38,7 +43,7 @@ The value of `instanceName` decides whether a new leader instance is specified f
   apiVersion: apps.kubeblocks.io/v1alpha1
   kind: OpsRequest
   metadata:
-    name: mycluster-switchover-jhkgl
+    name: mycluster-switchover
     namespace: demo
   spec:
     clusterName: mycluster
@@ -46,7 +51,7 @@ The value of `instanceName` decides whether a new leader instance is specified f
     switchover:
     - componentName: apecloud-mysql
       instanceName: '*'
-  >>
+  EOF
   ```
 
 * Initiate a switchover with a specified new leader instance.
@@ -56,7 +61,7 @@ The value of `instanceName` decides whether a new leader instance is specified f
   apiVersion: apps.kubeblocks.io/v1alpha1
   kind: OpsRequest
   metadata:
-    name: mycluster-switchover-jhkgl
+    name: mycluster-switchover
     namespace: demo
   spec:
     clusterName: mycluster
@@ -64,7 +69,7 @@ The value of `instanceName` decides whether a new leader instance is specified f
     switchover:
     - componentName: apecloud-mysql
       instanceName: 'mycluster-mysql-2'
-  >>
+  EOF
   ```
 
 ## Verify the switchover

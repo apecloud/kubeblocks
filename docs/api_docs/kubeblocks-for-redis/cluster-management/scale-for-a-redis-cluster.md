@@ -6,45 +6,43 @@ sidebar_position: 2
 sidebar_label: Scale
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Scale for a Redis cluster
 
 You can scale Redis DB instances in two ways, vertical scaling and horizontal scaling.
 
 ## Vertical scaling
 
-You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, if you need to change the resource demand from 1C2G to 2C4G, vertical scaling is what you need.
+You can vertically scale a cluster by changing resource requirements and limits (e.g. CPU and storage). For example, you can change the resource class from 1C2G to 2C4G by performing vertical scaling.
 
 :::note
 
-- During the vertical scaling process, a concurrent restart is triggered and the leader pod may change after the restarting.
-- From v0.9.0, after vertical scaling is executed, KubeBlocks will automatically adjust part of the parameters of the database instance to more appropriate values. It is recommended to back up and record your custom parameter settings so that you can restore them if needed.
+During the vertical scaling process, a concurrent restart is triggered and the primary pod may change after the restarting.
 
 :::
 
 ### Before you start
 
-Run the command below to check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
-
-```bash
-kubectl get cluster mycluster -n demo
-```
-
-***Example***
+Run the command below to check whether the cluster status is `Running`. Otherwise, the following operations may fail.
 
 ```bash
 kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
-mycluster   redis                redis-7.0.6    Delete               Running   4d18h
+mycluster   redis                redis-7.0.6    Delete               Running   18m
 ```
 
 ### Steps
 
-1. Change configuration. There are 2 ways to apply vertical scaling.
+There are two ways to apply vertical scaling.
 
-   **Option 1.** Create an OpsRequest
-  
-   Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
+<Tabs>
+
+<TabItem value="OpsRequest" label="OpsRequest" default>
+
+1. Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
 
    ```bash
    kubectl apply -f - <<EOF
@@ -66,16 +64,35 @@ mycluster   redis                redis-7.0.6    Delete               Running   4
          cpu: "2"
    EOF
    ```
-  
-   **Option 2.** Change the YAML file of the cluster
 
-   Change the configuration of `spec.componentSpecs.resources` in the YAML file.
+2. Check the operation status to validate the vertical scaling.
+
+   ```bash
+   kubectl get ops -n demo
+   >
+   NAMESPACE   NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
+   demo        ops-vertical-scaling   VerticalScaling   mycluster   Succeed   3/3        6m
+   ```
+
+   If an error occurs to the vertical scaling operation, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
+
+3. Check whether the corresponding resources change.
+
+    ```bash
+    kubectl describe cluster mycluster -n demo
+    ```
+
+</TabItem>
+
+<TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
+
+1. Change the configuration of `spec.componentSpecs.resources` in the YAML file.
 
    `spec.componentSpecs.resources` controls the requests and limits of resources and changing them triggers a vertical scaling.
 
-   ***Example***
-
-   ```YAML
+   ```yaml
+   kubectl edit cluster mycluster -n demo
+   >
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
    metadata:
@@ -106,54 +123,23 @@ mycluster   redis                redis-7.0.6    Delete               Running   4
      terminationPolicy: Delete
    ```
 
-2. Validate the vertical scaling.
-
-   Check the cluster status to identify the vertical scaling status.
-
-   ```bash
-   kubectl get cluster mycluster -n demo
-   ```
-
-   ***Example***
-
-   ```bash
-   kubectl get cluster mycluster -n demo
-   >
-   NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
-   mycluster   redis                redis-7.0.6    Delete               Running  4d18h
-   ```
-
-    :::note
-
-    Vertical scaling does not synchronize parameters related to CPU and memory and it is required to manually call the opsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
-
-    :::
-
-3. Check whether the corresponding resources change.
+2. Check whether the corresponding resources change.
 
     ```bash
     kubectl describe cluster mycluster -n demo
     ```
 
+</TabItem>
+
+</Tabs>
+
 ## Horizontal scaling
 
 Horizontal scaling changes the amount of pods. For example, you can apply horizontal scaling to scale up from three pods to five pods. The scaling process includes the backup and restoration of data.
 
-:::note
-
- From v0.9.0, after horizontal scaling is performed, KubeBlocks will automatically adjust part of the parameters of the database instance to more appropriate values. It is recommended to back up and record your custom parameter settings so that you can restore them if needed.
-
- :::
-
 ### Before you start
 
 Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
-
-```bash
-kubectl get cluster mycluster -n demo
-```
-
-***Example***
 
 ```bash
 kubectl get cluster mycluster -n demo
@@ -164,11 +150,13 @@ mycluster   redis                redis-7.0.6    Delete               Running   4
 
 ### Steps
 
-1. Change configuration. There are 2 ways to apply horizontal scaling.
+There are two ways to apply horizontal scaling.
 
-   **Option 1.** Create an OpsRequest
+<Tabs>
 
-   Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
+<TabItem value="OpsRequest" label="OpsRequest" default>
+
+1. Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
 
    ```bash
    kubectl apply -f - <<EOF
@@ -186,13 +174,32 @@ mycluster   redis                redis-7.0.6    Delete               Running   4
    EOF
    ```
 
-   **Option 2.** Change the YAML file of the cluster
+2. Check the operation status to validate the horizontal scaling.
 
-   Change the value of `spec.componentSpecs.replicas` in the YAML file. `spec.componentSpecs.replicas` stands for the pod amount and changing this value triggers a horizontal scaling of a cluster.
+   ```bash
+   kubectl get ops -n demo
+   >
+   NAMESPACE   NAME                     TYPE                CLUSTER     STATUS    PROGRESS   AGE
+   demo        ops-horizontal-scaling   HorizontalScaling   mycluster   Succeed   3/3        6m
+   ```
 
-   ***Example***
+   If an error occurs to the horizontal scaling operation, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
+
+3. Check whether the corresponding resources change.
+
+   ```bash
+   kubectl describe cluster mycluster -n demo
+   ```
+
+</TabItem>
+
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
+
+1. Change the value of `spec.componentSpecs.replicas` in the YAML file. `spec.componentSpecs.replicas` stands for the pod amount and changing this value triggers a horizontal scaling of a cluster.
 
    ```yaml
+   kubectl edit cluster mycluster -n demo
+   >
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
    metadata:
@@ -216,13 +223,15 @@ mycluster   redis                redis-7.0.6    Delete               Running   4
     terminationPolicy: Delete
    ```
 
-2. Validate the horizontal scaling operation.
-
-   Check the cluster STATUS to identify the horizontal scaling status.
+2. Check whether the corresponding resources change.
 
    ```bash
-   kubectl get cluster mycluster -n demo
+   kubectl describe cluster mycluster -n demo
    ```
+
+</TabItem>
+
+</Tabs>
 
 ### Handle the snapshot exception
 

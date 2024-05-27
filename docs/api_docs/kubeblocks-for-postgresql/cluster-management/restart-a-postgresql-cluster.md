@@ -13,7 +13,7 @@ You can restart all pods of the cluster. When an exception occurs in a database,
 
 :::note
 
-Restarting a PostgreSQL cluster triggers a concurrent restart and the leader may change after the cluster restarts.
+Restarting a PostgreSQL cluster triggers a concurrent restart and the primary may change after the cluster restarts.
 
 :::
 

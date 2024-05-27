@@ -1,7 +1,7 @@
 ---
-title: Stop/Start a MySQL cluster
-description: How to stop/start a MySQL cluster
-keywords: [mysql, stop a cluster, start a cluster]
+title: Stop/Start an ApeCloud MySQL Cluster
+description: How to stop/start an ApeCloud MySQL Cluster
+keywords: [apecloud mysql, stop an apecloud mysql cluster, start an apecloud mysql cluster]
 sidebar_position: 5
 sidebar_label: Stop/Start
 ---
@@ -36,7 +36,7 @@ EOF
 
 </TabItem>
   
-<TabItem value="Change the cluster YAML file" label="Change the cluster YAML file">
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
 Configure replicas as 0 to delete pods.
 
@@ -48,7 +48,7 @@ metadata:
 spec:
   clusterDefinitionRef: apecloud-mysql
   clusterVersionRef: ac-mysql-8.0.30
-  terminationPolicy: WipeOut
+  terminationPolicy: Delete
   componentSpecs:
   - name: mysql
     componentDefRef: mysql
@@ -92,7 +92,7 @@ EOF
 
 </TabItem>
   
-<TabItem value="Change the cluster YAML file" label="Change the cluster YAML file">
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
 Change replicas back to the original amount to start this cluster again.
 
@@ -104,7 +104,7 @@ metadata:
 spec:
   clusterDefinitionRef: apecloud-mysql
   clusterVersionRef: ac-mysql-8.0.30
-  terminationPolicy: WipeOut
+  terminationPolicy: Delete
   componentSpecs:
   - name: mysql
     componentDefRef: mysql

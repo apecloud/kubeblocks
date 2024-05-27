@@ -22,13 +22,13 @@ For your better high-availability experience, KubeBlocks creates a Redis Replica
 ### Before you start
 
 * [Install KubeBlocks](./../../installation/install-kubeblocks.md).
-* Make sure the Redis add-on is enabled.
+* Make sure the Redis addon is enabled.
 
   ```bash
   kubectl get addons.extensions.kubeblocks.io redis
   >            
   NAME    TYPE   VERSION   PROVIDER   STATUS    AGE
-  redis   Helm                        Enabled   16d
+  redis   Helm                        Enabled   16m
   ```
 
 * View all the database types and versions available for creating a cluster.
@@ -39,7 +39,7 @@ For your better high-availability experience, KubeBlocks creates a Redis Replica
   kubectl get clusterdefinition redis
   >
   NAME    TOPOLOGIES   SERVICEREFS   STATUS      AGE
-  redis                              Available   16d
+  redis                              Available   16m
   ```
 
   View all available versions for creating a cluster.
@@ -48,7 +48,7 @@ For your better high-availability experience, KubeBlocks creates a Redis Replica
   kubectl get clusterversions -l clusterdefinition.kubeblocks.io/name=redis
   >
   NAME          CLUSTER-DEFINITION   STATUS      AGE
-  redis-7.0.6   redis                Available   96m
+  redis-7.0.6   redis                Available   16m
   ```
 
 * To keep things isolated, create a separate namespace called `demo` throughout this tutorial.
@@ -61,8 +61,9 @@ For your better high-availability experience, KubeBlocks creates a Redis Replica
 
 ### Create a cluster
 
-KubeBlocks supports creating two types of Redis clusters: Standalone and Replication Cluster. Standalone only supports one replica and can be used in scenarios with lower requirements for availability. For scenarios with high availability requirements, it is recommended to create a Replication Cluster, which supports automatic failover. And to ensure high availability, Primary and Secondary are distributed on different nodes by default.
+KubeBlocks supports creating two types of Redis clusters: Standalone and Replication Cluster. Standalone only supports one replica and can be used in scenarios with lower requirements for availability. For scenarios with high availability requirements, it is recommended to create a Replication Cluster, which supports automatic failover.
 
+<<<<<<< HEAD
 <Tabs>
 
 <<<<<<< HEAD
@@ -102,67 +103,76 @@ kbcli cluster create redis --mode replication --availability-policy none <cluste
 =======
 >>>>>>> 25dfea9eb (docs: update redis create docs)
 <TabItem value="kubectl" label="kubectl">
+=======
+To ensure high availability, Primary and Secondary are distributed on different nodes by default. If you only have one node for deploying a Replication Cluster, set `spec.affinity.topologyKeys` as `null`.
+>>>>>>> b681bb302 (docs: update docs)
 
 KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a Standalone.
 
-  ```bash
+  ```yaml
   cat <<EOF | kubectl apply -f -
   apiVersion: apps.kubeblocks.io/v1alpha1
   kind: Cluster
   metadata:
     name: mycluster
-    namespace: demo
-    labels: 
-      helm.sh/chart: redis-cluster-0.6.0-alpha.36
-      app.kubernetes.io/version: "7.0.6"
-      app.kubernetes.io/instance: mycluster
+    namespace: default
   spec:
+    clusterDefinitionRef: redis
     clusterVersionRef: redis-7.0.6
-    terminationPolicy: Delete  
+    terminationPolicy: Delete
     affinity:
       podAntiAffinity: Preferred
       topologyKeys:
-        - kubernetes.io/hostname
+      - kubernetes.io/hostname
       tenancy: SharedNode
-    clusterDefinitionRef: redis  # ref clusterDefinition.name
+    tolerations:
+      - key: kb-data
+        operator: Equal
+        value: 'true'
+        effect: NoSchedule
     componentSpecs:
-      - name: redis
-        componentDefRef: redis # ref clusterDefinition componentDefs.name      
-        monitor: false      
-        replicas: 1
-        enabledLogs:
-          - running
-        serviceAccountName: kb-redis  
-        resources:
-          limits:
-            cpu: "0.5"
-            memory: "0.5Gi"
-          requests:
-            cpu: "0.5"
-            memory: "0.5Gi"      
-        volumeClaimTemplates:
-          - name: data # ref clusterDefinition components.containers.volumeMounts.name
-            spec:
-              accessModes:
-                - ReadWriteOnce
-              resources:
-                requests:
-                  storage: 20Gi      
-        services:
+    - name: redis
+      componentDefRef: redis
+      replicas: 1
+      monitor: false
+      enabledLogs:
+      - running
+      serviceAccountName: kb-redis-cluster
+      resources:
+        limits:
+          cpu: '0.5'
+          memory: 0.5Gi
+        requests:
+          cpu: '0.5'
+          memory: 0.5Gi
+      volumeClaimTemplates:
+      - name: data
+        spec:
+          accessModes:
+          - ReadWriteOnce
+          resources:
+            requests:
+              storage: 20Gi
   EOF
   ```
 
-* `spec.clusterDefinitionRef` is the name of the cluster definition CRD that defines the cluster components.
-* `spec.clusterVersionRef` is the name of the cluster version CRD that defines the cluster version.
-* `spec.componentSpecs` is the list of components that define the cluster components.
-* `spec.componentSpecs.componentDefRef` is the name of the component definition that is defined in the cluster definition, you can get the component definition names with `kubectl get clusterdefinition redis -o json | jq '.spec.componentDefs[].name'`
-* `spec.componentSpecs.name` is the name of the component.
-* `spec.componentSpecs.replicas` is the number of replicas of the component.
-* `spec.componentSpecs.resources` is the resource requirements of the component.
-* `spec.componentSpecs.volumeClaimTemplates` is the list of volume claim templates that define the volume claim templates for the component.
-* `spec.terminationPolicy` is the policy of the cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Halt`, `Delete`, `WipeOut`. `DoNotTerminate` will block delete operation. `Halt` deletes workload resources such as statefulset and deployment workloads but keep PVCs. `Delete` is based on Halt and deletes PVCs. `WipeOut` is based on Delete and wipe out all volume snapshots and snapshot data from backup storage location.
+| Field                                 | Definition  |
+|---------------------------------------|--------------------------------------|
+| `spec.clusterDefinitionRef`           | It specifies the name of the ClusterDefinition for creating a specific type of cluster.  |
+| `spec.clusterVersionRef`              | It is the name of the cluster version CRD that defines the cluster version.  |
+| `spec.terminationPolicy`              | It is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Halt`, `Delete`, `WipeOut`.  </br> - `DoNotTerminate` blocks deletion operation. </br> - `Halt` deletes workload resources such as statefulset and deployment workloads but keep PVCs. </br> - `Delete` is based on Halt and deletes PVCs. </br> - `WipeOut` is based on Delete and wipe out all volume snapshots and snapshot data from a backup storage location. |
+| `spec.affinity`                       | It defines a set of node affinity scheduling rules for the cluster's Pods. This field helps control the placement of Pods on nodes within the cluster.  |
+| `spec.affinity.podAntiAffinity`       | It specifies the anti-affinity level of Pods within a component. It determines how pods should spread across nodes to improve availability and performance. |
+| `spec.affinity.topologyKeys`          | It represents the key of node labels used to define the topology domain for Pod anti-affinity and Pod spread constraints.   |
+| `spec.affinity.tenacy`                | It determines the level of resource isolation between Pods. It can have the following values: `SharedNode` and `DedicatedNode`. </br> - SharedNode: It allows that multiple Pods may share the same node, which is the default behavior of K8s. </br> - DedicatedNode: Each Pod runs on a dedicated node, ensuring that no two Pods share the same node.                                                                                                                |
+| `spec.tolerations`                    | It is an array that specifies tolerations attached to the cluster's Pods, allowing them to be scheduled onto nodes with matching taints.  |
+| `spec.componentSpecs`                 | It is the list of components that define the cluster components. This field allows customized configuration of each component within a cluster.   |
+| `spec.componentSpecs.componentDefRef` | It is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition apecloud-mysql -o json \| jq '.spec.componentDefs[].name'`.   |
+| `spec.componentSpecs.name`            | It specifies the name of the component.     |
+| `spec.componentSpecs.replicas`        | It specifies the number of replicas of the component.  |
+| `spec.componentSpecs.resources`       | It specifies the resource requirements of the component.  |
 
-For the details of different parameters, you can refer to API docs.
+For the details of different parameters, you can refer to API docs for developers.
 
 Run the following command to see the created Redis cluster object:
 
@@ -180,7 +190,7 @@ kind: Cluster
 metadata:
   annotations:
     kubectl.kubernetes.io/last-applied-configuration: |
-      {"apiVersion":"apps.kubeblocks.io/v1alpha1","kind":"Cluster","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"mycluster","app.kubernetes.io/version":"7.0.6","helm.sh/chart":"redis-cluster-0.6.0-alpha.36"},"name":"mycluster","namespace":"demo"},"spec":{"affinity":{"podAntiAffinity":"Preferred","tenancy":"SharedNode","topologyKeys":["kubernetes.io/hostname"]},"clusterDefinitionRef":"redis","clusterVersionRef":"redis-7.0.6","componentSpecs":[{"componentDefRef":"redis","enabledLogs":["running"],"monitor":false,"name":"redis","replicas":1,"resources":{"limits":{"cpu":"0.5","memory":"0.5Gi"},"requests":{"cpu":"0.5","memory":"0.5Gi"}},"serviceAccountName":"kb-redis","services":null,"volumeClaimTemplates":[{"name":"data","spec":{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"20Gi"}}}}]}],"terminationPolicy":"Delete"}}
+      {"apiVersion":"apps.kubeblocks.io/v1alpha1","kind":"Cluster","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"mycluster","app.kubernetes.io/version":"7.0.6","helm.sh/chart":"redis-cluster-0.6.0-alpha.36"},"name":"mycluster","namespace":"demo"},"spec":{"affinity":{"podAntiAffinity":"Preferred","tenancy":"SharedNode","topologyKeys":["kubernetes.io/hostname"]},"clusterDefinitionRef":"redis","clusterVersionRef":"redis-7.0.6","componentSpecs":[{"componentDefRef":"redis","enabledLogs":["running"],"monitor":false,"name":"redis","replicas":1,"resources":{"limits":{"cpu":"0.5","memory":"0.5Gi"},"requests":{"cpu":"0.5","memory":"0.5Gi"}},"serviceAccountName":"kb-redis-cluster","services":null,"volumeClaimTemplates":[{"name":"data","spec":{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"20Gi"}}}}]}],"terminationPolicy":"Delete"}}
   creationTimestamp: "2024-05-11T03:04:27Z"
   finalizers:
   - cluster.kubeblocks.io/finalizer
@@ -217,7 +227,7 @@ spec:
       requests:
         cpu: "0.5"
         memory: 0.5Gi
-    serviceAccountName: kb-redis
+    serviceAccountName: kb-redis-cluster
     volumeClaimTemplates:
     - name: data
       spec:
@@ -263,62 +273,11 @@ status:
 
 </details>
 
-</TabItem>
-
-<TabItem value="helm" label="Helm">
-
-This tutorial takes creating a Redis cluster from the addon repository cloned from the [KubeBlocks addons repository](https://github.com/apecloud/kubeblocks-addons/tree/main) as an example.
-
-1. Clone the KubeBlocks addon repository.
-
-    ```bash
-    git clone https://github.com/apecloud/kubeblocks-addons.git
-    ```
-
- 2. (Optional) If you want to create a cluster with custom specifications, you can view the values available for configuring.
-
-    ```bash
-    helm show values ./addons/redis
-    ```
-
- 3. Create a Redis cluster.
-
-    ```bash
-    helm install mycluster ./addons/redis-cluster --namespace=demo
-    ```
-
-    If you need to customize the cluster specifications, use `--set` to specify the parameters. But only part of the parameters can be customized and you can view these parameters by running the command in step 2.
-
-    ```bash
-    helm install mycluster ./addons/redis-cluster --namespace=demo --set cpu=4,mode=replication
-    ```
-
- 4. Verify whether this cluster is created successfully.
-
-
-    ```bash
-    helm list -n demo
-    >
-    NAME   	   NAMESPACE	 REVISION	  UPDATED                             	STATUS  	CHART              	APP VERSION
-    mycluster   demo     	 1       	  2024-04-18 15:23:44.063714 +0800 CST	deployed	redis-cluster-0.9.0	7.0.6
-    ```
-
-    ```bash
-    kubectl get cluster -n demo
-    >
-    NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
-    mycluster   redis                redis-7.0.6    Delete               Running   5m34s
-    ```
-
-</TabItem>
-
-</Tabs>
-
 ## Connect to a Redis Cluster
 
 <Tabs>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 You can use `kubectl exec` to exec into a Pod and connect to a database.
 

@@ -8,16 +8,16 @@ sidebar_label: Connect
 
 ## Overview
 
-Before you connect to the Kafka cluster, you must check your network environment, and from which network you would like to connect to the cluster.
+Before connecting to the Kafka cluster, you must check your network environment, and from which network you would like to connect to the cluster.
 There are three scenarios of connecting.
 
 * Connect to the cluster within the same Kubernetes cluster.
-* Connect to a kafka cluster from outside of the Kubernetes cluster but in the same VPC.
-* Connect to a kafka cluster from public internet.
+* Connect to a Kafka cluster from outside of the Kubernetes cluster but in the same VPC.
+* Connect to a Kafka cluster from public internet.
 
 ## Connect to a kafka cluster within the Kubernetes cluster
 
-Within the same Kubernetes cluster, you can directly access the Kafka cluster with ClusterIp service:9092.
+Within the same Kubernetes cluster, you can directly access the Kafka cluster with ClusterIP service:9092.
 
 ***Steps:***
 
@@ -36,50 +36,50 @@ Within the same Kubernetes cluster, you can directly access the Kafka cluster wi
    mycluster-broker            ClusterIP   10.43.8.124   <none>        9093/TCP,9092/TCP,5556/TCP            7d16h
    ```
 
-2. Connect to the kafka cluster with the port No..
+2. Connect to the Kafka cluster with the port No..
 
    Below is an example of connecting with the official client script.
 
-   a. Start client pod
+   1. Start client pod.
 
-     ```bash
-     kubectl run kafka-producer --restart='Never' --image docker.io/bitnami/kafka:3.3.2-debian-11-r54 --command -- sleep infinity
-     kubectl run kafka-consumer --restart='Never' --image docker.io/bitnami/kafka:3.3.2-debian-11-r54 --command -- sleep infinity
-     ```
+       ```bash
+       kubectl run kafka-producer --restart='Never' --image docker.io/bitnami/kafka:3.3.2-debian-11-r54 --command -- sleep infinity
+       kubectl run kafka-consumer --restart='Never' --image docker.io/bitnami/kafka:3.3.2-debian-11-r54 --command -- sleep infinity
+       ```
 
-   b. Login to kafka-producer
+   2. Log in to kafka-producer.
 
-     ```bash
-     kubectl exec -ti kafka-producer -- bash
-     ```
+       ```bash
+       kubectl exec -ti kafka-producer -- bash
+       ```
 
-   c. Create topic
+   3. Create a topic.
 
-     ```bash
-     kafka-topics.sh --create --topic quickstart-events --bootstrap-server xxx-broker:9092
-     ```
+       ```bash
+       kafka-topics.sh --create --topic quickstart-events --bootstrap-server xxx-broker:9092
+       ```
 
-   d. Create producer
+   4. Create a producer.
 
-     ```bash
-     kafka-console-producer.sh --topic quickstart-events --bootstrap-server xxx-broker:9092 
-     ```
+       ```bash
+       kafka-console-producer.sh --topic quickstart-events --bootstrap-server xxx-broker:9092 
+       ```
 
-   e. Enter："Hello, KubeBlocks" and press Enter.
+   5. Enter："Hello, KubeBlocks" and press Enter.
 
-   f. Start a new terminal session and login to kafka-consumer.
+   6. Start a new terminal session and login to kafka-consumer.
 
-     ```bash
-     kubectl exec -ti kafka-consumer -- bash
-     ```
+       ```bash
+       kubectl exec -ti kafka-consumer -- bash
+       ```
 
-   g. Create consumer and specify consuming topic, and consuming message from the beginning.
+   7. Create consumer and specify consuming topic, and consuming message from the beginning.
 
-     ```bash
-     kafka-console-consumer.sh --topic quickstart-events --from-beginning --bootstrap-server xxx-broker:9092
-     ```
+       ```bash
+       kafka-console-consumer.sh --topic quickstart-events --from-beginning --bootstrap-server xxx-broker:9092
+       ```
 
-    And you get the output 'Hello, KubeBlocks'.
+   And you get the output 'Hello, KubeBlocks'.
 
 ## Connect to a Kafka cluster from outside of the Kubernetes cluster but in the same VPC
 

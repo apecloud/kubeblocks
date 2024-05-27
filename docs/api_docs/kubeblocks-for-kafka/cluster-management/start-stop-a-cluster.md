@@ -35,7 +35,7 @@ EOF
 
 </TabItem>
 
-<TabItem value="Cluster YAML File" label="Cluster YAML File">
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
 Configure replicas as 0 to delete pods.
 
@@ -48,7 +48,7 @@ metadata:
 spec:
   clusterDefinitionRef: kafka
   clusterVersionRef: kafka-3.3.2
-  terminationPolicy: WipeOut
+  terminationPolicy: Delete
   componentSpecs:
   - name: kafka
     componentDefRef: kafka
@@ -62,7 +62,7 @@ spec:
           - ReadWriteOnce
         resources:
           requests:
-            storage: 1Gi
+            storage: 20Gi
 ```
 
 </TabItem>
@@ -71,7 +71,7 @@ spec:
 
 ## Start a cluster
   
-You can stop a cluster by OpsRequest or changing the YAML file of the cluster.
+You can start a cluster by OpsRequest or changing the YAML file of the cluster.
 
 <Tabs>
 
@@ -107,7 +107,7 @@ metadata:
 spec:
   clusterDefinitionRef: kafka
   clusterVersionRef: kafka-3.3.2
-  terminationPolicy: WipeOut
+  terminationPolicy: Delete
   componentSpecs:
   - name: kafka
     componentDefRef: kafka
@@ -121,7 +121,7 @@ spec:
           - ReadWriteOnce
         resources:
           requests:
-            storage: 1Gi
+            storage: 20Gi
 ```
 
 </TabItem>

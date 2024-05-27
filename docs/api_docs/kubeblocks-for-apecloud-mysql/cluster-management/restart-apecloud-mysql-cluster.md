@@ -1,12 +1,12 @@
 ---
-title: Restart MySQL cluster
-description: How to restart a MySQL cluster
-keywords: [mysql, restart, restart a cluster]
+title: Restart an ApeCloud MySQL Cluster
+description: How to restart an ApeCloud MySQL Cluster
+keywords: [apecloud mysql, restart, restart an apecloud mysql cluster]
 sidebar_position: 4
 sidebar_label: Restart
 ---
 
-# Restart MySQL cluster
+# Restart an ApeCloud MySQL Cluster
 
 You can restart all pods of the cluster. When an exception occurs in a database, you can try to restart it.
 
@@ -55,3 +55,5 @@ All pods restart in the order of learner -> follower -> leader and the leader ma
 
    - STATUS=Terminating: it means the cluster restart is in progress.
    - STATUS=Running: it means the cluster has been restarted.
+
+   If an error occurs to the horizontal scaling operation, you can troubleshoot with `kubectl describe` command to view the events of this operation.

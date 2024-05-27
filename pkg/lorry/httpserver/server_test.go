@@ -40,7 +40,7 @@ func mockServer(t *testing.T) *server {
 			return fmt.Errorf("fake pre check error")
 		}),
 		"fake-3": operations.NewFakeOperations(operations.FakeDo, func(ctx context.Context, request *operations.OpsRequest) (*operations.OpsResponse, error) {
-			return nil, models.ErrNoImplemented
+			return nil, models.ErrNotImplemented
 		}),
 		"fake-4": operations.NewFakeOperations(operations.FakeDo, func(ctx context.Context, request *operations.OpsRequest) (*operations.OpsResponse, error) {
 			return nil, util.NewProbeError("fake probe error")
@@ -120,7 +120,7 @@ func TestRouter(t *testing.T) {
 		response := parseErrorResponse(t, ctx.Response.Body())
 		assert.Equal(t, fasthttp.StatusNotImplemented, ctx.Response.StatusCode())
 		assert.Equal(t, "ERR_OPERATION_FAILED", response.ErrorCode)
-		assert.Equal(t, "operation exec failed: no implemented", response.Message)
+		assert.Equal(t, "operation exec failed: not implemented", response.Message)
 	})
 
 	t.Run("do check probe error", func(t *testing.T) {

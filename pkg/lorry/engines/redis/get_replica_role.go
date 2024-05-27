@@ -28,11 +28,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 )
 
-func (mgr *Manager) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
-	role, _ := mgr.GetReplicaRole(ctx, cluster)
-	return role == models.PRIMARY, nil
-}
-
 func (mgr *Manager) GetReplicaRole(ctx context.Context, _ *dcs.Cluster) (string, error) {
 	// To ensure that the role information obtained through subscription is always delivered.
 	if mgr.role != "" && mgr.roleSubscribeUpdateTime+mgr.roleProbePeriod*2 < time.Now().Unix() {

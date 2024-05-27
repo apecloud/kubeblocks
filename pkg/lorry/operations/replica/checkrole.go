@@ -234,12 +234,16 @@ func (s *CheckRole) buildGlobalRoleSnapshot(cluster *dcs.Cluster, mgr engines.DB
 			if strings.EqualFold(member.Role, role) {
 				s.logger.Info("there is a another leader", "member", member.Name)
 				isLeader, err := mgr.IsLeaderMember(context.Background(), cluster, &member)
-				if err == nil && isLeader {
+				switch {
+				case err != nil:
+					s.logger.Info("old leader member access failed", "member", member.Name, "error", err.Error())
+				case err == nil && isLeader:
 					// old leader member is still healthy, just ignore it, and let it's lorry to handle the role change
 					s.logger.Info("another leader access normally, just ignore", "member", member.Name)
 					continue
+				case !isLeader:
+					s.logger.Info("old leader member is not leader, reset it's role", "member", member.Name)
 				}
-				s.logger.Info("old leader member access failed and reset it's role", "member", member.Name, "error", err.Error())
 				roleSnapshot.PodRoleNamePairs = append(roleSnapshot.PodRoleNamePairs, common.PodRoleNamePair{
 					PodName:  member.Name,
 					RoleName: "",

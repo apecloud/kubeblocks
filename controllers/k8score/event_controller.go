@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -64,13 +65,10 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "getEventError")
 	}
 
-	for _, handler := range EventHandlerMap {
-		// ignores the not found error.
-		if err := handler.Handle(r.Client, reqCtx, r.Recorder, event); err != nil && !apierrors.IsNotFound(err) {
-			return intctrlutil.RequeueWithError(err, reqCtx.Log, "handleEventError")
-		}
+	handler := &instanceset.PodRoleEventHandler{}
+	if err := handler.Handle(r.Client, reqCtx, r.Recorder, event); err != nil && !apierrors.IsNotFound(err) {
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, "handleEventError")
 	}
-
 	return intctrlutil.Reconciled()
 }
 

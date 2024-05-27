@@ -59,7 +59,7 @@ func (vs verticalScalingHandler) ActionStartedCondition(reqCtx intctrlutil.Reque
 // Action modifies cluster component resources according to
 // the definition of opsRequest with spec.componentNames and spec.componentOps.verticalScaling
 func (vs verticalScalingHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	applyVerticalScaling := func(compSpec *appsv1alpha1.ClusterComponentSpec, obj ComponentOpsInteface) {
+	applyVerticalScaling := func(compSpec *appsv1alpha1.ClusterComponentSpec, obj ComponentOpsInteface) error {
 		verticalScaling := obj.(appsv1alpha1.VerticalScaling)
 		if vs.verticalScalingComp(verticalScaling) {
 			compSpec.Resources = verticalScaling.ResourceRequirements
@@ -72,6 +72,7 @@ func (vs verticalScalingHandler) Action(reqCtx intctrlutil.RequestCtx, cli clien
 				}
 			}
 		}
+		return nil
 	}
 	compOpsSet := newComponentOpsHelper(opsRes.OpsRequest.Spec.VerticalScalingList)
 	// abort earlier running vertical scaling opsRequest.
@@ -87,7 +88,9 @@ func (vs verticalScalingHandler) Action(reqCtx intctrlutil.RequestCtx, cli clien
 		}); err != nil {
 		return err
 	}
-	compOpsSet.updateClusterComponentsAndShardings(opsRes.Cluster, applyVerticalScaling)
+	if err := compOpsSet.updateClusterComponentsAndShardings(opsRes.Cluster, applyVerticalScaling); err != nil {
+		return err
+	}
 	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
 }
 

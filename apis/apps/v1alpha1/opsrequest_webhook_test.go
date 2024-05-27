@@ -344,19 +344,16 @@ var _ = Describe("OpsRequest webhook", func() {
 	testHorizontalScaling := func(clusterDef *ClusterDefinition, clusterObj *Cluster) {
 		hScalingList := []HorizontalScaling{
 			{
-				ComponentOps: ComponentOps{ComponentName: "hs-not-exist"},
-				Replicas:     pointer.Int32(2),
-				Operator:     HScaleOverwriteOP,
+				ComponentOps:    ComponentOps{ComponentName: "hs-not-exist"},
+				ReplicasWrapper: ReplicasWrapper{Replicas: pointer.Int32(2)},
 			},
 			{
-				ComponentOps: ComponentOps{ComponentName: proxyComponentName},
-				Replicas:     pointer.Int32(2),
-				Operator:     HScaleOverwriteOP,
+				ComponentOps:    ComponentOps{ComponentName: proxyComponentName},
+				ReplicasWrapper: ReplicasWrapper{Replicas: pointer.Int32(2)},
 			},
 			{
-				ComponentOps: ComponentOps{ComponentName: componentName},
-				Replicas:     pointer.Int32(2),
-				Operator:     HScaleOverwriteOP,
+				ComponentOps:    ComponentOps{ComponentName: componentName},
+				ReplicasWrapper: ReplicasWrapper{Replicas: pointer.Int32(2)},
 			},
 		}
 
@@ -397,47 +394,51 @@ var _ = Describe("OpsRequest webhook", func() {
 		By("expect an error when replicas is greater than component's replicas and operator is Delete")
 		opsRequest = createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
 		opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{{
-			ComponentOps: ComponentOps{ComponentName: componentName},
-			Replicas:     pointer.Int32(2),
-			Operator:     HScaleDeleteOP,
+			ComponentOps:    ComponentOps{ComponentName: componentName},
+			ReplicasWrapper: ReplicasWrapper{ReplicasToDelete: pointer.Int32(2)},
 		}}
-		Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).Should(ContainSubstring("replicas can not greater than"))
+		Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).Should(ContainSubstring("replicasToDelete can not greater than"))
 
 		By("expect an error when instance template is not exist and operator is Delete")
 		opsRequest = createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
 		opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{{
-			ComponentOps: ComponentOps{ComponentName: componentName},
-			Replicas:     pointer.Int32(1),
-			Instances: []InstanceTemplate{
-				{Name: "non-exist", Replicas: pointer.Int32(1)},
+			ComponentOps:    ComponentOps{ComponentName: componentName},
+			ReplicasWrapper: ReplicasWrapper{Replicas: pointer.Int32(1)},
+			Instances: &InstancesOperation{
+				Change: []InstanceReplicasTemplate{
+					{Name: "non-exist", ReplicasWrapper: ReplicasWrapper{Replicas: pointer.Int32(1)}},
+				},
 			},
-			Operator: HScaleDeleteOP,
 		}}
 		Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).Should(ContainSubstring("an not found the instanceTemplate"))
 
 		By("expect an error when the offlineInstance is not exist in the component and operator is Delete")
 		opsRequest = createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
 		opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{{
-			ComponentOps:     ComponentOps{ComponentName: componentName},
-			Operator:         HScaleDeleteOP,
-			OfflineInstances: []string{fmt.Sprintf("%s-%s-0", clusterName, componentName)},
+			ComponentOps:             ComponentOps{ComponentName: componentName},
+			ReplicasWrapper:          ReplicasWrapper{ReplicasToAdd: pointer.Int32(1)},
+			OfflineInstancesToOnline: []string{fmt.Sprintf("%s-%s-0", clusterName, componentName)},
 		}}
 		Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).Should(ContainSubstring("can not found the offline instance"))
 
 		By("expect an error when the replicas is greater than instance's replicas and operator is Delete")
 		insTplName := "test"
+		clusterObj.Spec.ComponentSpecs[0].Replicas = 1
 		clusterObj.Spec.ComponentSpecs[0].Instances = []InstanceTemplate{{Name: insTplName, Replicas: pointer.Int32(1)}}
 		Expect(k8sClient.Update(context.Background(), clusterObj)).Should(Succeed())
 		opsRequest = createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
 		opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{{
-			ComponentOps: ComponentOps{ComponentName: componentName},
-			Operator:     HScaleDeleteOP,
-			Instances: []InstanceTemplate{
-				{Name: insTplName, Replicas: pointer.Int32(2)},
+			ComponentOps:    ComponentOps{ComponentName: componentName},
+			ReplicasWrapper: ReplicasWrapper{ReplicasToDelete: pointer.Int32(1)},
+			Instances: &InstancesOperation{
+				Change: []InstanceReplicasTemplate{
+					{Name: insTplName, ReplicasWrapper: ReplicasWrapper{ReplicasToDelete: pointer.Int32(3)}},
+				},
 			},
 		}}
-		Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).Should(ContainSubstring(
-			fmt.Sprintf(`replicas of instanceTemplate "%s" can not greater than %d when operator is Delete`, insTplName, 2)))
+		err := testCtx.CheckedCreateObj(ctx, opsRequest).Error()
+		Expect(err).Should(ContainSubstring(
+			fmt.Sprintf(`replicasToDelete of instanceTemplate "%s" can not greater than %d`, insTplName, 1)))
 	}
 
 	testSwitchover := func(clusterDef *ClusterDefinition, cluster *Cluster) {

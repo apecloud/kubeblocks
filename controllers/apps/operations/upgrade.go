@@ -64,7 +64,7 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		opsRes.Cluster.Spec.ClusterVersionRef = *opsRes.OpsRequest.Spec.Upgrade.ClusterVersionRef
 	} else {
 		compOpsHelper = newComponentOpsHelper(upgradeSpec.Components)
-		compOpsHelper.updateClusterComponentsAndShardings(opsRes.Cluster, func(compSpec *appsv1alpha1.ClusterComponentSpec, obj ComponentOpsInteface) {
+		if err := compOpsHelper.updateClusterComponentsAndShardings(opsRes.Cluster, func(compSpec *appsv1alpha1.ClusterComponentSpec, obj ComponentOpsInteface) error {
 			upgradeComp := obj.(appsv1alpha1.UpgradeComponent)
 			if u.needUpdateCompDef(upgradeComp, opsRes.Cluster) {
 				compSpec.ComponentDef = *upgradeComp.ComponentDefinitionName
@@ -72,7 +72,10 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 			if upgradeComp.ServiceVersion != nil {
 				compSpec.ServiceVersion = *upgradeComp.ServiceVersion
 			}
-		})
+			return nil
+		}); err != nil {
+			return err
+		}
 	}
 	// abort earlier running upgrade opsRequest.
 	if err := abortEarlierOpsRequestWithSameKind(reqCtx, cli, opsRes, []appsv1alpha1.OpsType{appsv1alpha1.UpgradeType},

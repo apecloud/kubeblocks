@@ -368,9 +368,8 @@ var _ = Describe("OpsRequest Controller", func() {
 				clusterObj.Name, appsv1alpha1.HorizontalScalingType)
 			ops.Spec.HorizontalScalingList = []appsv1alpha1.HorizontalScaling{
 				{
-					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: mysqlCompName},
-					Replicas:     pointer.Int32(replicas),
-					Operator:     appsv1alpha1.HScaleOverwriteOP,
+					ComponentOps:    appsv1alpha1.ComponentOps{ComponentName: mysqlCompName},
+					ReplicasWrapper: appsv1alpha1.ReplicasWrapper{Replicas: pointer.Int32(replicas)},
 				},
 			}
 			// for reconciling the ops labels

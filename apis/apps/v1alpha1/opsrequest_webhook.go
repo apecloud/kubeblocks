@@ -443,35 +443,63 @@ func (r *OpsRequest) validateHorizontalScaling(_ context.Context, _ client.Clien
 }
 
 func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, compSpec ClusterComponentSpec, componentName string) error {
-	if hScale.Operator != HScaleDeleteOP {
+	// TODO: check instanceReplicas and compReplicas
+	checkReplicasWrapper := func(replicasWrapper ReplicasWrapper) error {
+		var replicasOPCount int
+		if replicasWrapper.Replicas != nil {
+			replicasOPCount += 1
+		}
+		if replicasWrapper.ReplicasToAdd != nil {
+			replicasOPCount += 1
+		}
+		if replicasWrapper.ReplicasToDelete != nil {
+			replicasOPCount += 1
+		}
+		if replicasOPCount > 1 {
+			return fmt.Errorf("eplicas, replicasToAdd, and replicasToDelete: choose one or leave all empty")
+		}
 		return nil
 	}
-	if hScale.Replicas != nil && *hScale.Replicas > compSpec.Replicas {
-		return fmt.Errorf("replicas can not greater than %d when operator is Delete", hScale.Replicas)
+	if err := checkReplicasWrapper(hScale.ReplicasWrapper); err != nil {
+		return err
 	}
-	insTplMap := map[string]int32{}
-	for _, v := range compSpec.Instances {
-		if v.Replicas == nil {
-			insTplMap[v.Name] = 1
-		} else {
-			insTplMap[v.Name] = *v.Replicas
+	if hScale.ReplicasToDelete != nil && *hScale.ReplicasToDelete > compSpec.Replicas {
+		return fmt.Errorf("replicasToDelete can not greater than %d", hScale.Replicas)
+	}
+	if hScale.Instances != nil && len(hScale.Instances.Change) > 0 {
+		insTplMap := map[string]int32{}
+		for _, v := range compSpec.Instances {
+			if v.Replicas == nil {
+				insTplMap[v.Name] = 1
+			} else {
+				insTplMap[v.Name] = *v.Replicas
+			}
+		}
+		for _, v := range hScale.Instances.Add {
+			if _, ok := insTplMap[v.Name]; ok {
+				return fmt.Errorf(`the instanceTemplate "%s" already exists in component "%s"`, v.Name, componentName)
+			}
+		}
+		for _, v := range hScale.Instances.Change {
+			insReplicas, ok := insTplMap[v.Name]
+			if !ok {
+				return fmt.Errorf(`can not found the instanceTemplate "%s" in component "%s"`, v.Name, componentName)
+			}
+			if err := checkReplicasWrapper(v.ReplicasWrapper); err != nil {
+				return err
+			}
+			if v.ReplicasToDelete != nil && *v.ReplicasToDelete > insReplicas {
+				return fmt.Errorf(`replicasToDelete of instanceTemplate "%s" can not greater than %d when operator is Delete`,
+					v.Name, insReplicas)
+			}
 		}
 	}
-	for _, v := range hScale.Instances {
-		insReplicas, ok := insTplMap[v.Name]
-		if !ok {
-			return fmt.Errorf(`can not found the instanceTemplate "%s" in component "%s"`, v.Name, componentName)
-		}
-		if v.Replicas != nil && *v.Replicas > insReplicas {
-			return fmt.Errorf(`replicas of instanceTemplate "%s" can not greater than %d when operator is Delete`,
-				v.Name, *v.Replicas)
-		}
-	}
-	if len(hScale.OfflineInstances) == 0 {
+
+	if len(hScale.OfflineInstancesToOnline) == 0 {
 		return nil
 	}
 	offlineInstanceSet := sets.New(compSpec.OfflineInstances...)
-	for _, offlineInsName := range hScale.OfflineInstances {
+	for _, offlineInsName := range hScale.OfflineInstancesToOnline {
 		if _, ok := offlineInstanceSet[offlineInsName]; !ok {
 			return fmt.Errorf(`can not found the offline instance "%s" in component "%s"`, offlineInsName, componentName)
 		}

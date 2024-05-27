@@ -11737,9 +11737,6 @@ The policy can be set to <code>None</code>, <code>CloneVolume</code>, or <code>S
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.HScaleOperator">HScaleOperator
 (<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>)
-</p>
 <div>
 <p>HScaleOperator defines the operator for this horizontal scaling.</p>
 </div>
@@ -11958,12 +11955,17 @@ ComponentOps
 </tr>
 <tr>
 <td>
-<code>replicas</code><br/>
+<code>ReplicasWrapper</code><br/>
 <em>
-int32
+<a href="#apps.kubeblocks.io/v1alpha1.ReplicasWrapper">
+ReplicasWrapper
+</a>
 </em>
 </td>
 <td>
+<p>
+(Members of <code>ReplicasWrapper</code> are embedded into this type.)
+</p>
 <em>(Optional)</em>
 <p>Specifies the number of the replicas.</p>
 </td>
@@ -11972,80 +11974,43 @@ int32
 <td>
 <code>instances</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.InstanceTemplate">
-[]InstanceTemplate
+<a href="#apps.kubeblocks.io/v1alpha1.InstancesOperation">
+InstancesOperation
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Contains a list of InstanceTemplate objects.
-Each InstanceTemplate object allows for modifying replica counts or specifying configurations for new instances during scaling.</p>
-<p>The field supports two main use cases:</p>
-<ul>
-<li>Modifying replica count:
-Specify the desired replica count for existing instances with a particular configuration using Name and Replicas fields.
-To modify the replica count, the Name and Replicas fields of the InstanceTemplate object should be provided.
-Only these fields are used for matching and adjusting replicas; other fields are ignored.
-The Replicas value overrides any existing count.</li>
-<li>Configuring new instances:
-Define the configuration for new instances added during scaling, including resource requirements, labels, annotations, etc.
-New instances are created based on the provided InstanceTemplate.</li>
-</ul>
+<p>Defines operations for instanceTemplates, including adding new instance templates with specified configurations
+and modifying the replicas count of existing instance templates.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>offlineInstances</code><br/>
+<code>offlineInstancesToOnline</code><br/>
 <em>
 []string
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the names of instances to be started or terminated during the scaling operation, based on the operator field.</p>
-<p>&ldquo;Add&rdquo;:
-- Adds the specified instances to the Component&rsquo;s clusterComponentSpec.offlineInstances array.
-- Instances are expected to be online and will be moved to offline status.</p>
-<p>&ldquo;Delete&rdquo;:
-- Removes the specified instances from the Component&rsquo;s clusterComponentSpec.offlineInstances array.
-- Instances should be offline and will be moved to online status.</p>
-<p>&ldquo;Overwrite&rdquo;:
-- Replaces the existing instances in the Component&rsquo;s clusterComponentSpec.offlineInstances array with the specified instances.</p>
-<p>This field determines which instances are included in clusterComponentSpec.offlineInstances field, targeted for termination during replica count adjustment.</p>
+<p>Bring the specified offline instances back online.
+Replicas will be automatically adjust if the component and instance templates
+have no specified replicas and the component is not a sharding component.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>autoSyncReplicas</code><br/>
+<code>onlineInstancesToOffline</code><br/>
 <em>
-bool
+[]string
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Effective only when replicas of the component and instance templates are empty and the component is not a sharding component;
-otherwise it will be ignored.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>operator</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.HScaleOperator">
-HScaleOperator
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the operator for this HorizontalScaling operation.</p>
-<p>Valid values:
-- &ldquo;Overwrite&rdquo; (default): Replaces the replicas, instances, offlineInstances with those specified for the component.
-- &ldquo;Add&rdquo;: Adds replicas for the specified component and existing instance template.
-   Appends any non-existent instance templates to the instances array and the specified instances to the offlineInstances array.
-- &ldquo;Delete&rdquo;: Deletes replicas for the specified component and existing instance template.
-Removes the specified instances from the offlineInstances array.</p>
+<p>Specifies the instance name that needs to be taken offline.
+Replicas will be automatically adjust if the component and instance templates
+have no specified replicas and the component is not a sharding component.</p>
 </td>
 </tr>
 </tbody>
@@ -12242,6 +12207,50 @@ If not set, it will rebuild on a random node.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.InstanceReplicasTemplate">InstanceReplicasTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.InstancesOperation">InstancesOperation</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the instance template name.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ReplicasWrapper</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ReplicasWrapper">
+ReplicasWrapper
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ReplicasWrapper</code> are embedded into this type.)
+</p>
+<p>A wrapper for a horizontally scaled replicas.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.InstanceResourceTemplate">InstanceResourceTemplate
 </h3>
 <p>
@@ -12289,7 +12298,7 @@ Kubernetes core/v1.ResourceRequirements
 <h3 id="apps.kubeblocks.io/v1alpha1.InstanceTemplate">InstanceTemplate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.LastComponentConfiguration">LastComponentConfiguration</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.InstancesOperation">InstancesOperation</a>, <a href="#apps.kubeblocks.io/v1alpha1.LastComponentConfiguration">LastComponentConfiguration</a>)
 </p>
 <div>
 <p>InstanceTemplate allows customization of individual replica configurations in a Component.</p>
@@ -12528,6 +12537,52 @@ string
 </td>
 <td>
 <p>volumeClaimTemplates specifies the storage size and volumeClaimTemplate name.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.InstancesOperation">InstancesOperation
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>add</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.InstanceTemplate">
+[]InstanceTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the configuration for new instances added during scaling, including resource requirements, labels, annotations, etc.
+New instances are created based on the provided InstanceTemplate.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>change</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.InstanceReplicasTemplate">
+[]InstanceReplicasTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Modifies the desired replicas count for existing InstanceTemplate.</p>
 </td>
 </tr>
 </tbody>
@@ -16636,6 +16691,59 @@ int32
 </td>
 <td>
 <p>The maximum limit of replicas.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ReplicasWrapper">ReplicasWrapper
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.InstanceReplicasTemplate">InstanceReplicasTemplate</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>replicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the replicas count for the specified component and instance template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>replicasToAdd</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Adds replicas for the specified component and instance template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>replicasToDelete</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Deletes replicas for the specified component and instance template.</p>
 </td>
 </tr>
 </tbody>

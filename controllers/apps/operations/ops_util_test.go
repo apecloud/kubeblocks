@@ -75,9 +75,8 @@ var _ = Describe("OpsUtil functions", func() {
 
 			By("Test the functions in ops_util.go")
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, appsv1alpha1.HorizontalScaling{
-				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
-				Operator:     appsv1alpha1.HScaleOverwriteOP,
-				Replicas:     pointer.Int32(1),
+				ComponentOps:    appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+				ReplicasWrapper: appsv1alpha1.ReplicasWrapper{Replicas: pointer.Int32(1)},
 			})
 			Expect(patchValidateErrorCondition(ctx, k8sClient, opsRes, "validate error")).Should(Succeed())
 			Expect(PatchOpsHandlerNotSupported(ctx, k8sClient, opsRes)).Should(Succeed())
@@ -91,9 +90,8 @@ var _ = Describe("OpsUtil functions", func() {
 
 			By("Test the functions in ops_util.go")
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, appsv1alpha1.HorizontalScaling{
-				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
-				Operator:     appsv1alpha1.HScaleOverwriteOP,
-				Replicas:     pointer.Int32(1),
+				ComponentOps:    appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+				ReplicasWrapper: appsv1alpha1.ReplicasWrapper{Replicas: pointer.Int32(1)},
 			})
 			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsRunningPhase
 
@@ -179,9 +177,8 @@ var _ = Describe("OpsUtil functions", func() {
 
 			runHscaleOps := func(expectPhase appsv1alpha1.OpsPhase) *appsv1alpha1.OpsRequest {
 				ops := createHorizontalScaling(clusterName, appsv1alpha1.HorizontalScaling{
-					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
-					Operator:     appsv1alpha1.HScaleOverwriteOP,
-					Replicas:     pointer.Int32(1),
+					ComponentOps:    appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+					ReplicasWrapper: appsv1alpha1.ReplicasWrapper{Replicas: pointer.Int32(1)},
 				})
 				opsRes.OpsRequest = ops
 				_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)

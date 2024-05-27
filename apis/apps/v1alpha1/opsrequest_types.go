@@ -427,75 +427,63 @@ type HorizontalScaling struct {
 
 	// Specifies the number of the replicas.
 	//
+	// +optional
+	ReplicasWrapper `json:",inline"`
+
+	// Defines operations for instanceTemplates, including adding new instance templates with specified configurations
+	// and modifying the replicas count of existing instance templates.
+	// +optional
+	Instances *InstancesOperation `json:"instances,omitempty"`
+
+	// Bring the specified offline instances back online.
+	// Replicas will be automatically adjust if the component and instance templates
+	// have no specified replicas and the component is not a sharding component.
+	// +optional
+	OfflineInstancesToOnline []string `json:"offlineInstancesToOnline,omitempty"`
+
+	// Specifies the instance name that needs to be taken offline.
+	// Replicas will be automatically adjust if the component and instance templates
+	// have no specified replicas and the component is not a sharding component.
+	// +optional
+	OnlineInstancesToOffline []string `json:"onlineInstancesToOffline,omitempty"`
+}
+
+type ReplicasWrapper struct {
+
+	// Specifies the replicas count for the specified component and instance template.
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
 
-	// Contains a list of InstanceTemplate objects.
-	// Each InstanceTemplate object allows for modifying replica counts or specifying configurations for new instances during scaling.
-	//
-	// The field supports two main use cases:
-	//
-	// - Modifying replica count:
-	//   Specify the desired replica count for existing instances with a particular configuration using Name and Replicas fields.
-	//   To modify the replica count, the Name and Replicas fields of the InstanceTemplate object should be provided.
-	//   Only these fields are used for matching and adjusting replicas; other fields are ignored.
-	//   The Replicas value overrides any existing count.
-	// - Configuring new instances:
-	//   Define the configuration for new instances added during scaling, including resource requirements, labels, annotations, etc.
-	//   New instances are created based on the provided InstanceTemplate.
-	//
+	// Adds replicas for the specified component and instance template.
+	// +kubebuilder:validation:Minimum=0
 	// +optional
-	Instances []InstanceTemplate `json:"instances,omitempty"`
+	ReplicasToAdd *int32 `json:"replicasToAdd,omitempty"`
 
-	// Specifies the names of instances to be started or terminated during the scaling operation, based on the operator field.
-	//
-	// "Add":
-	// - Adds the specified instances to the Component's clusterComponentSpec.offlineInstances array.
-	// - Instances are expected to be online and will be moved to offline status.
-	//
-	// "Delete":
-	// - Removes the specified instances from the Component's clusterComponentSpec.offlineInstances array.
-	// - Instances should be offline and will be moved to online status.
-	//
-	// "Overwrite":
-	// - Replaces the existing instances in the Component's clusterComponentSpec.offlineInstances array with the specified instances.
-	//
-	// This field determines which instances are included in clusterComponentSpec.offlineInstances field, targeted for termination during replica count adjustment.
+	// Deletes replicas for the specified component and instance template.
+	// +kubebuilder:validation:Minimum=0
 	// +optional
-	OfflineInstances []string `json:"offlineInstances,omitempty"`
+	ReplicasToDelete *int32 `json:"replicasToDelete,omitempty"`
+}
 
-	// Controls whether changes in offlineInstances automatically trigger replicas adjustments.
-	//
-	// When operator is "Add" and an instance is added to offlineInstances:
-	// - If true, replicas will be automatically decreased by the number of added instances.
-	// - If false, replicas will remain unchanged, and new instances will be created by the reconciliation controller loop.
-	//
-	// When operator is "Delete" and an instance is removed from offlineInstances:
-	// - If true, replicas will be automatically increased by the number of removed instances.
-	// - If false, replicas will remain unchanged, and the reconciliation controller loop will handle the instance deletion.
-
-	// When operator is "Overwrite" and replaces the existing offlineInstances:
-	// - If true, replicas will automatically adjust based on the added or removed instances.
-	// - If false, replicas will remain unchanged, and the reconciliation controller loop will handle instance deletion or creation.
-
-	// Effective only when replicas of the component and instance templates are empty and the component is not a sharding component;
-	// otherwise it will be ignored.
-	// +kubebuilder:default=true
+type InstancesOperation struct {
+	// Defines the configuration for new instances added during scaling, including resource requirements, labels, annotations, etc.
+	// New instances are created based on the provided InstanceTemplate.
 	// +optional
-	AutoSyncReplicas bool `json:"autoSyncReplicas,omitempty"`
+	Add []InstanceTemplate `json:"add,omitempty"`
 
-	// Specifies the operator for this HorizontalScaling operation.
-	//
-	// Valid values:
-	// - "Overwrite" (default): Replaces the replicas, instances, offlineInstances with those specified for the component.
-	// - "Add": Adds replicas for the specified component and existing instance template.
-	//    Appends any non-existent instance templates to the instances array and the specified instances to the offlineInstances array.
-	// - "Delete": Deletes replicas for the specified component and existing instance template.
-	//    Removes the specified instances from the offlineInstances array.
-	// +kubebuilder:default=Overwrite
+	// Modifies the desired replicas count for existing InstanceTemplate.
 	// +optional
-	Operator HScaleOperator `json:"operator"`
+	Change []InstanceReplicasTemplate `json:"change,omitempty"`
+}
+
+type InstanceReplicasTemplate struct {
+	// Specifies the instance template name.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// A wrapper for a horizontally scaled replicas.
+	ReplicasWrapper `json:",inline"`
 }
 
 // Reconfigure defines the parameters for updating a Component's configuration.
@@ -1405,4 +1393,20 @@ func (r OpsRequestSpec) GetRestore() *Restore {
 func (p *ProgressStatusDetail) SetStatusAndMessage(status ProgressStatus, message string) {
 	p.Message = message
 	p.Status = status
+}
+
+func (r ReplicasWrapper) OverwriteOP() bool {
+	return r.Replicas != nil
+}
+
+func (r ReplicasWrapper) AddOP() bool {
+	return r.ReplicasToAdd != nil
+}
+
+func (r ReplicasWrapper) DeleteOP() bool {
+	return r.ReplicasToDelete != nil
+}
+
+func (r ReplicasWrapper) NoneOP() bool {
+	return r.Replicas == nil && r.ReplicasToAdd == nil && r.ReplicasToDelete == nil
 }

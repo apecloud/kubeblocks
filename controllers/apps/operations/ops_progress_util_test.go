@@ -119,9 +119,8 @@ var _ = Describe("Ops ProgressDetails", func() {
 
 			By("create horizontalScaling operation to test the progressDetails when scaling in the replicas")
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, appsv1alpha1.HorizontalScaling{
-				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
-				Operator:     appsv1alpha1.HScaleOverwriteOP,
-				Replicas:     pointer.Int32(1),
+				ComponentOps:    appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+				ReplicasWrapper: appsv1alpha1.ReplicasWrapper{Replicas: pointer.Int32(1)},
 			})
 			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase, consensusComp) // appsv1alpha1.HorizontalScalingPhase
 			initClusterForOps(opsRes)
@@ -166,9 +165,8 @@ var _ = Describe("Ops ProgressDetails", func() {
 			// ops will use the startTimestamp to make decision, start time should not equal the pod createTime during testing.
 			time.Sleep(time.Second)
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, appsv1alpha1.HorizontalScaling{
-				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
-				Operator:     appsv1alpha1.HScaleOverwriteOP,
-				Replicas:     pointer.Int32(3),
+				ComponentOps:    appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+				ReplicasWrapper: appsv1alpha1.ReplicasWrapper{Replicas: pointer.Int32(3)},
 			})
 			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase, consensusComp, statelessComp)
 			// update ops phase to Running first

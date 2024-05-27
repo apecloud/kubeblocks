@@ -24,7 +24,6 @@ import (
 	"slices"
 	"time"
 
-	"golang.org/x/exp/maps"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/pointer"
@@ -76,34 +75,16 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 					return false, nil
 				}
 				currHorizontalScaling := compOps.(appsv1alpha1.HorizontalScaling)
-				// When an earlier opsRequest has overlapping components with the current opsRequest,
-				// and this operation for the component is an overwrite operation, it needs to be aborted.
-				if v.Operator == appsv1alpha1.HScaleOverwriteOP || currHorizontalScaling.Operator == appsv1alpha1.HScaleOverwriteOP {
-					return true, nil
-				}
 				// if the earlier opsRequest is pending and not `Overwrite` operator, return false.
 				if earlierOps.Status.Phase == appsv1alpha1.OpsPendingPhase {
 					return false, nil
 				}
-				if v.Operator != currHorizontalScaling.Operator {
-					errMsg := fmt.Sprintf(`opsRequests only can run together with the same operator. `+
-						`However, the opsRequest "%s" is currently running using the "%s" operator`,
-						earlierOps.Name, v.Operator)
-					return false, intctrlutil.NewFatalError(errMsg)
+				if hs.existOverwriteReplicasOP(currHorizontalScaling, v) {
+					return true, nil
 				}
 				// check if the instance that needs to be offline was created by another opsRequest
-				if currHorizontalScaling.Operator == appsv1alpha1.HScaleAddOP && len(currHorizontalScaling.OfflineInstances) > 0 {
-					// TODO: check for sharding spec?
-					lastCompConfiguration := earlierOps.Status.LastConfiguration.Components[v.ComponentName]
-					compSpec := opsRes.Cluster.Spec.GetComponentByName(v.ComponentName)
-					createdPodSet, _ := hs.getCreateAndDeletePodSet(opsRes, lastCompConfiguration, *compSpec, v, v.ComponentName)
-					for _, offlineIns := range currHorizontalScaling.OfflineInstances {
-						if _, ok = createdPodSet[offlineIns]; ok {
-							errMsg := fmt.Sprintf(`instance "%s" cannot be taken offline as it has been created by another running opsRequest "%s"`,
-								offlineIns, earlierOps.Name)
-							return false, intctrlutil.NewFatalError(errMsg)
-						}
-					}
+				if err := hs.checkIntersectionWithEarlierOps(opsRes, earlierOps, currHorizontalScaling, v); err != nil {
+					return false, err
 				}
 			}
 			return false, nil
@@ -111,12 +92,27 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 		return err
 	}
 
-	compOpsSet.updateClusterComponentsAndShardings(opsRes.Cluster, func(compSpec *appsv1alpha1.ClusterComponentSpec, obj ComponentOpsInteface) {
+	if err := compOpsSet.updateClusterComponentsAndShardings(opsRes.Cluster, func(compSpec *appsv1alpha1.ClusterComponentSpec, obj ComponentOpsInteface) error {
 		horizontalScaling := obj.(appsv1alpha1.HorizontalScaling)
 		lastCompConfiguration := opsRes.OpsRequest.Status.LastConfiguration.Components[obj.GetComponentName()]
-		compSpec.Replicas, compSpec.Instances, compSpec.OfflineInstances = hs.getExpectedCompValues(opsRes.Cluster, compSpec,
+		replicas, instances, offlineInstances := hs.getExpectedCompValues(opsRes.Cluster, compSpec.DeepCopy(),
 			lastCompConfiguration, horizontalScaling)
-	})
+		var insReplicas int32
+		for _, v := range instances {
+			insReplicas += intctrlutil.TemplateReplicas(v)
+		}
+		if insReplicas > replicas {
+			errMsg := fmt.Sprintf(`the total number of replicas of the instance template can not greater than the number of replicas of component "%s" after horizontally scaling`,
+				horizontalScaling.ComponentName)
+			return intctrlutil.NewFatalError(errMsg)
+		}
+		compSpec.Replicas = replicas
+		compSpec.Instances = instances
+		compSpec.OfflineInstances = offlineInstances
+		return nil
+	}); err != nil {
+		return err
+	}
 	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
 }
 
@@ -129,7 +125,7 @@ func (hs horizontalScalingOpsHandler) getExpectedCompValues(
 	compReplicas := compSpec.Replicas
 	compInstanceTpls := compSpec.Instances
 	compOfflineInstances := compSpec.OfflineInstances
-	if horizontalScaling.Operator != appsv1alpha1.HScaleOverwriteOP {
+	if hs.comparedWithLastConfiguration(horizontalScaling) || hs.needAutoSyncReplicas(cluster, horizontalScaling) {
 		// `Add` and `Delete` operations require the use of recorded component snapshot information.
 		compReplicas = *lastCompConfiguration.Replicas
 		compInstanceTpls = lastCompConfiguration.Instances
@@ -151,27 +147,10 @@ func (hs horizontalScalingOpsHandler) autoSyncReplicas(
 	compInstanceTpls []appsv1alpha1.InstanceTemplate,
 	compOfflineInstances,
 	expectCompOfflineInstances []string) (int32, []appsv1alpha1.InstanceTemplate) {
-	if !hs.effectiveAutoSyncReplicas(cluster, horizontalScaling) {
+	if !hs.needAutoSyncReplicas(cluster, horizontalScaling) {
 		return compReplicas, compInstanceTpls
 	}
-	var (
-		// pods will be added to offlineInstances slice.
-		toAddOfflineInstances []string
-		// pods will be deleted from offlineInstances slice.
-		toDeleteOfflineInstances []string
-	)
-	switch horizontalScaling.Operator {
-	case appsv1alpha1.HScaleAddOP:
-		toAddOfflineInstances = horizontalScaling.OfflineInstances
-	case appsv1alpha1.HScaleDeleteOP:
-		toDeleteOfflineInstances = horizontalScaling.OfflineInstances
-	default:
-		currOfflineInsSet := sets.New(horizontalScaling.OfflineInstances...)
-		oldOfflineInsSet := sets.New(compOfflineInstances...)
-		toDeleteOfflineInstances = maps.Keys(oldOfflineInsSet.Difference(currOfflineInsSet))
-		toAddOfflineInstances = maps.Keys(currOfflineInsSet.Difference(oldOfflineInsSet))
-	}
-	handleAutoSyncReplicas := func(podSet map[string]string, diffOfflineInstances []string, deleteOfflineInstance bool) {
+	handleAutoSyncReplicas := func(podSet map[string]string, diffOfflineInstances []string, onlineInstance bool) {
 		diffReplicasMap := map[string]int32{}
 		for _, podName := range diffOfflineInstances {
 			tplName, ok := podSet[podName]
@@ -179,8 +158,8 @@ func (hs horizontalScalingOpsHandler) autoSyncReplicas(
 				continue
 			}
 			diffReplicasMap[tplName] += 1
-			if deleteOfflineInstance {
-				// scale out the instance which is removed fromm the offlineInstances slice.
+			if onlineInstance {
+				// online the instance which is removed fromm the offlineInstances slice.
 				compReplicas += 1
 			} else {
 				compReplicas -= 1
@@ -191,7 +170,7 @@ func (hs horizontalScalingOpsHandler) autoSyncReplicas(
 			if !ok {
 				continue
 			}
-			if deleteOfflineInstance {
+			if onlineInstance {
 				compInstanceTpls[i].Replicas = pointer.Int32(intctrlutil.TemplateReplicas(insTpl) + diffReplicas)
 			} else {
 				compInstanceTpls[i].Replicas = pointer.Int32(intctrlutil.TemplateReplicas(insTpl) - diffReplicas)
@@ -199,17 +178,17 @@ func (hs horizontalScalingOpsHandler) autoSyncReplicas(
 		}
 	}
 
-	if len(toDeleteOfflineInstances) > 0 {
-		// scale out the specified instances by removing the instance from offlineInstances slice.
+	if len(horizontalScaling.OfflineInstancesToOnline) > 0 {
+		// online the specified instances by removing the instance from offlineInstances slice.
 		podSet := getPodSetForComponent(compInstanceTpls, expectCompOfflineInstances,
 			cluster.Name, horizontalScaling.ComponentName, compReplicas)
-		handleAutoSyncReplicas(podSet, toDeleteOfflineInstances, true)
+		handleAutoSyncReplicas(podSet, horizontalScaling.OfflineInstancesToOnline, true)
 	}
-	if len(toAddOfflineInstances) > 0 {
-		// cale in the specified instances by adding the instance to offlineInstances slice.
+	if len(horizontalScaling.OnlineInstancesToOffline) > 0 {
+		// offline the specified instances by adding the instance to offlineInstances slice.
 		podSet := getPodSetForComponent(compInstanceTpls, compOfflineInstances,
 			cluster.Name, horizontalScaling.ComponentName, compReplicas)
-		handleAutoSyncReplicas(podSet, toAddOfflineInstances, false)
+		handleAutoSyncReplicas(podSet, horizontalScaling.OnlineInstancesToOffline, false)
 	}
 
 	return compReplicas, compInstanceTpls
@@ -218,14 +197,14 @@ func (hs horizontalScalingOpsHandler) autoSyncReplicas(
 // getCompExpectReplicas gets the expected replicas of the component.
 func (hs horizontalScalingOpsHandler) getCompExpectReplicas(horizontalScaling appsv1alpha1.HorizontalScaling,
 	compSyncedReplicas int32) int32 {
-	if horizontalScaling.Replicas == nil {
+	if horizontalScaling.NoneOP() {
 		return compSyncedReplicas
 	}
-	switch horizontalScaling.Operator {
-	case appsv1alpha1.HScaleAddOP:
-		return compSyncedReplicas + *horizontalScaling.Replicas
-	case appsv1alpha1.HScaleDeleteOP:
-		return compSyncedReplicas - *horizontalScaling.Replicas
+	switch {
+	case horizontalScaling.AddOP():
+		return compSyncedReplicas + *horizontalScaling.ReplicasToAdd
+	case horizontalScaling.DeleteOP():
+		return compSyncedReplicas - *horizontalScaling.ReplicasToDelete
 	default:
 		return *horizontalScaling.Replicas
 	}
@@ -236,7 +215,7 @@ func (hs horizontalScalingOpsHandler) getCompExpectedInstances(
 	compSyncedInstanceTpls []appsv1alpha1.InstanceTemplate,
 	horizontalScaling appsv1alpha1.HorizontalScaling,
 ) []appsv1alpha1.InstanceTemplate {
-	if len(horizontalScaling.Instances) == 0 {
+	if horizontalScaling.Instances == nil {
 		// delete instance template is not supported, return directly.
 		return compSyncedInstanceTpls
 	}
@@ -245,25 +224,22 @@ func (hs horizontalScalingOpsHandler) getCompExpectedInstances(
 	for i := range compSyncedInstanceTpls {
 		compInsTplSet[compSyncedInstanceTpls[i].Name] = i
 	}
-	for i := range horizontalScaling.Instances {
-		insTpl := horizontalScaling.Instances[i]
-		compInsIndex, ok := compInsTplSet[insTpl.Name]
-		if !ok && horizontalScaling.Operator != appsv1alpha1.HScaleDeleteOP {
-			// only support to add an instance template.
-			compSyncedInstanceTpls = append(compSyncedInstanceTpls, insTpl)
+	compSyncedInstanceTpls = append(compSyncedInstanceTpls, horizontalScaling.Instances.Add...)
+	for _, v := range horizontalScaling.Instances.Change {
+		compInsIndex, ok := compInsTplSet[v.Name]
+		if !ok {
 			continue
 		}
-		if horizontalScaling.Instances[i].Replicas == nil {
-			// ignore the changes if the replicas of the instance template is empty.
+		if v.NoneOP() {
 			continue
 		}
-		switch horizontalScaling.Operator {
-		case appsv1alpha1.HScaleAddOP:
-			compSyncedInstanceTpls[compInsIndex].Replicas = pointer.Int32(intctrlutil.TemplateReplicas(compSyncedInstanceTpls[compInsIndex]) + *insTpl.Replicas)
-		case appsv1alpha1.HScaleDeleteOP:
-			compSyncedInstanceTpls[compInsIndex].Replicas = pointer.Int32(intctrlutil.TemplateReplicas(compSyncedInstanceTpls[compInsIndex]) - *insTpl.Replicas)
+		switch {
+		case v.AddOP():
+			compSyncedInstanceTpls[compInsIndex].Replicas = pointer.Int32(intctrlutil.TemplateReplicas(compSyncedInstanceTpls[compInsIndex]) + *v.ReplicasToAdd)
+		case v.DeleteOP():
+			compSyncedInstanceTpls[compInsIndex].Replicas = pointer.Int32(intctrlutil.TemplateReplicas(compSyncedInstanceTpls[compInsIndex]) - *v.ReplicasToDelete)
 		default:
-			compSyncedInstanceTpls[compInsIndex].Replicas = insTpl.Replicas
+			compSyncedInstanceTpls[compInsIndex].Replicas = v.Replicas
 		}
 	}
 	return compSyncedInstanceTpls
@@ -274,26 +250,22 @@ func (hs horizontalScalingOpsHandler) getCompExpectedOfflineInstances(
 	compOfflineInstances []string,
 	horizontalScaling appsv1alpha1.HorizontalScaling,
 ) []string {
-	if len(horizontalScaling.OfflineInstances) == 0 {
-		return compOfflineInstances
-	}
-	handleOfflineInstances := func(compOfflineInstances, hScaleOfflineInstances, newOfflineInstances []string) []string {
-		compOfflineInsSet := sets.New(compOfflineInstances...)
-		for _, offlineIns := range horizontalScaling.OfflineInstances {
-			if _, ok := compOfflineInsSet[offlineIns]; !ok {
-				newOfflineInstances = append(newOfflineInstances, offlineIns)
+	handleOfflineInstances := func(baseInstanceNames, comparedInstanceNames, newOfflineInstances []string) []string {
+		instanceNameSet := sets.New(comparedInstanceNames...)
+		for _, instanceName := range baseInstanceNames {
+			if _, ok := instanceNameSet[instanceName]; !ok {
+				newOfflineInstances = append(newOfflineInstances, instanceName)
 			}
 		}
 		return newOfflineInstances
 	}
-	switch horizontalScaling.Operator {
-	case appsv1alpha1.HScaleAddOP:
-		return handleOfflineInstances(compOfflineInstances, horizontalScaling.OfflineInstances, compOfflineInstances)
-	case appsv1alpha1.HScaleDeleteOP:
-		return handleOfflineInstances(compOfflineInstances, horizontalScaling.OfflineInstances, make([]string, 0))
-	default:
-		return horizontalScaling.OfflineInstances
+	if len(horizontalScaling.OnlineInstancesToOffline) != 0 {
+		compOfflineInstances = handleOfflineInstances(horizontalScaling.OnlineInstancesToOffline, compOfflineInstances, compOfflineInstances)
 	}
+	if len(horizontalScaling.OfflineInstancesToOnline) != 0 {
+		compOfflineInstances = handleOfflineInstances(compOfflineInstances, horizontalScaling.OfflineInstancesToOnline, make([]string, 0))
+	}
+	return compOfflineInstances
 }
 
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
@@ -308,7 +280,7 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.Request
 		lastCompConfiguration := opsRes.OpsRequest.Status.LastConfiguration.Components[pgRes.compOps.GetComponentName()]
 		horizontalScaling := pgRes.compOps.(appsv1alpha1.HorizontalScaling)
 		pgRes.createdPodSet, pgRes.deletedPodSet = hs.getCreateAndDeletePodSet(opsRes, lastCompConfiguration, *pgRes.clusterComponent, horizontalScaling, pgRes.fullComponentName)
-		if horizontalScaling.Operator != appsv1alpha1.HScaleOverwriteOP {
+		if !horizontalScaling.OverwriteOP() {
 			pgRes.noWaitComponentCompleted = true
 		}
 		return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
@@ -371,19 +343,11 @@ func (hs horizontalScalingOpsHandler) Cancel(reqCtx intctrlutil.RequestCtx, cli 
 	})
 }
 
-// effectiveAutoSyncReplicas it is effective when replicas of the component and instance templates are empty, autoSyncReplicas is true and component is not a sharding component.
-func (hs horizontalScalingOpsHandler) effectiveAutoSyncReplicas(cluster *appsv1alpha1.Cluster, horizontalScaling appsv1alpha1.HorizontalScaling) bool {
-	if !horizontalScaling.AutoSyncReplicas {
+// needAutoSyncReplicas When replicas, replicasToAdd, and replicasToDelete are not specified and component is not a sharding component,
+// it needs to sync the component and instanceTemplate replicas automatically.
+func (hs horizontalScalingOpsHandler) needAutoSyncReplicas(cluster *appsv1alpha1.Cluster, horizontalScaling appsv1alpha1.HorizontalScaling) bool {
+	if len(horizontalScaling.OnlineInstancesToOffline) == 0 && len(horizontalScaling.OfflineInstancesToOnline) == 0 {
 		return false
-	}
-	// all replicas must be empty.
-	if horizontalScaling.Replicas != nil {
-		return false
-	}
-	for _, v := range horizontalScaling.Instances {
-		if v.Replicas != nil {
-			return false
-		}
 	}
 	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
 		// component can not be a sharding component.
@@ -391,5 +355,77 @@ func (hs horizontalScalingOpsHandler) effectiveAutoSyncReplicas(cluster *appsv1a
 			return false
 		}
 	}
+	if !horizontalScaling.NoneOP() {
+		return false
+	}
+	if horizontalScaling.Instances != nil {
+		for _, v := range horizontalScaling.Instances.Change {
+			if !v.NoneOP() {
+				return false
+			}
+		}
+	}
 	return true
+}
+
+func (hs horizontalScalingOpsHandler) comparedWithLastConfiguration(horizontalScaling appsv1alpha1.HorizontalScaling) bool {
+	// if existing replicasToAdd or replicasToDelete, compare with replicas snapshot which is saved in lastComponentConfiguration.
+	if horizontalScaling.AddOP() || horizontalScaling.DeleteOP() {
+		return true
+	}
+	if horizontalScaling.Instances != nil {
+		for _, v := range horizontalScaling.Instances.Change {
+			if v.AddOP() || horizontalScaling.DeleteOP() {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (hs horizontalScalingOpsHandler) existOverwriteReplicasOP(currHScaling, earlierHScaling appsv1alpha1.HorizontalScaling) bool {
+	checkInstances := func(instanceOps *appsv1alpha1.InstancesOperation) bool {
+		if instanceOps == nil {
+			return false
+		}
+		if len(instanceOps.Add) > 0 {
+			return true
+		}
+		for _, v := range instanceOps.Change {
+			if v.OverwriteOP() {
+				return true
+			}
+		}
+		return false
+	}
+	// if existing an overwrite replicas operation, need to abort.
+	if currHScaling.OverwriteOP() || earlierHScaling.OverwriteOP() {
+		return true
+	}
+	if checkInstances(earlierHScaling.Instances) {
+		return true
+	}
+	return checkInstances(currHScaling.Instances)
+}
+
+// checkIntersectionWithEarlierOps checks if the pod deleted by the current ops is a pod created by another ops
+func (hs horizontalScalingOpsHandler) checkIntersectionWithEarlierOps(opsRes *OpsResource, earlierOps *appsv1alpha1.OpsRequest,
+	currOpsHScaling, earlierOpsHScaling appsv1alpha1.HorizontalScaling) error {
+	getCreatedOrDeletedPodSet := func(ops *appsv1alpha1.OpsRequest, hScaling appsv1alpha1.HorizontalScaling) (map[string]string, map[string]string) {
+		lastCompSnapshot := ops.Status.LastConfiguration.Components[earlierOpsHScaling.ComponentName]
+		compSpec := opsRes.Cluster.Spec.GetComponentByName(earlierOpsHScaling.ComponentName).DeepCopy()
+		compSpec.Replicas, compSpec.Instances, compSpec.OfflineInstances = hs.getExpectedCompValues(opsRes.Cluster, compSpec,
+			lastCompSnapshot, hScaling)
+		return hs.getCreateAndDeletePodSet(opsRes, lastCompSnapshot, *compSpec, hScaling, hScaling.ComponentName)
+	}
+	createdPodSetForEarlier, _ := getCreatedOrDeletedPodSet(earlierOps, earlierOpsHScaling)
+	_, deletedPodSetForCurrent := getCreatedOrDeletedPodSet(opsRes.OpsRequest, currOpsHScaling)
+	for deletedPod := range deletedPodSetForCurrent {
+		if _, ok := createdPodSetForEarlier[deletedPod]; ok {
+			errMsg := fmt.Sprintf(`instance "%s" cannot be taken offline as it has been created by another running opsRequest "%s"`,
+				deletedPod, earlierOps.Name)
+			return intctrlutil.NewFatalError(errMsg)
+		}
+	}
+	return nil
 }

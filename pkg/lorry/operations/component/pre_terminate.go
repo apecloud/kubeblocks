@@ -85,7 +85,7 @@ func (s *PreTerminate) Do(ctx context.Context, req *operations.OpsRequest) (*ope
 
 	ptManager, ok := manager.(PreTerminateManager)
 	if !ok {
-		return nil, models.ErrNoImplemented
+		return nil, models.ErrNotImplemented
 	}
 	err = ptManager.PreTerminate(ctx)
 	return nil, err

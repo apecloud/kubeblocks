@@ -733,7 +733,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 		It("not implemented", func() {
 			err := lorryClient.PostProvision(context.TODO(), "", "", "", "", "")
 			Expect(err).Should(HaveOccurred())
-			Expect(err.Error()).Should(ContainSubstring("operation exec failed: no implemented"))
+			Expect(err.Error()).Should(ContainSubstring("operation exec failed: not implemented"))
 		})
 
 		// It("execute command failed cased by envs is unset", func() {
@@ -784,7 +784,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 		It("not implemented", func() {
 			err := lorryClient.PreTerminate(context.TODO())
 			Expect(err).Should(HaveOccurred())
-			Expect(err.Error()).Should(ContainSubstring("operation exec failed: no implemented"))
+			Expect(err.Error()).Should(ContainSubstring("operation exec failed: not implemented"))
 		})
 
 		// It("execute command failed cased by envs is unset", func() {

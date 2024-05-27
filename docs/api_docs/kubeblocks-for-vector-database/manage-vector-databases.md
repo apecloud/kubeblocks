@@ -14,18 +14,10 @@ In this chapter, we take Qdrant as an example to show how to manage vector datab
 ## Before you start
 
 * [Install KubeBlocks](./../installation/install-kubeblocks.md).
-* Make sure the Qdrant addon is enabled.
-
-  ```bash
-  kubectl get addons.extensions.kubeblocks.io qdrant
-  >
-  NAME         TYPE   VERSION   PROVIDER   STATUS    AGE
-  qdrant       Helm                        Enabled   30m
-  ```
-
+* 
 * View all the database types and versions available for creating a cluster.
   
-  Make sure the `qdrant` cluster definition is installed with `kubectl get clusterdefinitions qdrant`.
+  Make sure the `qdrant` cluster definition is installed. If the cluster definition is not available, refer to [this doc](./../overview/supported-addons.md#install-addons) to enable it first.
 
   ```bash
   kubectl get clusterdefinition qdrant

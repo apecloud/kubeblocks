@@ -22,18 +22,10 @@ For your better high-availability experience, KubeBlocks creates a Redis Replica
 ### Before you start
 
 * [Install KubeBlocks](./../../installation/install-kubeblocks.md).
-* Make sure the Redis addon is enabled.
-
-  ```bash
-  kubectl get addons.extensions.kubeblocks.io redis
-  >            
-  NAME    TYPE   VERSION   PROVIDER   STATUS    AGE
-  redis   Helm                        Enabled   16m
-  ```
 
 * View all the database types and versions available for creating a cluster.
 
-  Make sure the `redis` cluster definition is installed with `kubectl get clusterdefinitions redis`.
+  Make sure the `redis` cluster definition is installed. If the cluster definition is not available, refer to [this doc](./../../overview/supported-addons.md#install-addons) to enable it first.
 
   ```bash
   kubectl get clusterdefinition redis

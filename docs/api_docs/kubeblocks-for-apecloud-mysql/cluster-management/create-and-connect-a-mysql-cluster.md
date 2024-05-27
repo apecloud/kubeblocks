@@ -15,24 +15,13 @@ This tutorial shows how to create and connect to an ApeCloud MySQL cluster.
 ### Before you start
 
 * [Install KubeBlocks](./../../installation/install-kubeblocks.md).
-* Make sure the ApeCloud MySQL addon is enabled.
+* Make sure the `apecloud-mysql` cluster definition is installed. If the cluster definition is not available, refer to [this doc](./../../overview/supported-addons.md#install-addons) to enable it first.
 
   ```bash
-  kubectl get addons.extensions.kubeblocks.io apecloud-mysql
-  >
-  NAME             TYPE   VERSION   PROVIDER   STATUS    AGE
-  apecloud-mysql   Helm                        Enabled   1m
-  ```
-
-* View all the database types and versions available for creating a cluster.
-  
-  Make sure the `apecloud-mysql` cluster definition is installed.
-
-  ```bash
-  kubectl get clusterdefinition apecloud-mysql
+  kubectl get clusterdefinition mysql
   >
   NAME             TOPOLOGIES   SERVICEREFS   STATUS      AGE
-  apecloud-mysql                              Available   1m
+  apecloud-mysql                              Available   27m
   ```
 
   View all available versions for creating a cluster.

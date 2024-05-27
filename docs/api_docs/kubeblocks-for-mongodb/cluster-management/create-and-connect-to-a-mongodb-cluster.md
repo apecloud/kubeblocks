@@ -18,18 +18,10 @@ This tutorial shows how to create and connect to a MongoDB cluster.
 ### Before you start
 
 * [Install KubeBlocks](./../../installation/install-kubeblocks.md).
-* Make sure the MongoDB addon is enabled.
-
-  ```bash
-  kubectl get addons.extensions.kubeblocks.io mongodb
-  >
-  NAME      TYPE   VERSION   PROVIDER   STATUS    AGE
-  mongodb   Helm                        Enabled   26m
-  ```
 
 * View all the database types and versions available for creating a cluster.
   
-  Make sure the `mongodb` cluster definition is installed.
+  Make sure the `mongodb` cluster definition is installed. If the cluster definition is not available, refer to [this doc](./../../overview/supported-addons.md#install-addons) to enable it first.
 
   ```bash
   kubectl get clusterdefinition mongodb

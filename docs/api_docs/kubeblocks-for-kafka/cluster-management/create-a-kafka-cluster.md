@@ -18,7 +18,7 @@ This document shows how to create a Kafka cluster.
 * [Install KubeBlocks](./../../installation/install-kubeblocks.md).
 * View all the database types and versions available for creating a cluster.
   
-  Make sure the `kafka` cluster definition is installed.
+  Make sure the `kafka` cluster definition is installed. If the cluster definition is not available, refer to [this doc](./../../overview/supported-addons.md#install-addons) to enable it first.
 
   ```bash
   kubectl get clusterdefinition kafka

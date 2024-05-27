@@ -22,6 +22,38 @@ Refer to the [Pulsar official document](https://pulsar.apache.org/docs/3.1.x/) f
 | recovery (Optional)    | 1; if autoRecovery is not enabled for bookie, at least 3 replicas needed  |
 |   proxy (Optional)     |           1; and for production environment, 3 replicas needed            |
 
+## Before you start
+
+* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
+
+* View all the database types and versions available for creating a cluster.
+
+  Make sure the `pulsar` cluster definition is installed. If the cluster definition is not available, refer to [this doc](./../../overview/supported-addons.md#install-addons) to enable it first.
+
+  ```bash
+  kubectl get clusterdefinition redis
+  >
+  NAME    TOPOLOGIES   SERVICEREFS    STATUS      AGE
+  pulsar                              Available   16m
+  ```
+
+  View all available versions for creating a cluster.
+
+  ```bash
+  kubectl get clusterversions -l clusterdefinition.kubeblocks.io/name=redis
+  >
+  NAME           CLUSTER-DEFINITION   STATUS      AGE
+  pulsar-3.0.2   pulsar               Available   16m
+  ```
+
+* To keep things isolated, create a separate namespace called `demo` throughout this tutorial.
+
+  ```bash
+  kubectl create namespace demo
+  >
+  namespace/demo created
+  ```
+
 ## Create Pulsar cluster
 
 1. Create the Pulsar cluster template file `values-production.yaml` for `helm` locally.

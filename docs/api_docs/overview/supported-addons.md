@@ -6,7 +6,7 @@ sidebar_position: 2
 sidebar_label: Supported add-ons 
 ---
 
-# Supported add-ons
+# Supported addons
 
 KubeBlocks, as a cloud-native data infrastructure based on Kubernetes, provides management and control for relational databases, NoSQL databases, vector databases, and stream computing systems; and these databases can be all added as addons. Besides databases, KubeBlocks addon now also supports plugins for cloud environments and applications.
 
@@ -58,7 +58,7 @@ KubeBlocks, as a cloud-native data infrastructure based on Kubernetes, provides 
 | yashandb        | YashanDB is a database management system developed by Shenzhen  Institute of Computing Science. |
 | zookeeper       | Apache ZooKeeper is a centralized service for maintaining configuration information, naming, providing distributed synchronization, and providing group services. |
 
-## Supported version and functions of add-ons
+## Supported version and functions of addons
 
 | Add-on (v0.9.0)                       | Version                           | Vscale | Hscale | Volumeexpand | Stop/Start | Restart | Backup/Restore | Logs | Config | Upgrade (DB engine version) | Account | Failover | Switchover | Monitor |
 |---------------------------------------|-----------------------------------|--------|--------|--------------|------------|---------|----------------|------|--------|-----------------------------|---------|----------|------------|---------|

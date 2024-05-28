@@ -38,9 +38,12 @@ var pingerLogger = ctlruntime.Log.WithName("pinger")
 func IsDNSReady(dns string) (bool, error) {
 	// get the port where the Lorry HTTP service is listening
 	port := viper.GetString("port")
-	address := net.JoinHostPort(dns, port)
-	timeout := 2 * time.Second
+	return IsTCPReady(dns, port)
+}
 
+func IsTCPReady(host, port string) (bool, error) {
+	address := net.JoinHostPort(host, port)
+	timeout := 2 * time.Second
 	conn, err := net.DialTimeout("tcp", address, timeout)
 	if err != nil {
 		return false, err

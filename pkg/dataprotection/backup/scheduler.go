@@ -24,7 +24,6 @@ import (
 	"reflect"
 	"sort"
 
-	"golang.org/x/exp/slices"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -320,10 +319,8 @@ func (s *Scheduler) reconcileForContinuous(schedulePolicy *dpv1alpha1.SchedulePo
 	}
 
 	// notice to reconcile backup CR
-	if boolptr.IsSetToTrue(schedulePolicy.Enabled) && slices.Contains([]dpv1alpha1.BackupPhase{
-		dpv1alpha1.BackupPhaseCompleted, dpv1alpha1.BackupPhaseFailed},
-		backup.Status.Phase) {
-		// if schedule is enabled and backup already is Completed/Failed, update phase to running
+	if boolptr.IsSetToTrue(schedulePolicy.Enabled) && backup.Status.Phase == dpv1alpha1.BackupPhaseCompleted {
+		// if schedule is enabled and backup already is Completed, update phase to running
 		backup.Status.Phase = dpv1alpha1.BackupPhaseRunning
 		backup.Status.FailureReason = ""
 		return s.Client.Status().Patch(s.Ctx, backup, patch)

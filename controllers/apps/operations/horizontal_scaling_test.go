@@ -572,7 +572,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 					Add: []appsv1alpha1.InstanceTemplate{{Name: "bar", Replicas: pointer.Int32(3)}}},
 			})
 
-			By("expect opsReqeust phase is not Failed when using legal replicas")
+			By("expect opsReqeust phase is not Failed when all instances replicas count greater than component replicas count")
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.Cluster), opsRes.Cluster)).Should(Succeed())
 			_ = createOpsAndToCreatingPhase(reqCtx, opsRes, appsv1alpha1.HorizontalScaling{
 				Instances: &appsv1alpha1.InstancesOperation{

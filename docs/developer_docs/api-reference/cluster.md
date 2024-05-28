@@ -11967,7 +11967,7 @@ ReplicasWrapper
 (Members of <code>ReplicasWrapper</code> are embedded into this type.)
 </p>
 <em>(Optional)</em>
-<p>Specifies the number of the replicas.</p>
+<p>A wrapper for a horizontally scaled replicas.</p>
 </td>
 </tr>
 <tr>

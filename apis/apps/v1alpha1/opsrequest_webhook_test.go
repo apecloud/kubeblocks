@@ -391,7 +391,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		opsRequest.Spec.HorizontalScalingList[0].Replicas = pointer.Int32(5)
 		Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(Succeed())
 
-		By("expect an error when replicas is greater than component's replicas and operator is Delete")
+		By("expect an error when replicas is greater than component's replicas with `replicasToDelete`")
 		opsRequest = createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
 		opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{{
 			ComponentOps:    ComponentOps{ComponentName: componentName},
@@ -399,7 +399,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		}}
 		Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).Should(ContainSubstring("replicasToDelete can not greater than"))
 
-		By("expect an error when instance template is not exist and operator is Delete")
+		By("expect an error when instance template is not exist")
 		opsRequest = createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
 		opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{{
 			ComponentOps:    ComponentOps{ComponentName: componentName},
@@ -412,7 +412,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		}}
 		Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).Should(ContainSubstring("an not found the instanceTemplate"))
 
-		By("expect an error when the offlineInstance is not exist in the component and operator is Delete")
+		By("expect an error when an instance that is not in the offline instances list for online operation")
 		opsRequest = createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
 		opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{{
 			ComponentOps:             ComponentOps{ComponentName: componentName},
@@ -421,7 +421,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		}}
 		Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).Should(ContainSubstring("can not found the offline instance"))
 
-		By("expect an error when the replicas is greater than instance's replicas and operator is Delete")
+		By("expect an error when the replicas is greater than instance's replicas with `replicasToDelete`")
 		insTplName := "test"
 		clusterObj.Spec.ComponentSpecs[0].Replicas = 1
 		clusterObj.Spec.ComponentSpecs[0].Instances = []InstanceTemplate{{Name: insTplName, Replicas: pointer.Int32(1)}}

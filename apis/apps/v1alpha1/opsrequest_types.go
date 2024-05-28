@@ -425,7 +425,7 @@ type HorizontalScaling struct {
 	// Specifies the name of the Component.
 	ComponentOps `json:",inline"`
 
-	// Specifies the number of the replicas.
+	// A wrapper for a horizontally scaled replicas.
 	//
 	// +optional
 	ReplicasWrapper `json:",inline"`

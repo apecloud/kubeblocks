@@ -75,14 +75,14 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 					return false, nil
 				}
 				currHorizontalScaling := compOps.(appsv1alpha1.HorizontalScaling)
+				if hs.existOverwriteReplicasOP(currHorizontalScaling, v) {
+					return true, nil
+				}
 				// if the earlier opsRequest is pending and not `Overwrite` operator, return false.
 				if earlierOps.Status.Phase == appsv1alpha1.OpsPendingPhase {
 					return false, nil
 				}
-				if hs.existOverwriteReplicasOP(currHorizontalScaling, v) {
-					return true, nil
-				}
-				// check if the instance that needs to be offline was created by another opsRequest
+				// check if the instance to be taken offline was created by another opsRequest.
 				if err := hs.checkIntersectionWithEarlierOps(opsRes, earlierOps, currHorizontalScaling, v); err != nil {
 					return false, err
 				}
@@ -116,6 +116,170 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
 }
 
+// ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
+// the Reconcile function for horizontal scaling opsRequest.
+func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
+	handleComponentProgress := func(
+		reqCtx intctrlutil.RequestCtx,
+		cli client.Client,
+		opsRes *OpsResource,
+		pgRes *progressResource,
+		compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
+		lastCompConfiguration := opsRes.OpsRequest.Status.LastConfiguration.Components[pgRes.compOps.GetComponentName()]
+		horizontalScaling := pgRes.compOps.(appsv1alpha1.HorizontalScaling)
+		pgRes.createdPodSet, pgRes.deletedPodSet = hs.getCreateAndDeletePodSet(opsRes, lastCompConfiguration, *pgRes.clusterComponent, horizontalScaling, pgRes.fullComponentName)
+		if !horizontalScaling.OverwriteOP() {
+			pgRes.noWaitComponentCompleted = true
+		}
+		return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
+	}
+	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.HorizontalScalingList)
+	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "", handleComponentProgress)
+}
+
+// SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
+func (hs horizontalScalingOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
+	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.HorizontalScalingList)
+	getLastComponentInfo := func(compSpec appsv1alpha1.ClusterComponentSpec, comOps ComponentOpsInteface) appsv1alpha1.LastComponentConfiguration {
+		lastCompConfiguration := appsv1alpha1.LastComponentConfiguration{
+			Replicas:         pointer.Int32(compSpec.Replicas),
+			Instances:        compSpec.Instances,
+			OfflineInstances: compSpec.OfflineInstances,
+		}
+		return lastCompConfiguration
+	}
+	compOpsHelper.saveLastConfigurations(opsRes, getLastComponentInfo)
+	return nil
+}
+
+// getCreateAndDeletePodSet gets the pod set that are created and deleted in this opsRequest.
+func (hs horizontalScalingOpsHandler) getCreateAndDeletePodSet(opsRes *OpsResource,
+	lastCompConfiguration appsv1alpha1.LastComponentConfiguration,
+	currCompSpec appsv1alpha1.ClusterComponentSpec,
+	horizontalScaling appsv1alpha1.HorizontalScaling,
+	fullCompName string) (map[string]string, map[string]string) {
+	clusterName := opsRes.Cluster.Name
+	lastPodSet := getPodSetForComponent(lastCompConfiguration.Instances, lastCompConfiguration.OfflineInstances, clusterName, fullCompName, *lastCompConfiguration.Replicas)
+	expectReplicas, expectInstanceTpls, expectOfflineInstances := hs.getExpectedCompValues(opsRes.Cluster, &currCompSpec, lastCompConfiguration, horizontalScaling)
+	currPodSet := getPodSetForComponent(expectInstanceTpls, expectOfflineInstances, clusterName, fullCompName, expectReplicas)
+	createPodSet := map[string]string{}
+	deletePodSet := map[string]string{}
+	for k, v := range currPodSet {
+		if _, ok := lastPodSet[k]; !ok {
+			createPodSet[k] = v
+		}
+	}
+	for k, v := range lastPodSet {
+		if _, ok := currPodSet[k]; !ok {
+			deletePodSet[k] = v
+		}
+	}
+	if opsRes.OpsRequest.Status.Phase == appsv1alpha1.OpsCancellingPhase {
+		// when cancelling this opsRequest, revert the changes.
+		return deletePodSet, createPodSet
+	}
+	return createPodSet, deletePodSet
+}
+
+// Cancel this function defines the cancel horizontalScaling action.
+func (hs horizontalScalingOpsHandler) Cancel(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
+	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.VerticalScalingList)
+	return compOpsHelper.cancelComponentOps(reqCtx.Ctx, cli, opsRes, func(lastConfig *appsv1alpha1.LastComponentConfiguration, comp *appsv1alpha1.ClusterComponentSpec) {
+		comp.Replicas = *lastConfig.Replicas
+		comp.Instances = lastConfig.Instances
+		comp.OfflineInstances = lastConfig.OfflineInstances
+	})
+}
+
+// needAutoSyncReplicas When replicas, replicasToAdd, and replicasToDelete are not specified and component is not a sharding component,
+// it needs to sync the component and instanceTemplate replicas automatically.
+func (hs horizontalScalingOpsHandler) needAutoSyncReplicas(cluster *appsv1alpha1.Cluster, horizontalScaling appsv1alpha1.HorizontalScaling) bool {
+	if len(horizontalScaling.OnlineInstancesToOffline) == 0 && len(horizontalScaling.OfflineInstancesToOnline) == 0 {
+		return false
+	}
+	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
+		// component can not be a sharding component.
+		if shardingSpec.Name == horizontalScaling.ComponentName {
+			return false
+		}
+	}
+	if !horizontalScaling.NoneOP() {
+		return false
+	}
+	if horizontalScaling.Instances != nil {
+		for _, v := range horizontalScaling.Instances.Change {
+			if !v.NoneOP() {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// comparedWithLastConfiguration if existing replicasToAdd or replicasToDelete, compare with replicas snapshot which is saved in lastComponentConfiguration.
+func (hs horizontalScalingOpsHandler) comparedWithLastConfiguration(horizontalScaling appsv1alpha1.HorizontalScaling) bool {
+	// if existing replicasToAdd or replicasToDelete, compare with replicas snapshot which is saved in lastComponentConfiguration.
+	if horizontalScaling.AddOP() || horizontalScaling.DeleteOP() {
+		return true
+	}
+	if horizontalScaling.Instances != nil {
+		for _, v := range horizontalScaling.Instances.Change {
+			if v.AddOP() || horizontalScaling.DeleteOP() {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// existOverwriteReplicasOP checks if existing an "overwrite" operation.
+func (hs horizontalScalingOpsHandler) existOverwriteReplicasOP(currHScaling, earlierHScaling appsv1alpha1.HorizontalScaling) bool {
+	checkInstances := func(instanceOps *appsv1alpha1.InstancesOperation) bool {
+		if instanceOps == nil {
+			return false
+		}
+		if len(instanceOps.Add) > 0 {
+			return true
+		}
+		for _, v := range instanceOps.Change {
+			if v.OverwriteOP() {
+				return true
+			}
+		}
+		return false
+	}
+	// if existing an overwrite replicas operation, need to abort.
+	if currHScaling.OverwriteOP() || earlierHScaling.OverwriteOP() {
+		return true
+	}
+	if checkInstances(earlierHScaling.Instances) {
+		return true
+	}
+	return checkInstances(currHScaling.Instances)
+}
+
+// checkIntersectionWithEarlierOps checks if the pod deleted by the current ops is a pod created by another ops
+func (hs horizontalScalingOpsHandler) checkIntersectionWithEarlierOps(opsRes *OpsResource, earlierOps *appsv1alpha1.OpsRequest,
+	currOpsHScaling, earlierOpsHScaling appsv1alpha1.HorizontalScaling) error {
+	getCreatedOrDeletedPodSet := func(ops *appsv1alpha1.OpsRequest, hScaling appsv1alpha1.HorizontalScaling) (map[string]string, map[string]string) {
+		lastCompSnapshot := ops.Status.LastConfiguration.Components[earlierOpsHScaling.ComponentName]
+		compSpec := opsRes.Cluster.Spec.GetComponentByName(earlierOpsHScaling.ComponentName).DeepCopy()
+		compSpec.Replicas, compSpec.Instances, compSpec.OfflineInstances = hs.getExpectedCompValues(opsRes.Cluster, compSpec,
+			lastCompSnapshot, hScaling)
+		return hs.getCreateAndDeletePodSet(opsRes, lastCompSnapshot, *compSpec, hScaling, hScaling.ComponentName)
+	}
+	createdPodSetForEarlier, _ := getCreatedOrDeletedPodSet(earlierOps, earlierOpsHScaling)
+	_, deletedPodSetForCurrent := getCreatedOrDeletedPodSet(opsRes.OpsRequest, currOpsHScaling)
+	for deletedPod := range deletedPodSetForCurrent {
+		if _, ok := createdPodSetForEarlier[deletedPod]; ok {
+			errMsg := fmt.Sprintf(`instance "%s" cannot be taken offline as it has been created by another running opsRequest "%s"`,
+				deletedPod, earlierOps.Name)
+			return intctrlutil.NewFatalError(errMsg)
+		}
+	}
+	return nil
+}
+
 // getExpectedCompValues gets the expected replicas, instances, offlineInstances.
 func (hs horizontalScalingOpsHandler) getExpectedCompValues(
 	cluster *appsv1alpha1.Cluster,
@@ -126,7 +290,6 @@ func (hs horizontalScalingOpsHandler) getExpectedCompValues(
 	compInstanceTpls := compSpec.Instances
 	compOfflineInstances := compSpec.OfflineInstances
 	if hs.comparedWithLastConfiguration(horizontalScaling) || hs.needAutoSyncReplicas(cluster, horizontalScaling) {
-		// `Add` and `Delete` operations require the use of recorded component snapshot information.
 		compReplicas = *lastCompConfiguration.Replicas
 		compInstanceTpls = lastCompConfiguration.Instances
 		compOfflineInstances = lastCompConfiguration.OfflineInstances
@@ -266,166 +429,4 @@ func (hs horizontalScalingOpsHandler) getCompExpectedOfflineInstances(
 		compOfflineInstances = handleOfflineInstances(compOfflineInstances, horizontalScaling.OfflineInstancesToOnline, make([]string, 0))
 	}
 	return compOfflineInstances
-}
-
-// ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
-// the Reconcile function for horizontal scaling opsRequest.
-func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
-	handleComponentProgress := func(
-		reqCtx intctrlutil.RequestCtx,
-		cli client.Client,
-		opsRes *OpsResource,
-		pgRes *progressResource,
-		compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
-		lastCompConfiguration := opsRes.OpsRequest.Status.LastConfiguration.Components[pgRes.compOps.GetComponentName()]
-		horizontalScaling := pgRes.compOps.(appsv1alpha1.HorizontalScaling)
-		pgRes.createdPodSet, pgRes.deletedPodSet = hs.getCreateAndDeletePodSet(opsRes, lastCompConfiguration, *pgRes.clusterComponent, horizontalScaling, pgRes.fullComponentName)
-		if !horizontalScaling.OverwriteOP() {
-			pgRes.noWaitComponentCompleted = true
-		}
-		return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
-	}
-	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.HorizontalScalingList)
-	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "", handleComponentProgress)
-}
-
-// SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
-func (hs horizontalScalingOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.HorizontalScalingList)
-	getLastComponentInfo := func(compSpec appsv1alpha1.ClusterComponentSpec, comOps ComponentOpsInteface) appsv1alpha1.LastComponentConfiguration {
-		lastCompConfiguration := appsv1alpha1.LastComponentConfiguration{
-			Replicas:         pointer.Int32(compSpec.Replicas),
-			Instances:        compSpec.Instances,
-			OfflineInstances: compSpec.OfflineInstances,
-		}
-		return lastCompConfiguration
-	}
-	compOpsHelper.saveLastConfigurations(opsRes, getLastComponentInfo)
-	return nil
-}
-
-// getCreateAndDeletePodSet gets the pod set that are created and deleted in this opsRequest.
-func (hs horizontalScalingOpsHandler) getCreateAndDeletePodSet(opsRes *OpsResource,
-	lastCompConfiguration appsv1alpha1.LastComponentConfiguration,
-	currCompSpec appsv1alpha1.ClusterComponentSpec,
-	horizontalScaling appsv1alpha1.HorizontalScaling,
-	fullCompName string) (map[string]string, map[string]string) {
-	clusterName := opsRes.Cluster.Name
-	lastPodSet := getPodSetForComponent(lastCompConfiguration.Instances, lastCompConfiguration.OfflineInstances, clusterName, fullCompName, *lastCompConfiguration.Replicas)
-	expectReplicas, expectInstanceTpls, expectOfflineInstances := hs.getExpectedCompValues(opsRes.Cluster, &currCompSpec, lastCompConfiguration, horizontalScaling)
-	currPodSet := getPodSetForComponent(expectInstanceTpls, expectOfflineInstances, clusterName, fullCompName, expectReplicas)
-	createPodSet := map[string]string{}
-	deletePodSet := map[string]string{}
-	for k, v := range currPodSet {
-		if _, ok := lastPodSet[k]; !ok {
-			createPodSet[k] = v
-		}
-	}
-	for k, v := range lastPodSet {
-		if _, ok := currPodSet[k]; !ok {
-			deletePodSet[k] = v
-		}
-	}
-	if opsRes.OpsRequest.Status.Phase == appsv1alpha1.OpsCancellingPhase {
-		// when cancelling this opsRequest, revert the changes.
-		return deletePodSet, createPodSet
-	}
-	return createPodSet, deletePodSet
-}
-
-// Cancel this function defines the cancel horizontalScaling action.
-func (hs horizontalScalingOpsHandler) Cancel(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.VerticalScalingList)
-	return compOpsHelper.cancelComponentOps(reqCtx.Ctx, cli, opsRes, func(lastConfig *appsv1alpha1.LastComponentConfiguration, comp *appsv1alpha1.ClusterComponentSpec) {
-		comp.Replicas = *lastConfig.Replicas
-		comp.Instances = lastConfig.Instances
-		comp.OfflineInstances = lastConfig.OfflineInstances
-	})
-}
-
-// needAutoSyncReplicas When replicas, replicasToAdd, and replicasToDelete are not specified and component is not a sharding component,
-// it needs to sync the component and instanceTemplate replicas automatically.
-func (hs horizontalScalingOpsHandler) needAutoSyncReplicas(cluster *appsv1alpha1.Cluster, horizontalScaling appsv1alpha1.HorizontalScaling) bool {
-	if len(horizontalScaling.OnlineInstancesToOffline) == 0 && len(horizontalScaling.OfflineInstancesToOnline) == 0 {
-		return false
-	}
-	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
-		// component can not be a sharding component.
-		if shardingSpec.Name == horizontalScaling.ComponentName {
-			return false
-		}
-	}
-	if !horizontalScaling.NoneOP() {
-		return false
-	}
-	if horizontalScaling.Instances != nil {
-		for _, v := range horizontalScaling.Instances.Change {
-			if !v.NoneOP() {
-				return false
-			}
-		}
-	}
-	return true
-}
-
-func (hs horizontalScalingOpsHandler) comparedWithLastConfiguration(horizontalScaling appsv1alpha1.HorizontalScaling) bool {
-	// if existing replicasToAdd or replicasToDelete, compare with replicas snapshot which is saved in lastComponentConfiguration.
-	if horizontalScaling.AddOP() || horizontalScaling.DeleteOP() {
-		return true
-	}
-	if horizontalScaling.Instances != nil {
-		for _, v := range horizontalScaling.Instances.Change {
-			if v.AddOP() || horizontalScaling.DeleteOP() {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func (hs horizontalScalingOpsHandler) existOverwriteReplicasOP(currHScaling, earlierHScaling appsv1alpha1.HorizontalScaling) bool {
-	checkInstances := func(instanceOps *appsv1alpha1.InstancesOperation) bool {
-		if instanceOps == nil {
-			return false
-		}
-		if len(instanceOps.Add) > 0 {
-			return true
-		}
-		for _, v := range instanceOps.Change {
-			if v.OverwriteOP() {
-				return true
-			}
-		}
-		return false
-	}
-	// if existing an overwrite replicas operation, need to abort.
-	if currHScaling.OverwriteOP() || earlierHScaling.OverwriteOP() {
-		return true
-	}
-	if checkInstances(earlierHScaling.Instances) {
-		return true
-	}
-	return checkInstances(currHScaling.Instances)
-}
-
-// checkIntersectionWithEarlierOps checks if the pod deleted by the current ops is a pod created by another ops
-func (hs horizontalScalingOpsHandler) checkIntersectionWithEarlierOps(opsRes *OpsResource, earlierOps *appsv1alpha1.OpsRequest,
-	currOpsHScaling, earlierOpsHScaling appsv1alpha1.HorizontalScaling) error {
-	getCreatedOrDeletedPodSet := func(ops *appsv1alpha1.OpsRequest, hScaling appsv1alpha1.HorizontalScaling) (map[string]string, map[string]string) {
-		lastCompSnapshot := ops.Status.LastConfiguration.Components[earlierOpsHScaling.ComponentName]
-		compSpec := opsRes.Cluster.Spec.GetComponentByName(earlierOpsHScaling.ComponentName).DeepCopy()
-		compSpec.Replicas, compSpec.Instances, compSpec.OfflineInstances = hs.getExpectedCompValues(opsRes.Cluster, compSpec,
-			lastCompSnapshot, hScaling)
-		return hs.getCreateAndDeletePodSet(opsRes, lastCompSnapshot, *compSpec, hScaling, hScaling.ComponentName)
-	}
-	createdPodSetForEarlier, _ := getCreatedOrDeletedPodSet(earlierOps, earlierOpsHScaling)
-	_, deletedPodSetForCurrent := getCreatedOrDeletedPodSet(opsRes.OpsRequest, currOpsHScaling)
-	for deletedPod := range deletedPodSetForCurrent {
-		if _, ok := createdPodSetForEarlier[deletedPod]; ok {
-			errMsg := fmt.Sprintf(`instance "%s" cannot be taken offline as it has been created by another running opsRequest "%s"`,
-				deletedPod, earlierOps.Name)
-			return intctrlutil.NewFatalError(errMsg)
-		}
-	}
-	return nil
 }

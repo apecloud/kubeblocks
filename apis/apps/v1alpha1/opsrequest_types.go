@@ -435,15 +435,20 @@ type HorizontalScaling struct {
 	// +optional
 	Instances *InstancesOperation `json:"instances,omitempty"`
 
-	// Bring the specified offline instances back online.
-	// Replicas will be automatically adjust if the component and instance templates
-	// have no specified replicas and the component is not a sharding component.
+	// Specifies the instances in the offline list to bring back online.
+	// The replicas for the component and instance templates will automatically adjust
+	// if no replicas, replicasToAdd, or replicasToDelete are specified.
+	// For example, when bringing an instance that belongs to an instance template back online,
+	// the number of component replicas and instance template replicas will automatically increase by 1
+	// to ensure the current replicas remains unaffected.
 	// +optional
 	OfflineInstancesToOnline []string `json:"offlineInstancesToOnline,omitempty"`
 
 	// Specifies the instance name that needs to be taken offline.
-	// Replicas will be automatically adjust if the component and instance templates
-	// have no specified replicas and the component is not a sharding component.
+	// The replicas for the component and instance templates will automatically adjust
+	// if no replicas, replicasToAdd, or replicasToDelete are specified.
+	// For example, when taking an instance template instance offline,
+	// the number of component replicas and instance template replicas will decrease by 1.
 	// +optional
 	OnlineInstancesToOffline []string `json:"onlineInstancesToOffline,omitempty"`
 }

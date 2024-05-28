@@ -547,7 +547,7 @@ func getPodSetForComponent(
 			podSet[podName] = ins.Name
 		}
 	}
-	// get the pods these are created without any insTemplate
+	// get the pods created without any insTemplate
 	if insTplReplicasCnt < compReplicas {
 		podNames := instanceset.GenerateInstanceNamesFromTemplate(workloadName, "",
 			compReplicas-insTplReplicasCnt, offlineInstances)

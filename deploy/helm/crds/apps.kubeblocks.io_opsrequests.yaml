@@ -2889,18 +2889,24 @@ spec:
                           type: array
                       type: object
                     offlineInstancesToOnline:
-                      description: Bring the specified offline instances back online.
-                        Replicas will be automatically adjust if the component and
-                        instance templates have no specified replicas and the component
-                        is not a sharding component.
+                      description: Specifies the instances in the offline list to
+                        bring back online. The replicas for the component and instance
+                        templates will automatically adjust if no replicas, replicasToAdd,
+                        or replicasToDelete are specified. For example, when bringing
+                        an instance that belongs to an instance template back online,
+                        the number of component replicas and instance template replicas
+                        will automatically increase by 1 to ensure the current replicas
+                        remains unaffected.
                       items:
                         type: string
                       type: array
                     onlineInstancesToOffline:
                       description: Specifies the instance name that needs to be taken
-                        offline. Replicas will be automatically adjust if the component
-                        and instance templates have no specified replicas and the
-                        component is not a sharding component.
+                        offline. The replicas for the component and instance templates
+                        will automatically adjust if no replicas, replicasToAdd, or
+                        replicasToDelete are specified. For example, when taking an
+                        instance template instance offline, the number of component
+                        replicas and instance template replicas will decrease by 1.
                       items:
                         type: string
                       type: array

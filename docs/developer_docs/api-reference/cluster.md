@@ -11974,9 +11974,12 @@ and modifying the replicas count of existing instance templates.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Bring the specified offline instances back online.
-Replicas will be automatically adjust if the component and instance templates
-have no specified replicas and the component is not a sharding component.</p>
+<p>Specifies the instances in the offline list to bring back online.
+The replicas for the component and instance templates will automatically adjust
+if no replicas, replicasToAdd, or replicasToDelete are specified.
+For example, when bringing an instance that belongs to an instance template back online,
+the number of component replicas and instance template replicas will automatically increase by 1
+to ensure the current replicas remains unaffected.</p>
 </td>
 </tr>
 <tr>
@@ -11989,8 +11992,10 @@ have no specified replicas and the component is not a sharding component.</p>
 <td>
 <em>(Optional)</em>
 <p>Specifies the instance name that needs to be taken offline.
-Replicas will be automatically adjust if the component and instance templates
-have no specified replicas and the component is not a sharding component.</p>
+The replicas for the component and instance templates will automatically adjust
+if no replicas, replicasToAdd, or replicasToDelete are specified.
+For example, when taking an instance template instance offline,
+the number of component replicas and instance template replicas will decrease by 1.</p>
 </td>
 </tr>
 </tbody>

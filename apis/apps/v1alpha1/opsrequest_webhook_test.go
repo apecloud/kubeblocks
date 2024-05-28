@@ -397,7 +397,7 @@ var _ = Describe("OpsRequest webhook", func() {
 			ComponentOps:    ComponentOps{ComponentName: componentName},
 			ReplicasWrapper: ReplicasWrapper{ReplicasToDelete: pointer.Int32(2)},
 		}}
-		Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).Should(ContainSubstring("replicasToDelete can not greater than"))
+		Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).Should(ContainSubstring("replicasToDelete can't be greater than"))
 
 		By("expect an error when instance template is not exist")
 		opsRequest = createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
@@ -410,7 +410,7 @@ var _ = Describe("OpsRequest webhook", func() {
 				},
 			},
 		}}
-		Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).Should(ContainSubstring("an not found the instanceTemplate"))
+		Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).Should(ContainSubstring("cannot find the instanceTemplate"))
 
 		By("expect an error when an instance that is not in the offline instances list for online operation")
 		opsRequest = createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
@@ -419,7 +419,7 @@ var _ = Describe("OpsRequest webhook", func() {
 			ReplicasWrapper:          ReplicasWrapper{ReplicasToAdd: pointer.Int32(1)},
 			OfflineInstancesToOnline: []string{fmt.Sprintf("%s-%s-0", clusterName, componentName)},
 		}}
-		Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).Should(ContainSubstring("can not found the offline instance"))
+		Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).Should(ContainSubstring("cannot find the offline instance"))
 
 		By("expect an error when the replicas is greater than instance's replicas with `replicasToDelete`")
 		insTplName := "test"
@@ -438,7 +438,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		}}
 		err := testCtx.CheckedCreateObj(ctx, opsRequest).Error()
 		Expect(err).Should(ContainSubstring(
-			fmt.Sprintf(`replicasToDelete of instanceTemplate "%s" can not greater than %d`, insTplName, 1)))
+			fmt.Sprintf(`replicasToDelete of instanceTemplate "%s" can't be greater than %d`, insTplName, 1)))
 	}
 
 	testSwitchover := func(clusterDef *ClusterDefinition, cluster *Cluster) {

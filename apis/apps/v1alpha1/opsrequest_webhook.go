@@ -456,7 +456,7 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 			replicasOPCount += 1
 		}
 		if replicasOPCount > 1 {
-			return fmt.Errorf("eplicas, replicasToAdd, and replicasToDelete: choose one or leave all empty")
+			return fmt.Errorf("replicas, replicasToAdd, and replicasToDelete: choose one or leave all empty")
 		}
 		return nil
 	}
@@ -464,7 +464,7 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 		return err
 	}
 	if hScale.ReplicasToDelete != nil && *hScale.ReplicasToDelete > compSpec.Replicas {
-		return fmt.Errorf("replicasToDelete can not greater than %d", hScale.Replicas)
+		return fmt.Errorf("replicasToDelete can't be greater than %d", hScale.Replicas)
 	}
 	if hScale.Instances != nil && len(hScale.Instances.Change) > 0 {
 		insTplMap := map[string]int32{}
@@ -483,13 +483,13 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 		for _, v := range hScale.Instances.Change {
 			insReplicas, ok := insTplMap[v.Name]
 			if !ok {
-				return fmt.Errorf(`can not found the instanceTemplate "%s" in component "%s"`, v.Name, componentName)
+				return fmt.Errorf(`cannot find the instanceTemplate "%s" in component "%s"`, v.Name, componentName)
 			}
 			if err := checkReplicasWrapper(v.ReplicasWrapper); err != nil {
 				return err
 			}
 			if v.ReplicasToDelete != nil && *v.ReplicasToDelete > insReplicas {
-				return fmt.Errorf(`replicasToDelete of instanceTemplate "%s" can not greater than %d when operator is Delete`,
+				return fmt.Errorf(`replicasToDelete of instanceTemplate "%s" can't be greater than %d`,
 					v.Name, insReplicas)
 			}
 		}
@@ -501,7 +501,7 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 	offlineInstanceSet := sets.New(compSpec.OfflineInstances...)
 	for _, offlineInsName := range hScale.OfflineInstancesToOnline {
 		if _, ok := offlineInstanceSet[offlineInsName]; !ok {
-			return fmt.Errorf(`can not found the offline instance "%s" in component "%s"`, offlineInsName, componentName)
+			return fmt.Errorf(`cannot find the offline instance "%s" in component "%s"`, offlineInsName, componentName)
 		}
 	}
 	return nil

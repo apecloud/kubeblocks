@@ -104,7 +104,7 @@ func handleServiceRefFromCluster(ctx context.Context, cli client.Reader, namespa
 	b := builder.NewServiceDescriptorBuilder(namespace, serviceRefDecl.Name).
 		SetServiceVersion("").
 		SetServiceKind("")
-	for i, s := range []func(appsv1alpha1.CredentialVar) *builder.ServiceDescriptorBuilder{b.SetEndpoint, b.SetPort, b.SetAuthUsername, b.SetAuthPassword} {
+	for i, s := range []func(appsv1alpha1.CredentialVar) *builder.ServiceDescriptorBuilder{b.SetEndpoint, b.SetHost, b.SetPort, b.SetAuthUsername, b.SetAuthPassword} {
 		if vars[i] != nil {
 			s(*vars[i])
 		}
@@ -114,14 +114,14 @@ func handleServiceRefFromCluster(ctx context.Context, cli client.Reader, namespa
 
 func referencedVars(ctx context.Context, cli client.Reader, namespace string, serviceRef appsv1alpha1.ServiceRef) ([]*appsv1alpha1.CredentialVar, error) {
 	var (
-		vars = []*appsv1alpha1.CredentialVar{nil, nil, nil, nil}
+		vars = []*appsv1alpha1.CredentialVar{nil, nil, nil, nil, nil}
 		err  error
 	)
-	vars[0], vars[1], err = referencedServiceVars(ctx, cli, namespace, serviceRef)
+	vars[0], vars[1], vars[2], err = referencedServiceVars(ctx, cli, namespace, serviceRef)
 	if err != nil {
 		return nil, err
 	}
-	vars[2], vars[3], err = referencedCredentialVars(ctx, cli, namespace, serviceRef)
+	vars[3], vars[4], err = referencedCredentialVars(ctx, cli, namespace, serviceRef)
 	if err != nil {
 		return nil, err
 	}
@@ -129,16 +129,16 @@ func referencedVars(ctx context.Context, cli client.Reader, namespace string, se
 }
 
 func referencedServiceVars(ctx context.Context, cli client.Reader, namespace string,
-	serviceRef appsv1alpha1.ServiceRef) (*appsv1alpha1.CredentialVar, *appsv1alpha1.CredentialVar, error) {
+	serviceRef appsv1alpha1.ServiceRef) (*appsv1alpha1.CredentialVar, *appsv1alpha1.CredentialVar, *appsv1alpha1.CredentialVar, error) {
 	var (
-		selector       = serviceRef.ClusterServiceSelector
-		endpoint, port *appsv1alpha1.CredentialVar
-		obj            any
-		err            error
+		selector   = serviceRef.ClusterServiceSelector
+		host, port *appsv1alpha1.CredentialVar
+		obj        any
+		err        error
 	)
 
 	if selector.Service == nil {
-		return nil, nil, nil
+		return nil, nil, nil, nil
 	}
 
 	if serviceRef.Namespace != "" {
@@ -153,14 +153,26 @@ func referencedServiceVars(ctx context.Context, cli client.Reader, namespace str
 		obj, err = compServiceGetter(ctx, cli, namespace, selector.Cluster, selector.Service.Component, selector.Service.Service)
 	}
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	endpoint = &appsv1alpha1.CredentialVar{Value: composeHostValueFromServices(obj)}
+	host = &appsv1alpha1.CredentialVar{Value: composeHostValueFromServices(obj)}
 	if p := composePortValueFromServices(obj, selector.Service.Port); p != nil {
 		port = &appsv1alpha1.CredentialVar{Value: *p}
 	}
-	return endpoint, port, nil
+
+	endpoint := func() *appsv1alpha1.CredentialVar {
+		hval := host.Value
+		if port == nil {
+			return &appsv1alpha1.CredentialVar{Value: hval}
+		}
+		if strings.Contains(hval, ",") {
+			// pod-service, the port value has format: host1:port1,host2,port2,...
+			return &appsv1alpha1.CredentialVar{Value: port.Value}
+		}
+		return &appsv1alpha1.CredentialVar{Value: fmt.Sprintf("%s:%s", hval, port.Value)}
+	}
+	return endpoint(), host, port, nil
 }
 
 func referencedCredentialVars(ctx context.Context, cli client.Reader, namespace string,
@@ -222,14 +234,19 @@ func referencedVars4Legacy(ctx context.Context, cli client.Reader, namespace str
 		return nil, err
 	}
 
-	vars := []*appsv1alpha1.CredentialVar{nil, nil, nil, nil}
+	vars := []*appsv1alpha1.CredentialVar{nil, nil, nil, nil, nil}
 	keys := []string{
 		constant.ServiceDescriptorEndpointKey,
+		constant.ServiceDescriptorHostKey,
 		constant.ServiceDescriptorPortKey,
 		constant.ServiceDescriptorUsernameKey,
 		constant.ServiceDescriptorPasswordKey,
 	}
 	for idx, key := range keys {
+		if key == constant.ServiceDescriptorHostKey {
+			// don't set the host for legacy clusters
+			continue
+		}
 		if _, ok := secret.Data[key]; ok {
 			vars[idx] = &appsv1alpha1.CredentialVar{
 				ValueFrom: &corev1.EnvVarSource{

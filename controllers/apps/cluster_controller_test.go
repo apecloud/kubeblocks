@@ -36,6 +36,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -157,11 +158,16 @@ var _ = Describe("Cluster Controller", func() {
 		compDefObj = testapps.NewComponentDefinitionFactory(compDefName).
 			WithRandomName().
 			SetDefaultSpec().
+			AddConfigs(testapps.DefaultCompDefConfigs).
+			AddVolumeMounts(testapps.DefaultMySQLContainerName, []corev1.VolumeMount{{Name: testapps.DefaultConfigSpecVolumeName, MountPath: "/mnt/config"}}).
 			Create(&testCtx).
 			GetObject()
 
 		By("Create a bpt obj")
 		createBackupPolicyTpl(clusterDefObj, compDefObj.Name, clusterVersionName)
+
+		By("Create a config template obj")
+		createConfigTpl(testapps.DefaultCompDefConfigs)
 
 		By("Create a componentVersion obj")
 		compVersionObj = testapps.NewComponentVersionFactory(compVersionName).
@@ -538,6 +544,55 @@ var _ = Describe("Cluster Controller", func() {
 			constant.KBAppShardingNameLabelKey: compName,
 		}
 		Eventually(testapps.List(&testCtx, generics.ComponentSignature, ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(shards - 1))
+	}
+
+	testShardingClusterComponentWithConfiguration := func(compName, compDefName string, createObj func(string, string, func(*testapps.MockClusterFactory)), shards int) {
+		createObj(compName, compDefName, func(factory *testapps.MockClusterFactory) {
+			factory.SetShardingComponentConfigItem([]appsv1alpha1.ComponentConfigItem{
+				{
+					Name: testapps.DefaultConfigSpecName,
+					ParamsInFile: map[string]appsv1alpha1.ParametersInFile{
+						"my.cnf": {
+							Parameters: map[string]*string{
+								"max_connections": cfgutil.ToPointer("1000"),
+							},
+						},
+					},
+				},
+			})
+		})
+
+		By("check components created")
+		ml := client.MatchingLabels{
+			constant.AppInstanceLabelKey:       clusterKey.Name,
+			constant.KBAppShardingNameLabelKey: compName,
+		}
+		Eventually(testapps.List(&testCtx, generics.ComponentSignature, ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(shards))
+	}
+
+	createClusterObjWithShardingAndConfiguration := func(compTplName, compDefName string, processor func(*testapps.MockClusterFactory)) {
+		By("Creating a cluster with new component definition")
+		createClusterObjNoWait("", "", shardingComponentProcessorWrapper(false, compTplName, compDefName, processor))
+
+		By("Waiting for the cluster enter Creating phase")
+		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
+
+		By("Wait component created")
+		ml := client.MatchingLabels{
+			constant.AppInstanceLabelKey:       clusterKey.Name,
+			constant.KBAppShardingNameLabelKey: compTplName,
+		}
+		Eventually(testapps.List(&testCtx, generics.ComponentSignature,
+			ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(defaultShardCount))
+
+		By("checking configuration sxhedule")
+		// TODO: check configuration phase
+		// backupPolicyName := generateBackupPolicyName(clusterKey.Name, compTplName, "")
+		// backupPolicyKey := client.ObjectKey{Name: backupPolicyName, Namespace: clusterKey.Namespace}
+		// Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, bp *dpv1alpha1.BackupPolicy) {
+		// 	g.Expect(bp.Spec.Targets).Should(HaveLen(defaultShardCount))
+		// })).Should(Succeed())
 	}
 
 	testClusterService := func(compName, compDefName string, createObj func(string, string, func(*testapps.MockClusterFactory))) {
@@ -1116,6 +1171,10 @@ var _ = Describe("Cluster Controller", func() {
 			testShardingClusterComponent(consensusCompName, compDefObj.Name, createClusterObjWithSharding, defaultShardCount)
 		})
 
+		It("create sharding cluster with configuration", func() {
+			testShardingClusterComponentWithConfiguration(consensusCompName, compDefObj.Name, createClusterObjWithShardingAndConfiguration, defaultShardCount)
+		})
+
 		It("create cluster with default topology", func() {
 			testClusterComponentWithTopology("", consensusCompName, nil, compDefObj.Name, latestServiceVersion)
 		})
@@ -1551,6 +1610,11 @@ var _ = Describe("Cluster Controller", func() {
 		})
 	})
 })
+
+func createConfigTpl(configs []appsv1alpha1.ComponentConfigSpec) {
+	// TODO create configconstraint && configmap
+	panic("")
+}
 
 func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition, compDef string, mappingClusterVersions ...string) {
 	By("Creating a BackupPolicyTemplate")

@@ -317,3 +317,9 @@ func (factory *MockClusterFactory) AddUserConfigmapVolume(name, mountPoint, resN
 		userResourcesRefs.ConfigMapRefs = append(userResourcesRefs.ConfigMapRefs, cmResource)
 	})
 }
+
+func (factory *MockClusterFactory) SetShardingComponentConfigItem(items []appsv1alpha1.ComponentConfigItem) *MockClusterFactory {
+	return factory.lastShardingSpec(func(shardingSpec *appsv1alpha1.ShardingSpec) {
+		shardingSpec.Template.ComponentConfigItems = items
+	})
+}

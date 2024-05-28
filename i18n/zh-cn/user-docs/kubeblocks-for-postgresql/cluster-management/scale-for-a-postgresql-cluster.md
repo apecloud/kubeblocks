@@ -49,7 +49,7 @@ pg-cluster   default     postgresql-cluster           postgresql-14.7.0   Delete
 
    ```bash
    kbcli cluster vscale pg-cluster \
-   --components="pg-replication" \
+   --components="postgresql" \
    --memory="4Gi" --cpu="2" \
    ```
 
@@ -71,7 +71,7 @@ pg-cluster   default     postgresql-cluster           postgresql-14.7.0   Delete
      clusterRef: pg-cluster
      type: VerticalScaling 
      verticalScaling:
-     - componentName: pg-replication
+     - componentName: postgresql
        requests:
          memory: "2Gi"
          cpu: "1000m"
@@ -97,7 +97,7 @@ pg-cluster   default     postgresql-cluster           postgresql-14.7.0   Delete
      clusterDefinitionRef: postgresql-cluster
      clusterVersionRef: postgre-14.7.0
      componentSpecs:
-     - name: pg-replication
+     - name: postgresql
        componentDefRef: postgresql
        replicas: 1
        resources: # 修改资源值

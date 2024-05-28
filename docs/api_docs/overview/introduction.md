@@ -2,7 +2,7 @@
 title: KubeBlocks overview
 description: KubeBlocks, kbcli, multicloud
 keywords: [kubeblocks, overview, introduction]
-sidebar_position: 1
+sidebar_position: 3
 ---
 
 # Introduction

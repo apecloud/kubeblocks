@@ -22,6 +22,7 @@ package dcs
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -242,6 +243,7 @@ type Member struct {
 	UseIP         bool
 	resource      any
 	ComponentName string
+	StartTime     time.Time
 }
 
 func (m *Member) GetName() string {

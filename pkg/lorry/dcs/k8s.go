@@ -259,9 +259,17 @@ func (store *KubernetesStore) GetMembers() ([]Member, error) {
 		member.LorryPort = getLorryPort(&pod)
 		member.HAPort = getHAPort(&pod)
 		member.UID = string(pod.UID)
+		member.StartTime = pod.CreationTimestamp.Time
 		if pod.Spec.HostNetwork {
 			member.UseIP = true
 		}
+		var startTime time.Time
+		for _, cond := range pod.Status.Conditions {
+			if cond.Type == corev1.ContainersReady {
+				startTime = cond.LastTransitionTime.Time
+			}
+		}
+		member.StartTime = startTime
 		member.resource = pod.DeepCopy()
 		members = append(members, member)
 	}

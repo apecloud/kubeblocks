@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -246,6 +247,17 @@ type Member struct {
 
 func (m *Member) GetName() string {
 	return m.Name
+}
+
+func (m *Member) IsLorryReady() bool {
+	if m.PodIP == "" {
+		return false
+	}
+	ready, err := util.IsTCPReady(m.PodIP, m.LorryPort)
+	if err != nil {
+		return false
+	}
+	return ready
 }
 
 // func newMember(index string, name string, role string, url string) *Member {

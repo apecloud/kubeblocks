@@ -1,7 +1,7 @@
 ---
-title: KubeBlocks for MySQL Community Edition
+title: KubeBlocks for ApeCloud MySQL
 description: Feature list of KubeBlocks for MySQL Community Edition
-keywords: [mysql community edition, introduction, feature]
+keywords: [apecloud mysql, introduction, feature]
 sidebar_position: 1
 ---
 
@@ -11,5 +11,4 @@ sidebar_position: 1
 * [Cluster Management](./cluster-management/create-and-connect-a-mysql-cluster.md)
 * [Configuration](./configuration/configuration.md)
 * [High Availability](./high-availability/high-availability.md)
-* [Migration](./migration/feature-and-limit-list-mysql.md)
 * [Proxy](./proxy/introduction.md)

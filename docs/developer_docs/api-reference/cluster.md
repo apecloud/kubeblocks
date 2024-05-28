@@ -11735,26 +11735,6 @@ The policy can be set to <code>None</code>, <code>CloneVolume</code>, or <code>S
 </td>
 </tr></tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.HScaleOperator">HScaleOperator
-(<code>string</code> alias)</h3>
-<div>
-<p>HScaleOperator defines the operator for this horizontal scaling.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;Add&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;Delete&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;Overwrite&#34;</p></td>
-<td></td>
-</tr></tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.HTTPAction">HTTPAction
 </h3>
 <p>

@@ -86,7 +86,8 @@ var _ = Describe("service reference", func() {
 		redisServiceRefDeclarationName   = "redis"
 		mysqlServiceRefDeclarationName   = "mysql"
 
-		serviceRefEndpointValue = "my-mysql-0.default.svc.cluster.local"
+		serviceRefEndpointValue = "my-mysql-0.default.svc.cluster.local:3306"
+		serviceRefHostValue     = "my-mysql-0.default.svc.cluster.local"
 		serviceRefPortValue     = "3306"
 		serviceRefUsernameValue = "mock-username"
 		serviceRefPasswordValue = "mock-password"
@@ -133,6 +134,7 @@ var _ = Describe("service reference", func() {
 			},
 			Data: map[string]string{
 				constant.ServiceDescriptorEndpointKey: serviceRefEndpointValue,
+				constant.ServiceDescriptorHostKey:     serviceRefHostValue,
 				constant.ServiceDescriptorPortKey:     serviceRefPortValue,
 				constant.ServiceDescriptorUsernameKey: serviceRefUsernameValue,
 				constant.ServiceDescriptorPasswordKey: serviceRefPasswordValue,
@@ -146,6 +148,16 @@ var _ = Describe("service reference", func() {
 				ValueFrom: &corev1.EnvVarSource{
 					ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
 						Key: constant.ServiceDescriptorEndpointKey,
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: configMap.Name,
+						},
+					},
+				},
+			}).
+			SetHost(appsv1alpha1.CredentialVar{
+				ValueFrom: &corev1.EnvVarSource{
+					ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+						Key: constant.ServiceDescriptorHostKey,
 						LocalObjectReference: corev1.LocalObjectReference{
 							Name: configMap.Name,
 						},
@@ -199,6 +211,7 @@ var _ = Describe("service reference", func() {
 			},
 			Data: map[string][]byte{
 				constant.ServiceDescriptorEndpointKey: []byte(serviceRefEndpointValue),
+				constant.ServiceDescriptorHostKey:     []byte(serviceRefHostValue),
 				constant.ServiceDescriptorPortKey:     []byte(serviceRefPortValue),
 				constant.ServiceDescriptorUsernameKey: []byte(serviceRefUsernameValue),
 				constant.ServiceDescriptorPasswordKey: []byte(serviceRefPasswordValue),
@@ -253,6 +266,8 @@ var _ = Describe("service reference", func() {
 			Expect(component.ServiceReferences).ShouldNot(BeNil())
 			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Endpoint.Value).Should(Equal(serviceRefEndpointValue))
 			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Endpoint.ValueFrom).Should(BeNil())
+			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Host.Value).Should(Equal(serviceRefHostValue))
+			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Host.ValueFrom).Should(BeNil())
 			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Port.Value).Should(Equal(serviceRefPortValue))
 			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Port.ValueFrom).Should(BeNil())
 			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Auth.Username.Value).Should(BeEmpty())
@@ -262,6 +277,7 @@ var _ = Describe("service reference", func() {
 
 			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Endpoint.Value).Should(Equal(serviceRefEndpointValue))
 			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Endpoint.ValueFrom).Should(BeNil())
+			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Host).Should(BeNil()) // reference to a legacy cluster
 			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Port.Value).Should(Equal(serviceRefPortValue))
 			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Port.ValueFrom).Should(BeNil())
 			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Username.Value).Should(BeEmpty())

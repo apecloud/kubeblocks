@@ -138,6 +138,14 @@ func (r *ServiceDescriptorReconciler) checkServiceDescriptor(reqCtx intctrlutil.
 		return fmt.Errorf("endpoint.valueFrom.secretRef %s not found", serviceDescriptor.Spec.Endpoint.ValueFrom.SecretKeyRef.Name)
 	}
 
+	if serviceDescriptor.Spec.Host != nil && !secretRefExistFn(serviceDescriptor.Spec.Host.ValueFrom) {
+		return fmt.Errorf("host.valueFrom.secretRef %s not found", serviceDescriptor.Spec.Host.ValueFrom.SecretKeyRef.Name)
+	}
+
+	if serviceDescriptor.Spec.Port != nil && !secretRefExistFn(serviceDescriptor.Spec.Port.ValueFrom) {
+		return fmt.Errorf("port.valueFrom.secretRef %s not found", serviceDescriptor.Spec.Port.ValueFrom.SecretKeyRef.Name)
+	}
+
 	if serviceDescriptor.Spec.Auth != nil {
 		if serviceDescriptor.Spec.Auth.Username != nil && !secretRefExistFn(serviceDescriptor.Spec.Auth.Username.ValueFrom) {
 			return fmt.Errorf("auth.username.valueFrom.secretRef %s not found", serviceDescriptor.Spec.Auth.Username.ValueFrom.SecretKeyRef.Name)
@@ -147,9 +155,6 @@ func (r *ServiceDescriptorReconciler) checkServiceDescriptor(reqCtx intctrlutil.
 		}
 	}
 
-	if serviceDescriptor.Spec.Port != nil && !secretRefExistFn(serviceDescriptor.Spec.Port.ValueFrom) {
-		return fmt.Errorf("port.valueFrom.secretRef %s not found", serviceDescriptor.Spec.Port.ValueFrom.SecretKeyRef.Name)
-	}
 	return nil
 }
 

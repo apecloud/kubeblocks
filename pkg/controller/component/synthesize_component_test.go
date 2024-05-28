@@ -110,7 +110,7 @@ var _ = Describe("synthesized component", func() {
 		})
 
 		It("comp def", func() {
-			synthesizedComp, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil, nil)
+			synthesizedComp, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil)
 			Expect(err).Should(BeNil())
 
 			Expect(synthesizedComp).ShouldNot(BeNil())
@@ -128,7 +128,7 @@ var _ = Describe("synthesized component", func() {
 					},
 				},
 			})
-			synthesizedComp, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil, nil)
+			synthesizedComp, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil)
 			Expect(err).Should(BeNil())
 
 			Expect(synthesizedComp).ShouldNot(BeNil())
@@ -150,7 +150,7 @@ var _ = Describe("synthesized component", func() {
 					},
 				},
 			})
-			_, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil, nil)
+			_, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("not defined in definition"))
 		})
@@ -167,7 +167,7 @@ var _ = Describe("synthesized component", func() {
 					},
 				},
 			})
-			_, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil, nil)
+			_, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("partial overriding is not supported"))
 		})
@@ -177,7 +177,7 @@ var _ = Describe("synthesized component", func() {
 				Name:                         func() *string { name := "external"; return &name }(),
 				ClusterComponentConfigSource: appsv1alpha1.ClusterComponentConfigSource{},
 			})
-			_, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil, nil)
+			_, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("there is no content provided for config template"))
 		})

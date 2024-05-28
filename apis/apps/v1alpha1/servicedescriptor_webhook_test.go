@@ -43,6 +43,9 @@ var _ = Describe("ServiceDescriptor Webhook", func() {
 					Endpoint: &CredentialVar{
 						Value: "mock-endpoint",
 					},
+					Host: &CredentialVar{
+						Value: "mock-host",
+					},
 					Port: &CredentialVar{
 						Value: "mock-port",
 					},
@@ -63,32 +66,20 @@ var _ = Describe("ServiceDescriptor Webhook", func() {
 			Expect(k8sClient.Delete(ctx, sd)).Should(Succeed())
 		})
 
-		It("should return an error if endpoint value and valueFrom are not empty", func() {
-			sd.Spec.Endpoint.ValueFrom = &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "mock-secret",
+		It("should return an error if the value and valueFrom are not empty", func() {
+			for _, v := range []*CredentialVar{sd.Spec.Endpoint, sd.Spec.Host, sd.Spec.Port} {
+				v.ValueFrom = &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "mock-secret",
+						},
+						Key: "mock-key",
 					},
-					Key: "mock-key",
-				},
+				}
+				err := k8sClient.Create(ctx, sd)
+				Expect(err).ShouldNot(BeNil())
+				Expect(err.Error()).Should(ContainSubstring("value and valueFrom cannot be specified at the same time"))
 			}
-			err := k8sClient.Create(ctx, sd)
-			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("value and valueFrom cannot be specified at the same time"))
-		})
-
-		It("should return an error if port value and valueFrom are not empty", func() {
-			sd.Spec.Port.ValueFrom = &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "mock-secret",
-					},
-					Key: "mock-key",
-				},
-			}
-			err := k8sClient.Create(ctx, sd)
-			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("value and valueFrom cannot be specified at the same time"))
 		})
 
 		It("should return an error if auth username value and valueFrom are not empty", func() {

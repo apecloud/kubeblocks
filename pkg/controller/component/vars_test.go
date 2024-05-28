@@ -1228,148 +1228,170 @@ var _ = Describe("vars", func() {
 			})
 		})
 
-		It("serviceref vars", func() {
-			By("non-exist serviceref with optional")
-			vars := []appsv1alpha1.EnvVar{
-				{
-					Name: "non-exist-serviceref-var",
-					ValueFrom: &appsv1alpha1.VarSource{
-						ServiceRefVarRef: &appsv1alpha1.ServiceRefVarSelector{
-							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
-								Name:     "non-exist",
-								Optional: optional(),
-							},
-							ServiceRefVars: appsv1alpha1.ServiceRefVars{
-								Endpoint: &appsv1alpha1.VarOptional,
-							},
-						},
-					},
-				},
-			}
-			templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, vars)
-			Expect(err).Should(Succeed())
-			Expect(templateVars).ShouldNot(HaveKey("non-exist-serviceref-var"))
-			checkEnvVarNotExist(envVars, "non-exist-serviceref-var")
-
-			By("non-exist serviceref with required")
-			vars = []appsv1alpha1.EnvVar{
-				{
-					Name: "non-exist-serviceref-var",
-					ValueFrom: &appsv1alpha1.VarSource{
-						ServiceRefVarRef: &appsv1alpha1.ServiceRefVarSelector{
-							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
-								Name:     "non-exist",
-								Optional: required(),
-							},
-							ServiceRefVars: appsv1alpha1.ServiceRefVars{
-								Endpoint: &appsv1alpha1.VarRequired,
-							},
-						},
-					},
-				},
-			}
-			_, _, err = ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, vars)
-			Expect(err).ShouldNot(Succeed())
-
-			By("ok")
-			vars = []appsv1alpha1.EnvVar{
-				{
-					Name: "serviceref-endpoint",
-					ValueFrom: &appsv1alpha1.VarSource{
-						ServiceRefVarRef: &appsv1alpha1.ServiceRefVarSelector{
-							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
-								Name:     "serviceref",
-								Optional: required(),
-							},
-							ServiceRefVars: appsv1alpha1.ServiceRefVars{
-								Endpoint: &appsv1alpha1.VarRequired,
-							},
-						},
-					},
-				},
-				{
-					Name: "serviceref-port",
-					ValueFrom: &appsv1alpha1.VarSource{
-						ServiceRefVarRef: &appsv1alpha1.ServiceRefVarSelector{
-							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
-								Name:     "serviceref",
-								Optional: required(),
-							},
-							ServiceRefVars: appsv1alpha1.ServiceRefVars{
-								Port: &appsv1alpha1.VarRequired,
-							},
-						},
-					},
-				},
-				{
-					Name: "serviceref-username",
-					ValueFrom: &appsv1alpha1.VarSource{
-						ServiceRefVarRef: &appsv1alpha1.ServiceRefVarSelector{
-							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
-								Name:     "serviceref",
-								Optional: required(),
-							},
-							ServiceRefVars: appsv1alpha1.ServiceRefVars{
-								CredentialVars: appsv1alpha1.CredentialVars{
-									Username: &appsv1alpha1.VarRequired,
+		Context("service-ref vars", func() {
+			It("non-exist service-ref with optional", func() {
+				vars := []appsv1alpha1.EnvVar{
+					{
+						Name: "non-exist-serviceref-var",
+						ValueFrom: &appsv1alpha1.VarSource{
+							ServiceRefVarRef: &appsv1alpha1.ServiceRefVarSelector{
+								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+									Name:     "non-exist",
+									Optional: optional(),
+								},
+								ServiceRefVars: appsv1alpha1.ServiceRefVars{
+									Endpoint: &appsv1alpha1.VarOptional,
 								},
 							},
 						},
 					},
-				},
-				{
-					Name: "serviceref-password",
-					ValueFrom: &appsv1alpha1.VarSource{
-						ServiceRefVarRef: &appsv1alpha1.ServiceRefVarSelector{
-							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
-								Name:     "serviceref",
-								Optional: required(),
-							},
-							ServiceRefVars: appsv1alpha1.ServiceRefVars{
-								CredentialVars: appsv1alpha1.CredentialVars{
-									Password: &appsv1alpha1.VarRequired,
+				}
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, vars)
+				Expect(err).Should(Succeed())
+				Expect(templateVars).ShouldNot(HaveKey("non-exist-serviceref-var"))
+				checkEnvVarNotExist(envVars, "non-exist-serviceref-var")
+			})
+
+			It("non-exist service-ref with required", func() {
+				vars := []appsv1alpha1.EnvVar{
+					{
+						Name: "non-exist-serviceref-var",
+						ValueFrom: &appsv1alpha1.VarSource{
+							ServiceRefVarRef: &appsv1alpha1.ServiceRefVarSelector{
+								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+									Name:     "non-exist",
+									Optional: required(),
+								},
+								ServiceRefVars: appsv1alpha1.ServiceRefVars{
+									Endpoint: &appsv1alpha1.VarRequired,
 								},
 							},
 						},
 					},
-				},
-			}
-			synthesizedComp.ServiceReferences = map[string]*appsv1alpha1.ServiceDescriptor{
-				"serviceref": {
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: testCtx.DefaultNamespace,
-						Name:      "serviceref",
-					},
-					Spec: appsv1alpha1.ServiceDescriptorSpec{
-						ServiceKind:    "",
-						ServiceVersion: "",
-						Endpoint: &appsv1alpha1.CredentialVar{
-							Value: "endpoint",
-						},
-						Port: &appsv1alpha1.CredentialVar{
-							Value: "port",
-						},
-						Auth: &appsv1alpha1.ConnectionCredentialAuth{
-							Username: &appsv1alpha1.CredentialVar{
-								Value: "username",
-							},
-							Password: &appsv1alpha1.CredentialVar{
-								Value: "password",
+				}
+				_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, vars)
+				Expect(err).ShouldNot(Succeed())
+			})
+
+			It("ok", func() {
+				vars := []appsv1alpha1.EnvVar{
+					{
+						Name: "serviceref-endpoint",
+						ValueFrom: &appsv1alpha1.VarSource{
+							ServiceRefVarRef: &appsv1alpha1.ServiceRefVarSelector{
+								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+									Name:     "serviceref",
+									Optional: required(),
+								},
+								ServiceRefVars: appsv1alpha1.ServiceRefVars{
+									Endpoint: &appsv1alpha1.VarRequired,
+								},
 							},
 						},
 					},
-				},
-			}
-			templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, vars)
-			Expect(err).Should(Succeed())
-			Expect(templateVars).Should(HaveKeyWithValue("serviceref-endpoint", "endpoint"))
-			Expect(templateVars).Should(HaveKeyWithValue("serviceref-port", "port"))
-			Expect(templateVars).ShouldNot(HaveKey("serviceref-username"))
-			Expect(templateVars).ShouldNot(HaveKey("serviceref-password"))
-			checkEnvVarWithValue(envVars, "serviceref-endpoint", "endpoint")
-			checkEnvVarWithValue(envVars, "serviceref-port", "port")
-			checkEnvVarWithValue(envVars, "serviceref-username", "username")
-			checkEnvVarWithValue(envVars, "serviceref-password", "password")
+					{
+						Name: "serviceref-host",
+						ValueFrom: &appsv1alpha1.VarSource{
+							ServiceRefVarRef: &appsv1alpha1.ServiceRefVarSelector{
+								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+									Name:     "serviceref",
+									Optional: required(),
+								},
+								ServiceRefVars: appsv1alpha1.ServiceRefVars{
+									Host: &appsv1alpha1.VarRequired,
+								},
+							},
+						},
+					},
+					{
+						Name: "serviceref-port",
+						ValueFrom: &appsv1alpha1.VarSource{
+							ServiceRefVarRef: &appsv1alpha1.ServiceRefVarSelector{
+								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+									Name:     "serviceref",
+									Optional: required(),
+								},
+								ServiceRefVars: appsv1alpha1.ServiceRefVars{
+									Port: &appsv1alpha1.VarRequired,
+								},
+							},
+						},
+					},
+					{
+						Name: "serviceref-username",
+						ValueFrom: &appsv1alpha1.VarSource{
+							ServiceRefVarRef: &appsv1alpha1.ServiceRefVarSelector{
+								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+									Name:     "serviceref",
+									Optional: required(),
+								},
+								ServiceRefVars: appsv1alpha1.ServiceRefVars{
+									CredentialVars: appsv1alpha1.CredentialVars{
+										Username: &appsv1alpha1.VarRequired,
+									},
+								},
+							},
+						},
+					},
+					{
+						Name: "serviceref-password",
+						ValueFrom: &appsv1alpha1.VarSource{
+							ServiceRefVarRef: &appsv1alpha1.ServiceRefVarSelector{
+								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+									Name:     "serviceref",
+									Optional: required(),
+								},
+								ServiceRefVars: appsv1alpha1.ServiceRefVars{
+									CredentialVars: appsv1alpha1.CredentialVars{
+										Password: &appsv1alpha1.VarRequired,
+									},
+								},
+							},
+						},
+					},
+				}
+				synthesizedComp.ServiceReferences = map[string]*appsv1alpha1.ServiceDescriptor{
+					"serviceref": {
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: testCtx.DefaultNamespace,
+							Name:      "serviceref",
+						},
+						Spec: appsv1alpha1.ServiceDescriptorSpec{
+							ServiceKind:    "",
+							ServiceVersion: "",
+							Endpoint: &appsv1alpha1.CredentialVar{
+								Value: "endpoint",
+							},
+							Host: &appsv1alpha1.CredentialVar{
+								Value: "host",
+							},
+							Port: &appsv1alpha1.CredentialVar{
+								Value: "port",
+							},
+							Auth: &appsv1alpha1.ConnectionCredentialAuth{
+								Username: &appsv1alpha1.CredentialVar{
+									Value: "username",
+								},
+								Password: &appsv1alpha1.CredentialVar{
+									Value: "password",
+								},
+							},
+						},
+					},
+				}
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, vars)
+				Expect(err).Should(Succeed())
+				Expect(templateVars).Should(HaveKeyWithValue("serviceref-endpoint", "endpoint"))
+				Expect(templateVars).Should(HaveKeyWithValue("serviceref-host", "host"))
+				Expect(templateVars).Should(HaveKeyWithValue("serviceref-port", "port"))
+				Expect(templateVars).ShouldNot(HaveKey("serviceref-username"))
+				Expect(templateVars).ShouldNot(HaveKey("serviceref-password"))
+				checkEnvVarWithValue(envVars, "serviceref-endpoint", "endpoint")
+				checkEnvVarWithValue(envVars, "serviceref-host", "host")
+				checkEnvVarWithValue(envVars, "serviceref-port", "port")
+				checkEnvVarWithValue(envVars, "serviceref-username", "username")
+				checkEnvVarWithValue(envVars, "serviceref-password", "password")
+			})
 		})
 
 		It("component vars", func() {

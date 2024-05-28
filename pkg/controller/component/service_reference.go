@@ -38,6 +38,7 @@ func resolveServiceReferences(ctx context.Context, cli client.Reader, synthesize
 		// Only support referencing endpoint and port in configuration
 		credentialVars := []*appsv1alpha1.CredentialVar{
 			serviceDescriptor.Spec.Endpoint,
+			serviceDescriptor.Spec.Host,
 			serviceDescriptor.Spec.Port,
 		}
 		if err := resolveServiceRefCredentialVars(ctx, cli, serviceDescriptor.Namespace, credentialVars...); err != nil {

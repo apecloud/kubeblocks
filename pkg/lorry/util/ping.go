@@ -20,11 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package util
 
 import (
-	"strings"
+	"net"
 	"time"
 
-	"github.com/pkg/errors"
-	probing "github.com/prometheus-community/pro-bing"
 	ctlruntime "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -33,32 +31,26 @@ import (
 
 var pingerLogger = ctlruntime.Log.WithName("pinger")
 
-// IsDNSReady checks if dns and ip is ready, it can successfully resolve dns
+// IsDNSReady checks if dns and ip is ready, it can successfully resolve dns.
+// Since the vast majority of container runtimes currently prohibit the NET_RAW capability,
+// we can't rely on ICMP protocol to detect DNS resolution.
+// Instead, we directly depend on TCP for port detection.
 func IsDNSReady(dns string) (bool, error) {
-	if dns == "" {
-		return false, errors.New("the dns cannot have a length of zero")
-	}
-	pinger, err := probing.NewPinger(dns)
-	if err != nil {
-		err = errors.Wrap(err, "new pinger failed")
-		return false, err
-	}
+	// get the port where the Lorry HTTP service is listening
+	port := viper.GetString("port")
+	return IsTCPReady(dns, port)
+}
 
-	pinger.Count = 3
-	pinger.Timeout = 3 * time.Second
-	pinger.Interval = 500 * time.Millisecond
-	err = pinger.Run()
+func IsTCPReady(host, port string) (bool, error) {
+	address := net.JoinHostPort(host, port)
+	timeout := 2 * time.Second
+	conn, err := net.DialTimeout("tcp", address, timeout)
 	if err != nil {
-		// For container runtimes like Containerd, unprivileged users can't send icmp echo packets.
-		// As a temporary workaround, special handling is being implemented to bypass this limitation.
-		if strings.Contains(err.Error(), "socket: permission denied") {
-			pingerLogger.Info("ping failed, socket: permission denied, but temporarily return true")
-			time.Sleep(10 * time.Second)
-			return true, nil
-		}
-		err = errors.Wrapf(err, "ping dns:%s failed", dns)
 		return false, err
 	}
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	return true, nil
 }

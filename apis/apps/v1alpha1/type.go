@@ -1132,6 +1132,9 @@ type ServiceRefVars struct {
 	Endpoint *VarOption `json:"endpoint,omitempty"`
 
 	// +optional
+	Host *VarOption `json:"host,omitempty"`
+
+	// +optional
 	Port *VarOption `json:"port,omitempty"`
 
 	CredentialVars `json:",inline"`

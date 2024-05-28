@@ -5604,14 +5604,19 @@ func (in *ServiceDescriptorSpec) DeepCopyInto(out *ServiceDescriptorSpec) {
 		*out = new(CredentialVar)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.Auth != nil {
-		in, out := &in.Auth, &out.Auth
-		*out = new(ConnectionCredentialAuth)
+	if in.Host != nil {
+		in, out := &in.Host, &out.Host
+		*out = new(CredentialVar)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.Port != nil {
 		in, out := &in.Port, &out.Port
 		*out = new(CredentialVar)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.Auth != nil {
+		in, out := &in.Auth, &out.Auth
+		*out = new(ConnectionCredentialAuth)
 		(*in).DeepCopyInto(*out)
 	}
 }
@@ -5794,6 +5799,11 @@ func (in *ServiceRefVars) DeepCopyInto(out *ServiceRefVars) {
 	*out = *in
 	if in.Endpoint != nil {
 		in, out := &in.Endpoint, &out.Endpoint
+		*out = new(VarOption)
+		**out = **in
+	}
+	if in.Host != nil {
+		in, out := &in.Host, &out.Host
 		*out = new(VarOption)
 		**out = **in
 	}

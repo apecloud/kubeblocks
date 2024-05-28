@@ -72,7 +72,7 @@ var _ = Describe("Backup OpsRequest", func() {
 			reqCtx = intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 		})
 
-		It("should create a backup resource for cluster", func() {
+		testBackupOps := func(opsRes *OpsResource) {
 			By("create Backup OpsRequest")
 			opsRes.OpsRequest = createBackupOpsObj(clusterName, "backup-ops-"+randomStr)
 			// set ops phase to Pending
@@ -90,6 +90,33 @@ var _ = Describe("Backup OpsRequest", func() {
 			By("test backup reconcile action")
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
+		}
+
+		It("should create a backup resource for cluster", func() {
+			testBackupOps(opsRes)
+		})
+
+		It("should create a backup resource when cluster phase is Updating", func() {
+			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
+				opsRes.Cluster.Status.Phase = appsv1alpha1.UpdatingClusterPhase
+			})).Should(Succeed())
+			testBackupOps(opsRes)
+		})
+
+		It("should failed when cluster phase is Failed", func() {
+			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
+				opsRes.Cluster.Status.Phase = appsv1alpha1.FailedClusterPhase
+			})).Should(Succeed())
+
+			By("create Backup OpsRequest")
+			opsRes.OpsRequest = createBackupOpsObj(clusterName, "backup-ops-"+randomStr)
+			// set ops phase to Pending
+			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase
+
+			By("expect ops phase to Failed")
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsFailedPhase))
 		})
 	})
 })

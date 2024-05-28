@@ -267,6 +267,7 @@ func (store *KubernetesStore) GetMembers() ([]Member, error) {
 		for _, cond := range pod.Status.Conditions {
 			if cond.Type == corev1.ContainersReady {
 				startTime = cond.LastTransitionTime.Time
+				break
 			}
 		}
 		member.StartTime = startTime

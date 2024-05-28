@@ -692,7 +692,7 @@ const (
 	OrdinalSelector TargetPodSelector = "Ordinal"
 )
 
-// GRPCAction describes an Action that triggers HTTP requests.
+// GRPCAction describes an Action that triggers GRPC requests.
 type GRPCAction struct {
 	// Specifies the target port for the GRPC request.
 	// It can be specified either as a numeric value in the range of 1 to 65535.
@@ -855,6 +855,9 @@ type Action struct {
 	Exec *ExecAction `json:"exec,omitempty"`
 
 	// Specifies the GRPC request to perform.
+	// the GRCP proto file can be found here https://github.com/apecloud/kubeblocks/blob/a99d80e0629b6d936c5fb478e06f5b45ef3ab388/pkg/lorry/plugin/proto/service_plugin.proto.
+	// There is a mapping from actions to corresponding GRPC APIs.
+	// If the provider does not support the specified action, an error will be returned.
 	//
 	// This field cannot be updated.
 	//

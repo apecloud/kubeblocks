@@ -259,7 +259,6 @@ func (store *KubernetesStore) GetMembers() ([]Member, error) {
 		member.LorryPort = getLorryPort(&pod)
 		member.HAPort = getHAPort(&pod)
 		member.UID = string(pod.UID)
-		member.StartTime = pod.CreationTimestamp.Time
 		if pod.Spec.HostNetwork {
 			member.UseIP = true
 		}

@@ -48,7 +48,9 @@ type ConfigConstraintReconciler struct {
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=configconstraints/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=configconstraints/finalizers,verbs=update
 
-// +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;create;update;patch
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps,resources=deployments/status,verbs=get
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.

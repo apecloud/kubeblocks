@@ -2,7 +2,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  generateName: {{ .Release.Name }}-upgrade-job-
+  name: {{ .Release.Name }}-upgrade-hook-job
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
   annotations:

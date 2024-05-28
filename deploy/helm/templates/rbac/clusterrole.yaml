@@ -15,6 +15,10 @@ metadata:
   name: {{ include "kubeblocks.fullname" . }}-manager-role
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
+  {{- if .Values.crd.enabled }}
+  annotations:
+    "helm.sh/hook": pre-upgrade
+  {{- end }}
 rules:
 {{- $doInclude := false }}
 {{- range $i, $line := .Files.Lines "config/rbac/role.yaml" }}

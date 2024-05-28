@@ -22,7 +22,6 @@ package dcs
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
@@ -244,7 +243,6 @@ type Member struct {
 	UseIP         bool
 	resource      any
 	ComponentName string
-	StartTime     time.Time
 }
 
 func (m *Member) GetName() string {

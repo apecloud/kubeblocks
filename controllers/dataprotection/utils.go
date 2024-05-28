@@ -229,14 +229,13 @@ func getClusterLabelKeys() []string {
 	return []string{constant.AppInstanceLabelKey, constant.KBAppComponentLabelKey, constant.KBAppShardingNameLabelKey}
 }
 
-// sendWarningEventForError sends warning event for backup controller error
+// sendWarningEventForError sends warning event for controller error
 func sendWarningEventForError(recorder record.EventRecorder, obj client.Object, err error) {
 	controllerErr := intctrlutil.UnwrapControllerError(err)
 	if controllerErr != nil {
 		recorder.Eventf(obj, corev1.EventTypeWarning, string(controllerErr.Type), err.Error())
 	} else {
-		recorder.Eventf(obj, corev1.EventTypeWarning, "FailedCreatedBackup",
-			"Creating backup failed, error: %s", err.Error())
+		recorder.Eventf(obj, corev1.EventTypeWarning, "ReconcileFailed", "Reconciling failed, error: %s", err.Error())
 	}
 }
 

@@ -68,20 +68,21 @@ type ComponentTemplateSpec struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	VolumeName string `json:"volumeName"`
 
-	// Deprecated: DefaultMode is deprecated since 0.9.0 and will be removed in 0.10.0
-	// for scripts, auto set 0555
-	// for configs, auto set 0444
-	// Refers to the mode bits used to set permissions on created files by default.
+	// The operator attempts to set default file permissions for scripts (0555) and configurations (0444).
+	// However, certain database engines may require different file permissions.
+	// You can specify the desired file permissions here.
 	//
-	// Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
-	// YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
-	// Defaults to 0644.
+	// Must be specified as an octal value between 0000 and 0777 (inclusive),
+	// or as a decimal value between 0 and 511 (inclusive).
+	// YAML supports both octal and decimal values for file permissions.
 	//
-	// Directories within the path are not affected by this setting.
-	// This might be in conflict with other options that affect the file
-	// mode, like fsGroup, and the result can be other mode bits set.
+	// Please note that this setting only affects the permissions of the files themselves.
+	// Directories within the specified path are not impacted by this setting.
+	// It's important to be aware that this setting might conflict with other options
+	// that influence the file mode, such as fsGroup.
+	// In such cases, the resulting file mode may have additional bits set.
+	// Refers to documents of k8s.ConfigMapVolumeSource.defaultMode for more information.
 	//
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0 and will be removed in 0.10.0"
 	// +optional
 	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,3,opt,name=defaultMode"`
 }
@@ -641,20 +642,6 @@ const (
 	AnyPods ProvisionScope = "AnyPods"
 )
 
-// KBAccountType is used for bitwise operation.
-type KBAccountType uint8
-
-// System accounts represented in bit.
-const (
-	KBAccountInvalid        KBAccountType = 0
-	KBAccountAdmin                        = 1
-	KBAccountDataprotection               = 1 << 1
-	KBAccountProbe                        = 1 << 2
-	KBAccountMonitor                      = 1 << 3
-	KBAccountReplicator                   = 1 << 4
-	KBAccountMAX                          = KBAccountReplicator // KBAccountMAX indicates the max value of KBAccountType, used for validation.
-)
-
 // AccountName defines system account names.
 // +enum
 // +kubebuilder:validation:Enum={kbadmin,kbdataprotection,kbprobe,kbmonitoring,kbreplicator}
@@ -667,22 +654,6 @@ const (
 	MonitorAccount        AccountName = "kbmonitoring"
 	ReplicatorAccount     AccountName = "kbreplicator"
 )
-
-func (r AccountName) GetAccountID() KBAccountType {
-	switch r {
-	case AdminAccount:
-		return KBAccountAdmin
-	case DataprotectionAccount:
-		return KBAccountDataprotection
-	case ProbeAccount:
-		return KBAccountProbe
-	case MonitorAccount:
-		return KBAccountMonitor
-	case ReplicatorAccount:
-		return KBAccountReplicator
-	}
-	return KBAccountInvalid
-}
 
 // LetterCase defines the available cases to be used in password generation.
 //
@@ -927,6 +898,9 @@ type Service struct {
 	// Only one default service name is allowed.
 	// Cannot be updated.
 	//
+	// +kubebuilder:validation:MaxLength=25
+	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
+	//
 	// +optional
 	ServiceName string `json:"serviceName,omitempty"`
 
@@ -982,7 +956,8 @@ type Service struct {
 // EnvVar represents a variable present in the env of Pod/Action or the template of config/script.
 type EnvVar struct {
 	// Name of the variable. Must be a C_IDENTIFIER.
-	// +required
+	//
+	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
 	// Optional: no more than one of the following may be specified.
@@ -1001,8 +976,27 @@ type EnvVar struct {
 	Value string `json:"value,omitempty"`
 
 	// Source for the variable's value. Cannot be used if value is not empty.
+	//
 	// +optional
 	ValueFrom *VarSource `json:"valueFrom,omitempty"`
+
+	// A Go template expression that will be applied to the resolved value of the var.
+	//
+	// The expression will only be evaluated if the var is successfully resolved to a non-credential value.
+	//
+	// The resolved value can be accessed by its name within the expression, system vars and other user-defined
+	// non-credential vars can be used within the expression in the same way.
+	// Notice that, when accessing vars by its name, you should replace all the "-" in the name with "_", because of
+	// that "-" is not a valid identifier in Go.
+	//
+	// All expressions are evaluated in the order the vars are defined. If a var depends on any vars that also
+	// have expressions defined, be careful about the evaluation order as it may use intermediate values.
+	//
+	// The result of evaluation will be used as the final value of the var. If the expression fails to evaluate,
+	// the resolving of var will also be considered failed.
+	//
+	// +optional
+	Expression *string `json:"expression,omitempty"`
 }
 
 // VarSource represents a source for the value of an EnvVar.
@@ -1057,10 +1051,12 @@ type NamedVar struct {
 // ContainerVars defines the vars that can be referenced from a Container.
 type ContainerVars struct {
 	// The name of the container.
-	// +required
+	//
+	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
 	// Container port to reference.
+	//
 	// +optional
 	Port *NamedVar `json:"port,omitempty"`
 }
@@ -1166,24 +1162,33 @@ type ComponentVars struct {
 	Replicas *VarOption `json:"replicas,omitempty"`
 
 	// Reference to the instanceName list of the component.
-	// and the value will be presented in the following format: instanceName1,instanceName2...
+	// and the value will be presented in the following format: instanceName1,instanceName2,...
 	//
 	// +optional
 	InstanceNames *VarOption `json:"instanceNames,omitempty"`
+
+	// Reference to the pod FQDN list of the component.
+	// The value will be presented in the following format: FQDN1,FQDN2,...
+	//
+	// +optional
+	PodFQDNs *VarOption `json:"podFQDNs,omitempty"`
 }
 
 // ClusterObjectReference defines information to let you locate the referenced object inside the same Cluster.
 type ClusterObjectReference struct {
 	// CompDef specifies the definition used by the component that the referent object resident in.
 	// If not specified, the component itself will be used.
+	//
 	// +optional
 	CompDef string `json:"compDef,omitempty"`
 
 	// Name of the referent object.
+	//
 	// +optional
 	Name string `json:"name,omitempty"`
 
 	// Specify whether the object must be defined.
+	//
 	// +optional
 	Optional *bool `json:"optional,omitempty"`
 
@@ -1197,7 +1202,8 @@ type ClusterObjectReference struct {
 // MultipleClusterObjectOption defines the options for handling multiple cluster objects matched.
 type MultipleClusterObjectOption struct {
 	// Define the strategy for handling multiple cluster objects.
-	// +required
+	//
+	// +kubebuilder:validation:Required
 	Strategy MultipleClusterObjectStrategy `json:"strategy"`
 
 	// Define the options for handling combined variables.
@@ -1257,13 +1263,13 @@ type MultipleClusterObjectValueFormatFlatten struct {
 	// Pair delimiter.
 	//
 	// +kubebuilder:default=","
-	// +required
+	// +kubebuilder:validation:Required
 	Delimiter string `json:"delimiter"`
 
 	// Key-value delimiter.
 	//
 	// +kubebuilder:default=":"
-	// +required
+	// +kubebuilder:validation:Required
 	KeyValueDelimiter string `json:"keyValueDelimiter"`
 }
 

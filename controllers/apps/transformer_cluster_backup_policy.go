@@ -44,8 +44,7 @@ import (
 )
 
 const (
-	defaultCronExpression  = "0 18 * * *"
-	serviceKindLabelPrefix = "service-kind"
+	defaultCronExpression = "0 18 * * *"
 )
 
 // clusterBackupPolicyTransformer transforms the backup policy template to the data protection backup policy and backup schedule.
@@ -152,9 +151,9 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 				// if it exists.
 				if needMergeClusterBackup {
 					newBackupSchedule = r.mergeClusterBackup(comp, backupPolicy, newBackupSchedule)
-					if newBackupSchedule == nil {
-						return
-					}
+				}
+				if newBackupSchedule == nil {
+					return
 				}
 				// if exist multiple backup policy templates and duplicate spec.identifier,
 				// the backupSchedule that may be generated may have duplicate names,
@@ -198,9 +197,8 @@ func (r *clusterBackupPolicyTransformer) getBackupPolicyTemplates() (*appsv1alph
 	// get the backupPolicyTemplate if not exists spec.clusterDefRef
 	tplMap := map[string]sets.Empty{}
 	for _, v := range r.ComponentDefs {
-		serviceKindLabel := fmt.Sprintf("%s/%s", serviceKindLabelPrefix, v.Spec.ServiceKind)
 		tmpTPLs := &appsv1alpha1.BackupPolicyTemplateList{}
-		if err := r.Client.List(r.Context, tmpTPLs, client.MatchingLabels{serviceKindLabel: "true"}); err != nil {
+		if err := r.Client.List(r.Context, tmpTPLs, client.MatchingLabels{v.Name: v.Name}); err != nil {
 			return nil, err
 		}
 		for i := range tmpTPLs.Items {
@@ -656,10 +654,14 @@ func (r *clusterBackupPolicyTransformer) mergeClusterBackup(
 
 // getClusterComponentSpec returns the component which matches the componentDef or componentDefRef.
 func (r *clusterBackupPolicyTransformer) getClusterComponentItems() []componentItem {
+	matchedCompDef := func(compSpec appsv1alpha1.ClusterComponentSpec) bool {
+		// TODO: support to create bp when using cluster topology and componentDef is empty
+		return (compSpec.ComponentDefRef != "" && compSpec.ComponentDefRef == r.backupPolicy.ComponentDefRef) ||
+			(compSpec.ComponentDef != "" && slices.Contains(r.backupPolicy.ComponentDefs, compSpec.ComponentDef))
+	}
 	var compSpecItems []componentItem
 	for i, v := range r.clusterTransformContext.Cluster.Spec.ComponentSpecs {
-		if v.ComponentDefRef == r.backupPolicy.ComponentDefRef ||
-			(len(v.ComponentDef) > 0 && slices.Contains(r.backupPolicy.ComponentDefs, v.ComponentDef)) {
+		if matchedCompDef(v) {
 			compSpecItems = append(compSpecItems, componentItem{
 				compSpec:          &r.clusterTransformContext.Cluster.Spec.ComponentSpecs[i],
 				componentName:     v.Name,
@@ -668,8 +670,7 @@ func (r *clusterBackupPolicyTransformer) getClusterComponentItems() []componentI
 		}
 	}
 	for i, v := range r.clusterTransformContext.Cluster.Spec.ShardingSpecs {
-		if v.Template.ComponentDefRef == r.backupPolicy.ComponentDefRef ||
-			(len(v.Template.ComponentDef) > 0 && slices.Contains(r.backupPolicy.ComponentDefs, v.Template.ComponentDef)) {
+		if matchedCompDef(v.Template) {
 			compSpecItems = append(compSpecItems, componentItem{
 				compSpec:      &r.clusterTransformContext.Cluster.Spec.ShardingSpecs[i].Template,
 				componentName: v.Name,

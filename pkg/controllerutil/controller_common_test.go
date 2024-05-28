@@ -40,8 +40,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 var tlog = ctrl.Log.WithName("controller_testing")
@@ -337,20 +335,6 @@ var _ = Describe("Cluster Controller", func() {
 			err := k8sClient.Create(ctx, obj)
 			Expect(err).Should(HaveOccurred())
 			Expect(IgnoreIsAlreadyExists(err)).Should(BeNil())
-
-			By("test ManagedByKubeBlocksFilterPredicate function")
-			Expect(ManagedByKubeBlocksFilterPredicate(obj)).Should(BeFalse())
-			// set managed by KubeBlocks label
-			obj.Labels = map[string]string{
-				constant.AppManagedByLabelKey: constant.AppName,
-			}
-			Expect(ManagedByKubeBlocksFilterPredicate(obj)).Should(BeTrue())
-
-			By("test WorkloadFilterPredicate function")
-			Expect(WorkloadFilterPredicate(obj)).Should(BeFalse())
-			// set component name label
-			obj.Labels[constant.KBAppComponentLabelKey] = "mysql"
-			Expect(WorkloadFilterPredicate(obj)).Should(BeTrue())
 
 			By("test RecordCreatedEvent function")
 			RecordCreatedEvent(nil, obj)

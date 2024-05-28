@@ -123,16 +123,21 @@ spec:
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     defaultMode:
-                      description: "Deprecated: DefaultMode is deprecated since 0.9.0
-                        and will be removed in 0.10.0 for scripts, auto set 0555 for
-                        configs, auto set 0444 Refers to the mode bits used to set
-                        permissions on created files by default. \n Must be an octal
-                        value between 0000 and 0777 or a decimal value between 0 and
-                        511. YAML accepts both octal and decimal values, JSON requires
-                        decimal values for mode bits. Defaults to 0644. \n Directories
-                        within the path are not affected by this setting. This might
-                        be in conflict with other options that affect the file mode,
-                        like fsGroup, and the result can be other mode bits set."
+                      description: "The operator attempts to set default file permissions
+                        for scripts (0555) and configurations (0444). However, certain
+                        database engines may require different file permissions. You
+                        can specify the desired file permissions here. \n Must be
+                        specified as an octal value between 0000 and 0777 (inclusive),
+                        or as a decimal value between 0 and 511 (inclusive). YAML
+                        supports both octal and decimal values for file permissions.
+                        \n Please note that this setting only affects the permissions
+                        of the files themselves. Directories within the specified
+                        path are not impacted by this setting. It's important to be
+                        aware that this setting might conflict with other options
+                        that influence the file mode, such as fsGroup. In such cases,
+                        the resulting file mode may have additional bits set. Refers
+                        to documents of k8s.ConfigMapVolumeSource.defaultMode for
+                        more information."
                       format: int32
                       type: integer
                     injectEnvTo:
@@ -659,15 +664,12 @@ spec:
                               The conditions are as follows: \n - `Immediately`: Executed
                               right after the Component object is created. The readiness
                               of the Component and its resources is not guaranteed
-                              at this stage. The Component's state can not be marked
-                              as ready until the Action completes successfully. -
-                              `RuntimeReady`: The Action is triggered after the Component
-                              object has been created and all associated runtime resources
-                              (e.g. Pods) are in a ready state. The Component's state
-                              can not be marked as ready until the Action completes
-                              successfully. - `ComponentReady`: The Action is triggered
-                              after the Component itself is in a ready state. This
-                              process does not affect the readiness state of the Component
+                              at this stage. - `RuntimeReady`: The Action is triggered
+                              after the Component object has been created and all
+                              associated runtime resources (e.g. Pods) are in a ready
+                              state. - `ComponentReady`: The Action is triggered after
+                              the Component itself is in a ready state. This process
+                              does not affect the readiness state of the Component
                               or the Cluster. - `ClusterReady`: The Action is executed
                               after the Cluster is in a ready state. This execution
                               does not alter the Component or the Cluster's state
@@ -1028,15 +1030,12 @@ spec:
                               The conditions are as follows: \n - `Immediately`: Executed
                               right after the Component object is created. The readiness
                               of the Component and its resources is not guaranteed
-                              at this stage. The Component's state can not be marked
-                              as ready until the Action completes successfully. -
-                              `RuntimeReady`: The Action is triggered after the Component
-                              object has been created and all associated runtime resources
-                              (e.g. Pods) are in a ready state. The Component's state
-                              can not be marked as ready until the Action completes
-                              successfully. - `ComponentReady`: The Action is triggered
-                              after the Component itself is in a ready state. This
-                              process does not affect the readiness state of the Component
+                              at this stage. - `RuntimeReady`: The Action is triggered
+                              after the Component object has been created and all
+                              associated runtime resources (e.g. Pods) are in a ready
+                              state. - `ComponentReady`: The Action is triggered after
+                              the Component itself is in a ready state. This process
+                              does not affect the readiness state of the Component
                               or the Cluster. - `ClusterReady`: The Action is executed
                               after the Cluster is in a ready state. This execution
                               does not alter the Component or the Cluster's state
@@ -1396,15 +1395,12 @@ spec:
                               The conditions are as follows: \n - `Immediately`: Executed
                               right after the Component object is created. The readiness
                               of the Component and its resources is not guaranteed
-                              at this stage. The Component's state can not be marked
-                              as ready until the Action completes successfully. -
-                              `RuntimeReady`: The Action is triggered after the Component
-                              object has been created and all associated runtime resources
-                              (e.g. Pods) are in a ready state. The Component's state
-                              can not be marked as ready until the Action completes
-                              successfully. - `ComponentReady`: The Action is triggered
-                              after the Component itself is in a ready state. This
-                              process does not affect the readiness state of the Component
+                              at this stage. - `RuntimeReady`: The Action is triggered
+                              after the Component object has been created and all
+                              associated runtime resources (e.g. Pods) are in a ready
+                              state. - `ComponentReady`: The Action is triggered after
+                              the Component itself is in a ready state. This process
+                              does not affect the readiness state of the Component
                               or the Cluster. - `ClusterReady`: The Action is executed
                               after the Cluster is in a ready state. This execution
                               does not alter the Component or the Cluster's state
@@ -1779,15 +1775,12 @@ spec:
                               The conditions are as follows: \n - `Immediately`: Executed
                               right after the Component object is created. The readiness
                               of the Component and its resources is not guaranteed
-                              at this stage. The Component's state can not be marked
-                              as ready until the Action completes successfully. -
-                              `RuntimeReady`: The Action is triggered after the Component
-                              object has been created and all associated runtime resources
-                              (e.g. Pods) are in a ready state. The Component's state
-                              can not be marked as ready until the Action completes
-                              successfully. - `ComponentReady`: The Action is triggered
-                              after the Component itself is in a ready state. This
-                              process does not affect the readiness state of the Component
+                              at this stage. - `RuntimeReady`: The Action is triggered
+                              after the Component object has been created and all
+                              associated runtime resources (e.g. Pods) are in a ready
+                              state. - `ComponentReady`: The Action is triggered after
+                              the Component itself is in a ready state. This process
+                              does not affect the readiness state of the Component
                               or the Cluster. - `ClusterReady`: The Action is executed
                               after the Cluster is in a ready state. This execution
                               does not alter the Component or the Cluster's state
@@ -2164,15 +2157,12 @@ spec:
                               The conditions are as follows: \n - `Immediately`: Executed
                               right after the Component object is created. The readiness
                               of the Component and its resources is not guaranteed
-                              at this stage. The Component's state can not be marked
-                              as ready until the Action completes successfully. -
-                              `RuntimeReady`: The Action is triggered after the Component
-                              object has been created and all associated runtime resources
-                              (e.g. Pods) are in a ready state. The Component's state
-                              can not be marked as ready until the Action completes
-                              successfully. - `ComponentReady`: The Action is triggered
-                              after the Component itself is in a ready state. This
-                              process does not affect the readiness state of the Component
+                              at this stage. - `RuntimeReady`: The Action is triggered
+                              after the Component object has been created and all
+                              associated runtime resources (e.g. Pods) are in a ready
+                              state. - `ComponentReady`: The Action is triggered after
+                              the Component itself is in a ready state. This process
+                              does not affect the readiness state of the Component
                               or the Cluster. - `ClusterReady`: The Action is executed
                               after the Cluster is in a ready state. This execution
                               does not alter the Component or the Cluster's state
@@ -2552,15 +2542,12 @@ spec:
                               The conditions are as follows: \n - `Immediately`: Executed
                               right after the Component object is created. The readiness
                               of the Component and its resources is not guaranteed
-                              at this stage. The Component's state can not be marked
-                              as ready until the Action completes successfully. -
-                              `RuntimeReady`: The Action is triggered after the Component
-                              object has been created and all associated runtime resources
-                              (e.g. Pods) are in a ready state. The Component's state
-                              can not be marked as ready until the Action completes
-                              successfully. - `ComponentReady`: The Action is triggered
-                              after the Component itself is in a ready state. This
-                              process does not affect the readiness state of the Component
+                              at this stage. - `RuntimeReady`: The Action is triggered
+                              after the Component object has been created and all
+                              associated runtime resources (e.g. Pods) are in a ready
+                              state. - `ComponentReady`: The Action is triggered after
+                              the Component itself is in a ready state. This process
+                              does not affect the readiness state of the Component
                               or the Cluster. - `ClusterReady`: The Action is executed
                               after the Cluster is in a ready state. This execution
                               does not alter the Component or the Cluster's state
@@ -2946,15 +2933,12 @@ spec:
                               The conditions are as follows: \n - `Immediately`: Executed
                               right after the Component object is created. The readiness
                               of the Component and its resources is not guaranteed
-                              at this stage. The Component's state can not be marked
-                              as ready until the Action completes successfully. -
-                              `RuntimeReady`: The Action is triggered after the Component
-                              object has been created and all associated runtime resources
-                              (e.g. Pods) are in a ready state. The Component's state
-                              can not be marked as ready until the Action completes
-                              successfully. - `ComponentReady`: The Action is triggered
-                              after the Component itself is in a ready state. This
-                              process does not affect the readiness state of the Component
+                              at this stage. - `RuntimeReady`: The Action is triggered
+                              after the Component object has been created and all
+                              associated runtime resources (e.g. Pods) are in a ready
+                              state. - `ComponentReady`: The Action is triggered after
+                              the Component itself is in a ready state. This process
+                              does not affect the readiness state of the Component
                               or the Cluster. - `ClusterReady`: The Action is executed
                               after the Cluster is in a ready state. This execution
                               does not alter the Component or the Cluster's state
@@ -3315,15 +3299,12 @@ spec:
                               The conditions are as follows: \n - `Immediately`: Executed
                               right after the Component object is created. The readiness
                               of the Component and its resources is not guaranteed
-                              at this stage. The Component's state can not be marked
-                              as ready until the Action completes successfully. -
-                              `RuntimeReady`: The Action is triggered after the Component
-                              object has been created and all associated runtime resources
-                              (e.g. Pods) are in a ready state. The Component's state
-                              can not be marked as ready until the Action completes
-                              successfully. - `ComponentReady`: The Action is triggered
-                              after the Component itself is in a ready state. This
-                              process does not affect the readiness state of the Component
+                              at this stage. - `RuntimeReady`: The Action is triggered
+                              after the Component object has been created and all
+                              associated runtime resources (e.g. Pods) are in a ready
+                              state. - `ComponentReady`: The Action is triggered after
+                              the Component itself is in a ready state. This process
+                              does not affect the readiness state of the Component
                               or the Cluster. - `ClusterReady`: The Action is executed
                               after the Cluster is in a ready state. This execution
                               does not alter the Component or the Cluster's state
@@ -3686,15 +3667,12 @@ spec:
                               The conditions are as follows: \n - `Immediately`: Executed
                               right after the Component object is created. The readiness
                               of the Component and its resources is not guaranteed
-                              at this stage. The Component's state can not be marked
-                              as ready until the Action completes successfully. -
-                              `RuntimeReady`: The Action is triggered after the Component
-                              object has been created and all associated runtime resources
-                              (e.g. Pods) are in a ready state. The Component's state
-                              can not be marked as ready until the Action completes
-                              successfully. - `ComponentReady`: The Action is triggered
-                              after the Component itself is in a ready state. This
-                              process does not affect the readiness state of the Component
+                              at this stage. - `RuntimeReady`: The Action is triggered
+                              after the Component object has been created and all
+                              associated runtime resources (e.g. Pods) are in a ready
+                              state. - `ComponentReady`: The Action is triggered after
+                              the Component itself is in a ready state. This process
+                              does not affect the readiness state of the Component
                               or the Cluster. - `ClusterReady`: The Action is executed
                               after the Cluster is in a ready state. This execution
                               does not alter the Component or the Cluster's state
@@ -4045,15 +4023,12 @@ spec:
                               The conditions are as follows: \n - `Immediately`: Executed
                               right after the Component object is created. The readiness
                               of the Component and its resources is not guaranteed
-                              at this stage. The Component's state can not be marked
-                              as ready until the Action completes successfully. -
-                              `RuntimeReady`: The Action is triggered after the Component
-                              object has been created and all associated runtime resources
-                              (e.g. Pods) are in a ready state. The Component's state
-                              can not be marked as ready until the Action completes
-                              successfully. - `ComponentReady`: The Action is triggered
-                              after the Component itself is in a ready state. This
-                              process does not affect the readiness state of the Component
+                              at this stage. - `RuntimeReady`: The Action is triggered
+                              after the Component object has been created and all
+                              associated runtime resources (e.g. Pods) are in a ready
+                              state. - `ComponentReady`: The Action is triggered after
+                              the Component itself is in a ready state. This process
+                              does not affect the readiness state of the Component
                               or the Cluster. - `ClusterReady`: The Action is executed
                               after the Cluster is in a ready state. This execution
                               does not alter the Component or the Cluster's state
@@ -4426,15 +4401,12 @@ spec:
                               The conditions are as follows: \n - `Immediately`: Executed
                               right after the Component object is created. The readiness
                               of the Component and its resources is not guaranteed
-                              at this stage. The Component's state can not be marked
-                              as ready until the Action completes successfully. -
-                              `RuntimeReady`: The Action is triggered after the Component
-                              object has been created and all associated runtime resources
-                              (e.g. Pods) are in a ready state. The Component's state
-                              can not be marked as ready until the Action completes
-                              successfully. - `ComponentReady`: The Action is triggered
-                              after the Component itself is in a ready state. This
-                              process does not affect the readiness state of the Component
+                              at this stage. - `RuntimeReady`: The Action is triggered
+                              after the Component object has been created and all
+                              associated runtime resources (e.g. Pods) are in a ready
+                              state. - `ComponentReady`: The Action is triggered after
+                              the Component itself is in a ready state. This process
+                              does not affect the readiness state of the Component
                               or the Cluster. - `ClusterReady`: The Action is executed
                               after the Cluster is in a ready state. This execution
                               does not alter the Component or the Cluster's state
@@ -4792,15 +4764,12 @@ spec:
                               The conditions are as follows: \n - `Immediately`: Executed
                               right after the Component object is created. The readiness
                               of the Component and its resources is not guaranteed
-                              at this stage. The Component's state can not be marked
-                              as ready until the Action completes successfully. -
-                              `RuntimeReady`: The Action is triggered after the Component
-                              object has been created and all associated runtime resources
-                              (e.g. Pods) are in a ready state. The Component's state
-                              can not be marked as ready until the Action completes
-                              successfully. - `ComponentReady`: The Action is triggered
-                              after the Component itself is in a ready state. This
-                              process does not affect the readiness state of the Component
+                              at this stage. - `RuntimeReady`: The Action is triggered
+                              after the Component object has been created and all
+                              associated runtime resources (e.g. Pods) are in a ready
+                              state. - `ComponentReady`: The Action is triggered after
+                              the Component itself is in a ready state. This process
+                              does not affect the readiness state of the Component
                               or the Cluster. - `ClusterReady`: The Action is executed
                               after the Cluster is in a ready state. This execution
                               does not alter the Component or the Cluster's state
@@ -5099,15 +5068,12 @@ spec:
                               The conditions are as follows: \n - `Immediately`: Executed
                               right after the Component object is created. The readiness
                               of the Component and its resources is not guaranteed
-                              at this stage. The Component's state can not be marked
-                              as ready until the Action completes successfully. -
-                              `RuntimeReady`: The Action is triggered after the Component
-                              object has been created and all associated runtime resources
-                              (e.g. Pods) are in a ready state. The Component's state
-                              can not be marked as ready until the Action completes
-                              successfully. - `ComponentReady`: The Action is triggered
-                              after the Component itself is in a ready state. This
-                              process does not affect the readiness state of the Component
+                              at this stage. - `RuntimeReady`: The Action is triggered
+                              after the Component object has been created and all
+                              associated runtime resources (e.g. Pods) are in a ready
+                              state. - `ComponentReady`: The Action is triggered after
+                              the Component itself is in a ready state. This process
+                              does not affect the readiness state of the Component
                               or the Cluster. - `ClusterReady`: The Action is executed
                               after the Cluster is in a ready state. This execution
                               does not alter the Component or the Cluster's state
@@ -5335,17 +5301,6 @@ spec:
                 - message: the minimum replicas limit should be no greater than the
                     maximum
                   rule: self.minReplicas <= self.maxReplicas
-              roleArbitrator:
-                default: External
-                description: "This field has been deprecated since v0.9. This field
-                  is maintained for backward compatibility and its use is discouraged.
-                  Existing usage should be updated to the current preferred approach
-                  to avoid compatibility issues in future releases. \n This field
-                  is immutable."
-                enum:
-                - External
-                - Lorry
-                type: string
               roles:
                 description: "Enumerate all possible roles assigned to each replica
                   of the Component, influencing its behavior. \n A replica can have
@@ -12654,16 +12609,21 @@ spec:
                 items:
                   properties:
                     defaultMode:
-                      description: "Deprecated: DefaultMode is deprecated since 0.9.0
-                        and will be removed in 0.10.0 for scripts, auto set 0555 for
-                        configs, auto set 0444 Refers to the mode bits used to set
-                        permissions on created files by default. \n Must be an octal
-                        value between 0000 and 0777 or a decimal value between 0 and
-                        511. YAML accepts both octal and decimal values, JSON requires
-                        decimal values for mode bits. Defaults to 0644. \n Directories
-                        within the path are not affected by this setting. This might
-                        be in conflict with other options that affect the file mode,
-                        like fsGroup, and the result can be other mode bits set."
+                      description: "The operator attempts to set default file permissions
+                        for scripts (0555) and configurations (0444). However, certain
+                        database engines may require different file permissions. You
+                        can specify the desired file permissions here. \n Must be
+                        specified as an octal value between 0000 and 0777 (inclusive),
+                        or as a decimal value between 0 and 511 (inclusive). YAML
+                        supports both octal and decimal values for file permissions.
+                        \n Please note that this setting only affects the permissions
+                        of the files themselves. Directories within the specified
+                        path are not impacted by this setting. It's important to be
+                        aware that this setting might conflict with other options
+                        that influence the file mode, such as fsGroup. In such cases,
+                        the resulting file mode may have additional bits set. Refers
+                        to documents of k8s.ConfigMapVolumeSource.defaultMode for
+                        more information."
                       format: int32
                       type: integer
                     name:
@@ -12896,6 +12856,8 @@ spec:
                         cluster-level services - CLUSTER_NAME-COMPONENT_NAME: for
                         component-level services \n Only one default service name
                         is allowed. Cannot be updated."
+                      maxLength: 25
+                      pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
                     spec:
                       description: Spec defines the behavior of a service. https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -13386,6 +13348,23 @@ spec:
                   description: EnvVar represents a variable present in the env of
                     Pod/Action or the template of config/script.
                   properties:
+                    expression:
+                      description: "A Go template expression that will be applied
+                        to the resolved value of the var. \n The expression will only
+                        be evaluated if the var is successfully resolved to a non-credential
+                        value. \n The resolved value can be accessed by its name within
+                        the expression, system vars and other user-defined non-credential
+                        vars can be used within the expression in the same way. Notice
+                        that, when accessing vars by its name, you should replace
+                        all the \"-\" in the name with \"_\", because of that \"-\"
+                        is not a valid identifier in Go. \n All expressions are evaluated
+                        in the order the vars are defined. If a var depends on any
+                        vars that also have expressions defined, be careful about
+                        the evaluation order as it may use intermediate values. \n
+                        The result of evaluation will be used as the final value of
+                        the var. If the expression fails to evaluate, the resolving
+                        of var will also be considered failed."
+                      type: string
                     name:
                       description: Name of the variable. Must be a C_IDENTIFIER.
                       type: string
@@ -13422,7 +13401,7 @@ spec:
                             instanceNames:
                               description: 'Reference to the instanceName list of
                                 the component. and the value will be presented in
-                                the following format: instanceName1,instanceName2...'
+                                the following format: instanceName1,instanceName2,...'
                               enum:
                               - Required
                               - Optional
@@ -13486,6 +13465,14 @@ spec:
                             optional:
                               description: Specify whether the object must be defined.
                               type: boolean
+                            podFQDNs:
+                              description: 'Reference to the pod FQDN list of the
+                                component. The value will be presented in the following
+                                format: FQDN1,FQDN2,...'
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
                             replicas:
                               description: Reference to the replicas of the component.
                               enum:

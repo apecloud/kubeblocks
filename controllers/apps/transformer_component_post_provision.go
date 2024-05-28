@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"time"
+
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -43,17 +45,26 @@ func (t *componentPostProvisionTransformer) Transform(ctx graph.TransformContext
 	cluster := transCtx.Cluster
 	compOrig := transCtx.ComponentOrig
 	synthesizeComp := transCtx.SynthesizeComponent
+	runningWorkload := transCtx.RunningWorkload
 
 	if model.IsObjectDeleting(compOrig) {
 		return nil
 	}
 
-	actionCtx, err := component.NewActionContext(cluster, comp, synthesizeComp.LifecycleActions, synthesizeComp.ScriptTemplates, component.PostProvisionAction)
+	actionCtx, err := component.NewActionContext(cluster, comp, runningWorkload,
+		synthesizeComp.LifecycleActions, synthesizeComp.ScriptTemplates, component.PostProvisionAction)
 	if err != nil {
 		return err
 	}
 
 	if err := component.ReconcileCompPostProvision(reqCtx.Ctx, transCtx.Client, graphCli, actionCtx, dag); err != nil {
+		reqCtx.Log.Info("Failed to reconcile component postProvision action", "component", comp.Name, "error", err)
+		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeExpectedInProcess) {
+			return nil
+		}
+		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeRequeue) {
+			return newRequeueError(time.Second*1, "request to requeue the component postProvision action")
+		}
 		return err
 	}
 	return nil

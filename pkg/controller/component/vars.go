@@ -28,7 +28,9 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"text/template"
 
+	"github.com/Masterminds/sprig/v3"
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -45,6 +47,7 @@ import (
 
 var (
 	varReferenceRegExp = regexp.MustCompile(`\$\(([^)]+)\)`)
+	varTemplate        = template.New("vars").Option("missingkey=error").Funcs(sprig.TxtFuncMap())
 )
 
 func VarReferenceRegExp() *regexp.Regexp {
@@ -154,6 +157,9 @@ func resolveBuiltinNObjectRefVars(ctx context.Context, cli client.Reader, synthe
 		return nil, nil, err
 	}
 	vars = append(vars, vars1...)
+	if err = evaluateObjectVarsExpression(definedVars, vars2, &vars); err != nil {
+		return nil, nil, err
+	}
 	return vars, vars2, nil
 }
 
@@ -371,6 +377,75 @@ func buildEnv4UserDefined(annotations map[string]string) ([]corev1.EnvVar, error
 		vars = append(vars, corev1.EnvVar{Name: k, Value: udeMap[k]})
 	}
 	return vars, nil
+}
+
+func evaluateObjectVarsExpression(definedVars []appsv1alpha1.EnvVar, credentialVars []corev1.EnvVar, vars *[]corev1.EnvVar) error {
+	var (
+		isValues = make(map[string]bool)
+		values   = make(map[string]string)
+	)
+	normalize := func(name string) string {
+		return strings.ReplaceAll(name, "-", "_")
+	}
+	for _, v := range [][]corev1.EnvVar{*vars, credentialVars} {
+		for _, vv := range v {
+			if vv.ValueFrom == nil {
+				isValues[vv.Name] = true
+				values[normalize(vv.Name)] = vv.Value
+			} else {
+				isValues[vv.Name] = false
+			}
+		}
+	}
+
+	evaluable := func(v appsv1alpha1.EnvVar) bool {
+		if v.Expression == nil || len(*v.Expression) == 0 {
+			return false
+		}
+		isValue, ok := isValues[v.Name]
+		// !ok is for vars that defined and resolved successfully, but have nil value.
+		return !ok || isValue
+	}
+
+	update := func(name, value string) {
+		if val, exist := values[normalize(name)]; exist {
+			if val != value {
+				for i := range *vars {
+					if (*vars)[i].Name == name {
+						(*vars)[i].Value = value
+						break
+					}
+				}
+			}
+		} else {
+			// TODO: insert the var to keep orders?
+			*vars = append(*vars, corev1.EnvVar{Name: name, Value: value})
+		}
+		values[normalize(name)] = value
+	}
+
+	eval := func(v appsv1alpha1.EnvVar) error {
+		if !evaluable(v) {
+			return nil
+		}
+		tpl, err := varTemplate.Parse(*v.Expression)
+		if err != nil {
+			return err
+		}
+		var buf strings.Builder
+		if err = tpl.Execute(&buf, values); err != nil {
+			return err
+		}
+		update(v.Name, buf.String())
+		return nil
+	}
+
+	for _, v := range definedVars {
+		if err := eval(v); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func resolveClusterObjectRefVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
@@ -1010,6 +1085,8 @@ func resolveComponentVarRef(ctx context.Context, cli client.Reader, synthesizedC
 		resolveFunc = resolveComponentReplicasRef
 	case selector.InstanceNames != nil:
 		resolveFunc = resolveComponentInstanceNamesRef
+	case selector.PodFQDNs != nil:
+		resolveFunc = resolveComponentPodFQDNsRef
 	default:
 		return nil, nil, nil
 	}
@@ -1046,6 +1123,26 @@ func resolveComponentInstanceNamesRef(ctx context.Context, cli client.Reader, sy
 		return &corev1.EnvVar{Name: defineKey, Value: strings.Join(instanceNameList, ",")}, nil
 	}
 	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector, selector.InstanceNames, resolveInstanceNames)
+}
+
+func resolveComponentPodFQDNsRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+	defineKey string, selector appsv1alpha1.ComponentVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
+	resolveFQDNList := func(obj any) (*corev1.EnvVar, *corev1.EnvVar) {
+		comp := obj.(*appsv1alpha1.Component)
+		var templates []instanceset.InstanceTemplate
+		for i := range comp.Spec.Instances {
+			templates = append(templates, &comp.Spec.Instances[i])
+		}
+		names := instanceset.GenerateAllInstanceNames(comp.Name, comp.Spec.Replicas, templates, comp.Spec.OfflineInstances)
+		fqdn := func(name string) string {
+			return fmt.Sprintf("%s.%s-headless.%s.svc", name, comp.Name, synthesizedComp.Namespace)
+		}
+		for i := range names {
+			names[i] = fqdn(names[i])
+		}
+		return &corev1.EnvVar{Name: defineKey, Value: strings.Join(names, ",")}, nil
+	}
+	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector, selector.PodFQDNs, resolveFQDNList)
 }
 
 func resolveComponentVarRefLow(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,

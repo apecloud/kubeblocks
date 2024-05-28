@@ -292,7 +292,6 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, synthesizeComp *comp
 	itsObjCopy.Spec.Template = *itsProto.Spec.Template.DeepCopy()
 	itsObjCopy.Spec.Replicas = itsProto.Spec.Replicas
 	itsObjCopy.Spec.Service = updateService(itsObjCopy, itsProto)
-	itsObjCopy.Spec.AlternativeServices = itsProto.Spec.AlternativeServices
 	itsObjCopy.Spec.Roles = itsProto.Spec.Roles
 	itsObjCopy.Spec.RoleProbe = itsProto.Spec.RoleProbe
 	itsObjCopy.Spec.MembershipReconfiguration = itsProto.Spec.MembershipReconfiguration
@@ -616,12 +615,17 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 }
 
 func (r *componentWorkloadOps) deletePVCs4ScaleIn(itsObj *workloads.InstanceSet) error {
+	desiredPodNames := generatePodNames(r.synthesizeComp)
+	currentPodNames := generatePodNamesByITS(itsObj)
 	graphCli := model.NewGraphClient(r.cli)
-	for i := r.synthesizeComp.Replicas; i < *itsObj.Spec.Replicas; i++ {
+	for _, podName := range currentPodNames {
+		if slices.Contains(desiredPodNames, podName) {
+			continue
+		}
 		for _, vct := range itsObj.Spec.VolumeClaimTemplates {
 			pvcKey := types.NamespacedName{
 				Namespace: itsObj.Namespace,
-				Name:      fmt.Sprintf("%s-%s-%d", vct.Name, itsObj.Name, i),
+				Name:      fmt.Sprintf("%s-%s", vct.Name, podName),
 			}
 			pvc := corev1.PersistentVolumeClaim{}
 			if err := r.cli.Get(r.reqCtx.Ctx, pvcKey, &pvc, inDataContext4C()); err != nil {

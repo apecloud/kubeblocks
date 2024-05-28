@@ -339,6 +339,27 @@ func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent 
 	return inst, nil
 }
 
+func buildInstancePVCByTemplate(name string, template *instanceTemplateExt, parent *workloads.InstanceSet) []*corev1.PersistentVolumeClaim {
+	// 2. build pvcs from template
+	var pvcs []*corev1.PersistentVolumeClaim
+	labels := getMatchLabels(parent.Name)
+	for _, claimTemplate := range template.VolumeClaimTemplates {
+		pvcName := fmt.Sprintf("%s-%s", claimTemplate.Name, name)
+		pvc := builder.NewPVCBuilder(parent.Namespace, pvcName).
+			AddLabelsInMap(template.Labels).
+			AddLabelsInMap(labels).
+			AddLabels(constant.VolumeClaimTemplateNameLabelKey, claimTemplate.Name).
+			SetSpec(*claimTemplate.Spec.DeepCopy()).
+			GetObject()
+		if template.Name != "" {
+			pvc.Labels[constant.KBAppComponentInstanceTemplatelabelKey] = template.Name
+		}
+		pvcs = append(pvcs, pvc)
+	}
+
+	return pvcs
+}
+
 // copyAndMerge merges two objects for updating:
 // 1. new an object targetObj by copying from oldObj
 // 2. merge all fields can be updated from newObj into targetObj
@@ -347,36 +368,17 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		return nil
 	}
 
-	// mergeMetadataMap keeps the original elements.
-	mergeMetadataMap := func(originalMap map[string]string, targetMap map[string]string) map[string]string {
-		if targetMap == nil && originalMap == nil {
-			return nil
-		}
-		if targetMap == nil {
-			targetMap = map[string]string{}
-		}
-		for k, v := range originalMap {
-			// if the element not exist in targetMap, copy it from original.
-			if _, ok := (targetMap)[k]; !ok {
-				(targetMap)[k] = v
-			}
-		}
-		return targetMap
-	}
-
-	copyAndMergeSts := func(oldSts, newSts *appsv1.StatefulSet) client.Object {
-		oldSts.Labels = mergeMetadataMap(oldSts.Labels, newSts.Labels)
-		// if annotations exist and are replaced, the StatefulSet will be updated.
-		oldSts.Annotations = mergeMetadataMap(oldSts.Annotations, newSts.Annotations)
-		oldSts.Spec.Template = newSts.Spec.Template
-		oldSts.Spec.Replicas = newSts.Spec.Replicas
-		oldSts.Spec.UpdateStrategy = newSts.Spec.UpdateStrategy
-		return oldSts
-	}
-
 	copyAndMergeSvc := func(oldSvc *corev1.Service, newSvc *corev1.Service) client.Object {
-		oldSvc.Annotations = mergeMetadataMap(oldSvc.Annotations, newSvc.Annotations)
-		oldSvc.Spec = newSvc.Spec
+		mergeMap(&newSvc.Annotations, &oldSvc.Annotations)
+		mergeMap(&newSvc.Labels, &oldSvc.Labels)
+		mergeMap(&newSvc.Spec.Selector, &oldSvc.Spec.Selector)
+		oldSvc.Spec.Type = newSvc.Spec.Type
+		oldSvc.Spec.PublishNotReadyAddresses = newSvc.Spec.PublishNotReadyAddresses
+		intctrlutil.MergeList(&newSvc.Spec.Ports, &oldSvc.Spec.Ports, func(port corev1.ServicePort) func(corev1.ServicePort) bool {
+			return func(item corev1.ServicePort) bool {
+				return item.Name == port.Name
+			}
+		})
 		return oldSvc
 	}
 
@@ -396,17 +398,26 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		// resources.request.storage only supports volume expansion.
 		if reflect.DeepEqual(oldPVC.Spec.AccessModes, newPVC.Spec.AccessModes) &&
 			oldPVC.Spec.Resources.Requests.Storage().Cmp(*newPVC.Spec.Resources.Requests.Storage()) >= 0 {
-			return nil
+			return oldPVC
 		}
 		oldPVC.Spec.AccessModes = newPVC.Spec.AccessModes
-		oldPVC.Spec.Resources.Requests[corev1.ResourceStorage] = *newPVC.Spec.Resources.Requests.Storage()
+		if newPVC.Spec.Resources.Requests == nil {
+			return oldPVC
+		}
+		if _, ok := newPVC.Spec.Resources.Requests[corev1.ResourceStorage]; !ok {
+			return oldPVC
+		}
+		requests := oldPVC.Spec.Resources.Requests
+		if requests == nil {
+			requests = make(corev1.ResourceList)
+		}
+		requests[corev1.ResourceStorage] = *newPVC.Spec.Resources.Requests.Storage()
+		oldPVC.Spec.Resources.Requests = requests
 		return oldPVC
 	}
 
 	targetObj := oldObj.DeepCopyObject()
 	switch o := newObj.(type) {
-	case *appsv1.StatefulSet:
-		return copyAndMergeSts(targetObj.(*appsv1.StatefulSet), o)
 	case *corev1.Service:
 		return copyAndMergeSvc(targetObj.(*corev1.Service), o)
 	case *corev1.ConfigMap:

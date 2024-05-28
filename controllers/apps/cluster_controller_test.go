@@ -678,7 +678,8 @@ var _ = Describe("Cluster Controller", func() {
 			PodAntiAffinity: appsv1alpha1.Preferred,
 			TopologyKeys:    []string{compTopologyKey},
 			NodeLabels: map[string]string{
-				compLabelKey: compLabelValue,
+				compLabelKey:    compLabelValue,
+				clusterLabelKey: clusterLabelValue,
 			},
 			Tenancy: appsv1alpha1.DedicatedNode,
 		}
@@ -704,6 +705,10 @@ var _ = Describe("Cluster Controller", func() {
 		By("Checking the Affinity and Toleration")
 		schedulingPolicy, err := scheduling.BuildSchedulingPolicy4Component(clusterObj.Name, compName, &compAffinity, []corev1.Toleration{compToleration})
 		Expect(err).Should(BeNil())
+		// key of the MatchExpressions must be sorted.
+		MatchExpressions := schedulingPolicy.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions
+		Expect(MatchExpressions).Should(HaveLen(2))
+		Expect(MatchExpressions[0].Key).Should(Equal(clusterLabelKey))
 
 		compKey := types.NamespacedName{
 			Namespace: clusterObj.Namespace,
@@ -1551,7 +1556,7 @@ func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition, compDe
 	By("Creating a BackupPolicyTemplate")
 	bpt := testapps.NewBackupPolicyTemplateFactory(backupPolicyTPLName).
 		AddLabels(constant.ClusterDefLabelKey, clusterDefObj.Name).
-		AddLabels(fmt.Sprintf("%s/%s", serviceKindLabelPrefix, "mysql"), "true").
+		AddLabels(compDef, compDef).
 		SetClusterDefRef(clusterDefObj.Name)
 	ttl := "7d"
 	for _, v := range clusterDefObj.Spec.ComponentDefs {

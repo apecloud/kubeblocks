@@ -61,7 +61,8 @@ func (t *componentRestoreTransformer) Transform(ctx graph.TransformContext, dag 
 	cluster := transCtx.Cluster
 	restoreMGR := plan.NewRestoreManager(reqCtx.Ctx, t.Client, cluster, rscheme, nil, synthesizedComp.Replicas, 0)
 
-	actionCtx, err := component.NewActionContext(cluster, transCtx.Component, synthesizedComp.LifecycleActions, synthesizedComp.ScriptTemplates, component.PostProvisionAction)
+	actionCtx, err := component.NewActionContext(cluster, transCtx.Component, transCtx.RunningWorkload,
+		synthesizedComp.LifecycleActions, synthesizedComp.ScriptTemplates, component.PostProvisionAction)
 	if err != nil {
 		return err
 	}

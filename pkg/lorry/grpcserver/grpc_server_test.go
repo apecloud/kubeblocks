@@ -30,6 +30,7 @@ import (
 	. "github.com/onsi/gomega"
 	health "google.golang.org/grpc/health/grpc_health_v1"
 
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/custom"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
@@ -83,13 +84,12 @@ var _ = Describe("GRPC Server", func() {
 
 			// set up the expected answer
 			result := map[string]string{}
-			result["event"] = "Success"
-			result["operation"] = "checkRole"
-			result["originalRole"] = ""
-			result["role"] = "leader"
-			ans, _ := json.Marshal(result)
-
-			Expect(err.Error()).Should(Equal(string(ans)))
+			body := err.Error()
+			Expect(json.Unmarshal([]byte(body), &result)).Should(Succeed())
+			roleSnapShotStr := result["role"]
+			roleSnapShot := common.GlobalRoleSnapshot{}
+			Expect(json.Unmarshal([]byte(roleSnapShotStr), &roleSnapShot)).Should(Succeed())
+			Expect(roleSnapShot.PodRoleNamePairs[0].RoleName).Should(Equal("leader"))
 		})
 	})
 })

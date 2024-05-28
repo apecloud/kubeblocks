@@ -56,15 +56,11 @@ func (a *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*k
 	headlessSelectors := getSvcSelector(its, true)
 
 	svc := buildSvc(*its, labels, selectors)
-	altSvs := buildAlternativeSvs(*its, labels)
 	headLessSvc := buildHeadlessSvc(*its, labels, headlessSelectors)
 	envConfig := buildEnvConfigMap(*its, labels)
 	var objects []client.Object
 	if svc != nil {
 		objects = append(objects, svc)
-	}
-	for _, s := range altSvs {
-		objects = append(objects, s)
 	}
 	objects = append(objects, headLessSvc, envConfig)
 	for _, object := range objects {

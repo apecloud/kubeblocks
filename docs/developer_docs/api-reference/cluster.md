@@ -1691,23 +1691,6 @@ role is updated last. This helps minimize the number of leader changes during th
 </tr>
 <tr>
 <td>
-<code>roleArbitrator</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.RoleArbitrator">
-RoleArbitrator
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>This field has been deprecated since v0.9.
-This field is maintained for backward compatibility and its use is discouraged.
-Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
-<p>This field is immutable.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>lifecycleActions</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ComponentLifecycleActions">
@@ -1963,7 +1946,7 @@ When set, the controller executes the method defined here to execute hot paramet
 <p>Dynamic reloading is triggered only if both of the following conditions are met:</p>
 <ol>
 <li>The modified parameters are listed in the <code>dynamicParameters</code> field.
-If <code>dynamicParameterSelectedPolicy</code> is set to &ldquo;all&rdquo;, modifications to <code>staticParameters</code>
+If <code>reloadStaticParamsBeforeRestart</code> is set to true, modifications to <code>staticParameters</code>
 can also trigger a reload.</li>
 <li><code>reloadOptions</code> is set.</li>
 </ol>
@@ -2012,7 +1995,7 @@ to all parameters (including static parameters).</p>
 will trigger a dynamic reload.</li>
 <li>true: Modifications to both dynamic parameters listed in <code>dynamicParameters</code> and static parameters
 listed in <code>staticParameters</code> will trigger a dynamic reload.
-The &ldquo;all&rdquo; option is for certain engines that require static parameters to be set
+The &ldquo;true&rdquo; option is for certain engines that require static parameters to be set
 via SQL statements before they can take effect on restart.</li>
 </ul>
 </td>
@@ -3075,11 +3058,9 @@ Currently, this is only applicable to the <code>postProvision</code> action.</p>
 <p>The conditions are as follows:</p>
 <ul>
 <li><code>Immediately</code>: Executed right after the Component object is created.
-The readiness of the Component and its resources is not guaranteed at this stage.
-The Component&rsquo;s state can not be marked as ready until the Action completes successfully.</li>
+The readiness of the Component and its resources is not guaranteed at this stage.</li>
 <li><code>RuntimeReady</code>: The Action is triggered after the Component object has been created and all associated
-runtime resources (e.g. Pods) are in a ready state.
-The Component&rsquo;s state can not be marked as ready until the Action completes successfully.</li>
+runtime resources (e.g. Pods) are in a ready state.</li>
 <li><code>ComponentReady</code>: The Action is triggered after the Component itself is in a ready state.
 This process does not affect the readiness state of the Component or the Cluster.</li>
 <li><code>ClusterReady</code>: The Action is executed after the Cluster is in a ready state.
@@ -7697,23 +7678,6 @@ role is updated last. This helps minimize the number of leader changes during th
 </tr>
 <tr>
 <td>
-<code>roleArbitrator</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.RoleArbitrator">
-RoleArbitrator
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>This field has been deprecated since v0.9.
-This field is maintained for backward compatibility and its use is discouraged.
-Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
-<p>This field is immutable.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>lifecycleActions</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ComponentLifecycleActions">
@@ -9051,16 +9015,18 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>Deprecated: DefaultMode is deprecated since 0.9.0 and will be removed in 0.10.0
-for scripts, auto set 0555
-for configs, auto set 0444
-Refers to the mode bits used to set permissions on created files by default.</p>
-<p>Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
-YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
-Defaults to 0644.</p>
-<p>Directories within the path are not affected by this setting.
-This might be in conflict with other options that affect the file
-mode, like fsGroup, and the result can be other mode bits set.</p>
+<p>The operator attempts to set default file permissions for scripts (0555) and configurations (0444).
+However, certain database engines may require different file permissions.
+You can specify the desired file permissions here.</p>
+<p>Must be specified as an octal value between 0000 and 0777 (inclusive),
+or as a decimal value between 0 and 511 (inclusive).
+YAML supports both octal and decimal values for file permissions.</p>
+<p>Please note that this setting only affects the permissions of the files themselves.
+Directories within the specified path are not impacted by this setting.
+It&rsquo;s important to be aware that this setting might conflict with other options
+that influence the file mode, such as fsGroup.
+In such cases, the resulting file mode may have additional bits set.
+Refers to documents of k8s.ConfigMapVolumeSource.defaultMode for more information.</p>
 </td>
 </tr>
 </tbody>
@@ -9274,7 +9240,22 @@ VarOption
 <td>
 <em>(Optional)</em>
 <p>Reference to the instanceName list of the component.
-and the value will be presented in the following format: instanceName1,instanceName2&hellip;</p>
+and the value will be presented in the following format: instanceName1,instanceName2,&hellip;</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podFQDNs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reference to the pod FQDN list of the component.
+The value will be presented in the following format: FQDN1,FQDN2,&hellip;</p>
 </td>
 </tr>
 </tbody>
@@ -9599,7 +9580,7 @@ When set, the controller executes the method defined here to execute hot paramet
 <p>Dynamic reloading is triggered only if both of the following conditions are met:</p>
 <ol>
 <li>The modified parameters are listed in the <code>dynamicParameters</code> field.
-If <code>dynamicParameterSelectedPolicy</code> is set to &ldquo;all&rdquo;, modifications to <code>staticParameters</code>
+If <code>reloadStaticParamsBeforeRestart</code> is set to true, modifications to <code>staticParameters</code>
 can also trigger a reload.</li>
 <li><code>reloadOptions</code> is set.</li>
 </ol>
@@ -9648,7 +9629,7 @@ to all parameters (including static parameters).</p>
 will trigger a dynamic reload.</li>
 <li>true: Modifications to both dynamic parameters listed in <code>dynamicParameters</code> and static parameters
 listed in <code>staticParameters</code> will trigger a dynamic reload.
-The &ldquo;all&rdquo; option is for certain engines that require static parameters to be set
+The &ldquo;true&rdquo; option is for certain engines that require static parameters to be set
 via SQL statements before they can take effect on restart.</li>
 </ul>
 </td>
@@ -11354,6 +11335,27 @@ VarSource
 <p>Source for the variable&rsquo;s value. Cannot be used if value is not empty.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>expression</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A Go template expression that will be applied to the resolved value of the var.</p>
+<p>The expression will only be evaluated if the var is successfully resolved to a non-credential value.</p>
+<p>The resolved value can be accessed by its name within the expression, system vars and other user-defined
+non-credential vars can be used within the expression in the same way.
+Notice that, when accessing vars by its name, you should replace all the &ldquo;-&rdquo; in the name with &ldquo;_&rdquo;, because of
+that &ldquo;-&rdquo; is not a valid identifier in Go.</p>
+<p>All expressions are evaluated in the order the vars are defined. If a var depends on any vars that also
+have expressions defined, be careful about the evaluation order as it may use intermediate values.</p>
+<p>The result of evaluation will be used as the final value of the var. If the expression fails to evaluate,
+the resolving of var will also be considered failed.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.EnvVarRef">EnvVarRef
@@ -12590,22 +12592,6 @@ string
 </td>
 </tr>
 </tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.KBAccountType">KBAccountType
-(<code>byte</code> alias)</h3>
-<div>
-<p>KBAccountType is used for bitwise operation.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>0</p></td>
-<td></td>
-</tr></tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.LastComponentConfiguration">LastComponentConfiguration
 </h3>
@@ -14428,7 +14414,7 @@ string
 <em>(Optional)</em>
 <p>Specifies a role to target with the service.
 If specified, the service will only be exposed to pods with the matching role.</p>
-<p>Note: At least one of &lsquo;roleSelector&rsquo; or &lsquo;selector&rsquo; must be specified.
+<p>Note: At least one of &lsquo;roleSelector&rsquo; or &lsquo;podSelector&rsquo; must be specified.
 If both are specified, a pod must match both conditions to be selected.</p>
 </td>
 </tr>
@@ -14443,7 +14429,7 @@ map[string]string
 <em>(Optional)</em>
 <p>Routes service traffic to pods with matching label keys and values.
 If specified, the service will only be exposed to pods matching the selector.</p>
-<p>Note: At least one of &lsquo;roleSelector&rsquo; or &lsquo;selector&rsquo; must be specified.
+<p>Note: At least one of &lsquo;roleSelector&rsquo; or &lsquo;podSelector&rsquo; must be specified.
 If both are specified, a pod must match both conditions to be selected.</p>
 </td>
 </tr>
@@ -16825,28 +16811,6 @@ This value is set to 0 by default, indicating that there will be no delay betwee
 </td>
 </tr>
 </tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.RoleArbitrator">RoleArbitrator
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
-</p>
-<div>
-<p>RoleArbitrator defines how to arbitrate the role of replicas.</p>
-<p>Deprecated since v0.9</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;External&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;Lorry&#34;</p></td>
-<td></td>
-</tr></tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.RoleProbe">RoleProbe
 </h3>
@@ -22488,21 +22452,6 @@ Provides read-write service.
 </tr>
 <tr>
 <td>
-<code>alternativeServices</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#service-v1-core">
-[]Kubernetes core/v1.Service
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines Alternative Services selector pattern specifier.</p>
-<p>Note: This field will be removed in future version.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>template</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podtemplatespec-v1-core">
@@ -22984,21 +22933,6 @@ Kubernetes core/v1.Service
 <p>Defines the behavior of a service spec.
 Provides read-write service.
 <a href="https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status">https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status</a></p>
-<p>Note: This field will be removed in future version.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>alternativeServices</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#service-v1-core">
-[]Kubernetes core/v1.Service
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines Alternative Services selector pattern specifier.</p>
 <p>Note: This field will be removed in future version.</p>
 </td>
 </tr>

@@ -21,6 +21,7 @@ package k8score
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -32,14 +33,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	lorryutil "github.com/apecloud/kubeblocks/pkg/lorry/util"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -62,6 +61,11 @@ var _ = Describe("Event Controller", func() {
 		testapps.ClearResources(&testCtx, generics.EventSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml)
 	}
+
+	const (
+		// roleChangedAnnotKey is used to mark the role change event has been handled.
+		roleChangedAnnotKey = "role.kubeblocks.io/event-handled"
+	)
 
 	var (
 		beforeLastTS = time.Date(2021, time.January, 1, 12, 0, 0, 0, time.UTC)
@@ -184,7 +188,7 @@ var _ = Describe("Event Controller", func() {
 				g.Expect(p).ShouldNot(BeNil())
 				g.Expect(p.Labels).ShouldNot(BeNil())
 				g.Expect(p.Labels[constant.RoleLabelKey]).Should(Equal(role))
-				g.Expect(p.Annotations[constant.LastRoleSnapshotVersionAnnotationKey]).Should(Equal(sndEvent.EventTime.Time.Format(time.RFC3339Nano)))
+				g.Expect(p.Annotations[constant.LastRoleSnapshotVersionAnnotationKey]).Should(Equal(strconv.FormatInt(sndEvent.EventTime.UnixMicro(), 10)))
 			})).Should(Succeed())
 
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(sndEvent), func(g Gomega, e *corev1.Event) {
@@ -192,9 +196,6 @@ var _ = Describe("Event Controller", func() {
 				g.Expect(e.Annotations).ShouldNot(BeNil())
 				g.Expect(e.Annotations[roleChangedAnnotKey]).Should(Equal("count-0"))
 			})).Should(Succeed())
-
-			By("check whether the duration and number of events reach the threshold")
-			Expect(IsOvertimeEvent(sndEvent, 5*time.Second)).Should(BeFalse())
 
 			By("send role changed event with beforeLastTS earlier than pod last role changes event timestamp annotation should not be update successfully")
 			role = "follower"
@@ -215,7 +216,7 @@ var _ = Describe("Event Controller", func() {
 				g.Expect(p).ShouldNot(BeNil())
 				g.Expect(p.Labels).ShouldNot(BeNil())
 				g.Expect(p.Labels[constant.RoleLabelKey]).ShouldNot(Equal(role))
-				g.Expect(p.Annotations[constant.LastRoleSnapshotVersionAnnotationKey]).ShouldNot(Equal(sndInvalidEvent.EventTime.Time.Format(time.RFC3339Nano)))
+				g.Expect(p.Annotations[constant.LastRoleSnapshotVersionAnnotationKey]).ShouldNot(Equal(strconv.FormatInt(sndInvalidEvent.EventTime.UnixMicro(), 10)))
 			})).Should(Succeed())
 
 			By("send role changed event with afterLastTS later than pod last role changes event timestamp annotation should be update successfully")
@@ -237,39 +238,8 @@ var _ = Describe("Event Controller", func() {
 				g.Expect(p).ShouldNot(BeNil())
 				g.Expect(p.Labels).ShouldNot(BeNil())
 				g.Expect(p.Labels[constant.RoleLabelKey]).Should(Equal(role))
-				g.Expect(p.Annotations[constant.LastRoleSnapshotVersionAnnotationKey]).Should(Equal(sndValidEvent.EventTime.Time.Format(time.RFC3339Nano)))
+				g.Expect(p.Annotations[constant.LastRoleSnapshotVersionAnnotationKey]).Should(Equal(strconv.FormatInt(sndValidEvent.EventTime.UnixMicro(), 10)))
 			})).Should(Succeed())
-		})
-	})
-
-	Context("ParseProbeEventMessage function", func() {
-		It("should work well", func() {
-			reqCtx := intctrlutil.RequestCtx{
-				Ctx: testCtx.Ctx,
-				Log: log.FromContext(ctx).WithValues("event", testCtx.DefaultNamespace),
-			}
-			event := createRoleChangedEvent("foo", "", "bar")
-			event.Message = "not-a-role-message"
-			eventMessage := ParseProbeEventMessage(reqCtx, event)
-			Expect(eventMessage).Should(BeNil())
-		})
-	})
-
-	Context("IsOvertimeEvent function", func() {
-		It("should work well", func() {
-			event := createRoleChangedEvent("foo", "", "bar")
-			timeout := 50 * time.Millisecond
-			event.FirstTimestamp = metav1.NewTime(time.Now())
-			event.LastTimestamp = metav1.NewTime(time.Now())
-			Expect(IsOvertimeEvent(event, timeout)).Should(BeFalse())
-			event.LastTimestamp = metav1.NewTime(event.LastTimestamp.Time.Add(2 * timeout))
-			Expect(IsOvertimeEvent(event, timeout)).Should(BeTrue())
-
-			event.EventTime = metav1.NewMicroTime(time.Now())
-			event.Series = &corev1.EventSeries{LastObservedTime: metav1.NewMicroTime(time.Now())}
-			Expect(IsOvertimeEvent(event, timeout)).Should(BeFalse())
-			event.Series = &corev1.EventSeries{LastObservedTime: metav1.NewMicroTime(time.Now().Add(2 * timeout))}
-			Expect(IsOvertimeEvent(event, timeout)).Should(BeTrue())
 		})
 	})
 })

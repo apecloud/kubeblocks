@@ -461,16 +461,6 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	Roles []ReplicaRole `json:"roles,omitempty"`
 
-	// This field has been deprecated since v0.9.
-	// This field is maintained for backward compatibility and its use is discouraged.
-	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
-	//
-	// This field is immutable.
-	//
-	// +kubebuilder:default=External
-	// +optional
-	RoleArbitrator *RoleArbitrator `json:"roleArbitrator,omitempty"`
-
 	// Defines a set of hooks and procedures that customize the behavior of a Component throughout its lifecycle.
 	// Actions are triggered at specific lifecycle stages:
 	//
@@ -649,18 +639,6 @@ type Exporter struct {
 	// +optional
 	ScrapeScheme PrometheusScheme `json:"scrapeScheme,omitempty"`
 }
-
-// RoleArbitrator defines how to arbitrate the role of replicas.
-//
-// Deprecated since v0.9
-// +enum
-// +kubebuilder:validation:Enum={External,Lorry}
-type RoleArbitrator string
-
-const (
-	ExternalRoleArbitrator RoleArbitrator = "External"
-	LorryRoleArbitrator    RoleArbitrator = "Lorry"
-)
 
 // ReplicaRole represents a role that can be assumed by a component instance.
 type ReplicaRole struct {
@@ -947,10 +925,8 @@ type Action struct {
 	//
 	// - `Immediately`: Executed right after the Component object is created.
 	//   The readiness of the Component and its resources is not guaranteed at this stage.
-	//   The Component's state can not be marked as ready until the Action completes successfully.
 	// - `RuntimeReady`: The Action is triggered after the Component object has been created and all associated
 	//   runtime resources (e.g. Pods) are in a ready state.
-	//   The Component's state can not be marked as ready until the Action completes successfully.
 	// - `ComponentReady`: The Action is triggered after the Component itself is in a ready state.
 	//   This process does not affect the readiness state of the Component or the Cluster.
 	// - `ClusterReady`: The Action is executed after the Cluster is in a ready state.

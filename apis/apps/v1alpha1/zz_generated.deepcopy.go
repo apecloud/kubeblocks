@@ -1688,11 +1688,6 @@ func (in *ComponentDefinitionSpec) DeepCopyInto(out *ComponentDefinitionSpec) {
 		*out = make([]ReplicaRole, len(*in))
 		copy(*out, *in)
 	}
-	if in.RoleArbitrator != nil {
-		in, out := &in.RoleArbitrator, &out.RoleArbitrator
-		*out = new(RoleArbitrator)
-		**out = **in
-	}
 	if in.LifecycleActions != nil {
 		in, out := &in.LifecycleActions, &out.LifecycleActions
 		*out = new(ComponentLifecycleActions)
@@ -2155,6 +2150,11 @@ func (in *ComponentVars) DeepCopyInto(out *ComponentVars) {
 	}
 	if in.InstanceNames != nil {
 		in, out := &in.InstanceNames, &out.InstanceNames
+		*out = new(VarOption)
+		**out = **in
+	}
+	if in.PodFQDNs != nil {
+		in, out := &in.PodFQDNs, &out.PodFQDNs
 		*out = new(VarOption)
 		**out = **in
 	}
@@ -3075,6 +3075,11 @@ func (in *EnvVar) DeepCopyInto(out *EnvVar) {
 		in, out := &in.ValueFrom, &out.ValueFrom
 		*out = new(VarSource)
 		(*in).DeepCopyInto(*out)
+	}
+	if in.Expression != nil {
+		in, out := &in.Expression, &out.Expression
+		*out = new(string)
+		**out = **in
 	}
 }
 

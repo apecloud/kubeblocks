@@ -24,8 +24,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/pkg/common"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
-
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -56,12 +54,6 @@ func (t *componentConfigurationTransformer) Transform(ctx graph.TransformContext
 		return nil
 	}
 
-	// wait for the completion of relevant conditions
-	components, err := component.GetHostNetworkRelatedComponents(&transCtx.CompDef.Spec.Runtime, transCtx.Context, t.Client, transCtx.Cluster)
-	if err != nil {
-		return err
-	}
-
 	// get dependOnObjs which will be used in configuration render
 	var dependOnObjs []client.Object
 	for _, vertex := range dag.Vertices() {
@@ -74,9 +66,6 @@ func (t *componentConfigurationTransformer) Transform(ctx graph.TransformContext
 			dependOnObjs = append(dependOnObjs, secret)
 			continue
 		}
-	}
-	if components != nil {
-		dependOnObjs = append(dependOnObjs, components...)
 	}
 
 	// configuration render

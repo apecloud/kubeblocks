@@ -1,4 +1,4 @@
-name: RELEASE-SYNC
+name: Release Sync
 
 on:
   workflow_dispatch:

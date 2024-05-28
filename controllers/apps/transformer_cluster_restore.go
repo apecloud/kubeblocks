@@ -50,9 +50,6 @@ func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 		return err
 	}
 
-	if len(c.Cluster.Spec.ShardingSpecs) == 0 {
-		return nil
-	}
 	// when restoring a sharded cluster, it is essential to specify the 'sourceTarget' from which data should be restored for each sharded component.
 	// to achieve this, we allocate the source target for each component using annotations.
 	for i := range c.Cluster.Spec.ShardingSpecs {

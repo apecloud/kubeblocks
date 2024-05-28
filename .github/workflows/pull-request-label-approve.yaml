@@ -19,8 +19,17 @@ jobs:
       APECD_REF: "v0.1.61"
     secrets: inherit
 
+  remove-fork-approve-label:
+    if: github.event.pull_request.head.repo.full_name != github.repository
+    uses: apecloud/apecloud-cd/.github/workflows/pull-request-label.yml@v0.1.61
+    with:
+      LABEL_NAME: "pre-approve"
+      LABEL_OPS: "REMOVE"
+      APECD_REF: "v0.1.61"
+    secrets: inherit
+
   approve-label-fork:
-    needs: [ approve-label ]
+    needs: [ remove-fork-approve-label ]
     if: github.event.pull_request.head.repo.full_name != github.repository
     uses: apecloud/apecloud-cd/.github/workflows/pull-request-label.yml@v0.1.61
     with:

@@ -90,7 +90,7 @@ func (s *PostProvision) Do(ctx context.Context, req *operations.OpsRequest) (*op
 
 	ppManager, ok := manager.(PostProvisionManager)
 	if !ok {
-		return nil, models.ErrNoImplemented
+		return nil, models.ErrNotImplemented
 	}
 	err = ppManager.PostProvision(ctx, componentNames, podNames, podIPs, podHostNames, podHostIPs)
 	return nil, err

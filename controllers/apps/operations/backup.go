@@ -44,8 +44,9 @@ var _ OpsHandler = BackupOpsHandler{}
 func init() {
 	// ToClusterPhase is not defined, because 'backup' does not affect the cluster phase.
 	backupBehaviour := OpsBehaviour{
-		FromClusterPhases: appsv1alpha1.GetClusterUpRunningPhases(),
-		OpsHandler:        BackupOpsHandler{},
+		FromClusterPhases: []appsv1alpha1.ClusterPhase{appsv1alpha1.RunningClusterPhase,
+			appsv1alpha1.UpdatingClusterPhase, appsv1alpha1.AbnormalClusterPhase},
+		OpsHandler: BackupOpsHandler{},
 	}
 
 	opsMgr := GetOpsManager()

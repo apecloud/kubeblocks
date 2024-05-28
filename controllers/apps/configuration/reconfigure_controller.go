@@ -39,6 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/extensions"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -198,6 +199,14 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 		resources.componentMatchLabels())
 	if err := reconcileContext.GetRelatedObjects(); err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(configMap, r.Recorder, err, reqCtx.Log)
+	}
+
+	// if cluster is paused, pausing reconfigure as well
+	if reconcileContext.ClusterObj != nil {
+		if val, ok := reconcileContext.ClusterObj.Annotations[extensions.ControllerPaused]; ok && val == "true" {
+			reqCtx.Log.Info(fmt.Sprintf("reconfigure is paused beacuse cluster %s is paused", resources.clusterName))
+			return intctrlutil.Reconciled()
+		}
 	}
 
 	// Assumption: It is required that the cluster must have a component.

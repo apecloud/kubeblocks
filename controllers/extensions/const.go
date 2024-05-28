@@ -25,6 +25,7 @@ const (
 
 	// annotation keys
 	ControllerPaused     = "controller.kubeblocks.io/controller-paused"
+	ControllerResumed    = "controller.kubeblocks.io/controller-resumed"
 	SkipInstallableCheck = "extensions.kubeblocks.io/skip-installable-check"
 	NoDeleteJobs         = "extensions.kubeblocks.io/no-delete-jobs"
 	AddonDefaultIsEmpty  = "addons.extensions.kubeblocks.io/default-is-empty"

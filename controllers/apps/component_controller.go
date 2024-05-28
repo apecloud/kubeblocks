@@ -146,6 +146,8 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		AddTransformer(
 			// handle component deletion and pre-terminate
 			&componentDeletionTransformer{},
+			// handle component pause and resume
+			&componentPauseTransformer{},
 			// handle finalizers and referenced definition labels
 			&componentMetaTransformer{},
 			// validate referenced componentDefinition objects, and build synthesized component

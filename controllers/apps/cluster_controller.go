@@ -129,6 +129,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		AddTransformer(
 			// handle cluster deletion first
 			&clusterDeletionTransformer{},
+			// handle cluster pause and resume
+			&clusterPauseTransformer{Client: r.Client},
 			// check is recovering from halted cluster
 			&clusterHaltRecoveryTransformer{},
 			// update finalizer and cd&cv labels

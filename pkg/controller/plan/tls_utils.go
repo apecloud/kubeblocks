@@ -44,8 +44,9 @@ import (
 func ComposeTLSSecret(namespace, clusterName, componentName string) (*v1.Secret, error) {
 	name := GenerateTLSSecretName(clusterName, componentName)
 	secret := builder.NewSecretBuilder(namespace, name).
+		AddLabels(constant.AppManagedByLabelKey, constant.AppName).
 		AddLabels(constant.AppInstanceLabelKey, clusterName).
-		AddLabels(constant.KBManagedByKey, constant.AppName).
+		AddLabels(constant.KBAppComponentLabelKey, componentName).
 		SetStringData(map[string]string{}).
 		GetObject()
 
@@ -114,6 +115,8 @@ func GetTLSKeyWord(cType string) string {
 		return "ssl_cert_file"
 	case "redis":
 		return "tls-cert-file"
+	case "kafka":
+		return "tlsEnabled"
 	default:
 		return "unsupported-character-type"
 	}

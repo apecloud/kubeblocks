@@ -10,33 +10,30 @@ sidebar_label: Testing environment
 
 ## Procedure 1. Use kbcli cluster connect command
 
-You can use the `kbcli cluster connect` command and specify the cluster name to be connected.
+1. Get the `username` and `password` for the cluster.
 
-```bash
-kbcli cluster connect ${cluster-name}
-```
+   ```bash
+   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+   >
+   root
 
-The lower-level command is actually `kubectl exec`. The command is functional as long as the K8s API server is accessible.
+   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+   >
+   2gvztbvz
+   ```
+
+2. Run the `kubectl exec` command and specify the cluster name to be connected.
+
+   ```bash
+   kubectl exec -ti -n demo mycluster-mysql-0 -- bash
+   ```
+
+The `kubectl exec` command is functional as long as the K8s API server is accessible.
 
 ## Procedure 2. Connect database with CLI or SDK client
 
-Execute the following command to get the network information of the targeted database and connect it with the printed IP address.
+You can use `kubectl exec` to connet to this cluster by following the steps in Procedure 1, and then connect to the cluster with the client you prefer.
 
 ```bash
-kbcli cluster connect --show-example --show-password ${cluster-name}
+kubectl exec -ti -n demo mycluster-mysql-0 -- bash
 ```
-
-Information printed includes database addresses, port No., username, password. The figure below is an example of MySQL database network information.
-
-- Address: -h specifies the server address. In the example below it is 127.0.0.1
-- Port: -P specifies port No. , In the example below it is 3306.
-- User: -u is the user name.
-- Password: -p shows the password. In the example below, it is hQBCKZLI.
-
-:::note
-
-The password does not include -p.
-
-:::
-
-![Example](./../../img/connect_database_with_CLI_or_SDK_client.png)

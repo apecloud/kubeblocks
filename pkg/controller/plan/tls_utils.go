@@ -115,8 +115,6 @@ func GetTLSKeyWord(cType string) string {
 		return "ssl_cert_file"
 	case "redis":
 		return "tls-cert-file"
-	case "kafka":
-		return "tlsEnabled"
 	default:
 		return "unsupported-character-type"
 	}

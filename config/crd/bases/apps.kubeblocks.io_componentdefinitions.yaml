@@ -12727,6 +12727,11 @@ spec:
                     name:
                       description: Specifies the name of the ServiceRefDeclaration.
                       type: string
+                    optional:
+                      description: "Specifies whether the service reference can be
+                        optional. \n For an optional service-ref, the component can
+                        still be created even if the service-ref is not provided."
+                      type: boolean
                     serviceRefDeclarationSpecs:
                       description: "Defines a list of constraints and requirements
                         for services that can be bound to this ServiceRefDeclaration

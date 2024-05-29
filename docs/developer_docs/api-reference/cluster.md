@@ -19141,6 +19141,19 @@ For example, if it requires an OLTP database, specs for both MySQL and PostgreSQ
 either MySQL or PostgreSQL services can be used when binding.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>optional</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether the service reference can be optional.</p>
+<p>For an optional service-ref, the component can still be created even if the service-ref is not provided.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ServiceRefDeclarationSpec">ServiceRefDeclarationSpec

@@ -466,6 +466,13 @@ type ServiceRefDeclaration struct {
 	//
 	// +kubebuilder:validation:Required
 	ServiceRefDeclarationSpecs []ServiceRefDeclarationSpec `json:"serviceRefDeclarationSpecs"`
+
+	// Specifies whether the service reference can be optional.
+	//
+	// For an optional service-ref, the component can still be created even if the service-ref is not provided.
+	//
+	// +optional
+	Optional *bool `json:"optional,omitempty"`
 }
 
 type ServiceRefDeclarationSpec struct {

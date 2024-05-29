@@ -97,8 +97,7 @@ func TestGetRole(t *testing.T) {
 
 		role, err := manager.GetReplicaRole(ctx, nil)
 		assert.Equal(t, "", role)
-		assert.NotNil(t, err)
-		assert.ErrorContains(t, err, "no data returned")
+		assert.Nil(t, err)
 	})
 
 	if err := mock.ExpectationsWereMet(); err != nil {

@@ -84,5 +84,6 @@ func (mgr *Manager) GetReplicaRoleForMember(ctx context.Context, cluster *dcs.Cl
 	if isReady {
 		return role, nil
 	}
-	return "", errors.Errorf("exec sql %s failed: no data returned", sql)
+	mgr.Logger.Info("no data returned", "sql", sql)
+	return "", nil
 }

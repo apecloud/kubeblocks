@@ -97,6 +97,7 @@ func (s *CheckRole) Init(ctx context.Context) error {
 	// lorry utilizes the pod readiness probe to trigger role probe and 'timeoutSeconds' is directly copied from the 'probe.timeoutSeconds' field of pod.
 	// here we give 80% of the total time to role probe job and leave the remaining 20% to kubelet to handle the readiness probe related tasks.
 	s.Timeout = time.Duration(timeoutSeconds) * (800 * time.Millisecond)
+	s.OriRole = "waitForStart"
 	actionJSON := viper.GetString(constant.KBEnvActionCommands)
 	if actionJSON != "" {
 		actionCommands := map[string][]string{}
@@ -198,7 +199,8 @@ func (s *CheckRole) Do(ctx context.Context, _ *operations.OpsRequest) (*operatio
 // of report events to reduce the possibility of event conflicts.
 func (s *CheckRole) roleValidate(role string) (bool, string) {
 	if role == "" {
-		return false, "role is none"
+		// some time db replica may not have role, e.g. oceanbase
+		return true, ""
 	}
 	// do not validate them when db roles setting is missing
 	if len(s.DBRoles) == 0 {

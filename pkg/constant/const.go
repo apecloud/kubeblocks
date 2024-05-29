@@ -300,6 +300,7 @@ const (
 	ServiceDescriptorUsernameKey = "username"
 	ServiceDescriptorPasswordKey = "password"
 	ServiceDescriptorEndpointKey = "endpoint"
+	ServiceDescriptorHostKey     = "host"
 	ServiceDescriptorPortKey     = "port"
 )
 

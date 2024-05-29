@@ -204,6 +204,7 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 		}
 		if err = job.CheckJobSucceed(reqCtx.Ctx, cli, opsRes.Cluster, jobName); err != nil {
 			if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
+				// means this job is failed
 				completedCount += 1
 				failedCount += 1
 				checkJobProcessDetail.Status = appsv1alpha1.FailedProgressStatus

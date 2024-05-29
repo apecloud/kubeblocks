@@ -27,6 +27,8 @@ import (
 	"strconv"
 	"strings"
 
+	"slices"
+
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/dlclark/regexp2"
 	"github.com/jackc/pgx/v5"
@@ -35,7 +37,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/spf13/cast"
-	"golang.org/x/exp/slices"
 
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"

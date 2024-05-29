@@ -23,7 +23,8 @@ import (
 	"context"
 	"fmt"
 
-	"golang.org/x/exp/slices"
+	"slices"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"

@@ -24,7 +24,8 @@ import (
 	"fmt"
 	"time"
 
-	"golang.org/x/exp/slices"
+	"slices"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"

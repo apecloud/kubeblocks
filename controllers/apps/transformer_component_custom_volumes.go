@@ -22,7 +22,8 @@ package apps
 import (
 	"fmt"
 
-	"golang.org/x/exp/slices"
+	"slices"
+
 	corev1 "k8s.io/api/core/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"

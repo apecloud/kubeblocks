@@ -26,9 +26,10 @@ import (
 	"strings"
 	"time"
 
+	"slices"
+
 	"github.com/Masterminds/semver/v3"
 	ctrlerihandler "github.com/authzed/controller-idioms/handler"
-	"golang.org/x/exp/slices"
 	v1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -1101,8 +1102,8 @@ func logFailedJobPodToCondError(ctx context.Context, stageCtx *stageCtx, addon *
 	}
 
 	// sort pod with latest creation place front
-	slices.SortFunc(podList.Items, func(a, b corev1.Pod) bool {
-		return b.CreationTimestamp.Before(&(a.CreationTimestamp))
+	slices.SortFunc(podList.Items, func(a, b corev1.Pod) int {
+		return a.CreationTimestamp.Compare(b.CreationTimestamp.Time)
 	})
 
 podsloop:

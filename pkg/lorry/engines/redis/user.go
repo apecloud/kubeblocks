@@ -25,7 +25,7 @@ import (
 	"fmt"
 	"strings"
 
-	"golang.org/x/exp/slices"
+	"slices"
 
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 )

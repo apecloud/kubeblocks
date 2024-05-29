@@ -493,7 +493,9 @@ func (r *clusterBackupPolicyTransformer) mergeClusterBackup(
 			},
 		}
 	}
-
+	if backup.Method == "" {
+		return backupSchedule
+	}
 	// build backup schedule policy by cluster backup spec
 	sp := &dpv1alpha1.SchedulePolicy{
 		Enabled:         backup.Enabled,

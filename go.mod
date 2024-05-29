@@ -36,7 +36,6 @@ require (
 	github.com/opencontainers/image-spec v1.1.0
 	github.com/pashagolub/pgxmock/v2 v2.11.0
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus-community/pro-bing v0.3.0
 	github.com/redis/go-redis/v9 v9.0.5
 	github.com/replicatedhq/troubleshoot v0.57.0
 	github.com/rogpeppe/go-internal v1.12.0

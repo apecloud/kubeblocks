@@ -96,13 +96,16 @@ func (r switchoverOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli
 		opsRequestPhase = appsv1alpha1.OpsRunningPhase
 	)
 
-	expectCount, actualCount, err := handleSwitchoverProgress(reqCtx, cli, opsRes)
+	expectCount, actualCount, failedCount, err := handleSwitchoverProgress(reqCtx, cli, opsRes)
 	if err != nil {
 		return "", 0, err
 	}
 
 	if expectCount == actualCount {
 		opsRequestPhase = appsv1alpha1.OpsSucceedPhase
+		if failedCount > 0 {
+			opsRequestPhase = appsv1alpha1.OpsFailedPhase
+		}
 	}
 
 	return opsRequestPhase, time.Second, nil
@@ -165,9 +168,10 @@ func doSwitchoverComponents(reqCtx intctrlutil.RequestCtx, cli client.Client, op
 // - expectCount: the expected count of switchover operations
 // - completedCount: the number of completed switchover operations
 // - error: any error that occurred during the handling
-func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (int32, int32, error) {
+func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (int32, int32, int32, error) {
 	var (
 		expectCount         = int32(len(opsRes.OpsRequest.Spec.SwitchoverList))
+		failedCount         int32
 		completedCount      int32
 		opsRequest          = opsRes.OpsRequest
 		oldOpsRequestStatus = opsRequest.Status.DeepCopy()
@@ -196,6 +200,13 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 			Status:    appsv1alpha1.ProcessingProgressStatus,
 		}
 		if err = component.CheckJobSucceed(reqCtx.Ctx, cli, opsRes.Cluster, jobName); err != nil {
+			if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
+				// means this job is failed
+				completedCount += 1
+				failedCount += 1
+				checkJobProcessDetail.Status = appsv1alpha1.FailedProgressStatus
+				err = nil
+			}
 			checkJobProcessDetail.Message = fmt.Sprintf("switchover job %s is not succeed", jobName)
 			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.UpdatingClusterCompPhase, checkJobProcessDetail, switchover.ComponentName)
 			continue
@@ -251,24 +262,24 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 	// patch OpsRequest.status.components
 	if !reflect.DeepEqual(*oldOpsRequestStatus, opsRequest.Status) {
 		if err := cli.Status().Patch(reqCtx.Ctx, opsRequest, patch); err != nil {
-			return expectCount, 0, err
+			return expectCount, 0, 0, err
 		}
 	}
 
 	if err != nil {
-		return expectCount, completedCount, err
+		return expectCount, completedCount, failedCount, err
 	}
 
 	if completedCount == expectCount {
 		for _, jobName := range succeedJobs {
 			if err := component.CleanJobByName(reqCtx.Ctx, cli, opsRes.Cluster, jobName); err != nil {
 				reqCtx.Log.Error(err, "clean switchover job failed", "jobName", jobName)
-				return expectCount, completedCount, err
+				return expectCount, completedCount, failedCount, err
 			}
 		}
 	}
 
-	return expectCount, completedCount, nil
+	return expectCount, completedCount, failedCount, nil
 }
 
 // setComponentSwitchoverProgressDetails sets component switchover progress details.

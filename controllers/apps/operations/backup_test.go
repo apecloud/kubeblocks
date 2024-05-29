@@ -55,6 +55,8 @@ var _ = Describe("Backup OpsRequest", func() {
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
 		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.StatefulSetSignature, true, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.DeploymentSignature, true, inNS, ml)
 	}
 
 	BeforeEach(cleanEnv)

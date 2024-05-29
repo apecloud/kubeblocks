@@ -31,6 +31,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -572,6 +573,47 @@ var _ = Describe("Backup Controller test", func() {
 				By("check backup status failed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseFailed))
+				})).Should(Succeed())
+			})
+		})
+
+		Context("create continuous backup", func() {
+
+			It("continue reconcile when continuous backup is Failed after fixing the issue", func() {
+				By("create actionset and backupRepo for continuous backup")
+				actionSet := testdp.NewFakeActionSet(&testCtx)
+				Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(actionSet), func(fetched *dpv1alpha1.ActionSet) {
+					fetched.Spec.BackupType = dpv1alpha1.BackupTypeContinuous
+				})).Should(Succeed())
+				_ = testdp.NewFakeStorageProvider(&testCtx, nil)
+				backupRepo, repoPVCName := testdp.NewFakeBackupRepo(&testCtx, nil)
+
+				By("create backupPolicy with non-exist backupRepo")
+				backupPolicy = testdp.NewFakeBackupPolicy(&testCtx, func(bp *dpv1alpha1.BackupPolicy) {
+					bp.Spec.BackupRepoName = pointer.String("non-exist-repo")
+				})
+
+				By("create a backupSchedule and enable continuous backup")
+				backupSchedule := testdp.NewFakeBackupSchedule(&testCtx, func(schedule *dpv1alpha1.BackupSchedule) {
+					schedule.Spec.Schedules[0].Enabled = pointer.Bool(true)
+				})
+
+				By("expect backup phase to Failed")
+				backupName := dpbackup.GenerateCRNameByBackupSchedule(backupSchedule, testdp.BackupMethodName)
+				backupKey := client.ObjectKey{Name: backupName, Namespace: testCtx.DefaultNamespace}
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseFailed))
+				})).Should(Succeed())
+
+				By("use the correct backupRepo")
+				Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(policy *dpv1alpha1.BackupPolicy) {
+					policy.Spec.BackupRepoName = pointer.String(backupRepo.Name)
+				})).Should(Succeed())
+
+				By("expect backup phase to Running")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
+					g.Expect(fetched.Status.PersistentVolumeClaimName).Should(Equal(repoPVCName))
 				})).Should(Succeed())
 			})
 		})

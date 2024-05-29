@@ -980,7 +980,8 @@ func (r *BackupRepoReconciler) listAssociatedBackups(
 	var filtered []*dpv1alpha1.Backup
 	for idx := range backupList.Items {
 		backup := &backupList.Items[idx]
-		if backup.Status.Phase == dpv1alpha1.BackupPhaseFailed {
+		if backup.Status.Phase == dpv1alpha1.BackupPhaseFailed &&
+			backup.Labels[dptypes.BackupTypeLabelKey] != string(dpv1alpha1.BackupTypeContinuous) {
 			continue
 		}
 		filtered = append(filtered, backup)
@@ -1317,7 +1318,8 @@ func (r *BackupRepoReconciler) mapBackupToRepo(ctx context.Context, obj client.O
 		return nil
 	}
 	// ignore failed backups
-	if backup.Status.Phase == dpv1alpha1.BackupPhaseFailed {
+	if backup.Status.Phase == dpv1alpha1.BackupPhaseFailed &&
+		backup.Labels[dptypes.BackupTypeLabelKey] != string(dpv1alpha1.BackupTypeContinuous) {
 		return nil
 	}
 	// we should reconcile the BackupRepo when:

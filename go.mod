@@ -70,10 +70,10 @@ require (
 	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/yaml.v2 v2.4.0
 	helm.sh/helm/v3 v3.12.3
-	k8s.io/api v0.29.0
-	k8s.io/apiextensions-apiserver v0.29.0
-	k8s.io/apimachinery v0.29.0
-	k8s.io/apiserver v0.29.0
+	k8s.io/api v0.28.4
+	k8s.io/apiextensions-apiserver v0.28.4
+	k8s.io/apimachinery v0.28.4
+	k8s.io/apiserver v0.28.3
 	k8s.io/cli-runtime v0.28.3
 	k8s.io/client-go v0.28.3
 	k8s.io/code-generator v0.28.3
@@ -308,12 +308,10 @@ require (
 
 replace (
 	golang.org/x/exp => golang.org/x/exp v0.0.0-20230711153332-06a737ee72cb
-	k8s.io/api => k8s.io/api v0.28.3
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.28.3
 	k8s.io/apimachinery => k8s.io/apimachinery v0.28.3
 	k8s.io/apiserver => k8s.io/apiserver v0.28.3
 	k8s.io/cli-runtime => k8s.io/cli-runtime v0.28.3
-	k8s.io/client-go => k8s.io/client-go v0.28.3
 	k8s.io/cloud-provider => k8s.io/cloud-provider v0.28.3
 	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.28.3
 	k8s.io/code-generator => k8s.io/code-generator v0.28.3

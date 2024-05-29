@@ -2731,7 +2731,7 @@ CredentialVar
 <td>
 <em>(Optional)</em>
 <p>Specifies the endpoint of the external service.</p>
-<p>If the service is exposed via a cluster, the endpoint will be provided in the format of <host>:<port>.</p>
+<p>If the service is exposed via a cluster, the endpoint will be provided in the format of <code>host:port</code>.</p>
 </td>
 </tr>
 <tr>
@@ -17977,7 +17977,7 @@ CredentialVar
 <td>
 <em>(Optional)</em>
 <p>Specifies the endpoint of the external service.</p>
-<p>If the service is exposed via a cluster, the endpoint will be provided in the format of <host>:<port>.</p>
+<p>If the service is exposed via a cluster, the endpoint will be provided in the format of <code>host:port</code>.</p>
 </td>
 </tr>
 <tr>

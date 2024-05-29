@@ -273,7 +273,7 @@ spec:
               endpoint:
                 description: "Specifies the endpoint of the external service. \n If
                   the service is exposed via a cluster, the endpoint will be provided
-                  in the format of <host>:<port>."
+                  in the format of `host:port`."
                 properties:
                   value:
                     description: "Holds a direct string or an expression that can

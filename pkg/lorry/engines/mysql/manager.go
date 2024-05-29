@@ -113,7 +113,7 @@ func (mgr *Manager) IsDBStartupReady() bool {
 	if mgr.DBStartupReady {
 		return true
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5000*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 
 	// test if db is ready to connect or not

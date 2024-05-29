@@ -58,7 +58,7 @@ func buildServiceReferencesWithoutResolve(ctx context.Context, cli client.Reader
 	for _, serviceRefDecl := range compDef.Spec.ServiceRefDeclarations {
 		serviceRef, ok := serviceRefs[serviceRefDecl.Name]
 		if !ok {
-			if IsGenerated(comp) {
+			if IsGenerated(comp) || (serviceRefDecl.Optional != nil && *serviceRefDecl.Optional) {
 				continue
 			}
 			return fmt.Errorf("service-ref for %s is not defined", serviceRefDecl.Name)

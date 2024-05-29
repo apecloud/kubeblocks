@@ -121,6 +121,10 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return r.handleDeletingPhase(reqCtx, backup)
 	case dpv1alpha1.BackupPhaseFailed:
 		if backup.Labels[dptypes.BackupTypeLabelKey] == string(dpv1alpha1.BackupTypeContinuous) {
+			if backup.Status.StartTimestamp.IsZero() {
+				// if the backup fails in the 'New' phase, reconcile it from 'New' phase handler.
+				return r.handleNewPhase(reqCtx, backup)
+			}
 			return r.handleRunningPhase(reqCtx, backup)
 		}
 		return intctrlutil.Reconciled()

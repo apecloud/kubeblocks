@@ -38,6 +38,8 @@ const (
 	ServiceVPCName      = "vpc-lb"
 	ServiceInternetName = "internet-lb"
 
+	DefaultConfigKey = "my.cnf"
+
 	ReplicationPodRoleVolume      = "pod-role"
 	ReplicationRoleLabelFieldPath = "metadata.labels['kubeblocks.io/role']"
 	DefaultReplicationReplicas    = 2
@@ -496,5 +498,27 @@ var (
 				},
 			},
 		}
+	}
+
+	DefaultConfigData = map[string]string{
+		DefaultConfigKey: `
+[mysqld]
+innodb-buffer-pool-size=512M
+log-bin=master-bin
+gtid_mode=OFF
+consensus_auto_leader_transfer=ON
+
+pid-file=/var/run/mysqld/mysqld.pid
+socket=/var/run/mysqld/mysqld.sock
+
+port=3306
+general_log=0
+server-id=1
+slow_query_log=0
+
+[client]
+socket=/var/run/mysqld/mysqld.sock
+host=localhost
+`,
 	}
 )

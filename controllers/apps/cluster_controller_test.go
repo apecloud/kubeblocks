@@ -118,10 +118,13 @@ var _ = Describe("Cluster Controller", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupPolicySignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.VolumeSnapshotSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ServiceSignature, true, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ConfigMapSignature, true, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ConfigurationSignature, true, inNS, ml)
 		// non-namespaced
 		testapps.ClearResources(&testCtx, generics.BackupPolicyTemplateSignature, ml)
 		testapps.ClearResources(&testCtx, generics.ActionSetSignature, ml)
 		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
+		testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
 		resetTestContext()
 	}
 
@@ -552,7 +555,7 @@ var _ = Describe("Cluster Controller", func() {
 				{
 					Name: testapps.DefaultConfigSpecName,
 					ParamsInFile: map[string]appsv1alpha1.ParametersInFile{
-						"my.cnf": {
+						testapps.DefaultConfigKey: {
 							Parameters: map[string]*string{
 								"max_connections": cfgutil.ToPointer("1000"),
 							},
@@ -570,9 +573,9 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(testapps.List(&testCtx, generics.ComponentSignature, ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(shards))
 	}
 
-	createClusterObjWithShardingAndConfiguration := func(compTplName, compDefName string, processor func(*testapps.MockClusterFactory)) {
+	createClusterObjWithShardingAndConfiguration := func(shardingName, compDefName string, processor func(*testapps.MockClusterFactory)) {
 		By("Creating a cluster with new component definition")
-		createClusterObjNoWait("", "", shardingComponentProcessorWrapper(false, compTplName, compDefName, processor))
+		createClusterObjNoWait("", "", shardingComponentProcessorWrapper(false, shardingName, compDefName, processor))
 
 		By("Waiting for the cluster enter Creating phase")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
@@ -581,18 +584,28 @@ var _ = Describe("Cluster Controller", func() {
 		By("Wait component created")
 		ml := client.MatchingLabels{
 			constant.AppInstanceLabelKey:       clusterKey.Name,
-			constant.KBAppShardingNameLabelKey: compTplName,
+			constant.KBAppShardingNameLabelKey: shardingName,
 		}
-		Eventually(testapps.List(&testCtx, generics.ComponentSignature,
+		Eventually(testapps.List(&testCtx, generics.ConfigurationSignature,
 			ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(defaultShardCount))
 
-		By("checking configuration sxhedule")
-		// TODO: check configuration phase
-		// backupPolicyName := generateBackupPolicyName(clusterKey.Name, compTplName, "")
-		// backupPolicyKey := client.ObjectKey{Name: backupPolicyName, Namespace: clusterKey.Namespace}
-		// Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, bp *dpv1alpha1.BackupPolicy) {
-		// 	g.Expect(bp.Spec.Targets).Should(HaveLen(defaultShardCount))
-		// })).Should(Succeed())
+		checkConfig := func(g Gomega) {
+			configList := appsv1alpha1.ConfigurationList{}
+			g.Expect(testCtx.Cli.List(testCtx.Ctx, &configList, client.InNamespace(testCtx.DefaultNamespace), ml)).Should(Succeed())
+			g.Expect(configList.Items).Should(HaveLen(defaultShardCount))
+			for _, configuration := range configList.Items {
+				g.Expect(len(configuration.Spec.ConfigItemDetails)).Should(BeEquivalentTo(1))
+				g.Expect(configuration.Spec.ConfigItemDetails[0].Name).Should(BeEquivalentTo(testapps.DefaultConfigSpecName))
+				g.Expect(configuration.Spec.ConfigItemDetails[0].ConfigSpec).ShouldNot(BeNil())
+				g.Expect(configuration.Spec.ConfigItemDetails[0].ConfigSpec.Name).Should(BeEquivalentTo(testapps.DefaultConfigSpecName))
+				g.Expect(configuration.Spec.ConfigItemDetails[0].ConfigSpec.TemplateRef).Should(BeEquivalentTo(testapps.DefaultConfigSpecTplRef))
+				g.Expect(configuration.Spec.ConfigItemDetails[0].ConfigSpec.ConfigConstraintRef).Should(BeEquivalentTo(testapps.DefaultConfigSpecConstraintRef))
+				g.Expect(len(configuration.Spec.ConfigItemDetails[0].ConfigFileParams) > 0).Should(BeTrue())
+			}
+		}
+
+		By("checking configuration schedule")
+		Eventually(checkConfig).Should(Succeed())
 	}
 
 	testClusterService := func(compName, compDefName string, createObj func(string, string, func(*testapps.MockClusterFactory))) {
@@ -1612,8 +1625,16 @@ var _ = Describe("Cluster Controller", func() {
 })
 
 func createConfigTpl(configs []appsv1alpha1.ComponentConfigSpec) {
-	// TODO create configconstraint && configmap
-	panic("")
+	for _, config := range configs {
+		if config.ConfigConstraintRef != "" {
+			testapps.NewConfigConstraintFactory(config.ConfigConstraintRef).Create(&testCtx)
+		}
+		if config.TemplateRef != "" {
+			testapps.NewConfigTemplateFactory(config.TemplateRef, testCtx.DefaultNamespace).
+				Data(testapps.DefaultConfigData).
+				Create(&testCtx)
+		}
+	}
 }
 
 func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition, compDef string, mappingClusterVersions ...string) {

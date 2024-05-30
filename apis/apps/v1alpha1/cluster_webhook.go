@@ -110,7 +110,7 @@ func getLastComponentByName(lastCluster *Cluster, componentName string) *Cluster
 // setVolumeClaimStorageSizeZero set the volumeClaimTemplates storage size to zero. then we can diff last/current volumeClaimTemplates.
 func setVolumeClaimStorageSizeZero(volumeClaimTemplates []ClusterComponentVolumeClaimTemplate) {
 	for i := range volumeClaimTemplates {
-		volumeClaimTemplates[i].Spec.Resources = corev1.ResourceRequirements{}
+		volumeClaimTemplates[i].Spec.Resources = corev1.VolumeResourceRequirements{}
 	}
 }
 

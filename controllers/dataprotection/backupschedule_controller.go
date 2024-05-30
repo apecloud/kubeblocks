@@ -22,12 +22,10 @@ package dataprotection
 import (
 	"context"
 	"reflect"
-	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -129,8 +127,7 @@ func (r *BackupScheduleReconciler) deleteExternalResources(
 			return err
 		}
 	}
-	// notice running backup to completed
-	// TODO(ldm): is it necessary to notice running backup to completed?
+	/*// notice continuous backup to completed
 	backup := &dpv1alpha1.Backup{}
 	for _, s := range backupSchedule.Spec.Schedules {
 		backupKey := client.ObjectKey{
@@ -149,7 +146,7 @@ func (r *BackupScheduleReconciler) deleteExternalResources(
 		if err := r.Client.Status().Patch(reqCtx.Ctx, backup, patch); err != nil {
 			return err
 		}
-	}
+	}*/
 	return nil
 }
 

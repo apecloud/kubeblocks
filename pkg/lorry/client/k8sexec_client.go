@@ -193,7 +193,7 @@ func (cli *K8sExecClient) k8sExec(cmd []string, outWriter io.Writer, errWriter i
 			TTY:       t.Raw,
 		}, scheme.ParameterCodec)
 
-		return cli.Executor.Execute("POST", req.URL(), cli.restConfig, cli.In, outWriter, errWriter, t.Raw, sizeQueue)
+		return cli.Executor.Execute(req.URL(), cli.restConfig, cli.In, outWriter, errWriter, t.Raw, sizeQueue)
 	}
 
 	if err := t.Safe(fn); err != nil {

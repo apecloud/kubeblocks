@@ -26,9 +26,9 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // clusterServiceTransformer handles cluster services.
@@ -82,44 +82,14 @@ func (c *clusterShardingConfigurationTransformer) reconcile(transCtx *clusterTra
 }
 
 func (c *clusterShardingConfigurationTransformer) mergeConfiguration(expected *appsv1alpha1.Configuration, existing *appsv1alpha1.Configuration) *appsv1alpha1.Configuration {
-	fromList := func(items []appsv1alpha1.ConfigurationItemDetail) sets.Set[string] {
-		sets := sets.New[string]()
-		for _, item := range items {
-			sets.Insert(item.Name)
+	return configuration.MergeConfiguration(expected, existing, func(dest, expected *appsv1alpha1.ConfigurationItemDetail) {
+		if expected.ImportTemplateRef != nil {
+			dest.ImportTemplateRef = expected.ImportTemplateRef
 		}
-		return sets
-	}
-
-	// update cluster.spec.shardingSpecs[*].template.componentConfigItems.*
-	updateConfigSpec := func(item appsv1alpha1.ConfigurationItemDetail) appsv1alpha1.ConfigurationItemDetail {
-		if newItem := expected.Spec.GetConfigurationItem(item.Name); newItem != nil {
-			item.ImportTemplateRef = newItem.ImportTemplateRef
-			item.ConfigFileParams = newItem.ConfigFileParams
+		if len(expected.ConfigFileParams) != 0 {
+			dest.ConfigFileParams = expected.ConfigFileParams
 		}
-		return item
-	}
-
-	oldSets := fromList(existing.Spec.ConfigItemDetails)
-	newSets := fromList(expected.Spec.ConfigItemDetails)
-	addSets := newSets.Difference(oldSets)
-	delSets := oldSets.Difference(newSets)
-
-	newConfigItems := make([]appsv1alpha1.ConfigurationItemDetail, 0)
-	for _, item := range existing.Spec.ConfigItemDetails {
-		if !delSets.Has(item.Name) {
-			newConfigItems = append(newConfigItems, updateConfigSpec(item))
-		}
-	}
-	for _, item := range expected.Spec.ConfigItemDetails {
-		if addSets.Has(item.Name) {
-			newConfigItems = append(newConfigItems, item)
-		}
-	}
-
-	updated := existing.DeepCopy()
-	updated.Labels = intctrlutil.MergeMetadataMaps(updated.GetLabels(), expected.GetLabels())
-	updated.Spec.ConfigItemDetails = newConfigItems
-	return updated
+	})
 }
 
 func createShardingConfigurations(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) map[string]*appsv1alpha1.Configuration {

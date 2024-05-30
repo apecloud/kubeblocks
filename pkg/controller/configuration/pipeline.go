@@ -28,7 +28,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
-	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -216,45 +215,10 @@ func (p *pipeline) createConfiguration() *appsv1alpha1.Configuration {
 }
 
 func (p *pipeline) updateConfiguration(expected *appsv1alpha1.Configuration, existing *appsv1alpha1.Configuration) error {
-	fromMap := func(items []appsv1alpha1.ConfigurationItemDetail) *cfgutil.Sets {
-		sets := cfgutil.NewSet()
-		for _, item := range items {
-			sets.Add(item.Name)
-		}
-		return sets
-	}
-
-	updateConfigSpec := func(item appsv1alpha1.ConfigurationItemDetail) appsv1alpha1.ConfigurationItemDetail {
-		if newItem := expected.Spec.GetConfigurationItem(item.Name); newItem != nil {
-			item.ConfigSpec = newItem.ConfigSpec
-		}
-		return item
-	}
-
-	oldSets := fromMap(existing.Spec.ConfigItemDetails)
-	newSets := fromMap(expected.Spec.ConfigItemDetails)
-
-	addSets := cfgutil.Difference(newSets, oldSets)
-	delSets := cfgutil.Difference(oldSets, newSets)
-
-	newConfigItems := make([]appsv1alpha1.ConfigurationItemDetail, 0)
-	for _, item := range existing.Spec.ConfigItemDetails {
-		if !delSets.InArray(item.Name) {
-			newConfigItems = append(newConfigItems, updateConfigSpec(item))
-		}
-	}
-	for _, item := range expected.Spec.ConfigItemDetails {
-		if addSets.InArray(item.Name) {
-			newConfigItems = append(newConfigItems, item)
-		}
-	}
-
-	labels := intctrlutil.MergeMetadataMaps(existing.GetLabels(), expected.GetLabels())
-	patch := client.MergeFrom(existing)
-	updated := existing.DeepCopy()
-	updated.Labels = labels
-	updated.Spec.ConfigItemDetails = newConfigItems
-	return p.Client.Patch(p.Context, updated, patch)
+	updated := MergeConfiguration(expected, existing, func(dest, expected *appsv1alpha1.ConfigurationItemDetail) {
+		dest.ConfigSpec = expected.ConfigSpec
+	})
+	return p.Client.Patch(p.Context, updated, client.MergeFrom(existing))
 }
 
 func (p *updatePipeline) isDone() bool {

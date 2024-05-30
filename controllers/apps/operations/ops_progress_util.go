@@ -538,7 +538,7 @@ func getPodSetForComponent(
 	workloadName := constant.GenerateWorkloadNamePattern(clusterName, fullCompName)
 	podSet := map[string]string{}
 	insTplReplicasCnt := int32(0)
-	// get the pods these are created by insTemplate
+	// get the pods created by insTemplate
 	for _, ins := range instances {
 		insReplicas := intctrlutil.TemplateReplicas(ins)
 		insTplReplicasCnt += insReplicas

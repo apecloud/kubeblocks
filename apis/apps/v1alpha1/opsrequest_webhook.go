@@ -443,7 +443,6 @@ func (r *OpsRequest) validateHorizontalScaling(_ context.Context, _ client.Clien
 }
 
 func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, compSpec ClusterComponentSpec, componentName string) error {
-	// TODO: check instanceReplicas and compReplicas
 	checkReplicasWrapper := func(replicasWrapper ReplicasWrapper) error {
 		var replicasOPCount int
 		if replicasWrapper.Replicas != nil {

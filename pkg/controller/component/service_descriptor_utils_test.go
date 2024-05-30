@@ -407,6 +407,7 @@ var _ = Describe("build service references", func() {
 		})
 
 		It("has service-ref not defined", func() {
+			// for generated components, undefined service-refs are ignored by default.
 			err := buildServiceReferencesWithoutResolve(testCtx.Ctx, testCtx.Cli, synthesizedComp, compDef, comp)
 			Expect(err).Should(Succeed())
 			Expect(synthesizedComp.ServiceReferences).Should(HaveLen(0))
@@ -415,6 +416,12 @@ var _ = Describe("build service references", func() {
 			err = buildServiceReferencesWithoutResolve(testCtx.Ctx, testCtx.Cli, synthesizedComp, compDef, comp)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("service-ref for %s is not defined", serviceRefDeclaration.Name))
+
+			// set the service-ref as optional
+			compDef.Spec.ServiceRefDeclarations[0].Optional = func() *bool { optional := true; return &optional }()
+			err = buildServiceReferencesWithoutResolve(testCtx.Ctx, testCtx.Cli, synthesizedComp, compDef, comp)
+			Expect(err).Should(Succeed())
+			Expect(synthesizedComp.ServiceReferences).Should(HaveLen(0))
 		})
 
 		It("service vars - cluster service", func() {

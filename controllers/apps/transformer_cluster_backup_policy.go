@@ -168,6 +168,15 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 					graphCli.Patch(dag, oldBackupSchedule, newBackupSchedule)
 				}
 				graphCli.DependOn(dag, backupPolicy, newBackupSchedule)
+				// TODO: add a unit test to prove it
+				// the bug is:
+				// if a backuppolicy and a component does not depend on each other,
+				// when doing topology sort, component can be created after backuppolicy
+				// but in fact backuppolicy depends on component (sharding spec).
+				// so backuppolicy creation will fail, and reconcilation returns immediately,
+				// a deadlock!
+				comps := graphCli.FindAll(dag, &appsv1alpha1.Component{})
+				graphCli.DependOn(dag, backupPolicy, comps...)
 				backupScheduleNames[newBackupSchedule.Name] = struct{}{}
 			}
 

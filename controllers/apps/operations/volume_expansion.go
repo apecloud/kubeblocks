@@ -183,14 +183,12 @@ func (ve volumeExpansionOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.Req
 
 // pvcIsResizing when pvc start resizing, it will set conditions type to Resizing/FileSystemResizePending
 func (ve volumeExpansionOpsHandler) pvcIsResizing(pvc *corev1.PersistentVolumeClaim) bool {
-	var isResizing bool
 	for _, condition := range pvc.Status.Conditions {
 		if condition.Type == corev1.PersistentVolumeClaimResizing || condition.Type == corev1.PersistentVolumeClaimFileSystemResizePending {
-			isResizing = true
-			break
+			return true
 		}
 	}
-	return isResizing
+	return false
 }
 
 func (ve volumeExpansionOpsHandler) getRequestStorageMap(opsRequest *appsv1alpha1.OpsRequest) map[string]resource.Quantity {
@@ -266,8 +264,9 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 		}
 		currStorageSize := v.Status.Capacity.Storage()
 		// should check if the spec.resources.requests.storage equals to the requested storage
+		// and current storage size is greater than or equal to request storage size.
 		// and pvc is bound if the pvc is re-created for recovery.
-		if currStorageSize.Cmp(requestStorage) == 0 &&
+		if currStorageSize.Cmp(requestStorage) >= 0 &&
 			v.Spec.Resources.Requests.Storage().Cmp(requestStorage) == 0 &&
 			v.Status.Phase == corev1.ClaimBound {
 			succeedCount += 1

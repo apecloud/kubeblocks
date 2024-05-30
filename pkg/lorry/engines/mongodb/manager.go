@@ -300,6 +300,13 @@ func (mgr *Manager) GetReplSetStatus(ctx context.Context) (*ReplSetStatus, error
 }
 
 func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, dcsMember *dcs.Member) (bool, error) {
+	if dcsMember == nil {
+		dcsMember = cluster.GetMemberWithName(mgr.CurrentMemberName)
+	}
+	if dcsMember == nil {
+		return false, errors.New("no member specified")
+	}
+
 	status, err := mgr.GetReplSetStatus(ctx)
 	if err != nil {
 		mgr.Logger.Info("rs.status() error", "error", err.Error())
@@ -317,21 +324,7 @@ func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, dc
 }
 
 func (mgr *Manager) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
-	cur := mgr.Client.Database("admin").RunCommand(ctx, bson.D{{Key: "isMaster", Value: 1}})
-	if cur.Err() != nil {
-		return false, errors.Wrap(cur.Err(), "run isMaster")
-	}
-
-	resp := IsMasterResp{}
-	if err := cur.Decode(&resp); err != nil {
-		return false, errors.Wrap(err, "decode isMaster response")
-	}
-
-	if resp.OK != 1 {
-		return false, errors.Errorf("mongo says: %s", resp.Errmsg)
-	}
-
-	return resp.IsMaster, nil
+	return mgr.IsLeaderMember(ctx, cluster, nil)
 }
 
 func (mgr *Manager) GetReplSetConfig(ctx context.Context) (*RSConfig, error) {

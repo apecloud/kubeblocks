@@ -126,7 +126,7 @@ func checkAndCreateConfigManagerToolsContainer(toolContainers []appsv1beta1.Tool
 	toolContainers = append(toolContainers, appsv1beta1.ToolConfig{
 		Name:    installConfigMangerToolContainerName,
 		Image:   kbToolsImage,
-		Command: []string{"cp", constant.TPLRenderToolPath, mountPoint},
+		Command: []string{"cp", constant.ConfigManagerToolPath, mountPoint},
 	})
 	return toolContainers
 }

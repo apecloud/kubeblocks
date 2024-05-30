@@ -127,26 +127,6 @@ func (r *BackupScheduleReconciler) deleteExternalResources(
 			return err
 		}
 	}
-	/*// notice continuous backup to completed
-	backup := &dpv1alpha1.Backup{}
-	for _, s := range backupSchedule.Spec.Schedules {
-		backupKey := client.ObjectKey{
-			Namespace: backupSchedule.Namespace,
-			Name:      dpbackup.GenerateCRNameByBackupSchedule(backupSchedule, s.BackupMethod),
-		}
-		if err := r.Client.Get(reqCtx.Ctx, backupKey, backup); err != nil {
-			if client.IgnoreNotFound(err) == nil {
-				continue
-			}
-			return err
-		}
-		patch := client.MergeFrom(backup.DeepCopy())
-		backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
-		backup.Status.CompletionTimestamp = &metav1.Time{Time: time.Now().UTC()}
-		if err := r.Client.Status().Patch(reqCtx.Ctx, backup, patch); err != nil {
-			return err
-		}
-	}*/
 	return nil
 }
 

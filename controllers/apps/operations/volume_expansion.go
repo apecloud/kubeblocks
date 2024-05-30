@@ -356,7 +356,7 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 		}
 		currStorageSize := v.Status.Capacity.Storage()
 		// should check if the spec.resources.requests.storage equals to the requested storage
-		// and current storage size is greater than request storage size.
+		// and current storage size is greater than or equal to request storage size.
 		// and pvc is bound if the pvc is re-created for recovery.
 		if currStorageSize.Cmp(requestStorage) >= 0 &&
 			v.Spec.Resources.Requests.Storage().Cmp(requestStorage) == 0 &&

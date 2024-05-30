@@ -4296,6 +4296,72 @@ spec:
                           - Noop
                           type: string
                       type: object
+                    systemAccounts:
+                      description: Overrides system accounts defined in referenced
+                        ComponentDefinition.
+                      items:
+                        properties:
+                          name:
+                            description: The name of the system account.
+                            type: string
+                          passwordConfig:
+                            description: "Specifies the policy for generating the
+                              account's password. \n This field is immutable once
+                              set."
+                            properties:
+                              length:
+                                default: 16
+                                description: The length of the password.
+                                format: int32
+                                maximum: 32
+                                minimum: 8
+                                type: integer
+                              letterCase:
+                                default: MixedCases
+                                description: The case of the letters in the password.
+                                enum:
+                                - LowerCases
+                                - UpperCases
+                                - MixedCases
+                                type: string
+                              numDigits:
+                                default: 4
+                                description: The number of digits in the password.
+                                format: int32
+                                maximum: 8
+                                minimum: 0
+                                type: integer
+                              numSymbols:
+                                default: 0
+                                description: The number of symbols in the password.
+                                format: int32
+                                maximum: 8
+                                minimum: 0
+                                type: integer
+                              seed:
+                                description: Seed to generate the account's password.
+                                  Cannot be updated.
+                                type: string
+                            type: object
+                          secretRef:
+                            description: "Refers to the secret from which data will
+                              be copied to create the new account. \n This field is
+                              immutable once set."
+                            properties:
+                              name:
+                                description: The unique identifier of the secret.
+                                type: string
+                              namespace:
+                                description: The namespace where the secret is located.
+                                type: string
+                            required:
+                            - name
+                            - namespace
+                            type: object
+                        required:
+                        - name
+                        type: object
+                      type: array
                     tls:
                       description: A boolean flag that indicates whether the Component
                         should use Transport Layer Security (TLS) for secure communication.
@@ -10647,6 +10713,73 @@ spec:
                               - Noop
                               type: string
                           type: object
+                        systemAccounts:
+                          description: Overrides system accounts defined in referenced
+                            ComponentDefinition.
+                          items:
+                            properties:
+                              name:
+                                description: The name of the system account.
+                                type: string
+                              passwordConfig:
+                                description: "Specifies the policy for generating
+                                  the account's password. \n This field is immutable
+                                  once set."
+                                properties:
+                                  length:
+                                    default: 16
+                                    description: The length of the password.
+                                    format: int32
+                                    maximum: 32
+                                    minimum: 8
+                                    type: integer
+                                  letterCase:
+                                    default: MixedCases
+                                    description: The case of the letters in the password.
+                                    enum:
+                                    - LowerCases
+                                    - UpperCases
+                                    - MixedCases
+                                    type: string
+                                  numDigits:
+                                    default: 4
+                                    description: The number of digits in the password.
+                                    format: int32
+                                    maximum: 8
+                                    minimum: 0
+                                    type: integer
+                                  numSymbols:
+                                    default: 0
+                                    description: The number of symbols in the password.
+                                    format: int32
+                                    maximum: 8
+                                    minimum: 0
+                                    type: integer
+                                  seed:
+                                    description: Seed to generate the account's password.
+                                      Cannot be updated.
+                                    type: string
+                                type: object
+                              secretRef:
+                                description: "Refers to the secret from which data
+                                  will be copied to create the new account. \n This
+                                  field is immutable once set."
+                                properties:
+                                  name:
+                                    description: The unique identifier of the secret.
+                                    type: string
+                                  namespace:
+                                    description: The namespace where the secret is
+                                      located.
+                                    type: string
+                                required:
+                                - name
+                                - namespace
+                                type: object
+                            required:
+                            - name
+                            type: object
+                          type: array
                         tls:
                           description: A boolean flag that indicates whether the Component
                             should use Transport Layer Security (TLS) for secure communication.

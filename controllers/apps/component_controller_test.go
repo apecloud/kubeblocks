@@ -857,12 +857,13 @@ var _ = Describe("Component Controller", func() {
 					Spec: pvcSpec.ToV1PersistentVolumeClaimSpec(),
 				}
 				Expect(testCtx.CreateObj(testCtx.Ctx, pvc)).Should(Succeed())
+				patch := client.MergeFrom(pvc.DeepCopy())
 				pvc.Status.Phase = corev1.ClaimBound // only bound pvc allows resize
 				if pvc.Status.Capacity == nil {
 					pvc.Status.Capacity = corev1.ResourceList{}
 				}
 				pvc.Status.Capacity[corev1.ResourceStorage] = volumeQuantity
-				Expect(k8sClient.Status().Update(testCtx.Ctx, pvc)).Should(Succeed())
+				Expect(k8sClient.Status().Patch(testCtx.Ctx, pvc, patch)).Should(Succeed())
 			}
 		}
 

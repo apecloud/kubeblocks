@@ -47,20 +47,27 @@ type ServiceDescriptorSpec struct {
 	// +kubebuilder:validation:Required
 	ServiceVersion string `json:"serviceVersion"`
 
-	// Specifies the URL or IP address of the external service.
+	// Specifies the endpoint of the external service.
+	//
+	// If the service is exposed via a cluster, the endpoint will be provided in the format of `host:port`.
 	//
 	// +optional
 	Endpoint *CredentialVar `json:"endpoint,omitempty"`
+
+	// Specifies the service or IP address of the external service.
+	//
+	// +optional
+	Host *CredentialVar `json:"host,omitempty"`
+
+	// Specifies the port of the external service.
+	//
+	// +optional
+	Port *CredentialVar `json:"port,omitempty"`
 
 	// Specifies the authentication credentials required for accessing an external service.
 	//
 	// +optional
 	Auth *ConnectionCredentialAuth `json:"auth,omitempty"`
-
-	// Specifies the port of the external service.
-	//
-	// +optional
-	Port *CredentialVar `json:"port,omitempty" protobuf:"bytes,4,opt,name=port"`
 }
 
 // ConnectionCredentialAuth specifies the authentication credentials required for accessing an external service.

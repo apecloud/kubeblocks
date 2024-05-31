@@ -2730,21 +2730,22 @@ CredentialVar
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the URL or IP address of the external service.</p>
+<p>Specifies the endpoint of the external service.</p>
+<p>If the service is exposed via a cluster, the endpoint will be provided in the format of <code>host:port</code>.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>auth</code><br/>
+<code>host</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.ConnectionCredentialAuth">
-ConnectionCredentialAuth
+<a href="#apps.kubeblocks.io/v1alpha1.CredentialVar">
+CredentialVar
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the authentication credentials required for accessing an external service.</p>
+<p>Specifies the service or IP address of the external service.</p>
 </td>
 </tr>
 <tr>
@@ -2759,6 +2760,20 @@ CredentialVar
 <td>
 <em>(Optional)</em>
 <p>Specifies the port of the external service.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>auth</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ConnectionCredentialAuth">
+ConnectionCredentialAuth
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the authentication credentials required for accessing an external service.</p>
 </td>
 </tr>
 </table>
@@ -17961,21 +17976,22 @@ CredentialVar
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the URL or IP address of the external service.</p>
+<p>Specifies the endpoint of the external service.</p>
+<p>If the service is exposed via a cluster, the endpoint will be provided in the format of <code>host:port</code>.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>auth</code><br/>
+<code>host</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.ConnectionCredentialAuth">
-ConnectionCredentialAuth
+<a href="#apps.kubeblocks.io/v1alpha1.CredentialVar">
+CredentialVar
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the authentication credentials required for accessing an external service.</p>
+<p>Specifies the service or IP address of the external service.</p>
 </td>
 </tr>
 <tr>
@@ -17990,6 +18006,20 @@ CredentialVar
 <td>
 <em>(Optional)</em>
 <p>Specifies the port of the external service.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>auth</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ConnectionCredentialAuth">
+ConnectionCredentialAuth
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the authentication credentials required for accessing an external service.</p>
 </td>
 </tr>
 </tbody>
@@ -18404,6 +18434,19 @@ For example, if it requires an OLTP database, specs for both MySQL and PostgreSQ
 either MySQL or PostgreSQL services can be used when binding.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>optional</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether the service reference can be optional.</p>
+<p>For an optional service-ref, the component can still be created even if the service-ref is not provided.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ServiceRefDeclarationSpec">ServiceRefDeclarationSpec
@@ -18577,6 +18620,19 @@ ServiceRefVars
 <tr>
 <td>
 <code>endpoint</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>host</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.VarOption">
 VarOption

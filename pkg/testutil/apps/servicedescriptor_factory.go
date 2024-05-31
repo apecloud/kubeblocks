@@ -60,6 +60,11 @@ func (factory *MockServiceDescriptorFactory) SetEndpoint(endpoint appsv1alpha1.C
 	return factory
 }
 
+func (factory *MockServiceDescriptorFactory) SetHost(host appsv1alpha1.CredentialVar) *MockServiceDescriptorFactory {
+	factory.Get().Spec.Host = &host
+	return factory
+}
+
 func (factory *MockServiceDescriptorFactory) SetPort(port appsv1alpha1.CredentialVar) *MockServiceDescriptorFactory {
 	factory.Get().Spec.Port = &port
 	return factory

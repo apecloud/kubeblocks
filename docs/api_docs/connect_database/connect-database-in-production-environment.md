@@ -20,33 +20,10 @@ See the figure below to get a clear image of the network location.
 
 ## Procedure 3. Connect database in the same Kubernetes cluster
 
-You can connect with the database ClusterIP or domain name. To check the database endpoint, use `kbcli cluster describe ${cluster-name}`.
+You can connect with the database ClusterIP or domain name. To check the database endpoint, use `kubectl get service <cluster-name>-<component-name>`.
 
 ```bash
-kbcli cluster describe x
->
-Name: x         Created Time: Mar 01,2023 11:45 UTC+0800
-NAMESPACE   CLUSTER-DEFINITION   VERSION           STATUS    TERMINATION-POLICY
-default     apecloud-mysql       ac-mysql-8.0.30   Running   Delete
-
-Endpoints:
-COMPONENT   MODE        INTERNAL                                 EXTERNAL
-x           ReadWrite   x-mysql.default.svc.cluster.local:3306   <none>
-
-Topology:
-COMPONENT   INSTANCE    ROLE     STATUS    AZ                NODE                                                       CREATED-TIME
-mysql       x-mysql-0   leader   Running   cn-northwest-1b   ip-10-0-2-184.cn-northwest-1.compute.internal/10.0.2.184   Mar 01,2023 11:45 UTC+0800
-
-Resources Allocation:
-COMPONENT   DEDICATED   CPU(REQUEST/LIMIT)   MEMORY(REQUEST/LIMIT)   STORAGE-SIZE   STORAGE-CLASS
-mysql       false       1 / 1                1Gi / 1Gi               data:10Gi      <none>
-
-Images:
-COMPONENT   TYPE    IMAGE
-mysql       mysql   registry.cn-hangzhou.aliyuncs.com/apecloud/apecloud-mysql-server:8.0.30-5.alpha2.20230105.gd6b8719.2
-
-Events(last 5 warnings, see more:kbcli cluster list-events -n default x):
-TIME   TYPE   REASON   OBJECT   MESSAGE
+kubectl get service mycluster-mysql
 ```
 
 ## Procedure 4. Connect database with clients in other VPCs or public networks
@@ -59,14 +36,50 @@ The following command creates a LoadBalancer instance for the database instance,
 
 :::
 
-```bash
-kbcli cluster expose ${cluster-name} --type internet --enable=true
+```yaml
+kubectl apply -f - <<EOF
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: ops-expose
+spec:
+  clusterRef: mycluster
+  expose:
+  - componentName: mysql
+    services:
+    - annotations:
+        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: intranet
+      ipFamilyPolicy: PreferDualStack
+      name: vpc
+      serviceType: LoadBalancer
+    switch: Enable
+  ttlSecondsBeforeAbort: 0
+  type: Expose
+EOF
 ```
 
 To disable the LoadBalancer instance, execute the following command.
 
-```bash
-kbcli cluster expose ${cluster-name} --type internet --enable=false
+```yaml
+kubectl apply -f - <<EOF
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: ops-expose
+spec:
+  clusterRef: mycluster
+  expose:
+  - componentName: mysql
+    services:
+    - annotations:
+        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: intranet
+      ipFamilyPolicy: PreferDualStack
+      name: vpc
+      serviceType: LoadBalancer
+    switch: Disable
+  ttlSecondsBeforeAbort: 0
+  type: Expose
+EOF
 ```
 
 :::note
@@ -85,18 +98,54 @@ The following command creates a LoadBalancer instance for the database instance,
 
 :::
 
-```bash
-kbcli cluster expose ${cluster-name} --type vpc --enable=true
+```yaml
+kubectl apply -f - <<EOF
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: ops-expose
+spec:
+  clusterRef: mycluster
+  expose:
+  - componentName: mysql
+    services:
+    - annotations:
+        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: internet
+      ipFamilyPolicy: PreferDualStack
+      name: vpc
+      serviceType: LoadBalancer
+    switch: Enable
+  ttlSecondsBeforeAbort: 0
+  type: Expose
+EOF
 ```
 
 To disable the LoadBalancer instance, execute the following command.
+
+```yaml
+kubectl apply -f - <<EOF
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: ops-expose
+spec:
+  clusterRef: mycluster
+  expose:
+  - componentName: mysql
+    services:
+    - annotations:
+        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: internet
+      ipFamilyPolicy: PreferDualStack
+      name: vpc
+      serviceType: LoadBalancer
+    switch: Disable
+  ttlSecondsBeforeAbort: 0
+  type: Expose
+EOF
+```
 
 :::note
 
 Once disabled, the instance is not accessible.
 
 :::
-
-```bash
-kbcli cluster expose ${cluster-name} --type vpc --enable=false
-```

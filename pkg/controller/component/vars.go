@@ -874,6 +874,8 @@ func resolveServiceRefVarRef(ctx context.Context, cli client.Reader, synthesized
 	switch {
 	case selector.Endpoint != nil:
 		resolveFunc = resolveServiceRefEndpointRef
+	case selector.Host != nil:
+		resolveFunc = resolveServiceRefHostRef
 	case selector.Port != nil:
 		resolveFunc = resolveServiceRefPortRef
 	case selector.Username != nil:
@@ -899,6 +901,21 @@ func resolveServiceRefEndpointRef(ctx context.Context, cli client.Reader, synthe
 		}, nil
 	}
 	return resolveServiceRefVarRefLow(ctx, cli, synthesizedComp, selector, selector.Endpoint, resolveEndpoint)
+}
+
+func resolveServiceRefHostRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+	defineKey string, selector appsv1alpha1.ServiceRefVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
+	resolveHost := func(obj any) (*corev1.EnvVar, *corev1.EnvVar) {
+		sd := obj.(*appsv1alpha1.ServiceDescriptor)
+		if sd.Spec.Host == nil {
+			return nil, nil
+		}
+		return &corev1.EnvVar{
+			Name:  defineKey,
+			Value: sd.Spec.Host.Value,
+		}, nil
+	}
+	return resolveServiceRefVarRefLow(ctx, cli, synthesizedComp, selector, selector.Host, resolveHost)
 }
 
 func resolveServiceRefPortRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,

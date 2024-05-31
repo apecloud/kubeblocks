@@ -42,7 +42,7 @@ pg-cluster        default          postgresql            postgresql-14.7.0      
     配置参数 `--components`、`--volume-claim-templates` 和 `--storage`，并执行以下命令。
 
     ```bash
-    kbcli cluster volume-expand pg-cluster --components="pg-replication" \
+    kbcli cluster volume-expand pg-cluster --components="postgresql" \
     --volume-claim-templates="data" --storage="2Gi"
     ```
 
@@ -64,7 +64,7 @@ pg-cluster        default          postgresql            postgresql-14.7.0      
       clusterRef: pg-cluster
       type: VolumeExpansion
       volumeExpansion:
-      - componentName: pg-replication
+      - componentName: postgresql
         volumeClaimTemplates:
         - name: data
           storage: "2Gi"
@@ -87,7 +87,7 @@ pg-cluster        default          postgresql            postgresql-14.7.0      
       clusterDefinitionRef: postgresql
       clusterVersionRef: postgresql-14.7.0
       componentSpecs:
-      - name: pg-replication
+      - name: postgresql
         componentDefRef: postgresql
         replicas: 1
         volumeClaimTemplates:

@@ -48,7 +48,7 @@ func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	cluster *appsv1alpha1.Cluster,
 	compDef *appsv1alpha1.ComponentDefinition,
 	comp *appsv1alpha1.Component) (*SynthesizedComponent, error) {
-	return buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, cluster, nil)
+	return buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, cluster, nil)
 }
 
 // BuildSynthesizedComponent4Generated builds SynthesizedComponent for generated Component which w/o ComponentDefinition.
@@ -71,7 +71,7 @@ func BuildSynthesizedComponent4Generated(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, nil, err
 	}
-	synthesizedComp, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, clusterDef, clusterVer, cluster, clusterCompSpec)
+	synthesizedComp, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, clusterDef, cluster, clusterCompSpec)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -112,7 +112,7 @@ func BuildSynthesizedComponentWrapper4Test(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
-	return buildSynthesizedComponent(reqCtx, cli, compDef, comp, clusterDef, clusterVer, cluster, clusterCompSpec)
+	return buildSynthesizedComponent(reqCtx, cli, compDef, comp, clusterDef, cluster, clusterCompSpec)
 }
 
 // buildSynthesizedComponent builds a new SynthesizedComponent object, which is a mixture of component-related configs from ComponentDefinition and Component.
@@ -123,7 +123,6 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	compDef *appsv1alpha1.ComponentDefinition,
 	comp *appsv1alpha1.Component,
 	clusterDef *appsv1alpha1.ClusterDefinition,
-	clusterVer *appsv1alpha1.ClusterVersion,
 	cluster *appsv1alpha1.Cluster,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*SynthesizedComponent, error) {
 	if compDef == nil || comp == nil {
@@ -182,7 +181,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	// if cluster referenced a clusterDefinition and clusterVersion, for backward compatibility, we need to merge the clusterDefinition and clusterVersion into the component
 	// TODO(xingran): it will be removed in the future
 	if clusterDef != nil && cluster != nil && clusterCompSpec != nil {
-		if err = buildBackwardCompatibleFields(reqCtx, clusterDef, clusterVer, cluster, clusterCompSpec, synthesizeComp); err != nil {
+		if err = buildBackwardCompatibleFields(reqCtx, clusterDef, cluster, clusterCompSpec, synthesizeComp); err != nil {
 			return nil, err
 		}
 	}
@@ -491,7 +490,6 @@ func buildServiceAccountName(synthesizeComp *SynthesizedComponent) {
 // TODO(xingran): it will be removed in the future
 func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 	clusterDef *appsv1alpha1.ClusterDefinition,
-	clusterVer *appsv1alpha1.ClusterVersion,
 	cluster *appsv1alpha1.Cluster,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
 	synthesizeComp *SynthesizedComponent) error {

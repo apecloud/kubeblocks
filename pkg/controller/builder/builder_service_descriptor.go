@@ -48,6 +48,16 @@ func (builder *ServiceDescriptorBuilder) SetEndpoint(endpoint appsv1alpha1.Crede
 	return builder
 }
 
+func (builder *ServiceDescriptorBuilder) SetHost(host appsv1alpha1.CredentialVar) *ServiceDescriptorBuilder {
+	builder.get().Spec.Host = &host
+	return builder
+}
+
+func (builder *ServiceDescriptorBuilder) SetPort(port appsv1alpha1.CredentialVar) *ServiceDescriptorBuilder {
+	builder.get().Spec.Port = &port
+	return builder
+}
+
 func (builder *ServiceDescriptorBuilder) SetAuth(auth appsv1alpha1.ConnectionCredentialAuth) *ServiceDescriptorBuilder {
 	builder.get().Spec.Auth = &auth
 	return builder
@@ -70,10 +80,5 @@ func (builder *ServiceDescriptorBuilder) SetAuthPassword(password appsv1alpha1.C
 	}
 	auth.Password = &password
 	builder.get().Spec.Auth = auth
-	return builder
-}
-
-func (builder *ServiceDescriptorBuilder) SetPort(port appsv1alpha1.CredentialVar) *ServiceDescriptorBuilder {
-	builder.get().Spec.Port = &port
 	return builder
 }

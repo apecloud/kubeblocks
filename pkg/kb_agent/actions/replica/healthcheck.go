@@ -42,10 +42,6 @@ type CheckStatus struct {
 	failedEventReportFrequency int
 }
 
-type FailoverManager interface {
-	Failover(ctx context.Context, cluster *dcs.Cluster, candidate string) error
-}
-
 var checkstatus actions.Action = &CheckStatus{}
 
 func init() {
@@ -87,49 +83,14 @@ func (s *CheckStatus) Do(ctx context.Context, req *actions.OpsRequest) (*actions
 	k8sStore := s.dcsStore.(*dcs.KubernetesStore)
 	cluster := k8sStore.GetClusterFromCache()
 
-	err := s.Handler.CurrentMemberHealthyCheck(ctx, cluster)
+	err := s.Handler.MemberHealthyCheck(ctx, cluster, nil)
 	if err != nil {
 		return s.handlerError(ctx, err)
 	}
 
-	isLeader, err := s.Handler.IsLeader(ctx, cluster)
-	if err != nil {
-		return s.handlerError(ctx, err)
-	}
-
-	if isLeader {
-		s.LeaderFailedCount = 0
-		s.checkFailedCount = 0
-		resp.Data["event"] = util.OperationSuccess
-		return resp, nil
-	}
-	err = s.Handler.LeaderHealthyCheck(ctx, cluster)
-	if err != nil {
-		s.LeaderFailedCount++
-		if s.LeaderFailedCount > s.FailureThreshold {
-			err = s.failover(ctx, cluster)
-			if err != nil {
-				return s.handlerError(ctx, err)
-			}
-		}
-		return s.handlerError(ctx, err)
-	}
-	s.LeaderFailedCount = 0
 	s.checkFailedCount = 0
 	resp.Data["event"] = util.OperationSuccess
 	return resp, nil
-}
-
-func (s *CheckStatus) failover(ctx context.Context, cluster *dcs.Cluster) error {
-	failoverManger, ok := s.Handler.(FailoverManager)
-	if !ok {
-		return errors.New("failover manager not found")
-	}
-	err := failoverManger.Failover(ctx, cluster, s.Handler.GetCurrentMemberName())
-	if err != nil {
-		return errors.Wrap(err, "failover failed")
-	}
-	return nil
 }
 
 func (s *CheckStatus) handlerError(ctx context.Context, err error) (*actions.OpsResponse, error) {

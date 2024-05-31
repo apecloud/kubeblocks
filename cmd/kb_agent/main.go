@@ -34,22 +34,17 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	kzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/apecloud/kubeblocks/pkg/constant"
+	opsregister "github.com/apecloud/kubeblocks/pkg/kb_agent/actions/register"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/cronjobs"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/engines/register"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/highavailability"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/httpserver"
-	opsregister "github.com/apecloud/kubeblocks/pkg/kb_agent/operations/register"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-var configDir string
 var disableDNSChecker bool
 
 func init() {
 	viper.AutomaticEnv()
-	pflag.StringVar(&configDir, "config-path", "/config/kb_agent/components/", "kb_agent default config directory for builtin type")
 	pflag.BoolVar(&disableDNSChecker, "disable-dns-checker", false, "disable dns checker, for test&dev")
 }
 
@@ -81,26 +76,6 @@ func main() {
 	err = dcs.InitStore()
 	if err != nil {
 		panic(errors.Wrap(err, "DCS initialize failed"))
-	}
-
-	// Initialize DB Manager
-	err = register.InitDBManager(configDir)
-	if err != nil {
-		panic(errors.Wrap(err, "DB manager initialize failed"))
-	}
-
-	// Start HA
-	characterType := viper.GetString(constant.KBEnvCharacterType)
-	if viper.IsSet(constant.KBEnvBuiltinHandler) {
-		characterType = viper.GetString(constant.KBEnvBuiltinHandler)
-	}
-	workloadType := viper.GetString(constant.KBEnvWorkloadType)
-	if highavailability.IsHAAvailable(characterType, workloadType) {
-		ha := highavailability.NewHa(disableDNSChecker)
-		if ha != nil {
-			defer ha.ShutdownWithWait()
-			go ha.Start()
-		}
 	}
 
 	// start HTTP Server

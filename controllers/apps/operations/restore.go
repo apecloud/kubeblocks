@@ -25,7 +25,6 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -97,31 +96,21 @@ func (r RestoreOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 }
 
 // ReconcileAction implements the restore action.
-// It will check the cluster status and update the OpsRequest status.
-// If the cluster is running, it will update the OpsRequest status to Complete.
-// If the cluster is failed, it will update the OpsRequest status to Failed.
-// If the cluster is not running, it will update the OpsRequest status to Running.
 func (r RestoreOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
-	opsRequest := opsRes.OpsRequest
-	clusterDef := opsRequest.Spec.GetClusterName()
-
-	// get cluster
-	cluster := &appsv1alpha1.Cluster{}
-	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{
-		Namespace: opsRequest.GetNamespace(),
-		Name:      clusterDef,
-	}, cluster); err != nil {
-		if apierrors.IsNotFound(err) {
-			_ = PatchClusterNotFound(reqCtx.Ctx, cli, opsRes)
-		}
-		return appsv1alpha1.OpsFailedPhase, 0, err
-	}
-
-	// check if the cluster is running
-	if cluster.Status.Phase == appsv1alpha1.RunningClusterPhase {
+	if _, ok := opsRes.Cluster.Annotations[constant.RestoreFromBackupAnnotationKey]; !ok {
+		// restoring
 		return appsv1alpha1.OpsSucceedPhase, 0, nil
-	} else if cluster.Status.Phase == appsv1alpha1.FailedClusterPhase {
-		return appsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("restore failed")
+	}
+	restoreList := &dpv1alpha1.RestoreList{}
+	if err := cli.List(reqCtx.Ctx, restoreList, client.InNamespace(opsRes.Cluster.Namespace), client.MatchingLabels{
+		constant.AppInstanceLabelKey: opsRes.Cluster.Name,
+	}); err != nil {
+		return appsv1alpha1.OpsRunningPhase, 0, nil
+	}
+	for _, v := range restoreList.Items {
+		if v.Status.Phase == dpv1alpha1.RestorePhaseFailed {
+			return appsv1alpha1.OpsFailedPhase, 0, nil
+		}
 	}
 	return appsv1alpha1.OpsRunningPhase, 0, nil
 }

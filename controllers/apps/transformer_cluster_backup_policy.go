@@ -606,6 +606,7 @@ func (r *clusterBackupPolicyTransformer) mergeClusterBackup(
 	// method, for instance, the method is changed from A to B, we need to
 	// disable A and enable B.
 	exist := false
+	enbalePITR := false
 	for i, s := range backupSchedule.Spec.Schedules {
 		if s.BackupMethod == backup.Method {
 			mergeSchedulePolicy(sp, &backupSchedule.Spec.Schedules[i])
@@ -641,6 +642,10 @@ func (r *clusterBackupPolicyTransformer) mergeClusterBackup(
 		}
 		if as.Spec.BackupType != dpv1alpha1.BackupTypeContinuous {
 			backupSchedule.Spec.Schedules[i].Enabled = boolptr.False()
+		} else if !enbalePITR {
+			// enable the first pitr method
+			backupSchedule.Spec.Schedules[i].Enabled = boolptr.True()
+			enbalePITR = true
 		}
 	}
 	if !exist {

@@ -23,20 +23,15 @@ import (
 	"context"
 	"strings"
 
-	"github.com/go-logr/logr"
-	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 type CreateUser struct {
 	operations.Base
-	dbManager engines.DBManager
-	logger    logr.Logger
 }
 
 var createUser operations.Operation = &CreateUser{}
@@ -49,17 +44,9 @@ func init() {
 }
 
 func (s *CreateUser) Init(ctx context.Context) error {
-	dbManager, err := register.GetDBManager(nil)
-	if err != nil {
-		return errors.Wrap(err, "get manager failed")
-	}
-	s.dbManager = dbManager
-	s.logger = ctrl.Log.WithName("CreateUser")
-	return nil
-}
-
-func (s *CreateUser) IsReadonly(ctx context.Context) bool {
-	return false
+	s.Logger = ctrl.Log.WithName("CreateUser")
+	s.Action = constant.CreateUserAction
+	return s.Base.Init(ctx)
 }
 
 func (s *CreateUser) PreCheck(ctx context.Context, req *operations.OpsRequest) error {
@@ -75,16 +62,16 @@ func (s *CreateUser) Do(ctx context.Context, req *operations.OpsRequest) (*opera
 	userInfo, _ := UserInfoParser(req)
 	resp := operations.NewOpsResponse(util.CreateUserOp)
 
-	err := s.dbManager.CreateUser(ctx, userInfo.UserName, userInfo.Password)
+	err := s.DBManager.CreateUser(ctx, userInfo.UserName, userInfo.Password)
 	if err != nil {
-		s.logger.Info("executing CreateUser error", "error", err)
+		s.Logger.Info("executing CreateUser error", "error", err)
 		return resp, err
 	}
 
 	if userInfo.RoleName != "" {
-		err := s.dbManager.GrantUserRole(ctx, userInfo.UserName, userInfo.RoleName)
+		err := s.DBManager.GrantUserRole(ctx, userInfo.UserName, userInfo.RoleName)
 		if err != nil {
-			s.logger.Info("executing grantRole error", "error", err)
+			s.Logger.Info("executing grantRole error", "error", err)
 			return resp, err
 		}
 	}

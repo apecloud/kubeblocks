@@ -33,15 +33,15 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
-	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 type Manager struct {
 	engines.DBManagerBase
 
-	// For ASM Actions
+	// For InstanceSet Actions
 	actionSvcPorts *[]int
 	client         *http.Client
 
@@ -104,11 +104,18 @@ func (mgr *Manager) InitInstanceSetActions() error {
 }
 
 func (mgr *Manager) InitComponentDefinitionActions() error {
-	actionJSON := viper.GetString(constant.KBEnvActionCommands)
+	actionJSON := viper.GetString(constant.KBEnvActionHandlers)
 	if actionJSON != "" {
-		err := json.Unmarshal([]byte(actionJSON), &mgr.actionCommands)
+		var actionHandlers = map[string]util.Handlers{}
+		err := json.Unmarshal([]byte(actionJSON), &actionHandlers)
 		if err != nil {
 			return err
+		}
+
+		for action, handlers := range actionHandlers {
+			if len(handlers.Command) > 0 {
+				mgr.actionCommands[action] = handlers.Command
+			}
 		}
 	}
 	return nil
@@ -122,7 +129,7 @@ func (mgr *Manager) InitComponentDefinitionActions() error {
 // - KB_PRIMARY_POD_FQDN: The FQDN of the original primary Pod before switchover.
 // - KB_MEMBER_ADDRESSES: The addresses of all members.
 // - KB_NEW_MEMBER_POD_NAME: The name of the new member's Pod.
-// - KB_NEW_MEMBER_POD_IP: The name of the new member's Pod.
+// - KB_NEW_MEMBER_POD_IP: The IP of the new member's Pod.
 func (mgr *Manager) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs.Cluster) error {
 	memberJoinCmd, ok := mgr.actionCommands[constant.MemberJoinAction]
 	if !ok || len(memberJoinCmd) == 0 {
@@ -199,7 +206,7 @@ func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Clu
 // - KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
 // - KB_SERVICE_PASSWORD: The password of the user used to access the DB service .
 func (mgr *Manager) CurrentMemberHealthCheck(ctx context.Context, cluster *dcs.Cluster) error {
-	healthyCheckCmd, ok := mgr.actionCommands[constant.HealthyCheckAction]
+	healthyCheckCmd, ok := mgr.actionCommands[constant.CheckHealthyAction]
 	if !ok || len(healthyCheckCmd) == 0 {
 		return errors.New("member healthyCheck command is empty!")
 	}

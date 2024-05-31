@@ -23,20 +23,15 @@ import (
 	"context"
 	"strings"
 
-	"github.com/go-logr/logr"
-	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 type GrantRole struct {
 	operations.Base
-	dbManager engines.DBManager
-	logger    logr.Logger
 }
 
 var grantRole operations.Operation = &GrantRole{}
@@ -49,17 +44,9 @@ func init() {
 }
 
 func (s *GrantRole) Init(ctx context.Context) error {
-	dbManager, err := register.GetDBManager(nil)
-	if err != nil {
-		return errors.Wrap(err, "get manager failed")
-	}
-	s.dbManager = dbManager
-	s.logger = ctrl.Log.WithName("grantRole")
-	return nil
-}
-
-func (s *GrantRole) IsReadonly(ctx context.Context) bool {
-	return false
+	s.Logger = ctrl.Log.WithName("grantRole")
+	s.Action = constant.GrantRoleAction
+	return s.Base.Init(ctx)
 }
 
 func (s *GrantRole) PreCheck(ctx context.Context, req *operations.OpsRequest) error {
@@ -75,9 +62,9 @@ func (s *GrantRole) Do(ctx context.Context, req *operations.OpsRequest) (*operat
 	userInfo, _ := UserInfoParser(req)
 	resp := operations.NewOpsResponse(util.GrantUserRoleOp)
 
-	err := s.dbManager.GrantUserRole(ctx, userInfo.UserName, userInfo.RoleName)
+	err := s.DBManager.GrantUserRole(ctx, userInfo.UserName, userInfo.RoleName)
 	if err != nil {
-		s.logger.Info("executing grantRole error", "error", err)
+		s.Logger.Info("executing grantRole error", "error", err)
 		return resp, err
 	}
 

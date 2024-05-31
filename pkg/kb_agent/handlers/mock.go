@@ -61,7 +61,7 @@ func (*MockHandler) IsLeader(context.Context, *dcs.Cluster) (bool, error) {
 	return false, fmt.Errorf("NotSupported")
 }
 
-func (*MockHandler) JoinMember(context.Context, *dcs.Cluster) error {
+func (*MockHandler) JoinMember(context.Context, *dcs.Cluster, string) error {
 	return models.ErrNotImplemented
 }
 
@@ -73,6 +73,6 @@ func (*MockHandler) Lock(context.Context, string) error {
 	return fmt.Errorf("NotSupported")
 }
 
-func (*MockHandler) Unlock(context.Context) error {
+func (*MockHandler) Unlock(context.Context, string) error {
 	return fmt.Errorf("NotSupported")
 }

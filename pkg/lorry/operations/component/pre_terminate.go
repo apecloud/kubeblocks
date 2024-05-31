@@ -21,26 +21,20 @@ package component
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 	"time"
 
-	"github.com/go-logr/logr"
-	"github.com/pkg/errors"
-	"github.com/spf13/viper"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 type PreTerminate struct {
 	operations.Base
-	logger  logr.Logger
 	Timeout time.Duration
-	Command []string
 }
 
 type PreTerminateManager interface {
@@ -56,37 +50,17 @@ func init() {
 	}
 }
 
-func (s *PreTerminate) Init(_ context.Context) error {
-	actionJSON := viper.GetString(constant.KBEnvActionCommands)
-	if actionJSON != "" {
-		actionCommands := map[string][]string{}
-		err := json.Unmarshal([]byte(actionJSON), &actionCommands)
-		if err != nil {
-			s.logger.Info("get action commands failed", "error", err.Error())
-			return err
-		}
-		preTermianteCmd, ok := actionCommands[constant.PreTerminateAction]
-		if ok && len(preTermianteCmd) > 0 {
-			s.Command = preTermianteCmd
-		}
-	}
-	return nil
-}
-
-func (s *PreTerminate) PreCheck(ctx context.Context, req *operations.OpsRequest) error {
-	return nil
+func (s *PreTerminate) Init(ctx context.Context) error {
+	s.Logger = ctrl.Log.WithName("PreTerminate")
+	s.Action = constant.PreTerminateAction
+	return s.Base.Init(ctx)
 }
 
 func (s *PreTerminate) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
-	manager, err := register.GetDBManager(s.Command)
-	if err != nil {
-		return nil, errors.Wrap(err, "get manager failed")
-	}
-
-	ptManager, ok := manager.(PreTerminateManager)
+	ptManager, ok := s.DBManager.(PreTerminateManager)
 	if !ok {
 		return nil, models.ErrNotImplemented
 	}
-	err = ptManager.PreTerminate(ctx)
+	err := ptManager.PreTerminate(ctx)
 	return nil, err
 }

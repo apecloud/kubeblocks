@@ -21,9 +21,19 @@ package operations
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"os"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
+
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 )
 
 type Operation interface {
@@ -35,11 +45,49 @@ type Operation interface {
 }
 
 type Base struct {
+	// the name of componentdefinition action
+	Action  string
 	Timeout time.Duration
-	Command []string
+
+	Command   []string
+	DBManager engines.DBManager
+
+	Logger logr.Logger
+}
+
+var actionHandlers = map[string]util.Handlers{}
+
+func init() {
+	viper.AutomaticEnv()
+	actionJSON := viper.GetString(constant.KBEnvActionHandlers)
+	if actionJSON == "" {
+		return
+	}
+
+	err := json.Unmarshal([]byte(actionJSON), &actionHandlers)
+	if err != nil {
+		msg := fmt.Sprintf("unmarshal action handlers [%s] failed: %s", actionJSON, err.Error())
+		panic(msg)
+	}
 }
 
 func (b *Base) Init(ctx context.Context) error {
+	var handlers util.Handlers
+	if b.Action != "" {
+		handlers = actionHandlers[b.Action]
+	}
+
+	switch {
+	case len(handlers.Command) != 0:
+		b.Command = handlers.Command
+		b.DBManager = register.GetCustomManager()
+	default:
+		dbManager, err := register.GetDBManager()
+		if err != nil {
+			return errors.Wrap(err, "get builtin manager failed")
+		}
+		b.DBManager = dbManager
+	}
 	return nil
 }
 
@@ -57,4 +105,12 @@ func (b *Base) PreCheck(ctx context.Context, request *OpsRequest) error {
 
 func (b *Base) Do(ctx context.Context, request *OpsRequest) (*OpsResponse, error) {
 	return nil, errors.New("not implemented")
+}
+
+func (b *Base) ExecCommand(ctx context.Context) error {
+	output, err := util.ExecCommand(ctx, b.Command, os.Environ())
+	if output != "" {
+		b.Logger.Info(b.Action, "output", output)
+	}
+	return err
 }

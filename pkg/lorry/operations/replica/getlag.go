@@ -22,22 +22,18 @@ package replica
 import (
 	"context"
 
-	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 type GetLag struct {
 	operations.Base
-	dcsStore  dcs.DCS
-	dbManager engines.DBManager
-	logger    logr.Logger
+	dcsStore dcs.DCS
 }
 
 var getlag operations.Operation = &GetLag{}
@@ -49,23 +45,19 @@ func init() {
 	}
 }
 
-func (s *GetLag) Init(context.Context) error {
+func (s *GetLag) Init(ctx context.Context) error {
 	s.dcsStore = dcs.GetStore()
 	if s.dcsStore == nil {
 		return errors.New("dcs store init failed")
 	}
 
-	dbManager, err := register.GetDBManager(nil)
-	if err != nil {
-		return errors.Wrap(err, "get manager failed")
-	}
-	s.dbManager = dbManager
-	s.logger = ctrl.Log.WithName("getlag")
-	return nil
+	s.Logger = ctrl.Log.WithName("GetLag")
+	s.Action = constant.GetLagAction
+	return s.Base.Init(ctx)
 }
 
 func (s *GetLag) IsReadonly(context.Context) bool {
-	return false
+	return true
 }
 
 func (s *GetLag) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
@@ -81,9 +73,9 @@ func (s *GetLag) Do(ctx context.Context, req *operations.OpsRequest) (*operation
 	k8sStore := s.dcsStore.(*dcs.KubernetesStore)
 	cluster := k8sStore.GetClusterFromCache()
 
-	lag, err := s.dbManager.GetLag(ctx, cluster)
+	lag, err := s.DBManager.GetLag(ctx, cluster)
 	if err != nil {
-		s.logger.Info("executing getlag error", "error", err)
+		s.Logger.Info("executing getlag error", "error", err)
 		return resp, err
 	}
 

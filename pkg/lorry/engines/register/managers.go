@@ -105,18 +105,15 @@ func SetCustomManager(manager engines.DBManager) {
 	customManager = manager
 }
 
-func GetCustomManager(cmd []string) engines.DBManager {
-	return customManager
-}
-
 func SetDBManager(manager engines.DBManager) {
 	dbManager = manager
 }
 
-func GetDBManager(cmd []string) (engines.DBManager, error) {
-	if len(cmd) > 0 {
-		return customManager, nil
-	}
+func GetCustomManager() engines.DBManager {
+	return customManager
+}
+
+func GetDBManager() (engines.DBManager, error) {
 	if dbManager != nil {
 		return dbManager, nil
 	}

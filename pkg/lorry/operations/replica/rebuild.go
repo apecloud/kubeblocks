@@ -26,23 +26,17 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 )
 
 type Rebuild struct {
 	operations.Base
-	dcsStore  dcs.DCS
-	dbManager engines.DBManager
-	logger    logr.Logger
+	dcsStore dcs.DCS
 }
 
 var rebuild operations.Operation = &Rebuild{}
@@ -60,29 +54,9 @@ func (s *Rebuild) Init(ctx context.Context) error {
 		return errors.New("dcs store init failed")
 	}
 
-	s.logger = ctrl.Log.WithName("Rebuild")
-
-	actionJSON := viper.GetString(constant.KBEnvActionCommands)
-	if actionJSON != "" {
-		actionCommands := map[string][]string{}
-		err := json.Unmarshal([]byte(actionJSON), &actionCommands)
-		if err != nil {
-			s.logger.Info("get action commands failed", "error", err.Error())
-			return err
-		}
-		rebuildCmd, ok := actionCommands[constant.RebuildAction]
-		if ok && len(rebuildCmd) > 0 {
-			s.Command = rebuildCmd
-		}
-	}
-	dbManager, err := register.GetDBManager(s.Command)
-	if err != nil {
-		return errors.Wrap(err, "get manager failed")
-	}
-
-	s.dbManager = dbManager
-
-	return nil
+	s.Logger = ctrl.Log.WithName("Rebuild")
+	s.Action = constant.RebuildAction
+	return s.Base.Init(ctx)
 }
 
 func (s *Rebuild) IsReadonly(ctx context.Context) bool {
@@ -94,9 +68,8 @@ func (s *Rebuild) Do(ctx context.Context, req *operations.OpsRequest) (*operatio
 		Data: map[string]any{},
 	}
 	resp.Data["operation"] = constant.RebuildAction
-
 	cluster := s.dcsStore.GetClusterFromCache()
-	currentMember := cluster.GetMemberWithName(s.dbManager.GetCurrentMemberName())
+	currentMember := cluster.GetMemberWithName(s.DBManager.GetCurrentMemberName())
 	if currentMember == nil || currentMember.HAPort == "" {
 		return nil, errors.Errorf("current node does not support rebuild, there is no ha service yet")
 	}
@@ -116,7 +89,7 @@ func (s *Rebuild) Do(ctx context.Context, req *operations.OpsRequest) (*operatio
 		return resp, nil
 	}
 
-	s.logger.Info("request ha service failed", "status code", httpResp.StatusCode, "body", bodyString)
+	s.Logger.Info("request ha service failed", "status code", httpResp.StatusCode, "body", bodyString)
 	errResult := make(map[string]string)
 	err = json.Unmarshal(bodyBytes, &errResult)
 	if err != nil {

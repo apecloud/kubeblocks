@@ -26,13 +26,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
@@ -41,7 +39,6 @@ import (
 // If check fails continuously, report an event at FailedEventReportFrequency frequency
 type CheckRunning struct {
 	operations.Base
-	logger                     logr.Logger
 	Timeout                    time.Duration
 	DBAddress                  string
 	CheckRunningFailedCount    int
@@ -73,21 +70,17 @@ func (s *CheckRunning) Init(ctx context.Context) error {
 	// here we give 80% of the total time to probe job and leave the remaining 20% to kubelet to handle the readiness probe related tasks.
 	s.Timeout = time.Duration(timeoutSeconds) * (800 * time.Millisecond)
 	s.DBAddress = s.getAddress()
-	s.logger = ctrl.Log.WithName("checkrunning")
-	return nil
+	s.Logger = ctrl.Log.WithName("CheckRunning")
+	s.Action = constant.CheckRunningAction
+	return s.Base.Init(ctx)
 }
 
 func (s *CheckRunning) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
-	manager, err := register.GetDBManager(nil)
-	if err != nil {
-		return nil, errors.Wrap(err, "get manager failed")
-	}
-
 	var message string
 	opsRsp := &operations.OpsResponse{}
 	opsRsp.Data["operation"] = util.CheckRunningOperation
 
-	dbPort, err := manager.GetPort()
+	dbPort, err := s.DBManager.GetPort()
 	if err != nil {
 		return nil, errors.Wrap(err, "get db port failed")
 	}
@@ -97,11 +90,11 @@ func (s *CheckRunning) Do(ctx context.Context, req *operations.OpsRequest) (*ope
 	conn, err := net.DialTimeout("tcp", host, 500*time.Millisecond)
 	if err != nil {
 		message = fmt.Sprintf("running check %s error", host)
-		s.logger.Error(err, message)
+		s.Logger.Error(err, message)
 		opsRsp.Data["event"] = util.OperationFailed
 		opsRsp.Data["message"] = message
 		if s.CheckRunningFailedCount%s.FailedEventReportFrequency == 0 {
-			s.logger.Info("running checks failed continuously", "times", s.CheckRunningFailedCount)
+			s.Logger.Info("running checks failed continuously", "times", s.CheckRunningFailedCount)
 			// resp.Metadata[StatusCode] = OperationFailedHTTPCode
 			err = util.SentEventForProbe(ctx, opsRsp.Data)
 		}
@@ -113,7 +106,7 @@ func (s *CheckRunning) Do(ctx context.Context, req *operations.OpsRequest) (*ope
 	message = "TCP Connection Established Successfully!"
 	if tcpCon, ok := conn.(*net.TCPConn); ok {
 		err := tcpCon.SetLinger(0)
-		s.logger.Error(err, "running check, set tcp linger failed")
+		s.Logger.Error(err, "running check, set tcp linger failed")
 	}
 	opsRsp.Data["event"] = util.OperationSuccess
 	opsRsp.Data["message"] = message

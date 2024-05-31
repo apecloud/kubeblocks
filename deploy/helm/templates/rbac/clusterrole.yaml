@@ -51,3 +51,43 @@ rules:
   - patch
   - update
 {{- end }}
+{{- if .Values.crd.enabled }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "kubeblocks.fullname" . }}-helmhook-role
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-upgrade
+rules:
+  - apiGroups:
+      - apiextensions.k8s.io
+    resources:
+      - customresourcedefinitions
+    verbs:
+      - create
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - apps
+    resources:
+      - deployments
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+  - apiGroups:
+      - apps
+    resources:
+      - deployments/status
+    verbs:
+      - get
+{{- end }}

@@ -581,6 +581,30 @@ spec:
                                   type: string
                                 type: array
                             type: object
+                          grpc:
+                            description: "Specifies the GRPC request to perform. the
+                              GRCP proto file can be found here https://github.com/apecloud/kubeblocks/blob/a99d80e0629b6d936c5fb478e06f5b45ef3ab388/pkg/lorry/plugin/proto/service_plugin.proto.
+                              There is a mapping from actions to corresponding GRPC
+                              APIs. If the provider does not support the specified
+                              action, an error will be returned. \n This field cannot
+                              be updated."
+                            properties:
+                              host:
+                                description: Indicates the server's domain name or
+                                  IP address. Defaults to the Pod's IP.
+                                type: string
+                              port:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                description: Specifies the target port for the GRPC
+                                  request. It can be specified either as a numeric
+                                  value in the range of 1 to 65535. or as a named
+                                  port that meets the IANA_SVC_NAME specification.
+                                x-kubernetes-int-or-string: true
+                            required:
+                            - port
+                            type: object
                           http:
                             description: "Specifies the HTTP request to perform. \n
                               This field cannot be updated. \n Note: HTTPAction is
@@ -947,6 +971,30 @@ spec:
                                   type: string
                                 type: array
                             type: object
+                          grpc:
+                            description: "Specifies the GRPC request to perform. the
+                              GRCP proto file can be found here https://github.com/apecloud/kubeblocks/blob/a99d80e0629b6d936c5fb478e06f5b45ef3ab388/pkg/lorry/plugin/proto/service_plugin.proto.
+                              There is a mapping from actions to corresponding GRPC
+                              APIs. If the provider does not support the specified
+                              action, an error will be returned. \n This field cannot
+                              be updated."
+                            properties:
+                              host:
+                                description: Indicates the server's domain name or
+                                  IP address. Defaults to the Pod's IP.
+                                type: string
+                              port:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                description: Specifies the target port for the GRPC
+                                  request. It can be specified either as a numeric
+                                  value in the range of 1 to 65535. or as a named
+                                  port that meets the IANA_SVC_NAME specification.
+                                x-kubernetes-int-or-string: true
+                            required:
+                            - port
+                            type: object
                           http:
                             description: "Specifies the HTTP request to perform. \n
                               This field cannot be updated. \n Note: HTTPAction is
@@ -1311,6 +1359,30 @@ spec:
                                 items:
                                   type: string
                                 type: array
+                            type: object
+                          grpc:
+                            description: "Specifies the GRPC request to perform. the
+                              GRCP proto file can be found here https://github.com/apecloud/kubeblocks/blob/a99d80e0629b6d936c5fb478e06f5b45ef3ab388/pkg/lorry/plugin/proto/service_plugin.proto.
+                              There is a mapping from actions to corresponding GRPC
+                              APIs. If the provider does not support the specified
+                              action, an error will be returned. \n This field cannot
+                              be updated."
+                            properties:
+                              host:
+                                description: Indicates the server's domain name or
+                                  IP address. Defaults to the Pod's IP.
+                                type: string
+                              port:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                description: Specifies the target port for the GRPC
+                                  request. It can be specified either as a numeric
+                                  value in the range of 1 to 65535. or as a named
+                                  port that meets the IANA_SVC_NAME specification.
+                                x-kubernetes-int-or-string: true
+                            required:
+                            - port
                             type: object
                           http:
                             description: "Specifies the HTTP request to perform. \n
@@ -1691,6 +1763,30 @@ spec:
                                 items:
                                   type: string
                                 type: array
+                            type: object
+                          grpc:
+                            description: "Specifies the GRPC request to perform. the
+                              GRCP proto file can be found here https://github.com/apecloud/kubeblocks/blob/a99d80e0629b6d936c5fb478e06f5b45ef3ab388/pkg/lorry/plugin/proto/service_plugin.proto.
+                              There is a mapping from actions to corresponding GRPC
+                              APIs. If the provider does not support the specified
+                              action, an error will be returned. \n This field cannot
+                              be updated."
+                            properties:
+                              host:
+                                description: Indicates the server's domain name or
+                                  IP address. Defaults to the Pod's IP.
+                                type: string
+                              port:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                description: Specifies the target port for the GRPC
+                                  request. It can be specified either as a numeric
+                                  value in the range of 1 to 65535. or as a named
+                                  port that meets the IANA_SVC_NAME specification.
+                                x-kubernetes-int-or-string: true
+                            required:
+                            - port
                             type: object
                           http:
                             description: "Specifies the HTTP request to perform. \n
@@ -2073,6 +2169,30 @@ spec:
                                 items:
                                   type: string
                                 type: array
+                            type: object
+                          grpc:
+                            description: "Specifies the GRPC request to perform. the
+                              GRCP proto file can be found here https://github.com/apecloud/kubeblocks/blob/a99d80e0629b6d936c5fb478e06f5b45ef3ab388/pkg/lorry/plugin/proto/service_plugin.proto.
+                              There is a mapping from actions to corresponding GRPC
+                              APIs. If the provider does not support the specified
+                              action, an error will be returned. \n This field cannot
+                              be updated."
+                            properties:
+                              host:
+                                description: Indicates the server's domain name or
+                                  IP address. Defaults to the Pod's IP.
+                                type: string
+                              port:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                description: Specifies the target port for the GRPC
+                                  request. It can be specified either as a numeric
+                                  value in the range of 1 to 65535. or as a named
+                                  port that meets the IANA_SVC_NAME specification.
+                                x-kubernetes-int-or-string: true
+                            required:
+                            - port
                             type: object
                           http:
                             description: "Specifies the HTTP request to perform. \n
@@ -2458,6 +2578,30 @@ spec:
                                 items:
                                   type: string
                                 type: array
+                            type: object
+                          grpc:
+                            description: "Specifies the GRPC request to perform. the
+                              GRCP proto file can be found here https://github.com/apecloud/kubeblocks/blob/a99d80e0629b6d936c5fb478e06f5b45ef3ab388/pkg/lorry/plugin/proto/service_plugin.proto.
+                              There is a mapping from actions to corresponding GRPC
+                              APIs. If the provider does not support the specified
+                              action, an error will be returned. \n This field cannot
+                              be updated."
+                            properties:
+                              host:
+                                description: Indicates the server's domain name or
+                                  IP address. Defaults to the Pod's IP.
+                                type: string
+                              port:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                description: Specifies the target port for the GRPC
+                                  request. It can be specified either as a numeric
+                                  value in the range of 1 to 65535. or as a named
+                                  port that meets the IANA_SVC_NAME specification.
+                                x-kubernetes-int-or-string: true
+                            required:
+                            - port
                             type: object
                           http:
                             description: "Specifies the HTTP request to perform. \n
@@ -2850,6 +2994,30 @@ spec:
                                   type: string
                                 type: array
                             type: object
+                          grpc:
+                            description: "Specifies the GRPC request to perform. the
+                              GRCP proto file can be found here https://github.com/apecloud/kubeblocks/blob/a99d80e0629b6d936c5fb478e06f5b45ef3ab388/pkg/lorry/plugin/proto/service_plugin.proto.
+                              There is a mapping from actions to corresponding GRPC
+                              APIs. If the provider does not support the specified
+                              action, an error will be returned. \n This field cannot
+                              be updated."
+                            properties:
+                              host:
+                                description: Indicates the server's domain name or
+                                  IP address. Defaults to the Pod's IP.
+                                type: string
+                              port:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                description: Specifies the target port for the GRPC
+                                  request. It can be specified either as a numeric
+                                  value in the range of 1 to 65535. or as a named
+                                  port that meets the IANA_SVC_NAME specification.
+                                x-kubernetes-int-or-string: true
+                            required:
+                            - port
+                            type: object
                           http:
                             description: "Specifies the HTTP request to perform. \n
                               This field cannot be updated. \n Note: HTTPAction is
@@ -3215,6 +3383,30 @@ spec:
                                 items:
                                   type: string
                                 type: array
+                            type: object
+                          grpc:
+                            description: "Specifies the GRPC request to perform. the
+                              GRCP proto file can be found here https://github.com/apecloud/kubeblocks/blob/a99d80e0629b6d936c5fb478e06f5b45ef3ab388/pkg/lorry/plugin/proto/service_plugin.proto.
+                              There is a mapping from actions to corresponding GRPC
+                              APIs. If the provider does not support the specified
+                              action, an error will be returned. \n This field cannot
+                              be updated."
+                            properties:
+                              host:
+                                description: Indicates the server's domain name or
+                                  IP address. Defaults to the Pod's IP.
+                                type: string
+                              port:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                description: Specifies the target port for the GRPC
+                                  request. It can be specified either as a numeric
+                                  value in the range of 1 to 65535. or as a named
+                                  port that meets the IANA_SVC_NAME specification.
+                                x-kubernetes-int-or-string: true
+                            required:
+                            - port
                             type: object
                           http:
                             description: "Specifies the HTTP request to perform. \n
@@ -3584,6 +3776,30 @@ spec:
                                   type: string
                                 type: array
                             type: object
+                          grpc:
+                            description: "Specifies the GRPC request to perform. the
+                              GRCP proto file can be found here https://github.com/apecloud/kubeblocks/blob/a99d80e0629b6d936c5fb478e06f5b45ef3ab388/pkg/lorry/plugin/proto/service_plugin.proto.
+                              There is a mapping from actions to corresponding GRPC
+                              APIs. If the provider does not support the specified
+                              action, an error will be returned. \n This field cannot
+                              be updated."
+                            properties:
+                              host:
+                                description: Indicates the server's domain name or
+                                  IP address. Defaults to the Pod's IP.
+                                type: string
+                              port:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                description: Specifies the target port for the GRPC
+                                  request. It can be specified either as a numeric
+                                  value in the range of 1 to 65535. or as a named
+                                  port that meets the IANA_SVC_NAME specification.
+                                x-kubernetes-int-or-string: true
+                            required:
+                            - port
+                            type: object
                           http:
                             description: "Specifies the HTTP request to perform. \n
                               This field cannot be updated. \n Note: HTTPAction is
@@ -3939,6 +4155,30 @@ spec:
                                 items:
                                   type: string
                                 type: array
+                            type: object
+                          grpc:
+                            description: "Specifies the GRPC request to perform. the
+                              GRCP proto file can be found here https://github.com/apecloud/kubeblocks/blob/a99d80e0629b6d936c5fb478e06f5b45ef3ab388/pkg/lorry/plugin/proto/service_plugin.proto.
+                              There is a mapping from actions to corresponding GRPC
+                              APIs. If the provider does not support the specified
+                              action, an error will be returned. \n This field cannot
+                              be updated."
+                            properties:
+                              host:
+                                description: Indicates the server's domain name or
+                                  IP address. Defaults to the Pod's IP.
+                                type: string
+                              port:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                description: Specifies the target port for the GRPC
+                                  request. It can be specified either as a numeric
+                                  value in the range of 1 to 65535. or as a named
+                                  port that meets the IANA_SVC_NAME specification.
+                                x-kubernetes-int-or-string: true
+                            required:
+                            - port
                             type: object
                           http:
                             description: "Specifies the HTTP request to perform. \n
@@ -4318,6 +4558,30 @@ spec:
                                   type: string
                                 type: array
                             type: object
+                          grpc:
+                            description: "Specifies the GRPC request to perform. the
+                              GRCP proto file can be found here https://github.com/apecloud/kubeblocks/blob/a99d80e0629b6d936c5fb478e06f5b45ef3ab388/pkg/lorry/plugin/proto/service_plugin.proto.
+                              There is a mapping from actions to corresponding GRPC
+                              APIs. If the provider does not support the specified
+                              action, an error will be returned. \n This field cannot
+                              be updated."
+                            properties:
+                              host:
+                                description: Indicates the server's domain name or
+                                  IP address. Defaults to the Pod's IP.
+                                type: string
+                              port:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                description: Specifies the target port for the GRPC
+                                  request. It can be specified either as a numeric
+                                  value in the range of 1 to 65535. or as a named
+                                  port that meets the IANA_SVC_NAME specification.
+                                x-kubernetes-int-or-string: true
+                            required:
+                            - port
+                            type: object
                           http:
                             description: "Specifies the HTTP request to perform. \n
                               This field cannot be updated. \n Note: HTTPAction is
@@ -4681,6 +4945,30 @@ spec:
                                   type: string
                                 type: array
                             type: object
+                          grpc:
+                            description: "Specifies the GRPC request to perform. the
+                              GRCP proto file can be found here https://github.com/apecloud/kubeblocks/blob/a99d80e0629b6d936c5fb478e06f5b45ef3ab388/pkg/lorry/plugin/proto/service_plugin.proto.
+                              There is a mapping from actions to corresponding GRPC
+                              APIs. If the provider does not support the specified
+                              action, an error will be returned. \n This field cannot
+                              be updated."
+                            properties:
+                              host:
+                                description: Indicates the server's domain name or
+                                  IP address. Defaults to the Pod's IP.
+                                type: string
+                              port:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                description: Specifies the target port for the GRPC
+                                  request. It can be specified either as a numeric
+                                  value in the range of 1 to 65535. or as a named
+                                  port that meets the IANA_SVC_NAME specification.
+                                x-kubernetes-int-or-string: true
+                            required:
+                            - port
+                            type: object
                           http:
                             description: "Specifies the HTTP request to perform. \n
                               This field cannot be updated. \n Note: HTTPAction is
@@ -4984,6 +5272,30 @@ spec:
                                 items:
                                   type: string
                                 type: array
+                            type: object
+                          grpc:
+                            description: "Specifies the GRPC request to perform. the
+                              GRCP proto file can be found here https://github.com/apecloud/kubeblocks/blob/a99d80e0629b6d936c5fb478e06f5b45ef3ab388/pkg/lorry/plugin/proto/service_plugin.proto.
+                              There is a mapping from actions to corresponding GRPC
+                              APIs. If the provider does not support the specified
+                              action, an error will be returned. \n This field cannot
+                              be updated."
+                            properties:
+                              host:
+                                description: Indicates the server's domain name or
+                                  IP address. Defaults to the Pod's IP.
+                                type: string
+                              port:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                description: Specifies the target port for the GRPC
+                                  request. It can be specified either as a numeric
+                                  value in the range of 1 to 65535. or as a named
+                                  port that meets the IANA_SVC_NAME specification.
+                                x-kubernetes-int-or-string: true
+                            required:
+                            - port
                             type: object
                           http:
                             description: "Specifies the HTTP request to perform. \n

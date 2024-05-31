@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
@@ -33,6 +34,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -62,10 +64,6 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 	var lorryContainers []corev1.Container
 	lorryHTTPPort := viper.GetInt32(constant.KBEnvLorryHTTPPort)
 	lorryGRPCPort := viper.GetInt32(constant.KBEnvLorryGRPCPort)
-	if synthesizeComp.PodSpec.HostNetwork {
-		lorryHTTPPort = 51
-		lorryGRPCPort = 61
-	}
 	availablePorts, err := getAvailableContainerPorts(synthesizeComp.PodSpec.Containers, []int32{lorryHTTPPort, lorryGRPCPort})
 	if err != nil {
 		reqCtx.Log.Info("get lorry container port failed", "error", err)
@@ -73,13 +71,6 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 	}
 	lorryHTTPPort = availablePorts[0]
 	lorryGRPCPort = availablePorts[1]
-	if synthesizeComp.PodSpec.HostNetwork {
-		if lorryGRPCPort >= 100 || lorryHTTPPort >= 100 {
-			return fmt.Errorf("port numbers need to be less than 100 when using the host network! "+
-				"lorry http port: %d, lorry grpc port: %d", lorryHTTPPort, lorryGRPCPort)
-		}
-	}
-
 	container := buildBasicContainer(int(lorryHTTPPort))
 	// inject role probe container
 	var compRoleProbe *appsv1alpha1.RoleProbe
@@ -107,7 +98,10 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 	}
 
 	buildLorryServiceContainer(synthesizeComp, &lorryContainers[0], int(lorryHTTPPort), int(lorryGRPCPort), clusterCompSpec)
-	adaptLorryIfCustomHandlerDefined(synthesizeComp, &lorryContainers[0], int(lorryHTTPPort), int(lorryGRPCPort))
+	err = adaptLorryIfCustomHandlerDefined(synthesizeComp, &lorryContainers[0], int(lorryHTTPPort), int(lorryGRPCPort))
+	if err != nil {
+		return err
+	}
 
 	reqCtx.Log.V(1).Info("lorry", "containers", lorryContainers)
 	synthesizeComp.PodSpec.Containers = append(synthesizeComp.PodSpec.Containers, lorryContainers...)
@@ -116,37 +110,35 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 }
 
 func adaptLorryIfCustomHandlerDefined(synthesizeComp *SynthesizedComponent, lorryContainer *corev1.Container,
-	lorryHTTPPort, lorryGRPCPort int) {
-	actionCommands, execImage, containerName := getActionCommandsWithExecImageOrContainerName(synthesizeComp)
-	if len(actionCommands) == 0 {
-		return
+	lorryHTTPPort, lorryGRPCPort int) error {
+	actions, execImage, execContainer, err := getActionsWithExecImageOrContainer(synthesizeComp)
+	if err != nil {
+		return err
+	}
+
+	if len(actions) == 0 {
+		return nil
+	}
+	actionJSON, _ := json.Marshal(actions)
+	lorryContainer.Env = append(lorryContainer.Env, corev1.EnvVar{
+		Name:  constant.KBEnvActionHandlers,
+		Value: string(actionJSON),
+	})
+
+	if execImage == "" {
+		return nil
 	}
 	initContainer := buildLorryInitContainer()
 	synthesizeComp.PodSpec.InitContainers = append(synthesizeComp.PodSpec.InitContainers, *initContainer)
-	execContainer := getExecContainer(synthesizeComp.PodSpec.Containers, containerName)
-	if execImage == "" {
-		if execContainer == nil {
-			return
-		}
-		execImage = execContainer.Image
-	}
-
 	lorryContainer.Image = execImage
 	lorryContainer.VolumeMounts = append(lorryContainer.VolumeMounts, corev1.VolumeMount{Name: "kubeblocks", MountPath: "/kubeblocks"})
-
 	lorryContainer.Command = []string{"/kubeblocks/lorry",
 		"--port", strconv.Itoa(lorryHTTPPort),
 		"--grpcport", strconv.Itoa(lorryGRPCPort),
 		"--config-path", "/kubeblocks/config/lorry/components/",
 	}
-	actionJSON, _ := json.Marshal(actionCommands)
-	lorryContainer.Env = append(lorryContainer.Env, corev1.EnvVar{
-		Name:  constant.KBEnvActionCommands,
-		Value: string(actionJSON),
-	})
-
 	if execContainer == nil {
-		return
+		return nil
 	}
 
 	envSet := sets.New([]string{}...)
@@ -160,6 +152,7 @@ func adaptLorryIfCustomHandlerDefined(synthesizeComp *SynthesizedComponent, lorr
 		}
 		lorryContainer.Env = append(lorryContainer.Env, env)
 	}
+	return nil
 }
 
 func buildBasicContainer(lorryHTTPPort int) *corev1.Container {
@@ -458,9 +451,9 @@ func getBuiltinActionHandler(synthesizeComp *SynthesizedComponent) appsv1alpha1.
 	return appsv1alpha1.UnknownBuiltinActionHandler
 }
 
-func getActionCommandsWithExecImageOrContainerName(synthesizeComp *SynthesizedComponent) (map[string][]string, string, string) {
+func getActionsWithExecImageOrContainer(synthesizeComp *SynthesizedComponent) (map[string]util.Handlers, string, *corev1.Container, error) {
 	if synthesizeComp.LifecycleActions == nil {
-		return nil, "", ""
+		return nil, "", nil, nil
 	}
 
 	actions := map[string]*appsv1alpha1.LifecycleActionHandler{
@@ -482,20 +475,73 @@ func getActionCommandsWithExecImageOrContainerName(synthesizeComp *SynthesizedCo
 
 	var toolImage string
 	var containerName string
-	actionCommands := map[string][]string{}
-	for action, handler := range actions {
-		if handler != nil && handler.CustomHandler != nil && handler.CustomHandler.Exec != nil {
-			actionCommands[action] = handler.CustomHandler.Exec.Command
+	actionNames := []string{}
+	for name := range actions {
+		actionNames = append(actionNames, name)
+	}
+	sort.Strings(actionNames)
+
+	hasCommand := false
+	actionHandlers := map[string]util.Handlers{}
+	for _, name := range actionNames {
+		handler := actions[name]
+		if handler == nil || handler.CustomHandler == nil {
+			continue
+		}
+
+		handlers := util.Handlers{}
+		if handler.CustomHandler.Exec != nil {
+			hasCommand = true
+			handlers.Command = handler.CustomHandler.Exec.Command
 			if handler.CustomHandler.Image != "" {
 				toolImage = handler.CustomHandler.Image
 			}
 			if handler.CustomHandler.Container != "" {
 				containerName = handler.CustomHandler.Container
 			}
+		} else if handler.CustomHandler.GRPC != nil {
+			port, err := getPort(synthesizeComp.PodSpec.Containers, handler.CustomHandler.GRPC.Port)
+			if err != nil {
+				return nil, "", nil, err
+			}
+			handlers.GPRC = map[string]string{}
+			handlers.GPRC["port"] = strconv.Itoa(int(port))
+			if handler.CustomHandler.GRPC.Host != "" {
+				handlers.GPRC["host"] = handler.CustomHandler.GRPC.Host
+			}
+		}
+		actionHandlers[name] = handlers
+	}
+	if !hasCommand {
+		return actionHandlers, "", nil, nil
+	}
+
+	execContainer := getExecContainer(synthesizeComp.PodSpec.Containers, containerName)
+	if toolImage == "" {
+		if execContainer == nil {
+			return actionHandlers, "", nil, nil
+		}
+		toolImage = execContainer.Image
+	}
+	return actionHandlers, toolImage, execContainer, nil
+}
+
+func getPort(containers []corev1.Container, port intstr.IntOrString) (int32, error) {
+	var portValue int32
+	var err error
+	if port.Type == intstr.Int {
+		portValue = port.IntVal
+	} else {
+		portValue, err = intctrlutil.GetPortByPortName(containers, port.StrVal)
+		if err != nil {
+			return 0, err
 		}
 	}
 
-	return actionCommands, toolImage, containerName
+	if portValue < 1 || portValue > 65535 {
+		return 0, fmt.Errorf("invalid port value: %d", portValue)
+	}
+	return portValue, nil
 }
 
 func getExecContainer(containers []corev1.Container, name string) *corev1.Container {

@@ -692,6 +692,19 @@ const (
 	OrdinalSelector TargetPodSelector = "Ordinal"
 )
 
+// GRPCAction describes an Action that triggers GRPC requests.
+type GRPCAction struct {
+	// Specifies the target port for the GRPC request.
+	// It can be specified either as a numeric value in the range of 1 to 65535.
+	// or as a named port that meets the IANA_SVC_NAME specification.
+	Port intstr.IntOrString `json:"port"`
+
+	// Indicates the server's domain name or IP address. Defaults to the Pod's IP.
+	//
+	// +optional
+	Host string `json:"host,omitempty"`
+}
+
 // HTTPAction describes an Action that triggers HTTP requests.
 // HTTPAction is to be implemented in future version.
 type HTTPAction struct {
@@ -840,6 +853,16 @@ type Action struct {
 	//
 	// +optional
 	Exec *ExecAction `json:"exec,omitempty"`
+
+	// Specifies the GRPC request to perform.
+	// the GRCP proto file can be found here https://github.com/apecloud/kubeblocks/blob/a99d80e0629b6d936c5fb478e06f5b45ef3ab388/pkg/lorry/plugin/proto/service_plugin.proto.
+	// There is a mapping from actions to corresponding GRPC APIs.
+	// If the provider does not support the specified action, an error will be returned.
+	//
+	// This field cannot be updated.
+	//
+	// +optional
+	GRPC *GRPCAction `json:"grpc,omitempty"`
 
 	// Specifies the HTTP request to perform.
 	//

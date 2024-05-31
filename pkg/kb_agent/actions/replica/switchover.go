@@ -27,13 +27,13 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
-	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 type Switchover struct {
-	operations.Base
+	actions.Base
 	dcsStore dcs.DCS
 }
 
@@ -41,10 +41,10 @@ type SwitchoverManager interface {
 	Switchover(ctx context.Context, cluster *dcs.Cluster, primary, candidate string, force bool) error
 }
 
-var switchover operations.Operation = &Switchover{}
+var switchover actions.Action = &Switchover{}
 
 func init() {
-	err := operations.Register(strings.ToLower(string(util.SwitchoverOperation)), switchover)
+	err := actions.Register(strings.ToLower(string(util.SwitchoverOperation)), switchover)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -59,7 +59,7 @@ func (s *Switchover) Init(ctx context.Context) error {
 	return s.Base.Init(ctx)
 }
 
-func (s *Switchover) PreCheck(ctx context.Context, req *operations.OpsRequest) error {
+func (s *Switchover) PreCheck(ctx context.Context, req *actions.OpsRequest) error {
 	primary := req.GetString("primary")
 	candidate := req.GetString("candidate")
 	if primary == "" && candidate == "" {
@@ -93,7 +93,7 @@ func (s *Switchover) PreCheck(ctx context.Context, req *operations.OpsRequest) e
 	return nil
 }
 
-func (s *Switchover) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
+func (s *Switchover) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
 	primary := req.GetString("primary")
 	candidate := req.GetString("candidate")
 	// force := req.GetBool("force")

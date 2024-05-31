@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/operations"
+	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 )
 
 type Job struct {

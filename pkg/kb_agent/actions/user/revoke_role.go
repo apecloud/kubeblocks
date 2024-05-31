@@ -26,18 +26,18 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
-	"github.com/apecloud/kubeblocks/pkg/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
 type RevokeRole struct {
-	operations.Base
+	actions.Base
 }
 
-var revokeRole operations.Operation = &RevokeRole{}
+var revokeRole actions.Action = &RevokeRole{}
 
 func init() {
-	err := operations.Register(strings.ToLower(string(util.RevokeUserRoleOp)), revokeRole)
+	err := actions.Register(strings.ToLower(string(util.RevokeUserRoleOp)), revokeRole)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -49,7 +49,7 @@ func (s *RevokeRole) Init(ctx context.Context) error {
 	return s.Base.Init(ctx)
 }
 
-func (s *RevokeRole) PreCheck(ctx context.Context, req *operations.OpsRequest) error {
+func (s *RevokeRole) PreCheck(ctx context.Context, req *actions.OpsRequest) error {
 	userInfo, err := UserInfoParser(req)
 	if err != nil {
 		return err
@@ -58,11 +58,11 @@ func (s *RevokeRole) PreCheck(ctx context.Context, req *operations.OpsRequest) e
 	return userInfo.UserNameAndRoleValidator()
 }
 
-func (s *RevokeRole) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
+func (s *RevokeRole) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
 	userInfo, _ := UserInfoParser(req)
-	resp := operations.NewOpsResponse(util.RevokeUserRoleOp)
+	resp := actions.NewOpsResponse(util.RevokeUserRoleOp)
 
-	err := s.DBManager.RevokeUserRole(ctx, userInfo.UserName, userInfo.RoleName)
+	err := s.Handler.RevokeUserRole(ctx, userInfo.UserName, userInfo.RoleName)
 	if err != nil {
 		s.Logger.Info("executing RevokeRole error", "error", err)
 		return resp, err

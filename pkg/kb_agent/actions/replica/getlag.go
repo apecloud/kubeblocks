@@ -26,20 +26,20 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
-	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
-	"github.com/apecloud/kubeblocks/pkg/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
 type GetLag struct {
-	operations.Base
+	actions.Base
 	dcsStore dcs.DCS
 }
 
-var getlag operations.Operation = &GetLag{}
+var getlag actions.Action = &GetLag{}
 
 func init() {
-	err := operations.Register("getlag", getlag)
+	err := actions.Register("getlag", getlag)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -60,20 +60,20 @@ func (s *GetLag) IsReadonly(context.Context) bool {
 	return true
 }
 
-func (s *GetLag) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
+func (s *GetLag) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
 	sql := req.GetString("sql")
 	if sql == "" {
 		return nil, errors.New("no sql provided")
 	}
 
-	resp := &operations.OpsResponse{
+	resp := &actions.OpsResponse{
 		Data: map[string]any{},
 	}
 	resp.Data["operation"] = util.ExecOperation
 	k8sStore := s.dcsStore.(*dcs.KubernetesStore)
 	cluster := k8sStore.GetClusterFromCache()
 
-	lag, err := s.DBManager.GetLag(ctx, cluster)
+	lag, err := s.Handler.GetLag(ctx, cluster)
 	if err != nil {
 		s.Logger.Info("executing getlag error", "error", err)
 		return resp, err

@@ -25,18 +25,18 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
-	"github.com/apecloud/kubeblocks/pkg/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
 type ListSystemAccounts struct {
-	operations.Base
+	actions.Base
 }
 
-var listSystemAccounts operations.Operation = &ListSystemAccounts{}
+var listSystemAccounts actions.Action = &ListSystemAccounts{}
 
 func init() {
-	err := operations.Register("listsystemaccounts", listSystemAccounts)
+	err := actions.Register("listsystemaccounts", listSystemAccounts)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -52,10 +52,10 @@ func (s *ListSystemAccounts) IsReadonly(ctx context.Context) bool {
 	return true
 }
 
-func (s *ListSystemAccounts) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
-	resp := operations.NewOpsResponse(util.ListSystemAccountsOp)
+func (s *ListSystemAccounts) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
+	resp := actions.NewOpsResponse(util.ListSystemAccountsOp)
 
-	result, err := s.DBManager.ListSystemAccounts(ctx)
+	result, err := s.Handler.ListSystemAccounts(ctx)
 	if err != nil {
 		s.Logger.Info("executing ListSystemAccounts error", "error", err)
 		return resp, err

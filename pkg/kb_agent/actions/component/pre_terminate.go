@@ -27,13 +27,13 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
-	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
-	"github.com/apecloud/kubeblocks/pkg/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers/models"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
 type PreTerminate struct {
-	operations.Base
+	actions.Base
 	Timeout time.Duration
 }
 
@@ -41,10 +41,10 @@ type PreTerminateManager interface {
 	PreTerminate(ctx context.Context) error
 }
 
-var preTerminate operations.Operation = &PreTerminate{}
+var preTerminate actions.Action = &PreTerminate{}
 
 func init() {
-	err := operations.Register(strings.ToLower(string(util.PreTerminateOperation)), preTerminate)
+	err := actions.Register(strings.ToLower(string(util.PreTerminateOperation)), preTerminate)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -56,10 +56,10 @@ func (s *PreTerminate) Init(ctx context.Context) error {
 	return s.Base.Init(ctx)
 }
 
-func (s *PreTerminate) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
-	ptManager, ok := s.DBManager.(PreTerminateManager)
+func (s *PreTerminate) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
+	ptManager, ok := s.Handler.(PreTerminateManager)
 	if !ok {
-		return nil, models.ErrNoImplemented
+		return nil, models.ErrNotImplemented
 	}
 	err := ptManager.PreTerminate(ctx)
 	return nil, err

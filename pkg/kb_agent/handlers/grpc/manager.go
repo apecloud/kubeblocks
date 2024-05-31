@@ -96,7 +96,7 @@ func (h *Handler) IsDBStartupReady() bool {
 // - KB_MEMBER_ADDRESSES: The addresses of all members.
 // - KB_NEW_MEMBER_POD_NAME: The name of the new member's Pod.
 // - KB_NEW_MEMBER_POD_IP: The IP of the new member's Pod.
-func (h *Handler) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs.Cluster) error {
+func (h *Handler) JoinMember(ctx context.Context, cluster *dcs.Cluster, memberName string) error {
 	req := &plugin.JoinMemberRequest{
 		ServiceInfo: &plugin.ServiceInfo{},
 		NewMember:   h.CurrentMemberName,
@@ -126,7 +126,7 @@ func (h *Handler) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs.C
 // - KB_MEMBER_ADDRESSES: The addresses of all members.
 // - KB_LEAVE_MEMBER_POD_NAME: The name of the leave member's Pod.
 // - KB_LEAVE_MEMBER_POD_IP: The IP of the leave member's Pod.
-func (h *Handler) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Cluster, memberName string) error {
+func (h *Handler) LeaveMember(ctx context.Context, cluster *dcs.Cluster, memberName string) error {
 	req := &plugin.LeaveMemberRequest{
 		ServiceInfo: &plugin.ServiceInfo{},
 		LeaveMember: memberName,
@@ -168,7 +168,7 @@ func (h *Handler) Lock(ctx context.Context, reason string) error {
 // - KB_SERVICE_PORT: The port on which the DB service listens.
 // - KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
 // - KB_SERVICE_PASSWORD: The password of the user used to access the DB service .
-func (h *Handler) Unlock(ctx context.Context) error {
+func (h *Handler) Unlock(ctx context.Context, reason string) error {
 	req := &plugin.ReadwriteRequest{
 		ServiceInfo: &plugin.ServiceInfo{},
 	}

@@ -31,24 +31,24 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 // CheckRunning checks whether the binding service is in running status,
 // If check fails continuously, report an event at FailedEventReportFrequency frequency
 type CheckRunning struct {
-	operations.Base
+	actions.Base
 	Timeout                    time.Duration
 	DBAddress                  string
 	CheckRunningFailedCount    int
 	FailedEventReportFrequency int
 }
 
-var checkrunning operations.Operation = &CheckRunning{}
+var checkrunning actions.Action = &CheckRunning{}
 
 func init() {
-	err := operations.Register("checkrunning", checkrunning)
+	err := actions.Register("checkrunning", checkrunning)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -75,12 +75,12 @@ func (s *CheckRunning) Init(ctx context.Context) error {
 	return s.Base.Init(ctx)
 }
 
-func (s *CheckRunning) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
+func (s *CheckRunning) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
 	var message string
-	opsRsp := &operations.OpsResponse{}
+	opsRsp := &actions.OpsResponse{}
 	opsRsp.Data["operation"] = util.CheckRunningOperation
 
-	dbPort, err := s.DBManager.GetPort()
+	dbPort, err := s.Handler.GetPort()
 	if err != nil {
 		return nil, errors.Wrap(err, "get db port failed")
 	}

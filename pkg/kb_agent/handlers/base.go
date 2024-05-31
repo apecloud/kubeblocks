@@ -147,11 +147,19 @@ func (mgr *HandlerBase) IsRunning() bool {
 	return false
 }
 
+func (mgr *HandlerBase) PostProvision(context.Context, *dcs.Cluster) error {
+	return nil
+}
+
+func (mgr *HandlerBase) PreTerminate(context.Context, *dcs.Cluster) error {
+	return nil
+}
+
 func (mgr *HandlerBase) Lock(context.Context, string) error {
 	return models.ErrNotImplemented
 }
 
-func (mgr *HandlerBase) Unlock(context.Context) error {
+func (mgr *HandlerBase) Unlock(context.Context, string) error {
 	return models.ErrNotImplemented
 }
 

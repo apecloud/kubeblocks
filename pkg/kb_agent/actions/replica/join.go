@@ -28,21 +28,21 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
-	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
-	"github.com/apecloud/kubeblocks/pkg/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
 type Join struct {
-	operations.Base
+	actions.Base
 	dcsStore dcs.DCS
 	Timeout  time.Duration
 }
 
-var join operations.Operation = &Join{}
+var join actions.Action = &Join{}
 
 func init() {
-	err := operations.Register(strings.ToLower(string(util.JoinMemberOperation)), join)
+	err := actions.Register(strings.ToLower(string(util.JoinMemberOperation)), join)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -59,7 +59,7 @@ func (s *Join) Init(ctx context.Context) error {
 	return s.Base.Init(ctx)
 }
 
-func (s *Join) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
+func (s *Join) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
 	cluster, err := s.dcsStore.GetCluster()
 	if err != nil {
 		s.Logger.Error(err, "get cluster failed")
@@ -67,7 +67,7 @@ func (s *Join) Do(ctx context.Context, req *operations.OpsRequest) (*operations.
 	}
 
 	// join current member to db cluster
-	err = s.DBManager.JoinCurrentMemberToCluster(ctx, cluster)
+	err = s.Handler.JoinMember(ctx, cluster, "")
 	if err != nil {
 		s.Logger.Error(err, "join member to cluster failed")
 		return nil, err

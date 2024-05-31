@@ -28,19 +28,19 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
-	"github.com/apecloud/kubeblocks/pkg/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
 type Lock struct {
-	operations.Base
+	actions.Base
 	Timeout time.Duration
 }
 
-var lock operations.Operation = &Lock{}
+var lock actions.Action = &Lock{}
 
 func init() {
-	err := operations.Register(strings.ToLower(string(util.LockOperation)), lock)
+	err := actions.Register(strings.ToLower(string(util.LockOperation)), lock)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -52,8 +52,8 @@ func (s *Lock) Init(ctx context.Context) error {
 	return s.Base.Init(ctx)
 }
 
-func (s *Lock) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
-	err := s.DBManager.Lock(ctx, "disk full")
+func (s *Lock) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
+	err := s.Handler.Lock(ctx, "disk full")
 	if err != nil {
 		return nil, errors.Wrap(err, "Lock DB failed")
 	}

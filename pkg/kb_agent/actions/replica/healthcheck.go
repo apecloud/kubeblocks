@@ -28,13 +28,13 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
-	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
-	"github.com/apecloud/kubeblocks/pkg/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
 type CheckStatus struct {
-	operations.Base
+	actions.Base
 	LeaderFailedCount          int
 	FailureThreshold           int
 	dcsStore                   dcs.DCS
@@ -46,10 +46,10 @@ type FailoverManager interface {
 	Failover(ctx context.Context, cluster *dcs.Cluster, candidate string) error
 }
 
-var checkstatus operations.Operation = &CheckStatus{}
+var checkstatus actions.Action = &CheckStatus{}
 
 func init() {
-	err := operations.Register(strings.ToLower(string(util.HealthyCheckOperation)), checkstatus)
+	err := actions.Register(strings.ToLower(string(util.HealthyCheckOperation)), checkstatus)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -78,8 +78,8 @@ func (s *CheckStatus) IsReadonly(ctx context.Context) bool {
 	return true
 }
 
-func (s *CheckStatus) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
-	resp := &operations.OpsResponse{
+func (s *CheckStatus) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
+	resp := &actions.OpsResponse{
 		Data: map[string]any{},
 	}
 	resp.Data["operation"] = util.HealthyCheckOperation
@@ -87,12 +87,12 @@ func (s *CheckStatus) Do(ctx context.Context, req *operations.OpsRequest) (*oper
 	k8sStore := s.dcsStore.(*dcs.KubernetesStore)
 	cluster := k8sStore.GetClusterFromCache()
 
-	err := s.DBManager.CurrentMemberHealthyCheck(ctx, cluster)
+	err := s.Handler.CurrentMemberHealthyCheck(ctx, cluster)
 	if err != nil {
 		return s.handlerError(ctx, err)
 	}
 
-	isLeader, err := s.DBManager.IsLeader(ctx, cluster)
+	isLeader, err := s.Handler.IsLeader(ctx, cluster)
 	if err != nil {
 		return s.handlerError(ctx, err)
 	}
@@ -103,7 +103,7 @@ func (s *CheckStatus) Do(ctx context.Context, req *operations.OpsRequest) (*oper
 		resp.Data["event"] = util.OperationSuccess
 		return resp, nil
 	}
-	err = s.DBManager.LeaderHealthyCheck(ctx, cluster)
+	err = s.Handler.LeaderHealthyCheck(ctx, cluster)
 	if err != nil {
 		s.LeaderFailedCount++
 		if s.LeaderFailedCount > s.FailureThreshold {
@@ -121,19 +121,19 @@ func (s *CheckStatus) Do(ctx context.Context, req *operations.OpsRequest) (*oper
 }
 
 func (s *CheckStatus) failover(ctx context.Context, cluster *dcs.Cluster) error {
-	failoverManger, ok := s.DBManager.(FailoverManager)
+	failoverManger, ok := s.Handler.(FailoverManager)
 	if !ok {
 		return errors.New("failover manager not found")
 	}
-	err := failoverManger.Failover(ctx, cluster, s.DBManager.GetCurrentMemberName())
+	err := failoverManger.Failover(ctx, cluster, s.Handler.GetCurrentMemberName())
 	if err != nil {
 		return errors.Wrap(err, "failover failed")
 	}
 	return nil
 }
 
-func (s *CheckStatus) handlerError(ctx context.Context, err error) (*operations.OpsResponse, error) {
-	resp := &operations.OpsResponse{
+func (s *CheckStatus) handlerError(ctx context.Context, err error) (*actions.OpsResponse, error) {
+	resp := &actions.OpsResponse{
 		Data: map[string]any{},
 	}
 	message := err.Error()

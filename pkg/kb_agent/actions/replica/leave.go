@@ -28,21 +28,21 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
-	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
-	"github.com/apecloud/kubeblocks/pkg/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
 type Leave struct {
-	operations.Base
+	actions.Base
 	dcsStore dcs.DCS
 	Timeout  time.Duration
 }
 
-var leave operations.Operation = &Leave{}
+var leave actions.Action = &Leave{}
 
 func init() {
-	err := operations.Register(strings.ToLower(string(util.LeaveMemberOperation)), leave)
+	err := actions.Register(strings.ToLower(string(util.LeaveMemberOperation)), leave)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -59,21 +59,21 @@ func (s *Leave) Init(ctx context.Context) error {
 	return s.Base.Init(ctx)
 }
 
-func (s *Leave) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
+func (s *Leave) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
 	cluster, err := s.dcsStore.GetCluster()
 	if err != nil {
 		s.Logger.Error(err, "get cluster failed")
 		return nil, err
 	}
 
-	currentMember := cluster.GetMemberWithName(s.DBManager.GetCurrentMemberName())
+	currentMember := cluster.GetMemberWithName(s.Handler.GetCurrentMemberName())
 	if !cluster.HaConfig.IsDeleting(currentMember) {
 		cluster.HaConfig.AddMemberToDelete(currentMember)
 		_ = s.dcsStore.UpdateHaConfig()
 	}
 
 	// remove current member from db cluster
-	err = s.DBManager.LeaveMemberFromCluster(ctx, cluster, s.DBManager.GetCurrentMemberName())
+	err = s.Handler.LeaveMember(ctx, cluster, s.Handler.GetCurrentMemberName())
 	if err != nil {
 		s.Logger.Error(err, "Leave member from cluster failed")
 		return nil, err

@@ -26,18 +26,18 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
-	"github.com/apecloud/kubeblocks/pkg/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
 type GrantRole struct {
-	operations.Base
+	actions.Base
 }
 
-var grantRole operations.Operation = &GrantRole{}
+var grantRole actions.Action = &GrantRole{}
 
 func init() {
-	err := operations.Register(strings.ToLower(string(util.GrantUserRoleOp)), grantRole)
+	err := actions.Register(strings.ToLower(string(util.GrantUserRoleOp)), grantRole)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -49,7 +49,7 @@ func (s *GrantRole) Init(ctx context.Context) error {
 	return s.Base.Init(ctx)
 }
 
-func (s *GrantRole) PreCheck(ctx context.Context, req *operations.OpsRequest) error {
+func (s *GrantRole) PreCheck(ctx context.Context, req *actions.OpsRequest) error {
 	userInfo, err := UserInfoParser(req)
 	if err != nil {
 		return err
@@ -58,11 +58,11 @@ func (s *GrantRole) PreCheck(ctx context.Context, req *operations.OpsRequest) er
 	return userInfo.UserNameValidator()
 }
 
-func (s *GrantRole) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
+func (s *GrantRole) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
 	userInfo, _ := UserInfoParser(req)
-	resp := operations.NewOpsResponse(util.GrantUserRoleOp)
+	resp := actions.NewOpsResponse(util.GrantUserRoleOp)
 
-	err := s.DBManager.GrantUserRole(ctx, userInfo.UserName, userInfo.RoleName)
+	err := s.Handler.GrantUserRole(ctx, userInfo.UserName, userInfo.RoleName)
 	if err != nil {
 		s.Logger.Info("executing grantRole error", "error", err)
 		return resp, err

@@ -30,19 +30,19 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
-	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
 )
 
 type Rebuild struct {
-	operations.Base
+	actions.Base
 	dcsStore dcs.DCS
 }
 
-var rebuild operations.Operation = &Rebuild{}
+var rebuild actions.Action = &Rebuild{}
 
 func init() {
-	err := operations.Register("rebuild", rebuild)
+	err := actions.Register("rebuild", rebuild)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -63,13 +63,13 @@ func (s *Rebuild) IsReadonly(ctx context.Context) bool {
 	return false
 }
 
-func (s *Rebuild) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
-	resp := &operations.OpsResponse{
+func (s *Rebuild) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
+	resp := &actions.OpsResponse{
 		Data: map[string]any{},
 	}
 	resp.Data["operation"] = constant.RebuildAction
 	cluster := s.dcsStore.GetClusterFromCache()
-	currentMember := cluster.GetMemberWithName(s.DBManager.GetCurrentMemberName())
+	currentMember := cluster.GetMemberWithName(s.Handler.GetCurrentMemberName())
 	if currentMember == nil || currentMember.HAPort == "" {
 		return nil, errors.Errorf("current node does not support rebuild, there is no ha service yet")
 	}

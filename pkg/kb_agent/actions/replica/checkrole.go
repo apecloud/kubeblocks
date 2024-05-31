@@ -27,7 +27,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,7 +35,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions/register"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers/models"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
@@ -47,8 +45,7 @@ import (
 type AccessMode string
 
 type CheckRole struct {
-	actions.Base
-	logger                     logr.Logger
+	GetRole
 	dcsStore                   dcs.DCS
 	OriRole                    string
 	CheckRoleFailedCount       int
@@ -56,6 +53,7 @@ type CheckRole struct {
 	Timeout                    time.Duration
 	DBRoles                    map[string]AccessMode
 	Command                    []string
+	IsDBStartupReady           bool
 }
 
 var checkrole actions.Action = &CheckRole{}
@@ -73,11 +71,11 @@ func (s *CheckRole) Init(ctx context.Context) error {
 		return errors.New("dcs store init failed")
 	}
 
-	s.logger = ctrl.Log.WithName("checkrole")
+	s.Logger = ctrl.Log.WithName("checkrole")
 	val := viper.GetString(constant.KBEnvServiceRoles)
 	if val != "" {
 		if err := json.Unmarshal([]byte(val), &s.DBRoles); err != nil {
-			s.logger.Info("KB_DB_ROLES env format error", "error", err)
+			s.Logger.Info("KB_DB_ROLES env format error", "error", err)
 		}
 	}
 
@@ -96,20 +94,8 @@ func (s *CheckRole) Init(ctx context.Context) error {
 	// here we give 80% of the total time to role probe job and leave the remaining 20% to kubelet to handle the readiness probe related tasks.
 	s.Timeout = time.Duration(timeoutSeconds) * (800 * time.Millisecond)
 	s.OriRole = "waitForStart"
-	actionJSON := viper.GetString(constant.KBEnvActionCommands)
-	if actionJSON != "" {
-		actionCommands := map[string][]string{}
-		err := json.Unmarshal([]byte(actionJSON), &actionCommands)
-		if err != nil {
-			s.logger.Info("get action commands failed", "error", err.Error())
-			return err
-		}
-		roleProbeCmd, ok := actionCommands[constant.RoleProbeAction]
-		if ok && len(roleProbeCmd) > 0 {
-			s.Command = roleProbeCmd
-		}
-	}
-	return nil
+	s.Action = constant.RoleProbeAction
+	return s.Base.Init(ctx)
 }
 
 func (s *CheckRole) IsReadonly(ctx context.Context) bool {
@@ -125,12 +111,7 @@ func (s *CheckRole) Do(ctx context.Context, _ *actions.OpsRequest) (*actions.Ops
 	var role string
 	var err error
 
-	manager, err1 := register.GetDBManager(s.Command)
-	if err1 != nil {
-		return nil, errors.Wrap(err1, "get manager failed")
-	}
-
-	if !manager.IsDBStartupReady() {
+	if !s.Handler.IsDBStartupReady() {
 		resp.Data["message"] = "db not ready"
 		return resp, nil
 	}
@@ -139,14 +120,14 @@ func (s *CheckRole) Do(ctx context.Context, _ *actions.OpsRequest) (*actions.Ops
 
 	ctx1, cancel := context.WithTimeout(ctx, s.Timeout)
 	defer cancel()
-	role, err = manager.GetReplicaRole(ctx1, cluster)
+	role, err = s.Handler.GetReplicaRole(ctx1, cluster)
 
 	if err != nil {
-		s.logger.Info("executing checkRole error", "error", err.Error())
+		s.Logger.Info("executing checkRole error", "error", err.Error())
 		// do not return err, as it will cause readinessprobe to fail
 		err = nil
 		if s.CheckRoleFailedCount%s.FailedEventReportFrequency == 0 {
-			s.logger.Info("role checks failed continuously", "times", s.CheckRoleFailedCount)
+			s.Logger.Info("role checks failed continuously", "times", s.CheckRoleFailedCount)
 			// if err is not nil, send event through kubelet readinessprobe
 			err = util.SentEventForProbe(ctx, resp.Data)
 		}
@@ -165,7 +146,7 @@ func (s *CheckRole) Do(ctx context.Context, _ *actions.OpsRequest) (*actions.Ops
 	}
 
 	// When network partition occurs, the new primary needs to send global role change information to the controller.
-	isLeader, err := manager.IsLeader(ctx, cluster)
+	isLeader, err := s.Handler.IsLeader(ctx, cluster)
 	if err != nil {
 		if err != models.ErrNotImplemented {
 			return nil, err
@@ -180,7 +161,7 @@ func (s *CheckRole) Do(ctx context.Context, _ *actions.OpsRequest) (*actions.Ops
 			return nil, err
 		}
 		cluster.Members = members
-		resp.Data["role"] = s.buildGlobalRoleSnapshot(cluster, manager, role)
+		resp.Data["role"] = s.buildGlobalRoleSnapshot(cluster, role)
 	} else {
 		resp.Data["role"] = role
 	}
@@ -219,8 +200,8 @@ func (s *CheckRole) roleValidate(role string) (bool, string) {
 	return isValid, msg
 }
 
-func (s *CheckRole) buildGlobalRoleSnapshot(cluster *dcs.Cluster, mgr handlers.DBManager, role string) string {
-	currentMemberName := mgr.GetCurrentMemberName()
+func (s *CheckRole) buildGlobalRoleSnapshot(cluster *dcs.Cluster, role string) string {
+	currentMemberName := s.Handler.GetCurrentMemberName()
 	roleSnapshot := &common.GlobalRoleSnapshot{
 		Version: strconv.FormatInt(metav1.NowMicro().UnixMicro(), 10),
 		PodRoleNamePairs: []common.PodRoleNamePair{
@@ -233,16 +214,16 @@ func (s *CheckRole) buildGlobalRoleSnapshot(cluster *dcs.Cluster, mgr handlers.D
 	}
 
 	for _, member := range cluster.Members {
-		s.logger.V(1).Info("check member", "member", member.Name, "role", member.Role)
+		s.Logger.V(1).Info("check member", "member", member.Name, "role", member.Role)
 		if member.Name != currentMemberName {
 			// get old primary and set it's role to none
 			if strings.EqualFold(member.Role, role) {
-				s.logger.Info("there is a another leader", "member", member.Name)
+				s.Logger.Info("there is a another leader", "member", member.Name)
 				if member.IsLorryReady() {
-					s.logger.Info("another leader's lorry is online, just ignore", "member", member.Name)
+					s.Logger.Info("another leader's lorry is online, just ignore", "member", member.Name)
 					continue
 				}
-				s.logger.Info("reset old leader role to none", "member", member.Name)
+				s.Logger.Info("reset old leader role to none", "member", member.Name)
 				roleSnapshot.PodRoleNamePairs = append(roleSnapshot.PodRoleNamePairs, common.PodRoleNamePair{
 					PodName:  member.Name,
 					RoleName: "",

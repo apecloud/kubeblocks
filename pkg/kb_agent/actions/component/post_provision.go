@@ -27,13 +27,13 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
-	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
-	"github.com/apecloud/kubeblocks/pkg/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers/models"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
 type PostProvision struct {
-	operations.Base
+	actions.Base
 	Timeout time.Duration
 }
 
@@ -41,10 +41,10 @@ type PostProvisionManager interface {
 	PostProvision(ctx context.Context, componentNames, podNames, podIPs, podHostNames, podHostIPs string) error
 }
 
-var postProvision operations.Operation = &PostProvision{}
+var postProvision actions.Action = &PostProvision{}
 
 func init() {
-	err := operations.Register(strings.ToLower(string(util.PostProvisionOperation)), postProvision)
+	err := actions.Register(strings.ToLower(string(util.PostProvisionOperation)), postProvision)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -56,19 +56,19 @@ func (s *PostProvision) Init(ctx context.Context) error {
 	return s.Base.Init(ctx)
 }
 
-func (s *PostProvision) PreCheck(ctx context.Context, req *operations.OpsRequest) error {
+func (s *PostProvision) PreCheck(ctx context.Context, req *actions.OpsRequest) error {
 	return nil
 }
 
-func (s *PostProvision) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
+func (s *PostProvision) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
 	componentNames := req.GetString("componentNames")
 	podNames := req.GetString("podNames")
 	podIPs := req.GetString("podIPs")
 	podHostNames := req.GetString("podHostNames")
 	podHostIPs := req.GetString("podHostIPs")
-	ppManager, ok := s.DBManager.(PostProvisionManager)
+	ppManager, ok := s.Handler.(PostProvisionManager)
 	if !ok {
-		return nil, models.ErrNoImplemented
+		return nil, models.ErrNotImplemented
 	}
 	err := ppManager.PostProvision(ctx, componentNames, podNames, podIPs, podHostNames, podHostIPs)
 	return nil, err

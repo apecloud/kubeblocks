@@ -24,13 +24,13 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/operations"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
 )
 
 type Job struct {
 	Name             string
 	Ticker           *time.Ticker
-	Operation        operations.Operation
+	Operation        actions.Action
 	TimeoutSeconds   int
 	PeriodSeconds    int
 	SuccessThreshold int
@@ -38,8 +38,8 @@ type Job struct {
 }
 
 func NewJob(name string, settings map[string]string) (*Job, error) {
-	operations := operations.Operations()
-	ops, ok := operations[name]
+	actions := actions.Operations()
+	ops, ok := actions[name]
 	if !ok {
 		logger.Info("Operation not found", "name", name)
 		return nil, nil

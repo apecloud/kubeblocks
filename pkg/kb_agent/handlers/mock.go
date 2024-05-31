@@ -26,7 +26,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/engines/models"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers/models"
 )
 
 type MockHandler struct {

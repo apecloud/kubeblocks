@@ -42,8 +42,8 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
-	"github.com/apecloud/kubeblocks/pkg/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
 const (
@@ -61,10 +61,10 @@ type volumeStatsRequester interface {
 	request(ctx context.Context) ([]byte, error)
 }
 
-var protection operations.Operation = &Protection{}
+var protection actions.Action = &Protection{}
 
 func init() {
-	err := operations.Register(strings.ToLower(string(util.VolumeProtection)), protection)
+	err := actions.Register(strings.ToLower(string(util.VolumeProtection)), protection)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -77,7 +77,7 @@ type volumeExt struct {
 }
 
 type Protection struct {
-	operations.Base
+	actions.Base
 	Requester     volumeStatsRequester
 	Pod           string
 	HighWatermark int
@@ -112,11 +112,11 @@ func (p *Protection) Init(ctx context.Context) error {
 	return nil
 }
 
-func (p *Protection) PreCheck(ctx context.Context, req *operations.OpsRequest) error {
+func (p *Protection) PreCheck(ctx context.Context, req *actions.OpsRequest) error {
 	return nil
 }
 
-func (p *Protection) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
+func (p *Protection) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
 	if p.disabled() {
 		p.Logger.Info("the volume protection operation is disabled")
 		return nil, nil
@@ -133,7 +133,7 @@ func (p *Protection) Do(ctx context.Context, req *operations.OpsRequest) (*opera
 	}
 
 	volumeUsages, err := p.checkUsage(ctx)
-	resp := &operations.OpsResponse{
+	resp := &actions.OpsResponse{
 		Data: map[string]any{},
 	}
 	if err == nil {
@@ -293,11 +293,11 @@ func (p *Protection) lowWatermark(ctx context.Context, volumeUsages map[string]a
 }
 
 func (p *Protection) lockInstance(ctx context.Context) error {
-	return p.DBManager.Lock(ctx, "disk full")
+	return p.Handler.Lock(ctx, "disk full")
 }
 
 func (p *Protection) unlockInstance(ctx context.Context) error {
-	return p.DBManager.Unlock(ctx)
+	return p.Handler.Unlock(ctx, "disk full")
 }
 
 func (p *Protection) buildVolumesMsg() map[string]any {

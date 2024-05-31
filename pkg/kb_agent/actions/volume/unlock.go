@@ -28,19 +28,19 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
-	"github.com/apecloud/kubeblocks/pkg/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
 type Unlock struct {
-	operations.Base
+	actions.Base
 	Timeout time.Duration
 }
 
-var unlock operations.Operation = &Unlock{}
+var unlock actions.Action = &Unlock{}
 
 func init() {
-	err := operations.Register(strings.ToLower(string(util.UnlockOperation)), unlock)
+	err := actions.Register(strings.ToLower(string(util.UnlockOperation)), unlock)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -52,8 +52,8 @@ func (s *Unlock) Init(ctx context.Context) error {
 	return s.Base.Init(ctx)
 }
 
-func (s *Unlock) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
-	err := s.DBManager.Unlock(ctx)
+func (s *Unlock) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
+	err := s.Handler.Unlock(ctx, "")
 	if err != nil {
 		return nil, errors.Wrap(err, "Unlock DB failed")
 	}

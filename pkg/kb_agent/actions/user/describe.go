@@ -27,19 +27,19 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
-	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
-	"github.com/apecloud/kubeblocks/pkg/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers/models"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
 type DescribeUser struct {
-	operations.Base
+	actions.Base
 }
 
-var describeUser operations.Operation = &DescribeUser{}
+var describeUser actions.Action = &DescribeUser{}
 
 func init() {
-	err := operations.Register("describeuser", describeUser)
+	err := actions.Register("describeuser", describeUser)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -55,7 +55,7 @@ func (s *DescribeUser) IsReadonly(ctx context.Context) bool {
 	return true
 }
 
-func (s *DescribeUser) PreCheck(ctx context.Context, req *operations.OpsRequest) error {
+func (s *DescribeUser) PreCheck(ctx context.Context, req *actions.OpsRequest) error {
 	userInfo, err := UserInfoParser(req)
 	if err != nil {
 		return err
@@ -64,11 +64,11 @@ func (s *DescribeUser) PreCheck(ctx context.Context, req *operations.OpsRequest)
 	return userInfo.UserNameValidator()
 }
 
-func (s *DescribeUser) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
+func (s *DescribeUser) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
 	userInfo, _ := UserInfoParser(req)
-	resp := operations.NewOpsResponse(util.DescribeUserOp)
+	resp := actions.NewOpsResponse(util.DescribeUserOp)
 
-	result, err := s.DBManager.DescribeUser(ctx, userInfo.UserName)
+	result, err := s.Handler.DescribeUser(ctx, userInfo.UserName)
 	if err != nil {
 		s.Logger.Info("executing describeUser error", "error", err)
 		return resp, err
@@ -78,7 +78,7 @@ func (s *DescribeUser) Do(ctx context.Context, req *operations.OpsRequest) (*ope
 	return resp.WithSuccess("")
 }
 
-func UserInfoParser(req *operations.OpsRequest) (*models.UserInfo, error) {
+func UserInfoParser(req *actions.OpsRequest) (*models.UserInfo, error) {
 	user := &models.UserInfo{}
 	if req == nil || req.Parameters == nil {
 		return nil, fmt.Errorf("no Parameters provided")

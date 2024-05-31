@@ -26,18 +26,18 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
-	"github.com/apecloud/kubeblocks/pkg/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
 type CreateUser struct {
-	operations.Base
+	actions.Base
 }
 
-var createUser operations.Operation = &CreateUser{}
+var createUser actions.Action = &CreateUser{}
 
 func init() {
-	err := operations.Register(strings.ToLower(string(util.CreateUserOp)), createUser)
+	err := actions.Register(strings.ToLower(string(util.CreateUserOp)), createUser)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -49,7 +49,7 @@ func (s *CreateUser) Init(ctx context.Context) error {
 	return s.Base.Init(ctx)
 }
 
-func (s *CreateUser) PreCheck(ctx context.Context, req *operations.OpsRequest) error {
+func (s *CreateUser) PreCheck(ctx context.Context, req *actions.OpsRequest) error {
 	userInfo, err := UserInfoParser(req)
 	if err != nil {
 		return err
@@ -58,18 +58,18 @@ func (s *CreateUser) PreCheck(ctx context.Context, req *operations.OpsRequest) e
 	return userInfo.UserNameAndPasswdValidator()
 }
 
-func (s *CreateUser) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
+func (s *CreateUser) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
 	userInfo, _ := UserInfoParser(req)
-	resp := operations.NewOpsResponse(util.CreateUserOp)
+	resp := actions.NewOpsResponse(util.CreateUserOp)
 
-	err := s.DBManager.CreateUser(ctx, userInfo.UserName, userInfo.Password)
+	err := s.Handler.CreateUser(ctx, userInfo.UserName, userInfo.Password)
 	if err != nil {
 		s.Logger.Info("executing CreateUser error", "error", err)
 		return resp, err
 	}
 
 	if userInfo.RoleName != "" {
-		err := s.DBManager.GrantUserRole(ctx, userInfo.UserName, userInfo.RoleName)
+		err := s.Handler.GrantUserRole(ctx, userInfo.UserName, userInfo.RoleName)
 		if err != nil {
 			s.Logger.Info("executing grantRole error", "error", err)
 			return resp, err

@@ -25,18 +25,18 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
-	"github.com/apecloud/kubeblocks/pkg/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
 type ListUsers struct {
-	operations.Base
+	actions.Base
 }
 
-var listusers operations.Operation = &ListUsers{}
+var listusers actions.Action = &ListUsers{}
 
 func init() {
-	err := operations.Register("listusers", listusers)
+	err := actions.Register("listusers", listusers)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -52,10 +52,10 @@ func (s *ListUsers) IsReadonly(ctx context.Context) bool {
 	return true
 }
 
-func (s *ListUsers) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
-	resp := operations.NewOpsResponse(util.ListUsersOp)
+func (s *ListUsers) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
+	resp := actions.NewOpsResponse(util.ListUsersOp)
 
-	result, err := s.DBManager.ListUsers(ctx)
+	result, err := s.Handler.ListUsers(ctx)
 	if err != nil {
 		s.Logger.Info("executing listusers error", "error", err)
 		return resp, err

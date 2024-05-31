@@ -25,18 +25,18 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
-	"github.com/apecloud/kubeblocks/pkg/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
 type DeleteUser struct {
-	operations.Base
+	actions.Base
 }
 
-var deleteUser operations.Operation = &DeleteUser{}
+var deleteUser actions.Action = &DeleteUser{}
 
 func init() {
-	err := operations.Register("deleteuser", deleteUser)
+	err := actions.Register("deleteuser", deleteUser)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -52,7 +52,7 @@ func (s *DeleteUser) IsReadonly(ctx context.Context) bool {
 	return false
 }
 
-func (s *DeleteUser) PreCheck(ctx context.Context, req *operations.OpsRequest) error {
+func (s *DeleteUser) PreCheck(ctx context.Context, req *actions.OpsRequest) error {
 	userInfo, err := UserInfoParser(req)
 	if err != nil {
 		return err
@@ -61,11 +61,11 @@ func (s *DeleteUser) PreCheck(ctx context.Context, req *operations.OpsRequest) e
 	return userInfo.UserNameValidator()
 }
 
-func (s *DeleteUser) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
+func (s *DeleteUser) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
 	userInfo, _ := UserInfoParser(req)
-	resp := operations.NewOpsResponse(util.DeleteUserOp)
+	resp := actions.NewOpsResponse(util.DeleteUserOp)
 
-	err := s.DBManager.DeleteUser(ctx, userInfo.UserName)
+	err := s.Handler.DeleteUser(ctx, userInfo.UserName)
 	if err != nil {
 		s.Logger.Info("executing DeleteUser error", "error", err)
 		return resp, err

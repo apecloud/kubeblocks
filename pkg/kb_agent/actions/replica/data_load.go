@@ -26,16 +26,16 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
-	"github.com/apecloud/kubeblocks/pkg/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
 type dataLoad struct {
-	operations.Base
+	actions.Base
 }
 
 func init() {
-	err := operations.Register(strings.ToLower(string(util.DataLoadOperation)), &dataLoad{})
+	err := actions.Register(strings.ToLower(string(util.DataLoadOperation)), &dataLoad{})
 	if err != nil {
 		panic(err.Error())
 	}
@@ -47,6 +47,6 @@ func (s *dataLoad) Init(ctx context.Context) error {
 	return s.Base.Init(ctx)
 }
 
-func (s *dataLoad) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
+func (s *dataLoad) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
 	return nil, s.ExecCommand(ctx)
 }

@@ -529,9 +529,6 @@ func (r *clusterBackupPolicyTransformer) mergeClusterBackup(
 			continue
 		}
 
-		// if PITR is enabled, we should check and disable the backup schedule if
-		// the backup type is not Continuous. The Continuous backup schedule is
-		// reconciled by the enterprise edition operator.
 		m := dputils.GetBackupMethodByName(s.BackupMethod, backupPolicy)
 		if m == nil {
 			continue

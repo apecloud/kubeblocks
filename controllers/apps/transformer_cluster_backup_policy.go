@@ -36,6 +36,11 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
+	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils/boolptr"
+)
+
+const (
+	defaultCronExpression = "0 18 * * *"
 )
 
 // clusterBackupPolicyTransformer transforms the backup policy template to the data protection backup policy and backup schedule.
@@ -476,6 +481,13 @@ func (r *clusterBackupPolicyTransformer) mergeClusterBackup(
 	}
 
 	backup := cluster.Spec.Backup
+	method := dputils.GetBackupMethodByName(backup.Method, backupPolicy)
+	// the specified backup method should be in the backup policy, if not, record event and return.
+	if method == nil {
+		r.EventRecorder.Event(r.Cluster, corev1.EventTypeWarning,
+			"BackupMethodNotFound", fmt.Sprintf("backup method %s is not found in backup policy", backup.Method))
+		return backupSchedule
+	}
 	// there is no backup schedule created by backup policy template, so we need to
 	// create a new backup schedule for cluster backup.
 	if backupSchedule == nil {
@@ -493,9 +505,6 @@ func (r *clusterBackupPolicyTransformer) mergeClusterBackup(
 			},
 		}
 	}
-	if backup.Method == "" {
-		return backupSchedule
-	}
 	// build backup schedule policy by cluster backup spec
 	sp := &dpv1alpha1.SchedulePolicy{
 		Enabled:         backup.Enabled,
@@ -508,13 +517,54 @@ func (r *clusterBackupPolicyTransformer) mergeClusterBackup(
 	// schedule with specified method already exists, we need to update it
 	// using the cluster backup schedule policy. Otherwise, we need to append
 	// it to the backup schedule.
+	// If cluster backup method is changed, we need to disable previous backup
+	// method, for instance, the method is changed from A to B, we need to
+	// disable A and enable B.
+	exist := false
+	hasSyncPITRMethod := false
 	for i, s := range backupSchedule.Spec.Schedules {
 		if s.BackupMethod == backup.Method {
 			mergeSchedulePolicy(sp, &backupSchedule.Spec.Schedules[i])
-			return backupSchedule
+			exist = true
+			continue
+		}
+
+		// if PITR is enabled, we should check and disable the backup schedule if
+		// the backup type is not Continuous. The Continuous backup schedule is
+		// reconciled by the enterprise edition operator.
+		m := dputils.GetBackupMethodByName(s.BackupMethod, backupPolicy)
+		if m == nil {
+			continue
+		}
+		if m.ActionSetName == "" {
+			if boolptr.IsSetToTrue(m.SnapshotVolumes) {
+				// disable the automatic backup when the specified method is not a volume snapshot for volume-snapshot method
+				backupSchedule.Spec.Schedules[i].Enabled = boolptr.False()
+			}
+			continue
+		}
+
+		as := &dpv1alpha1.ActionSet{}
+		if err := r.Client.Get(r.Context, client.ObjectKey{Name: m.ActionSetName}, as); err != nil {
+			r.Error(err, "failed to get ActionSet for backup.", "ActionSet", as.Name)
+			continue
+		}
+		if as.Spec.BackupType == dpv1alpha1.BackupTypeContinuous && backup.PITREnabled != nil && !hasSyncPITRMethod {
+			// auto-sync the first continuous backup for the 'pirtEnable' option.
+			backupSchedule.Spec.Schedules[i].Enabled = backup.PITREnabled
+			hasSyncPITRMethod = true
+		}
+		if as.Spec.BackupType == dpv1alpha1.BackupTypeFull && backup.Enabled != nil {
+			// disable the automatic backup for other full backup method
+			backupSchedule.Spec.Schedules[i].Enabled = boolptr.False()
 		}
 	}
-	backupSchedule.Spec.Schedules = append(backupSchedule.Spec.Schedules, *sp)
+	if !exist {
+		if sp.CronExpression == "" {
+			sp.CronExpression = defaultCronExpression
+		}
+		backupSchedule.Spec.Schedules = append(backupSchedule.Spec.Schedules, *sp)
+	}
 	return backupSchedule
 }
 

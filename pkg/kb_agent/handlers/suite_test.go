@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package engines
+package handlers
 
 import (
 	"testing"
@@ -28,5 +28,5 @@ import (
 
 func TestEngine(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "engines Suite")
+	RunSpecs(t, "handlers Suite")
 }

@@ -17,38 +17,31 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package handlers
+package plugin
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
+
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/spf13/viper"
 )
 
-const (
-	// types for probe
-	CheckRunningType int = iota
-	CheckStatusType
-	CheckRoleChangedType
-)
-
-func MaxInt64(x, y int64) int64 {
-	if x > y {
-		return x
+func ParseEndpoint(ep string) (string, string, error) {
+	if strings.HasPrefix(strings.ToLower(ep), "unix://") || strings.HasPrefix(strings.ToLower(ep), "tcp://") {
+		s := strings.SplitN(ep, "://", 2)
+		if s[1] != "" {
+			return s[0], s[1], nil
+		}
 	}
-	return y
+	return "", "", fmt.Errorf("invalid endpoint: %v", ep)
 }
 
-func GetIndex(memberName string) (int, error) {
-	i := strings.LastIndex(memberName, "-")
-	if i < 0 {
-		return 0, fmt.Errorf("the format of member name is wrong: %s", memberName)
+func GetServiceInfo() *ServiceInfo {
+	return &ServiceInfo{
+		Fqdn:          viper.GetString(constant.KBEnvPodFQDN),
+		Port:          viper.GetString(constant.KBEnvServicePort),
+		AdminUser:     viper.GetString(constant.KBEnvServiceUser),
+		AdminPassword: viper.GetString(constant.KBEnvServicePassword),
 	}
-	return strconv.Atoi(memberName[i+1:])
 }
-
-func AddSingleQuote(str string) string {
-	return "'" + str + "'"
-}
-
-type Properties map[string]string

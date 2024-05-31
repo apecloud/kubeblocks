@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package engines
+package handlers
 
 import (
 	"context"
@@ -25,129 +25,54 @@ import (
 
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/engines/models"
 )
 
-type MockManager struct {
-	DBManagerBase
+type MockHandler struct {
+	HandlerBase
 }
 
-var _ DBManager = &MockManager{}
+var _ Handler = &MockHandler{}
 
-func NewMockManager(properties Properties) (DBManager, error) {
-	logger := ctrl.Log.WithName("MockManager")
+func NewMockHandler(properties Properties) (Handler, error) {
+	logger := ctrl.Log.WithName("MockHandler")
 
-	managerBase, err := NewDBManagerBase(logger)
+	managerBase, err := NewHandlerBase(logger)
 	if err != nil {
 		return nil, err
 	}
 
-	Mgr := &MockManager{
-		DBManagerBase: *managerBase,
+	Mgr := &MockHandler{
+		HandlerBase: *managerBase,
 	}
 
 	return Mgr, nil
 }
-func (*MockManager) IsRunning() bool {
+func (*MockHandler) IsRunning() bool {
 	return true
 }
 
-func (*MockManager) IsDBStartupReady() bool {
+func (*MockHandler) IsDBStartupReady() bool {
 	return true
 }
 
-func (*MockManager) InitializeCluster(context.Context, *dcs.Cluster) error {
-	return fmt.Errorf("NotSupported")
-}
-func (*MockManager) IsClusterInitialized(context.Context, *dcs.Cluster) (bool, error) {
+func (*MockHandler) IsLeader(context.Context, *dcs.Cluster) (bool, error) {
 	return false, fmt.Errorf("NotSupported")
 }
 
-func (*MockManager) IsCurrentMemberInCluster(context.Context, *dcs.Cluster) bool {
-	return true
+func (*MockHandler) JoinMember(context.Context, *dcs.Cluster) error {
+	return models.ErrNotImplemented
 }
 
-func (*MockManager) IsCurrentMemberHealthy(context.Context, *dcs.Cluster) bool {
-	return true
+func (*MockHandler) LeaveMember(context.Context, *dcs.Cluster, string) error {
+	return models.ErrNotImplemented
 }
 
-func (*MockManager) IsClusterHealthy(context.Context, *dcs.Cluster) bool {
-	return true
-}
-
-func (*MockManager) IsMemberHealthy(context.Context, *dcs.Cluster, *dcs.Member) bool {
-	return true
-}
-
-func (*MockManager) HasOtherHealthyLeader(context.Context, *dcs.Cluster) *dcs.Member {
-	return nil
-}
-
-func (*MockManager) HasOtherHealthyMembers(context.Context, *dcs.Cluster, string) []*dcs.Member {
-	return nil
-}
-
-func (*MockManager) IsLeader(context.Context, *dcs.Cluster) (bool, error) {
-	return false, fmt.Errorf("NotSupported")
-}
-
-func (*MockManager) IsLeaderMember(context.Context, *dcs.Cluster, *dcs.Member) (bool, error) {
-	return false, fmt.Errorf("NotSupported")
-}
-
-func (*MockManager) IsFirstMember() bool {
-	return true
-}
-
-func (*MockManager) JoinCurrentMemberToCluster(context.Context, *dcs.Cluster) error {
+func (*MockHandler) Lock(context.Context, string) error {
 	return fmt.Errorf("NotSupported")
 }
 
-func (*MockManager) LeaveMemberFromCluster(context.Context, *dcs.Cluster, string) error {
-	return fmt.Errorf("NotSupported")
-}
-
-func (*MockManager) Promote(context.Context, *dcs.Cluster) error {
-	return fmt.Errorf("NotSupported")
-}
-
-func (*MockManager) IsPromoted(context.Context) bool {
-	return true
-}
-
-func (*MockManager) Demote(context.Context) error {
-	return fmt.Errorf("NotSupported")
-}
-
-func (*MockManager) Follow(context.Context, *dcs.Cluster) error {
-	return fmt.Errorf("NotSupported")
-}
-
-func (*MockManager) Recover(context.Context, *dcs.Cluster) error {
-	return nil
-
-}
-
-func (*MockManager) GetHealthiestMember(*dcs.Cluster, string) *dcs.Member {
-	return nil
-}
-
-func (*MockManager) GetMemberAddrs(context.Context, *dcs.Cluster) []string {
-	return nil
-}
-
-func (*MockManager) IsRootCreated(context.Context) (bool, error) {
-	return false, fmt.Errorf("NotSupported")
-}
-
-func (*MockManager) CreateRoot(context.Context) error {
-	return fmt.Errorf("NotSupported")
-}
-
-func (*MockManager) Lock(context.Context, string) error {
-	return fmt.Errorf("NotSupported")
-}
-
-func (*MockManager) Unlock(context.Context) error {
+func (*MockHandler) Unlock(context.Context) error {
 	return fmt.Errorf("NotSupported")
 }

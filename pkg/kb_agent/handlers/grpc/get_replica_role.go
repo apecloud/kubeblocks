@@ -17,6 +17,24 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package handlers
+package grpc
 
-//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../../hack/boilerplate.go.txt -package handlers -destination handlers_mock.go github.com/apecloud/kubeblocks/pkg/kb_agent/handlers Handler
+import (
+	"context"
+
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/plugin"
+)
+
+func (h *Handler) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (string, error) {
+	getRoleRequest := &plugin.GetRoleRequest{
+		ServiceInfo: plugin.GetServiceInfo(),
+	}
+
+	resp, err := h.dbClient.GetRole(ctx, getRoleRequest)
+	if err != nil {
+		return "", err
+	}
+
+	return resp.Role, nil
+}

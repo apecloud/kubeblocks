@@ -1,0 +1,244 @@
+/*
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+syntax = "proto3";
+package plugin.v1;
+
+import "google/protobuf/descriptor.proto";
+
+option go_package = "github.com/apecloud/kubeblocks/pkg/lorry/plugin";
+
+extend google.protobuf.FieldOptions {
+  // Indicates that a field MAY contain information that is sensitive
+  // and MUST be treated as such (e.g. not logged).
+  bool kb_secret = 1059;
+}
+
+message GetPluginInfoRequest {
+  map<string, string> metadata = 1;
+}
+
+message GetPluginInfoResponse {
+  // The name of the plugin. It MUST be 63
+  // characters or less, beginning and ending with an alphanumeric
+  // character ([a-z0-9A-Z]) with dashes (-), dots (.), and
+  // alphanumerics between. This field is REQUIRED.
+  string name = 1;
+
+  string service_type = 2;
+
+  // This field is REQUIRED. 
+  string version = 3;
+
+  // This field is OPTIONAL. 
+  map<string, string> metadata = 4;
+}
+
+message ServiceInfo {
+  // The pod FQDN of the replica.
+  string fqdn = 1;
+
+  // The port on which the service listens.
+  string port = 2;
+
+  // name of the account with the necessary privileges to execute the action.
+  string admin_user = 3;
+
+  // password of the account with the necessary privileges to execute the action.
+  string admin_password = 4 [(kb_secret) = true];
+}
+
+message IsServiceReadyRequest {
+  ServiceInfo service_info = 1;
+
+  // Common metadata property for extention
+  map<string, string> metadata = 2;
+}
+
+message IsServiceReadyResponse {
+  // true if the service is ready, false otherwise.
+  bool ready = 1;
+
+  // This field is OPTIONAL. 
+  map<string, string> metadata = 2;
+}
+
+message GetRoleRequest {
+  ServiceInfo service_info = 1;
+
+  // Common metadata property for extention
+  map<string, string> metadata = 2;
+}
+
+message GetRoleResponse {
+  string role = 1;
+
+  // Common metadata property for extention
+  map<string, string> metadata = 2;
+}
+
+message JoinMemberRequest {
+  ServiceInfo service_info = 1;
+
+  // The Names of all members.
+  repeated string members = 2;
+
+  // The name of the new member's Pod.
+  string new_member = 3;
+
+  // The IP of the new member's Pod.
+  string new_member_ip = 4;
+
+  // Common metadata property for extention
+  map<string, string> metadata = 5;
+}
+
+message JoinMemberResponse {
+  // Common metadata property for extention
+  map<string, string> metadata = 1;
+}
+
+message LeaveMemberRequest {
+  ServiceInfo service_info = 1;
+
+  // The Names of all members.
+  repeated string members = 2;
+
+  // The name of the leave member's Pod.
+  string leave_member = 3;
+
+  // The IP of the leave member's Pod.
+  string leave_member_ip = 4;
+
+  // Common metadata property for extention
+  map<string, string> metadata = 5;
+}
+
+message LeaveMemberResponse {
+  // Common metadata property for extention
+  map<string, string> metadata = 1;
+}
+
+message ReadonlyRequest {
+  ServiceInfo service_info = 1;
+
+  // The reason for setting the replica as read-only.
+  string Reason = 2;
+
+  // Common metadata property for extention
+  map<string, string> metadata = 3;
+}
+
+message ReadonlyResponse {
+  // Common metadata property for extention
+  map<string, string> metadata = 1;
+}
+
+message ReadwriteRequest {
+  ServiceInfo service_info = 1;
+
+  // The reason for setting the replica as read-write.
+  string Reason = 2;
+
+  // Common metadata property for extention
+  map<string, string> metadata = 3;
+}
+
+message ReadwriteResponse {
+  // Common metadata property for extention
+  map<string, string> metadata = 1;
+}
+
+message AccountProvisionRequest {
+  ServiceInfo service_info = 1;
+
+  // the user name of the new account.
+  string user_name = 2;
+
+  // the password of the new account.
+  string password = 3 [(kb_secret) = true];
+
+  // the role of the new account.
+  string role = 4;
+
+  // Common metadata property for extention
+}
+
+message AccountProvisionResponse {
+  // Common metadata property for extention
+  map<string, string> metadata = 1;
+}
+
+message SwitchoverRequest {
+  ServiceInfo service_info = 1;
+
+  // The Name of the old primary replica to demote.
+  string primary = 2;
+
+  // The Name of the new primary replica.
+  string candidate = 3;
+
+  // Force the switchover to happen even if the primary is not ready.
+  bool force = 4;
+
+  // Common metadata property for extention
+  map<string, string> metadata = 5;
+}
+
+message SwitchoverResponse {
+  // Common metadata property for extention
+  map<string, string> metadata = 1;
+}
+
+// ServicePlugin service provides APIs to kubeblocks operator to exec component operation.
+service ServicePlugin {
+  rpc GetPluginInfo(GetPluginInfoRequest) returns (GetPluginInfoResponse) {}
+
+  // IsServiceReady defines the mechanism to probe the readiness of the database.
+  rpc IsServiceReady(IsServiceReadyRequest) returns (IsServiceReadyResponse) {}
+
+  // GetRole defines the mechanism to probe the role of replicas. The return role
+  // must be one of the names defined in the componentdefinition roles. 
+  rpc GetRole(GetRoleRequest) returns (GetRoleResponse) {}
+
+  // MemberJoin defines how to add a new replica to the replication group. 
+  // This action is typically invoked when a new replica needs to be added, 
+  // such as during scale-out. It may involve updating configuration, 
+  // notifying other members, and ensuring data consistency.
+  rpc JoinMember(JoinMemberRequest) returns (JoinMemberResponse) {}
+
+  // MemberLeave defines how to remove a replica from the replication group. 
+  // This action is typically invoked when a replica needs to be removed, 
+  // such as during scale-in. It may involve configuration updates and notifying
+  // other members about the departure,
+  rpc LeaveMember(LeaveMemberRequest) returns (LeaveMemberResponse) {}
+
+  // Readonly defines how to set a replica service as read-only.
+  rpc Readonly(ReadonlyRequest) returns (ReadonlyResponse) {}
+
+  // Readwrite defines how to set a replica service as read-write.
+  rpc Readwrite(ReadwriteRequest) returns (ReadwriteResponse) {}
+
+  // AccountProvision Defines the procedure to generate a new database account.
+  rpc AccountProvision(AccountProvisionRequest) returns (AccountProvisionResponse) {}
+
+  // Switchover defines the procedure to switch replica roles in a primary-secondary 
+  // HA DBEngine by promoting the secondary to primary and demoting the current primary to secondary.
+  rpc Switchover(SwitchoverRequest) returns (SwitchoverResponse) {}
+}

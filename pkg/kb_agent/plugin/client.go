@@ -17,6 +17,24 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package handlers
+package plugin
 
-//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../../hack/boilerplate.go.txt -package handlers -destination handlers_mock.go github.com/apecloud/kubeblocks/pkg/kb_agent/handlers Handler
+import (
+	"fmt"
+
+	"github.com/pkg/errors"
+	grpc "google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+)
+
+func NewPluginClient(host, port string) (ServicePluginClient, error) {
+	addr := fmt.Sprintf("%s:%s", host, port)
+	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return nil, errors.Wrap(err, "grpc: failed to dial")
+	}
+
+	client := NewServicePluginClient(conn)
+
+	return client, nil
+}

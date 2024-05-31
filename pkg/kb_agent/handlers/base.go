@@ -17,22 +17,21 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package engines
+package handlers
 
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/go-logr/logr"
 	"github.com/spf13/viper"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers/models"
 )
 
-type DBManagerBase struct {
+type HandlerBase struct {
 	CurrentMemberName string
 	CurrentMemberIP   string
 	ClusterCompName   string
@@ -44,13 +43,13 @@ type DBManagerBase struct {
 	DBState           *dcs.DBState
 }
 
-func NewDBManagerBase(logger logr.Logger) (*DBManagerBase, error) {
+func NewHandlerBase(logger logr.Logger) (*HandlerBase, error) {
 	currentMemberName := viper.GetString(constant.KBEnvPodName)
 	if currentMemberName == "" {
 		return nil, fmt.Errorf("%s is not set", constant.KBEnvPodName)
 	}
 
-	mgr := DBManagerBase{
+	mgr := HandlerBase{
 		CurrentMemberName: currentMemberName,
 		CurrentMemberIP:   viper.GetString(constant.KBEnvPodIP),
 		ClusterCompName:   viper.GetString(constant.KBEnvClusterCompName),
@@ -60,200 +59,102 @@ func NewDBManagerBase(logger logr.Logger) (*DBManagerBase, error) {
 	return &mgr, nil
 }
 
-func (mgr *DBManagerBase) IsDBStartupReady() bool {
+func (mgr *HandlerBase) IsDBStartupReady() bool {
 	return mgr.DBStartupReady
 }
 
-func (mgr *DBManagerBase) GetLogger() logr.Logger {
+func (mgr *HandlerBase) GetLogger() logr.Logger {
 	return mgr.Logger
 }
 
-func (mgr *DBManagerBase) SetLogger(logger logr.Logger) {
+func (mgr *HandlerBase) SetLogger(logger logr.Logger) {
 	mgr.Logger = logger
 }
 
-func (mgr *DBManagerBase) GetCurrentMemberName() string {
+func (mgr *HandlerBase) GetCurrentMemberName() string {
 	return mgr.CurrentMemberName
 }
 
-func (mgr *DBManagerBase) IsFirstMember() bool {
-	return strings.HasSuffix(mgr.CurrentMemberName, "-0")
-}
-
-func (mgr *DBManagerBase) IsPromoted(context.Context) bool {
-	return true
-}
-
-func (mgr *DBManagerBase) Promote(context.Context, *dcs.Cluster) error {
-	return models.ErrNotImplemented
-}
-
-func (mgr *DBManagerBase) Demote(context.Context) error {
-	return models.ErrNotImplemented
-}
-
-func (mgr *DBManagerBase) Follow(context.Context, *dcs.Cluster) error {
-	return models.ErrNotImplemented
-}
-
-func (mgr *DBManagerBase) Recover(context.Context, *dcs.Cluster) error {
-	return nil
-}
-
-func (mgr *DBManagerBase) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
+func (mgr *HandlerBase) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
 	return false, models.ErrNotImplemented
 }
 
-func (mgr *DBManagerBase) IsLeaderMember(context.Context, *dcs.Cluster, *dcs.Member) (bool, error) {
-	return false, models.ErrNotImplemented
-}
-
-func (mgr *DBManagerBase) GetMemberAddrs(context.Context, *dcs.Cluster) []string {
+func (mgr *HandlerBase) MemberHealthyCheck(context.Context, *dcs.Cluster, *dcs.Member) error {
 	return nil
 }
 
-func (mgr *DBManagerBase) InitializeCluster(context.Context, *dcs.Cluster) error {
+func (mgr *HandlerBase) JoinMember(context.Context, *dcs.Cluster, string) error {
 	return nil
 }
 
-func (mgr *DBManagerBase) IsClusterInitialized(context.Context, *dcs.Cluster) (bool, error) {
-	return true, nil
-}
-
-func (mgr *DBManagerBase) IsClusterHealthy(context.Context, *dcs.Cluster) bool {
-	return true
-}
-
-func (mgr *DBManagerBase) MemberHealthyCheck(context.Context, *dcs.Cluster, *dcs.Member) error {
+func (mgr *HandlerBase) LeaveMember(context.Context, *dcs.Cluster, string) error {
 	return nil
 }
 
-func (mgr *DBManagerBase) LeaderHealthyCheck(context.Context, *dcs.Cluster) error {
-	return nil
-}
-
-func (mgr *DBManagerBase) CurrentMemberHealthyCheck(ctx context.Context, cluster *dcs.Cluster) error {
-	member := cluster.GetMemberWithName(mgr.CurrentMemberName)
-	return mgr.MemberHealthyCheck(ctx, cluster, member)
-}
-
-func (mgr *DBManagerBase) HasOtherHealthyLeader(context.Context, *dcs.Cluster) *dcs.Member {
-	return nil
-}
-
-func (mgr *DBManagerBase) HasOtherHealthyMembers(context.Context, *dcs.Cluster, string) []*dcs.Member {
-	return nil
-}
-
-func (mgr *DBManagerBase) IsMemberHealthy(context.Context, *dcs.Cluster, *dcs.Member) bool {
-	return false
-}
-
-func (mgr *DBManagerBase) IsCurrentMemberHealthy(context.Context, *dcs.Cluster) bool {
-	return true
-}
-
-func (mgr *DBManagerBase) IsCurrentMemberInCluster(context.Context, *dcs.Cluster) bool {
-	return true
-}
-
-func (mgr *DBManagerBase) JoinCurrentMemberToCluster(context.Context, *dcs.Cluster) error {
-	return nil
-}
-
-func (mgr *DBManagerBase) LeaveMemberFromCluster(context.Context, *dcs.Cluster, string) error {
-	return nil
-}
-
-func (mgr *DBManagerBase) IsMemberLagging(context.Context, *dcs.Cluster, *dcs.Member) (bool, int64) {
-	return false, 0
-}
-
-func (mgr *DBManagerBase) GetLag(context.Context, *dcs.Cluster) (int64, error) {
+func (mgr *HandlerBase) GetLag(context.Context, *dcs.Cluster) (int64, error) {
 	return 0, models.ErrNotImplemented
 }
 
-func (mgr *DBManagerBase) GetDBState(context.Context, *dcs.Cluster) *dcs.DBState {
-	// mgr.DBState = DBState
+func (mgr *HandlerBase) MoveData(context.Context, *dcs.Cluster) error {
 	return nil
 }
 
-func (mgr *DBManagerBase) MoveData(context.Context, *dcs.Cluster) error {
-	return nil
-}
-
-func (mgr *DBManagerBase) GetReplicaRole(context.Context, *dcs.Cluster) (string, error) {
+func (mgr *HandlerBase) GetReplicaRole(context.Context, *dcs.Cluster) (string, error) {
 	return "", models.ErrNotImplemented
 }
 
-func (mgr *DBManagerBase) Exec(context.Context, string) (int64, error) {
+func (mgr *HandlerBase) Exec(context.Context, string) (int64, error) {
 	return 0, models.ErrNotImplemented
 }
 
-func (mgr *DBManagerBase) Query(context.Context, string) ([]byte, error) {
+func (mgr *HandlerBase) Query(context.Context, string) ([]byte, error) {
 	return []byte{}, models.ErrNotImplemented
 }
 
-func (mgr *DBManagerBase) GetPort() (int, error) {
+func (mgr *HandlerBase) GetPort() (int, error) {
 	return 0, models.ErrNotImplemented
 }
 
-func (mgr *DBManagerBase) IsRootCreated(context.Context) (bool, error) {
-	return true, nil
-}
-
-func (mgr *DBManagerBase) ListUsers(context.Context) ([]models.UserInfo, error) {
+func (mgr *HandlerBase) ListUsers(context.Context) ([]models.UserInfo, error) {
 	return nil, models.ErrNotImplemented
 }
 
-func (mgr *DBManagerBase) ListSystemAccounts(context.Context) ([]models.UserInfo, error) {
+func (mgr *HandlerBase) ListSystemAccounts(context.Context) ([]models.UserInfo, error) {
 	return nil, models.ErrNotImplemented
 }
 
-func (mgr *DBManagerBase) CreateUser(context.Context, string, string) error {
+func (mgr *HandlerBase) CreateUser(context.Context, string, string) error {
 	return models.ErrNotImplemented
 }
 
-func (mgr *DBManagerBase) DeleteUser(context.Context, string) error {
+func (mgr *HandlerBase) DeleteUser(context.Context, string) error {
 	return models.ErrNotImplemented
 }
 
-func (mgr *DBManagerBase) DescribeUser(context.Context, string) (*models.UserInfo, error) {
+func (mgr *HandlerBase) DescribeUser(context.Context, string) (*models.UserInfo, error) {
 	return nil, models.ErrNotImplemented
 }
 
-func (mgr *DBManagerBase) GrantUserRole(context.Context, string, string) error {
+func (mgr *HandlerBase) GrantUserRole(context.Context, string, string) error {
 	return models.ErrNotImplemented
 }
 
-func (mgr *DBManagerBase) RevokeUserRole(context.Context, string, string) error {
+func (mgr *HandlerBase) RevokeUserRole(context.Context, string, string) error {
 	return models.ErrNotImplemented
 }
 
-func (mgr *DBManagerBase) IsRunning() bool {
+func (mgr *HandlerBase) IsRunning() bool {
 	return false
 }
 
-func (mgr *DBManagerBase) Lock(context.Context, string) error {
+func (mgr *HandlerBase) Lock(context.Context, string) error {
 	return models.ErrNotImplemented
 }
 
-func (mgr *DBManagerBase) Unlock(context.Context) error {
+func (mgr *HandlerBase) Unlock(context.Context) error {
 	return models.ErrNotImplemented
 }
 
-func (mgr *DBManagerBase) Start(context.Context, *dcs.Cluster) error {
-	return nil
-}
-
-func (mgr *DBManagerBase) Stop() error {
-	return nil
-}
-
-func (mgr *DBManagerBase) CreateRoot(context.Context) error {
-	return nil
-}
-
-func (mgr *DBManagerBase) ShutDownWithWait() {
+func (mgr *HandlerBase) ShutDownWithWait() {
 	mgr.Logger.Info("Override me if need")
 }

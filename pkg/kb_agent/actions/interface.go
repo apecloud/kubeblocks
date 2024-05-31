@@ -17,16 +17,27 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package operations
+package actions
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"os"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
+
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers/exec"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers/grpc"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
-type Operation interface {
+type Action interface {
 	Init(context.Context) error
 	SetTimeout(timeout time.Duration)
 	IsReadonly(context.Context) bool
@@ -35,11 +46,69 @@ type Operation interface {
 }
 
 type Base struct {
+	// the name of componentdefinition action
+	Action  string
 	Timeout time.Duration
+
 	Command []string
+	Handler handlers.Handler
+
+	Logger logr.Logger
+}
+
+var actionHandlers = map[string]util.Handlers{}
+var defaultGRPCSetting map[string]string
+
+func init() {
+	viper.AutomaticEnv()
+	actionJSON := viper.GetString(constant.KBEnvActionHandlers)
+	if actionJSON == "" {
+		panic("action handlers is not specified")
+	}
+
+	err := json.Unmarshal([]byte(actionJSON), &actionHandlers)
+	if err != nil {
+		msg := fmt.Sprintf("unmarshal action handlers [%s] failed: %s", actionJSON, err.Error())
+		panic(msg)
+	}
+
+	for _, handlers := range actionHandlers {
+		if len(handlers.GPRC) != 0 {
+			defaultGRPCSetting = handlers.GPRC
+			break
+		}
+	}
 }
 
 func (b *Base) Init(ctx context.Context) error {
+	var handlers util.Handlers
+	if b.Action != "" {
+		handlers = actionHandlers[b.Action]
+	}
+
+	switch {
+	case len(handlers.Command) != 0:
+		b.Command = handlers.Command
+		handler, err := exec.NewHandler(nil)
+		if err != nil {
+			return errors.Wrap(err, "new exec manager failed")
+		}
+		b.Handler = handler
+
+	case len(handlers.GPRC) != 0 || len(defaultGRPCSetting) != 0:
+		grpcSetting := handlers.GPRC
+		if len(grpcSetting) == 0 {
+			grpcSetting = defaultGRPCSetting
+		}
+		handler, err := grpc.NewHandler(grpcSetting)
+		if err != nil {
+			return errors.Wrap(err, "new grpc manager failed")
+		}
+
+		b.Handler = handler
+	default:
+		return errors.New("no handler found")
+	}
 	return nil
 }
 
@@ -57,4 +126,12 @@ func (b *Base) PreCheck(ctx context.Context, request *OpsRequest) error {
 
 func (b *Base) Do(ctx context.Context, request *OpsRequest) (*OpsResponse, error) {
 	return nil, errors.New("not implemented")
+}
+
+func (b *Base) ExecCommand(ctx context.Context) error {
+	output, err := util.ExecCommand(ctx, b.Command, os.Environ())
+	if output != "" {
+		b.Logger.Info(b.Action, "output", output)
+	}
+	return err
 }

@@ -17,44 +17,24 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package operations
+package models
 
-import (
-	"sync"
+import "strings"
 
-	"github.com/pkg/errors"
+const (
+	PRIMARY   = "primary"
+	SECONDARY = "secondary"
+	MASTER    = "master"
+	SLAVE     = "slave"
+	LEADER    = "Leader"
+	FOLLOWER  = "Follower"
+	LEARNER   = "Learner"
+	CANDIDATE = "Candidate"
 )
 
-type Ops struct {
-	ops  map[string]Operation
-	lock sync.Mutex
-}
-
-var ops Ops
-
-func (ops *Ops) Register(name string, op Operation) error {
-	if _, ok := ops.ops[name]; ok {
-		return errors.New("Operation already registered: " + name)
-	}
-
-	ops.lock.Lock()
-	defer ops.lock.Unlock()
-	if ops.ops == nil {
-		ops.ops = make(map[string]Operation)
-	}
-
-	ops.ops[name] = op
-	return nil
-}
-
-func (ops *Ops) Operations() map[string]Operation {
-	return ops.ops
-}
-
-func Register(name string, op Operation) error {
-	return ops.Register(name, op)
-}
-
-func Operations() map[string]Operation {
-	return ops.Operations()
+// IsLikelyPrimaryRole returns true if the role is primary,
+// it is used for the case where db manager do not implemement the IsLeader method.
+// use it curefully, as it is for normal case, and may be wrong for some special cases.
+func IsLikelyPrimaryRole(role string) bool {
+	return strings.EqualFold(role, PRIMARY) || strings.EqualFold(role, MASTER) || strings.EqualFold(role, LEADER)
 }

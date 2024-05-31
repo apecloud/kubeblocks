@@ -21,32 +21,25 @@ package replica
 
 import (
 	"context"
-	"encoding/json"
 
-	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
-	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
-	"github.com/apecloud/kubeblocks/pkg/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
 type GetRole struct {
-	operations.Base
-	dcsStore  dcs.DCS
-	dbManager engines.DBManager
-	logger    logr.Logger
+	actions.Base
+	dcsStore dcs.DCS
 }
 
-var getrole operations.Operation = &GetRole{}
+var getrole actions.Action = &GetRole{}
 
 func init() {
-	err := operations.Register("getrole", getrole)
+	err := actions.Register("getrole", getrole)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -58,44 +51,25 @@ func (s *GetRole) Init(ctx context.Context) error {
 		return errors.New("dcs store init failed")
 	}
 
-	s.logger = ctrl.Log.WithName("getrole")
-
-	actionJSON := viper.GetString(constant.KBEnvActionCommands)
-	if actionJSON != "" {
-		actionCommands := map[string][]string{}
-		err := json.Unmarshal([]byte(actionJSON), &actionCommands)
-		if err != nil {
-			s.logger.Info("get action commands failed", "error", err.Error())
-			return err
-		}
-		roleProbeCmd, ok := actionCommands[constant.RoleProbeAction]
-		if ok && len(roleProbeCmd) > 0 {
-			s.Command = roleProbeCmd
-		}
-	}
-	dbManager, err := register.GetDBManager(nil)
-	if err != nil {
-		return errors.Wrap(err, "get manager failed")
-	}
-
-	s.dbManager = dbManager
-	return nil
+	s.Logger = ctrl.Log.WithName("GetRole")
+	s.Action = constant.RoleProbeAction
+	return s.Base.Init(ctx)
 }
 
 func (s *GetRole) IsReadonly(ctx context.Context) bool {
 	return true
 }
 
-func (s *GetRole) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
-	resp := &operations.OpsResponse{
+func (s *GetRole) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
+	resp := &actions.OpsResponse{
 		Data: map[string]any{},
 	}
 	resp.Data["operation"] = util.GetRoleOperation
-
 	cluster := s.dcsStore.GetClusterFromCache()
-	role, err := s.dbManager.GetReplicaRole(ctx, cluster)
+	role, err := s.Handler.GetReplicaRole(ctx, cluster)
+
 	if err != nil {
-		s.logger.Info("executing getrole error", "error", err)
+		s.Logger.Info("executing getrole error", "error", err.Error())
 		return resp, err
 	}
 

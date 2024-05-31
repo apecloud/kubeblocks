@@ -39,7 +39,7 @@ type Handler struct {
 	dbClient plugin.ServicePluginClient
 }
 
-func NewManager(properties handlers.Properties) (handlers.Handler, error) {
+func NewHandler(properties map[string]string) (handlers.Handler, error) {
 	logger := ctrl.Log.WithName("GRPC")
 	managerBase, err := handlers.NewHandlerBase(logger)
 	if err != nil {

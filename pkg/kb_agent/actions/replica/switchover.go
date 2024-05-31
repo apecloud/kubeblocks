@@ -26,8 +26,8 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
@@ -50,13 +50,13 @@ func init() {
 	}
 }
 
-func (s *Switchover) Init(_ context.Context) error {
+func (s *Switchover) Init(ctx context.Context) error {
 	s.dcsStore = dcs.GetStore()
 	if s.dcsStore == nil {
 		return errors.New("dcs store init failed")
 	}
-
-	return nil
+	s.Action = constant.SwitchoverAction
+	return s.Base.Init(ctx)
 }
 
 func (s *Switchover) PreCheck(ctx context.Context, req *operations.OpsRequest) error {
@@ -71,11 +71,6 @@ func (s *Switchover) PreCheck(ctx context.Context, req *operations.OpsRequest) e
 		return errors.Wrap(err, "get cluster failed")
 	}
 
-	manager, err := register.GetDBManager(nil)
-	if err != nil {
-		return errors.Wrap(err, "get manager failed")
-	}
-
 	if cluster.HaConfig == nil || !cluster.HaConfig.IsEnable() {
 		return errors.New("cluster's ha is disabled")
 	}
@@ -86,11 +81,6 @@ func (s *Switchover) PreCheck(ctx context.Context, req *operations.OpsRequest) e
 			message := fmt.Sprintf("primary %s not exists", primary)
 			return errors.New(message)
 		}
-
-		if ok, err := manager.IsLeaderMember(ctx, cluster, leaderMember); err != nil || !ok {
-			message := fmt.Sprintf("%s is not the primary", primary)
-			return errors.New(message)
-		}
 	}
 
 	if candidate != "" {
@@ -99,15 +89,7 @@ func (s *Switchover) PreCheck(ctx context.Context, req *operations.OpsRequest) e
 			message := fmt.Sprintf("candidate %s not exists", candidate)
 			return errors.New(message)
 		}
-
-		if !manager.IsMemberHealthy(ctx, cluster, candidateMember) {
-			message := fmt.Sprintf("candidate %s is unhealthy", candidate)
-			return errors.New(message)
-		}
-	} else if len(manager.HasOtherHealthyMembers(ctx, cluster, primary)) == 0 {
-		return errors.New("candidate is not set and has no other healthy members")
 	}
-
 	return nil
 }
 

@@ -42,8 +42,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
@@ -80,7 +78,6 @@ type volumeExt struct {
 
 type Protection struct {
 	operations.Base
-	dbManager     engines.DBManager
 	Requester     volumeStatsRequester
 	Pod           string
 	HighWatermark int
@@ -99,11 +96,9 @@ func (p *Protection) Init(ctx context.Context) error {
 	}
 	p.SendEvent = true
 
-	dbManager, err := register.GetDBManager(nil)
-	if err != nil {
-		return errors.Wrap(err, "get manager failed")
+	if err := p.Base.Init(ctx); err != nil {
+		return err
 	}
-	p.dbManager = dbManager
 
 	if err := p.Requester.init(ctx); err != nil {
 		return err
@@ -298,11 +293,11 @@ func (p *Protection) lowWatermark(ctx context.Context, volumeUsages map[string]a
 }
 
 func (p *Protection) lockInstance(ctx context.Context) error {
-	return p.dbManager.Lock(ctx, "disk full")
+	return p.DBManager.Lock(ctx, "disk full")
 }
 
 func (p *Protection) unlockInstance(ctx context.Context) error {
-	return p.dbManager.Unlock(ctx)
+	return p.DBManager.Unlock(ctx)
 }
 
 func (p *Protection) buildVolumesMsg() map[string]any {

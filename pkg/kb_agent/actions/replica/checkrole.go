@@ -27,8 +27,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
-
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
@@ -37,11 +35,11 @@ import (
 
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
-	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
-	"github.com/apecloud/kubeblocks/pkg/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions/register"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers/models"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
 // AccessMode defines SVC access mode enums.
@@ -49,7 +47,7 @@ import (
 type AccessMode string
 
 type CheckRole struct {
-	operations.Base
+	actions.Base
 	logger                     logr.Logger
 	dcsStore                   dcs.DCS
 	OriRole                    string
@@ -60,10 +58,10 @@ type CheckRole struct {
 	Command                    []string
 }
 
-var checkrole operations.Operation = &CheckRole{}
+var checkrole actions.Action = &CheckRole{}
 
 func init() {
-	err := operations.Register(strings.ToLower(string(util.CheckRoleOperation)), checkrole)
+	err := actions.Register(strings.ToLower(string(util.CheckRoleOperation)), checkrole)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -118,8 +116,8 @@ func (s *CheckRole) IsReadonly(ctx context.Context) bool {
 	return true
 }
 
-func (s *CheckRole) Do(ctx context.Context, _ *operations.OpsRequest) (*operations.OpsResponse, error) {
-	resp := &operations.OpsResponse{
+func (s *CheckRole) Do(ctx context.Context, _ *actions.OpsRequest) (*actions.OpsResponse, error) {
+	resp := &actions.OpsResponse{
 		Data: map[string]any{},
 	}
 	resp.Data["operation"] = util.CheckRoleOperation
@@ -221,7 +219,7 @@ func (s *CheckRole) roleValidate(role string) (bool, string) {
 	return isValid, msg
 }
 
-func (s *CheckRole) buildGlobalRoleSnapshot(cluster *dcs.Cluster, mgr engines.DBManager, role string) string {
+func (s *CheckRole) buildGlobalRoleSnapshot(cluster *dcs.Cluster, mgr handlers.DBManager, role string) string {
 	currentMemberName := mgr.GetCurrentMemberName()
 	roleSnapshot := &common.GlobalRoleSnapshot{
 		Version: strconv.FormatInt(metav1.NowMicro().UnixMicro(), 10),

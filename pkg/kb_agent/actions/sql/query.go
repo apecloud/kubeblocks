@@ -22,20 +22,16 @@ package sql
 import (
 	"context"
 
-	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 type Query struct {
 	operations.Base
-	dbManager engines.DBManager
-	logger    logr.Logger
 }
 
 var query operations.Operation = &Query{}
@@ -47,14 +43,10 @@ func init() {
 	}
 }
 
-func (s *Query) Init(context.Context) error {
-	dbManager, err := register.GetDBManager(nil)
-	if err != nil {
-		return errors.Wrap(err, "get manager failed")
-	}
-	s.dbManager = dbManager
-	s.logger = ctrl.Log.WithName("query")
-	return nil
+func (s *Query) Init(ctx context.Context) error {
+	s.Logger = ctrl.Log.WithName("query")
+	s.Action = constant.QuerySQLAction
+	return s.Base.Init(ctx)
 }
 
 func (s *Query) IsReadonly(context.Context) bool {
@@ -69,9 +61,9 @@ func (s *Query) Do(ctx context.Context, req *operations.OpsRequest) (*operations
 
 	resp := operations.NewOpsResponse(util.QueryOperation)
 
-	result, err := s.dbManager.Query(ctx, sql)
+	result, err := s.DBManager.Query(ctx, sql)
 	if err != nil {
-		s.logger.Info("executing query error", "error", err)
+		s.Logger.Info("executing query error", "error", err)
 		return resp, err
 	}
 

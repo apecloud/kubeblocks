@@ -24,21 +24,16 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/go-logr/logr"
-	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 type DescribeUser struct {
 	operations.Base
-	dbManager engines.DBManager
-	logger    logr.Logger
 }
 
 var describeUser operations.Operation = &DescribeUser{}
@@ -51,13 +46,9 @@ func init() {
 }
 
 func (s *DescribeUser) Init(ctx context.Context) error {
-	dbManager, err := register.GetDBManager(nil)
-	if err != nil {
-		return errors.Wrap(err, "get manager failed")
-	}
-	s.dbManager = dbManager
-	s.logger = ctrl.Log.WithName("describeUser")
-	return nil
+	s.Logger = ctrl.Log.WithName("describeUser")
+	s.Action = constant.DescribeUserAction
+	return s.Base.Init(ctx)
 }
 
 func (s *DescribeUser) IsReadonly(ctx context.Context) bool {
@@ -77,9 +68,9 @@ func (s *DescribeUser) Do(ctx context.Context, req *operations.OpsRequest) (*ope
 	userInfo, _ := UserInfoParser(req)
 	resp := operations.NewOpsResponse(util.DescribeUserOp)
 
-	result, err := s.dbManager.DescribeUser(ctx, userInfo.UserName)
+	result, err := s.DBManager.DescribeUser(ctx, userInfo.UserName)
 	if err != nil {
-		s.logger.Info("executing describeUser error", "error", err)
+		s.Logger.Info("executing describeUser error", "error", err)
 		return resp, err
 	}
 

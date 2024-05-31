@@ -17,36 +17,32 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package replica
+package models
 
-import (
-	"context"
-	"strings"
+type ClientType string
 
-	ctrl "sigs.k8s.io/controller-runtime"
-
-	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
+const (
+	CLI     ClientType = "cli"
+	DJANGO  ClientType = "django"
+	DOTNET  ClientType = ".net"
+	GO      ClientType = "go"
+	JAVA    ClientType = "java"
+	NODEJS  ClientType = "node.js"
+	PHP     ClientType = "php"
+	PRISMA  ClientType = "prisma"
+	PYTHON  ClientType = "python"
+	RAILS   ClientType = "rails"
+	RUST    ClientType = "rust"
+	SYMFONY ClientType = "symfony"
 )
 
-type dataDump struct {
-	actions.Base
-}
-
-func init() {
-	err := actions.Register(strings.ToLower(string(util.DataDumpOperation)), &dataDump{})
-	if err != nil {
-		panic(err.Error())
+func ClientTypes() []string {
+	return []string{CLI.String(), DJANGO.String(), DOTNET.String(), GO.String(),
+		JAVA.String(), NODEJS.String(), PHP.String(), PRISMA.String(),
+		PYTHON.String(), RAILS.String(), RUST.String(), SYMFONY.String(),
 	}
 }
 
-func (s *dataDump) Init(ctx context.Context) error {
-	s.Logger = ctrl.Log.WithName("DataDump")
-	s.Action = constant.DataDumpAction
-	return s.Base.Init(ctx)
-}
-
-func (s *dataDump) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
-	return nil, s.ExecCommand(ctx)
+func (t ClientType) String() string {
+	return string(t)
 }

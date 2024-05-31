@@ -21,11 +21,9 @@ package replica
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 
-	"github.com/go-logr/logr"
-	"github.com/spf13/viper"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
@@ -34,8 +32,6 @@ import (
 
 type dataLoad struct {
 	operations.Base
-	logger  logr.Logger
-	Command []string
 }
 
 func init() {
@@ -45,27 +41,12 @@ func init() {
 	}
 }
 
-func (s *dataLoad) Init(_ context.Context) error {
-	actionJSON := viper.GetString(constant.KBEnvActionCommands)
-	if actionJSON != "" {
-		actionCommands := map[string][]string{}
-		err := json.Unmarshal([]byte(actionJSON), &actionCommands)
-		if err != nil {
-			s.logger.Info("get action commands failed", "error", err.Error())
-			return err
-		}
-		cmd, ok := actionCommands[constant.DataLoadAction]
-		if ok && len(cmd) > 0 {
-			s.Command = cmd
-		}
-	}
-	return nil
-}
-
-func (s *dataLoad) PreCheck(ctx context.Context, req *operations.OpsRequest) error {
-	return nil
+func (s *dataLoad) Init(ctx context.Context) error {
+	s.Logger = ctrl.Log.WithName("DataLoad")
+	s.Action = constant.DataLoadAction
+	return s.Base.Init(ctx)
 }
 
 func (s *dataLoad) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
-	return nil, doCommonAction(ctx, s.logger, "dataLoad", s.Command)
+	return nil, s.ExecCommand(ctx)
 }

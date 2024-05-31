@@ -21,17 +21,14 @@ package replica
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
@@ -39,9 +36,7 @@ import (
 type Leave struct {
 	operations.Base
 	dcsStore dcs.DCS
-	logger   logr.Logger
 	Timeout  time.Duration
-	Command  []string
 }
 
 var leave operations.Operation = &Leave{}
@@ -58,44 +53,29 @@ func (s *Leave) Init(ctx context.Context) error {
 	if s.dcsStore == nil {
 		return errors.New("dcs store init failed")
 	}
-	actionJSON := viper.GetString(constant.KBEnvActionCommands)
-	if actionJSON != "" {
-		actionCommands := map[string][]string{}
-		err := json.Unmarshal([]byte(actionJSON), &actionCommands)
-		if err != nil {
-			s.logger.Info("get action commands failed", "error", err.Error())
-			return err
-		}
-		memberLeaveCmd, ok := actionCommands[constant.MemberLeaveAction]
-		if ok && len(memberLeaveCmd) > 0 {
-			s.Command = memberLeaveCmd
-		}
-	}
-	return nil
+
+	s.Logger = ctrl.Log.WithName("LeaveMember")
+	s.Action = constant.MemberLeaveAction
+	return s.Base.Init(ctx)
 }
 
 func (s *Leave) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
-	manager, err := register.GetDBManager(s.Command)
-	if err != nil {
-		return nil, errors.Wrap(err, "get manager failed")
-	}
-
 	cluster, err := s.dcsStore.GetCluster()
 	if err != nil {
-		s.logger.Error(err, "get cluster failed")
+		s.Logger.Error(err, "get cluster failed")
 		return nil, err
 	}
 
-	currentMember := cluster.GetMemberWithName(manager.GetCurrentMemberName())
+	currentMember := cluster.GetMemberWithName(s.DBManager.GetCurrentMemberName())
 	if !cluster.HaConfig.IsDeleting(currentMember) {
 		cluster.HaConfig.AddMemberToDelete(currentMember)
 		_ = s.dcsStore.UpdateHaConfig()
 	}
 
 	// remove current member from db cluster
-	err = manager.LeaveMemberFromCluster(ctx, cluster, manager.GetCurrentMemberName())
+	err = s.DBManager.LeaveMemberFromCluster(ctx, cluster, s.DBManager.GetCurrentMemberName())
 	if err != nil {
-		s.logger.Error(err, "Leave member from cluster failed")
+		s.Logger.Error(err, "Leave member from cluster failed")
 		return nil, err
 	}
 

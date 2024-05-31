@@ -21,26 +21,20 @@ package component
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 	"time"
 
-	"github.com/go-logr/logr"
-	"github.com/pkg/errors"
-	"github.com/spf13/viper"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 type PostProvision struct {
 	operations.Base
-	logger  logr.Logger
 	Timeout time.Duration
-	Command []string
 }
 
 type PostProvisionManager interface {
@@ -56,21 +50,10 @@ func init() {
 	}
 }
 
-func (s *PostProvision) Init(_ context.Context) error {
-	actionJSON := viper.GetString(constant.KBEnvActionCommands)
-	if actionJSON != "" {
-		actionCommands := map[string][]string{}
-		err := json.Unmarshal([]byte(actionJSON), &actionCommands)
-		if err != nil {
-			s.logger.Info("get action commands failed", "error", err.Error())
-			return err
-		}
-		postProvisionCmd, ok := actionCommands[constant.PostProvisionAction]
-		if ok && len(postProvisionCmd) > 0 {
-			s.Command = postProvisionCmd
-		}
-	}
-	return nil
+func (s *PostProvision) Init(ctx context.Context) error {
+	s.Logger = ctrl.Log.WithName("PostProvision")
+	s.Action = constant.PostProvisionAction
+	return s.Base.Init(ctx)
 }
 
 func (s *PostProvision) PreCheck(ctx context.Context, req *operations.OpsRequest) error {
@@ -83,15 +66,10 @@ func (s *PostProvision) Do(ctx context.Context, req *operations.OpsRequest) (*op
 	podIPs := req.GetString("podIPs")
 	podHostNames := req.GetString("podHostNames")
 	podHostIPs := req.GetString("podHostIPs")
-	manager, err := register.GetDBManager(s.Command)
-	if err != nil {
-		return nil, errors.Wrap(err, "get manager failed")
-	}
-
-	ppManager, ok := manager.(PostProvisionManager)
+	ppManager, ok := s.DBManager.(PostProvisionManager)
 	if !ok {
-		return nil, models.ErrNotImplemented
+		return nil, models.ErrNoImplemented
 	}
-	err = ppManager.PostProvision(ctx, componentNames, podNames, podIPs, podHostNames, podHostIPs)
+	err := ppManager.PostProvision(ctx, componentNames, podNames, podIPs, podHostNames, podHostIPs)
 	return nil, err
 }

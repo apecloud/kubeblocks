@@ -21,25 +21,20 @@ package volume
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 type Lock struct {
 	operations.Base
-	logger  logr.Logger
 	Timeout time.Duration
-	Command []string
 }
 
 var lock operations.Operation = &Lock{}
@@ -52,29 +47,13 @@ func init() {
 }
 
 func (s *Lock) Init(ctx context.Context) error {
-	actionJSON := viper.GetString(constant.KBEnvActionCommands)
-	if actionJSON != "" {
-		actionCommands := map[string][]string{}
-		err := json.Unmarshal([]byte(actionJSON), &actionCommands)
-		if err != nil {
-			s.logger.Info("get action commands failed", "error", err.Error())
-			return err
-		}
-		readonlyCmd, ok := actionCommands[constant.ReadonlyAction]
-		if ok && len(readonlyCmd) > 0 {
-			s.Command = readonlyCmd
-		}
-	}
-	return nil
+	s.Logger = ctrl.Log.WithName("Lock")
+	s.Action = constant.ReadonlyAction
+	return s.Base.Init(ctx)
 }
 
 func (s *Lock) Do(ctx context.Context, req *operations.OpsRequest) (*operations.OpsResponse, error) {
-	manager, err := register.GetDBManager(s.Command)
-	if err != nil {
-		return nil, errors.Wrap(err, "Get DB manager failed")
-	}
-
-	err = manager.Lock(ctx, "disk full")
+	err := s.DBManager.Lock(ctx, "disk full")
 	if err != nil {
 		return nil, errors.Wrap(err, "Lock DB failed")
 	}

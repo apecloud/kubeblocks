@@ -17,36 +17,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package replica
+package dcs
 
-import (
-	"context"
-	"strings"
-
-	ctrl "sigs.k8s.io/controller-runtime"
-
-	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
-)
-
-type dataDump struct {
-	actions.Base
-}
-
-func init() {
-	err := actions.Register(strings.ToLower(string(util.DataDumpOperation)), &dataDump{})
-	if err != nil {
-		panic(err.Error())
-	}
-}
-
-func (s *dataDump) Init(ctx context.Context) error {
-	s.Logger = ctrl.Log.WithName("DataDump")
-	s.Action = constant.DataDumpAction
-	return s.Base.Init(ctx)
-}
-
-func (s *dataDump) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
-	return nil, s.ExecCommand(ctx)
-}
+//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../../hack/boilerplate.go.txt -package dcs -destination dcs_mock.go github.com/apecloud/kubeblocks/pkg/kb_agent/dcs DCS

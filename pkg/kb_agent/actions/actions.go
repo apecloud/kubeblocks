@@ -17,36 +17,44 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package replica
+package actions
 
 import (
-	"context"
-	"strings"
+	"sync"
 
-	ctrl "sigs.k8s.io/controller-runtime"
-
-	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
+	"github.com/pkg/errors"
 )
 
-type dataDump struct {
-	actions.Base
+type ActionRegister struct {
+	actions map[string]Action
+	lock    sync.Mutex
 }
 
-func init() {
-	err := actions.Register(strings.ToLower(string(util.DataDumpOperation)), &dataDump{})
-	if err != nil {
-		panic(err.Error())
+var register ActionRegister
+
+func (r *ActionRegister) Register(name string, action Action) error {
+	if _, ok := r.actions[name]; ok {
+		return errors.New("Action already registered: " + name)
 	}
+
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	if r.actions == nil {
+		r.actions = make(map[string]Action)
+	}
+
+	r.actions[name] = action
+	return nil
 }
 
-func (s *dataDump) Init(ctx context.Context) error {
-	s.Logger = ctrl.Log.WithName("DataDump")
-	s.Action = constant.DataDumpAction
-	return s.Base.Init(ctx)
+func (r *ActionRegister) Operations() map[string]Action {
+	return r.actions
 }
 
-func (s *dataDump) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
-	return nil, s.ExecCommand(ctx)
+func Register(name string, action Action) error {
+	return register.Register(name, action)
+}
+
+func Operations() map[string]Action {
+	return register.Operations()
 }

@@ -17,12 +17,12 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package operations
+package actions
 
 import (
 	"time"
 
-	"github.com/apecloud/kubeblocks/pkg/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
 // OpsRequest is the request for Operation

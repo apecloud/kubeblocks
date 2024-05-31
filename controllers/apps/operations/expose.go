@@ -328,7 +328,7 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 
 	defaultServicePortsFunc := func() ([]corev1.ServicePort, error) {
 		if len(compDefName) > 0 {
-			compDef, err := component.GetCompDefByName(reqCtx, cli, compDefName)
+			compDef, err := component.GetCompDefByName(reqCtx.Ctx, cli, compDefName)
 			if err != nil {
 				return nil, err
 			}
@@ -350,7 +350,7 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 
 	defaultRoleSelectorFunc := func() (string, error) {
 		if len(compDefName) > 0 {
-			compDef, err := component.GetCompDefByName(reqCtx, cli, compDefName)
+			compDef, err := component.GetCompDefByName(reqCtx.Ctx, cli, compDefName)
 			if err != nil {
 				return "", err
 			}

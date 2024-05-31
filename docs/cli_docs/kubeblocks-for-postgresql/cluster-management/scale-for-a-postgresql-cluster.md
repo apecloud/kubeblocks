@@ -48,7 +48,7 @@ pg-cluster   default     postgresql-cluster           postgresql-14.7.0   Delete
 
    ```bash
    kbcli cluster vscale pg-cluster \
-   --components="pg-replication" \
+   --components="postgresql" \
    --memory="4Gi" --cpu="2" \
    ```
 

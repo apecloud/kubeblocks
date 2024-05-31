@@ -9,6 +9,3 @@ sidebar_position: 1
 
 * [Cluster Management](./cluster-management/create-and-connect-a-mysql-cluster.md)
 * [Configuration](./configuration/configuration.md)
-* [High Availability](./high-availability/high-availability.md)
-* [Migration](./migration/feature-and-limit-list-mysql.md)
-* [Proxy](./proxy/introduction.md)

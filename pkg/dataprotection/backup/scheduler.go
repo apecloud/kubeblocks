@@ -24,7 +24,6 @@ import (
 	"reflect"
 	"sort"
 
-	"golang.org/x/exp/slices"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -287,12 +286,29 @@ func (s *Scheduler) generateBackupName(schedulePolicy *dpv1alpha1.SchedulePolicy
 	return backupNamePrefix + "-$(date -u +'%Y%m%d%H%M%S')"
 }
 
-func (s *Scheduler) reconcileForContinuous(schedulePolicy *dpv1alpha1.SchedulePolicy,
-	targetSelectorLabels map[string]string) error {
-	backupName := GenerateCRNameByBackupSchedule(s.BackupSchedule, schedulePolicy.BackupMethod)
+func (s *Scheduler) getGenerateContinuousBackup(schedulePolicy *dpv1alpha1.SchedulePolicy) (*dpv1alpha1.Backup, error) {
 	backup := &dpv1alpha1.Backup{}
+	backupName := GenerateCRNameByBackupSchedule(s.BackupSchedule, schedulePolicy.BackupMethod)
 	exists, err := intctrlutil.CheckResourceExists(s.Ctx, s.Client, client.ObjectKey{Name: backupName,
 		Namespace: s.BackupSchedule.Namespace}, backup)
+	if err != nil {
+		return nil, err
+	}
+	if exists {
+		return backup, nil
+	}
+	// if no backup found, check if existing legacy backup.
+	backupName = GenerateLegacyCRNameByBackupSchedule(s.BackupSchedule, schedulePolicy.BackupMethod)
+	if _, err = intctrlutil.CheckResourceExists(s.Ctx, s.Client, client.ObjectKey{Name: backupName,
+		Namespace: s.BackupSchedule.Namespace}, backup); err != nil {
+		return nil, err
+	}
+	return backup, nil
+}
+
+func (s *Scheduler) reconcileForContinuous(schedulePolicy *dpv1alpha1.SchedulePolicy,
+	targetSelectorLabels map[string]string) error {
+	backup, err := s.getGenerateContinuousBackup(schedulePolicy)
 	if err != nil {
 		return err
 	}
@@ -307,11 +323,11 @@ func (s *Scheduler) reconcileForContinuous(schedulePolicy *dpv1alpha1.SchedulePo
 	backup.Labels[dptypes.BackupScheduleLabelKey] = s.BackupSchedule.Name
 	backup.Labels[dptypes.BackupTypeLabelKey] = string(dpv1alpha1.BackupTypeContinuous)
 	backup.Labels[dptypes.AutoBackupLabelKey] = "true"
-	if !exists {
+	if backup.Name == "" {
 		if boolptr.IsSetToFalse(schedulePolicy.Enabled) {
 			return nil
 		}
-		backup.Name = backupName
+		backup.Name = GenerateCRNameByBackupSchedule(s.BackupSchedule, schedulePolicy.BackupMethod)
 		backup.Namespace = s.BackupSchedule.Namespace
 		backup.Spec.BackupMethod = schedulePolicy.BackupMethod
 		backup.Spec.BackupPolicyName = s.BackupSchedule.Spec.BackupPolicyName
@@ -320,10 +336,8 @@ func (s *Scheduler) reconcileForContinuous(schedulePolicy *dpv1alpha1.SchedulePo
 	}
 
 	// notice to reconcile backup CR
-	if boolptr.IsSetToTrue(schedulePolicy.Enabled) && slices.Contains([]dpv1alpha1.BackupPhase{
-		dpv1alpha1.BackupPhaseCompleted, dpv1alpha1.BackupPhaseFailed},
-		backup.Status.Phase) {
-		// if schedule is enabled and backup already is Completed/Failed, update phase to running
+	if boolptr.IsSetToTrue(schedulePolicy.Enabled) && backup.Status.Phase == dpv1alpha1.BackupPhaseCompleted {
+		// if schedule is enabled and backup already is Completed, update phase to running
 		backup.Status.Phase = dpv1alpha1.BackupPhaseRunning
 		backup.Status.FailureReason = ""
 		return s.Client.Status().Patch(s.Ctx, backup, patch)

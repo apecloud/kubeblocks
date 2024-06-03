@@ -3,11 +3,14 @@ package grpc
 import (
 	"context"
 
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/plugin"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"google.golang.org/grpc"
+
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/plugin"
+	"github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("GRPC Handler", func() {
@@ -21,6 +24,36 @@ var _ = Describe("GRPC Handler", func() {
 		handler = &Handler{}
 		cluster = &dcs.Cluster{}
 		ctx = context.Background()
+	})
+
+	Describe("NewHandler", func() {
+		Context("when podname is empty", func() {
+			properties := map[string]string{
+				"host": "localhost",
+				"port": "50051",
+			}
+
+			handler, err := NewHandler(properties)
+
+			It("should return a nil and error", func() {
+				Expect(handler).To(BeNil())
+				Expect(err).ToNot(Succeed())
+			})
+		})
+		Context("when properties is empty", func() {
+			viperx.Set(constant.KBEnvPodName, "test-pod-0")
+			properties := map[string]string{
+				"host": "localhost",
+				"port": "50051",
+			}
+
+			handler, err := NewHandler(properties)
+
+			It("should return a handler and no error", func() {
+				Expect(handler).ToNot(BeNil())
+				Expect(err).To(Succeed())
+			})
+		})
 	})
 
 	Describe("IsDBStartupReady", func() {
@@ -136,11 +169,19 @@ var _ = Describe("GRPC Handler", func() {
 type mockServicePluginClient struct {
 	plugin.ServicePluginClient
 
+	mockGetRole        func(ctx context.Context, req *plugin.GetRoleRequest) (*plugin.GetRoleResponse, error)
 	mockIsServiceReady func(ctx context.Context, req *plugin.IsServiceReadyRequest) (*plugin.IsServiceReadyResponse, error)
 	mockJoinMember     func(ctx context.Context, req *plugin.JoinMemberRequest) (*plugin.JoinMemberResponse, error)
 	mockLeaveMember    func(ctx context.Context, req *plugin.LeaveMemberRequest) (*plugin.LeaveMemberResponse, error)
 	mockReadonly       func(ctx context.Context, req *plugin.ReadonlyRequest) (*plugin.ReadonlyResponse, error)
 	mockReadwrite      func(ctx context.Context, req *plugin.ReadwriteRequest) (*plugin.ReadwriteResponse, error)
+}
+
+func (m *mockServicePluginClient) GetRole(ctx context.Context, req *plugin.GetRoleRequest, opts ...grpc.CallOption) (*plugin.GetRoleResponse, error) {
+	if m.mockGetRole != nil {
+		return m.mockGetRole(ctx, req)
+	}
+	return nil, nil
 }
 
 func (m *mockServicePluginClient) IsServiceReady(ctx context.Context, req *plugin.IsServiceReadyRequest, opts ...grpc.CallOption) (*plugin.IsServiceReadyResponse, error) {

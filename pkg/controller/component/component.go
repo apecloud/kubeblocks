@@ -84,7 +84,7 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluste
 		AddLabels(constant.KBAppClusterUIDLabelKey, string(cluster.UID)).
 		SetServiceVersion(compSpec.ServiceVersion).
 		SetSchedulingPolicy(schedulingPolicy).
-		DisableExporter(compSpec.GetDisableExporter()).
+		SetDisableExporter(compSpec.GetDisableExporter()).
 		SetReplicas(compSpec.Replicas).
 		SetResources(compSpec.Resources).
 		SetServiceAccountName(compSpec.ServiceAccountName).
@@ -94,7 +94,9 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluste
 		SetServiceRefs(compSpec.ServiceRefs).
 		SetTLSConfig(compSpec.TLS, compSpec.Issuer).
 		SetInstances(compSpec.Instances).
-		SetOfflineInstances(compSpec.OfflineInstances)
+		SetOfflineInstances(compSpec.OfflineInstances).
+		SetRuntimeClassName(cluster.Spec.RuntimeClassName).
+		SetSystemAccounts(compSpec.SystemAccounts)
 	if labels != nil {
 		compBuilder.AddLabelsInMap(labels)
 	}
@@ -103,9 +105,6 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluste
 	}
 	if !IsGenerated(compBuilder.GetObject()) {
 		compBuilder.SetServices(compSpec.Services)
-	}
-	if cluster.Spec.RuntimeClassName != nil {
-		compBuilder.SetRuntimeClassName(*cluster.Spec.RuntimeClassName)
 	}
 	return compBuilder.GetObject(), nil
 }

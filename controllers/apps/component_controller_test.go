@@ -1152,6 +1152,55 @@ var _ = Describe("Component Controller", func() {
 		})).Should(Succeed())
 	}
 
+	testCompSystemAccountOverride := func(compName, compDefName string) {
+		passwordConfig := &appsv1alpha1.PasswordConfig{
+			Length: 29,
+		}
+		secret := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      "sysaccount-override",
+			},
+			StringData: map[string]string{
+				constant.AccountPasswdForSecret: "sysaccount-override",
+			},
+		}
+		secretRef := func() *appsv1alpha1.ProvisionSecretRef {
+			Expect(testCtx.CreateObj(testCtx.Ctx, &secret)).Should(Succeed())
+			return &appsv1alpha1.ProvisionSecretRef{
+				Name:      secret.Name,
+				Namespace: testCtx.DefaultNamespace,
+			}
+		}
+
+		createClusterObjV2(compName, compDefObj.Name, func(f *testapps.MockClusterFactory) {
+			f.AddSystemAccount("root", passwordConfig, nil).
+				AddSystemAccount("admin", nil, secretRef()).
+				AddSystemAccount("not-exist", nil, nil)
+		})
+
+		By("check root account")
+		rootSecretKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      constant.GenerateAccountSecretName(clusterObj.Name, compName, "root"),
+		}
+		Eventually(testapps.CheckObj(&testCtx, rootSecretKey, func(g Gomega, secret *corev1.Secret) {
+			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("root")))
+			g.Expect(secret.Data).Should(HaveKey(constant.AccountPasswdForSecret))
+			g.Expect(secret.Data[constant.AccountPasswdForSecret]).Should(HaveLen(int(passwordConfig.Length)))
+		})).Should(Succeed())
+
+		By("check admin account")
+		adminSecretKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      constant.GenerateAccountSecretName(clusterObj.Name, compName, "admin"),
+		}
+		Eventually(testapps.CheckObj(&testCtx, adminSecretKey, func(g Gomega, secret *corev1.Secret) {
+			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("admin")))
+			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountPasswdForSecret, secret.Data[constant.AccountPasswdForSecret]))
+		})).Should(Succeed())
+	}
+
 	testCompVars := func(compName, compDefName string) {
 		compDefKey := client.ObjectKeyFromObject(compDefObj)
 		Eventually(testapps.GetAndChangeObj(&testCtx, compDefKey, func(compDef *appsv1alpha1.ComponentDefinition) {
@@ -2071,6 +2120,10 @@ var _ = Describe("Component Controller", func() {
 
 		It("with component system accounts", func() {
 			testCompSystemAccount(defaultCompName, compDefName)
+		})
+
+		It("with component system accounts - override", func() {
+			testCompSystemAccountOverride(defaultCompName, compDefName)
 		})
 
 		It("with component vars", func() {

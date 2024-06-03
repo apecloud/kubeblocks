@@ -728,6 +728,11 @@ type ClusterComponentSpec struct {
 	// +optional
 	Services []ClusterComponentService `json:"services,omitempty"`
 
+	// Overrides system accounts defined in referenced ComponentDefinition.
+	//
+	// +optional
+	SystemAccounts []ComponentSystemAccount `json:"systemAccounts,omitempty"`
+
 	// +optional
 	Configs []ClusterComponentConfig `json:"configs,omitempty"`
 
@@ -1214,6 +1219,27 @@ type ClusterComponentService struct {
 	//
 	// +optional
 	PodService *bool `json:"podService,omitempty"`
+}
+
+type ComponentSystemAccount struct {
+	// The name of the system account.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Specifies the policy for generating the account's password.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	PasswordConfig *PasswordConfig `json:"passwordConfig,omitempty"`
+
+	// Refers to the secret from which data will be copied to create the new account.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	SecretRef *ProvisionSecretRef `json:"secretRef,omitempty"`
 }
 
 // ClusterComponentConfig represents a config with its source bound.

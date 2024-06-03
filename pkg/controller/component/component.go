@@ -218,22 +218,25 @@ func getCompLabelValue(comp *appsv1alpha1.Component, label string) (string, erro
 	return val, nil
 }
 
-// GetComponentByName gets the component by component full name.
-func GetComponentByName(reqCtx intctrlutil.RequestCtx, cli client.Client, compFullName, namespace string) (*appsv1alpha1.Component, error) {
-	comp := &appsv1alpha1.Component{}
-	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: compFullName, Namespace: namespace}, comp); err != nil {
-		return nil, err
-	}
-	return comp, nil
-}
-
 // GetCompDefByName gets the component definition by component definition name.
-func GetCompDefByName(reqCtx intctrlutil.RequestCtx, cli client.Client, compDefName string) (*appsv1alpha1.ComponentDefinition, error) {
+func GetCompDefByName(ctx context.Context, cli client.Reader, compDefName string) (*appsv1alpha1.ComponentDefinition, error) {
 	compDef := &appsv1alpha1.ComponentDefinition{}
-	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: compDefName}, compDef); err != nil {
+	if err := cli.Get(ctx, client.ObjectKey{Name: compDefName}, compDef); err != nil {
 		return nil, err
 	}
 	return compDef, nil
+}
+
+func GetCompNCompDefByName(ctx context.Context, cli client.Reader, namespace, fullCompName string) (*appsv1alpha1.Component, *appsv1alpha1.ComponentDefinition, error) {
+	comp := &appsv1alpha1.Component{}
+	if err := cli.Get(ctx, client.ObjectKey{Name: fullCompName, Namespace: namespace}, comp); err != nil {
+		return nil, nil, err
+	}
+	compDef, err := GetCompDefByName(ctx, cli, comp.Spec.CompDef)
+	if err != nil {
+		return nil, nil, err
+	}
+	return comp, compDef, nil
 }
 
 // CheckAndGetClusterComponents checks if all components have created and gets the created components.

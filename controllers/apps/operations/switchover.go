@@ -301,11 +301,8 @@ func setComponentSwitchoverProgressDetails(recorder record.EventRecorder,
 // buildSynthesizedComp builds synthesized component for native component or generated component.
 func buildSynthesizedComp(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*component.SynthesizedComponent, error) {
 	if len(clusterCompSpec.ComponentDef) > 0 {
-		compObj, err := component.GetComponentByName(reqCtx, cli, constant.GenerateClusterComponentName(opsRes.Cluster.Name, clusterCompSpec.Name), opsRes.Cluster.Namespace)
-		if err != nil {
-			return nil, err
-		}
-		compDefObj, err := component.GetCompDefByName(reqCtx, cli, clusterCompSpec.ComponentDef)
+		compObj, compDefObj, err := component.GetCompNCompDefByName(reqCtx.Ctx, cli,
+			opsRes.Cluster.Namespace, constant.GenerateClusterComponentName(opsRes.Cluster.Name, clusterCompSpec.Name))
 		if err != nil {
 			return nil, err
 		}

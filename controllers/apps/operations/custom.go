@@ -242,12 +242,9 @@ func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx,
 
 		// 2. validate component and componentDef
 		if len(opsRes.OpsDef.Spec.ComponentInfos) > 0 {
-			compObj, err := component.GetComponentByName(reqCtx, cli, constant.GenerateClusterComponentName(opsRes.Cluster.Name, v.ComponentName), opsRes.Cluster.Namespace)
-			if err != nil {
-				return err
-			}
 			// get component definition
-			compDef, err := component.GetCompDefByName(reqCtx, cli, compObj.Spec.CompDef)
+			_, compDef, err := component.GetCompNCompDefByName(reqCtx.Ctx, cli,
+				opsRes.Cluster.Namespace, constant.GenerateClusterComponentName(opsRes.Cluster.Name, v.ComponentName))
 			if err != nil {
 				return err
 			}

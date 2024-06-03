@@ -1,4 +1,4 @@
-package exec_test
+package exec
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
+	"github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("Handler", func() {
@@ -21,12 +21,13 @@ var _ = Describe("Handler", func() {
 
 	BeforeEach(func() {
 		logger := ctrl.Log.WithName("exec handler")
+		viperx.Set(constant.KBEnvPodName, "test-pod-0")
 		handlerBase, err := handlers.NewHandlerBase(logger)
 		Expect(err).NotTo(HaveOccurred())
 		handlerBase.DBStartupReady = true
 		handler = &Handler{
 			HandlerBase:    *handlerBase,
-			Executor:       &util.ExecutorImpl{},
+			Executor:       &MockExecutor{},
 			actionCommands: make(map[string][]string),
 		}
 	})
@@ -77,7 +78,10 @@ var _ = Describe("Handler", func() {
 			cluster := &dcs.Cluster{}
 			memberName := "member1"
 			handler.actionCommands[constant.MemberJoinAction] = []string{"command1"}
-
+			handler.Executor.(*MockExecutor).MockExecCommand = func(ctx context.Context, command []string, envs []string) (string, error) {
+				Expect(command).To(Equal([]string{"command1"}))
+				return "output for test", nil
+			}
 			err := handler.JoinMember(ctx, cluster, memberName)
 			Expect(err).NotTo(HaveOccurred())
 			// Add your assertions here
@@ -100,7 +104,10 @@ var _ = Describe("Handler", func() {
 			cluster := &dcs.Cluster{}
 			memberName := "member1"
 			handler.actionCommands[constant.MemberLeaveAction] = []string{"command1"}
-
+			handler.Executor.(*MockExecutor).MockExecCommand = func(ctx context.Context, command []string, envs []string) (string, error) {
+				Expect(command).To(Equal([]string{"command1"}))
+				return "output for test", nil
+			}
 			err := handler.LeaveMember(ctx, cluster, memberName)
 			Expect(err).NotTo(HaveOccurred())
 			// Add your assertions here
@@ -124,6 +131,10 @@ var _ = Describe("Handler", func() {
 			member := &dcs.Member{}
 			handler.actionCommands[constant.CheckHealthyAction] = []string{"command1"}
 
+			handler.Executor.(*MockExecutor).MockExecCommand = func(ctx context.Context, command []string, envs []string) (string, error) {
+				Expect(command).To(Equal([]string{"command1"}))
+				return "output for test", nil
+			}
 			err := handler.MemberHealthCheck(ctx, cluster, member)
 			Expect(err).NotTo(HaveOccurred())
 			// Add your assertions here
@@ -146,6 +157,10 @@ var _ = Describe("Handler", func() {
 			reason := "reason1"
 			handler.actionCommands[constant.ReadonlyAction] = []string{"command1"}
 
+			handler.Executor.(*MockExecutor).MockExecCommand = func(ctx context.Context, command []string, envs []string) (string, error) {
+				Expect(command).To(Equal([]string{"command1"}))
+				return "output for test", nil
+			}
 			err := handler.Lock(ctx, reason)
 			Expect(err).NotTo(HaveOccurred())
 			// Add your assertions here
@@ -167,6 +182,10 @@ var _ = Describe("Handler", func() {
 			reason := "reason1"
 			handler.actionCommands[constant.ReadWriteAction] = []string{"command1"}
 
+			handler.Executor.(*MockExecutor).MockExecCommand = func(ctx context.Context, command []string, envs []string) (string, error) {
+				Expect(command).To(Equal([]string{"command1"}))
+				return "output for test", nil
+			}
 			err := handler.Unlock(ctx, reason)
 			Expect(err).NotTo(HaveOccurred())
 			// Add your assertions here
@@ -188,6 +207,10 @@ var _ = Describe("Handler", func() {
 			cluster := &dcs.Cluster{}
 			handler.actionCommands[constant.PostProvisionAction] = []string{"command1"}
 
+			handler.Executor.(*MockExecutor).MockExecCommand = func(ctx context.Context, command []string, envs []string) (string, error) {
+				Expect(command).To(Equal([]string{"command1"}))
+				return "output for test", nil
+			}
 			err := handler.PostProvision(ctx, cluster)
 			Expect(err).NotTo(HaveOccurred())
 			// Add your assertions here
@@ -209,6 +232,10 @@ var _ = Describe("Handler", func() {
 			cluster := &dcs.Cluster{}
 			handler.actionCommands[constant.PreTerminateAction] = []string{"command1"}
 
+			handler.Executor.(*MockExecutor).MockExecCommand = func(ctx context.Context, command []string, envs []string) (string, error) {
+				Expect(command).To(Equal([]string{"command1"}))
+				return "output for test", nil
+			}
 			err := handler.PreTerminate(ctx, cluster)
 			Expect(err).NotTo(HaveOccurred())
 			// Add your assertions here
@@ -224,3 +251,14 @@ var _ = Describe("Handler", func() {
 		})
 	})
 })
+
+type MockExecutor struct {
+	MockExecCommand func(ctx context.Context, command []string, envs []string) (string, error)
+}
+
+func (m *MockExecutor) ExecCommand(ctx context.Context, command []string, envs []string) (string, error) {
+	if m.MockExecCommand != nil {
+		return m.MockExecCommand(ctx, command, envs)
+	}
+	return "", nil
+}

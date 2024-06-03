@@ -28,7 +28,6 @@ import (
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
 // GetReplicaRole provides the following dedicated environment variables for the action:
@@ -53,7 +52,7 @@ func (h *Handler) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (str
 	// if err != nil {
 	// 	return "", err
 	// }
-	return util.ExecCommand(ctx, roleProbeCmd, os.Environ())
+	return h.Executor.ExecCommand(ctx, roleProbeCmd, os.Environ())
 }
 
 func contains(supportedShells []string, shell string) bool {

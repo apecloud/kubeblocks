@@ -5035,10 +5035,10 @@ Determines whether metrics exporter information is annotated on the Component&rs
 </tr>
 <tr>
 <td>
-<code>componentConfigItem</code><br/>
+<code>parameters</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.ComponentConfigItem">
-[]ComponentConfigItem
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentParameters">
+[]ComponentParameters
 </a>
 </em>
 </td>
@@ -6978,70 +6978,6 @@ MatchExpressions
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ComponentConfigItem">ComponentConfigItem
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Defines the unique identifier of the configuration template.</p>
-<p>It must be a string of maximum 63 characters, and can only include lowercase alphanumeric characters,
-hyphens, and periods.
-The name must start and end with an alphanumeric character.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>importTemplateRef</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ConfigTemplateExtension">
-ConfigTemplateExtension
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the user-defined configuration template.</p>
-<p>When provided, the <code>importTemplateRef</code> overrides the default configuration template
-specified in <code>configSpec.templateRef</code>.
-This allows users to customize the configuration template according to their specific requirements.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>paramsInFile</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ParametersInFile">
-map[string]github.com/apecloud/kubeblocks/apis/apps/v1alpha1.ParametersInFile
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the user-defined configuration parameters.</p>
-<p>When provided, the parameter values in <code>configFileParams</code> override the default configuration parameters.
-This allows users to override the default configuration according to their specific needs.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentConfigSpec">ComponentConfigSpec
 </h3>
 <p>
@@ -8358,6 +8294,66 @@ string
 </td>
 <td>
 <p>Specifies the name of the Component.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ComponentParameters">ComponentParameters
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Defines the unique identifier of the configuration template.</p>
+<p>It must be a string of maximum 63 characters, and can only include lowercase alphanumeric characters,
+hyphens, and periods.
+The name must start and end with an alphanumeric character.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>importTemplateRef</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ConfigTemplateExtension">
+ConfigTemplateExtension
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the user-defined configuration template.</p>
+<p>When provided, the <code>importTemplateRef</code> overrides the default configuration template
+specified in <code>configSpec.templateRef</code>.
+This allows users to customize the configuration template according to their specific requirements.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>parameters</code><br/>
+<em>
+map[string]*string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the user-defined configuration parameters.</p>
 </td>
 </tr>
 </tbody>
@@ -9986,7 +9982,7 @@ Kubernetes core/v1.ConfigMapVolumeSource
 <h3 id="apps.kubeblocks.io/v1alpha1.ConfigTemplateExtension">ConfigTemplateExtension
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentConfigItem">ComponentConfigItem</a>, <a href="#apps.kubeblocks.io/v1alpha1.ConfigurationItemDetail">ConfigurationItemDetail</a>, <a href="#apps.kubeblocks.io/v1alpha1.LegacyRenderedTemplateSpec">LegacyRenderedTemplateSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentParameters">ComponentParameters</a>, <a href="#apps.kubeblocks.io/v1alpha1.ConfigurationItemDetail">ConfigurationItemDetail</a>, <a href="#apps.kubeblocks.io/v1alpha1.LegacyRenderedTemplateSpec">LegacyRenderedTemplateSpec</a>)
 </p>
 <div>
 </div>
@@ -14934,7 +14930,7 @@ If set to nil, the parameter defined by the Key field will be removed from the c
 <h3 id="apps.kubeblocks.io/v1alpha1.ParametersInFile">ParametersInFile
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentConfigItem">ComponentConfigItem</a>, <a href="#apps.kubeblocks.io/v1alpha1.ConfigurationItemDetail">ConfigurationItemDetail</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigurationItemDetail">ConfigurationItemDetail</a>)
 </p>
 <div>
 </div>

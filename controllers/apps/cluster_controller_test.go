@@ -551,15 +551,11 @@ var _ = Describe("Cluster Controller", func() {
 
 	testShardingClusterComponentWithConfiguration := func(compName, compDefName string, createObj func(string, string, func(*testapps.MockClusterFactory)), shards int) {
 		createObj(compName, compDefName, func(factory *testapps.MockClusterFactory) {
-			factory.SetShardingComponentConfigItem([]appsv1alpha1.ComponentConfigItem{
+			factory.SetShardingComponentParameters([]appsv1alpha1.ComponentParameters{
 				{
 					Name: testapps.DefaultConfigSpecName,
-					ParamsInFile: map[string]appsv1alpha1.ParametersInFile{
-						testapps.DefaultConfigKey: {
-							Parameters: map[string]*string{
-								"max_connections": cfgutil.ToPointer("1000"),
-							},
-						},
+					Parameters: map[string]*string{
+						"max_connections": cfgutil.ToPointer("1000"),
 					},
 				},
 			})

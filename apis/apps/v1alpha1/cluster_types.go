@@ -876,7 +876,7 @@ type ClusterComponentSpec struct {
 	// +listType=map
 	// +listMapKey=name
 	// +optional
-	ComponentConfigItems []ComponentConfigItem `json:"componentConfigItem,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+	ComponentParameters []ComponentParameters `json:"parameters,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 }
 
 type ComponentMessageMap map[string]string

@@ -101,7 +101,7 @@ type ParametersInFile struct {
 	Parameters map[string]*string `json:"parameters,omitempty"`
 }
 
-type ComponentConfigItem struct {
+type ComponentParameters struct {
 	// Defines the unique identifier of the configuration template.
 	//
 	// It must be a string of maximum 63 characters, and can only include lowercase alphanumeric characters,
@@ -124,9 +124,6 @@ type ComponentConfigItem struct {
 
 	// Specifies the user-defined configuration parameters.
 	//
-	// When provided, the parameter values in `configFileParams` override the default configuration parameters.
-	// This allows users to override the default configuration according to their specific needs.
-	//
 	// +optional
-	ParamsInFile map[string]ParametersInFile `json:"paramsInFile,omitempty"`
+	Parameters map[string]*string `json:"parameters,omitempty"`
 }

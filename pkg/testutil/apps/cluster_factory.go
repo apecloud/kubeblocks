@@ -318,8 +318,8 @@ func (factory *MockClusterFactory) AddUserConfigmapVolume(name, mountPoint, resN
 	})
 }
 
-func (factory *MockClusterFactory) SetShardingComponentConfigItem(items []appsv1alpha1.ComponentConfigItem) *MockClusterFactory {
+func (factory *MockClusterFactory) SetShardingComponentParameters(items []appsv1alpha1.ComponentParameters) *MockClusterFactory {
 	return factory.lastShardingSpec(func(shardingSpec *appsv1alpha1.ShardingSpec) {
-		shardingSpec.Template.ComponentConfigItems = items
+		shardingSpec.Template.ComponentParameters = items
 	})
 }

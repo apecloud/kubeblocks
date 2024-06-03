@@ -18,7 +18,9 @@ package apps
 
 import (
 	"context"
+	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -56,7 +58,10 @@ func (c *clusterShardingConfigurationTransformer) reconcile(transCtx *clusterTra
 	if err != nil {
 		return err
 	}
-	expectedConfigMap := createShardingConfigurations(transCtx, cluster)
+	expectedConfigMap, err := createShardingConfigurations(transCtx, cluster)
+	if err != nil {
+		return err
+	}
 
 	existingConfigSet := sets.KeySet(existingConfigMap)
 	expectedConfigSet := sets.KeySet(expectedConfigMap)
@@ -83,27 +88,27 @@ func (c *clusterShardingConfigurationTransformer) reconcile(transCtx *clusterTra
 
 func (c *clusterShardingConfigurationTransformer) mergeConfiguration(expected *appsv1alpha1.Configuration, existing *appsv1alpha1.Configuration) *appsv1alpha1.Configuration {
 	return configuration.MergeConfiguration(expected, existing, func(dest, expected *appsv1alpha1.ConfigurationItemDetail) {
-		if expected.ImportTemplateRef != nil {
-			dest.ImportTemplateRef = expected.ImportTemplateRef
-		}
 		if len(expected.ConfigFileParams) != 0 {
 			dest.ConfigFileParams = expected.ConfigFileParams
 		}
 	})
 }
 
-func createShardingConfigurations(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) map[string]*appsv1alpha1.Configuration {
+func createShardingConfigurations(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) (map[string]*appsv1alpha1.Configuration, error) {
 	expectedObjects := make(map[string]*appsv1alpha1.Configuration)
 
 	for shardingName, shardingComponent := range transCtx.ShardingComponentSpecs {
 		if len(shardingComponent) != 0 {
-			configs := buildShardingConfigurations(cluster.GetName(), cluster.GetNamespace(), shardingComponent, shardingName)
+			configs, err := buildShardingConfigurations(transCtx, cluster.GetName(), cluster.GetNamespace(), shardingComponent, shardingName)
+			if err != nil {
+				return nil, err
+			}
 			for _, config := range configs {
 				expectedObjects[config.Name] = config
 			}
 		}
 	}
-	return expectedObjects
+	return expectedObjects, nil
 }
 
 func (c *clusterShardingConfigurationTransformer) runningShardingConfigurations(ctx *clusterTransformContext) (map[string]*appsv1alpha1.Configuration, error) {
@@ -132,15 +137,19 @@ func listShardingConfigurations(ctx context.Context, cli client.Reader, ns, clus
 	return compList.Items, nil
 }
 
-func buildShardingConfigurations(clusterName, ns string, shardingComponents []*appsv1alpha1.ClusterComponentSpec, shardingName string) []*appsv1alpha1.Configuration {
+func buildShardingConfigurations(transCtx *clusterTransformContext, clusterName, ns string, shardingComponents []*appsv1alpha1.ClusterComponentSpec, shardingName string) ([]*appsv1alpha1.Configuration, error) {
 	var configs []*appsv1alpha1.Configuration
 	for i := 0; i < len(shardingComponents); i++ {
-		configs = append(configs, buildConfiguration(clusterName, ns, shardingComponents[i], shardingName))
+		config, err := buildConfiguration(transCtx, clusterName, ns, shardingComponents[i], shardingName)
+		if err != nil {
+			return nil, err
+		}
+		configs = append(configs, config)
 	}
-	return configs
+	return configs, nil
 }
 
-func buildConfiguration(clusterName, ns string, shardingComponent *appsv1alpha1.ClusterComponentSpec, shardingName string) *appsv1alpha1.Configuration {
+func buildConfiguration(transCtx *clusterTransformContext, clusterName, ns string, shardingComponent *appsv1alpha1.ClusterComponentSpec, shardingName string) (*appsv1alpha1.Configuration, error) {
 	config := builder.NewConfigurationBuilder(ns,
 		core.GenerateComponentConfigurationName(clusterName,
 			shardingComponent.Name)).
@@ -150,12 +159,65 @@ func buildConfiguration(clusterName, ns string, shardingComponent *appsv1alpha1.
 		Component(shardingComponent.Name).
 		GetObject()
 
-	for _, item := range shardingComponent.ComponentConfigItems {
+	for _, item := range shardingComponent.ComponentParameters {
+		configInFile, configSpec, err := fromUserParameters(transCtx, item.Parameters, shardingComponent.ComponentDef, item.Name)
+		if err != nil {
+			return nil, err
+		}
 		config.Spec.ConfigItemDetails = append(config.Spec.ConfigItemDetails, appsv1alpha1.ConfigurationItemDetail{
-			Name:              item.Name,
-			ImportTemplateRef: item.ImportTemplateRef,
-			ConfigFileParams:  item.ParamsInFile,
+			Name:             item.Name,
+			ConfigSpec:       configSpec,
+			ConfigFileParams: configInFile,
 		})
 	}
-	return config
+	return config, nil
+}
+
+func fromUserParameters(transCtx *clusterTransformContext, parameters map[string]*string, componentDefName string, configSpecName string) (map[string]appsv1alpha1.ParametersInFile, *appsv1alpha1.ComponentConfigSpec, error) {
+	foundConfigSpec := func(component *appsv1alpha1.ComponentDefinition, name string) *appsv1alpha1.ComponentConfigSpec {
+		for _, config := range component.Spec.Configs {
+			if config.Name == name {
+				return config.DeepCopy()
+			}
+		}
+		return nil
+	}
+
+	if len(parameters) == 0 {
+		return nil, nil, nil
+	}
+	componentDef, ok := transCtx.ComponentDefs[componentDefName]
+	if !ok {
+		return nil, nil, fmt.Errorf("not fount componentDef[%s]", componentDefName)
+	}
+	configSpec := foundConfigSpec(componentDef, configSpecName)
+	if configSpec == nil {
+		return nil, nil, fmt.Errorf("not fount component config: [%s] componentDefName: %s", configSpecName, componentDefName)
+	}
+
+	returnSucceed := func(fileName string) (map[string]appsv1alpha1.ParametersInFile, *appsv1alpha1.ComponentConfigSpec, error) {
+		return map[string]appsv1alpha1.ParametersInFile{
+			fileName: {
+				Parameters: parameters,
+			},
+		}, configSpec, nil
+	}
+
+	if len(configSpec.Keys) == 1 {
+		return returnSucceed(configSpec.Keys[0])
+	}
+
+	cmKey := client.ObjectKey{
+		Name:      configSpec.TemplateRef,
+		Namespace: configSpec.Namespace,
+	}
+	cmObj := corev1.ConfigMap{}
+	if err := transCtx.GetClient().Get(transCtx.GetContext(), cmKey, &cmObj); err != nil {
+		return nil, nil, err
+	}
+	files := sets.StringKeySet(cmObj.Data)
+	if len(files) == 1 {
+		return returnSucceed(files.List()[0])
+	}
+	return nil, nil, fmt.Errorf("not fount configSpec file:[%v]", files)
 }

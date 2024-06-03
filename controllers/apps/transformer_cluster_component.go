@@ -160,6 +160,15 @@ func checkAllCompsReady(transCtx *clusterTransformContext, cluster *appsv1alpha1
 	if len(compList.Items) != len(transCtx.ComponentSpecs) {
 		return false, nil
 	}
+	for _, comp := range compList.Items {
+		kbGeneration, ok := comp.Annotations[constant.KubeBlocksGenerationKey]
+		if !ok {
+			return false, nil
+		}
+		if comp.Generation != comp.Status.ObservedGeneration || kbGeneration != strconv.FormatInt(cluster.Generation, 10) {
+			return false, nil
+		}
+	}
 	return true, nil
 }
 

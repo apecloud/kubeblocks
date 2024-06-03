@@ -31,14 +31,14 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
-// GetReplicaRoleThroughCommands provides the following dedicated environment variables for the action:
+// GetReplicaRole provides the following dedicated environment variables for the action:
 //
 // - KB_POD_FQDN: The pod FQDN of the replica to check the role.
 // - KB_SERVICE_PORT: The port on which the DB service listens.
 // - KB_SERVICE_USER: The username used to access the DB service and retrieve the role information with sufficient privileges.
 // - KB_SERVICE_PASSWORD: The password of the user used to access the DB service and retrieve the role information.
-func (mgr *Handler) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (string, error) {
-	roleProbeCmd, ok := mgr.actionCommands[constant.RoleProbeAction]
+func (h *Handler) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (string, error) {
+	roleProbeCmd, ok := h.actionCommands[constant.RoleProbeAction]
 	if !ok || len(roleProbeCmd) == 0 {
 		return "", errors.New("role probe commands is empty!")
 	}

@@ -31,6 +31,16 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
+type Executor interface {
+	ExecCommand(ctx context.Context, command []string, envs []string) (string, error)
+}
+
+type ExecutorImpl struct{}
+
+func (e *ExecutorImpl) ExecCommand(ctx context.Context, command []string, envs []string) (string, error) {
+	return ExecCommand(ctx, command, envs)
+}
+
 func ExecCommand(ctx context.Context, command []string, envs []string) (string, error) {
 	if len(command) == 0 {
 		return "", errors.New("command can not be empty")

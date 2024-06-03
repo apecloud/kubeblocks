@@ -37,6 +37,7 @@ import (
 type Handler struct {
 	handlers.HandlerBase
 
+	Executor util.Executor
 	// For ComponentDefinition Actions
 	actionCommands map[string][]string
 }
@@ -52,6 +53,7 @@ func NewHandler(properties map[string]string) (handlers.Handler, error) {
 	handlerBase.DBStartupReady = true
 	h := &Handler{
 		HandlerBase: *handlerBase,
+		Executor:    &util.ExecutorImpl{},
 	}
 
 	err = h.InitComponentDefinitionActions()
@@ -89,7 +91,7 @@ func (h *Handler) InitComponentDefinitionActions() error {
 // - KB_MEMBER_ADDRESSES: The addresses of all members.
 // - KB_NEW_MEMBER_POD_NAME: The name of the new member's Pod.
 // - KB_NEW_MEMBER_POD_IP: The name of the new member's Pod.
-func (h *Handler) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs.Cluster, memberName string) error {
+func (h *Handler) JoinMember(ctx context.Context, cluster *dcs.Cluster, memberName string) error {
 	memberJoinCmd, ok := h.actionCommands[constant.MemberJoinAction]
 	if !ok || len(memberJoinCmd) == 0 {
 		h.Logger.Info("member join command is empty!")
@@ -116,7 +118,7 @@ func (h *Handler) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs.C
 	if member != nil {
 		envs = append(envs, "KB_NEW_MEMBER_POD_IP"+"="+member.PodIP)
 	}
-	output, err := util.ExecCommand(ctx, memberJoinCmd, envs)
+	output, err := h.Executor.ExecCommand(ctx, memberJoinCmd, envs)
 
 	if output != "" {
 		h.Logger.Info("member join", "output", output)
@@ -153,7 +155,7 @@ func (h *Handler) LeaveMember(ctx context.Context, cluster *dcs.Cluster, memberN
 	if member != nil {
 		envs = append(envs, "KB_LEAVE_MEMBER_POD_IP"+"="+member.PodIP)
 	}
-	output, err := util.ExecCommand(ctx, memberLeaveCmd, envs)
+	output, err := h.Executor.ExecCommand(ctx, memberLeaveCmd, envs)
 
 	if output != "" {
 		h.Logger.Info("member leave", "output", output)
@@ -161,13 +163,13 @@ func (h *Handler) LeaveMember(ctx context.Context, cluster *dcs.Cluster, memberN
 	return err
 }
 
-// CurrentMemberHealthCheck provides the following dedicated environment variables for the action:
+// MemberHealthCheck provides the following dedicated environment variables for the action:
 //
 // - KB_POD_FQDN: The FQDN of the replica pod to check the role.
 // - KB_SERVICE_PORT: The port on which the DB service listens.
 // - KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
 // - KB_SERVICE_PASSWORD: The password of the user used to access the DB service .
-func (h *Handler) CurrentMemberHealthCheck(ctx context.Context, cluster *dcs.Cluster) error {
+func (h *Handler) MemberHealthCheck(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) error {
 	healthyCheckCmd, ok := h.actionCommands[constant.CheckHealthyAction]
 	if !ok || len(healthyCheckCmd) == 0 {
 		h.Logger.Info("member healthyCheck command is empty!")
@@ -177,7 +179,7 @@ func (h *Handler) CurrentMemberHealthCheck(ctx context.Context, cluster *dcs.Clu
 	if err != nil {
 		return err
 	}
-	output, err := util.ExecCommand(ctx, healthyCheckCmd, envs)
+	output, err := h.Executor.ExecCommand(ctx, healthyCheckCmd, envs)
 
 	if output != "" {
 		h.Logger.Info("member healthy check", "output", output)
@@ -201,7 +203,7 @@ func (h *Handler) Lock(ctx context.Context, reason string) error {
 	if err != nil {
 		return err
 	}
-	output, err := util.ExecCommand(ctx, readonlyCmd, envs)
+	output, err := h.Executor.ExecCommand(ctx, readonlyCmd, envs)
 
 	if output != "" {
 		h.Logger.Info("member lock", "output", output)
@@ -225,7 +227,7 @@ func (h *Handler) Unlock(ctx context.Context, reason string) error {
 	if err != nil {
 		return err
 	}
-	output, err := util.ExecCommand(ctx, readWriteCmd, envs)
+	output, err := h.Executor.ExecCommand(ctx, readWriteCmd, envs)
 
 	if output != "" {
 		h.Logger.Info("member unlock", "output", output)
@@ -259,7 +261,7 @@ func (h *Handler) PostProvision(ctx context.Context, _ *dcs.Cluster) error {
 	// envs = append(envs, "KB_CLUSTER_COMPONENT_POD_IP_LIST"+"="+podIPs)
 	// envs = append(envs, "KB_CLUSTER_COMPONENT_POD_HOST_NAME_LIST"+"="+podHostNames)
 	// envs = append(envs, "KB_CLUSTER_COMPONENT_POD_HOST_IP_LIST"+"="+podHostIPs)
-	output, err := util.ExecCommand(ctx, postProvisionCmd, envs)
+	output, err := h.Executor.ExecCommand(ctx, postProvisionCmd, envs)
 
 	if output != "" {
 		h.Logger.Info("component postprovision", "output", output)
@@ -283,7 +285,7 @@ func (h *Handler) PreTerminate(ctx context.Context, _ *dcs.Cluster) error {
 	if err != nil {
 		return err
 	}
-	output, err := util.ExecCommand(ctx, preTerminateCmd, envs)
+	output, err := h.Executor.ExecCommand(ctx, preTerminateCmd, envs)
 
 	if output != "" {
 		h.Logger.Info("component preterminate", "output", output)

@@ -565,8 +565,36 @@ var _ = Describe("build service references", func() {
 				}
 			}
 			reader := &mockReader{
-				cli:  testCtx.Cli,
-				objs: []client.Object{newPodService(0), newPodService(1), newPodService(2)},
+				cli: testCtx.Cli,
+				objs: []client.Object{
+					newPodService(0),
+					newPodService(1),
+					newPodService(2),
+					&appsv1alpha1.Component{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: namespace,
+							Name:      FullName(etcdCluster, etcdComponent),
+						},
+						Spec: appsv1alpha1.ComponentSpec{
+							CompDef: "test-compdef",
+						},
+					},
+					&appsv1alpha1.ComponentDefinition{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "test-compdef",
+						},
+						Spec: appsv1alpha1.ComponentDefinitionSpec{
+							Services: []appsv1alpha1.ComponentService{
+								{
+									Service: appsv1alpha1.Service{
+										Name:        "peer",
+										ServiceName: "peer",
+									},
+								},
+							},
+						},
+					},
+				},
 			}
 
 			hosts, ports := make([]string, 0), make([]string, 0)

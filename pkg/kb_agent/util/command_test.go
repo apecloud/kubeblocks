@@ -50,6 +50,7 @@ func TestGetGlobalSharedEnvs(t *testing.T) {
 	assert.NoError(t, err)
 	assert.ElementsMatch(t, expectedEnvs, envs)
 }
+
 func TestExecCommand(t *testing.T) {
 	// Set up test environment
 	ctx := context.Background()

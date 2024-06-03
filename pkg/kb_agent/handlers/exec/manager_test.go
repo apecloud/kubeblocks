@@ -1,10 +1,12 @@
-package exec
+package exec_test
 
 import (
 	"context"
-	"testing"
 
-	"github.com/stretchr/testify/assert"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"github.com/spf13/viper"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
@@ -12,117 +14,213 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
-func TestHandler_JoinMember(t *testing.T) {
-	handler := &Handler{
-		HandlerBase: handlers.HandlerBase{},
-		Executor:    &util.ExecutorImpl{},
-		actionCommands: map[string][]string{
-			constant.MemberJoinAction: {"join-member-command"},
-		},
-	}
+var _ = Describe("Handler", func() {
+	var (
+		handler *Handler
+	)
 
-	cluster := &dcs.Cluster{}
-	memberName := "member-1"
+	BeforeEach(func() {
+		logger := ctrl.Log.WithName("exec handler")
+		handlerBase, err := handlers.NewHandlerBase(logger)
+		Expect(err).NotTo(HaveOccurred())
+		handlerBase.DBStartupReady = true
+		handler = &Handler{
+			HandlerBase:    *handlerBase,
+			Executor:       &util.ExecutorImpl{},
+			actionCommands: make(map[string][]string),
+		}
+	})
 
-	err := handler.JoinMember(context.Background(), cluster, memberName)
+	Describe("NewHandler", func() {
+		It("should initialize a new Handler", func() {
+			properties := make(map[string]string)
+			h, err := NewHandler(properties)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(h).NotTo(BeNil())
+		})
+	})
 
-	assert.NoError(t, err)
-}
+	Describe("InitComponentDefinitionActions", func() {
+		It("should initialize component definition actions", func() {
+			viper.Set(constant.KBEnvActionHandlers, `{
+				"action1": {
+					"Command": ["command1"]
+				},
+				"action2": {
+					"Command": ["command2"]
+				}
+			}`)
+			err := handler.InitComponentDefinitionActions()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(handler.actionCommands).To(HaveLen(2))
+			Expect(handler.actionCommands["action1"]).To(Equal([]string{"command1"}))
+			Expect(handler.actionCommands["action2"]).To(Equal([]string{"command2"}))
+		})
 
-func TestHandler_LeaveMember(t *testing.T) {
-	handler := &Handler{
-		HandlerBase: handlers.HandlerBase{},
-		Executor:    &util.ExecutorImpl{},
-		actionCommands: map[string][]string{
-			constant.MemberLeaveAction: {"leave-member-command"},
-		},
-	}
+		It("should handle empty action commands", func() {
+			viper.Set(constant.KBEnvActionHandlers, `{}`)
+			err := handler.InitComponentDefinitionActions()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(handler.actionCommands).To(HaveLen(0))
+		})
 
-	cluster := &dcs.Cluster{}
-	memberName := "member-1"
+		It("should handle invalid JSON", func() {
+			viper.Set(constant.KBEnvActionHandlers, `invalid-json`)
+			err := handler.InitComponentDefinitionActions()
+			Expect(err).To(HaveOccurred())
+		})
+	})
 
-	err := handler.LeaveMember(context.Background(), cluster, memberName)
+	Describe("JoinMember", func() {
+		It("should execute member join command", func() {
+			ctx := context.TODO()
+			cluster := &dcs.Cluster{}
+			memberName := "member1"
+			handler.actionCommands[constant.MemberJoinAction] = []string{"command1"}
 
-	assert.NoError(t, err)
-}
+			err := handler.JoinMember(ctx, cluster, memberName)
+			Expect(err).NotTo(HaveOccurred())
+			// Add your assertions here
+		})
 
-func TestHandler_MemberHealthCheck(t *testing.T) {
-	handler := &Handler{
-		HandlerBase: handlers.HandlerBase{},
-		Executor:    &util.ExecutorImpl{},
-		actionCommands: map[string][]string{
-			constant.CheckHealthyAction: {"member-health-check-command"},
-		},
-	}
+		It("should handle empty member join command", func() {
+			ctx := context.TODO()
+			cluster := &dcs.Cluster{}
+			memberName := "member1"
 
-	cluster := &dcs.Cluster{}
-	member := &dcs.Member{}
+			err := handler.JoinMember(ctx, cluster, memberName)
+			Expect(err).NotTo(HaveOccurred())
+			// Add your assertions here
+		})
+	})
 
-	err := handler.MemberHealthCheck(context.Background(), cluster, member)
+	Describe("LeaveMember", func() {
+		It("should execute member leave command", func() {
+			ctx := context.TODO()
+			cluster := &dcs.Cluster{}
+			memberName := "member1"
+			handler.actionCommands[constant.MemberLeaveAction] = []string{"command1"}
 
-	assert.NoError(t, err)
-}
+			err := handler.LeaveMember(ctx, cluster, memberName)
+			Expect(err).NotTo(HaveOccurred())
+			// Add your assertions here
+		})
 
-func TestHandler_Lock(t *testing.T) {
-	handler := &Handler{
-		HandlerBase: handlers.HandlerBase{},
-		Executor:    &util.ExecutorImpl{},
-		actionCommands: map[string][]string{
-			constant.ReadonlyAction: {"lock-command"},
-		},
-	}
+		It("should handle empty member leave command", func() {
+			ctx := context.TODO()
+			cluster := &dcs.Cluster{}
+			memberName := "member1"
 
-	reason := "lock-reason"
+			err := handler.LeaveMember(ctx, cluster, memberName)
+			Expect(err).NotTo(HaveOccurred())
+			// Add your assertions here
+		})
+	})
 
-	err := handler.Lock(context.Background(), reason)
+	Describe("MemberHealthCheck", func() {
+		It("should execute member health check command", func() {
+			ctx := context.TODO()
+			cluster := &dcs.Cluster{}
+			member := &dcs.Member{}
+			handler.actionCommands[constant.CheckHealthyAction] = []string{"command1"}
 
-	assert.NoError(t, err)
-}
+			err := handler.MemberHealthCheck(ctx, cluster, member)
+			Expect(err).NotTo(HaveOccurred())
+			// Add your assertions here
+		})
 
-func TestHandler_Unlock(t *testing.T) {
-	handler := &Handler{
-		HandlerBase: handlers.HandlerBase{},
-		Executor:    &util.ExecutorImpl{},
-		actionCommands: map[string][]string{
-			constant.ReadWriteAction: {"unlock-command"},
-		},
-	}
+		It("should handle empty member health check command", func() {
+			ctx := context.TODO()
+			cluster := &dcs.Cluster{}
+			member := &dcs.Member{}
 
-	reason := "unlock-reason"
+			err := handler.MemberHealthCheck(ctx, cluster, member)
+			Expect(err).NotTo(HaveOccurred())
+			// Add your assertions here
+		})
+	})
 
-	err := handler.Unlock(context.Background(), reason)
+	Describe("Lock", func() {
+		It("should execute lock command", func() {
+			ctx := context.TODO()
+			reason := "reason1"
+			handler.actionCommands[constant.ReadonlyAction] = []string{"command1"}
 
-	assert.NoError(t, err)
-}
+			err := handler.Lock(ctx, reason)
+			Expect(err).NotTo(HaveOccurred())
+			// Add your assertions here
+		})
 
-func TestHandler_PostProvision(t *testing.T) {
-	handler := &Handler{
-		HandlerBase: handlers.HandlerBase{},
-		Executor:    &util.ExecutorImpl{},
-		actionCommands: map[string][]string{
-			constant.PostProvisionAction: {"post-provision-command"},
-		},
-	}
+		It("should handle empty lock command", func() {
+			ctx := context.TODO()
+			reason := "reason1"
 
-	cluster := &dcs.Cluster{}
+			err := handler.Lock(ctx, reason)
+			Expect(err).NotTo(HaveOccurred())
+			// Add your assertions here
+		})
+	})
 
-	err := handler.PostProvision(context.Background(), cluster)
+	Describe("Unlock", func() {
+		It("should execute unlock command", func() {
+			ctx := context.TODO()
+			reason := "reason1"
+			handler.actionCommands[constant.ReadWriteAction] = []string{"command1"}
 
-	assert.NoError(t, err)
-}
+			err := handler.Unlock(ctx, reason)
+			Expect(err).NotTo(HaveOccurred())
+			// Add your assertions here
+		})
 
-func TestHandler_PreTerminate(t *testing.T) {
-	handler := &Handler{
-		HandlerBase: handlers.HandlerBase{},
-		Executor:    &util.ExecutorImpl{},
-		actionCommands: map[string][]string{
-			constant.PreTerminateAction: {"pre-terminate-command"},
-		},
-	}
+		It("should handle empty unlock command", func() {
+			ctx := context.TODO()
+			reason := "reason1"
 
-	cluster := &dcs.Cluster{}
+			err := handler.Unlock(ctx, reason)
+			Expect(err).NotTo(HaveOccurred())
+			// Add your assertions here
+		})
+	})
 
-	err := handler.PreTerminate(context.Background(), cluster)
+	Describe("PostProvision", func() {
+		It("should execute post-provision command", func() {
+			ctx := context.TODO()
+			cluster := &dcs.Cluster{}
+			handler.actionCommands[constant.PostProvisionAction] = []string{"command1"}
 
-	assert.NoError(t, err)
-}
+			err := handler.PostProvision(ctx, cluster)
+			Expect(err).NotTo(HaveOccurred())
+			// Add your assertions here
+		})
+
+		It("should handle empty post-provision command", func() {
+			ctx := context.TODO()
+			cluster := &dcs.Cluster{}
+
+			err := handler.PostProvision(ctx, cluster)
+			Expect(err).NotTo(HaveOccurred())
+			// Add your assertions here
+		})
+	})
+
+	Describe("PreTerminate", func() {
+		It("should execute pre-terminate command", func() {
+			ctx := context.TODO()
+			cluster := &dcs.Cluster{}
+			handler.actionCommands[constant.PreTerminateAction] = []string{"command1"}
+
+			err := handler.PreTerminate(ctx, cluster)
+			Expect(err).NotTo(HaveOccurred())
+			// Add your assertions here
+		})
+
+		It("should handle empty pre-terminate command", func() {
+			ctx := context.TODO()
+			cluster := &dcs.Cluster{}
+
+			err := handler.PreTerminate(ctx, cluster)
+			Expect(err).NotTo(HaveOccurred())
+			// Add your assertions here
+		})
+	})
+})

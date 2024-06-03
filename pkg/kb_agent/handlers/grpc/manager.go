@@ -87,7 +87,7 @@ func (h *Handler) IsDBStartupReady() bool {
 	return resp.Ready
 }
 
-// JoinCurrentMemberToCluster provides the following dedicated environment variables for the action:
+// JoinMember provides the following dedicated environment variables for the action:
 //
 // - KB_SERVICE_PORT: The port on which the DB service listens.
 // - KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
@@ -117,7 +117,7 @@ func (h *Handler) JoinMember(ctx context.Context, cluster *dcs.Cluster, memberNa
 	return err
 }
 
-// LeaveMemberFromCluster provides the following dedicated environment variables for the action:
+// LeaveMember provides the following dedicated environment variables for the action:
 //
 // - KB_SERVICE_PORT: The port on which the DB service listens.
 // - KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
@@ -171,6 +171,7 @@ func (h *Handler) Lock(ctx context.Context, reason string) error {
 func (h *Handler) Unlock(ctx context.Context, reason string) error {
 	req := &plugin.ReadwriteRequest{
 		ServiceInfo: &plugin.ServiceInfo{},
+		Reason:      reason,
 	}
 	_, err := h.dbClient.Readwrite(ctx, req)
 	return err

@@ -300,11 +300,12 @@ func (mgr *Manager) GetReplSetStatus(ctx context.Context) (*ReplSetStatus, error
 }
 
 func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, dcsMember *dcs.Member) (bool, error) {
-	if dcsMember == nil {
-		dcsMember = cluster.GetMemberWithName(mgr.CurrentMemberName)
-	}
-	if dcsMember == nil {
-		return false, errors.New("no member specified")
+	memberName := mgr.CurrentMemberName
+	memberIP := mgr.CurrentMemberIP
+
+	if dcsMember != nil {
+		memberName = dcsMember.Name
+		memberIP = dcsMember.PodIP
 	}
 
 	status, err := mgr.GetReplSetStatus(ctx)
@@ -313,7 +314,7 @@ func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, dc
 		return false, err
 	}
 	for _, member := range status.Members {
-		if strings.HasPrefix(member.Name, dcsMember.Name) || strings.HasPrefix(member.Name, dcsMember.PodIP) {
+		if strings.HasPrefix(member.Name, memberName) || strings.HasPrefix(member.Name, memberIP) {
 			if member.StateStr == "PRIMARY" {
 				return true, nil
 			}

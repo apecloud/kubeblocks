@@ -98,6 +98,11 @@ type ComponentSpec struct {
 	// +optional
 	Services []ComponentService `json:"services,omitempty"`
 
+	// Overrides system accounts defined in referenced ComponentDefinition.
+	//
+	// +optional
+	SystemAccounts []ComponentSystemAccount `json:"systemAccounts,omitempty"`
+
 	// Specifies the desired number of replicas in the Component for enhancing availability and durability, or load balancing.
 	//
 	// +kubebuilder:validation:Required

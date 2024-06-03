@@ -883,6 +883,20 @@ by clients.</p>
 </tr>
 <tr>
 <td>
+<code>systemAccounts</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentSystemAccount">
+[]ComponentSystemAccount
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Overrides system accounts defined in referenced ComponentDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>replicas</code><br/>
 <em>
 int32
@@ -5078,6 +5092,20 @@ These templates are used to dynamically provision persistent volumes for the Com
 </tr>
 <tr>
 <td>
+<code>systemAccounts</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentSystemAccount">
+[]ComponentSystemAccount
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Overrides system accounts defined in referenced ComponentDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>switchPolicy</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterSwitchPolicy">
@@ -9225,6 +9253,20 @@ by clients.</p>
 </tr>
 <tr>
 <td>
+<code>systemAccounts</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentSystemAccount">
+[]ComponentSystemAccount
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Overrides system accounts defined in referenced ComponentDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>replicas</code><br/>
 <em>
 int32
@@ -9582,6 +9624,64 @@ If this field is set, the scripts defined under the &lsquo;scripts&rsquo; field 
 <p>This field is deprecated from v0.9.
 This field is maintained for backward compatibility and its use is discouraged.
 Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ComponentSystemAccount">ComponentSystemAccount
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The name of the system account.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>passwordConfig</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.PasswordConfig">
+PasswordConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the policy for generating the account&rsquo;s password.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>secretRef</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ProvisionSecretRef">
+ProvisionSecretRef
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Refers to the secret from which data will be copied to create the new account.</p>
+<p>This field is immutable once set.</p>
 </td>
 </tr>
 </tbody>
@@ -15676,7 +15776,7 @@ The supported property types include:
 <h3 id="apps.kubeblocks.io/v1alpha1.PasswordConfig">PasswordConfig
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SystemAccount">SystemAccount</a>, <a href="#apps.kubeblocks.io/v1alpha1.SystemAccountSpec">SystemAccountSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentSystemAccount">ComponentSystemAccount</a>, <a href="#apps.kubeblocks.io/v1alpha1.SystemAccount">SystemAccount</a>, <a href="#apps.kubeblocks.io/v1alpha1.SystemAccountSpec">SystemAccountSpec</a>)
 </p>
 <div>
 <p>PasswordConfig helps provide to customize complexity of password generation pattern.</p>
@@ -16647,7 +16747,7 @@ ProvisionSecretRef
 <h3 id="apps.kubeblocks.io/v1alpha1.ProvisionSecretRef">ProvisionSecretRef
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ProvisionPolicy">ProvisionPolicy</a>, <a href="#apps.kubeblocks.io/v1alpha1.SystemAccount">SystemAccount</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentSystemAccount">ComponentSystemAccount</a>, <a href="#apps.kubeblocks.io/v1alpha1.ProvisionPolicy">ProvisionPolicy</a>, <a href="#apps.kubeblocks.io/v1alpha1.SystemAccount">SystemAccount</a>)
 </p>
 <div>
 <p>ProvisionSecretRef represents the reference to a secret.</p>

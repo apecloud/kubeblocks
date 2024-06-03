@@ -168,7 +168,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		MinReadySeconds:    compDefObj.Spec.MinReadySeconds,
 		PolicyRules:        compDefObj.Spec.PolicyRules,
 		LifecycleActions:   compDefObj.Spec.LifecycleActions,
-		SystemAccounts:     compDefObj.Spec.SystemAccounts,
+		SystemAccounts:     mergeSystemAccounts(compDefObj.Spec.SystemAccounts, comp.Spec.SystemAccounts),
 		RoleArbitrator:     compDefObj.Spec.RoleArbitrator,
 		Replicas:           comp.Spec.Replicas,
 		Resources:          comp.Spec.Resources,
@@ -240,13 +240,6 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	replaceContainerPlaceholderTokens(synthesizeComp, GetEnvReplacementMapForConnCredential(synthesizeComp.ClusterName))
 
 	return synthesizeComp, nil
-}
-
-func buildRuntimeClassName(synthesizeComp *SynthesizedComponent, comp *appsv1alpha1.Component) {
-	if comp.Spec.RuntimeClassName == nil {
-		return
-	}
-	synthesizeComp.PodSpec.RuntimeClassName = comp.Spec.RuntimeClassName
 }
 
 func clusterGeneration(cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component) string {
@@ -333,6 +326,35 @@ func buildLabelsAndAnnotations(compDef *appsv1alpha1.ComponentDefinition, comp *
 		// override annotations from component
 		synthesizeComp.Annotations = mergeMaps(baseAnnotations, comp.Annotations)
 	}
+}
+
+func mergeSystemAccounts(compDefAccounts []appsv1alpha1.SystemAccount,
+	compAccounts []appsv1alpha1.ComponentSystemAccount) []appsv1alpha1.SystemAccount {
+	if len(compAccounts) == 0 {
+		return compDefAccounts
+	}
+
+	override := func(compAccount appsv1alpha1.ComponentSystemAccount, idx int) {
+		if compAccount.PasswordConfig != nil {
+			compDefAccounts[idx].PasswordGenerationPolicy = *compAccount.PasswordConfig
+		}
+		compDefAccounts[idx].SecretRef = compAccount.SecretRef
+	}
+
+	tbl := make(map[string]int)
+	for i, account := range compDefAccounts {
+		tbl[account.Name] = i
+	}
+
+	for _, account := range compAccounts {
+		idx, ok := tbl[account.Name]
+		if !ok {
+			continue // ignore it silently
+		}
+		override(account, idx)
+	}
+
+	return compDefAccounts
 }
 
 // buildAffinitiesAndTolerations builds affinities and tolerations for component.
@@ -452,6 +474,13 @@ func buildServiceAccountName(synthesizeComp *SynthesizedComponent) {
 	synthesizeComp.ServiceAccountName = constant.GenerateDefaultServiceAccountName(synthesizeComp.ClusterName)
 	// set component.PodSpec.ServiceAccountName
 	synthesizeComp.PodSpec.ServiceAccountName = synthesizeComp.ServiceAccountName
+}
+
+func buildRuntimeClassName(synthesizeComp *SynthesizedComponent, comp *appsv1alpha1.Component) {
+	if comp.Spec.RuntimeClassName == nil {
+		return
+	}
+	synthesizeComp.PodSpec.RuntimeClassName = comp.Spec.RuntimeClassName
 }
 
 // buildBackwardCompatibleFields builds backward compatible fields for component which referenced a clusterComponentDefinition and clusterComponentVersion before KubeBlocks Version 0.7.0

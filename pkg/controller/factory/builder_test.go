@@ -374,14 +374,14 @@ var _ = Describe("builder", func() {
 				Volumes:       []corev1.VolumeMount{},
 				Cluster:       cluster,
 			}
-			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam, synthesizedComponent)
+			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam)
 			Expect(err).Should(BeNil())
 			Expect(configmap).ShouldNot(BeNil())
 			Expect(configmap.SecurityContext).Should(BeNil())
 		})
 
 		It("builds config manager sidecar container correctly", func() {
-			_, cluster, synthesizedComponent := newClusterObjs(nil)
+			_, cluster, _ := newClusterObjs(nil)
 			sidecarRenderedParam := &cfgcm.CfgManagerBuildParams{
 				ManagerName:           "cfgmgr",
 				CharacterType:         mysqlCharacterType,
@@ -393,7 +393,7 @@ var _ = Describe("builder", func() {
 				Volumes:               []corev1.VolumeMount{},
 				Cluster:               cluster,
 			}
-			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam, synthesizedComponent)
+			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam)
 			Expect(err).Should(BeNil())
 			Expect(configmap).ShouldNot(BeNil())
 			Expect(configmap.SecurityContext).ShouldNot(BeNil())

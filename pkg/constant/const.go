@@ -329,3 +329,5 @@ const (
 const (
 	FeatureGateIgnoreConfigTemplateDefaultMode = "IGNORE_CONFIG_TEMPLATE_DEFAULT_MODE"
 )
+
+const InvalidContainerPort int32 = 0

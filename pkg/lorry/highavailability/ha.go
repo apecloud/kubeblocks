@@ -209,7 +209,7 @@ func (ha *Ha) Start() {
 	ha.logger.Info("HA starting")
 	cluster, err := ha.dcs.GetCluster()
 	for cluster == nil {
-		ha.logger.Error(err, "Get Cluster failed.", "cluster-name", ha.dcs.GetClusterName())
+		ha.logger.Info("Get Cluster failed.", "cluster-name", ha.dcs.GetClusterName(), "error", err.Error())
 		time.Sleep(10 * time.Second)
 		cluster, err = ha.dcs.GetCluster()
 	}
@@ -235,7 +235,9 @@ func (ha *Ha) Start() {
 			ha.logger.Info("Initialize cluster.")
 			err := ha.dbManager.InitializeCluster(ha.ctx, cluster)
 			if err != nil {
-				ha.logger.Error(err, "Cluster initialize failed")
+				ha.logger.Info("Cluster initialize failed", "error", err.Error())
+				// update cluster, in case of the info is out of date
+				cluster, _ = ha.dcs.GetCluster()
 			}
 		} else if err != nil {
 			ha.logger.Info("Initialize the database cluster Failed.", "error", err.Error())

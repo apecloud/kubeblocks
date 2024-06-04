@@ -21,16 +21,23 @@ package apps
 
 import (
 	"fmt"
+
+	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/extensions"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/pkg/errors"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 // componentDeletionTransformer handles component deletion
 type componentPauseTransformer struct {
+	client.Client
 }
 
 var _ graph.Transformer = &componentDeletionTransformer{}
@@ -40,30 +47,53 @@ func (t *componentPauseTransformer) Transform(ctx graph.TransformContext, dag *g
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	comp := transCtx.Component
-	// if paused
-	if checkPaused(comp) {
+	if model.IsReconciliationPaused(comp) {
 		// get instanceSet and set paused
-		oldInstanceSet, err := t.getInstanceSet(transCtx, comp)
-		newInstanceSet := oldInstanceSet.DeepCopy()
+		instanceSet, err := t.getInstanceSet(transCtx, comp)
 		if err != nil {
 			return err
 		}
-		newInstanceSet.Spec.Paused = true
-		// update in dag
-		graphCli.Update(dag, oldInstanceSet, newInstanceSet)
+		if !instanceSet.Spec.Paused {
+			instanceSet.Spec.Paused = true
+			graphCli.Update(dag, nil, instanceSet)
+		}
+		// list configmaps and set paused
+		configMapList, err := t.listConfigMaps(transCtx, comp)
+		if err != nil {
+			return err
+		}
+		if err != nil {
+			return err
+		}
+		for _, configMap := range configMapList.Items {
+			annotations := configMap.GetAnnotations()
+			if annotations == nil {
+				annotations = make(map[string]string)
+			}
+			annotations[extensions.ControllerPaused] = trueVal
+			configMap.SetAnnotations(annotations)
+			graphCli.Update(dag, nil, &configMap)
+		}
+
 		return graph.ErrPrematureStop
 	} else {
 		// get instanceSet and cancel paused
-		oldInstanceSet, err := t.getInstanceSet(transCtx, comp)
+		oldInstanceSet, _ := t.getInstanceSet(transCtx, comp)
 		if model.IsReconciliationPaused(oldInstanceSet) {
-			newInstanceSet := oldInstanceSet.DeepCopy()
-			if err != nil {
-				return err
-			}
-			newInstanceSet.Spec.Paused = false
-			// update in dag
-			graphCli.Update(dag, oldInstanceSet, newInstanceSet)
+			oldInstanceSet.Spec.Paused = false
+			graphCli.Update(dag, nil, oldInstanceSet)
 			return nil
+		}
+		// list configmaps and cancel paused
+		configMapList, err := t.listConfigMaps(transCtx, comp)
+		if err != nil {
+			return err
+		}
+		for _, configMap := range configMapList.Items {
+			if model.IsReconciliationPaused(&configMap) {
+				delete(configMap.Annotations, extensions.ControllerPaused)
+				graphCli.Update(dag, configMap.DeepCopy(), &configMap)
+			}
 		}
 		return nil
 	}
@@ -77,4 +107,21 @@ func (t *componentPauseTransformer) getInstanceSet(transCtx *componentTransformC
 		return nil, errors.New(fmt.Sprintf("failed to get instanceSet %s: %v", instanceName, err))
 	}
 	return instanceSet, nil
+}
+
+func (t *componentPauseTransformer) listConfigMaps(transCtx *componentTransformContext, component *appsv1alpha1.Component) (*corev1.ConfigMapList, error) {
+	cmList := &corev1.ConfigMapList{}
+	ml := map[string]string{
+		constant.AppManagedByLabelKey:   constant.AppName,
+		constant.KBAppComponentLabelKey: component.Name,
+	}
+	listOpts := []client.ListOption{
+		client.InNamespace(component.Namespace),
+		client.MatchingLabels(ml),
+	}
+	err := t.Client.List(transCtx, cmList, listOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return cmList, nil
 }

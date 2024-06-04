@@ -22,6 +22,7 @@ package model
 import (
 	"errors"
 	"fmt"
+	"github.com/apecloud/kubeblocks/controllers/extensions"
 	"reflect"
 	"time"
 
@@ -175,6 +176,11 @@ func IsReconciliationPaused(object client.Object) bool {
 	}
 	if value.Kind() != reflect.Struct {
 		return false
+	}
+	if annotations := object.GetAnnotations(); annotations != nil {
+		if val, ok := annotations[extensions.ControllerPaused]; ok && val == "true" {
+			return true
+		}
 	}
 	spec := value.FieldByName("Spec")
 	if !spec.IsValid() {

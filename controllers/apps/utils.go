@@ -26,7 +26,6 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/controllers/extensions"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
@@ -84,15 +83,4 @@ func clientOption(v *model.ObjectVertex) *multicluster.ClientOption {
 		panic(fmt.Sprintf("unknown client option: %T", v.ClientOpt))
 	}
 	return multicluster.InControlContext()
-}
-
-func checkPaused(object client.Object) bool {
-	annotations := object.GetAnnotations()
-	if annotations == nil {
-		return false
-	}
-	if val, ok := annotations[extensions.ControllerPaused]; ok && val == "true" {
-		return true
-	}
-	return false
 }

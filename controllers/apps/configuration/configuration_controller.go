@@ -36,10 +36,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/extensions"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -114,12 +114,9 @@ func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		reqCtx.Log.Info("cluster is deleting, skip reconcile")
 		return intctrlutil.Reconciled()
 	}
-	// if cluster is paused, pausing reconfigure as well
-	if fetcherTask.ClusterObj != nil {
-		if val, ok := fetcherTask.ClusterObj.Annotations[extensions.ControllerPaused]; ok && val == "true" {
-			reqCtx.Log.Info(fmt.Sprintf("cluster is paused, skip reconcile"))
-			return intctrlutil.Reconciled()
-		}
+	if model.IsReconciliationPaused(config) {
+		reqCtx.Log.Info(fmt.Sprintf("cluster is paused, skip reconcile"))
+		return intctrlutil.Reconciled()
 	}
 	if fetcherTask.ClusterComObj == nil || fetcherTask.ComponentObj == nil {
 		return r.failWithInvalidComponent(config, reqCtx)

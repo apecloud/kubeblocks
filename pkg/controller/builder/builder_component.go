@@ -70,7 +70,7 @@ func (builder *ComponentBuilder) SetResources(resources corev1.ResourceRequireme
 	return builder
 }
 
-func (builder *ComponentBuilder) DisableExporter(disableExporter *bool) *ComponentBuilder {
+func (builder *ComponentBuilder) SetDisableExporter(disableExporter *bool) *ComponentBuilder {
 	builder.get().Spec.DisableExporter = disableExporter
 	return builder
 }
@@ -123,6 +123,11 @@ func (builder *ComponentBuilder) SetServices(services []appsv1alpha1.ClusterComp
 	return builder
 }
 
+func (builder *ComponentBuilder) SetSystemAccounts(systemAccounts []appsv1alpha1.ComponentSystemAccount) *ComponentBuilder {
+	builder.get().Spec.SystemAccounts = systemAccounts
+	return builder
+}
+
 func (builder *ComponentBuilder) SetServiceRefs(serviceRefs []appsv1alpha1.ServiceRef) *ComponentBuilder {
 	builder.get().Spec.ServiceRefs = serviceRefs
 	return builder
@@ -138,7 +143,10 @@ func (builder *ComponentBuilder) SetOfflineInstances(offlineInstances []string) 
 	return builder
 }
 
-func (builder *ComponentBuilder) SetRuntimeClassName(runtimeClassName string) *ComponentBuilder {
-	builder.get().Spec.RuntimeClassName = &runtimeClassName
+func (builder *ComponentBuilder) SetRuntimeClassName(runtimeClassName *string) *ComponentBuilder {
+	if runtimeClassName != nil {
+		className := *runtimeClassName
+		builder.get().Spec.RuntimeClassName = &className
+	}
 	return builder
 }

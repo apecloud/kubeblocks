@@ -15,7 +15,7 @@ env:
 jobs:
   trigger-mode:
     name: trigger mode
-    if: github.event.action == 'labeled' && github.event.label.name == 'approved'
+    if: github.event.action == 'labeled' && (github.event.label.name == 'approved' || github.event.label.name == 'pre-approve')
     runs-on: ubuntu-latest
     outputs:
       trigger-mode: ${{ steps.get_trigger_mode.outputs.trigger_mode }}

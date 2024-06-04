@@ -55,13 +55,13 @@ func (t *clusterComponentTransformer) Transform(ctx graph.TransformContext, dag 
 		return nil
 	}
 
-	allCompsReady, err := checkAllCompsReady(transCtx, transCtx.Cluster)
+	allCompsUpToDate, err := checkAllCompsUpToDate(transCtx, transCtx.Cluster)
 	if err != nil {
 		return err
 	}
 
-	// if all component objects ready and cluster is not updating, skip reconciling components
-	if !transCtx.OrigCluster.IsUpdating() && allCompsReady {
+	// if the cluster is not updating and all components are up-to-date, skip the reconciliation
+	if !transCtx.OrigCluster.IsUpdating() && allCompsUpToDate {
 		return nil
 	}
 
@@ -151,7 +151,7 @@ func (t *clusterComponentTransformer) handleComps(transCtx *clusterTransformCont
 	return nil
 }
 
-func checkAllCompsReady(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) (bool, error) {
+func checkAllCompsUpToDate(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) (bool, error) {
 	compList := &appsv1alpha1.ComponentList{}
 	labels := constant.GetClusterWellKnownLabels(cluster.Name)
 	if err := transCtx.Client.List(transCtx.Context, compList, client.InNamespace(cluster.Namespace), client.MatchingLabels(labels)); err != nil {
@@ -159,6 +159,15 @@ func checkAllCompsReady(transCtx *clusterTransformContext, cluster *appsv1alpha1
 	}
 	if len(compList.Items) != len(transCtx.ComponentSpecs) {
 		return false, nil
+	}
+	for _, comp := range compList.Items {
+		kbGeneration, ok := comp.Annotations[constant.KubeBlocksGenerationKey]
+		if !ok {
+			return false, nil
+		}
+		if comp.Generation != comp.Status.ObservedGeneration || kbGeneration != strconv.FormatInt(cluster.Generation, 10) {
+			return false, nil
+		}
 	}
 	return true, nil
 }

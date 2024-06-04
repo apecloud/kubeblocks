@@ -32,7 +32,7 @@ func TestStripSecrets(t *testing.T) {
 	secretValue := "123"
 
 	getRoleReq := &GetRoleRequest{
-		ServiceInfo: &ServiceInfo{
+		EngineInfo: &EngineInfo{
 			Fqdn:          "fqdn",
 			Port:          "1024",
 			AdminUser:     "admin",
@@ -51,19 +51,19 @@ func TestStripSecrets(t *testing.T) {
 		{true, "true"},
 		{false, "false"},
 		{&GetRoleRequest{}, `{}`},
-		{getRoleReq, `{"db_info":{"admin_password":"***stripped***","admin_user":"admin","fqdn":"fqdn","port":"1024"}}`},
+		{getRoleReq, `{"engine_info":{"admin_password":"***stripped***","admin_user":"admin","fqdn":"fqdn","port":"1024"}}`},
 	}
 
 	// Message from revised spec as received by a sidecar based on the current spec.
 	// The XXX_unrecognized field contains secrets and must not get logged.
 	unknownFields := &GetRoleRequest{}
-	serviceinfo := &ServiceInfo{
+	EngineInfo := &EngineInfo{
 		Fqdn:          "fqdn",
 		Port:          "1024",
 		AdminUser:     "admin",
 		AdminPassword: secretValue,
 	}
-	m := serviceinfo.ProtoReflect()
+	m := EngineInfo.ProtoReflect()
 	md := m.Descriptor()
 	fields := md.Fields()
 	for i := 0; i < fields.Len(); i++ {
@@ -78,7 +78,7 @@ func TestStripSecrets(t *testing.T) {
 	if assert.NoError(t, err, "marshall future message") &&
 		assert.NoError(t, proto.Unmarshal(data, unknownFields), "unmarshal with unknown fields") {
 		cases = append(cases, testcase{unknownFields,
-			`{"db_info":{"admin_password":"***stripped***","admin_user":"admin","fqdn":"fqdn","port":"1024"}}`,
+			`{"engine_info":{"admin_password":"***stripped***","admin_user":"admin","fqdn":"fqdn","port":"1024"}}`,
 		})
 	}
 

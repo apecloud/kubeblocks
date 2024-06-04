@@ -41,7 +41,7 @@ message GetPluginInfoResponse {
   // alphanumerics between. This field is REQUIRED.
   string name = 1;
 
-  string service_type = 2;
+  string engine_type = 2;
 
   // This field is REQUIRED. 
   string version = 3;
@@ -50,11 +50,11 @@ message GetPluginInfoResponse {
   map<string, string> metadata = 4;
 }
 
-message ServiceInfo {
+message EngineInfo {
   // The pod FQDN of the replica.
   string fqdn = 1;
 
-  // The port on which the service listens.
+  // The port on which the Engine listens.
   string port = 2;
 
   // name of the account with the necessary privileges to execute the action.
@@ -64,15 +64,15 @@ message ServiceInfo {
   string admin_password = 4 [(kb_secret) = true];
 }
 
-message IsServiceReadyRequest {
-  ServiceInfo service_info = 1;
+message IsEngineReadyRequest {
+  EngineInfo engine_info = 1;
 
   // Common metadata property for extention
   map<string, string> metadata = 2;
 }
 
-message IsServiceReadyResponse {
-  // true if the service is ready, false otherwise.
+message IsEngineReadyResponse {
+  // true if the Engine is ready, false otherwise.
   bool ready = 1;
 
   // This field is OPTIONAL. 
@@ -80,7 +80,7 @@ message IsServiceReadyResponse {
 }
 
 message GetRoleRequest {
-  ServiceInfo service_info = 1;
+  EngineInfo engine_info = 1;
 
   // Common metadata property for extention
   map<string, string> metadata = 2;
@@ -94,7 +94,7 @@ message GetRoleResponse {
 }
 
 message JoinMemberRequest {
-  ServiceInfo service_info = 1;
+  EngineInfo engine_info = 1;
 
   // The Names of all members.
   repeated string members = 2;
@@ -115,7 +115,7 @@ message JoinMemberResponse {
 }
 
 message LeaveMemberRequest {
-  ServiceInfo service_info = 1;
+  EngineInfo engine_info = 1;
 
   // The Names of all members.
   repeated string members = 2;
@@ -136,7 +136,7 @@ message LeaveMemberResponse {
 }
 
 message ReadonlyRequest {
-  ServiceInfo service_info = 1;
+  EngineInfo engine_info = 1;
 
   // The reason for setting the replica as read-only.
   string Reason = 2;
@@ -151,7 +151,7 @@ message ReadonlyResponse {
 }
 
 message ReadwriteRequest {
-  ServiceInfo service_info = 1;
+  EngineInfo engine_info = 1;
 
   // The reason for setting the replica as read-write.
   string Reason = 2;
@@ -166,7 +166,7 @@ message ReadwriteResponse {
 }
 
 message AccountProvisionRequest {
-  ServiceInfo service_info = 1;
+  EngineInfo engine_info = 1;
 
   // the user name of the new account.
   string user_name = 2;
@@ -186,7 +186,7 @@ message AccountProvisionResponse {
 }
 
 message SwitchoverRequest {
-  ServiceInfo service_info = 1;
+  EngineInfo engine_info = 1;
 
   // The Name of the old primary replica to demote.
   string primary = 2;
@@ -206,12 +206,12 @@ message SwitchoverResponse {
   map<string, string> metadata = 1;
 }
 
-// ServicePlugin service provides APIs to kubeblocks operator to exec component operation.
-service ServicePlugin {
+// EnginePlugin Engine provides APIs to kubeblocks operator to exec component operation.
+service EnginePlugin {
   rpc GetPluginInfo(GetPluginInfoRequest) returns (GetPluginInfoResponse) {}
 
-  // IsServiceReady defines the mechanism to probe the readiness of the database.
-  rpc IsServiceReady(IsServiceReadyRequest) returns (IsServiceReadyResponse) {}
+  // IsEngineReady defines the mechanism to probe the readiness of the database.
+  rpc IsEngineReady(IsEngineReadyRequest) returns (IsEngineReadyResponse) {}
 
   // GetRole defines the mechanism to probe the role of replicas. The return role
   // must be one of the names defined in the componentdefinition roles. 
@@ -229,10 +229,10 @@ service ServicePlugin {
   // other members about the departure,
   rpc LeaveMember(LeaveMemberRequest) returns (LeaveMemberResponse) {}
 
-  // Readonly defines how to set a replica service as read-only.
+  // Readonly defines how to set a replica Engine as read-only.
   rpc Readonly(ReadonlyRequest) returns (ReadonlyResponse) {}
 
-  // Readwrite defines how to set a replica service as read-write.
+  // Readwrite defines how to set a replica Engine as read-write.
   rpc Readwrite(ReadwriteRequest) returns (ReadwriteResponse) {}
 
   // AccountProvision Defines the procedure to generate a new database account.

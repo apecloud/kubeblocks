@@ -48,7 +48,7 @@ var _ = Describe("GRPC Handler", func() {
 			expectedRole := "primary"
 
 			getRoleRequest := &plugin.GetRoleRequest{
-				ServiceInfo: plugin.GetServiceInfo(),
+				EngineInfo: plugin.GetEngineInfo(),
 			}
 			getRoleResponse := &plugin.GetRoleResponse{
 				Role: expectedRole,
@@ -57,7 +57,7 @@ var _ = Describe("GRPC Handler", func() {
 				Expect(req).To(Equal(getRoleRequest))
 				return getRoleResponse, nil
 			}
-			handler.dbClient = &mockServicePluginClient{
+			handler.dbClient = &mockEnginePluginClient{
 				mockGetRole: mockGetRoleFunc,
 			}
 
@@ -67,13 +67,13 @@ var _ = Describe("GRPC Handler", func() {
 		It("get role error", func() {
 			expectedError := errors.New("failed to get role")
 			getRoleRequest := &plugin.GetRoleRequest{
-				ServiceInfo: plugin.GetServiceInfo(),
+				EngineInfo: plugin.GetEngineInfo(),
 			}
 			mockGetRoleFunc := func(ctx context.Context, req *plugin.GetRoleRequest) (*plugin.GetRoleResponse, error) {
 				Expect(req).To(Equal(getRoleRequest))
 				return nil, expectedError
 			}
-			handler.dbClient = &mockServicePluginClient{
+			handler.dbClient = &mockEnginePluginClient{
 				mockGetRole: mockGetRoleFunc,
 			}
 			role, err := handler.GetReplicaRole(ctx, cluster)

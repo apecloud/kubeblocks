@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -58,9 +59,17 @@ type Base struct {
 
 var actionHandlers = map[string]util.Handlers{}
 var defaultGRPCSetting map[string]string
+var lock sync.Mutex
 
-func init() {
-	viper.AutomaticEnv()
+func initHandlerSettings() {
+	if len(actionHandlers) != 0 {
+		return
+	}
+	lock.Lock()
+	defer lock.Unlock()
+	if len(actionHandlers) != 0 {
+		return
+	}
 	actionJSON := viper.GetString(constant.KBEnvActionHandlers)
 	if actionJSON == "" {
 		panic("action handlers is not specified")
@@ -81,6 +90,7 @@ func init() {
 }
 
 func (b *Base) Init(ctx context.Context) error {
+	initHandlerSettings()
 	var handlers util.Handlers
 	if b.Action != "" {
 		handlers = actionHandlers[b.Action]

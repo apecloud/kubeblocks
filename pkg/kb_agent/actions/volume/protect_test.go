@@ -33,8 +33,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers"
 )
 
 type mockVolumeStatsRequester struct {
@@ -197,8 +196,8 @@ var _ = Describe("Volume Protection Operation", func() {
 		})
 
 		It("disabled - empty pod name", func() {
-			viper.SetDefault(constant.KBEnvPodName, "")
 			obj := newProtection()
+			viper.SetDefault(constant.KBEnvPodName, "")
 			obj.Pod = viper.GetString(constant.KBEnvPodName)
 			Expect(obj.disabled()).Should(BeTrue())
 			_, err := obj.Do(context.Background(), nil)
@@ -302,11 +301,11 @@ var _ = Describe("Volume Protection Operation", func() {
 
 		It("volume over high watermark", func() {
 			ctrl := gomock.NewController(GinkgoT())
-			mockDBManager := engines.NewMockDBManager(ctrl)
+			mockDBManager := handlers.NewMockHandler(ctrl)
 			mockDBManager.EXPECT().Lock(gomock.Any(), gomock.Any()).Return(nil)
-			register.SetDBManager(mockDBManager)
 
 			obj := newProtection()
+			obj.Handler = mockDBManager
 			mock := obj.Requester.(*mockVolumeStatsRequester)
 			stats := statsv1alpha1.Summary{
 				Pods: []statsv1alpha1.PodStats{
@@ -342,12 +341,12 @@ var _ = Describe("Volume Protection Operation", func() {
 
 		It("volume under high watermark", func() {
 			ctrl := gomock.NewController(GinkgoT())
-			mockDBManager := engines.NewMockDBManager(ctrl)
+			mockDBManager := handlers.NewMockHandler(ctrl)
 			mockDBManager.EXPECT().Lock(gomock.Any(), gomock.Any()).Return(nil)
-			mockDBManager.EXPECT().Unlock(gomock.Any()).Return(nil)
-			register.SetDBManager(mockDBManager)
+			mockDBManager.EXPECT().Unlock(gomock.Any(), gomock.Any()).Return(nil)
 
 			obj := newProtection()
+			obj.Handler = mockDBManager
 			mock := obj.Requester.(*mockVolumeStatsRequester)
 			stats := statsv1alpha1.Summary{
 				Pods: []statsv1alpha1.PodStats{
@@ -382,12 +381,12 @@ var _ = Describe("Volume Protection Operation", func() {
 
 		It("lock/unlock error", func() {
 			ctrl := gomock.NewController(GinkgoT())
-			mockDBManager := engines.NewMockDBManager(ctrl)
+			mockDBManager := handlers.NewMockHandler(ctrl)
 			mockDBManager.EXPECT().Lock(gomock.Any(), gomock.Any()).Return(fmt.Errorf("test"))
-			mockDBManager.EXPECT().Unlock(gomock.Any()).Return(fmt.Errorf("test"))
-			register.SetDBManager(mockDBManager)
+			mockDBManager.EXPECT().Unlock(gomock.Any(), gomock.Any()).Return(fmt.Errorf("test"))
 
 			obj := newProtection()
+			obj.Handler = mockDBManager
 			mock := obj.Requester.(*mockVolumeStatsRequester)
 			stats := statsv1alpha1.Summary{
 				Pods: []statsv1alpha1.PodStats{

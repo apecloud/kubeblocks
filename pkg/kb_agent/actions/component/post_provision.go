@@ -28,7 +28,6 @@ import (
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers/models"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
@@ -61,15 +60,6 @@ func (s *PostProvision) PreCheck(ctx context.Context, req *actions.OpsRequest) e
 }
 
 func (s *PostProvision) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
-	componentNames := req.GetString("componentNames")
-	podNames := req.GetString("podNames")
-	podIPs := req.GetString("podIPs")
-	podHostNames := req.GetString("podHostNames")
-	podHostIPs := req.GetString("podHostIPs")
-	ppManager, ok := s.Handler.(PostProvisionManager)
-	if !ok {
-		return nil, models.ErrNotImplemented
-	}
-	err := ppManager.PostProvision(ctx, componentNames, podNames, podIPs, podHostNames, podHostIPs)
+	err := s.Handler.PostProvision(ctx, nil)
 	return nil, err
 }

@@ -52,8 +52,9 @@ func NewHandler(properties map[string]string) (handlers.Handler, error) {
 
 	handlerBase.DBStartupReady = true
 	h := &Handler{
-		HandlerBase: *handlerBase,
-		Executor:    &util.ExecutorImpl{},
+		HandlerBase:    *handlerBase,
+		Executor:       &util.ExecutorImpl{},
+		actionCommands: map[string][]string{},
 	}
 
 	err = h.InitComponentDefinitionActions()

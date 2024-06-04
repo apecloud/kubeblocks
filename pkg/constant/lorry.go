@@ -36,6 +36,7 @@ const (
 	CheckRunningAction  = "checkRunning"
 	MemberJoinAction    = "memberJoin"
 	MemberLeaveAction   = "memberLeave"
+	ProtectAction       = "protect"
 	ReadonlyAction      = "readonly"
 	ReadWriteAction     = "readwrite"
 	PostProvisionAction = "postProvision"

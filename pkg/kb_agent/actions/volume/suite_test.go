@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package volume
 
 import (
+	"fmt"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -31,23 +32,30 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers"
 )
 
 var (
-	dbManager     engines.DBManager
-	mockDBManager *engines.MockDBManager
+	dbManager     handlers.Handler
+	mockDBManager *handlers.MockHandler
 	dcsStore      dcs.DCS
 	mockDCSStore  *dcs.MockDCS
 )
 
 func init() {
 	viper.AutomaticEnv()
-	viper.SetDefault(constant.KBEnvPodName, "pod-test")
+	viper.SetDefault(constant.KBEnvPodName, "pod-test-0")
 	viper.SetDefault(constant.KBEnvClusterCompName, "cluster-component-test")
 	viper.SetDefault(constant.KBEnvNamespace, "namespace-test")
+	viper.SetDefault(constant.KBEnvActionHandlers, fmt.Sprintf(`{
+				"%s": {
+					"command": ["command1"]
+				},
+				"action2": {
+					"Command": ["command2"]
+				}
+			}`, constant.ProtectAction))
 	ctrl.SetLogger(zap.New())
 }
 
@@ -69,8 +77,7 @@ var _ = AfterSuite(func() {
 
 func InitMockDBManager() {
 	ctrl := gomock.NewController(GinkgoT())
-	mockDBManager = engines.NewMockDBManager(ctrl)
-	register.SetDBManager(mockDBManager)
+	mockDBManager = handlers.NewMockHandler(ctrl)
 	dbManager = mockDBManager
 }
 

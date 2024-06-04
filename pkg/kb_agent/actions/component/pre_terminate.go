@@ -28,7 +28,6 @@ import (
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers/models"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
@@ -57,10 +56,6 @@ func (s *PreTerminate) Init(ctx context.Context) error {
 }
 
 func (s *PreTerminate) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
-	ptManager, ok := s.Handler.(PreTerminateManager)
-	if !ok {
-		return nil, models.ErrNotImplemented
-	}
-	err := ptManager.PreTerminate(ctx)
+	err := s.Handler.PreTerminate(ctx, nil)
 	return nil, err
 }

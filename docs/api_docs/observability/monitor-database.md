@@ -74,7 +74,7 @@ kubectl patch cluster mycluster -n demo --type "json" -p '[{"op":"add","path":"/
 If you want to disable the monitoring function, run the command below to disable it.
 
 ```bash
-k patch cluster clusterName -n namespace --type "json" -p '[{"op":"add","path":"/spec/componentSpecs/0/monitor","value":false}]'
+kubectl patch cluster mycluster -n namespace --type "json" -p '[{"op":"add","path":"/spec/componentSpecs/0/monitor","value":false}]'
 ```
 
 You can also edit the `cluster.yaml` to enable/disable the monitoring function.
@@ -92,7 +92,7 @@ componentSpecs:
     monitor: false # Change this value
 ```
 
-### View the dashboard
+### View the dashboardß
 
 Use the `kubeblocks-grafana` addon to view the dashboard.
 
@@ -131,7 +131,7 @@ kubectl patch cluster mycluster -n demo --type "json" -p '[{"op":"add","path":"/
 If you want to disable the monitoring function, run the command below to disable it.
 
 ```bash
-k patch cluster clusterName -n namespace --type "json" -p '[{"op":"add","path":"/spec/componentSpecs/0/monitor","value":false}]'
+kubectl patch cluster mycluster -n namespace --type "json" -p '[{"op":"add","path":"/spec/componentSpecs/0/monitor","value":false}]'
 ```
 
 You can also edit the `cluster.yaml` to enable/disable the monitoring function.
@@ -160,7 +160,7 @@ KubeBlocks supports the `victoria-metrics-agent` addon to enable you to remotely
 Install the `victoria-metrics-agent` addon.
 
 ```bash
-helm install  vm xxx/victoria-metrics-agent --set remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}
+helm install vm xxx/victoria-metrics-agent --set remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}
 ```
 
 For detailed settings, you can refer to [Victoria Metrics docs](https://artifacthub.io/packages/helm/victoriametrics/victoria-metrics-agent).

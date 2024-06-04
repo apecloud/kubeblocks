@@ -94,8 +94,8 @@ type SpecificOpsRequest struct {
 	Upgrade *Upgrade `json:"upgrade,omitempty"`
 
 	// Lists HorizontalScaling objects, each specifying scaling requirements for a Component,
-	// including desired replica counts, configurations for new instances, modifications for existing instances,
-	// and instance downscaling options.
+	// including desired replica changes, configurations for new instances, modifications for existing instances,
+	// and take offline/online the specified instances.
 	//
 	// +optional
 	// +patchMergeKey=componentName
@@ -1404,20 +1404,3 @@ func (p *ProgressStatusDetail) SetStatusAndMessage(status ProgressStatus, messag
 	p.Message = message
 	p.Status = status
 }
-
-/*func (r ReplicasWrapper) OverwriteOP() bool {
-	return r.Replicas != nil
-}
-
-func (r ReplicasWrapper) AddOP() bool {
-	return r.ReplicasToAdd != nil
-}
-
-func (r ReplicasWrapper) DeleteOP() bool {
-	return r.ReplicasToDelete != nil
-}
-
-func (r ReplicasWrapper) NoneOP() bool {
-	return r.Replicas == nil && r.ReplicasToAdd == nil && r.ReplicasToDelete == nil
-}
-*/

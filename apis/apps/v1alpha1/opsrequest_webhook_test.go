@@ -37,9 +37,8 @@ import (
 
 var _ = Describe("OpsRequest webhook", func() {
 	const (
-		componentName         = "replicasets"
-		proxyComponentName    = "proxy"
-		shardingComponentName = "sharding"
+		componentName      = "replicasets"
+		proxyComponentName = "proxy"
 	)
 	var (
 		randomStr                    = testCtx.GetRandomStr()

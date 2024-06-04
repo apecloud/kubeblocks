@@ -472,9 +472,9 @@ spec:
                   rule: self == oldSelf
               horizontalScaling:
                 description: Lists HorizontalScaling objects, each specifying scaling
-                  requirements for a Component, including desired replica counts,
+                  requirements for a Component, including desired replica changes,
                   configurations for new instances, modifications for existing instances,
-                  and instance downscaling options.
+                  and take offline/online the specified instances.
                 items:
                   description: HorizontalScaling defines the parameters of a horizontal
                     scaling operation.

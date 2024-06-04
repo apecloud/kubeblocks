@@ -19195,8 +19195,8 @@ Upgrade
 <td>
 <em>(Optional)</em>
 <p>Lists HorizontalScaling objects, each specifying scaling requirements for a Component,
-including desired replica counts, configurations for new instances, modifications for existing instances,
-and instance downscaling options.</p>
+including desired replica changes, configurations for new instances, modifications for existing instances,
+and take offline/online the specified instances.</p>
 </td>
 </tr>
 <tr>

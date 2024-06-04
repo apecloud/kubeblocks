@@ -174,11 +174,12 @@ func (d *baseDataClone) isPVCExists(pvcKey types.NamespacedName) (bool, error) {
 }
 
 func (d *baseDataClone) checkAllPVCsExist() (bool, error) {
-	for i := *d.itsObj.Spec.Replicas; i < d.component.Replicas; i++ {
+	desiredPodNames := generatePodNames(d.component)
+	for _, podName := range desiredPodNames {
 		for _, vct := range d.component.VolumeClaimTemplates {
 			pvcKey := types.NamespacedName{
 				Namespace: d.itsObj.Namespace,
-				Name:      fmt.Sprintf("%s-%s-%d", vct.Name, d.itsObj.Name, i),
+				Name:      fmt.Sprintf("%s-%s", vct.Name, podName),
 			}
 			// check pvc existence
 			pvcExists, err := d.isPVCExists(pvcKey)

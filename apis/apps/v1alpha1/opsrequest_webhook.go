@@ -449,6 +449,12 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 	if hScale.Replicas != nil {
 		return nil
 	}
+	if lastCompConfiguration, ok := r.Status.LastConfiguration.Components[componentName]; ok {
+		// use last component configuration snapshot
+		compSpec.Instances = lastCompConfiguration.Instances
+		compSpec.Replicas = *lastCompConfiguration.Replicas
+		compSpec.OfflineInstances = lastCompConfiguration.OfflineInstances
+	}
 	compInsTplMap := map[string]int32{}
 	for _, v := range compSpec.Instances {
 		compInsTplMap[v.Name] = v.GetReplicas()

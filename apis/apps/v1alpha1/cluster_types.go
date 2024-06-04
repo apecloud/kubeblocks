@@ -1655,7 +1655,7 @@ func (t *InstanceTemplate) GetReplicas() int32 {
 	if t.Replicas != nil {
 		return *t.Replicas
 	}
-	return 1
+	return defaultInstanceTemplateReplicas
 }
 
 // GetClusterUpRunningPhases returns Cluster running or partially running phases.

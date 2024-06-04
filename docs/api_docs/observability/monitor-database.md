@@ -7,131 +7,160 @@ sidebar_position: 1
 
 # Monitor a database
 
-With the built-in database observability, you can observe the database health status and track and measure your database in real-time to optimize database performance. This section shows you how database monitoring tools work with KubeBlocks and how to use the function.
+With the built-in database observability, you can observe the database health status and track and measure your database in real-time to optimize database performance. This section shows how database monitoring tools work with KubeBlocks and how to use the monitoring function.
 
-## For Playground/test
+## For the test/demo environment
 
-KubeBlocks integrates open-source monitoring components, such as Prometheus, AlertManager, and Grafana, by add-ons and adopts the custom `apecloud-otel-collector` to collect the monitoring indicators of databases and host machines. All monitoring add-ons are enabled when KubeBlocks Playground is deployed.
+### Enable monitoring addons
 
-KubeBlock Playground supports the following built-in monitoring add-ons:
+KubeBlocks integrates open-source monitoring components, such as Prometheus, AlertManager, and Grafana, by addons and adopts the custom `apecloud-otel-collector` to collect the monitoring indicators of databases and host machines. You can use these addons for test or demo.
 
-* `prometheus`: it includes Prometheus and AlertManager add-ons.
-* `grafana`: it includes Grafana monitoring add-ons.
-* `alertmanager-webhook-adaptor`: it includes the notification extension add-on and is used to extend the notification capability of AlertManager. Currently, the custom bots of Feishu, DingTalk, and Wechat Enterprise are supported.
+* `prometheus`: it includes Prometheus and AlertManager addons.
+* `grafana`: it includes Grafana monitoring addons.
+* `victoria-metrics`: it collects metrics from various sources and stores them to VictoriaMetrics.
+* `victoria-metrics-agent`: it collects metrics from various sources, relabel and filter the collected metrics and store them in VictoriaMetrics or any other storage systems via Prometheus `remote_write` protocol or via VictoriaMetrics `remote_write` protocol.
+* `alertmanager-webhook-adaptor`: it includes the notification extension and is used to extend the notification capability of AlertManager. Currently, the custom bots of Feishu, DingTalk, and Wechat Enterprise are supported.
 * `apecloud-otel-collector`: it is used to collect the indicators of databases and the host machine.
 
-1. View all built-in add-ons and make sure the monitoring add-ons are enabled.
+***Steps:***
+
+:::note
+
+Here is an example of enabling the `prometheus` addon. You can enable other monitoring addons by replacing `prometheus` in the example with the name of other addons.
+
+:::
+
+1. (Optional) Add the KubeBlocks repo. If you install KubeBlocks with Helm, just run `helm repo update`.
 
    ```bash
-   # View all add-ons supported
-   kbcli addon list
-   ...
-   grafana                        Helm   Enabled                   true                                                                                    
-   alertmanager-webhook-adaptor   Helm   Enabled                   true                                                                                    
-   prometheus                     Helm   Enabled    alertmanager   true 
-   ...
+   helm repo add kubeblocks https://apecloud.github.io/helm-charts
+   helm repo update
    ```
 
-2. View the dashboard list.
+2. View the addon versions.
 
    ```bash
-   kbcli dashboard list
+   helm search repo kubeblocks/prometheus --devel --versions
+   ```
+
+3. Install the addon.
+
+   ```bash
+   helm install prometheus kubeblocks/prometheus --namespace kb-system --create-namespace
+   ```
+
+4. Verify whether this addon is installed.
+
+   The STATUS is deployed and this addon is installed successfully.
+
+   ```bash
+   helm list -A
    >
-   NAME                                 NAMESPACE   PORT    CREATED-TIME
-   kubeblocks-grafana                   kb-system   13000   Jul 24,2023 11:38 UTC+0800
-   kubeblocks-prometheus-alertmanager   kb-system   19093   Jul 24,2023 11:38 UTC+0800
-   kubeblocks-prometheus-server         kb-system   19090   Jul 24,2023 11:38 UTC+0800
+   NAME                          NAMESPACE   REVISION    UPDATED                                 STATUS      CHART                           APP VERSION
+   ......
+   prometheus                  	kb-system	1       	   2024-05-31 12:01:52.872584 +0800 CST    deployed	 prometheus-15.16.1          	   2.39.1 
    ```
 
-3. Open and view the web console of a monitoring dashboard. For example,
+### Enable the monitoring function for a database
 
-   ```bash
-   kbcli dashboard open kubeblocks-grafana
-   ```
+The open-source or customized Exporter is injected after the monitoring function is enabled. This Exporter can be found by the Prometheus server automatically and scrape monitoring indicators at regular intervals.
 
-## For production environment
+If you disable the monitoring function when creating a cluster, run the command below to enable it.
 
-In the production environment, it is highly recommended to build your monitoring system or purchase a third-party monitoring service.
+```bash
+kubectl patch cluster mycluster -n demo --type "json" -p '[{"op":"add","path":"/spec/componentSpecs/0/monitor","value":true}]'
+```
 
-### Enable monitoring function
+If you want to disable the monitoring function, run the command below to disable it.
 
-KubeBlocks provides an add-on, `victoria-metrics-agent`, to push the monitoring data to a third-party monitoring system compatible with the Prometheus Remote Write protocol. Compared with the native Prometheus, [vmgent](https://docs.victoriametrics.com/vmagent.html) is lighter and supports the horizontal extension.
+```bash
+k patch cluster clusterName -n namespace --type "json" -p '[{"op":"add","path":"/spec/componentSpecs/0/monitor","value":false}]'
+```
 
-1. Enable data push.
+You can also edit the `cluster.yaml` to enable/disable the monitoring function.
 
-   You just need to provide the endpoint which supports the Prometheus Remote Write protocol and multiple endpoints can be supported. Refer to the tutorials of your third-party monitoring system for how to get an endpoint.
+```bash
+kubectl edit cluster mycluster -n demo
+......
+componentSpecs:
+  - name: mysql
+    componentDefRef: mysql
+    enabledLogs:
+    - error
+    - general
+    - slow
+    monitor: false # Change this value
+```
 
-   The following examples show how to enable data push by different options.
+### View the dashboard
 
-   ```bash
-   # The default option. You only need to provide an endpoint with no verification.
-   # Endpoint example: http://localhost:8428/api/v1/write
-   kbcli addon enable victoria-metrics-agent --set remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}
-   ```
+Use the `kubeblocks-grafana` addon to view the dashboard.
 
-   ```bash
-   # Basic Auth
-   kbcli addon enable victoria-metrics-agent --set "extraArgs.remoteWrite\.basicAuth\.username=<your username>,extraArgs.remoteWrite\.basicAuth\.password=<your password>,remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}"
-   ```
+```bash
+kbcli dashboard open kubeblocks-grafana
+```
 
-   ```bash
-   # TLS
-   kbcli addon enable victoria-metrics-agent --set "extraArgs.tls=true,extraArgs.tlsCertFile=<path to certifle>,extraArgs.tlsKeyFile=<path to keyfile>,remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}"
-   ```
+### (Optional) Enable remote write
 
-   ```bash
-   # AWS SigV4
-   kbcli addon enable victoria-metrics-agent --set "extraArgs.remoteWrite\.aws\.region=<your AMP region>,extraArgs.remoteWrite\.aws\.accessKey=<your accessKey>,extraArgs.remoteWrite\.aws\.secretKey=<your secretKey>,remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}"
-   ```
+KubeBlocks supports the `victoria-metrics-agent` addon to enable you to remotely write the data to your VM. Compared with the native Prometheus, [vmgent](https://docs.victoriametrics.com/vmagent.html) is lighter and supports the horizontal extension.
 
-2. (Optional) Horizontally scale the `victoria-metrics-agent` add-on.
+Install the `victoria-metrics-agent` addon.
 
-   When the amount of database instances continues to increase, a single-node vmagent becomes the bottleneck. This problem can be solved by scaling vmagent. The multiple-node vmagent automatically divides the task of data collection according to the Hash strategy.
+```bash
+helm install  vm xxx/victoria-metrics-agent --set remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}
+```
 
-   ```bash
-   kbcli addon enable victoria-metrics-agent --replicas <replica count> --set remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}
-   ```
+For detailed settings, you can refer to [Victoria Metrics docs](https://artifacthub.io/packages/helm/victoriametrics/victoria-metrics-agent).
 
-3. (Optional) Disable the `victoria-metrics-agent` add-on.
+## For the production environment
 
-   ```bash
-   kbcli addon disable victoria-metrics-agent
-   ```
+### Integrate monitoring tools
 
-### Integrate Dashboard and Alert Rules
+For the production environment, it is highly recommended to build your monitoring system or purchase a third-party monitoring service. You can follow the docs of monitoring tools to integrate the tools with KubeBlocks.
 
-Kubeblocks provides Grafana Dashboards and Prometheus AlertRules for mainstream engines, which you can obtain from [the repository](https://github.com/apecloud/kubeblocks-mixin), or convert and customize according to your needs.
+### Enable the monitoring function for a database
 
-For the importing method, refer to the tutorials of your third-party monitoring service.
+The open-source or customized Exporter is injected after the monitoring function is enabled. This Exporter can be found by the Prometheus server automatically and scrape monitoring indicators at regular intervals.
 
-## Enable the monitoring function for a database
+If you disable the monitoring function when creating a cluster, run the command below to enable it.
 
-The monitoring function is enabled by default when a database is created. The open-source or customized Exporter is injected after the monitoring function is enabled. This Exporter can be found by Prometheus server automatically and scrape monitoring indicators at regular intervals. You can change mysql as `postgresql`, `mongodb`, `redis` to create a cluster of other database engines.
+```bash
+kubectl patch cluster mycluster -n demo --type "json" -p '[{"op":"add","path":"/spec/componentSpecs/0/monitor","value":true}]'
+```
 
-* For a new cluster, run the command below to create a database cluster.
+If you want to disable the monitoring function, run the command below to disable it.
 
-    ```bash
-    # Search the cluster definition
-    kbcli clusterdefinition list 
+```bash
+k patch cluster clusterName -n namespace --type "json" -p '[{"op":"add","path":"/spec/componentSpecs/0/monitor","value":false}]'
+```
 
-    # Create a cluster
-    kbcli cluster create mysql <clustername> 
-    ```
+You can also edit the `cluster.yaml` to enable/disable the monitoring function.
 
- :::note
+```bash
+kubectl edit cluster mycluster -n demo
+......
+componentSpecs:
+  - name: mysql
+    componentDefRef: mysql
+    enabledLogs:
+    - error
+    - general
+    - slow
+    monitor: false # Change this value
+```
 
- You can change `--monitoring-interval` as `0` to disable the monitoring function but it is not recommended.
-
- ```bash
- kbcli cluster create mysql mycluster --monitoring-interval=0
- ```
-
- :::
-
-* For the existing cluster with the monitoring function disabled, you can update it to enable the monitor function by the `update` command.
-
-    ```bash
-    kbcli cluster update mycluster --monitoring-interval=15s
-    ```
+### View the dashboard
 
 You can view the dashboard of the corresponding cluster via Grafana Web Console. For more detailed information, see the [Grafana dashboard documentation](https://grafana.com/docs/grafana/latest/dashboards/).
+
+### (Optional) Enable remote write
+
+KubeBlocks supports the `victoria-metrics-agent` addon to enable you to remotely write the data to your VM. Compared with the native Prometheus, [vmgent](https://docs.victoriametrics.com/vmagent.html) is lighter and supports the horizontal extension.
+
+Install the `victoria-metrics-agent` addon.
+
+```bash
+helm install  vm xxx/victoria-metrics-agent --set remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}
+```
+
+For detailed settings, you can refer to [Victoria Metrics docs](https://artifacthub.io/packages/helm/victoriametrics/victoria-metrics-agent).

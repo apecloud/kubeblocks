@@ -6,6 +6,9 @@ sidebar_position: 3
 sidebar_label: Install KubeBlocks
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Install KubeBlocks 
 
 KubeBlocks is kubernetes-native, you can use Helm or kubectl with yaml file to install it.
@@ -15,7 +18,6 @@ If you install KubeBlocks with Helm, to uninstall it, you have to use Helm too.
 
 Make sure you have [kubectl](https://kubernetes.io/docs/tasks/tools/) and [Helm](https://helm.sh/docs/intro/install/) installed.
 :::
-
 
 ## Environment preparation
 
@@ -50,8 +52,6 @@ Make sure you have [kubectl](https://kubernetes.io/docs/tasks/tools/) and [Helm]
 
 <Tabs>
 <TabItem value="Helm" label="Install with Helm" default>
-
-### Install with Helm
 
 Use Helm and follow the steps below to install KubeBlocks.
 
@@ -97,10 +97,7 @@ Use Helm and follow the steps below to install KubeBlocks.
 </TabItem>
 <TabItem value="kubectl" label="Install with kubectl" default>
 
-### Install with `kubectl`
-
 KubeBlocks can be installed like any other resource in Kubernetes, through a YAML manifest applied via `kubectl`.
-
 
 Run the following command to install the latest operator manifest for this minor release:
 
@@ -110,7 +107,6 @@ Run the following command to install the latest operator manifest for this minor
 
 </TabItem>
 </Tabs>
-
 
 ## Verify KubeBlocks installation
 

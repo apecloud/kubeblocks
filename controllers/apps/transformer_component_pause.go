@@ -111,10 +111,8 @@ func (t *componentPauseTransformer) getInstanceSet(transCtx *componentTransformC
 
 func (t *componentPauseTransformer) listConfigMaps(transCtx *componentTransformContext, component *appsv1alpha1.Component) (*corev1.ConfigMapList, error) {
 	cmList := &corev1.ConfigMapList{}
-	ml := map[string]string{
-		constant.AppManagedByLabelKey:   constant.AppName,
-		constant.KBAppComponentLabelKey: component.Name,
-	}
+	ml := constant.GetComponentWellKnownLabels(component.Labels[constant.AppInstanceLabelKey], component.Labels[constant.KBAppComponentLabelKey])
+
 	listOpts := []client.ListOption{
 		client.InNamespace(component.Namespace),
 		client.MatchingLabels(ml),

@@ -540,7 +540,7 @@ func getPodSetForComponent(
 	insTplReplicasCnt := int32(0)
 	// get the pods created by insTemplate
 	for _, ins := range instances {
-		insReplicas := intctrlutil.TemplateReplicas(ins)
+		insReplicas := ins.GetReplicas()
 		insTplReplicasCnt += insReplicas
 		templatePodNames := instanceset.GenerateInstanceNamesFromTemplate(workloadName, ins.Name, insReplicas, offlineInstances)
 		for _, podName := range templatePodNames {

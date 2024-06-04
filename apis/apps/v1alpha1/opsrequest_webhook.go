@@ -446,16 +446,12 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 	if hScale.Replicas != nil && (hScale.ScaleIn != nil || hScale.ScaleOut != nil) {
 		return fmt.Errorf(`"replicas" has been deprecated and cannot be used with "scaleOut" and "scaleIn"`)
 	}
-	if hScale.ScaleIn == nil && hScale.ScaleOut == nil {
+	if hScale.Replicas != nil {
 		return nil
 	}
 	compInsTplMap := map[string]int32{}
 	for _, v := range compSpec.Instances {
-		if v.Replicas == nil {
-			compInsTplMap[v.Name] = 1
-		} else {
-			compInsTplMap[v.Name] = *v.Replicas
-		}
+		compInsTplMap[v.Name] = v.GetReplicas()
 	}
 	checkInstances := func(compReplicaChanges int32, instances []InstanceReplicasTemplate, newInstances []InstanceTemplate, isScaleIn bool) (map[string]int32, error) {
 		msgPrefix := "ScaleIn:"
@@ -482,11 +478,7 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 				if _, ok := compInsTplMap[insTpl.Name]; ok {
 					return nil, fmt.Errorf(`new instance template "%s" already exists in component "%s"`, insTpl.Name, componentName)
 				}
-				if insTpl.Replicas == nil {
-					allInsReplicaChanges += 1
-				} else {
-					allInsReplicaChanges += *insTpl.Replicas
-				}
+				allInsReplicaChanges += insTpl.GetReplicas()
 			}
 		}
 		if allInsReplicaChanges > compReplicaChanges {
@@ -524,11 +516,9 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 	}
 
 	if hScale.ScaleIn != nil {
-		insTplMap, err := checkInstances(hScale.ScaleIn.ReplicaChanges, hScale.ScaleIn.Instances, nil, true)
-		if err != nil {
+		if insTplMap, err := checkInstances(hScale.ScaleIn.ReplicaChanges, hScale.ScaleIn.Instances, nil, true); err != nil {
 			return err
-		}
-		if len(hScale.ScaleIn.OnlineInstancesToOffline) > 0 {
+		} else if len(hScale.ScaleIn.OnlineInstancesToOffline) > 0 {
 			if err = validateOfflineOrOnlineInstances(hScale.ScaleIn.ReplicaChanges, insTplMap,
 				hScale.ScaleIn.OnlineInstancesToOffline, "offline"); err != nil {
 				return err
@@ -539,21 +529,17 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 		}
 	}
 	if hScale.ScaleOut != nil {
-		insTplMap, err := checkInstances(hScale.ScaleOut.ReplicaChanges, hScale.ScaleOut.Instances, hScale.ScaleOut.NewInstances, false)
-		if err != nil {
+		if insTplMap, err := checkInstances(hScale.ScaleOut.ReplicaChanges, hScale.ScaleOut.Instances, hScale.ScaleOut.NewInstances, false); err != nil {
 			return err
-		}
-		if len(hScale.ScaleOut.OfflineInstancesToOnline) > 0 {
+		} else if len(hScale.ScaleOut.OfflineInstancesToOnline) > 0 {
 			offlineInstanceSet := sets.New(compSpec.OfflineInstances...)
 			for _, offlineInsName := range hScale.ScaleOut.OfflineInstancesToOnline {
 				if _, ok := offlineInstanceSet[offlineInsName]; !ok {
 					return fmt.Errorf(`cannot find the offline instance "%s" in component "%s" for scaleOut operation`, offlineInsName, componentName)
 				}
 			}
-			if err = validateOfflineOrOnlineInstances(hScale.ScaleOut.ReplicaChanges,
-				insTplMap, hScale.ScaleOut.OfflineInstancesToOnline, "online"); err != nil {
-				return err
-			}
+			return validateOfflineOrOnlineInstances(hScale.ScaleOut.ReplicaChanges,
+				insTplMap, hScale.ScaleOut.OfflineInstancesToOnline, "online")
 		}
 	}
 	return nil

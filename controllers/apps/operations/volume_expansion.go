@@ -122,7 +122,7 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 	getTemplateReplicas := func(templates []appsv1alpha1.InstanceTemplate) int32 {
 		var replicaCount int32
 		for _, v := range templates {
-			replicaCount += intctrlutil.TemplateReplicas(v)
+			replicaCount += v.GetReplicas()
 		}
 		return replicaCount
 	}
@@ -152,7 +152,7 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 					veHelpers = append(veHelpers, volumeExpansionHelper{
 						compOps:           compOps,
 						fullComponentName: fullComponentName,
-						expectCount:       int(intctrlutil.TemplateReplicas(ins)),
+						expectCount:       int(ins.GetReplicas()),
 						vctName:           vct.Name,
 					})
 				}

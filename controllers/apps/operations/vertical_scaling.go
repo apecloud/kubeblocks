@@ -112,7 +112,7 @@ func (vs verticalScalingHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, 
 			workloadName := constant.GenerateWorkloadNamePattern(opsRes.Cluster.Name, pgRes.fullComponentName)
 			templateReplicasCnt := int32(0)
 			for _, template := range pgRes.clusterComponent.Instances {
-				replicas := intctrlutil.TemplateReplicas(template)
+				replicas := template.GetReplicas()
 				insMap[template.Name] = replicas
 				templateReplicasCnt += replicas
 			}

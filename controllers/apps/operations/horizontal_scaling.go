@@ -100,7 +100,7 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 			lastCompConfiguration, horizontalScaling)
 		var insReplicas int32
 		for _, v := range instances {
-			insReplicas += intctrlutil.TemplateReplicas(v)
+			insReplicas += v.GetReplicas()
 		}
 		if insReplicas > replicas {
 			errMsg := fmt.Sprintf(`the total number of replicas of the instance template can not greater than the number of replicas of component "%s" after horizontally scaling`,
@@ -266,9 +266,9 @@ func (hs horizontalScalingOpsHandler) getCompExpectedInstances(
 				continue
 			}
 			if isScaleIn {
-				compInstanceTpls[compInsIndex].Replicas = pointer.Int32(intctrlutil.TemplateReplicas(compInstanceTpls[compInsIndex]) - v.ReplicaChanges)
+				compInstanceTpls[compInsIndex].Replicas = pointer.Int32(compInstanceTpls[compInsIndex].GetReplicas() - v.ReplicaChanges)
 			} else {
-				compInstanceTpls[compInsIndex].Replicas = pointer.Int32(intctrlutil.TemplateReplicas(compInstanceTpls[compInsIndex]) + v.ReplicaChanges)
+				compInstanceTpls[compInsIndex].Replicas = pointer.Int32(compInstanceTpls[compInsIndex].GetReplicas() + v.ReplicaChanges)
 			}
 		}
 	}

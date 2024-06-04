@@ -84,7 +84,7 @@ func (stop StopOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		compSpec.Replicas = expectReplicas
 		for i := range compSpec.Instances {
 			compKey = getComponentKeyForStartSnapshot(componentName, compSpec.Instances[i].Name)
-			componentReplicasMap[compKey] = intctrlutil.TemplateReplicas(compSpec.Instances[i])
+			componentReplicasMap[compKey] = compSpec.Instances[i].GetReplicas()
 			compSpec.Instances[i].Replicas = &expectReplicas
 		}
 	}

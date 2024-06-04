@@ -1651,8 +1651,11 @@ func (t *InstanceTemplate) GetName() string {
 	return t.Name
 }
 
-func (t *InstanceTemplate) GetReplicas() *int32 {
-	return t.Replicas
+func (t *InstanceTemplate) GetReplicas() int32 {
+	if t.Replicas != nil {
+		return *t.Replicas
+	}
+	return 1
 }
 
 // GetClusterUpRunningPhases returns Cluster running or partially running phases.

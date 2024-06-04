@@ -425,7 +425,7 @@ func httpRequest(ctx context.Context) (*http.Request, error) {
 	return req, nil
 }
 
-func kubeletEndpointHost(ctx context.Context) (string, error) {
+func kubeletEndpointHost(_ context.Context) (string, error) {
 	return viper.GetString(constant.KBEnvHostIP), nil
 }
 

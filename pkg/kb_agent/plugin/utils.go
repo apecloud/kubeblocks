@@ -23,8 +23,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/spf13/viper"
+
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 func ParseEndpoint(ep string) (string, string, error) {

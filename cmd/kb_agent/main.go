@@ -79,7 +79,7 @@ func main() {
 	}
 
 	// start HTTP Server
-	ops := opsregister.Operations()
+	ops := opsregister.Actions()
 	httpServer := httpserver.NewServer(ops)
 	err = httpServer.StartNonBlocking()
 	if err != nil {

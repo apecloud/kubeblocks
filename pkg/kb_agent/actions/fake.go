@@ -34,15 +34,15 @@ const (
 	FakeDefault    FakeFuncType = "fake-default"
 )
 
-type FakeOperations struct {
+type FakeAction struct {
 	InitFunc       func(ctx context.Context) error
 	IsReadOnlyFunc func(ctx context.Context) bool
 	PreCheckFunc   func(ctx context.Context, request *OpsRequest) error
 	DoFunc         func(ctx context.Context, request *OpsRequest) (*OpsResponse, error)
 }
 
-func NewFakeOperations(funcType FakeFuncType, fakeFunc interface{}) *FakeOperations {
-	op := &FakeOperations{
+func NewFakeAction(funcType FakeFuncType, fakeFunc interface{}) *FakeAction {
+	op := &FakeAction{
 		InitFunc: func(ctx context.Context) error {
 			return nil
 		},
@@ -70,21 +70,21 @@ func NewFakeOperations(funcType FakeFuncType, fakeFunc interface{}) *FakeOperati
 	return op
 }
 
-func (f *FakeOperations) Init(ctx context.Context) error {
+func (f *FakeAction) Init(ctx context.Context) error {
 	return f.InitFunc(ctx)
 }
 
-func (f *FakeOperations) SetTimeout(timeout time.Duration) {
+func (f *FakeAction) SetTimeout(timeout time.Duration) {
 }
 
-func (f *FakeOperations) IsReadonly(ctx context.Context) bool {
+func (f *FakeAction) IsReadonly(ctx context.Context) bool {
 	return f.IsReadOnlyFunc(ctx)
 }
 
-func (f *FakeOperations) PreCheck(ctx context.Context, request *OpsRequest) error {
+func (f *FakeAction) PreCheck(ctx context.Context, request *OpsRequest) error {
 	return f.PreCheckFunc(ctx, request)
 }
 
-func (f *FakeOperations) Do(ctx context.Context, request *OpsRequest) (*OpsResponse, error) {
+func (f *FakeAction) Do(ctx context.Context, request *OpsRequest) (*OpsResponse, error) {
 	return f.DoFunc(ctx, request)
 }

@@ -29,10 +29,10 @@ import (
 	fasthttprouter "github.com/fasthttp/router"
 	"github.com/valyala/fasthttp"
 
-	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
 )
 
-// Server is an interface for the Lorry HTTP server.
+// Server is an interface for the kb-agent HTTP server.
 type Server interface {
 	io.Closer
 	Router() fasthttp.RequestHandler
@@ -46,7 +46,7 @@ type server struct {
 }
 
 // NewServer returns a new HTTP server.
-func NewServer(ops map[string]operations.Operation) Server {
+func NewServer(ops map[string]actions.Action) Server {
 	a := &api{}
 	a.RegisterOperations(ops)
 	return &server{
@@ -67,7 +67,7 @@ func (s *server) StartNonBlocking() error {
 
 	var listeners []net.Listener
 	if s.config.UnixDomainSocket != "" {
-		socket := fmt.Sprintf("%s/lorry.socket", s.config.UnixDomainSocket)
+		socket := fmt.Sprintf("%s/kb_agent.socket", s.config.UnixDomainSocket)
 		l, err := net.Listen("unix", socket)
 		if err != nil {
 			return err

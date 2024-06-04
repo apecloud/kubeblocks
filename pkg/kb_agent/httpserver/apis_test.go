@@ -26,19 +26,19 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
 )
 
 func TestRegisterOperations(t *testing.T) {
 	fakeAPI := &api{}
-	fakeOps := map[string]operations.Operation{
-		"fake-1": operations.NewFakeOperations(operations.FakeInit, func(ctx context.Context) error {
+	fakeOps := map[string]actions.Action{
+		"fake-1": actions.NewFakeAction(actions.FakeInit, func(ctx context.Context) error {
 			return fmt.Errorf("some error")
 		}),
-		"fake-2": operations.NewFakeOperations(operations.FakeIsReadOnly, func(ctx context.Context) bool {
+		"fake-2": actions.NewFakeAction(actions.FakeIsReadOnly, func(ctx context.Context) bool {
 			return true
 		}),
-		"fake-3": operations.NewFakeOperations(operations.FakeDefault, nil),
+		"fake-3": actions.NewFakeAction(actions.FakeDefault, nil),
 	}
 
 	fakeAPI.RegisterOperations(fakeOps)

@@ -27,9 +27,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/valyala/fasthttp"
 
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
-	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
-	"github.com/apecloud/kubeblocks/pkg/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers/models"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
 const (
@@ -41,7 +41,7 @@ type option = func(ctx *fasthttp.RequestCtx)
 
 type OperationAPI interface {
 	Endpoints() []Endpoint
-	RegisterOperations(map[string]operations.Operation)
+	RegisterOperations(map[string]actions.Action)
 }
 
 type api struct {
@@ -53,7 +53,7 @@ func (a *api) Endpoints() []Endpoint {
 	return a.endpoints
 }
 
-func (a *api) RegisterOperations(ops map[string]operations.Operation) {
+func (a *api) RegisterOperations(ops map[string]actions.Action) {
 	endpoints := make([]Endpoint, 0, len(ops))
 
 	for key, op := range ops {
@@ -82,7 +82,7 @@ func (a *api) RegisterOperations(ops map[string]operations.Operation) {
 	a.ready = true
 }
 
-func OperationWrapper(op operations.Operation) fasthttp.RequestHandler {
+func OperationWrapper(op actions.Action) fasthttp.RequestHandler {
 	return func(reqCtx *fasthttp.RequestCtx) {
 		ctx := context.Background()
 		body := reqCtx.PostBody()
@@ -104,7 +104,7 @@ func OperationWrapper(op operations.Operation) fasthttp.RequestHandler {
 			logger.Info("marshal request data field", "error", err.Error())
 			return
 		}
-		opsReq := &operations.OpsRequest{
+		opsReq := &actions.OpsRequest{
 			Parameters: req.Parameters,
 			Data:       b,
 		}

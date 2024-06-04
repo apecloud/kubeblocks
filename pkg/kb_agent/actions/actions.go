@@ -47,7 +47,7 @@ func (r *ActionRegister) Register(name string, action Action) error {
 	return nil
 }
 
-func (r *ActionRegister) Operations() map[string]Action {
+func (r *ActionRegister) Actions() map[string]Action {
 	return r.actions
 }
 
@@ -55,6 +55,6 @@ func Register(name string, action Action) error {
 	return register.Register(name, action)
 }
 
-func Operations() map[string]Action {
-	return register.Operations()
+func Actions() map[string]Action {
+	return register.Actions()
 }

@@ -20,18 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package register
 
 import (
-	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
-	_ "github.com/apecloud/kubeblocks/pkg/lorry/operations/component"
-	_ "github.com/apecloud/kubeblocks/pkg/lorry/operations/replica"
-	_ "github.com/apecloud/kubeblocks/pkg/lorry/operations/sql"
-	_ "github.com/apecloud/kubeblocks/pkg/lorry/operations/user"
-	_ "github.com/apecloud/kubeblocks/pkg/lorry/operations/volume"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
+	_ "github.com/apecloud/kubeblocks/pkg/kb_agent/actions/component"
+	_ "github.com/apecloud/kubeblocks/pkg/kb_agent/actions/replica"
+	_ "github.com/apecloud/kubeblocks/pkg/kb_agent/actions/user"
+	_ "github.com/apecloud/kubeblocks/pkg/kb_agent/actions/volume"
 )
 
-func Register(name string, op operations.Operation) error {
-	return operations.Register(name, op)
+func Register(name string, op actions.Action) error {
+	return actions.Register(name, op)
 }
 
-func Operations() map[string]operations.Operation {
-	return operations.Operations()
+func Actions() map[string]actions.Action {
+	return actions.Actions()
 }

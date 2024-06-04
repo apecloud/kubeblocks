@@ -22,7 +22,7 @@ package plugin.v1;
 
 import "google/protobuf/descriptor.proto";
 
-option go_package = "github.com/apecloud/kubeblocks/pkg/lorry/plugin";
+option go_package = "github.com/apecloud/kubeblocks/pkg/kb-agent/plugin";
 
 extend google.protobuf.FieldOptions {
   // Indicates that a field MAY contain information that is sensitive

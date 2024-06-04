@@ -28,28 +28,28 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/valyala/fasthttp"
 
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
-	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
-	"github.com/apecloud/kubeblocks/pkg/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers/models"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
 func mockServer(t *testing.T) *server {
-	fakeOps := map[string]operations.Operation{
-		"fake-1": operations.NewFakeOperations(operations.FakeDefault, nil),
-		"fake-2": operations.NewFakeOperations(operations.FakePreCheck, func(ctx context.Context, request *operations.OpsRequest) error {
+	fakeOps := map[string]actions.Action{
+		"fake-1": actions.NewFakeAction(actions.FakeDefault, nil),
+		"fake-2": actions.NewFakeAction(actions.FakePreCheck, func(ctx context.Context, request *actions.OpsRequest) error {
 			return fmt.Errorf("fake pre check error")
 		}),
-		"fake-3": operations.NewFakeOperations(operations.FakeDo, func(ctx context.Context, request *operations.OpsRequest) (*operations.OpsResponse, error) {
+		"fake-3": actions.NewFakeAction(actions.FakeDo, func(ctx context.Context, request *actions.OpsRequest) (*actions.OpsResponse, error) {
 			return nil, models.ErrNotImplemented
 		}),
-		"fake-4": operations.NewFakeOperations(operations.FakeDo, func(ctx context.Context, request *operations.OpsRequest) (*operations.OpsResponse, error) {
+		"fake-4": actions.NewFakeAction(actions.FakeDo, func(ctx context.Context, request *actions.OpsRequest) (*actions.OpsResponse, error) {
 			return nil, util.NewProbeError("fake probe error")
 		}),
-		"fake-5": operations.NewFakeOperations(operations.FakeDo, func(ctx context.Context, request *operations.OpsRequest) (*operations.OpsResponse, error) {
+		"fake-5": actions.NewFakeAction(actions.FakeDo, func(ctx context.Context, request *actions.OpsRequest) (*actions.OpsResponse, error) {
 			return nil, fmt.Errorf("fake do error")
 		}),
-		"fake-6": operations.NewFakeOperations(operations.FakeDo, func(ctx context.Context, request *operations.OpsRequest) (*operations.OpsResponse, error) {
-			return &operations.OpsResponse{
+		"fake-6": actions.NewFakeAction(actions.FakeDo, func(ctx context.Context, request *actions.OpsRequest) (*actions.OpsResponse, error) {
+			return &actions.OpsResponse{
 				Data: map[string]any{
 					"data": request.Data,
 				},

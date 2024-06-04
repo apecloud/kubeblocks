@@ -38,7 +38,7 @@ type Job struct {
 }
 
 func NewJob(name string, settings map[string]string) (*Job, error) {
-	actions := actions.Operations()
+	actions := actions.Actions()
 	ops, ok := actions[name]
 	if !ok {
 		logger.Info("Operation not found", "name", name)

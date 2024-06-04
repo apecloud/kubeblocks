@@ -501,7 +501,7 @@ var _ = Describe("OpsRequest webhook", func() {
 			},
 		}}
 		Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).Should(ContainSubstring(
-			fmt.Sprintf(`the length of "offlineInstancesToOnline" or "onlineInstancesToOffline" can't be greater than the "replicaChanges" for the component`)))
+			`the length of "offlineInstancesToOnline" or "onlineInstancesToOffline" can't be greater than the "replicaChanges" for the component`))
 
 		By("expect an error when an instance that is not in the offline instances list for online operation")
 		opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{{

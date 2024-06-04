@@ -511,7 +511,7 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 				return fmt.Errorf(`"replicaChanges" of the instance temaplte "%s" were not specified when %s instance "%s"`,
 					insTplName, operationKey, insName)
 			}
-			hScaleInsMap[insTplName] = hScaleInsMap[insTplName] + 1
+			hScaleInsMap[insTplName]++
 		}
 		// check if replicaChanges of specified instance template is greater than the count of offline/online instances.
 		for insTplName, replicas := range hScaleInsMap {

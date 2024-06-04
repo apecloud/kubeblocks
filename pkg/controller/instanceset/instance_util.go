@@ -597,14 +597,12 @@ func buildInstanceTemplateExt(template workloads.InstanceTemplate, templateExt *
 		replicas = *template.Replicas
 	}
 	templateExt.Replicas = replicas
-	if template.SchedulingPolicy != nil && template.SchedulingPolicy.NodeName != "" {
-		templateExt.Spec.NodeName = template.SchedulingPolicy.NodeName
+	if template.NodeName != nil {
+		templateExt.Spec.NodeName = *template.NodeName
 	}
 	mergeMap(&template.Annotations, &templateExt.Annotations)
 	mergeMap(&template.Labels, &templateExt.Labels)
-	if template.SchedulingPolicy != nil {
-		mergeMap(&template.SchedulingPolicy.NodeSelector, &templateExt.Spec.NodeSelector)
-	}
+	mergeMap(&template.NodeSelector, &templateExt.Spec.NodeSelector)
 	if len(templateExt.Spec.Containers) > 0 {
 		if template.Image != nil {
 			templateExt.Spec.Containers[0].Image = *template.Image
@@ -624,23 +622,12 @@ func buildInstanceTemplateExt(template workloads.InstanceTemplate, templateExt *
 				})
 		}
 	}
-
-	if template.SchedulingPolicy != nil {
-		intctrlutil.MergeList(&template.SchedulingPolicy.Tolerations, &templateExt.Spec.Tolerations,
-			func(item corev1.Toleration) func(corev1.Toleration) bool {
-				return func(t corev1.Toleration) bool {
-					return reflect.DeepEqual(item, t)
-				}
-			})
-		intctrlutil.MergeList(&template.SchedulingPolicy.TopologySpreadConstraints, &templateExt.Spec.TopologySpreadConstraints,
-			func(item corev1.TopologySpreadConstraint) func(corev1.TopologySpreadConstraint) bool {
-				return func(t corev1.TopologySpreadConstraint) bool {
-					return reflect.DeepEqual(item, t)
-				}
-			})
-		mergeAffinity(&template.SchedulingPolicy.Affinity, &templateExt.Spec.Affinity)
-	}
-
+	intctrlutil.MergeList(&template.Tolerations, &templateExt.Spec.Tolerations,
+		func(item corev1.Toleration) func(corev1.Toleration) bool {
+			return func(t corev1.Toleration) bool {
+				return reflect.DeepEqual(item, t)
+			}
+		})
 	intctrlutil.MergeList(&template.Volumes, &templateExt.Spec.Volumes,
 		func(item corev1.Volume) func(corev1.Volume) bool {
 			return func(v corev1.Volume) bool {
@@ -673,106 +660,6 @@ func mergeCPUNMemory(s, d *corev1.ResourceList) {
 			(*d)[k] = v
 		}
 	}
-}
-
-// TODO: merge with existing mergeAffinity function which locates at pkg/controller/scheduling/scheduling_utils.go
-func mergeAffinity(affinity1Ptr, affinity2Ptr **corev1.Affinity) {
-	if affinity1Ptr == nil || *affinity1Ptr == nil {
-		return
-	}
-	if *affinity2Ptr == nil {
-		*affinity2Ptr = &corev1.Affinity{}
-	}
-	affinity1 := *affinity1Ptr
-	affinity2 := *affinity2Ptr
-
-	// Merge PodAffinity
-	mergePodAffinity(&affinity1.PodAffinity, &affinity2.PodAffinity)
-
-	// Merge PodAntiAffinity
-	mergePodAntiAffinity(&affinity1.PodAntiAffinity, &affinity2.PodAntiAffinity)
-
-	// Merge NodeAffinity
-	mergeNodeAffinity(&affinity1.NodeAffinity, &affinity2.NodeAffinity)
-}
-
-func mergePodAffinity(podAffinity1Ptr, podAffinity2Ptr **corev1.PodAffinity) {
-	if podAffinity1Ptr == nil || *podAffinity1Ptr == nil {
-		return
-	}
-	if *podAffinity2Ptr == nil {
-		*podAffinity2Ptr = &corev1.PodAffinity{}
-	}
-	podAffinity1 := *podAffinity1Ptr
-	podAffinity2 := *podAffinity2Ptr
-
-	intctrlutil.MergeList(&podAffinity1.RequiredDuringSchedulingIgnoredDuringExecution, &podAffinity2.RequiredDuringSchedulingIgnoredDuringExecution,
-		func(item corev1.PodAffinityTerm) func(corev1.PodAffinityTerm) bool {
-			return func(t corev1.PodAffinityTerm) bool {
-				return reflect.DeepEqual(item, t)
-			}
-		})
-	intctrlutil.MergeList(&podAffinity1.PreferredDuringSchedulingIgnoredDuringExecution, &podAffinity2.PreferredDuringSchedulingIgnoredDuringExecution,
-		func(item corev1.WeightedPodAffinityTerm) func(corev1.WeightedPodAffinityTerm) bool {
-			return func(t corev1.WeightedPodAffinityTerm) bool {
-				return reflect.DeepEqual(item, t)
-			}
-		})
-}
-
-func mergePodAntiAffinity(podAntiAffinity1Ptr, podAntiAffinity2Ptr **corev1.PodAntiAffinity) {
-	if podAntiAffinity1Ptr == nil || *podAntiAffinity1Ptr == nil {
-		return
-	}
-	if *podAntiAffinity2Ptr == nil {
-		*podAntiAffinity2Ptr = &corev1.PodAntiAffinity{}
-	}
-	podAntiAffinity1 := *podAntiAffinity1Ptr
-	podAntiAffinity2 := *podAntiAffinity2Ptr
-
-	intctrlutil.MergeList(&podAntiAffinity1.RequiredDuringSchedulingIgnoredDuringExecution, &podAntiAffinity2.RequiredDuringSchedulingIgnoredDuringExecution,
-		func(item corev1.PodAffinityTerm) func(corev1.PodAffinityTerm) bool {
-			return func(t corev1.PodAffinityTerm) bool {
-				return reflect.DeepEqual(item, t)
-			}
-		})
-	intctrlutil.MergeList(&podAntiAffinity1.PreferredDuringSchedulingIgnoredDuringExecution, &podAntiAffinity2.PreferredDuringSchedulingIgnoredDuringExecution,
-		func(item corev1.WeightedPodAffinityTerm) func(corev1.WeightedPodAffinityTerm) bool {
-			return func(t corev1.WeightedPodAffinityTerm) bool {
-				return reflect.DeepEqual(item, t)
-			}
-		})
-}
-
-func mergeNodeAffinity(nodeAffinity1Ptr, nodeAffinity2Ptr **corev1.NodeAffinity) {
-	if nodeAffinity1Ptr == nil || *nodeAffinity1Ptr == nil {
-		return
-	}
-	if *nodeAffinity2Ptr == nil {
-		*nodeAffinity2Ptr = &corev1.NodeAffinity{}
-	}
-	nodeAffinity1 := *nodeAffinity1Ptr
-	nodeAffinity2 := *nodeAffinity2Ptr
-
-	if nodeAffinity1.RequiredDuringSchedulingIgnoredDuringExecution != nil {
-		if nodeAffinity2.RequiredDuringSchedulingIgnoredDuringExecution == nil {
-			nodeAffinity2.RequiredDuringSchedulingIgnoredDuringExecution = &corev1.NodeSelector{}
-		}
-		intctrlutil.MergeList(&nodeAffinity1.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms,
-			&nodeAffinity2.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms,
-			func(item corev1.NodeSelectorTerm) func(corev1.NodeSelectorTerm) bool {
-				return func(t corev1.NodeSelectorTerm) bool {
-					return reflect.DeepEqual(item, t)
-				}
-			})
-	}
-	intctrlutil.MergeList(&nodeAffinity1.PreferredDuringSchedulingIgnoredDuringExecution,
-		&nodeAffinity2.PreferredDuringSchedulingIgnoredDuringExecution,
-		func(item corev1.PreferredSchedulingTerm) func(corev1.PreferredSchedulingTerm) bool {
-			return func(t corev1.PreferredSchedulingTerm) bool {
-				return reflect.DeepEqual(item, t)
-			}
-		})
 }
 
 func buildInstanceSetExt(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) (*instanceSetExt, error) {

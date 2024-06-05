@@ -383,7 +383,7 @@ func BuildConfigMapWithTemplate(cluster *appsv1alpha1.Cluster,
 		GetObject()
 }
 
-func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams, component *component.SynthesizedComponent) (*corev1.Container, error) {
+func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams) (*corev1.Container, error) {
 	var env []corev1.EnvVar
 	env = append(env, corev1.EnvVar{
 		Name: "CONFIG_MANAGER_POD_IP",
@@ -432,6 +432,11 @@ func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams,
 		AddArgs(getSidecarBinaryPath(sidecarRenderedParam)).
 		AddArgs(sidecarRenderedParam.Args...).
 		AddEnv(env...).
+		AddPorts(corev1.ContainerPort{
+			Name:          constant.ConfigManagerPortName,
+			ContainerPort: sidecarRenderedParam.ContainerPort,
+			Protocol:      "TCP",
+		}).
 		SetImage(sidecarRenderedParam.Image).
 		SetImagePullPolicy(corev1.PullIfNotPresent).
 		AddVolumeMounts(sidecarRenderedParam.Volumes...)

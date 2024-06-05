@@ -215,7 +215,7 @@ func (u upgradeOpsHandler) getComponentDefMapWithUpdatedImages(reqCtx intctrluti
 			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`"can not found the component "%s" in the cluster "%s"`,
 				v.ComponentName, opsRes.Cluster.Name))
 		}
-		compDef, err := component.GetCompDefByName(reqCtx, cli, compSpec.ComponentDef)
+		compDef, err := component.GetCompDefByName(reqCtx.Ctx, cli, compSpec.ComponentDef)
 		if err != nil {
 			return nil, err
 		}

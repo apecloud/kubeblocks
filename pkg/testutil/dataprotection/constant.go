@@ -31,7 +31,6 @@ const (
 	VSBackupMethodName = "volume-snapshot"
 	BackupPathPrefix   = "/backup"
 	ActionSetName      = "xtrabackup"
-	VSActionSetName    = "volume-snapshot"
 
 	DataVolumeName      = "data"
 	DataVolumeMountPath = "/data"

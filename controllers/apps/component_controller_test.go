@@ -70,7 +70,6 @@ const (
 	backupMethodName    = "test-backup-method"
 	vsBackupMethodName  = "test-vs-backup-method"
 	actionSetName       = "test-action-set"
-	vsActionSetName     = "test-vs-action-set"
 )
 
 var (
@@ -712,47 +711,7 @@ var _ = Describe("Component Controller", func() {
 
 					if policyType == appsv1alpha1.HScaleDataClonePolicyCloneVolume {
 						By("creating actionSet if backup policy is backup")
-						actionSet := &dpv1alpha1.ActionSet{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      actionSetName,
-								Namespace: clusterKey.Namespace,
-								Labels: map[string]string{
-									constant.ClusterDefLabelKey: clusterDef.Name,
-								},
-							},
-							Spec: dpv1alpha1.ActionSetSpec{
-								Env: []corev1.EnvVar{
-									{
-										Name:  "test-name",
-										Value: "test-value",
-									},
-								},
-								BackupType: dpv1alpha1.BackupTypeFull,
-								Backup: &dpv1alpha1.BackupActionSpec{
-									BackupData: &dpv1alpha1.BackupDataActionSpec{
-										JobActionSpec: dpv1alpha1.JobActionSpec{
-											BaseJobActionSpec: dpv1alpha1.BaseJobActionSpec{
-												Image:   "xtrabackup",
-												Command: []string{""},
-											},
-										},
-									},
-								},
-								Restore: &dpv1alpha1.RestoreActionSpec{
-									PrepareData: &dpv1alpha1.JobActionSpec{
-										BaseJobActionSpec: dpv1alpha1.BaseJobActionSpec{
-											Image: "xtrabackup",
-											Command: []string{
-												"sh",
-												"-c",
-												"/backup_scripts.sh",
-											},
-										},
-									},
-								},
-							},
-						}
-						testapps.CheckedCreateK8sResource(&testCtx, actionSet)
+						fakeActionSet(clusterDef.Name)
 					}
 				}
 			})()).ShouldNot(HaveOccurred())
@@ -857,12 +816,13 @@ var _ = Describe("Component Controller", func() {
 					Spec: pvcSpec.ToV1PersistentVolumeClaimSpec(),
 				}
 				Expect(testCtx.CreateObj(testCtx.Ctx, pvc)).Should(Succeed())
+				patch := client.MergeFrom(pvc.DeepCopy())
 				pvc.Status.Phase = corev1.ClaimBound // only bound pvc allows resize
 				if pvc.Status.Capacity == nil {
 					pvc.Status.Capacity = corev1.ResourceList{}
 				}
 				pvc.Status.Capacity[corev1.ResourceStorage] = volumeQuantity
-				Expect(k8sClient.Status().Update(testCtx.Ctx, pvc)).Should(Succeed())
+				Expect(k8sClient.Status().Patch(testCtx.Ctx, pvc, patch)).Should(Succeed())
 			}
 		}
 
@@ -1148,6 +1108,55 @@ var _ = Describe("Component Controller", func() {
 			g.Expect(cond.Status).Should(BeEquivalentTo(metav1.ConditionTrue))
 			g.Expect(cond.Message).ShouldNot(ContainSubstring("root"))
 			g.Expect(cond.Message).Should(ContainSubstring("admin"))
+		})).Should(Succeed())
+	}
+
+	testCompSystemAccountOverride := func(compName, compDefName string) {
+		passwordConfig := &appsv1alpha1.PasswordConfig{
+			Length: 29,
+		}
+		secret := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      "sysaccount-override",
+			},
+			StringData: map[string]string{
+				constant.AccountPasswdForSecret: "sysaccount-override",
+			},
+		}
+		secretRef := func() *appsv1alpha1.ProvisionSecretRef {
+			Expect(testCtx.CreateObj(testCtx.Ctx, &secret)).Should(Succeed())
+			return &appsv1alpha1.ProvisionSecretRef{
+				Name:      secret.Name,
+				Namespace: testCtx.DefaultNamespace,
+			}
+		}
+
+		createClusterObjV2(compName, compDefObj.Name, func(f *testapps.MockClusterFactory) {
+			f.AddSystemAccount("root", passwordConfig, nil).
+				AddSystemAccount("admin", nil, secretRef()).
+				AddSystemAccount("not-exist", nil, nil)
+		})
+
+		By("check root account")
+		rootSecretKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      constant.GenerateAccountSecretName(clusterObj.Name, compName, "root"),
+		}
+		Eventually(testapps.CheckObj(&testCtx, rootSecretKey, func(g Gomega, secret *corev1.Secret) {
+			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("root")))
+			g.Expect(secret.Data).Should(HaveKey(constant.AccountPasswdForSecret))
+			g.Expect(secret.Data[constant.AccountPasswdForSecret]).Should(HaveLen(int(passwordConfig.Length)))
+		})).Should(Succeed())
+
+		By("check admin account")
+		adminSecretKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      constant.GenerateAccountSecretName(clusterObj.Name, compName, "admin"),
+		}
+		Eventually(testapps.CheckObj(&testCtx, adminSecretKey, func(g Gomega, secret *corev1.Secret) {
+			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("admin")))
+			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountPasswdForSecret, secret.Data[constant.AccountPasswdForSecret]))
 		})).Should(Succeed())
 	}
 
@@ -2008,7 +2017,7 @@ var _ = Describe("Component Controller", func() {
 		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *appsv1alpha1.Component) {
 			comp.Spec.Replicas += 1
 		})()).Should(Succeed())
-		checkWorkloadGenerationAndToolsImage(Eventually, initWorkloadGeneration+1, 0, 1)
+		checkWorkloadGenerationAndToolsImage(Eventually, initWorkloadGeneration+2, 0, 1)
 	}
 
 	testCompInheritLabelsAndAnnotations := func(compName, compDefName string) {
@@ -2070,6 +2079,10 @@ var _ = Describe("Component Controller", func() {
 
 		It("with component system accounts", func() {
 			testCompSystemAccount(defaultCompName, compDefName)
+		})
+
+		It("with component system accounts - override", func() {
+			testCompSystemAccountOverride(defaultCompName, compDefName)
 		})
 
 		It("with component vars", func() {
@@ -2413,4 +2426,48 @@ func checkRestoreAndSetCompleted(clusterKey types.NamespacedName, compName strin
 
 	By("Mocking restore phase to succeeded")
 	mockRestoreCompleted(ml)
+}
+
+func fakeActionSet(clusterDefName string) *dpv1alpha1.ActionSet {
+	actionSet := &dpv1alpha1.ActionSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: actionSetName,
+			Labels: map[string]string{
+				constant.ClusterDefLabelKey: clusterDefName,
+			},
+		},
+		Spec: dpv1alpha1.ActionSetSpec{
+			Env: []corev1.EnvVar{
+				{
+					Name:  "test-name",
+					Value: "test-value",
+				},
+			},
+			BackupType: dpv1alpha1.BackupTypeFull,
+			Backup: &dpv1alpha1.BackupActionSpec{
+				BackupData: &dpv1alpha1.BackupDataActionSpec{
+					JobActionSpec: dpv1alpha1.JobActionSpec{
+						BaseJobActionSpec: dpv1alpha1.BaseJobActionSpec{
+							Image:   "xtrabackup",
+							Command: []string{""},
+						},
+					},
+				},
+			},
+			Restore: &dpv1alpha1.RestoreActionSpec{
+				PrepareData: &dpv1alpha1.JobActionSpec{
+					BaseJobActionSpec: dpv1alpha1.BaseJobActionSpec{
+						Image: "xtrabackup",
+						Command: []string{
+							"sh",
+							"-c",
+							"/backup_scripts.sh",
+						},
+					},
+				},
+			},
+		},
+	}
+	testapps.CheckedCreateK8sResource(&testCtx, actionSet)
+	return actionSet
 }

@@ -135,6 +135,22 @@ var _ = Describe("update plan test.", func() {
 			checkPlan(expectedPlan, true)
 		})
 
+		It("should work well in a serial plan when pod has no role", func() {
+			By("build a serial plan")
+			strategy := workloads.SerialUpdateStrategy
+			its.Spec.MemberUpdateStrategy = &strategy
+			expectedPlan := [][]*corev1.Pod{
+				{pod4},
+				{pod2},
+				{pod6},
+				{pod3},
+				{pod1},
+				{pod0},
+				{pod5},
+			}
+			checkPlan(expectedPlan, false)
+		})
+
 		It("should work well in a parallel plan", func() {
 			By("build a parallel plan")
 			strategy := workloads.ParallelUpdateStrategy

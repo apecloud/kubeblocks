@@ -90,7 +90,7 @@ func (s *CheckRole) Init(ctx context.Context) error {
 	if viper.IsSet(constant.KBEnvRoleProbeTimeout) {
 		timeoutSeconds = viper.GetInt(constant.KBEnvRoleProbeTimeout)
 	}
-	// lorry utilizes the pod readiness probe to trigger role probe and 'timeoutSeconds' is directly copied from the 'probe.timeoutSeconds' field of pod.
+	// kb-agent utilizes the pod readiness probe to trigger role probe and 'timeoutSeconds' is directly copied from the 'probe.timeoutSeconds' field of pod.
 	// here we give 80% of the total time to role probe job and leave the remaining 20% to kubelet to handle the readiness probe related tasks.
 	s.Timeout = time.Duration(timeoutSeconds) * (800 * time.Millisecond)
 	s.OriRole = "waitForStart"
@@ -220,7 +220,7 @@ func (s *CheckRole) buildGlobalRoleSnapshot(cluster *dcs.Cluster, role string) s
 			if strings.EqualFold(member.Role, role) {
 				s.Logger.Info("there is a another leader", "member", member.Name)
 				if member.IsKBAgentReady() {
-					s.Logger.Info("another leader's lorry is online, just ignore", "member", member.Name)
+					s.Logger.Info("another leader's kb-agent is online, just ignore", "member", member.Name)
 					continue
 				}
 				s.Logger.Info("reset old leader role to none", "member", member.Name)

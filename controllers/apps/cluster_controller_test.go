@@ -1359,10 +1359,19 @@ var _ = Describe("Cluster Controller", func() {
 
 				checkSchedule := func(g Gomega, schedule *dpv1alpha1.BackupSchedule) {
 					var policy *dpv1alpha1.SchedulePolicy
+					enableOtherFullMethod := false
 					for i, s := range schedule.Spec.Schedules {
 						if s.BackupMethod == backup.Method {
 							Expect(*s.Enabled).Should(BeEquivalentTo(*backup.Enabled))
 							policy = &schedule.Spec.Schedules[i]
+							if *backup.Enabled {
+								enableOtherFullMethod = true
+							}
+							continue
+						}
+						if enableOtherFullMethod {
+							// another full backup method should be disabled.
+							Expect(*s.Enabled).Should(BeFalse())
 						}
 					}
 					if backup.Enabled != nil && *backup.Enabled {
@@ -1535,6 +1544,9 @@ var _ = Describe("Cluster Controller", func() {
 })
 
 func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition, compDef string, mappingClusterVersions ...string) {
+	By("create actionSet")
+	fakeActionSet(clusterDefObj.Name)
+
 	By("Creating a BackupPolicyTemplate")
 	bpt := testapps.NewBackupPolicyTemplateFactory(backupPolicyTPLName).
 		AddLabels(constant.ClusterDefLabelKey, clusterDefObj.Name).
@@ -1546,7 +1558,7 @@ func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition, compDe
 			AddBackupMethod(backupMethodName, false, actionSetName, mappingClusterVersions...).
 			SetComponentDef(compDef).
 			SetBackupMethodVolumeMounts("data", "/data").
-			AddBackupMethod(vsBackupMethodName, true, vsActionSetName).
+			AddBackupMethod(vsBackupMethodName, true, "").
 			SetBackupMethodVolumes([]string{"data"}).
 			AddSchedule(backupMethodName, "0 0 * * *", ttl, true).
 			AddSchedule(vsBackupMethodName, "0 0 * * *", ttl, true)

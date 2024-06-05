@@ -70,7 +70,6 @@ const (
 	backupMethodName    = "test-backup-method"
 	vsBackupMethodName  = "test-vs-backup-method"
 	actionSetName       = "test-action-set"
-	vsActionSetName     = "test-vs-action-set"
 )
 
 var (
@@ -712,47 +711,7 @@ var _ = Describe("Component Controller", func() {
 
 					if policyType == appsv1alpha1.HScaleDataClonePolicyCloneVolume {
 						By("creating actionSet if backup policy is backup")
-						actionSet := &dpv1alpha1.ActionSet{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      actionSetName,
-								Namespace: clusterKey.Namespace,
-								Labels: map[string]string{
-									constant.ClusterDefLabelKey: clusterDef.Name,
-								},
-							},
-							Spec: dpv1alpha1.ActionSetSpec{
-								Env: []corev1.EnvVar{
-									{
-										Name:  "test-name",
-										Value: "test-value",
-									},
-								},
-								BackupType: dpv1alpha1.BackupTypeFull,
-								Backup: &dpv1alpha1.BackupActionSpec{
-									BackupData: &dpv1alpha1.BackupDataActionSpec{
-										JobActionSpec: dpv1alpha1.JobActionSpec{
-											BaseJobActionSpec: dpv1alpha1.BaseJobActionSpec{
-												Image:   "xtrabackup",
-												Command: []string{""},
-											},
-										},
-									},
-								},
-								Restore: &dpv1alpha1.RestoreActionSpec{
-									PrepareData: &dpv1alpha1.JobActionSpec{
-										BaseJobActionSpec: dpv1alpha1.BaseJobActionSpec{
-											Image: "xtrabackup",
-											Command: []string{
-												"sh",
-												"-c",
-												"/backup_scripts.sh",
-											},
-										},
-									},
-								},
-							},
-						}
-						testapps.CheckedCreateK8sResource(&testCtx, actionSet)
+						fakeActionSet(clusterDef.Name)
 					}
 				}
 			})()).ShouldNot(HaveOccurred())
@@ -2469,4 +2428,48 @@ func checkRestoreAndSetCompleted(clusterKey types.NamespacedName, compName strin
 
 	By("Mocking restore phase to succeeded")
 	mockRestoreCompleted(ml)
+}
+
+func fakeActionSet(clusterDefName string) *dpv1alpha1.ActionSet {
+	actionSet := &dpv1alpha1.ActionSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: actionSetName,
+			Labels: map[string]string{
+				constant.ClusterDefLabelKey: clusterDefName,
+			},
+		},
+		Spec: dpv1alpha1.ActionSetSpec{
+			Env: []corev1.EnvVar{
+				{
+					Name:  "test-name",
+					Value: "test-value",
+				},
+			},
+			BackupType: dpv1alpha1.BackupTypeFull,
+			Backup: &dpv1alpha1.BackupActionSpec{
+				BackupData: &dpv1alpha1.BackupDataActionSpec{
+					JobActionSpec: dpv1alpha1.JobActionSpec{
+						BaseJobActionSpec: dpv1alpha1.BaseJobActionSpec{
+							Image:   "xtrabackup",
+							Command: []string{""},
+						},
+					},
+				},
+			},
+			Restore: &dpv1alpha1.RestoreActionSpec{
+				PrepareData: &dpv1alpha1.JobActionSpec{
+					BaseJobActionSpec: dpv1alpha1.BaseJobActionSpec{
+						Image: "xtrabackup",
+						Command: []string{
+							"sh",
+							"-c",
+							"/backup_scripts.sh",
+						},
+					},
+				},
+			},
+		},
+	}
+	testapps.CheckedCreateK8sResource(&testCtx, actionSet)
+	return actionSet
 }

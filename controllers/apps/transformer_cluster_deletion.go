@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -61,7 +60,6 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 
 	// list all kinds to be deleted based on v1alpha1.TerminationPolicyType
 	var toDeleteNamespacedKinds, toDeleteNonNamespacedKinds []client.ObjectList
-	var toPreserveKinds []client.ObjectList
 	switch cluster.Spec.TerminationPolicy {
 	case appsv1alpha1.DoNotTerminate:
 		transCtx.EventRecorder.Eventf(cluster, corev1.EventTypeWarning, "DoNotTerminate",
@@ -69,7 +67,6 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 		return graph.ErrPrematureStop
 	case appsv1alpha1.Halt:
 		toDeleteNamespacedKinds, toDeleteNonNamespacedKinds = kindsForHalt()
-		toPreserveKinds = haltPreserveKinds()
 	case appsv1alpha1.Delete:
 		toDeleteNamespacedKinds, toDeleteNonNamespacedKinds = kindsForDelete()
 	case appsv1alpha1.WipeOut:
@@ -79,21 +76,13 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	transCtx.EventRecorder.Eventf(cluster, corev1.EventTypeNormal, constant.ReasonDeletingCR, "Deleting %s: %s",
 		strings.ToLower(cluster.GetObjectKind().GroupVersionKind().Kind), cluster.GetName())
 
-	// list all objects owned by this cluster in cache, and delete them all
-	// there is chance that objects leak occurs because of cache stale
-	// ignore the problem currently
-	// TODO: GC the leaked objects
-	ml := getAppInstanceML(*cluster)
-
-	// handle preserved objects update vertex
-	if err := preserveClusterObjects(transCtx.Context, transCtx.Client, graphCli, dag, cluster, ml, toPreserveKinds); err != nil {
-		return err
-	}
-
 	// delete components in the order that topology defined.
 	if err := deleteCompsInOrder4Terminate(transCtx, dag); err != nil {
 		return err
 	}
+
+	// list all objects owned by this cluster in cache, and delete them all
+	ml := getAppInstanceML(*cluster)
 
 	toDeleteObjs := func(objs owningObjects) []client.Object {
 		var delObjs []client.Object
@@ -126,6 +115,7 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 		}
 	}
 	delObjs = append(delObjs, toDeleteObjs(nonNamespacedObjs)...)
+
 	delKindMap := map[string]sets.Empty{}
 	for _, o := range delObjs {
 		// skip the objects owned by the component and InstanceSet controller
@@ -139,6 +129,7 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 		graphCli.Delete(dag, o, inUniversalContext4G())
 		delKindMap[o.GetObjectKind().GroupVersionKind().Kind] = sets.Empty{}
 	}
+
 	// set cluster action to noop until all the sub-resources deleted
 	if len(delObjs) == 0 {
 		graphCli.Delete(dag, cluster)
@@ -151,14 +142,6 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 
 	// fast return, that is stopping the plan.Build() stage and jump to plan.Execute() directly
 	return graph.ErrPrematureStop
-}
-
-func haltPreserveKinds() []client.ObjectList {
-	return []client.ObjectList{
-		&corev1.PersistentVolumeClaimList{},
-		&corev1.SecretList{},
-		&corev1.ConfigMapList{},
-	}
 }
 
 func kindsForDoNotTerminate() ([]client.ObjectList, []client.ObjectList) {
@@ -199,12 +182,6 @@ func kindsForWipeOut() ([]client.ObjectList, []client.ObjectList) {
 		&dpv1alpha1.BackupList{},
 	}
 	return append(namespacedKinds, namespacedKindsPlus...), nonNamespacedKinds
-}
-
-// preserveClusterObjects preserves the objects owned by the cluster when the cluster is being deleted
-func preserveClusterObjects(ctx context.Context, cli client.Reader, graphCli model.GraphClient, dag *graph.DAG,
-	cluster *appsv1alpha1.Cluster, ml client.MatchingLabels, toPreserveKinds []client.ObjectList) error {
-	return preserveObjects(ctx, cli, graphCli, dag, cluster, ml, toPreserveKinds, constant.DBClusterFinalizerName, constant.LastAppliedClusterAnnotationKey)
 }
 
 // shouldSkipObjOwnedByComp is used to judge whether the object owned by component should be skipped when deleting the cluster

@@ -249,7 +249,7 @@ func (m *Member) GetName() string {
 	return m.Name
 }
 
-func (m *Member) IsLorryReady() bool {
+func (m *Member) IsKBAgentReady() bool {
 	if m.PodIP == "" {
 		return false
 	}

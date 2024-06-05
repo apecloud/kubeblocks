@@ -32,7 +32,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
-	"github.com/apecloud/kubeblocks/pkg/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
 // CheckRunning checks whether the binding service is in running status,
@@ -66,7 +66,7 @@ func (s *CheckRunning) Init(ctx context.Context) error {
 	if viper.IsSet(constant.KBEnvRoleProbeTimeout) {
 		timeoutSeconds = viper.GetInt(constant.KBEnvRoleProbeTimeout)
 	}
-	// lorry utilizes the pod readiness probe to trigger probe and 'timeoutSeconds' is directly copied from the 'probe.timeoutSeconds' field of pod.
+	// kb-agent utilizes the pod readiness probe to trigger probe and 'timeoutSeconds' is directly copied from the 'probe.timeoutSeconds' field of pod.
 	// here we give 80% of the total time to probe job and leave the remaining 20% to kubelet to handle the readiness probe related tasks.
 	s.Timeout = time.Duration(timeoutSeconds) * (800 * time.Millisecond)
 	s.DBAddress = s.getAddress()

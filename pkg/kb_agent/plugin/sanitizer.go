@@ -35,7 +35,7 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 )
 
-// StripSecrets returns a wrapper around the original lorry gRPC message
+// StripSecrets returns a wrapper around the original kb-agent gRPC message
 // which has a Stringer implementation that serializes the message
 // as one-line JSON, but without including secret information.
 // Instead of the secret value(s), the string "***stripped***" is

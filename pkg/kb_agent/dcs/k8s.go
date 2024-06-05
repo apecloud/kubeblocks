@@ -42,8 +42,8 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
-	k8s "github.com/apecloud/kubeblocks/pkg/lorry/util/kubernetes"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers/models"
+	k8s "github.com/apecloud/kubeblocks/pkg/kb_agent/util/kubernetes"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 

@@ -219,7 +219,7 @@ func (s *CheckRole) buildGlobalRoleSnapshot(cluster *dcs.Cluster, role string) s
 			// get old primary and set it's role to none
 			if strings.EqualFold(member.Role, role) {
 				s.Logger.Info("there is a another leader", "member", member.Name)
-				if member.IsLorryReady() {
+				if member.IsKBAgentReady() {
 					s.Logger.Info("another leader's lorry is online, just ignore", "member", member.Name)
 					continue
 				}

@@ -652,6 +652,8 @@ const (
 	ReasonInstanceFailure = "InstanceFailure"
 )
 
+const defaultInstanceTemplateReplicas = 1
+
 func (t *InstanceTemplate) GetName() string {
 	return t.Name
 }
@@ -660,7 +662,7 @@ func (t *InstanceTemplate) GetReplicas() int32 {
 	if t.Replicas != nil {
 		return *t.Replicas
 	}
-	return 1
+	return defaultInstanceTemplateReplicas
 }
 
 func init() {

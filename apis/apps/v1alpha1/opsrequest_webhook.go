@@ -427,14 +427,14 @@ func (r *OpsRequest) validateHorizontalScaling(_ context.Context, _ client.Clien
 	}
 	for _, comSpec := range cluster.Spec.ComponentSpecs {
 		if hScale, ok := hScaleMap[comSpec.Name]; ok {
-			if err := r.validateHorizontalScalingSpec(hScale, comSpec, cluster.Name, comSpec.Name); err != nil {
+			if err := r.validateHorizontalScalingSpec(hScale, comSpec, cluster.Name, false); err != nil {
 				return err
 			}
 		}
 	}
 	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
 		if hScale, ok := hScaleMap[shardingSpec.Name]; ok {
-			if err := r.validateHorizontalScalingSpec(hScale, shardingSpec.Template, cluster.Name, shardingSpec.Name); err != nil {
+			if err := r.validateHorizontalScalingSpec(hScale, shardingSpec.Template, cluster.Name, true); err != nil {
 				return err
 			}
 		}
@@ -442,14 +442,26 @@ func (r *OpsRequest) validateHorizontalScaling(_ context.Context, _ client.Clien
 	return nil
 }
 
-func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, compSpec ClusterComponentSpec, clusterName, componentName string) error {
-	if hScale.Replicas != nil && (hScale.ScaleIn != nil || hScale.ScaleOut != nil) {
+// CountOfflineOrOnlineInstances calculate the number of instances that need to be brought online and offline corresponding to the instance template name.
+func (r *OpsRequest) CountOfflineOrOnlineInstances(clusterName, componentName string, hScaleInstanceNames []string) map[string]int32 {
+	offlineOrOnlineInsCountMap := map[string]int32{}
+	for _, insName := range hScaleInstanceNames {
+		insTplName := GetInstanceTemplateName(clusterName, componentName, insName)
+		offlineOrOnlineInsCountMap[insTplName]++
+	}
+	return offlineOrOnlineInsCountMap
+}
+
+func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, compSpec ClusterComponentSpec, clusterName string, isSharding bool) error {
+	scaleIn := hScale.ScaleIn
+	scaleOut := hScale.ScaleOut
+	if hScale.Replicas != nil && (scaleIn != nil || scaleOut != nil) {
 		return fmt.Errorf(`"replicas" has been deprecated and cannot be used with "scaleOut" and "scaleIn"`)
 	}
 	if hScale.Replicas != nil {
 		return nil
 	}
-	if lastCompConfiguration, ok := r.Status.LastConfiguration.Components[componentName]; ok {
+	if lastCompConfiguration, ok := r.Status.LastConfiguration.Components[hScale.ComponentName]; ok {
 		// use last component configuration snapshot
 		compSpec.Instances = lastCompConfiguration.Instances
 		compSpec.Replicas = *lastCompConfiguration.Replicas
@@ -459,93 +471,76 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 	for _, v := range compSpec.Instances {
 		compInsTplMap[v.Name] = v.GetReplicas()
 	}
-	checkInstances := func(compReplicaChanges int32, instances []InstanceReplicasTemplate, newInstances []InstanceTemplate, isScaleIn bool) (map[string]int32, error) {
+	// Rules:
+	// 1. length of offlineInstancesToOnline or onlineInstancesToOffline can't greater than the configured replicaChanges for the component.
+	// 2. replicaChanges for component must greater than or equal to the sum of replicaChanges configured in instance templates.
+	validateHScaleOperation := func(replicaChanger ReplicaChanger, newInstances []InstanceTemplate, offlineOrOnlineInsNames []string, isScaleIn bool) error {
 		msgPrefix := "ScaleIn:"
+		hScaleInstanceFieldName := "onlineInstancesToOffline"
 		if !isScaleIn {
-			msgPrefix = "ScaleOut:"
+			msgPrefix = "ScaleOut"
+			hScaleInstanceFieldName = "offlineInstancesToOnline"
 		}
-		insTplMap := map[string]int32{}
-		allInsReplicaChanges := int32(0)
-		for _, v := range instances {
+		if !isSharding && replicaChanger.ReplicaChanges != nil && len(offlineOrOnlineInsNames) > int(*replicaChanger.ReplicaChanges) {
+			return fmt.Errorf(`the length of %s can't be greater than the "replicaChanges" for the component`, hScaleInstanceFieldName)
+		}
+		offlineOrOnlineInsCountMap := r.CountOfflineOrOnlineInstances(clusterName, hScale.ComponentName, offlineOrOnlineInsNames)
+		insTplChangeMap := map[string]int32{}
+		allReplicaChanges := int32(0)
+		for _, v := range replicaChanger.Instances {
 			compInsReplicas, ok := compInsTplMap[v.Name]
 			if !ok {
-				return nil, fmt.Errorf(`%s cannot find the instance template "%s" in component "%s"`,
-					msgPrefix, v.Name, componentName)
+				return fmt.Errorf(`%s cannot find the instance template "%s" in component "%s"`,
+					msgPrefix, v.Name, hScale.ComponentName)
 			}
 			if isScaleIn && v.ReplicaChanges > compInsReplicas {
-				return nil, fmt.Errorf(`%s "replicaChanges" of instanceTemplate "%s" can't be greater than %d`,
+				return fmt.Errorf(`%s "replicaChanges" of instanceTemplate "%s" can't be greater than %d`,
 					msgPrefix, v.Name, compInsReplicas)
 			}
-			insTplMap[v.Name] = v.ReplicaChanges
-			allInsReplicaChanges += v.ReplicaChanges
+			allReplicaChanges += v.ReplicaChanges
+			insTplChangeMap[v.Name] = v.ReplicaChanges
 		}
-		if len(newInstances) > 0 {
-			for _, insTpl := range newInstances {
-				if _, ok := compInsTplMap[insTpl.Name]; ok {
-					return nil, fmt.Errorf(`new instance template "%s" already exists in component "%s"`, insTpl.Name, componentName)
-				}
-				allInsReplicaChanges += insTpl.GetReplicas()
-			}
-		}
-		if allInsReplicaChanges > compReplicaChanges {
-			return nil, fmt.Errorf(`%s "replicaChanges" can't be less than the sum of "replicaChanges" for specified instance templates`, msgPrefix)
-		}
-		return insTplMap, nil
-	}
-
-	validateOfflineOrOnlineInstances := func(compReplicaChanges int32, insTplMap map[string]int32, hScaleInstanceNames []string, operationKey string) error {
-		if len(hScaleInstanceNames) > int(compReplicaChanges) {
-			return fmt.Errorf(`the length of "offlineInstancesToOnline" or "onlineInstancesToOffline" can't be greater than the "replicaChanges" for the component`)
-		}
-		hScaleInsMap := map[string]int32{}
-		workloadPrefix := fmt.Sprintf("%s-%s", clusterName, componentName)
-		for _, insName := range hScaleInstanceNames {
-			compInsKey := insName[:strings.LastIndex(insName, "-")]
-			if compInsKey == workloadPrefix {
+		for insTplName, replicaCount := range offlineOrOnlineInsCountMap {
+			replicaChanges, ok := insTplChangeMap[insTplName]
+			if !ok {
+				allReplicaChanges += replicaCount
 				continue
 			}
-			insTplName := strings.Replace(compInsKey, workloadPrefix+"-", "", 1)
-			if _, ok := insTplMap[insTplName]; !ok {
-				return fmt.Errorf(`"replicaChanges" of the instance temaplte "%s" were not specified when %s instance "%s"`,
-					insTplName, operationKey, insName)
+			if replicaChanges < replicaCount {
+				return fmt.Errorf(`"replicaChanges" can't be less than %d when %d instances of the instance template "%s" are configured in %s`,
+					replicaCount, replicaCount, insTplName, hScaleInstanceFieldName)
 			}
-			hScaleInsMap[insTplName]++
 		}
-		// check if replicaChanges of specified instance template is greater than the count of offline/online instances.
-		for insTplName, replicas := range hScaleInsMap {
-			if replicas > insTplMap[insTplName] {
-				return fmt.Errorf(`"replicaChanges" can't be less than %d when %d instances of the instance template "%s" are designated %s`,
-					replicas, replicas, insTplName, operationKey)
+		for _, insTpl := range newInstances {
+			if _, ok := compInsTplMap[insTpl.Name]; ok {
+				return fmt.Errorf(`new instance template "%s" already exists in component "%s"`, insTpl.Name, hScale.ComponentName)
 			}
+			allReplicaChanges += insTpl.GetReplicas()
+		}
+		if !isSharding && replicaChanger.ReplicaChanges != nil && allReplicaChanges > *replicaChanger.ReplicaChanges {
+			return fmt.Errorf(`%s "replicaChanges" can't be less than the sum of "replicaChanges" for specified instance templates`, msgPrefix)
 		}
 		return nil
 	}
-
-	if hScale.ScaleIn != nil {
-		if insTplMap, err := checkInstances(hScale.ScaleIn.ReplicaChanges, hScale.ScaleIn.Instances, nil, true); err != nil {
+	if scaleIn != nil {
+		if err := validateHScaleOperation(scaleIn.ReplicaChanger, nil, scaleIn.OnlineInstancesToOffline, true); err != nil {
 			return err
-		} else if len(hScale.ScaleIn.OnlineInstancesToOffline) > 0 {
-			if err = validateOfflineOrOnlineInstances(hScale.ScaleIn.ReplicaChanges, insTplMap,
-				hScale.ScaleIn.OnlineInstancesToOffline, "offline"); err != nil {
-				return err
-			}
 		}
-		if hScale.ScaleIn.ReplicaChanges > compSpec.Replicas {
-			return fmt.Errorf(`"scaleIn.replicaChanges" can't be greater than %d for component "%s"`, compSpec.Replicas, componentName)
+		if scaleIn.ReplicaChanges != nil && *scaleIn.ReplicaChanges > compSpec.Replicas {
+			return fmt.Errorf(`"scaleIn.replicaChanges" can't be greater than %d for component "%s"`, compSpec.Replicas, hScale.ComponentName)
 		}
 	}
-	if hScale.ScaleOut != nil {
-		if insTplMap, err := checkInstances(hScale.ScaleOut.ReplicaChanges, hScale.ScaleOut.Instances, hScale.ScaleOut.NewInstances, false); err != nil {
+	if scaleOut != nil {
+		if err := validateHScaleOperation(scaleOut.ReplicaChanger, scaleOut.NewInstances, scaleOut.OfflineInstancesToOnline, false); err != nil {
 			return err
-		} else if len(hScale.ScaleOut.OfflineInstancesToOnline) > 0 {
+		}
+		if len(scaleOut.OfflineInstancesToOnline) > 0 {
 			offlineInstanceSet := sets.New(compSpec.OfflineInstances...)
-			for _, offlineInsName := range hScale.ScaleOut.OfflineInstancesToOnline {
+			for _, offlineInsName := range scaleOut.OfflineInstancesToOnline {
 				if _, ok := offlineInstanceSet[offlineInsName]; !ok {
-					return fmt.Errorf(`cannot find the offline instance "%s" in component "%s" for scaleOut operation`, offlineInsName, componentName)
+					return fmt.Errorf(`cannot find the offline instance "%s" in component "%s" for scaleOut operation`, offlineInsName, hScale.ComponentName)
 				}
 			}
-			return validateOfflineOrOnlineInstances(hScale.ScaleOut.ReplicaChanges,
-				insTplMap, hScale.ScaleOut.OfflineInstancesToOnline, "online")
 		}
 	}
 	return nil

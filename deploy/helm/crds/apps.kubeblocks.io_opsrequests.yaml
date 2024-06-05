@@ -494,11 +494,11 @@ spec:
                         and instance templates, and takes specified instances offline.
                         Can be used in conjunction with the "scaleOut" operation.
                         Note: Any configuration that creates instances is considered
-                        invalid.'
+                        invalid except for sharding component.'
                       properties:
                         instances:
                           description: Modifies the desired replicas count for existing
-                            InstanceTemplate.
+                            InstanceTemplate. if the inst
                           items:
                             description: InstanceReplicasTemplate defines the template
                               for instance replicas.
@@ -517,6 +517,9 @@ spec:
                             - replicaChanges
                             type: object
                           type: array
+                          x-kubernetes-list-map-keys:
+                          - name
+                          x-kubernetes-list-type: map
                         onlineInstancesToOffline:
                           description: Specifies the instance names that need to be
                             taken offline.
@@ -528,19 +531,17 @@ spec:
                           format: int32
                           minimum: 0
                           type: integer
-                      required:
-                      - replicaChanges
                       type: object
                     scaleOut:
                       description: 'Specifies the replica changes for scaling out
                         components and instance templates, and brings offline instances
                         back online. Can be used in conjunction with the "scaleIn"
                         operation. Note: Any configuration that deletes instances
-                        is considered invalid.'
+                        is considered invalid except for sharding component.'
                       properties:
                         instances:
                           description: Modifies the desired replicas count for existing
-                            InstanceTemplate.
+                            InstanceTemplate. if the inst
                           items:
                             description: InstanceReplicasTemplate defines the template
                               for instance replicas.
@@ -559,6 +560,9 @@ spec:
                             - replicaChanges
                             type: object
                           type: array
+                          x-kubernetes-list-map-keys:
+                          - name
+                          x-kubernetes-list-type: map
                         newInstances:
                           description: Defines the configuration for new instances
                             added during scaling, including resource requirements,
@@ -4304,6 +4308,9 @@ spec:
                             - name
                             type: object
                           type: array
+                          x-kubernetes-list-map-keys:
+                          - name
+                          x-kubernetes-list-type: map
                         offlineInstancesToOnline:
                           description: Specifies the instances in the offline list
                             to bring back online.
@@ -4315,8 +4322,6 @@ spec:
                           format: int32
                           minimum: 0
                           type: integer
-                      required:
-                      - replicaChanges
                       type: object
                   required:
                   - componentName
@@ -5182,6 +5187,9 @@ spec:
                         type: object
                         x-kubernetes-preserve-unknown-fields: true
                       type: array
+                      x-kubernetes-list-map-keys:
+                      - name
+                      x-kubernetes-list-type: map
                     limits:
                       additionalProperties:
                         anyOf:
@@ -5266,6 +5274,9 @@ spec:
                         - volumeClaimTemplates
                         type: object
                       type: array
+                      x-kubernetes-list-map-keys:
+                      - name
+                      x-kubernetes-list-type: map
                     volumeClaimTemplates:
                       description: Specifies a list of OpsRequestVolumeClaimTemplate
                         objects, defining the volumeClaimTemplates that are used to

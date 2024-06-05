@@ -96,14 +96,24 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 	if err := compOpsSet.updateClusterComponentsAndShardings(opsRes.Cluster, func(compSpec *appsv1alpha1.ClusterComponentSpec, obj ComponentOpsInteface) error {
 		horizontalScaling := obj.(appsv1alpha1.HorizontalScaling)
 		lastCompConfiguration := opsRes.OpsRequest.Status.LastConfiguration.Components[obj.GetComponentName()]
-		replicas, instances, offlineInstances := hs.getExpectedCompValues(compSpec.DeepCopy(),
+		if horizontalScaling.ScaleIn != nil && len(horizontalScaling.ScaleIn.OnlineInstancesToOffline) > 0 {
+			// check if the instances are online.
+			currPodSet := getPodSetForComponent(lastCompConfiguration.Instances, lastCompConfiguration.OfflineInstances,
+				opsRes.Cluster.Name, obj.GetComponentName(), *lastCompConfiguration.Replicas)
+			for _, onlineIns := range horizontalScaling.ScaleIn.OnlineInstancesToOffline {
+				if _, ok := currPodSet[onlineIns]; !ok {
+					return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" specified in onlineInstancesToOffline is not online`, onlineIns))
+				}
+			}
+		}
+		replicas, instances, offlineInstances := hs.getExpectedCompValues(opsRes, compSpec.DeepCopy(),
 			lastCompConfiguration, horizontalScaling)
 		var insReplicas int32
 		for _, v := range instances {
 			insReplicas += v.GetReplicas()
 		}
 		if insReplicas > replicas {
-			errMsg := fmt.Sprintf(`the total number of replicas of the instance template can not greater than the number of replicas of component "%s" after horizontally scaling`,
+			errMsg := fmt.Sprintf(`the total number of replicas for the instance template can not greater than the number of replicas for component "%s" after horizontally scaling`,
 				horizontalScaling.ComponentName)
 			return intctrlutil.NewFatalError(errMsg)
 		}
@@ -161,7 +171,7 @@ func (hs horizontalScalingOpsHandler) getCreateAndDeletePodSet(opsRes *OpsResour
 	fullCompName string) (map[string]string, map[string]string) {
 	clusterName := opsRes.Cluster.Name
 	lastPodSet := getPodSetForComponent(lastCompConfiguration.Instances, lastCompConfiguration.OfflineInstances, clusterName, fullCompName, *lastCompConfiguration.Replicas)
-	expectReplicas, expectInstanceTpls, expectOfflineInstances := hs.getExpectedCompValues(&currCompSpec, lastCompConfiguration, horizontalScaling)
+	expectReplicas, expectInstanceTpls, expectOfflineInstances := hs.getExpectedCompValues(opsRes, &currCompSpec, lastCompConfiguration, horizontalScaling)
 	currPodSet := getPodSetForComponent(expectInstanceTpls, expectOfflineInstances, clusterName, fullCompName, expectReplicas)
 	createPodSet := map[string]string{}
 	deletePodSet := map[string]string{}
@@ -198,7 +208,7 @@ func (hs horizontalScalingOpsHandler) checkIntersectionWithEarlierOps(opsRes *Op
 	getCreatedOrDeletedPodSet := func(ops *appsv1alpha1.OpsRequest, hScaling appsv1alpha1.HorizontalScaling) (map[string]string, map[string]string) {
 		lastCompSnapshot := ops.Status.LastConfiguration.Components[earlierOpsHScaling.ComponentName]
 		compSpec := opsRes.Cluster.Spec.GetComponentByName(earlierOpsHScaling.ComponentName).DeepCopy()
-		compSpec.Replicas, compSpec.Instances, compSpec.OfflineInstances = hs.getExpectedCompValues(compSpec, lastCompSnapshot, hScaling)
+		compSpec.Replicas, compSpec.Instances, compSpec.OfflineInstances = hs.getExpectedCompValues(opsRes, compSpec, lastCompSnapshot, hScaling)
 		return hs.getCreateAndDeletePodSet(opsRes, lastCompSnapshot, *compSpec, hScaling, hScaling.ComponentName)
 	}
 	createdPodSetForEarlier, _ := getCreatedOrDeletedPodSet(earlierOps, earlierOpsHScaling)
@@ -215,6 +225,7 @@ func (hs horizontalScalingOpsHandler) checkIntersectionWithEarlierOps(opsRes *Op
 
 // getExpectedCompValues gets the expected replicas, instances, offlineInstances.
 func (hs horizontalScalingOpsHandler) getExpectedCompValues(
+	opsRes *OpsResource,
 	compSpec *appsv1alpha1.ClusterComponentSpec,
 	lastCompConfiguration appsv1alpha1.LastComponentConfiguration,
 	horizontalScaling appsv1alpha1.HorizontalScaling) (int32, []appsv1alpha1.InstanceTemplate, []string) {
@@ -227,9 +238,75 @@ func (hs horizontalScalingOpsHandler) getExpectedCompValues(
 		compOfflineInstances = lastCompConfiguration.OfflineInstances
 	}
 	expectOfflineInstances := hs.getCompExpectedOfflineInstances(compOfflineInstances, horizontalScaling)
+	hs.autoSyncReplicaChanges(opsRes, horizontalScaling, compReplicas, compInstanceTpls, expectOfflineInstances)
 	return hs.getCompExpectReplicas(horizontalScaling, compReplicas),
 		hs.getCompExpectedInstances(compInstanceTpls, horizontalScaling),
 		expectOfflineInstances
+}
+
+// autoSyncReplicaChanges auto-sync the replicaChanges of the component and instance templates.
+func (hs horizontalScalingOpsHandler) autoSyncReplicaChanges(
+	opsRes *OpsResource,
+	horizontalScaling appsv1alpha1.HorizontalScaling,
+	compReplicas int32,
+	compInstanceTpls []appsv1alpha1.InstanceTemplate,
+	compExpectOfflineInstances []string) {
+	for _, v := range opsRes.Cluster.Spec.ShardingSpecs {
+		// when the component is a sharding component, ignore to auto sync replica changes.
+		if v.Name == horizontalScaling.ComponentName {
+			return
+		}
+	}
+	// sync the replicaChanges for component and instance template.
+	getSyncedInstancesAndReplicaChanges := func(offlineOrOnlineInsCountMap map[string]int32,
+		replicaChanger appsv1alpha1.ReplicaChanger,
+		newInstances []appsv1alpha1.InstanceTemplate) ([]appsv1alpha1.InstanceReplicasTemplate, *int32) {
+		allReplicaChanges := int32(0)
+		insTplMap := map[string]sets.Empty{}
+		for _, v := range replicaChanger.Instances {
+			insTplMap[v.Name] = sets.Empty{}
+			allReplicaChanges += v.ReplicaChanges
+		}
+		for k, v := range offlineOrOnlineInsCountMap {
+			if k == "" {
+				allReplicaChanges += v
+				continue
+			}
+			if _, ok := insTplMap[k]; !ok {
+				replicaChanger.Instances = append(replicaChanger.Instances, appsv1alpha1.InstanceReplicasTemplate{Name: k, ReplicaChanges: v})
+				allReplicaChanges += v
+			}
+		}
+		for _, v := range newInstances {
+			allReplicaChanges += v.GetReplicas()
+		}
+		if replicaChanger.ReplicaChanges != nil {
+			allReplicaChanges = *replicaChanger.ReplicaChanges
+		}
+		return replicaChanger.Instances, &allReplicaChanges
+	}
+	// auto sync the replicaChanges.
+	scaleIn := horizontalScaling.ScaleIn
+	if scaleIn != nil {
+		offlineInsCountMap := opsRes.OpsRequest.CountOfflineOrOnlineInstances(opsRes.Cluster.Name, horizontalScaling.ComponentName, scaleIn.OnlineInstancesToOffline)
+		scaleIn.Instances, scaleIn.ReplicaChanges = getSyncedInstancesAndReplicaChanges(offlineInsCountMap, scaleIn.ReplicaChanger, nil)
+	}
+	scaleOut := horizontalScaling.ScaleOut
+	if scaleOut != nil {
+		// get the pod set when removing the specified instances from offlineInstances slice
+		podSet := getPodSetForComponent(compInstanceTpls, compExpectOfflineInstances,
+			opsRes.Cluster.Name, horizontalScaling.ComponentName, compReplicas)
+		onlineInsCountMap := map[string]int32{}
+		for _, insName := range scaleOut.OfflineInstancesToOnline {
+			if _, ok := podSet[insName]; !ok {
+				//  if the specified instance will not be created, continue
+				continue
+			}
+			insTplName := appsv1alpha1.GetInstanceTemplateName(opsRes.Cluster.Name, horizontalScaling.ComponentName, insName)
+			onlineInsCountMap[insTplName]++
+		}
+		scaleOut.Instances, scaleOut.ReplicaChanges = getSyncedInstancesAndReplicaChanges(onlineInsCountMap, scaleOut.ReplicaChanger, scaleOut.NewInstances)
+	}
 }
 
 // getCompExpectReplicas gets the expected replicas for the component.
@@ -238,11 +315,11 @@ func (hs horizontalScalingOpsHandler) getCompExpectReplicas(horizontalScaling ap
 	if horizontalScaling.Replicas != nil {
 		return *horizontalScaling.Replicas
 	}
-	if horizontalScaling.ScaleOut != nil {
-		compReplicas += horizontalScaling.ScaleOut.ReplicaChanges
+	if horizontalScaling.ScaleOut != nil && horizontalScaling.ScaleOut.ReplicaChanges != nil {
+		compReplicas += *horizontalScaling.ScaleOut.ReplicaChanges
 	}
-	if horizontalScaling.ScaleIn != nil {
-		compReplicas -= horizontalScaling.ScaleIn.ReplicaChanges
+	if horizontalScaling.ScaleIn != nil && horizontalScaling.ScaleIn.ReplicaChanges != nil {
+		compReplicas -= *horizontalScaling.ScaleIn.ReplicaChanges
 	}
 	return compReplicas
 }

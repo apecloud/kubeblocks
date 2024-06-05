@@ -1700,3 +1700,13 @@ func GetComponentUpRunningPhase() []ClusterComponentPhase {
 func ComponentPodsAreReady(podsAreReady *bool) bool {
 	return podsAreReady != nil && *podsAreReady
 }
+
+// GetInstanceTemplateName get the instance template name by instance name.
+func GetInstanceTemplateName(clusterName, componentName, instanceName string) string {
+	workloadPrefix := fmt.Sprintf("%s-%s", clusterName, componentName)
+	compInsKey := instanceName[:strings.LastIndex(instanceName, "-")]
+	if compInsKey == workloadPrefix {
+		return ""
+	}
+	return strings.Replace(compInsKey, workloadPrefix+"-", "", 1)
+}

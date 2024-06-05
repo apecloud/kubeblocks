@@ -12074,7 +12074,7 @@ ScaleOut
 <em>(Optional)</em>
 <p>Specifies the replica changes for scaling out components and instance templates,
 and brings offline instances back online. Can be used in conjunction with the &ldquo;scaleIn&rdquo; operation.
-Note: Any configuration that deletes instances is considered invalid.</p>
+Note: Any configuration that deletes instances is considered invalid except for sharding component.</p>
 </td>
 </tr>
 <tr>
@@ -12087,9 +12087,10 @@ ScaleIn
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Specifies the replica changes for scaling in components and instance templates,
 and takes specified instances offline. Can be used in conjunction with the &ldquo;scaleOut&rdquo; operation.
-Note: Any configuration that creates instances is considered invalid.</p>
+Note: Any configuration that creates instances is considered invalid except for sharding component.</p>
 </td>
 </tr>
 </tbody>
@@ -16618,7 +16619,8 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>Modifies the desired replicas count for existing InstanceTemplate.</p>
+<p>Modifies the desired replicas count for existing InstanceTemplate.
+if the inst</p>
 </td>
 </tr>
 </tbody>
@@ -20917,6 +20919,7 @@ Kubernetes core/v1.ResourceRequirements
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Specifies the desired compute resources of the instance template that need to vertical scale.</p>
 </td>
 </tr>
@@ -20978,6 +20981,7 @@ that are used to expand the storage and the desired storage size for each one.</
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Specifies the desired storage size of the instance template that need to volume expand.</p>
 </td>
 </tr>

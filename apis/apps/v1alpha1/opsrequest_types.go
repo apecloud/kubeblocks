@@ -360,7 +360,12 @@ type VerticalScaling struct {
 	corev1.ResourceRequirements `json:",inline"`
 
 	// Specifies the desired compute resources of the instance template that need to vertical scale.
-	Instances []InstanceResourceTemplate `json:"instances,omitempty"`
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	Instances []InstanceResourceTemplate `json:"instances,omitempty"  patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 }
 
 type InstanceResourceTemplate struct {
@@ -403,7 +408,12 @@ type VolumeExpansion struct {
 	VolumeClaimTemplates []OpsRequestVolumeClaimTemplate `json:"volumeClaimTemplates" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// Specifies the desired storage size of the instance template that need to volume expand.
-	Instances []InstanceVolumeClaimTemplate `json:"instances,omitempty"`
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	Instances []InstanceVolumeClaimTemplate `json:"instances,omitempty"  patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 }
 
 type OpsRequestVolumeClaimTemplate struct {
@@ -434,14 +444,15 @@ type HorizontalScaling struct {
 
 	// Specifies the replica changes for scaling out components and instance templates,
 	// and brings offline instances back online. Can be used in conjunction with the "scaleIn" operation.
-	// Note: Any configuration that deletes instances is considered invalid.
+	// Note: Any configuration that deletes instances is considered invalid except for sharding component.
 	//
 	// +optional
 	ScaleOut *ScaleOut `json:"scaleOut,omitempty"`
 
 	// Specifies the replica changes for scaling in components and instance templates,
 	// and takes specified instances offline. Can be used in conjunction with the "scaleOut" operation.
-	// Note: Any configuration that creates instances is considered invalid.
+	// Note: Any configuration that creates instances is considered invalid except for sharding component.
+	// +optional
 	ScaleIn *ScaleIn `json:"scaleIn,omitempty"`
 }
 
@@ -454,7 +465,11 @@ type ScaleOut struct {
 	// Defines the configuration for new instances added during scaling, including resource requirements, labels, annotations, etc.
 	// New instances are created based on the provided instance templates.
 	// +optional
-	NewInstances []InstanceTemplate `json:"newInstances,omitempty"`
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	NewInstances []InstanceTemplate `json:"newInstances,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// Specifies the instances in the offline list to bring back online.
 	// +optional
@@ -476,12 +491,16 @@ type ScaleIn struct {
 type ReplicaChanger struct {
 	// Specifies the replica changes for the component.
 	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:validation:Required
-	ReplicaChanges int32 `json:"replicaChanges"`
+	ReplicaChanges *int32 `json:"replicaChanges,omitempty"`
 
 	// Modifies the desired replicas count for existing InstanceTemplate.
+	// if the inst
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
 	// +optional
-	Instances []InstanceReplicasTemplate `json:"instances,omitempty"`
+	Instances []InstanceReplicasTemplate `json:"instances,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 }
 
 // InstanceReplicasTemplate defines the template for instance replicas.

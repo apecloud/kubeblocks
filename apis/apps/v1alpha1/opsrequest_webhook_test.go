@@ -396,7 +396,7 @@ var _ = Describe("OpsRequest webhook", func() {
 			ComponentOps: ComponentOps{ComponentName: componentName},
 			ScaleIn: &ScaleIn{
 				ReplicaChanger: ReplicaChanger{
-					ReplicaChanges: 1,
+					ReplicaChanges: pointer.Int32(1),
 					Instances:      []InstanceReplicasTemplate{{Name: "non-exist", ReplicaChanges: 1}},
 				},
 			},
@@ -407,7 +407,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{{
 			ComponentOps: ComponentOps{ComponentName: componentName},
 			ScaleIn: &ScaleIn{
-				ReplicaChanger: ReplicaChanger{ReplicaChanges: 3},
+				ReplicaChanger: ReplicaChanger{ReplicaChanges: pointer.Int32(3)},
 			},
 		}}
 		Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).Should(ContainSubstring(`"scaleIn.replicaChanges" can't be greater than 1`))
@@ -422,7 +422,7 @@ var _ = Describe("OpsRequest webhook", func() {
 			ComponentOps: ComponentOps{ComponentName: componentName},
 			ScaleIn: &ScaleIn{
 				ReplicaChanger: ReplicaChanger{
-					ReplicaChanges: 2,
+					ReplicaChanges: pointer.Int32(2),
 					Instances: []InstanceReplicasTemplate{
 						{Name: insTplName, ReplicaChanges: 3},
 					},
@@ -436,7 +436,7 @@ var _ = Describe("OpsRequest webhook", func() {
 			ComponentOps: ComponentOps{ComponentName: componentName},
 			ScaleOut: &ScaleOut{
 				ReplicaChanger: ReplicaChanger{
-					ReplicaChanges: 2,
+					ReplicaChanges: pointer.Int32(2),
 					Instances: []InstanceReplicasTemplate{
 						{Name: insTplName, ReplicaChanges: 3},
 					},
@@ -450,7 +450,7 @@ var _ = Describe("OpsRequest webhook", func() {
 			ComponentOps: ComponentOps{ComponentName: componentName},
 			ScaleOut: &ScaleOut{
 				ReplicaChanger: ReplicaChanger{
-					ReplicaChanges: 2,
+					ReplicaChanges: pointer.Int32(2),
 				},
 				NewInstances: []InstanceTemplate{
 					{Name: insTplName, Replicas: pointer.Int32(2)},
@@ -460,25 +460,12 @@ var _ = Describe("OpsRequest webhook", func() {
 		Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).Should(ContainSubstring(
 			fmt.Sprintf(`new instance template "%s" already exists in component`, insTplName)))
 
-		By("expect an error when offline specified pod of the instance template but not specified the replicaChanges")
-		opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{{
-			ComponentOps: ComponentOps{ComponentName: componentName},
-			ScaleIn: &ScaleIn{
-				ReplicaChanger: ReplicaChanger{
-					ReplicaChanges: 1,
-				},
-				OnlineInstancesToOffline: []string{fmt.Sprintf("%s-%s-%s-0", clusterName, componentName, insTplName)},
-			},
-		}}
-		Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).Should(ContainSubstring(
-			fmt.Sprintf(`"replicaChanges" of the instance temaplte "%s" were not specified when offline instance`, insTplName)))
-
 		By("expect an error when replicaChanges of specified instance template is greater than the count of offline/online instances")
 		opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{{
 			ComponentOps: ComponentOps{ComponentName: componentName},
 			ScaleIn: &ScaleIn{
 				ReplicaChanger: ReplicaChanger{
-					ReplicaChanges: 1,
+					ReplicaChanges: pointer.Int32(1),
 					Instances: []InstanceReplicasTemplate{
 						{Name: insTplName, ReplicaChanges: 0},
 					},
@@ -487,26 +474,26 @@ var _ = Describe("OpsRequest webhook", func() {
 			},
 		}}
 		Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).Should(ContainSubstring(
-			fmt.Sprintf(`"replicaChanges" can't be less than 1 when 1 instances of the instance template "%s" are designated offline`, insTplName)))
+			fmt.Sprintf(`"replicaChanges" can't be less than 1 when 1 instances of the instance template "%s" are configured in onlineInstancesToOffline`, insTplName)))
 
 		By("expect an error when the length of offlineInstancesToOnline is greater than replicaChanges")
 		opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{{
 			ComponentOps: ComponentOps{ComponentName: componentName},
 			ScaleOut: &ScaleOut{
 				ReplicaChanger: ReplicaChanger{
-					ReplicaChanges: 0,
+					ReplicaChanges: pointer.Int32(0),
 				},
 				OfflineInstancesToOnline: []string{fmt.Sprintf("%s-%s-1", clusterName, componentName)},
 			},
 		}}
 		Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).Should(ContainSubstring(
-			`the length of "offlineInstancesToOnline" or "onlineInstancesToOffline" can't be greater than the "replicaChanges" for the component`))
+			`the length of offlineInstancesToOnline can't be greater than the "replicaChanges" for the component`))
 
 		By("expect an error when an instance that is not in the offline instances list for online operation")
 		opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{{
 			ComponentOps: ComponentOps{ComponentName: componentName},
 			ScaleOut: &ScaleOut{
-				ReplicaChanger:           ReplicaChanger{ReplicaChanges: 1},
+				ReplicaChanger:           ReplicaChanger{ReplicaChanges: pointer.Int32(1)},
 				OfflineInstancesToOnline: []string{fmt.Sprintf("%s-%s-0", clusterName, componentName)},
 			},
 		}}

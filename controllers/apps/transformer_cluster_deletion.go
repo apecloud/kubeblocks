@@ -91,7 +91,7 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	}
 
 	// delete components in the order that topology defined.
-	if err := deleteCompsOrdered(transCtx, dag); err != nil {
+	if err := deleteCompsInOrder4Terminate(transCtx, dag); err != nil {
 		return err
 	}
 
@@ -132,7 +132,7 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 		if shouldSkipObjOwnedByComp(o, *cluster) || isOwnedByInstanceSet(o) {
 			continue
 		}
-		// skip components objects since they are deleted in the previous step.
+		// skip component objects since they are deleted in the previous step.
 		if _, ok := o.(*appsv1alpha1.Component); ok {
 			continue
 		}
@@ -238,7 +238,7 @@ func shouldSkipObjOwnedByComp(obj client.Object, cluster appsv1alpha1.Cluster) b
 	return true
 }
 
-func deleteCompsOrdered(transCtx *clusterTransformContext, dag *graph.DAG) error {
+func deleteCompsInOrder4Terminate(transCtx *clusterTransformContext, dag *graph.DAG) error {
 	compNameSet, err := component.GetClusterComponentShortNameSet(transCtx.Context, transCtx.Client, transCtx.Cluster)
 	if err != nil {
 		return err
@@ -249,7 +249,5 @@ func deleteCompsOrdered(transCtx *clusterTransformContext, dag *graph.DAG) error
 	if err = loadNCheckClusterDefinition(transCtx, transCtx.Cluster); err != nil {
 		return err
 	}
-	transformer := &clusterComponentTransformer{}
-	handler := newCompHandler(transCtx, nil, nil, nil, deleteOp, true)
-	return transformer.handleComps(transCtx, dag, compNameSet, handler)
+	return deleteCompsInOrder(transCtx, dag, compNameSet, true)
 }

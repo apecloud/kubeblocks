@@ -110,7 +110,7 @@ var _ = Describe("clusterDeletionTransformer", func() {
 		dag = newDag(transCtx.Client.(model.GraphClient))
 	})
 
-	FIt("w/o terminate orders", func() {
+	It("w/o terminate orders", func() {
 		transCtx.Cluster.Spec.ClusterDefRef = ""
 		transCtx.Cluster.Spec.Topology = ""
 
@@ -122,7 +122,7 @@ var _ = Describe("clusterDeletionTransformer", func() {
 		Expect(dag.Vertices()).Should(HaveLen(1 + 3))
 	})
 
-	FIt("w/ terminate orders", func() {
+	It("w/ terminate orders", func() {
 		transformer := &clusterDeletionTransformer{}
 		err := transformer.Transform(transCtx, dag)
 		Expect(err).ShouldNot(BeNil())

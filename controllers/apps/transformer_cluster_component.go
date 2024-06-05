@@ -233,12 +233,12 @@ const (
 )
 
 func newCompHandler(transCtx *clusterTransformContext, compSpecs map[string]*appsv1alpha1.ClusterComponentSpec,
-	labels, annotations map[string]map[string]string, op int) compConditionalHandler {
+	labels, annotations map[string]map[string]string, op int, opts ...any) compConditionalHandler {
 	orders := definedOrders(transCtx, op)
 	if len(orders) == 0 {
-		return newParallelHandler(compSpecs, labels, annotations, op)
+		return newParallelHandler(compSpecs, labels, annotations, op, opts...)
 	}
-	return newOrderedHandler(compSpecs, labels, annotations, orders, op)
+	return newOrderedHandler(compSpecs, labels, annotations, orders, op, opts...)
 }
 
 func definedOrders(transCtx *clusterTransformContext, op int) []string {
@@ -268,7 +268,7 @@ func definedOrders(transCtx *clusterTransformContext, op int) []string {
 }
 
 func newParallelHandler(compSpecs map[string]*appsv1alpha1.ClusterComponentSpec,
-	labels, annotations map[string]map[string]string, op int) compConditionalHandler {
+	labels, annotations map[string]map[string]string, op int, opts ...any) compConditionalHandler {
 	switch op {
 	case createOp:
 		return &parallelCreateCompHandler{
@@ -279,7 +279,7 @@ func newParallelHandler(compSpecs map[string]*appsv1alpha1.ClusterComponentSpec,
 			},
 		}
 	case deleteOp:
-		return &parallelDeleteCompHandler{}
+		return (&parallelDeleteCompHandler{}).with(opts...)
 	case updateOp:
 		return &parallelUpdateCompHandler{
 			updateCompHandler: updateCompHandler{
@@ -294,7 +294,7 @@ func newParallelHandler(compSpecs map[string]*appsv1alpha1.ClusterComponentSpec,
 }
 
 func newOrderedHandler(compSpecs map[string]*appsv1alpha1.ClusterComponentSpec,
-	labels, annotations map[string]map[string]string, orders []string, op int) compConditionalHandler {
+	labels, annotations map[string]map[string]string, orders []string, op int, opts ...any) compConditionalHandler {
 	switch op {
 	case createOp:
 		return &orderedCreateCompHandler{
@@ -312,7 +312,7 @@ func newOrderedHandler(compSpecs map[string]*appsv1alpha1.ClusterComponentSpec,
 			},
 		}
 	case deleteOp:
-		return &orderedDeleteCompHandler{
+		return (&orderedDeleteCompHandler{
 			compOrderedOrder: compOrderedOrder{
 				orders: orders,
 			},
@@ -320,7 +320,7 @@ func newOrderedHandler(compSpecs map[string]*appsv1alpha1.ClusterComponentSpec,
 				orders: orders,
 			},
 			deleteCompHandler: deleteCompHandler{},
-		}
+		}).with(opts...)
 	case updateOp:
 		return &orderedUpdateCompHandler{
 			compOrderedOrder: compOrderedOrder{
@@ -493,7 +493,9 @@ func (h *createCompHandler) initClusterCompStatus(cluster *appsv1alpha1.Cluster,
 	cluster.Status.Components[compName] = appsv1alpha1.ClusterComponentStatus{}
 }
 
-type deleteCompHandler struct{}
+type deleteCompHandler struct {
+	terminate bool
+}
 
 func (h *deleteCompHandler) handle(transCtx *clusterTransformContext, dag *graph.DAG, compName string) error {
 	cluster := transCtx.Cluster
@@ -506,14 +508,16 @@ func (h *deleteCompHandler) handle(transCtx *clusterTransformContext, dag *graph
 		return nil
 	}
 	transCtx.Logger.Info(fmt.Sprintf("deleting component %s", comp.Name))
-	compCopy := comp.DeepCopy()
-	if comp.Annotations == nil {
-		comp.Annotations = make(map[string]string)
-	}
-	// update the scale-in annotation to component before deleting
-	comp.Annotations[constant.ComponentScaleInAnnotationKey] = trueVal
 	deleteCompVertex := graphCli.Do(dag, nil, comp, model.ActionDeletePtr(), nil)
-	graphCli.Do(dag, compCopy, comp, model.ActionUpdatePtr(), deleteCompVertex)
+	if !h.terminate { // scale-in
+		compCopy := comp.DeepCopy()
+		if comp.Annotations == nil {
+			comp.Annotations = make(map[string]string)
+		}
+		// update the scale-in annotation to component before deleting
+		comp.Annotations[constant.ComponentScaleInAnnotationKey] = trueVal
+		graphCli.Do(dag, compCopy, comp, model.ActionUpdatePtr(), deleteCompVertex)
+	}
 	return nil
 }
 
@@ -552,6 +556,13 @@ type parallelDeleteCompHandler struct {
 	deleteCompHandler
 }
 
+func (h *parallelDeleteCompHandler) with(opts ...any) compConditionalHandler {
+	if len(opts) > 0 {
+		h.terminate = opts[0].(bool)
+	}
+	return h
+}
+
 type parallelUpdateCompHandler struct {
 	compParallelOrder
 	compDummyPrecondition
@@ -568,6 +579,13 @@ type orderedDeleteCompHandler struct {
 	compOrderedOrder
 	compNotExistPrecondition
 	deleteCompHandler
+}
+
+func (h *orderedDeleteCompHandler) with(opts ...any) compConditionalHandler {
+	if len(opts) > 0 {
+		h.terminate = opts[0].(bool)
+	}
+	return h
 }
 
 type orderedUpdateCompHandler struct {

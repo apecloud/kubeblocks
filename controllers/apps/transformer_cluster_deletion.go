@@ -38,6 +38,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -90,6 +91,11 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 		return err
 	}
 
+	// delete components in the order that topology defined.
+	if err := deleteCompsOrdered(transCtx, dag); err != nil {
+		return err
+	}
+
 	toDeleteObjs := func(objs owningObjects) []client.Object {
 		var delObjs []client.Object
 		for _, obj := range objs {
@@ -125,6 +131,10 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	for _, o := range delObjs {
 		// skip the objects owned by the component and InstanceSet controller
 		if shouldSkipObjOwnedByComp(o, *cluster) || isOwnedByInstanceSet(o) {
+			continue
+		}
+		// skip components objects since they are deleted in the previous step.
+		if _, ok := o.(*appsv1alpha1.Component); ok {
 			continue
 		}
 		graphCli.Delete(dag, o, inUniversalContext4G())
@@ -237,4 +247,20 @@ func shouldSkipObjOwnedByComp(obj client.Object, cluster appsv1alpha1.Cluster) b
 		}
 	}
 	return true
+}
+
+func deleteCompsOrdered(transCtx *clusterTransformContext, dag *graph.DAG) error {
+	compNameSet, err := component.GetClusterComponentShortNameSet(transCtx.Context, transCtx.Client, transCtx.Cluster)
+	if err != nil {
+		return err
+	}
+	if len(compNameSet) == 0 {
+		return nil
+	}
+	if err = loadNCheckClusterDefinition(transCtx, transCtx.Cluster); err != nil {
+		return err
+	}
+	transformer := &clusterComponentTransformer{}
+	handler := newCompHandler(transCtx, nil, nil, nil, deleteOp, true)
+	return transformer.handleComps(transCtx, dag, compNameSet, handler)
 }

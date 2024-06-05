@@ -150,6 +150,12 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 		graphCli.Delete(dag, comp)
 	}
 
+	// release the allocated host-network ports for the component
+	pm := intctrlutil.GetPortManager()
+	if err = pm.ReleaseByPrefix(comp.Name); err != nil {
+		return newRequeueError(time.Second*1, fmt.Sprintf("release host ports for component %s error: %s", comp.Name, err.Error()))
+	}
+
 	// fast return, that is stopping the plan.Build() stage and jump to plan.Execute() directly
 	return graph.ErrPrematureStop
 }

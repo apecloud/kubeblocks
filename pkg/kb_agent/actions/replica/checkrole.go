@@ -23,20 +23,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers/models"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
@@ -116,11 +112,9 @@ func (s *CheckRole) Do(ctx context.Context, _ *actions.OpsRequest) (*actions.Ops
 		return resp, nil
 	}
 
-	cluster := s.dcsStore.GetClusterFromCache()
-
 	ctx1, cancel := context.WithTimeout(ctx, s.Timeout)
 	defer cancel()
-	role, err = s.Handler.GetReplicaRole(ctx1, cluster)
+	role, err = s.Handler.GetReplicaRole(ctx1)
 
 	if err != nil {
 		s.Logger.Info("executing checkRole error", "error", err.Error())
@@ -145,27 +139,7 @@ func (s *CheckRole) Do(ctx context.Context, _ *actions.OpsRequest) (*actions.Ops
 		return nil, nil
 	}
 
-	// When network partition occurs, the new primary needs to send global role change information to the controller.
-	isLeader, err := s.Handler.IsLeader(ctx, cluster)
-	if err != nil {
-		if err != models.ErrNotImplemented {
-			return nil, err
-		}
-		isLeader = models.IsLikelyPrimaryRole(role)
-	}
-
-	if isLeader {
-		// we need to get latest member info to build global role snapshot
-		members, err := s.dcsStore.GetMembers()
-		if err != nil {
-			return nil, err
-		}
-		cluster.Members = members
-		resp.Data["role"] = s.buildGlobalRoleSnapshot(cluster, role)
-	} else {
-		resp.Data["role"] = role
-	}
-
+	resp.Data["role"] = role
 	resp.Data["event"] = util.OperationSuccess
 	s.OriRole = role
 	err = util.SentEventForProbe(ctx, resp.Data)
@@ -198,41 +172,4 @@ func (s *CheckRole) roleValidate(role string) (bool, string) {
 		msg = fmt.Sprintf("role %s is not configured in cluster definition %v", role, s.DBRoles)
 	}
 	return isValid, msg
-}
-
-func (s *CheckRole) buildGlobalRoleSnapshot(cluster *dcs.Cluster, role string) string {
-	currentMemberName := s.Handler.GetCurrentMemberName()
-	roleSnapshot := &common.GlobalRoleSnapshot{
-		Version: strconv.FormatInt(metav1.NowMicro().UnixMicro(), 10),
-		PodRoleNamePairs: []common.PodRoleNamePair{
-			{
-				PodName:  currentMemberName,
-				RoleName: role,
-				PodUID:   cluster.GetMemberWithName(currentMemberName).UID,
-			},
-		},
-	}
-
-	for _, member := range cluster.Members {
-		s.Logger.V(1).Info("check member", "member", member.Name, "role", member.Role)
-		if member.Name != currentMemberName {
-			// get old primary and set it's role to none
-			if strings.EqualFold(member.Role, role) {
-				s.Logger.Info("there is a another leader", "member", member.Name)
-				if member.IsKBAgentReady() {
-					s.Logger.Info("another leader's kb-agent is online, just ignore", "member", member.Name)
-					continue
-				}
-				s.Logger.Info("reset old leader role to none", "member", member.Name)
-				roleSnapshot.PodRoleNamePairs = append(roleSnapshot.PodRoleNamePairs, common.PodRoleNamePair{
-					PodName:  member.Name,
-					RoleName: "",
-					PodUID:   cluster.GetMemberWithName(member.Name).UID,
-				})
-			}
-		}
-	}
-
-	b, _ := json.Marshal(roleSnapshot)
-	return string(b)
 }

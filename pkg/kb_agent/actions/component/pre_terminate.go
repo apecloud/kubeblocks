@@ -56,6 +56,6 @@ func (s *PreTerminate) Init(ctx context.Context) error {
 }
 
 func (s *PreTerminate) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
-	err := s.Handler.PreTerminate(ctx, nil)
+	err := s.Handler.PreTerminate(ctx)
 	return nil, err
 }

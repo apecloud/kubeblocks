@@ -60,6 +60,6 @@ func (s *PostProvision) PreCheck(ctx context.Context, req *actions.OpsRequest) e
 }
 
 func (s *PostProvision) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
-	err := s.Handler.PostProvision(ctx, nil)
+	err := s.Handler.PostProvision(ctx)
 	return nil, err
 }

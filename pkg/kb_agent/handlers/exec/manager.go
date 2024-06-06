@@ -23,13 +23,11 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"strings"
 
 	"github.com/spf13/viper"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
@@ -92,7 +90,7 @@ func (h *Handler) InitComponentDefinitionActions() error {
 // - KB_MEMBER_ADDRESSES: The addresses of all members.
 // - KB_NEW_MEMBER_POD_NAME: The name of the new member's Pod.
 // - KB_NEW_MEMBER_POD_IP: The name of the new member's Pod.
-func (h *Handler) JoinMember(ctx context.Context, cluster *dcs.Cluster, memberName string) error {
+func (h *Handler) JoinMember(ctx context.Context, primary string) error {
 	memberJoinCmd, ok := h.actionCommands[constant.MemberJoinAction]
 	if !ok || len(memberJoinCmd) == 0 {
 		h.Logger.Info("member join command is empty!")
@@ -103,22 +101,8 @@ func (h *Handler) JoinMember(ctx context.Context, cluster *dcs.Cluster, memberNa
 		return err
 	}
 
-	if cluster.Leader != nil && cluster.Leader.Name != "" {
-		leaderMember := cluster.GetMemberWithName(cluster.Leader.Name)
-		fqdn := cluster.GetMemberAddr(*leaderMember)
-		envs = append(envs, "KB_PRIMARY_POD_FQDN"+"="+fqdn)
-	}
+	envs = append(envs, "KB_PRIMARY_POD_FQDN"+"="+primary)
 
-	addrs := cluster.GetMemberAddrs()
-	envs = append(envs, "KB_MEMBER_ADDRESSES"+"="+strings.Join(addrs, ","))
-	envs = append(envs, "KB_NEW_MEMBER_POD_NAME"+"="+h.CurrentMemberName)
-	if memberName == "" {
-		memberName = h.CurrentMemberName
-	}
-	member := cluster.GetMemberWithName(memberName)
-	if member != nil {
-		envs = append(envs, "KB_NEW_MEMBER_POD_IP"+"="+member.PodIP)
-	}
 	output, err := h.Executor.ExecCommand(ctx, memberJoinCmd, envs)
 
 	if output != "" {
@@ -136,26 +120,15 @@ func (h *Handler) JoinMember(ctx context.Context, cluster *dcs.Cluster, memberNa
 // - KB_MEMBER_ADDRESSES: The addresses of all members.
 // - KB_LEAVE_MEMBER_POD_NAME: The name of the leave member's Pod.
 // - KB_LEAVE_MEMBER_POD_IP: The IP of the leave member's Pod.
-func (h *Handler) LeaveMember(ctx context.Context, cluster *dcs.Cluster, memberName string) error {
+func (h *Handler) LeaveMember(ctx context.Context, primary string) error {
 	memberLeaveCmd, ok := h.actionCommands[constant.MemberLeaveAction]
 	if !ok || len(memberLeaveCmd) == 0 {
 		h.Logger.Info("member leave command is empty!")
 		return nil
 	}
 	envs := os.Environ()
-	if cluster.Leader != nil && cluster.Leader.Name != "" {
-		leaderMember := cluster.GetMemberWithName(cluster.Leader.Name)
-		fqdn := cluster.GetMemberAddr(*leaderMember)
-		envs = append(envs, "KB_PRIMARY_POD_FQDN"+"="+fqdn)
-	}
+	envs = append(envs, "KB_PRIMARY_POD_FQDN"+"="+primary)
 
-	addrs := cluster.GetMemberAddrs()
-	envs = append(envs, "KB_MEMBER_ADDRESSES"+"="+strings.Join(addrs, ","))
-	envs = append(envs, "KB_LEAVE_MEMBER_POD_NAME"+"="+memberName)
-	member := cluster.GetMemberWithName(memberName)
-	if member != nil {
-		envs = append(envs, "KB_LEAVE_MEMBER_POD_IP"+"="+member.PodIP)
-	}
 	output, err := h.Executor.ExecCommand(ctx, memberLeaveCmd, envs)
 
 	if output != "" {
@@ -164,13 +137,13 @@ func (h *Handler) LeaveMember(ctx context.Context, cluster *dcs.Cluster, memberN
 	return err
 }
 
-// MemberHealthCheck provides the following dedicated environment variables for the action:
+// HealthyCheck provides the following dedicated environment variables for the action:
 //
 // - KB_POD_FQDN: The FQDN of the replica pod to check the role.
 // - KB_SERVICE_PORT: The port on which the DB service listens.
 // - KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
 // - KB_SERVICE_PASSWORD: The password of the user used to access the DB service .
-func (h *Handler) MemberHealthCheck(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) error {
+func (h *Handler) HealthyCheck(ctx context.Context) error {
 	healthyCheckCmd, ok := h.actionCommands[constant.CheckHealthyAction]
 	if !ok || len(healthyCheckCmd) == 0 {
 		h.Logger.Info("member healthyCheck command is empty!")
@@ -188,16 +161,16 @@ func (h *Handler) MemberHealthCheck(ctx context.Context, cluster *dcs.Cluster, m
 	return err
 }
 
-// Lock provides the following dedicated environment variables for the action:
+// ReadOnly provides the following dedicated environment variables for the action:
 //
 // - KB_POD_FQDN: The FQDN of the replica pod to check the role.
 // - KB_SERVICE_PORT: The port on which the DB service listens.
 // - KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
 // - KB_SERVICE_PASSWORD: The password of the user used to access the DB service .
-func (h *Handler) Lock(ctx context.Context, reason string) error {
+func (h *Handler) ReadOnly(ctx context.Context, reason string) error {
 	readonlyCmd, ok := h.actionCommands[constant.ReadonlyAction]
 	if !ok || len(readonlyCmd) == 0 {
-		h.Logger.Info("member lock command is empty!")
+		h.Logger.Info("member ReadOnly command is empty!")
 		return nil
 	}
 	envs, err := util.GetGlobalSharedEnvs()
@@ -207,21 +180,21 @@ func (h *Handler) Lock(ctx context.Context, reason string) error {
 	output, err := h.Executor.ExecCommand(ctx, readonlyCmd, envs)
 
 	if output != "" {
-		h.Logger.Info("member lock", "output", output)
+		h.Logger.Info("member ReadOnly", "output", output)
 	}
 	return err
 }
 
-// Unlock provides the following dedicated environment variables for the action:
+// ReadWrite provides the following dedicated environment variables for the action:
 //
 // - KB_POD_FQDN: The FQDN of the replica pod to check the role.
 // - KB_SERVICE_PORT: The port on which the DB service listens.
 // - KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
 // - KB_SERVICE_PASSWORD: The password of the user used to access the DB service .
-func (h *Handler) Unlock(ctx context.Context, reason string) error {
+func (h *Handler) ReadWrite(ctx context.Context, reason string) error {
 	readWriteCmd, ok := h.actionCommands[constant.ReadWriteAction]
 	if !ok || len(readWriteCmd) == 0 {
-		h.Logger.Info("member unlock command is empty!")
+		h.Logger.Info("member ReadWrite command is empty!")
 		return nil
 	}
 	envs, err := util.GetGlobalSharedEnvs()
@@ -231,7 +204,7 @@ func (h *Handler) Unlock(ctx context.Context, reason string) error {
 	output, err := h.Executor.ExecCommand(ctx, readWriteCmd, envs)
 
 	if output != "" {
-		h.Logger.Info("member unlock", "output", output)
+		h.Logger.Info("member ReadWrite", "output", output)
 	}
 	return err
 }
@@ -246,7 +219,7 @@ func (h *Handler) Unlock(ctx context.Context, reason string) error {
 // - KB_CLUSTER_COMPONENT_POD_IP_LIST: Lists the IP addresses of each pod in this component, corresponding one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST. Joined by ',' (e.g., "podIp1,podIp2").
 // - KB_CLUSTER_COMPONENT_POD_HOST_NAME_LIST: Lists the host names where each pod resides in this component, corresponding one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST. Joined by ',' (e.g., "hostName1,hostName2").
 // - KB_CLUSTER_COMPONENT_POD_HOST_IP_LIST: Lists the host IP addresses where each pod resides in this component, corresponding one-to-one with each pod in the KB_CLUSTER_COMPONENT_POD_NAME_LIST. Joined by ',' (e.g., "hostIp1,hostIp2").
-func (h *Handler) PostProvision(ctx context.Context, _ *dcs.Cluster) error {
+func (h *Handler) PostProvision(ctx context.Context) error {
 	postProvisionCmd, ok := h.actionCommands[constant.PostProvisionAction]
 	if !ok || len(postProvisionCmd) == 0 {
 		h.Logger.Info("component postprovision command is empty!")
@@ -276,7 +249,7 @@ func (h *Handler) PostProvision(ctx context.Context, _ *dcs.Cluster) error {
 // - KB_SERVICE_PORT: The port on which the DB service listens.
 // - KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
 // - KB_SERVICE_PASSWORD: The password of the user used to access the DB service .
-func (h *Handler) PreTerminate(ctx context.Context, _ *dcs.Cluster) error {
+func (h *Handler) PreTerminate(ctx context.Context) error {
 	preTerminateCmd, ok := h.actionCommands[constant.PreTerminateAction]
 	if !ok || len(preTerminateCmd) == 0 {
 		h.Logger.Info("component preterminate command is empty!")

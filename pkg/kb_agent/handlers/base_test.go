@@ -67,40 +67,26 @@ func TestHandlerBase(t *testing.T) {
 
 	assert.Equal(t, viper.GetString(constant.KBEnvPodName), mgr.GetCurrentMemberName())
 
-	isLeader, err := mgr.IsLeader(context.Background(), nil)
-	assert.False(t, isLeader)
+	err = mgr.HealthyCheck(context.Background())
+	assert.NoError(t, err)
+
+	err = mgr.JoinMember(context.Background(), "")
+	assert.NoError(t, err)
+
+	err = mgr.LeaveMember(context.Background(), "")
+	assert.NoError(t, err)
+
+	err = mgr.DataLoad(context.Background())
 	assert.EqualError(t, err, models.ErrNotImplemented.Error())
 
-	err = mgr.MemberHealthyCheck(context.Background(), nil, nil)
-	assert.NoError(t, err)
-
-	err = mgr.JoinMember(context.Background(), nil, "")
-	assert.NoError(t, err)
-
-	err = mgr.LeaveMember(context.Background(), nil, "")
-	assert.NoError(t, err)
-
-	lag, err := mgr.GetLag(context.Background(), nil)
-	assert.Equal(t, int64(0), lag)
+	err = mgr.DataDump(context.Background())
 	assert.EqualError(t, err, models.ErrNotImplemented.Error())
 
-	err = mgr.MoveData(context.Background(), nil)
-	assert.NoError(t, err)
+	err = mgr.Switchover(context.Background(), "", "")
+	assert.EqualError(t, err, models.ErrNotImplemented.Error())
 
-	role, err := mgr.GetReplicaRole(context.Background(), nil)
+	role, err := mgr.GetReplicaRole(context.Background())
 	assert.Equal(t, "", role)
-	assert.EqualError(t, err, models.ErrNotImplemented.Error())
-
-	execResult, err := mgr.Exec(context.Background(), "")
-	assert.Equal(t, int64(0), execResult)
-	assert.EqualError(t, err, models.ErrNotImplemented.Error())
-
-	queryResult, err := mgr.Query(context.Background(), "")
-	assert.Equal(t, []byte{}, queryResult)
-	assert.EqualError(t, err, models.ErrNotImplemented.Error())
-
-	port, err := mgr.GetPort()
-	assert.Equal(t, 0, port)
 	assert.EqualError(t, err, models.ErrNotImplemented.Error())
 
 	users, err := mgr.ListUsers(context.Background())
@@ -129,16 +115,16 @@ func TestHandlerBase(t *testing.T) {
 
 	assert.False(t, mgr.IsRunning())
 
-	err = mgr.PostProvision(context.Background(), nil)
+	err = mgr.PostProvision(context.Background())
 	assert.NoError(t, err)
 
-	err = mgr.PreTerminate(context.Background(), nil)
+	err = mgr.PreTerminate(context.Background())
 	assert.NoError(t, err)
 
-	err = mgr.Lock(context.Background(), "")
+	err = mgr.ReadOnly(context.Background(), "")
 	assert.EqualError(t, err, models.ErrNotImplemented.Error())
 
-	err = mgr.Unlock(context.Background(), "")
+	err = mgr.ReadWrite(context.Background(), "")
 	assert.EqualError(t, err, models.ErrNotImplemented.Error())
 
 	mgr.ShutDownWithWait()

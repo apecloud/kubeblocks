@@ -22,11 +22,10 @@ package grpc
 import (
 	"context"
 
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/plugin"
 )
 
-func (h *Handler) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (string, error) {
+func (h *Handler) GetReplicaRole(ctx context.Context) (string, error) {
 	getRoleRequest := &plugin.GetRoleRequest{
 		EngineInfo: plugin.GetEngineInfo(),
 	}

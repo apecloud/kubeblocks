@@ -24,35 +24,24 @@ import (
 
 	"github.com/go-logr/logr"
 
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers/models"
 )
 
 type Handler interface {
+	// healthy check
 	IsRunning() bool
-
 	IsDBStartupReady() bool
-
-	// Member healthy check
-	MemberHealthyCheck(context.Context, *dcs.Cluster, *dcs.Member) error
-	GetLag(context.Context, *dcs.Cluster) (int64, error)
+	HealthyCheck(context.Context) error
 
 	// Functions related to replica member relationship.
-	IsLeader(context.Context, *dcs.Cluster) (bool, error)
-	GetReplicaRole(context.Context, *dcs.Cluster) (string, error)
-
-	JoinMember(context.Context, *dcs.Cluster, string) error
-	LeaveMember(context.Context, *dcs.Cluster, string) error
-
-	GetCurrentMemberName() string
+	GetReplicaRole(context.Context) (string, error)
+	JoinMember(context.Context, string) error
+	LeaveMember(context.Context, string) error
+	Switchover(context.Context, string, string) error
 
 	// Readonly lock for disk full
-	Lock(context.Context, string) error
-	Unlock(context.Context, string) error
-
-	// sql query
-	Exec(context.Context, string) (int64, error)
-	Query(context.Context, string) ([]byte, error)
+	ReadOnly(context.Context, string) error
+	ReadWrite(context.Context, string) error
 
 	// user management
 	ListUsers(context.Context) ([]models.UserInfo, error)
@@ -63,14 +52,13 @@ type Handler interface {
 	GrantUserRole(context.Context, string, string) error
 	RevokeUserRole(context.Context, string, string) error
 
-	GetPort() (int, error)
+	DataLoad(context.Context) error
+	DataDump(context.Context) error
 
-	MoveData(context.Context, *dcs.Cluster) error
+	PostProvision(context.Context) error
+	PreTerminate(context.Context) error
 
-	PostProvision(context.Context, *dcs.Cluster) error
-	PreTerminate(context.Context, *dcs.Cluster) error
-
+	GetCurrentMemberName() string
 	GetLogger() logr.Logger
-
 	ShutDownWithWait()
 }

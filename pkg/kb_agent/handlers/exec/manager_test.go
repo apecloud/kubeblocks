@@ -27,7 +27,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers"
 	"github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -93,24 +92,22 @@ var _ = Describe("Handler", func() {
 	Describe("JoinMember", func() {
 		It("should execute member join command", func() {
 			ctx := context.TODO()
-			cluster := &dcs.Cluster{}
 			memberName := "member1"
 			handler.actionCommands[constant.MemberJoinAction] = []string{"command1"}
 			handler.Executor.(*MockExecutor).MockExecCommand = func(ctx context.Context, command []string, envs []string) (string, error) {
 				Expect(command).To(Equal([]string{"command1"}))
 				return "output for test", nil
 			}
-			err := handler.JoinMember(ctx, cluster, memberName)
+			err := handler.JoinMember(ctx, memberName)
 			Expect(err).NotTo(HaveOccurred())
 			// Add your assertions here
 		})
 
 		It("should handle empty member join command", func() {
 			ctx := context.TODO()
-			cluster := &dcs.Cluster{}
 			memberName := "member1"
 
-			err := handler.JoinMember(ctx, cluster, memberName)
+			err := handler.JoinMember(ctx, memberName)
 			Expect(err).NotTo(HaveOccurred())
 			// Add your assertions here
 		})
@@ -119,51 +116,45 @@ var _ = Describe("Handler", func() {
 	Describe("LeaveMember", func() {
 		It("should execute member leave command", func() {
 			ctx := context.TODO()
-			cluster := &dcs.Cluster{}
 			memberName := "member1"
 			handler.actionCommands[constant.MemberLeaveAction] = []string{"command1"}
 			handler.Executor.(*MockExecutor).MockExecCommand = func(ctx context.Context, command []string, envs []string) (string, error) {
 				Expect(command).To(Equal([]string{"command1"}))
 				return "output for test", nil
 			}
-			err := handler.LeaveMember(ctx, cluster, memberName)
+			err := handler.LeaveMember(ctx, memberName)
 			Expect(err).NotTo(HaveOccurred())
 			// Add your assertions here
 		})
 
 		It("should handle empty member leave command", func() {
 			ctx := context.TODO()
-			cluster := &dcs.Cluster{}
 			memberName := "member1"
 
-			err := handler.LeaveMember(ctx, cluster, memberName)
+			err := handler.LeaveMember(ctx, memberName)
 			Expect(err).NotTo(HaveOccurred())
 			// Add your assertions here
 		})
 	})
 
-	Describe("MemberHealthCheck", func() {
+	Describe("HealthyCheck", func() {
 		It("should execute member health check command", func() {
 			ctx := context.TODO()
-			cluster := &dcs.Cluster{}
-			member := &dcs.Member{}
 			handler.actionCommands[constant.CheckHealthyAction] = []string{"command1"}
 
 			handler.Executor.(*MockExecutor).MockExecCommand = func(ctx context.Context, command []string, envs []string) (string, error) {
 				Expect(command).To(Equal([]string{"command1"}))
 				return "output for test", nil
 			}
-			err := handler.MemberHealthCheck(ctx, cluster, member)
+			err := handler.HealthyCheck(ctx)
 			Expect(err).NotTo(HaveOccurred())
 			// Add your assertions here
 		})
 
 		It("should handle empty member health check command", func() {
 			ctx := context.TODO()
-			cluster := &dcs.Cluster{}
-			member := &dcs.Member{}
 
-			err := handler.MemberHealthCheck(ctx, cluster, member)
+			err := handler.HealthyCheck(ctx)
 			Expect(err).NotTo(HaveOccurred())
 			// Add your assertions here
 		})
@@ -179,7 +170,7 @@ var _ = Describe("Handler", func() {
 				Expect(command).To(Equal([]string{"command1"}))
 				return "output for test", nil
 			}
-			err := handler.Lock(ctx, reason)
+			err := handler.ReadOnly(ctx, reason)
 			Expect(err).NotTo(HaveOccurred())
 			// Add your assertions here
 		})
@@ -188,7 +179,7 @@ var _ = Describe("Handler", func() {
 			ctx := context.TODO()
 			reason := "reason1"
 
-			err := handler.Lock(ctx, reason)
+			err := handler.ReadOnly(ctx, reason)
 			Expect(err).NotTo(HaveOccurred())
 			// Add your assertions here
 		})
@@ -204,7 +195,7 @@ var _ = Describe("Handler", func() {
 				Expect(command).To(Equal([]string{"command1"}))
 				return "output for test", nil
 			}
-			err := handler.Unlock(ctx, reason)
+			err := handler.ReadWrite(ctx, reason)
 			Expect(err).NotTo(HaveOccurred())
 			// Add your assertions here
 		})
@@ -213,7 +204,7 @@ var _ = Describe("Handler", func() {
 			ctx := context.TODO()
 			reason := "reason1"
 
-			err := handler.Unlock(ctx, reason)
+			err := handler.ReadWrite(ctx, reason)
 			Expect(err).NotTo(HaveOccurred())
 			// Add your assertions here
 		})
@@ -222,23 +213,21 @@ var _ = Describe("Handler", func() {
 	Describe("PostProvision", func() {
 		It("should execute post-provision command", func() {
 			ctx := context.TODO()
-			cluster := &dcs.Cluster{}
 			handler.actionCommands[constant.PostProvisionAction] = []string{"command1"}
 
 			handler.Executor.(*MockExecutor).MockExecCommand = func(ctx context.Context, command []string, envs []string) (string, error) {
 				Expect(command).To(Equal([]string{"command1"}))
 				return "output for test", nil
 			}
-			err := handler.PostProvision(ctx, cluster)
+			err := handler.PostProvision(ctx)
 			Expect(err).NotTo(HaveOccurred())
 			// Add your assertions here
 		})
 
 		It("should handle empty post-provision command", func() {
 			ctx := context.TODO()
-			cluster := &dcs.Cluster{}
 
-			err := handler.PostProvision(ctx, cluster)
+			err := handler.PostProvision(ctx)
 			Expect(err).NotTo(HaveOccurred())
 			// Add your assertions here
 		})
@@ -247,23 +236,21 @@ var _ = Describe("Handler", func() {
 	Describe("PreTerminate", func() {
 		It("should execute pre-terminate command", func() {
 			ctx := context.TODO()
-			cluster := &dcs.Cluster{}
 			handler.actionCommands[constant.PreTerminateAction] = []string{"command1"}
 
 			handler.Executor.(*MockExecutor).MockExecCommand = func(ctx context.Context, command []string, envs []string) (string, error) {
 				Expect(command).To(Equal([]string{"command1"}))
 				return "output for test", nil
 			}
-			err := handler.PreTerminate(ctx, cluster)
+			err := handler.PreTerminate(ctx)
 			Expect(err).NotTo(HaveOccurred())
 			// Add your assertions here
 		})
 
 		It("should handle empty pre-terminate command", func() {
 			ctx := context.TODO()
-			cluster := &dcs.Cluster{}
 
-			err := handler.PreTerminate(ctx, cluster)
+			err := handler.PreTerminate(ctx)
 			Expect(err).NotTo(HaveOccurred())
 			// Add your assertions here
 		})

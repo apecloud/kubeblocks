@@ -27,7 +27,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
 )
 
 // GetReplicaRole provides the following dedicated environment variables for the action:
@@ -36,7 +35,7 @@ import (
 // - KB_SERVICE_PORT: The port on which the DB service listens.
 // - KB_SERVICE_USER: The username used to access the DB service and retrieve the role information with sufficient privileges.
 // - KB_SERVICE_PASSWORD: The password of the user used to access the DB service and retrieve the role information.
-func (h *Handler) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (string, error) {
+func (h *Handler) GetReplicaRole(ctx context.Context) (string, error) {
 	roleProbeCmd, ok := h.actionCommands[constant.RoleProbeAction]
 	if !ok || len(roleProbeCmd) == 0 {
 		return "", errors.New("role probe commands is empty!")

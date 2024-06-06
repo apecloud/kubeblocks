@@ -32,30 +32,30 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
-type Unlock struct {
+type Lock struct {
 	actions.Base
 	Timeout time.Duration
 }
 
-var unlock actions.Action = &Unlock{}
+var lock actions.Action = &Lock{}
 
 func init() {
-	err := actions.Register(strings.ToLower(string(util.UnlockOperation)), unlock)
+	err := actions.Register(strings.ToLower(string(util.LockOperation)), lock)
 	if err != nil {
 		panic(err.Error())
 	}
 }
 
-func (s *Unlock) Init(ctx context.Context) error {
-	s.Logger = ctrl.Log.WithName("Unlock")
-	s.Action = constant.ReadWriteAction
+func (s *Lock) Init(ctx context.Context) error {
+	s.Logger = ctrl.Log.WithName("ReadOnly")
+	s.Action = constant.ReadonlyAction
 	return s.Base.Init(ctx)
 }
 
-func (s *Unlock) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
-	err := s.Handler.Unlock(ctx, "")
+func (s *Lock) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
+	err := s.Handler.ReadOnly(ctx, "disk full")
 	if err != nil {
-		return nil, errors.Wrap(err, "Unlock DB failed")
+		return nil, errors.Wrap(err, "set DB readonly failed")
 	}
 
 	return nil, nil

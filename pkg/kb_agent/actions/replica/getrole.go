@@ -65,8 +65,7 @@ func (s *GetRole) Do(ctx context.Context, req *actions.OpsRequest) (*actions.Ops
 		Data: map[string]any{},
 	}
 	resp.Data["operation"] = util.GetRoleOperation
-	cluster := s.dcsStore.GetClusterFromCache()
-	role, err := s.Handler.GetReplicaRole(ctx, cluster)
+	role, err := s.Handler.GetReplicaRole(ctx)
 
 	if err != nil {
 		s.Logger.Info("executing getrole error", "error", err.Error())

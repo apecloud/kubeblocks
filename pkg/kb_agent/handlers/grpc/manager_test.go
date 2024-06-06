@@ -27,7 +27,6 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/plugin"
 	"github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -35,13 +34,11 @@ import (
 var _ = Describe("GRPC Handler", func() {
 	var (
 		handler *Handler
-		cluster *dcs.Cluster
 		ctx     context.Context
 	)
 
 	BeforeEach(func() {
 		handler = &Handler{}
-		cluster = &dcs.Cluster{}
 		ctx = context.Background()
 	})
 
@@ -109,10 +106,12 @@ var _ = Describe("GRPC Handler", func() {
 
 	Describe("JoinMember", func() {
 		It("should call dbClient.JoinMember with the correct request", func() {
+			primaryFQDN := "test-pod-0"
 			mockJoinMember := &plugin.JoinMemberRequest{
-				EngineInfo: &plugin.EngineInfo{},
-				NewMember:  handler.CurrentMemberName,
-				Members:    cluster.GetMemberAddrs(),
+				EngineInfo: &plugin.EngineInfo{
+					Fqdn: primaryFQDN,
+				},
+				NewMember: handler.CurrentMemberName,
 			}
 			mockJoinMemberFunc := func(ctx context.Context, req *plugin.JoinMemberRequest) (*plugin.JoinMemberResponse, error) {
 				Expect(req).To(Equal(mockJoinMember))
@@ -122,17 +121,17 @@ var _ = Describe("GRPC Handler", func() {
 				mockJoinMember: mockJoinMemberFunc,
 			}
 
-			Expect(handler.JoinMember(ctx, cluster, "memberName")).To(Succeed())
+			Expect(handler.JoinMember(ctx, primaryFQDN)).To(Succeed())
 		})
 	})
 
 	Describe("LeaveMember", func() {
 		It("should call dbClient.LeaveMember with the correct request", func() {
-			memberName := "test-pod-0"
+			primaryFQDN := "test-pod-0"
 			mockLeaveMember := &plugin.LeaveMemberRequest{
-				EngineInfo:  &plugin.EngineInfo{},
-				LeaveMember: memberName,
-				Members:     cluster.GetMemberAddrs(),
+				EngineInfo: &plugin.EngineInfo{
+					Fqdn: primaryFQDN,
+				},
 			}
 			mockLeaveMemberFunc := func(ctx context.Context, req *plugin.LeaveMemberRequest) (*plugin.LeaveMemberResponse, error) {
 				Expect(req).To(Equal(mockLeaveMember))
@@ -142,18 +141,18 @@ var _ = Describe("GRPC Handler", func() {
 				mockLeaveMember: mockLeaveMemberFunc,
 			}
 
-			Expect(handler.LeaveMember(ctx, cluster, memberName)).To(Succeed())
+			Expect(handler.LeaveMember(ctx, primaryFQDN)).To(Succeed())
 		})
 	})
 
 	Describe("Lock", func() {
 		It("should call dbClient.Readonly with the correct request", func() {
 			reason := "reason for test lock"
-			mockReadonly := &plugin.ReadonlyRequest{
+			mockReadonly := &plugin.ReadOnlyRequest{
 				EngineInfo: &plugin.EngineInfo{},
 				Reason:     reason,
 			}
-			mockReadonlyFunc := func(ctx context.Context, req *plugin.ReadonlyRequest) (*plugin.ReadonlyResponse, error) {
+			mockReadonlyFunc := func(ctx context.Context, req *plugin.ReadOnlyRequest) (*plugin.ReadOnlyResponse, error) {
 				Expect(req).To(Equal(mockReadonly))
 				return nil, nil
 			}
@@ -168,11 +167,11 @@ var _ = Describe("GRPC Handler", func() {
 	Describe("Unlock", func() {
 		It("should call dbClient.Readwrite with the correct request", func() {
 			reason := "reason for test unlock"
-			mockReadwrite := &plugin.ReadwriteRequest{
+			mockReadwrite := &plugin.ReadWriteRequest{
 				EngineInfo: &plugin.EngineInfo{},
 				Reason:     reason,
 			}
-			mockReadwriteFunc := func(ctx context.Context, req *plugin.ReadwriteRequest) (*plugin.ReadwriteResponse, error) {
+			mockReadwriteFunc := func(ctx context.Context, req *plugin.ReadWriteRequest) (*plugin.ReadWriteResponse, error) {
 				Expect(req).To(Equal(mockReadwrite))
 				return nil, nil
 			}
@@ -192,8 +191,8 @@ type mockEnginePluginClient struct {
 	mockIsEngineReady func(ctx context.Context, req *plugin.IsEngineReadyRequest) (*plugin.IsEngineReadyResponse, error)
 	mockJoinMember    func(ctx context.Context, req *plugin.JoinMemberRequest) (*plugin.JoinMemberResponse, error)
 	mockLeaveMember   func(ctx context.Context, req *plugin.LeaveMemberRequest) (*plugin.LeaveMemberResponse, error)
-	mockReadonly      func(ctx context.Context, req *plugin.ReadonlyRequest) (*plugin.ReadonlyResponse, error)
-	mockReadwrite     func(ctx context.Context, req *plugin.ReadwriteRequest) (*plugin.ReadwriteResponse, error)
+	mockReadonly      func(ctx context.Context, req *plugin.ReadOnlyRequest) (*plugin.ReadOnlyResponse, error)
+	mockReadwrite     func(ctx context.Context, req *plugin.ReadWriteRequest) (*plugin.ReadWriteResponse, error)
 }
 
 func (m *mockEnginePluginClient) GetRole(ctx context.Context, req *plugin.GetRoleRequest, opts ...grpc.CallOption) (*plugin.GetRoleResponse, error) {
@@ -224,14 +223,14 @@ func (m *mockEnginePluginClient) LeaveMember(ctx context.Context, req *plugin.Le
 	return nil, nil
 }
 
-func (m *mockEnginePluginClient) Readonly(ctx context.Context, req *plugin.ReadonlyRequest, opts ...grpc.CallOption) (*plugin.ReadonlyResponse, error) {
+func (m *mockEnginePluginClient) Readonly(ctx context.Context, req *plugin.ReadOnlyRequest, opts ...grpc.CallOption) (*plugin.ReadOnlyResponse, error) {
 	if m.mockReadonly != nil {
 		return m.mockReadonly(ctx, req)
 	}
 	return nil, nil
 }
 
-func (m *mockEnginePluginClient) Readwrite(ctx context.Context, req *plugin.ReadwriteRequest, opts ...grpc.CallOption) (*plugin.ReadwriteResponse, error) {
+func (m *mockEnginePluginClient) Readwrite(ctx context.Context, req *plugin.ReadWriteRequest, opts ...grpc.CallOption) (*plugin.ReadWriteResponse, error) {
 	if m.mockReadwrite != nil {
 		return m.mockReadwrite(ctx, req)
 	}

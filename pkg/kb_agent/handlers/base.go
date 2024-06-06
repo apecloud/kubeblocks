@@ -43,6 +43,8 @@ type HandlerBase struct {
 	DBState           *dcs.DBState
 }
 
+var _ Handler = &HandlerBase{}
+
 func NewHandlerBase(logger logr.Logger) (*HandlerBase, error) {
 	currentMemberName := viper.GetString(constant.KBEnvPodName)
 	if currentMemberName == "" {
@@ -75,40 +77,32 @@ func (mgr *HandlerBase) GetCurrentMemberName() string {
 	return mgr.CurrentMemberName
 }
 
-func (mgr *HandlerBase) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
-	return false, models.ErrNotImplemented
+func (mgr *HandlerBase) Switchover(ctx context.Context, primary, candidate string) error {
+	return models.ErrNotImplemented
 }
 
-func (mgr *HandlerBase) MemberHealthyCheck(context.Context, *dcs.Cluster, *dcs.Member) error {
+func (mgr *HandlerBase) HealthyCheck(context.Context) error {
 	return nil
 }
 
-func (mgr *HandlerBase) JoinMember(context.Context, *dcs.Cluster, string) error {
+func (mgr *HandlerBase) JoinMember(context.Context, string) error {
 	return nil
 }
 
-func (mgr *HandlerBase) LeaveMember(context.Context, *dcs.Cluster, string) error {
+func (mgr *HandlerBase) LeaveMember(context.Context, string) error {
 	return nil
 }
 
-func (mgr *HandlerBase) GetLag(context.Context, *dcs.Cluster) (int64, error) {
-	return 0, models.ErrNotImplemented
+func (mgr *HandlerBase) DataDump(context.Context) error {
+	return models.ErrNotImplemented
 }
 
-func (mgr *HandlerBase) MoveData(context.Context, *dcs.Cluster) error {
-	return nil
+func (mgr *HandlerBase) DataLoad(context.Context) error {
+	return models.ErrNotImplemented
 }
 
-func (mgr *HandlerBase) GetReplicaRole(context.Context, *dcs.Cluster) (string, error) {
+func (mgr *HandlerBase) GetReplicaRole(context.Context) (string, error) {
 	return "", models.ErrNotImplemented
-}
-
-func (mgr *HandlerBase) Exec(context.Context, string) (int64, error) {
-	return 0, models.ErrNotImplemented
-}
-
-func (mgr *HandlerBase) Query(context.Context, string) ([]byte, error) {
-	return []byte{}, models.ErrNotImplemented
 }
 
 func (mgr *HandlerBase) GetPort() (int, error) {
@@ -147,19 +141,19 @@ func (mgr *HandlerBase) IsRunning() bool {
 	return false
 }
 
-func (mgr *HandlerBase) PostProvision(context.Context, *dcs.Cluster) error {
+func (mgr *HandlerBase) PostProvision(context.Context) error {
 	return nil
 }
 
-func (mgr *HandlerBase) PreTerminate(context.Context, *dcs.Cluster) error {
+func (mgr *HandlerBase) PreTerminate(context.Context) error {
 	return nil
 }
 
-func (mgr *HandlerBase) Lock(context.Context, string) error {
+func (mgr *HandlerBase) ReadOnly(context.Context, string) error {
 	return models.ErrNotImplemented
 }
 
-func (mgr *HandlerBase) Unlock(context.Context, string) error {
+func (mgr *HandlerBase) ReadWrite(context.Context, string) error {
 	return models.ErrNotImplemented
 }
 

@@ -38,10 +38,10 @@ type EnginePluginClient interface {
 	// such as during scale-in. It may involve configuration updates and notifying
 	// other members about the departure,
 	LeaveMember(ctx context.Context, in *LeaveMemberRequest, opts ...grpc.CallOption) (*LeaveMemberResponse, error)
-	// Readonly defines how to set a replica Engine as read-only.
-	Readonly(ctx context.Context, in *ReadonlyRequest, opts ...grpc.CallOption) (*ReadonlyResponse, error)
-	// Readwrite defines how to set a replica Engine as read-write.
-	Readwrite(ctx context.Context, in *ReadwriteRequest, opts ...grpc.CallOption) (*ReadwriteResponse, error)
+	// ReadOnly defines how to set a replica Engine as read-only.
+	ReadOnly(ctx context.Context, in *ReadOnlyRequest, opts ...grpc.CallOption) (*ReadOnlyResponse, error)
+	// ReadWrite defines how to set a replica Engine as read-write.
+	ReadWrite(ctx context.Context, in *ReadWriteRequest, opts ...grpc.CallOption) (*ReadWriteResponse, error)
 	// AccountProvision Defines the procedure to generate a new database account.
 	AccountProvision(ctx context.Context, in *AccountProvisionRequest, opts ...grpc.CallOption) (*AccountProvisionResponse, error)
 	// Switchover defines the procedure to switch replica roles in a primary-secondary
@@ -102,18 +102,18 @@ func (c *enginePluginClient) LeaveMember(ctx context.Context, in *LeaveMemberReq
 	return out, nil
 }
 
-func (c *enginePluginClient) Readonly(ctx context.Context, in *ReadonlyRequest, opts ...grpc.CallOption) (*ReadonlyResponse, error) {
-	out := new(ReadonlyResponse)
-	err := c.cc.Invoke(ctx, "/plugin.v1.EnginePlugin/Readonly", in, out, opts...)
+func (c *enginePluginClient) ReadOnly(ctx context.Context, in *ReadOnlyRequest, opts ...grpc.CallOption) (*ReadOnlyResponse, error) {
+	out := new(ReadOnlyResponse)
+	err := c.cc.Invoke(ctx, "/plugin.v1.EnginePlugin/ReadOnly", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *enginePluginClient) Readwrite(ctx context.Context, in *ReadwriteRequest, opts ...grpc.CallOption) (*ReadwriteResponse, error) {
-	out := new(ReadwriteResponse)
-	err := c.cc.Invoke(ctx, "/plugin.v1.EnginePlugin/Readwrite", in, out, opts...)
+func (c *enginePluginClient) ReadWrite(ctx context.Context, in *ReadWriteRequest, opts ...grpc.CallOption) (*ReadWriteResponse, error) {
+	out := new(ReadWriteResponse)
+	err := c.cc.Invoke(ctx, "/plugin.v1.EnginePlugin/ReadWrite", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -158,10 +158,10 @@ type EnginePluginServer interface {
 	// such as during scale-in. It may involve configuration updates and notifying
 	// other members about the departure,
 	LeaveMember(context.Context, *LeaveMemberRequest) (*LeaveMemberResponse, error)
-	// Readonly defines how to set a replica Engine as read-only.
-	Readonly(context.Context, *ReadonlyRequest) (*ReadonlyResponse, error)
-	// Readwrite defines how to set a replica Engine as read-write.
-	Readwrite(context.Context, *ReadwriteRequest) (*ReadwriteResponse, error)
+	// ReadOnly defines how to set a replica Engine as read-only.
+	ReadOnly(context.Context, *ReadOnlyRequest) (*ReadOnlyResponse, error)
+	// ReadWrite defines how to set a replica Engine as read-write.
+	ReadWrite(context.Context, *ReadWriteRequest) (*ReadWriteResponse, error)
 	// AccountProvision Defines the procedure to generate a new database account.
 	AccountProvision(context.Context, *AccountProvisionRequest) (*AccountProvisionResponse, error)
 	// Switchover defines the procedure to switch replica roles in a primary-secondary
@@ -189,11 +189,11 @@ func (UnimplementedEnginePluginServer) JoinMember(context.Context, *JoinMemberRe
 func (UnimplementedEnginePluginServer) LeaveMember(context.Context, *LeaveMemberRequest) (*LeaveMemberResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method LeaveMember not implemented")
 }
-func (UnimplementedEnginePluginServer) Readonly(context.Context, *ReadonlyRequest) (*ReadonlyResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Readonly not implemented")
+func (UnimplementedEnginePluginServer) ReadOnly(context.Context, *ReadOnlyRequest) (*ReadOnlyResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ReadOnly not implemented")
 }
-func (UnimplementedEnginePluginServer) Readwrite(context.Context, *ReadwriteRequest) (*ReadwriteResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Readwrite not implemented")
+func (UnimplementedEnginePluginServer) ReadWrite(context.Context, *ReadWriteRequest) (*ReadWriteResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ReadWrite not implemented")
 }
 func (UnimplementedEnginePluginServer) AccountProvision(context.Context, *AccountProvisionRequest) (*AccountProvisionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AccountProvision not implemented")
@@ -304,38 +304,38 @@ func _EnginePlugin_LeaveMember_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
-func _EnginePlugin_Readonly_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ReadonlyRequest)
+func _EnginePlugin_ReadOnly_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReadOnlyRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(EnginePluginServer).Readonly(ctx, in)
+		return srv.(EnginePluginServer).ReadOnly(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/plugin.v1.EnginePlugin/Readonly",
+		FullMethod: "/plugin.v1.EnginePlugin/ReadOnly",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(EnginePluginServer).Readonly(ctx, req.(*ReadonlyRequest))
+		return srv.(EnginePluginServer).ReadOnly(ctx, req.(*ReadOnlyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _EnginePlugin_Readwrite_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ReadwriteRequest)
+func _EnginePlugin_ReadWrite_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReadWriteRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(EnginePluginServer).Readwrite(ctx, in)
+		return srv.(EnginePluginServer).ReadWrite(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/plugin.v1.EnginePlugin/Readwrite",
+		FullMethod: "/plugin.v1.EnginePlugin/ReadWrite",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(EnginePluginServer).Readwrite(ctx, req.(*ReadwriteRequest))
+		return srv.(EnginePluginServer).ReadWrite(ctx, req.(*ReadWriteRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -404,12 +404,12 @@ var EnginePlugin_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _EnginePlugin_LeaveMember_Handler,
 		},
 		{
-			MethodName: "Readonly",
-			Handler:    _EnginePlugin_Readonly_Handler,
+			MethodName: "ReadOnly",
+			Handler:    _EnginePlugin_ReadOnly_Handler,
 		},
 		{
-			MethodName: "Readwrite",
-			Handler:    _EnginePlugin_Readwrite_Handler,
+			MethodName: "ReadWrite",
+			Handler:    _EnginePlugin_ReadWrite_Handler,
 		},
 		{
 			MethodName: "AccountProvision",

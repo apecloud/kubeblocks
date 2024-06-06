@@ -294,11 +294,11 @@ func (p *Protection) lowWatermark(ctx context.Context, volumeUsages map[string]a
 }
 
 func (p *Protection) lockInstance(ctx context.Context) error {
-	return p.Handler.Lock(ctx, "disk full")
+	return p.Handler.ReadOnly(ctx, "disk full")
 }
 
 func (p *Protection) unlockInstance(ctx context.Context) error {
-	return p.Handler.Unlock(ctx, "disk full")
+	return p.Handler.ReadWrite(ctx, "disk full")
 }
 
 func (p *Protection) buildVolumesMsg() map[string]any {

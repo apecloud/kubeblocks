@@ -302,7 +302,7 @@ var _ = Describe("Volume Protection Operation", func() {
 		It("volume over high watermark", func() {
 			ctrl := gomock.NewController(GinkgoT())
 			mockDBManager := handlers.NewMockHandler(ctrl)
-			mockDBManager.EXPECT().Lock(gomock.Any(), gomock.Any()).Return(nil)
+			mockDBManager.EXPECT().ReadOnly(gomock.Any(), gomock.Any()).Return(nil)
 
 			obj := newProtection()
 			obj.Handler = mockDBManager
@@ -342,8 +342,8 @@ var _ = Describe("Volume Protection Operation", func() {
 		It("volume under high watermark", func() {
 			ctrl := gomock.NewController(GinkgoT())
 			mockDBManager := handlers.NewMockHandler(ctrl)
-			mockDBManager.EXPECT().Lock(gomock.Any(), gomock.Any()).Return(nil)
-			mockDBManager.EXPECT().Unlock(gomock.Any(), gomock.Any()).Return(nil)
+			mockDBManager.EXPECT().ReadOnly(gomock.Any(), gomock.Any()).Return(nil)
+			mockDBManager.EXPECT().ReadWrite(gomock.Any(), gomock.Any()).Return(nil)
 
 			obj := newProtection()
 			obj.Handler = mockDBManager
@@ -382,8 +382,8 @@ var _ = Describe("Volume Protection Operation", func() {
 		It("lock/unlock error", func() {
 			ctrl := gomock.NewController(GinkgoT())
 			mockDBManager := handlers.NewMockHandler(ctrl)
-			mockDBManager.EXPECT().Lock(gomock.Any(), gomock.Any()).Return(fmt.Errorf("test"))
-			mockDBManager.EXPECT().Unlock(gomock.Any(), gomock.Any()).Return(fmt.Errorf("test"))
+			mockDBManager.EXPECT().ReadOnly(gomock.Any(), gomock.Any()).Return(fmt.Errorf("test"))
+			mockDBManager.EXPECT().ReadWrite(gomock.Any(), gomock.Any()).Return(fmt.Errorf("test"))
 
 			obj := newProtection()
 			obj.Handler = mockDBManager

@@ -79,11 +79,7 @@ func (s *CheckStatus) Do(ctx context.Context, req *actions.OpsRequest) (*actions
 		Data: map[string]any{},
 	}
 	resp.Data["operation"] = util.HealthyCheckOperation
-
-	k8sStore := s.dcsStore.(*dcs.KubernetesStore)
-	cluster := k8sStore.GetClusterFromCache()
-
-	err := s.Handler.MemberHealthyCheck(ctx, cluster, nil)
+	err := s.Handler.HealthyCheck(ctx)
 	if err != nil {
 		return s.handlerError(ctx, err)
 	}

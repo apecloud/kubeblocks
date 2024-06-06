@@ -27,7 +27,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/plugin"
 	"github.com/apecloud/kubeblocks/pkg/viperx"
@@ -96,23 +95,13 @@ func (h *Handler) IsDBStartupReady() bool {
 // - KB_MEMBER_ADDRESSES: The addresses of all members.
 // - KB_NEW_MEMBER_POD_NAME: The name of the new member's Pod.
 // - KB_NEW_MEMBER_POD_IP: The IP of the new member's Pod.
-func (h *Handler) JoinMember(ctx context.Context, cluster *dcs.Cluster, memberName string) error {
+func (h *Handler) JoinMember(ctx context.Context, primary string) error {
 	req := &plugin.JoinMemberRequest{
 		EngineInfo: &plugin.EngineInfo{},
 		NewMember:  h.CurrentMemberName,
-		Members:    cluster.GetMemberAddrs(),
 	}
 
-	if cluster.Leader != nil && cluster.Leader.Name != "" {
-		leaderMember := cluster.GetMemberWithName(cluster.Leader.Name)
-		req.EngineInfo.Fqdn = cluster.GetMemberAddr(*leaderMember)
-	}
-
-	member := cluster.GetMemberWithName(h.CurrentMemberName)
-	if member != nil {
-		req.NewMemberIp = member.PodIP
-	}
-
+	req.EngineInfo.Fqdn = primary
 	_, err := h.dbClient.JoinMember(ctx, req)
 	return err
 }
@@ -126,22 +115,12 @@ func (h *Handler) JoinMember(ctx context.Context, cluster *dcs.Cluster, memberNa
 // - KB_MEMBER_ADDRESSES: The addresses of all members.
 // - KB_LEAVE_MEMBER_POD_NAME: The name of the leave member's Pod.
 // - KB_LEAVE_MEMBER_POD_IP: The IP of the leave member's Pod.
-func (h *Handler) LeaveMember(ctx context.Context, cluster *dcs.Cluster, memberName string) error {
+func (h *Handler) LeaveMember(ctx context.Context, primary string) error {
 	req := &plugin.LeaveMemberRequest{
-		EngineInfo:  &plugin.EngineInfo{},
-		LeaveMember: memberName,
-		Members:     cluster.GetMemberAddrs(),
+		EngineInfo: &plugin.EngineInfo{},
 	}
 
-	if cluster.Leader != nil && cluster.Leader.Name != "" {
-		leaderMember := cluster.GetMemberWithName(cluster.Leader.Name)
-		req.EngineInfo.Fqdn = cluster.GetMemberAddr(*leaderMember)
-	}
-
-	member := cluster.GetMemberWithName(memberName)
-	if member != nil {
-		req.LeaveMemberIp = member.PodIP
-	}
+	req.EngineInfo.Fqdn = primary
 	_, err := h.dbClient.LeaveMember(ctx, req)
 
 	return err
@@ -154,11 +133,11 @@ func (h *Handler) LeaveMember(ctx context.Context, cluster *dcs.Cluster, memberN
 // - KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
 // - KB_SERVICE_PASSWORD: The password of the user used to access the DB service .
 func (h *Handler) Lock(ctx context.Context, reason string) error {
-	req := &plugin.ReadonlyRequest{
+	req := &plugin.ReadOnlyRequest{
 		EngineInfo: &plugin.EngineInfo{},
 		Reason:     reason,
 	}
-	_, err := h.dbClient.Readonly(ctx, req)
+	_, err := h.dbClient.ReadOnly(ctx, req)
 	return err
 }
 
@@ -169,10 +148,10 @@ func (h *Handler) Lock(ctx context.Context, reason string) error {
 // - KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
 // - KB_SERVICE_PASSWORD: The password of the user used to access the DB service .
 func (h *Handler) Unlock(ctx context.Context, reason string) error {
-	req := &plugin.ReadwriteRequest{
+	req := &plugin.ReadWriteRequest{
 		EngineInfo: &plugin.EngineInfo{},
 		Reason:     reason,
 	}
-	_, err := h.dbClient.Readwrite(ctx, req)
+	_, err := h.dbClient.ReadWrite(ctx, req)
 	return err
 }

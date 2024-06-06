@@ -26,20 +26,17 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/plugin"
 )
 
 var _ = Describe("GRPC Handler", func() {
 	var (
 		handler *Handler
-		cluster *dcs.Cluster
 		ctx     context.Context
 	)
 
 	BeforeEach(func() {
 		handler = &Handler{}
-		cluster = &dcs.Cluster{}
 		ctx = context.Background()
 	})
 
@@ -61,7 +58,7 @@ var _ = Describe("GRPC Handler", func() {
 				mockGetRole: mockGetRoleFunc,
 			}
 
-			Expect(handler.GetReplicaRole(ctx, cluster)).To(Equal(expectedRole))
+			Expect(handler.GetReplicaRole(ctx)).To(Equal(expectedRole))
 		})
 
 		It("get role error", func() {
@@ -76,7 +73,7 @@ var _ = Describe("GRPC Handler", func() {
 			handler.dbClient = &mockEnginePluginClient{
 				mockGetRole: mockGetRoleFunc,
 			}
-			role, err := handler.GetReplicaRole(ctx, cluster)
+			role, err := handler.GetReplicaRole(ctx)
 			Expect(err).To(Equal(expectedError))
 			Expect(role).To(BeZero())
 		})

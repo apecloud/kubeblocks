@@ -60,14 +60,9 @@ func (s *Join) Init(ctx context.Context) error {
 }
 
 func (s *Join) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
-	cluster, err := s.dcsStore.GetCluster()
-	if err != nil {
-		s.Logger.Error(err, "get cluster failed")
-		return nil, err
-	}
-
+	leader := req.GetString("leader")
 	// join current member to db cluster
-	err = s.Handler.JoinMember(ctx, cluster, "")
+	err := s.Handler.JoinMember(ctx, leader)
 	if err != nil {
 		s.Logger.Error(err, "join member to cluster failed")
 		return nil, err

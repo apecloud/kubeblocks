@@ -29,7 +29,6 @@ import (
 	context "context"
 	reflect "reflect"
 
-	dcs "github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
 	models "github.com/apecloud/kubeblocks/pkg/kb_agent/handlers/models"
 	logr "github.com/go-logr/logr"
 	gomock "github.com/golang/mock/gomock"
@@ -72,6 +71,34 @@ func (mr *MockHandlerMockRecorder) CreateUser(arg0, arg1, arg2 interface{}) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateUser", reflect.TypeOf((*MockHandler)(nil).CreateUser), arg0, arg1, arg2)
 }
 
+// DataDump mocks base method.
+func (m *MockHandler) DataDump(arg0 context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DataDump", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DataDump indicates an expected call of DataDump.
+func (mr *MockHandlerMockRecorder) DataDump(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DataDump", reflect.TypeOf((*MockHandler)(nil).DataDump), arg0)
+}
+
+// DataLoad mocks base method.
+func (m *MockHandler) DataLoad(arg0 context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DataLoad", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DataLoad indicates an expected call of DataLoad.
+func (mr *MockHandlerMockRecorder) DataLoad(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DataLoad", reflect.TypeOf((*MockHandler)(nil).DataLoad), arg0)
+}
+
 // DeleteUser mocks base method.
 func (m *MockHandler) DeleteUser(arg0 context.Context, arg1 string) error {
 	m.ctrl.T.Helper()
@@ -101,21 +128,6 @@ func (mr *MockHandlerMockRecorder) DescribeUser(arg0, arg1 interface{}) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeUser", reflect.TypeOf((*MockHandler)(nil).DescribeUser), arg0, arg1)
 }
 
-// Exec mocks base method.
-func (m *MockHandler) Exec(arg0 context.Context, arg1 string) (int64, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Exec", arg0, arg1)
-	ret0, _ := ret[0].(int64)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// Exec indicates an expected call of Exec.
-func (mr *MockHandlerMockRecorder) Exec(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Exec", reflect.TypeOf((*MockHandler)(nil).Exec), arg0, arg1)
-}
-
 // GetCurrentMemberName mocks base method.
 func (m *MockHandler) GetCurrentMemberName() string {
 	m.ctrl.T.Helper()
@@ -128,21 +140,6 @@ func (m *MockHandler) GetCurrentMemberName() string {
 func (mr *MockHandlerMockRecorder) GetCurrentMemberName() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentMemberName", reflect.TypeOf((*MockHandler)(nil).GetCurrentMemberName))
-}
-
-// GetLag mocks base method.
-func (m *MockHandler) GetLag(arg0 context.Context, arg1 *dcs.Cluster) (int64, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetLag", arg0, arg1)
-	ret0, _ := ret[0].(int64)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetLag indicates an expected call of GetLag.
-func (mr *MockHandlerMockRecorder) GetLag(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLag", reflect.TypeOf((*MockHandler)(nil).GetLag), arg0, arg1)
 }
 
 // GetLogger mocks base method.
@@ -159,34 +156,19 @@ func (mr *MockHandlerMockRecorder) GetLogger() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLogger", reflect.TypeOf((*MockHandler)(nil).GetLogger))
 }
 
-// GetPort mocks base method.
-func (m *MockHandler) GetPort() (int, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetPort")
-	ret0, _ := ret[0].(int)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetPort indicates an expected call of GetPort.
-func (mr *MockHandlerMockRecorder) GetPort() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPort", reflect.TypeOf((*MockHandler)(nil).GetPort))
-}
-
 // GetReplicaRole mocks base method.
-func (m *MockHandler) GetReplicaRole(arg0 context.Context, arg1 *dcs.Cluster) (string, error) {
+func (m *MockHandler) GetReplicaRole(arg0 context.Context) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetReplicaRole", arg0, arg1)
+	ret := m.ctrl.Call(m, "GetReplicaRole", arg0)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetReplicaRole indicates an expected call of GetReplicaRole.
-func (mr *MockHandlerMockRecorder) GetReplicaRole(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockHandlerMockRecorder) GetReplicaRole(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetReplicaRole", reflect.TypeOf((*MockHandler)(nil).GetReplicaRole), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetReplicaRole", reflect.TypeOf((*MockHandler)(nil).GetReplicaRole), arg0)
 }
 
 // GrantUserRole mocks base method.
@@ -203,6 +185,20 @@ func (mr *MockHandlerMockRecorder) GrantUserRole(arg0, arg1, arg2 interface{}) *
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GrantUserRole", reflect.TypeOf((*MockHandler)(nil).GrantUserRole), arg0, arg1, arg2)
 }
 
+// HealthyCheck mocks base method.
+func (m *MockHandler) HealthyCheck(arg0 context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "HealthyCheck", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// HealthyCheck indicates an expected call of HealthyCheck.
+func (mr *MockHandlerMockRecorder) HealthyCheck(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HealthyCheck", reflect.TypeOf((*MockHandler)(nil).HealthyCheck), arg0)
+}
+
 // IsDBStartupReady mocks base method.
 func (m *MockHandler) IsDBStartupReady() bool {
 	m.ctrl.T.Helper()
@@ -215,21 +211,6 @@ func (m *MockHandler) IsDBStartupReady() bool {
 func (mr *MockHandlerMockRecorder) IsDBStartupReady() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsDBStartupReady", reflect.TypeOf((*MockHandler)(nil).IsDBStartupReady))
-}
-
-// IsLeader mocks base method.
-func (m *MockHandler) IsLeader(arg0 context.Context, arg1 *dcs.Cluster) (bool, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IsLeader", arg0, arg1)
-	ret0, _ := ret[0].(bool)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// IsLeader indicates an expected call of IsLeader.
-func (mr *MockHandlerMockRecorder) IsLeader(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsLeader", reflect.TypeOf((*MockHandler)(nil).IsLeader), arg0, arg1)
 }
 
 // IsRunning mocks base method.
@@ -247,31 +228,31 @@ func (mr *MockHandlerMockRecorder) IsRunning() *gomock.Call {
 }
 
 // JoinMember mocks base method.
-func (m *MockHandler) JoinMember(arg0 context.Context, arg1 *dcs.Cluster, arg2 string) error {
+func (m *MockHandler) JoinMember(arg0 context.Context, arg1 string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "JoinMember", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "JoinMember", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // JoinMember indicates an expected call of JoinMember.
-func (mr *MockHandlerMockRecorder) JoinMember(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockHandlerMockRecorder) JoinMember(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "JoinMember", reflect.TypeOf((*MockHandler)(nil).JoinMember), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "JoinMember", reflect.TypeOf((*MockHandler)(nil).JoinMember), arg0, arg1)
 }
 
 // LeaveMember mocks base method.
-func (m *MockHandler) LeaveMember(arg0 context.Context, arg1 *dcs.Cluster, arg2 string) error {
+func (m *MockHandler) LeaveMember(arg0 context.Context, arg1 string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "LeaveMember", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "LeaveMember", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // LeaveMember indicates an expected call of LeaveMember.
-func (mr *MockHandlerMockRecorder) LeaveMember(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockHandlerMockRecorder) LeaveMember(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LeaveMember", reflect.TypeOf((*MockHandler)(nil).LeaveMember), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LeaveMember", reflect.TypeOf((*MockHandler)(nil).LeaveMember), arg0, arg1)
 }
 
 // ListSystemAccounts mocks base method.
@@ -304,89 +285,60 @@ func (mr *MockHandlerMockRecorder) ListUsers(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListUsers", reflect.TypeOf((*MockHandler)(nil).ListUsers), arg0)
 }
 
-// Lock mocks base method.
-func (m *MockHandler) Lock(arg0 context.Context, arg1 string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Lock", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Lock indicates an expected call of Lock.
-func (mr *MockHandlerMockRecorder) Lock(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Lock", reflect.TypeOf((*MockHandler)(nil).Lock), arg0, arg1)
-}
-
-// MemberHealthyCheck mocks base method.
-func (m *MockHandler) MemberHealthyCheck(arg0 context.Context, arg1 *dcs.Cluster, arg2 *dcs.Member) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "MemberHealthyCheck", arg0, arg1, arg2)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// MemberHealthyCheck indicates an expected call of MemberHealthyCheck.
-func (mr *MockHandlerMockRecorder) MemberHealthyCheck(arg0, arg1, arg2 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MemberHealthyCheck", reflect.TypeOf((*MockHandler)(nil).MemberHealthyCheck), arg0, arg1, arg2)
-}
-
-// MoveData mocks base method.
-func (m *MockHandler) MoveData(arg0 context.Context, arg1 *dcs.Cluster) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "MoveData", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// MoveData indicates an expected call of MoveData.
-func (mr *MockHandlerMockRecorder) MoveData(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MoveData", reflect.TypeOf((*MockHandler)(nil).MoveData), arg0, arg1)
-}
-
 // PostProvision mocks base method.
-func (m *MockHandler) PostProvision(arg0 context.Context, arg1 *dcs.Cluster) error {
+func (m *MockHandler) PostProvision(arg0 context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PostProvision", arg0, arg1)
+	ret := m.ctrl.Call(m, "PostProvision", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // PostProvision indicates an expected call of PostProvision.
-func (mr *MockHandlerMockRecorder) PostProvision(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockHandlerMockRecorder) PostProvision(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostProvision", reflect.TypeOf((*MockHandler)(nil).PostProvision), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostProvision", reflect.TypeOf((*MockHandler)(nil).PostProvision), arg0)
 }
 
 // PreTerminate mocks base method.
-func (m *MockHandler) PreTerminate(arg0 context.Context, arg1 *dcs.Cluster) error {
+func (m *MockHandler) PreTerminate(arg0 context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PreTerminate", arg0, arg1)
+	ret := m.ctrl.Call(m, "PreTerminate", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // PreTerminate indicates an expected call of PreTerminate.
-func (mr *MockHandlerMockRecorder) PreTerminate(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockHandlerMockRecorder) PreTerminate(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PreTerminate", reflect.TypeOf((*MockHandler)(nil).PreTerminate), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PreTerminate", reflect.TypeOf((*MockHandler)(nil).PreTerminate), arg0)
 }
 
-// Query mocks base method.
-func (m *MockHandler) Query(arg0 context.Context, arg1 string) ([]byte, error) {
+// ReadOnly mocks base method.
+func (m *MockHandler) ReadOnly(arg0 context.Context, arg1 string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Query", arg0, arg1)
-	ret0, _ := ret[0].([]byte)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret := m.ctrl.Call(m, "ReadOnly", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
-// Query indicates an expected call of Query.
-func (mr *MockHandlerMockRecorder) Query(arg0, arg1 interface{}) *gomock.Call {
+// ReadOnly indicates an expected call of ReadOnly.
+func (mr *MockHandlerMockRecorder) ReadOnly(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Query", reflect.TypeOf((*MockHandler)(nil).Query), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadOnly", reflect.TypeOf((*MockHandler)(nil).ReadOnly), arg0, arg1)
+}
+
+// ReadWrite mocks base method.
+func (m *MockHandler) ReadWrite(arg0 context.Context, arg1 string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReadWrite", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ReadWrite indicates an expected call of ReadWrite.
+func (mr *MockHandlerMockRecorder) ReadWrite(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadWrite", reflect.TypeOf((*MockHandler)(nil).ReadWrite), arg0, arg1)
 }
 
 // RevokeUserRole mocks base method.
@@ -415,16 +367,16 @@ func (mr *MockHandlerMockRecorder) ShutDownWithWait() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ShutDownWithWait", reflect.TypeOf((*MockHandler)(nil).ShutDownWithWait))
 }
 
-// Unlock mocks base method.
-func (m *MockHandler) Unlock(arg0 context.Context, arg1 string) error {
+// Switchover mocks base method.
+func (m *MockHandler) Switchover(arg0 context.Context, arg1, arg2 string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Unlock", arg0, arg1)
+	ret := m.ctrl.Call(m, "Switchover", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// Unlock indicates an expected call of Unlock.
-func (mr *MockHandlerMockRecorder) Unlock(arg0, arg1 interface{}) *gomock.Call {
+// Switchover indicates an expected call of Switchover.
+func (mr *MockHandlerMockRecorder) Switchover(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Unlock", reflect.TypeOf((*MockHandler)(nil).Unlock), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Switchover", reflect.TypeOf((*MockHandler)(nil).Switchover), arg0, arg1, arg2)
 }

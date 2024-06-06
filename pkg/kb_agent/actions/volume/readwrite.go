@@ -17,68 +17,46 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package replica
+package volume
 
 import (
 	"context"
+	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
-type GetLag struct {
+type Unlock struct {
 	actions.Base
-	dcsStore dcs.DCS
+	Timeout time.Duration
 }
 
-var getlag actions.Action = &GetLag{}
+var unlock actions.Action = &Unlock{}
 
 func init() {
-	err := actions.Register("getlag", getlag)
+	err := actions.Register(strings.ToLower(string(util.UnlockOperation)), unlock)
 	if err != nil {
 		panic(err.Error())
 	}
 }
 
-func (s *GetLag) Init(ctx context.Context) error {
-	s.dcsStore = dcs.GetStore()
-	if s.dcsStore == nil {
-		return errors.New("dcs store init failed")
-	}
-
-	s.Logger = ctrl.Log.WithName("GetLag")
-	s.Action = constant.GetLagAction
+func (s *Unlock) Init(ctx context.Context) error {
+	s.Logger = ctrl.Log.WithName("ReadWrite")
+	s.Action = constant.ReadWriteAction
 	return s.Base.Init(ctx)
 }
 
-func (s *GetLag) IsReadonly(context.Context) bool {
-	return true
-}
-
-func (s *GetLag) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
-	sql := req.GetString("sql")
-	if sql == "" {
-		return nil, errors.New("no sql provided")
-	}
-
-	resp := &actions.OpsResponse{
-		Data: map[string]any{},
-	}
-	resp.Data["operation"] = util.ExecOperation
-	k8sStore := s.dcsStore.(*dcs.KubernetesStore)
-	cluster := k8sStore.GetClusterFromCache()
-
-	lag, err := s.Handler.GetLag(ctx, cluster)
+func (s *Unlock) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
+	err := s.Handler.ReadWrite(ctx, "")
 	if err != nil {
-		s.Logger.Info("executing getlag error", "error", err)
-		return resp, err
+		return nil, errors.Wrap(err, "set DB readwrite failed")
 	}
 
-	resp.Data["lag"] = lag
-	return resp, err
+	return nil, nil
 }

@@ -27,7 +27,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers"
 	"github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -35,7 +34,6 @@ import (
 var _ = Describe("Handler", func() {
 	var (
 		handler *Handler
-		cluster *dcs.Cluster
 		ctx     context.Context
 	)
 
@@ -44,7 +42,6 @@ var _ = Describe("Handler", func() {
 		viperx.Set(constant.KBEnvPodName, "test-pod-0")
 		handlerBase, err := handlers.NewHandlerBase(logger)
 		Expect(err).NotTo(HaveOccurred())
-		cluster = &dcs.Cluster{}
 		ctx = context.Background()
 		handlerBase.DBStartupReady = true
 		handler = &Handler{
@@ -67,7 +64,7 @@ var _ = Describe("Handler", func() {
 			}
 			handler.Executor.(*MockExecutor).MockExecCommand = mockExecCommand
 
-			role, err := handler.GetReplicaRole(ctx, cluster)
+			role, err := handler.GetReplicaRole(ctx)
 			Expect(err).To(BeNil())
 			Expect(role).To(Equal(expectedRole))
 		})
@@ -85,7 +82,7 @@ var _ = Describe("Handler", func() {
 			}
 			handler.Executor.(*MockExecutor).MockExecCommand = mockExecCommand
 
-			role, err := handler.GetReplicaRole(ctx, cluster)
+			role, err := handler.GetReplicaRole(ctx)
 			Expect(err).To(BeNil())
 			Expect(role).To(Equal(expectedRole))
 		})
@@ -93,7 +90,7 @@ var _ = Describe("Handler", func() {
 		It("should return an error when role probe command is empty", func() {
 			handler.actionCommands[constant.RoleProbeAction] = nil
 
-			role, err := handler.GetReplicaRole(ctx, cluster)
+			role, err := handler.GetReplicaRole(ctx)
 			Expect(err).To(MatchError("role probe commands is empty!"))
 			Expect(role).To(BeEmpty())
 		})

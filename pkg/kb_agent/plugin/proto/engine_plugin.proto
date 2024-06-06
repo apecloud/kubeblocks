@@ -135,7 +135,7 @@ message LeaveMemberResponse {
   map<string, string> metadata = 1;
 }
 
-message ReadonlyRequest {
+message ReadOnlyRequest {
   EngineInfo engine_info = 1;
 
   // The reason for setting the replica as read-only.
@@ -145,12 +145,12 @@ message ReadonlyRequest {
   map<string, string> metadata = 3;
 }
 
-message ReadonlyResponse {
+message ReadOnlyResponse {
   // Common metadata property for extention
   map<string, string> metadata = 1;
 }
 
-message ReadwriteRequest {
+message ReadWriteRequest {
   EngineInfo engine_info = 1;
 
   // The reason for setting the replica as read-write.
@@ -160,7 +160,7 @@ message ReadwriteRequest {
   map<string, string> metadata = 3;
 }
 
-message ReadwriteResponse {
+message ReadWriteResponse {
   // Common metadata property for extention
   map<string, string> metadata = 1;
 }
@@ -229,11 +229,11 @@ service EnginePlugin {
   // other members about the departure,
   rpc LeaveMember(LeaveMemberRequest) returns (LeaveMemberResponse) {}
 
-  // Readonly defines how to set a replica Engine as read-only.
-  rpc Readonly(ReadonlyRequest) returns (ReadonlyResponse) {}
+  // ReadOnly defines how to set a replica Engine as read-only.
+  rpc ReadOnly(ReadOnlyRequest) returns (ReadOnlyResponse) {}
 
-  // Readwrite defines how to set a replica Engine as read-write.
-  rpc Readwrite(ReadwriteRequest) returns (ReadwriteResponse) {}
+  // ReadWrite defines how to set a replica Engine as read-write.
+  rpc ReadWrite(ReadWriteRequest) returns (ReadWriteResponse) {}
 
   // AccountProvision Defines the procedure to generate a new database account.
   rpc AccountProvision(AccountProvisionRequest) returns (AccountProvisionResponse) {}

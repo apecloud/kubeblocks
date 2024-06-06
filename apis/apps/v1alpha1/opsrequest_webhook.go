@@ -481,7 +481,10 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 			msgPrefix = "ScaleOut"
 			hScaleInstanceFieldName = "offlineInstancesToOnline"
 		}
-		if !isSharding && replicaChanger.ReplicaChanges != nil && len(offlineOrOnlineInsNames) > int(*replicaChanger.ReplicaChanges) {
+		if isSharding && len(offlineOrOnlineInsNames) > 0 {
+			return fmt.Errorf(`cannot specify %s for a sharding component "%s"`, hScaleInstanceFieldName, hScale.ComponentName)
+		}
+		if replicaChanger.ReplicaChanges != nil && len(offlineOrOnlineInsNames) > int(*replicaChanger.ReplicaChanges) {
 			return fmt.Errorf(`the length of %s can't be greater than the "replicaChanges" for the component`, hScaleInstanceFieldName)
 		}
 		offlineOrOnlineInsCountMap := r.CountOfflineOrOnlineInstances(clusterName, hScale.ComponentName, offlineOrOnlineInsNames)
@@ -517,7 +520,7 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 			}
 			allReplicaChanges += insTpl.GetReplicas()
 		}
-		if !isSharding && replicaChanger.ReplicaChanges != nil && allReplicaChanges > *replicaChanger.ReplicaChanges {
+		if replicaChanger.ReplicaChanges != nil && allReplicaChanges > *replicaChanger.ReplicaChanges {
 			return fmt.Errorf(`%s "replicaChanges" can't be less than the sum of "replicaChanges" for specified instance templates`, msgPrefix)
 		}
 		return nil

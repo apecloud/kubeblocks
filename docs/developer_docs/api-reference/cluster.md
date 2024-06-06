@@ -12074,7 +12074,7 @@ ScaleOut
 <em>(Optional)</em>
 <p>Specifies the replica changes for scaling out components and instance templates,
 and brings offline instances back online. Can be used in conjunction with the &ldquo;scaleIn&rdquo; operation.
-Note: Any configuration that deletes instances is considered invalid except for sharding component.</p>
+Note: Any configuration that deletes instances is considered invalid.</p>
 </td>
 </tr>
 <tr>
@@ -12090,7 +12090,7 @@ ScaleIn
 <em>(Optional)</em>
 <p>Specifies the replica changes for scaling in components and instance templates,
 and takes specified instances offline. Can be used in conjunction with the &ldquo;scaleOut&rdquo; operation.
-Note: Any configuration that creates instances is considered invalid except for sharding component.</p>
+Note: Any configuration that creates instances is considered invalid.</p>
 </td>
 </tr>
 </tbody>

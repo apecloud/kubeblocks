@@ -251,12 +251,6 @@ func (hs horizontalScalingOpsHandler) autoSyncReplicaChanges(
 	compReplicas int32,
 	compInstanceTpls []appsv1alpha1.InstanceTemplate,
 	compExpectOfflineInstances []string) {
-	for _, v := range opsRes.Cluster.Spec.ShardingSpecs {
-		// when the component is a sharding component, ignore to auto sync replica changes.
-		if v.Name == horizontalScaling.ComponentName {
-			return
-		}
-	}
 	// sync the replicaChanges for component and instance template.
 	getSyncedInstancesAndReplicaChanges := func(offlineOrOnlineInsCountMap map[string]int32,
 		replicaChanger appsv1alpha1.ReplicaChanger,

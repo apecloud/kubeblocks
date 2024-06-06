@@ -444,14 +444,14 @@ type HorizontalScaling struct {
 
 	// Specifies the replica changes for scaling out components and instance templates,
 	// and brings offline instances back online. Can be used in conjunction with the "scaleIn" operation.
-	// Note: Any configuration that deletes instances is considered invalid except for sharding component.
+	// Note: Any configuration that deletes instances is considered invalid.
 	//
 	// +optional
 	ScaleOut *ScaleOut `json:"scaleOut,omitempty"`
 
 	// Specifies the replica changes for scaling in components and instance templates,
 	// and takes specified instances offline. Can be used in conjunction with the "scaleOut" operation.
-	// Note: Any configuration that creates instances is considered invalid except for sharding component.
+	// Note: Any configuration that creates instances is considered invalid.
 	// +optional
 	ScaleIn *ScaleIn `json:"scaleIn,omitempty"`
 }

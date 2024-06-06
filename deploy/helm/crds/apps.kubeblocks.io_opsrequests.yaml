@@ -494,7 +494,7 @@ spec:
                         and instance templates, and takes specified instances offline.
                         Can be used in conjunction with the "scaleOut" operation.
                         Note: Any configuration that creates instances is considered
-                        invalid except for sharding component.'
+                        invalid.'
                       properties:
                         instances:
                           description: Modifies the desired replicas count for existing
@@ -537,7 +537,7 @@ spec:
                         components and instance templates, and brings offline instances
                         back online. Can be used in conjunction with the "scaleIn"
                         operation. Note: Any configuration that deletes instances
-                        is considered invalid except for sharding component.'
+                        is considered invalid.'
                       properties:
                         instances:
                           description: Modifies the desired replicas count for existing

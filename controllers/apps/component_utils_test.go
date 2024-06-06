@@ -114,7 +114,7 @@ var _ = Describe("Component Utils", func() {
 			Expect(len(itsList.Items) > 0).Should(BeTrue())
 
 			By("test GetComponentStsMinReadySeconds")
-			minReadySeconds, _ := component.GetComponentMinReadySeconds(ctx, k8sClient, *cluster, consensusCompName)
+			minReadySeconds, _ := component.GetMinReadySeconds(ctx, k8sClient, *cluster, consensusCompName)
 			Expect(minReadySeconds).To(Equal(int32(0)))
 		})
 	})

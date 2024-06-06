@@ -478,7 +478,7 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 		msgPrefix := "ScaleIn:"
 		hScaleInstanceFieldName := "onlineInstancesToOffline"
 		if !isScaleIn {
-			msgPrefix = "ScaleOut"
+			msgPrefix = "ScaleOut:"
 			hScaleInstanceFieldName = "offlineInstancesToOnline"
 		}
 		if isSharding && len(offlineOrOnlineInsNames) > 0 {

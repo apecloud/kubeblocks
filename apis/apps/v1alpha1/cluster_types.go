@@ -1596,8 +1596,11 @@ func (t *InstanceTemplate) GetName() string {
 	return t.Name
 }
 
-func (t *InstanceTemplate) GetReplicas() *int32 {
-	return t.Replicas
+func (t *InstanceTemplate) GetReplicas() int32 {
+	if t.Replicas != nil {
+		return *t.Replicas
+	}
+	return defaultInstanceTemplateReplicas
 }
 
 // GetClusterUpRunningPhases returns Cluster running or partially running phases.
@@ -1641,4 +1644,14 @@ func GetComponentUpRunningPhase() []ClusterComponentPhase {
 // ComponentPodsAreReady checks if the pods of component are ready.
 func ComponentPodsAreReady(podsAreReady *bool) bool {
 	return podsAreReady != nil && *podsAreReady
+}
+
+// GetInstanceTemplateName get the instance template name by instance name.
+func GetInstanceTemplateName(clusterName, componentName, instanceName string) string {
+	workloadPrefix := fmt.Sprintf("%s-%s", clusterName, componentName)
+	compInsKey := instanceName[:strings.LastIndex(instanceName, "-")]
+	if compInsKey == workloadPrefix {
+		return ""
+	}
+	return strings.Replace(compInsKey, workloadPrefix+"-", "", 1)
 }

@@ -59,7 +59,7 @@ func (vs verticalScalingHandler) ActionStartedCondition(reqCtx intctrlutil.Reque
 // Action modifies cluster component resources according to
 // the definition of opsRequest with spec.componentNames and spec.componentOps.verticalScaling
 func (vs verticalScalingHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	applyVerticalScaling := func(compSpec *appsv1alpha1.ClusterComponentSpec, obj ComponentOpsInteface) {
+	applyVerticalScaling := func(compSpec *appsv1alpha1.ClusterComponentSpec, obj ComponentOpsInteface) error {
 		verticalScaling := obj.(appsv1alpha1.VerticalScaling)
 		if vs.verticalScalingComp(verticalScaling) {
 			compSpec.Resources = verticalScaling.ResourceRequirements
@@ -72,22 +72,25 @@ func (vs verticalScalingHandler) Action(reqCtx intctrlutil.RequestCtx, cli clien
 				}
 			}
 		}
+		return nil
 	}
 	compOpsSet := newComponentOpsHelper(opsRes.OpsRequest.Spec.VerticalScalingList)
 	// abort earlier running vertical scaling opsRequest.
 	if err := abortEarlierOpsRequestWithSameKind(reqCtx, cli, opsRes, []appsv1alpha1.OpsType{appsv1alpha1.VerticalScalingType},
-		func(earlierOps *appsv1alpha1.OpsRequest) bool {
+		func(earlierOps *appsv1alpha1.OpsRequest) (bool, error) {
 			for _, v := range earlierOps.Spec.VerticalScalingList {
 				// abort the earlierOps if exists the same component.
 				if _, ok := compOpsSet.componentOpsSet[v.ComponentName]; ok {
-					return true
+					return true, nil
 				}
 			}
-			return false
+			return false, nil
 		}); err != nil {
 		return err
 	}
-	compOpsSet.updateClusterComponentsAndShardings(opsRes.Cluster, applyVerticalScaling)
+	if err := compOpsSet.updateClusterComponentsAndShardings(opsRes.Cluster, applyVerticalScaling); err != nil {
+		return err
+	}
 	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
 }
 
@@ -99,7 +102,7 @@ func (vs verticalScalingHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, 
 		reqCtx intctrlutil.RequestCtx,
 		cli client.Client,
 		opsRes *OpsResource,
-		pgRes progressResource,
+		pgRes *progressResource,
 		compStatus *appsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
 		verticalScaling := pgRes.compOps.(appsv1alpha1.VerticalScaling)
 		if len(pgRes.clusterComponent.Instances) != 0 {
@@ -109,7 +112,7 @@ func (vs verticalScalingHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, 
 			workloadName := constant.GenerateWorkloadNamePattern(opsRes.Cluster.Name, pgRes.fullComponentName)
 			templateReplicasCnt := int32(0)
 			for _, template := range pgRes.clusterComponent.Instances {
-				replicas := intctrlutil.TemplateReplicas(template)
+				replicas := template.GetReplicas()
 				insMap[template.Name] = replicas
 				templateReplicasCnt += replicas
 			}

@@ -620,12 +620,17 @@ const (
 	ReasonInstanceFailure = "InstanceFailure"
 )
 
+const defaultInstanceTemplateReplicas = 1
+
 func (t *InstanceTemplate) GetName() string {
 	return t.Name
 }
 
-func (t *InstanceTemplate) GetReplicas() *int32 {
-	return t.Replicas
+func (t *InstanceTemplate) GetReplicas() int32 {
+	if t.Replicas != nil {
+		return *t.Replicas
+	}
+	return defaultInstanceTemplateReplicas
 }
 
 func init() {

@@ -218,8 +218,8 @@ var _ = Describe("Upgrade OpsRequest", func() {
 		Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsSucceedPhase))
 	}
 
-	mockPodsAppliedImage := func(releaseVersion string) {
-		pods := testapps.MockInstanceSetPods(&testCtx, nil, clusterName, consensusComp)
+	mockPodsAppliedImage := func(cluster *appsv1alpha1.Cluster, releaseVersion string) {
+		pods := testapps.MockInstanceSetPods(&testCtx, nil, cluster, consensusComp)
 		image := testapps.AppImage(testapps.AppName, releaseVersion)
 		for i := range pods {
 			pod := pods[i]
@@ -256,8 +256,8 @@ var _ = Describe("Upgrade OpsRequest", func() {
 
 			By("expect upgrade successfully")
 			_ = testapps.MockInstanceSetPod(&testCtx, nil, clusterName, statelessComp, fmt.Sprintf(clusterName+"-"+statelessComp+"-0"), "", "")
-			_ = testapps.MockInstanceSetPods(&testCtx, nil, clusterName, statefulComp)
-			pods := testapps.MockInstanceSetPods(&testCtx, nil, clusterName, consensusComp)
+			_ = testapps.MockInstanceSetPods(&testCtx, nil, clusterObject, statefulComp)
+			pods := testapps.MockInstanceSetPods(&testCtx, nil, clusterObject, consensusComp)
 			for i := range pods {
 				pod := pods[i]
 				Expect(testapps.ChangeObj(&testCtx, pod, func(pod *corev1.Pod) {
@@ -298,7 +298,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			})).Should(Succeed())
 
 			By("expect upgrade successfully with the image that is provided in the specified componentDefinition")
-			mockPodsAppliedImage(release2)
+			mockPodsAppliedImage(opsRes.Cluster, release2)
 			expectOpsSucceed(reqCtx, opsRes, consensusComp)
 		})
 
@@ -326,7 +326,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			})).Should(Succeed())
 
 			By("expect upgrade successfully")
-			mockPodsAppliedImage(release3)
+			mockPodsAppliedImage(opsRes.Cluster, release3)
 			expectOpsSucceed(reqCtx, opsRes, consensusComp)
 		})
 
@@ -354,7 +354,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			})).Should(Succeed())
 
 			By("expect upgrade successfully with the latest release of the specified serviceVersion")
-			mockPodsAppliedImage(release4)
+			mockPodsAppliedImage(opsRes.Cluster, release4)
 			expectOpsSucceed(reqCtx, opsRes, consensusComp)
 		})
 
@@ -382,7 +382,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			})).Should(Succeed())
 
 			By("looking forward to using the latest serviceVersion and releaseVersion")
-			mockPodsAppliedImage(release4)
+			mockPodsAppliedImage(opsRes.Cluster, release4)
 			expectOpsSucceed(reqCtx, opsRes, consensusComp)
 		})
 

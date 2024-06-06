@@ -101,7 +101,7 @@ var _ = Describe("OpsUtil functions", func() {
 
 		prepareOpsRes := func(backupName string) *OpsResource {
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
-			podList := initInstanceSetPods(ctx, k8sClient, opsRes, clusterName)
+			podList := initInstanceSetPods(ctx, k8sClient, opsRes)
 
 			// fake to create the source pvc.
 			for i := range podList {
@@ -227,7 +227,7 @@ var _ = Describe("OpsUtil functions", func() {
 
 			By("fake th rebuild pods to ready ")
 			// recreate the instances and fake it to ready.
-			pods := initInstanceSetPods(ctx, k8sClient, opsRes, clusterName)
+			pods := initInstanceSetPods(ctx, k8sClient, opsRes)
 			if ignoreRoleCheck {
 				for i := range pods {
 					Expect(testapps.ChangeObj(&testCtx, &pods[i], func(pod *corev1.Pod) {

@@ -33,6 +33,8 @@ const (
 	ClusterKind           = "Cluster"
 	ComponentKind         = "Component"
 	OpsRequestKind        = "OpsRequestKind"
+
+	defaultInstanceTemplateReplicas = 1
 )
 
 type ComponentTemplateSpec struct {

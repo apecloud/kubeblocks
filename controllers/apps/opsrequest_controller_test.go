@@ -26,15 +26,16 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/pointer"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -57,6 +58,7 @@ var _ = Describe("OpsRequest Controller", func() {
 	const mysqlCompDefName = "mysql"
 	const mysqlCompName = "mysql"
 	const defaultMinReadySeconds = 10
+
 	var (
 		_1c1g = corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse("1"),
@@ -89,8 +91,6 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		// non-namespaced
 		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.ComponentResourceConstraintSignature, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.ComponentClassDefinitionSignature, ml)
 	}
 
 	BeforeEach(func() {
@@ -220,7 +220,6 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		By("check cluster resource requirements changed")
 		targetRequests := scalingCtx.target.Requests
-
 		itsList = testk8s.ListAndCheckInstanceSetWithComponent(&testCtx, clusterKey, mysqlCompName)
 		mysqlIts = &itsList.Items[0]
 		Expect(reflect.DeepEqual(mysqlIts.Spec.Template.Spec.Containers[0].Resources.Requests, targetRequests)).Should(BeTrue())
@@ -306,7 +305,9 @@ var _ = Describe("OpsRequest Controller", func() {
 					testk8s.RemovePodFinalizer(ctx, testCtx, &podList.Items[i])
 				}
 			}
-			mockPods := testapps.MockInstanceSetPods(&testCtx, its, clusterObj.Name, mysqlCompName)
+			cluster := &appsv1alpha1.Cluster{}
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterObj), cluster)).Should(Succeed())
+			mockPods := testapps.MockInstanceSetPods(&testCtx, its, cluster, mysqlCompName)
 			Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
 				testk8s.MockInstanceSetReady(its, mockPods...)
 			})).ShouldNot(HaveOccurred())
@@ -368,7 +369,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			ops.Spec.HorizontalScalingList = []appsv1alpha1.HorizontalScaling{
 				{
 					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: mysqlCompName},
-					Replicas:     replicas,
+					Replicas:     pointer.Int32(replicas),
 				},
 			}
 			// for reconciling the ops labels

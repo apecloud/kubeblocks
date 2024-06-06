@@ -48,7 +48,7 @@ import (
 
 type InstanceTemplate interface {
 	GetName() string
-	GetReplicas() *int32
+	GetReplicas() int32
 }
 
 type instanceTemplateExt struct {
@@ -217,16 +217,10 @@ func buildInstanceName2TemplateMap(itsExt *instanceSetExt) (map[string]*instance
 }
 
 func GenerateAllInstanceNames(parentName string, replicas int32, templates []InstanceTemplate, offlineInstances []string) []string {
-	templateReplicas := func(template InstanceTemplate) int32 {
-		if template.GetReplicas() != nil {
-			return *template.GetReplicas()
-		}
-		return 1
-	}
 	totalReplicas := int32(0)
 	instanceNameList := make([]string, 0)
 	for _, template := range templates {
-		replicas := templateReplicas(template)
+		replicas := template.GetReplicas()
 		names := GenerateInstanceNamesFromTemplate(parentName, template.GetName(), replicas, offlineInstances)
 		instanceNameList = append(instanceNameList, names...)
 		totalReplicas += replicas

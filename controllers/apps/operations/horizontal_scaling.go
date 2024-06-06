@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -98,8 +99,8 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 		lastCompConfiguration := opsRes.OpsRequest.Status.LastConfiguration.Components[obj.GetComponentName()]
 		if horizontalScaling.ScaleIn != nil && len(horizontalScaling.ScaleIn.OnlineInstancesToOffline) > 0 {
 			// check if the instances are online.
-			currPodSet := getPodSetForComponent(lastCompConfiguration.Instances, lastCompConfiguration.OfflineInstances,
-				opsRes.Cluster.Name, obj.GetComponentName(), *lastCompConfiguration.Replicas)
+			currPodSet := intctrlcomp.GenerateAllPodNamesToSet(*lastCompConfiguration.Replicas, lastCompConfiguration.Instances, lastCompConfiguration.OfflineInstances,
+				opsRes.Cluster.Name, obj.GetComponentName())
 			for _, onlineIns := range horizontalScaling.ScaleIn.OnlineInstancesToOffline {
 				if _, ok := currPodSet[onlineIns]; !ok {
 					return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" specified in onlineInstancesToOffline is not online`, onlineIns))
@@ -170,19 +171,21 @@ func (hs horizontalScalingOpsHandler) getCreateAndDeletePodSet(opsRes *OpsResour
 	horizontalScaling appsv1alpha1.HorizontalScaling,
 	fullCompName string) (map[string]string, map[string]string) {
 	clusterName := opsRes.Cluster.Name
-	lastPodSet := getPodSetForComponent(lastCompConfiguration.Instances, lastCompConfiguration.OfflineInstances, clusterName, fullCompName, *lastCompConfiguration.Replicas)
+	lastPodSet := intctrlcomp.GenerateAllPodNamesToSet(*lastCompConfiguration.Replicas,
+		lastCompConfiguration.Instances, lastCompConfiguration.OfflineInstances, clusterName, fullCompName)
 	expectReplicas, expectInstanceTpls, expectOfflineInstances := hs.getExpectedCompValues(opsRes, &currCompSpec, lastCompConfiguration, horizontalScaling)
-	currPodSet := getPodSetForComponent(expectInstanceTpls, expectOfflineInstances, clusterName, fullCompName, expectReplicas)
+	currPodSet := intctrlcomp.GenerateAllPodNamesToSet(expectReplicas, expectInstanceTpls,
+		expectOfflineInstances, clusterName, fullCompName)
 	createPodSet := map[string]string{}
 	deletePodSet := map[string]string{}
-	for k, v := range currPodSet {
+	for k := range currPodSet {
 		if _, ok := lastPodSet[k]; !ok {
-			createPodSet[k] = v
+			createPodSet[k] = appsv1alpha1.GetInstanceTemplateName(clusterName, fullCompName, k)
 		}
 	}
-	for k, v := range lastPodSet {
+	for k := range lastPodSet {
 		if _, ok := currPodSet[k]; !ok {
-			deletePodSet[k] = v
+			deletePodSet[k] = appsv1alpha1.GetInstanceTemplateName(clusterName, fullCompName, k)
 		}
 	}
 	if opsRes.OpsRequest.Status.Phase == appsv1alpha1.OpsCancellingPhase {
@@ -288,8 +291,8 @@ func (hs horizontalScalingOpsHandler) autoSyncReplicaChanges(
 	scaleOut := horizontalScaling.ScaleOut
 	if scaleOut != nil {
 		// get the pod set when removing the specified instances from offlineInstances slice
-		podSet := getPodSetForComponent(compInstanceTpls, compExpectOfflineInstances,
-			opsRes.Cluster.Name, horizontalScaling.ComponentName, compReplicas)
+		podSet := intctrlcomp.GenerateAllPodNamesToSet(compReplicas, compInstanceTpls, compExpectOfflineInstances,
+			opsRes.Cluster.Name, horizontalScaling.ComponentName)
 		onlineInsCountMap := map[string]int32{}
 		for _, insName := range scaleOut.OfflineInstancesToOnline {
 			if _, ok := podSet[insName]; !ok {

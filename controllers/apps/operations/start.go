@@ -28,6 +28,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -99,8 +100,8 @@ func (start StartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli 
 		opsRes *OpsResource,
 		pgRes *progressResource,
 		compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
-		pgRes.createdPodSet = getPodSetForComponent(pgRes.clusterComponent.Instances,
-			pgRes.clusterComponent.OfflineInstances, opsRes.Cluster.Name, pgRes.fullComponentName, pgRes.clusterComponent.Replicas)
+		pgRes.createdPodSet = intctrlcomp.GenerateAllPodNamesToSet(pgRes.clusterComponent.Replicas, pgRes.clusterComponent.Instances,
+			pgRes.clusterComponent.OfflineInstances, opsRes.Cluster.Name, pgRes.fullComponentName)
 		return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
 	}
 	compOpsHelper := newComponentOpsHelper([]appsv1alpha1.ComponentOps{})

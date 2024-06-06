@@ -31,6 +31,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -116,8 +117,8 @@ func (stop StopOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		pgRes *progressResource,
 		compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
 		lastCompConfiguration := opsRes.OpsRequest.Status.LastConfiguration.Components[pgRes.compOps.GetComponentName()]
-		pgRes.deletedPodSet = getPodSetForComponent(lastCompConfiguration.Instances,
-			pgRes.clusterComponent.OfflineInstances, opsRes.Cluster.Name, pgRes.fullComponentName, *lastCompConfiguration.Replicas)
+		pgRes.deletedPodSet = intctrlcomp.GenerateAllPodNamesToSet(*lastCompConfiguration.Replicas, lastCompConfiguration.Instances,
+			pgRes.clusterComponent.OfflineInstances, opsRes.Cluster.Name, pgRes.fullComponentName)
 		expectProgressCount, completedCount, err := handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
 		if err != nil {
 			return expectProgressCount, completedCount, err

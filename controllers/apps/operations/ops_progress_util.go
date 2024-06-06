@@ -34,7 +34,6 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -527,33 +526,4 @@ func syncProgressToOpsRequest(
 		return cli.Status().Patch(reqCtx.Ctx, opsRes.OpsRequest, client.MergeFrom(oldOpsRequest))
 	}
 	return nil
-}
-
-func getPodSetForComponent(
-	instances []appsv1alpha1.InstanceTemplate,
-	offlineInstances []string,
-	clusterName,
-	fullCompName string,
-	compReplicas int32) map[string]string {
-	workloadName := constant.GenerateWorkloadNamePattern(clusterName, fullCompName)
-	podSet := map[string]string{}
-	insTplReplicasCnt := int32(0)
-	// get the pods created by insTemplate
-	for _, ins := range instances {
-		insReplicas := ins.GetReplicas()
-		insTplReplicasCnt += insReplicas
-		templatePodNames := instanceset.GenerateInstanceNamesFromTemplate(workloadName, ins.Name, insReplicas, offlineInstances)
-		for _, podName := range templatePodNames {
-			podSet[podName] = ins.Name
-		}
-	}
-	// get the pods created without any insTemplate
-	if insTplReplicasCnt < compReplicas {
-		podNames := instanceset.GenerateInstanceNamesFromTemplate(workloadName, "",
-			compReplicas-insTplReplicasCnt, offlineInstances)
-		for _, podName := range podNames {
-			podSet[podName] = ""
-		}
-	}
-	return podSet
 }

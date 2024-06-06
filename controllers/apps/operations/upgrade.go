@@ -64,7 +64,7 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		opsRes.Cluster.Spec.ClusterVersionRef = *opsRes.OpsRequest.Spec.Upgrade.ClusterVersionRef
 	} else {
 		compOpsHelper = newComponentOpsHelper(upgradeSpec.Components)
-		compOpsHelper.updateClusterComponentsAndShardings(opsRes.Cluster, func(compSpec *appsv1alpha1.ClusterComponentSpec, obj ComponentOpsInteface) {
+		if err := compOpsHelper.updateClusterComponentsAndShardings(opsRes.Cluster, func(compSpec *appsv1alpha1.ClusterComponentSpec, obj ComponentOpsInteface) error {
 			upgradeComp := obj.(appsv1alpha1.UpgradeComponent)
 			if u.needUpdateCompDef(upgradeComp, opsRes.Cluster) {
 				compSpec.ComponentDef = *upgradeComp.ComponentDefinitionName
@@ -72,21 +72,24 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 			if upgradeComp.ServiceVersion != nil {
 				compSpec.ServiceVersion = *upgradeComp.ServiceVersion
 			}
-		})
+			return nil
+		}); err != nil {
+			return err
+		}
 	}
 	// abort earlier running upgrade opsRequest.
 	if err := abortEarlierOpsRequestWithSameKind(reqCtx, cli, opsRes, []appsv1alpha1.OpsType{appsv1alpha1.UpgradeType},
-		func(earlierOps *appsv1alpha1.OpsRequest) bool {
+		func(earlierOps *appsv1alpha1.OpsRequest) (bool, error) {
 			if u.existClusterVersion(earlierOps) {
-				return true
+				return true, nil
 			}
 			for _, v := range earlierOps.Spec.Upgrade.Components {
 				// abort the earlierOps if exists the same component.
 				if _, ok := compOpsHelper.componentOpsSet[v.ComponentName]; ok {
-					return true
+					return true, nil
 				}
 			}
-			return false
+			return false, nil
 		}); err != nil {
 		return err
 	}
@@ -158,7 +161,7 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 	handleUpgradeProgress := func(reqCtx intctrlutil.RequestCtx,
 		cli client.Client,
 		opsRes *OpsResource,
-		pgRes progressResource,
+		pgRes *progressResource,
 		compStatus *appsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
 		return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus, podApplyCompOps)
 	}

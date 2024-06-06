@@ -48,11 +48,3 @@ func GetOriginalOrGeneratedComponentSpecByName(ctx context.Context, cli client.R
 	}
 	return nil, nil
 }
-
-func TemplateReplicas(template appsv1alpha1.InstanceTemplate) int32 {
-	replicas := int32(1)
-	if template.Replicas != nil {
-		replicas = *template.Replicas
-	}
-	return replicas
-}

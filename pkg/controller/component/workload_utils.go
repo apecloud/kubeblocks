@@ -30,6 +30,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
@@ -105,4 +106,36 @@ func listObjWithLabelsInNamespace[T generics.Object, PT generics.PObject[T], L g
 		objs = append(objs, &items[i])
 	}
 	return objs, nil
+}
+
+// GenerateAllPodNames generate all pod names for a component.
+func GenerateAllPodNames(
+	compReplicas int32,
+	instances []appsv1alpha1.InstanceTemplate,
+	offlineInstances []string,
+	clusterName,
+	fullCompName string) []string {
+	workloadName := constant.GenerateWorkloadNamePattern(clusterName, fullCompName)
+	var templates []instanceset.InstanceTemplate
+	for i := range instances {
+		templates = append(templates, &instances[i])
+	}
+	return instanceset.GenerateAllInstanceNames(workloadName, compReplicas, templates, offlineInstances)
+}
+
+// GenerateAllPodNamesToSet generate all pod names for a component
+// and return a set which key is the pod name and value is a template name.
+func GenerateAllPodNamesToSet(
+	compReplicas int32,
+	instances []appsv1alpha1.InstanceTemplate,
+	offlineInstances []string,
+	clusterName,
+	fullCompName string) map[string]string {
+	instanceNames := GenerateAllPodNames(compReplicas, instances, offlineInstances, clusterName, fullCompName)
+	// key: podName, value: templateName
+	podSet := map[string]string{}
+	for _, insName := range instanceNames {
+		podSet[insName] = appsv1alpha1.GetInstanceTemplateName(clusterName, fullCompName, insName)
+	}
+	return podSet
 }

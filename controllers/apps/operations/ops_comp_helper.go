@@ -54,22 +54,30 @@ func newComponentOpsHelper[T ComponentOpsInteface](compOpsList []T) componentOps
 }
 
 func (c componentOpsHelper) updateClusterComponentsAndShardings(cluster *appsv1alpha1.Cluster,
-	updateFunc func(compSpec *appsv1alpha1.ClusterComponentSpec, compOpsItem ComponentOpsInteface)) {
-	updateComponentSpecs := func(compSpec *appsv1alpha1.ClusterComponentSpec, componentName string) {
+	updateFunc func(compSpec *appsv1alpha1.ClusterComponentSpec, compOpsItem ComponentOpsInteface) error) error {
+	updateComponentSpecs := func(compSpec *appsv1alpha1.ClusterComponentSpec, componentName string) error {
 		if obj, ok := c.componentOpsSet[componentName]; ok {
-			updateFunc(compSpec, obj)
+			if err := updateFunc(compSpec, obj); err != nil {
+				return err
+			}
 		}
+		return nil
 	}
 	// 1. update the components
 	for index := range cluster.Spec.ComponentSpecs {
 		comSpec := &cluster.Spec.ComponentSpecs[index]
-		updateComponentSpecs(comSpec, comSpec.Name)
+		if err := updateComponentSpecs(comSpec, comSpec.Name); err != nil {
+			return err
+		}
 	}
 	// 1. update the sharding components
 	for index := range cluster.Spec.ShardingSpecs {
 		shardingSpec := &cluster.Spec.ShardingSpecs[index]
-		updateComponentSpecs(&shardingSpec.Template, shardingSpec.Name)
+		if err := updateComponentSpecs(&shardingSpec.Template, shardingSpec.Name); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func (c componentOpsHelper) saveLastConfigurations(opsRes *OpsResource,
@@ -218,13 +226,11 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 		}
 	}
 	var waitComponentCompleted bool
-	for _, pgResource := range progressResources {
+	for i := range progressResources {
+		pgResource := progressResources[i]
 		opsCompStatus := opsRequest.Status.Components[pgResource.compOps.GetComponentName()]
-		expectCount, completedCount, err := handleStatusProgress(reqCtx, cli, opsRes, pgResource, &opsCompStatus)
+		expectCount, completedCount, err := handleStatusProgress(reqCtx, cli, opsRes, &pgResource, &opsCompStatus)
 		if err != nil {
-			if intctrlutil.IsTargetError(err, intctrlutil.ErrorWaitCacheRefresh) {
-				return opsRequestPhase, time.Second, nil
-			}
 			return opsRequestPhase, 0, err
 		}
 		expectProgressCount += expectCount

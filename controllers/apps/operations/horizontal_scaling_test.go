@@ -27,6 +27,8 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -45,6 +47,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr
 		clusterVersionName    = "clusterversion-for-ops-" + randomStr
 		clusterName           = "cluster-for-ops-" + randomStr
+		insTplName            = "foo"
 	)
 
 	cleanEnv := func() {
@@ -78,14 +81,21 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 	}
 
 	Context("Test OpsRequest", func() {
-		commonHScaleConsensusCompTest := func(reqCtx intctrlutil.RequestCtx, replicas int, offlineInstances []string, instances ...appsv1alpha1.InstanceTemplate) (*OpsResource, []*corev1.Pod) {
+		commonHScaleConsensusCompTest := func(reqCtx intctrlutil.RequestCtx,
+			changeClusterSpec func(cluster *appsv1alpha1.Cluster),
+			horizontalScaling appsv1alpha1.HorizontalScaling) (*OpsResource, []*corev1.Pod) {
 			By("init operations resources with CLusterDefinition/ClusterVersion/Hybrid components Cluster/consensus Pods")
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
-			podList := initInstanceSetPods(ctx, k8sClient, opsRes, clusterName)
-
-			By(fmt.Sprintf("create opsRequest for horizontal scaling of consensus component from 3 to %d", replicas))
+			if changeClusterSpec != nil {
+				Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func(cluster *appsv1alpha1.Cluster) {
+					changeClusterSpec(cluster)
+				})).Should(Succeed())
+			}
+			pods := testapps.MockInstanceSetPods(&testCtx, nil, opsRes.Cluster, consensusComp)
+			By("create opsRequest for horizontal scaling of consensus component")
 			initClusterAnnotationAndPhaseForOps(opsRes)
-			opsRes.OpsRequest = createHorizontalScaling(clusterName, replicas, offlineInstances, instances...)
+			horizontalScaling.ComponentName = consensusComp
+			opsRes.OpsRequest = createHorizontalScaling(clusterName, horizontalScaling)
 			// set ops phase to Pending
 			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase
 			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase, consensusComp)
@@ -95,18 +105,31 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
 
-			By(fmt.Sprintf("expect for the replicas of consensus component is %d after doing action again when opsRequest phase is Creating", replicas))
+			By("check for the replicas of consensus component after doing action again when opsRequest phase is Creating")
 			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
-				g.Expect(tmpCluster.Spec.GetComponentByName(consensusComp).Replicas).Should(BeEquivalentTo(replicas))
+				if horizontalScaling.Replicas == nil {
+					return
+				}
+				lastCompConfiguration := opsRes.OpsRequest.Status.LastConfiguration.Components[consensusComp]
+				var expectedCompReplicas int32
+				switch {
+				case horizontalScaling.ScaleIn != nil:
+					expectedCompReplicas = *lastCompConfiguration.Replicas - *horizontalScaling.ScaleIn.ReplicaChanges
+				case horizontalScaling.ScaleOut != nil:
+					expectedCompReplicas = *lastCompConfiguration.Replicas + *horizontalScaling.ScaleOut.ReplicaChanges
+				default:
+					expectedCompReplicas = *horizontalScaling.Replicas
+				}
+				g.Expect(tmpCluster.Spec.GetComponentByName(consensusComp).Replicas).Should(BeEquivalentTo(expectedCompReplicas))
 			})).Should(Succeed())
 
 			By("Test OpsManager.Reconcile function when horizontal scaling OpsRequest is Running")
 			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsRunningPhase
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			return opsRes, podList
+			return opsRes, pods
 		}
 
 		checkOpsRequestPhaseIsSucceed := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource) {
@@ -127,87 +150,315 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			Expect(len(opsProgressDetails)).Should(Equal(2))
 		}
 
-		It("test scaling down replicas", func() {
-			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
-			opsRes, podList := commonHScaleConsensusCompTest(reqCtx, 1, nil)
-			By("mock two pods are deleted")
-			for i := 1; i < 3; i++ {
-				pod := podList[i]
-				testk8s.MockPodIsTerminating(ctx, testCtx, pod)
-				testk8s.RemovePodFinalizer(ctx, testCtx, pod)
+		deletePods := func(pods ...*corev1.Pod) {
+			for i := range pods {
+				testk8s.MockPodIsTerminating(ctx, testCtx, pods[i])
+				testk8s.RemovePodFinalizer(ctx, testCtx, pods[i])
 			}
-			checkOpsRequestPhaseIsSucceed(reqCtx, opsRes)
-		})
+		}
 
-		It("test scaling out replicas", func() {
-			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
-			opsRes, _ := commonHScaleConsensusCompTest(reqCtx, 5, nil)
-			By("mock two pods are created")
-			for i := 3; i < 5; i++ {
-				podName := fmt.Sprintf("%s-%s-%d", clusterName, consensusComp, i)
-				testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp, podName, "follower", "Readonly")
+		createPods := func(templateName string, ordinals ...int) []*corev1.Pod {
+			var pods []*corev1.Pod
+			prefix := ""
+			if templateName != "" {
+				prefix = "-" + templateName
 			}
-			checkOpsRequestPhaseIsSucceed(reqCtx, opsRes)
-		})
+			for i := range ordinals {
+				podName := fmt.Sprintf("%s-%s%s-%d", clusterName, consensusComp, prefix, ordinals[i])
+				pod := testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp, podName, "follower", "Readonly")
+				pods = append(pods, pod)
+			}
+			return pods
+		}
 
-		It("test canceling HScale opsRequest which scales down replicas of component", func() {
+		testHScaleReplicas := func(
+			changeClusterSpec func(cluster *appsv1alpha1.Cluster),
+			horizontalScaling appsv1alpha1.HorizontalScaling,
+			mockHScale func(podList []*corev1.Pod)) {
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
-			opsRes, podList := commonHScaleConsensusCompTest(reqCtx, 1, nil)
+			opsRes, podList := commonHScaleConsensusCompTest(reqCtx, changeClusterSpec, horizontalScaling)
+			mockHScale(podList)
+			checkOpsRequestPhaseIsSucceed(reqCtx, opsRes)
+		}
 
-			By("mock one pod has been deleted")
-			pod := podList[2]
-			testk8s.MockPodIsTerminating(ctx, testCtx, pod)
-			testk8s.RemovePodFinalizer(ctx, testCtx, pod)
+		testCancelHScale := func(
+			horizontalScaling appsv1alpha1.HorizontalScaling,
+			isScaleDown bool) {
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			opsRes, podList := commonHScaleConsensusCompTest(reqCtx, nil, horizontalScaling)
+			var pod *corev1.Pod
+			if isScaleDown {
+				By("delete the pod")
+				pod = podList[2]
+				deletePods(pod)
+			} else {
+				By("create the pod")
+				pod = createPods("", 3)[0]
+			}
 
 			By("cancel HScale opsRequest after one pod has been deleted")
 			cancelOpsRequest(reqCtx, opsRes, time.Now().Add(-1*time.Second))
-
-			By("re-create the deleted pod")
-			podName := fmt.Sprintf("%s-%s-%d", clusterName, consensusComp, 2)
-			testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp, podName, "follower", "ReadOnly")
-
-			By("expect for opsRequest phase is Succeed after pods has been scaled and component phase is Running")
-			mockConsensusCompToRunning(opsRes)
-			checkCancelledSucceed(reqCtx, opsRes)
-			Expect(findStatusProgressDetail(opsRes.OpsRequest.Status.Components[consensusComp].ProgressDetails,
-				getProgressObjectKey(constant.PodKind, podName)).Status).Should(Equal(appsv1alpha1.SucceedProgressStatus))
-		})
-
-		It("test canceling HScale opsRequest which scales out replicas of component", func() {
-			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
-			opsRes, _ := commonHScaleConsensusCompTest(reqCtx, 5, nil)
-
-			By("mock one pod is created")
-			podName := fmt.Sprintf("%s-%s-%d", clusterName, consensusComp, 3)
-			pod := testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp, podName, "follower", "Readonly")
-
-			By("cancel HScale opsRequest after pne pod is created")
-			cancelOpsRequest(reqCtx, opsRes, time.Now().Add(-1*time.Second))
-
-			By("delete the created pod")
-			pod.Kind = constant.PodKind
-			testk8s.MockPodIsTerminating(ctx, testCtx, pod)
-			testk8s.RemovePodFinalizer(ctx, testCtx, pod)
+			if isScaleDown {
+				By("re-create the pod for rollback")
+				createPods("", 2)
+			} else {
+				By("delete the pod for rollback")
+				deletePods(pod)
+			}
 
 			By("expect for opsRequest phase is Succeed after pods has been scaled and component phase is Running")
 			mockConsensusCompToRunning(opsRes)
 			checkCancelledSucceed(reqCtx, opsRes)
 			Expect(findStatusProgressDetail(opsRes.OpsRequest.Status.Components[consensusComp].ProgressDetails,
 				getProgressObjectKey(constant.PodKind, pod.Name)).Status).Should(Equal(appsv1alpha1.SucceedProgressStatus))
+		}
+
+		It("test to scale in replicas with `replicas`", func() {
+			By("scale in replicas from 3 to 1 ")
+			horizontalScaling := appsv1alpha1.HorizontalScaling{}
+			horizontalScaling.Replicas = pointer.Int32(1)
+			testHScaleReplicas(nil, horizontalScaling, func(podList []*corev1.Pod) {
+				By("delete the pods")
+				deletePods(podList[1], podList[2])
+			})
 		})
 
-		It("force run horizontal scaling opsRequests ", func() {
-			By("create opsRequest for horizontal scaling")
-			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
-			opsRes, _ := commonHScaleConsensusCompTest(reqCtx, 5, nil)
-			firstOps := opsRes.OpsRequest.DeepCopy()
-			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
-				opsRes.Cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
-			})).ShouldNot(HaveOccurred())
+		It("test to scale out replicas with `replicas`", func() {
+			By("scale out replicas from 3 to 5")
+			horizontalScaling := appsv1alpha1.HorizontalScaling{}
+			horizontalScaling.Replicas = pointer.Int32(5)
+			testHScaleReplicas(nil, horizontalScaling, func(podList []*corev1.Pod) {
+				By("create the pods(ordinal:[3,4])")
+				createPods("", 3, 4)
+			})
+		})
 
-			By("create opsRequest for horizontal scaling with force flag")
-			ops := createHorizontalScaling(clusterName, 4, nil)
-			opsRes.OpsRequest = ops
+		It("test to scale out replicas with `scaleOut`", func() {
+			By("scale out replicas from 3 to 5 with `scaleOut`")
+			horizontalScaling := appsv1alpha1.HorizontalScaling{ScaleOut: &appsv1alpha1.ScaleOut{}}
+			horizontalScaling.ScaleOut.ReplicaChanges = pointer.Int32(2)
+			testHScaleReplicas(nil, horizontalScaling, func(podList []*corev1.Pod) {
+				By("create the pods(ordinal:[3,4])")
+				createPods("", 3, 4)
+			})
+		})
+
+		It("test to scale in replicas with `scaleIn`", func() {
+			By("scale in replicas from 3 to 1")
+			horizontalScaling := appsv1alpha1.HorizontalScaling{ScaleIn: &appsv1alpha1.ScaleIn{}}
+			horizontalScaling.ScaleIn.ReplicaChanges = pointer.Int32(2)
+			testHScaleReplicas(nil, horizontalScaling, func(podList []*corev1.Pod) {
+				By("delete the pods")
+				deletePods(podList[1], podList[2])
+			})
+		})
+
+		It("cancel the opsRequest which scaling in replicas with `replicas`", func() {
+			By("scale in replicas of component from 3 to 1")
+			testCancelHScale(appsv1alpha1.HorizontalScaling{Replicas: pointer.Int32(1)}, true)
+		})
+
+		It("cancel the opsRequest which scaling up replicas with `replicas`", func() {
+			By("scale out replicas of component from 3 to 5")
+			testCancelHScale(appsv1alpha1.HorizontalScaling{Replicas: pointer.Int32(5)}, false)
+		})
+
+		It("cancel the opsRequest which scaling up replicas with `scaleOut`", func() {
+			By("scale out replicas of component from 3 to 5")
+			testCancelHScale(appsv1alpha1.HorizontalScaling{ScaleOut: &appsv1alpha1.ScaleOut{ReplicaChanger: appsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(2)}}}, false)
+		})
+
+		It("cancel the opsRequest which scaling in replicas with `scaleIn`", func() {
+			By("scale in replicas of component from 3 to 1")
+			testCancelHScale(appsv1alpha1.HorizontalScaling{ScaleIn: &appsv1alpha1.ScaleIn{ReplicaChanger: appsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(2)}}}, true)
+		})
+
+		setClusterCompSpec := func(cluster *appsv1alpha1.Cluster, instances []appsv1alpha1.InstanceTemplate, offlineInstances []string) {
+			for i, v := range cluster.Spec.ComponentSpecs {
+				if v.Name == consensusComp {
+					cluster.Spec.ComponentSpecs[i].OfflineInstances = offlineInstances
+					cluster.Spec.ComponentSpecs[i].Instances = instances
+					break
+				}
+			}
+		}
+
+		testHScaleWithSpecifiedPod := func(changeClusterSpec func(cluster *appsv1alpha1.Cluster),
+			horizontalScaling appsv1alpha1.HorizontalScaling,
+			expectOfflineInstances []string,
+			mockHScale func(podList []*corev1.Pod)) *OpsResource {
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			opsRes, podList := commonHScaleConsensusCompTest(reqCtx, changeClusterSpec, horizontalScaling)
+			By("verify cluster spec is correct")
+			targetSpec := opsRes.Cluster.Spec.GetComponentByName(consensusComp)
+			Expect(targetSpec.OfflineInstances).Should(HaveLen(len(expectOfflineInstances)))
+			expectedOfflineInsSet := sets.New(expectOfflineInstances...)
+			for _, v := range targetSpec.OfflineInstances {
+				_, ok := expectedOfflineInsSet[v]
+				Expect(ok).Should(BeTrue())
+			}
+
+			By("mock specified pods deleted")
+			mockHScale(podList)
+			checkOpsRequestPhaseIsSucceed(reqCtx, opsRes)
+			return opsRes
+		}
+
+		It("test offline the specified pod of the component", func() {
+			toDeletePodName := fmt.Sprintf("%s-%s-1", clusterName, consensusComp)
+			offlineInstances := []string{toDeletePodName}
+			opsRes := testHScaleWithSpecifiedPod(func(cluster *appsv1alpha1.Cluster) {
+				setClusterCompSpec(cluster, []appsv1alpha1.InstanceTemplate{
+					{Name: insTplName, Replicas: pointer.Int32(1)},
+				}, nil)
+			}, appsv1alpha1.HorizontalScaling{
+				ScaleIn: &appsv1alpha1.ScaleIn{
+					ReplicaChanger:           appsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)},
+					OnlineInstancesToOffline: offlineInstances,
+				},
+			}, offlineInstances, func(podList []*corev1.Pod) {
+				By(fmt.Sprintf(`delete the specified pod "%s"`, toDeletePodName))
+				deletePods(podList[2])
+			})
+			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("1/1"))
+		})
+
+		It("test offline the specified pod and scale out another replicas", func() {
+			toDeletePodName := fmt.Sprintf("%s-%s-1", clusterName, consensusComp)
+			offlineInstances := []string{toDeletePodName}
+			opsRes := testHScaleWithSpecifiedPod(func(cluster *appsv1alpha1.Cluster) {
+				setClusterCompSpec(cluster, []appsv1alpha1.InstanceTemplate{
+					{Name: insTplName, Replicas: pointer.Int32(1)},
+				}, nil)
+			}, appsv1alpha1.HorizontalScaling{
+				ScaleIn: &appsv1alpha1.ScaleIn{
+					ReplicaChanger:           appsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)},
+					OnlineInstancesToOffline: offlineInstances,
+				},
+				ScaleOut: &appsv1alpha1.ScaleOut{
+					ReplicaChanger: appsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)},
+				},
+			}, offlineInstances, func(podList []*corev1.Pod) {
+				By(fmt.Sprintf(`delete the specified pod "%s"`, toDeletePodName))
+				deletePods(podList[2])
+				By("create a new pod(ordinal:2) by replicas")
+				createPods("", 2)
+			})
+			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("2/2"))
+		})
+
+		It("test offline the specified pod and auto-sync replicaChanges", func() {
+			offlineInstanceName := fmt.Sprintf("%s-%s-%s-0", clusterName, consensusComp, insTplName)
+			offlineInstances := []string{offlineInstanceName}
+			opsRes := testHScaleWithSpecifiedPod(func(cluster *appsv1alpha1.Cluster) {
+				setClusterCompSpec(cluster, []appsv1alpha1.InstanceTemplate{
+					{Name: insTplName, Replicas: pointer.Int32(1)},
+				}, nil)
+			}, appsv1alpha1.HorizontalScaling{
+				ScaleIn: &appsv1alpha1.ScaleIn{
+					OnlineInstancesToOffline: offlineInstances,
+				},
+			}, offlineInstances, func(podList []*corev1.Pod) {
+				By("delete the specified pod " + offlineInstanceName)
+				deletePods(podList[0])
+			})
+			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("1/1"))
+			By("expect replicas to 2 and template " + insTplName + " replicas to 0")
+			compSpec := opsRes.Cluster.Spec.GetComponentByName(consensusComp)
+			Expect(compSpec.Replicas).Should(BeEquivalentTo(2))
+			Expect(*compSpec.Instances[0].Replicas).Should(BeEquivalentTo(0))
+		})
+
+		It("test online the specified pod of the instance template and auto-sync replicaChanges", func() {
+			offlineInstanceName := fmt.Sprintf("%s-%s-%s-0", clusterName, consensusComp, insTplName)
+			offlineInstances := []string{offlineInstanceName}
+			opsRes := testHScaleWithSpecifiedPod(func(cluster *appsv1alpha1.Cluster) {
+				setClusterCompSpec(cluster, []appsv1alpha1.InstanceTemplate{
+					{Name: insTplName, Replicas: pointer.Int32(1)},
+				}, offlineInstances)
+			}, appsv1alpha1.HorizontalScaling{
+				ScaleOut: &appsv1alpha1.ScaleOut{
+					OfflineInstancesToOnline: offlineInstances,
+				},
+			}, []string{}, func(podList []*corev1.Pod) {
+				By("create the specified pod " + offlineInstanceName)
+				testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp, offlineInstanceName, "follower", "Readonly")
+			})
+			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("1/1"))
+			By("expect replicas to 4")
+			compSpec := opsRes.Cluster.Spec.GetComponentByName(consensusComp)
+			Expect(compSpec.Replicas).Should(BeEquivalentTo(4))
+			Expect(*compSpec.Instances[0].Replicas).Should(BeEquivalentTo(2))
+		})
+
+		It("test offline and online the specified pod and auto-sync replicaChanges", func() {
+			onlinePodName := fmt.Sprintf("%s-%s-1", clusterName, consensusComp)
+			offlinePodName := fmt.Sprintf("%s-%s-%s-0", clusterName, consensusComp, insTplName)
+			opsRes := testHScaleWithSpecifiedPod(func(cluster *appsv1alpha1.Cluster) {
+				setClusterCompSpec(cluster, []appsv1alpha1.InstanceTemplate{
+					{Name: insTplName, Replicas: pointer.Int32(1)},
+				}, []string{onlinePodName})
+			}, appsv1alpha1.HorizontalScaling{
+				ScaleIn: &appsv1alpha1.ScaleIn{
+					OnlineInstancesToOffline: []string{offlinePodName},
+				},
+				ScaleOut: &appsv1alpha1.ScaleOut{
+					OfflineInstancesToOnline: []string{onlinePodName},
+				},
+			}, []string{offlinePodName}, func(podList []*corev1.Pod) {
+				By(fmt.Sprintf(`delete the specified pod"%s"`, offlinePodName))
+				deletePods(podList[0])
+
+				By(fmt.Sprintf(`create the pod "%s" which is removed from offlineInstances`, onlinePodName))
+				createPods("", 1)
+			})
+			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("2/2"))
+			By("expect replicas to 3")
+			Expect(opsRes.Cluster.Spec.GetComponentByName(consensusComp).Replicas).Should(BeEquivalentTo(3))
+		})
+
+		It("h-scale new instance templates and scale in all old replicas", func() {
+			templateFoo := appsv1alpha1.InstanceTemplate{
+				Name:     insTplName,
+				Replicas: func() *int32 { r := int32(3); return &r }(),
+			}
+			templateBar := appsv1alpha1.InstanceTemplate{
+				Name:     "bar",
+				Replicas: func() *int32 { r := int32(3); return &r }(),
+			}
+			instances := []appsv1alpha1.InstanceTemplate{templateFoo, templateBar}
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			opsRes, pods := commonHScaleConsensusCompTest(reqCtx, nil, appsv1alpha1.HorizontalScaling{
+				ScaleOut: &appsv1alpha1.ScaleOut{
+					NewInstances: []appsv1alpha1.InstanceTemplate{templateFoo, templateBar},
+				},
+				ScaleIn: &appsv1alpha1.ScaleIn{
+					ReplicaChanger: appsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(3)},
+				},
+			})
+			By("verify cluster spec is correct")
+			var targetSpec *appsv1alpha1.ClusterComponentSpec
+			for i := range opsRes.Cluster.Spec.ComponentSpecs {
+				spec := &opsRes.Cluster.Spec.ComponentSpecs[i]
+				if spec.Name == consensusComp {
+					targetSpec = spec
+				}
+			}
+
+			// auto-sync replicaChanges of the component to 6
+			Expect(targetSpec.Replicas).Should(BeEquivalentTo(6))
+			Expect(targetSpec.Instances).Should(HaveLen(2))
+			Expect(targetSpec.Instances).Should(Equal(instances))
+			By("mock six pods are created")
+			createPods(insTplName, 0, 1, 2)
+			createPods("bar", 0, 1, 2)
+			By("delete three pods")
+			deletePods(pods...)
+			checkOpsRequestPhaseIsSucceed(reqCtx, opsRes)
+		})
+		createOpsAndToCreatingPhase := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, horizontalScaling appsv1alpha1.HorizontalScaling) *appsv1alpha1.OpsRequest {
+			horizontalScaling.ComponentName = consensusComp
+			opsRes.OpsRequest = createHorizontalScaling(clusterName, horizontalScaling)
 			opsRes.OpsRequest.Spec.Force = true
 			// set ops phase to Pending
 			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase
@@ -218,91 +469,92 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
 
-			By("mock the next reconcile")
+			By("do Action")
 			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(testapps.ChangeObjStatus(&testCtx, ops, func() {
-				ops.Status.Phase = appsv1alpha1.OpsRunningPhase
-			})).Should(Succeed())
+			return opsRes.OpsRequest
+		}
 
-			By("the first operations request is expected to be aborted.")
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(firstOps))).Should(Equal(appsv1alpha1.OpsAbortedPhase))
-			opsRequestSlice, _ := opsutil.GetOpsRequestSliceFromCluster(opsRes.Cluster)
-			Expect(len(opsRequestSlice)).Should(Equal(1))
-			for _, v := range opsRequestSlice {
-				Expect(v.InQueue).Should(BeFalse())
-			}
+		It("test offline the specified pod but it is not online", func() {
+			By("init operations resources with CLusterDefinition/ClusterVersion/Hybrid components Cluster/consensus Pods")
+			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 
+			By("offline the specified pod but it is not online")
+			offlineInsName := fmt.Sprintf("%s-%s-4", clusterName, consensusComp)
+			_ = createOpsAndToCreatingPhase(reqCtx, opsRes, appsv1alpha1.HorizontalScaling{
+				ScaleIn: &appsv1alpha1.ScaleIn{
+					ReplicaChanger:           appsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)},
+					OnlineInstancesToOffline: []string{offlineInsName},
+				},
+			})
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsFailedPhase))
+			conditions := opsRes.OpsRequest.Status.Conditions
+			Expect(conditions[len(conditions)-1].Message).Should(ContainSubstring(
+				fmt.Sprintf(`instance "%s" specified in onlineInstancesToOffline is not online`, offlineInsName)))
 		})
 
-		It("test scaling down replicas with specified pod", func() {
-			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
-			specifiedOrdinal := 1
-			offlineInstances := []string{fmt.Sprintf("%s-%s-%d", clusterName, consensusComp, specifiedOrdinal)}
-			opsRes, podList := commonHScaleConsensusCompTest(reqCtx, 2, offlineInstances)
-			By("verify cluster spec is correct")
-			var targetSpec *appsv1alpha1.ClusterComponentSpec
-			for i := range opsRes.Cluster.Spec.ComponentSpecs {
-				spec := &opsRes.Cluster.Spec.ComponentSpecs[i]
-				if spec.Name == consensusComp {
-					targetSpec = spec
-				}
-			}
-			Expect(targetSpec.Instances).Should(BeNil())
-			Expect(targetSpec.OfflineInstances).Should(HaveLen(1))
-			Expect(targetSpec.OfflineInstances).Should(Equal(offlineInstances))
+		It("test run multi horizontalScaling opsRequest with force flag", func() {
+			By("init operations resources with CLusterDefinition/ClusterVersion/Hybrid components Cluster/consensus Pods")
+			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			By("create first opsRequest to add 1 replicas with `scaleOut` field and expect replicas to 4")
+			ops1 := createOpsAndToCreatingPhase(reqCtx, opsRes, appsv1alpha1.HorizontalScaling{
+				ScaleOut: &appsv1alpha1.ScaleOut{ReplicaChanger: appsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)}},
+			})
+			Expect(opsRes.Cluster.Spec.GetComponentByName(consensusComp).Replicas).Should(BeEquivalentTo(4))
 
-			By("mock specified pod (with ordinal 1) deleted")
-			pod := podList[specifiedOrdinal]
-			testk8s.MockPodIsTerminating(ctx, testCtx, pod)
-			testk8s.RemovePodFinalizer(ctx, testCtx, pod)
-			checkOpsRequestPhaseIsSucceed(reqCtx, opsRes)
-		})
+			By("create secondary opsRequest to add 1 replicas with `replicasToAdd` field and expect replicas to 5")
+			ops2 := createOpsAndToCreatingPhase(reqCtx, opsRes, appsv1alpha1.HorizontalScaling{
+				ScaleOut: &appsv1alpha1.ScaleOut{ReplicaChanger: appsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)}},
+			})
+			Expect(opsRes.Cluster.Spec.GetComponentByName(consensusComp).Replicas).Should(BeEquivalentTo(5))
 
-		It("test scaling out replicas with heterogeneous pod", func() {
-			templateFoo := appsv1alpha1.InstanceTemplate{
-				Name:     "foo",
-				Replicas: func() *int32 { r := int32(3); return &r }(),
-			}
-			templateBar := appsv1alpha1.InstanceTemplate{
-				Name:     "bar",
-				Replicas: func() *int32 { r := int32(3); return &r }(),
-			}
-			instances := []appsv1alpha1.InstanceTemplate{templateFoo, templateBar}
-			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
-			opsRes, _ := commonHScaleConsensusCompTest(reqCtx, 6, nil, instances...)
-			By("verify cluster spec is correct")
-			var targetSpec *appsv1alpha1.ClusterComponentSpec
-			for i := range opsRes.Cluster.Spec.ComponentSpecs {
-				spec := &opsRes.Cluster.Spec.ComponentSpecs[i]
-				if spec.Name == consensusComp {
-					targetSpec = spec
-				}
-			}
-			Expect(targetSpec.Replicas).Should(BeEquivalentTo(6))
-			Expect(targetSpec.Instances).Should(HaveLen(2))
-			Expect(targetSpec.Instances).Should(Equal(instances))
-			By("mock two pods are created")
-			for i := 3; i < 6; i++ {
-				podName := fmt.Sprintf("%s-%s-%d", clusterName, consensusComp, i)
-				testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp, podName, "follower", "Readonly")
-			}
-			checkOpsRequestPhaseIsSucceed(reqCtx, opsRes)
+			By("create third opsRequest to offline a pod which is created by another running opsRequest and expect it to fail")
+			offlineInsName := fmt.Sprintf("%s-%s-3", clusterName, consensusComp)
+			_ = createOpsAndToCreatingPhase(reqCtx, opsRes, appsv1alpha1.HorizontalScaling{
+				ScaleIn: &appsv1alpha1.ScaleIn{
+					ReplicaChanger:           appsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)},
+					OnlineInstancesToOffline: []string{offlineInsName},
+				},
+			})
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsFailedPhase))
+			conditions := opsRes.OpsRequest.Status.Conditions
+			Expect(conditions[len(conditions)-1].Message).Should(ContainSubstring(fmt.Sprintf(`instance "%s" cannot be taken offline as it has been created by another running opsRequest`, offlineInsName)))
+
+			By("create a opsRequest to delete 1 replicas which is created by another running opsRequest and expect it to fail")
+			_ = createOpsAndToCreatingPhase(reqCtx, opsRes, appsv1alpha1.HorizontalScaling{
+				ScaleIn: &appsv1alpha1.ScaleIn{ReplicaChanger: appsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)}},
+			})
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsFailedPhase))
+			conditions = opsRes.OpsRequest.Status.Conditions
+			Expect(conditions[len(conditions)-1].Message).Should(ContainSubstring(`cannot be taken offline as it has been created by another running opsRequest`))
+
+			By("create a opsRequest with `replicas` field and expect to abort the running ops")
+			// if existing an overwrite replicas operation for a component or instanceTemplate, need to abort.
+			ops3 := createOpsAndToCreatingPhase(reqCtx, opsRes, appsv1alpha1.HorizontalScaling{
+				Replicas: pointer.Int32(3),
+			})
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).Should(Equal(appsv1alpha1.OpsAbortedPhase))
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops2))).Should(Equal(appsv1alpha1.OpsAbortedPhase))
+
+			By("create a opsRequest with `scaleOut` field and expect to abort last running ops")
+			// if running opsRequest exists an overwrite replicas operation for a component or instanceTemplate, need to abort.
+			createOpsAndToCreatingPhase(reqCtx, opsRes, appsv1alpha1.HorizontalScaling{
+				ScaleOut: &appsv1alpha1.ScaleOut{ReplicaChanger: appsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)}},
+			})
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops3))).Should(Equal(appsv1alpha1.OpsAbortedPhase))
+			Expect(opsRes.Cluster.Spec.GetComponentByName(consensusComp).Replicas).Should(BeEquivalentTo(4))
 		})
 	})
 })
 
-func createHorizontalScaling(clusterName string, replicas int, offlineInstances []string, instances ...appsv1alpha1.InstanceTemplate) *appsv1alpha1.OpsRequest {
+func createHorizontalScaling(clusterName string, horizontalScaling appsv1alpha1.HorizontalScaling) *appsv1alpha1.OpsRequest {
 	horizontalOpsName := "horizontal-scaling-ops-" + testCtx.GetRandomStr()
 	ops := testapps.NewOpsRequestObj(horizontalOpsName, testCtx.DefaultNamespace,
 		clusterName, appsv1alpha1.HorizontalScalingType)
 	ops.Spec.HorizontalScalingList = []appsv1alpha1.HorizontalScaling{
-		{
-			ComponentOps:     appsv1alpha1.ComponentOps{ComponentName: consensusComp},
-			Replicas:         int32(replicas),
-			Instances:        instances,
-			OfflineInstances: offlineInstances,
-		},
+		horizontalScaling,
 	}
 	opsRequest := testapps.CreateOpsRequest(ctx, testCtx, ops)
 	opsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase

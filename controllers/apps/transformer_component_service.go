@@ -251,12 +251,8 @@ func (t *componentServiceTransformer) createOrUpdateServiceInUnique(ctx graph.Tr
 }
 
 func generatePodNames(synthesizeComp *component.SynthesizedComponent) []string {
-	workloadName := constant.GenerateWorkloadNamePattern(synthesizeComp.ClusterName, synthesizeComp.Name)
-	var templates []instanceset.InstanceTemplate
-	for i := range synthesizeComp.Instances {
-		templates = append(templates, &synthesizeComp.Instances[i])
-	}
-	return instanceset.GenerateAllInstanceNames(workloadName, synthesizeComp.Replicas, templates, synthesizeComp.OfflineInstances)
+	return component.GenerateAllPodNames(synthesizeComp.Replicas, synthesizeComp.Instances,
+		synthesizeComp.OfflineInstances, synthesizeComp.ClusterName, synthesizeComp.Name)
 }
 
 func generatePodNamesByITS(its *workloads.InstanceSet) []string {

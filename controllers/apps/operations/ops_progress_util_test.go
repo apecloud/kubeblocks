@@ -25,6 +25,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -99,7 +100,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 			By("create restart ops and pods of consensus component")
 			opsRes.OpsRequest = createRestartOpsObj(clusterName, "restart-"+randomStr)
 			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase, consensusComp, statelessComp)
-			podList := initInstanceSetPods(ctx, k8sClient, opsRes, clusterName)
+			podList := initInstanceSetPods(ctx, k8sClient, opsRes)
 
 			By("mock restart OpsRequest is Running")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
@@ -114,10 +115,13 @@ var _ = Describe("Ops ProgressDetails", func() {
 			By("init operations resources ")
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
-			podList := initInstanceSetPods(ctx, k8sClient, opsRes, clusterName)
+			podList := initInstanceSetPods(ctx, k8sClient, opsRes)
 
-			By("create horizontalScaling operation to test the progressDetails when scaling down the replicas")
-			opsRes.OpsRequest = createHorizontalScaling(clusterName, 1, nil)
+			By("create horizontalScaling operation to test the progressDetails when scaling in the replicas")
+			opsRes.OpsRequest = createHorizontalScaling(clusterName, appsv1alpha1.HorizontalScaling{
+				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+				Replicas:     pointer.Int32(1),
+			})
 			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase, consensusComp) // appsv1alpha1.HorizontalScalingPhase
 			initClusterForOps(opsRes)
 
@@ -160,7 +164,10 @@ var _ = Describe("Ops ProgressDetails", func() {
 			})).ShouldNot(HaveOccurred())
 			// ops will use the startTimestamp to make decision, start time should not equal the pod createTime during testing.
 			time.Sleep(time.Second)
-			opsRes.OpsRequest = createHorizontalScaling(clusterName, 3, nil)
+			opsRes.OpsRequest = createHorizontalScaling(clusterName, appsv1alpha1.HorizontalScaling{
+				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+				Replicas:     pointer.Int32(3),
+			})
 			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase, consensusComp, statelessComp)
 			// update ops phase to Running first
 			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)

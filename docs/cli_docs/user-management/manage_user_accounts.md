@@ -44,7 +44,7 @@ Currently, KubeBlocks only supports managing user accounts for ApeCloud MySQL, M
     | ReadWrite | GRANT SELECT, INSERT, DELETE ON * TO a user | GRANT pg_write_all_data TO a user | -@ALL +@Write +@READ allkeys |
     | ReadOnly  | GRANT SELECT, SHOW VIEW ON * TO a user | GRANT pg_read_all_data TO a user | -@ALL +@READ allkeys |
 
-- Check role level of a user account
+- Check the role level of a user account
 
   ```bash
   kbcli cluster describe-account <clustername> --name <username>

@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 
 # Install KubeBlocks 
 
-KubeBlocks is kubernetes-native, you can use Helm or kubectl with yaml file to install it.
+KubeBlocks is Kubernetes-native, you can use Helm or kubectl with a YAML file to install it.
 
 :::note
 
@@ -86,7 +86,7 @@ Use Helm and follow the steps below to install KubeBlocks.
 
    If you want to install KubeBlocks with a specified version, follow the steps below.
 
-   1. View the available versions in [KubeBlocks Release](https://github.com/apecloud/kubeblocks/releases/).
+   1. View the available versions in the [KubeBlocks Release](https://github.com/apecloud/kubeblocks/releases/).
    2. Specify a version with `--version` and run the command below.
 
       ```bash

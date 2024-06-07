@@ -74,6 +74,11 @@ RUN --mount=type=bind,target=. \
 RUN --mount=type=bind,target=. \
     --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o /out/kb_agent cmd/kb_agent/main.go
+
+RUN --mount=type=bind,target=. \
+    --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o /out/lorry cmd/lorry/main.go
 
 RUN --mount=type=bind,target=. \
@@ -97,6 +102,7 @@ RUN apk add --no-cache curl kubectl helm jq --allow-untrusted \
     && rm -rf /var/cache/apk/*
 
 # copy kubeblocks tools
+COPY config/kb__agent config/kb__agent
 COPY config/lorry config/lorry
 COPY config/crd/bases /kubeblocks/crd
 COPY --from=builder /out/killer /bin
@@ -106,10 +112,6 @@ COPY --from=builder /out/lorry /bin
 COPY --from=builder /out/lorryctl /bin
 COPY --from=builder /bin/grpc_health_probe /bin
 COPY --from=builder /out/helm_hook /bin
-
-# make breaking change compatible
-RUN ln -s /bin/lorry /bin/probe
-RUN ln -s /config/lorry /config/probe
 
 # enable grpc_health_probe binary
 RUN chmod +x /bin/grpc_health_probe

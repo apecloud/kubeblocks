@@ -92,12 +92,10 @@ spec:
                 - Retain
                 type: string
               storageProviderRef:
-                description: Specifies the name of the `StorageProvider` used by this
-                  backup repository.
+                description: "Specifies the name of the `StorageProvider` used by
+                  this backup repository. \n TODO +kubebuilder:validation:XValidation:rule=\"self
+                  == oldSelf\",message=\"StorageProviderRef is immutable\""
                 type: string
-                x-kubernetes-validations:
-                - message: StorageProviderRef is immutable
-                  rule: self == oldSelf
               volumeCapacity:
                 anyOf:
                 - type: integer

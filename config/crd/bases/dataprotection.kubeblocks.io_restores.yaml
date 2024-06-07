@@ -73,7 +73,9 @@ spec:
                   the most recent full backup of this incremental backup. 3. Differential:
                   will be restored sequentially from the parent backup of the differential
                   backup. 4. Continuous: will find the most recent full backup at
-                  this time point and the continuous backups after it to restore."
+                  this time point and the continuous backups after it to restore.
+                  \n TODO +kubebuilder:validation:XValidation:rule=\"self == oldSelf\",message=\"forbidden
+                  to update spec.backupName\""
                 properties:
                   name:
                     description: Specifies the backup name.
@@ -89,9 +91,6 @@ spec:
                 - name
                 - namespace
                 type: object
-                x-kubernetes-validations:
-                - message: forbidden to update spec.backupName
-                  rule: self == oldSelf
               containerResources:
                 description: Specifies the required resources of restore job's container.
                 properties:
@@ -259,9 +258,13 @@ spec:
                   and scheduling strategy of temporary recovery pod.
                 properties:
                   dataSourceRef:
-                    description: Specifies the configuration when using `persistentVolumeClaim.spec.dataSourceRef`
+                    description: "Specifies the configuration when using `persistentVolumeClaim.spec.dataSourceRef`
                       method for restoring. Describes the source volume of the backup
                       targetVolumes and the mount path in the restoring container.
+                      \n TODO +kubebuilder:validation:XValidation:rule=\"self.volumeSource
+                      != '' || self.mountPath !=''\",message=\"at least one exists
+                      for volumeSource and mountPath.\" TODO +kubebuilder:validation:XValidation:rule=\"self
+                      == oldSelf\",message=\"forbidden to update spec.prepareDataConfig.dataSourceRef\""
                     properties:
                       mountPath:
                         description: Specifies the path within the restoring container
@@ -273,11 +276,6 @@ spec:
                           required if the backup uses a volume snapshot.
                         type: string
                     type: object
-                    x-kubernetes-validations:
-                    - message: at least one exists for volumeSource and mountPath.
-                      rule: self.volumeSource != '' || self.mountPath !=''
-                    - message: forbidden to update spec.prepareDataConfig.dataSourceRef
-                      rule: self == oldSelf
                   requiredPolicyForAllPodSelection:
                     description: Specifies the restore policy, which is required when
                       the pod selection strategy for the source target is 'All'. This
@@ -309,7 +307,9 @@ spec:
                     - dataRestorePolicy
                     type: object
                   schedulingSpec:
-                    description: Specifies the scheduling spec for the restoring pod.
+                    description: "Specifies the scheduling spec for the restoring
+                      pod. \n TODO +kubebuilder:validation:XValidation:rule=\"self
+                      == oldSelf\",message=\"forbidden to update spec.prepareDataConfig.schedulingSpec\""
                     properties:
                       affinity:
                         description: Contains a group of affinity scheduling rules.
@@ -1466,9 +1466,6 @@ spec:
                           type: object
                         type: array
                     type: object
-                    x-kubernetes-validations:
-                    - message: forbidden to update spec.prepareDataConfig.schedulingSpec
-                      rule: self == oldSelf
                   volumeClaimRestorePolicy:
                     default: Parallel
                     description: "Defines restore policy for persistent volume claim.
@@ -1481,9 +1478,11 @@ spec:
                     - Serial
                     type: string
                   volumeClaims:
-                    description: Defines the persistent Volume claims that need to
+                    description: "Defines the persistent Volume claims that need to
                       be restored and mounted together into the restore job. These
                       persistent Volume claims will be created if they do not exist.
+                      \n TODO +kubebuilder:validation:XValidation:rule=\"self == oldSelf\",message=\"forbidden
+                      to update spec.prepareDataConfig.volumeClaims\""
                     items:
                       properties:
                         metadata:
@@ -1740,18 +1739,13 @@ spec:
                       - metadata
                       - volumeClaimSpec
                       type: object
-                      x-kubernetes-validations:
-                      - message: at least one exists for volumeSource and mountPath.
-                        rule: self.volumeSource != '' || self.mountPath !=''
                     type: array
-                    x-kubernetes-validations:
-                    - message: forbidden to update spec.prepareDataConfig.volumeClaims
-                      rule: self == oldSelf
                   volumeClaimsTemplate:
-                    description: Defines a template to build persistent Volume claims
+                    description: "Defines a template to build persistent Volume claims
                       that need to be restored. These claims will be created in an
                       orderly manner based on the number of replicas or reused if
-                      they already exist.
+                      they already exist. \n TODO +kubebuilder:validation:XValidation:rule=\"self
+                      == oldSelf\",message=\"forbidden to update spec.prepareDataConfig.volumeClaimsTemplate\""
                     properties:
                       replicas:
                         description: Specifies the replicas of persistent volume claim
@@ -2038,22 +2032,19 @@ spec:
                           - metadata
                           - volumeClaimSpec
                           type: object
-                          x-kubernetes-validations:
-                          - message: at least one exists for volumeSource and mountPath.
-                            rule: self.volumeSource != '' || self.mountPath !=''
                         type: array
                     required:
                     - replicas
                     - templates
                     type: object
-                    x-kubernetes-validations:
-                    - message: forbidden to update spec.prepareDataConfig.volumeClaimsTemplate
-                      rule: self == oldSelf
                 required:
                 - volumeClaimRestorePolicy
                 type: object
               readyConfig:
-                description: Configuration for the action of "postReady" phase.
+                description: "Configuration for the action of \"postReady\" phase.
+                  \n TODO +kubebuilder:validation:XValidation:rule=\"has(self.jobAction)
+                  || has(self.execAction)\", message=\"at least one exists for jobAction
+                  and execAction.\""
                 properties:
                   connectionCredential:
                     description: Defines the credential template used to create a
@@ -2341,11 +2332,10 @@ spec:
                     - exec
                     type: object
                 type: object
-                x-kubernetes-validations:
-                - message: at least one exists for jobAction and execAction.
-                  rule: has(self.jobAction) || has(self.execAction)
               resources:
-                description: Restores the specified resources of Kubernetes.
+                description: "Restores the specified resources of Kubernetes. \n TODO
+                  +kubebuilder:validation:XValidation:rule=\"self == oldSelf\",message=\"forbidden
+                  to update spec.resources\""
                 properties:
                   included:
                     description: Restores the specified resources.
@@ -2405,16 +2395,11 @@ spec:
                       type: object
                     type: array
                 type: object
-                x-kubernetes-validations:
-                - message: forbidden to update spec.resources
-                  rule: self == oldSelf
               restoreTime:
-                description: Specifies the point in time for restoring.
+                description: "Specifies the point in time for restoring. \n TODO +kubebuilder:validation:XValidation:rule=\"self
+                  == oldSelf\",message=\"forbidden to update spec.restoreTime\""
                 pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$
                 type: string
-                x-kubernetes-validations:
-                - message: forbidden to update spec.restoreTime
-                  rule: self == oldSelf
               serviceAccountName:
                 description: Specifies the service account name needed for recovery
                   pod.

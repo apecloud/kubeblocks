@@ -48,6 +48,9 @@ spec:
             type: object
           spec:
             description: BackupPolicySpec defines the desired state of BackupPolicy
+              TODO +kubebuilder:validation:XValidation:rule="(has(self.target) &&
+              !has(self.targets)) || (has(self.targets) && !has(self.target))",message="either
+              spec.target or spec.targets"
             properties:
               backoffLimit:
                 default: 2
@@ -1075,10 +1078,6 @@ spec:
             required:
             - backupMethods
             type: object
-            x-kubernetes-validations:
-            - message: either spec.target or spec.targets
-              rule: (has(self.target) && !has(self.targets)) || (has(self.targets)
-                && !has(self.target))
           status:
             description: BackupPolicyStatus defines the observed state of BackupPolicy
             properties:

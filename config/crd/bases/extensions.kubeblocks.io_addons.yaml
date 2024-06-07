@@ -55,7 +55,9 @@ spec:
           metadata:
             type: object
           spec:
-            description: AddonSpec defines the desired state of an add-on.
+            description: 'AddonSpec defines the desired state of an add-on. TODO +kubebuilder:validation:XValidation:rule="has(self.type)
+              && self.type == ''Helm'' ?  has(self.helm) : !has(self.helm)",message="spec.helm
+              is required when spec.type is Helm, and forbidden otherwise"'
             properties:
               cliPlugins:
                 description: Specifies the CLI plugin installation specifications.
@@ -462,11 +464,6 @@ spec:
                 required:
                 - chartLocationURL
                 type: object
-                x-kubernetes-validations:
-                - message: chartsImage is required when chartLocationURL starts with
-                    'file://'
-                  rule: 'self.chartLocationURL.startsWith(''file://'') ? has(self.chartsImage)
-                    : true'
               install:
                 description: Defines the installation parameters.
                 properties:
@@ -644,10 +641,6 @@ spec:
             - defaultInstallValues
             - type
             type: object
-            x-kubernetes-validations:
-            - message: spec.helm is required when spec.type is Helm, and forbidden
-                otherwise
-              rule: 'has(self.type) && self.type == ''Helm'' ?  has(self.helm) : !has(self.helm)'
           status:
             description: AddonStatus defines the observed state of an add-on.
             properties:

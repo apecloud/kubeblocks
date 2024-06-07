@@ -27,13 +27,13 @@ type BackupSpec struct {
 	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.backupPolicyName"
+	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.backupPolicyName"
 	BackupPolicyName string `json:"backupPolicyName"`
 
 	// Specifies the backup method name that is defined in the backup policy.
 	//
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.backupMethod"
+	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.backupMethod"
 	BackupMethod string `json:"backupMethod"`
 
 	// Determines whether the backup contents stored in the backup repository
@@ -72,7 +72,7 @@ type BackupSpec struct {
 	// Determines the parent backup name for incremental or differential backup.
 	//
 	// +optional
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.parentBackupName"
+	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.parentBackupName"
 	ParentBackupName string `json:"parentBackupName,omitempty"`
 }
 

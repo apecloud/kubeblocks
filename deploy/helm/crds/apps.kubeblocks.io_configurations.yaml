@@ -40,19 +40,15 @@ spec:
               resource.
             properties:
               clusterRef:
-                description: Specifies the name of the Cluster that this configuration
-                  is associated with.
+                description: "Specifies the name of the Cluster that this configuration
+                  is associated with. \n TODO +kubebuilder:validation:XValidation:rule=\"self
+                  == oldSelf\",message=\"forbidden to update spec.clusterRef\""
                 type: string
-                x-kubernetes-validations:
-                - message: forbidden to update spec.clusterRef
-                  rule: self == oldSelf
               componentName:
-                description: Represents the name of the Component that this configuration
-                  pertains to.
+                description: "Represents the name of the Component that this configuration
+                  pertains to. \n TODO +kubebuilder:validation:XValidation:rule=\"self
+                  == oldSelf\",message=\"forbidden to update spec.clusterRef\""
                 type: string
-                x-kubernetes-validations:
-                - message: forbidden to update spec.clusterRef
-                  rule: self == oldSelf
               configItemDetails:
                 description: "ConfigItemDetails is an array of ConfigurationItemDetail
                   objects. \n Each ConfigurationItemDetail corresponds to a configuration

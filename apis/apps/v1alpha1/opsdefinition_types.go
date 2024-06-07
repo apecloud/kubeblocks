@@ -160,7 +160,7 @@ type OpsEnvVar struct {
 	ValueFrom *OpsVarSource `json:"valueFrom"`
 }
 
-// +kubebuilder:validation:XValidation:rule="has(self.envRef) || has(self.fieldPath)", message="either fieldPath and envRef."
+// TODO +kubebuilder:validation:XValidation:rule="has(self.envRef) || has(self.fieldPath)", message="either fieldPath and envRef."
 
 type OpsVarSource struct {
 	// Specifies a reference to a specific environment variable within a container.
@@ -252,7 +252,7 @@ type ParametersSchema struct {
 //     suitable for immediate, short-lived operations.
 //   - resourceModifier: Modifies a K8s object using JSON patches, useful for updating the spec of some resource.
 //
-// +kubebuilder:validation:XValidation:rule="has(self.workload) || has(self.exec) || has(self.resourceModifier)", message="at least one action exists for workload, exec and resourceModifier."
+// TODO +kubebuilder:validation:XValidation:rule="has(self.workload) || has(self.exec) || has(self.resourceModifier)", message="at least one action exists for workload, exec and resourceModifier."
 type OpsAction struct {
 	// Specifies the name of the OpsAction.
 	// +kubebuilder:validation:MaxLength=20

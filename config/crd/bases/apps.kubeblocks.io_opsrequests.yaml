@@ -58,7 +58,11 @@ spec:
           metadata:
             type: object
           spec:
-            description: OpsRequestSpec defines the desired state of OpsRequest
+            description: "OpsRequestSpec defines the desired state of OpsRequest \n
+              TODO +kubebuilder:validation:XValidation:rule=\"has(self.cancel) &&
+              self.cancel ? (self.type in ['VerticalScaling', 'HorizontalScaling'])
+              : true\",message=\"forbidden to cancel the opsRequest which type not
+              in ['VerticalScaling','HorizontalScaling']\""
             properties:
               backup:
                 description: Specifies the parameters to backup a Cluster.
@@ -160,19 +164,16 @@ spec:
                   ineffective."
                 type: boolean
               clusterName:
-                description: Specifies the name of the Cluster resource that this
-                  operation is targeting.
+                description: "Specifies the name of the Cluster resource that this
+                  operation is targeting. \n TODO +kubebuilder:validation:XValidation:rule=\"self
+                  == oldSelf\",message=\"forbidden to update spec.clusterName\""
                 type: string
-                x-kubernetes-validations:
-                - message: forbidden to update spec.clusterName
-                  rule: self == oldSelf
               clusterRef:
                 description: 'Deprecated: since v0.9, use clusterName instead. Specifies
-                  the name of the Cluster resource that this operation is targeting.'
+                  the name of the Cluster resource that this operation is targeting.
+                  TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden
+                  to update spec.clusterRef"'
                 type: string
-                x-kubernetes-validations:
-                - message: forbidden to update spec.clusterRef
-                  rule: self == oldSelf
               custom:
                 description: Specifies a custom operation defined by OpsDefinition.
                 properties:
@@ -465,16 +466,15 @@ spec:
                   'HorizontalScaling' opsRequests. By setting `force` to true, you
                   can bypass the default checks and demand these opsRequests to run
                   simultaneously. \n Note: Once set, the `force` field is immutable
-                  and cannot be updated."
+                  and cannot be updated. \n TODO +kubebuilder:validation:XValidation:rule=\"self
+                  == oldSelf\",message=\"forbidden to update spec.force\""
                 type: boolean
-                x-kubernetes-validations:
-                - message: forbidden to update spec.force
-                  rule: self == oldSelf
               horizontalScaling:
-                description: Lists HorizontalScaling objects, each specifying scaling
+                description: "Lists HorizontalScaling objects, each specifying scaling
                   requirements for a Component, including desired replica changes,
                   configurations for new instances, modifications for existing instances,
-                  and take offline/online the specified instances.
+                  and take offline/online the specified instances. \n TODO +kubebuilder:validation:XValidation:rule=\"self
+                  == oldSelf\",message=\"forbidden to update spec.horizontalScaling\""
                 items:
                   description: HorizontalScaling defines the parameters of a horizontal
                     scaling operation.
@@ -4330,9 +4330,6 @@ spec:
                 x-kubernetes-list-map-keys:
                 - componentName
                 x-kubernetes-list-type: map
-                x-kubernetes-validations:
-                - message: forbidden to update spec.horizontalScaling
-                  rule: self == oldSelf
               preConditionDeadlineSeconds:
                 default: 0
                 description: Specifies the maximum time in seconds that the OpsRequest
@@ -4342,11 +4339,12 @@ spec:
                 format: int32
                 type: integer
               rebuildFrom:
-                description: Specifies the parameters to rebuild some instances. Rebuilding
-                  an instance involves restoring its data from a backup or another
-                  database replica. The instances being rebuilt usually serve as standby
-                  in the cluster. Hence rebuilding instances is often also referred
-                  to as "standby reconstruction".
+                description: "Specifies the parameters to rebuild some instances.
+                  Rebuilding an instance involves restoring its data from a backup
+                  or another database replica. The instances being rebuilt usually
+                  serve as standby in the cluster. Hence rebuilding instances is often
+                  also referred to as \"standby reconstruction\". \n TODO +kubebuilder:validation:XValidation:rule=\"self
+                  == oldSelf\",message=\"forbidden to update spec.rebuildFrom\""
                 items:
                   properties:
                     backupName:
@@ -4514,9 +4512,6 @@ spec:
                 x-kubernetes-list-map-keys:
                 - componentName
                 x-kubernetes-list-type: map
-                x-kubernetes-validations:
-                - message: forbidden to update spec.rebuildFrom
-                  rule: self == oldSelf
               reconfigure:
                 description: "Specifies a component and its configuration updates.
                   \n This field is deprecated and replaced by `reconfigures`."
@@ -4609,8 +4604,9 @@ spec:
                 - configurations
                 type: object
               reconfigures:
-                description: Lists Reconfigure objects, each specifying a Component
-                  and its configuration updates.
+                description: "Lists Reconfigure objects, each specifying a Component
+                  and its configuration updates. \n TODO +kubebuilder:validation:XValidation:rule=\"self
+                  == oldSelf\",message=\"forbidden to update spec.reconfigure\""
                 items:
                   description: Reconfigure defines the parameters for updating a Component's
                     configuration.
@@ -4706,11 +4702,9 @@ spec:
                 x-kubernetes-list-map-keys:
                 - componentName
                 x-kubernetes-list-type: map
-                x-kubernetes-validations:
-                - message: forbidden to update spec.reconfigure
-                  rule: self == oldSelf
               restart:
-                description: Lists Components to be restarted.
+                description: "Lists Components to be restarted. \n TODO +kubebuilder:validation:XValidation:rule=\"self
+                  == oldSelf\",message=\"forbidden to update spec.restart\""
                 items:
                   description: ComponentOps specifies the Component to be operated
                     on.
@@ -4726,9 +4720,6 @@ spec:
                 x-kubernetes-list-map-keys:
                 - componentName
                 x-kubernetes-list-type: map
-                x-kubernetes-validations:
-                - message: forbidden to update spec.restart
-                  rule: self == oldSelf
               restore:
                 description: Specifies the parameters to restore a Cluster. Note that
                   this restore operation will roll back cluster services.
@@ -4820,13 +4811,11 @@ spec:
                     description: "Defines the content of scripts to be executed. \n
                       All scripts specified in this field will be executed in the
                       order they are provided. \n Note: this field cannot be modified
-                      once set."
+                      once set. \n TODO +kubebuilder:validation:XValidation:rule=\"self
+                      == oldSelf\",message=\"forbidden to update spec.scriptSpec.script\""
                     items:
                       type: string
                     type: array
-                    x-kubernetes-validations:
-                    - message: forbidden to update spec.scriptSpec.script
-                      rule: self == oldSelf
                   scriptFrom:
                     description: "Specifies the sources of the scripts to be executed.
                       Each script can be imported either from a ConfigMap or a Secret.
@@ -4836,12 +4825,14 @@ spec:
                       field, in the order of the scripts listed. 2. Scripts imported
                       from ConfigMaps, in the order of the sources listed. 3. Scripts
                       imported from Secrets, in the order of the sources listed. \n
-                      Note: this field cannot be modified once set."
+                      Note: this field cannot be modified once set. \n TODO +kubebuilder:validation:XValidation:rule=\"self
+                      == oldSelf\",message=\"forbidden to update spec.scriptSpec.scriptFrom\""
                     properties:
                       configMapRef:
                         description: "A list of ConfigMapKeySelector objects, each
                           specifies a ConfigMap and a key containing the script. \n
-                          Note: This field cannot be modified once set."
+                          Note: This field cannot be modified once set. \n TODO +kubebuilder:validation:XValidation:rule=\"self
+                          == oldSelf\",message=\"forbidden to update spec.scriptSpec.scriptFrom.configMapRef\""
                         items:
                           description: Selects a key from a ConfigMap.
                           properties:
@@ -4861,13 +4852,11 @@ spec:
                           type: object
                           x-kubernetes-map-type: atomic
                         type: array
-                        x-kubernetes-validations:
-                        - message: forbidden to update spec.scriptSpec.scriptFrom.configMapRef
-                          rule: self == oldSelf
                       secretRef:
                         description: "A list of SecretKeySelector objects, each specifies
                           a Secret and a key containing the script. \n Note: This
-                          field cannot be modified once set."
+                          field cannot be modified once set. \n TODO +kubebuilder:validation:XValidation:rule=\"self
+                          == oldSelf\",message=\"forbidden to update spec.scriptSpec.scriptFrom.secretRef\""
                         items:
                           description: SecretKeySelector selects a key of a Secret.
                           properties:
@@ -4888,13 +4877,7 @@ spec:
                           type: object
                           x-kubernetes-map-type: atomic
                         type: array
-                        x-kubernetes-validations:
-                        - message: forbidden to update spec.scriptSpec.scriptFrom.secretRef
-                          rule: self == oldSelf
                     type: object
-                    x-kubernetes-validations:
-                    - message: forbidden to update spec.scriptSpec.scriptFrom
-                      rule: self == oldSelf
                   secret:
                     description: Defines the secret to be used to execute the script.
                       If not specified, the default cluster root credential secret
@@ -4924,7 +4907,9 @@ spec:
                       \n However, some Components, such as Redis, do not synchronize
                       account information between primary and secondary Pods. In these
                       cases, the script must be executed on all replica Pods matching
-                      the selector. \n Note: this field cannot be modified once set."
+                      the selector. \n Note: this field cannot be modified once set.
+                      \n TODO +kubebuilder:validation:XValidation:rule=\"self == oldSelf\",message=\"forbidden
+                      to update spec.scriptSpec.script.selector\""
                     properties:
                       matchExpressions:
                         description: matchExpressions is a list of label selector
@@ -4968,15 +4953,13 @@ spec:
                         type: object
                     type: object
                     x-kubernetes-map-type: atomic
-                    x-kubernetes-validations:
-                    - message: forbidden to update spec.scriptSpec.script.selector
-                      rule: self == oldSelf
                 required:
                 - componentName
                 type: object
               switchover:
-                description: Lists Switchover objects, each specifying a Component
-                  to perform the switchover operation.
+                description: "Lists Switchover objects, each specifying a Component
+                  to perform the switchover operation. \n TODO +kubebuilder:validation:XValidation:rule=\"self
+                  == oldSelf\",message=\"forbidden to update spec.switchover\""
                 items:
                   properties:
                     componentName:
@@ -5005,9 +4988,6 @@ spec:
                 x-kubernetes-list-map-keys:
                 - componentName
                 x-kubernetes-list-type: map
-                x-kubernetes-validations:
-                - message: forbidden to update spec.switchover
-                  rule: self == oldSelf
               ttlSecondsAfterSucceed:
                 description: Specifies the duration in seconds that an OpsRequest
                   will remain in the system after successfully completing (when `opsRequest.status.phase`
@@ -5019,7 +4999,8 @@ spec:
                   include \"Start\", \"Stop\", \"Restart\", \"Switchover\", \"VerticalScaling\",
                   \"HorizontalScaling\", \"VolumeExpansion\", \"Reconfiguring\", \"Upgrade\",
                   \"Backup\", \"Restore\", \"Expose\", \"DataScript\", \"RebuildInstance\",
-                  \"Custom\". \n Note: This field is immutable once set."
+                  \"Custom\". \n Note: This field is immutable once set. \n TODO +kubebuilder:validation:XValidation:rule=\"self
+                  == oldSelf\",message=\"forbidden to update spec.type\""
                 enum:
                 - Upgrade
                 - VerticalScaling
@@ -5037,12 +5018,10 @@ spec:
                 - RebuildInstance
                 - Custom
                 type: string
-                x-kubernetes-validations:
-                - message: forbidden to update spec.type
-                  rule: self == oldSelf
               upgrade:
                 description: "Specifies the desired new version of the Cluster. \n
-                  Note: This field is immutable once set."
+                  Note: This field is immutable once set. \n TODO +kubebuilder:validation:XValidation:rule=\"self
+                  == oldSelf\",message=\"forbidden to update spec.upgrade\""
                 properties:
                   clusterVersionRef:
                     description: 'Deprecated: since v0.9 because ClusterVersion is
@@ -5084,18 +5063,12 @@ spec:
                       required:
                       - componentName
                       type: object
-                      x-kubernetes-validations:
-                      - message: at least one componentDefinitionName or serviceVersion
-                        rule: has(self.componentDefinitionName) || has(self.serviceVersion)
                     maxItems: 1024
                     type: array
                     x-kubernetes-list-map-keys:
                     - componentName
                     x-kubernetes-list-type: map
                 type: object
-                x-kubernetes-validations:
-                - message: forbidden to update spec.upgrade
-                  rule: self == oldSelf
               verticalScaling:
                 description: Lists VerticalScaling objects, each specifying a component
                   and its desired compute resources for vertical scaling.
@@ -5316,10 +5289,6 @@ spec:
             required:
             - type
             type: object
-            x-kubernetes-validations:
-            - message: forbidden to cancel the opsRequest which type not in ['VerticalScaling','HorizontalScaling']
-              rule: 'has(self.cancel) && self.cancel ? (self.type in [''VerticalScaling'',
-                ''HorizontalScaling'']) : true'
           status:
             description: OpsRequestStatus represents the observed state of an OpsRequest.
             properties:
@@ -5458,9 +5427,6 @@ spec:
                         required:
                         - status
                         type: object
-                        x-kubernetes-validations:
-                        - message: at least one objectKey or actionName.
-                          rule: has(self.objectKey) || has(self.actionName)
                       type: array
                     reason:
                       description: Provides an explanation for the Component being

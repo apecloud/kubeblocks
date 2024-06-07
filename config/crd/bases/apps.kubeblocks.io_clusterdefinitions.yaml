@@ -75,7 +75,11 @@ spec:
                   description: "ClusterComponentDefinition defines a Component within
                     a ClusterDefinition but is deprecated and has been replaced by
                     ComponentDefinition. \n Deprecated: Use ComponentDefinition instead.
-                    This type is deprecated as of version 0.8."
+                    This type is deprecated as of version 0.8. \n TODO +kubebuilder:validation:XValidation:rule=\"has(self.workloadType)
+                    && self.workloadType == 'Consensus' ? (has(self.consensusSpec)
+                    || has(self.rsmSpec)) : !has(self.consensusSpec)\",message=\"componentDefs.consensusSpec(deprecated)
+                    or componentDefs.rsmSpec(recommended) is required when componentDefs.workloadType
+                    is Consensus, and forbidden otherwise\""
                   properties:
                     characterType:
                       description: Defines well-known database component name, such
@@ -10115,12 +10119,6 @@ spec:
                   - name
                   - workloadType
                   type: object
-                  x-kubernetes-validations:
-                  - message: componentDefs.consensusSpec(deprecated) or componentDefs.rsmSpec(recommended)
-                      is required when componentDefs.workloadType is Consensus, and
-                      forbidden otherwise
-                    rule: 'has(self.workloadType) && self.workloadType == ''Consensus''
-                      ? (has(self.consensusSpec) || has(self.rsmSpec)) : !has(self.consensusSpec)'
                 type: array
                 x-kubernetes-list-map-keys:
                 - name

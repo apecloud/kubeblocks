@@ -39,7 +39,7 @@ const (
 type BackupRepoSpec struct {
 	// Specifies the name of the `StorageProvider` used by this backup repository.
 	//
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="StorageProviderRef is immutable"
+	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="StorageProviderRef is immutable"
 	// +kubebuilder:validation:Required
 	StorageProviderRef string `json:"storageProviderRef"`
 

@@ -31,19 +31,19 @@ type RestoreSpec struct {
 	// 4. Continuous: will find the most recent full backup at this time point and the continuous backups after it to restore.
 	//
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.backupName"
+	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.backupName"
 	Backup BackupRef `json:"backup"`
 
 	// Specifies the point in time for restoring.
 	//
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.restoreTime"
+	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.restoreTime"
 	// +optional
 	// +kubebuilder:validation:Pattern=`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$`
 	RestoreTime string `json:"restoreTime,omitempty"`
 
 	// Restores the specified resources of Kubernetes.
 	//
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.resources"
+	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.resources"
 	// +optional
 	Resources *RestoreKubeResources `json:"resources,omitempty"`
 
@@ -60,7 +60,7 @@ type RestoreSpec struct {
 
 	// Configuration for the action of "postReady" phase.
 	//
-	// +kubebuilder:validation:XValidation:rule="has(self.jobAction) || has(self.execAction)", message="at least one exists for jobAction and execAction."
+	// TODO +kubebuilder:validation:XValidation:rule="has(self.jobAction) || has(self.execAction)", message="at least one exists for jobAction and execAction."
 	// +optional
 	ReadyConfig *ReadyConfig `json:"readyConfig,omitempty"`
 
@@ -131,15 +131,15 @@ type PrepareDataConfig struct {
 	// Specifies the configuration when using `persistentVolumeClaim.spec.dataSourceRef` method for restoring.
 	// Describes the source volume of the backup targetVolumes and the mount path in the restoring container.
 	//
-	// +kubebuilder:validation:XValidation:rule="self.volumeSource != '' || self.mountPath !=''",message="at least one exists for volumeSource and mountPath."
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.prepareDataConfig.dataSourceRef"
+	// TODO +kubebuilder:validation:XValidation:rule="self.volumeSource != '' || self.mountPath !=''",message="at least one exists for volumeSource and mountPath."
+	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.prepareDataConfig.dataSourceRef"
 	// +optional
 	DataSourceRef *VolumeConfig `json:"dataSourceRef,omitempty"`
 
 	// Defines the persistent Volume claims that need to be restored and mounted together into the restore job.
 	// These persistent Volume claims will be created if they do not exist.
 	//
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.prepareDataConfig.volumeClaims"
+	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.prepareDataConfig.volumeClaims"
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +optional
@@ -148,7 +148,7 @@ type PrepareDataConfig struct {
 	// Defines a template to build persistent Volume claims that need to be restored.
 	// These claims will be created in an orderly manner based on the number of replicas or reused if they already exist.
 	//
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.prepareDataConfig.volumeClaimsTemplate"
+	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.prepareDataConfig.volumeClaimsTemplate"
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +optional
@@ -166,7 +166,7 @@ type PrepareDataConfig struct {
 
 	// Specifies the scheduling spec for the restoring pod.
 	//
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.prepareDataConfig.schedulingSpec"
+	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.prepareDataConfig.schedulingSpec"
 	// +optional
 	SchedulingSpec SchedulingSpec `json:"schedulingSpec,omitempty"`
 }
@@ -286,7 +286,7 @@ type RestoreVolumeClaim struct {
 	// Describes the source volume of the backup target volumes and the mount path in the restoring container.
 	// At least one must exist for volumeSource and mountPath.
 	//
-	// +kubebuilder:validation:XValidation:rule="self.volumeSource != '' || self.mountPath !=''",message="at least one exists for volumeSource and mountPath."
+	// TODO +kubebuilder:validation:XValidation:rule="self.volumeSource != '' || self.mountPath !=''",message="at least one exists for volumeSource and mountPath."
 	VolumeConfig `json:",inline"`
 }
 

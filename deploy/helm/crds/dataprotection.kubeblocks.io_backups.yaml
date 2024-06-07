@@ -66,19 +66,16 @@ spec:
             description: BackupSpec defines the desired state of Backup.
             properties:
               backupMethod:
-                description: Specifies the backup method name that is defined in the
-                  backup policy.
+                description: "Specifies the backup method name that is defined in
+                  the backup policy. \n TODO +kubebuilder:validation:XValidation:rule=\"self
+                  == oldSelf\",message=\"forbidden to update spec.backupMethod\""
                 type: string
-                x-kubernetes-validations:
-                - message: forbidden to update spec.backupMethod
-                  rule: self == oldSelf
               backupPolicyName:
-                description: Specifies the backup policy to be applied for this backup.
+                description: "Specifies the backup policy to be applied for this backup.
+                  \n TODO +kubebuilder:validation:XValidation:rule=\"self == oldSelf\",message=\"forbidden
+                  to update spec.backupPolicyName\""
                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
-                x-kubernetes-validations:
-                - message: forbidden to update spec.backupPolicyName
-                  rule: self == oldSelf
               deletionPolicy:
                 allOf:
                 - enum:
@@ -100,12 +97,10 @@ spec:
                   of backup data."
                 type: string
               parentBackupName:
-                description: Determines the parent backup name for incremental or
-                  differential backup.
+                description: "Determines the parent backup name for incremental or
+                  differential backup. \n TODO +kubebuilder:validation:XValidation:rule=\"self
+                  == oldSelf\",message=\"forbidden to update spec.parentBackupName\""
                 type: string
-                x-kubernetes-validations:
-                - message: forbidden to update spec.parentBackupName
-                  rule: self == oldSelf
               retentionPeriod:
                 description: "Determines a duration up to which the backup should
                   be kept. Controller will remove all backups that are older than

@@ -90,13 +90,13 @@ type ConfigurationSpec struct {
 	// Specifies the name of the Cluster that this configuration is associated with.
 	//
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
+	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
 	ClusterRef string `json:"clusterRef"`
 
 	// Represents the name of the Component that this configuration pertains to.
 	//
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
+	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
 	ComponentName string `json:"componentName"`
 
 	// ConfigItemDetails is an array of ConfigurationItemDetail objects.

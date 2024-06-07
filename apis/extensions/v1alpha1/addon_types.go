@@ -30,7 +30,7 @@ import (
 )
 
 // AddonSpec defines the desired state of an add-on.
-// +kubebuilder:validation:XValidation:rule="has(self.type) && self.type == 'Helm' ?  has(self.helm) : !has(self.helm)",message="spec.helm is required when spec.type is Helm, and forbidden otherwise"
+// TODO +kubebuilder:validation:XValidation:rule="has(self.type) && self.type == 'Helm' ?  has(self.helm) : !has(self.helm)",message="spec.helm is required when spec.type is Helm, and forbidden otherwise"
 type AddonSpec struct {
 	// Specifies the description of the add-on.
 	//
@@ -145,7 +145,7 @@ type SelectorRequirement struct {
 }
 
 // HelmTypeInstallSpec defines the Helm installation spec.
-// +kubebuilder:validation:XValidation:rule="self.chartLocationURL.startsWith('file://') ? has(self.chartsImage) : true",message="chartsImage is required when chartLocationURL starts with 'file://'"
+// TODO +kubebuilder:validation:XValidation:rule="self.chartLocationURL.startsWith('file://') ? has(self.chartsImage) : true",message="chartsImage is required when chartLocationURL starts with 'file://'"
 type HelmTypeInstallSpec struct {
 	// Specifies the URL location of the Helm Chart.
 	//

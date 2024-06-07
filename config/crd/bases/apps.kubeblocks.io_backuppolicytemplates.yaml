@@ -971,15 +971,13 @@ spec:
                 minItems: 1
                 type: array
               clusterDefinitionRef:
-                description: Specifies the name of a ClusterDefinition. This is an
+                description: "Specifies the name of a ClusterDefinition. This is an
                   immutable attribute that cannot be changed after creation. And this
                   field is deprecated since v0.9, consider using the ComponentDef
-                  instead.
+                  instead. \n TODO +kubebuilder:validation:XValidation:rule=\"self
+                  == oldSelf\",message=\"clusterDefinitionRef is immutable\""
                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
-                x-kubernetes-validations:
-                - message: clusterDefinitionRef is immutable
-                  rule: self == oldSelf
               identifier:
                 description: "Specifies a unique identifier for the BackupPolicyTemplate.
                   \n This identifier will be used as the suffix of the name of automatically

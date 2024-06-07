@@ -524,7 +524,7 @@ type MonitorConfig struct {
 //
 // Deprecated: Use ComponentDefinition instead. This type is deprecated as of version 0.8.
 //
-// +kubebuilder:validation:XValidation:rule="has(self.workloadType) && self.workloadType == 'Consensus' ? (has(self.consensusSpec) || has(self.rsmSpec)) : !has(self.consensusSpec)",message="componentDefs.consensusSpec(deprecated) or componentDefs.rsmSpec(recommended) is required when componentDefs.workloadType is Consensus, and forbidden otherwise"
+// TODO +kubebuilder:validation:XValidation:rule="has(self.workloadType) && self.workloadType == 'Consensus' ? (has(self.consensusSpec) || has(self.rsmSpec)) : !has(self.consensusSpec)",message="componentDefs.consensusSpec(deprecated) or componentDefs.rsmSpec(recommended) is required when componentDefs.workloadType is Consensus, and forbidden otherwise"
 type ClusterComponentDefinition struct {
 	// This name could be used as default name of `cluster.spec.componentSpecs.name`, and needs to conform with same
 	// validation rules as `cluster.spec.componentSpecs.name`, currently complying with IANA Service Naming rule.

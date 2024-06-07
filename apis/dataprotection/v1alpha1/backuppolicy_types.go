@@ -22,7 +22,7 @@ import (
 )
 
 // BackupPolicySpec defines the desired state of BackupPolicy
-// +kubebuilder:validation:XValidation:rule="(has(self.target) && !has(self.targets)) || (has(self.targets) && !has(self.target))",message="either spec.target or spec.targets"
+// TODO +kubebuilder:validation:XValidation:rule="(has(self.target) && !has(self.targets)) || (has(self.targets) && !has(self.target))",message="either spec.target or spec.targets"
 type BackupPolicySpec struct {
 	// Specifies the name of BackupRepo where the backup data will be stored.
 	// If not set, data will be stored in the default backup repository.

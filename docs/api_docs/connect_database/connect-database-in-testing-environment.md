@@ -6,37 +6,58 @@ sidebar_position: 2
 sidebar_label: Testing environment
 ---
 
-# Connect database in testing environment
+# Connect database in the testing environment
 
-## Procedure 1. Use kbcli cluster connect command
+## Procedure 1. Use kubectl exec command
+
+If the database address is not required, run the command below to connect to the cluster via the default address.
 
 You can use the `kbcli cluster connect` command and specify the cluster name to be connected.
 
-```bash
-kbcli cluster connect ${cluster-name}
-```
+   ```bash
+   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+   >
+   root
 
-The lower-level command is actually `kubectl exec`. The command is functional as long as the K8s API server is accessible.
+   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+   >
+   2gvztbvz
+   ```
+
+2. Run the `kubectl exec` command and specify the pod to be connected.
+
+   ```bash
+   kubectl exec -ti -n demo mycluster-mysql-0 -- bash
+   ```
+
+3. Connect to the cluster.
+
+   ```bash
+   mysql -u root -p2gvztbvz
+   ```
 
 ## Procedure 2. Connect database with CLI or SDK client
 
-Execute the following command to get the network information of the targeted database and connect it with the printed IP address.
+For a pod without a client, you can follow the steps below to connect to the cluster. You can also connect to the cluster by other options, like CLI, SDK client, go connection, java connection, etc.
 
-```bash
-kbcli cluster connect --show-example --show-password ${cluster-name}
-```
+Below is an example of using CLI to connect to the cluster on the local host.
 
-Information printed includes database addresses, port No., username, password. The figure below is an example of MySQL database network information.
+1. Get the `username` and `password` for the cluster.
 
-- Address: -h specifies the server address. In the example below it is 127.0.0.1
-- Port: -P specifies port No. , In the example below it is 3306.
-- User: -u is the user name.
-- Password: -p shows the password. In the example below, it is hQBCKZLI.
+   ```bash
+   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+   >
+   root
 
-:::note
+   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+   >
+   2gvztbvz
+   ```
 
-The password does not include -p.
+2. Run the command below to connect to the cluster.
 
-:::
+   ```bash
+   kubectl port-forward svc/mycluster-mysql 3306:3306 -n demo
 
-![Example](./../../img/connect_database_with_CLI_or_SDK_client.png)
+   mysql -h 127.0.0.1 -P 3306 -u root -p2gvztbvz
+   ```

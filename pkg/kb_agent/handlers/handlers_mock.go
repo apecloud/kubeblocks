@@ -341,6 +341,20 @@ func (mr *MockHandlerMockRecorder) ReadWrite(arg0, arg1 interface{}) *gomock.Cal
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadWrite", reflect.TypeOf((*MockHandler)(nil).ReadWrite), arg0, arg1)
 }
 
+// Rebuild mocks base method.
+func (m *MockHandler) Rebuild(arg0 context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Rebuild", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Rebuild indicates an expected call of Rebuild.
+func (mr *MockHandlerMockRecorder) Rebuild(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Rebuild", reflect.TypeOf((*MockHandler)(nil).Rebuild), arg0)
+}
+
 // RevokeUserRole mocks base method.
 func (m *MockHandler) RevokeUserRole(arg0 context.Context, arg1, arg2 string) error {
 	m.ctrl.T.Helper()

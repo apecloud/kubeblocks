@@ -82,6 +82,9 @@ func TestHandlerBase(t *testing.T) {
 	err = mgr.DataDump(context.Background())
 	assert.EqualError(t, err, models.ErrNotImplemented.Error())
 
+	err = mgr.Rebuild(context.Background())
+	assert.EqualError(t, err, models.ErrNotImplemented.Error())
+
 	err = mgr.Switchover(context.Background(), "", "")
 	assert.EqualError(t, err, models.ErrNotImplemented.Error())
 

@@ -21,22 +21,15 @@ package replica
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-	"io"
-	"net/http"
 
-	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
 )
 
 type Rebuild struct {
 	actions.Base
-	dcsStore dcs.DCS
 }
 
 var rebuild actions.Action = &Rebuild{}
@@ -49,11 +42,6 @@ func init() {
 }
 
 func (s *Rebuild) Init(ctx context.Context) error {
-	s.dcsStore = dcs.GetStore()
-	if s.dcsStore == nil {
-		return errors.New("dcs store init failed")
-	}
-
 	s.Logger = ctrl.Log.WithName("Rebuild")
 	s.Action = constant.RebuildAction
 	return s.Base.Init(ctx)
@@ -68,36 +56,10 @@ func (s *Rebuild) Do(ctx context.Context, req *actions.OpsRequest) (*actions.Ops
 		Data: map[string]any{},
 	}
 	resp.Data["operation"] = constant.RebuildAction
-	cluster := s.dcsStore.GetClusterFromCache()
-	currentMember := cluster.GetMemberWithName(s.Handler.GetCurrentMemberName())
-	if currentMember == nil || currentMember.HAPort == "" {
-		return nil, errors.Errorf("current node does not support rebuild, there is no ha service yet")
-	}
 
-	haAddr := fmt.Sprintf("http://127.0.0.1:%s/v1.0/rebuild", currentMember.HAPort)
-	httpResp, err := http.Post(haAddr, "application/json", nil)
+	err := s.Handler.Rebuild(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "request ha service failed")
+		return nil, err
 	}
-	bodyBytes, err := io.ReadAll(httpResp.Body)
-	if err != nil {
-		return resp, errors.Wrap(err, "error reading response body")
-	}
-	bodyString := string(bodyBytes)
-	if httpResp.StatusCode/100 == 2 {
-		resp.Data["message"] = bodyString
-		return resp, nil
-	}
-
-	s.Logger.Info("request ha service failed", "status code", httpResp.StatusCode, "body", bodyString)
-	errResult := make(map[string]string)
-	err = json.Unmarshal(bodyBytes, &errResult)
-	if err != nil {
-		return nil, errors.New(bodyString)
-	}
-	if msg, ok := errResult["message"]; ok {
-		return nil, errors.New(msg)
-	}
-
-	return nil, errors.New(bodyString)
+	return resp, nil
 }

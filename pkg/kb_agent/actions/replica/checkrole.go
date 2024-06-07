@@ -26,13 +26,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
@@ -42,7 +40,6 @@ type AccessMode string
 
 type CheckRole struct {
 	GetRole
-	dcsStore                   dcs.DCS
 	OriRole                    string
 	CheckRoleFailedCount       int
 	FailedEventReportFrequency int
@@ -62,11 +59,6 @@ func init() {
 }
 
 func (s *CheckRole) Init(ctx context.Context) error {
-	s.dcsStore = dcs.GetStore()
-	if s.dcsStore == nil {
-		return errors.New("dcs store init failed")
-	}
-
 	s.Logger = ctrl.Log.WithName("checkrole")
 	val := viper.GetString(constant.KBEnvServiceRoles)
 	if val != "" {

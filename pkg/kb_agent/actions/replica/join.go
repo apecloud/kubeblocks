@@ -24,19 +24,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
 type Join struct {
 	actions.Base
-	dcsStore dcs.DCS
-	Timeout  time.Duration
+	Timeout time.Duration
 }
 
 var join actions.Action = &Join{}
@@ -49,11 +46,6 @@ func init() {
 }
 
 func (s *Join) Init(ctx context.Context) error {
-	s.dcsStore = dcs.GetStore()
-	if s.dcsStore == nil {
-		return errors.New("dcs store init failed")
-	}
-
 	s.Logger = ctrl.Log.WithName("MemberJoin")
 	s.Action = constant.MemberJoinAction
 	return s.Base.Init(ctx)

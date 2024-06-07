@@ -25,19 +25,14 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/golang/mock/gomock"
 	"github.com/spf13/viper"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
 )
 
-var (
-	dcsStore     dcs.DCS
-	mockDCSStore *dcs.MockDCS
-)
+var ()
 
 func init() {
 	viper.AutomaticEnv()
@@ -53,18 +48,8 @@ func TestCustomDBManager(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	// Init mock dcs store
-	InitMockDCSStore()
 
 })
 
 var _ = AfterSuite(func() {
 })
-
-func InitMockDCSStore() {
-	ctrl := gomock.NewController(GinkgoT())
-	mockDCSStore = dcs.NewMockDCS(ctrl)
-	mockDCSStore.EXPECT().GetClusterFromCache().Return(&dcs.Cluster{}).AnyTimes()
-	dcs.SetStore(mockDCSStore)
-	dcsStore = mockDCSStore
-}

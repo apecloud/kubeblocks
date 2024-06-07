@@ -145,9 +145,9 @@ var _ = Describe("GRPC Handler", func() {
 		})
 	})
 
-	Describe("Lock", func() {
+	Describe("ReadOnly", func() {
 		It("should call dbClient.Readonly with the correct request", func() {
-			reason := "reason for test lock"
+			reason := "reason for test ReadOnly"
 			mockReadonly := &plugin.ReadOnlyRequest{
 				EngineInfo: &plugin.EngineInfo{},
 				Reason:     reason,
@@ -160,13 +160,13 @@ var _ = Describe("GRPC Handler", func() {
 				mockReadonly: mockReadonlyFunc,
 			}
 
-			Expect(handler.Lock(ctx, reason)).To(Succeed())
+			Expect(handler.ReadOnly(ctx, reason)).To(Succeed())
 		})
 	})
 
-	Describe("Unlock", func() {
+	Describe("ReadWrite", func() {
 		It("should call dbClient.Readwrite with the correct request", func() {
-			reason := "reason for test unlock"
+			reason := "reason for test ReadWrite"
 			mockReadwrite := &plugin.ReadWriteRequest{
 				EngineInfo: &plugin.EngineInfo{},
 				Reason:     reason,
@@ -179,7 +179,7 @@ var _ = Describe("GRPC Handler", func() {
 				mockReadwrite: mockReadwriteFunc,
 			}
 
-			Expect(handler.Unlock(ctx, reason)).To(Succeed())
+			Expect(handler.ReadWrite(ctx, reason)).To(Succeed())
 		})
 	})
 })
@@ -223,14 +223,14 @@ func (m *mockEnginePluginClient) LeaveMember(ctx context.Context, req *plugin.Le
 	return nil, nil
 }
 
-func (m *mockEnginePluginClient) Readonly(ctx context.Context, req *plugin.ReadOnlyRequest, opts ...grpc.CallOption) (*plugin.ReadOnlyResponse, error) {
+func (m *mockEnginePluginClient) ReadOnly(ctx context.Context, req *plugin.ReadOnlyRequest, opts ...grpc.CallOption) (*plugin.ReadOnlyResponse, error) {
 	if m.mockReadonly != nil {
 		return m.mockReadonly(ctx, req)
 	}
 	return nil, nil
 }
 
-func (m *mockEnginePluginClient) Readwrite(ctx context.Context, req *plugin.ReadWriteRequest, opts ...grpc.CallOption) (*plugin.ReadWriteResponse, error) {
+func (m *mockEnginePluginClient) ReadWrite(ctx context.Context, req *plugin.ReadWriteRequest, opts ...grpc.CallOption) (*plugin.ReadWriteResponse, error) {
 	if m.mockReadwrite != nil {
 		return m.mockReadwrite(ctx, req)
 	}

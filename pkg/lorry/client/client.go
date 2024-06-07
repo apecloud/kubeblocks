@@ -84,6 +84,7 @@ func NewClient(pod corev1.Pod) (Client, error) {
 type Requester interface {
 	Request(ctx context.Context, operation, method string, req map[string]any) (map[string]any, error)
 }
+
 type lorryClient struct {
 	requester Requester
 }

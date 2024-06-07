@@ -36,7 +36,6 @@ import (
 
 	opsregister "github.com/apecloud/kubeblocks/pkg/kb_agent/actions/register"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/cronjobs"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/httpserver"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -71,12 +70,6 @@ func main() {
 		kopts = append(kopts, kzap.RawZapOpts(zap.AddCaller()))
 	}
 	ctrl.SetLogger(kzap.New(kopts...))
-
-	// Initialize DCS (Distributed Control System)
-	err = dcs.InitStore()
-	if err != nil {
-		panic(errors.Wrap(err, "DCS initialize failed"))
-	}
 
 	// start HTTP Server
 	ops := opsregister.Actions()

@@ -32,15 +32,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers"
 )
 
 var (
 	dbManager     handlers.Handler
 	mockDBManager *handlers.MockHandler
-	dcsStore      dcs.DCS
-	mockDCSStore  *dcs.MockDCS
 )
 
 func init() {
@@ -68,8 +65,6 @@ var _ = BeforeSuite(func() {
 	// Init mock db manager
 	InitMockDBManager()
 
-	// Init mock dcs store
-	InitMockDCSStore()
 })
 
 var _ = AfterSuite(func() {
@@ -79,12 +74,4 @@ func InitMockDBManager() {
 	ctrl := gomock.NewController(GinkgoT())
 	mockDBManager = handlers.NewMockHandler(ctrl)
 	dbManager = mockDBManager
-}
-
-func InitMockDCSStore() {
-	ctrl := gomock.NewController(GinkgoT())
-	mockDCSStore = dcs.NewMockDCS(ctrl)
-	mockDCSStore.EXPECT().GetClusterFromCache().Return(&dcs.Cluster{}).AnyTimes()
-	dcs.SetStore(mockDCSStore)
-	dcsStore = mockDCSStore
 }

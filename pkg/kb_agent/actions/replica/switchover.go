@@ -26,19 +26,12 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
 type Switchover struct {
 	actions.Base
-	dcsStore dcs.DCS
-}
-
-type SwitchoverManager interface {
-	Switchover(ctx context.Context, cluster *dcs.Cluster, primary, candidate string, force bool) error
 }
 
 var switchover actions.Action = &Switchover{}
@@ -51,11 +44,6 @@ func init() {
 }
 
 func (s *Switchover) Init(ctx context.Context) error {
-	s.dcsStore = dcs.GetStore()
-	if s.dcsStore == nil {
-		return errors.New("dcs store init failed")
-	}
-	s.Action = constant.SwitchoverAction
 	return s.Base.Init(ctx)
 }
 
@@ -66,48 +54,14 @@ func (s *Switchover) PreCheck(ctx context.Context, req *actions.OpsRequest) erro
 		return errors.New("primary or candidate must be set")
 	}
 
-	cluster, err := s.dcsStore.GetCluster()
-	if cluster == nil {
-		return errors.Wrap(err, "get cluster failed")
-	}
-
-	if cluster.HaConfig == nil || !cluster.HaConfig.IsEnable() {
-		return errors.New("cluster's ha is disabled")
-	}
-
-	if primary != "" {
-		leaderMember := cluster.GetMemberWithName(primary)
-		if leaderMember == nil {
-			message := fmt.Sprintf("primary %s not exists", primary)
-			return errors.New(message)
-		}
-	}
-
-	if candidate != "" {
-		candidateMember := cluster.GetMemberWithName(candidate)
-		if candidateMember == nil {
-			message := fmt.Sprintf("candidate %s not exists", candidate)
-			return errors.New(message)
-		}
-	}
 	return nil
 }
 
 func (s *Switchover) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
 	primary := req.GetString("primary")
 	candidate := req.GetString("candidate")
-	// force := req.GetBool("force")
-	// if swManager, ok := manager.(SwitchoverManager); ok {
-	// 	cluster, err := s.dcsStore.GetCluster()
-	// 	if cluster == nil {
-	// 		return nil, errors.Wrap(err, "get cluster failed")
-	// 	}
 
-	// 	err = swManager.Switchover(ctx, cluster, primary, candidate, force)
-	// 	return nil, err
-	// }
-
-	err := s.dcsStore.CreateSwitchover(primary, candidate)
+	err := s.Handler.Switchover(ctx, primary, candidate)
 	if err != nil {
 		message := fmt.Sprintf("Create switchover failed: %v", err)
 		return nil, errors.New(message)

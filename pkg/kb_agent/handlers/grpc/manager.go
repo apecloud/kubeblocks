@@ -126,13 +126,13 @@ func (h *Handler) LeaveMember(ctx context.Context, primary string) error {
 	return err
 }
 
-// Lock provides the following dedicated environment variables for the action:
+// ReadOnly provides the following dedicated environment variables for the action:
 //
 // - KB_POD_FQDN: The FQDN of the replica pod to check the role.
 // - KB_SERVICE_PORT: The port on which the DB service listens.
 // - KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
 // - KB_SERVICE_PASSWORD: The password of the user used to access the DB service .
-func (h *Handler) Lock(ctx context.Context, reason string) error {
+func (h *Handler) ReadOnly(ctx context.Context, reason string) error {
 	req := &plugin.ReadOnlyRequest{
 		EngineInfo: &plugin.EngineInfo{},
 		Reason:     reason,
@@ -141,13 +141,13 @@ func (h *Handler) Lock(ctx context.Context, reason string) error {
 	return err
 }
 
-// Unlock provides the following dedicated environment variables for the action:
+// ReadWrite provides the following dedicated environment variables for the action:
 //
 // - KB_POD_FQDN: The FQDN of the replica pod to check the role.
 // - KB_SERVICE_PORT: The port on which the DB service listens.
 // - KB_SERVICE_USER: The username used to access the DB service with sufficient privileges.
 // - KB_SERVICE_PASSWORD: The password of the user used to access the DB service .
-func (h *Handler) Unlock(ctx context.Context, reason string) error {
+func (h *Handler) ReadWrite(ctx context.Context, reason string) error {
 	req := &plugin.ReadWriteRequest{
 		EngineInfo: &plugin.EngineInfo{},
 		Reason:     reason,

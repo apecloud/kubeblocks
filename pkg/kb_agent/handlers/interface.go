@@ -54,6 +54,7 @@ type Handler interface {
 
 	DataLoad(context.Context) error
 	DataDump(context.Context) error
+	Rebuild(context.Context) error
 
 	PostProvision(context.Context) error
 	PreTerminate(context.Context) error

@@ -23,13 +23,11 @@ import (
 	"context"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
@@ -37,7 +35,6 @@ type CheckStatus struct {
 	actions.Base
 	LeaderFailedCount          int
 	FailureThreshold           int
-	dcsStore                   dcs.DCS
 	checkFailedCount           int
 	failedEventReportFrequency int
 }
@@ -52,11 +49,6 @@ func init() {
 }
 
 func (s *CheckStatus) Init(ctx context.Context) error {
-	s.dcsStore = dcs.GetStore()
-	if s.dcsStore == nil {
-		return errors.New("dcs store init failed")
-	}
-
 	s.failedEventReportFrequency = viper.GetInt("KB_FAILED_EVENT_REPORT_FREQUENCY")
 	if s.failedEventReportFrequency < 300 {
 		s.failedEventReportFrequency = 300

@@ -27,7 +27,6 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers/models"
 )
 
@@ -40,7 +39,6 @@ type HandlerBase struct {
 	Logger            logr.Logger
 	DBStartupReady    bool
 	IsLocked          bool
-	DBState           *dcs.DBState
 }
 
 var _ Handler = &HandlerBase{}
@@ -98,6 +96,10 @@ func (mgr *HandlerBase) DataDump(context.Context) error {
 }
 
 func (mgr *HandlerBase) DataLoad(context.Context) error {
+	return models.ErrNotImplemented
+}
+
+func (mgr *HandlerBase) Rebuild(context.Context) error {
 	return models.ErrNotImplemented
 }
 

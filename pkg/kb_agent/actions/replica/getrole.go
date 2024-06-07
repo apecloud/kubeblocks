@@ -22,18 +22,15 @@ package replica
 import (
 	"context"
 
-	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/dcs"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
 type GetRole struct {
 	actions.Base
-	dcsStore dcs.DCS
 }
 
 var getrole actions.Action = &GetRole{}
@@ -46,11 +43,6 @@ func init() {
 }
 
 func (s *GetRole) Init(ctx context.Context) error {
-	s.dcsStore = dcs.GetStore()
-	if s.dcsStore == nil {
-		return errors.New("dcs store init failed")
-	}
-
 	s.Logger = ctrl.Log.WithName("GetRole")
 	s.Action = constant.RoleProbeAction
 	return s.Base.Init(ctx)

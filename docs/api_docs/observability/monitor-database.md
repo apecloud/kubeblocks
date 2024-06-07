@@ -13,7 +13,7 @@ With the built-in database observability, you can observe the database health st
 
 ### Enable monitoring addons
 
-KubeBlocks integrates open-source monitoring components, such as Prometheus, AlertManager, and Grafana, by addons and adopts the custom `apecloud-otel-collector` to collect the monitoring indicators of databases and host machines. You can use these addons for test or demo.
+KubeBlocks integrates open-source monitoring components, such as Prometheus, AlertManager, and Grafana, by addons and adopts the custom `apecloud-otel-collector` to collect the monitoring indicators of databases and host machines. You can use these addons for the test or demo environment.
 
 * `prometheus`: it includes Prometheus and AlertManager addons.
 * `grafana`: it includes Grafana monitoring addons.
@@ -94,20 +94,37 @@ componentSpecs:
 
 ### View the dashboardß
 
-Use the `kubeblocks-grafana` addon to view the dashboard.
+Use the `grafana` addon provided by KubeBlocks to view the dashboard.
 
-```bash
-kbcli dashboard open kubeblocks-grafana
-```
+1. Get the username and password of the `grafana` addon.
+
+   ```bash
+   kubectl get secret grafana -n kb-system -o jsonpath='{.data.admin-user}' |base64 -d
+
+   kubectl get secret grafana -n kb-system -o jsonpath='{.data.admin-password}' |base64 -d
+   ```
+
+2. Run the command below to connect to the Grafana dashboard.
+
+   ```bash
+   kubectl port-forward svc/grafana -n kb-system 3000:80
+   >
+   Forwarding from 127.0.0.1:3000 -> 3000
+   Forwarding from [::1]:3000 -> 3000
+   Handling connection for 3000
+   ```
+
+3. Open the web browser and enter the address `127.0.0.1:3000` to visit the dashboard.
+4. Enter the username and password obtained from step 1.
 
 ### (Optional) Enable remote write
 
-KubeBlocks supports the `victoria-metrics-agent` addon to enable you to remotely write the data to your VM. Compared with the native Prometheus, [vmgent](https://docs.victoriametrics.com/vmagent.html) is lighter and supports the horizontal extension.
+KubeBlocks supports the `victoria-metrics-agent` addon to enable you to remotely write the data to your VM. Compared with the native Prometheus, [vmgent](https://docs.victoriametrics.com/vmagent.html) is lighter.
 
 Install the `victoria-metrics-agent` addon.
 
 ```bash
-helm install  vm xxx/victoria-metrics-agent --set remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}
+helm install  vm kubeblocks/victoria-metrics-agent --set remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}
 ```
 
 For detailed settings, you can refer to [Victoria Metrics docs](https://artifacthub.io/packages/helm/victoriametrics/victoria-metrics-agent).
@@ -160,7 +177,7 @@ KubeBlocks supports the `victoria-metrics-agent` addon to enable you to remotely
 Install the `victoria-metrics-agent` addon.
 
 ```bash
-helm install vm xxx/victoria-metrics-agent --set remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}
+helm install vm kubeblocks/victoria-metrics-agent --set remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}
 ```
 
 For detailed settings, you can refer to [Victoria Metrics docs](https://artifacthub.io/packages/helm/victoriametrics/victoria-metrics-agent).

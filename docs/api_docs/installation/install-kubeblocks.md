@@ -12,6 +12,7 @@ import TabItem from '@theme/TabItem';
 # Install KubeBlocks 
 
 KubeBlocks is kubernetes-native, you can use Helm or kubectl with yaml file to install it.
+
 :::note
 
 If you install KubeBlocks with Helm, to uninstall it, you have to use Helm too.
@@ -51,22 +52,26 @@ Make sure you have [kubectl](https://kubernetes.io/docs/tasks/tools/) and [Helm]
 ## Installation steps
 
 <Tabs>
+
 <TabItem value="Helm" label="Install with Helm" default>
 
 Use Helm and follow the steps below to install KubeBlocks.
 
-1. Create dependent CRDs.
+1. Create dependent CRDs. Specify the version you want to install.
+
    ```bash
    kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/vx.x.x/kubeblocks_crds.yaml
    ```
 
-2. Add Helm repo.
+2. Add the KubeBlocks Helm repo.
+
    ```bash
    helm repo add kubeblocks https://apecloud.github.io/helm-charts
    helm repo update
    ```
 
 3. Install KubeBlocks.
+
    ```bash
    helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-namespace
    ```
@@ -95,17 +100,19 @@ Use Helm and follow the steps below to install KubeBlocks.
      :::
 
 </TabItem>
-<TabItem value="kubectl" label="Install with kubectl" default>
+
+<TabItem value="kubectl" label="Install with kubectl">
 
 KubeBlocks can be installed like any other resource in Kubernetes, through a YAML manifest applied via `kubectl`.
 
 Run the following command to install the latest operator manifest for this minor release:
 
  ```bash
-   kubectl create -f \address.yaml
-   ```
+ kubectl create -f \address.yaml
+ ```
 
 </TabItem>
+
 </Tabs>
 
 ## Verify KubeBlocks installation

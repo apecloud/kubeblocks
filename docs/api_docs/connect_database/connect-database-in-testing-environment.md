@@ -10,7 +10,7 @@ sidebar_label: Testing environment
 
 ## Procedure 1. Use kubectl exec command
 
-If the database address is not required, run the command below to connect to the cluster.
+If the database address is not required, run the command below to connect to the cluster via the default address.
 
 1. Get the `username` and `password` for the cluster.
 
@@ -36,11 +36,11 @@ If the database address is not required, run the command below to connect to the
    mysql -u root -p2gvztbvz
    ```
 
-## Procedure 2. Connect database with SDK client
+## Procedure 2. Connect database with CLI or SDK client
 
-For a pod without a client, you can follow the steps below to connect to the cluster. You can also connect to the cluster by other options, like CLI, SDK client, go connection, java connection, ect.
+For a pod without a client, you can follow the steps below to connect to the cluster. You can also connect to the cluster by other options, like CLI, SDK client, go connection, java connection, etc.
 
-Below is an example of using CLI to connect to the cluster on the localhost.
+Below is an example of using CLI to connect to the cluster on the local host.
 
 1. Get the `username` and `password` for the cluster.
 

@@ -146,3 +146,9 @@ The upgrade feature means that KubeBlocks supports minor version upgrades for a 
    ......
    mariadb                     	kb-system	1       	2024-05-08 17:41:29.112721 +0800 CST   	deployed	mariadb-0.9.0               	10.6.15
    ```
+
+5. (Optional) You can run the command below to disable the addon.
+
+   ```bash
+   helm uninstall mariadb --namespace kb-system
+   ```

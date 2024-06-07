@@ -1,3 +1,11 @@
+---
+title: Overview on in-place update
+description: Overview on in-place update
+keywords: [in-place update, overview]
+sidebar_position: 1
+sidebar_label: Overview on in-place update
+---
+
 # Overview on in-place update
 
 In its earlier versions, KubeBlocks ultimately generated Workloads as StatefulSets. For statefulsets, any change in the segment of PodTemplate may result in the update of all pods, and  the method of update is called `Recreate`, that is deleting all current pods and create a new one. This is obviously not the best practice for database management, which has a high requirement on system availability.

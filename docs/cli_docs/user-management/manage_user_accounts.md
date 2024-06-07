@@ -10,6 +10,12 @@ sidebar_label: Manage user accounts
 
 KubeBlocks offers a variety of services to enhance the usability, availability, and observability of database clusters. Different components require user accounts with different permissions to create connections.
 
+:::note
+
+Currently, KubeBlocks only supports managing user accounts for ApeCloud MySQL, MySQL Community version, PostgreSQL, and Redis.
+
+:::
+
 ***Steps***
 
 - Create a user account
@@ -38,7 +44,7 @@ KubeBlocks offers a variety of services to enhance the usability, availability, 
     | ReadWrite | GRANT SELECT, INSERT, DELETE ON * TO a user | GRANT pg_write_all_data TO a user | -@ALL +@Write +@READ allkeys |
     | ReadOnly  | GRANT SELECT, SHOW VIEW ON * TO a user | GRANT pg_read_all_data TO a user | -@ALL +@READ allkeys |
 
-- Check role level of a user account
+- Check the role level of a user account
 
   ```bash
   kbcli cluster describe-account <clustername> --name <username>

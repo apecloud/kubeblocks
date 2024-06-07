@@ -6,7 +6,7 @@ sidebar_position: 2
 ---
 
 - Node: In a distributed database, each computer is referred to as a node, and each node has its own storage and processing capabilities. By adding new nodes, the storage and processing capacity of the distributed database can be easily expanded to accommodate the growing volume of data and concurrent access demands. Distributed databases can distribute read and write requests to different nodes for processing, achieving load balancing and improving the system's concurrent processing capabilities.
-- Data Sharding：To achieve distributed storage of data, it is necessary to divide the data into multiple parts, with each part being called a data shard. Common data sharding strategies include:
+- Data Sharding: To achieve distributed storage of data, it is necessary to divide the data into multiple parts, with each part being called a data shard. Common data sharding strategies include:
   - Range Sharding: The data is divided into multiple shards based on the key value range, with each shard responsible for a continuous key value range.
   - Hash Sharding: A hash function is used to map the data's key values to different shards, with each shard being responsible for a hash value range.
   - Composite Sharding: Multiple sharding strategies are combined, such as first sharding based on range and then sharding based on hash, to optimize the distribution and access efficiency of data.
@@ -16,6 +16,7 @@ sidebar_position: 2
   - Resource limits define the maximum amount of resources that a Pod can use at runtime. They are used to prevent the Pod from consuming excessive resources and protect nodes and other Pods from being affected.
 
 - Replication
+
   To improve the availability and fault tolerance of data, distributed databases typically replicate data across multiple nodes, with each node having a complete or partial copy of the data. Through data replication and failover mechanisms, distributed databases can continue to provide service even when nodes fail, thereby increasing the system's availability. Common replication strategies include:
   - Primary-Replica Replication:
     - Each partition has a single primary node and multiple replica nodes.
@@ -28,7 +29,7 @@ sidebar_position: 2
 
 Overall, data replication is a key technology used by distributed databases to improve availability and fault tolerance. Different replication strategies involve different trade-offs between consistency, availability, and performance, and the choice should be made based on the specific application requirements.
 
-The management of containerized distributed database by KubeBlocks is mapped to objects at four levels: Cluster, Component, InstanceSet, and Instance, forming a layered architecture:
+The management of a containerized distributed database by KubeBlocks is mapped to objects at four levels: Cluster, Component, InstanceSet, and Instance, forming a layered architecture:
 
 - Cluster layer: A Cluster object represents a complete distributed database cluster. Cluster is the top-level abstraction, including all components and services of the database.
 - Component layer: A Component represents logical components that make up the Cluster object, such as metadata management, data storage, query engine, etc. Each Component object has its specific task and functions. A Cluster object contains one or more Component objects.

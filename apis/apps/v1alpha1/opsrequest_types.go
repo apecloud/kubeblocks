@@ -27,17 +27,17 @@ import (
 
 // OpsRequestSpec defines the desired state of OpsRequest
 //
-// +kubebuilder:validation:XValidation:rule="has(self.cancel) && self.cancel ? (self.type in ['VerticalScaling', 'HorizontalScaling']) : true",message="forbidden to cancel the opsRequest which type not in ['VerticalScaling','HorizontalScaling']"
+// TODO +kubebuilder:validation:XValidation:rule="has(self.cancel) && self.cancel ? (self.type in ['VerticalScaling', 'HorizontalScaling']) : true",message="forbidden to cancel the opsRequest which type not in ['VerticalScaling','HorizontalScaling']"
 type OpsRequestSpec struct {
 	// Specifies the name of the Cluster resource that this operation is targeting.
 	//
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterName"
+	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterName"
 	ClusterName string `json:"clusterName,omitempty"`
 
 	// Deprecated: since v0.9, use clusterName instead.
 	// Specifies the name of the Cluster resource that this operation is targeting.
 	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
+	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
 	ClusterRef string `json:"clusterRef,omitempty"`
 
 	// Indicates whether the current operation should be canceled and terminated gracefully if it's in the
@@ -60,7 +60,7 @@ type OpsRequestSpec struct {
 	//
 	// Note: Once set, the `force` field is immutable and cannot be updated.
 	//
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.force"
+	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.force"
 	// +optional
 	Force bool `json:"force,omitempty"`
 
@@ -71,7 +71,7 @@ type OpsRequestSpec struct {
 	// Note: This field is immutable once set.
 	//
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.type"
+	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.type"
 	Type OpsType `json:"type"`
 
 	// Specifies the duration in seconds that an OpsRequest will remain in the system after successfully completing
@@ -90,7 +90,7 @@ type SpecificOpsRequest struct {
 	// Note: This field is immutable once set.
 	//
 	// +optional
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.upgrade"
+	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.upgrade"
 	Upgrade *Upgrade `json:"upgrade,omitempty"`
 
 	// Lists HorizontalScaling objects, each specifying scaling requirements for a Component,
@@ -102,7 +102,7 @@ type SpecificOpsRequest struct {
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=componentName
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.horizontalScaling"
+	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.horizontalScaling"
 	HorizontalScalingList []HorizontalScaling `json:"horizontalScaling,omitempty"  patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
 	// Lists VolumeExpansion objects, each specifying a component and its corresponding volumeClaimTemplates
@@ -118,7 +118,7 @@ type SpecificOpsRequest struct {
 	// Lists Components to be restarted.
 	//
 	// +optional
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.restart"
+	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.restart"
 	// +kubebuilder:validation:MaxItems=1024
 	// +patchMergeKey=componentName
 	// +patchStrategy=merge,retainKeys
@@ -133,7 +133,7 @@ type SpecificOpsRequest struct {
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=componentName
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.switchover"
+	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.switchover"
 	SwitchoverList []Switchover `json:"switchover,omitempty"  patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
 	// Lists VerticalScaling objects, each specifying a component and its desired compute resources for vertical scaling.
@@ -155,7 +155,7 @@ type SpecificOpsRequest struct {
 
 	// Lists Reconfigure objects, each specifying a Component and its configuration updates.
 	//
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.reconfigure"
+	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.reconfigure"
 	// +optional
 	// +patchMergeKey=componentName
 	// +patchStrategy=merge,retainKeys
@@ -219,7 +219,7 @@ type SpecificOpsRequest struct {
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=componentName
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.rebuildFrom"
+	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.rebuildFrom"
 	RebuildFrom []RebuildInstance `json:"rebuildFrom,omitempty"  patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
 	// Specifies a custom operation defined by OpsDefinition.
@@ -328,7 +328,7 @@ type Upgrade struct {
 	Components []UpgradeComponent `json:"components,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 }
 
-// +kubebuilder:validation:XValidation:rule="has(self.componentDefinitionName) || has(self.serviceVersion)",message="at least one componentDefinitionName or serviceVersion"
+// TODO +kubebuilder:validation:XValidation:rule="has(self.componentDefinitionName) || has(self.serviceVersion)",message="at least one componentDefinitionName or serviceVersion"
 
 type UpgradeComponent struct {
 	// Specifies the name of the Component.
@@ -872,7 +872,7 @@ type ScriptSpec struct {
 	// Note: this field cannot be modified once set.
 	//
 	// +optional
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec.script"
+	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec.script"
 	Script []string `json:"script,omitempty"`
 
 	// Specifies the sources of the scripts to be executed.
@@ -889,7 +889,7 @@ type ScriptSpec struct {
 	// Note: this field cannot be modified once set.
 	//
 	// +optional
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec.scriptFrom"
+	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec.scriptFrom"
 	ScriptFrom *ScriptFrom `json:"scriptFrom,omitempty"`
 
 	// Specifies the labels used to select the Pods on which the script should be executed.
@@ -903,7 +903,7 @@ type ScriptSpec struct {
 	// Note: this field cannot be modified once set.
 	//
 	// +optional
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec.script.selector"
+	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec.script.selector"
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 }
 
@@ -1021,7 +1021,7 @@ type ScriptFrom struct {
 	// Note: This field cannot be modified once set.
 	//
 	// +optional
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec.scriptFrom.configMapRef"
+	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec.scriptFrom.configMapRef"
 	ConfigMapRef []corev1.ConfigMapKeySelector `json:"configMapRef,omitempty"`
 
 	// A list of SecretKeySelector objects, each specifies a Secret and a key containing the script.
@@ -1029,7 +1029,7 @@ type ScriptFrom struct {
 	// Note: This field cannot be modified once set.
 	//
 	// +optional
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec.scriptFrom.secretRef"
+	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec.scriptFrom.secretRef"
 	SecretRef []corev1.SecretKeySelector `json:"secretRef,omitempty"`
 }
 
@@ -1092,7 +1092,7 @@ type OpsRequestStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
-// +kubebuilder:validation:XValidation:rule="has(self.objectKey) || has(self.actionName)", message="at least one objectKey or actionName."
+// TODO +kubebuilder:validation:XValidation:rule="has(self.objectKey) || has(self.actionName)", message="at least one objectKey or actionName."
 
 type ProgressStatusDetail struct {
 	// Specifies the group to which the current object belongs to.

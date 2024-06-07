@@ -89,8 +89,8 @@ type ComponentVersionRelease struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinProperties=1
 	// +kubebuilder:validation:MaxProperties=128
-	// +kubebuilder:validation:XValidation:rule="self.all(key, size(key) <= 32)",message="Container name may not exceed maximum length of 32 characters"
-	// +kubebuilder:validation:XValidation:rule="self.all(key, size(self[key]) <= 256)",message="Image name may not exceed maximum length of 256 characters"
+	// TODO +kubebuilder:validation:XValidation:rule="self.all(key, size(key) <= 32)",message="Container name may not exceed maximum length of 32 characters"
+	// TODO +kubebuilder:validation:XValidation:rule="self.all(key, size(self[key]) <= 256)",message="Image name may not exceed maximum length of 256 characters"
 	Images map[string]string `json:"images"`
 }
 

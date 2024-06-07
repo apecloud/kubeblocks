@@ -98,17 +98,15 @@ spec:
                     images:
                       additionalProperties:
                         type: string
-                      description: Images define the new images for different containers
-                        within the release.
+                      description: "Images define the new images for different containers
+                        within the release. \n TODO +kubebuilder:validation:XValidation:rule=\"self.all(key,
+                        size(key) <= 32)\",message=\"Container name may not exceed
+                        maximum length of 32 characters\" TODO +kubebuilder:validation:XValidation:rule=\"self.all(key,
+                        size(self[key]) <= 256)\",message=\"Image name may not exceed
+                        maximum length of 256 characters\""
                       maxProperties: 128
                       minProperties: 1
                       type: object
-                      x-kubernetes-validations:
-                      - message: Container name may not exceed maximum length of 32
-                          characters
-                        rule: self.all(key, size(key) <= 32)
-                      - message: Image name may not exceed maximum length of 256 characters
-                        rule: self.all(key, size(self[key]) <= 256)
                     name:
                       description: Name is a unique identifier for this release. Cannot
                         be updated.

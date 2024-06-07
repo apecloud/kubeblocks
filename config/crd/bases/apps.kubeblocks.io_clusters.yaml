@@ -227,13 +227,11 @@ spec:
                   specific ComponentDefinitions for each component within `componentSpecs[*].componentDef`.
                   \n If this field is not provided, each component must be explicitly
                   defined in `componentSpecs[*].componentDef`. \n Note: Once set,
-                  this field cannot be modified; it is immutable."
+                  this field cannot be modified; it is immutable. \n TODO +kubebuilder:validation:XValidation:rule=\"self
+                  == oldSelf\",message=\"clusterDefinitionRef is immutable\""
                 maxLength: 63
                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
-                x-kubernetes-validations:
-                - message: clusterDefinitionRef is immutable
-                  rule: self == oldSelf
               clusterVersionRef:
                 description: "Refers to the ClusterVersion name. \n Deprecated since
                   v0.9, use ComponentVersion instead. This field is maintained for
@@ -248,7 +246,13 @@ spec:
                   to define the individual Components that make up a Cluster. This
                   field allows for detailed configuration of each Component within
                   the Cluster. \n Note: `shardingSpecs` and `componentSpecs` cannot
-                  both be empty; at least one must be defined to configure a Cluster."
+                  both be empty; at least one must be defined to configure a Cluster.
+                  \n TODO +kubebuilder:validation:XValidation:rule=\"self.all(x, size(self.filter(c,
+                  c.name == x.name)) == 1)\",message=\"duplicated component\" TODO
+                  +kubebuilder:validation:XValidation:rule=\"self.all(x, size(self.filter(c,
+                  has(c.componentDef))) == 0) || self.all(x, size(self.filter(c, has(c.componentDef)))
+                  == size(self))\",message=\"two kinds of definition API can not be
+                  used simultaneously\""
                 items:
                   description: ClusterComponentSpec defines the specification of a
                     Component within a Cluster. TODO +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDefRef)
@@ -6044,12 +6048,6 @@ spec:
                 maxItems: 128
                 minItems: 1
                 type: array
-                x-kubernetes-validations:
-                - message: duplicated component
-                  rule: self.all(x, size(self.filter(c, c.name == x.name)) == 1)
-                - message: two kinds of definition API can not be used simultaneously
-                  rule: self.all(x, size(self.filter(c, has(c.componentDef))) == 0)
-                    || self.all(x, size(self.filter(c, has(c.componentDef))) == size(self))
               network:
                 description: "The configuration of network. \n Deprecated since v0.9.
                   This field is maintained for backward compatibility and its use
@@ -7679,13 +7677,12 @@ spec:
                         Component name would be \"my-shard-abc\". \n Note that the
                         name defined in Component template(`shardingSpec.template.name`)
                         will be disregarded when generating the Component names of
-                        the shards. The `shardingSpec.name` field takes precedence."
+                        the shards. The `shardingSpec.name` field takes precedence.
+                        \n TODO +kubebuilder:validation:XValidation:rule=\"self ==
+                        oldSelf\",message=\"name is immutable\""
                       maxLength: 15
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
-                      x-kubernetes-validations:
-                      - message: name is immutable
-                        rule: self == oldSelf
                     shards:
                       description: "Specifies the desired number of shards. Users
                         can declare the desired number of shards through this field.

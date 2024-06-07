@@ -29,7 +29,7 @@ type BackupPolicyTemplateSpec struct {
 	// And this field is deprecated since v0.9, consider using the ComponentDef instead.
 	//
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="clusterDefinitionRef is immutable"
+	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="clusterDefinitionRef is immutable"
 	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0, consider using the ComponentDef instead"
 	ClusterDefRef string `json:"clusterDefinitionRef,omitempty"`
 

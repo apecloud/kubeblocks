@@ -59,7 +59,9 @@ spec:
                     commands directly within an existing container using the kubectl
                     exec interface, suitable for immediate, short-lived operations.
                     - resourceModifier: Modifies a K8s object using JSON patches,
-                    useful for updating the spec of some resource."
+                    useful for updating the spec of some resource. \n TODO +kubebuilder:validation:XValidation:rule=\"has(self.workload)
+                    || has(self.exec) || has(self.resourceModifier)\", message=\"at
+                    least one action exists for workload, exec and resourceModifier.\""
                   properties:
                     exec:
                       description: Specifies the configuration for a 'exec' action.
@@ -8378,9 +8380,6 @@ spec:
                   required:
                   - name
                   type: object
-                  x-kubernetes-validations:
-                  - message: at least one action exists for workload, exec and resourceModifier.
-                    rule: has(self.workload) || has(self.exec) || has(self.resourceModifier)
                 minItems: 1
                 type: array
                 x-kubernetes-list-map-keys:
@@ -8491,9 +8490,6 @@ spec:
                                 type: object
                                 x-kubernetes-map-type: atomic
                             type: object
-                            x-kubernetes-validations:
-                            - message: either fieldPath and envRef.
-                              rule: has(self.envRef) || has(self.fieldPath)
                         required:
                         - name
                         - valueFrom

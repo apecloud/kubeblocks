@@ -71,7 +71,7 @@ var _ = Describe("Configuration Controller", func() {
 
 			By("reconfiguring parameters.")
 			Eventually(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *appsv1alpha1.Configuration) {
-				cfg.Spec.GetConfigurationItem(configSpecName).ConfigFileParams = map[string]appsv1alpha1.ConfigParams{
+				cfg.Spec.GetConfigurationItem(configSpecName).ConfigFileParams = map[string]appsv1alpha1.ParametersInFile{
 					"my.cnf": {
 						Parameters: map[string]*string{
 							"max_connections": cfgutil.ToPointer("1000"),

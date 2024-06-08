@@ -86,7 +86,7 @@ const (
 	CFinishedPhase       ConfigurationPhase = "Finished"
 )
 
-type ConfigParams struct {
+type ParametersInFile struct {
 	// Holds the configuration keys and values. This field is a workaround for issues found in kubebuilder and code-generator.
 	// Refer to https://github.com/kubernetes-sigs/kubebuilder/issues/528 and https://github.com/kubernetes/code-generator/issues/50 for more details.
 	//
@@ -96,6 +96,33 @@ type ConfigParams struct {
 	Content *string `json:"content"`
 
 	// Represents the updated parameters for a single configuration file.
+	//
+	// +optional
+	Parameters map[string]*string `json:"parameters,omitempty"`
+}
+
+type ComponentParameters struct {
+	// Defines the unique identifier of the configuration template.
+	//
+	// It must be a string of maximum 63 characters, and can only include lowercase alphanumeric characters,
+	// hyphens, and periods.
+	// The name must start and end with an alphanumeric character.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	Name string `json:"name"`
+
+	// Specifies the user-defined configuration template.
+	//
+	// When provided, the `importTemplateRef` overrides the default configuration template
+	// specified in `configSpec.templateRef`.
+	// This allows users to customize the configuration template according to their specific requirements.
+	//
+	// +optional
+	ImportTemplateRef *ConfigTemplateExtension `json:"importTemplateRef,omitempty"`
+
+	// Specifies the user-defined configuration parameters.
 	//
 	// +optional
 	Parameters map[string]*string `json:"parameters,omitempty"`

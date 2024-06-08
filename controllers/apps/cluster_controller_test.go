@@ -36,6 +36,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -117,10 +118,13 @@ var _ = Describe("Cluster Controller", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupPolicySignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.VolumeSnapshotSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ServiceSignature, true, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ConfigMapSignature, true, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ConfigurationSignature, true, inNS, ml)
 		// non-namespaced
 		testapps.ClearResources(&testCtx, generics.BackupPolicyTemplateSignature, ml)
 		testapps.ClearResources(&testCtx, generics.ActionSetSignature, ml)
 		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
+		testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
 		resetTestContext()
 	}
 
@@ -157,11 +161,16 @@ var _ = Describe("Cluster Controller", func() {
 		compDefObj = testapps.NewComponentDefinitionFactory(compDefName).
 			WithRandomName().
 			SetDefaultSpec().
+			AddConfigs(testapps.DefaultCompDefConfigs).
+			AddVolumeMounts(testapps.DefaultMySQLContainerName, []corev1.VolumeMount{{Name: testapps.DefaultConfigSpecVolumeName, MountPath: "/mnt/config"}}).
 			Create(&testCtx).
 			GetObject()
 
 		By("Create a bpt obj")
 		createBackupPolicyTpl(clusterDefObj, compDefObj.Name, clusterVersionName)
+
+		By("Create a config template obj")
+		createConfigTpl(testapps.DefaultCompDefConfigs)
 
 		By("Create a componentVersion obj")
 		compVersionObj = testapps.NewComponentVersionFactory(compVersionName).
@@ -538,6 +547,61 @@ var _ = Describe("Cluster Controller", func() {
 			constant.KBAppShardingNameLabelKey: compName,
 		}
 		Eventually(testapps.List(&testCtx, generics.ComponentSignature, ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(shards - 1))
+	}
+
+	testShardingClusterComponentWithConfiguration := func(compName, compDefName string, createObj func(string, string, func(*testapps.MockClusterFactory)), shards int) {
+		createObj(compName, compDefName, func(factory *testapps.MockClusterFactory) {
+			factory.SetShardingComponentParameters([]appsv1alpha1.ComponentParameters{
+				{
+					Name: testapps.DefaultConfigSpecName,
+					Parameters: map[string]*string{
+						"max_connections": cfgutil.ToPointer("1000"),
+					},
+				},
+			})
+		})
+
+		By("check components created")
+		ml := client.MatchingLabels{
+			constant.AppInstanceLabelKey:       clusterKey.Name,
+			constant.KBAppShardingNameLabelKey: compName,
+		}
+		Eventually(testapps.List(&testCtx, generics.ComponentSignature, ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(shards))
+	}
+
+	createClusterObjWithShardingAndConfiguration := func(shardingName, compDefName string, processor func(*testapps.MockClusterFactory)) {
+		By("Creating a cluster with new component definition")
+		createClusterObjNoWait("", "", shardingComponentProcessorWrapper(false, shardingName, compDefName, processor))
+
+		By("Waiting for the cluster enter Creating phase")
+		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
+
+		By("Wait component created")
+		ml := client.MatchingLabels{
+			constant.AppInstanceLabelKey:       clusterKey.Name,
+			constant.KBAppShardingNameLabelKey: shardingName,
+		}
+		Eventually(testapps.List(&testCtx, generics.ConfigurationSignature,
+			ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(defaultShardCount))
+
+		checkConfig := func(g Gomega) {
+			configList := appsv1alpha1.ConfigurationList{}
+			g.Expect(testCtx.Cli.List(testCtx.Ctx, &configList, client.InNamespace(testCtx.DefaultNamespace), ml)).Should(Succeed())
+			g.Expect(configList.Items).Should(HaveLen(defaultShardCount))
+			for _, configuration := range configList.Items {
+				g.Expect(len(configuration.Spec.ConfigItemDetails)).Should(BeEquivalentTo(1))
+				g.Expect(configuration.Spec.ConfigItemDetails[0].Name).Should(BeEquivalentTo(testapps.DefaultConfigSpecName))
+				g.Expect(configuration.Spec.ConfigItemDetails[0].ConfigSpec).ShouldNot(BeNil())
+				g.Expect(configuration.Spec.ConfigItemDetails[0].ConfigSpec.Name).Should(BeEquivalentTo(testapps.DefaultConfigSpecName))
+				g.Expect(configuration.Spec.ConfigItemDetails[0].ConfigSpec.TemplateRef).Should(BeEquivalentTo(testapps.DefaultConfigSpecTplRef))
+				g.Expect(configuration.Spec.ConfigItemDetails[0].ConfigSpec.ConfigConstraintRef).Should(BeEquivalentTo(testapps.DefaultConfigSpecConstraintRef))
+				g.Expect(len(configuration.Spec.ConfigItemDetails[0].ConfigFileParams) > 0).Should(BeTrue())
+			}
+		}
+
+		By("checking configuration schedule")
+		Eventually(checkConfig).Should(Succeed())
 	}
 
 	testClusterService := func(compName, compDefName string, createObj func(string, string, func(*testapps.MockClusterFactory))) {
@@ -1116,6 +1180,10 @@ var _ = Describe("Cluster Controller", func() {
 			testShardingClusterComponent(consensusCompName, compDefObj.Name, createClusterObjWithSharding, defaultShardCount)
 		})
 
+		It("create sharding cluster with configuration", func() {
+			testShardingClusterComponentWithConfiguration(consensusCompName, compDefObj.Name, createClusterObjWithShardingAndConfiguration, defaultShardCount)
+		})
+
 		It("create cluster with default topology", func() {
 			testClusterComponentWithTopology("", consensusCompName, nil, compDefObj.Name, latestServiceVersion)
 		})
@@ -1560,6 +1628,19 @@ var _ = Describe("Cluster Controller", func() {
 		})
 	})
 })
+
+func createConfigTpl(configs []appsv1alpha1.ComponentConfigSpec) {
+	for _, config := range configs {
+		if config.ConfigConstraintRef != "" {
+			testapps.NewConfigConstraintFactory(config.ConfigConstraintRef).Create(&testCtx)
+		}
+		if config.TemplateRef != "" {
+			testapps.NewConfigTemplateFactory(config.TemplateRef, testCtx.DefaultNamespace).
+				Data(testapps.DefaultConfigData).
+				Create(&testCtx)
+		}
+	}
+}
 
 func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition, compDef string, mappingClusterVersions ...string) {
 	By("create actionSet")

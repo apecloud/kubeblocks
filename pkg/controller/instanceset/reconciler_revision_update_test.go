@@ -56,7 +56,7 @@ var _ = Describe("revision update reconciler test", func() {
 			newITS, ok := newTree.GetRoot().(*workloads.InstanceSet)
 			Expect(ok).Should(BeTrue())
 			Expect(newITS.Status.ObservedGeneration).Should(Equal(its.Generation))
-			updateRevisions, err := getUpdateRevisions(newITS.Status.UpdateRevisions)
+			updateRevisions, err := GetRevisions(newITS.Status.UpdateRevisions)
 			Expect(err).Should(BeNil())
 			Expect(updateRevisions).Should(HaveLen(3))
 			Expect(updateRevisions).Should(HaveKey(its.Name + "-0"))

@@ -22,19 +22,24 @@ package operations
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // getProgressObjectKey gets progress object key from the client.Object.
@@ -265,10 +270,7 @@ func handleCancelProgressForPodsRollingUpdate(
 	return completedCount
 }
 
-func podIsAvailable(pgRes *progressResource, pod *corev1.Pod, minReadySeconds int32) bool {
-	if pod == nil {
-		return false
-	}
+func needToCheckRole(pgRes *progressResource) bool {
 	var needCheckRole bool
 	if pgRes.componentDef != nil {
 		needCheckRole = len(pgRes.componentDef.Spec.Roles) > 0
@@ -277,7 +279,14 @@ func podIsAvailable(pgRes *progressResource, pod *corev1.Pod, minReadySeconds in
 		compDef := pgRes.clusterDef.GetComponentDefByName(pgRes.clusterComponent.ComponentDefRef)
 		needCheckRole = compDef != nil && (compDef.WorkloadType == appsv1alpha1.Replication || compDef.WorkloadType == appsv1alpha1.Consensus)
 	}
-	if needCheckRole {
+	return needCheckRole
+}
+
+func podIsAvailable(pgRes *progressResource, pod *corev1.Pod, minReadySeconds int32) bool {
+	if pod == nil {
+		return false
+	}
+	if needToCheckRole(pgRes) {
 		return intctrlutil.PodIsReadyWithLabel(*pod)
 	}
 	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: time.Now()})
@@ -413,6 +422,10 @@ func handleComponentProgressForScalingReplicas(reqCtx intctrlutil.RequestCtx,
 	if updatedPodCount == 0 {
 		return 0, 0, nil
 	}
+	if viper.GetBool(constant.FeatureGateReconcileOpsWithInstanceSet) {
+		completedCount, err = handleHScaleProgressWithInstanceSet(reqCtx, cli, opsRes, pgRes, compStatus)
+		return updatedPodCount, completedCount, err
+	}
 	if pods, err = intctrlcomp.ListOwnedPods(reqCtx.Ctx, cli, opsRes.Cluster.Namespace, opsRes.Cluster.Name, pgRes.fullComponentName); err != nil {
 		return 0, 0, err
 	}
@@ -467,6 +480,31 @@ func handleScaleOutProgress(reqCtx intctrlutil.RequestCtx,
 	return completedCount, nil
 }
 
+func updateProgressDetailForScaleIn(
+	opsRes *OpsResource,
+	pgRes *progressResource,
+	compStatus *appsv1alpha1.OpsRequestComponentStatus,
+	objectKey string, status appsv1alpha1.ProgressStatus) {
+	progressDetail := appsv1alpha1.ProgressStatusDetail{
+		Group:     fmt.Sprintf("%s/%s", pgRes.fullComponentName, pgRes.opsMessageKey),
+		ObjectKey: objectKey,
+		Status:    status,
+	}
+	var messagePrefix string
+	switch status {
+	case appsv1alpha1.SucceedProgressStatus:
+		messagePrefix = "Successfully"
+	case appsv1alpha1.ProcessingProgressStatus:
+		messagePrefix = "Start to"
+	case appsv1alpha1.PendingProgressStatus:
+		messagePrefix = "wait to"
+	}
+	progressDetail.Message = fmt.Sprintf("%s %s pod: %s in Component: %s",
+		messagePrefix, strings.ToLower(pgRes.opsMessageKey), objectKey, pgRes.clusterComponent.Name)
+	setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest,
+		&compStatus.ProgressDetails, progressDetail)
+}
+
 // handleScaleInProgress handles the progressDetails of scaled in replicas.
 func handleScaleInProgress(
 	opsRes *OpsResource,
@@ -478,38 +516,114 @@ func handleScaleInProgress(
 		objectKey := getProgressObjectKey(constant.PodKind, pods[i].Name)
 		podMap[objectKey] = pods[i]
 	}
-	updateProgressDetail := func(objectKey string, status appsv1alpha1.ProgressStatus) {
-		progressDetail := appsv1alpha1.ProgressStatusDetail{
-			Group:     fmt.Sprintf("%s/Delete", pgRes.fullComponentName),
-			ObjectKey: objectKey,
-			Status:    status,
-		}
-		var messagePrefix string
-		switch status {
-		case appsv1alpha1.SucceedProgressStatus:
-			completedCount += 1
-			messagePrefix = "Successfully"
-		case appsv1alpha1.ProcessingProgressStatus:
-			messagePrefix = "Start to"
-		case appsv1alpha1.PendingProgressStatus:
-			messagePrefix = "wait to"
-		}
-		progressDetail.Message = fmt.Sprintf("%s delete pod: %s in Component: %s", messagePrefix, objectKey, pgRes.clusterComponent.Name)
-		setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest,
-			&compStatus.ProgressDetails, progressDetail)
-	}
+	pgRes.opsMessageKey = "Delete"
 	for k := range pgRes.deletedPodSet {
 		objectKey := getProgressObjectKey(constant.PodKind, k)
 		pod, ok := podMap[objectKey]
 		if !ok {
-			updateProgressDetail(objectKey, appsv1alpha1.SucceedProgressStatus)
+			completedCount += 1
+			updateProgressDetailForScaleIn(opsRes, pgRes, compStatus, objectKey, appsv1alpha1.SucceedProgressStatus)
 			continue
 		}
 		if !pod.DeletionTimestamp.IsZero() {
-			updateProgressDetail(objectKey, appsv1alpha1.ProcessingProgressStatus)
+			updateProgressDetailForScaleIn(opsRes, pgRes, compStatus, objectKey, appsv1alpha1.ProcessingProgressStatus)
 			continue
 		}
-		updateProgressDetail(objectKey, appsv1alpha1.PendingProgressStatus)
+		updateProgressDetailForScaleIn(opsRes, pgRes, compStatus, objectKey, appsv1alpha1.PendingProgressStatus)
+	}
+	return completedCount, nil
+}
+
+func handleHScaleProgressWithInstanceSet(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	opsRes *OpsResource,
+	pgRes *progressResource,
+	compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, error) {
+	var (
+		completedCount int32
+		err            error
+	)
+	itsName := constant.GenerateClusterComponentName(opsRes.Cluster.Name, pgRes.fullComponentName)
+	its := &workloads.InstanceSet{}
+	if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: itsName, Namespace: opsRes.OpsRequest.Namespace}, its); err != nil {
+		return 0, err
+	}
+	if len(pgRes.createdPodSet) > 0 {
+		scaleOutCompletedCount, scaleOutErr := handleScaleOutProgressWithInstanceSet(opsRes, pgRes, its, compStatus)
+		if scaleOutErr != nil {
+			err = scaleOutErr
+		}
+		completedCount += scaleOutCompletedCount
+	}
+	if len(pgRes.deletedPodSet) > 0 {
+		scaleInCompletedCount, scaleInErr := handleScaleInProgressWithInstanceSet(opsRes, pgRes, its, compStatus)
+		if scaleInErr != nil {
+			err = fmt.Errorf(scaleInErr.Error(), err)
+		}
+		completedCount += scaleInCompletedCount
+	}
+	return completedCount, err
+}
+
+func handleScaleOutProgressWithInstanceSet(
+	opsRes *OpsResource,
+	pgRes *progressResource,
+	its *workloads.InstanceSet,
+	compStatus *appsv1alpha1.OpsRequestComponentStatus) (completedCount int32, err error) {
+	currPodRevisionMap, _ := instanceset.GetRevisions(its.Status.CurrentRevisions)
+	notReadyPodSet := instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceReady)
+	failurePodSet := instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceFailure)
+	pgRes.opsMessageKey = "Create"
+	memberStatusMap := map[string]sets.Empty{}
+	if needToCheckRole(pgRes) {
+		for _, v := range its.Status.MembersStatus {
+			memberStatusMap[v.PodName] = sets.Empty{}
+		}
+	}
+	for podName := range pgRes.createdPodSet {
+		objectKey := getProgressObjectKey(constant.PodKind, podName)
+		if _, ok := currPodRevisionMap[podName]; !ok {
+			updateProgressDetailForScaleIn(opsRes, pgRes, compStatus, objectKey, appsv1alpha1.PendingProgressStatus)
+			continue
+		}
+		if _, ok := failurePodSet[podName]; ok {
+			completedCount += 1
+			updateProgressDetailForScaleIn(opsRes, pgRes, compStatus, objectKey, appsv1alpha1.FailedProgressStatus)
+			continue
+		}
+		if _, ok := notReadyPodSet[podName]; ok {
+			updateProgressDetailForScaleIn(opsRes, pgRes, compStatus, objectKey, appsv1alpha1.ProcessingProgressStatus)
+			continue
+		}
+		if _, ok := memberStatusMap[podName]; !ok && needToCheckRole(pgRes) {
+			continue
+		}
+		completedCount += 1
+		updateProgressDetailForScaleIn(opsRes, pgRes, compStatus, objectKey, appsv1alpha1.SucceedProgressStatus)
+	}
+	return completedCount, nil
+}
+
+func handleScaleInProgressWithInstanceSet(
+	opsRes *OpsResource,
+	pgRes *progressResource,
+	its *workloads.InstanceSet,
+	compStatus *appsv1alpha1.OpsRequestComponentStatus) (completedCount int32, err error) {
+	currPodRevisionMap, _ := instanceset.GetRevisions(its.Status.CurrentRevisions)
+	notReadyPodSet := instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceReady)
+	pgRes.opsMessageKey = "Delete"
+	for podName := range pgRes.deletedPodSet {
+		objectKey := getProgressObjectKey(constant.PodKind, podName)
+		if _, ok := currPodRevisionMap[podName]; !ok {
+			completedCount += 1
+			updateProgressDetailForScaleIn(opsRes, pgRes, compStatus, objectKey, appsv1alpha1.SucceedProgressStatus)
+			continue
+		}
+		if _, ok := notReadyPodSet[podName]; ok {
+			updateProgressDetailForScaleIn(opsRes, pgRes, compStatus, objectKey, appsv1alpha1.ProcessingProgressStatus)
+			continue
+		}
+		updateProgressDetailForScaleIn(opsRes, pgRes, compStatus, objectKey, appsv1alpha1.PendingProgressStatus)
 	}
 	return completedCount, nil
 }

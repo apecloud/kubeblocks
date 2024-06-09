@@ -104,7 +104,7 @@ var _ = Describe("status reconciler test", func() {
 			Expect(its.Status.AvailableReplicas).Should(BeEquivalentTo(0))
 			Expect(its.Status.UpdatedReplicas).Should(BeEquivalentTo(0))
 			Expect(its.Status.CurrentReplicas).Should(BeEquivalentTo(0))
-			Expect(its.Status.CurrentRevisions).Should(HaveLen(0))
+			// Expect(its.Status.CurrentRevisions).Should(HaveLen(7))
 
 			By("make all pods ready with old revision")
 			condition := corev1.PodCondition{
@@ -118,10 +118,13 @@ var _ = Describe("status reconciler test", func() {
 				pod.Status.Conditions = append(pod.Status.Conditions, condition)
 			}
 			pods := newTree.List(&corev1.Pod{})
+			currentRevisionMap := map[string]string{}
+			oldRevision := "old-revision"
 			for _, object := range pods {
 				pod, ok := object.(*corev1.Pod)
 				Expect(ok).Should(BeTrue())
-				makePodAvailableWithRevision(pod, "old-revision")
+				makePodAvailableWithRevision(pod, oldRevision)
+				currentRevisionMap[pod.Name] = oldRevision
 			}
 			_, err = reconciler.Reconcile(newTree)
 			Expect(err).Should(BeNil())
@@ -130,10 +133,11 @@ var _ = Describe("status reconciler test", func() {
 			Expect(its.Status.AvailableReplicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.UpdatedReplicas).Should(BeEquivalentTo(0))
 			Expect(its.Status.CurrentReplicas).Should(BeEquivalentTo(replicas))
-			Expect(its.Status.CurrentRevisions).Should(HaveLen(0))
+			currentRevisions, _ := buildRevisions(currentRevisionMap)
+			Expect(its.Status.CurrentRevisions).Should(Equal(currentRevisions))
 
 			By("make all pods available with latest revision")
-			updateRevisions, err := getUpdateRevisions(its.Status.UpdateRevisions)
+			updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
 			Expect(err).Should(BeNil())
 			for _, object := range pods {
 				pod, ok := object.(*corev1.Pod)

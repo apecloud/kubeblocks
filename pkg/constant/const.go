@@ -328,6 +328,10 @@ const (
 
 const (
 	FeatureGateIgnoreConfigTemplateDefaultMode = "IGNORE_CONFIG_TEMPLATE_DEFAULT_MODE"
+
+	// FeatureGateReconcileOpsWithInstanceSet OpsRequest controller will perform a reconcile action based on the instanceSet
+	// when the pods of the cluster in the Kubernetes cluster cannot be obtained.
+	FeatureGateReconcileOpsWithInstanceSet = "RECONCILE_OPS_WITH_INSTANCESET"
 )
 
 const InvalidContainerPort int32 = 0

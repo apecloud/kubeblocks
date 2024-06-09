@@ -143,6 +143,7 @@ func init() {
 	viper.SetDefault(intctrlutil.FeatureGateEnableRuntimeMetrics, false)
 	viper.SetDefault(constant.CfgKBReconcileWorkers, 8)
 	viper.SetDefault(constant.FeatureGateIgnoreConfigTemplateDefaultMode, false)
+	viper.SetDefault(constant.FeatureGateReconcileOpsWithInstanceSet, false)
 }
 
 type flagName string

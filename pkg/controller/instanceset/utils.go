@@ -20,10 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -230,4 +234,18 @@ func getSvcSelector(its *workloads.InstanceSet, headless bool) map[string]string
 		selectors[k] = v
 	}
 	return selectors
+}
+
+// GetPodNameSetFromInstanceSetCondition get the pod name sets from the InstanceSet conditions
+func GetPodNameSetFromInstanceSetCondition(its *workloads.InstanceSet, conditionType workloads.ConditionType) map[string]sets.Empty {
+	notReadyPodSet := map[string]sets.Empty{}
+	readyCondition := meta.FindStatusCondition(its.Status.Conditions, string(conditionType))
+	if readyCondition != nil &&
+		readyCondition.Status == metav1.ConditionFalse &&
+		readyCondition.Message != "" {
+		var notReadyPods []string
+		_ = json.Unmarshal([]byte(readyCondition.Message), &notReadyPods)
+		notReadyPodSet = sets.New(notReadyPods...)
+	}
+	return notReadyPodSet
 }

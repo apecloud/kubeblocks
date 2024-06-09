@@ -159,7 +159,7 @@ func DeepHashObject(hasher hash.Hash, objectToWrite interface{}) {
 	fmt.Fprintf(hasher, "%v", dump.ForHash(objectToWrite))
 }
 
-func getUpdateRevisions(revisions map[string]string) (map[string]string, error) {
+func GetRevisions(revisions map[string]string) (map[string]string, error) {
 	if revisions == nil {
 		return nil, nil
 	}
@@ -182,7 +182,7 @@ func getUpdateRevisions(revisions map[string]string) (map[string]string, error) 
 	return updateRevisions, nil
 }
 
-func buildUpdateRevisions(updateRevisions map[string]string) (map[string]string, error) {
+func buildRevisions(updateRevisions map[string]string) (map[string]string, error) {
 	maxPlainRevisionCount := viper.GetInt(MaxPlainRevisionCount)
 	if len(updateRevisions) <= maxPlainRevisionCount {
 		return updateRevisions, nil

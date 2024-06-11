@@ -2,13 +2,13 @@
 title: Supported addons 
 description: Addons supported by KubeBlocks
 keywords: [addons, enable, KubeBlocks, prometheus, s3, alertmanager,]
-sidebar_position: 4
+sidebar_position: 2
 sidebar_label: Supported addons 
 ---
 
 # Supported addons
 
-KubeBlocks, as a cloud-native data infrastructure based on Kubernetes, provides management and control for relational databases, NoSQL databases, vector databases, and stream computing systems; and these databases can be all added as addons. Besides databases, KubeBlocks addon now also supports plugins for cloud environments and applications.
+KubeBlocks, as a cloud-native data infrastructure based on Kubernetes, provides management and control for relational databases, NoSQL databases, vector databases, and stream computing systems; and these databases can be all added as addons. Besides databases, the KubeBlocks addon now also supports plugins for cloud environments and applications.
 
 | Addons          | Description                                                                                                                                                                                                       |
 |:----------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -31,7 +31,7 @@ KubeBlocks, as a cloud-native data infrastructure based on Kubernetes, provides 
 | minio           | MinIO is an object storage solution that provides an Amazon Web Services S3-compatible API and supports all core S3 features. |
 | mogdb           | MOgDB is a stable and easy-to-use enterprise-ready relational database based on the openGauss open source database. |
 | mongodb         | MongoDB is a document-oriented NoSQL database used for high volume data storage.                                                                                                                                  |
-| mysql           | MySQL is a widely used, open-source relational database management system (RDBMS). |
+| mysql  (Primary-Secondary replication) |
 | nebula          | NebulaGraph is an open source graph database that can store and process graphs with trillions of edges and vertices.                                                                                              |
 | neon            | Neon is Serverless Postgres built for the cloud. |
 | oceanbase       | Unlimited scalable distributed database for data-intensive transactional and real-time operational analytics workloads, with ultra-fast performance that has once achieved world records in the TPC-C benchmark test. OceanBase has served over 400 customers across the globe and has been supporting all mission critical systems in Alipay. |
@@ -39,6 +39,7 @@ KubeBlocks, as a cloud-native data infrastructure based on Kubernetes, provides 
 | opengauss       | openGauss is an open source relational database management system that is released with the Mulan PSL v2.  |
 | openldap        | The OpenLDAP Project is a collaborative effort to develop a robust, commercial-grade, fully featured, and open source LDAP suite of applications and development tools. This chart provides KubeBlocks. |
 | opensearch      | Open source distributed and RESTful search engine. |
+| oracle-mysql    | MySQL is a widely used, open-source relational database management system (RDBMS). |
 | oriolebd        | OrioleDB is a new storage engine for PostgreSQL, bringing a modern approach to database capacity, capabilities and performance to the world's most-loved database platform. |
 | pika            | Pika (PikiwiDB) is a persistent huge storage service, compatible with the vast majority of redis interfaces, including string, hash, list, zset, set and management interfaces. |
 | polardb-x       | PolarDB-X is a cloud native distributed SQL Database designed for high concurrency, massive storage, complex querying scenarios. |
@@ -114,41 +115,74 @@ The upgrade feature means that KubeBlocks supports minor version upgrades for a 
 
 :::
 
-## Install addons
+## Use addons
 
-1. (Optional) Add the KubeBlocks repo. If you install KubeBlocks with Helm, just run `helm repo update`. 
+### Use the index to install an addon
+
+With the release of KubeBlocks v0.8.0, addons are decoupled from KubeBlocks and some addons are not installed by default. If you want to use these addons, add addons first by index.
+
+The official index repo is [KubeBlocks index](https://github.com/apecloud/block-index). The code of all addons is maintained in the [KubeBlocks addon repo](https://github.com/apecloud/kubeblocks-addons).
+
+1. View the index.
+
+   kbcli creates an index named `kubeblocks` by default and you can check whether this index is created by running `kbcli addon index list`.
 
    ```bash
-   helm repo add kubeblocks https://apecloud.github.io/helm-charts
-   helm repo update
+   kbcli addon index list
+   >
+   INDEX        URL
+   kubeblocks   https://github.com/apecloud/block-index.git 
    ```
 
-2. View the addon versions.
+   If the list is empty or you want to add your index, you can add the index manually by using `kbcli addon index add <index-name> <source>`. For example,
 
    ```bash
-   helm search repo kubeblocks/mariadb --devel --versions
+   kbcli addon index add kubeblocks https://github.com/apecloud/block-index.git
+   ```
+
+2. (Optional) Search whether the addon exists in the index.
+
+   ```bash
+   kbcli addon search mariadb
+   >
+   ADDON     VERSION   INDEX
+   mariadb   0.7.0     kubeblocks
    ```
 
 3. Install the addon.
 
+   If there are multiple index sources and versions for an addon, you can specify them by adding flags. The system installs the latest version in the `kubeblocks` index by default.
+
    ```bash
-   helm install mariadb kubeblocks/mariadb --namespace kb-system --create-namespace --version 0.9.0
+   kbcli addon install mariadb --index kubeblocks --version 0.7.0
    ```
 
-4. Verify whether this addon is installed.
+   **What's next**
 
-   The STATUS is `deployed` and this addon is installed successfully.
+   After the addon is installed, you can list and enable it.
+
+### List addons
+
+To list supported addons, run `kbcli addon list` command.
+
+### Enable/Disable addons
+
+To manually enable or disable addons, follow the steps below.
+
+***Steps:***
+
+1. To enable an addon, use `kbcli addon enable`.
+
+   ***Example***
 
    ```bash
-   helm list -A
-   >
-   NAME                        	NAMESPACE	REVISION	UPDATED                                	STATUS  	CHART                       	APP VERSION
-   ......
-   mariadb                     	kb-system	1       	2024-05-08 17:41:29.112721 +0800 CST   	deployed	mariadb-0.9.0               	10.6.15
+   kbcli addon enable snapshot-controller
    ```
 
-5. (Optional) You can run the command below to disable the addon.
+   To disable an addon, use `kbcli addon disable`.
+
+2. List the addons again to check whether it is enabled.
 
    ```bash
-   helm uninstall mariadb --namespace kb-system
+   kbcli addon list
    ```

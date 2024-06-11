@@ -144,7 +144,7 @@ If you do not configure the BackupRepo information when installing KubeBlocks, y
     helm repo add kubeblocks https://jihulab.com/api/v4/projects/85949/packages/helm/stable
     helm install csi-s3 kubeblocks/csi-s3 --version=0.7.0 -n kb-system
 
-    # You can add flags to customize the installation of this add-on
+    # You can add flags to customize the installation of this addon
     # CSI-S3 installs a daemonSet Pod on all nodes by default and you can set tolerations to install it on the specified node
     --set-json tolerations='[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"taintValue"}]'
     --set-json daemonsetTolerations='[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"taintValue"}]'

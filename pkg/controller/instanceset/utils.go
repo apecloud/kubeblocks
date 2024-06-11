@@ -238,14 +238,14 @@ func getSvcSelector(its *workloads.InstanceSet, headless bool) map[string]string
 
 // GetPodNameSetFromInstanceSetCondition get the pod name sets from the InstanceSet conditions
 func GetPodNameSetFromInstanceSetCondition(its *workloads.InstanceSet, conditionType workloads.ConditionType) map[string]sets.Empty {
-	notReadyPodSet := map[string]sets.Empty{}
-	readyCondition := meta.FindStatusCondition(its.Status.Conditions, string(conditionType))
-	if readyCondition != nil &&
-		readyCondition.Status == metav1.ConditionFalse &&
-		readyCondition.Message != "" {
-		var notReadyPods []string
-		_ = json.Unmarshal([]byte(readyCondition.Message), &notReadyPods)
-		notReadyPodSet = sets.New(notReadyPods...)
+	podSet := map[string]sets.Empty{}
+	condition := meta.FindStatusCondition(its.Status.Conditions, string(conditionType))
+	if condition != nil &&
+		condition.Status == metav1.ConditionFalse &&
+		condition.Message != "" {
+		var podNames []string
+		_ = json.Unmarshal([]byte(condition.Message), &podNames)
+		podSet = sets.New(podNames...)
 	}
-	return notReadyPodSet
+	return podSet
 }

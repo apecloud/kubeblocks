@@ -142,6 +142,7 @@ func renderActionCmdJob(ctx context.Context, cli client.Reader, actionCtx *Actio
 	renderJobPodVolumes := func() ([]corev1.Volume, []corev1.VolumeMount) {
 		volumes := make([]corev1.Volume, 0)
 		volumeMounts := make([]corev1.VolumeMount, 0)
+		volumeMountSet := make(map[string]struct{})
 
 		// find current pod's volume which mapped to scriptsTemplates
 		findVolumes := func(tplSpec appsv1alpha1.ComponentTemplateSpec) {
@@ -162,7 +163,11 @@ func renderActionCmdJob(ctx context.Context, cli client.Reader, actionCtx *Actio
 			for _, container := range tplPod.Spec.Containers {
 				for _, volumeMount := range container.VolumeMounts {
 					if volumeMount.Name == volume.Name {
-						volumeMounts = append(volumeMounts, volumeMount)
+						// filter duplicate volumeMounts
+						if _, exists := volumeMountSet[volumeMount.Name]; !exists {
+							volumeMounts = append(volumeMounts, volumeMount)
+							volumeMountSet[volumeMount.Name] = struct{}{}
+						}
 						break
 					}
 				}

@@ -14,8 +14,8 @@ Starting from version 0.9, we're able to establish multiple instance templates f
 In KubeBlocks, a *Cluster* is composed of several *Components*, where each *Component* ultimately oversees multiple *Pods* and auxiliary objects.
 
 Prior to version 0.9, these pods were rendered from a shared PodTemplate, as defined in either ClusterDefinition or ComponentDefinition. However, this design can’t meet the following demands:
- - For Clusters rendered from the same add-on, setting separate scheduling configurations such as *NodeName*, *NodeSelector*, or *Tolerations*.
- - For Components rendered from the same add-on, adding custom *Annotations*, *Labels*, or ENV to the Pods they manage.
+ - For Clusters rendered from the same addon, setting separate scheduling configurations such as *NodeName*, *NodeSelector*, or *Tolerations*.
+ - For Components rendered from the same addon, adding custom *Annotations*, *Labels*, or ENV to the Pods they manage.
 - For Pods managed by the same Component, configuring different *CPU*, *Memory*, and other *Resource Requests* and *Limits*.
 
 With various similar requirements emerging, the Cluster API introduced the Instance Template feature from version 0.9 onwards to cater to these needs.

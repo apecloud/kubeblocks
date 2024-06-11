@@ -90,7 +90,18 @@ func (p *realUpdatePlan) planWalkFunc(vertex graph.Vertex) error {
 		}
 		isRoleful := func() bool { return len(p.its.Spec.Roles) > 0 }()
 		if isRoleful && !intctrlutil.PodIsReadyWithLabel(*pod) {
-			return ErrWait
+			// If none of the replicas are ready, and the system is employing a serial update strategy, it may end up
+			// waiting indefinitely. To prevent this, we choose to bypass the role label check if there are no replicas
+			// that have had their role probed.
+			//
+			// This change may lead to false alarms, as when all replicas are temporarily unavailable for some reason,
+			// the system will update them without waiting for their roles to be elected and probed. This cloud
+			// potentially hide some uncertain risks.
+			serialUpdate := p.its.Spec.MemberUpdateStrategy != nil && *p.its.Spec.MemberUpdateStrategy == workloads.SerialUpdateStrategy
+			hasRoleProbed := len(p.its.Status.MembersStatus) > 0
+			if !serialUpdate || hasRoleProbed {
+				return ErrWait
+			}
 		}
 		return ErrContinue
 	}

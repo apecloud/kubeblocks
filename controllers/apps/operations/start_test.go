@@ -58,6 +58,7 @@ var _ = Describe("Start OpsRequest", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.InstanceSetSignature, true, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
 	}
 
@@ -70,7 +71,9 @@ var _ = Describe("Start OpsRequest", func() {
 			By("init operations resources ")
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
-
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusComp)
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, statelessComp)
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, statefulComp)
 			By("mock cluster annotations for start opsRequest")
 			// mock snapshot annotation for cluster
 			componentReplicasMap := map[string]int32{}

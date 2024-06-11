@@ -60,7 +60,7 @@ var _ = Describe("OpsUtil functions", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.InstanceSetSignature, true, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.ConfigMapSignature, inNS, ml)
 	}
 
@@ -72,6 +72,7 @@ var _ = Describe("OpsUtil functions", func() {
 		It("Test ops_util functions", func() {
 			By("init operations resources ")
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusComp)
 
 			By("Test the functions in ops_util.go")
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, appsv1alpha1.HorizontalScaling{
@@ -87,6 +88,7 @@ var _ = Describe("OpsUtil functions", func() {
 		It("Test opsRequest failed cases", func() {
 			By("init operations resources ")
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusComp)
 
 			By("Test the functions in ops_util.go")
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, appsv1alpha1.HorizontalScaling{
@@ -149,7 +151,7 @@ var _ = Describe("OpsUtil functions", func() {
 			}
 
 			By("mock instance set")
-			_ = testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusComp)
+			its := testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusComp)
 
 			By("expect to disable ha")
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
@@ -161,7 +163,7 @@ var _ = Describe("OpsUtil functions", func() {
 
 			By("mock restart ops to succeed and expect to enable ha")
 			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsRunningPhase
-			_ = initInstanceSetPods(ctx, k8sClient, opsRes)
+			_ = testapps.MockInstanceSetPods(&testCtx, its, opsRes.Cluster, consensusComp)
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsSucceedPhase))

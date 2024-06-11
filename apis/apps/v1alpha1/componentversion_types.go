@@ -22,6 +22,13 @@ import (
 
 // ComponentVersionSpec defines the desired state of ComponentVersion
 type ComponentVersionSpec struct {
+	// Releases represents different releases of component instances within this ComponentVersion.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=128
+	Releases []ComponentVersionRelease `json:"releases"`
+
 	// CompatibilityRules defines compatibility rules between sets of component definitions and releases.
 	//
 	// +kubebuilder:validation:Required
@@ -29,35 +36,8 @@ type ComponentVersionSpec struct {
 	// +kubebuilder:validation:MaxItems=128
 	CompatibilityRules []ComponentVersionCompatibilityRule `json:"compatibilityRules"`
 
-	// Releases represents different releases of component instances within this ComponentVersion.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
-	// +kubebuilder:validation:MaxItems=128
-	Releases []ComponentVersionRelease `json:"releases"`
-}
-
-// ComponentVersionCompatibilityRule defines the compatibility between a set of component definitions and a set of releases.
-type ComponentVersionCompatibilityRule struct {
-	// CompDefs specifies names for the component definitions associated with this ComponentVersion.
-	// Each name in the list can represent an exact name, or a name prefix.
-	//
-	// For example:
-	//
-	// - "mysql-8.0.30-v1alpha1": Matches the exact name "mysql-8.0.30-v1alpha1"
-	// - "mysql-8.0.30": Matches all names starting with "mysql-8.0.30"
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
-	// +kubebuilder:validation:MaxItems=128
-	CompDefs []string `json:"compDefs"`
-
-	// Releases is a list of identifiers for the releases.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
-	// +kubebuilder:validation:MaxItems=128
-	Releases []string `json:"releases"`
+	// +optional
+	UpgradePolicy *ComponentVersionUpgradePolicy `json:"upgradePolicy,omitempty"`
 }
 
 // ComponentVersionRelease represents a release of component instances within a ComponentVersion.
@@ -93,6 +73,92 @@ type ComponentVersionRelease struct {
 	// +kubebuilder:validation:XValidation:rule="self.all(key, size(self[key]) <= 256)",message="Image name may not exceed maximum length of 256 characters"
 	Images map[string]string `json:"images"`
 }
+
+// ComponentVersionCompatibilityRule defines the compatibility between a set of component definitions and a set of releases.
+type ComponentVersionCompatibilityRule struct {
+	// CompDefs specifies names for the component definitions associated with this ComponentVersion.
+	// Each name in the list can represent an exact name, or a name prefix.
+	//
+	// For example:
+	//
+	// - "mysql-8.0.30-v1alpha1": Matches the exact name "mysql-8.0.30-v1alpha1"
+	// - "mysql-8.0.30": Matches all names starting with "mysql-8.0.30"
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=128
+	CompDefs []string `json:"compDefs"`
+
+	// Releases is a list of identifiers for the releases.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=128
+	Releases []string `json:"releases"`
+}
+
+type ComponentVersionUpgradePolicy struct {
+	//// +optional
+	// Policy *VersionUpgradePolicy `json:"policy,omitempty"`
+
+	// +kubebuilder:validation:MaxItems=128
+	// +optional
+	Rules []ComponentVersionUpgradeRule `json:"rules,omitempty"`
+}
+
+//// VersionUpgradePolicy
+//// +enum
+//// +kubebuilder:validation:Enum={minor,major}
+// type VersionUpgradePolicy string
+//
+// const (
+//	MinorVersion VersionUpgradePolicy = "minor"
+//	MajorVersion VersionUpgradePolicy = "major"
+// )
+
+type ComponentVersionUpgradeRule struct {
+	// +kubebuilder:validation:Required
+	Source ServiceVersionSet `json:"source"`
+
+	// +kubebuilder:validation:Required
+	Target ServiceVersionSet `json:"target"`
+
+	//// +kubebuilder:default=true
+	//// +optional
+	// Allowed *bool `json:"allowed,omitempty"`
+	//
+	//// Negative message.
+	////
+	//// +optional
+	// Message *string `json:"message,omitempty"`
+	//
+	//// Method defines the upgrade method supported.
+	//
+	//// +optional
+	// Method *VersionUpgradeMethod `json:"method,omitempty"`
+}
+
+type ServiceVersionSet struct {
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=128
+	Versions []string `json:"versions"`
+
+	// +optional
+	Excludes []string `json:"excludes,omitempty"`
+}
+
+//// VersionUpgradeMethod
+//// +enum
+//// +kubebuilder:validation:Enum={in-place,upgrade,replication,migration}
+// type VersionUpgradeMethod string
+//
+// const (
+//	InPlaceUpgrade VersionUpgradeMethod = "in-place"
+//	Upgrade VersionUpgradeMethod = "upgrade"
+//	DataReplicationUpgrade   VersionUpgradeMethod = "replication"
+//	DataMigrationUpgrade   VersionUpgradeMethod = "migration"
+// )
 
 // ComponentVersionStatus defines the observed state of ComponentVersion
 type ComponentVersionStatus struct {

@@ -183,6 +183,9 @@ type ClusterTopologyOrders struct {
 	//
 	// +optional
 	Update []string `json:"update,omitempty"`
+
+	// +optional
+	Upgrade []string `json:"upgrade,omitempty"`
 }
 
 // SystemAccountSpec specifies information to create system accounts.

@@ -1343,6 +1343,11 @@ type ComponentLifecycleActions struct {
 	//
 	// +optional
 	AccountProvision *LifecycleActionHandler `json:"accountProvision,omitempty"`
+
+	// 0 for pre hook, and 1 for post hook.
+	//
+	// +optional
+	Upgrade []LifecycleActionHandler `json:"upgrade,omitempty"`
 }
 
 type ComponentSwitchover struct {

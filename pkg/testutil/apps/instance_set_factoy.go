@@ -73,6 +73,11 @@ func (factory *MockInstanceSetFactory) SetReplicas(replicas int32) *MockInstance
 	return factory
 }
 
+func (factory *MockInstanceSetFactory) SetRoles(roles []workloads.ReplicaRole) *MockInstanceSetFactory {
+	factory.Get().Spec.Roles = roles
+	return factory
+}
+
 func (factory *MockInstanceSetFactory) AddVolume(volume corev1.Volume) *MockInstanceSetFactory {
 	volumes := &factory.Get().Spec.Template.Spec.Volumes
 	*volumes = append(*volumes, volume)

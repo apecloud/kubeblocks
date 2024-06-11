@@ -87,7 +87,7 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*ku
 	}
 
 	// 3. persistent these revisions to status
-	revisions, err := buildUpdateRevisions(updatedRevisions)
+	revisions, err := buildRevisions(updatedRevisions)
 	if err != nil {
 		return nil, err
 	}

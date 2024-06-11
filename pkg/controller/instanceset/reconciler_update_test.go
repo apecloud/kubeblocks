@@ -130,7 +130,7 @@ var _ = Describe("update reconciler test", func() {
 				if labels == nil {
 					labels = make(map[string]string)
 				}
-				updateRevisions, err := getUpdateRevisions(its.Status.UpdateRevisions)
+				updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
 				Expect(err).Should(BeNil())
 				labels[appsv1.ControllerRevisionHashLabelKey] = updateRevisions[pod.Name]
 			}

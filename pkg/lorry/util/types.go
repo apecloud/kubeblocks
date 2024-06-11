@@ -77,8 +77,9 @@ const (
 	DataDumpOperation OperationKind = "dataDump"
 	DataLoadOperation OperationKind = "dataLoad"
 
-	LegacyEventFieldPath = "spec.containers{kb-checkrole}"
-	LorryEventFieldPath  = "spec.containers{lorry}"
+	LegacyEventFieldPath  = "spec.containers{kb-checkrole}"
+	LorryEventFieldPath   = "spec.containers{lorry}"
+	KbAgentEventFieldPath = "spec.containers{kb-agent}"
 
 	// this is a general script template, which can be used for all kinds of exec request to databases.
 	DataScriptRequestTpl string = `

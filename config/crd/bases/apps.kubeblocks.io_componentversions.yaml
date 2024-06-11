@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.12.1
+    controller-gen.kubebuilder.io/version: v0.14.0
   labels:
     app.kubernetes.io/name: kubeblocks
   name: componentversions.apps.kubeblocks.io
@@ -37,14 +37,19 @@ spec:
         description: ComponentVersion is the Schema for the componentversions API
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
@@ -59,11 +64,16 @@ spec:
                     between a set of component definitions and a set of releases.
                   properties:
                     compDefs:
-                      description: "CompDefs specifies names for the component definitions
-                        associated with this ComponentVersion. Each name in the list
-                        can represent an exact name, or a name prefix. \n For example:
-                        \n - \"mysql-8.0.30-v1alpha1\": Matches the exact name \"mysql-8.0.30-v1alpha1\"
-                        - \"mysql-8.0.30\": Matches all names starting with \"mysql-8.0.30\""
+                      description: |-
+                        CompDefs specifies names for the component definitions associated with this ComponentVersion.
+                        Each name in the list can represent an exact name, or a name prefix.
+
+
+                        For example:
+
+
+                        - "mysql-8.0.30-v1alpha1": Matches the exact name "mysql-8.0.30-v1alpha1"
+                        - "mysql-8.0.30": Matches all names starting with "mysql-8.0.30"
                       items:
                         type: string
                       maxItems: 128
@@ -110,17 +120,17 @@ spec:
                       - message: Image name may not exceed maximum length of 256 characters
                         rule: self.all(key, size(self[key]) <= 256)
                     name:
-                      description: Name is a unique identifier for this release. Cannot
-                        be updated.
+                      description: |-
+                        Name is a unique identifier for this release.
+                        Cannot be updated.
                       maxLength: 32
                       type: string
                     serviceVersion:
-                      description: ServiceVersion defines the version of the well-known
-                        service that the component provides. The version should follow
-                        the syntax and semantics of the "Semantic Versioning" specification
-                        (http://semver.org/). If the release is used, it will serve
-                        as the service version for component instances, overriding
-                        the one defined in the component definition. Cannot be updated.
+                      description: |-
+                        ServiceVersion defines the version of the well-known service that the component provides.
+                        The version should follow the syntax and semantics of the "Semantic Versioning" specification (http://semver.org/).
+                        If the release is used, it will serve as the service version for component instances, overriding the one defined in the component definition.
+                        Cannot be updated.
                       maxLength: 32
                       type: string
                   required:
@@ -147,9 +157,9 @@ spec:
                 format: int64
                 type: integer
               phase:
-                description: Phase valid values are ``, `Available`, 'Unavailable`.
-                  Available is ComponentVersion become available, and can be used
-                  for co-related objects.
+                description: |-
+                  Phase valid values are ``, `Available`, 'Unavailable`.
+                  Available is ComponentVersion become available, and can be used for co-related objects.
                 enum:
                 - Available
                 - Unavailable

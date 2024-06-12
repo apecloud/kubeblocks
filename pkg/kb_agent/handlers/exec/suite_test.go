@@ -32,8 +32,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
-var ()
-
 func init() {
 	viper.AutomaticEnv()
 	viper.SetDefault(constant.KBEnvPodName, "pod-test-0")

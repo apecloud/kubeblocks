@@ -303,7 +303,7 @@ func createOrUpdateService(ctx graph.TransformContext, dag *graph.DAG, graphCli 
 		Name:      service.Name,
 	}
 	obj := &corev1.Service{}
-	if err := ctx.GetClient().Get(ctx.GetContext(), key, obj, inDataContext4C()); err != nil {
+	if err := ctx.GetClient().Get(ctx.GetContext(), key, obj, inDataContextWithMultiCheck4C()); err != nil {
 		if apierrors.IsNotFound(err) {
 			graphCli.Create(dag, service, inDataContext4G())
 			return nil

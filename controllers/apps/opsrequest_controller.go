@@ -47,6 +47,7 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/operations"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -85,7 +86,15 @@ func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *OpsRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *OpsRequestReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager) error {
+	if multiClusterMgr == nil {
+		return r.setupWithManager(mgr)
+	}
+	return r.setupWithMultiClusterManager(mgr, multiClusterMgr)
+}
+
+// SetupWithManager sets up the controller with the Manager.
+func (r *OpsRequestReconciler) setupWithManager(mgr ctrl.Manager) error {
 	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
 		For(&appsv1alpha1.OpsRequest{}).
 		WithOptions(controller.Options{
@@ -93,12 +102,29 @@ func (r *OpsRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}).
 		Watches(&appsv1alpha1.Cluster{}, handler.EnqueueRequestsFromMapFunc(r.parseRunningOpsRequests)).
 		Watches(&workloadsv1alpha1.InstanceSet{}, handler.EnqueueRequestsFromMapFunc(r.parseRunningOpsRequestsForInstanceSet)).
-		Watches(&dpv1alpha1.Backup{}, handler.EnqueueRequestsFromMapFunc(r.parseBackupOpsRequest)).
+		Watches(&dpv1alpha1.Backup{}, handler.EnqueueRequestsFromMapFunc(r.parseOpsRequestResource)).
 		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.parseVolumeExpansionOpsRequest)).
-		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.parsePod)).
+		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.parseOpsRequestResource)).
 		Owns(&batchv1.Job{}).
 		Owns(&dpv1alpha1.Restore{}).
 		Complete(r)
+}
+
+func (r *OpsRequestReconciler) setupWithMultiClusterManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager) error {
+	b := intctrlutil.NewNamespacedControllerManagedBy(mgr).
+		For(&appsv1alpha1.OpsRequest{}).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: int(math.Ceil(viper.GetFloat64(constant.CfgKBReconcileWorkers) / 2)),
+		}).Watches(&appsv1alpha1.Cluster{}, handler.EnqueueRequestsFromMapFunc(r.parseRunningOpsRequests)).
+		Watches(&workloadsv1alpha1.InstanceSet{}, handler.EnqueueRequestsFromMapFunc(r.parseRunningOpsRequestsForInstanceSet)).
+		Watches(&dpv1alpha1.Backup{}, handler.EnqueueRequestsFromMapFunc(r.parseOpsRequestResource)).
+		Owns(&dpv1alpha1.Restore{})
+
+	multiClusterMgr.Watch(b, &corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.parseVolumeExpansionOpsRequest)).
+		Watch(b, &corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.parseOpsRequestResource)).
+		Watch(b, &batchv1.Job{}, handler.EnqueueRequestsFromMapFunc(r.parseOpsRequestResource))
+
+	return b.Complete(r)
 }
 
 // fetchOpsRequestAndCluster fetches the OpsRequest from the request.
@@ -436,39 +462,23 @@ func (r *OpsRequestReconciler) deleteExternalJobs(ctx context.Context, ops *apps
 	return nil
 }
 
-func (r *OpsRequestReconciler) parseBackupOpsRequest(ctx context.Context, object client.Object) []reconcile.Request {
-	backup := object.(*dpv1alpha1.Backup)
-	var (
-		requests []reconcile.Request
-	)
-	opsRequestRecorder := opsutil.GetOpsRequestFromBackup(backup)
-	if opsRequestRecorder != nil {
-		requests = append(requests, reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Namespace: backup.Namespace,
-				Name:      opsRequestRecorder.Name,
-			},
-		})
+func (r *OpsRequestReconciler) parseOpsRequestResource(ctx context.Context, object client.Object) []reconcile.Request {
+	opsName := object.GetLabels()[constant.OpsRequestNameLabelKey]
+	if opsName == "" {
+		return nil
 	}
-	return requests
-}
-
-func (r *OpsRequestReconciler) parsePod(ctx context.Context, object client.Object) []reconcile.Request {
-	pod := object.(*corev1.Pod)
-	var (
-		requests []reconcile.Request
-	)
-	opsName := pod.Labels[constant.OpsRequestNameLabelKey]
-	opsNamespace := pod.Labels[constant.OpsRequestNamespaceLabelKey]
-	if opsName != "" && opsNamespace != "" {
-		requests = append(requests, reconcile.Request{
+	namespace := object.GetLabels()[constant.OpsRequestNamespaceLabelKey]
+	if namespace == "" {
+		namespace = object.GetNamespace()
+	}
+	return []reconcile.Request{
+		{
 			NamespacedName: types.NamespacedName{
-				Namespace: opsNamespace,
+				Namespace: namespace,
 				Name:      opsName,
 			},
-		})
+		},
 	}
-	return requests
 }
 
 func (r *OpsRequestReconciler) deleteCreatedPodsInKBNamespace(reqCtx intctrlutil.RequestCtx, opsRequest *appsv1alpha1.OpsRequest) error {

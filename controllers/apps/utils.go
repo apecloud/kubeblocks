@@ -62,6 +62,10 @@ func inDataContext4C() *multicluster.ClientOption {
 	return multicluster.InDataContext()
 }
 
+func inDataContextWithMultiCheck4C() *multicluster.ClientOption {
+	return multicluster.InDataContextWithMultiCheck()
+}
+
 func inUniversalContext4C() *multicluster.ClientOption {
 	return multicluster.InUniversalContext()
 }
@@ -72,6 +76,12 @@ func inDataContext4G() model.GraphOption {
 
 func inUniversalContext4G() model.GraphOption {
 	return model.WithClientOption(multicluster.InUniversalContext())
+}
+
+// inDataContextWithMultiCheck4G If a resource is a mirror object which is created in all data clusters,
+// this option needs to be used for GET interface. And if any data cluster does not exist the object, an error will be reported.
+func inDataContextWithMultiCheck4G() model.GraphOption {
+	return model.WithClientOption(multicluster.InDataContextWithMultiCheck())
 }
 
 func clientOption(v *model.ObjectVertex) *multicluster.ClientOption {

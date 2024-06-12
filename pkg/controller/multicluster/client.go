@@ -148,6 +148,7 @@ func (c *clientWriter) Update(ctx context.Context, obj client.Object, opts ...cl
 		if !ok {
 			return fmt.Errorf("not client object: %T", obj)
 		}
+		setPlacementKey(o, cc.context)
 		return cc.cli.Update(ctx, o, opts...)
 	}
 	return allOf(c.mctx, ctx, obj, request, opts)
@@ -159,6 +160,7 @@ func (c *clientWriter) Patch(ctx context.Context, obj client.Object, patch clien
 		if !ok {
 			return fmt.Errorf("not client object: %T", obj)
 		}
+		setPlacementKey(o, cc.context)
 		return cc.cli.Patch(ctx, o, patch, opts...)
 	}
 	return allOf(c.mctx, ctx, obj, request, opts)

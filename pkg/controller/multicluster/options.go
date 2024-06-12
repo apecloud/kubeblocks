@@ -51,7 +51,7 @@ func Oneshot() *ClientOption {
 	}
 }
 
-func MultiCheck() *ClientOption {
+func InDataContextWithMultiCheck() *ClientOption {
 	return &ClientOption{
 		multiCheck: true,
 	}

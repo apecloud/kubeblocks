@@ -80,6 +80,15 @@ func setPlacementKey(obj client.Object, context string) {
 	}
 }
 
+func removePlacementKey(obj client.Object) {
+	if obj.GetAnnotations() == nil {
+		return
+	}
+	if _, ok := obj.GetAnnotations()[constant.KBAppMultiClusterPlacementKey]; ok {
+		delete(obj.GetAnnotations(), constant.KBAppMultiClusterPlacementKey)
+	}
+}
+
 type placementKey struct{}
 
 type placementNotFoundError struct{}

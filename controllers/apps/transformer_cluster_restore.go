@@ -73,9 +73,13 @@ func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 		}
 		// obtain components that have already been assigned targets.
 		allocateTargetMap := map[string]string{}
+		restoreDoneForShardComponents := true
 		for _, v := range shardComponents {
 			if model.IsObjectDeleting(&v) {
 				continue
+			}
+			if v.Annotations[constant.RestoreDoneAnnotationKey] != "true" {
+				restoreDoneForShardComponents = false
 			}
 			if targetName, ok := v.Annotations[constant.BackupSourceTargetAnnotationKey]; ok {
 				compName := v.Labels[constant.KBAppComponentLabelKey]
@@ -85,7 +89,7 @@ func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 		}
 		if len(allocateTargetMap) == len(backup.Status.Targets) {
 			// check if the restore is completed when all source target have allocated.
-			if err = c.cleanupRestoreAnnotationForSharding(dag, shardComponents, backupSource, shardingSpec.Name); err != nil {
+			if err = c.cleanupRestoreAnnotationForSharding(dag, shardingSpec.Name, restoreDoneForShardComponents); err != nil {
 				return err
 			}
 			continue
@@ -126,27 +130,21 @@ func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 }
 
 func (c *clusterRestoreTransformer) cleanupRestoreAnnotationForSharding(dag *graph.DAG,
-	shardComponents []appsv1alpha1.Component,
-	backupSource map[string]string,
-	shardName string) error {
+	shardName string,
+	restoreDoneForShardComponents bool) error {
 	if c.Cluster.Status.Phase != appsv1alpha1.RunningClusterPhase {
 		return nil
 	}
-	for _, v := range shardComponents {
-		if backupSource[constant.DoReadyRestoreAfterClusterRunning] != "true" {
-			continue
-		}
-		if v.Annotations[constant.RestoreDoneAnnotationKey] != "true" {
-			return nil
-		}
-		needCleanup, err := plan.CleanupClusterRestoreAnnotation(c.Cluster, shardName)
-		if err != nil {
-			return err
-		}
-		if needCleanup {
-			graphCli, _ := c.Client.(model.GraphClient)
-			graphCli.Patch(dag, c.OrigCluster, c.Cluster, &model.ReplaceIfExistingOption{})
-		}
+	if !restoreDoneForShardComponents {
+		return nil
+	}
+	needCleanup, err := plan.CleanupClusterRestoreAnnotation(c.Cluster, shardName)
+	if err != nil {
+		return err
+	}
+	if needCleanup {
+		graphCli, _ := c.Client.(model.GraphClient)
+		graphCli.Patch(dag, c.OrigCluster, c.Cluster, &model.ReplaceIfExistingOption{})
 	}
 	return nil
 }

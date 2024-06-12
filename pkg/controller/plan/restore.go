@@ -94,6 +94,12 @@ func (r *RestoreManager) DoRestore(comp *component.SynthesizedComponent, compObj
 	if err = r.DoPrepareData(comp, compObj, backupObj); err != nil {
 		return err
 	}
+	if compObj.Status.Phase != appsv1alpha1.RunningClusterCompPhase {
+		return nil
+	}
+	if r.doReadyRestoreAfterClusterRunning && r.Cluster.Status.Phase != appsv1alpha1.RunningClusterPhase {
+		return nil
+	}
 	if err = r.DoPostReady(comp, compObj, backupObj); err != nil {
 		return err
 	}
@@ -190,12 +196,6 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
 	compObj *appsv1alpha1.Component,
 	backupObj *dpv1alpha1.Backup) error {
-	if compObj.Status.Phase != appsv1alpha1.RunningClusterCompPhase {
-		return nil
-	}
-	if r.doReadyRestoreAfterClusterRunning && r.Cluster.Status.Phase != appsv1alpha1.RunningClusterPhase {
-		return nil
-	}
 	jobActionLabels := constant.GetComponentWellKnownLabels(r.Cluster.Name, comp.Name)
 	if comp.WorkloadType == appsv1alpha1.Consensus || comp.WorkloadType == appsv1alpha1.Replication {
 		// TODO: use rsm constant
@@ -338,7 +338,7 @@ func (r *RestoreManager) createRestoreAndWait(restore *dpv1alpha1.Restore, compO
 
 func (r *RestoreManager) cleanupClusterAnnotations(compName string) error {
 	// TODO: Waiting for all component recovery jobs to be completed
-	if r.Cluster.Status.Phase == appsv1alpha1.RunningClusterPhase && r.Cluster.Annotations != nil {
+	if r.Cluster.Annotations != nil {
 		restoreInfo := r.Cluster.Annotations[constant.RestoreFromBackupAnnotationKey]
 		if restoreInfo == "" {
 			return nil

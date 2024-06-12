@@ -112,6 +112,7 @@ func (mgr *Manager) InitComponentDefinitionActions() error {
 			return err
 		}
 
+		mgr.actionCommands = map[string][]string{}
 		for action, handlers := range actionHandlers {
 			if len(handlers.Command) > 0 {
 				mgr.actionCommands[action] = handlers.Command

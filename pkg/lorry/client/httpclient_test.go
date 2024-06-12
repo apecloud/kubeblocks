@@ -36,6 +36,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	kbagentutil "github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/custom"
@@ -404,18 +405,18 @@ var _ = Describe("Lorry HTTP Client", func() {
 
 		It("execute command failed cased by executable file is not found", func() {
 			mockDCSStore.EXPECT().GetCluster().Return(cluster, nil)
-			actions := map[string][]string{}
-			actions[constant.MemberJoinAction] = []string{"binary_not_exist"}
+			actions := map[string]kbagentutil.Handlers{}
+			actions[constant.MemberJoinAction] = kbagentutil.Handlers{Command: []string{"binary_not_exist"}}
 			jsonStr, _ := json.Marshal(actions)
 			viperx.SetDefault(constant.KBEnvActionHandlers, jsonStr)
 			os.Setenv(constant.KBEnvPodFQDN, "test")
 			os.Setenv(constant.KBEnvServicePort, "test")
 			os.Setenv(constant.KBEnvServiceUser, "test")
 			os.Setenv(constant.KBEnvServicePassword, "test")
+			customManager, _ := custom.NewManager(engines.Properties{})
+			register.SetDBManager(customManager)
 			ops := opsregister.Operations()
 			_ = ops[strings.ToLower(string(util.JoinMemberOperation))].Init(context.TODO())
-			customManager, _ := custom.NewManager(engines.Properties{})
-			register.SetCustomManager(customManager)
 			err := lorryClient.JoinMember(context.TODO())
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring("executable file not found"))
@@ -495,18 +496,18 @@ var _ = Describe("Lorry HTTP Client", func() {
 		It("execute command failed cased by executable file is not found", func() {
 			mockDCSStore.EXPECT().GetCluster().Return(cluster, nil)
 			mockDCSStore.EXPECT().UpdateHaConfig().Return(nil)
-			actions := map[string][]string{}
-			actions[constant.MemberLeaveAction] = []string{"binary_not_exist"}
+			actions := map[string]kbagentutil.Handlers{}
+			actions[constant.MemberLeaveAction] = kbagentutil.Handlers{Command: []string{"binary_not_exist"}}
 			jsonStr, _ := json.Marshal(actions)
 			viperx.SetDefault(constant.KBEnvActionHandlers, jsonStr)
 			os.Setenv(constant.KBEnvPodFQDN, "test")
 			os.Setenv(constant.KBEnvServicePort, "test")
 			os.Setenv(constant.KBEnvServiceUser, "test")
 			os.Setenv(constant.KBEnvServicePassword, "test")
+			customManager, _ := custom.NewManager(engines.Properties{})
+			register.SetDBManager(customManager)
 			ops := opsregister.Operations()
 			_ = ops[strings.ToLower(string(util.LeaveMemberOperation))].Init(context.TODO())
-			customManager, _ := custom.NewManager(engines.Properties{})
-			register.SetCustomManager(customManager)
 			err := lorryClient.LeaveMember(context.TODO())
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring("executable file not found"))
@@ -544,21 +545,9 @@ var _ = Describe("Lorry HTTP Client", func() {
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring("primary pod-a not exists"))
 
-			mockDBManager.EXPECT().IsLeaderMember(gomock.Any(), gomock.Any(), gomock.Any()).Return(false, nil).Times(1)
-			err = lorryClient.Switchover(context.TODO(), "pod-0", "pod-1", false)
-			Expect(err).Should(HaveOccurred())
-			Expect(err.Error()).Should(ContainSubstring("pod-0 is not the primary"))
-
-			mockDBManager.EXPECT().IsLeaderMember(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).Times(1)
 			err = lorryClient.Switchover(context.TODO(), "pod-0", "pod-b", false)
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring("candidate pod-b not exists"))
-
-			mockDBManager.EXPECT().IsLeaderMember(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).Times(1)
-			mockDBManager.EXPECT().IsMemberHealthy(gomock.Any(), gomock.Any(), gomock.Any()).Return(false).Times(1)
-			err = lorryClient.Switchover(context.TODO(), "pod-0", "pod-1", false)
-			Expect(err).Should(HaveOccurred())
-			Expect(err.Error()).Should(ContainSubstring("candidate pod-1 is unhealthy"))
 		})
 
 		It("success if the primary specified only", func() {
@@ -569,8 +558,6 @@ var _ = Describe("Lorry HTTP Client", func() {
 			clusterTemp.HaConfig.SetEnable(true)
 			mockDCSStore.EXPECT().GetCluster().Return(clusterTemp, nil).AnyTimes()
 			mockDCSStore.EXPECT().CreateSwitchover(gomock.Any(), gomock.Any()).Return(nil)
-			mockDBManager.EXPECT().IsLeaderMember(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).Times(1)
-			mockDBManager.EXPECT().HasOtherHealthyMembers(gomock.Any(), gomock.Any(), gomock.Any()).Return([]*dcs.Member{{}, {}}).Times(1)
 			err := lorryClient.Switchover(context.TODO(), "pod-0", "", false)
 			Expect(err).Should(BeNil())
 		})
@@ -583,7 +570,6 @@ var _ = Describe("Lorry HTTP Client", func() {
 			clusterTemp.HaConfig.SetEnable(true)
 			mockDCSStore.EXPECT().GetCluster().Return(clusterTemp, nil).AnyTimes()
 			mockDCSStore.EXPECT().CreateSwitchover(gomock.Any(), gomock.Any()).Return(nil)
-			mockDBManager.EXPECT().IsMemberHealthy(gomock.Any(), gomock.Any(), gomock.Any()).Return(true).Times(1)
 			err := lorryClient.Switchover(context.TODO(), "", "pod-1", false)
 			Expect(err).Should(BeNil())
 		})
@@ -596,8 +582,6 @@ var _ = Describe("Lorry HTTP Client", func() {
 			clusterTemp.HaConfig.SetEnable(true)
 			mockDCSStore.EXPECT().GetCluster().Return(clusterTemp, nil).AnyTimes()
 			mockDCSStore.EXPECT().CreateSwitchover(gomock.Any(), gomock.Any()).Return(nil)
-			mockDBManager.EXPECT().IsLeaderMember(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).Times(1)
-			mockDBManager.EXPECT().IsMemberHealthy(gomock.Any(), gomock.Any(), gomock.Any()).Return(true).Times(1)
 			err := lorryClient.Switchover(context.TODO(), "pod-0", "pod-1", false)
 			Expect(err).Should(BeNil())
 		})
@@ -643,18 +627,18 @@ var _ = Describe("Lorry HTTP Client", func() {
 		// })
 
 		It("execute command failed cased by executable file is not found", func() {
-			actions := map[string][]string{}
-			actions[constant.ReadonlyAction] = []string{"binary_not_exist"}
+			actions := map[string]kbagentutil.Handlers{}
+			actions[constant.ReadonlyAction] = kbagentutil.Handlers{Command: []string{"binary_not_exist"}}
 			jsonStr, _ := json.Marshal(actions)
 			viperx.SetDefault(constant.KBEnvActionHandlers, jsonStr)
 			os.Setenv(constant.KBEnvPodFQDN, "test")
 			os.Setenv(constant.KBEnvServicePort, "test")
 			os.Setenv(constant.KBEnvServiceUser, "test")
 			os.Setenv(constant.KBEnvServicePassword, "test")
+			customManager, _ := custom.NewManager(engines.Properties{})
+			register.SetDBManager(customManager)
 			ops := opsregister.Operations()
 			_ = ops[strings.ToLower(string(util.LockOperation))].Init(context.TODO())
-			customManager, _ := custom.NewManager(engines.Properties{})
-			register.SetCustomManager(customManager)
 			err := lorryClient.Lock(context.TODO())
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring("executable file not found"))
@@ -700,18 +684,18 @@ var _ = Describe("Lorry HTTP Client", func() {
 		// })
 
 		It("execute command failed cased by executable file is not found", func() {
-			actions := map[string][]string{}
-			actions[constant.ReadWriteAction] = []string{"binary_not_exist"}
+			actions := map[string]kbagentutil.Handlers{}
+			actions[constant.ReadWriteAction] = kbagentutil.Handlers{Command: []string{"binary_not_exist"}}
 			jsonStr, _ := json.Marshal(actions)
 			viperx.SetDefault(constant.KBEnvActionHandlers, jsonStr)
 			os.Setenv(constant.KBEnvPodFQDN, "test")
 			os.Setenv(constant.KBEnvServicePort, "test")
 			os.Setenv(constant.KBEnvServiceUser, "test")
 			os.Setenv(constant.KBEnvServicePassword, "test")
+			customManager, _ := custom.NewManager(engines.Properties{})
+			register.SetDBManager(customManager)
 			ops := opsregister.Operations()
 			_ = ops[strings.ToLower(string(util.UnlockOperation))].Init(context.TODO())
-			customManager, _ := custom.NewManager(engines.Properties{})
-			register.SetCustomManager(customManager)
 			err := lorryClient.Unlock(context.TODO())
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring("executable file not found"))
@@ -751,18 +735,18 @@ var _ = Describe("Lorry HTTP Client", func() {
 		// })
 
 		It("execute command failed cased by executable file is not found", func() {
-			actions := map[string][]string{}
-			actions[constant.PostProvisionAction] = []string{"binary_not_exist"}
+			actions := map[string]kbagentutil.Handlers{}
+			actions[constant.PostProvisionAction] = kbagentutil.Handlers{Command: []string{"binary_not_exist"}}
 			jsonStr, _ := json.Marshal(actions)
 			viperx.SetDefault(constant.KBEnvActionHandlers, jsonStr)
 			os.Setenv(constant.KBEnvPodFQDN, "test")
 			os.Setenv(constant.KBEnvServicePort, "test")
 			os.Setenv(constant.KBEnvServiceUser, "test")
 			os.Setenv(constant.KBEnvServicePassword, "test")
+			customManager, _ := custom.NewManager(engines.Properties{})
+			register.SetDBManager(customManager)
 			ops := opsregister.Operations()
 			_ = ops[strings.ToLower(string(util.PostProvisionOperation))].Init(context.TODO())
-			customManager, _ := custom.NewManager(engines.Properties{})
-			register.SetCustomManager(customManager)
 			err := lorryClient.PostProvision(context.TODO(), "", "", "", "", "")
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring("executable file not found"))
@@ -802,18 +786,18 @@ var _ = Describe("Lorry HTTP Client", func() {
 		// })
 
 		It("execute command failed cased by executable file is not found", func() {
-			actions := map[string][]string{}
-			actions[constant.PreTerminateAction] = []string{"binary_not_exist"}
+			actions := map[string]kbagentutil.Handlers{}
+			actions[constant.PreTerminateAction] = kbagentutil.Handlers{Command: []string{"binary_not_exist"}}
 			jsonStr, _ := json.Marshal(actions)
 			viperx.SetDefault(constant.KBEnvActionHandlers, jsonStr)
 			os.Setenv(constant.KBEnvPodFQDN, "test")
 			os.Setenv(constant.KBEnvServicePort, "test")
 			os.Setenv(constant.KBEnvServiceUser, "test")
 			os.Setenv(constant.KBEnvServicePassword, "test")
+			customManager, _ := custom.NewManager(engines.Properties{})
+			register.SetDBManager(customManager)
 			ops := opsregister.Operations()
 			_ = ops[strings.ToLower(string(util.PreTerminateOperation))].Init(context.TODO())
-			customManager, _ := custom.NewManager(engines.Properties{})
-			register.SetCustomManager(customManager)
 			err := lorryClient.PreTerminate(context.TODO())
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring("executable file not found"))

@@ -58,6 +58,7 @@ func init() {
 func TestLorryClient(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Lorry Client. Suite")
+	defer GinkgoRecover()
 }
 
 var _ = BeforeSuite(func() {

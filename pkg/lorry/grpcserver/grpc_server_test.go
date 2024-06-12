@@ -50,6 +50,11 @@ var _ = Describe("GRPC Server", func() {
 		It("success", func() {
 			err := operations.Register(strings.ToLower(string(util.CheckRoleOperation)), &replica.CheckRole{})
 			Expect(err).ShouldNot(HaveOccurred())
+
+			customManager, err := custom.NewManager(nil)
+			Expect(err).Should(BeNil())
+			register.SetDBManager(customManager)
+
 			server, err := NewGRPCServer()
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(server).ShouldNot(BeNil())

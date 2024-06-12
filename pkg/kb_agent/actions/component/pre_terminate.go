@@ -55,7 +55,7 @@ func (s *PreTerminate) Init(ctx context.Context) error {
 	return s.Base.Init(ctx)
 }
 
-func (s *PreTerminate) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
+func (s *PreTerminate) Do(ctx context.Context, req *actions.ActionRequest) (*actions.ActionResponse, error) {
 	err := s.Handler.PreTerminate(ctx)
 	return nil, err
 }

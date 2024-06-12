@@ -55,11 +55,11 @@ func (s *PostProvision) Init(ctx context.Context) error {
 	return s.Base.Init(ctx)
 }
 
-func (s *PostProvision) PreCheck(ctx context.Context, req *actions.OpsRequest) error {
+func (s *PostProvision) PreCheck(ctx context.Context, req *actions.ActionRequest) error {
 	return nil
 }
 
-func (s *PostProvision) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
+func (s *PostProvision) Do(ctx context.Context, req *actions.ActionRequest) (*actions.ActionResponse, error) {
 	err := s.Handler.PostProvision(ctx)
 	return nil, err
 }

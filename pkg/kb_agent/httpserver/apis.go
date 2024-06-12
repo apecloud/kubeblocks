@@ -104,7 +104,7 @@ func OperationWrapper(op actions.Action) fasthttp.RequestHandler {
 			logger.Info("marshal request data field", "error", err.Error())
 			return
 		}
-		opsReq := &actions.OpsRequest{
+		opsReq := &actions.ActionRequest{
 			Parameters: req.Parameters,
 			Data:       b,
 		}

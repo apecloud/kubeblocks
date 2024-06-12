@@ -51,7 +51,7 @@ func (s *Leave) Init(ctx context.Context) error {
 	return s.Base.Init(ctx)
 }
 
-func (s *Leave) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
+func (s *Leave) Do(ctx context.Context, req *actions.ActionRequest) (*actions.ActionResponse, error) {
 	leader := req.GetString("leader")
 	// remove current member from db cluster
 	err := s.Handler.LeaveMember(ctx, leader)

@@ -25,13 +25,13 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
-// OpsRequest is the request for Operation
-type OpsRequest struct {
+// ActionRequest is the request for Operation
+type ActionRequest struct {
 	Data       []byte         `json:"data,omitempty"`
 	Parameters map[string]any `json:"parameters,omitempty"`
 }
 
-func (r *OpsRequest) GetString(key string) string {
+func (r *ActionRequest) GetString(key string) string {
 	value, ok := r.Parameters[key]
 	if ok {
 		val, ok := value.(string)
@@ -42,7 +42,7 @@ func (r *OpsRequest) GetString(key string) string {
 	return ""
 }
 
-func (r *OpsRequest) GetBool(key string) bool {
+func (r *ActionRequest) GetBool(key string) bool {
 	value, ok := r.Parameters[key]
 	if ok {
 		val, ok := value.(bool)
@@ -53,8 +53,8 @@ func (r *OpsRequest) GetBool(key string) bool {
 	return false
 }
 
-// OpsResponse is the response for Operation
-type OpsResponse struct {
+// ActionResponse is the response for Operation
+type ActionResponse struct {
 	Data     map[string]any    `json:"data,omitempty"`
 	Metadata map[string]string `json:"metadata,omitempty"`
 }
@@ -70,8 +70,8 @@ func getAndFormatNow() string {
 	return time.Now().Format(time.RFC3339Nano)
 }
 
-func NewOpsResponse(operation util.OperationKind) *OpsResponse {
-	resp := &OpsResponse{
+func NewOpsResponse(operation util.OperationKind) *ActionResponse {
+	resp := &ActionResponse{
 		Data:     map[string]any{},
 		Metadata: map[string]string{},
 	}
@@ -81,7 +81,7 @@ func NewOpsResponse(operation util.OperationKind) *OpsResponse {
 	return resp
 }
 
-func (resp *OpsResponse) WithSuccess(msg string) (*OpsResponse, error) {
+func (resp *ActionResponse) WithSuccess(msg string) (*ActionResponse, error) {
 	resp.Metadata["endTime"] = getAndFormatNow()
 	resp.Data[util.RespFieldEvent] = util.OperationSuccess
 	if msg != "" {
@@ -91,7 +91,7 @@ func (resp *OpsResponse) WithSuccess(msg string) (*OpsResponse, error) {
 	return resp, nil
 }
 
-func (resp *OpsResponse) WithError(err error) (*OpsResponse, error) {
+func (resp *ActionResponse) WithError(err error) (*ActionResponse, error) {
 	resp.Metadata["endTime"] = getAndFormatNow()
 	resp.Data[util.RespFieldEvent] = util.OperationFailed
 	resp.Data[util.RespFieldMessage] = err.Error()

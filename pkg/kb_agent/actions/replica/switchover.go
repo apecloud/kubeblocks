@@ -47,7 +47,7 @@ func (s *Switchover) Init(ctx context.Context) error {
 	return s.Base.Init(ctx)
 }
 
-func (s *Switchover) PreCheck(ctx context.Context, req *actions.OpsRequest) error {
+func (s *Switchover) PreCheck(ctx context.Context, req *actions.ActionRequest) error {
 	primary := req.GetString("primary")
 	candidate := req.GetString("candidate")
 	if primary == "" && candidate == "" {
@@ -57,7 +57,7 @@ func (s *Switchover) PreCheck(ctx context.Context, req *actions.OpsRequest) erro
 	return nil
 }
 
-func (s *Switchover) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
+func (s *Switchover) Do(ctx context.Context, req *actions.ActionRequest) (*actions.ActionResponse, error) {
 	primary := req.GetString("primary")
 	candidate := req.GetString("candidate")
 

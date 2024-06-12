@@ -36,20 +36,20 @@ import (
 func mockServer(t *testing.T) *server {
 	fakeOps := map[string]actions.Action{
 		"fake-1": actions.NewFakeAction(actions.FakeDefault, nil),
-		"fake-2": actions.NewFakeAction(actions.FakePreCheck, func(ctx context.Context, request *actions.OpsRequest) error {
+		"fake-2": actions.NewFakeAction(actions.FakePreCheck, func(ctx context.Context, request *actions.ActionRequest) error {
 			return fmt.Errorf("fake pre check error")
 		}),
-		"fake-3": actions.NewFakeAction(actions.FakeDo, func(ctx context.Context, request *actions.OpsRequest) (*actions.OpsResponse, error) {
+		"fake-3": actions.NewFakeAction(actions.FakeDo, func(ctx context.Context, request *actions.ActionRequest) (*actions.ActionResponse, error) {
 			return nil, models.ErrNotImplemented
 		}),
-		"fake-4": actions.NewFakeAction(actions.FakeDo, func(ctx context.Context, request *actions.OpsRequest) (*actions.OpsResponse, error) {
+		"fake-4": actions.NewFakeAction(actions.FakeDo, func(ctx context.Context, request *actions.ActionRequest) (*actions.ActionResponse, error) {
 			return nil, util.NewProbeError("fake probe error")
 		}),
-		"fake-5": actions.NewFakeAction(actions.FakeDo, func(ctx context.Context, request *actions.OpsRequest) (*actions.OpsResponse, error) {
+		"fake-5": actions.NewFakeAction(actions.FakeDo, func(ctx context.Context, request *actions.ActionRequest) (*actions.ActionResponse, error) {
 			return nil, fmt.Errorf("fake do error")
 		}),
-		"fake-6": actions.NewFakeAction(actions.FakeDo, func(ctx context.Context, request *actions.OpsRequest) (*actions.OpsResponse, error) {
-			return &actions.OpsResponse{
+		"fake-6": actions.NewFakeAction(actions.FakeDo, func(ctx context.Context, request *actions.ActionRequest) (*actions.ActionResponse, error) {
+			return &actions.ActionResponse{
 				Data: map[string]any{
 					"data": request.Data,
 				},

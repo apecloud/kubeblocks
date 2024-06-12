@@ -51,8 +51,8 @@ func (s *Rebuild) IsReadonly(ctx context.Context) bool {
 	return false
 }
 
-func (s *Rebuild) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
-	resp := &actions.OpsResponse{
+func (s *Rebuild) Do(ctx context.Context, req *actions.ActionRequest) (*actions.ActionResponse, error) {
+	resp := &actions.ActionResponse{
 		Data: map[string]any{},
 	}
 	resp.Data["operation"] = constant.RebuildAction

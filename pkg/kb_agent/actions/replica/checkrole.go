@@ -92,8 +92,8 @@ func (s *CheckRole) IsReadonly(ctx context.Context) bool {
 	return true
 }
 
-func (s *CheckRole) Do(ctx context.Context, _ *actions.OpsRequest) (*actions.OpsResponse, error) {
-	resp := &actions.OpsResponse{
+func (s *CheckRole) Do(ctx context.Context, _ *actions.ActionRequest) (*actions.ActionResponse, error) {
+	resp := &actions.ActionResponse{
 		Data: map[string]any{},
 	}
 	resp.Data["operation"] = util.CheckRoleOperation

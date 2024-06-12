@@ -113,11 +113,11 @@ func (p *Protection) Init(ctx context.Context) error {
 	return nil
 }
 
-func (p *Protection) PreCheck(ctx context.Context, req *actions.OpsRequest) error {
+func (p *Protection) PreCheck(ctx context.Context, req *actions.ActionRequest) error {
 	return nil
 }
 
-func (p *Protection) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
+func (p *Protection) Do(ctx context.Context, req *actions.ActionRequest) (*actions.ActionResponse, error) {
 	if p.disabled() {
 		p.Logger.Info("the volume protection operation is disabled")
 		return nil, nil
@@ -134,7 +134,7 @@ func (p *Protection) Do(ctx context.Context, req *actions.OpsRequest) (*actions.
 	}
 
 	volumeUsages, err := p.checkUsage(ctx)
-	resp := &actions.OpsResponse{
+	resp := &actions.ActionResponse{
 		Data: map[string]any{},
 	}
 	if err == nil {

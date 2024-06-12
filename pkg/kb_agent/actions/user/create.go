@@ -49,7 +49,7 @@ func (s *CreateUser) Init(ctx context.Context) error {
 	return s.Base.Init(ctx)
 }
 
-func (s *CreateUser) PreCheck(ctx context.Context, req *actions.OpsRequest) error {
+func (s *CreateUser) PreCheck(ctx context.Context, req *actions.ActionRequest) error {
 	userInfo, err := UserInfoParser(req)
 	if err != nil {
 		return err
@@ -58,7 +58,7 @@ func (s *CreateUser) PreCheck(ctx context.Context, req *actions.OpsRequest) erro
 	return userInfo.UserNameAndPasswdValidator()
 }
 
-func (s *CreateUser) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
+func (s *CreateUser) Do(ctx context.Context, req *actions.ActionRequest) (*actions.ActionResponse, error) {
 	userInfo, _ := UserInfoParser(req)
 	resp := actions.NewOpsResponse(util.CreateUserOp)
 

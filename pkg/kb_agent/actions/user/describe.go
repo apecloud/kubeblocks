@@ -55,7 +55,7 @@ func (s *DescribeUser) IsReadonly(ctx context.Context) bool {
 	return true
 }
 
-func (s *DescribeUser) PreCheck(ctx context.Context, req *actions.OpsRequest) error {
+func (s *DescribeUser) PreCheck(ctx context.Context, req *actions.ActionRequest) error {
 	userInfo, err := UserInfoParser(req)
 	if err != nil {
 		return err
@@ -64,7 +64,7 @@ func (s *DescribeUser) PreCheck(ctx context.Context, req *actions.OpsRequest) er
 	return userInfo.UserNameValidator()
 }
 
-func (s *DescribeUser) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
+func (s *DescribeUser) Do(ctx context.Context, req *actions.ActionRequest) (*actions.ActionResponse, error) {
 	userInfo, _ := UserInfoParser(req)
 	resp := actions.NewOpsResponse(util.DescribeUserOp)
 
@@ -78,7 +78,7 @@ func (s *DescribeUser) Do(ctx context.Context, req *actions.OpsRequest) (*action
 	return resp.WithSuccess("")
 }
 
-func UserInfoParser(req *actions.OpsRequest) (*models.UserInfo, error) {
+func UserInfoParser(req *actions.ActionRequest) (*models.UserInfo, error) {
 	user := &models.UserInfo{}
 	if req == nil || req.Parameters == nil {
 		return nil, fmt.Errorf("no Parameters provided")

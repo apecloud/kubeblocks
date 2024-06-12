@@ -52,7 +52,7 @@ func (s *Unlock) Init(ctx context.Context) error {
 	return s.Base.Init(ctx)
 }
 
-func (s *Unlock) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
+func (s *Unlock) Do(ctx context.Context, req *actions.ActionRequest) (*actions.ActionResponse, error) {
 	err := s.Handler.ReadWrite(ctx, "")
 	if err != nil {
 		return nil, errors.Wrap(err, "set DB readwrite failed")

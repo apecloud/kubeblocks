@@ -52,7 +52,7 @@ func (s *DeleteUser) IsReadonly(ctx context.Context) bool {
 	return false
 }
 
-func (s *DeleteUser) PreCheck(ctx context.Context, req *actions.OpsRequest) error {
+func (s *DeleteUser) PreCheck(ctx context.Context, req *actions.ActionRequest) error {
 	userInfo, err := UserInfoParser(req)
 	if err != nil {
 		return err
@@ -61,7 +61,7 @@ func (s *DeleteUser) PreCheck(ctx context.Context, req *actions.OpsRequest) erro
 	return userInfo.UserNameValidator()
 }
 
-func (s *DeleteUser) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
+func (s *DeleteUser) Do(ctx context.Context, req *actions.ActionRequest) (*actions.ActionResponse, error) {
 	userInfo, _ := UserInfoParser(req)
 	resp := actions.NewOpsResponse(util.DeleteUserOp)
 

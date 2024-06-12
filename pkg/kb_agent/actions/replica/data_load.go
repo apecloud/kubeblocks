@@ -47,7 +47,7 @@ func (s *dataLoad) Init(ctx context.Context) error {
 	return s.Base.Init(ctx)
 }
 
-func (s *dataLoad) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
+func (s *dataLoad) Do(ctx context.Context, req *actions.ActionRequest) (*actions.ActionResponse, error) {
 	s.Logger.Info("DataLoad action is called")
 	err := s.ExecCommand(ctx)
 	if err != nil {

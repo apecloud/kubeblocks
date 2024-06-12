@@ -37,8 +37,8 @@ const (
 type FakeAction struct {
 	InitFunc       func(ctx context.Context) error
 	IsReadOnlyFunc func(ctx context.Context) bool
-	PreCheckFunc   func(ctx context.Context, request *OpsRequest) error
-	DoFunc         func(ctx context.Context, request *OpsRequest) (*OpsResponse, error)
+	PreCheckFunc   func(ctx context.Context, request *ActionRequest) error
+	DoFunc         func(ctx context.Context, request *ActionRequest) (*ActionResponse, error)
 }
 
 func NewFakeAction(funcType FakeFuncType, fakeFunc interface{}) *FakeAction {
@@ -49,10 +49,10 @@ func NewFakeAction(funcType FakeFuncType, fakeFunc interface{}) *FakeAction {
 		IsReadOnlyFunc: func(ctx context.Context) bool {
 			return false
 		},
-		PreCheckFunc: func(ctx context.Context, request *OpsRequest) error {
+		PreCheckFunc: func(ctx context.Context, request *ActionRequest) error {
 			return nil
 		},
-		DoFunc: func(ctx context.Context, request *OpsRequest) (*OpsResponse, error) {
+		DoFunc: func(ctx context.Context, request *ActionRequest) (*ActionResponse, error) {
 			return nil, nil
 		},
 	}
@@ -63,9 +63,9 @@ func NewFakeAction(funcType FakeFuncType, fakeFunc interface{}) *FakeAction {
 	case FakeIsReadOnly:
 		op.IsReadOnlyFunc = fakeFunc.(func(ctx context.Context) bool)
 	case FakePreCheck:
-		op.PreCheckFunc = fakeFunc.(func(ctx context.Context, request *OpsRequest) error)
+		op.PreCheckFunc = fakeFunc.(func(ctx context.Context, request *ActionRequest) error)
 	case FakeDo:
-		op.DoFunc = fakeFunc.(func(ctx context.Context, request *OpsRequest) (*OpsResponse, error))
+		op.DoFunc = fakeFunc.(func(ctx context.Context, request *ActionRequest) (*ActionResponse, error))
 	}
 	return op
 }
@@ -81,10 +81,10 @@ func (f *FakeAction) IsReadonly(ctx context.Context) bool {
 	return f.IsReadOnlyFunc(ctx)
 }
 
-func (f *FakeAction) PreCheck(ctx context.Context, request *OpsRequest) error {
+func (f *FakeAction) PreCheck(ctx context.Context, request *ActionRequest) error {
 	return f.PreCheckFunc(ctx, request)
 }
 
-func (f *FakeAction) Do(ctx context.Context, request *OpsRequest) (*OpsResponse, error) {
+func (f *FakeAction) Do(ctx context.Context, request *ActionRequest) (*ActionResponse, error) {
 	return f.DoFunc(ctx, request)
 }

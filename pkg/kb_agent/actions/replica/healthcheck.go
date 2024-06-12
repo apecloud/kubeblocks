@@ -68,8 +68,8 @@ func (s *CheckStatus) IsReadonly(ctx context.Context) bool {
 	return true
 }
 
-func (s *CheckStatus) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
-	resp := &actions.OpsResponse{
+func (s *CheckStatus) Do(ctx context.Context, req *actions.ActionRequest) (*actions.ActionResponse, error) {
+	resp := &actions.ActionResponse{
 		Data: map[string]any{},
 	}
 	resp.Data["operation"] = util.HealthyCheckOperation
@@ -83,8 +83,8 @@ func (s *CheckStatus) Do(ctx context.Context, req *actions.OpsRequest) (*actions
 	return resp, nil
 }
 
-func (s *CheckStatus) handlerError(ctx context.Context, err error) (*actions.OpsResponse, error) {
-	resp := &actions.OpsResponse{
+func (s *CheckStatus) handlerError(ctx context.Context, err error) (*actions.ActionResponse, error) {
+	resp := &actions.ActionResponse{
 		Data: map[string]any{},
 	}
 	message := err.Error()

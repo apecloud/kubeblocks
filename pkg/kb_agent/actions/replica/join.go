@@ -51,7 +51,7 @@ func (s *Join) Init(ctx context.Context) error {
 	return s.Base.Init(ctx)
 }
 
-func (s *Join) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
+func (s *Join) Do(ctx context.Context, req *actions.ActionRequest) (*actions.ActionResponse, error) {
 	leader := req.GetString("leader")
 	// join current member to db cluster
 	err := s.Handler.JoinMember(ctx, leader)

@@ -52,7 +52,7 @@ func (s *ListUsers) IsReadonly(ctx context.Context) bool {
 	return true
 }
 
-func (s *ListUsers) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
+func (s *ListUsers) Do(ctx context.Context, req *actions.ActionRequest) (*actions.ActionResponse, error) {
 	resp := actions.NewOpsResponse(util.ListUsersOp)
 
 	result, err := s.Handler.ListUsers(ctx)

@@ -52,8 +52,8 @@ func (s *GetRole) IsReadonly(ctx context.Context) bool {
 	return true
 }
 
-func (s *GetRole) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
-	resp := &actions.OpsResponse{
+func (s *GetRole) Do(ctx context.Context, req *actions.ActionRequest) (*actions.ActionResponse, error) {
+	resp := &actions.ActionResponse{
 		Data: map[string]any{},
 	}
 	resp.Data["operation"] = util.GetRoleOperation

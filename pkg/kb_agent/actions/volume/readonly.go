@@ -52,7 +52,7 @@ func (s *Lock) Init(ctx context.Context) error {
 	return s.Base.Init(ctx)
 }
 
-func (s *Lock) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
+func (s *Lock) Do(ctx context.Context, req *actions.ActionRequest) (*actions.ActionResponse, error) {
 	err := s.Handler.ReadOnly(ctx, "disk full")
 	if err != nil {
 		return nil, errors.Wrap(err, "set DB readonly failed")

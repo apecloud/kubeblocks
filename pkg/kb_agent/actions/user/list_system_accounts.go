@@ -52,7 +52,7 @@ func (s *ListSystemAccounts) IsReadonly(ctx context.Context) bool {
 	return true
 }
 
-func (s *ListSystemAccounts) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
+func (s *ListSystemAccounts) Do(ctx context.Context, req *actions.ActionRequest) (*actions.ActionResponse, error) {
 	resp := actions.NewOpsResponse(util.ListSystemAccountsOp)
 
 	result, err := s.Handler.ListSystemAccounts(ctx)

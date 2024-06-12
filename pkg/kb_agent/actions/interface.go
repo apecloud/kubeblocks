@@ -42,8 +42,8 @@ type Action interface {
 	Init(context.Context) error
 	SetTimeout(timeout time.Duration)
 	IsReadonly(context.Context) bool
-	PreCheck(context.Context, *OpsRequest) error
-	Do(context.Context, *OpsRequest) (*OpsResponse, error)
+	PreCheck(context.Context, *ActionRequest) error
+	Do(context.Context, *ActionRequest) (*ActionResponse, error)
 }
 
 type Base struct {
@@ -130,11 +130,11 @@ func (b *Base) IsReadonly(ctx context.Context) bool {
 	return false
 }
 
-func (b *Base) PreCheck(ctx context.Context, request *OpsRequest) error {
+func (b *Base) PreCheck(ctx context.Context, request *ActionRequest) error {
 	return nil
 }
 
-func (b *Base) Do(ctx context.Context, request *OpsRequest) (*OpsResponse, error) {
+func (b *Base) Do(ctx context.Context, request *ActionRequest) (*ActionResponse, error) {
 	return nil, errors.New("not implemented")
 }
 

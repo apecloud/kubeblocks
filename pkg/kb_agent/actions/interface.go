@@ -62,9 +62,6 @@ var defaultGRPCSetting map[string]string
 var lock sync.Mutex
 
 func initHandlerSettings() {
-	if len(actionHandlers) != 0 {
-		return
-	}
 	lock.Lock()
 	defer lock.Unlock()
 	if len(actionHandlers) != 0 {

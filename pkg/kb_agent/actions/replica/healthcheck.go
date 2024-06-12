@@ -51,8 +51,10 @@ func init() {
 func (s *CheckStatus) Init(ctx context.Context) error {
 	s.failedEventReportFrequency = viper.GetInt("KB_FAILED_EVENT_REPORT_FREQUENCY")
 	if s.failedEventReportFrequency < 300 {
+		s.Logger.Info("failedEventReportFrequency is too small, set to 300")
 		s.failedEventReportFrequency = 300
 	} else if s.failedEventReportFrequency > 3600 {
+		s.Logger.Info("failedEventReportFrequency is too large, set to 3600")
 		s.failedEventReportFrequency = 3600
 	}
 
@@ -90,7 +92,7 @@ func (s *CheckStatus) handlerError(ctx context.Context, err error) (*actions.Ops
 	resp.Data["event"] = util.OperationFailed
 	resp.Data["message"] = message
 	if s.checkFailedCount%s.failedEventReportFrequency == 0 {
-		s.Logger.Info("healthy checks failed continuously", "times", s.checkFailedCount)
+		s.Logger.Info("healthy checks were failling continuously", "times", s.checkFailedCount)
 		_ = util.SentEventForProbe(ctx, resp.Data)
 	}
 	s.checkFailedCount++

@@ -68,5 +68,6 @@ func (s *GrantRole) Do(ctx context.Context, req *actions.OpsRequest) (*actions.O
 		return resp, err
 	}
 
+	s.Logger.Info("executing grantRole success")
 	return resp.WithSuccess("")
 }

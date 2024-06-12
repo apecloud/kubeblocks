@@ -48,5 +48,11 @@ func (s *dataLoad) Init(ctx context.Context) error {
 }
 
 func (s *dataLoad) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
-	return nil, s.ExecCommand(ctx)
+	s.Logger.Info("DataLoad action is called")
+	err := s.ExecCommand(ctx)
+	if err != nil {
+		s.Logger.Info("DataLoad action failed", "error", err.Error())
+		return nil, err
+	}
+	return nil, nil
 }

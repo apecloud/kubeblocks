@@ -71,5 +71,6 @@ func (s *DeleteUser) Do(ctx context.Context, req *actions.OpsRequest) (*actions.
 		return resp, err
 	}
 
+	s.Logger.Info("executing DeleteUser success")
 	return resp.WithSuccess("")
 }

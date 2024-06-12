@@ -66,6 +66,7 @@ func (s *Switchover) Do(ctx context.Context, req *actions.OpsRequest) (*actions.
 		message := fmt.Sprintf("Create switchover failed: %v", err)
 		return nil, errors.New(message)
 	}
+	s.Logger.Info("Create switchover success")
 
 	return nil, nil
 }

@@ -56,9 +56,10 @@ func (s *Leave) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsRe
 	// remove current member from db cluster
 	err := s.Handler.LeaveMember(ctx, leader)
 	if err != nil {
-		s.Logger.Error(err, "Leave member from cluster failed")
+		s.Logger.Info("Leave member from cluster failed", "error", err.Error())
 		return nil, err
 	}
+	s.Logger.Info("Leave member from cluster success")
 
 	return nil, nil
 }

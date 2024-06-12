@@ -48,5 +48,11 @@ func (s *dataDump) Init(ctx context.Context) error {
 }
 
 func (s *dataDump) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsResponse, error) {
-	return nil, s.ExecCommand(ctx)
+	s.Logger.Info("DataDump action is called")
+	err := s.ExecCommand(ctx)
+	if err != nil {
+		s.Logger.Info("DataDump action failed", "error", err.Error())
+		return nil, err
+	}
+	return nil, nil
 }

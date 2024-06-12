@@ -59,7 +59,9 @@ func (s *Rebuild) Do(ctx context.Context, req *actions.OpsRequest) (*actions.Ops
 
 	err := s.Handler.Rebuild(ctx)
 	if err != nil {
+		s.Logger.Info("Rebuild failed", "error", err.Error())
 		return nil, err
 	}
+	s.Logger.Info("Rebuild success")
 	return resp, nil
 }

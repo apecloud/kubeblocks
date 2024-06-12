@@ -69,8 +69,10 @@ func (s *CheckRole) Init(ctx context.Context) error {
 
 	s.FailedEventReportFrequency = viper.GetInt("KB_FAILED_EVENT_REPORT_FREQUENCY")
 	if s.FailedEventReportFrequency < 300 {
+		s.Logger.Info("FailedEventReportFrequency is too small, set to 300")
 		s.FailedEventReportFrequency = 300
 	} else if s.FailedEventReportFrequency > 3600 {
+		s.Logger.Info("FailedEventReportFrequency is too large, set to 3600")
 		s.FailedEventReportFrequency = 3600
 	}
 

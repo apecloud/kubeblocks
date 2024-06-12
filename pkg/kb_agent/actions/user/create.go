@@ -76,5 +76,6 @@ func (s *CreateUser) Do(ctx context.Context, req *actions.OpsRequest) (*actions.
 		}
 	}
 
+	s.Logger.Info("CreateUser success")
 	return resp.WithSuccess("")
 }

@@ -56,9 +56,10 @@ func (s *Join) Do(ctx context.Context, req *actions.OpsRequest) (*actions.OpsRes
 	// join current member to db cluster
 	err := s.Handler.JoinMember(ctx, leader)
 	if err != nil {
-		s.Logger.Error(err, "join member to cluster failed")
+		s.Logger.Info("join member to cluster failed", "error", err.Error())
 		return nil, err
 	}
+	s.Logger.Info("join member to cluster success")
 
 	return nil, nil
 }

@@ -68,5 +68,6 @@ func (s *RevokeRole) Do(ctx context.Context, req *actions.OpsRequest) (*actions.
 		return resp, err
 	}
 
+	s.Logger.Info("executing RevokeRole success")
 	return resp.WithSuccess("")
 }

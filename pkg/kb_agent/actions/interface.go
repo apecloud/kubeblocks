@@ -101,7 +101,7 @@ func (b *Base) Init(ctx context.Context) error {
 		b.Command = handlers.Command
 		handler, err := exec.NewHandler(nil)
 		if err != nil {
-			return errors.Wrap(err, "new exec manager failed")
+			return errors.Wrap(err, "new exec handler failed")
 		}
 		b.Handler = handler
 
@@ -112,7 +112,7 @@ func (b *Base) Init(ctx context.Context) error {
 		}
 		handler, err := grpc.NewHandler(grpcSetting)
 		if err != nil {
-			return errors.Wrap(err, "new grpc manager failed")
+			return errors.Wrap(err, "new grpc handler failed")
 		}
 
 		b.Handler = handler

@@ -21,6 +21,7 @@ package backup
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -370,6 +371,14 @@ func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 	}
 
 	targetPodSelector := s.BackupPolicy.Spec.Target.PodSelector
+	clusterName := targetPodSelector.MatchLabels[constant.AppInstanceLabelKey]
+	cluster := &appsv1alpha1.Cluster{}
+	if err := s.Client.Get(s.Ctx, client.ObjectKey{Name: clusterName, Namespace: s.BackupSchedule.Namespace}, cluster); err != nil {
+		return err
+	}
+	if !slices.Contains(appsv1alpha1.GetReconfiguringRunningPhases(), cluster.Status.Phase) {
+		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting for the cluster %s to be available.", clusterName)
+	}
 	ops := appsv1alpha1.OpsRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: s.BackupSchedule.Name + "-",
@@ -380,7 +389,7 @@ func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 		},
 		Spec: appsv1alpha1.OpsRequestSpec{
 			Type:       appsv1alpha1.ReconfiguringType,
-			ClusterRef: targetPodSelector.MatchLabels[constant.AppInstanceLabelKey],
+			ClusterRef: clusterName,
 			Reconfigure: &appsv1alpha1.Reconfigure{
 				ComponentOps: appsv1alpha1.ComponentOps{
 					ComponentName: targetPodSelector.MatchLabels[constant.KBAppComponentLabelKey],

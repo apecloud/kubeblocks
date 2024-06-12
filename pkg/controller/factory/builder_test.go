@@ -367,7 +367,6 @@ var _ = Describe("builder", func() {
 				ManagerName:   "cfgmgr",
 				SecreteName:   "test-secret",
 				ComponentName: synthesizedComponent.Name,
-				CharacterType: synthesizedComponent.CharacterType,
 				Image:         constant.KBToolsImage,
 				Args:          []string{},
 				Envs:          []corev1.EnvVar{},
@@ -384,7 +383,6 @@ var _ = Describe("builder", func() {
 			_, cluster, _ := newClusterObjs(nil)
 			sidecarRenderedParam := &cfgcm.CfgManagerBuildParams{
 				ManagerName:           "cfgmgr",
-				CharacterType:         mysqlCharacterType,
 				SecreteName:           "test-secret",
 				Image:                 constant.KBToolsImage,
 				ShareProcessNamespace: true,

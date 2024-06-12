@@ -396,38 +396,6 @@ func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams)
 			},
 		},
 	})
-	if len(sidecarRenderedParam.CharacterType) > 0 {
-		env = append(env, corev1.EnvVar{
-			Name:  "DB_TYPE",
-			Value: sidecarRenderedParam.CharacterType,
-		})
-	}
-	// TODO: Remove hard coding
-	if sidecarRenderedParam.CharacterType == "mysql" {
-		env = append(env, corev1.EnvVar{
-			Name: "MYSQL_USER",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					Key:                  "username",
-					LocalObjectReference: corev1.LocalObjectReference{Name: sidecarRenderedParam.SecreteName},
-				},
-			},
-		},
-			corev1.EnvVar{
-				Name: "MYSQL_PASSWORD",
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						Key:                  "password",
-						LocalObjectReference: corev1.LocalObjectReference{Name: sidecarRenderedParam.SecreteName},
-					},
-				},
-			},
-			corev1.EnvVar{
-				Name:  "DATA_SOURCE_NAME",
-				Value: "$(MYSQL_USER):$(MYSQL_PASSWORD)@(localhost:3306)/",
-			},
-		)
-	}
 	containerBuilder := builder.NewContainerBuilder(sidecarRenderedParam.ManagerName).
 		AddCommands("env").
 		AddArgs("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$(TOOLS_PATH)").

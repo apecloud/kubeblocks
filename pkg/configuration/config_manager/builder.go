@@ -25,12 +25,15 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/imdario/mergo"
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/util/retry"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -76,7 +79,7 @@ func BuildConfigManagerContainerParams(cli client.Client, ctx context.Context, m
 		buildParam = &managerParams.ConfigSpecsBuildParams[i]
 		volume = FindVolumeMount(managerParams.Volumes, buildParam.ConfigSpec.VolumeName)
 		if volume == nil {
-			logger.Info(fmt.Sprintf("volume mount not be use : %s", buildParam.ConfigSpec.VolumeName))
+			ctrl.Log.Info(fmt.Sprintf("volume mount not be use : %s", buildParam.ConfigSpec.VolumeName))
 			continue
 		}
 		buildParam.MountPoint = volume.MountPath
@@ -349,39 +352,62 @@ func buildLazyRenderedConfigVolume(cmName string, manager *CfgManagerBuildParams
 
 func checkOrCreateConfigMap(referenceCM client.ObjectKey, scriptCMKey client.ObjectKey, cli client.Client, ctx context.Context, cluster *appsv1alpha1.Cluster, fn func(cm *corev1.ConfigMap) error) error {
 	var (
-		err error
-
-		refCM     = corev1.ConfigMap{}
-		sidecarCM = corev1.ConfigMap{}
+		err   error
+		op    controllerutil.OperationResult
+		refCM = corev1.ConfigMap{}
 	)
 
 	if err = cli.Get(ctx, referenceCM, &refCM); err != nil {
 		return err
 	}
-	if err = cli.Get(ctx, scriptCMKey, &sidecarCM, inDataContext()); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return err
-		}
 
-		scheme, _ := appsv1alpha1.SchemeBuilder.Build()
-		sidecarCM.Data = refCM.Data
-		if fn != nil {
-			if err := fn(&sidecarCM); err != nil {
-				return err
-			}
-		}
-		sidecarCM.SetLabels(refCM.GetLabels())
-		sidecarCM.SetName(scriptCMKey.Name)
-		sidecarCM.SetNamespace(scriptCMKey.Namespace)
-		sidecarCM.SetLabels(refCM.Labels)
-		if err := controllerutil.SetOwnerReference(cluster, &sidecarCM, scheme); err != nil {
-			return err
-		}
-		if err := cli.Create(ctx, &sidecarCM, inDataContext()); err != nil {
-			return err
+	expected, err := createScripts(&refCM, scriptCMKey, cluster, fn)
+	if err != nil {
+		return err
+	}
+	existing := expected.DeepCopy()
+	mutateFn := func() (err error) {
+		mergeWithOverride(existing.Labels, expected.Labels)
+		mergeWithOverride(existing.Annotations, expected.Annotations)
+		existing.SetOwnerReferences(expected.GetOwnerReferences())
+		existing.Data = expected.Data
+		return
+	}
+
+	updateLog := func() {
+		ctrl.Log.Info(fmt.Sprintf("expected cm object[%s] has been %s", scriptCMKey, op))
+	}
+
+	defer updateLog()
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		result, createOrUpdateErr := ctrl.CreateOrUpdate(ctx, cli, existing, mutateFn)
+		op = result
+		return createOrUpdateErr
+	})
+}
+
+func createScripts(refCM *corev1.ConfigMap, key client.ObjectKey, owner client.Object, fn func(cm *corev1.ConfigMap) error) (*corev1.ConfigMap, error) {
+	expected := &corev1.ConfigMap{}
+
+	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
+	expected.Data = refCM.Data
+	if fn != nil {
+		if err := fn(expected); err != nil {
+			return nil, err
 		}
 	}
-	return nil
+	expected.SetLabels(refCM.GetLabels())
+	expected.SetName(key.Name)
+	expected.SetNamespace(key.Namespace)
+	expected.SetAnnotations(refCM.GetAnnotations())
+	if err := controllerutil.SetOwnerReference(owner, expected, scheme); err != nil {
+		return nil, err
+	}
+	return expected, nil
+}
+
+func mergeWithOverride(dst, src interface{}) {
+	_ = mergo.Merge(dst, src, mergo.WithOverride)
 }
 
 func checkAndUpdateReloadYaml(data map[string]string, reloadConfig string, formatterConfig appsv1beta1.FileFormatConfig) (map[string]string, error) {

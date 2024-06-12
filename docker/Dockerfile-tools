@@ -102,7 +102,6 @@ RUN apk add --no-cache curl kubectl helm jq --allow-untrusted \
     && rm -rf /var/cache/apk/*
 
 # copy kubeblocks tools
-COPY config/kb__agent config/kb__agent
 COPY config/lorry config/lorry
 COPY config/crd/bases /kubeblocks/crd
 COPY --from=builder /out/killer /bin
@@ -110,6 +109,7 @@ COPY --from=builder /out/reloader /bin
 COPY --from=builder /out/config_render /bin
 COPY --from=builder /out/lorry /bin
 COPY --from=builder /out/lorryctl /bin
+COPY --from=builder /out/kb_agent /bin
 COPY --from=builder /bin/grpc_health_probe /bin
 COPY --from=builder /out/helm_hook /bin
 

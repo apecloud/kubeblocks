@@ -2941,6 +2941,24 @@ ExecAction
 </tr>
 <tr>
 <td>
+<code>grpc</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.GRPCAction">
+GRPCAction
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the GRPC request to perform.
+the GRCP proto file can be found here <a href="https://github.com/apecloud/kubeblocks/blob/a99d80e0629b6d936c5fb478e06f5b45ef3ab388/pkg/lorry/plugin/proto/service_plugin.proto">https://github.com/apecloud/kubeblocks/blob/a99d80e0629b6d936c5fb478e06f5b45ef3ab388/pkg/lorry/plugin/proto/service_plugin.proto</a>.
+There is a mapping from actions to corresponding GRPC APIs.
+If the provider does not support the specified action, an error will be returned.</p>
+<p>This field cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>http</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.HTTPAction">
@@ -11678,6 +11696,51 @@ in each OpsService definition.</p>
 <td><p>FailurePolicyIgnore means that an error will be ignored but logged.</p>
 </td>
 </tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.GRPCAction">GRPCAction
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.Action">Action</a>)
+</p>
+<div>
+<p>GRPCAction describes an Action that triggers GRPC requests.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>port</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the target port for the GRPC request.
+It can be specified either as a numeric value in the range of 1 to 65535.
+or as a named port that meets the IANA_SVC_NAME specification.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>host</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates the server&rsquo;s domain name or IP address. Defaults to the Pod&rsquo;s IP.</p>
+</td>
+</tr>
+</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.GVKResource">GVKResource
 </h3>

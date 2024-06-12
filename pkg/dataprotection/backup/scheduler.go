@@ -404,7 +404,7 @@ func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 		return err
 	}
 	if !slices.Contains(appsv1alpha1.GetReconfiguringRunningPhases(), cluster.Status.Phase) {
-		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting the cluster %s to be available.", clusterName)
+		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting for the cluster %s to be available.", clusterName)
 	}
 	ops := appsv1alpha1.OpsRequest{
 		ObjectMeta: metav1.ObjectMeta{

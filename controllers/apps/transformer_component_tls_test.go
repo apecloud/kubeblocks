@@ -332,6 +332,17 @@ var _ = Describe("TLS self-signed cert function", func() {
 				clusterObj.Spec.ComponentSpecs[0].Issuer = nil
 				Expect(k8sClient.Patch(ctx, clusterObj, patch)).Should(Succeed())
 				Eventually(hasTLSSettings).Should(BeFalse())
+
+				By("delete a cluster cleanly when tls enabled")
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterObj), clusterObj)).Should(Succeed())
+				patch = client.MergeFrom(clusterObj.DeepCopy())
+				clusterObj.Spec.ComponentSpecs[0].TLS = true
+				clusterObj.Spec.ComponentSpecs[0].Issuer = &appsv1alpha1.Issuer{Name: appsv1alpha1.IssuerKubeBlocks}
+				Expect(k8sClient.Patch(ctx, clusterObj, patch)).Should(Succeed())
+				Eventually(hasTLSSettings).Should(BeTrue())
+
+				testapps.DeleteObject(&testCtx, clusterKey, &appsv1alpha1.Cluster{})
+				Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, false)).Should(Succeed())
 			})
 		})
 	})

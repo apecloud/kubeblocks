@@ -483,34 +483,33 @@ func cleanActionJob(ctx context.Context,
 	dag *graph.DAG,
 	actionCtx *ActionContext,
 	jobName string) error {
-	if actionCtx.cluster.Annotations == nil || actionCtx.component.Annotations == nil {
-		return errors.New("cluster or component annotations not found")
-	}
 	// check action done annotation has been set
 	if !checkActionDoneAnnotationExist(actionCtx) {
-		return fmt.Errorf("cluster %s %s done annotation has not been set", actionCtx.cluster.Name, actionCtx.actionType)
+		return fmt.Errorf("component %s %s action done annotation has not been set", actionCtx.component.Name, actionCtx.actionType)
 	}
 	return job.CleanJobByNameWithDAG(ctx, cli, dag, actionCtx.cluster, jobName)
 }
 
 // checkActionDoneAnnotationExist checks if the action done annotation exists.
 func checkActionDoneAnnotationExist(actionCtx *ActionContext) bool {
-	if actionCtx.cluster.Annotations == nil || actionCtx.component.Annotations == nil {
-		return false
-	}
 	var actionDoneKey string
 	switch actionCtx.actionType {
 	case PostProvisionAction:
 		// TODO(xingran): for backward compatibility before KubeBlocks v0.8.0, check the annotation of the cluster object first, it will be deprecated in the future
-		compPostStartDoneKey := fmt.Sprintf(kbCompPostStartDoneKeyPattern, actionCtx.component.Name)
-		_, ok := actionCtx.cluster.Annotations[compPostStartDoneKey]
-		if ok {
-			return true
+		if actionCtx.cluster.Annotations != nil {
+			compPostStartDoneKey := fmt.Sprintf(kbCompPostStartDoneKeyPattern, actionCtx.component.Name)
+			_, ok := actionCtx.cluster.Annotations[compPostStartDoneKey]
+			if ok {
+				return true
+			}
 		}
 		actionDoneKey = kbCompPostProvisionDoneKey
 	case PreTerminateAction:
 		actionDoneKey = kbCompPreTerminateDoneKey
 	default:
+		return false
+	}
+	if actionCtx.component.Annotations == nil {
 		return false
 	}
 	_, ok := actionCtx.component.Annotations[actionDoneKey]

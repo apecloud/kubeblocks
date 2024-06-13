@@ -492,8 +492,9 @@ func (r *BackupReconciler) checkIsCompletedDuringRunning(reqCtx intctrlutil.Requ
 		return false, err
 	}
 	var (
-		enabled             *bool
-		targetClusterExists = true
+		enabled                   *bool
+		targetClusterExists       = true
+		targetIsDeletingOrStopped = false
 	)
 	// check if Continuous backupMethod is enabled
 	for _, v := range backupScheduleList.Items {
@@ -514,8 +515,9 @@ func (r *BackupReconciler) checkIsCompletedDuringRunning(reqCtx intctrlutil.Requ
 		if err != nil {
 			return false, err
 		}
+		targetIsDeletingOrStopped = cluster.IsDeleting() || cluster.Status.Phase == appsv1alpha1.StoppedClusterPhase
 	}
-	if boolptr.IsSetToTrue(enabled) && targetClusterExists {
+	if boolptr.IsSetToTrue(enabled) && targetClusterExists && !targetIsDeletingOrStopped {
 		return false, nil
 	}
 	patch := client.MergeFrom(request.Backup.DeepCopy())

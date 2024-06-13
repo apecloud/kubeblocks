@@ -285,6 +285,15 @@ func TestTransNumberOrBoolType(t *testing.T) {
 		name: "testClassResource",
 		args: args{
 			t:        ClassicTimeDurationType,
+			objs:     []string{"1", "1000", "1s", "1min", "20m", "5d", "10000ms", "20MIN"},
+			expected: []interface{}{1, 1000, 1, 60, 20 * 60, int64(5 * Day / 1000), 10, 20 * 60},
+			expand:   "1s",
+		},
+		wantErr: false,
+	}, {
+		name: "testClassResource",
+		args: args{
+			t:        ClassicTimeDurationType,
 			objs:     []string{"", "100yy", "s", "min45", "second"},
 			expected: []interface{}{0, 0, 0, 0, 0},
 		},

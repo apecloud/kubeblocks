@@ -323,6 +323,8 @@ func (r *clusterBackupPolicyTransformer) syncBackupSchedule(backupSchedule *dpv1
 		scheduleMethodMap[s.BackupMethod] = struct{}{}
 	}
 	mergeMap(backupSchedule.Annotations, r.buildAnnotations())
+	// update backupSchedule annotation to reconcile it.
+	backupSchedule.Annotations[constant.ReconcileAnnotationKey] = r.Cluster.ResourceVersion
 	// sync the newly added schedule policies.
 	for _, s := range r.backupPolicy.Schedules {
 		if _, ok := scheduleMethodMap[s.BackupMethod]; ok {

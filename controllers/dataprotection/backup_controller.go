@@ -618,9 +618,9 @@ func (r *BackupReconciler) handleRunningPhase(
 func (r *BackupReconciler) checkIsCompletedDuringRunning(reqCtx intctrlutil.RequestCtx,
 	backup *dpv1alpha1.Backup) (bool, error) {
 	var (
-		backupTargetExists     = true
-		backupTargetIsDeleting bool
-		err                    error
+		backupTargetExists              = true
+		backupTargetIsStoppedOrDeleting bool
+		err                             error
 	)
 	// check if target cluster exits
 	clusterName := backup.Labels[constant.AppInstanceLabelKey]
@@ -631,10 +631,10 @@ func (r *BackupReconciler) checkIsCompletedDuringRunning(reqCtx intctrlutil.Requ
 		if err != nil {
 			return false, err
 		}
-		backupTargetIsDeleting = cluster.IsDeleting()
+		backupTargetIsStoppedOrDeleting = cluster.IsDeleting() || cluster.Status.Phase == appsv1alpha1.StoppedClusterPhase
 	}
-	// if backup target exists, and it is not deleting, check if the schedule is enabled.
-	if backupTargetExists && !backupTargetIsDeleting {
+	// if backup target exists, and it is not deleting or stopped, check if the schedule is enabled.
+	if backupTargetExists && !backupTargetIsStoppedOrDeleting {
 		backupSchedule := &dpv1alpha1.BackupSchedule{}
 		if err = r.Client.Get(reqCtx.Ctx, client.ObjectKey{Name: backup.Labels[dptypes.BackupScheduleLabelKey],
 			Namespace: backup.Namespace}, backupSchedule); err != nil {

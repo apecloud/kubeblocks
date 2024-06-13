@@ -96,15 +96,25 @@ func (r *RestoreManager) DoRestore(comp *component.SynthesizedComponent, compObj
 	if err = r.DoPrepareData(comp, compObj, backupObj); err != nil {
 		return err
 	}
+	if compObj.Status.Phase != appsv1alpha1.RunningClusterCompPhase {
+		return nil
+	}
 	// wait for the post-provision action to complete.
 	if needDoPostProvision {
+		return nil
+	}
+	if r.doReadyRestoreAfterClusterRunning && r.Cluster.Status.Phase != appsv1alpha1.RunningClusterPhase {
 		return nil
 	}
 	if err = r.DoPostReady(comp, compObj, backupObj); err != nil {
 		return err
 	}
+	// mark component restore done
+	if compObj.Annotations != nil {
+		compObj.Annotations[constant.RestoreDoneAnnotationKey] = "true"
+	}
 	// do clean up
-	return r.cleanupRestoreAnnotations(compObj, comp.Name)
+	return r.cleanupRestoreAnnotations(comp.Name)
 }
 
 func (r *RestoreManager) DoPrepareData(comp *component.SynthesizedComponent,
@@ -200,12 +210,6 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
 	compObj *appsv1alpha1.Component,
 	backupObj *dpv1alpha1.Backup) error {
-	if compObj.Status.Phase != appsv1alpha1.RunningClusterCompPhase {
-		return nil
-	}
-	if r.doReadyRestoreAfterClusterRunning && r.Cluster.Status.Phase != appsv1alpha1.RunningClusterPhase {
-		return nil
-	}
 	jobActionLabels := constant.GetComponentWellKnownLabels(r.Cluster.Name, comp.Name)
 	if len(comp.Roles) > 0 {
 		jobActionLabels[instanceset.AccessModeLabelKey] = string(appsv1alpha1.ReadWrite)
@@ -265,7 +269,14 @@ func (r *RestoreManager) buildRequiredPolicy(sourceTarget *dpv1alpha1.BackupStat
 }
 
 func (r *RestoreManager) buildSchedulingSpec(comp *component.SynthesizedComponent) (dpv1alpha1.SchedulingSpec, error) {
-	schedulingPolicy, err := scheduling.BuildSchedulingPolicy(r.Cluster, r.Cluster.Spec.GetComponentByName(comp.Name))
+	shardingName := comp.Labels[constant.KBAppShardingNameLabelKey]
+	var compSpec *appsv1alpha1.ClusterComponentSpec
+	if shardingName != "" {
+		compSpec = &r.Cluster.Spec.GetShardingByName(shardingName).Template
+	} else {
+		compSpec = r.Cluster.Spec.GetComponentByName(comp.Name)
+	}
+	schedulingPolicy, err := scheduling.BuildSchedulingPolicy(r.Cluster, compSpec)
 	if err != nil {
 		return dpv1alpha1.SchedulingSpec{}, err
 	}
@@ -350,13 +361,8 @@ func (r *RestoreManager) createRestoreAndWait(restore *dpv1alpha1.Restore, compO
 	}
 }
 
-func (r *RestoreManager) cleanupRestoreAnnotations(compObj *appsv1alpha1.Component, compName string) error {
-	if compObj.Status.Phase == appsv1alpha1.RunningClusterCompPhase &&
-		compObj.Annotations[constant.RestoreFromBackupAnnotationKey] != "" {
-		// mark restore-done annotation
-		compObj.Annotations[constant.RestoreDoneAnnotationKey] = "true"
-	}
-	if r.Cluster.Status.Phase == appsv1alpha1.RunningClusterPhase && r.Cluster.Annotations != nil {
+func (r *RestoreManager) cleanupRestoreAnnotations(compName string) error {
+	if r.Cluster.Annotations != nil {
 		patch := client.MergeFrom(r.Cluster.DeepCopy())
 		needCleanup, err := CleanupClusterRestoreAnnotation(r.Cluster, compName)
 		if err != nil {

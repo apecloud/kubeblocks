@@ -20,8 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"fmt"
 	"slices"
 
+	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -111,7 +114,15 @@ func (p *pipeline) ConfigConstraints() *pipeline {
 			Name: p.configSpec.ConfigConstraintRef,
 		}
 		p.configConstraint = &appsv1beta1.ConfigConstraint{}
-		return p.cli.Get(p.reqCtx.Ctx, ccKey, p.configConstraint)
+		if err := p.cli.Get(p.reqCtx.Ctx, ccKey, p.configConstraint); err != nil {
+			return err
+		}
+		if p.configConstraint.Spec.FileFormatConfig == nil {
+			return errors.Wrap(field.Invalid(field.NewPath("spec.fileFormatConfig"), nil,
+				"fileFormatConfig is empty"),
+				fmt.Sprintf("invalid configconstraint: %s", p.configSpec.ConfigConstraintRef))
+		}
+		return nil
 	}
 
 	return p.Wrap(func() error {

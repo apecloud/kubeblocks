@@ -252,21 +252,6 @@ func ListClusterComponents(ctx context.Context, cli client.Reader, cluster *apps
 	return compList.Items, nil
 }
 
-func ListComponentsByName(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	componentName string) ([]appsv1alpha1.Component, error) {
-	if cluster.Spec.GetComponentByName(componentName) != nil {
-		comp, err := GetComponentByName(reqCtx.Ctx, cli, cluster.Namespace,
-			constant.GenerateClusterComponentName(cluster.Name, componentName))
-		if err != nil {
-			return nil, err
-		}
-		return []appsv1alpha1.Component{*comp}, nil
-	}
-	return intctrlutil.ListShardingComponents(reqCtx.Ctx, cli, cluster, componentName)
-}
-
 // GetClusterComponentShortNameSet gets the component short name set of the cluster.
 func GetClusterComponentShortNameSet(ctx context.Context, cli client.Reader, cluster *appsv1alpha1.Cluster) (sets.Set[string], error) {
 	compList, err := ListClusterComponents(ctx, cli, cluster)

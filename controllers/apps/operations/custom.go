@@ -32,6 +32,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -119,6 +120,21 @@ func (c CustomOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, c
 	return nil
 }
 
+func (c CustomOpsHandler) listComponents(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	componentName string) ([]appsv1alpha1.Component, error) {
+	if cluster.Spec.GetComponentByName(componentName) != nil {
+		comp, err := component.GetComponentByName(reqCtx.Ctx, cli, cluster.Namespace,
+			constant.GenerateClusterComponentName(cluster.Name, componentName))
+		if err != nil {
+			return nil, err
+		}
+		return []appsv1alpha1.Component{*comp}, nil
+	}
+	return intctrlutil.ListShardingComponents(reqCtx.Ctx, cli, cluster, componentName)
+}
+
 func (c CustomOpsHandler) checkExpression(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
@@ -128,7 +144,7 @@ func (c CustomOpsHandler) checkExpression(reqCtx intctrlutil.RequestCtx,
 	if opsSpec.Force {
 		return nil
 	}
-	comps, err := component.ListComponentsByName(reqCtx, cli, opsRes.Cluster, compCustomItem.ComponentName)
+	comps, err := c.listComponents(reqCtx, cli, opsRes.Cluster, compCustomItem.ComponentName)
 	if err != nil {
 		return err
 	}

@@ -210,7 +210,7 @@ func (hs horizontalScalingOpsHandler) checkIntersectionWithEarlierOps(opsRes *Op
 	currOpsHScaling, earlierOpsHScaling appsv1alpha1.HorizontalScaling) error {
 	getCreatedOrDeletedPodSet := func(ops *appsv1alpha1.OpsRequest, hScaling appsv1alpha1.HorizontalScaling) (map[string]string, map[string]string) {
 		lastCompSnapshot := ops.Status.LastConfiguration.Components[earlierOpsHScaling.ComponentName]
-		compSpec := opsRes.Cluster.Spec.GetComponentByName(earlierOpsHScaling.ComponentName).DeepCopy()
+		compSpec := getComponentSpecOrShardingTemplate(opsRes.Cluster, earlierOpsHScaling.ComponentName).DeepCopy()
 		compSpec.Replicas, compSpec.Instances, compSpec.OfflineInstances = hs.getExpectedCompValues(opsRes, compSpec, lastCompSnapshot, hScaling)
 		return hs.getCreateAndDeletePodSet(opsRes, lastCompSnapshot, *compSpec, hScaling, hScaling.ComponentName)
 	}

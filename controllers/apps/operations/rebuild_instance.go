@@ -220,7 +220,7 @@ func (r rebuildInstanceOpsHandler) buildSynthesizedComponent(reqCtx intctrlutil.
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	componentName string) (*component.SynthesizedComponent, error) {
-	compSpec := cluster.Spec.GetCompSpecByComponentName(componentName)
+	compSpec := getComponentSpecOrShardingTemplate(cluster, componentName)
 	if compSpec.ComponentDef == "" {
 		// TODO: remove after 0.9
 		return component.BuildSynthesizedComponentWrapper(reqCtx, cli, cluster, compSpec)

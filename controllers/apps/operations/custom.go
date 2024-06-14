@@ -243,7 +243,7 @@ func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx,
 		// 2. validate component and componentDef
 		if len(opsRes.OpsDef.Spec.ComponentInfos) > 0 {
 			// get component definition
-			compSpec := opsRes.Cluster.Spec.GetCompSpecByComponentName(v.ComponentName)
+			compSpec := getComponentSpecOrShardingTemplate(opsRes.Cluster, v.ComponentName)
 			compDef, err := component.GetCompDefByName(reqCtx.Ctx, cli, compSpec.ComponentDef)
 			if err != nil {
 				return err

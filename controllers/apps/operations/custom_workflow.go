@@ -60,7 +60,7 @@ func (w *WorkflowContext) Run(compCustomSpec *appsv1alpha1.CustomOpsComponent) (
 		compStatus     = w.OpsRes.OpsRequest.Status.Components[compCustomSpec.ComponentName]
 		workflowStatus = &WorkflowStatus{}
 		actions        = w.OpsRes.OpsDef.Spec.Actions
-		compSpec       = w.OpsRes.Cluster.Spec.GetCompSpecByComponentName(compCustomSpec.ComponentName)
+		compSpec       = getComponentSpecOrShardingTemplate(w.OpsRes.Cluster, compCustomSpec.ComponentName)
 	)
 	defer func() {
 		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {

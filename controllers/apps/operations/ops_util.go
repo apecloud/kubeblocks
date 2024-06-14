@@ -311,3 +311,17 @@ func updateHAConfigIfNecessary(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	haConfig.Annotations["enable"] = switchBoolStr
 	return cli.Update(reqCtx.Ctx, haConfig)
 }
+
+func getComponentSpecOrShardingTemplate(cluster *appsv1alpha1.Cluster, componentName string) *appsv1alpha1.ClusterComponentSpec {
+	for _, v := range cluster.Spec.ComponentSpecs {
+		if v.Name == componentName {
+			return &v
+		}
+	}
+	for _, v := range cluster.Spec.ShardingSpecs {
+		if v.Name == componentName {
+			return &v.Template
+		}
+	}
+	return nil
+}

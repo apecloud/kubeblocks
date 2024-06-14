@@ -58,7 +58,6 @@ const (
 type rebuildInstanceOpsHandler struct{}
 
 type instanceHelper struct {
-	compSpec  *appsv1alpha1.ClusterComponentSpec
 	targetPod *corev1.Pod
 	backup    *dpv1alpha1.Backup
 	instance  appsv1alpha1.Instance

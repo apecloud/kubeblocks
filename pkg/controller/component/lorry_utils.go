@@ -21,11 +21,10 @@ package component
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
-	"sort"
 	"strconv"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -56,11 +55,145 @@ var (
 // In the new ComponentDefinition API, StatusProbe and RunningProbe have been removed.
 func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *SynthesizedComponent, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) error {
 	// If it's not a built-in handler supported by Lorry, LorryContainers are not injected by default.
-	builtinHandler := getBuiltinActionHandler(synthesizeComp)
-	if builtinHandler == appsv1alpha1.UnknownBuiltinActionHandler {
+	builtinHandler, execActionHandlers, grpcActionHandlers, err := getActionHandlers(synthesizeComp)
+	if err != nil {
+		return err
+	}
+	if builtinHandler == appsv1alpha1.UnknownBuiltinActionHandler && len(execActionHandlers) == 0 && len(grpcActionHandlers) == 0 {
 		return nil
 	}
 
+	if builtinHandler != appsv1alpha1.UnknownBuiltinActionHandler && len(grpcActionHandlers) > 0 {
+		// grpc handler is supported by kb-agent,
+		// builtin handler is supported by lorry,
+		// exec handler supported by lorry and kb-agent.
+		return errors.New("builtin handler and grpc handler cannot be set at the same time")
+	}
+
+	if len(grpcActionHandlers) > 0 {
+		return buildKBAgentContainer(reqCtx, synthesizeComp, clusterCompSpec)
+	}
+	return buildLorryContainer(reqCtx, synthesizeComp, clusterCompSpec)
+
+}
+
+func buildKBAgentContainer(reqCtx intctrlutil.RequestCtx, synthesizeComp *SynthesizedComponent, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) error {
+	// inject kb-agent container
+	container, err := buildKBAgentServiceContainer(synthesizeComp, clusterCompSpec)
+	if err != nil {
+		return err
+	}
+	err = adaptKBAgentIfExecHandlerDefined(synthesizeComp, container)
+	if err != nil {
+		return err
+	}
+
+	// inject role probe container
+	var compRoleProbe *appsv1alpha1.RoleProbe
+	if synthesizeComp.LifecycleActions != nil {
+		compRoleProbe = synthesizeComp.LifecycleActions.RoleProbe
+	}
+	if compRoleProbe != nil {
+		reqCtx.Log.V(3).Info("kb-agent", "role probe settings", compRoleProbe)
+		buildRoleProbeContainer(container, compRoleProbe, int(container.Ports[0].ContainerPort))
+	}
+
+	reqCtx.Log.V(1).Info("kb-agent", "container", container)
+	synthesizeComp.PodSpec.Containers = append(synthesizeComp.PodSpec.Containers, *container)
+	return nil
+}
+
+func buildKBAgentServiceContainer(synthesizeComp *SynthesizedComponent, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*corev1.Container, error) {
+	kbAgentPort := viper.GetInt32(constant.KBEnvAgentPort)
+	availablePorts, err := getAvailableContainerPorts(synthesizeComp.PodSpec.Containers, []int32{kbAgentPort})
+	if err != nil {
+		return nil, errors.Wrap(err, "get kb-agent container port failed")
+	}
+	kbAgentPort = availablePorts[0]
+	container := buildBasicContainer(int(kbAgentPort))
+	container.Name = constant.KBAgentContainerName
+	container.Image = viper.GetString(constant.KBToolsImage)
+	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
+	container.Command = []string{"kb_agent",
+		"--port", strconv.Itoa(int(kbAgentPort)),
+	}
+
+	container.Ports = []corev1.ContainerPort{
+		{
+			ContainerPort: int32(kbAgentPort),
+			Name:          constant.KBAgentPortName,
+			Protocol:      "TCP",
+		},
+	}
+
+	buildEnvs(container, synthesizeComp, clusterCompSpec)
+
+	// set kb-agent container ports to host network
+	if synthesizeComp.HostNetwork != nil {
+		if synthesizeComp.HostNetwork.ContainerPorts == nil {
+			synthesizeComp.HostNetwork.ContainerPorts = make([]appsv1alpha1.HostNetworkContainerPort, 0)
+		}
+		synthesizeComp.HostNetwork.ContainerPorts = append(
+			synthesizeComp.HostNetwork.ContainerPorts,
+			appsv1alpha1.HostNetworkContainerPort{
+				Container: container.Name,
+				Ports:     []string{constant.KBAgentPortName},
+			})
+	}
+	return container, nil
+}
+func adaptKBAgentIfExecHandlerDefined(synthesizeComp *SynthesizedComponent, kbAgentContainer *corev1.Container) error {
+	_, execHandlers, grpcHandlers, _ := getActionHandlers(synthesizeComp)
+	for name, handler := range execHandlers {
+		grpcHandlers[name] = handler
+	}
+
+	handlerSetttings, err := getHandlerSettings(synthesizeComp, grpcHandlers)
+	if err != nil {
+		return err
+	}
+
+	handlersJSON, _ := json.Marshal(handlerSetttings)
+	kbAgentContainer.Env = append(kbAgentContainer.Env, corev1.EnvVar{
+		Name:  constant.KBEnvActionHandlers,
+		Value: string(handlersJSON),
+	})
+
+	if len(execHandlers) == 0 {
+		return nil
+	}
+	execImage, execContainer, err := getExecImageAndContainer(synthesizeComp, execHandlers)
+	if err != nil {
+		return err
+	}
+
+	if execImage == "" {
+		return nil
+	}
+	initContainer := buildKBAgentInitContainer()
+	synthesizeComp.PodSpec.InitContainers = append(synthesizeComp.PodSpec.InitContainers, *initContainer)
+	kbAgentContainer.Image = execImage
+	kbAgentContainer.VolumeMounts = append(kbAgentContainer.VolumeMounts, corev1.VolumeMount{Name: "kubeblocks", MountPath: "/kubeblocks"})
+	if execContainer == nil {
+		return nil
+	}
+
+	envSet := sets.New([]string{}...)
+	for _, env := range kbAgentContainer.Env {
+		envSet.Insert(env.Name)
+	}
+
+	for _, env := range execContainer.Env {
+		if envSet.Has(env.Name) {
+			continue
+		}
+		kbAgentContainer.Env = append(kbAgentContainer.Env, env)
+	}
+	return nil
+}
+
+func buildLorryContainer(reqCtx intctrlutil.RequestCtx, synthesizeComp *SynthesizedComponent, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) error {
+	// inject lorry container
 	var lorryContainers []corev1.Container
 	lorryHTTPPort := viper.GetInt32(constant.KBEnvLorryHTTPPort)
 	lorryGRPCPort := viper.GetInt32(constant.KBEnvLorryGRPCPort)
@@ -111,18 +244,24 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 
 func adaptLorryIfCustomHandlerDefined(synthesizeComp *SynthesizedComponent, lorryContainer *corev1.Container,
 	lorryHTTPPort, lorryGRPCPort int) error {
-	actions, execImage, execContainer, err := getActionsWithExecImageOrContainer(synthesizeComp)
+	_, execHandlers, _, _ := getActionHandlers(synthesizeComp)
+	if len(execHandlers) == 0 {
+		return nil
+	}
+	execImage, execContainer, err := getExecImageAndContainer(synthesizeComp, execHandlers)
 	if err != nil {
 		return err
 	}
 
-	if len(actions) == 0 {
-		return nil
+	handlerSetttings, err := getHandlerSettings(synthesizeComp, execHandlers)
+	if err != nil {
+		return err
 	}
-	actionJSON, _ := json.Marshal(actions)
+
+	handlersJSON, _ := json.Marshal(handlerSetttings)
 	lorryContainer.Env = append(lorryContainer.Env, corev1.EnvVar{
 		Name:  constant.KBEnvActionHandlers,
-		Value: string(actionJSON),
+		Value: string(handlersJSON),
 	})
 
 	if execImage == "" {
@@ -190,7 +329,12 @@ func buildLorryServiceContainer(synthesizeComp *SynthesizedComponent, container 
 		},
 	}
 
-	buildLorryEnvs(container, synthesizeComp, clusterCompSpec)
+	container.Env = append(container.Env, corev1.EnvVar{
+		Name:      constant.KBEnvBuiltinHandler,
+		Value:     string(getBuiltinActionHandler(synthesizeComp)),
+		ValueFrom: nil,
+	})
+	buildEnvs(container, synthesizeComp, clusterCompSpec)
 
 	// set lorry container ports to host network
 	if synthesizeComp.HostNetwork != nil {
@@ -219,15 +363,21 @@ func buildLorryInitContainer() *corev1.Container {
 	return container
 }
 
-func buildLorryEnvs(container *corev1.Container, synthesizeComp *SynthesizedComponent, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) {
-	envs := []corev1.EnvVar{
-		// inject the default built-in handler env to lorry container.
-		{
-			Name:      constant.KBEnvBuiltinHandler,
-			Value:     string(getBuiltinActionHandler(synthesizeComp)),
-			ValueFrom: nil,
-		},
-	}
+func buildKBAgentInitContainer() *corev1.Container {
+	container := &corev1.Container{}
+	container.Image = viper.GetString(constant.KBToolsImage)
+	container.Name = constant.KBAgentInitContainerName
+	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
+	container.Command = []string{"cp", "-r", "/bin/kb_agent", "/kubeblocks/"}
+	container.StartupProbe = nil
+	container.ReadinessProbe = nil
+	volumeMount := corev1.VolumeMount{Name: "kubeblocks", MountPath: "/kubeblocks"}
+	container.VolumeMounts = []corev1.VolumeMount{volumeMount}
+	return container
+}
+
+func buildEnvs(container *corev1.Container, synthesizeComp *SynthesizedComponent, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) {
+	envs := []corev1.EnvVar{}
 
 	envs = append(envs, buildEnv4DBAccount(synthesizeComp, clusterCompSpec)...)
 
@@ -273,7 +423,6 @@ func buildLorryEnvs(container *corev1.Container, synthesizeComp *SynthesizedComp
 }
 
 func buildRoleProbeContainer(roleChangedContainer *corev1.Container, roleProbe *appsv1alpha1.RoleProbe, probeSvcHTTPPort int) {
-	roleChangedContainer.Name = constant.RoleProbeContainerName
 	httpGet := &corev1.HTTPGetAction{}
 	httpGet.Path = constant.LorryRoleProbePath
 	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
@@ -410,53 +559,21 @@ func buildEnv4CronJobs(_ *SynthesizedComponent) []corev1.EnvVar {
 // getBuiltinActionHandler gets the built-in handler.
 // The BuiltinActionHandler within the same synthesizeComp LifecycleActions should be consistent, we can take any one of them.
 func getBuiltinActionHandler(synthesizeComp *SynthesizedComponent) appsv1alpha1.BuiltinActionHandlerType {
-	if synthesizeComp.LifecycleActions == nil {
-		return appsv1alpha1.UnknownBuiltinActionHandler
+	builtinHandler, _, _, _ := getActionHandlers(synthesizeComp)
+	if builtinHandler == appsv1alpha1.UnknownBuiltinActionHandler {
+		builtinHandler = appsv1alpha1.CustomActionHandler
 	}
-
-	if synthesizeComp.LifecycleActions.RoleProbe != nil {
-		if synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler != nil &&
-			*synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler != appsv1alpha1.UnknownBuiltinActionHandler {
-			return *synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler
-		} else {
-			return appsv1alpha1.CustomActionHandler
-		}
-	}
-
-	actions := []*appsv1alpha1.LifecycleActionHandler{
-		synthesizeComp.LifecycleActions.PostProvision,
-		synthesizeComp.LifecycleActions.PreTerminate,
-		synthesizeComp.LifecycleActions.MemberJoin,
-		synthesizeComp.LifecycleActions.MemberLeave,
-		synthesizeComp.LifecycleActions.Readonly,
-		synthesizeComp.LifecycleActions.Readwrite,
-		synthesizeComp.LifecycleActions.DataDump,
-		synthesizeComp.LifecycleActions.DataLoad,
-		synthesizeComp.LifecycleActions.Reconfigure,
-		// synthesizeComp.LifecycleActions.AccountProvision,
-	}
-
-	hasAction := false
-	for _, action := range actions {
-		if action != nil {
-			hasAction = true
-			if action.BuiltinHandler != nil {
-				return *action.BuiltinHandler
-			}
-		}
-	}
-	if hasAction {
-		return appsv1alpha1.CustomActionHandler
-	}
-	return appsv1alpha1.UnknownBuiltinActionHandler
+	return builtinHandler
 }
 
-func getActionsWithExecImageOrContainer(synthesizeComp *SynthesizedComponent) (map[string]util.Handlers, string, *corev1.Container, error) {
+func getActionHandlers(synthesizeComp *SynthesizedComponent) (appsv1alpha1.BuiltinActionHandlerType,
+	map[string]*appsv1alpha1.LifecycleActionHandler, map[string]*appsv1alpha1.LifecycleActionHandler, error) {
+	builtinHandler := appsv1alpha1.UnknownBuiltinActionHandler
 	if synthesizeComp.LifecycleActions == nil {
-		return nil, "", nil, nil
+		return builtinHandler, nil, nil, nil
 	}
 
-	actions := map[string]*appsv1alpha1.LifecycleActionHandler{
+	actionHandlers := map[string]*appsv1alpha1.LifecycleActionHandler{
 		constant.PostProvisionAction: synthesizeComp.LifecycleActions.PostProvision,
 		constant.PreTerminateAction:  synthesizeComp.LifecycleActions.PreTerminate,
 		constant.MemberJoinAction:    synthesizeComp.LifecycleActions.MemberJoin,
@@ -470,21 +587,45 @@ func getActionsWithExecImageOrContainer(synthesizeComp *SynthesizedComponent) (m
 	}
 
 	if synthesizeComp.LifecycleActions.RoleProbe != nil {
-		actions[constant.RoleProbeAction] = &synthesizeComp.LifecycleActions.RoleProbe.LifecycleActionHandler
+		actionHandlers[constant.RoleProbeAction] = &synthesizeComp.LifecycleActions.RoleProbe.LifecycleActionHandler
 	}
 
+	execActionHandlers := map[string]*appsv1alpha1.LifecycleActionHandler{}
+	grpcActionHandlers := map[string]*appsv1alpha1.LifecycleActionHandler{}
+	for name, handler := range actionHandlers {
+		if handler == nil {
+			continue
+		}
+
+		if handler.BuiltinHandler != nil &&
+			*handler.BuiltinHandler != appsv1alpha1.CustomActionHandler &&
+			*handler.BuiltinHandler != appsv1alpha1.UnknownBuiltinActionHandler {
+			if builtinHandler == appsv1alpha1.UnknownBuiltinActionHandler {
+				builtinHandler = *handler.BuiltinHandler
+			}
+			if builtinHandler != *handler.BuiltinHandler {
+				err := fmt.Errorf("builtin handler conflict: %s, %s", builtinHandler, *handler.BuiltinHandler)
+				return appsv1alpha1.UnknownBuiltinActionHandler, nil, nil, err
+			}
+		}
+
+		if handler.CustomHandler != nil {
+			if handler.CustomHandler.Exec != nil {
+				execActionHandlers[name] = handler
+			} else if handler.CustomHandler.GRPC != nil {
+				grpcActionHandlers[name] = handler
+			}
+		}
+	}
+	return builtinHandler, execActionHandlers, grpcActionHandlers, nil
+}
+
+func getExecImageAndContainer(synthesizeComp *SynthesizedComponent, execHandlers map[string]*appsv1alpha1.LifecycleActionHandler) (string, *corev1.Container, error) {
 	var toolImage string
 	var containerName string
-	actionNames := []string{}
-	for name := range actions {
-		actionNames = append(actionNames, name)
-	}
-	sort.Strings(actionNames)
 
 	hasCommand := false
-	actionHandlers := map[string]util.Handlers{}
-	for _, name := range actionNames {
-		handler := actions[name]
+	for _, handler := range execHandlers {
 		if handler == nil || handler.CustomHandler == nil {
 			continue
 		}
@@ -494,15 +635,52 @@ func getActionsWithExecImageOrContainer(synthesizeComp *SynthesizedComponent) (m
 			hasCommand = true
 			handlers.Command = handler.CustomHandler.Exec.Command
 			if handler.CustomHandler.Image != "" {
-				toolImage = handler.CustomHandler.Image
+				if toolImage == "" {
+					toolImage = handler.CustomHandler.Image
+				}
+				if toolImage != handler.CustomHandler.Image {
+					return "", nil, errors.New("exec image conflict")
+				}
 			}
 			if handler.CustomHandler.Container != "" {
-				containerName = handler.CustomHandler.Container
+				if containerName == "" {
+					containerName = handler.CustomHandler.Container
+				}
+				if containerName != handler.CustomHandler.Container {
+					return "", nil, errors.New("exec container conflict")
+				}
 			}
+		}
+	}
+
+	if !hasCommand {
+		return "", nil, nil
+	}
+
+	execContainer := getExecContainer(synthesizeComp.PodSpec.Containers, containerName)
+	if toolImage == "" {
+		if execContainer == nil {
+			return "", nil, errors.New("no exec container found")
+		}
+		toolImage = execContainer.Image
+	}
+	return toolImage, execContainer, nil
+}
+
+func getHandlerSettings(synthesizeComp *SynthesizedComponent, actionHandlers map[string]*appsv1alpha1.LifecycleActionHandler) (map[string]util.Handlers, error) {
+	handlerSettings := map[string]util.Handlers{}
+	for name, handler := range actionHandlers {
+		if handler == nil || handler.CustomHandler == nil {
+			continue
+		}
+
+		handlers := util.Handlers{}
+		if handler.CustomHandler.Exec != nil {
+			handlers.Command = handler.CustomHandler.Exec.Command
 		} else if handler.CustomHandler.GRPC != nil {
 			port, err := getPort(synthesizeComp.PodSpec.Containers, handler.CustomHandler.GRPC.Port)
 			if err != nil {
-				return nil, "", nil, err
+				return nil, err
 			}
 			handlers.GPRC = map[string]string{}
 			handlers.GPRC["port"] = strconv.Itoa(int(port))
@@ -510,20 +688,9 @@ func getActionsWithExecImageOrContainer(synthesizeComp *SynthesizedComponent) (m
 				handlers.GPRC["host"] = handler.CustomHandler.GRPC.Host
 			}
 		}
-		actionHandlers[name] = handlers
+		handlerSettings[name] = handlers
 	}
-	if !hasCommand {
-		return actionHandlers, "", nil, nil
-	}
-
-	execContainer := getExecContainer(synthesizeComp.PodSpec.Containers, containerName)
-	if toolImage == "" {
-		if execContainer == nil {
-			return actionHandlers, "", nil, nil
-		}
-		toolImage = execContainer.Image
-	}
-	return actionHandlers, toolImage, execContainer, nil
+	return handlerSettings, nil
 }
 
 func getPort(containers []corev1.Container, port intstr.IntOrString) (int32, error) {

@@ -155,3 +155,13 @@ func (h *Handler) ReadWrite(ctx context.Context, reason string) error {
 	_, err := h.dbClient.ReadWrite(ctx, req)
 	return err
 }
+
+func (h *Handler) Switchover(ctx context.Context, primary, candidate string) error {
+	req := &plugin.SwitchoverRequest{
+		EngineInfo: &plugin.EngineInfo{},
+		Primary:    primary,
+		Candidate:  candidate,
+	}
+	_, err := h.dbClient.Switchover(ctx, req)
+	return err
+}

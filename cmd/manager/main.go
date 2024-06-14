@@ -126,6 +126,7 @@ func init() {
 	viper.SetDefault(constant.EnableRBACManager, true)
 	viper.SetDefault("VOLUMESNAPSHOT_API_BETA", false)
 	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks-tools:latest")
+	viper.SetDefault(constant.KBEnvAgentPort, 3501)
 	viper.SetDefault(constant.KBEnvLorryHTTPPort, 3501)
 	viper.SetDefault(constant.KBEnvLorryGRPCPort, 50001)
 	viper.SetDefault(constant.KBEnvLorryLogLevel, "info")

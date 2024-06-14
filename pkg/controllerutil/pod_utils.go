@@ -343,11 +343,19 @@ func GetLorryGRPCPortFromContainers(containers []corev1.Container) (int32, error
 }
 
 func GetLorryHTTPPort(pod *corev1.Pod) (int32, error) {
-	return GetLorryHTTPPortFromContainers(pod.Spec.Containers)
+	port, err := GetLorryHTTPPortFromContainers(pod.Spec.Containers)
+	if err != nil {
+		port, err = GetKBAgentPortFromContainers(pod.Spec.Containers)
+	}
+	return port, err
 }
 
 func GetLorryHTTPPortFromContainers(containers []corev1.Container) (int32, error) {
 	return GetPortByPortName(containers, constant.LorryHTTPPortName)
+}
+
+func GetKBAgentPortFromContainers(containers []corev1.Container) (int32, error) {
+	return GetPortByPortName(containers, constant.KBAgentPortName)
 }
 
 // GetLorryContainerName gets the lorry container from pod
@@ -364,7 +372,7 @@ func GetLorryContainer(containers []corev1.Container) *corev1.Container {
 	for i := range containers {
 		container = &containers[i]
 		for _, port := range container.Ports {
-			if port.Name == constant.LorryHTTPPortName {
+			if port.Name == constant.LorryHTTPPortName || port.Name == constant.KBAgentPortName {
 				return container
 			}
 		}

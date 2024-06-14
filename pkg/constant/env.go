@@ -88,6 +88,7 @@ const (
 	KBEnvCharacterType   = "KB_SERVICE_CHARACTER_TYPE"
 	KBEnvServiceUser     = "KB_SERVICE_USER"
 	KBEnvServicePassword = "KB_SERVICE_PASSWORD"
+	KBEnvAgentPort       = "KB_AGENT_PORT"
 	KBEnvLorryHTTPPort   = "LORRY_HTTP_PORT"
 	KBEnvLorryGRPCPort   = "LORRY_GRPC_PORT"
 	KBEnvLorryLogLevel   = "LORRY_LOG_LEVEL"

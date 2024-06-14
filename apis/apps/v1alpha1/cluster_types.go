@@ -1525,6 +1525,21 @@ func (r ClusterSpec) GetShardingByName(shardingName string) *ShardingSpec {
 	return nil
 }
 
+// GetCompSpecByComponentName gets component spec by the component name(include sharding spec).
+func (r ClusterSpec) GetCompSpecByComponentName(componentName string) *ClusterComponentSpec {
+	for _, v := range r.ComponentSpecs {
+		if v.Name == componentName {
+			return &v
+		}
+	}
+	for _, v := range r.ShardingSpecs {
+		if v.Name == componentName {
+			return &v.Template
+		}
+	}
+	return nil
+}
+
 // GetComponentDefRefName gets the name of referenced component definition.
 func (r ClusterSpec) GetComponentDefRefName(componentName string) string {
 	for _, component := range r.ComponentSpecs {

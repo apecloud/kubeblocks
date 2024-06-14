@@ -223,9 +223,17 @@ func GetCompDefByName(ctx context.Context, cli client.Reader, compDefName string
 	return compDef, nil
 }
 
-func GetCompNCompDefByName(ctx context.Context, cli client.Reader, namespace, fullCompName string) (*appsv1alpha1.Component, *appsv1alpha1.ComponentDefinition, error) {
+func GetComponentByName(ctx context.Context, cli client.Reader, namespace, fullCompName string) (*appsv1alpha1.Component, error) {
 	comp := &appsv1alpha1.Component{}
 	if err := cli.Get(ctx, client.ObjectKey{Name: fullCompName, Namespace: namespace}, comp); err != nil {
+		return nil, err
+	}
+	return comp, nil
+}
+
+func GetCompNCompDefByName(ctx context.Context, cli client.Reader, namespace, fullCompName string) (*appsv1alpha1.Component, *appsv1alpha1.ComponentDefinition, error) {
+	comp, err := GetComponentByName(ctx, cli, namespace, fullCompName)
+	if err != nil {
 		return nil, nil, err
 	}
 	compDef, err := GetCompDefByName(ctx, cli, comp.Spec.CompDef)
@@ -242,6 +250,21 @@ func ListClusterComponents(ctx context.Context, cli client.Reader, cluster *apps
 		return nil, err
 	}
 	return compList.Items, nil
+}
+
+func ListComponentsByName(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	componentName string) ([]appsv1alpha1.Component, error) {
+	if cluster.Spec.GetComponentByName(componentName) != nil {
+		comp, err := GetComponentByName(reqCtx.Ctx, cli, cluster.Namespace,
+			constant.GenerateClusterComponentName(cluster.Name, componentName))
+		if err != nil {
+			return nil, err
+		}
+		return []appsv1alpha1.Component{*comp}, nil
+	}
+	return intctrlutil.ListShardingComponents(reqCtx.Ctx, cli, cluster, componentName)
 }
 
 // GetClusterComponentShortNameSet gets the component short name set of the cluster.

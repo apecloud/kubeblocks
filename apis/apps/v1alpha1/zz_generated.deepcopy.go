@@ -1689,6 +1689,11 @@ func (in *ComponentDefinitionSpec) DeepCopyInto(out *ComponentDefinitionSpec) {
 		*out = new(UpdateStrategy)
 		**out = **in
 	}
+	if in.PodManagementPolicy != nil {
+		in, out := &in.PodManagementPolicy, &out.PodManagementPolicy
+		*out = new(appsv1.PodManagementPolicyType)
+		**out = **in
+	}
 	if in.Roles != nil {
 		in, out := &in.Roles, &out.Roles
 		*out = make([]ReplicaRole, len(*in))

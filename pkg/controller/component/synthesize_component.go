@@ -515,7 +515,7 @@ func buildRuntimeClassName(synthesizeComp *SynthesizedComponent, comp *appsv1alp
 	synthesizeComp.PodSpec.RuntimeClassName = comp.Spec.RuntimeClassName
 }
 
-// buildBackwardCompatibleFields builds backward compatible fields for component which referenced a clusterComponentDefinition and clusterComponentVersion before KubeBlocks Version 0.7.0
+// buildBackwardCompatibleFields builds backward compatible fields for component which referenced a clusterComponentDefinition and clusterComponentVersion
 // TODO(xingran): it will be removed in the future
 func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 	clusterDef *appsv1alpha1.ClusterDefinition,

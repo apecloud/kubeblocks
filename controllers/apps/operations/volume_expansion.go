@@ -329,7 +329,7 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 		constant.KBAppComponentLabelKey:          veHelper.fullComponentName,
 	}
 	if veHelper.templateName != "" {
-		matchingLabels[constant.KBAppComponentInstanceTemplatelabelKey] = veHelper.templateName
+		matchingLabels[constant.KBAppComponentInstanceTemplateLabelKey] = veHelper.templateName
 	}
 	pvcList := &corev1.PersistentVolumeClaimList{}
 	if err = cli.List(reqCtx.Ctx, pvcList, matchingLabels, client.InNamespace(opsRes.Cluster.Namespace)); err != nil {
@@ -345,7 +345,7 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 		if ordinal > veHelper.expectCount-1 {
 			continue
 		}
-		if v.Labels[constant.KBAppComponentInstanceTemplatelabelKey] != veHelper.templateName {
+		if v.Labels[constant.KBAppComponentInstanceTemplateLabelKey] != veHelper.templateName {
 			continue
 		}
 		objectKey := getPVCProgressObjectKey(v.Name)

@@ -300,7 +300,7 @@ func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent 
 			SetSpec(*claimTemplate.Spec.DeepCopy()).
 			GetObject()
 		if template.Name != "" {
-			pvc.Labels[constant.KBAppComponentInstanceTemplatelabelKey] = template.Name
+			pvc.Labels[constant.KBAppComponentInstanceTemplateLabelKey] = template.Name
 		}
 		pvcMap[pvcName] = pvc
 		pvcNameMap[pvcName] = claimTemplate.Name
@@ -346,7 +346,7 @@ func buildInstancePVCByTemplate(name string, template *instanceTemplateExt, pare
 			SetSpec(*claimTemplate.Spec.DeepCopy()).
 			GetObject()
 		if template.Name != "" {
-			pvc.Labels[constant.KBAppComponentInstanceTemplatelabelKey] = template.Name
+			pvc.Labels[constant.KBAppComponentInstanceTemplateLabelKey] = template.Name
 		}
 		pvcs = append(pvcs, pvc)
 	}

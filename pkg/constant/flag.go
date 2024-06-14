@@ -33,4 +33,8 @@ const (
 
 	// HostNetworkAnnotationKey defines the feature gate to enable the host-network for specified components or shardings.
 	HostNetworkAnnotationKey = "kubeblocks.io/host-network"
+
+	// FeatureReconciliationInCompactModeAnnotationKey indicates that the controller should run in compact mode,
+	// means to try the best to cutoff useless objects.
+	FeatureReconciliationInCompactModeAnnotationKey = "kubeblocks.io/compact-mode"
 )

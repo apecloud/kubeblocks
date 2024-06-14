@@ -258,11 +258,11 @@ func (r rebuildInstanceOpsHandler) prepareInstanceHelper(reqCtx intctrlutil.Requ
 		return nil, err
 	}
 	synthesizedComp, err := component.BuildSynthesizedComponentWrapper(reqCtx, cli, opsRes.Cluster, comp)
-	// TODO: remove after v0.9
-	synthesizedComp.CompDefName = comp.ComponentDef
 	if err != nil {
 		return nil, err
 	}
+	// TODO: remove after v0.9
+	synthesizedComp.CompDefName = comp.ComponentDef
 	rebuildPrefix := fmt.Sprintf("rebuild-%s", opsRes.OpsRequest.UID[:8])
 	pvcMap, volumes, volumeMounts, err := r.getPVCMapAndVolumes(opsRes, synthesizedComp, targetPod, rebuildPrefix, index)
 	if err != nil {

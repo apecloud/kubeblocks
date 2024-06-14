@@ -226,9 +226,17 @@ func GetCompDefByName(ctx context.Context, cli client.Reader, compDefName string
 	return compDef, nil
 }
 
-func GetCompNCompDefByName(ctx context.Context, cli client.Reader, namespace, fullCompName string) (*appsv1alpha1.Component, *appsv1alpha1.ComponentDefinition, error) {
+func GetComponentByName(ctx context.Context, cli client.Reader, namespace, fullCompName string) (*appsv1alpha1.Component, error) {
 	comp := &appsv1alpha1.Component{}
 	if err := cli.Get(ctx, client.ObjectKey{Name: fullCompName, Namespace: namespace}, comp); err != nil {
+		return nil, err
+	}
+	return comp, nil
+}
+
+func GetCompNCompDefByName(ctx context.Context, cli client.Reader, namespace, fullCompName string) (*appsv1alpha1.Component, *appsv1alpha1.ComponentDefinition, error) {
+	comp, err := GetComponentByName(ctx, cli, namespace, fullCompName)
+	if err != nil {
 		return nil, nil, err
 	}
 	compDef, err := GetCompDefByName(ctx, cli, comp.Spec.CompDef)

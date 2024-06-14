@@ -136,7 +136,7 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		insTemplateName string) bool {
 		if u.existClusterVersion(opsRes.OpsRequest) {
 			// TODO: remove this deprecated API after v0.9
-			compSpec := opsRes.Cluster.Spec.GetComponentByName(compOps.GetComponentName())
+			compSpec := getComponentSpecOrShardingTemplate(opsRes.Cluster, compOps.GetComponentName())
 			if compSpec == nil {
 				return true
 			}
@@ -213,7 +213,7 @@ func (u upgradeOpsHandler) getComponentDefMapWithUpdatedImages(reqCtx intctrluti
 	opsRes *OpsResource) (map[string]*appsv1alpha1.ComponentDefinition, error) {
 	compDefMap := map[string]*appsv1alpha1.ComponentDefinition{}
 	for _, v := range opsRes.OpsRequest.Spec.Upgrade.Components {
-		compSpec := opsRes.Cluster.Spec.GetComponentByName(v.ComponentName)
+		compSpec := getComponentSpecOrShardingTemplate(opsRes.Cluster, v.ComponentName)
 		if compSpec == nil {
 			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`"can not found the component "%s" in the cluster "%s"`,
 				v.ComponentName, opsRes.Cluster.Name))

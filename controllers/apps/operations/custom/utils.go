@@ -320,13 +320,26 @@ func getTargetPods(
 		podList *corev1.PodList
 		err     error
 	)
-	if podSelector.Role != "" {
-		podList, err = component.GetComponentPodListWithRole(ctx, cli, *cluster, compName, podSelector.Role)
+	if cluster.Spec.GetShardingByName(compName) != nil {
+		// get pods of the sharding components
+		podList := &corev1.PodList{}
+		labels := constant.GetClusterWellKnownLabels(cluster.Namespace)
+		labels[constant.KBAppShardingNameLabelKey] = compName
+		if podSelector.Role != "" {
+			labels[constant.RoleLabelKey] = podSelector.Role
+		}
+		if err = cli.List(ctx, podList, client.InNamespace(cluster.Namespace), client.MatchingLabels(labels)); err != nil {
+			return nil, err
+		}
 	} else {
-		podList, err = component.GetComponentPodList(ctx, cli, *cluster, compName)
-	}
-	if err != nil {
-		return nil, err
+		if podSelector.Role != "" {
+			podList, err = component.GetComponentPodListWithRole(ctx, cli, *cluster, compName, podSelector.Role)
+		} else {
+			podList, err = component.GetComponentPodList(ctx, cli, *cluster, compName)
+		}
+		if err != nil {
+			return nil, err
+		}
 	}
 	if len(podList.Items) == 0 {
 		return nil, intctrlutil.NewFatalError("can not find any pod which matches the podSelector for the component " + compName)

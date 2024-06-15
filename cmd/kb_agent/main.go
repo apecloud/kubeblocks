@@ -35,7 +35,6 @@ import (
 	kzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/httpserver"
-	"github.com/apecloud/kubeblocks/pkg/lorry/cronjobs"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -76,13 +75,6 @@ func main() {
 	if err != nil {
 		panic(errors.Wrap(err, "HTTP server initialize failed"))
 	}
-
-	// start cron jobs
-	jobManager, err := cronjobs.NewManager()
-	if err != nil {
-		panic(errors.Wrap(err, "Cron jobs initialize failed"))
-	}
-	jobManager.Start()
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, os.Interrupt)

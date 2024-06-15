@@ -46,7 +46,7 @@ type api struct {
 	ready     bool
 }
 
-func NewAPI() OperationAPI {
+func NewAPI() *api {
 	endpoints := []Endpoint{
 		{
 			Route:   "/action",

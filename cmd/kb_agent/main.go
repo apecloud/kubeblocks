@@ -34,9 +34,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	kzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	opsregister "github.com/apecloud/kubeblocks/pkg/kb_agent/actions/register"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/cronjobs"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/httpserver"
+	"github.com/apecloud/kubeblocks/pkg/lorry/cronjobs"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -72,8 +71,7 @@ func main() {
 	ctrl.SetLogger(kzap.New(kopts...))
 
 	// start HTTP Server
-	ops := opsregister.Actions()
-	httpServer := httpserver.NewServer(ops)
+	httpServer := httpserver.NewServer()
 	err = httpServer.StartNonBlocking()
 	if err != nil {
 		panic(errors.Wrap(err, "HTTP server initialize failed"))

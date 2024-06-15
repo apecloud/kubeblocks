@@ -31,8 +31,6 @@ type ExecHandler struct {
 	HandlerBase
 
 	Executor util.Executor
-	// For ComponentDefinition Actions
-	actionCommands map[string][]string
 }
 
 var _ Handler = &ExecHandler{}
@@ -54,7 +52,7 @@ func NewExecHandler(properties map[string]string) (Handler, error) {
 }
 
 func (h *ExecHandler) Do(ctx context.Context, setting util.Handlers, args map[string]any) (map[string]any, error) {
-	if len(setting.Command) < 0 {
+	if len(setting.Command) == 0 {
 		h.Logger.Info("member join command is empty!")
 		return nil, nil
 	}

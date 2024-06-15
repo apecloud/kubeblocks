@@ -28,8 +28,6 @@ import (
 
 	fasthttprouter "github.com/fasthttp/router"
 	"github.com/valyala/fasthttp"
-
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/actions"
 )
 
 // Server is an interface for the kb-agent HTTP server.
@@ -46,7 +44,7 @@ type server struct {
 }
 
 // NewServer returns a new HTTP server.
-func NewServer(ops map[string]actions.Action) Server {
+func NewServer() Server {
 	a := NewAPI()
 	return &server{
 		api:    a,

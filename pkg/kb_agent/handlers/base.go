@@ -27,7 +27,6 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers/models"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
@@ -75,5 +74,5 @@ func (mgr *HandlerBase) GetCurrentMemberName() string {
 }
 
 func (mgr *HandlerBase) Do(ctx context.Context, settings util.Handlers, args map[string]any) (map[string]any, error) {
-	return nil, models.ErrNotImplemented
+	return nil, ErrNotImplemented
 }

@@ -114,7 +114,7 @@ func (t *componentWorkloadUpgradeTransformer) Transform(ctx graph.TransformConte
 		rsm := &legacy.ReplicatedStateMachine{}
 		if err := graphCli.Get(transCtx.Context, client.ObjectKeyFromObject(comp), rsm); err == nil {
 			legacyFound = true
-			parent = graphCli.Do(dag, nil, rsm, model.ActionDeletePtr(), parent, model.WithPropagationPolicy(client.PropagationPolicy(metav1.DeletePropagationOrphan)))
+			graphCli.Do(dag, nil, rsm, model.ActionDeletePtr(), parent, model.WithPropagationPolicy(client.PropagationPolicy(metav1.DeletePropagationOrphan)))
 		} else if !apierrors.IsNotFound(err) {
 			return err
 		}

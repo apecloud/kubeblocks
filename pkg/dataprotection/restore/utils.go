@@ -116,7 +116,9 @@ func SetRestoreStatusAction(actions *[]dpv1alpha1.RestoreStatusAction,
 	if existingAction.Status != statusAction.Status {
 		existingAction.Status = statusAction.Status
 		existingAction.EndTime = statusAction.EndTime
-		existingAction.Message = statusAction.Message
+		if !strings.HasPrefix(existingAction.Message, dptypes.LogCollectorOutput) {
+			existingAction.Message = statusAction.Message
+		}
 	}
 }
 

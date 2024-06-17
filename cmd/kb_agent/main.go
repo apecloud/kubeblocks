@@ -40,11 +40,8 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-var disableDNSChecker bool
-
 func init() {
 	viper.AutomaticEnv()
-	pflag.BoolVar(&disableDNSChecker, "disable-dns-checker", false, "disable dns checker, for test&dev")
 }
 
 func main() {

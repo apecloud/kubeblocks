@@ -49,11 +49,8 @@ func (job *CheckRoleJob) Do() error {
 
 	if err != nil {
 		logger.Info("executing checkRole error", "error", err.Error())
-		// do not return err, as it will cause readinessprobe to fail
-		err = nil
 		if job.FailedCount%job.ReportFrequency == 0 {
 			logger.Info("role checks failed continuously", "times", job.FailedCount)
-			// if err is not nil, send event through kubelet readinessprobe
 			err = util.SentEventForProbe(context.Background(), resp)
 		}
 		job.FailedCount++

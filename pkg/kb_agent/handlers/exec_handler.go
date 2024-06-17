@@ -35,7 +35,7 @@ type ExecHandler struct {
 
 var _ Handler = &ExecHandler{}
 
-func NewExecHandler(properties map[string]string) (Handler, error) {
+func NewExecHandler(properties map[string]string) (*ExecHandler, error) {
 	logger := ctrl.Log.WithName("exec handler")
 
 	handlerBase, err := NewHandlerBase(logger)
@@ -53,7 +53,7 @@ func NewExecHandler(properties map[string]string) (Handler, error) {
 
 func (h *ExecHandler) Do(ctx context.Context, setting util.Handlers, args map[string]any) (map[string]any, error) {
 	if len(setting.Command) == 0 {
-		h.Logger.Info("member join command is empty!")
+		h.Logger.Info("action command is empty!")
 		return nil, nil
 	}
 	envs, err := util.GetGlobalSharedEnvs()

@@ -32,8 +32,8 @@ import (
 )
 
 var actionHandlers = map[string]util.Handlers{}
-var execHandler = &ExecHandler{}
-var grpcHandler = &GRPCHandler{}
+var execHandler *ExecHandler
+var grpcHandler *GRPCHandler
 var lock sync.Mutex
 
 func initHandlerSettings() error {
@@ -51,6 +51,15 @@ func initHandlerSettings() error {
 	if err != nil {
 		msg := fmt.Sprintf("unmarshal action handlers [%s] failed: %s", actionJSON, err.Error())
 		return errors.New(msg)
+	}
+	execHandler, err = NewExecHandler(nil)
+	if err != nil {
+		return errors.Wrap(err, "new exec handler failed")
+	}
+
+	grpcHandler, err = NewGRPCHandler(nil)
+	if err != nil {
+		return errors.Wrap(err, "new grpc handler failed")
 	}
 	return nil
 }

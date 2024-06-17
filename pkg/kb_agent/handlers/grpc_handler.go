@@ -34,7 +34,7 @@ type GRPCHandler struct {
 
 var _ Handler = &GRPCHandler{}
 
-func NewGRPCHandler(properties map[string]string) (Handler, error) {
+func NewGRPCHandler(properties map[string]string) (*GRPCHandler, error) {
 	logger := ctrl.Log.WithName("GRPC")
 	managerBase, err := NewHandlerBase(logger)
 	if err != nil {
@@ -52,5 +52,6 @@ func (h *GRPCHandler) Do(ctx context.Context, setting util.Handlers, args map[st
 	if setting.GPRC == nil {
 		return nil, errors.New("grpc setting is nil")
 	}
+	// TODO: implement grpc handler
 	return nil, ErrNotImplemented
 }

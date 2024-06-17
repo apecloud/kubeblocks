@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	vsv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
@@ -793,8 +794,12 @@ func PatchBackupObjectMeta(
 func mergeActionStatus(request *dpbackup.Request, status *dpv1alpha1.ActionStatus) {
 	var exist bool
 	for i := range request.Status.Actions {
-		if request.Status.Actions[i].Name == status.Name {
+		action := request.Status.Actions[i]
+		if action.Name == status.Name {
 			as := status.DeepCopy()
+			if strings.HasPrefix(action.FailureReason, dptypes.LogCollectorOutput) {
+				as.FailureReason = action.FailureReason
+			}
 			if request.Status.Actions[i].StartTimestamp != nil {
 				as.StartTimestamp = request.Status.Actions[i].StartTimestamp
 			}

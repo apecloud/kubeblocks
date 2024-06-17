@@ -34,6 +34,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	kzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/cronjobs"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/httpserver"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -68,6 +70,19 @@ func main() {
 		kopts = append(kopts, kzap.RawZapOpts(zap.AddCaller()))
 	}
 	ctrl.SetLogger(kzap.New(kopts...))
+
+	// init action handlers
+	err = handlers.InitHandlers()
+	if err != nil {
+		panic(errors.Wrap(err, "init action handlers failed"))
+	}
+
+	// start cron jobs
+	jobManager, err := cronjobs.NewManager()
+	if err != nil {
+		panic(errors.Wrap(err, "Cron jobs initialize failed"))
+	}
+	jobManager.Start()
 
 	// start HTTP Server
 	httpServer := httpserver.NewServer()

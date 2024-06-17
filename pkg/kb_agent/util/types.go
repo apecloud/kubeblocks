@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package util
 
 import (
-	"errors"
 	"strings"
 )
 
@@ -33,20 +32,12 @@ const (
 	RespEveSucc      = "Success"
 	RespEveFail      = "Failed"
 
-	GetOperation    OperationKind = "get"
-	CreateOperation OperationKind = "create"
-	DeleteOperation OperationKind = "delete"
-	ListOperation   OperationKind = "list"
-
 	CheckRunningOperation OperationKind = "checkRunning"
 	HealthyCheckOperation OperationKind = "healthyCheck"
 	CheckRoleOperation    OperationKind = "checkRole"
 	GetRoleOperation      OperationKind = "getRole"
 	GetLagOperation       OperationKind = "getLag"
 	SwitchoverOperation   OperationKind = "switchover"
-	ExecOperation         OperationKind = "exec"
-	QueryOperation        OperationKind = "query"
-	CloseOperation        OperationKind = "close"
 
 	LockOperation    OperationKind = "lockInstance"
 	UnlockOperation  OperationKind = "unlockInstance"
@@ -68,31 +59,12 @@ const (
 	JoinMemberOperation  OperationKind = "joinMember"
 	LeaveMemberOperation OperationKind = "leaveMember"
 
-	OperationNotImplemented    = "NotImplemented"
-	OperationInvalid           = "Invalid"
-	OperationSuccess           = "Success"
-	OperationFailed            = "Failed"
 	DefaultProbeTimeoutSeconds = 2
 
 	DataDumpOperation OperationKind = "dataDump"
 	DataLoadOperation OperationKind = "dataLoad"
 
-	LegacyEventFieldPath = "spec.containers{kb-checkrole}"
-	LorryEventFieldPath  = "spec.containers{kb-agent}"
-
-	// this is a general script template, which can be used for all kinds of exec request to databases.
-	DataScriptRequestTpl string = `
-		response=$(curl -s -X POST -H 'Content-Type: application/json' http://%s:3501/v1.0/bindings/%s -d '%s')
-		result=$(echo $response | jq -r '.event')
-		message=$(echo $response | jq -r '.message')
-		if [ "$result" == "Failed" ]; then
-			echo $message
-			exit 1
-		else
-			echo "$result"
-			exit 0
-		fi
-			`
+	KBAgentEventFieldPath = "spec.containers{kb-agent}"
 )
 
 type RoleType string
@@ -142,9 +114,15 @@ func NewProbeError(msg string) error {
 	}
 }
 
-var ErrNotImplemented = errors.New("not implemented")
+type CronJob struct {
+	TimeoutSeconds   int `json:"timeoutSeconds,omitempty"`
+	PeriodSeconds    int `json:"periodSeconds,omitempty"`
+	SuccessThreshold int `json:"successThreshold,omitempty"`
+	FailureThreshold int `json:"failureThreshold,omitempty"`
+}
 
 type Handlers struct {
 	Command []string          `json:"command,omitempty"`
 	GPRC    map[string]string `json:"grpc,omitempty"`
+	CronJob *CronJob          `json:"cronJob,omitempty"`
 }

@@ -23,22 +23,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sync"
+
+	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
-	"github.com/pkg/errors"
-	"github.com/spf13/viper"
 )
 
 var actionHandlers = map[string]util.Handlers{}
 var execHandler *ExecHandler
 var grpcHandler *GRPCHandler
-var lock sync.Mutex
 
-func initHandlerSettings() error {
-	lock.Lock()
-	defer lock.Unlock()
+func InitHandlers() error {
 	if len(actionHandlers) != 0 {
 		return nil
 	}
@@ -64,11 +61,11 @@ func initHandlerSettings() error {
 	return nil
 }
 
+func GetHandlers() map[string]util.Handlers {
+	return actionHandlers
+}
+
 func Do(ctx context.Context, action string, args map[string]any) (map[string]any, error) {
-	err := initHandlerSettings()
-	if err != nil {
-		return nil, errors.Wrap(err, "init handler settings failed")
-	}
 	if action == "" {
 		return nil, errors.New("action is empty")
 	}

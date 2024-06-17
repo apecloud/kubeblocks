@@ -34,7 +34,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	ctlruntime "sigs.k8s.io/controller-runtime"
 
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -43,31 +42,19 @@ var logger = ctlruntime.Log.WithName("event")
 
 func SentEventForProbe(ctx context.Context, data map[string]any) error {
 	logger.Info(fmt.Sprintf("send event: %v", data))
-	roleUpdateMechanism := workloads.DirectAPIServerEventUpdate
-	if viper.IsSet(constant.KBEnvRsmRoleUpdateMechanism) {
-		roleUpdateMechanism = workloads.RoleUpdateMechanism(viper.GetString(constant.KBEnvRsmRoleUpdateMechanism))
+	operation, ok := data["operation"]
+	if !ok {
+		return errors.New("operation failed must be set")
+	}
+	event, err := CreateEvent(string(operation.(OperationKind)), data)
+	if err != nil {
+		logger.Info("generate event failed", "error", err.Error())
+		return err
 	}
 
-	switch roleUpdateMechanism {
-	case workloads.ReadinessProbeEventUpdate:
-		return NewProbeError("not sending event directly, use readiness probe instand")
-	case workloads.DirectAPIServerEventUpdate:
-		operation, ok := data["operation"]
-		if !ok {
-			return errors.New("operation failed must be set")
-		}
-		event, err := CreateEvent(string(operation.(OperationKind)), data)
-		if err != nil {
-			logger.Info("generate event failed", "error", err.Error())
-			return err
-		}
-
-		go func() {
-			_ = SendEvent(ctx, event)
-		}()
-	default:
-		logger.Info(fmt.Sprintf("no event sent, RoleUpdateMechanism: %s", roleUpdateMechanism))
-	}
+	go func() {
+		_ = SendEvent(ctx, event)
+	}()
 
 	return nil
 }

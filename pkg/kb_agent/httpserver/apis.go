@@ -43,7 +43,6 @@ type OperationAPI interface {
 
 type api struct {
 	endpoints []Endpoint
-	ready     bool
 }
 
 func NewAPI() *api {
@@ -84,6 +83,12 @@ func actionHandler(reqCtx *fasthttp.RequestCtx) {
 		msg := NewErrorResponse("ERR_MALFORMED_REQUEST_DATA", fmt.Sprintf("marshal request data field: %v", err))
 		respond(reqCtx, withError(fasthttp.StatusInternalServerError, msg))
 		logger.Info("marshal request data field", "error", err.Error())
+		return
+	}
+
+	if req.Action == "" {
+		msg := NewErrorResponse("ERR_MALFORMED_REQUEST_DATA", "no action in request")
+		respond(reqCtx, withError(fasthttp.StatusBadRequest, msg))
 		return
 	}
 
@@ -131,13 +136,6 @@ func withEmpty() option {
 	}
 }
 
-func withMetadata(metadata map[string]string) option {
-	return func(ctx *fasthttp.RequestCtx) {
-		for k, v := range metadata {
-			ctx.Response.Header.Set("KB."+k, v)
-		}
-	}
-}
 func respond(ctx *fasthttp.RequestCtx, options ...option) {
 	for _, option := range options {
 		option(ctx)

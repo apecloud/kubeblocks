@@ -45,6 +45,16 @@ func (builder *ComponentBuilder) SetServiceVersion(serviceVersion string) *Compo
 	return builder
 }
 
+func (builder *ComponentBuilder) SetAnnotations(annotations map[string]string) *ComponentBuilder {
+	builder.get().Spec.Annotations = annotations
+	return builder
+}
+
+func (builder *ComponentBuilder) SetEnv(env []corev1.EnvVar) *ComponentBuilder {
+	builder.get().Spec.Env = env
+	return builder
+}
+
 func (builder *ComponentBuilder) SetSchedulingPolicy(schedulingPolicy *appsv1alpha1.SchedulingPolicy) *ComponentBuilder {
 	builder.get().Spec.SchedulingPolicy = schedulingPolicy
 	return builder
@@ -101,6 +111,11 @@ func (builder *ComponentBuilder) AddVolumeClaimTemplate(volumeName string,
 
 func (builder *ComponentBuilder) SetVolumeClaimTemplates(volumeClaimTemplates []appsv1alpha1.ClusterComponentVolumeClaimTemplate) *ComponentBuilder {
 	builder.get().Spec.VolumeClaimTemplates = volumeClaimTemplates
+	return builder
+}
+
+func (builder *ComponentBuilder) SetVolumes(volumes []corev1.Volume) *ComponentBuilder {
+	builder.get().Spec.Volumes = volumes
 	return builder
 }
 

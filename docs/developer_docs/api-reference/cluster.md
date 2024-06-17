@@ -831,6 +831,32 @@ identified using Cluster, Component and Service names.</li>
 </tr>
 <tr>
 <td>
+<code>annotations</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies Annotations to override or add for underlying Pods.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>env</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>List of environment variables to add.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>resources</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcerequirements-v1-core">
@@ -859,6 +885,20 @@ It allows defining the CPU, memory requirements and limits for the Component&rsq
 Each template specifies the desired characteristics of a persistent volume, such as storage class,
 size, and access modes.
 These templates are used to dynamically provision persistent volumes for the Component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumes</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volume-v1-core">
+[]Kubernetes core/v1.Volume
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>List of volumes to override.</p>
 </td>
 </tr>
 <tr>
@@ -912,6 +952,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
+<p>Specifies the configuration content of a config template.</p>
 </td>
 </tr>
 <tr>
@@ -4741,6 +4782,32 @@ you can enable the collection of these logs by including their names in the <cod
 </tr>
 <tr>
 <td>
+<code>annotations</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies Annotations to override or add for underlying Pods.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>env</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>List of environment variables to add.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>replicas</code><br/>
 <em>
 int32
@@ -4836,6 +4903,20 @@ These templates are used to dynamically provision persistent volumes for the Com
 </tr>
 <tr>
 <td>
+<code>volumes</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volume-v1-core">
+[]Kubernetes core/v1.Volume
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>List of volumes to override.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>services</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentService">
@@ -4873,6 +4954,7 @@ These templates are used to dynamically provision persistent volumes for the Com
 </td>
 <td>
 <em>(Optional)</em>
+<p>Specifies the configuration content of a config template.</p>
 </td>
 </tr>
 <tr>
@@ -8562,6 +8644,32 @@ identified using Cluster, Component and Service names.</li>
 </tr>
 <tr>
 <td>
+<code>annotations</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies Annotations to override or add for underlying Pods.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>env</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>List of environment variables to add.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>resources</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcerequirements-v1-core">
@@ -8590,6 +8698,20 @@ It allows defining the CPU, memory requirements and limits for the Component&rsq
 Each template specifies the desired characteristics of a persistent volume, such as storage class,
 size, and access modes.
 These templates are used to dynamically provision persistent volumes for the Component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumes</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volume-v1-core">
+[]Kubernetes core/v1.Volume
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>List of volumes to override.</p>
 </td>
 </tr>
 <tr>
@@ -8643,6 +8765,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
+<p>Specifies the configuration content of a config template.</p>
 </td>
 </tr>
 <tr>

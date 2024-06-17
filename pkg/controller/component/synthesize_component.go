@@ -147,34 +147,35 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	}
 	compDefObj := compDef.DeepCopy()
 	synthesizeComp := &SynthesizedComponent{
-		Namespace:          comp.Namespace,
-		ClusterName:        clusterName,
-		ClusterUID:         clusterUID,
-		Comp2CompDefs:      comp2CompDef,
-		Name:               compName,
-		FullCompName:       comp.Name,
-		CompDefName:        compDef.Name,
-		ServiceVersion:     comp.Spec.ServiceVersion,
-		ClusterGeneration:  clusterGeneration(cluster, comp),
-		PodSpec:            &compDef.Spec.Runtime,
-		HostNetwork:        compDefObj.Spec.HostNetwork,
-		ComponentServices:  compDefObj.Spec.Services,
-		LogConfigs:         compDefObj.Spec.LogConfigs,
-		ConfigTemplates:    compDefObj.Spec.Configs,
-		ScriptTemplates:    compDefObj.Spec.Scripts,
-		Roles:              compDefObj.Spec.Roles,
-		UpdateStrategy:     compDefObj.Spec.UpdateStrategy,
-		MinReadySeconds:    compDefObj.Spec.MinReadySeconds,
-		PolicyRules:        compDefObj.Spec.PolicyRules,
-		LifecycleActions:   compDefObj.Spec.LifecycleActions,
-		SystemAccounts:     mergeSystemAccounts(compDefObj.Spec.SystemAccounts, comp.Spec.SystemAccounts),
-		Replicas:           comp.Spec.Replicas,
-		Resources:          comp.Spec.Resources,
-		TLSConfig:          comp.Spec.TLSConfig,
-		ServiceAccountName: comp.Spec.ServiceAccountName,
-		Instances:          comp.Spec.Instances,
-		OfflineInstances:   comp.Spec.OfflineInstances,
-		DisableExporter:    comp.Spec.DisableExporter,
+		Namespace:           comp.Namespace,
+		ClusterName:         clusterName,
+		ClusterUID:          clusterUID,
+		Comp2CompDefs:       comp2CompDef,
+		Name:                compName,
+		FullCompName:        comp.Name,
+		CompDefName:         compDef.Name,
+		ServiceVersion:      comp.Spec.ServiceVersion,
+		ClusterGeneration:   clusterGeneration(cluster, comp),
+		TemplateAnnotations: comp.Spec.Annotations,
+		PodSpec:             &compDef.Spec.Runtime,
+		HostNetwork:         compDefObj.Spec.HostNetwork,
+		ComponentServices:   compDefObj.Spec.Services,
+		LogConfigs:          compDefObj.Spec.LogConfigs,
+		ConfigTemplates:     compDefObj.Spec.Configs,
+		ScriptTemplates:     compDefObj.Spec.Scripts,
+		Roles:               compDefObj.Spec.Roles,
+		UpdateStrategy:      compDefObj.Spec.UpdateStrategy,
+		MinReadySeconds:     compDefObj.Spec.MinReadySeconds,
+		PolicyRules:         compDefObj.Spec.PolicyRules,
+		LifecycleActions:    compDefObj.Spec.LifecycleActions,
+		SystemAccounts:      mergeSystemAccounts(compDefObj.Spec.SystemAccounts, comp.Spec.SystemAccounts),
+		Replicas:            comp.Spec.Replicas,
+		Resources:           comp.Spec.Resources,
+		TLSConfig:           comp.Spec.TLSConfig,
+		ServiceAccountName:  comp.Spec.ServiceAccountName,
+		Instances:           comp.Spec.Instances,
+		OfflineInstances:    comp.Spec.OfflineInstances,
+		DisableExporter:     comp.Spec.DisableExporter,
 	}
 
 	// build backward compatible fields, including workload, services, componentRefEnvs, clusterDefName, clusterCompDefName, and clusterCompVer, etc.
@@ -189,6 +190,10 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		buildCompatibleHorizontalScalePolicy(compDefObj, synthesizeComp)
 	}
 
+	if err = userDefinedEnv(synthesizeComp, comp); err != nil {
+		return nil, err
+	}
+
 	// build scheduling policy for workload
 	if err = buildSchedulingPolicy(synthesizeComp, comp); err != nil {
 		reqCtx.Log.Error(err, "failed to build scheduling policy")
@@ -201,8 +206,11 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	// build labels and annotations
 	buildLabelsAndAnnotations(compDef, comp, synthesizeComp)
 
-	// build volumeClaimTemplates
+	// build volumes & volumeClaimTemplates
 	buildVolumeClaimTemplates(synthesizeComp, comp)
+	if err = userDefinedVolumesNMounts(synthesizeComp, comp); err != nil {
+		return nil, err
+	}
 
 	limitSharedMemoryVolumeSize(synthesizeComp, comp)
 
@@ -212,9 +220,6 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	if err = overrideConfigTemplates(synthesizeComp, comp); err != nil {
 		return nil, err
 	}
-
-	// build monitor
-	// buildMonitorConfig(compDefObj.Spec.Monitor, comp.Spec.Monitor, &compDefObj.Spec.Runtime, synthesizeComp)
 
 	// build serviceAccountName
 	buildServiceAccountName(synthesizeComp)
@@ -326,6 +331,44 @@ func buildLabelsAndAnnotations(compDef *appsv1alpha1.ComponentDefinition, comp *
 	}
 }
 
+func userDefinedEnv(synthesizedComp *SynthesizedComponent, comp *appsv1alpha1.Component) error {
+	if comp == nil || len(comp.Spec.Env) == 0 {
+		return nil
+	}
+
+	vars := map[string]bool{}
+	for _, v := range comp.Spec.Env {
+		if vars[v.Name] {
+			return fmt.Errorf("duplicated user-defined env var %s", v.Name)
+		}
+		vars[v.Name] = true
+	}
+
+	check := func(containers []corev1.Container) error {
+		for _, c := range containers {
+			for _, v := range c.Env {
+				if vars[v.Name] {
+					return fmt.Errorf("duplicated env var %s", v.Name)
+				}
+			}
+		}
+		return nil
+	}
+	for _, cc := range [][]corev1.Container{synthesizedComp.PodSpec.InitContainers, synthesizedComp.PodSpec.Containers} {
+		if err := check(cc); err != nil {
+			return err
+		}
+	}
+
+	for i := range synthesizedComp.PodSpec.InitContainers {
+		synthesizedComp.PodSpec.InitContainers[i].Env = append(synthesizedComp.PodSpec.InitContainers[i].Env, comp.Spec.Env...)
+	}
+	for i := range synthesizedComp.PodSpec.Containers {
+		synthesizedComp.PodSpec.Containers[i].Env = append(synthesizedComp.PodSpec.Containers[i].Env, comp.Spec.Env...)
+	}
+	return nil
+}
+
 func mergeSystemAccounts(compDefAccounts []appsv1alpha1.SystemAccount,
 	compAccounts []appsv1alpha1.ComponentSystemAccount) []appsv1alpha1.SystemAccount {
 	if len(compAccounts) == 0 {
@@ -381,6 +424,61 @@ func buildVolumeClaimTemplates(synthesizeComp *SynthesizedComponent, comp *appsv
 	if comp.Spec.VolumeClaimTemplates != nil {
 		synthesizeComp.VolumeClaimTemplates = toVolumeClaimTemplates(&comp.Spec)
 	}
+}
+
+func userDefinedVolumesNMounts(synthesizedComp *SynthesizedComponent, comp *appsv1alpha1.Component) error {
+	if comp == nil {
+		return nil
+	}
+	volumes := map[string]bool{}
+	for _, vols := range [][]corev1.Volume{synthesizedComp.PodSpec.Volumes, comp.Spec.Volumes} {
+		for _, vol := range vols {
+			if volumes[vol.Name] {
+				return fmt.Errorf("duplicated volume %s", vol.Name)
+			}
+			volumes[vol.Name] = true
+		}
+	}
+	for _, vct := range synthesizedComp.VolumeClaimTemplates {
+		if volumes[vct.Name] {
+			return fmt.Errorf("duplicated volume %s", vct.Name)
+		}
+		volumes[vct.Name] = true
+	}
+
+	checkConfigNScriptTemplate := func(tpl appsv1alpha1.ComponentTemplateSpec) error {
+		if volumes[tpl.VolumeName] {
+			return fmt.Errorf("duplicated volume %s for template %s", tpl.VolumeName, tpl.Name)
+		}
+		volumes[tpl.VolumeName] = true
+		return nil
+	}
+	for _, tpl := range synthesizedComp.ConfigTemplates {
+		if err := checkConfigNScriptTemplate(tpl.ComponentTemplateSpec); err != nil {
+			return err
+		}
+	}
+	for _, tpl := range synthesizedComp.ScriptTemplates {
+		if err := checkConfigNScriptTemplate(tpl); err != nil {
+			return err
+		}
+	}
+
+	// for _, cc := range [][]corev1.Container{synthesizedComp.PodSpec.InitContainers, synthesizedComp.PodSpec.Containers} {
+	//	for _, c := range cc {
+	//		missed := make([]string, 0)
+	//		for _, mount := range c.VolumeMounts {
+	//			if !volumes[mount.Name] {
+	//				missed = append(missed, mount.Name)
+	//			}
+	//		}
+	//		if len(missed) > 0 {
+	//			return fmt.Errorf("volumes should be provided for mounts %s", strings.Join(missed, ","))
+	//		}
+	//	}
+	// }
+	synthesizedComp.PodSpec.Volumes = append(synthesizedComp.PodSpec.Volumes, comp.Spec.Volumes...)
+	return nil
 }
 
 // limitSharedMemoryVolumeSize limits the shared memory volume size to memory requests/limits.

@@ -182,4 +182,172 @@ var _ = Describe("synthesized component", func() {
 			Expect(err.Error()).Should(ContainSubstring("there is no content provided for config template"))
 		})
 	})
+
+	Context("env", func() {
+		BeforeEach(func() {
+			compDef = &appsv1alpha1.ComponentDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-compdef",
+				},
+				Spec: appsv1alpha1.ComponentDefinitionSpec{
+					Runtime: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name: "app",
+								Env: []corev1.EnvVar{
+									{
+										Name:  "key",
+										Value: "value",
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+			comp = &appsv1alpha1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-cluster-comp",
+					Labels: map[string]string{
+						constant.AppInstanceLabelKey:     "test-cluster",
+						constant.KBAppClusterUIDLabelKey: "uuid",
+					},
+					Annotations: map[string]string{
+						constant.KubeBlocksGenerationKey: "1",
+					},
+				},
+				Spec: appsv1alpha1.ComponentSpec{
+					Env: []corev1.EnvVar{
+						{
+							Name:  "ukey",
+							Value: "uvalue",
+						},
+					},
+				},
+			}
+		})
+
+		It("duplicated", func() {
+			comp.Spec.Env = append(comp.Spec.Env, comp.Spec.Env[0])
+
+			_, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring("duplicated user-defined env var"))
+		})
+
+		It("duplicated with definition", func() {
+			comp.Spec.Env = append(comp.Spec.Env, compDef.Spec.Runtime.Containers[0].Env[0])
+
+			_, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring("duplicated env var"))
+		})
+
+		It("ok", func() {
+			synthesizedComp, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil)
+			Expect(err).Should(BeNil())
+			Expect(synthesizedComp).ShouldNot(BeNil())
+			Expect(synthesizedComp.PodSpec.Containers[0].Env).Should(HaveLen(2))
+			Expect(synthesizedComp.PodSpec.Containers[0].Env[1]).Should(BeEquivalentTo(comp.Spec.Env[0]))
+		})
+	})
+
+	Context("volumes", func() {
+		BeforeEach(func() {
+			compDef = &appsv1alpha1.ComponentDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-compdef",
+				},
+				Spec: appsv1alpha1.ComponentDefinitionSpec{
+					Runtime: corev1.PodSpec{
+						Volumes: []corev1.Volume{
+							{
+								Name: "config",
+							},
+						},
+						Containers: []corev1.Container{
+							{
+								Name: "app",
+								VolumeMounts: []corev1.VolumeMount{
+									{
+										Name:      "config",
+										MountPath: "/config",
+									},
+									{
+										Name:      "data",
+										MountPath: "/data",
+									},
+									{
+										Name:      "log",
+										MountPath: "/log",
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+			comp = &appsv1alpha1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-cluster-comp",
+					Labels: map[string]string{
+						constant.AppInstanceLabelKey:     "test-cluster",
+						constant.KBAppClusterUIDLabelKey: "uuid",
+					},
+					Annotations: map[string]string{
+						constant.KubeBlocksGenerationKey: "1",
+					},
+				},
+				Spec: appsv1alpha1.ComponentSpec{
+					Volumes: []corev1.Volume{
+						{
+							Name: "data",
+						},
+						{
+							Name: "log",
+						},
+						{
+							Name: "not-defined",
+						},
+					},
+				},
+			}
+		})
+
+		It("duplicated", func() {
+			comp.Spec.Volumes = append(comp.Spec.Volumes, comp.Spec.Volumes[0])
+
+			_, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring("duplicated volume"))
+		})
+
+		It("duplicated with definition", func() {
+			comp.Spec.Volumes = append(comp.Spec.Volumes, compDef.Spec.Runtime.Volumes[0])
+
+			_, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring("duplicated volume"))
+		})
+
+		// It("missed volumes", func() {
+		//	volumes := comp.Spec.Volumes
+		//	comp.Spec.Volumes = comp.Spec.Volumes[0:1]
+		//
+		//	_, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil)
+		//	Expect(err).ShouldNot(BeNil())
+		//	Expect(err.Error()).Should(And(ContainSubstring("volumes should be provided for mounts"), ContainSubstring(volumes[1].Name)))
+		// })
+
+		It("ok", func() {
+			synthesizedComp, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil)
+			Expect(err).Should(BeNil())
+			Expect(synthesizedComp).ShouldNot(BeNil())
+			Expect(synthesizedComp.PodSpec.Volumes).Should(HaveLen(4))
+			Expect(synthesizedComp.PodSpec.Volumes[0].Name).Should(Equal("config"))
+			Expect(synthesizedComp.PodSpec.Volumes[1].Name).Should(Equal("data"))
+			Expect(synthesizedComp.PodSpec.Volumes[2].Name).Should(Equal("log"))
+			Expect(synthesizedComp.PodSpec.Volumes[3].Name).Should(Equal("not-defined"))
+		})
+	})
 })

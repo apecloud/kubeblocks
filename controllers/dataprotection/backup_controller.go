@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	vsv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
@@ -656,6 +657,9 @@ func mergeActionStatus(original, new *dpv1alpha1.ActionStatus) dpv1alpha1.Action
 	as := new.DeepCopy()
 	if original.StartTimestamp != nil {
 		as.StartTimestamp = original.StartTimestamp
+	}
+	if strings.HasPrefix(original.FailureReason, dptypes.LogCollectorOutput) {
+		as.FailureReason = original.FailureReason
 	}
 	return *as
 }

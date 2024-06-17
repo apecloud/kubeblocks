@@ -23,6 +23,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
@@ -42,7 +43,7 @@ type CommonJob struct {
 	FailureThreshold int
 }
 
-func NewJob(name string, cronJob *util.CronJob) (*CommonJob, error) {
+func NewJob(name string, cronJob *util.CronJob) Job {
 	job := &CommonJob{
 		Name:             name,
 		TimeoutSeconds:   60,
@@ -67,7 +68,11 @@ func NewJob(name string, cronJob *util.CronJob) (*CommonJob, error) {
 		job.FailureThreshold = cronJob.FailureThreshold
 	}
 
-	return job, nil
+	if name == constant.RoleProbeAction {
+		return NewCheckRoleJob(*job)
+	}
+
+	return job
 }
 
 func (job *CommonJob) Start() {

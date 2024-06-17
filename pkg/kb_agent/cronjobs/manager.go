@@ -26,23 +26,20 @@ import (
 )
 
 type Manager struct {
-	Jobs map[string]*CommonJob
+	Jobs map[string]Job
 }
 
 var logger = ctrl.Log.WithName("cronjobs")
 
 func NewManager() (*Manager, error) {
 	actionHandlers := handlers.GetHandlers()
-	jobs := make(map[string]*CommonJob)
+	jobs := make(map[string]Job)
 	for name, handler := range actionHandlers {
 		if handler.CronJob == nil {
 			continue
 		}
 		logger.Info("cronjob found", "name", name)
-		job, err := NewJob(name, handler.CronJob)
-		if err != nil {
-			logger.Info("Failed to create job", "error", err.Error(), "name", name, "setting", handler.CronJob)
-		}
+		job := NewJob(name, handler.CronJob)
 		jobs[name] = job
 	}
 	return &Manager{

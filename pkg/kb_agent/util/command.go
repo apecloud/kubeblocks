@@ -21,14 +21,11 @@ package util
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
-	"strings"
 
 	"github.com/pkg/errors"
-	"k8s.io/apimachinery/pkg/util/sets"
-
-	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 type Executor interface {
@@ -54,29 +51,12 @@ func ExecCommand(ctx context.Context, command []string, envs []string) (string, 
 	return string(bytes), err
 }
 
-func GetGlobalSharedEnvs() ([]string, error) {
-	envSetRequired := sets.New(
-		constant.KBEnvPodFQDN,
-		constant.KBEnvServicePort,
-		constant.KBEnvServiceUser,
-		constant.KBEnvServicePassword,
-	)
-	envSetGot := sets.KeySet(map[string]string{})
-	envs := make([]string, 0, envSetRequired.Len())
-	Es := os.Environ()
-	for _, env := range Es {
-		keys := strings.SplitN(env, "=", 2)
-		if len(keys) != 2 {
-			continue
-		}
-		if envSetRequired.Has(keys[0]) {
-			envs = append(envs, env)
-			envSetGot.Insert(keys[0])
-		}
+func GetAllEnvs(args map[string]any) []string {
+	envs := os.Environ()
+	for k, v := range args {
+		env := fmt.Sprintf("%s=%v", k, v)
+		envs = append(envs, env)
 	}
-	// if len(envs) != envSetRequired.Len() {
-	// 	return nil, errors.Errorf("%v envs is unset", sets.List(envSetRequired.Difference(envSetGot)))
-	// }
 
 	return envs, nil
 }

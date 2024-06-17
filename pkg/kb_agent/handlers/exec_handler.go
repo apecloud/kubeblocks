@@ -56,12 +56,8 @@ func (h *ExecHandler) Do(ctx context.Context, setting util.Handlers, args map[st
 		h.Logger.Info("action command is empty!")
 		return nil, nil
 	}
-	envs, err := util.GetGlobalSharedEnvs()
-	if err != nil {
-		return nil, err
-	}
-
-	h.Logger.Info("execute action", "commands", setting.Command)
+	envs := util.GetAllEnvs(args)
+	h.Logger.Info("execute action", "commands", setting.Command, "envs", envs)
 	output, err := h.Executor.ExecCommand(ctx, setting.Command, envs)
 	var result map[string]any
 	if output != "" {

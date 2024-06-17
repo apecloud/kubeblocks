@@ -767,7 +767,7 @@ func (r rebuildInstanceOpsHandler) instanceIsAvailable(
 	if !targetPod.DeletionTimestamp.IsZero() {
 		return false, nil
 	}
-	isFailed, isTimeout, _ := intctrlutil.IsPodFailedAndTimedOut(targetPod, true)
+	isFailed, isTimeout, _ := intctrlutil.IsPodFailedAndTimedOut(targetPod)
 	if isFailed && isTimeout {
 		return false, intctrlutil.NewFatalError(fmt.Sprintf(`the new instance "%s" is failed, please check it`, targetPod.Name))
 	}

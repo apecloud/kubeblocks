@@ -564,7 +564,7 @@ func hasFailedAndTimedOutPod(pods []*corev1.Pod) (bool, appsv1alpha1.ComponentMe
 		requeueAfter   time.Duration
 	)
 	for _, pod := range pods {
-		isFailed, isTimedOut, messageStr := intctrlutil.IsPodFailedAndTimedOut(pod, false)
+		isFailed, isTimedOut, messageStr := intctrlutil.IsPodFailedAndTimedOut(pod)
 		if !isFailed {
 			continue
 		}

@@ -35,7 +35,7 @@ type GRPCHandler struct {
 var _ Handler = &GRPCHandler{}
 
 func NewGRPCHandler(properties map[string]string) (*GRPCHandler, error) {
-	logger := ctrl.Log.WithName("GRPC")
+	logger := ctrl.Log.WithName("GRPC handler")
 	managerBase, err := NewHandlerBase(logger)
 	if err != nil {
 		return nil, err

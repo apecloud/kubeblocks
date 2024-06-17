@@ -21,35 +21,10 @@ package util
 
 import (
 	"context"
-	"os"
-	"strings"
 	"testing"
 
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/stretchr/testify/assert"
 )
-
-func TestGetGlobalSharedEnvs(t *testing.T) {
-	// Set up test environment
-	expectedEnvs := []string{
-		constant.KBEnvPodFQDN + "=value1",
-		constant.KBEnvServicePort + "=value2",
-		constant.KBEnvServiceUser + "=value3",
-		constant.KBEnvServicePassword + "=value4",
-	}
-	os.Clearenv()
-	for _, env := range expectedEnvs {
-		parts := strings.SplitN(env, "=", 2)
-		os.Setenv(parts[0], parts[1])
-	}
-
-	// Call the function
-	envs, err := GetGlobalSharedEnvs()
-
-	// Check the results
-	assert.NoError(t, err)
-	assert.ElementsMatch(t, expectedEnvs, envs)
-}
 
 func TestExecCommand(t *testing.T) {
 	// Set up test environment

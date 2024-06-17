@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/pkg/errors"
 )
@@ -54,9 +55,9 @@ func ExecCommand(ctx context.Context, command []string, envs []string) (string, 
 func GetAllEnvs(args map[string]any) []string {
 	envs := os.Environ()
 	for k, v := range args {
-		env := fmt.Sprintf("%s=%v", k, v)
+		env := fmt.Sprintf("%s=%v", strings.ToUpper(k), v)
 		envs = append(envs, env)
 	}
 
-	return envs, nil
+	return envs
 }

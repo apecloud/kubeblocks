@@ -36,7 +36,7 @@ type ExecHandler struct {
 var _ Handler = &ExecHandler{}
 
 func NewExecHandler(properties map[string]string) (*ExecHandler, error) {
-	logger := ctrl.Log.WithName("exec handler")
+	logger := ctrl.Log.WithName("EXEC handler")
 
 	handlerBase, err := NewHandlerBase(logger)
 	if err != nil {

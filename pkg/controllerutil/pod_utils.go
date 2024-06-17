@@ -562,12 +562,7 @@ func ResolveContainerDefaultFields(container corev1.Container, pcontainer *corev
 }
 
 // IsPodFailedAndTimedOut checks if the pod is failed and timed out.
-func IsPodFailedAndTimedOut(pod *corev1.Pod, ignoreScheduledCheck bool) (bool, bool, string) {
-	if !ignoreScheduledCheck {
-		if isFailed, isTimedOut, message := isPodScheduledFailedAndTimedOut(pod); isFailed {
-			return isFailed, isTimedOut, message
-		}
-	}
+func IsPodFailedAndTimedOut(pod *corev1.Pod) (bool, bool, string) {
 	initContainerFailed, message := isAnyContainerFailed(pod.Status.InitContainerStatuses)
 	if initContainerFailed {
 		return initContainerFailed, isContainerFailedAndTimedOut(pod, corev1.PodInitialized), message
@@ -575,20 +570,6 @@ func IsPodFailedAndTimedOut(pod *corev1.Pod, ignoreScheduledCheck bool) (bool, b
 	containerFailed, message := isAnyContainerFailed(pod.Status.ContainerStatuses)
 	if containerFailed {
 		return containerFailed, isContainerFailedAndTimedOut(pod, corev1.ContainersReady), message
-	}
-	return false, false, ""
-}
-
-// IsPodScheduledFailedAndTimedOut checks whether the unscheduled pod has timed out.
-func isPodScheduledFailedAndTimedOut(pod *corev1.Pod) (bool, bool, string) {
-	for _, cond := range pod.Status.Conditions {
-		if cond.Type != corev1.PodScheduled {
-			continue
-		}
-		if cond.Status == corev1.ConditionTrue {
-			return false, false, ""
-		}
-		return true, time.Now().After(cond.LastTransitionTime.Add(PodScheduledFailedTimeout)), cond.Message
 	}
 	return false, false, ""
 }

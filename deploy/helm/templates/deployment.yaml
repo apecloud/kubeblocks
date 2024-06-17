@@ -69,8 +69,8 @@ spec:
             - "--zap-encoder={{ . }}"
             {{- end }}
             - "--extensions={{- default "true" ( include "kubeblocks.addonControllerEnabled" . ) }}"
-            - "--apps={{- default "true" .Values.controllers.apps.enabled }}"
-            - "--workloads={{- default "true" .Values.controllers.workloads.enabled }}"
+            - "--apps={{ ne .Values.controllers.apps.enabled false }}"
+            - "--workloads={{ ne .Values.controllers.workloads.enabled false }}"
             - "--experimental={{- default "false" .Values.controllers.experimental.enabled }}"
             {{- with .Values.managedNamespaces }}
             - "--managed-namespaces={{ . }}"

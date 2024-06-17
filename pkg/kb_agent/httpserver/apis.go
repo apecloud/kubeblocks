@@ -37,16 +37,8 @@ const (
 
 type option = func(ctx *fasthttp.RequestCtx)
 
-type OperationAPI interface {
-	Endpoints() []Endpoint
-}
-
-type api struct {
-	endpoints []Endpoint
-}
-
-func NewAPI() *api {
-	endpoints := []Endpoint{
+func Endpoints() []Endpoint {
+	return []Endpoint{
 		{
 			Route:   "/action",
 			Method:  fasthttp.MethodPost,
@@ -55,13 +47,6 @@ func NewAPI() *api {
 		},
 	}
 
-	return &api{
-		endpoints: endpoints,
-	}
-}
-
-func (a *api) Endpoints() []Endpoint {
-	return a.endpoints
 }
 
 func actionHandler(reqCtx *fasthttp.RequestCtx) {

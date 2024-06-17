@@ -38,17 +38,16 @@ type Server interface {
 }
 
 type server struct {
-	config  Config
-	api     OperationAPI
-	servers []*fasthttp.Server
+	config    Config
+	endpoints []Endpoint
+	servers   []*fasthttp.Server
 }
 
 // NewServer returns a new HTTP server.
 func NewServer() Server {
-	a := NewAPI()
 	return &server{
-		api:    a,
-		config: config,
+		endpoints: Endpoints(),
+		config:    config,
 	}
 }
 
@@ -126,8 +125,7 @@ func (s *server) apiLogger(next fasthttp.RequestHandler) fasthttp.RequestHandler
 }
 
 func (s *server) Router() fasthttp.RequestHandler {
-	endpoints := s.api.Endpoints()
-	router := s.getRouter(endpoints)
+	router := s.getRouter(s.endpoints)
 
 	return router.Handler
 }

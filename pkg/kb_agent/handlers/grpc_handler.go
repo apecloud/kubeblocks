@@ -22,6 +22,7 @@ package handlers
 import (
 	"context"
 
+	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -29,20 +30,15 @@ import (
 )
 
 type GRPCHandler struct {
-	HandlerBase
+	Logger logr.Logger
 }
 
 var _ Handler = &GRPCHandler{}
 
 func NewGRPCHandler(properties map[string]string) (*GRPCHandler, error) {
 	logger := ctrl.Log.WithName("GRPC handler")
-	managerBase, err := NewHandlerBase(logger)
-	if err != nil {
-		return nil, err
-	}
-
 	h := &GRPCHandler{
-		HandlerBase: *managerBase,
+		Logger: logger,
 	}
 
 	return h, nil

@@ -22,15 +22,10 @@ package handlers
 import (
 	"context"
 
-	"github.com/go-logr/logr"
-
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
 type Handler interface {
 	// exec action
 	Do(ctx context.Context, settings util.Handlers, agrs map[string]interface{}) (map[string]interface{}, error)
-
-	GetCurrentMemberName() string
-	GetLogger() logr.Logger
 }

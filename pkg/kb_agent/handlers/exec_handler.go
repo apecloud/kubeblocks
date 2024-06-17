@@ -22,13 +22,14 @@ package handlers
 import (
 	"context"
 
+	"github.com/go-logr/logr"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
 type ExecHandler struct {
-	HandlerBase
+	Logger logr.Logger
 
 	Executor util.Executor
 }
@@ -38,14 +39,9 @@ var _ Handler = &ExecHandler{}
 func NewExecHandler(properties map[string]string) (*ExecHandler, error) {
 	logger := ctrl.Log.WithName("EXEC handler")
 
-	handlerBase, err := NewHandlerBase(logger)
-	if err != nil {
-		return nil, err
-	}
-
 	h := &ExecHandler{
-		HandlerBase: *handlerBase,
-		Executor:    &util.ExecutorImpl{},
+		Logger:   logger,
+		Executor: &util.ExecutorImpl{},
 	}
 
 	return h, nil

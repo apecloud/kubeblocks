@@ -5207,6 +5207,15 @@ spec:
                     - scrapePort
                     type: object
                 type: object
+              podManagementPolicy:
+                description: "InstanceSet controls the creation of pods during initial
+                  scale up, replacement of pods on nodes, and scaling down. \n - `OrderedReady`:
+                  Creates pods in increasing order (pod-0, then pod-1, etc). The controller
+                  waits until each pod is ready before continuing. Pods are removed
+                  in reverse order when scaling down. - `Parallel`: Creates pods in
+                  parallel to match the desired scale without waiting. All pods are
+                  deleted at once when scaling down."
+                type: string
               policyRules:
                 description: "Defines the namespaced policy rules required by the
                   Component. \n The `policyRules` field is an array of `rbacv1.PolicyRule`

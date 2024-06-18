@@ -1756,6 +1756,26 @@ at least 3 operational for quorum.</li>
 </tr>
 <tr>
 <td>
+<code>podManagementPolicy</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podmanagementpolicytype-v1-apps">
+Kubernetes apps/v1.PodManagementPolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>InstanceSet controls the creation of pods during initial scale up, replacement of pods on nodes, and scaling down.</p>
+<ul>
+<li><code>OrderedReady</code>: Creates pods in increasing order (pod-0, then pod-1, etc). The controller waits until each pod
+is ready before continuing. Pods are removed in reverse order when scaling down.</li>
+<li><code>Parallel</code>: Creates pods in parallel to match the desired scale without waiting. All pods are deleted at once
+when scaling down.</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
 <code>roles</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ReplicaRole">
@@ -8203,6 +8223,26 @@ number of operational replicas for maintaining quorum.
 at least 3 operational for quorum.</li>
 </ul>
 <p>This field is immutable and defaults to &lsquo;Serial&rsquo;.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podManagementPolicy</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podmanagementpolicytype-v1-apps">
+Kubernetes apps/v1.PodManagementPolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>InstanceSet controls the creation of pods during initial scale up, replacement of pods on nodes, and scaling down.</p>
+<ul>
+<li><code>OrderedReady</code>: Creates pods in increasing order (pod-0, then pod-1, etc). The controller waits until each pod
+is ready before continuing. Pods are removed in reverse order when scaling down.</li>
+<li><code>Parallel</code>: Creates pods in parallel to match the desired scale without waiting. All pods are deleted at once
+when scaling down.</li>
+</ul>
 </td>
 </tr>
 <tr>

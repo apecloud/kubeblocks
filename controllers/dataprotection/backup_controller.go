@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	vsv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
@@ -618,9 +619,9 @@ func (r *BackupReconciler) handleRunningPhase(
 func (r *BackupReconciler) checkIsCompletedDuringRunning(reqCtx intctrlutil.RequestCtx,
 	backup *dpv1alpha1.Backup) (bool, error) {
 	var (
-		backupTargetExists     = true
-		backupTargetIsDeleting bool
-		err                    error
+		backupTargetExists              = true
+		backupTargetIsStoppedOrDeleting bool
+		err                             error
 	)
 	// check if target cluster exits
 	clusterName := backup.Labels[constant.AppInstanceLabelKey]
@@ -631,10 +632,10 @@ func (r *BackupReconciler) checkIsCompletedDuringRunning(reqCtx intctrlutil.Requ
 		if err != nil {
 			return false, err
 		}
-		backupTargetIsDeleting = cluster.IsDeleting()
+		backupTargetIsStoppedOrDeleting = cluster.IsDeleting() || cluster.Status.Phase == appsv1alpha1.StoppedClusterPhase
 	}
-	// if backup target exists, and it is not deleting, check if the schedule is enabled.
-	if backupTargetExists && !backupTargetIsDeleting {
+	// if backup target exists, and it is not deleting or stopped, check if the schedule is enabled.
+	if backupTargetExists && !backupTargetIsStoppedOrDeleting {
 		backupSchedule := &dpv1alpha1.BackupSchedule{}
 		if err = r.Client.Get(reqCtx.Ctx, client.ObjectKey{Name: backup.Labels[dptypes.BackupScheduleLabelKey],
 			Namespace: backup.Namespace}, backupSchedule); err != nil {
@@ -793,8 +794,12 @@ func PatchBackupObjectMeta(
 func mergeActionStatus(request *dpbackup.Request, status *dpv1alpha1.ActionStatus) {
 	var exist bool
 	for i := range request.Status.Actions {
-		if request.Status.Actions[i].Name == status.Name {
+		action := request.Status.Actions[i]
+		if action.Name == status.Name {
 			as := status.DeepCopy()
+			if strings.HasPrefix(action.FailureReason, dptypes.LogCollectorOutput) {
+				as.FailureReason = action.FailureReason
+			}
 			if request.Status.Actions[i].StartTimestamp != nil {
 				as.StartTimestamp = request.Status.Actions[i].StartTimestamp
 			}

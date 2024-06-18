@@ -77,7 +77,7 @@ var _ = Describe("Component Utils", func() {
 			_, _, cluster := testapps.InitClusterWithHybridComps(&testCtx, clusterDefName,
 				clusterVersionName, clusterName, statelessCompName, "stateful", consensusCompName)
 			its := testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusCompName)
-			_ = testapps.MockInstanceSetPods(&testCtx, its, clusterName, consensusCompName)
+			_ = testapps.MockInstanceSetPods(&testCtx, its, cluster, consensusCompName)
 
 			By("test GetMinReadySeconds function")
 			minReadySeconds, _ := component.GetMinReadySeconds(ctx, k8sClient, *cluster, consensusCompName)
@@ -101,7 +101,7 @@ var _ = Describe("Component Utils", func() {
 				AddAppComponentLabel(compName).
 				AddAppManagedByLabel().
 				AddRoleLabel(role).
-				AddConsensusSetAccessModeLabel(mode).
+				AddAccessModeLabel(mode).
 				AddControllerRevisionHashLabel("").
 				AddVolume(corev1.Volume{
 					Name: testapps.DataVolumeName,

@@ -70,7 +70,6 @@ const (
 	backupMethodName    = "test-backup-method"
 	vsBackupMethodName  = "test-vs-backup-method"
 	actionSetName       = "test-action-set"
-	vsActionSetName     = "test-vs-action-set"
 )
 
 var (
@@ -334,7 +333,7 @@ var _ = Describe("Component Controller", func() {
 		itsList := testk8s.ListAndCheckInstanceSetWithComponent(&testCtx, client.ObjectKeyFromObject(clusterObj), compName)
 		Expect(itsList.Items).Should(HaveLen(1))
 		its := itsList.Items[0]
-		pods := testapps.MockInstanceSetPods(&testCtx, &its, clusterObj.Name, compName)
+		pods := testapps.MockInstanceSetPods(&testCtx, &its, clusterObj, compName)
 		Expect(testapps.ChangeObjStatus(&testCtx, &its, func() {
 			testk8s.MockInstanceSetReady(&its, pods...)
 		})).ShouldNot(HaveOccurred())
@@ -712,47 +711,7 @@ var _ = Describe("Component Controller", func() {
 
 					if policyType == appsv1alpha1.HScaleDataClonePolicyCloneVolume {
 						By("creating actionSet if backup policy is backup")
-						actionSet := &dpv1alpha1.ActionSet{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      actionSetName,
-								Namespace: clusterKey.Namespace,
-								Labels: map[string]string{
-									constant.ClusterDefLabelKey: clusterDef.Name,
-								},
-							},
-							Spec: dpv1alpha1.ActionSetSpec{
-								Env: []corev1.EnvVar{
-									{
-										Name:  "test-name",
-										Value: "test-value",
-									},
-								},
-								BackupType: dpv1alpha1.BackupTypeFull,
-								Backup: &dpv1alpha1.BackupActionSpec{
-									BackupData: &dpv1alpha1.BackupDataActionSpec{
-										JobActionSpec: dpv1alpha1.JobActionSpec{
-											BaseJobActionSpec: dpv1alpha1.BaseJobActionSpec{
-												Image:   "xtrabackup",
-												Command: []string{""},
-											},
-										},
-									},
-								},
-								Restore: &dpv1alpha1.RestoreActionSpec{
-									PrepareData: &dpv1alpha1.JobActionSpec{
-										BaseJobActionSpec: dpv1alpha1.BaseJobActionSpec{
-											Image: "xtrabackup",
-											Command: []string{
-												"sh",
-												"-c",
-												"/backup_scripts.sh",
-											},
-										},
-									},
-								},
-							},
-						}
-						testapps.CheckedCreateK8sResource(&testCtx, actionSet)
+						fakeActionSet(clusterDef.Name)
 					}
 				}
 			})()).ShouldNot(HaveOccurred())
@@ -868,7 +827,7 @@ var _ = Describe("Component Controller", func() {
 		}
 
 		By("mock pods of component are available")
-		mockPods := testapps.MockInstanceSetPods(&testCtx, its, clusterObj.Name, compName)
+		mockPods := testapps.MockInstanceSetPods(&testCtx, its, clusterObj, compName)
 		Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
 			testk8s.MockInstanceSetReady(its, mockPods...)
 		})).ShouldNot(HaveOccurred())
@@ -1729,7 +1688,7 @@ var _ = Describe("Component Controller", func() {
 		By("Checking instanceSet number")
 		itsList := testk8s.ListAndCheckInstanceSetItemsCount(&testCtx, clusterKey, 1)
 		its := &itsList.Items[0]
-		mockPods := testapps.MockInstanceSetPods(&testCtx, its, clusterObj.Name, compDefName)
+		mockPods := testapps.MockInstanceSetPods(&testCtx, its, clusterObj, compDefName)
 		Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
 			testk8s.MockInstanceSetReady(its, mockPods...)
 		})).ShouldNot(HaveOccurred())
@@ -1895,7 +1854,7 @@ var _ = Describe("Component Controller", func() {
 		itsList := testk8s.ListAndCheckInstanceSet(&testCtx, clusterKey)
 		its := &itsList.Items[0]
 		By("mock pod are available and wait for component enter running phase")
-		mockPods := testapps.MockInstanceSetPods(&testCtx, its, clusterObj.Name, compName)
+		mockPods := testapps.MockInstanceSetPods(&testCtx, its, clusterObj, compName)
 		Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
 			testk8s.MockInstanceSetReady(its, mockPods...)
 		})).ShouldNot(HaveOccurred())
@@ -2058,7 +2017,7 @@ var _ = Describe("Component Controller", func() {
 		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *appsv1alpha1.Component) {
 			comp.Spec.Replicas += 1
 		})()).Should(Succeed())
-		checkWorkloadGenerationAndToolsImage(Eventually, initWorkloadGeneration+1, 0, 1)
+		checkWorkloadGenerationAndToolsImage(Eventually, initWorkloadGeneration+2, 0, 1)
 	}
 
 	testCompInheritLabelsAndAnnotations := func(compName, compDefName string) {
@@ -2467,4 +2426,48 @@ func checkRestoreAndSetCompleted(clusterKey types.NamespacedName, compName strin
 
 	By("Mocking restore phase to succeeded")
 	mockRestoreCompleted(ml)
+}
+
+func fakeActionSet(clusterDefName string) *dpv1alpha1.ActionSet {
+	actionSet := &dpv1alpha1.ActionSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: actionSetName,
+			Labels: map[string]string{
+				constant.ClusterDefLabelKey: clusterDefName,
+			},
+		},
+		Spec: dpv1alpha1.ActionSetSpec{
+			Env: []corev1.EnvVar{
+				{
+					Name:  "test-name",
+					Value: "test-value",
+				},
+			},
+			BackupType: dpv1alpha1.BackupTypeFull,
+			Backup: &dpv1alpha1.BackupActionSpec{
+				BackupData: &dpv1alpha1.BackupDataActionSpec{
+					JobActionSpec: dpv1alpha1.JobActionSpec{
+						BaseJobActionSpec: dpv1alpha1.BaseJobActionSpec{
+							Image:   "xtrabackup",
+							Command: []string{""},
+						},
+					},
+				},
+			},
+			Restore: &dpv1alpha1.RestoreActionSpec{
+				PrepareData: &dpv1alpha1.JobActionSpec{
+					BaseJobActionSpec: dpv1alpha1.BaseJobActionSpec{
+						Image: "xtrabackup",
+						Command: []string{
+							"sh",
+							"-c",
+							"/backup_scripts.sh",
+						},
+					},
+				},
+			},
+		},
+	}
+	testapps.CheckedCreateK8sResource(&testCtx, actionSet)
+	return actionSet
 }

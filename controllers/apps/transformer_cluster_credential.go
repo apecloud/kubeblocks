@@ -93,7 +93,8 @@ func (t *clusterConnCredentialTransformer) buildSynthesizedComponent(transCtx *c
 				continue
 			}
 			return &component.SynthesizedComponent{
-				Name: compSpec.Name,
+				Name:        compSpec.Name,
+				Annotations: transCtx.Cluster.Annotations,
 				ComponentServices: []appsv1alpha1.ComponentService{
 					{
 						Service: appsv1alpha1.Service{

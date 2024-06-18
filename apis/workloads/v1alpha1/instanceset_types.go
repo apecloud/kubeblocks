@@ -25,6 +25,55 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+// SchedulingPolicy the scheduling policy.
+// Deprecated: Unify with apps/v1alpha1.SchedulingPolicy
+type SchedulingPolicy struct {
+	// If specified, the Pod will be dispatched by specified scheduler.
+	// If not specified, the Pod will be dispatched by default scheduler.
+	//
+	// +optional
+	SchedulerName string `json:"schedulerName,omitempty"`
+
+	// NodeSelector is a selector which must be true for the Pod to fit on a node.
+	// Selector which must match a node's labels for the Pod to be scheduled on that node.
+	// More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
+	//
+	// +optional
+	// +mapType=atomic
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// NodeName is a request to schedule this Pod onto a specific node. If it is non-empty,
+	// the scheduler simply schedules this Pod onto that node, assuming that it fits resource
+	// requirements.
+	//
+	// +optional
+	NodeName string `json:"nodeName,omitempty"`
+
+	// Specifies a group of affinity scheduling rules of the Cluster, including NodeAffinity, PodAffinity, and PodAntiAffinity.
+	//
+	// +optional
+	Affinity *corev1.Affinity `json:"affinity,omitempty"`
+
+	// Allows Pods to be scheduled onto nodes with matching taints.
+	// Each toleration in the array allows the Pod to tolerate node taints based on
+	// specified `key`, `value`, `effect`, and `operator`.
+	//
+	// - The `key`, `value`, and `effect` identify the taint that the toleration matches.
+	// - The `operator` determines how the toleration matches the taint.
+	//
+	// Pods with matching tolerations are allowed to be scheduled on tainted nodes, typically reserved for specific purposes.
+	//
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// TopologySpreadConstraints describes how a group of Pods ought to spread across topology
+	// domains. Scheduler will schedule Pods in a way which abides by the constraints.
+	// All topologySpreadConstraints are ANDed.
+	//
+	// +optional
+	TopologySpreadConstraints []corev1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty"`
+}
+
 // InstanceTemplate allows customization of individual replica configurations within a Component,
 // without altering the base component template defined in ClusterComponentSpec.
 // It enables the application of distinct settings to specific instances (replicas),
@@ -67,27 +116,10 @@ type InstanceTemplate struct {
 	// +optional
 	Image *string `json:"image,omitempty"`
 
-	// Specifies the name of the node where the Pod should be scheduled.
-	// If set, the Pod will be directly assigned to the specified node, bypassing the Kubernetes scheduler.
-	// This is useful for controlling Pod placement on specific nodes.
-	//
-	// Important considerations:
-	// - `nodeName` bypasses default scheduling constraints (e.g., resource requirements, node selectors, affinity rules).
-	// - It is the user's responsibility to ensure the node is suitable for the Pod.
-	// - If the node is unavailable, the Pod will remain in "Pending" state until the node is available or the Pod is deleted.
+	// Specifies the scheduling policy for the Component.
 	//
 	// +optional
-	NodeName *string `json:"nodeName,omitempty"`
-
-	// Defines NodeSelector to override.
-	// +optional
-	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
-
-	// Tolerations specifies a list of tolerations to be applied to the Pod, allowing it to tolerate node taints.
-	// This field can be used to add new tolerations or override existing ones.
-	//
-	// +optional
-	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+	SchedulingPolicy *SchedulingPolicy `json:"schedulingPolicy,omitempty"`
 
 	// Specifies an override for the resource requirements of the first container in the Pod.
 	// This field allows for customizing resource allocation (CPU, memory, etc.) for the container.
@@ -620,12 +652,17 @@ const (
 	ReasonInstanceFailure = "InstanceFailure"
 )
 
+const defaultInstanceTemplateReplicas = 1
+
 func (t *InstanceTemplate) GetName() string {
 	return t.Name
 }
 
-func (t *InstanceTemplate) GetReplicas() *int32 {
-	return t.Replicas
+func (t *InstanceTemplate) GetReplicas() int32 {
+	if t.Replicas != nil {
+		return *t.Replicas
+	}
+	return defaultInstanceTemplateReplicas
 }
 
 func init() {

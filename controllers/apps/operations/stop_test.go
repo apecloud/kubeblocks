@@ -55,6 +55,7 @@ var _ = Describe("Stop OpsRequest", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.InstanceSetSignature, true, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
 	}
 
@@ -66,6 +67,9 @@ var _ = Describe("Stop OpsRequest", func() {
 		It("Test stop OpsRequest", func() {
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusComp)
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, statelessComp)
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, statefulComp)
 			By("create Stop opsRequest")
 			ops := testapps.NewOpsRequestObj("stop-ops-"+randomStr, testCtx.DefaultNamespace,
 				clusterName, appsv1alpha1.StopType)

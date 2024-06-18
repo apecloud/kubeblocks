@@ -20,6 +20,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package constant
 
 const (
+	LorryHTTPPortName                  = "lorry-http-port"
+	LorryGRPCPortName                  = "lorry-grpc-port"
+	LorryContainerName                 = "lorry"
+	LorryInitContainerName             = "init-lorry"
+	RoleProbeContainerName             = "kb-checkrole"
+	StatusProbeContainerName           = "kb-checkstatus"
+	RunningProbeContainerName          = "kb-checkrunning"
+	VolumeProtectionProbeContainerName = "kb-volume-protection"
+	LorryRoleProbePath                 = "/v1.0/checkrole"
+	LorryVolumeProtectPath             = "/v1.0/volumeprotection"
+)
+
+const (
 	PostgreSQLCharacterType = "postgresql"
 	MySQLCharacterType      = "mysql"
 	RedisCharacterType      = "redis"

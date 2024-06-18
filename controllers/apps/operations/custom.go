@@ -120,6 +120,21 @@ func (c CustomOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, c
 	return nil
 }
 
+func (c CustomOpsHandler) listComponents(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	componentName string) ([]appsv1alpha1.Component, error) {
+	if cluster.Spec.GetComponentByName(componentName) != nil {
+		comp, err := component.GetComponentByName(reqCtx.Ctx, cli, cluster.Namespace,
+			constant.GenerateClusterComponentName(cluster.Name, componentName))
+		if err != nil {
+			return nil, err
+		}
+		return []appsv1alpha1.Component{*comp}, nil
+	}
+	return intctrlutil.ListShardingComponents(reqCtx.Ctx, cli, cluster, componentName)
+}
+
 func (c CustomOpsHandler) checkExpression(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
@@ -129,43 +144,44 @@ func (c CustomOpsHandler) checkExpression(reqCtx intctrlutil.RequestCtx,
 	if opsSpec.Force {
 		return nil
 	}
-	componentObjName := constant.GenerateClusterComponentName(opsSpec.GetClusterName(), compCustomItem.ComponentName)
-	comp := &appsv1alpha1.Component{}
-	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: componentObjName, Namespace: opsRes.OpsRequest.Namespace}, comp); err != nil {
+	comps, err := c.listComponents(reqCtx, cli, opsRes.Cluster, compCustomItem.ComponentName)
+	if err != nil {
 		return err
 	}
-	params := covertParametersToMap(compCustomItem.Parameters)
-	// get the built-in objects and covert the json tag
-	getBuiltInObjs := func() (map[string]interface{}, error) {
-		b, err := json.Marshal(map[string]interface{}{
-			"cluster":    opsRes.Cluster,
-			"component":  comp,
-			"parameters": params,
-		})
-		if err != nil {
-			return nil, err
+	for _, comp := range comps {
+		params := covertParametersToMap(compCustomItem.Parameters)
+		// get the built-in objects and covert the json tag
+		getBuiltInObjs := func() (map[string]interface{}, error) {
+			b, err := json.Marshal(map[string]interface{}{
+				"cluster":    opsRes.Cluster,
+				"component":  &comp,
+				"parameters": params,
+			})
+			if err != nil {
+				return nil, err
+			}
+			data := map[string]interface{}{}
+			if err = json.Unmarshal(b, &data); err != nil {
+				return nil, err
+			}
+			return data, nil
 		}
-		data := map[string]interface{}{}
-		if err = json.Unmarshal(b, &data); err != nil {
-			return nil, err
-		}
-		return data, nil
-	}
 
-	data, err := getBuiltInObjs()
-	if err != nil {
-		return err
-	}
-	tmpl, err := template.New("opsDefTemplate").Parse(rule.Expression)
-	if err != nil {
-		return err
-	}
-	var buf strings.Builder
-	if err = tmpl.Execute(&buf, data); err != nil {
-		return err
-	}
-	if buf.String() == "false" {
-		return fmt.Errorf(rule.Message)
+		data, err := getBuiltInObjs()
+		if err != nil {
+			return err
+		}
+		tmpl, err := template.New("opsDefTemplate").Parse(rule.Expression)
+		if err != nil {
+			return err
+		}
+		var buf strings.Builder
+		if err = tmpl.Execute(&buf, data); err != nil {
+			return err
+		}
+		if buf.String() == "false" {
+			return fmt.Errorf(rule.Message)
+		}
 	}
 	return nil
 }
@@ -243,8 +259,8 @@ func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx,
 		// 2. validate component and componentDef
 		if len(opsRes.OpsDef.Spec.ComponentInfos) > 0 {
 			// get component definition
-			_, compDef, err := component.GetCompNCompDefByName(reqCtx.Ctx, cli,
-				opsRes.Cluster.Namespace, constant.GenerateClusterComponentName(opsRes.Cluster.Name, v.ComponentName))
+			compSpec := getComponentSpecOrShardingTemplate(opsRes.Cluster, v.ComponentName)
+			compDef, err := component.GetCompDefByName(reqCtx.Ctx, cli, compSpec.ComponentDef)
 			if err != nil {
 				return err
 			}

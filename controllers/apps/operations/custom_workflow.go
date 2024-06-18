@@ -60,7 +60,7 @@ func (w *WorkflowContext) Run(compCustomSpec *appsv1alpha1.CustomOpsComponent) (
 		compStatus     = w.OpsRes.OpsRequest.Status.Components[compCustomSpec.ComponentName]
 		workflowStatus = &WorkflowStatus{}
 		actions        = w.OpsRes.OpsDef.Spec.Actions
-		comp           = w.OpsRes.Cluster.Spec.GetComponentByName(compCustomSpec.ComponentName)
+		compSpec       = getComponentSpecOrShardingTemplate(w.OpsRes.Cluster, compCustomSpec.ComponentName)
 	)
 	defer func() {
 		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
@@ -88,7 +88,7 @@ steps:
 		case appsv1alpha1.PendingProgressStatus:
 			// execute action and set status progress
 			progressDetail := *actionProgress
-			ac := w.getAction(actions[i], compCustomSpec, comp, progressDetail)
+			ac := w.getAction(actions[i], compCustomSpec, compSpec, progressDetail)
 			if ac == nil {
 				err = intctrlutil.NewFatalError("the action type is not implement for action " + actions[i].Name)
 				return nil, err
@@ -99,13 +99,13 @@ steps:
 			}
 			progressDetail.ActionTasks = actionStatus.ActionTasks
 			progressDetail.SetStatusAndMessage(appsv1alpha1.ProcessingProgressStatus,
-				fmt.Sprintf(`Start to processing action "%s" of the component %s`, actions[i].Name, comp.Name))
+				fmt.Sprintf(`Start to processing action "%s" of the component %s`, actions[i].Name, compCustomSpec.ComponentName))
 			setComponentStatusProgressDetail(w.reqCtx.Recorder, w.OpsRes.OpsRequest, &compStatus.ProgressDetails, progressDetail)
 			break steps
 		case appsv1alpha1.ProcessingProgressStatus:
 			// check action status and set status progress
 			progressDetail := *actionProgress
-			ac := w.getAction(actions[i], compCustomSpec, comp, progressDetail)
+			ac := w.getAction(actions[i], compCustomSpec, compSpec, progressDetail)
 			if ac == nil {
 				err = intctrlutil.NewFatalError("the action type is not implement for action " + actions[i].Name)
 				return nil, err
@@ -122,7 +122,7 @@ steps:
 					progressDetail.Status = appsv1alpha1.SucceedProgressStatus
 				}
 				progressDetail.Message = fmt.Sprintf(`the action "%s" of the component "%s" is %s`,
-					actions[i].Name, comp.Name, progressDetail.Status)
+					actions[i].Name, compCustomSpec.ComponentName, progressDetail.Status)
 			}
 			setComponentStatusProgressDetail(w.reqCtx.Recorder, w.OpsRes.OpsRequest, &compStatus.ProgressDetails, progressDetail)
 			break steps
@@ -146,15 +146,15 @@ steps:
 
 func (w *WorkflowContext) getAction(action appsv1alpha1.OpsAction,
 	compCustomItem *appsv1alpha1.CustomOpsComponent,
-	comp *appsv1alpha1.ClusterComponentSpec,
+	compSpec *appsv1alpha1.ClusterComponentSpec,
 	progressDetail appsv1alpha1.ProgressStatusDetail) custom.OpsAction {
 	switch {
 	case action.Workload != nil:
 		return custom.NewWorkloadAction(w.OpsRes.OpsRequest, w.OpsRes.Cluster,
-			w.OpsRes.OpsDef, compCustomItem, comp, progressDetail)
+			w.OpsRes.OpsDef, compCustomItem, compSpec, progressDetail)
 	case action.Exec != nil:
 		return custom.NewExecAction(w.OpsRes.OpsRequest, w.OpsRes.Cluster,
-			w.OpsRes.OpsDef, compCustomItem, comp, progressDetail)
+			w.OpsRes.OpsDef, compCustomItem, compSpec, progressDetail)
 	case action.ResourceModifier != nil:
 		// TODO: implement it.
 		return nil

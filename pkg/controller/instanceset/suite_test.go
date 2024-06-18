@@ -179,8 +179,12 @@ func makePodUpdateReady(newRevision string, roleful bool, pods ...*corev1.Pod) {
 	}
 	for _, pod := range pods {
 		pod.Labels[apps.StatefulSetRevisionLabel] = newRevision
-		if roleful && pod.Labels[RoleLabelKey] == "" {
-			pod.Labels[RoleLabelKey] = "learner"
+		if roleful {
+			if pod.Labels[RoleLabelKey] == "" {
+				pod.Labels[RoleLabelKey] = "learner"
+			}
+		} else {
+			delete(pod.Labels, RoleLabelKey)
 		}
 		pod.Status.Conditions = append(pod.Status.Conditions, readyCondition)
 	}

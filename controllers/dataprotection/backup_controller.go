@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	vsv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
@@ -121,6 +122,10 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return r.handleDeletingPhase(reqCtx, backup)
 	case dpv1alpha1.BackupPhaseFailed:
 		if backup.Labels[dptypes.BackupTypeLabelKey] == string(dpv1alpha1.BackupTypeContinuous) {
+			if backup.Status.StartTimestamp.IsZero() {
+				// if the backup fails in the 'New' phase, reconcile it from 'New' phase handler.
+				return r.handleNewPhase(reqCtx, backup)
+			}
 			return r.handleRunningPhase(reqCtx, backup)
 		}
 		return intctrlutil.Reconciled()
@@ -512,21 +517,17 @@ func (r *BackupReconciler) patchBackupStatus(
 func (r *BackupReconciler) handleRunningPhase(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dpv1alpha1.Backup) (ctrl.Result, error) {
-	request, err := r.prepareBackupRequest(reqCtx, backup)
-	if err != nil {
-		return r.updateStatusIfFailed(reqCtx, backup.DeepCopy(), backup, err)
-	}
-	if request.ActionSet != nil && request.ActionSet.Spec.BackupType == dpv1alpha1.BackupTypeContinuous {
-		// record the status.target/status.targets infos.
-		if err = r.recordBackupStatusTargets(reqCtx, request); err != nil {
-			return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
-		}
+	if backup.Labels[dptypes.BackupTypeLabelKey] == string(dpv1alpha1.BackupTypeContinuous) {
 		// check if the continuous backup is completed.
-		if completed, err := r.checkIsCompletedDuringRunning(reqCtx, request); err != nil {
+		if completed, err := r.checkIsCompletedDuringRunning(reqCtx, backup); err != nil {
 			return RecorderEventAndRequeue(reqCtx, r.Recorder, backup, err)
 		} else if completed {
 			return intctrlutil.Reconciled()
 		}
+	}
+	request, err := r.prepareBackupRequest(reqCtx, backup)
+	if err != nil {
+		return r.updateStatusIfFailed(reqCtx, backup.DeepCopy(), backup, err)
 	}
 	var (
 		existFailedAction bool
@@ -616,50 +617,47 @@ func (r *BackupReconciler) handleRunningPhase(
 // checkIsCompletedDuringRunning when continuous schedule is disabled or cluster has been deleted,
 // backup phase should be Completed.
 func (r *BackupReconciler) checkIsCompletedDuringRunning(reqCtx intctrlutil.RequestCtx,
-	request *dpbackup.Request) (bool, error) {
-	backupScheduleList := &dpv1alpha1.BackupScheduleList{}
-	if err := r.Client.List(reqCtx.Ctx, backupScheduleList, client.MatchingLabels{
-		dptypes.BackupPolicyLabelKey: request.Backup.Spec.BackupPolicyName,
-	}); err != nil {
-		return false, err
-	}
+	backup *dpv1alpha1.Backup) (bool, error) {
 	var (
-		enabled             *bool
-		targetClusterExists = true
+		backupTargetExists              = true
+		backupTargetIsStoppedOrDeleting bool
+		err                             error
 	)
-	// check if Continuous backupMethod is enabled
-	for _, v := range backupScheduleList.Items {
-		for _, method := range v.Spec.Schedules {
-			if method.BackupMethod == request.Spec.BackupMethod {
-				enabled = method.Enabled
-				break
-			}
-		}
-	}
 	// check if target cluster exits
-	clusterName := request.Labels[constant.AppInstanceLabelKey]
+	clusterName := backup.Labels[constant.AppInstanceLabelKey]
 	if clusterName != "" {
 		cluster := &appsv1alpha1.Cluster{}
-		var err error
-		targetClusterExists, err = intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client,
-			client.ObjectKey{Name: clusterName, Namespace: request.Namespace}, cluster)
+		backupTargetExists, err = intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client,
+			client.ObjectKey{Name: clusterName, Namespace: backup.Namespace}, cluster)
 		if err != nil {
 			return false, err
 		}
+		backupTargetIsStoppedOrDeleting = cluster.IsDeleting() || cluster.Status.Phase == appsv1alpha1.StoppedClusterPhase
 	}
-	if boolptr.IsSetToTrue(enabled) && targetClusterExists {
-		return false, nil
+	// if backup target exists, and it is not deleting or stopped, check if the schedule is enabled.
+	if backupTargetExists && !backupTargetIsStoppedOrDeleting {
+		backupSchedule := &dpv1alpha1.BackupSchedule{}
+		if err = r.Client.Get(reqCtx.Ctx, client.ObjectKey{Name: backup.Labels[dptypes.BackupScheduleLabelKey],
+			Namespace: backup.Namespace}, backupSchedule); err != nil {
+			return false, err
+		}
+		for _, method := range backupSchedule.Spec.Schedules {
+			// if Continuous backupMethod is enabled, return
+			if method.BackupMethod == backup.Spec.BackupMethod && boolptr.IsSetToTrue(method.Enabled) {
+				return false, nil
+			}
+		}
 	}
-	patch := client.MergeFrom(request.Backup.DeepCopy())
-	request.Status.Phase = dpv1alpha1.BackupPhaseCompleted
-	request.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
-	_ = dpbackup.SetExpirationByCreationTime(request.Backup)
-	if !request.Status.StartTimestamp.IsZero() {
+	patch := client.MergeFrom(backup.DeepCopy())
+	backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
+	backup.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
+	_ = dpbackup.SetExpirationByCreationTime(backup)
+	if !backup.Status.StartTimestamp.IsZero() {
 		// round the duration to a multiple of seconds.
-		duration := request.Status.CompletionTimestamp.Sub(request.Status.StartTimestamp.Time).Round(time.Second)
-		request.Status.Duration = &metav1.Duration{Duration: duration}
+		duration := backup.Status.CompletionTimestamp.Sub(backup.Status.StartTimestamp.Time).Round(time.Second)
+		backup.Status.Duration = &metav1.Duration{Duration: duration}
 	}
-	return true, r.Client.Status().Patch(reqCtx.Ctx, request.Backup, patch)
+	return true, r.Client.Status().Patch(reqCtx.Ctx, backup, patch)
 }
 
 // handleCompletedPhase handles the backup object in completed phase.
@@ -796,8 +794,12 @@ func PatchBackupObjectMeta(
 func mergeActionStatus(request *dpbackup.Request, status *dpv1alpha1.ActionStatus) {
 	var exist bool
 	for i := range request.Status.Actions {
-		if request.Status.Actions[i].Name == status.Name {
+		action := request.Status.Actions[i]
+		if action.Name == status.Name {
 			as := status.DeepCopy()
+			if strings.HasPrefix(action.FailureReason, dptypes.LogCollectorOutput) {
+				as.FailureReason = action.FailureReason
+			}
 			if request.Status.Actions[i].StartTimestamp != nil {
 				as.StartTimestamp = request.Status.Actions[i].StartTimestamp
 			}

@@ -433,27 +433,10 @@ type InstanceTemplate struct {
 	// +optional
 	Image *string `json:"image,omitempty"`
 
-	// Specifies the name of the node where the Pod should be scheduled.
-	// If set, the Pod will be directly assigned to the specified node, bypassing the Kubernetes scheduler.
-	// This is useful for controlling Pod placement on specific nodes.
-	//
-	// Important considerations:
-	// - `nodeName` bypasses default scheduling constraints (e.g., resource requirements, node selectors, affinity rules).
-	// - It is the user's responsibility to ensure the node is suitable for the Pod.
-	// - If the node is unavailable, the Pod will remain in "Pending" state until the node is available or the Pod is deleted.
+	// Specifies the scheduling policy for the Component.
 	//
 	// +optional
-	NodeName *string `json:"nodeName,omitempty"`
-
-	// Defines NodeSelector to override.
-	// +optional
-	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
-
-	// Tolerations specifies a list of tolerations to be applied to the Pod, allowing it to tolerate node taints.
-	// This field can be used to add new tolerations or override existing ones.
-	//
-	// +optional
-	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+	SchedulingPolicy *SchedulingPolicy `json:"schedulingPolicy,omitempty"`
 
 	// Specifies an override for the resource requirements of the first container in the Pod.
 	// This field allows for customizing resource allocation (CPU, memory, etc.) for the container.
@@ -727,6 +710,11 @@ type ClusterComponentSpec struct {
 	//
 	// +optional
 	Services []ClusterComponentService `json:"services,omitempty"`
+
+	// Overrides system accounts defined in referenced ComponentDefinition.
+	//
+	// +optional
+	SystemAccounts []ComponentSystemAccount `json:"systemAccounts,omitempty"`
 
 	// +optional
 	Configs []ClusterComponentConfig `json:"configs,omitempty"`
@@ -1216,6 +1204,27 @@ type ClusterComponentService struct {
 	PodService *bool `json:"podService,omitempty"`
 }
 
+type ComponentSystemAccount struct {
+	// The name of the system account.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Specifies the policy for generating the account's password.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	PasswordConfig *PasswordConfig `json:"passwordConfig,omitempty"`
+
+	// Refers to the secret from which data will be copied to create the new account.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	SecretRef *ProvisionSecretRef `json:"secretRef,omitempty"`
+}
+
 // ClusterComponentConfig represents a config with its source bound.
 type ClusterComponentConfig struct {
 	// The name of the config.
@@ -1642,8 +1651,11 @@ func (t *InstanceTemplate) GetName() string {
 	return t.Name
 }
 
-func (t *InstanceTemplate) GetReplicas() *int32 {
-	return t.Replicas
+func (t *InstanceTemplate) GetReplicas() int32 {
+	if t.Replicas != nil {
+		return *t.Replicas
+	}
+	return defaultInstanceTemplateReplicas
 }
 
 // GetClusterUpRunningPhases returns Cluster running or partially running phases.
@@ -1687,4 +1699,14 @@ func GetComponentUpRunningPhase() []ClusterComponentPhase {
 // ComponentPodsAreReady checks if the pods of component are ready.
 func ComponentPodsAreReady(podsAreReady *bool) bool {
 	return podsAreReady != nil && *podsAreReady
+}
+
+// GetInstanceTemplateName get the instance template name by instance name.
+func GetInstanceTemplateName(clusterName, componentName, instanceName string) string {
+	workloadPrefix := fmt.Sprintf("%s-%s", clusterName, componentName)
+	compInsKey := instanceName[:strings.LastIndex(instanceName, "-")]
+	if compInsKey == workloadPrefix {
+		return ""
+	}
+	return strings.Replace(compInsKey, workloadPrefix+"-", "", 1)
 }

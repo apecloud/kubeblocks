@@ -48,7 +48,7 @@ func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	cluster *appsv1alpha1.Cluster,
 	compDef *appsv1alpha1.ComponentDefinition,
 	comp *appsv1alpha1.Component) (*SynthesizedComponent, error) {
-	return buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, cluster, nil)
+	return buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, cluster, nil)
 }
 
 // BuildSynthesizedComponent4Generated builds SynthesizedComponent for generated Component which w/o ComponentDefinition.
@@ -71,7 +71,7 @@ func BuildSynthesizedComponent4Generated(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, nil, err
 	}
-	synthesizedComp, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, clusterDef, clusterVer, cluster, clusterCompSpec)
+	synthesizedComp, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, clusterDef, cluster, clusterCompSpec)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -112,7 +112,7 @@ func BuildSynthesizedComponentWrapper4Test(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
-	return buildSynthesizedComponent(reqCtx, cli, compDef, comp, clusterDef, clusterVer, cluster, clusterCompSpec)
+	return buildSynthesizedComponent(reqCtx, cli, compDef, comp, clusterDef, cluster, clusterCompSpec)
 }
 
 // buildSynthesizedComponent builds a new SynthesizedComponent object, which is a mixture of component-related configs from ComponentDefinition and Component.
@@ -123,7 +123,6 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	compDef *appsv1alpha1.ComponentDefinition,
 	comp *appsv1alpha1.Component,
 	clusterDef *appsv1alpha1.ClusterDefinition,
-	clusterVer *appsv1alpha1.ClusterVersion,
 	cluster *appsv1alpha1.Cluster,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*SynthesizedComponent, error) {
 	if compDef == nil || comp == nil {
@@ -148,41 +147,42 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	}
 	compDefObj := compDef.DeepCopy()
 	synthesizeComp := &SynthesizedComponent{
-		Namespace:          comp.Namespace,
-		ClusterName:        clusterName,
-		ClusterUID:         clusterUID,
-		Comp2CompDefs:      comp2CompDef,
-		Name:               compName,
-		FullCompName:       comp.Name,
-		CompDefName:        compDef.Name,
-		ServiceVersion:     comp.Spec.ServiceVersion,
-		ClusterGeneration:  clusterGeneration(cluster, comp),
-		PodSpec:            &compDef.Spec.Runtime,
-		HostNetwork:        compDefObj.Spec.HostNetwork,
-		ComponentServices:  compDefObj.Spec.Services,
-		LogConfigs:         compDefObj.Spec.LogConfigs,
-		ConfigTemplates:    compDefObj.Spec.Configs,
-		ScriptTemplates:    compDefObj.Spec.Scripts,
-		Roles:              compDefObj.Spec.Roles,
-		UpdateStrategy:     compDefObj.Spec.UpdateStrategy,
-		MinReadySeconds:    compDefObj.Spec.MinReadySeconds,
-		PolicyRules:        compDefObj.Spec.PolicyRules,
-		LifecycleActions:   compDefObj.Spec.LifecycleActions,
-		SystemAccounts:     compDefObj.Spec.SystemAccounts,
-		Replicas:           comp.Spec.Replicas,
-		Resources:          comp.Spec.Resources,
-		TLSConfig:          comp.Spec.TLSConfig,
-		ServiceAccountName: comp.Spec.ServiceAccountName,
-		Instances:          comp.Spec.Instances,
-		OfflineInstances:   comp.Spec.OfflineInstances,
-		DisableExporter:    comp.Spec.DisableExporter,
+		Namespace:           comp.Namespace,
+		ClusterName:         clusterName,
+		ClusterUID:          clusterUID,
+		Comp2CompDefs:       comp2CompDef,
+		Name:                compName,
+		FullCompName:        comp.Name,
+		CompDefName:         compDef.Name,
+		ServiceVersion:      comp.Spec.ServiceVersion,
+		ClusterGeneration:   clusterGeneration(cluster, comp),
+		PodSpec:             &compDef.Spec.Runtime,
+		HostNetwork:         compDefObj.Spec.HostNetwork,
+		ComponentServices:   compDefObj.Spec.Services,
+		LogConfigs:          compDefObj.Spec.LogConfigs,
+		ConfigTemplates:     compDefObj.Spec.Configs,
+		ScriptTemplates:     compDefObj.Spec.Scripts,
+		Roles:               compDefObj.Spec.Roles,
+		UpdateStrategy:      compDefObj.Spec.UpdateStrategy,
+		MinReadySeconds:     compDefObj.Spec.MinReadySeconds,
+		PolicyRules:         compDefObj.Spec.PolicyRules,
+		LifecycleActions:    compDefObj.Spec.LifecycleActions,
+		SystemAccounts:      mergeSystemAccounts(compDefObj.Spec.SystemAccounts, comp.Spec.SystemAccounts),
+		Replicas:            comp.Spec.Replicas,
+		Resources:           comp.Spec.Resources,
+		TLSConfig:           comp.Spec.TLSConfig,
+		ServiceAccountName:  comp.Spec.ServiceAccountName,
+		Instances:           comp.Spec.Instances,
+		OfflineInstances:    comp.Spec.OfflineInstances,
+		DisableExporter:     comp.Spec.DisableExporter,
+		PodManagementPolicy: compDef.Spec.PodManagementPolicy,
 	}
 
 	// build backward compatible fields, including workload, services, componentRefEnvs, clusterDefName, clusterCompDefName, and clusterCompVer, etc.
 	// if cluster referenced a clusterDefinition and clusterVersion, for backward compatibility, we need to merge the clusterDefinition and clusterVersion into the component
 	// TODO(xingran): it will be removed in the future
 	if clusterDef != nil && cluster != nil && clusterCompSpec != nil {
-		if err = buildBackwardCompatibleFields(reqCtx, clusterDef, clusterVer, cluster, clusterCompSpec, synthesizeComp); err != nil {
+		if err = buildBackwardCompatibleFields(reqCtx, clusterDef, cluster, clusterCompSpec, synthesizeComp); err != nil {
 			return nil, err
 		}
 	}
@@ -239,13 +239,6 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	replaceContainerPlaceholderTokens(synthesizeComp, GetEnvReplacementMapForConnCredential(synthesizeComp.ClusterName))
 
 	return synthesizeComp, nil
-}
-
-func buildRuntimeClassName(synthesizeComp *SynthesizedComponent, comp *appsv1alpha1.Component) {
-	if comp.Spec.RuntimeClassName == nil {
-		return
-	}
-	synthesizeComp.PodSpec.RuntimeClassName = comp.Spec.RuntimeClassName
 }
 
 func clusterGeneration(cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component) string {
@@ -332,6 +325,35 @@ func buildLabelsAndAnnotations(compDef *appsv1alpha1.ComponentDefinition, comp *
 		// override annotations from component
 		synthesizeComp.Annotations = mergeMaps(baseAnnotations, comp.Annotations)
 	}
+}
+
+func mergeSystemAccounts(compDefAccounts []appsv1alpha1.SystemAccount,
+	compAccounts []appsv1alpha1.ComponentSystemAccount) []appsv1alpha1.SystemAccount {
+	if len(compAccounts) == 0 {
+		return compDefAccounts
+	}
+
+	override := func(compAccount appsv1alpha1.ComponentSystemAccount, idx int) {
+		if compAccount.PasswordConfig != nil {
+			compDefAccounts[idx].PasswordGenerationPolicy = *compAccount.PasswordConfig
+		}
+		compDefAccounts[idx].SecretRef = compAccount.SecretRef
+	}
+
+	tbl := make(map[string]int)
+	for i, account := range compDefAccounts {
+		tbl[account.Name] = i
+	}
+
+	for _, account := range compAccounts {
+		idx, ok := tbl[account.Name]
+		if !ok {
+			continue // ignore it silently
+		}
+		override(account, idx)
+	}
+
+	return compDefAccounts
 }
 
 func buildSchedulingPolicy(synthesizedComp *SynthesizedComponent, comp *appsv1alpha1.Component) error {
@@ -487,11 +509,17 @@ func buildServiceAccountName(synthesizeComp *SynthesizedComponent) {
 	synthesizeComp.PodSpec.ServiceAccountName = synthesizeComp.ServiceAccountName
 }
 
-// buildBackwardCompatibleFields builds backward compatible fields for component which referenced a clusterComponentDefinition and clusterComponentVersion before KubeBlocks Version 0.7.0
+func buildRuntimeClassName(synthesizeComp *SynthesizedComponent, comp *appsv1alpha1.Component) {
+	if comp.Spec.RuntimeClassName == nil {
+		return
+	}
+	synthesizeComp.PodSpec.RuntimeClassName = comp.Spec.RuntimeClassName
+}
+
+// buildBackwardCompatibleFields builds backward compatible fields for component which referenced a clusterComponentDefinition and clusterComponentVersion
 // TODO(xingran): it will be removed in the future
 func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 	clusterDef *appsv1alpha1.ClusterDefinition,
-	clusterVer *appsv1alpha1.ClusterVersion,
 	cluster *appsv1alpha1.Cluster,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
 	synthesizeComp *SynthesizedComponent) error {

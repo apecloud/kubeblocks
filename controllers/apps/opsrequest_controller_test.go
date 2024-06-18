@@ -26,6 +26,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/utils/pointer"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"golang.org/x/exp/slices"
@@ -304,7 +305,12 @@ var _ = Describe("OpsRequest Controller", func() {
 					testk8s.RemovePodFinalizer(ctx, testCtx, &podList.Items[i])
 				}
 			}
-			mockPods := testapps.MockInstanceSetPods(&testCtx, its, clusterObj.Name, mysqlCompName)
+			cluster := &appsv1alpha1.Cluster{}
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterObj), cluster)).Should(Succeed())
+			mockPods := testapps.MockInstanceSetPods(&testCtx, its, cluster, mysqlCompName)
+
+			// mock currentRevisions and updateRevisions
+			testapps.MockInstanceSetStatus(testCtx, clusterObj, mysqlCompName)
 			Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
 				testk8s.MockInstanceSetReady(its, mockPods...)
 			})).ShouldNot(HaveOccurred())
@@ -366,7 +372,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			ops.Spec.HorizontalScalingList = []appsv1alpha1.HorizontalScaling{
 				{
 					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: mysqlCompName},
-					Replicas:     replicas,
+					Replicas:     pointer.Int32(replicas),
 				},
 			}
 			// for reconciling the ops labels
@@ -558,7 +564,7 @@ var _ = Describe("OpsRequest Controller", func() {
 				clusterObj.Spec.ComponentSpecs[0].Replicas = 4
 			})).Should(Succeed())
 
-			By("scale down the cluster replicas to 2")
+			By("scale in the cluster replicas to 2")
 			phase := appsv1alpha1.OpsPendingPhase
 			replicas := int32(2)
 			ops := createClusterHscaleOps(replicas)

@@ -874,6 +874,8 @@ func resolveServiceRefVarRef(ctx context.Context, cli client.Reader, synthesized
 	switch {
 	case selector.Endpoint != nil:
 		resolveFunc = resolveServiceRefEndpointRef
+	case selector.Host != nil:
+		resolveFunc = resolveServiceRefHostRef
 	case selector.Port != nil:
 		resolveFunc = resolveServiceRefPortRef
 	case selector.Username != nil:
@@ -899,6 +901,21 @@ func resolveServiceRefEndpointRef(ctx context.Context, cli client.Reader, synthe
 		}, nil
 	}
 	return resolveServiceRefVarRefLow(ctx, cli, synthesizedComp, selector, selector.Endpoint, resolveEndpoint)
+}
+
+func resolveServiceRefHostRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+	defineKey string, selector appsv1alpha1.ServiceRefVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
+	resolveHost := func(obj any) (*corev1.EnvVar, *corev1.EnvVar) {
+		sd := obj.(*appsv1alpha1.ServiceDescriptor)
+		if sd.Spec.Host == nil {
+			return nil, nil
+		}
+		return &corev1.EnvVar{
+			Name:  defineKey,
+			Value: sd.Spec.Host.Value,
+		}, nil
+	}
+	return resolveServiceRefVarRefLow(ctx, cli, synthesizedComp, selector, selector.Host, resolveHost)
 }
 
 func resolveServiceRefPortRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
@@ -996,13 +1013,33 @@ func clusterServiceGetter(ctx context.Context, cli client.Reader, namespace, clu
 }
 
 func compServiceGetter(ctx context.Context, cli client.Reader, namespace, clusterName, compName, name string) (any, error) {
-	svcName := constant.GenerateComponentServiceName(clusterName, compName, name)
+	svcName, err := func() (string, error) {
+		if len(name) == 0 {
+			return constant.GenerateDefaultComponentServiceName(clusterName, compName), nil
+		}
+
+		// resolve service name from referenced component definition
+		_, compDef, err := GetCompNCompDefByName(ctx, cli, namespace, FullName(clusterName, compName))
+		if err != nil {
+			return "", err
+		}
+		for _, svc := range compDef.Spec.Services {
+			if svc.Name == name {
+				return constant.GenerateComponentServiceName(clusterName, compName, svc.ServiceName), nil
+			}
+		}
+		return "", fmt.Errorf("service %s not defined in the component definition that component %s used", name, compName)
+	}()
+	if err != nil {
+		return nil, err
+	}
+
 	key := types.NamespacedName{
 		Namespace: namespace,
 		Name:      svcName,
 	}
 	obj := &corev1.Service{}
-	err := cli.Get(ctx, key, obj, inDataContext())
+	err = cli.Get(ctx, key, obj, inDataContext())
 	if err == nil {
 		return &resolvedServiceObj{service: obj}, nil
 	}

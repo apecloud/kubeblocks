@@ -50,11 +50,11 @@ func (t *clusterLoadRefResourcesTransformer) Transform(ctx graph.TransformContex
 		return newRequeueError(requeueDuration, err.Error())
 	}
 
-	if err = t.loadNCheckClusterDefinition(transCtx, cluster); err != nil {
+	if err = loadNCheckClusterDefinition(transCtx, cluster); err != nil {
 		return newRequeueError(requeueDuration, err.Error())
 	}
 
-	if err = t.loadNCheckClusterVersion(transCtx, cluster); err != nil {
+	if err = loadNCheckClusterVersion(transCtx, cluster); err != nil {
 		return newRequeueError(requeueDuration, err.Error())
 	}
 
@@ -79,7 +79,28 @@ func (t *clusterLoadRefResourcesTransformer) apiValidation(cluster *appsv1alpha1
 		cluster.Spec.ClusterDefRef, cluster.Spec.Topology, clusterCompCnt(cluster), legacyClusterCompCnt(cluster), withClusterSimplifiedAPI(cluster))
 }
 
-func (t *clusterLoadRefResourcesTransformer) loadNCheckClusterDefinition(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) error {
+func (t *clusterLoadRefResourcesTransformer) checkNUpdateClusterTopology(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) error {
+	clusterTopology := referredClusterTopology(transCtx.ClusterDef, cluster.Spec.Topology)
+	if clusterTopology == nil {
+		return fmt.Errorf("specified cluster topology not found: %s", cluster.Spec.Topology)
+	}
+
+	comps := make(map[string]bool, 0)
+	for _, comp := range clusterTopology.Components {
+		comps[comp.Name] = true
+	}
+	for _, comp := range cluster.Spec.ComponentSpecs {
+		if !comps[comp.Name] {
+			return fmt.Errorf("component %s not defined in topology %s", comp.Name, clusterTopology.Name)
+		}
+	}
+
+	cluster.Spec.Topology = clusterTopology.Name
+
+	return nil
+}
+
+func loadNCheckClusterDefinition(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) error {
 	var cd *appsv1alpha1.ClusterDefinition
 	if len(cluster.Spec.ClusterDefRef) > 0 {
 		cd = &appsv1alpha1.ClusterDefinition{}
@@ -105,7 +126,7 @@ func (t *clusterLoadRefResourcesTransformer) loadNCheckClusterDefinition(transCt
 	return nil
 }
 
-func (t *clusterLoadRefResourcesTransformer) loadNCheckClusterVersion(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) error {
+func loadNCheckClusterVersion(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) error {
 	var cv *appsv1alpha1.ClusterVersion
 	if len(cluster.Spec.ClusterVersionRef) > 0 {
 		cv = &appsv1alpha1.ClusterVersion{}
@@ -128,27 +149,6 @@ func (t *clusterLoadRefResourcesTransformer) loadNCheckClusterVersion(transCtx *
 		cv = &appsv1alpha1.ClusterVersion{}
 	}
 	transCtx.ClusterVer = cv
-	return nil
-}
-
-func (t *clusterLoadRefResourcesTransformer) checkNUpdateClusterTopology(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) error {
-	clusterTopology := referredClusterTopology(transCtx.ClusterDef, cluster.Spec.Topology)
-	if clusterTopology == nil {
-		return fmt.Errorf("specified cluster topology not found: %s", cluster.Spec.Topology)
-	}
-
-	comps := make(map[string]bool, 0)
-	for _, comp := range clusterTopology.Components {
-		comps[comp.Name] = true
-	}
-	for _, comp := range cluster.Spec.ComponentSpecs {
-		if !comps[comp.Name] {
-			return fmt.Errorf("component %s not defined in topology %s", comp.Name, clusterTopology.Name)
-		}
-	}
-
-	cluster.Spec.Topology = clusterTopology.Name
-
 	return nil
 }
 

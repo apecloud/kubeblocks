@@ -62,7 +62,9 @@ func (r *mockReader) List(ctx context.Context, list client.ObjectList, opts ...c
 	if len(r.objs) > 0 {
 		objs := reflect.MakeSlice(items.Type(), 0, 0)
 		for i := range r.objs {
-			objs = reflect.Append(objs, reflect.ValueOf(r.objs[i]).Elem())
+			if reflect.TypeOf(r.objs[i]).Elem().AssignableTo(items.Type().Elem()) {
+				objs = reflect.Append(objs, reflect.ValueOf(r.objs[i]).Elem())
+			}
 		}
 		items.Set(objs)
 	}

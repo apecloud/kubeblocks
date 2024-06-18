@@ -94,9 +94,13 @@ func (t *componentAccountProvisionTransformer) Transform(ctx graph.TransformCont
 		if t.isAccountProvisioned(cond, account) {
 			continue
 		}
-		if err = t.provisionAccount(transCtx, cond, lorryCli, account); err != nil {
-			t.markProvisionAsFailed(transCtx, &cond, err)
-			return err
+		if transCtx.SynthesizeComponent.Annotations[constant.RestoreFromBackupAnnotationKey] == "" {
+			// TODO: restore account secret from backup.
+			// provision account when the component is not recovered from backup
+			if err = t.provisionAccount(transCtx, cond, lorryCli, account); err != nil {
+				t.markProvisionAsFailed(transCtx, &cond, err)
+				return err
+			}
 		}
 		t.markAccountProvisioned(&cond, account)
 	}

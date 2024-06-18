@@ -74,7 +74,7 @@ func (ve volumeExpansionOpsHandler) ActionStartedCondition(reqCtx intctrlutil.Re
 
 // Action modifies Cluster.spec.components[*].VolumeClaimTemplates[*].spec.resources
 func (ve volumeExpansionOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	applyVolumeExpansion := func(compSpec *appsv1alpha1.ClusterComponentSpec, obj ComponentOpsInteface) {
+	applyVolumeExpansion := func(compSpec *appsv1alpha1.ClusterComponentSpec, obj ComponentOpsInteface) error {
 		setVolumeStorage := func(volumeExpansionVCTs []appsv1alpha1.OpsRequestVolumeClaimTemplate,
 			targetVCTs []appsv1alpha1.ClusterComponentVolumeClaimTemplate) {
 			for _, v := range volumeExpansionVCTs {
@@ -97,9 +97,12 @@ func (ve volumeExpansionOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli cl
 				}
 			}
 		}
+		return nil
 	}
 	compOpsSet := newComponentOpsHelper(opsRes.OpsRequest.Spec.VolumeExpansionList)
-	compOpsSet.updateClusterComponentsAndShardings(opsRes.Cluster, applyVolumeExpansion)
+	if err := compOpsSet.updateClusterComponentsAndShardings(opsRes.Cluster, applyVolumeExpansion); err != nil {
+		return err
+	}
 	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
 }
 
@@ -119,7 +122,7 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 	getTemplateReplicas := func(templates []appsv1alpha1.InstanceTemplate) int32 {
 		var replicaCount int32
 		for _, v := range templates {
-			replicaCount += intctrlutil.TemplateReplicas(v)
+			replicaCount += v.GetReplicas()
 		}
 		return replicaCount
 	}
@@ -149,7 +152,7 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 					veHelpers = append(veHelpers, volumeExpansionHelper{
 						compOps:           compOps,
 						fullComponentName: fullComponentName,
-						expectCount:       int(intctrlutil.TemplateReplicas(ins)),
+						expectCount:       int(ins.GetReplicas()),
 						vctName:           vct.Name,
 					})
 				}
@@ -273,14 +276,12 @@ func (ve volumeExpansionOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.Req
 
 // pvcIsResizing when pvc start resizing, it will set conditions type to Resizing/FileSystemResizePending
 func (ve volumeExpansionOpsHandler) pvcIsResizing(pvc *corev1.PersistentVolumeClaim) bool {
-	var isResizing bool
 	for _, condition := range pvc.Status.Conditions {
 		if condition.Type == corev1.PersistentVolumeClaimResizing || condition.Type == corev1.PersistentVolumeClaimFileSystemResizePending {
-			isResizing = true
-			break
+			return true
 		}
 	}
-	return isResizing
+	return false
 }
 
 func (ve volumeExpansionOpsHandler) getRequestStorageMap(opsRequest *appsv1alpha1.OpsRequest) map[string]resource.Quantity {
@@ -328,7 +329,7 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 		constant.KBAppComponentLabelKey:          veHelper.fullComponentName,
 	}
 	if veHelper.templateName != "" {
-		matchingLabels[constant.KBAppComponentInstanceTemplatelabelKey] = veHelper.templateName
+		matchingLabels[constant.KBAppComponentInstanceTemplateLabelKey] = veHelper.templateName
 	}
 	pvcList := &corev1.PersistentVolumeClaimList{}
 	if err = cli.List(reqCtx.Ctx, pvcList, matchingLabels, client.InNamespace(opsRes.Cluster.Namespace)); err != nil {
@@ -344,7 +345,7 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 		if ordinal > veHelper.expectCount-1 {
 			continue
 		}
-		if v.Labels[constant.KBAppComponentInstanceTemplatelabelKey] != veHelper.templateName {
+		if v.Labels[constant.KBAppComponentInstanceTemplateLabelKey] != veHelper.templateName {
 			continue
 		}
 		objectKey := getPVCProgressObjectKey(v.Name)
@@ -358,8 +359,9 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 		}
 		currStorageSize := v.Status.Capacity.Storage()
 		// should check if the spec.resources.requests.storage equals to the requested storage
+		// and current storage size is greater than or equal to request storage size.
 		// and pvc is bound if the pvc is re-created for recovery.
-		if currStorageSize.Cmp(requestStorage) == 0 &&
+		if currStorageSize.Cmp(requestStorage) >= 0 &&
 			v.Spec.Resources.Requests.Storage().Cmp(requestStorage) == 0 &&
 			v.Status.Phase == corev1.ClaimBound {
 			succeedCount += 1

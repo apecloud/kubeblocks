@@ -89,7 +89,7 @@ func buildConfigManagerWithComponent(podSpec *corev1.PodSpec, configSpecs []apps
 
 	// This sidecar container will be able to view and signal processes from other containers
 	checkAndUpdateSharProcessNamespace(podSpec, buildParams, configSpecMetas)
-	container, err := factory.BuildCfgManagerContainer(buildParams, synthesizedComp)
+	container, err := factory.BuildCfgManagerContainer(buildParams)
 	if err != nil {
 		return err
 	}
@@ -206,7 +206,6 @@ func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1a
 func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *appsv1alpha1.Cluster, comp *component.SynthesizedComponent, configSpecBuildParams []cfgcm.ConfigSpecMeta, volumeDirs []corev1.VolumeMount, podSpec *corev1.PodSpec) (*cfgcm.CfgManagerBuildParams, error) {
 	cfgManagerParams := &cfgcm.CfgManagerBuildParams{
 		ManagerName:               constant.ConfigSidecarName,
-		CharacterType:             comp.CharacterType,
 		ComponentName:             comp.Name,
 		SecreteName:               constant.GenerateDefaultConnCredential(cluster.Name),
 		Image:                     viper.GetString(constant.KBToolsImage),
@@ -218,7 +217,7 @@ func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *a
 	}
 
 	if podSpec.HostNetwork {
-		containerPort, err := GetConfigManagerGRPCPort(podSpec.Containers)
+		containerPort, err := allocConfigManagerHostPort(comp)
 		if err != nil {
 			return nil, err
 		}
@@ -236,20 +235,33 @@ func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *a
 
 func GetConfigManagerGRPCPort(containers []corev1.Container) (int32, error) {
 	for _, container := range containers {
-		if found := foundPortByConfigManagerPortName(container); found != nil {
-			return found.ContainerPort, nil
+		if container.Name != constant.ConfigSidecarName {
+			continue
+		}
+		if port, ok := findPortByPortName(container); ok {
+			return port, nil
 		}
 	}
-	return -1, core.MakeError("failed to find config manager grpc port, please add named config-manager port")
+	return constant.InvalidContainerPort, core.MakeError("failed to find config manager grpc port, please add named config-manager port")
 }
 
-func foundPortByConfigManagerPortName(container corev1.Container) *corev1.ContainerPort {
+func allocConfigManagerHostPort(comp *component.SynthesizedComponent) (int32, error) {
+	pm := intctrlutil.GetPortManager()
+	portKey := intctrlutil.BuildHostPortName(comp.ClusterName, comp.Name, constant.ConfigSidecarName, constant.ConfigManagerPortName)
+	port, err := pm.AllocatePort(portKey)
+	if err != nil {
+		return constant.InvalidContainerPort, err
+	}
+	return port, nil
+}
+
+func findPortByPortName(container corev1.Container) (int32, bool) {
 	for _, port := range container.Ports {
 		if port.Name == constant.ConfigManagerPortName {
-			return &port
+			return port.ContainerPort, true
 		}
 	}
-	return nil
+	return constant.InvalidContainerPort, false
 }
 
 // UpdateConfigPayload updates the configuration payload

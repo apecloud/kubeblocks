@@ -58,7 +58,6 @@ const (
 type rebuildInstanceOpsHandler struct{}
 
 type instanceHelper struct {
-	comp      *appsv1alpha1.ClusterComponentSpec
 	targetPod *corev1.Pod
 	backup    *dpv1alpha1.Backup
 	instance  appsv1alpha1.Instance
@@ -105,14 +104,13 @@ func (r rebuildInstanceOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli cli
 			appsv1alpha1.AbnormalClusterCompPhase, appsv1alpha1.UpdatingClusterCompPhase}, compStatus.Phase) {
 			return intctrlutil.NewFatalError(fmt.Sprintf(`the phase of component "%s" can not be %s`, v.ComponentName, compStatus.Phase))
 		}
-		comp := opsRes.Cluster.Spec.GetComponentByName(v.ComponentName)
-		synthesizedComp, err := component.BuildSynthesizedComponentWrapper(reqCtx, cli, opsRes.Cluster, comp)
-		if err != nil {
-			return err
-		}
 		for _, ins := range v.Instances {
 			targetPod := &corev1.Pod{}
-			if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: ins.Name, Namespace: opsRes.Cluster.Namespace}, targetPod); err != nil {
+			if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: ins.Name, Namespace: opsRes.Cluster.Namespace}, targetPod); err != nil {
+				return err
+			}
+			synthesizedComp, err := r.buildSynthesizedComponent(reqCtx, cli, opsRes.Cluster, targetPod.Labels[constant.KBAppComponentLabelKey])
+			if err != nil {
 				return err
 			}
 			isAvailable, _ := r.instanceIsAvailable(synthesizedComp, targetPod, "")
@@ -156,7 +154,6 @@ func (r rebuildInstanceOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx
 	}
 	for _, v := range opsRes.OpsRequest.Spec.RebuildFrom {
 		compStatus := opsRes.OpsRequest.Status.Components[v.ComponentName]
-		comp := opsRes.Cluster.Spec.GetComponentByName(v.ComponentName)
 		for i, instance := range v.Instances {
 			expectCount += 1
 			progressDetail := r.getInstanceProgressDetail(compStatus, instance.Name)
@@ -168,7 +165,7 @@ func (r rebuildInstanceOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx
 				continue
 			}
 			// rebuild instance
-			completed, err := r.rebuildInstance(reqCtx, cli, opsRes, comp, v.RestoreEnv, &progressDetail, instance, v.BackupName, i)
+			completed, err := r.rebuildInstance(reqCtx, cli, opsRes, v.RestoreEnv, &progressDetail, instance, v.BackupName, i)
 			if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
 				// If a fatal error occurs, this instance rebuilds failed.
 				progressDetail.SetStatusAndMessage(appsv1alpha1.FailedProgressStatus, err.Error())
@@ -204,13 +201,12 @@ func (r rebuildInstanceOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx
 func (r rebuildInstanceOpsHandler) rebuildInstance(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
-	comp *appsv1alpha1.ClusterComponentSpec,
 	envForRestore []corev1.EnvVar,
 	progressDetail *appsv1alpha1.ProgressStatusDetail,
 	instance appsv1alpha1.Instance,
 	backupName string,
 	index int) (bool, error) {
-	insHelper, err := r.prepareInstanceHelper(reqCtx, cli, opsRes, comp, envForRestore, instance, backupName, index)
+	insHelper, err := r.prepareInstanceHelper(reqCtx, cli, opsRes, envForRestore, instance, backupName, index)
 	if err != nil {
 		return false, err
 	}
@@ -220,18 +216,34 @@ func (r rebuildInstanceOpsHandler) rebuildInstance(reqCtx intctrlutil.RequestCtx
 	return r.rebuildInstanceWithBackup(reqCtx, cli, opsRes, insHelper, progressDetail)
 }
 
+func (r rebuildInstanceOpsHandler) buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	componentName string) (*component.SynthesizedComponent, error) {
+	compSpec := getComponentSpecOrShardingTemplate(cluster, componentName)
+	if compSpec.ComponentDef == "" {
+		// TODO: remove after 0.9
+		return component.BuildSynthesizedComponentWrapper(reqCtx, cli, cluster, compSpec)
+	}
+	comp, compDef, err := component.GetCompNCompDefByName(reqCtx.Ctx, cli, cluster.Namespace, constant.GenerateClusterComponentName(cluster.Name, componentName))
+	if err != nil {
+		return nil, err
+	}
+	return component.BuildSynthesizedComponent(reqCtx, cli, cluster, compDef, comp)
+}
+
 func (r rebuildInstanceOpsHandler) prepareInstanceHelper(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
-	comp *appsv1alpha1.ClusterComponentSpec,
 	envForRestore []corev1.EnvVar,
 	instance appsv1alpha1.Instance,
 	backupName string,
 	index int) (*instanceHelper, error) {
 	var (
-		backup    *dpv1alpha1.Backup
-		actionSet *dpv1alpha1.ActionSet
-		err       error
+		backup          *dpv1alpha1.Backup
+		actionSet       *dpv1alpha1.ActionSet
+		synthesizedComp *component.SynthesizedComponent
+		err             error
 	)
 	if backupName != "" {
 		// prepare backup infos
@@ -257,9 +269,7 @@ func (r rebuildInstanceOpsHandler) prepareInstanceHelper(reqCtx intctrlutil.Requ
 	if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: instance.Name, Namespace: opsRes.Cluster.Namespace}, targetPod); err != nil {
 		return nil, err
 	}
-	synthesizedComp, err := component.BuildSynthesizedComponentWrapper(reqCtx, cli, opsRes.Cluster, comp)
-	// TODO: remove after v0.9
-	synthesizedComp.CompDefName = comp.ComponentDef
+	synthesizedComp, err = r.buildSynthesizedComponent(reqCtx, cli, opsRes.Cluster, targetPod.Labels[constant.KBAppComponentLabelKey])
 	if err != nil {
 		return nil, err
 	}
@@ -270,7 +280,6 @@ func (r rebuildInstanceOpsHandler) prepareInstanceHelper(reqCtx intctrlutil.Requ
 	}
 	return &instanceHelper{
 		index:           index,
-		comp:            comp,
 		backup:          backup,
 		instance:        instance,
 		actionSet:       actionSet,
@@ -313,7 +322,7 @@ func (r rebuildInstanceOpsHandler) rebuildInstanceWithBackup(reqCtx intctrlutil.
 
 	getRestore := func(stage dpv1alpha1.RestoreStage) (*dpv1alpha1.Restore, string, error) {
 		restoreName := fmt.Sprintf("%s-%s-%s-%s-%d", insHelper.rebuildPrefix, strings.ToLower(string(stage)),
-			common.CutString(opsRes.OpsRequest.Name, 10), insHelper.comp.Name, insHelper.index)
+			common.CutString(opsRes.OpsRequest.Name, 10), insHelper.synthesizedComp.Name, insHelper.index)
 		restore := &dpv1alpha1.Restore{}
 		if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: restoreName, Namespace: opsRes.Cluster.Namespace}, restore); err != nil {
 			return nil, restoreName, client.IgnoreNotFound(err)
@@ -380,7 +389,7 @@ func (r rebuildInstanceOpsHandler) rebuildInstancePVByPod(reqCtx intctrlutil.Req
 	opsRes *OpsResource,
 	insHelper *instanceHelper,
 	progressDetail *appsv1alpha1.ProgressStatusDetail) (bool, error) {
-	rebuildPodName := fmt.Sprintf("%s-%s-%s-%d", insHelper.rebuildPrefix, common.CutString(opsRes.OpsRequest.Name, 20), insHelper.comp.Name, insHelper.index)
+	rebuildPodName := fmt.Sprintf("%s-%s-%s-%d", insHelper.rebuildPrefix, common.CutString(opsRes.OpsRequest.Name, 20), insHelper.synthesizedComp.Name, insHelper.index)
 	rebuildPod := &corev1.Pod{}
 	exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, cli, client.ObjectKey{Name: rebuildPodName, Namespace: opsRes.Cluster.Namespace}, rebuildPod)
 	if err != nil {
@@ -774,7 +783,7 @@ func (r rebuildInstanceOpsHandler) instanceIsAvailable(
 	if !targetPod.DeletionTimestamp.IsZero() {
 		return false, nil
 	}
-	isFailed, isTimeout, _ := intctrlutil.IsPodFailedAndTimedOut(targetPod, true)
+	isFailed, isTimeout, _ := intctrlutil.IsPodFailedAndTimedOut(targetPod)
 	if isFailed && isTimeout {
 		return false, intctrlutil.NewFatalError(fmt.Sprintf(`the new instance "%s" is failed, please check it`, targetPod.Name))
 	}

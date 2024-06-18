@@ -96,6 +96,7 @@ func (r *ServiceDescriptor) validate() error {
 
 	checkValueAndValueFrom("auth", r.Spec.Auth.Username, r.Spec.Auth.Password)
 	checkValueAndValueFrom("endpoint", r.Spec.Endpoint)
+	checkValueAndValueFrom("host", r.Spec.Host)
 	checkValueAndValueFrom("port", r.Spec.Port)
 
 	if len(allErrs) > 0 {

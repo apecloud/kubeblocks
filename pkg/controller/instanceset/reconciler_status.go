@@ -60,7 +60,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 		podList = append(podList, pod)
 	}
 	// 2. calculate status summary
-	updateRevisions, err := getUpdateRevisions(its.Status.UpdateRevisions)
+	updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +68,9 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	currentReplicas, updatedReplicas := int32(0), int32(0)
 	readyReplicas, availableReplicas := int32(0), int32(0)
 	notReadyNames := sets.New[string]()
+	currentRevisions := map[string]string{}
 	for _, pod := range podList {
+		currentRevisions[pod.Name] = getPodRevision(pod)
 		if isCreated(pod) {
 			notReadyNames.Insert(pod.Name)
 			replicas++
@@ -98,13 +100,13 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	its.Status.AvailableReplicas = availableReplicas
 	its.Status.CurrentReplicas = currentReplicas
 	its.Status.UpdatedReplicas = updatedReplicas
+	its.Status.CurrentRevisions, _ = buildRevisions(currentRevisions)
 	// all pods have been updated
 	totalReplicas := int32(1)
 	if its.Spec.Replicas != nil {
 		totalReplicas = *its.Spec.Replicas
 	}
 	if its.Status.Replicas == totalReplicas && its.Status.UpdatedReplicas == totalReplicas {
-		its.Status.CurrentRevisions = its.Status.UpdateRevisions
 		its.Status.CurrentRevision = its.Status.UpdateRevision
 		its.Status.CurrentReplicas = totalReplicas
 	}
@@ -170,7 +172,7 @@ func buildFailureCondition(its *workloads.InstanceSet, pods []*corev1.Pod) (*met
 			continue
 		}
 		// KubeBlocks says the Pod is 'Failed'
-		isFailed, isTimedOut, _ := intctrlutil.IsPodFailedAndTimedOut(pod, false)
+		isFailed, isTimedOut, _ := intctrlutil.IsPodFailedAndTimedOut(pod)
 		if isFailed && isTimedOut {
 			failureNames = append(failureNames, pod.Name)
 		}

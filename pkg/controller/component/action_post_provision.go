@@ -103,7 +103,7 @@ func NeedDoPostProvision(ctx context.Context, cli client.Reader, actionCtx *Acti
 			}
 			runningITS, _ := actionCtx.workload.(*workloads.InstanceSet)
 			if !instanceset.IsInstancesReady(runningITS) {
-				return false, intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "runtime is not ready when checking RuntimeReady preCondition in postProvision action")
+				return false, intctrlutil.NewErrorf(intctrlutil.ErrorTypeExpectedInProcess, "runtime is not ready when checking RuntimeReady preCondition in postProvision action")
 			}
 		case appsv1alpha1.ComponentReadyPreConditionType:
 			if actionCtx.component.Status.Phase != appsv1alpha1.RunningClusterCompPhase {

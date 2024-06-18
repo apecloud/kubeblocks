@@ -37,10 +37,22 @@ var _ = Describe("service descriptor builder", func() {
 			serviceKind    = "mock-kind"
 			serviceVersion = "mock-version"
 			endpointName   = "mock-endpoint"
+			hostName       = "mock-host"
 			secretRefName  = "foo"
 		)
 		endpoint := appsv1alpha1.CredentialVar{
 			Value: endpointName,
+		}
+		host := appsv1alpha1.CredentialVar{
+			Value: hostName,
+		}
+		port := appsv1alpha1.CredentialVar{
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: secretRefName},
+					Key:                  constant.ServiceDescriptorPortKey,
+				},
+			},
 		}
 		username := &appsv1alpha1.CredentialVar{
 			ValueFrom: &corev1.EnvVarSource{
@@ -58,14 +70,7 @@ var _ = Describe("service descriptor builder", func() {
 				},
 			},
 		}
-		port := appsv1alpha1.CredentialVar{
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{Name: secretRefName},
-					Key:                  constant.ServiceDescriptorPortKey,
-				},
-			},
-		}
+
 		auth := appsv1alpha1.ConnectionCredentialAuth{
 			Username: username,
 			Password: password,
@@ -74,6 +79,7 @@ var _ = Describe("service descriptor builder", func() {
 			SetServiceKind(serviceKind).
 			SetServiceVersion(serviceVersion).
 			SetEndpoint(endpoint).
+			SetHost(host).
 			SetPort(port).
 			SetAuth(auth).
 			GetObject()
@@ -84,6 +90,8 @@ var _ = Describe("service descriptor builder", func() {
 		Expect(sd.Spec.ServiceVersion).Should(Equal(serviceVersion))
 		Expect(sd.Spec.Endpoint.Value).Should(Equal(endpointName))
 		Expect(sd.Spec.Endpoint.ValueFrom).Should(BeNil())
+		Expect(sd.Spec.Host.Value).Should(Equal(hostName))
+		Expect(sd.Spec.Host.ValueFrom).Should(BeNil())
 		Expect(sd.Spec.Auth.Username.Value).Should(BeEmpty())
 		Expect(sd.Spec.Auth.Username.ValueFrom.SecretKeyRef.Key).Should(Equal(constant.ServiceDescriptorUsernameKey))
 		Expect(sd.Spec.Auth.Username.ValueFrom.SecretKeyRef.Name).Should(Equal(secretRefName))

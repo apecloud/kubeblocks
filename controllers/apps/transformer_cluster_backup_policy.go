@@ -323,6 +323,8 @@ func (r *clusterBackupPolicyTransformer) syncBackupSchedule(backupSchedule *dpv1
 		scheduleMethodMap[s.BackupMethod] = struct{}{}
 	}
 	mergeMap(backupSchedule.Annotations, r.buildAnnotations())
+	// update backupSchedule annotation to reconcile it.
+	backupSchedule.Annotations[constant.ReconcileAnnotationKey] = r.Cluster.ResourceVersion
 	// sync the newly added schedule policies.
 	for _, s := range r.backupPolicy.Schedules {
 		if _, ok := scheduleMethodMap[s.BackupMethod]; ok {
@@ -606,6 +608,8 @@ func (r *clusterBackupPolicyTransformer) mergeClusterBackup(
 	// method, for instance, the method is changed from A to B, we need to
 	// disable A and enable B.
 	exist := false
+	hasSyncPITRMethod := false
+	enableAutoBackup := boolptr.IsSetToTrue(backup.Enabled)
 	for i, s := range backupSchedule.Spec.Schedules {
 		if s.BackupMethod == backup.Method {
 			mergeSchedulePolicy(sp, &backupSchedule.Spec.Schedules[i])
@@ -613,24 +617,15 @@ func (r *clusterBackupPolicyTransformer) mergeClusterBackup(
 			continue
 		}
 
-		// for the backup methods that are not specified in the cluster backup,
-		// we need to disable them.
-
-		if !boolptr.IsSetToTrue(s.Enabled) {
-			continue
-		}
-
-		// if PITR is not enabled, disable the backup schedule.
-		if !boolptr.IsSetToTrue(backup.PITREnabled) {
-			backupSchedule.Spec.Schedules[i].Enabled = boolptr.False()
-			continue
-		}
-
-		// if PITR is enabled, we should check and disable the backup schedule if
-		// the backup type is not Continuous. The Continuous backup schedule is
-		// reconciled by the enterprise edition operator.
 		m := dputils.GetBackupMethodByName(s.BackupMethod, backupPolicy)
-		if m == nil || m.ActionSetName == "" {
+		if m == nil {
+			continue
+		}
+		if m.ActionSetName == "" {
+			if boolptr.IsSetToTrue(m.SnapshotVolumes) && enableAutoBackup {
+				// disable the automatic backup when the specified method is not a volume snapshot for volume-snapshot method
+				backupSchedule.Spec.Schedules[i].Enabled = boolptr.False()
+			}
 			continue
 		}
 
@@ -639,7 +634,13 @@ func (r *clusterBackupPolicyTransformer) mergeClusterBackup(
 			r.Error(err, "failed to get ActionSet for backup.", "ActionSet", as.Name)
 			continue
 		}
-		if as.Spec.BackupType != dpv1alpha1.BackupTypeContinuous {
+		if as.Spec.BackupType == dpv1alpha1.BackupTypeContinuous && backup.PITREnabled != nil && !hasSyncPITRMethod {
+			// auto-sync the first continuous backup for the 'pirtEnable' option.
+			backupSchedule.Spec.Schedules[i].Enabled = backup.PITREnabled
+			hasSyncPITRMethod = true
+		}
+		if as.Spec.BackupType == dpv1alpha1.BackupTypeFull && enableAutoBackup {
+			// disable the automatic backup for other full backup method
 			backupSchedule.Spec.Schedules[i].Enabled = boolptr.False()
 		}
 	}

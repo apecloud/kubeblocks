@@ -33,6 +33,8 @@ const (
 	ClusterKind           = "Cluster"
 	ComponentKind         = "Component"
 	OpsRequestKind        = "OpsRequestKind"
+
+	defaultInstanceTemplateReplicas = 1
 )
 
 type ComponentTemplateSpec struct {
@@ -1102,6 +1104,9 @@ type CredentialVars struct {
 type ServiceRefVars struct {
 	// +optional
 	Endpoint *VarOption `json:"endpoint,omitempty"`
+
+	// +optional
+	Host *VarOption `json:"host,omitempty"`
 
 	// +optional
 	Port *VarOption `json:"port,omitempty"`

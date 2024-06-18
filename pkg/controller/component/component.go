@@ -84,7 +84,7 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluste
 		AddLabels(constant.KBAppClusterUIDLabelKey, string(cluster.UID)).
 		SetServiceVersion(compSpec.ServiceVersion).
 		SetSchedulingPolicy(schedulingPolicy).
-		DisableExporter(compSpec.GetDisableExporter()).
+		SetDisableExporter(compSpec.GetDisableExporter()).
 		SetReplicas(compSpec.Replicas).
 		SetResources(compSpec.Resources).
 		SetServiceAccountName(compSpec.ServiceAccountName).
@@ -94,7 +94,9 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluste
 		SetServiceRefs(compSpec.ServiceRefs).
 		SetTLSConfig(compSpec.TLS, compSpec.Issuer).
 		SetInstances(compSpec.Instances).
-		SetOfflineInstances(compSpec.OfflineInstances)
+		SetOfflineInstances(compSpec.OfflineInstances).
+		SetRuntimeClassName(cluster.Spec.RuntimeClassName).
+		SetSystemAccounts(compSpec.SystemAccounts)
 	if labels != nil {
 		compBuilder.AddLabelsInMap(labels)
 	}
@@ -103,9 +105,6 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluste
 	}
 	if !IsGenerated(compBuilder.GetObject()) {
 		compBuilder.SetServices(compSpec.Services)
-	}
-	if cluster.Spec.RuntimeClassName != nil {
-		compBuilder.SetRuntimeClassName(*cluster.Spec.RuntimeClassName)
 	}
 	return compBuilder.GetObject(), nil
 }
@@ -215,22 +214,33 @@ func getCompLabelValue(comp *appsv1alpha1.Component, label string) (string, erro
 	return val, nil
 }
 
-// GetComponentByName gets the component by component full name.
-func GetComponentByName(reqCtx intctrlutil.RequestCtx, cli client.Client, compFullName, namespace string) (*appsv1alpha1.Component, error) {
+// GetCompDefByName gets the component definition by component definition name.
+func GetCompDefByName(ctx context.Context, cli client.Reader, compDefName string) (*appsv1alpha1.ComponentDefinition, error) {
+	compDef := &appsv1alpha1.ComponentDefinition{}
+	if err := cli.Get(ctx, client.ObjectKey{Name: compDefName}, compDef); err != nil {
+		return nil, err
+	}
+	return compDef, nil
+}
+
+func GetComponentByName(ctx context.Context, cli client.Reader, namespace, fullCompName string) (*appsv1alpha1.Component, error) {
 	comp := &appsv1alpha1.Component{}
-	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: compFullName, Namespace: namespace}, comp); err != nil {
+	if err := cli.Get(ctx, client.ObjectKey{Name: fullCompName, Namespace: namespace}, comp); err != nil {
 		return nil, err
 	}
 	return comp, nil
 }
 
-// GetCompDefByName gets the component definition by component definition name.
-func GetCompDefByName(reqCtx intctrlutil.RequestCtx, cli client.Client, compDefName string) (*appsv1alpha1.ComponentDefinition, error) {
-	compDef := &appsv1alpha1.ComponentDefinition{}
-	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: compDefName}, compDef); err != nil {
-		return nil, err
+func GetCompNCompDefByName(ctx context.Context, cli client.Reader, namespace, fullCompName string) (*appsv1alpha1.Component, *appsv1alpha1.ComponentDefinition, error) {
+	comp, err := GetComponentByName(ctx, cli, namespace, fullCompName)
+	if err != nil {
+		return nil, nil, err
 	}
-	return compDef, nil
+	compDef, err := GetCompDefByName(ctx, cli, comp.Spec.CompDef)
+	if err != nil {
+		return nil, nil, err
+	}
+	return comp, compDef, nil
 }
 
 // ListClusterComponents lists the components of the cluster.

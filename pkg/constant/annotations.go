@@ -19,6 +19,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package constant
 
+const (
+	HorizontalScaleBackupPolicyTemplateKey = "apps.kubeblocks.io/horizontal-scale-backup-policy-template"
+)
+
+// annotations for kubeblocks
+const (
+	ClusterSnapshotAnnotationKey             = "kubeblocks.io/cluster-snapshot" // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
+	OpsRequestAnnotationKey                  = "kubeblocks.io/ops-request"      // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
+	ReconcileAnnotationKey                   = "kubeblocks.io/reconcile"        // ReconcileAnnotationKey Notify k8s object to reconcile
+	RestartAnnotationKey                     = "kubeblocks.io/restart"          // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
+	RestoreFromBackupAnnotationKey           = "kubeblocks.io/restore-from-backup"
+	RestoreDoneAnnotationKey                 = "kubeblocks.io/restore-done"
+	BackupSourceTargetAnnotationKey          = "kubeblocks.io/backup-source-target" // RestoreFromBackupAnnotationKey specifies the component to recover from the backup.
+	SnapShotForStartAnnotationKey            = "kubeblocks.io/snapshot-for-start"
+	ComponentReplicasAnnotationKey           = "apps.kubeblocks.io/component-replicas" // ComponentReplicasAnnotationKey specifies the number of pods in replicas
+	BackupPolicyTemplateAnnotationKey        = "apps.kubeblocks.io/backup-policy-template"
+	LastAppliedClusterAnnotationKey          = "apps.kubeblocks.io/last-applied-cluster"
+	PVLastClaimPolicyAnnotationKey           = "apps.kubeblocks.io/pv-last-claim-policy"
+	HaltRecoveryAllowInconsistentCVAnnotKey  = "clusters.apps.kubeblocks.io/allow-inconsistent-cv"
+	HaltRecoveryAllowInconsistentResAnnotKey = "clusters.apps.kubeblocks.io/allow-inconsistent-resource"
+	KubeBlocksGenerationKey                  = "kubeblocks.io/generation"
+	ExtraEnvAnnotationKey                    = "kubeblocks.io/extra-env"
+	LastRoleSnapshotVersionAnnotationKey     = "apps.kubeblocks.io/last-role-snapshot-version"
+	ComponentScaleInAnnotationKey            = "apps.kubeblocks.io/component-scale-in" // ComponentScaleInAnnotationKey specifies whether the component is scaled in
+	DisableHAAnnotationKey                   = "kubeblocks.io/disable-ha"
+)
+
+// annotations for multi-cluster
+const (
+	KBAppMultiClusterPlacementKey   = "apps.kubeblocks.io/multi-cluster-placement"
+	MultiClusterServicePlacementKey = "apps.kubeblocks.io/multi-cluster-service-placement"
+)
+
 // GetKBGenerationAnnotation returns the annotation for kubeblocks generation.
 func GetKBGenerationAnnotation(generation string) map[string]string {
 	return map[string]string{
@@ -40,13 +73,3 @@ func GetKBReservedAnnotationKeys() []string {
 		KBAppServiceVersionKey,
 	}
 }
-
-const (
-	HorizontalScaleBackupPolicyTemplateKey = "apps.kubeblocks.io/horizontal-scale-backup-policy-template"
-)
-
-// annotations for multi-cluster
-const (
-	KBAppMultiClusterPlacementKey   = "apps.kubeblocks.io/multi-cluster-placement"
-	MultiClusterServicePlacementKey = "apps.kubeblocks.io/multi-cluster-service-placement"
-)

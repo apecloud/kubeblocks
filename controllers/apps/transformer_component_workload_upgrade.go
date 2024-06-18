@@ -60,30 +60,6 @@ func (t *componentWorkloadUpgradeTransformer) Transform(ctx graph.TransformConte
 	var parent *model.ObjectVertex
 	legacyFound := false
 
-	// remove the RSM object if found
-	exists, err := legacyCRDExists(transCtx.Context, graphCli)
-	if err != nil {
-		return err
-	}
-	if exists {
-		rsm := &legacy.ReplicatedStateMachine{}
-		if err := graphCli.Get(transCtx.Context, client.ObjectKeyFromObject(comp), rsm); err == nil {
-			legacyFound = true
-			parent = graphCli.Do(dag, nil, rsm, model.ActionDeletePtr(), parent)
-		} else if !apierrors.IsNotFound(err) {
-			return err
-		}
-	}
-
-	// remove the StatefulSet object if found
-	sts := &appsv1.StatefulSet{}
-	if err := graphCli.Get(transCtx.Context, client.ObjectKeyFromObject(comp), sts); err == nil {
-		legacyFound = true
-		parent = graphCli.Do(dag, nil, sts, model.ActionDeletePtr(), parent, model.WithPropagationPolicy(client.PropagationPolicy(metav1.DeletePropagationOrphan)))
-	} else if !apierrors.IsNotFound(err) {
-		return err
-	}
-
 	// update pod & pvc & svc labels
 	objectList := []client.ObjectList{&corev1.PersistentVolumeClaimList{}, &corev1.ServiceList{}, &corev1.PodList{}}
 	ml := constant.GetComponentWellKnownLabels(transCtx.Cluster.Name, synthesizeComp.Name)
@@ -117,6 +93,30 @@ func (t *componentWorkloadUpgradeTransformer) Transform(ctx graph.TransformConte
 				}
 				parent = graphCli.Do(dag, nil, object, model.ActionUpdatePtr(), parent)
 			}
+		}
+	}
+
+	// remove the StatefulSet object if found
+	sts := &appsv1.StatefulSet{}
+	if err := graphCli.Get(transCtx.Context, client.ObjectKeyFromObject(comp), sts); err == nil {
+		legacyFound = true
+		parent = graphCli.Do(dag, nil, sts, model.ActionDeletePtr(), parent, model.WithPropagationPolicy(client.PropagationPolicy(metav1.DeletePropagationOrphan)))
+	} else if !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	// remove the RSM object if found
+	exists, err := legacyCRDExists(transCtx.Context, graphCli)
+	if err != nil {
+		return err
+	}
+	if exists {
+		rsm := &legacy.ReplicatedStateMachine{}
+		if err := graphCli.Get(transCtx.Context, client.ObjectKeyFromObject(comp), rsm); err == nil {
+			legacyFound = true
+			graphCli.Do(dag, nil, rsm, model.ActionDeletePtr(), parent, model.WithPropagationPolicy(client.PropagationPolicy(metav1.DeletePropagationOrphan)))
+		} else if !apierrors.IsNotFound(err) {
+			return err
 		}
 	}
 

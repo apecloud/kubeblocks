@@ -35,6 +35,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
 var _ = Describe("OpsUtil functions", func() {
@@ -62,6 +63,7 @@ var _ = Describe("OpsUtil functions", func() {
 		// namespaced
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.InstanceSetSignature, true, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.ConfigMapSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -89,13 +91,15 @@ var _ = Describe("OpsUtil functions", func() {
 			By("init operations resources ")
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
 			testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusComp)
-
+			pods := testapps.MockInstanceSetPods(&testCtx, nil, opsRes.Cluster, consensusComp)
+			time.Sleep(time.Second)
 			By("Test the functions in ops_util.go")
-			opsRes.OpsRequest = createHorizontalScaling(clusterName, appsv1alpha1.HorizontalScaling{
-				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
-				Replicas:     pointer.Int32(1),
-			})
+			ops := testapps.NewOpsRequestObj("restart-ops-"+randomStr, testCtx.DefaultNamespace,
+				clusterName, appsv1alpha1.RestartType)
+			ops.Spec.RestartList = []appsv1alpha1.ComponentOps{{ComponentName: consensusComp}}
+			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
 			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsRunningPhase
+			opsRes.OpsRequest.Status.StartTimestamp = metav1.Now()
 
 			By("mock component failed")
 			clusterComp := opsRes.Cluster.Status.Components[consensusComp]
@@ -103,19 +107,33 @@ var _ = Describe("OpsUtil functions", func() {
 			opsRes.Cluster.Status.SetComponentStatus(consensusComp, clusterComp)
 
 			By("expect for opsRequest is running")
+			handleRestartProgress := func(reqCtx intctrlutil.RequestCtx,
+				cli client.Client,
+				opsRes *OpsResource,
+				pgRes *progressResource,
+				compStatus *appsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
+				return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus,
+					func(pod *corev1.Pod, inteface ComponentOpsInteface, opsStartTime metav1.Time, s string) bool {
+						return !pod.CreationTimestamp.Before(&opsStartTime)
+					})
+			}
+
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
-			compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.HorizontalScalingList)
+			compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.RestartList)
 
 			opsPhase, _, err := compOpsHelper.reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes,
-				"test", handleComponentProgressForScalingReplicas)
+				"test", handleRestartProgress)
 			Expect(err).Should(BeNil())
 			Expect(opsPhase).Should(Equal(appsv1alpha1.OpsRunningPhase))
 
-			By("mock component failed time reaches the threshold, expect for opsRequest is Failed")
-			compStatus := opsRes.OpsRequest.Status.Components[consensusComp]
-			compStatus.LastFailedTime = metav1.Time{Time: compStatus.LastFailedTime.Add(-1 * componentFailedTimeout).Add(-1 * time.Second)}
-			opsRes.OpsRequest.Status.Components[consensusComp] = compStatus
-			opsPhase, _, err = compOpsHelper.reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes, "test", handleComponentProgressForScalingReplicas)
+			By("mock one pod recreates failed, expect for opsRequest is Failed")
+			testk8s.MockPodIsTerminating(ctx, testCtx, pods[2])
+			testk8s.RemovePodFinalizer(ctx, testCtx, pods[2])
+			// recreate it
+			pod := testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp, pods[2].Name, "follower", "Readonly")
+			// mock pod is failed
+			testk8s.MockPodIsFailed(ctx, testCtx, pod)
+			opsPhase, _, err = compOpsHelper.reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes, "test", handleRestartProgress)
 			Expect(err).Should(BeNil())
 			Expect(opsPhase).Should(Equal(appsv1alpha1.OpsFailedPhase))
 		})

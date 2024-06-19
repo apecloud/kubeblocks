@@ -47,7 +47,7 @@ func TestCheckRoleJob(t *testing.T) {
 	}
 	job := NewCheckRoleJob(commonJob)
 
-	t.Run("do - role unchanged with send role event periodically", func(t *testing.T) {
+	t.Run("do - role unchanged with sendRoleEventPeriodically disable", func(t *testing.T) {
 		job.originRole = "role1"
 		job.roleUnchangedEventCount = 0
 
@@ -65,7 +65,7 @@ func TestCheckRoleJob(t *testing.T) {
 		assert.Equal(t, 0, job.roleUnchangedEventCount)
 	})
 
-	t.Run("do - role unchanged with send role event periodically", func(t *testing.T) {
+	t.Run("do - role unchanged with sendRoleEventPeriodically enable", func(t *testing.T) {
 		job.originRole = "role1"
 		job.roleUnchangedEventCount = 0
 		sendRoleEventPeriodically = true

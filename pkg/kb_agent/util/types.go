@@ -26,16 +26,16 @@ const (
 )
 
 type CronJob struct {
-	TimeoutSeconds   int `json:"timeoutSeconds,omitempty"`
 	PeriodSeconds    int `json:"periodSeconds,omitempty"`
 	SuccessThreshold int `json:"successThreshold,omitempty"`
 	FailureThreshold int `json:"failureThreshold,omitempty"`
 }
 
 type HandlerSpec struct {
-	Command []string          `json:"command,omitempty"`
-	GPRC    map[string]string `json:"grpc,omitempty"`
-	CronJob *CronJob          `json:"cronJob,omitempty"`
+	TimeoutSeconds int               `json:"timeoutSeconds,omitempty"`
+	Command        []string          `json:"command,omitempty"`
+	GPRC           map[string]string `json:"grpc,omitempty"`
+	CronJob        *CronJob          `json:"cronJob,omitempty"`
 }
 
 type ActionMessage interface {

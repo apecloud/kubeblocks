@@ -55,10 +55,6 @@ func NewJob(name string, cronJob *util.CronJob) Job {
 		ReportFrequency:  60,
 	}
 
-	if cronJob.TimeoutSeconds != 0 {
-		job.TimeoutSeconds = cronJob.TimeoutSeconds
-	}
-
 	if cronJob.PeriodSeconds != 0 {
 		job.PeriodSeconds = cronJob.PeriodSeconds
 	}
@@ -103,9 +99,7 @@ func (job *CommonJob) Start() {
 }
 
 func (job *CommonJob) do() error {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(job.TimeoutSeconds)*time.Second)
-	defer cancel()
-	_, err := handlers.Do(ctx, job.Name, nil)
+	_, err := handlers.Do(context.Background(), job.Name, nil)
 	return err
 }
 

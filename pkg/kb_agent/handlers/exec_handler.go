@@ -21,8 +21,10 @@ package handlers
 
 import (
 	"context"
+	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
@@ -54,7 +56,17 @@ func (h *ExecHandler) Do(ctx context.Context, setting util.HandlerSpec, args map
 	}
 	envs := util.GetAllEnvs(args)
 	h.Logger.Info("execute action", "commands", setting.Command, "envs", envs)
+	if setting.TimeoutSeconds > 0 {
+		timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(setting.TimeoutSeconds)*time.Second)
+		defer cancel()
+		ctx = timeoutCtx
+	}
+
 	output, err := h.Executor.ExecCommand(ctx, setting.Command, envs)
+	if err != nil {
+		return nil, errors.Wrap(err, "ExecHandler executes action failed")
+	}
+
 	var result map[string]any
 	if output != "" {
 		h.Logger.Info("execute action", "output", output)

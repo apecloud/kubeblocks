@@ -84,9 +84,9 @@ func actionHandler(reqCtx *fasthttp.RequestCtx) {
 			statusCode = fasthttp.StatusNotImplemented
 		} else {
 			statusCode = fasthttp.StatusInternalServerError
-			logger.Info("operation exec failed", "error", err.Error())
+			logger.Info("action exec failed", "action", req.Action, "error", err.Error())
 		}
-		msg := NewErrorResponse("ERR_OPERATION_FAILED", fmt.Sprintf("operation exec failed: %v", err))
+		msg := NewErrorResponse("ERR_ACTION_FAILED", fmt.Sprintf("action exec failed: %s", err.Error()))
 		respond(reqCtx, withError(statusCode, msg))
 		return
 	}

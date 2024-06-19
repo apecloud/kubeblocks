@@ -26,17 +26,20 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
-var actionHandlers = map[string]util.HandlerSpec{}
+var actionHandlerSpecs = map[string]util.HandlerSpec{}
 var execHandler *ExecHandler
 var grpcHandler *GRPCHandler
+var logger = ctrl.Log.WithName("EXEC handler")
 
 func InitHandlers() error {
-	if len(actionHandlers) != 0 {
+	if len(actionHandlerSpecs) != 0 {
 		return nil
 	}
 	actionJSON := viper.GetString(constant.KBEnvActionHandlers)
@@ -44,7 +47,7 @@ func InitHandlers() error {
 		return errors.New("action handlers is not specified")
 	}
 
-	err := json.Unmarshal([]byte(actionJSON), &actionHandlers)
+	err := json.Unmarshal([]byte(actionJSON), &actionHandlerSpecs)
 	if err != nil {
 		msg := fmt.Sprintf("unmarshal action handlers [%s] failed: %s", actionJSON, err.Error())
 		return errors.New(msg)
@@ -61,23 +64,41 @@ func InitHandlers() error {
 	return nil
 }
 
-func GetHandlers() map[string]util.HandlerSpec {
-	return actionHandlers
+func GetHandlerSpecs() map[string]util.HandlerSpec {
+	return actionHandlerSpecs
 }
 
 func Do(ctx context.Context, action string, args map[string]any) (map[string]any, error) {
 	if action == "" {
 		return nil, errors.New("action is empty")
 	}
-	handlers := actionHandlers[action]
-
-	switch {
-	case len(handlers.Command) != 0:
-		return execHandler.Do(ctx, handlers, args)
-
-	case len(handlers.GPRC) != 0:
-		return grpcHandler.Do(ctx, handlers, args)
+	handlerSpec, ok := actionHandlerSpecs[action]
+	if !ok {
+		return nil, errors.New("action handler spec not found")
 	}
 
-	return nil, errors.New("no handler found")
+	handler := GetHandler(handlerSpec)
+	if intctrlutil.IsNil(handler) {
+		return nil, errors.New("no handler found")
+	}
+
+	resp, err := handler.Do(ctx, handlerSpec, args)
+	if err != nil {
+		logger.Info("action exec failed", "action", action, "handler spec", handlerSpec, "error", err.Error())
+		return nil, err
+	}
+
+	return resp, nil
+}
+
+func GetHandler(handlerSpec util.HandlerSpec) Handler {
+	if len(handlerSpec.Command) != 0 {
+		return execHandler
+	}
+
+	if len(handlerSpec.GPRC) != 0 {
+		return grpcHandler
+	}
+
+	return nil
 }

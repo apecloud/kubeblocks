@@ -32,7 +32,7 @@ type Manager struct {
 var logger = ctrl.Log.WithName("cronjobs")
 
 func NewManager() (*Manager, error) {
-	actionHandlers := handlers.GetHandlers()
+	actionHandlers := handlers.GetHandlerSpecs()
 	jobs := make(map[string]Job)
 	for name, handler := range actionHandlers {
 		if handler.CronJob == nil {

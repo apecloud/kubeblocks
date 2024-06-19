@@ -36,6 +36,7 @@ import (
 var actionHandlerSpecs = map[string]util.HandlerSpec{}
 var execHandler *ExecHandler
 var grpcHandler *GRPCHandler
+var defaultHandler Handler
 var logger = ctrl.Log.WithName("EXEC handler")
 
 func InitHandlers() error {
@@ -100,5 +101,13 @@ func GetHandler(handlerSpec util.HandlerSpec) Handler {
 		return grpcHandler
 	}
 
+	if defaultHandler != nil {
+		return defaultHandler
+	}
+
 	return nil
+}
+
+func SetDefaultHandler(handler Handler) {
+	defaultHandler = handler
 }

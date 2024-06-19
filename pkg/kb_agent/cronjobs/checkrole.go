@@ -25,11 +25,20 @@ import (
 
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
+	"github.com/spf13/pflag"
 )
 
 type CheckRoleJob struct {
 	CommonJob
 	originRole string
+}
+
+var sendRoleEventPeriodically bool
+var sendRoleEventFrequency int
+var roleUnchangedEventCount int
+
+func init() {
+	pflag.BoolVar(&sendRoleEventPeriodically, "send-role-event-periodically", false, "Enable the mechanism to send role events periodically to prevent event loss.")
 }
 
 func NewCheckRoleJob(commonJob CommonJob) *CheckRoleJob {
@@ -53,7 +62,17 @@ func (job *CheckRoleJob) do() error {
 
 	role := resp.Message
 	if job.originRole == role {
-		return nil
+		if !sendRoleEventPeriodically {
+			return nil
+		}
+		roleUnchangedEventCount++
+		if roleUnchangedEventCount%sendRoleEventFrequency != 0 {
+			return nil
+		}
+		logger.Info("send role event periodically", "role", role)
+	} else {
+		roleUnchangedEventCount = 0
+		logger.Info("send role changed event", "role", role)
 	}
 
 	result := util.RoleProbeMessage{

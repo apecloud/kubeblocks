@@ -31,7 +31,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/client-go/kubernetes"
 	ctlruntime "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -102,13 +101,7 @@ func CreateEvent(reason string, msg ActionMessage) (*corev1.Event, error) {
 
 func SendEvent(ctx context.Context, event *corev1.Event) error {
 	ctx1 := context.Background()
-	config, err := ctlruntime.GetConfig()
-	if err != nil {
-		logger.Info("get k8s client config failed", "error", err.Error())
-		return err
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
+	clientset, err := GetClientSet()
 	if err != nil {
 		logger.Info("k8s client create failed", "error", err.Error())
 		return err

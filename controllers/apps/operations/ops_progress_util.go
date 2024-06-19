@@ -320,13 +320,9 @@ func handleFailedOrProcessingProgressDetail(opsRes *OpsResource,
 	progressDetail appsv1alpha1.ProgressStatusDetail,
 	pod *corev1.Pod) (completedCount int32) {
 	componentName := pgRes.clusterComponent.Name
-	opsStartTime := opsRes.OpsRequest.Status.StartTimestamp
-	if podIsFailedDuringOperation(opsStartTime, pod, compStatus.Phase) {
+	isFailed, isTimeout, _ := intctrlutil.IsPodFailedAndTimedOut(pod)
+	if isFailed && isTimeout {
 		podMessage := getFailedPodMessage(opsRes.Cluster, componentName, pod)
-		// if the pod is not failed, return
-		if len(podMessage) == 0 {
-			return
-		}
 		message := getProgressFailedMessage(pgRes.opsMessageKey, progressDetail.ObjectKey, componentName, podMessage)
 		progressDetail.SetStatusAndMessage(appsv1alpha1.FailedProgressStatus, message)
 		completedCount = 1
@@ -342,20 +338,6 @@ func handleFailedOrProcessingProgressDetail(opsRes *OpsResource,
 // podIsPendingDuringOperation checks if pod is pending during the component's operation.
 func podIsPendingDuringOperation(opsStartTime metav1.Time, pod *corev1.Pod) bool {
 	return pod.CreationTimestamp.Before(&opsStartTime) && pod.DeletionTimestamp.IsZero()
-}
-
-// podIsFailedDuringOperation checks if pod is failed during operation.
-func podIsFailedDuringOperation(
-	opsStartTime metav1.Time,
-	pod *corev1.Pod,
-	componentPhase appsv1alpha1.ClusterComponentPhase) bool {
-	if !isFailedOrAbnormal(componentPhase) {
-		return false
-	}
-	// When the component is running and the pod has been created after opsStartTime,
-	// but it does not meet the success condition, it indicates that the changes made
-	// to the operations have been overwritten, resulting in a failed status.
-	return !pod.CreationTimestamp.Before(&opsStartTime) && componentPhase == appsv1alpha1.RunningClusterCompPhase
 }
 
 // podProcessedSuccessful checks if the pod has been processed successfully:

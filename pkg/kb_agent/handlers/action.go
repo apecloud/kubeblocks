@@ -31,7 +31,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
-var actionHandlers = map[string]util.Handlers{}
+var actionHandlers = map[string]util.HandlerSpec{}
 var execHandler *ExecHandler
 var grpcHandler *GRPCHandler
 
@@ -61,7 +61,7 @@ func InitHandlers() error {
 	return nil
 }
 
-func GetHandlers() map[string]util.Handlers {
+func GetHandlers() map[string]util.HandlerSpec {
 	return actionHandlers
 }
 

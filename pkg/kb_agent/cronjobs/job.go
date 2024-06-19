@@ -30,7 +30,6 @@ import (
 
 type Job interface {
 	Start()
-	Do() error
 	Stop()
 }
 
@@ -41,6 +40,9 @@ type CommonJob struct {
 	PeriodSeconds    int
 	SuccessThreshold int
 	FailureThreshold int
+	FailedCount      int
+	ReportFrequency  int
+	Do               func() error
 }
 
 func NewJob(name string, cronJob *util.CronJob) Job {
@@ -50,6 +52,7 @@ func NewJob(name string, cronJob *util.CronJob) Job {
 		PeriodSeconds:    60,
 		SuccessThreshold: 1,
 		FailureThreshold: 3,
+		ReportFrequency:  60,
 	}
 
 	if cronJob.TimeoutSeconds != 0 {
@@ -72,6 +75,7 @@ func NewJob(name string, cronJob *util.CronJob) Job {
 		return NewCheckRoleJob(*job)
 	}
 
+	job.Do = job.do
 	return job
 }
 
@@ -82,12 +86,23 @@ func (job *CommonJob) Start() {
 		err := job.Do()
 		if err != nil {
 			logger.Info("Failed to run job", "name", job.Name, "error", err.Error())
-			// Handle error, e.g., increase failure count, stop job if failureThreshold is reached, etc.
+			if job.FailedCount%job.ReportFrequency == 0 {
+				logger.Info("job failed continuously", "name", job.Name, "times", job.FailedCount)
+				msg := util.MessageBase{
+					Event:   util.OperationFailed,
+					Action:  job.Name,
+					Message: err.Error(),
+				}
+				_ = util.SentEventForProbe(context.Background(), msg)
+			}
+			job.FailedCount++
+		} else {
+			job.FailedCount = 0
 		}
 	}
 }
 
-func (job *CommonJob) Do() error {
+func (job *CommonJob) do() error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(job.TimeoutSeconds)*time.Second)
 	defer cancel()
 	_, err := handlers.Do(ctx, job.Name, nil)

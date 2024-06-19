@@ -47,7 +47,7 @@ func NewExecHandler(properties map[string]string) (*ExecHandler, error) {
 	return h, nil
 }
 
-func (h *ExecHandler) Do(ctx context.Context, setting util.Handlers, args map[string]any) (map[string]any, error) {
+func (h *ExecHandler) Do(ctx context.Context, setting util.HandlerSpec, args map[string]any) (map[string]any, error) {
 	if len(setting.Command) == 0 {
 		h.Logger.Info("action command is empty!")
 		return nil, nil

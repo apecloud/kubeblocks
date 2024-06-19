@@ -27,5 +27,5 @@ import (
 
 type Handler interface {
 	// exec action
-	Do(ctx context.Context, settings util.Handlers, agrs map[string]interface{}) (map[string]interface{}, error)
+	Do(ctx context.Context, settings util.HandlerSpec, agrs map[string]interface{}) (map[string]interface{}, error)
 }

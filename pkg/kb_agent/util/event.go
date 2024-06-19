@@ -39,13 +39,13 @@ import (
 
 var logger = ctlruntime.Log.WithName("event")
 
-func SentEventForProbe(ctx context.Context, data map[string]any) error {
-	logger.Info(fmt.Sprintf("send event: %v", data))
-	operation, ok := data["operation"]
-	if !ok {
-		return errors.New("operation is unset")
+func SentEventForProbe(ctx context.Context, msg ActionMessage) error {
+	logger.Info(fmt.Sprintf("send event: %v", msg))
+	action := msg.GetAction()
+	if action == "" {
+		return errors.New("action is unset")
 	}
-	event, err := CreateEvent(operation.(string), data)
+	event, err := CreateEvent(action, msg)
 	if err != nil {
 		logger.Info("create event failed", "error", err.Error())
 		return err
@@ -58,13 +58,13 @@ func SentEventForProbe(ctx context.Context, data map[string]any) error {
 	return nil
 }
 
-func CreateEvent(reason string, data map[string]any) (*corev1.Event, error) {
+func CreateEvent(reason string, msg ActionMessage) (*corev1.Event, error) {
 	// get pod object
 	podName := os.Getenv(constant.KBEnvPodName)
 	podUID := os.Getenv(constant.KBEnvPodUID)
 	nodeName := os.Getenv(constant.KBEnvNodeName)
 	namespace := os.Getenv(constant.KBEnvNamespace)
-	msg, err := json.Marshal(data)
+	data, err := json.Marshal(msg)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +82,7 @@ func CreateEvent(reason string, data map[string]any) (*corev1.Event, error) {
 			FieldPath: "spec.containers{kb-agent}",
 		},
 		Reason:  reason,
-		Message: string(msg),
+		Message: string(data),
 		Source: corev1.EventSource{
 			Component: "kb-agent",
 			Host:      nodeName,

@@ -20,7 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package util
 
 const (
-	CheckRoleOperation    = "checkRole"
+	OperationSuccess      = "Success"
+	OperationFailed       = "Failed"
 	KBAgentEventFieldPath = "spec.containers{kb-agent}"
 )
 
@@ -31,8 +32,27 @@ type CronJob struct {
 	FailureThreshold int `json:"failureThreshold,omitempty"`
 }
 
-type Handlers struct {
+type HandlerSpec struct {
 	Command []string          `json:"command,omitempty"`
 	GPRC    map[string]string `json:"grpc,omitempty"`
 	CronJob *CronJob          `json:"cronJob,omitempty"`
+}
+
+type ActionMessage interface {
+	GetAction() string
+}
+
+type MessageBase struct {
+	Event   string `json:"event,omitempty"`
+	Message string `json:"message,omitempty"`
+	Action  string `json:"action,omitempty"`
+}
+
+func (m MessageBase) GetAction() string {
+	return m.Action
+}
+
+type RoleProbeMessage struct {
+	MessageBase
+	Role string `json:"role,omitempty"`
 }

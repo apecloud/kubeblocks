@@ -29,57 +29,41 @@ import (
 
 type CheckRoleJob struct {
 	CommonJob
-	originRole      string
-	FailedCount     int
-	ReportFrequency int
+	originRole string
 }
 
 func NewCheckRoleJob(commonJob CommonJob) *CheckRoleJob {
-	return &CheckRoleJob{
-		CommonJob:       commonJob,
-		originRole:      "waitForStart",
-		ReportFrequency: 60,
+	checkRoleJob := &CheckRoleJob{
+		CommonJob:  commonJob,
+		originRole: "waitForStart",
 	}
+
+	checkRoleJob.Do = checkRoleJob.do
+	return checkRoleJob
 }
 
-func (job *CheckRoleJob) Do() error {
+func (job *CheckRoleJob) do() error {
 	ctx1, cancel := context.WithTimeout(context.Background(), time.Duration(job.TimeoutSeconds))
 	defer cancel()
 	resp, err := handlers.Do(ctx1, job.Name, nil)
 
 	if err != nil {
-		logger.Info("executing checkRole error", "error", err.Error())
-		if job.FailedCount%job.ReportFrequency == 0 {
-			logger.Info("role checks failed continuously", "times", job.FailedCount)
-			err = util.SentEventForProbe(context.Background(), resp)
-		}
-		job.FailedCount++
 		return err
 	}
 
 	role, _ := resp["output"].(string)
-	job.FailedCount = 0
 	if job.originRole == role {
 		return nil
 	}
 
-	result := map[string]any{}
-	result["operation"] = util.CheckRoleOperation
-	result["role"] = role
-	result["originalRole"] = job.originRole
+	result := util.RoleProbeMessage{
+		MessageBase: util.MessageBase{
+			Event:  util.OperationSuccess,
+			Action: job.Name,
+		},
+		Role: role,
+	}
 	job.originRole = role
 	err = util.SentEventForProbe(context.Background(), result)
 	return err
-}
-
-func (job *CheckRoleJob) Start() {
-	job.Ticker = time.NewTicker(time.Duration(job.PeriodSeconds) * time.Second)
-	defer job.Ticker.Stop()
-	for range job.Ticker.C {
-		err := job.Do()
-		if err != nil {
-			logger.Info("Failed to run job", "name", job.Name, "error", err.Error())
-			// Handle error, e.g., increase failure count, stop job if failureThreshold is reached, etc.
-		}
-	}
 }

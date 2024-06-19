@@ -44,7 +44,7 @@ func NewGRPCHandler(properties map[string]string) (*GRPCHandler, error) {
 	return h, nil
 }
 
-func (h *GRPCHandler) Do(ctx context.Context, setting util.Handlers, args map[string]any) (map[string]any, error) {
+func (h *GRPCHandler) Do(ctx context.Context, setting util.HandlerSpec, args map[string]any) (map[string]any, error) {
 	if setting.GPRC == nil {
 		return nil, errors.New("grpc setting is nil")
 	}

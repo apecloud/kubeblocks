@@ -43,11 +43,11 @@ func SentEventForProbe(ctx context.Context, data map[string]any) error {
 	logger.Info(fmt.Sprintf("send event: %v", data))
 	operation, ok := data["operation"]
 	if !ok {
-		return errors.New("operation failed must be set")
+		return errors.New("operation is unset")
 	}
 	event, err := CreateEvent(operation.(string), data)
 	if err != nil {
-		logger.Info("generate event failed", "error", err.Error())
+		logger.Info("create event failed", "error", err.Error())
 		return err
 	}
 

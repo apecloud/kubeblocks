@@ -80,7 +80,7 @@ func (s *server) StartNonBlocking() error {
 	}
 
 	if len(listeners) == 0 {
-		return errors.New("could not listen on any endpoint")
+		return errors.New("no endpoint to listen on")
 	}
 
 	for _, listener := range listeners {

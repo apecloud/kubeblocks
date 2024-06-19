@@ -51,7 +51,7 @@ func (job *CheckRoleJob) do() error {
 		return err
 	}
 
-	role, _ := resp["output"].(string)
+	role := resp.Message
 	if job.originRole == role {
 		return nil
 	}

@@ -68,7 +68,7 @@ func GetHandlerSpecs() map[string]util.HandlerSpec {
 	return actionHandlerSpecs
 }
 
-func Do(ctx context.Context, action string, args map[string]any) (map[string]any, error) {
+func Do(ctx context.Context, action string, args map[string]any) (*Response, error) {
 	if action == "" {
 		return nil, errors.New("action is empty")
 	}

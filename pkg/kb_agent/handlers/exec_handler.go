@@ -49,7 +49,7 @@ func NewExecHandler(properties map[string]string) (*ExecHandler, error) {
 	return h, nil
 }
 
-func (h *ExecHandler) Do(ctx context.Context, setting util.HandlerSpec, args map[string]any) (map[string]any, error) {
+func (h *ExecHandler) Do(ctx context.Context, setting util.HandlerSpec, args map[string]any) (*Response, error) {
 	if len(setting.Command) == 0 {
 		h.Logger.Info("action command is empty!")
 		return nil, nil
@@ -67,10 +67,9 @@ func (h *ExecHandler) Do(ctx context.Context, setting util.HandlerSpec, args map
 		return nil, errors.Wrap(err, "ExecHandler executes action failed")
 	}
 
-	var result map[string]any
-	if output != "" {
-		h.Logger.Info("execute action", "output", output)
-		result = map[string]any{"output": output}
+	h.Logger.V(1).Info("execute action", "output", output)
+	resp := &Response{
+		Message: output,
 	}
-	return result, err
+	return resp, err
 }

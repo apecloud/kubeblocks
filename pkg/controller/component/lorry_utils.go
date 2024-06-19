@@ -326,6 +326,7 @@ func buildEnv4DBAccount(synthesizeComp *SynthesizedComponent, clusterCompSpec *a
 	)
 
 	for index, sysAccount := range synthesizeComp.SystemAccounts {
+		// use first init account
 		if sysAccount.InitAccount {
 			sysInitAccount = &synthesizeComp.SystemAccounts[index]
 			break

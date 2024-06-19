@@ -298,10 +298,6 @@ func (r *ComponentDefinitionReconciler) validateSystemAccounts(cli client.Client
 	if !checkUniqueItemWithValue(cmpd.Spec.SystemAccounts, "Name", nil) {
 		return fmt.Errorf("duplicate system accounts are not allowed")
 	}
-	if !checkUniqueItemWithValue(cmpd.Spec.SystemAccounts, "InitAccount", true) {
-		return fmt.Errorf("multiple system init accounts are not allowed")
-	}
-
 	for _, account := range cmpd.Spec.SystemAccounts {
 		if !account.InitAccount && len(account.Statement) == 0 && account.SecretRef == nil {
 			return fmt.Errorf("the Statement or SecretRef must be provided to create system account: %s", account.Name)

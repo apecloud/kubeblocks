@@ -30,12 +30,12 @@ import (
 
 type CheckRoleJob struct {
 	CommonJob
-	originRole string
+	originRole              string
+	roleUnchangedEventCount int
 }
 
 var sendRoleEventPeriodically bool
-var sendRoleEventFrequency int
-var roleUnchangedEventCount int
+var sendRoleEventFrequency int = 300
 
 func init() {
 	pflag.BoolVar(&sendRoleEventPeriodically, "send-role-event-periodically", false, "Enable the mechanism to send role events periodically to prevent event loss.")
@@ -65,13 +65,13 @@ func (job *CheckRoleJob) do() error {
 		if !sendRoleEventPeriodically {
 			return nil
 		}
-		roleUnchangedEventCount++
-		if roleUnchangedEventCount%sendRoleEventFrequency != 0 {
+		job.roleUnchangedEventCount++
+		if job.roleUnchangedEventCount%sendRoleEventFrequency != 0 {
 			return nil
 		}
 		logger.Info("send role event periodically", "role", role)
 	} else {
-		roleUnchangedEventCount = 0
+		job.roleUnchangedEventCount = 0
 		logger.Info("send role changed event", "role", role)
 	}
 

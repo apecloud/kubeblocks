@@ -366,9 +366,6 @@ func (r *componentWorkloadOps) expandVolume() error {
 // horizontalScale handles rsm workload horizontal scale
 func (r *componentWorkloadOps) horizontalScale() error {
 	sts := rsmcore.ConvertRSMToSTS(r.runningRSM)
-	if sts.Status.ReadyReplicas == r.synthesizeComp.Replicas {
-		return nil
-	}
 	ret := r.horizontalScaling(r.synthesizeComp, sts)
 	if ret == 0 {
 		if err := r.postScaleIn(); err != nil {

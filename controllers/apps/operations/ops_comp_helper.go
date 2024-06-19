@@ -26,11 +26,11 @@ import (
 	"slices"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -134,6 +134,15 @@ func (c componentOpsHelper) cancelComponentOps(ctx context.Context,
 	return cli.Update(ctx, opsRes.Cluster)
 }
 
+func (c componentOpsHelper) existFailure(ops *appsv1alpha1.OpsRequest, componentName string) bool {
+	for _, v := range ops.Status.Components[componentName].ProgressDetails {
+		if v.Status == appsv1alpha1.FailedProgressStatus {
+			return true
+		}
+	}
+	return false
+}
+
 // reconcileActionWithComponentOps will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the common function to reconcile opsRequest status when the opsRequest will affect the lifecycle of the components.
 func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
@@ -148,7 +157,6 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 	var (
 		opsRequestPhase        = appsv1alpha1.OpsRunningPhase
 		opsRequest             = opsRes.OpsRequest
-		isFailed               bool
 		expectProgressCount    int32
 		completedProgressCount int32
 		requeueTimeAfterFailed time.Duration
@@ -225,7 +233,8 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 			}
 		}
 	}
-	var waitComponentCompleted bool
+	opsIsCompleted := true
+	existFailure := false
 	for i := range progressResources {
 		pgResource := progressResources[i]
 		opsCompStatus := opsRequest.Status.Components[pgResource.compOps.GetComponentName()]
@@ -235,29 +244,29 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 		}
 		expectProgressCount += expectCount
 		completedProgressCount += completedCount
+		if c.existFailure(opsRes.OpsRequest, pgResource.compOps.GetComponentName()) {
+			existFailure = true
+		}
+		componentPhase := opsRes.Cluster.Status.Components[pgResource.compOps.GetComponentName()].Phase
 		if !pgResource.isShardingComponent {
-			lastFailedTime := opsCompStatus.LastFailedTime
-			componentPhase := opsRes.Cluster.Status.Components[pgResource.compOps.GetComponentName()].Phase
-			if isFailedOrAbnormal(componentPhase) {
-				isFailed = true
-				if lastFailedTime.IsZero() {
-					lastFailedTime = metav1.Now()
-				}
-				if time.Now().Before(lastFailedTime.Add(componentFailedTimeout)) {
-					requeueTimeAfterFailed = componentFailedTimeout - time.Since(lastFailedTime.Time)
-				}
-			} else if !lastFailedTime.IsZero() {
-				// reset lastFailedTime if component is not failed
-				lastFailedTime = metav1.Time{}
-			}
 			if opsCompStatus.Phase != componentPhase {
 				opsCompStatus.Phase = componentPhase
-				opsCompStatus.LastFailedTime = lastFailedTime
 			}
-			// wait the component to complete
-			if !pgResource.noWaitComponentCompleted && !slices.Contains(appsv1alpha1.GetComponentTerminalPhases(), componentPhase) {
-				waitComponentCompleted = true
+		} else {
+			compObj, err := component.GetComponentByName(reqCtx.Ctx, cli, opsRes.Cluster.Namespace,
+				constant.GenerateClusterComponentName(opsRes.Cluster.Name, pgResource.fullComponentName))
+			if err != nil {
+				return opsRequestPhase, 0, err
 			}
+			componentPhase = compObj.Status.Phase
+		}
+		// conditions whether ops is running:
+		//  1. completedProgressCount is not equal to expectProgressCount when the ops do not need to wait component phase to a terminal phase.
+		//  2. the component phase is not a terminal phase.
+		//  3. no completed progresses
+		if (pgResource.noWaitComponentCompleted && expectCount != completedCount) ||
+			!slices.Contains(appsv1alpha1.GetComponentTerminalPhases(), componentPhase) || completedCount == 0 {
+			opsIsCompleted = false
 		}
 		opsRequest.Status.Components[pgResource.compOps.GetComponentName()] = opsCompStatus
 	}
@@ -268,10 +277,10 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 			return opsRequestPhase, 0, err
 		}
 	}
-	if waitComponentCompleted || completedProgressCount != expectProgressCount {
+	if !opsIsCompleted {
 		return opsRequestPhase, 0, nil
 	}
-	if isFailed {
+	if existFailure {
 		if requeueTimeAfterFailed != 0 {
 			// component failure may be temporary, waiting for component failure timeout.
 			return opsRequestPhase, requeueTimeAfterFailed, nil

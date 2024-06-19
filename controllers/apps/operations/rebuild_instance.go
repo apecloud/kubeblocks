@@ -658,7 +658,11 @@ func (r rebuildInstanceOpsHandler) rebuildSourcePVCsAndRecreateInstance(reqCtx i
 	}
 	// update progress message and recreate the target instance by deleting it.
 	progressDetail.Message = waitingForInstanceReadyMessage
-	return intctrlutil.BackgroundDeleteObject(cli, reqCtx.Ctx, insHelper.targetPod)
+	var options []client.DeleteOption
+	if opsRequest.Spec.Force {
+		options = append(options, client.GracePeriodSeconds(0))
+	}
+	return intctrlutil.BackgroundDeleteObject(cli, reqCtx.Ctx, insHelper.targetPod, options...)
 }
 
 func (r rebuildInstanceOpsHandler) getRestoredPV(reqCtx intctrlutil.RequestCtx,

@@ -1,5 +1,25 @@
+## Basic Concepts
+The core of `KubeBlocks` is a K8s operator built on [KubeBuilder](https://book.kubebuilder.io/introduction). Before you start, please make sure you have basic understanding of:
+- [Basic usage of KubeBlocks](https://kubeblocks.io/docs/preview/user_docs/overview/introduction)
+    - Please install `kbcli` and attempt to create a MySQL cluster and establish a connection follow the [guidelines](https://kubeblocks.io/docs/release-0.8/user_docs/kubeblocks-for-mysql).
+- [CRD(Custom Resource Definitions)](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/)
+- [Operator](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/)
+ 
+## Setup a Kubernetes development environment
+To run `KubeBlocks`, you needs `Docker` and a `Kubernetes` 1.24.1+ cluster for development.
+
+#### Docker environment
+1. Install [Docker](https://docs.docker.com/install/)
+   > For Linux, you'll have to configure docker to run without `sudo` for the KubeBlocks build scripts to work. Follow the instructions to [manage Docker as a non-root user](https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user).
+2. Create your [Docker Hub account](https://hub.docker.com/signup) if you don't already have one.
+
+#### Kubernetes environment
+- Kubernetes cluster
+  You can use cloud Kubernetes service, such as [`EKS`](https://aws.amazon.com/eks/) [`GKE`](https://cloud.google.com/kubernetes-engine) [`AKS`](https://azure.microsoft.com/en-us/products/kubernetes-service/), or use local Kubernetes cluster, such as [`Minikube`](https://minikube.sigs.k8s.io/docs/) [`k3d`](https://k3d.io/stable/).
+- For development purposes, you will also want to follow the optional steps to install [Helm 3.x](https://helm.sh/docs/intro/install/).
+
 ## Setup development environment
-There are two options for getting an environment up and running for `KubeBlocks` development.
+There are two options for getting an environment up and running for `KubeBlocks` development：1. Bring your own toolbox; 2. Use VSCode and development container.  Generally we recommend **Bringing your own toolbox**.
 
 ### Bring your own toolbox
 To build `KubeBlocks` on your own host, needs to install the following tools:
@@ -109,17 +129,45 @@ If you want to reuse an existing Kubernetes config, such as your [`EKS`](https:/
     ```
 > ⚠ The `SYNC_LOCALHOST_KUBECONFIG` option only supports providing the dev container with the snapshot configuration from the host and does not support updating the host Kubernetes configuration from the dev container directly.
 
+### An example
 
+Here we present an example of deploying `KubeBlocks` locally(Bring your own toolbox) and utilizing it to create an `apeloud-mysql` cluster.
 
-### Setup a Kubernetes development environment
-To run `KubeBlocks`, you needs `Docker` and a `Kubernetes` 1.24.1+ cluster for development.
+Before you start, please ensure that you have prior experience with the [basic usage of KubeBlocks](https://kubeblocks.io/docs/preview/user_docs/overview/introduction). You can attempt to create a mysql cluster and establish a connection to it.
 
-#### Docker environment
-1. Install [Docker](https://docs.docker.com/install/)
-   > For Linux, you'll have to configure docker to run without `sudo` for the KubeBlocks build scripts to work. Follow the instructions to [manage Docker as a non-root user](https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user).
-2. Create your [Docker Hub account](https://hub.docker.com/signup) if you don't already have one.
+#### Deploy KubeBlocks
+- Setup local cluster(Minikube, k3d), e.g., `k3d cluster create mycluster`
+- Install add-on. You can install add-ons through [Helm](https://kubeblocks.io/docs/release-0.8/developer_docs/integration/how-to-add-an-add-on). Here is a simpler example:
+    - Install `kbcli`
+    - Install `KubeBlocks`: `kbcli kubeblocks install`. This will install `KubeBlocks` and start running its manager.
+    - Install add-ons you need. Please follow guildlines [here](https://kubeblocks.io/docs/preview/user_docs/overview/supported-addons#list-addons). 
+```shell
+# make sure there is an index
+kbcli addon index list
+# search supported addon
+kbcli addon search apecloud-mysql  
+# install addon
+kbcli addon install apecloud-mysql --index kubeblocks --version [YOUR_VERSION]
+# enable addon
+kbcli addon enable apecloud-mysql
+# list the addons again to check whether it is enabled.
+kbcli addon list
+```
+- To deploy KubeBlocks of your version locally, stop the manager of `KubeBlocks` you just install: 
+```shell
+kubectl scale deployment kubeblocks --replicas=0 -n kb-system
+```
+- Generate CRD: `make manifests`. This will create CRD of your KubeBlocks.
+- Deploy CRD: `make install`. This will register CR to cluster.
+- Start your operator: `make run`. This will start your `KubeBlocks` controller and output logs.
 
-#### Kubernetes environment
-- Kubernetes cluster
-  You can use cloud Kubernetes service, such as [`EKS`](https://aws.amazon.com/eks/) [`GKE`](https://cloud.google.com/kubernetes-engine) [`AKS`](https://azure.microsoft.com/en-us/products/kubernetes-service/), or use local Kubernetes cluster, such as [`Minikube`](https://minikube.sigs.k8s.io/docs/) [`k3d`](https://k3d.io/stable/).
-- For development purposes, you will also want to follow the optional steps to install [Helm 3.x](https://helm.sh/docs/intro/install/).
+#### Test with apecloud-mysql
+- Create `apecloud-mysql` cluster
+```
+kbcli cluster create apecloud-mysql kbcli cluster create apecloud-mysql apecloud-mysql --cluster-definition=apecloud-mysql
+```
+- Now you will see corresponding logs. You can use `kbcli cluster list` to see information of clusters.
+
+#### Debug
+- To observe the behavior of `KubeBlocks` in the example mentioned above, you can set a breakpoint on `Concile` function in `controllers/apps/cluster_controller.go`
+- And then start manager in `cmd/manager/main.go`.

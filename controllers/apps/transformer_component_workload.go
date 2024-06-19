@@ -396,9 +396,6 @@ func (r *componentWorkloadOps) expandVolume() error {
 // horizontalScale handles workload horizontal scale
 func (r *componentWorkloadOps) horizontalScale() error {
 	its := r.runningITS
-	if its.Status.ReadyReplicas == r.synthesizeComp.Replicas {
-		return nil
-	}
 	ret := r.horizontalScaling(r.synthesizeComp, its)
 	if ret == 0 {
 		if err := r.postScaleIn(); err != nil {

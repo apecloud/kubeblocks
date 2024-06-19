@@ -43,6 +43,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var (
@@ -1170,9 +1171,15 @@ func resolveComponentPodFQDNsRef(ctx context.Context, cli client.Reader, synthes
 		for i := range comp.Spec.Instances {
 			templates = append(templates, &comp.Spec.Instances[i])
 		}
+		clusterDomainFn := func(name string) string {
+			if selector.ClusterDomain != nil && *selector.ClusterDomain {
+				return fmt.Sprintf("%s.%s", name, viper.GetString(constant.KubernetesClusterDomainEnv))
+			}
+			return name
+		}
 		names := instanceset.GenerateAllInstanceNames(comp.Name, comp.Spec.Replicas, templates, comp.Spec.OfflineInstances)
 		fqdn := func(name string) string {
-			return fmt.Sprintf("%s.%s-headless.%s.svc", name, comp.Name, synthesizedComp.Namespace)
+			return clusterDomainFn(fmt.Sprintf("%s.%s-headless.%s.svc", name, comp.Name, synthesizedComp.Namespace))
 		}
 		for i := range names {
 			names[i] = fqdn(names[i])

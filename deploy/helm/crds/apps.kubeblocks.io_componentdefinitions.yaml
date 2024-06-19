@@ -14049,6 +14049,11 @@ spec:
                         componentVarRef:
                           description: Selects a defined var of a Component.
                           properties:
+                            clusterDomain:
+                              description: Specify whether add the k8s clusterdomain
+                                to pod FQDN. Add the clusterDomain to the pod FQDN
+                                if set true, fqdns will add k8s clusterDocmain.
+                              type: boolean
                             compDef:
                               description: |-
                                 CompDef specifies the definition used by the component that the referent object resident in.

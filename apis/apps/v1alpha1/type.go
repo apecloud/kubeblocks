@@ -1177,6 +1177,12 @@ type ComponentVars struct {
 	//
 	// +optional
 	PodFQDNs *VarOption `json:"podFQDNs,omitempty"`
+
+	// Specify whether add the k8s clusterdomain to pod FQDN.
+	// Add the clusterDomain to the pod FQDN
+	// if set true, fqdns will add k8s clusterDocmain.
+	// +optional
+	ClusterDomain *bool `json:"clusterDomain,omitempty"`
 }
 
 // ClusterObjectReference defines information to let you locate the referenced object inside the same Cluster.

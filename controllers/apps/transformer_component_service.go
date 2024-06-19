@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -65,6 +66,11 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 
 	synthesizeComp := transCtx.SynthesizeComponent
+	runningServices, err := t.listOwnedServices(transCtx.Context, transCtx.Client, transCtx.Component, synthesizeComp)
+	if err != nil {
+		return err
+	}
+
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for _, service := range synthesizeComp.ComponentServices {
 		// component controller does not handle the default headless service; the default headless service is managed by the InstanceSet.
@@ -79,10 +85,30 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 			if err = t.createOrUpdateService(ctx, dag, graphCli, &service, svc, transCtx.ComponentOrig); err != nil {
 				return err
 			}
+			delete(runningServices, svc.Name)
 		}
 	}
-	// TODO: delete orphaned services
+
+	for svc := range runningServices {
+		graphCli.Delete(dag, runningServices[svc], inDataContext4G())
+	}
+
 	return nil
+}
+
+func (t *componentServiceTransformer) listOwnedServices(ctx context.Context, cli client.Reader,
+	comp *appsv1alpha1.Component, synthesizedComp *component.SynthesizedComponent) (map[string]*corev1.Service, error) {
+	services, err := component.ListOwnedServices(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
+	if err != nil {
+		return nil, err
+	}
+	owned := make(map[string]*corev1.Service)
+	for i, svc := range services {
+		if model.IsOwnerOf(comp, svc) {
+			owned[svc.Name] = services[i]
+		}
+	}
+	return owned, nil
 }
 
 func (t *componentServiceTransformer) buildCompService(comp *appsv1alpha1.Component,

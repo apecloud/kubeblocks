@@ -38,6 +38,8 @@ import (
 )
 
 var logger = ctlruntime.Log.WithName("event")
+var EventSendMaxAttempts = 30
+var EventSendPeriod = 10 * time.Second
 
 func SentEventForProbe(ctx context.Context, msg ActionMessage) error {
 	logger.Info(fmt.Sprintf("send event: %v", msg))
@@ -112,14 +114,14 @@ func SendEvent(ctx context.Context, event *corev1.Event) error {
 		return err
 	}
 	namespace := os.Getenv(constant.KBEnvNamespace)
-	for i := 0; i < 30; i++ {
+	for i := 0; i < EventSendMaxAttempts; i++ {
 		_, err = clientset.CoreV1().Events(namespace).Create(ctx1, event, metav1.CreateOptions{})
 		if err == nil {
 			logger.Info("send event success", "message", event.Message)
 			break
 		}
 		logger.Info("send event failed", "error", err.Error())
-		time.Sleep(10 * time.Second)
+		time.Sleep(EventSendPeriod)
 	}
 	return err
 }

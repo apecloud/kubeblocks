@@ -37,11 +37,6 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-const (
-	// componentFailedTimeout when the duration of component failure exceeds this threshold, it is determined that opsRequest has failed
-	componentFailedTimeout = 30 * time.Second
-)
-
 var _ error = &WaitForClusterPhaseErr{}
 
 type WaitForClusterPhaseErr struct {
@@ -61,12 +56,6 @@ type handleStatusProgressWithComponent func(reqCtx intctrlutil.RequestCtx,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, succeedCount int32, err error)
 
 type handleReconfigureOpsStatus func(cmStatus *appsv1alpha1.ConfigurationItemStatus) error
-
-func isFailedOrAbnormal(phase appsv1alpha1.ClusterComponentPhase) bool {
-	return slices.Index([]appsv1alpha1.ClusterComponentPhase{
-		appsv1alpha1.FailedClusterCompPhase,
-		appsv1alpha1.AbnormalClusterCompPhase}, phase) != -1
-}
 
 // getClusterDefByName gets the ClusterDefinition object by the name.
 func getClusterDefByName(ctx context.Context, cli client.Client, clusterDefName string) (*appsv1alpha1.ClusterDefinition, error) {

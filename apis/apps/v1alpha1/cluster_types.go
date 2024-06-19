@@ -658,6 +658,7 @@ type ClusterComponentSpec struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 
 	// List of environment variables to add.
+	// These environment variables will be placed after the environment variables declared in the Pod.
 	//
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`

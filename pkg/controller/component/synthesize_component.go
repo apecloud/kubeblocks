@@ -29,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -191,7 +192,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		buildCompatibleHorizontalScalePolicy(compDefObj, synthesizeComp)
 	}
 
-	if err = userDefinedEnv(synthesizeComp, comp); err != nil {
+	if err = mergeUserDefinedEnv(synthesizeComp, comp); err != nil {
 		return nil, err
 	}
 
@@ -209,7 +210,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 
 	// build volumes & volumeClaimTemplates
 	buildVolumeClaimTemplates(synthesizeComp, comp)
-	if err = userDefinedVolumesNMounts(synthesizeComp, comp); err != nil {
+	if err = mergeUserDefinedVolumes(synthesizeComp, comp); err != nil {
 		return nil, err
 	}
 
@@ -332,33 +333,17 @@ func buildLabelsAndAnnotations(compDef *appsv1alpha1.ComponentDefinition, comp *
 	}
 }
 
-func userDefinedEnv(synthesizedComp *SynthesizedComponent, comp *appsv1alpha1.Component) error {
+func mergeUserDefinedEnv(synthesizedComp *SynthesizedComponent, comp *appsv1alpha1.Component) error {
 	if comp == nil || len(comp.Spec.Env) == 0 {
 		return nil
 	}
 
-	vars := map[string]bool{}
+	vars := sets.New[string]()
 	for _, v := range comp.Spec.Env {
-		if vars[v.Name] {
+		if vars.Has(v.Name) {
 			return fmt.Errorf("duplicated user-defined env var %s", v.Name)
 		}
-		vars[v.Name] = true
-	}
-
-	check := func(containers []corev1.Container) error {
-		for _, c := range containers {
-			for _, v := range c.Env {
-				if vars[v.Name] {
-					return fmt.Errorf("duplicated env var %s", v.Name)
-				}
-			}
-		}
-		return nil
-	}
-	for _, cc := range [][]corev1.Container{synthesizedComp.PodSpec.InitContainers, synthesizedComp.PodSpec.Containers} {
-		if err := check(cc); err != nil {
-			return err
-		}
+		vars.Insert(v.Name)
 	}
 
 	for i := range synthesizedComp.PodSpec.InitContainers {
@@ -427,7 +412,7 @@ func buildVolumeClaimTemplates(synthesizeComp *SynthesizedComponent, comp *appsv
 	}
 }
 
-func userDefinedVolumesNMounts(synthesizedComp *SynthesizedComponent, comp *appsv1alpha1.Component) error {
+func mergeUserDefinedVolumes(synthesizedComp *SynthesizedComponent, comp *appsv1alpha1.Component) error {
 	if comp == nil {
 		return nil
 	}

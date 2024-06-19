@@ -540,7 +540,9 @@ spec:
                       type: array
                       x-kubernetes-list-type: set
                     env:
-                      description: List of environment variables to add.
+                      description: |-
+                        List of environment variables to add.
+                        These environment variables will be placed after the environment variables declared in the Pod.
                       items:
                         description: EnvVar represents an environment variable present
                           in a Container.
@@ -9144,7 +9146,9 @@ spec:
                           type: array
                           x-kubernetes-list-type: set
                         env:
-                          description: List of environment variables to add.
+                          description: |-
+                            List of environment variables to add.
+                            These environment variables will be placed after the environment variables declared in the Pod.
                           items:
                             description: EnvVar represents an environment variable
                               present in a Container.

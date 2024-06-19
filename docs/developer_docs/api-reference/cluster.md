@@ -4823,7 +4823,8 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>List of environment variables to add.</p>
+<p>List of environment variables to add.
+These environment variables will be placed after the environment variables declared in the Pod.</p>
 </td>
 </tr>
 <tr>

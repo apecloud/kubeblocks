@@ -235,14 +235,6 @@ var _ = Describe("synthesized component", func() {
 			Expect(err.Error()).Should(ContainSubstring("duplicated user-defined env var"))
 		})
 
-		It("duplicated with definition", func() {
-			comp.Spec.Env = append(comp.Spec.Env, compDef.Spec.Runtime.Containers[0].Env[0])
-
-			_, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil)
-			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("duplicated env var"))
-		})
-
 		It("ok", func() {
 			synthesizedComp, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil)
 			Expect(err).Should(BeNil())

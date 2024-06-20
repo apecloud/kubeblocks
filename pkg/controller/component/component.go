@@ -76,6 +76,8 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1
 		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 		AddLabelsInMap(constant.GetComponentWellKnownLabels(cluster.Name, clusterCompSpec.Name)).
 		AddLabels(constant.KBAppClusterUIDLabelKey, string(cluster.UID)).
+		SetAnnotations(clusterCompSpec.Annotations).
+		SetEnv(clusterCompSpec.Env).
 		SetAffinity(affinities).
 		SetTolerations(tolerations).
 		SetReplicas(clusterCompSpec.Replicas).
@@ -83,6 +85,7 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1
 		SetMonitor(clusterCompSpec.Monitor).
 		SetServiceAccountName(clusterCompSpec.ServiceAccountName).
 		SetVolumeClaimTemplates(clusterCompSpec.VolumeClaimTemplates).
+		SetVolumes(clusterCompSpec.Volumes).
 		SetUpdateStrategy(clusterCompSpec.UpdateStrategy).
 		SetEnabledLogs(clusterCompSpec.EnabledLogs).
 		SetServiceRefs(clusterCompSpec.ServiceRefs).

@@ -46,6 +46,16 @@ type ComponentSpec struct {
 	// +optional
 	ServiceRefs []ServiceRef `json:"serviceRefs,omitempty"`
 
+	// Specifies Annotations to override or add for underlying Pods.
+	//
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// List of environment variables to add.
+	//
+	// +optional
+	Env []corev1.EnvVar `json:"env,omitempty"`
+
 	// Resources requests and limits of workload.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
@@ -56,6 +66,11 @@ type ComponentSpec struct {
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+
+	// List of volumes to override.
+	//
+	// +optional
+	Volumes []corev1.Volume `json:"volumes,omitempty"`
 
 	// Component replicas. The default value is used in ClusterDefinition spec if not specified.
 	// +kubebuilder:validation:Required

@@ -29,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -157,6 +158,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		CompDefName:         compDef.Name,
 		ServiceVersion:      comp.Spec.ServiceVersion,
 		ClusterGeneration:   clusterGeneration(cluster, comp),
+		TemplateAnnotations: comp.Spec.Annotations,
 		PodSpec:             &compDef.Spec.Runtime,
 		HostNetwork:         compDefObj.Spec.HostNetwork,
 		ComponentServices:   compDefObj.Spec.Services,
@@ -192,6 +194,10 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		buildCompatibleHorizontalScalePolicy(compDefObj, synthesizeComp)
 	}
 
+	if err = mergeUserDefinedEnv(synthesizeComp, comp); err != nil {
+		return nil, err
+	}
+
 	// build affinity and tolerations
 	if err := buildAffinitiesAndTolerations(comp, synthesizeComp); err != nil {
 		reqCtx.Log.Error(err, "build affinities and tolerations failed.")
@@ -208,16 +214,16 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	// build labels and annotations
 	buildLabelsAndAnnotations(compDef, comp, synthesizeComp)
 
-	// build volumeClaimTemplates
+	// build volumes & volumeClaimTemplates
 	buildVolumeClaimTemplates(synthesizeComp, comp)
+	if err = mergeUserDefinedVolumes(synthesizeComp, comp); err != nil {
+		return nil, err
+	}
 
 	limitSharedMemoryVolumeSize(synthesizeComp, comp)
 
 	// build componentService
 	buildComponentServices(synthesizeComp, compDefObj, comp)
-
-	// build monitor
-	// buildMonitorConfig(compDefObj.Spec.Monitor, comp.Spec.Monitor, &compDefObj.Spec.Runtime, synthesizeComp)
 
 	// build serviceAccountName
 	buildServiceAccountName(synthesizeComp)
@@ -329,6 +335,28 @@ func buildLabelsAndAnnotations(compDef *appsv1alpha1.ComponentDefinition, comp *
 	}
 }
 
+func mergeUserDefinedEnv(synthesizedComp *SynthesizedComponent, comp *appsv1alpha1.Component) error {
+	if comp == nil || len(comp.Spec.Env) == 0 {
+		return nil
+	}
+
+	vars := sets.New[string]()
+	for _, v := range comp.Spec.Env {
+		if vars.Has(v.Name) {
+			return fmt.Errorf("duplicated user-defined env var %s", v.Name)
+		}
+		vars.Insert(v.Name)
+	}
+
+	for i := range synthesizedComp.PodSpec.InitContainers {
+		synthesizedComp.PodSpec.InitContainers[i].Env = append(synthesizedComp.PodSpec.InitContainers[i].Env, comp.Spec.Env...)
+	}
+	for i := range synthesizedComp.PodSpec.Containers {
+		synthesizedComp.PodSpec.Containers[i].Env = append(synthesizedComp.PodSpec.Containers[i].Env, comp.Spec.Env...)
+	}
+	return nil
+}
+
 func mergeSystemAccounts(compDefAccounts []appsv1alpha1.SystemAccount,
 	compAccounts []appsv1alpha1.ComponentSystemAccount) []appsv1alpha1.SystemAccount {
 	if len(compAccounts) == 0 {
@@ -375,6 +403,61 @@ func buildVolumeClaimTemplates(synthesizeComp *SynthesizedComponent, comp *appsv
 	if comp.Spec.VolumeClaimTemplates != nil {
 		synthesizeComp.VolumeClaimTemplates = toVolumeClaimTemplates(&comp.Spec)
 	}
+}
+
+func mergeUserDefinedVolumes(synthesizedComp *SynthesizedComponent, comp *appsv1alpha1.Component) error {
+	if comp == nil {
+		return nil
+	}
+	volumes := map[string]bool{}
+	for _, vols := range [][]corev1.Volume{synthesizedComp.PodSpec.Volumes, comp.Spec.Volumes} {
+		for _, vol := range vols {
+			if volumes[vol.Name] {
+				return fmt.Errorf("duplicated volume %s", vol.Name)
+			}
+			volumes[vol.Name] = true
+		}
+	}
+	for _, vct := range synthesizedComp.VolumeClaimTemplates {
+		if volumes[vct.Name] {
+			return fmt.Errorf("duplicated volume %s", vct.Name)
+		}
+		volumes[vct.Name] = true
+	}
+
+	checkConfigNScriptTemplate := func(tpl appsv1alpha1.ComponentTemplateSpec) error {
+		if volumes[tpl.VolumeName] {
+			return fmt.Errorf("duplicated volume %s for template %s", tpl.VolumeName, tpl.Name)
+		}
+		volumes[tpl.VolumeName] = true
+		return nil
+	}
+	for _, tpl := range synthesizedComp.ConfigTemplates {
+		if err := checkConfigNScriptTemplate(tpl.ComponentTemplateSpec); err != nil {
+			return err
+		}
+	}
+	for _, tpl := range synthesizedComp.ScriptTemplates {
+		if err := checkConfigNScriptTemplate(tpl); err != nil {
+			return err
+		}
+	}
+
+	// for _, cc := range [][]corev1.Container{synthesizedComp.PodSpec.InitContainers, synthesizedComp.PodSpec.Containers} {
+	//	for _, c := range cc {
+	//		missed := make([]string, 0)
+	//		for _, mount := range c.VolumeMounts {
+	//			if !volumes[mount.Name] {
+	//				missed = append(missed, mount.Name)
+	//			}
+	//		}
+	//		if len(missed) > 0 {
+	//			return fmt.Errorf("volumes should be provided for mounts %s", strings.Join(missed, ","))
+	//		}
+	//	}
+	// }
+	synthesizedComp.PodSpec.Volumes = append(synthesizedComp.PodSpec.Volumes, comp.Spec.Volumes...)
+	return nil
 }
 
 // limitSharedMemoryVolumeSize limits the shared memory volume size to memory requests/limits.

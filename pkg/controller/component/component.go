@@ -85,6 +85,8 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluste
 		AddLabelsInMap(constant.GetComponentWellKnownLabels(cluster.Name, compSpec.Name)).
 		AddLabels(constant.KBAppClusterUIDLabelKey, string(cluster.UID)).
 		SetServiceVersion(compSpec.ServiceVersion).
+		SetAnnotations(compSpec.Annotations).
+		SetEnv(compSpec.Env).
 		SetAffinity(affinities).
 		SetTolerations(tolerations).
 		SetDisableExporter(compSpec.GetDisableExporter()).
@@ -92,6 +94,7 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluste
 		SetResources(compSpec.Resources).
 		SetServiceAccountName(compSpec.ServiceAccountName).
 		SetVolumeClaimTemplates(compSpec.VolumeClaimTemplates).
+		SetVolumes(compSpec.Volumes).
 		SetEnabledLogs(compSpec.EnabledLogs).
 		SetServiceRefs(compSpec.ServiceRefs).
 		SetClassRef(compSpec.ClassDefRef).

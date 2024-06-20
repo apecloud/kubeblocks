@@ -75,7 +75,6 @@ var _ = Describe("Component", func() {
 				AddComponent(mysqlCompName, mysqlCompDefName).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				AddComponent(proxyCompName, proxyCompDefName).
-				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				GetObject()
 		})
 

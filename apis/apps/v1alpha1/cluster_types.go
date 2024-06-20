@@ -668,6 +668,17 @@ type ClusterComponentSpec struct {
 	// +optional
 	EnabledLogs []string `json:"enabledLogs,omitempty"`
 
+	// Specifies Annotations to override or add for underlying Pods.
+	//
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// List of environment variables to add.
+	// These environment variables will be placed after the environment variables declared in the Pod.
+	//
+	// +optional
+	Env []corev1.EnvVar `json:"env,omitempty"`
+
 	// Specifies the desired number of replicas in the Component for enhancing availability and durability, or load balancing.
 	//
 	// +kubebuilder:validation:Required
@@ -710,6 +721,11 @@ type ClusterComponentSpec struct {
 	// +patchStrategy=merge,retainKeys
 	// +optional
 	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+
+	// List of volumes to override.
+	//
+	// +optional
+	Volumes []corev1.Volume `json:"volumes,omitempty"`
 
 	// Overrides services defined in referenced ComponentDefinition and expose endpoints that can be accessed by clients.
 	//

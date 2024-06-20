@@ -182,12 +182,16 @@ var (
 		VolumeProtectionSpec: &appsv1alpha1.VolumeProtectionSpec{},
 		Service:              &defaultMySQLService,
 		PodSpec: &corev1.PodSpec{
-			Containers: []corev1.Container{defaultMySQLContainer},
+			Containers: []corev1.Container{
+				defaultMySQLContainer,
+			},
 		},
-		VolumeTypes: []appsv1alpha1.VolumeTypeSpec{{
-			Name: DataVolumeName,
-			Type: appsv1alpha1.VolumeTypeData,
-		}},
+		VolumeTypes: []appsv1alpha1.VolumeTypeSpec{
+			{
+				Name: DataVolumeName,
+				Type: appsv1alpha1.VolumeTypeData,
+			},
+		},
 	}
 
 	defaultConsensusSpec = appsv1alpha1.ConsensusSetSpec{
@@ -226,12 +230,16 @@ var (
 		VolumeProtectionSpec: &appsv1alpha1.VolumeProtectionSpec{},
 		Service:              &defaultMySQLService,
 		PodSpec: &corev1.PodSpec{
-			Containers: []corev1.Container{defaultMySQLContainer},
+			Containers: []corev1.Container{
+				defaultMySQLContainer,
+			},
 		},
-		VolumeTypes: []appsv1alpha1.VolumeTypeSpec{{
-			Name: DataVolumeName,
-			Type: appsv1alpha1.VolumeTypeData,
-		}},
+		VolumeTypes: []appsv1alpha1.VolumeTypeSpec{
+			{
+				Name: DataVolumeName,
+				Type: appsv1alpha1.VolumeTypeData,
+			},
+		},
 	}
 
 	defaultComponentDefSpec = appsv1alpha1.ComponentDefinitionSpec{

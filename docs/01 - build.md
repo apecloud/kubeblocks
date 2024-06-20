@@ -129,18 +129,18 @@ If you want to reuse an existing Kubernetes config, such as your [`EKS`](https:/
     ```
 > ⚠ The `SYNC_LOCALHOST_KUBECONFIG` option only supports providing the dev container with the snapshot configuration from the host and does not support updating the host Kubernetes configuration from the dev container directly.
 
-### An example
+## Deploying released version of KubeBlocks
+Here we present an example of deploying released version of `KubeBlocks` locally and utilizing it to create an `apeloud-mysql` cluster. 
 
-Here we present an example of deploying `KubeBlocks` locally(Bring your own toolbox) and utilizing it to create an `apeloud-mysql` cluster.
-
-Before you start, please ensure that you have prior experience with the [basic usage of KubeBlocks](https://kubeblocks.io/docs/preview/user_docs/overview/introduction). You can attempt to create a mysql cluster and establish a connection to it.
-
-#### Deploy KubeBlocks
+#### Setup Kubernetes environment
 - Setup local cluster(Minikube, k3d), e.g., `k3d cluster create mycluster`
-- Install add-on. You can install add-ons through [Helm](https://kubeblocks.io/docs/release-0.8/developer_docs/integration/how-to-add-an-add-on). Here is a simpler example:
-    - Install [`kbcli`](https://kubeblocks.io/docs/release-0.8/user_docs/installation/install-with-kbcli/install-kbcli)
-    - Install [`KubeBlocks`](https://kubeblocks.io/docs/release-0.8/user_docs/installation/install-with-kbcli/install-kubeblocks-with-kbcli): `kbcli kubeblocks install`. This will install `KubeBlocks` and start running its manager.
-    - Install add-ons you need. Please follow guildlines [here](https://kubeblocks.io/docs/preview/user_docs/overview/supported-addons#list-addons). 
+#### Install `KubeBlocks`
+- Install [`kbcli`](https://kubeblocks.io/docs/release-0.8/user_docs/installation/install-with-kbcli/install-kbcli)
+- Install [`KubeBlocks`](https://kubeblocks.io/docs/release-0.8/user_docs/installation/install-with-kbcli/install-kubeblocks-with-kbcli): `kbcli kubeblocks install`. This will install `KubeBlocks` and start running its manager.
+
+#### Install `apecloud-mysql` addon 
+Databases can be added as addons in `KubeBlocks`. To test with `apecloud-mysql`, you need to install and enable corresponding addon. You can install addons through [Helm](https://kubeblocks.io/docs/release-0.8/developer_docs/integration/how-to-add-an-add-on). Here is a simpler example using [`kbcli`](https://kubeblocks.io/docs/preview/user_docs/overview/supported-addons#list-addons):
+
 ```shell
 # make sure there is an index
 kbcli addon index list
@@ -153,21 +153,31 @@ kbcli addon enable apecloud-mysql
 # list the addons again to check whether it is enabled.
 kbcli addon list
 ```
-- To deploy KubeBlocks of your version locally, stop the manager of `KubeBlocks` you just install: 
-```shell
-kubectl scale deployment kubeblocks --replicas=0 -n kb-system
-```
-- Generate CRD: `make manifests`. This will create CRD of your KubeBlocks.
-- Deploy CRD: `make install`. This will register CR to cluster.
-- Start your operator: `make run`. This will start your `KubeBlocks` controller and output logs.
-
-#### Test with apecloud-mysql
+#### Test with `apecloud-mysql`
+Here, we present a simple example of creating an `apecloud-mysql` cluster.
 - [Create `apecloud-mysql` cluster](https://kubeblocks.io/docs/preview/user_docs/kubeblocks-for-mysql/cluster-management/create-and-connect-a-mysql-cluster) 
 ```
 kbcli cluster create apecloud-mysql apecloud-mysql --cluster-definition=apecloud-mysql
 ```
-- Now you will see corresponding logs. You can use `kbcli cluster list` to see information of clusters.
+- You can use `kbcli cluster list` to see information of clusters.
+
+## Deploy your development version of the controller
+Here we present an example of deploying your development version(e.g., Debugging) of the controller locally and utilizing it to create an `apeloud-mysql` cluster.
+#### Deploy 
+- Follow instructions above to [setup a Kubernetes development environment](#setup-kubernetes-environment) and [install `apecloud-mysql` addon](#install-apecloud-mysql-addon).
+- Stop the manager of `KubeBlocks` you just install: 
+```shell
+kubectl scale deployment kubeblocks --replicas=0 -n kb-system
+```
+- Generate CRD: `make manifests`. This will create CRD of your `KubeBlocks`.
+- Deploy CRD: `make install`. This will register CR to cluster.
+- Start your operator: `make run`. This will start your `KubeBlocks` controller and output logs.
+
+Now you can test with creating `apecloud-mysql` cluster following instructions [above](#test-with-apecloud-mysql).
 
 #### Debug
-- To observe the behavior of `KubeBlocks` in the example mentioned above, you can set a breakpoint on `Concile` function in `controllers/apps/cluster_controller.go`
-- And then start manager in `cmd/manager/main.go`.
+To observe the behavior of `KubeBlocks`, it is recommended to debug and trace its execution. The central function responsible for controlling the execution is `Concile`. In the mentioned example, creating a cluster will activate the `Concile` function located in `controllers/apps/cluster_controller.go`. To trace the execution process, you can:
+- Set a breakpoint on `Concile` function in `controllers/apps/cluster_controller.go`
+- And then start manager in `cmd/manager/main.go`
+
+More information about debugging can be found in [Debug](03%20-%20debug.md#debug).

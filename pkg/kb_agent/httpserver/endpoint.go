@@ -24,8 +24,13 @@ import (
 )
 
 type Endpoint struct {
-	Method    string
-	Route     string
+	Method string
+	Route  string
+
+	// Version represents the version of the API, which is currently v1.0.
+	// the version is introduced to allow breaking changes.
+	// If the API is upgraded to v2.0, the v1.0 API will be maintained
+	// for compatibility until all legacy accesses are removed.
 	Version   string
 	Duplicate string
 	Handler   fasthttp.RequestHandler

@@ -33,6 +33,7 @@ import (
 const (
 	jsonContentTypeHeader = "application/json"
 	version               = "v1.0"
+	path                  = "/action"
 )
 
 type option = func(ctx *fasthttp.RequestCtx)
@@ -40,7 +41,7 @@ type option = func(ctx *fasthttp.RequestCtx)
 func Endpoints() []Endpoint {
 	return []Endpoint{
 		{
-			Route:   "/action",
+			Route:   path,
 			Method:  fasthttp.MethodPost,
 			Version: version,
 			Handler: actionHandler,

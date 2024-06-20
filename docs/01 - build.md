@@ -176,8 +176,8 @@ kubectl scale deployment kubeblocks --replicas=0 -n kb-system
 Now you can test with creating `apecloud-mysql` cluster following instructions [above](#test-with-apecloud-mysql).
 
 #### Debug
-To observe the behavior of `KubeBlocks`, it is recommended to debug and trace its execution. The central function responsible for controlling the execution is `Concile`. In the mentioned example, creating a cluster will activate the `Concile` function located in `controllers/apps/cluster_controller.go`. To trace the execution process, you can:
-- Set a breakpoint on `Concile` function in `controllers/apps/cluster_controller.go`
+To observe the behavior of `KubeBlocks`, it is recommended to debug and trace its execution. The central function responsible for controlling the execution is `Reconcile`. In the mentioned example, creating a cluster will activate the `Reconcile` function located in `controllers/apps/cluster_controller.go`. To trace the execution process, you can:
+- Set a breakpoint on `Reconcile` function in `controllers/apps/cluster_controller.go`
 - And then start manager in `cmd/manager/main.go`
 
 More information about debugging can be found in [Debug](03%20-%20debug.md#debug).

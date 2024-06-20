@@ -25,6 +25,13 @@ const (
 	KBAgentEventFieldPath = "spec.containers{kb-agent}"
 )
 
+// for http server
+const (
+	JSONContentTypeHeader = "application/json"
+	Version               = "v1.0"
+	Path                  = "/action"
+)
+
 type CronJob struct {
 	PeriodSeconds    int `json:"periodSeconds,omitempty"`
 	SuccessThreshold int `json:"successThreshold,omitempty"`

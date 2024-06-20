@@ -28,12 +28,7 @@ import (
 	"github.com/valyala/fasthttp"
 
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers"
-)
-
-const (
-	jsonContentTypeHeader = "application/json"
-	version               = "v1.0"
-	path                  = "/action"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
 type option = func(ctx *fasthttp.RequestCtx)
@@ -41,9 +36,9 @@ type option = func(ctx *fasthttp.RequestCtx)
 func Endpoints() []Endpoint {
 	return []Endpoint{
 		{
-			Route:   path,
+			Route:   util.Path,
 			Method:  fasthttp.MethodPost,
-			Version: version,
+			Version: util.Version,
 			Handler: actionHandler,
 		},
 	}
@@ -105,7 +100,7 @@ func withJSON(code int, obj []byte) option {
 	return func(ctx *fasthttp.RequestCtx) {
 		ctx.Response.SetStatusCode(code)
 		ctx.Response.SetBody(obj)
-		ctx.Response.Header.SetContentType(jsonContentTypeHeader)
+		ctx.Response.Header.SetContentType(util.JSONContentTypeHeader)
 	}
 }
 

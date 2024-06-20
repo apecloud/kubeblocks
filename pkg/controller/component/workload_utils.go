@@ -67,6 +67,16 @@ func GetObjectListByComponentName(ctx context.Context, cli client.Reader, cluste
 	return cli.List(ctx, objectList, client.MatchingLabels(matchLabels), inNamespace)
 }
 
+func ListOwnedServices(ctx context.Context, cli client.Reader, namespace, clusterName, compName string,
+	opts ...client.ListOption) ([]*corev1.Service, error) {
+	labels := constant.GetComponentWellKnownLabels(clusterName, compName)
+	if opts == nil {
+		opts = make([]client.ListOption, 0)
+	}
+	opts = append(opts, inDataContext())
+	return listObjWithLabelsInNamespace(ctx, cli, generics.ServiceSignature, namespace, labels, opts...)
+}
+
 // GetMinReadySeconds gets the underlying workload's minReadySeconds of the component.
 func GetMinReadySeconds(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, compName string) (minReadySeconds int32, err error) {
 	var its []*workloads.InstanceSet

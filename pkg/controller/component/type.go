@@ -47,15 +47,14 @@ type SynthesizedComponent struct {
 	TLSConfig            *v1alpha1.TLSConfig                    `json:"tlsConfig"`
 	ServiceAccountName   string                                 `json:"serviceAccountName,omitempty"`
 	// TODO: remove this later
-	ComponentRefEnvs  []corev1.EnvVar                        `json:"componentRefEnvs,omitempty"`
-	ServiceReferences map[string]*v1alpha1.ServiceDescriptor `json:"serviceReferences,omitempty"`
-	TemplateVars      map[string]any                         `json:"templateVars,omitempty"`
-	EnvVars           []corev1.EnvVar                        `json:"envVars,omitempty"`
-	EnvFromSources    []corev1.EnvFromSource                 `json:"envFromSources,omitempty"`
-	Instances         []v1alpha1.InstanceTemplate            `json:"instances,omitempty"`
-	OfflineInstances  []string                               `json:"offlineInstances,omitempty"`
-
-	// The following fields were introduced with the ComponentDefinition and Component API in KubeBlocks version 0.8.0
+	ComponentRefEnvs    []corev1.EnvVar                        `json:"componentRefEnvs,omitempty"`
+	ServiceReferences   map[string]*v1alpha1.ServiceDescriptor `json:"serviceReferences,omitempty"`
+	TemplateAnnotations map[string]string
+	TemplateVars        map[string]any                      `json:"templateVars,omitempty"`
+	EnvVars             []corev1.EnvVar                     `json:"envVars,omitempty"`
+	EnvFromSources      []corev1.EnvFromSource              `json:"envFromSources,omitempty"`
+	Instances           []v1alpha1.InstanceTemplate         `json:"instances,omitempty"`
+	OfflineInstances    []string                            `json:"offlineInstances,omitempty"`
 	Roles               []v1alpha1.ReplicaRole              `json:"roles,omitempty"`
 	Labels              map[string]string                   `json:"labels,omitempty"`
 	Annotations         map[string]string                   `json:"annotations,omitempty"`

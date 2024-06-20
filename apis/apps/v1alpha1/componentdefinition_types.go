@@ -604,8 +604,7 @@ type SystemAccount struct {
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// Indicates if this account is the unique system initialization account (e.g., MySQL root).
-	// Only one system initialization account is permitted.
+	// Indicates if this account is a system initialization account (e.g., MySQL root).
 	//
 	// This field is immutable once set.
 	//

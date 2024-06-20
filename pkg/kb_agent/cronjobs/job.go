@@ -71,7 +71,11 @@ func NewJob(name string, cronJob *util.CronJob) Job {
 		return NewCheckRoleJob(*job)
 	}
 
-	job.Do = job.do
+	job.Do = func() error {
+		_, err := handlers.Do(context.Background(), job.Name, nil)
+		return err
+	}
+
 	return job
 }
 
@@ -96,11 +100,6 @@ func (job *CommonJob) Start() {
 			job.FailedCount = 0
 		}
 	}
-}
-
-func (job *CommonJob) do() error {
-	_, err := handlers.Do(context.Background(), job.Name, nil)
-	return err
 }
 
 func (job *CommonJob) Stop() {

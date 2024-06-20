@@ -30,7 +30,7 @@ import (
 
 type CheckRoleJob struct {
 	CommonJob
-	originRole              string
+	lastRole                string
 	roleUnchangedEventCount int
 }
 
@@ -43,8 +43,8 @@ func init() {
 
 func NewCheckRoleJob(commonJob CommonJob) *CheckRoleJob {
 	checkRoleJob := &CheckRoleJob{
-		CommonJob:  commonJob,
-		originRole: "waitForStart",
+		CommonJob: commonJob,
+		lastRole:  "waitForStart",
 	}
 
 	checkRoleJob.Do = checkRoleJob.do
@@ -61,7 +61,7 @@ func (job *CheckRoleJob) do() error {
 	}
 
 	role := resp.Message
-	if job.originRole == role {
+	if job.lastRole == role {
 		if !sendRoleEventPeriodically {
 			return nil
 		}
@@ -82,7 +82,7 @@ func (job *CheckRoleJob) do() error {
 		},
 		Role: role,
 	}
-	job.originRole = role
+	job.lastRole = role
 	err = util.SentEventForProbe(context.Background(), result)
 	return err
 }

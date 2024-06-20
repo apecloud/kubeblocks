@@ -48,7 +48,7 @@ func TestCheckRoleJob(t *testing.T) {
 	job := NewCheckRoleJob(commonJob)
 
 	t.Run("do - role unchanged with sendRoleEventPeriodically disable", func(t *testing.T) {
-		job.originRole = "role1"
+		job.lastRole = "role1"
 		job.roleUnchangedEventCount = 0
 
 		handler := &MockHandler{}
@@ -66,7 +66,7 @@ func TestCheckRoleJob(t *testing.T) {
 	})
 
 	t.Run("do - role unchanged with sendRoleEventPeriodically enable", func(t *testing.T) {
-		job.originRole = "role1"
+		job.lastRole = "role1"
 		job.roleUnchangedEventCount = 0
 		sendRoleEventPeriodically = true
 
@@ -85,7 +85,7 @@ func TestCheckRoleJob(t *testing.T) {
 	})
 
 	t.Run("do - role changed", func(t *testing.T) {
-		job.originRole = "role1"
+		job.lastRole = "role1"
 		job.roleUnchangedEventCount = 0
 
 		handler := &MockHandler{
@@ -104,7 +104,7 @@ func TestCheckRoleJob(t *testing.T) {
 	})
 
 	t.Run("do - error", func(t *testing.T) {
-		job.originRole = "role1"
+		job.lastRole = "role1"
 		job.roleUnchangedEventCount = 0
 
 		handler := &MockHandler{

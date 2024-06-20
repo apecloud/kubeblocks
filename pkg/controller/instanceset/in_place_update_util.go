@@ -24,8 +24,9 @@ import (
 	"reflect"
 	"strings"
 
+	"slices"
+
 	"github.com/rogpeppe/go-internal/semver"
-	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"

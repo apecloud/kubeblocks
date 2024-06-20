@@ -25,7 +25,8 @@ import (
 	"reflect"
 	"time"
 
-	"golang.org/x/exp/slices"
+	"slices"
+
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"

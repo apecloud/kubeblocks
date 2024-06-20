@@ -203,10 +203,10 @@ func (builder *ComponentDefinitionBuilder) SetReplicasLimit(minReplicas, maxRepl
 	return builder
 }
 
-func (builder *ComponentDefinitionBuilder) AddSystemAccount(accountName string, isSystemInitAccount bool, statement string) *ComponentDefinitionBuilder {
+func (builder *ComponentDefinitionBuilder) AddSystemAccount(accountName string, initAccount bool, statement string) *ComponentDefinitionBuilder {
 	account := appsv1alpha1.SystemAccount{
 		Name:        accountName,
-		InitAccount: isSystemInitAccount,
+		InitAccount: initAccount,
 		Statement:   statement,
 	}
 	if builder.get().Spec.SystemAccounts == nil {

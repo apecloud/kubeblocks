@@ -289,7 +289,7 @@ func (c *itsCredentialConvertor) convert(args ...any) (any, error) {
 		return nil, err
 	}
 
-	// use the system init account as the default credential
+	// use first init account as the default credential
 	var sysInitAccount *appsv1alpha1.SystemAccount
 	for index, sysAccount := range synthesizeComp.SystemAccounts {
 		if sysAccount.InitAccount {

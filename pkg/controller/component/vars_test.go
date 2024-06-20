@@ -34,7 +34,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -1689,21 +1688,6 @@ var _ = Describe("vars", func() {
 							},
 						},
 					},
-					{
-						Name: "podFQDNsWithClusterDomain",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ComponentVarRef: &appsv1alpha1.ComponentVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
-									CompDef:  synthesizedComp.CompDefName,
-									Optional: required(),
-								},
-								ComponentVars: appsv1alpha1.ComponentVars{
-									PodFQDNs:      &appsv1alpha1.VarRequired,
-									ClusterDomain: cfgutil.ToPointer(true),
-								},
-							},
-						},
-					},
 				}
 				reader := &mockReader{
 					cli: testCtx.Cli,
@@ -1734,25 +1718,14 @@ var _ = Describe("vars", func() {
 				withClusterDomain := func(name string) string {
 					return fmt.Sprintf("%s.%s", name, viper.GetString(constant.KubernetesClusterDomainEnv))
 				}
-				optionWrapper := func(fns ...func(string) string) func(name string) string {
-					return func(name string) string {
-						v := name
-						for _, fn := range fns {
-							v = fn(v)
-						}
-						return v
-					}
-				}
 				fqdnList := func(fn ...func(string) string) []string {
 					l := make([]string, 0)
-					optionFn := optionWrapper(fn...)
 					for _, i := range mockInstanceList {
-						l = append(l, optionFn(fmt.Sprintf("%s.%s-headless.%s.svc", i, compName, testCtx.DefaultNamespace)))
+						l = append(l, withClusterDomain(fmt.Sprintf("%s.%s-headless.%s.svc", i, compName, testCtx.DefaultNamespace)))
 					}
 					return l
 				}
 				checkEnvVarWithValue(envVars, "podFQDNs", strings.Join(fqdnList(), ","))
-				checkEnvVarWithValue(envVars, "podFQDNsWithClusterDomain", strings.Join(fqdnList(withClusterDomain), ","))
 			})
 		})
 
@@ -2618,6 +2591,20 @@ var _ = Describe("vars", func() {
 				Expect(err).Should(Succeed())
 				Expect(templateVars).Should(HaveKeyWithValue("port", "012345"))
 				checkEnvVarWithValue(envVars, "port", "012345")
+			})
+
+			It("cluster domain", func() {
+				vars := []appsv1alpha1.EnvVar{
+					{
+						Name:       "headless",
+						Value:      "test-headless.default.svc",
+						Expression: expp("{{ printf \"%s.%s\" .headless .ClusterDomain }}"),
+					},
+				}
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, nil, synthesizedComp, vars)
+				Expect(err).Should(Succeed())
+				Expect(templateVars).Should(HaveKeyWithValue("headless", "test-headless.default.svc.cluster.local"))
+				checkEnvVarWithValue(envVars, "headless", "test-headless.default.svc.cluster.local")
 			})
 
 			It("condition exp", func() {

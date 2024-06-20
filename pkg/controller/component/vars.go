@@ -51,6 +51,8 @@ var (
 	varTemplate        = template.New("vars").Option("missingkey=error").Funcs(sprig.TxtFuncMap())
 )
 
+const builtinClusterDomain = "ClusterDomain"
+
 func VarReferenceRegExp() *regexp.Regexp {
 	return varReferenceRegExp
 }
@@ -389,6 +391,7 @@ func evaluateObjectVarsExpression(definedVars []appsv1alpha1.EnvVar, credentialV
 		return strings.ReplaceAll(name, "-", "_")
 	}
 	for _, v := range [][]corev1.EnvVar{*vars, credentialVars} {
+		values[builtinClusterDomain] = viper.GetString(constant.KubernetesClusterDomainEnv)
 		for _, vv := range v {
 			if vv.ValueFrom == nil {
 				isValues[vv.Name] = true
@@ -1172,10 +1175,7 @@ func resolveComponentPodFQDNsRef(ctx context.Context, cli client.Reader, synthes
 			templates = append(templates, &comp.Spec.Instances[i])
 		}
 		clusterDomainFn := func(name string) string {
-			if selector.ClusterDomain != nil && *selector.ClusterDomain {
-				return fmt.Sprintf("%s.%s", name, viper.GetString(constant.KubernetesClusterDomainEnv))
-			}
-			return name
+			return fmt.Sprintf("%s.%s", name, viper.GetString(constant.KubernetesClusterDomainEnv))
 		}
 		names := instanceset.GenerateAllInstanceNames(comp.Name, comp.Spec.Replicas, templates, comp.Spec.OfflineInstances)
 		fqdn := func(name string) string {

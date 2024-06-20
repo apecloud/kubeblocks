@@ -13261,10 +13261,9 @@ spec:
                   properties:
                     initAccount:
                       default: false
-                      description: "Indicates if this account is the unique system
-                        initialization account (e.g., MySQL root). Only one system
-                        initialization account is permitted. \n This field is immutable
-                        once set."
+                      description: "Indicates if this account is a system initialization
+                        account (e.g., MySQL root). \n This field is immutable once
+                        set."
                       type: boolean
                     name:
                       description: "Specifies the unique identifier for the account.

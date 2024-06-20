@@ -138,8 +138,8 @@ Before you start, please ensure that you have prior experience with the [basic u
 #### Deploy KubeBlocks
 - Setup local cluster(Minikube, k3d), e.g., `k3d cluster create mycluster`
 - Install add-on. You can install add-ons through [Helm](https://kubeblocks.io/docs/release-0.8/developer_docs/integration/how-to-add-an-add-on). Here is a simpler example:
-    - Install `kbcli`
-    - Install `KubeBlocks`: `kbcli kubeblocks install`. This will install `KubeBlocks` and start running its manager.
+    - Install [`kbcli`](https://kubeblocks.io/docs/release-0.8/user_docs/installation/install-with-kbcli/install-kbcli)
+    - Install [`KubeBlocks`](https://kubeblocks.io/docs/release-0.8/user_docs/installation/install-with-kbcli/install-kubeblocks-with-kbcli): `kbcli kubeblocks install`. This will install `KubeBlocks` and start running its manager.
     - Install add-ons you need. Please follow guildlines [here](https://kubeblocks.io/docs/preview/user_docs/overview/supported-addons#list-addons). 
 ```shell
 # make sure there is an index
@@ -162,9 +162,9 @@ kubectl scale deployment kubeblocks --replicas=0 -n kb-system
 - Start your operator: `make run`. This will start your `KubeBlocks` controller and output logs.
 
 #### Test with apecloud-mysql
-- Create `apecloud-mysql` cluster
+- [Create `apecloud-mysql` cluster](https://kubeblocks.io/docs/preview/user_docs/kubeblocks-for-mysql/cluster-management/create-and-connect-a-mysql-cluster) 
 ```
-kbcli cluster create apecloud-mysql kbcli cluster create apecloud-mysql apecloud-mysql --cluster-definition=apecloud-mysql
+kbcli cluster create apecloud-mysql apecloud-mysql --cluster-definition=apecloud-mysql
 ```
 - Now you will see corresponding logs. You can use `kbcli cluster list` to see information of clusters.
 

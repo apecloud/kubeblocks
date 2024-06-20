@@ -244,5 +244,61 @@ var _ = Describe("OpsUtil functions", func() {
 				g.Expect(opsSlice).Should(BeEmpty())
 			})
 		})
+
+		It("Test opsRequest dependency", func() {
+			By("init operations resources ")
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+
+			By("create a first horizontal opsRequest")
+			ops1 := createHorizontalScaling(clusterName, appsv1alpha1.HorizontalScaling{
+				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+				ScaleIn: &appsv1alpha1.ScaleIn{
+					ReplicaChanger: appsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)},
+				},
+			})
+			opsRes.OpsRequest = ops1
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsCreatingPhase))
+
+			By("create another horizontal opsRequest with force flag and dependent the first opsRequest")
+			ops2 := createHorizontalScaling(clusterName, appsv1alpha1.HorizontalScaling{
+				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+				ScaleOut: &appsv1alpha1.ScaleOut{
+					ReplicaChanger: appsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)},
+				},
+			})
+			ops2.Annotations = map[string]string{constant.OpsDependentOnSuccessfulOpsAnnoKey: ops1.Name}
+			ops2.Spec.Force = true
+			opsRes.OpsRequest = ops2
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsPendingPhase))
+			// expect the dependent ops has been annotated
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(ops1), func(g Gomega, ops *appsv1alpha1.OpsRequest) {
+				g.Expect(ops.Annotations[constant.RelatedOpsAnnotationKey]).Should(Equal(ops2.Name))
+			})).Should(Succeed())
+
+			By("expect for the ops is Creating when dependent ops is succeed")
+			Expect(testapps.ChangeObjStatus(&testCtx, ops1, func() {
+				ops1.Status.Phase = appsv1alpha1.OpsSucceedPhase
+			})).Should(Succeed())
+
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsCreatingPhase))
+
+			By("expect for the ops is Cancelled when dependent ops is Failed")
+			Expect(testapps.ChangeObjStatus(&testCtx, ops1, func() {
+				ops1.Status.Phase = appsv1alpha1.OpsFailedPhase
+			})).Should(Succeed())
+
+			ops2.Annotations = map[string]string{constant.OpsDependentOnSuccessfulOpsAnnoKey: ops1.Name}
+			ops2.Status.Phase = appsv1alpha1.OpsPendingPhase
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops2))).Should(Equal(appsv1alpha1.OpsCancelledPhase))
+		})
 	})
 })

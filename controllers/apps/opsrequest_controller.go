@@ -23,6 +23,7 @@ import (
 	"context"
 	"math"
 	"reflect"
+	"strings"
 	"time"
 
 	"golang.org/x/exp/slices"
@@ -175,10 +176,12 @@ func (r *OpsRequestReconciler) handleOpsRequestByPhase(reqCtx intctrlutil.Reques
 		return r.reconcileStatusDuringRunningOrCanceling(reqCtx, opsRes)
 	case appsv1alpha1.OpsSucceedPhase:
 		return r.handleSucceedOpsRequest(reqCtx, opsRes.OpsRequest)
-	case appsv1alpha1.OpsFailedPhase, appsv1alpha1.OpsCancelledPhase:
+	default:
+		if err := r.annotateRelatedOps(reqCtx, opsRes.OpsRequest); err != nil {
+			return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
+		}
 		return intctrlutil.ResultToP(intctrlutil.Reconciled())
 	}
-	return intctrlutil.ResultToP(intctrlutil.Reconciled())
 }
 
 // handleCancelSignal handles the cancel signal for opsRequest.
@@ -218,6 +221,9 @@ func (r *OpsRequestReconciler) handleCancelSignal(reqCtx intctrlutil.RequestCtx,
 
 // handleSucceedOpsRequest the opsRequest will be deleted after one hour when status.phase is Succeed
 func (r *OpsRequestReconciler) handleSucceedOpsRequest(reqCtx intctrlutil.RequestCtx, opsRequest *appsv1alpha1.OpsRequest) (*ctrl.Result, error) {
+	if err := r.annotateRelatedOps(reqCtx, opsRequest); err != nil {
+		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
+	}
 	if err := r.deleteExternalJobs(reqCtx.Ctx, opsRequest); err != nil {
 		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 	}
@@ -485,6 +491,35 @@ func (r *OpsRequestReconciler) deleteCreatedPodsInKBNamespace(reqCtx intctrlutil
 	}
 	for i := range podList.Items {
 		if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, &podList.Items[i]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// annotateRelatedOps annotates the related opsRequests to reconcile.
+func (r *OpsRequestReconciler) annotateRelatedOps(reqCtx intctrlutil.RequestCtx, opsRequest *appsv1alpha1.OpsRequest) error {
+	relatedOpsStr := opsRequest.Annotations[constant.RelatedOpsAnnotationKey]
+	if relatedOpsStr == "" {
+		return nil
+	}
+	relatedOpsNames := strings.Split(relatedOpsStr, ",")
+	for _, opsName := range relatedOpsNames {
+		relatedOps := &appsv1alpha1.OpsRequest{}
+		if err := r.Client.Get(reqCtx.Ctx, client.ObjectKey{Name: opsName, Namespace: opsRequest.Namespace}, relatedOps); err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+			return err
+		}
+		if relatedOps.Annotations[constant.ReconcileAnnotationKey] == opsRequest.ResourceVersion {
+			continue
+		}
+		if relatedOps.Annotations == nil {
+			relatedOps.Annotations = map[string]string{}
+		}
+		relatedOps.Annotations[constant.ReconcileAnnotationKey] = opsRequest.ResourceVersion
+		if err := r.Client.Update(reqCtx.Ctx, relatedOps); err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
 	}

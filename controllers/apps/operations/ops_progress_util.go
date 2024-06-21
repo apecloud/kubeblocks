@@ -424,7 +424,7 @@ func handleComponentProgressForScalingReplicas(reqCtx intctrlutil.RequestCtx,
 	return updatedPodCount, completedCount, err
 }
 
-func updateProgressDetailForScaleIn(
+func updateProgressDetailForHScale(
 	opsRes *OpsResource,
 	pgRes *progressResource,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus,
@@ -467,23 +467,23 @@ func handleScaleOutProgressWithInstanceSet(
 	for podName := range pgRes.createdPodSet {
 		objectKey := getProgressObjectKey(constant.PodKind, podName)
 		if _, ok := currPodRevisionMap[podName]; !ok {
-			updateProgressDetailForScaleIn(opsRes, pgRes, compStatus, objectKey, appsv1alpha1.PendingProgressStatus)
+			updateProgressDetailForHScale(opsRes, pgRes, compStatus, objectKey, appsv1alpha1.PendingProgressStatus)
 			continue
 		}
 		if _, ok := failurePodSet[podName]; ok {
 			completedCount += 1
-			updateProgressDetailForScaleIn(opsRes, pgRes, compStatus, objectKey, appsv1alpha1.FailedProgressStatus)
+			updateProgressDetailForHScale(opsRes, pgRes, compStatus, objectKey, appsv1alpha1.FailedProgressStatus)
 			continue
 		}
 		if _, ok := notReadyPodSet[podName]; ok {
-			updateProgressDetailForScaleIn(opsRes, pgRes, compStatus, objectKey, appsv1alpha1.ProcessingProgressStatus)
+			updateProgressDetailForHScale(opsRes, pgRes, compStatus, objectKey, appsv1alpha1.ProcessingProgressStatus)
 			continue
 		}
 		if _, ok := memberStatusMap[podName]; !ok && needToCheckRole(pgRes) {
 			continue
 		}
 		completedCount += 1
-		updateProgressDetailForScaleIn(opsRes, pgRes, compStatus, objectKey, appsv1alpha1.SucceedProgressStatus)
+		updateProgressDetailForHScale(opsRes, pgRes, compStatus, objectKey, appsv1alpha1.SucceedProgressStatus)
 	}
 	return completedCount, nil
 }
@@ -500,14 +500,14 @@ func handleScaleInProgressWithInstanceSet(
 		objectKey := getProgressObjectKey(constant.PodKind, podName)
 		if _, ok := currPodRevisionMap[podName]; !ok {
 			completedCount += 1
-			updateProgressDetailForScaleIn(opsRes, pgRes, compStatus, objectKey, appsv1alpha1.SucceedProgressStatus)
+			updateProgressDetailForHScale(opsRes, pgRes, compStatus, objectKey, appsv1alpha1.SucceedProgressStatus)
 			continue
 		}
 		if _, ok := notReadyPodSet[podName]; ok {
-			updateProgressDetailForScaleIn(opsRes, pgRes, compStatus, objectKey, appsv1alpha1.ProcessingProgressStatus)
+			updateProgressDetailForHScale(opsRes, pgRes, compStatus, objectKey, appsv1alpha1.ProcessingProgressStatus)
 			continue
 		}
-		updateProgressDetailForScaleIn(opsRes, pgRes, compStatus, objectKey, appsv1alpha1.PendingProgressStatus)
+		updateProgressDetailForHScale(opsRes, pgRes, compStatus, objectKey, appsv1alpha1.PendingProgressStatus)
 	}
 	return completedCount, nil
 }

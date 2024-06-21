@@ -244,6 +244,9 @@ func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx,
 	opsRes.OpsDef = opsDef
 	// 1. validate OpenApV3Schema
 	parametersSchema := opsDef.Spec.ParametersSchema
+	if parametersSchema == nil {
+		return nil
+	}
 	for _, v := range customSpec.CustomOpsComponents {
 		// covert to type map[string]interface{}
 		params, err := common.CoverStringToInterfaceBySchemaType(parametersSchema.OpenAPIV3Schema, covertParametersToMap(v.Parameters))

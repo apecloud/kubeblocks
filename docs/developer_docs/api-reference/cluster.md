@@ -2876,6 +2876,20 @@ int32
 </tr>
 <tr>
 <td>
+<code>preConditionDeadlineSeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the maximum time in seconds that the OpsRequest will wait for its pre-conditions to be met
+before it aborts the operation.
+If set to 0 (default), pre-conditions must be satisfied immediately for the OpsRequest to proceed.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>SpecificOpsRequest</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">
@@ -15119,6 +15133,20 @@ int32
 </tr>
 <tr>
 <td>
+<code>preConditionDeadlineSeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the maximum time in seconds that the OpsRequest will wait for its pre-conditions to be met
+before it aborts the operation.
+If set to 0 (default), pre-conditions must be satisfied immediately for the OpsRequest to proceed.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>SpecificOpsRequest</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">
@@ -20234,20 +20262,6 @@ Reconfigure
 <td>
 <em>(Optional)</em>
 <p>Lists Expose objects, each specifying a Component and its services to be exposed.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>preConditionDeadlineSeconds</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the maximum time in seconds that the OpsRequest will wait for its pre-conditions to be met
-before it aborts the operation.
-If set to 0 (default), pre-conditions must be satisfied immediately for the OpsRequest to proceed.</p>
 </td>
 </tr>
 <tr>

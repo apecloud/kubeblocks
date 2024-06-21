@@ -129,7 +129,7 @@ func enqueueOpsRequestToClusterAnnotation(ctx context.Context, cli client.Client
 			// the opsRequest is already running.
 			return &opsRecorder, nil
 		}
-		if existOtherRunningOps(opsRequestSlice, opsRecorder.Type, opsBehaviour) {
+		if !opsRes.OpsRequest.Spec.Force && existOtherRunningOps(opsRequestSlice, opsRecorder.Type, opsBehaviour) {
 			// if exists other running opsRequest, return.
 			return &opsRecorder, nil
 		}

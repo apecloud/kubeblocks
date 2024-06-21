@@ -80,6 +80,14 @@ type OpsRequestSpec struct {
 	// +optional
 	TTLSecondsAfterSucceed int32 `json:"ttlSecondsAfterSucceed,omitempty"`
 
+	// Specifies the maximum time in seconds that the OpsRequest will wait for its pre-conditions to be met
+	// before it aborts the operation.
+	// If set to 0 (default), pre-conditions must be satisfied immediately for the OpsRequest to proceed.
+	//
+	// +kubebuilder:default=0
+	// +optional
+	PreConditionDeadlineSeconds *int32 `json:"preConditionDeadlineSeconds,omitempty"`
+
 	// Exactly one of its members must be set.
 	SpecificOpsRequest `json:",inline"`
 }
@@ -167,14 +175,6 @@ type SpecificOpsRequest struct {
 	//
 	// +optional
 	ExposeList []Expose `json:"expose,omitempty"`
-
-	// Specifies the maximum time in seconds that the OpsRequest will wait for its pre-conditions to be met
-	// before it aborts the operation.
-	// If set to 0 (default), pre-conditions must be satisfied immediately for the OpsRequest to proceed.
-	//
-	// +kubebuilder:default=0
-	// +optional
-	PreConditionDeadlineSeconds *int32 `json:"preConditionDeadlineSeconds,omitempty"`
 
 	// Specifies the image and scripts for executing engine-specific operations such as creating databases or users.
 	// It supports limited engines including MySQL, PostgreSQL, Redis, MongoDB.

@@ -782,6 +782,18 @@ It should be noted that the ServiceRef has cluster-level semantic consistency, m
 </tr>
 <tr>
 <td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies Labels to override or add for underlying Pods.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>annotations</code><br/>
 <em>
 map[string]string
@@ -4284,6 +4296,18 @@ and will set relative variables about this log type in database kernel.</p>
 </tr>
 <tr>
 <td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies Labels to override or add for underlying Pods.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>annotations</code><br/>
 <em>
 map[string]string
@@ -7693,6 +7717,18 @@ ClassDefRef
 </ul>
 <p>Each type of service reference requires specific configurations and bindings to establish the connection and interaction with the respective services.
 It should be noted that the ServiceRef has cluster-level semantic consistency, meaning that within the same Cluster, service references with the same ServiceRef.Name are considered to be the same service. It is only allowed to bind to the same Cluster or ServiceDescriptor.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies Labels to override or add for underlying Pods.</p>
 </td>
 </tr>
 <tr>

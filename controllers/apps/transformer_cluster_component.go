@@ -184,6 +184,7 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component) *apps
 	compObjCopy.Spec.ClassDefRef = compProto.Spec.ClassDefRef
 	compObjCopy.Spec.Resources = compProto.Spec.Resources
 	compObjCopy.Spec.ServiceRefs = compProto.Spec.ServiceRefs
+	compObjCopy.Spec.Labels = compProto.Spec.Labels
 	compObjCopy.Spec.Annotations = compProto.Spec.Annotations
 	compObjCopy.Spec.Env = compProto.Spec.Env
 	compObjCopy.Spec.Replicas = compProto.Spec.Replicas

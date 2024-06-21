@@ -74,7 +74,8 @@ func BuildRSM(cluster *appsv1alpha1.Cluster, synthesizedComp *component.Synthesi
 		AddLabelsInMap(labels).
 		AddLabelsInMap(compDefLabel).
 		AddLabelsInMap(constant.GetAppVersionLabel(compDefName)).
-		AddAnnotationsInMap(synthesizedComp.TemplateAnnotations)
+		AddLabelsInMap(synthesizedComp.UserDefinedLabels).
+		AddAnnotationsInMap(synthesizedComp.UserDefinedAnnotations)
 	template := corev1.PodTemplateSpec{
 		ObjectMeta: podBuilder.GetObject().ObjectMeta,
 		Spec:       *synthesizedComp.PodSpec.DeepCopy(),

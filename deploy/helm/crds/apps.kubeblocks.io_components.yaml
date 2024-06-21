@@ -3464,6 +3464,11 @@ spec:
                   - name
                   type: object
                 type: array
+              labels:
+                additionalProperties:
+                  type: string
+                description: Specifies Labels to override or add for underlying Pods.
+                type: object
               offlineInstances:
                 description: |-
                   Specifies the names of instances to be transitioned to offline status.

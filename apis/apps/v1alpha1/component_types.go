@@ -65,6 +65,11 @@ type ComponentSpec struct {
 	// +optional
 	ServiceRefs []ServiceRef `json:"serviceRefs,omitempty"`
 
+	// Specifies Labels to override or add for underlying Pods.
+	//
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+
 	// Specifies Annotations to override or add for underlying Pods.
 	//
 	// +optional

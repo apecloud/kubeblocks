@@ -336,6 +336,11 @@ spec:
                 items:
                   type: string
                 type: array
+              labels:
+                additionalProperties:
+                  type: string
+                description: Specifies Labels to override or add for underlying Pods.
+                type: object
               monitor:
                 default: false
                 description: monitor is a switch to enable monitoring and is set as

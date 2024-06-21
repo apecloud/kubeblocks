@@ -83,6 +83,7 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluste
 		AddLabelsInMap(constant.GetComponentWellKnownLabels(cluster.Name, compSpec.Name)).
 		AddLabels(constant.KBAppClusterUIDLabelKey, string(cluster.UID)).
 		SetServiceVersion(compSpec.ServiceVersion).
+		SetLabels(compSpec.Labels).
 		SetAnnotations(compSpec.Annotations).
 		SetEnv(compSpec.Env).
 		SetSchedulingPolicy(schedulingPolicy).

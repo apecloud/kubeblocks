@@ -24,6 +24,190 @@ spec:
       jsonPath: .status.topologies
       name: Topologies
       type: string
+    - description: status phase
+      jsonPath: .status.phase
+      name: STATUS
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          ClusterDefinition defines the topology for databases or storage systems,
+          offering a variety of topological configurations to meet diverse deployment needs and scenarios.
+
+
+          It includes a list of Components, each linked to a ComponentDefinition, which enhances reusability and reduce redundancy.
+          For example, widely used components such as etcd and Zookeeper can be defined once and reused across multiple ClusterDefinitions,
+          simplifying the setup of new systems.
+
+
+          Additionally, ClusterDefinition also specifies the sequence of startup, upgrade, and shutdown for Components,
+          ensuring a controlled and predictable management of component lifecycles.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ClusterDefinitionSpec defines the desired state of ClusterDefinition
+            properties:
+              topologies:
+                description: Topologies defines all possible topologies within the
+                  cluster.
+                items:
+                  description: ClusterTopology represents the definition for a specific
+                    cluster topology.
+                  properties:
+                    components:
+                      description: Components specifies the components in the topology.
+                      items:
+                        description: ClusterTopologyComponent defines a Component
+                          within a ClusterTopology.
+                        properties:
+                          compDef:
+                            description: |-
+                              Specifies the name or prefix of the ComponentDefinition custom resource(CR) that
+                              defines the Component's characteristics and behavior.
+
+
+                              When a prefix is used, the system selects the ComponentDefinition CR with the latest version that matches the prefix.
+                              This approach allows:
+
+
+                              1. Precise selection by providing the exact name of a ComponentDefinition CR.
+                              2. Flexible and automatic selection of the most up-to-date ComponentDefinition CR by specifying a prefix.
+
+
+                              Once set, this field cannot be updated.
+                            maxLength: 64
+                            type: string
+                          name:
+                            description: |-
+                              Defines the unique identifier of the component within the cluster topology.
+                              It follows IANA Service naming rules and is used as part of the Service's DNS name.
+                              The name must start with a lowercase letter, can contain lowercase letters, numbers,
+                              and hyphens, and must end with a lowercase letter or number.
+
+
+                              Cannot be updated once set.
+                            maxLength: 16
+                            pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
+                            type: string
+                        required:
+                        - compDef
+                        - name
+                        type: object
+                      maxItems: 128
+                      minItems: 1
+                      type: array
+                    default:
+                      description: |-
+                        Default indicates whether this topology serves as the default configuration.
+                        When set to true, this topology is automatically used unless another is explicitly specified.
+                      type: boolean
+                    name:
+                      description: |-
+                        Name is the unique identifier for the cluster topology.
+                        Cannot be updated.
+                      maxLength: 32
+                      type: string
+                    orders:
+                      description: |-
+                        Specifies the sequence in which components within a cluster topology are
+                        started, stopped, and upgraded.
+                        This ordering is crucial for maintaining the correct dependencies and operational flow across components.
+                      properties:
+                        provision:
+                          description: |-
+                            Specifies the order for creating and initializing components.
+                            This is designed for components that depend on one another. Components without dependencies can be grouped together.
+
+
+                            Components that can be provisioned independently or have no dependencies can be listed together in the same stage,
+                            separated by commas.
+                          items:
+                            type: string
+                          type: array
+                        terminate:
+                          description: |-
+                            Outlines the order for stopping and deleting components.
+                            This sequence is designed for components that require a graceful shutdown or have interdependencies.
+
+
+                            Components that can be terminated independently or have no dependencies can be listed together in the same stage,
+                            separated by commas.
+                          items:
+                            type: string
+                          type: array
+                        update:
+                          description: |-
+                            Update determines the order for updating components' specifications, such as image upgrades or resource scaling.
+                            This sequence is designed for components that have dependencies or require specific update procedures.
+
+
+                            Components that can be updated independently or have no dependencies can be listed together in the same stage,
+                            separated by commas.
+                          items:
+                            type: string
+                          type: array
+                      type: object
+                  required:
+                  - components
+                  - name
+                  type: object
+                maxItems: 128
+                minItems: 1
+                type: array
+            type: object
+          status:
+            description: ClusterDefinitionStatus defines the observed state of ClusterDefinition
+            properties:
+              message:
+                description: Provides additional information about the current phase.
+                type: string
+              observedGeneration:
+                description: Represents the most recent generation observed for this
+                  ClusterDefinition.
+                format: int64
+                type: integer
+              phase:
+                description: |-
+                  Specifies the current phase of the ClusterDefinition. Valid values are `empty`, `Available`, `Unavailable`.
+                  When `Available`, the ClusterDefinition is ready and can be referenced by related objects.
+                enum:
+                - Available
+                - Unavailable
+                type: string
+              topologies:
+                description: Topologies this ClusterDefinition supported.
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+  - additionalPrinterColumns:
+    - description: topologies
+      jsonPath: .status.topologies
+      name: Topologies
+      type: string
     - description: service references
       jsonPath: .status.serviceRefs
       name: ServiceRefs
@@ -9815,6 +9999,6 @@ spec:
             type: object
         type: object
     served: true
-    storage: true
+    storage: false
     subresources:
       status: {}

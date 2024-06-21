@@ -20,6 +20,8 @@ package fake
 
 import (
 	clientset "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned"
+	appsv1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/apps/v1"
+	fakeappsv1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/apps/v1/fake"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/apps/v1alpha1"
 	fakeappsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/apps/v1alpha1/fake"
 	appsv1beta1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/apps/v1beta1"
@@ -97,6 +99,11 @@ func (c *Clientset) AppsV1alpha1() appsv1alpha1.AppsV1alpha1Interface {
 // AppsV1beta1 retrieves the AppsV1beta1Client
 func (c *Clientset) AppsV1beta1() appsv1beta1.AppsV1beta1Interface {
 	return &fakeappsv1beta1.FakeAppsV1beta1{Fake: &c.Fake}
+}
+
+// AppsV1 retrieves the AppsV1Client
+func (c *Clientset) AppsV1() appsv1.AppsV1Interface {
+	return &fakeappsv1.FakeAppsV1{Fake: &c.Fake}
 }
 
 // DataprotectionV1alpha1 retrieves the DataprotectionV1alpha1Client

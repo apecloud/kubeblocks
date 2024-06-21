@@ -134,6 +134,8 @@ const (
 	StatefulSetPodNameLabelKey = "statefulset.kubernetes.io/pod-name"
 
 	// kubeblocks.io annotations
+	OpsDependentOnSuccessfulOpsAnnoKey          = "ops.kubeblocks.io/dependent-on-successful-ops" // OpsDependentOnSuccessfulOpsAnnoKey wait for the dependent ops to succeed before executing the current ops. If it fails, this ops will also fail.
+	RelatedOpsAnnotationKey                     = "ops.kubeblocks.io/related-ops"
 	ClusterSnapshotAnnotationKey                = "kubeblocks.io/cluster-snapshot"           // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
 	DefaultClusterVersionAnnotationKey          = "kubeblocks.io/is-default-cluster-version" // DefaultClusterVersionAnnotationKey specifies the default cluster version.
 	OpsRequestAnnotationKey                     = "kubeblocks.io/ops-request"                // OpsRequestAnnotationKey OpsRequest annotation key in Cluster

@@ -20,14 +20,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"slices"
+	"strings"
 	"sync"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -96,6 +100,14 @@ func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, o
 				return intctrlutil.ResultToP(intctrlutil.Reconciled())
 			}
 		}
+		// validate if the dependent ops have been successful
+		if pass, err := opsMgr.validateDependOnSuccessfulOps(reqCtx, cli, opsRes); intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
+			return &ctrl.Result{}, patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error())
+		} else if err != nil {
+			return nil, err
+		} else if !pass {
+			return intctrlutil.ResultToP(intctrlutil.Reconciled())
+		}
 		opsDeepCopy := opsRequest.DeepCopy()
 		// save last configuration into status.lastConfiguration
 		if err = opsBehaviour.OpsHandler.SaveLastConfiguration(reqCtx, cli, opsRes); err != nil {
@@ -152,6 +164,49 @@ func (opsMgr *OpsManager) Reconcile(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	default:
 		return requeueAfter, nil
 	}
+}
+
+// validateDependOnOps validates if the dependent ops have been successful
+func (opsMgr *OpsManager) validateDependOnSuccessfulOps(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	opsRes *OpsResource) (bool, error) {
+	dependentOpsStr := opsRes.OpsRequest.Annotations[constant.OpsDependentOnSuccessfulOpsAnnoKey]
+	if dependentOpsStr == "" {
+		return true, nil
+	}
+	opsNames := strings.Split(dependentOpsStr, ",")
+	for _, opsName := range opsNames {
+		ops := &appsv1alpha1.OpsRequest{}
+		if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: opsName, Namespace: opsRes.OpsRequest.Namespace}, ops); err != nil {
+			if apierrors.IsNotFound(err) {
+				return false, intctrlutil.NewFatalError(err.Error())
+			}
+			return false, err
+		}
+		var relatedOpsArr []string
+		relatedOpsStr := ops.Annotations[constant.RelatedOpsAnnotationKey]
+		if relatedOpsStr != "" {
+			relatedOpsArr = strings.Split(relatedOpsStr, ",")
+		}
+		if !slices.Contains(relatedOpsArr, opsRes.OpsRequest.Name) {
+			// annotate to the dependent opsRequest
+			relatedOpsArr = append(relatedOpsArr, opsRes.OpsRequest.Name)
+			if ops.Annotations == nil {
+				ops.Annotations = map[string]string{}
+			}
+			ops.Annotations[constant.RelatedOpsAnnotationKey] = strings.Join(relatedOpsArr, ",")
+			if err := cli.Update(reqCtx.Ctx, ops); err != nil {
+				return false, err
+			}
+		}
+		if slices.Contains([]appsv1alpha1.OpsPhase{appsv1alpha1.OpsFailedPhase, appsv1alpha1.OpsCancelledPhase}, ops.Status.Phase) {
+			return false, PatchOpsStatus(reqCtx.Ctx, cli, opsRes, appsv1alpha1.OpsCancelledPhase)
+		}
+		if ops.Status.Phase != appsv1alpha1.OpsSucceedPhase {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
 func (opsMgr *OpsManager) handleOpsCompleted(reqCtx intctrlutil.RequestCtx,

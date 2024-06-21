@@ -721,6 +721,12 @@ var _ = Describe("OpsRequest Controller", func() {
 
 			By("create second restart ops")
 			ops2 := createRestartOps(clusterObj.Name, 2)
+			Eventually(testapps.ChangeObj(&testCtx, ops2, func(request *appsv1alpha1.OpsRequest) {
+				if request.Annotations == nil {
+					request.Annotations = map[string]string{}
+				}
+				request.Annotations[constant.OpsDependentOnSuccessfulOpsAnnoKey] = ops1.Name
+			})).Should(Succeed())
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops2))).Should(Equal(appsv1alpha1.OpsPendingPhase))
 
 			By("create third restart ops")
@@ -740,6 +746,9 @@ var _ = Describe("OpsRequest Controller", func() {
 			By("mock ops1 phase to Succeed")
 			mockCompRunning(replicas, true)
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).Should(Equal(appsv1alpha1.OpsSucceedPhase))
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(ops2), func(g Gomega, opsRequest *appsv1alpha1.OpsRequest) {
+				g.Expect(opsRequest.Annotations[constant.ReconcileAnnotationKey]).ShouldNot(BeEmpty())
+			})).Should(Succeed())
 
 			By("expect for next ops is Running")
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops2))).Should(Equal(appsv1alpha1.OpsRunningPhase))

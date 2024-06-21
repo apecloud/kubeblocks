@@ -206,6 +206,7 @@ func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1a
 func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *appsv1alpha1.Cluster, comp *component.SynthesizedComponent, configSpecBuildParams []cfgcm.ConfigSpecMeta, volumeDirs []corev1.VolumeMount, podSpec *corev1.PodSpec) (*cfgcm.CfgManagerBuildParams, error) {
 	cfgManagerParams := &cfgcm.CfgManagerBuildParams{
 		ManagerName:               constant.ConfigSidecarName,
+		CharacterType:             comp.CharacterType,
 		ComponentName:             comp.Name,
 		SecreteName:               constant.GenerateDefaultConnCredential(cluster.Name),
 		Image:                     viper.GetString(constant.KBToolsImage),

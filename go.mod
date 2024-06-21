@@ -26,7 +26,6 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-hclog v1.5.0
 	github.com/hashicorp/vault/sdk v0.9.2
-	github.com/imdario/mergo v0.3.14
 	github.com/jackc/pgx/v5 v5.5.4
 	github.com/klauspost/compress v1.17.6
 	github.com/kubernetes-csi/external-snapshotter/client/v3 v3.0.0
@@ -187,6 +186,7 @@ require (
 	github.com/hashicorp/hcl v1.0.1-vault-5 // indirect
 	github.com/hashicorp/yamux v0.1.1 // indirect
 	github.com/huandu/xstrings v1.4.0 // indirect
+	github.com/imdario/mergo v0.3.14 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect

@@ -836,6 +836,18 @@ identified using Cluster, Component and Service names.</li>
 </tr>
 <tr>
 <td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies Labels to override or add for underlying Pods.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>annotations</code><br/>
 <em>
 map[string]string
@@ -5055,6 +5067,18 @@ you can enable the collection of these logs by including their names in the <cod
 - slow_query_log
 - error_log
 </code></pre>
+</td>
+</tr>
+<tr>
+<td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies Labels to override or add for underlying Pods.</p>
 </td>
 </tr>
 <tr>
@@ -9323,6 +9347,18 @@ identified using Cluster, Component and Service names.</li>
         component: &quot;postgresql&quot;
 </code></pre>
 <p>The example above includes ServiceRefs to an external Redis Sentinel service and a PostgreSQL Cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies Labels to override or add for underlying Pods.</p>
 </td>
 </tr>
 <tr>

@@ -2850,6 +2850,12 @@ spec:
                       required:
                       - name
                       type: object
+                    labels:
+                      additionalProperties:
+                        type: string
+                      description: Specifies Labels to override or add for underlying
+                        Pods.
+                      type: object
                     monitor:
                       description: "Deprecated since v0.9 Determines whether metrics
                         exporter information is annotated on the Component's headless
@@ -8597,6 +8603,12 @@ spec:
                               type: object
                           required:
                           - name
+                          type: object
+                        labels:
+                          additionalProperties:
+                            type: string
+                          description: Specifies Labels to override or add for underlying
+                            Pods.
                           type: object
                         monitor:
                           description: "Deprecated since v0.9 Determines whether metrics

@@ -90,8 +90,11 @@ func (r *InstanceSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		Do(instanceset.NewReplicasAlignmentReconciler()).
 		Do(instanceset.NewUpdateReconciler()).
 		Commit()
+	if re, ok := err.(intctrlutil.DelayedRequeueError); ok {
+		return intctrlutil.RequeueAfter(re.RequeueAfter(), logger, re.Reason())
+	}
 	requeue := false
-	if err != nil && apierrors.IsConflict(err) {
+	if apierrors.IsConflict(err) {
 		requeue = true
 		err = nil
 	}

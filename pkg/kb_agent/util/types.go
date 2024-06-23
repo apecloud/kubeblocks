@@ -36,6 +36,7 @@ type CronJob struct {
 	PeriodSeconds    int `json:"periodSeconds,omitempty"`
 	SuccessThreshold int `json:"successThreshold,omitempty"`
 	FailureThreshold int `json:"failureThreshold,omitempty"`
+	ReportFrequency  int `json:"reportFrequency,omitempty"`
 }
 
 type HandlerSpec struct {

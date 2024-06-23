@@ -67,6 +67,10 @@ func NewJob(name string, cronJob *util.CronJob) (Job, error) {
 		job.FailureThreshold = cronJob.FailureThreshold
 	}
 
+	if cronJob.ReportFrequency != 0 {
+		job.ReportFrequency = cronJob.ReportFrequency
+	}
+
 	if name == constant.RoleProbeAction {
 		return NewCheckRoleJob(*job), nil
 	}

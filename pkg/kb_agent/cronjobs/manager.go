@@ -39,7 +39,11 @@ func NewManager() (*Manager, error) {
 			continue
 		}
 		logger.Info("cronjob found", "name", name)
-		job := NewJob(name, handler.CronJob)
+		job, err := NewJob(name, handler.CronJob)
+		if err != nil {
+			logger.Info("Failed to create job", "name", name, "error", err.Error())
+			continue
+		}
 		jobs[name] = job
 	}
 	return &Manager{

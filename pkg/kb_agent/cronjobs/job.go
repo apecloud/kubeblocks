@@ -21,10 +21,10 @@ package cronjobs
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
@@ -45,7 +45,7 @@ type CommonJob struct {
 	Do               func() error
 }
 
-func NewJob(name string, cronJob *util.CronJob) Job {
+func NewJob(name string, cronJob *util.CronJob) (Job, error) {
 	job := &CommonJob{
 		Name:             name,
 		TimeoutSeconds:   60,
@@ -68,15 +68,10 @@ func NewJob(name string, cronJob *util.CronJob) Job {
 	}
 
 	if name == constant.RoleProbeAction {
-		return NewCheckRoleJob(*job)
+		return NewCheckRoleJob(*job), nil
 	}
 
-	job.Do = func() error {
-		_, err := handlers.Do(context.Background(), job.Name, nil)
-		return err
-	}
-
-	return job
+	return nil, fmt.Errorf("%s not implemented", name)
 }
 
 func (job *CommonJob) Start() {

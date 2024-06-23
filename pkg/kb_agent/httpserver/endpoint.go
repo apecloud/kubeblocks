@@ -31,9 +31,9 @@ type Endpoint struct {
 	// the version is introduced to allow breaking changes.
 	// If the API is upgraded to v2.0, the v1.0 API will be maintained
 	// for compatibility until all legacy accesses are removed.
-	Version   string
-	Duplicate string
-	Handler   fasthttp.RequestHandler
+	Version     string
+	LegacyRoute string
+	Handler     fasthttp.RequestHandler
 }
 
 type Request struct {

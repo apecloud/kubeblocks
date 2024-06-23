@@ -130,8 +130,8 @@ func (s *server) getRouter(endpoints []Endpoint) *fasthttprouter.Router {
 		path := fmt.Sprintf("/%s/%s", e.Version, e.Route)
 		router.Handle(e.Method, path, e.Handler)
 
-		if e.Duplicate != "" {
-			path := fmt.Sprintf("/%s/%s", e.Version, e.Duplicate)
+		if e.LegacyRoute != "" {
+			path := fmt.Sprintf("/%s/%s", e.Version, e.LegacyRoute)
 			router.Handle(e.Method, path, e.Handler)
 		}
 	}

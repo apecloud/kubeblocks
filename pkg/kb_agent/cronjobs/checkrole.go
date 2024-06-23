@@ -35,10 +35,11 @@ type CheckRoleJob struct {
 }
 
 var sendRoleEventPeriodically bool
-var sendRoleEventFrequency int = 300
+var sendRoleEventFrequency int
 
 func init() {
 	pflag.BoolVar(&sendRoleEventPeriodically, "send-role-event-periodically", false, "Enable the mechanism to send role events periodically to prevent event loss.")
+	pflag.IntVar(&sendRoleEventFrequency, "send-role-event-frequency", 300, "the frequency of sending role events.")
 }
 
 func NewCheckRoleJob(commonJob CommonJob) *CheckRoleJob {
@@ -82,7 +83,10 @@ func (job *CheckRoleJob) do() error {
 		},
 		Role: role,
 	}
-	job.lastRole = role
 	err = util.SentEventForProbe(context.Background(), result)
-	return err
+	if err != nil {
+		return err
+	}
+	job.lastRole = role
+	return nil
 }

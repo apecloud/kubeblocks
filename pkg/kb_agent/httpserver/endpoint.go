@@ -32,9 +32,10 @@ type Endpoint struct {
 	// If the API is upgraded to v2.0, the v1.0 API will be maintained
 	// for compatibility until all legacy accesses are removed.
 	Version string
+
 	// LegacyRoute is used When the API is upgraded, some old APIs may
 	// need to update their path routes. To ensure compatibility,
-	// the old paths can be setted as legacyRoute.
+	// the old paths can be set as legacyRoute.
 	LegacyRoute string
 	Handler     fasthttp.RequestHandler
 }

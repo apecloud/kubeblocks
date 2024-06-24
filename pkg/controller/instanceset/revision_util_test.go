@@ -962,7 +962,7 @@ var _ = Describe("revision util test", func() {
 			Expect(err).Should(Succeed())
 			cr, err := NewRevision(its)
 			Expect(err).Should(Succeed())
-			Expect(cr.Name).Should(Equal("redis-test-redis-694cf8dbf8"))
+			Expect(cr.Name).Should(Equal("redis-test-redis-59996f5569"))
 		})
 	})
 

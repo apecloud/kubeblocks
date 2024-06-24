@@ -41,7 +41,8 @@ var logger = ctrl.Log.WithName("HTTPServer")
 
 func init() {
 	pflag.IntVar(&config.Port, "port", KBAgentDefaultPort, "The HTTP Server listen port for kb-agent service.")
-	pflag.IntVar(&config.ConCurrency, "currency", 0, "The maximum number of concurrent connections the Server may serve, use the default value (256*1024) if not set.")
+	pflag.IntVar(&config.ConCurrency, "currency", 1024, "The maximum number of concurrent connections the Server may serve, use 1024 if <=0.")
 	pflag.StringVar(&config.Address, "address", "0.0.0.0", "The HTTP Server listen address for kb-agent service.")
+	pflag.StringVar(&config.UnixDomainSocket, "unix-socket", "./", "The path of the Unix Domain Socket for kb-agent service.")
 	pflag.BoolVar(&config.APILogging, "api-logging", true, "Enable api logging for kb-agent request.")
 }

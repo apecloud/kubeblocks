@@ -246,7 +246,9 @@ func (r *OpsRequestReconciler) reconcileStatusDuringRunningOrCanceling(reqCtx in
 	opsRequest := opsRes.OpsRequest
 	// wait for OpsRequest.status.phase to Succeed
 	if requeueAfter, err := operations.GetOpsManager().Reconcile(reqCtx, r.Client, opsRes); err != nil {
-		r.Recorder.Eventf(opsRequest, corev1.EventTypeWarning, reasonOpsReconcileStatusFailed, "Failed to reconcile the status of OpsRequest: %s", err.Error())
+		if !apierrors.IsConflict(err) {
+			r.Recorder.Eventf(opsRequest, corev1.EventTypeWarning, reasonOpsReconcileStatusFailed, "Failed to reconcile the status of OpsRequest: %s", err.Error())
+		}
 		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 	} else if requeueAfter != 0 {
 		// if the reconcileAction need requeue, do it
@@ -300,7 +302,9 @@ func (r *OpsRequestReconciler) doOpsRequestAction(reqCtx intctrlutil.RequestCtx,
 	opsDeepCopy := opsRequest.DeepCopy()
 	res, err := operations.GetOpsManager().Do(reqCtx, r.Client, opsRes)
 	if err != nil {
-		r.Recorder.Eventf(opsRequest, corev1.EventTypeWarning, reasonOpsDoActionFailed, "Failed to process the operation of OpsRequest: %s", err.Error())
+		if !apierrors.IsConflict(err) {
+			r.Recorder.Eventf(opsRequest, corev1.EventTypeWarning, reasonOpsDoActionFailed, "Failed to process the operation of OpsRequest: %s", err.Error())
+		}
 		if !reflect.DeepEqual(opsRequest.Status, opsDeepCopy.Status) {
 			if patchErr := r.Client.Status().Patch(reqCtx.Ctx, opsRequest, client.MergeFrom(opsDeepCopy)); patchErr != nil {
 				return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))

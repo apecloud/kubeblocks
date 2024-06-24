@@ -605,6 +605,10 @@ const (
 	// Or, a NotReady reason with not ready instances encoded in the Message filed will be set.
 	InstanceReady ConditionType = "InstanceReady"
 
+	// InstanceAvailable ConditionStatus will be True if all instances(pods) are in the ready condition
+	// and continue for "MinReadySeconds" seconds. Otherwise, it will be set to False.
+	InstanceAvailable ConditionType = "InstanceAvailable"
+
 	// InstanceFailure is added in an instance set when at least one of its instances(pods) is in a `Failed` phase.
 	InstanceFailure ConditionType = "InstanceFailure"
 )
@@ -615,6 +619,12 @@ const (
 
 	// ReasonReady is a reason for condition InstanceReady.
 	ReasonReady = "Ready"
+
+	// ReasonNotAvailable is a reason for condition InstanceAvailable.
+	ReasonNotAvailable = "NotAvailable"
+
+	// ReasonAvailable is a reason for condition InstanceAvailable.
+	ReasonAvailable = "Available"
 
 	// ReasonInstanceFailure is a reason for condition InstanceFailure.
 	ReasonInstanceFailure = "InstanceFailure"

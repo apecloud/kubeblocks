@@ -24064,7 +24064,11 @@ string
 <th>Description</th>
 </tr>
 </thead>
-<tbody><tr><td><p>&#34;InstanceFailure&#34;</p></td>
+<tbody><tr><td><p>&#34;InstanceAvailable&#34;</p></td>
+<td><p>InstanceAvailable ConditionStatus will be True if all instances(pods) are in the ready condition
+and continue for &ldquo;MinReadySeconds&rdquo; seconds. Otherwise, it will be set to False.</p>
+</td>
+</tr><tr><td><p>&#34;InstanceFailure&#34;</p></td>
 <td><p>InstanceFailure is added in an instance set when at least one of its instances(pods) is in a <code>Failed</code> phase.</p>
 </td>
 </tr><tr><td><p>&#34;InstanceReady&#34;</p></td>

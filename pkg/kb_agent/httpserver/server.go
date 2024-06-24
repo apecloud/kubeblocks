@@ -88,6 +88,7 @@ func (s *server) StartNonBlocking() error {
 		// has a handle on the underlying listener.
 		customServer := &fasthttp.Server{
 			Handler:            handler,
+			Concurrency:        s.config.ConCurrency,
 			MaxRequestBodySize: s.config.MaxRequestBodySize * 1024 * 1024,
 			ReadBufferSize:     s.config.ReadBufferSize * 1024,
 		}

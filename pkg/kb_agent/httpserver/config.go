@@ -20,20 +20,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package httpserver
 
 import (
+	"fmt"
+
 	"github.com/spf13/pflag"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 const KBAgentDefaultPort = 3501
+const KBAgentDefaultConcurrency = 10
 
 type Config struct {
-	Port               int
-	Address            string
-	ConCurrency        int
-	MaxRequestBodySize int
-	UnixDomainSocket   string
-	ReadBufferSize     int
-	APILogging         bool
+	Port             int
+	Address          string
+	ConCurrency      int
+	UnixDomainSocket string
+	APILogging       bool
 }
 
 var config Config
@@ -41,7 +42,8 @@ var logger = ctrl.Log.WithName("HTTPServer")
 
 func init() {
 	pflag.IntVar(&config.Port, "port", KBAgentDefaultPort, "The HTTP Server listen port for kb-agent service.")
-	pflag.IntVar(&config.ConCurrency, "currency", 1024, "The maximum number of concurrent connections the Server may serve, use 1024 if <=0.")
+	pflag.IntVar(&config.ConCurrency, "max-concurrency", KBAgentDefaultConcurrency,
+		fmt.Sprintf("The maximum number of concurrent connections the Server may serve, use the default value %d if <=0.", KBAgentDefaultConcurrency))
 	pflag.StringVar(&config.Address, "address", "0.0.0.0", "The HTTP Server listen address for kb-agent service.")
 	pflag.StringVar(&config.UnixDomainSocket, "unix-socket", ".", "The path of the Unix Domain Socket for kb-agent service.")
 	pflag.BoolVar(&config.APILogging, "api-logging", true, "Enable api logging for kb-agent request.")

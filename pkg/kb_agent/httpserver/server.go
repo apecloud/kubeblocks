@@ -93,7 +93,7 @@ func (s *server) StartNonBlocking() error {
 		if s.config.ConCurrency > 0 {
 			customServer.Concurrency = s.config.ConCurrency
 		} else {
-			customServer.Concurrency = 1024
+			customServer.Concurrency = KBAgentDefaultConcurrency
 		}
 
 		s.servers = append(s.servers, customServer)

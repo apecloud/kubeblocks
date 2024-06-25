@@ -154,7 +154,7 @@ func doSwitchoverComponents(reqCtx intctrlutil.RequestCtx, cli client.Client, op
 				ProgressDetails: []appsv1alpha1.ProgressStatusDetail{},
 			}
 		}
-		if err := createSwitchoverJob(reqCtx, cli, opsRes.Cluster, synthesizedComp, &switchover); err != nil {
+		if err := createSwitchoverJob(reqCtx, cli, opsRes.Cluster, opsRes.OpsRequest, synthesizedComp, &switchover); err != nil {
 			return err
 		}
 	}

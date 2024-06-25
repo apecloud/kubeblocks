@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -108,6 +109,7 @@ func needDoSwitchover(ctx context.Context,
 func createSwitchoverJob(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
+	ops *appsv1alpha1.OpsRequest,
 	synthesizedComp *component.SynthesizedComponent,
 	switchover *appsv1alpha1.Switchover) error {
 	switchoverJob, err := renderSwitchoverCmdJob(reqCtx.Ctx, cli, cluster, synthesizedComp, switchover)
@@ -130,6 +132,10 @@ func createSwitchoverJob(reqCtx intctrlutil.RequestCtx,
 			if err := job.CleanJobWithLabels(reqCtx.Ctx, cli, cluster, ml); err != nil {
 				return err
 			}
+		}
+		scheme, _ := appsv1alpha1.SchemeBuilder.Build()
+		if err := controllerutil.SetOwnerReference(ops, switchoverJob, scheme); err != nil {
+			return err
 		}
 		// create the current generation switchoverJob
 		if err := cli.Create(reqCtx.Ctx, switchoverJob); err != nil {

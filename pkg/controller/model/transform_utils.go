@@ -34,11 +34,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
-	"github.com/apecloud/kubeblocks/controllers/extensions"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
-
-const trueval string = "true"
 
 func FindRootVertex(dag *graph.DAG) (*ObjectVertex, error) {
 	root := dag.Root()
@@ -178,11 +175,6 @@ func IsReconciliationPaused(object client.Object) bool {
 	}
 	if value.Kind() != reflect.Struct {
 		return false
-	}
-	if annotations := object.GetAnnotations(); annotations != nil {
-		if val, ok := annotations[extensions.ControllerPaused]; ok && val == trueval {
-			return true
-		}
 	}
 	spec := value.FieldByName("Spec")
 	if !spec.IsValid() {

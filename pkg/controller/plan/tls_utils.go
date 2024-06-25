@@ -22,10 +22,6 @@ package plan
 import (
 	"bytes"
 	"context"
-	"crypto/x509"
-	"encoding/pem"
-	"log"
-	"software.sslmate.com/src/go-pkcs12"
 	"strings"
 	"text/template"
 
@@ -71,33 +67,6 @@ func ComposeTLSSecret(namespace, clusterName, componentName string) (*v1.Secret,
 	secret.StringData[constant.CAName] = cert
 	secret.StringData[constant.CertName] = cert
 	secret.StringData[constant.KeyName] = key
-
-	// generate PKCS#12 file
-	caBlock, _ := pem.Decode([]byte(cert))
-	certBlock, _ := pem.Decode([]byte(cert))
-	keyBlock, _ := pem.Decode([]byte(key))
-
-	_ca, _ := x509.ParseCertificate(caBlock.Bytes)
-	_cert, _ := x509.ParseCertificate(certBlock.Bytes)
-	_key, _ := x509.ParsePKCS1PrivateKey(keyBlock.Bytes)
-
-	caCerts := []*x509.Certificate{_ca}
-
-	keystoreP12, err := pkcs12.LegacyRC2.Encode(_key, _cert, caCerts, "kubeblocks")
-	if err != nil {
-		log.Fatalf("Failed to create PKCS#12: %s", err)
-	}
-	//truststoreP12, err := pkcs12.LegacyRC2.Encode(nil, _cert, caCerts, "kubeblocks")
-	//if err != nil {
-	//	log.Fatalf("Failed to create PKCS#12: %s", err)
-	//}
-
-	secret.StringData[constant.KeystoreLocation] = string(keystoreP12)
-	secret.StringData[constant.KeystorePassword] = "KubeBlocks"
-	secret.StringData[constant.KeyPassword] = "KubeBlocks"
-	secret.StringData[constant.TruststoreLocation] = string(keystoreP12)
-	secret.StringData[constant.TruststorePassword] = "KubeBlocks"
-
 	return secret, nil
 }
 
@@ -146,8 +115,6 @@ func GetTLSKeyWord(cType string) string {
 		return "ssl_cert_file"
 	case "redis":
 		return "tls-cert-file"
-	case "kafka":
-		return "# SSL Keystore of an Existing Listener"
 	default:
 		return "unsupported-character-type"
 	}

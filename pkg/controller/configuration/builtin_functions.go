@@ -52,14 +52,9 @@ const (
 	builtInMysqlCalBufferFunctionName = "callBufferSizeByResource"
 
 	// TLS Built-in
-	builtInGetCAFile             = "getCAFile"
-	builtInGetCertFile           = "getCertFile"
-	builtInGetKeyFile            = "getKeyFile"
-	buildInGetKeystoreLocation   = "getKeystoreLocation"
-	buildInGetKeystorePassword   = "getKeystorePassword"
-	buildInGetKeyPassword        = "getKeyPassword"
-	buildInGetTruststoreLocation = "getTruststoreLocation"
-	buildInGetTruststorePassword = "getTruststorePassword"
+	builtInGetCAFile   = "getCAFile"
+	builtInGetCertFile = "getCertFile"
+	builtInGetKeyFile  = "getKeyFile"
 )
 
 func toJSONObject[T corev1.VolumeSource | corev1.Container | corev1.ContainerPort](obj T) (interface{}, error) {
@@ -321,31 +316,6 @@ func getKeyFile() string {
 	return constant.MountPath + "/" + constant.KeyName
 }
 
-// getKeystoreLocation gets the keystore file location
-func getKeystoreLocation() string {
-	return constant.MountPath + "/" + constant.KeystoreLocation
-}
-
-// getKeystorePassword gets the keystore password
-func getKeystorePassword() string {
-	return constant.MountPath + "/" + constant.KeystorePassword
-}
-
-// getKeyPassword gets the key password
-func getKeyPassword() string {
-	return constant.MountPath + "/" + constant.KeyPassword
-}
-
-// getTruststoreLocation gets the truststore file location
-func getTruststoreLocation() string {
-	return constant.MountPath + "/" + constant.TruststoreLocation
-}
-
-// getTruststorePassword gets the truststore password
-func getTruststorePassword() string {
-	return constant.MountPath + "/" + constant.TruststorePassword
-}
-
 // BuiltInCustomFunctions builds a map of customized functions for KubeBlocks
 func BuiltInCustomFunctions(c *configTemplateBuilder, component *component.SynthesizedComponent, localObjs []client.Object) *gotemplate.BuiltInObjectsFunc {
 	return &gotemplate.BuiltInObjectsFunc{
@@ -364,11 +334,6 @@ func BuiltInCustomFunctions(c *configTemplateBuilder, component *component.Synth
 		builtInGetCAFile:                             getCAFile,
 		builtInGetCertFile:                           getCertFile,
 		builtInGetKeyFile:                            getKeyFile,
-		buildInGetKeystoreLocation:                   getKeystoreLocation,
-		buildInGetKeystorePassword:                   getKeystorePassword,
-		buildInGetKeyPassword:                        getKeyPassword,
-		buildInGetTruststoreLocation:                 getTruststoreLocation,
-		buildInGetTruststorePassword:                 getTruststorePassword,
 	}
 
 }

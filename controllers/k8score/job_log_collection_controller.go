@@ -41,6 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
@@ -92,6 +93,10 @@ func (r *LogCollectionReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 	case dptypes.RestoreKind:
 		if err := r.patchRestoreStatus(reqCtx, job, owner.Name); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
+	case appsv1alpha1.OpsRequestKind:
+		if err := r.patchOpsRequestStatus(reqCtx, job, owner.Name); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
 	}
@@ -229,6 +234,53 @@ func (r *LogCollectionReconciler) patchRestoreStatus(reqCtx intctrlutil.RequestC
 		return nil
 	}
 	return r.Client.Status().Update(reqCtx.Ctx, restore)
+}
+
+func (r *LogCollectionReconciler) patchOpsRequestStatus(reqCtx intctrlutil.RequestCtx, job *batchv1.Job, opsName string) error {
+	ops := &appsv1alpha1.OpsRequest{}
+	err := r.Client.Get(reqCtx.Ctx, client.ObjectKey{Name: opsName, Namespace: reqCtx.Req.Namespace}, ops)
+	if err != nil {
+		return err
+	}
+	/*actions := restore.Status.Actions
+	if len(actions.PrepareData) == 0 && len(actions.PostReady) == 0 {
+		return nil
+	}
+
+	objectKey := dprestore.BuildJobKeyForActionStatus(job.Name)
+	var hasPatchedLogs bool
+	doLogsPatch := func(actions []dpv1alpha1.RestoreStatusAction) error {
+		for i := range actions {
+			if actions[i].ObjectKey != objectKey {
+				continue
+			}
+			if strings.HasPrefix(actions[i].Message, dptypes.LogCollectorOutput) {
+				hasPatchedLogs = true
+				return nil
+			}
+			errorLogs, err := r.collectErrorLogs(reqCtx, job)
+			if err != nil {
+				return fmt.Errorf("collect error logs failed: %s", err.Error())
+			}
+			if errorLogs == "" {
+				return nil
+			}
+			actions[i].Message = fmt.Sprintf("%s: %s", dptypes.LogCollectorOutput, errorLogs)
+			break
+		}
+		return nil
+	}
+	if err = doLogsPatch(actions.PrepareData); err != nil {
+		return err
+	}
+	if err = doLogsPatch(actions.PostReady); err != nil {
+		return err
+	}
+	if hasPatchedLogs {
+		return nil
+	}
+	return r.Client.Status().Update(reqCtx.Ctx, restore)*/
+	return nil
 }
 
 type failedJobUpdatePredicate struct {

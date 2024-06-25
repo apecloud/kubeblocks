@@ -29,19 +29,25 @@ helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-nam
 ## Examples
 
 ### [Create](cluster.yaml) 
-Create a redis cluster with specified cluster definition 
+Create a redis replication cluster (with an official Redis Sentinel HA) with specified cluster definition 
 ```bash
 kubectl apply -f examples/redis/cluster.yaml
 ```
 Starting from kubeblocks 0.9.0, we introduced a more flexible cluster creation method based on components, allowing customization of cluster topology, functionalities and scale according to specific requirements.
 
-Create a redis cluster with ComponentSpecs 
+Create a redis replication cluster (with an official Redis Sentinel HA) with specified component definition 
 ```bash
 kubectl apply -f examples/redis/cluster-cmpd.yaml
 ```
-Create a redis cluster with ShardingSpecs
+
+Or you can create a redis replication cluster (with an official Redis Sentinel HA) with specified cluster definition topology
 ```bash
-kubectl apply -f examples/redis/cluster-shard.yaml
+kubectl apply -f examples/redis/cluster-cd-topology.yaml
+```
+
+Or you want to create a redis sharding cluster (An official distributed Redis) with specified component definition
+```bash
+kubectl apply -f examples/redis/cluster-sharding.yaml
 ```
 
 ### [Horizontal scaling](horizontalscale.yaml)

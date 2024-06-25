@@ -53,7 +53,7 @@ spec:
     # Specifies the name of the Component. This name is also part of the Service DNS name and must comply with the IANA service naming rule. 
   - name: pulsar-broker
     componentDef: pulsar-broker
-    monitorEnabled: false
+    disableExporter: true
     serviceAccountName: kb-pulsar-cluster
     replicas: 1
     resources:

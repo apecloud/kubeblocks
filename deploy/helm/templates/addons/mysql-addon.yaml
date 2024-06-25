@@ -7,4 +7,4 @@
   "model" "RDBMS"
   "provider" "community"
   "description" "MySQL is a widely used, open-source relational database management system (RDBMS)."
-  "autoInstall" false) . ) -}}
+  "autoInstall" true) . ) -}}

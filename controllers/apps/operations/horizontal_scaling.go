@@ -24,8 +24,11 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -140,7 +143,7 @@ func getCompPodNamesBeforeScaleDownReplicas(reqCtx intctrlutil.RequestCtx,
 
 // Cancel this function defines the cancel horizontalScaling action.
 func (hs horizontalScalingOpsHandler) Cancel(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	return cancelComponentOps(reqCtx.Ctx, cli, opsRes, func(lastConfig *appsv1alpha1.LastComponentConfiguration, comp *appsv1alpha1.ClusterComponentSpec) error {
+	if err := cancelComponentOps(reqCtx.Ctx, cli, opsRes, func(lastConfig *appsv1alpha1.LastComponentConfiguration, comp *appsv1alpha1.ClusterComponentSpec) error {
 		if lastConfig.Replicas == nil {
 			return nil
 		}
@@ -154,5 +157,38 @@ func (hs horizontalScalingOpsHandler) Cancel(reqCtx intctrlutil.RequestCtx, cli 
 		lastConfig.TargetResources[appsv1alpha1.PodsCompResourceKey] = podNames
 		comp.Replicas = *lastConfig.Replicas
 		return nil
-	})
+	}); err != nil {
+		return err
+	}
+	// delete the running restore resource to release PVC of the pod which will be deleted after cancelling the ops.
+	restoreList := &dpv1alpha1.RestoreList{}
+	if err := cli.List(reqCtx.Ctx, restoreList, client.InNamespace(opsRes.OpsRequest.Namespace),
+		client.MatchingLabels{constant.AppInstanceLabelKey: opsRes.Cluster.Name}); err != nil {
+		return err
+	}
+	compNameMap := opsRes.OpsRequest.Spec.ToHorizontalScalingListToMap()
+	for i := range restoreList.Items {
+		restore := &restoreList.Items[i]
+		if restore.Status.Phase != dpv1alpha1.RestorePhaseRunning {
+			continue
+		}
+		compName := restore.Labels[constant.KBAppComponentLabelKey]
+		if _, ok := compNameMap[compName]; !ok {
+			continue
+		}
+		workloadName := constant.GenerateClusterComponentName(opsRes.Cluster.Name, compName)
+		if restore.Spec.Backup.Name != workloadName+"-scaling" {
+			continue
+		}
+		if err := intctrlutil.BackgroundDeleteObject(cli, reqCtx.Ctx, restore); err != nil {
+			return err
+		}
+		// remove component finalizer
+		patch := client.MergeFrom(restore.DeepCopy())
+		controllerutil.RemoveFinalizer(restore, constant.DBComponentFinalizerName)
+		if err := cli.Patch(reqCtx.Ctx, restore, patch); err != nil {
+			return err
+		}
+	}
+	return nil
 }

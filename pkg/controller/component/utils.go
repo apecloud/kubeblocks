@@ -24,10 +24,12 @@ import (
 	"slices"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/apiutil"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -81,11 +83,32 @@ func isHostNetworkEnabled(ctx context.Context, cli client.Reader, synthesizedCom
 }
 
 func hasHostNetworkCapability(synthesizedComp *SynthesizedComponent, compDef *appsv1alpha1.ComponentDefinition) bool {
+	// be compatible with a kind of usage to cmpd:
+	// spec:
+	//   runtime:
+	//     hostNetwork: true
+	//     containers:
+	//       - ports:
+	//         - containerPort: 80
+	compatibleCmpdHostNetwork := func(podSpec *corev1.PodSpec) bool {
+		if podSpec.HostNetwork {
+			for _, containers := range [][]corev1.Container{podSpec.InitContainers, podSpec.Containers} {
+				for _, container := range containers {
+					for _, port := range container.Ports {
+						if apiutil.IsHostNetworkDynamicPort(port.ContainerPort) {
+							return true
+						}
+					}
+				}
+			}
+		}
+		return false
+	}
 	switch {
 	case synthesizedComp != nil:
-		return synthesizedComp.HostNetwork != nil
+		return synthesizedComp.HostNetwork != nil || compatibleCmpdHostNetwork(synthesizedComp.PodSpec)
 	case compDef != nil:
-		return compDef.Spec.HostNetwork != nil
+		return compDef.Spec.HostNetwork != nil || compatibleCmpdHostNetwork(&compDef.Spec.Runtime)
 	}
 	return false
 }

@@ -24,7 +24,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/rogpeppe/go-internal/semver"
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -34,7 +33,6 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -47,15 +45,6 @@ const (
 )
 
 func supportPodVerticalScaling() bool {
-	kubeVersion, err := utils.GetKubeVersion()
-	// if the Kubernetes version is unknown, assume pod vertical scaling is not supported.
-	if err != nil {
-		return false
-	}
-	if semver.Compare(kubeVersion, "v1.29") >= 0 {
-		return true
-	}
-
 	return utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling)
 }
 

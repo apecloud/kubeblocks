@@ -41,7 +41,7 @@ spec:
     componentDefRef: mongodb
     enabledLogs:
     - running
-    monitorEnabled: false
+    disableExporter: true
     serviceAccountName: kb-mongo-cluster
     replicas: 3
     resources:

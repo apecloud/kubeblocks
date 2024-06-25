@@ -119,7 +119,7 @@ func (mgr *Manager) CreateUser(ctx context.Context, userName, password string) e
 
 	_, err := mgr.Exec(ctx, sql)
 	if err != nil {
-		mgr.Logger.Error(err, "execute sql failed", "sql", sql)
+		mgr.Logger.Info("execute sql failed", "sql", sql, "error", err.Error())
 		return err
 	}
 

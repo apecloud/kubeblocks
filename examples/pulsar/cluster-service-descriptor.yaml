@@ -74,7 +74,7 @@ spec:
     - name: pulsarZookeeper
       namespace: default
       serviceDescriptor: pulsar-cluster-zookeeper-service
-    monitorEnabled: false
+    disableExporter: true
     serviceAccountName: kb-pulsar-cluster
     replicas: 1
     resources:
@@ -98,7 +98,7 @@ spec:
     - name: pulsarZookeeper
       namespace: default
       serviceDescriptor: pulsar-cluster-zookeeper-service
-    monitorEnabled: false
+    disableExporter: true
     replicas: 1
     resources:
       limits:
@@ -113,7 +113,7 @@ spec:
     - name: pulsarZookeeper
       namespace: default
       serviceDescriptor: pulsar-cluster-zookeeper-service
-    monitorEnabled: false
+    disableExporter: true
     replicas: 3
     resources:
       limits:
@@ -143,7 +143,7 @@ spec:
     - name: pulsarZookeeper
       namespace: default
       serviceDescriptor: pulsar-cluster-zookeeper-service
-    monitorEnabled: false
+    disableExporter: true
     replicas: 1
     resources:
       limits:
@@ -154,7 +154,7 @@ spec:
         memory: 0.5Gi
   - name: zookeeper
     componentDefRef: zookeeper
-    monitorEnabled: false
+    disableExporter: true
     replicas: 3
     resources:
       limits:

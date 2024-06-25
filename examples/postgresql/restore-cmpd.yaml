@@ -34,7 +34,7 @@ spec:
     enabledLogs:
     - running
     # Determines whether the metrics exporter needs to be published to the service endpoint.  
-    monitorEnabled: false
+    disableExporter: true
     # Each component supports running multiple replicas to provide high availability and persistence. This field can be used to specify the desired number of replicas.
     replicas: 2
     # Specifies the resources required by the Component. It allows defining the CPU, memory requirements and limits for the Component's containers.

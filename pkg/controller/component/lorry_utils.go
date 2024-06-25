@@ -164,7 +164,7 @@ func adaptLorryIfCustomHandlerDefined(synthesizeComp *SynthesizedComponent, lorr
 
 func buildBasicContainer(lorryHTTPPort int) *corev1.Container {
 	return builder.NewContainerBuilder("string").
-		SetImage("infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/google_containers/pause:3.6").
+		SetImage("apecloud-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/pause:3.6").
 		SetImagePullPolicy(corev1.PullIfNotPresent).
 		AddCommands("/pause").
 		SetStartupProbe(corev1.Probe{
@@ -326,6 +326,7 @@ func buildEnv4DBAccount(synthesizeComp *SynthesizedComponent, clusterCompSpec *a
 	)
 
 	for index, sysAccount := range synthesizeComp.SystemAccounts {
+		// use first init account
 		if sysAccount.InitAccount {
 			sysInitAccount = &synthesizeComp.SystemAccounts[index]
 			break

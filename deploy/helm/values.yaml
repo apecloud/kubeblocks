@@ -12,7 +12,7 @@ versionOverride:
 ## @param image.imagePullSecrets KubeBlocks image pull secrets
 ## @param image.tools.repository KubeBlocks tools image repository
 image:
-  registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
+  registry: apecloud-registry.cn-zhangjiakou.cr.aliyuncs.com
   repository: apecloud/kubeblocks
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.

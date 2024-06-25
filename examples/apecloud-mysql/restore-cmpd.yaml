@@ -36,7 +36,7 @@ spec:
     - general
     - slow
     # Determines whether the metrics exporter needs to be published to the service endpoint.  
-    monitorEnabled: false
+    disableExporter: true
     # Specifies the name of the ServiceAccount required by the running Component.
     serviceAccountName: kb-acmysql-cluster
     # Each component supports running multiple replicas to provide high availability and persistence. This field can be used to specify the desired number of replicas.

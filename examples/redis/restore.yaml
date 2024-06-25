@@ -39,7 +39,7 @@ spec:
   componentSpecs:
   - name: redis
     componentDefRef: redis
-    monitorEnabled: false
+    disableExporter: true
     enabledLogs:
     - running
     serviceAccountName: kb-redis-cluster

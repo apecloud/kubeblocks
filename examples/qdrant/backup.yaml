@@ -6,7 +6,6 @@ metadata:
 spec:
   # Specifies the backup method name that is defined in the backup policy.
   # - datafile
-  # - volume-snapshot
   backupMethod: datafile
   # Specifies the backup policy to be applied for this backup.
   backupPolicyName: qdrant-cluster-qdrant-backup-policy

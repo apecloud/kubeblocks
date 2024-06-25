@@ -21,7 +21,6 @@ package wesql
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/pkg/errors"
 
@@ -34,7 +33,7 @@ func (mgr *Manager) GetReplicaRole(ctx context.Context, _ *dcs.Cluster) (string,
 
 	rows, err := mgr.DB.QueryContext(ctx, sql)
 	if err != nil {
-		mgr.Logger.Error(err, fmt.Sprintf("error executing %s", sql))
+		mgr.Logger.Info("error executing query", "sql", sql, "error", err.Error())
 		return "", errors.Wrapf(err, "error executing %s", sql)
 	}
 
@@ -49,7 +48,7 @@ func (mgr *Manager) GetReplicaRole(ctx context.Context, _ *dcs.Cluster) (string,
 	var isReady bool
 	for rows.Next() {
 		if err = rows.Scan(&curLeader, &role, &serverID); err != nil {
-			mgr.Logger.Error(err, "Role query error")
+			mgr.Logger.Info("Role query failed", "error", err.Error())
 			return role, err
 		}
 		isReady = true
@@ -68,7 +67,7 @@ func (mgr *Manager) GetClusterLocalInfo() (mysql.RowMap, error) {
 		return nil
 	})
 	if err != nil {
-		mgr.Logger.Error(err, fmt.Sprintf("error executing %s", sql))
+		mgr.Logger.Info("error executing query", "sql", sql, "error", err.Error())
 		return nil, err
 	}
 	return result, nil

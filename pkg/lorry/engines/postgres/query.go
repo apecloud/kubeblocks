@@ -126,7 +126,7 @@ func (mgr *Manager) ExecWithHost(ctx context.Context, sql string, host string) (
 		res, err = mgr.ExecOthers(ctx, sql, host)
 	}
 	if err != nil {
-		return 0, errors.Errorf("exec sql:%s failed: %v", sql, err)
+		return 0, errors.Wrapf(err, "sql:%s", sql)
 	}
 
 	result = res.RowsAffected()

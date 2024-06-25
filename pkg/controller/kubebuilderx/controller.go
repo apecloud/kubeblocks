@@ -30,7 +30,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // TODO(free6om): this is a new reconciler framework in the very early stage leaving the following tasks to do:
@@ -100,22 +100,23 @@ func (c *controller) Do(reconcilers ...Reconciler) Controller {
 func (c *controller) Commit() error {
 	defer c.emitFailureEvent()
 
-	if c.err != nil {
+	if c.err != nil && !intctrlutil.IsDelayedRequeueError(c.err) {
 		return c.err
 	}
 	if c.oldTree.GetRoot() == nil {
 		return nil
 	}
 	builder := NewPlanBuilder(c.ctx, c.cli, c.oldTree, c.tree, c.recorder, c.logger)
-	if c.err = builder.Init(); c.err != nil {
-		return c.err
+	if err := builder.Init(); err != nil {
+		return err
 	}
-	var plan graph.Plan
-	plan, c.err = builder.Build()
-	if c.err != nil {
-		return c.err
+	plan, err := builder.Build()
+	if err != nil {
+		return err
 	}
-	c.err = plan.Execute()
+	if err = plan.Execute(); err != nil {
+		return err
+	}
 	return c.err
 }
 

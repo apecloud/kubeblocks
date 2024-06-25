@@ -43,12 +43,15 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var (
 	varReferenceRegExp = regexp.MustCompile(`\$\(([^)]+)\)`)
 	varTemplate        = template.New("vars").Option("missingkey=error").Funcs(sprig.TxtFuncMap())
 )
+
+const builtinClusterDomain = "ClusterDomain"
 
 func VarReferenceRegExp() *regexp.Regexp {
 	return varReferenceRegExp
@@ -388,6 +391,7 @@ func evaluateObjectVarsExpression(definedVars []appsv1alpha1.EnvVar, credentialV
 		return strings.ReplaceAll(name, "-", "_")
 	}
 	for _, v := range [][]corev1.EnvVar{*vars, credentialVars} {
+		values[builtinClusterDomain] = viper.GetString(constant.KubernetesClusterDomainEnv)
 		for _, vv := range v {
 			if vv.ValueFrom == nil {
 				isValues[vv.Name] = true
@@ -1170,9 +1174,12 @@ func resolveComponentPodFQDNsRef(ctx context.Context, cli client.Reader, synthes
 		for i := range comp.Spec.Instances {
 			templates = append(templates, &comp.Spec.Instances[i])
 		}
+		clusterDomainFn := func(name string) string {
+			return fmt.Sprintf("%s.%s", name, viper.GetString(constant.KubernetesClusterDomainEnv))
+		}
 		names := instanceset.GenerateAllInstanceNames(comp.Name, comp.Spec.Replicas, templates, comp.Spec.OfflineInstances)
 		fqdn := func(name string) string {
-			return fmt.Sprintf("%s.%s-headless.%s.svc", name, comp.Name, synthesizedComp.Namespace)
+			return clusterDomainFn(fmt.Sprintf("%s.%s-headless.%s.svc", name, comp.Name, synthesizedComp.Namespace))
 		}
 		for i := range names {
 			names[i] = fqdn(names[i])

@@ -659,12 +659,25 @@ var _ = Describe("OpsRequest Controller", func() {
 			podName := fmt.Sprintf("%s-%s-%d", clusterObj.Name, mysqlCompName, 3)
 			pod := testapps.MockInstanceSetPod(&testCtx, nil, clusterObj.Name, mysqlCompName, podName, "follower", "Readonly")
 
+			By("mock a running restore")
+			workloadName := constant.GenerateWorkloadNamePattern(clusterKey.Name, mysqlCompName)
+			restore := testdp.NewRestoreFactory(testCtx.DefaultNamespace, testdp.RestoreName).
+				AddFinalizers([]string{constant.DBComponentFinalizerName}).
+				SetLabels(map[string]string{
+					constant.AppInstanceLabelKey:    clusterKey.Name,
+					constant.KBAppComponentLabelKey: mysqlCompName,
+				}).
+				SetBackup(constant.GenerateResourceNameWithScalingSuffix(workloadName), testCtx.DefaultNamespace).Create(&testCtx).GetObject()
+			Expect(testapps.ChangeObjStatus(&testCtx, restore, func() {
+				restore.Status.Phase = dpv1alpha1.RestorePhaseRunning
+			})).Should(Succeed())
+
 			By("cancel the opsRequest")
 			Eventually(testapps.ChangeObj(&testCtx, ops, func(opsRequest *appsv1alpha1.OpsRequest) {
 				opsRequest.Spec.Cancel = true
 			})).Should(Succeed())
 
-			By("check opsRequest is Cancelling")
+			By("check opsRequest is Cancelling and Running restore should be deleted")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(ops), func(g Gomega, opsRequest *appsv1alpha1.OpsRequest) {
 				g.Expect(opsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsCancellingPhase))
 				g.Expect(opsRequest.Status.CancelTimestamp.IsZero()).Should(BeFalse())
@@ -672,6 +685,7 @@ var _ = Describe("OpsRequest Controller", func() {
 				g.Expect(cancelCondition).ShouldNot(BeNil())
 				g.Expect(cancelCondition.Reason).Should(Equal(appsv1alpha1.ReasonOpsCanceling))
 			})).Should(Succeed())
+			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(restore), &dpv1alpha1.Restore{}, false)).Should(Succeed())
 
 			By("delete the created pod")
 			pod.Kind = constant.PodKind
@@ -721,6 +735,12 @@ var _ = Describe("OpsRequest Controller", func() {
 
 			By("create second restart ops")
 			ops2 := createRestartOps(clusterObj.Name, 2)
+			Eventually(testapps.ChangeObj(&testCtx, ops2, func(request *appsv1alpha1.OpsRequest) {
+				if request.Annotations == nil {
+					request.Annotations = map[string]string{}
+				}
+				request.Annotations[constant.OpsDependentOnSuccessfulOpsAnnoKey] = ops1.Name
+			})).Should(Succeed())
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops2))).Should(Equal(appsv1alpha1.OpsPendingPhase))
 
 			By("create third restart ops")
@@ -740,6 +760,9 @@ var _ = Describe("OpsRequest Controller", func() {
 			By("mock ops1 phase to Succeed")
 			mockCompRunning(replicas, true)
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).Should(Equal(appsv1alpha1.OpsSucceedPhase))
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(ops2), func(g Gomega, opsRequest *appsv1alpha1.OpsRequest) {
+				g.Expect(opsRequest.Annotations[constant.ReconcileAnnotationKey]).ShouldNot(BeEmpty())
+			})).Should(Succeed())
 
 			By("expect for next ops is Running")
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops2))).Should(Equal(appsv1alpha1.OpsRunningPhase))

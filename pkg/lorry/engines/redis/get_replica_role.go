@@ -41,7 +41,7 @@ func (mgr *Manager) GetReplicaRole(ctx context.Context, _ *dcs.Cluster) (string,
 		var role string
 		result, err := mgr.client.Info(ctx, "Replication").Result()
 		if err != nil {
-			mgr.Logger.Error(err, "Role query error")
+			mgr.Logger.Info("Role query failed", "error", err.Error())
 			return role, err
 		} else {
 			// split the result into lines

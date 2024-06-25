@@ -22,6 +22,7 @@ package testutil
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -66,6 +67,28 @@ func MockPodIsTerminating(ctx context.Context, testCtx testutil.TestContext, pod
 			client.ObjectKey{Name: pod.Name, Namespace: testCtx.DefaultNamespace}, tmpPod)
 		g.Expect(!tmpPod.DeletionTimestamp.IsZero()).Should(gomega.BeTrue())
 	}).Should(gomega.Succeed())
+}
+
+func MockPodIsFailed(ctx context.Context, testCtx testutil.TestContext, pod *corev1.Pod) {
+	patch := client.MergeFrom(pod.DeepCopy())
+	pod.Status.Conditions = []corev1.PodCondition{
+		{
+			Type:               corev1.ContainersReady,
+			Status:             corev1.ConditionFalse,
+			LastTransitionTime: metav1.Time{Time: time.Now().Add(-20 * time.Second)},
+		},
+	}
+	pod.Status.ContainerStatuses = []corev1.ContainerStatus{
+		{
+			Name: pod.Spec.Containers[0].Name,
+			State: corev1.ContainerState{
+				Terminated: &corev1.ContainerStateTerminated{
+					ExitCode: 1,
+				},
+			},
+		},
+	}
+	gomega.Expect(testCtx.Cli.Status().Patch(ctx, pod, patch)).Should(gomega.Succeed())
 }
 
 // RemovePodFinalizer removes the pod finalizer to delete the pod finally.

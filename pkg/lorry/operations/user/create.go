@@ -75,16 +75,22 @@ func (s *CreateUser) Do(ctx context.Context, req *operations.OpsRequest) (*opera
 	userInfo, _ := UserInfoParser(req)
 	resp := operations.NewOpsResponse(util.CreateUserOp)
 
-	err := s.dbManager.CreateUser(ctx, userInfo.UserName, userInfo.Password)
+	user, err := s.dbManager.DescribeUser(ctx, userInfo.UserName)
+	if err == nil && user != nil {
+		return resp.WithSuccess("account already exists")
+	}
+
+	err = s.dbManager.CreateUser(ctx, userInfo.UserName, userInfo.Password)
 	if err != nil {
-		s.logger.Info("executing CreateUser error", "error", err)
+		err = errors.Cause(err)
+		s.logger.Info("executing CreateUser error", "error", err.Error())
 		return resp, err
 	}
 
 	if userInfo.RoleName != "" {
 		err := s.dbManager.GrantUserRole(ctx, userInfo.UserName, userInfo.RoleName)
 		if err != nil {
-			s.logger.Info("executing grantRole error", "error", err)
+			s.logger.Info("executing grantRole error", "error", err.Error())
 			return resp, err
 		}
 	}

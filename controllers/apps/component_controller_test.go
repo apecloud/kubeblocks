@@ -2122,7 +2122,7 @@ var _ = Describe("Component Controller", func() {
 		})
 	})
 
-	Context("when creating cluster with multiple kinds of components", func() {
+	Context("scale-out with different backup methods", func() {
 		BeforeEach(func() {
 			cleanEnv()
 			createAllWorkloadTypesClusterDef()

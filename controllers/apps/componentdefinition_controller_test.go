@@ -287,7 +287,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 				SetLifecycleAction("AccountProvision", defaultActionHandler).
 				Create(&testCtx).GetObject()
 
-			checkObjectStatus(componentDefObj, appsv1alpha1.UnavailablePhase)
+			checkObjectStatus(componentDefObj, appsv1alpha1.AvailablePhase)
 		})
 
 		It("multiple accounts should be ok", func() {

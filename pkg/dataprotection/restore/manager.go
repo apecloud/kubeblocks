@@ -329,7 +329,7 @@ func (r *RestoreManager) RestorePVCFromSnapshot(reqCtx intctrlutil.RequestCtx, c
 				return err
 			}
 			if target.PodSelector.Strategy == dpv1alpha1.PodSelectionStrategyAny || sourceTargetPodName != "" {
-				snapshotGroup := GetVolumeSnapshotsBySourcePod(backupSet.Backup, sourceTargetPodName)
+				snapshotGroup := GetVolumeSnapshotsBySourcePod(backupSet.Backup, target, sourceTargetPodName)
 				if snapshotGroup == nil {
 					message := fmt.Sprintf(`can not found the volumeSnapshot in status.actions, sourceTargetPod is "%s"`, sourceTargetPodName)
 					return intctrlutil.NewFatalError(message)

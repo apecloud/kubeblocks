@@ -30,7 +30,7 @@ func (mgr *Manager) GetReplcaRole(ctx context.Context) (string, error) {
 
 	rows, err := mgr.DB.QueryContext(ctx, sql)
 	if err != nil {
-		mgr.Logger.Error(err, "error executing sql", "sql", sql)
+		mgr.Logger.Info("error executing sql", "sql", sql, "error", err.Error())
 		return "", errors.Wrapf(err, "error executing %s", sql)
 	}
 
@@ -43,7 +43,7 @@ func (mgr *Manager) GetReplcaRole(ctx context.Context) (string, error) {
 	var isReady bool
 	for rows.Next() {
 		if err = rows.Scan(&role); err != nil {
-			mgr.Logger.Error(err, "Role query error")
+			mgr.Logger.Info("Role query failed", "error", err.Error())
 			return role, err
 		}
 		isReady = true

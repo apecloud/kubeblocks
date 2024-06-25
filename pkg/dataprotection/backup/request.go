@@ -234,6 +234,7 @@ func (r *Request) buildCreateVolumeSnapshotAction(targetPod *corev1.Pod, name st
 		Name:          name,
 		Index:         index,
 		TargetPodName: targetPod.Name,
+		TargetName:    r.Target.Name,
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: r.Backup.Namespace,
 			Name:      r.Backup.Name,

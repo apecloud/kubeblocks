@@ -831,6 +831,44 @@ identified using Cluster, Component and Service names.</li>
 </tr>
 <tr>
 <td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies Labels to override or add for underlying Pods.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>annotations</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies Annotations to override or add for underlying Pods.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>env</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>List of environment variables to add.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>resources</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcerequirements-v1-core">
@@ -859,6 +897,20 @@ It allows defining the CPU, memory requirements and limits for the Component&rsq
 Each template specifies the desired characteristics of a persistent volume, such as storage class,
 size, and access modes.
 These templates are used to dynamically provision persistent volumes for the Component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumes</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volume-v1-core">
+[]Kubernetes core/v1.Volume
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>List of volumes to override.</p>
 </td>
 </tr>
 <tr>
@@ -912,6 +964,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
+<p>Specifies the configuration content of a config template.</p>
 </td>
 </tr>
 <tr>
@@ -2626,6 +2679,20 @@ int32
 <em>(Optional)</em>
 <p>Specifies the duration in seconds that an OpsRequest will remain in the system after successfully completing
 (when <code>opsRequest.status.phase</code> is &ldquo;Succeed&rdquo;) before automatic deletion.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>preConditionDeadlineSeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the maximum time in seconds that the OpsRequest will wait for its pre-conditions to be met
+before it aborts the operation.
+If set to 0 (default), pre-conditions must be satisfied immediately for the OpsRequest to proceed.</p>
 </td>
 </tr>
 <tr>
@@ -4761,6 +4828,45 @@ you can enable the collection of these logs by including their names in the <cod
 </tr>
 <tr>
 <td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies Labels to override or add for underlying Pods.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>annotations</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies Annotations to override or add for underlying Pods.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>env</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>List of environment variables to add.
+These environment variables will be placed after the environment variables declared in the Pod.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>replicas</code><br/>
 <em>
 int32
@@ -4856,6 +4962,20 @@ These templates are used to dynamically provision persistent volumes for the Com
 </tr>
 <tr>
 <td>
+<code>volumes</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volume-v1-core">
+[]Kubernetes core/v1.Volume
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>List of volumes to override.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>services</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentService">
@@ -4893,6 +5013,7 @@ These templates are used to dynamically provision persistent volumes for the Com
 </td>
 <td>
 <em>(Optional)</em>
+<p>Specifies the configuration content of a config template.</p>
 </td>
 </tr>
 <tr>
@@ -8602,6 +8723,44 @@ identified using Cluster, Component and Service names.</li>
 </tr>
 <tr>
 <td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies Labels to override or add for underlying Pods.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>annotations</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies Annotations to override or add for underlying Pods.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>env</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>List of environment variables to add.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>resources</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcerequirements-v1-core">
@@ -8630,6 +8789,20 @@ It allows defining the CPU, memory requirements and limits for the Component&rsq
 Each template specifies the desired characteristics of a persistent volume, such as storage class,
 size, and access modes.
 These templates are used to dynamically provision persistent volumes for the Component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumes</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volume-v1-core">
+[]Kubernetes core/v1.Volume
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>List of volumes to override.</p>
 </td>
 </tr>
 <tr>
@@ -8683,6 +8856,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
+<p>Specifies the configuration content of a config template.</p>
 </td>
 </tr>
 <tr>
@@ -14205,6 +14379,20 @@ int32
 </tr>
 <tr>
 <td>
+<code>preConditionDeadlineSeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the maximum time in seconds that the OpsRequest will wait for its pre-conditions to be met
+before it aborts the operation.
+If set to 0 (default), pre-conditions must be satisfied immediately for the OpsRequest to proceed.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>SpecificOpsRequest</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">
@@ -19343,20 +19531,6 @@ Reconfigure
 </tr>
 <tr>
 <td>
-<code>preConditionDeadlineSeconds</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the maximum time in seconds that the OpsRequest will wait for its pre-conditions to be met
-before it aborts the operation.
-If set to 0 (default), pre-conditions must be satisfied immediately for the OpsRequest to proceed.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>scriptSpec</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ScriptSpec">
@@ -19837,8 +20011,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Indicates if this account is the unique system initialization account (e.g., MySQL root).
-Only one system initialization account is permitted.</p>
+<p>Indicates if this account is a system initialization account (e.g., MySQL root).</p>
 <p>This field is immutable once set.</p>
 </td>
 </tr>
@@ -23111,7 +23284,11 @@ string
 <th>Description</th>
 </tr>
 </thead>
-<tbody><tr><td><p>&#34;InstanceFailure&#34;</p></td>
+<tbody><tr><td><p>&#34;InstanceAvailable&#34;</p></td>
+<td><p>InstanceAvailable ConditionStatus will be True if all instances(pods) are in the ready condition
+and continue for &ldquo;MinReadySeconds&rdquo; seconds. Otherwise, it will be set to False.</p>
+</td>
+</tr><tr><td><p>&#34;InstanceFailure&#34;</p></td>
 <td><p>InstanceFailure is added in an instance set when at least one of its instances(pods) is in a <code>Failed</code> phase.</p>
 </td>
 </tr><tr><td><p>&#34;InstanceReady&#34;</p></td>

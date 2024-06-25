@@ -31,7 +31,7 @@ spec:
       value: 'true'
       effect: NoSchedule
     # Determines whether the metrics exporter needs to be published to the service endpoint.  
-    monitorEnabled: false
+    disableExporter: true
     # Specifies which types of logs should be collected for the Cluster. 
     enabledLogs:
     - running

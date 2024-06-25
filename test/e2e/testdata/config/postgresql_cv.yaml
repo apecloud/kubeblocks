@@ -9,15 +9,15 @@ spec:
       versionsContext:
         containers:
           - name: postgresql
-            image: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/spilo:14.7.2
+            image: apecloud-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/spilo:14.7.2
           - name: pgbouncer
-            image: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/pgbouncer:1.19.0
+            image: apecloud-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/pgbouncer:1.19.0
         initContainers:
-          - image: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/spilo:14.7.2
+          - image: apecloud-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/spilo:14.7.2
             name: pg-init-container
       systemAccountSpec:
         cmdExecutorConfig:
-          image: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/spilo:14.7.2
+          image: apecloud-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/spilo:14.7.2
       switchoverSpec:
         cmdExecutorConfig:
-          image: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/spilo:14.7.2
+          image: apecloud-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/spilo:14.7.2

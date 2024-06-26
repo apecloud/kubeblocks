@@ -23,10 +23,10 @@ import (
 	"context"
 	"fmt"
 
-	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -49,11 +49,11 @@ type dataClone interface {
 	ClearTmpResources() ([]client.Object, error)
 
 	CheckBackupStatus() (backupStatus, error)
-	CheckRestoreStatus(startingIndex int32) (dpv1alpha1.RestorePhase, error)
+	CheckRestoreStatus(templateName string, startingIndex int32) (dpv1alpha1.RestorePhase, error)
 
 	backup() ([]client.Object, error)
 
-	restore(startingIndex int32) ([]client.Object, error)
+	restore(templateName string, startingIndex int32) ([]client.Object, error)
 }
 
 type backupStatus string
@@ -77,26 +77,30 @@ func newDataClone(reqCtx intctrlutil.RequestCtx,
 	if component.HorizontalScalePolicy == nil {
 		return &dummyDataClone{
 			baseDataClone{
-				reqCtx:    reqCtx,
-				cli:       cli,
-				cluster:   cluster,
-				component: component,
-				itsObj:    itsObj,
-				itsProto:  itsProto,
-				backupKey: backupKey,
+				reqCtx:            reqCtx,
+				cli:               cli,
+				cluster:           cluster,
+				component:         component,
+				itsObj:            itsObj,
+				itsProto:          itsProto,
+				backupKey:         backupKey,
+				desiredPodNames:   generatePodNames(component),
+				currentPodNameSet: sets.New(generatePodNamesByITS(itsObj)...),
 			},
 		}, nil
 	}
 	if component.HorizontalScalePolicy.Type == appsv1alpha1.HScaleDataClonePolicyCloneVolume {
 		return &backupDataClone{
 			baseDataClone{
-				reqCtx:    reqCtx,
-				cli:       cli,
-				cluster:   cluster,
-				component: component,
-				itsObj:    itsObj,
-				itsProto:  itsProto,
-				backupKey: backupKey,
+				reqCtx:            reqCtx,
+				cli:               cli,
+				cluster:           cluster,
+				component:         component,
+				itsObj:            itsObj,
+				itsProto:          itsProto,
+				backupKey:         backupKey,
+				desiredPodNames:   generatePodNames(component),
+				currentPodNameSet: sets.New(generatePodNamesByITS(itsObj)...),
 			},
 		}, nil
 	}
@@ -105,13 +109,15 @@ func newDataClone(reqCtx intctrlutil.RequestCtx,
 }
 
 type baseDataClone struct {
-	reqCtx    intctrlutil.RequestCtx
-	cli       client.Client
-	cluster   *appsv1alpha1.Cluster
-	component *component.SynthesizedComponent
-	itsObj    *workloads.InstanceSet
-	itsProto  *workloads.InstanceSet
-	backupKey types.NamespacedName
+	reqCtx            intctrlutil.RequestCtx
+	cli               client.Client
+	cluster           *appsv1alpha1.Cluster
+	component         *component.SynthesizedComponent
+	itsObj            *workloads.InstanceSet
+	itsProto          *workloads.InstanceSet
+	backupKey         types.NamespacedName
+	desiredPodNames   []string
+	currentPodNameSet sets.Set[string]
 }
 
 func (d *baseDataClone) CloneData(realDataClone dataClone) ([]client.Object, []client.Object, error) {
@@ -140,15 +146,22 @@ func (d *baseDataClone) CloneData(realDataClone dataClone) ([]client.Object, []c
 		panic(fmt.Sprintf("unexpected backup status: %s, clustre: %s, component: %s",
 			status, d.cluster.Name, d.component.Name))
 	}
-	// backup's ready, then start to check restore
-	for i := *d.itsObj.Spec.Replicas; i < d.component.Replicas; i++ {
-		restoreStatus, err := realDataClone.CheckRestoreStatus(i)
+	for _, podName := range d.desiredPodNames {
+		if _, ok := d.currentPodNameSet[podName]; ok {
+			continue
+		}
+		// backup's ready, then start to check restore
+		templateName, index, err := component.GetTemplateNameAndOrdinal(d.itsObj.Name, podName)
+		if err != nil {
+			return nil, nil, err
+		}
+		restoreStatus, err := realDataClone.CheckRestoreStatus(templateName, index)
 		if err != nil {
 			return nil, nil, err
 		}
 		switch restoreStatus {
 		case "":
-			restoreObjs, err := realDataClone.restore(i)
+			restoreObjs, err := realDataClone.restore(templateName, index)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -158,6 +171,7 @@ func (d *baseDataClone) CloneData(realDataClone dataClone) ([]client.Object, []c
 		}
 	}
 	// create PVCs that do not need to restore
+	// TODO: create pvc by the volumeClaimTemplates of instance template if it necessary.
 	pvcObjs, err := d.createPVCs(d.excludeBackupVCTs())
 	if err != nil {
 		return nil, nil, err
@@ -219,12 +233,14 @@ func (d *baseDataClone) excludeBackupVCTs() []*corev1.PersistentVolumeClaimTempl
 }
 
 func (d *baseDataClone) createPVCs(vcts []*corev1.PersistentVolumeClaimTemplate) ([]client.Object, error) {
-	currentPodNames := generatePodNamesByITS(d.itsObj)
-	desiredPodNames := generatePodNames(d.component)
 	objs := make([]client.Object, 0)
-	for _, podName := range desiredPodNames {
-		if slices.Contains(currentPodNames, podName) {
+	for _, podName := range d.desiredPodNames {
+		if _, ok := d.currentPodNameSet[podName]; ok {
 			continue
+		}
+		templateName, _, err := component.GetTemplateNameAndOrdinal(d.itsObj.Name, podName)
+		if err != nil {
+			return nil, err
 		}
 		for _, vct := range vcts {
 			pvcKey := types.NamespacedName{
@@ -236,7 +252,7 @@ func (d *baseDataClone) createPVCs(vcts []*corev1.PersistentVolumeClaimTemplate)
 			} else if exist {
 				continue
 			}
-			pvc := factory.BuildPVC(d.cluster, d.component, vct, pvcKey, "")
+			pvc := factory.BuildPVC(d.cluster, d.component, vct, pvcKey, templateName, "")
 			objs = append(objs, pvc)
 		}
 	}
@@ -278,11 +294,11 @@ func (d *dummyDataClone) backup() ([]client.Object, error) {
 	panic("runtime error: dummyDataClone.backup called")
 }
 
-func (d *dummyDataClone) CheckRestoreStatus(startingIndex int32) (dpv1alpha1.RestorePhase, error) {
+func (d *dummyDataClone) CheckRestoreStatus(templateName string, startingIndex int32) (dpv1alpha1.RestorePhase, error) {
 	return dpv1alpha1.RestorePhaseCompleted, nil
 }
 
-func (d *dummyDataClone) restore(startingIndex int32) ([]client.Object, error) {
+func (d *dummyDataClone) restore(templateName string, startingIndex int32) ([]client.Object, error) {
 	panic("runtime error: dummyDataClone.restore called")
 }
 
@@ -304,8 +320,15 @@ func (d *backupDataClone) Succeed() (bool, error) {
 	if err != nil || !allPVCsExist {
 		return allPVCsExist, err
 	}
-	for i := *d.itsObj.Spec.Replicas; i < d.component.Replicas; i++ {
-		restoreStatus, err := d.CheckRestoreStatus(i)
+	for _, podName := range d.desiredPodNames {
+		if _, ok := d.currentPodNameSet[podName]; ok {
+			continue
+		}
+		templateName, index, err := component.GetTemplateNameAndOrdinal(d.itsObj.Name, podName)
+		if err != nil {
+			return false, err
+		}
+		restoreStatus, err := d.CheckRestoreStatus(templateName, index)
 		if err != nil {
 			return false, err
 		}
@@ -387,22 +410,22 @@ func (d *backupDataClone) CheckBackupStatus() (backupStatus, error) {
 	return backupStatusProcessing, nil
 }
 
-func (d *backupDataClone) restore(startingIndex int32) ([]client.Object, error) {
+func (d *backupDataClone) restore(templateName string, startingIndex int32) ([]client.Object, error) {
 	backup := &dpv1alpha1.Backup{}
 	if err := d.cli.Get(d.reqCtx.Ctx, d.backupKey, backup); err != nil {
 		return nil, err
 	}
 	restoreMGR := plan.NewRestoreManager(d.reqCtx.Ctx, d.cli, d.cluster, nil, d.getBRLabels(), int32(1), startingIndex)
-	restore, err := restoreMGR.BuildPrepareDataRestore(d.component, backup)
+	restore, err := restoreMGR.BuildPrepareDataRestore(d.component, backup, templateName)
 	if err != nil || restore == nil {
 		return nil, err
 	}
 	return []client.Object{restore}, nil
 }
 
-func (d *backupDataClone) CheckRestoreStatus(startingIndex int32) (dpv1alpha1.RestorePhase, error) {
+func (d *backupDataClone) CheckRestoreStatus(templateName string, startingIndex int32) (dpv1alpha1.RestorePhase, error) {
 	restoreMGR := plan.NewRestoreManager(d.reqCtx.Ctx, d.cli, d.cluster, nil, d.getBRLabels(), int32(1), startingIndex)
-	restoreMeta := restoreMGR.GetRestoreObjectMeta(d.component, dpv1alpha1.PrepareData)
+	restoreMeta := restoreMGR.GetRestoreObjectMeta(d.component, dpv1alpha1.PrepareData, templateName)
 	restore := &dpv1alpha1.Restore{}
 	if err := d.cli.Get(d.reqCtx.Ctx, types.NamespacedName{Namespace: d.cluster.Namespace, Name: restoreMeta.Name}, restore); err != nil {
 		return "", client.IgnoreNotFound(err)

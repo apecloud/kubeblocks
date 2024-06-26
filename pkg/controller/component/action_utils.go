@@ -197,8 +197,9 @@ func renderActionCmdJob(ctx context.Context, cli client.Reader, actionCtx *Actio
 						Name:      jobName,
 					},
 					Spec: corev1.PodSpec{
-						Volumes:       volumes,
-						RestartPolicy: corev1.RestartPolicyNever,
+						Volumes:            volumes,
+						RestartPolicy:      corev1.RestartPolicyNever,
+						ServiceAccountName: tplPod.Spec.ServiceAccountName,
 						Containers: []corev1.Container{
 							{
 								Name:            kbLifecycleActionJobContainerName,

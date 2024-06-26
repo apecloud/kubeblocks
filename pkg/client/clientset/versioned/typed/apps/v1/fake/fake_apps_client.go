@@ -40,6 +40,10 @@ func (c *FakeAppsV1) ComponentVersions() v1.ComponentVersionInterface {
 	return &FakeComponentVersions{c}
 }
 
+func (c *FakeAppsV1) ServiceDescriptors(namespace string) v1.ServiceDescriptorInterface {
+	return &FakeServiceDescriptors{c, namespace}
+}
+
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeAppsV1) RESTClient() rest.Interface {

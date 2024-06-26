@@ -47,4 +47,3 @@ bash ${CODE_GENERATOR_PATH}/generate-groups.sh \
 rm -rf "${SCRIPT_ROOT}/pkg/client"
 mv "${OUTPUT_BASE}/${OUTPUT_PACKAGE}" "${SCRIPT_ROOT}/pkg/client"
 rm -rf "${OUTPUT_BASE}/github.com"
-

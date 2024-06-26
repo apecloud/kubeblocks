@@ -76,19 +76,23 @@ type ComponentVersionSpec struct {
 // ComponentVersionStatus defines the observed state of ComponentVersion
 type ComponentVersionStatus struct {
 	// ObservedGeneration is the most recent generation observed for this ComponentVersion.
+	//
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	// Phase valid values are ``, `Available`, 'Unavailable`.
 	// Available is ComponentVersion become available, and can be used for co-related objects.
+	//
 	// +optional
 	Phase Phase `json:"phase,omitempty"`
 
 	// Extra message for current phase.
+	//
 	// +optional
 	Message string `json:"message,omitempty"`
 
 	// ServiceVersions represent the supported service versions of this ComponentVersion.
+	//
 	// +optional
 	ServiceVersions string `json:"serviceVersions,omitempty"`
 }

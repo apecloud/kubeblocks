@@ -31,6 +31,7 @@ type AppsV1Interface interface {
 	ClusterDefinitionsGetter
 	ComponentDefinitionsGetter
 	ComponentVersionsGetter
+	ServiceDescriptorsGetter
 }
 
 // AppsV1Client is used to interact with features provided by the apps.kubeblocks.io group.
@@ -48,6 +49,10 @@ func (c *AppsV1Client) ComponentDefinitions() ComponentDefinitionInterface {
 
 func (c *AppsV1Client) ComponentVersions() ComponentVersionInterface {
 	return newComponentVersions(c)
+}
+
+func (c *AppsV1Client) ServiceDescriptors(namespace string) ServiceDescriptorInterface {
+	return newServiceDescriptors(c, namespace)
 }
 
 // NewForConfig creates a new AppsV1Client for the given config.

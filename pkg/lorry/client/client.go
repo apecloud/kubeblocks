@@ -135,7 +135,7 @@ func (cli *lorryClient) DescribeUser(ctx context.Context, userName string) (map[
 		return nil, err
 	}
 	user, ok := resp["user"]
-	if !ok {
+	if !ok || user == nil {
 		return nil, nil
 	}
 

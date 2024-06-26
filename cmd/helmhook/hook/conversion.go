@@ -62,7 +62,7 @@ func (p *Conversion) Handle(ctx *UpgradeContext) (err error) {
 }
 
 func matchVersion(meta ConversionMeta, oldVersion Version, newVersion Version) bool {
-	if meta.ToVersion != newVersion {
+	if meta.ToVersion == newVersion {
 		return false
 	}
 	for _, version := range meta.FromVersion {
@@ -70,7 +70,7 @@ func matchVersion(meta ConversionMeta, oldVersion Version, newVersion Version) b
 			return true
 		}
 	}
-	return true
+	return false
 }
 
 func RegisterCRDConversion(gvr schema.GroupVersionResource, newVersion Version, handler ConversionHandler, oldVersions ...Version) {

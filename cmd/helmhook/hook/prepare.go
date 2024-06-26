@@ -27,6 +27,8 @@ const kubeblocksVersionLabelName = "app.kubernetes.io/version"
 
 func PrepareFor(ctx *UpgradeContext) (err error) {
 	ctx.From, err = getVersionInfo(ctx, ctx.K8sClient, ctx.Namespace)
+
+	Log("kubeblock upgrade: [from: %v --> to: %v]", ctx.From, ctx.To)
 	return
 }
 

@@ -18,6 +18,7 @@ package hook
 
 import (
 	"context"
+	"fmt"
 
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -59,6 +60,10 @@ type UpgradeContext struct {
 type Version struct {
 	Major int32
 	Minor int32
+}
+
+func (v Version) String() string {
+	return fmt.Sprintf("%d.%d", v.Major, v.Minor)
 }
 
 // ContextHandler is the interface for a "chunk" of reconciliation. It either

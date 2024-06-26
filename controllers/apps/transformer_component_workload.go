@@ -301,6 +301,7 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, synthesizeComp *comp
 	itsObjCopy.Spec.Instances = itsProto.Spec.Instances
 	itsObjCopy.Spec.OfflineInstances = itsProto.Spec.OfflineInstances
 	itsObjCopy.Spec.MinReadySeconds = itsProto.Spec.MinReadySeconds
+	itsObjCopy.Spec.VolumeClaimTemplates = itsProto.Spec.VolumeClaimTemplates
 
 	if itsProto.Spec.UpdateStrategy.Type != "" || itsProto.Spec.UpdateStrategy.RollingUpdate != nil {
 		updateUpdateStrategy(itsObjCopy, itsProto)

@@ -22,7 +22,6 @@ package operations
 import (
 	"fmt"
 	"reflect"
-	"regexp"
 	"strings"
 	"time"
 
@@ -52,8 +51,6 @@ type volumeExpansionHelper struct {
 }
 
 var _ OpsHandler = volumeExpansionOpsHandler{}
-
-var pvcNameRegex = regexp.MustCompile("(.*)-([0-9]+)$")
 
 const (
 	// VolumeExpansionTimeOut volume expansion timeout.

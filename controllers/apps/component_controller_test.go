@@ -92,6 +92,7 @@ var mockLorryClient = func(mock func(*lorry.MockClientMockRecorder)) {
 var mockLorryClientDefault = func() {
 	mockLorryClient(func(recorder *lorry.MockClientMockRecorder) {
 		recorder.CreateUser(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+		recorder.DescribeUser(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
 		recorder.GrantUserRole(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	})
 }

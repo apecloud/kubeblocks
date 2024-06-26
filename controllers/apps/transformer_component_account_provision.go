@@ -233,6 +233,10 @@ func (t *componentAccountProvisionTransformer) provisionAccount(transCtx *compon
 		return nil
 	}
 
+	userInfo, err := lorryCli.DescribeUser(transCtx, string(username))
+	if err == nil && len(userInfo) != 0 {
+		return nil
+	}
 	// TODO: re-define the role
 	return lorryCli.CreateUser(transCtx.Context, string(username), string(password), string(lorryModel.SuperUserRole))
 }

@@ -437,7 +437,7 @@ func (r rebuildInstanceOpsHandler) getPVCMapAndVolumes(opsRes *OpsResource,
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	// TODO: create pvc by the volumeClaimTemplates of instance template if it necessary.
+	// TODO: create pvc by the volumeClaimTemplates of instance template if it is necessary.
 	for i, vct := range synthesizedComp.VolumeClaimTemplates {
 		sourcePVCName := volumePVCMap[vct.Name]
 		if sourcePVCName == "" {

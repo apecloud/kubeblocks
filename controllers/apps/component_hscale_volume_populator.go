@@ -171,7 +171,7 @@ func (d *baseDataClone) CloneData(realDataClone dataClone) ([]client.Object, []c
 		}
 	}
 	// create PVCs that do not need to restore
-	// TODO: create pvc by the volumeClaimTemplates of instance template if it necessary.
+	// TODO: create pvc by the volumeClaimTemplates of instance template if it is necessary.
 	pvcObjs, err := d.createPVCs(d.excludeBackupVCTs())
 	if err != nil {
 		return nil, nil, err

@@ -111,6 +111,15 @@ resources:
 - api:
     crdVersion: v1
     namespaced: true
+  controller: true
+  domain: kubeblocks.io
+  group: extensions
+  kind: Addon
+  path: github.com/apecloud/kubeblocks/apis/extensions/v1
+  version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
   domain: troubleshoot.sh
   kind: HostPreflight
   path: github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2
@@ -135,6 +144,15 @@ resources:
     defaulting: true
     validation: true
     webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: kubeblocks.io
+  group: workloads
+  kind: InstanceSet
+  path: github.com/apecloud/kubeblocks/apis/workloads/v1
+  version: v1
 - api:
     crdVersion: v1
   controller: true

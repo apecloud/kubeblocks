@@ -456,6 +456,7 @@ func handleScaleOutProgressWithInstanceSet(
 	compStatus *appsv1alpha1.OpsRequestComponentStatus) (completedCount int32, err error) {
 	currPodRevisionMap, _ := instanceset.GetRevisions(its.Status.CurrentRevisions)
 	notReadyPodSet := instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceReady)
+	notAvailablePodSet := instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceAvailable)
 	failurePodSet := instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceFailure)
 	pgRes.opsMessageKey = "Create"
 	memberStatusMap := map[string]sets.Empty{}
@@ -477,6 +478,9 @@ func handleScaleOutProgressWithInstanceSet(
 		}
 		if _, ok := notReadyPodSet[podName]; ok {
 			updateProgressDetailForHScale(opsRes, pgRes, compStatus, objectKey, appsv1alpha1.ProcessingProgressStatus)
+			continue
+		}
+		if _, ok := notAvailablePodSet[podName]; ok {
 			continue
 		}
 		if _, ok := memberStatusMap[podName]; !ok && needToCheckRole(pgRes) {

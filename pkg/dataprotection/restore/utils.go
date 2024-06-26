@@ -22,6 +22,7 @@ package restore
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -369,19 +370,23 @@ func GetSourcePodNameFromTarget(target *dpv1alpha1.BackupStatusTarget,
 }
 
 // GetVolumeSnapshotsBySourcePod gets the volume snapshots of the backup and group by source target pod.
-func GetVolumeSnapshotsBySourcePod(backup *dpv1alpha1.Backup, sourcePodName string) map[string]string {
+func GetVolumeSnapshotsBySourcePod(backup *dpv1alpha1.Backup, target *dpv1alpha1.BackupStatusTarget, sourcePodName string) map[string]string {
 	actions := backup.Status.Actions
 	for i := range actions {
 		if len(actions[i].VolumeSnapshots) == 0 {
 			continue
 		}
-		if sourcePodName == "" || sourcePodName == actions[i].TargetPodName {
-			snapshotGroup := map[string]string{}
-			for _, v := range actions[i].VolumeSnapshots {
-				snapshotGroup[v.VolumeName] = v.Name
-			}
-			return snapshotGroup
+		if len(target.SelectedTargetPods) > 0 && !slices.Contains(target.SelectedTargetPods, actions[i].TargetPodName) {
+			continue
 		}
+		if sourcePodName != "" && sourcePodName != actions[i].TargetPodName {
+			continue
+		}
+		snapshotGroup := map[string]string{}
+		for _, v := range actions[i].VolumeSnapshots {
+			snapshotGroup[v.VolumeName] = v.Name
+		}
+		return snapshotGroup
 	}
 	return nil
 }

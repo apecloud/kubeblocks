@@ -78,7 +78,7 @@ spec:
     - name: pulsarZookeeper
       namespace: default
       cluster: zookeeperp-cluster
-    monitorEnabled: false
+    disableExporter: true
     serviceAccountName: kb-pulsar-cluster
     replicas: 3
     resources:
@@ -102,7 +102,7 @@ spec:
     - name: pulsarZookeeper
       namespace: default
       cluster: zookeeperp-cluster
-    monitorEnabled: true
+    disableExporter: false
     replicas: 1
     resources:
       limits:
@@ -117,7 +117,7 @@ spec:
     - name: pulsarZookeeper
       namespace: default
       cluster: zookeeperp-cluster
-    monitorEnabled: true
+    disableExporter: false
     replicas: 3
     resources:
       limits:
@@ -147,7 +147,7 @@ spec:
     - name: pulsarZookeeper
       namespace: default
       cluster: zookeeperp-cluster
-    monitorEnabled: true
+    disableExporter: false
     replicas: 1
     resources:
       limits:

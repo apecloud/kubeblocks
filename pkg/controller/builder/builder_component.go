@@ -45,6 +45,11 @@ func (builder *ComponentBuilder) SetServiceVersion(serviceVersion string) *Compo
 	return builder
 }
 
+func (builder *ComponentBuilder) SetLabels(labels map[string]string) *ComponentBuilder {
+	builder.get().Spec.Labels = labels
+	return builder
+}
+
 func (builder *ComponentBuilder) SetAnnotations(annotations map[string]string) *ComponentBuilder {
 	builder.get().Spec.Annotations = annotations
 	return builder

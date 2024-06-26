@@ -831,6 +831,18 @@ identified using Cluster, Component and Service names.</li>
 </tr>
 <tr>
 <td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies Labels to override or add for underlying Pods.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>annotations</code><br/>
 <em>
 map[string]string
@@ -2667,6 +2679,20 @@ int32
 <em>(Optional)</em>
 <p>Specifies the duration in seconds that an OpsRequest will remain in the system after successfully completing
 (when <code>opsRequest.status.phase</code> is &ldquo;Succeed&rdquo;) before automatic deletion.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>preConditionDeadlineSeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the maximum time in seconds that the OpsRequest will wait for its pre-conditions to be met
+before it aborts the operation.
+If set to 0 (default), pre-conditions must be satisfied immediately for the OpsRequest to proceed.</p>
 </td>
 </tr>
 <tr>
@@ -4798,6 +4824,18 @@ you can enable the collection of these logs by including their names in the <cod
 - slow_query_log
 - error_log
 </code></pre>
+</td>
+</tr>
+<tr>
+<td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies Labels to override or add for underlying Pods.</p>
 </td>
 </tr>
 <tr>
@@ -8681,6 +8719,18 @@ identified using Cluster, Component and Service names.</li>
         component: &quot;postgresql&quot;
 </code></pre>
 <p>The example above includes ServiceRefs to an external Redis Sentinel service and a PostgreSQL Cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies Labels to override or add for underlying Pods.</p>
 </td>
 </tr>
 <tr>
@@ -14329,6 +14379,20 @@ int32
 </tr>
 <tr>
 <td>
+<code>preConditionDeadlineSeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the maximum time in seconds that the OpsRequest will wait for its pre-conditions to be met
+before it aborts the operation.
+If set to 0 (default), pre-conditions must be satisfied immediately for the OpsRequest to proceed.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>SpecificOpsRequest</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">
@@ -19467,20 +19531,6 @@ Reconfigure
 </tr>
 <tr>
 <td>
-<code>preConditionDeadlineSeconds</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the maximum time in seconds that the OpsRequest will wait for its pre-conditions to be met
-before it aborts the operation.
-If set to 0 (default), pre-conditions must be satisfied immediately for the OpsRequest to proceed.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>scriptSpec</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ScriptSpec">
@@ -23234,7 +23284,11 @@ string
 <th>Description</th>
 </tr>
 </thead>
-<tbody><tr><td><p>&#34;InstanceFailure&#34;</p></td>
+<tbody><tr><td><p>&#34;InstanceAvailable&#34;</p></td>
+<td><p>InstanceAvailable ConditionStatus will be True if all instances(pods) are in the ready condition
+and continue for &ldquo;MinReadySeconds&rdquo; seconds. Otherwise, it will be set to False.</p>
+</td>
+</tr><tr><td><p>&#34;InstanceFailure&#34;</p></td>
 <td><p>InstanceFailure is added in an instance set when at least one of its instances(pods) is in a <code>Failed</code> phase.</p>
 </td>
 </tr><tr><td><p>&#34;InstanceReady&#34;</p></td>

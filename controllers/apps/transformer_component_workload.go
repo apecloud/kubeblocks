@@ -299,6 +299,7 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, synthesizeComp *comp
 	itsObjCopy.Spec.Credential = itsProto.Spec.Credential
 	itsObjCopy.Spec.Instances = itsProto.Spec.Instances
 	itsObjCopy.Spec.OfflineInstances = itsProto.Spec.OfflineInstances
+	itsObjCopy.Spec.MinReadySeconds = itsProto.Spec.MinReadySeconds
 
 	if itsProto.Spec.UpdateStrategy.Type != "" || itsProto.Spec.UpdateStrategy.RollingUpdate != nil {
 		updateUpdateStrategy(itsObjCopy, itsProto)
@@ -639,11 +640,12 @@ func (r *componentWorkloadOps) deletePVCs4ScaleIn(itsObj *workloads.InstanceSet)
 }
 
 func (r *componentWorkloadOps) expandVolumes(vctName string, proto *corev1.PersistentVolumeClaimTemplate) error {
-	for i := *r.runningITS.Spec.Replicas - 1; i >= 0; i-- {
+	pods := generatePodNamesByITS(r.runningITS)
+	for _, pod := range pods {
 		pvc := &corev1.PersistentVolumeClaim{}
 		pvcKey := types.NamespacedName{
 			Namespace: r.cluster.Namespace,
-			Name:      fmt.Sprintf("%s-%s-%d", vctName, r.runningITS.Name, i),
+			Name:      fmt.Sprintf("%s-%s", vctName, pod),
 		}
 		pvcNotFound := false
 		if err := r.cli.Get(r.reqCtx.Ctx, pvcKey, pvc, inDataContext4C()); err != nil {

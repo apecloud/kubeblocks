@@ -17,7 +17,7 @@ spec:
     # Specifies the name of the Component. This name is also part of the Service DNS name and must comply with the IANA service naming rule. 
   - name: redis
     # References the name of a ComponentDefinition. The ComponentDefinition specifies the behavior and characteristics of the Component. If both `componentDefRef` and `componentDef` are provided, the `componentDef` will take precedence over `componentDefRef`.
-    componentDef: redis
+    componentDef: redis-7
     # Specifies a group of affinity scheduling rules for the Component. It allows users to control how the Component's Pods are scheduled onto nodes in the cluster.
     affinity:
       podAntiAffinity: Preferred
@@ -56,7 +56,7 @@ spec:
         resources:
           requests:
             storage: 30Gi
-  - componentDefRef: redis-sentinel
+  - componentDef: redis-sentinel-7
     name: redis-sentinel
     replicas: 3
     resources:

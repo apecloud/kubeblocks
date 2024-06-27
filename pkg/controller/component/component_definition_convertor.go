@@ -213,11 +213,14 @@ func convertHostNetwork(clusterCompDef *appsv1alpha1.ClusterComponentDefinition)
 	if clusterCompDef.PodSpec == nil || !clusterCompDef.PodSpec.HostNetwork {
 		return nil, nil
 	}
+	return convertHostNetworkFromPodSpec(clusterCompDef.PodSpec), nil
+}
 
+func convertHostNetworkFromPodSpec(spec *corev1.PodSpec) *appsv1alpha1.HostNetwork {
 	hostNetwork := &appsv1alpha1.HostNetwork{
 		ContainerPorts: []appsv1alpha1.HostNetworkContainerPort{},
 	}
-	for _, container := range clusterCompDef.PodSpec.Containers {
+	for _, container := range spec.Containers {
 		cp := appsv1alpha1.HostNetworkContainerPort{
 			Container: container.Name,
 			Ports:     []string{},
@@ -231,7 +234,7 @@ func convertHostNetwork(clusterCompDef *appsv1alpha1.ClusterComponentDefinition)
 			hostNetwork.ContainerPorts = append(hostNetwork.ContainerPorts, cp)
 		}
 	}
-	return hostNetwork, nil
+	return hostNetwork
 }
 
 // compDefServicesConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Services.

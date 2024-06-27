@@ -36,27 +36,27 @@ var (
 )
 
 func init() {
-	hook.RegisterCRDConversion(sdGVR, hook.NewNoVersion(1, 0), serviceDescriptorHandler(),
+	hook.RegisterCRDConversion(sdGVR, hook.NewNoVersion(1, 0), sdHandler(),
 		hook.NewNoVersion(0, 7),
 		hook.NewNoVersion(0, 8),
 		hook.NewNoVersion(0, 9))
 }
 
-func serviceDescriptorHandler() hook.ConversionHandler {
+func sdHandler() hook.ConversionHandler {
 	return &convertor{
 		namespaces: []string{"default"}, // TODO: namespaces
-		sourceKind: &serviceDescriptor{},
-		targetKind: &serviceDescriptor{},
+		sourceKind: &sdConvertor{},
+		targetKind: &sdConvertor{},
 	}
 }
 
-type serviceDescriptor struct{}
+type sdConvertor struct{}
 
-func (s *serviceDescriptor) kind() string {
+func (c *sdConvertor) kind() string {
 	return "ServiceDescriptor"
 }
 
-func (s *serviceDescriptor) list(ctx context.Context, cli *versioned.Clientset, namespace string) ([]client.Object, error) {
+func (c *sdConvertor) list(ctx context.Context, cli *versioned.Clientset, namespace string) ([]client.Object, error) {
 	list, err := cli.AppsV1alpha1().ServiceDescriptors(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, err
@@ -68,25 +68,27 @@ func (s *serviceDescriptor) list(ctx context.Context, cli *versioned.Clientset, 
 	return addons, nil
 }
 
-func (s *serviceDescriptor) get(ctx context.Context, cli *versioned.Clientset, namespace, name string) (client.Object, error) {
+func (c *sdConvertor) get(ctx context.Context, cli *versioned.Clientset, namespace, name string) (client.Object, error) {
 	return cli.AppsV1().ServiceDescriptors(namespace).Get(ctx, name, metav1.GetOptions{})
 }
 
-func (s *serviceDescriptor) convert(source client.Object) client.Object {
+func (c *sdConvertor) convert(source client.Object) []client.Object {
 	sd := source.(*appsv1alpha1.ServiceDescriptor)
-	return &appsv1.ServiceDescriptor{
-		Spec: appsv1.ServiceDescriptorSpec{
-			ServiceKind:    sd.Spec.ServiceKind,
-			ServiceVersion: sd.Spec.ServiceVersion,
-			Endpoint:       s.credentialVar(sd.Spec.Endpoint),
-			Host:           s.credentialVar(sd.Spec.Host),
-			Port:           s.credentialVar(sd.Spec.Port),
-			Auth:           s.credentialAuth(sd.Spec.Auth),
+	return []client.Object{
+		&appsv1.ServiceDescriptor{
+			Spec: appsv1.ServiceDescriptorSpec{
+				ServiceKind:    sd.Spec.ServiceKind,
+				ServiceVersion: sd.Spec.ServiceVersion,
+				Endpoint:       c.credentialVar(sd.Spec.Endpoint),
+				Host:           c.credentialVar(sd.Spec.Host),
+				Port:           c.credentialVar(sd.Spec.Port),
+				Auth:           c.credentialAuth(sd.Spec.Auth),
+			},
 		},
 	}
 }
 
-func (s *serviceDescriptor) credentialVar(v *appsv1alpha1.CredentialVar) *appsv1.CredentialVar {
+func (c *sdConvertor) credentialVar(v *appsv1alpha1.CredentialVar) *appsv1.CredentialVar {
 	if v == nil {
 		return nil
 	}
@@ -96,12 +98,12 @@ func (s *serviceDescriptor) credentialVar(v *appsv1alpha1.CredentialVar) *appsv1
 	}
 }
 
-func (s *serviceDescriptor) credentialAuth(v *appsv1alpha1.ConnectionCredentialAuth) *appsv1.CredentialAuth {
+func (c *sdConvertor) credentialAuth(v *appsv1alpha1.ConnectionCredentialAuth) *appsv1.CredentialAuth {
 	if v == nil {
 		return nil
 	}
 	return &appsv1.CredentialAuth{
-		Username: s.credentialVar(v.Username),
-		Password: s.credentialVar(v.Password),
+		Username: c.credentialVar(v.Username),
+		Password: c.credentialVar(v.Password),
 	}
 }

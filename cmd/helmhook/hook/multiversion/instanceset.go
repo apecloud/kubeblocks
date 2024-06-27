@@ -43,18 +43,18 @@ func init() {
 func itsHandler() hook.ConversionHandler {
 	return &convertor{
 		namespaces: []string{"default"}, // TODO: namespaces
-		sourceKind: &its{},
-		targetKind: &its{},
+		sourceKind: &itsConvertor{},
+		targetKind: &itsConvertor{},
 	}
 }
 
-type its struct{}
+type itsConvertor struct{}
 
-func (i *its) kind() string {
+func (c *itsConvertor) kind() string {
 	return "InstanceSet"
 }
 
-func (i *its) list(ctx context.Context, cli *versioned.Clientset, namespace string) ([]client.Object, error) {
+func (c *itsConvertor) list(ctx context.Context, cli *versioned.Clientset, namespace string) ([]client.Object, error) {
 	list, err := cli.WorkloadsV1alpha1().InstanceSets(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, err
@@ -66,35 +66,37 @@ func (i *its) list(ctx context.Context, cli *versioned.Clientset, namespace stri
 	return addons, nil
 }
 
-func (i *its) get(ctx context.Context, cli *versioned.Clientset, namespace, name string) (client.Object, error) {
+func (c *itsConvertor) get(ctx context.Context, cli *versioned.Clientset, namespace, name string) (client.Object, error) {
 	return cli.WorkloadsV1().InstanceSets(namespace).Get(ctx, name, metav1.GetOptions{})
 }
 
-func (i *its) convert(source client.Object) client.Object {
+func (c *itsConvertor) convert(source client.Object) []client.Object {
 	its := source.(*workloadsv1alpha1.InstanceSet)
-	return &workloadsv1.InstanceSet{
-		Spec: workloadsv1.InstanceSetSpec{
-			Replicas:                  its.Spec.Replicas,
-			MinReadySeconds:           its.Spec.MinReadySeconds,
-			Selector:                  its.Spec.Selector,
-			Service:                   its.Spec.Service,
-			Template:                  its.Spec.Template,
-			Instances:                 i.instances(its.Spec.Instances),
-			OfflineInstances:          its.Spec.OfflineInstances,
-			VolumeClaimTemplates:      its.Spec.VolumeClaimTemplates,
-			PodManagementPolicy:       its.Spec.PodManagementPolicy,
-			UpdateStrategy:            its.Spec.UpdateStrategy,
-			Roles:                     i.roles(its.Spec.Roles),
-			RoleProbe:                 i.roleProbe(its.Spec.RoleProbe),
-			MembershipReconfiguration: i.membershipReconfiguration(its.Spec.MembershipReconfiguration),
-			MemberUpdateStrategy:      i.memberUpdateStrategy(its.Spec.MemberUpdateStrategy),
-			Paused:                    its.Spec.Paused,
-			Credential:                i.credential(its.Spec.Credential),
+	return []client.Object{
+		&workloadsv1.InstanceSet{
+			Spec: workloadsv1.InstanceSetSpec{
+				Replicas:                  its.Spec.Replicas,
+				MinReadySeconds:           its.Spec.MinReadySeconds,
+				Selector:                  its.Spec.Selector,
+				Service:                   its.Spec.Service,
+				Template:                  its.Spec.Template,
+				Instances:                 c.instances(its.Spec.Instances),
+				OfflineInstances:          its.Spec.OfflineInstances,
+				VolumeClaimTemplates:      its.Spec.VolumeClaimTemplates,
+				PodManagementPolicy:       its.Spec.PodManagementPolicy,
+				UpdateStrategy:            its.Spec.UpdateStrategy,
+				Roles:                     c.roles(its.Spec.Roles),
+				RoleProbe:                 c.roleProbe(its.Spec.RoleProbe),
+				MembershipReconfiguration: c.membershipReconfiguration(its.Spec.MembershipReconfiguration),
+				MemberUpdateStrategy:      c.memberUpdateStrategy(its.Spec.MemberUpdateStrategy),
+				Paused:                    its.Spec.Paused,
+				Credential:                c.credential(its.Spec.Credential),
+			},
 		},
 	}
 }
 
-func (i *its) instances(templates []workloadsv1alpha1.InstanceTemplate) []workloadsv1.InstanceTemplate {
+func (c *itsConvertor) instances(templates []workloadsv1alpha1.InstanceTemplate) []workloadsv1.InstanceTemplate {
 	if len(templates) == 0 {
 		return nil
 	}
@@ -127,7 +129,7 @@ func (i *its) instances(templates []workloadsv1alpha1.InstanceTemplate) []worklo
 	return newTemplates
 }
 
-func (i *its) roles(roles []workloadsv1alpha1.ReplicaRole) []workloadsv1.ReplicaRole {
+func (c *itsConvertor) roles(roles []workloadsv1alpha1.ReplicaRole) []workloadsv1.ReplicaRole {
 	if len(roles) == 0 {
 		return nil
 	}
@@ -143,7 +145,7 @@ func (i *its) roles(roles []workloadsv1alpha1.ReplicaRole) []workloadsv1.Replica
 	return newRoles
 }
 
-func (i *its) roleProbe(probe *workloadsv1alpha1.RoleProbe) *workloadsv1.RoleProbe {
+func (c *itsConvertor) roleProbe(probe *workloadsv1alpha1.RoleProbe) *workloadsv1.RoleProbe {
 	if probe == nil {
 		return nil
 	}
@@ -169,7 +171,7 @@ func (i *its) roleProbe(probe *workloadsv1alpha1.RoleProbe) *workloadsv1.RolePro
 	return newProbe
 }
 
-func (i *its) membershipReconfiguration(r *workloadsv1alpha1.MembershipReconfiguration) *workloadsv1.MembershipReconfiguration {
+func (c *itsConvertor) membershipReconfiguration(r *workloadsv1alpha1.MembershipReconfiguration) *workloadsv1.MembershipReconfiguration {
 	if r == nil {
 		return nil
 	}
@@ -199,7 +201,7 @@ func (i *its) membershipReconfiguration(r *workloadsv1alpha1.MembershipReconfigu
 	return rr
 }
 
-func (i *its) memberUpdateStrategy(strategy *workloadsv1alpha1.MemberUpdateStrategy) *workloadsv1.MemberUpdateStrategy {
+func (c *itsConvertor) memberUpdateStrategy(strategy *workloadsv1alpha1.MemberUpdateStrategy) *workloadsv1.MemberUpdateStrategy {
 	if strategy == nil {
 		return nil
 	}
@@ -207,7 +209,7 @@ func (i *its) memberUpdateStrategy(strategy *workloadsv1alpha1.MemberUpdateStrat
 	return &s
 }
 
-func (i *its) credential(credential *workloadsv1alpha1.Credential) *workloadsv1.Credential {
+func (c *itsConvertor) credential(credential *workloadsv1alpha1.Credential) *workloadsv1.Credential {
 	if credential == nil {
 		return nil
 	}

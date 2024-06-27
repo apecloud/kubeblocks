@@ -27,6 +27,26 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
+// func used(ctx context.Context, cli hook.CRClient, cdName string, namespaces []string) (bool, error) {
+//	selectors := []string{
+//		fmt.Sprintf("%s=%s", constant.AppManagedByLabelKey, constant.AppName),
+//		fmt.Sprintf("%s=%s", constant.AppNameLabelKey, cdName),
+//	}
+//	opts := metav1.ListOptions{
+//		LabelSelector: strings.Join(selectors, ","),
+//	}
+//
+//	used := false
+//	for _, namespace := range namespaces {
+//		compList, err := cli.KBClient.AppsV1alpha1().Clusters(namespace).List(ctx, opts)
+//		if err != nil {
+//			return false, err
+//		}
+//		used = used || (len(compList.Items) > 0)
+//	}
+//	return used, nil
+// }
+
 func checkExistedNConverted(getter func() (client.Object, error)) (bool, bool, error) {
 	obj, err := getter()
 	if err != nil {

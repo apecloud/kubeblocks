@@ -35,7 +35,7 @@ type sourceKind interface {
 type targetKind interface {
 	kind() string
 	get(ctx context.Context, cli *versioned.Clientset, namespace, name string) (client.Object, error)
-	convert(source client.Object) client.Object
+	convert(source client.Object) []client.Object
 }
 
 type convertor struct {
@@ -79,28 +79,29 @@ func (c *convertor) Convert(ctx context.Context, cli hook.CRClient) ([]client.Ob
 
 	targets := make([]client.Object, 0)
 	for name := range c.stat.toBeConverted {
-		targets = append(targets, c.convert(c.objects[name]))
+		targets = append(targets, c.convert(c.objects[name])...)
 	}
 	return targets, nil
 }
 
-func (c *convertor) convert(source client.Object) client.Object {
-	target := c.targetKind.convert(source)
-
-	// TODO: filter labels & annotations
-	labels := func() map[string]string {
-		return source.GetLabels()
+func (c *convertor) convert(source client.Object) []client.Object {
+	targets := c.targetKind.convert(source)
+	for i := range targets {
+		// TODO: filter labels & annotations
+		labels := func() map[string]string {
+			return source.GetLabels()
+		}
+		annotations := func() map[string]string {
+			m := map[string]string{}
+			maps.Copy(m, source.GetAnnotations())
+			b, _ := json.Marshal(source)
+			m[convertedFromAnnotationKey] = string(b)
+			return m
+		}
+		targets[i].SetNamespace(source.GetNamespace())
+		targets[i].SetName(source.GetName())
+		targets[i].SetLabels(labels())
+		targets[i].SetAnnotations(annotations())
 	}
-	annotations := func() map[string]string {
-		m := map[string]string{}
-		maps.Copy(m, source.GetAnnotations())
-		b, _ := json.Marshal(source)
-		m[convertedFromAnnotationKey] = string(b)
-		return m
-	}
-	target.SetNamespace(source.GetNamespace())
-	target.SetName(source.GetName())
-	target.SetLabels(labels())
-	target.SetAnnotations(annotations())
-	return target
+	return targets
 }

@@ -18,20 +18,15 @@ package multiversion
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"strings"
 
-	"golang.org/x/exp/maps"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/cmd/helmhook/hook"
-	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/client/clientset/versioned"
 )
 
 // covert appsv1alpha1.clusterdefinition resources to:
@@ -44,153 +39,48 @@ var (
 )
 
 func init() {
-	hook.RegisterCRDConversion(cdGVR, hook.NewNoVersion(1, 0), &cdConvertor{},
+	hook.RegisterCRDConversion(cdGVR, hook.NewNoVersion(1, 0), cdHandler(),
 		hook.NewNoVersion(0, 7),
 		hook.NewNoVersion(0, 8),
 		hook.NewNoVersion(0, 9))
 }
 
-type cdConvertor struct {
-	namespaces []string // TODO: namespaces
-
-	cds           map[string]*appsv1alpha1.ClusterDefinition
-	errors        map[string]error
-	unused        sets.Set[string]
-	native        sets.Set[string]
-	beenConverted sets.Set[string]
-	toBeConverted sets.Set[string]
+func cdHandler() hook.ConversionHandler {
+	return &convertor{
+		sourceKind: &cdConvertor{},
+		targetKind: &cdConvertor{},
+	}
 }
 
-func (c *cdConvertor) Convert(ctx context.Context, cli hook.CRClient) ([]client.Object, error) {
-	cdList, err := cli.KBClient.AppsV1alpha1().ClusterDefinitions().List(ctx, metav1.ListOptions{})
+type cdConvertor struct{}
+
+func (c *cdConvertor) kind() string {
+	return "ClusterDefinition"
+}
+
+func (c *cdConvertor) list(ctx context.Context, cli *versioned.Clientset, _ string) ([]client.Object, error) {
+	list, err := cli.AppsV1alpha1().ClusterDefinitions().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
-
-	for i, cd := range cdList.Items {
-		c.cds[cd.GetName()] = &cdList.Items[i]
-
-		used, err1 := c.used(ctx, cli, cd.GetName(), c.namespaces)
-		if err1 != nil {
-			c.errors[cd.GetName()] = err1
-			continue
-		}
-		if !used {
-			c.unused.Insert(cd.GetName())
-			continue
-		}
-
-		cdv1, err2 := c.existed(ctx, cli, cd.GetName())
-		switch {
-		case err2 != nil:
-			c.errors[cd.GetName()] = err2
-		case cdv1 == nil:
-			c.toBeConverted.Insert(cd.GetName())
-		case c.converted(cdv1):
-			c.beenConverted.Insert(cd.GetName())
-		default:
-			c.native.Insert(cd.GetName())
-		}
+	addons := make([]client.Object, 0)
+	for i := range list.Items {
+		addons = append(addons, &list.Items[i])
 	}
-	c.dump()
-
-	objects := make([]client.Object, 0)
-	for name := range c.toBeConverted {
-		objects = append(objects, c.convert(c.cds[name]))
-	}
-	return objects, nil
+	return addons, nil
 }
 
-func (c *cdConvertor) used(ctx context.Context, cli hook.CRClient, cdName string, namespaces []string) (bool, error) {
-	selectors := []string{
-		fmt.Sprintf("%s=%s", constant.AppManagedByLabelKey, constant.AppName),
-		fmt.Sprintf("%s=%s", constant.AppNameLabelKey, cdName),
-	}
-	opts := metav1.ListOptions{
-		LabelSelector: strings.Join(selectors, ","),
-	}
-
-	used := false
-	for _, namespace := range namespaces {
-		compList, err := cli.KBClient.AppsV1alpha1().Clusters(namespace).List(ctx, opts)
-		if err != nil {
-			return false, err
-		}
-		used = used || (len(compList.Items) > 0)
-	}
-	return used, nil
+func (c *cdConvertor) get(ctx context.Context, cli *versioned.Clientset, _, name string) (client.Object, error) {
+	return cli.AppsV1().ClusterDefinitions().Get(ctx, name, metav1.GetOptions{})
 }
 
-func (c *cdConvertor) existed(ctx context.Context, cli hook.CRClient, name string) (*appsv1.ClusterDefinition, error) {
-	obj, err := cli.KBClient.AppsV1().ClusterDefinitions().Get(ctx, name, metav1.GetOptions{})
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	return obj, nil
-}
-
-func (c *cdConvertor) converted(cd *appsv1.ClusterDefinition) bool {
-	if cd != nil && cd.GetAnnotations() != nil {
-		_, ok := cd.GetAnnotations()[convertedFromAnnotationKey]
-		return ok
-	}
-	return false
-}
-
-func (c *cdConvertor) dump() {
-	hook.Log("ClusterDefinition conversion to v1 status")
-	hook.Log("\tunused ClusterDefinitions")
-	hook.Log(c.doubleTableFormat(sets.List(c.unused)))
-	hook.Log("\thas native ClusterDefinitions defined")
-	hook.Log(c.doubleTableFormat(sets.List(c.native)))
-	hook.Log("\thas been converted ClusterDefinitions")
-	hook.Log(c.doubleTableFormat(sets.List(c.beenConverted)))
-	hook.Log("\tto be converted ClusterDefinitions")
-	hook.Log(c.doubleTableFormat(sets.List(c.toBeConverted)))
-	hook.Log("\terror occurred when perform pre-check")
-	hook.Log(c.doubleTableFormat(maps.Keys(c.errors), c.errors))
-}
-
-func (c *cdConvertor) doubleTableFormat(items []string, errors ...map[string]error) string {
-	formattedErr := func(key string) string {
-		if len(errors) == 0 {
-			return ""
-		}
-		if err, ok := errors[0][key]; ok {
-			return fmt.Sprintf(": %s", err.Error())
-		}
-		return ""
-	}
-	var sb strings.Builder
-	for _, item := range items {
-		sb.WriteString("\t\t" + item + formattedErr(item) + "\n")
-	}
-	return sb.String()
-}
-
-func (c *cdConvertor) convert(cd *appsv1alpha1.ClusterDefinition) client.Object {
-	// TODO: filter labels & annotations
-	labels := func() map[string]string {
-		return cd.GetLabels()
-	}
-	annotations := func() map[string]string {
-		m := map[string]string{}
-		maps.Copy(m, cd.GetAnnotations())
-		b, _ := json.Marshal(cd)
-		m[convertedFromAnnotationKey] = string(b)
-		return m
-	}
-	return &appsv1.ClusterDefinition{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        cd.GetName(),
-			Labels:      labels(),
-			Annotations: annotations(),
-		},
-		Spec: appsv1.ClusterDefinitionSpec{
-			Topologies: c.topologies(cd.Spec.Topologies),
+func (c *cdConvertor) convert(source client.Object) []client.Object {
+	cd := source.(*appsv1alpha1.ClusterDefinition)
+	return []client.Object{
+		&appsv1.ClusterDefinition{
+			Spec: appsv1.ClusterDefinitionSpec{
+				Topologies: c.topologies(cd.Spec.Topologies),
+			},
 		},
 	}
 }

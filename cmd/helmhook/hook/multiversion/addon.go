@@ -44,18 +44,18 @@ func init() {
 
 func addonHandler() hook.ConversionHandler {
 	return &convertor{
-		sourceKind: &addon{},
-		targetKind: &addon{},
+		sourceKind: &addonConvertor{},
+		targetKind: &addonConvertor{},
 	}
 }
 
-type addon struct{}
+type addonConvertor struct{}
 
-func (a *addon) kind() string {
+func (c *addonConvertor) kind() string {
 	return "Addon"
 }
 
-func (a *addon) list(ctx context.Context, cli *versioned.Clientset, _ string) ([]client.Object, error) {
+func (c *addonConvertor) list(ctx context.Context, cli *versioned.Clientset, _ string) ([]client.Object, error) {
 	addonList, err := cli.ExtensionsV1alpha1().Addons().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, err
@@ -67,52 +67,54 @@ func (a *addon) list(ctx context.Context, cli *versioned.Clientset, _ string) ([
 	return addons, nil
 }
 
-func (a *addon) get(ctx context.Context, cli *versioned.Clientset, _, name string) (client.Object, error) {
+func (c *addonConvertor) get(ctx context.Context, cli *versioned.Clientset, _, name string) (client.Object, error) {
 	return cli.ExtensionsV1().Addons().Get(ctx, name, metav1.GetOptions{})
 }
 
-func (a *addon) convert(source client.Object) client.Object {
+func (c *addonConvertor) convert(source client.Object) []client.Object {
 	spec := source.(*extensionsv1alpha1.Addon).Spec
-	return &extensionsv1.Addon{
-		Spec: extensionsv1.AddonSpec{
-			Description:          spec.Description,
-			Type:                 extensionsv1.AddonType(spec.Type),
-			Version:              spec.Version,
-			Provider:             spec.Provider,
-			Helm:                 a.helm(spec.Helm),
-			DefaultInstallValues: a.defaultInstallValues(spec.DefaultInstallValues),
-			InstallSpec:          a.installSpec(spec.InstallSpec),
-			Installable:          a.installable(spec.Installable),
-			CliPlugins:           a.cliPlugins(spec.CliPlugins),
+	return []client.Object{
+		&extensionsv1.Addon{
+			Spec: extensionsv1.AddonSpec{
+				Description:          spec.Description,
+				Type:                 extensionsv1.AddonType(spec.Type),
+				Version:              spec.Version,
+				Provider:             spec.Provider,
+				Helm:                 c.helm(spec.Helm),
+				DefaultInstallValues: c.defaultInstallValues(spec.DefaultInstallValues),
+				InstallSpec:          c.installSpec(spec.InstallSpec),
+				Installable:          c.installable(spec.Installable),
+				CliPlugins:           c.cliPlugins(spec.CliPlugins),
+			},
 		},
 	}
 }
 
-func (a *addon) helm(spec *extensionsv1alpha1.HelmTypeInstallSpec) *extensionsv1.HelmTypeInstallSpec {
+func (c *addonConvertor) helm(spec *extensionsv1alpha1.HelmTypeInstallSpec) *extensionsv1.HelmTypeInstallSpec {
 	if spec == nil {
 		return nil
 	}
 	return &extensionsv1.HelmTypeInstallSpec{
 		ChartLocationURL:  spec.ChartLocationURL,
 		InstallOptions:    extensionsv1.HelmInstallOptions(spec.InstallOptions),
-		InstallValues:     a.installValues(spec.InstallValues),
-		ValuesMapping:     a.valuesMapping(spec.ValuesMapping),
+		InstallValues:     c.installValues(spec.InstallValues),
+		ValuesMapping:     c.valuesMapping(spec.ValuesMapping),
 		ChartsImage:       spec.ChartsImage,
 		ChartsPathInImage: spec.ChartsPathInImage,
 	}
 }
 
-func (a *addon) installValues(spec extensionsv1alpha1.HelmInstallValues) extensionsv1.HelmInstallValues {
+func (c *addonConvertor) installValues(spec extensionsv1alpha1.HelmInstallValues) extensionsv1.HelmInstallValues {
 	return extensionsv1.HelmInstallValues{
 		URLs:          spec.URLs,
-		ConfigMapRefs: a.dataObjectKeySelector(spec.ConfigMapRefs),
-		SecretRefs:    a.dataObjectKeySelector(spec.SecretRefs),
+		ConfigMapRefs: c.dataObjectKeySelector(spec.ConfigMapRefs),
+		SecretRefs:    c.dataObjectKeySelector(spec.SecretRefs),
 		SetValues:     spec.SetValues,
 		SetJSONValues: spec.SetJSONValues,
 	}
 }
 
-func (a *addon) dataObjectKeySelector(selectors []extensionsv1alpha1.DataObjectKeySelector) []extensionsv1.DataObjectKeySelector {
+func (c *addonConvertor) dataObjectKeySelector(selectors []extensionsv1alpha1.DataObjectKeySelector) []extensionsv1.DataObjectKeySelector {
 	if len(selectors) == 0 {
 		return nil
 	}
@@ -126,14 +128,14 @@ func (a *addon) dataObjectKeySelector(selectors []extensionsv1alpha1.DataObjectK
 	return newSelectors
 }
 
-func (a *addon) valuesMapping(spec extensionsv1alpha1.HelmValuesMapping) extensionsv1.HelmValuesMapping {
+func (c *addonConvertor) valuesMapping(spec extensionsv1alpha1.HelmValuesMapping) extensionsv1.HelmValuesMapping {
 	return extensionsv1.HelmValuesMapping{
-		HelmValuesMappingItem: a.helmValuesMappingItem(spec.HelmValuesMappingItem),
-		ExtraItems:            a.helmValuesMappingExtraItem(spec.ExtraItems),
+		HelmValuesMappingItem: c.helmValuesMappingItem(spec.HelmValuesMappingItem),
+		ExtraItems:            c.helmValuesMappingExtraItem(spec.ExtraItems),
 	}
 }
 
-func (a *addon) helmValuesMappingItem(item extensionsv1alpha1.HelmValuesMappingItem) extensionsv1.HelmValuesMappingItem {
+func (c *addonConvertor) helmValuesMappingItem(item extensionsv1alpha1.HelmValuesMappingItem) extensionsv1.HelmValuesMappingItem {
 	return extensionsv1.HelmValuesMappingItem{
 		HelmValueMap: extensionsv1.HelmValueMapType{
 			ReplicaCount: item.HelmValueMap.ReplicaCount,
@@ -143,11 +145,11 @@ func (a *addon) helmValuesMappingItem(item extensionsv1alpha1.HelmValuesMappingI
 		HelmJSONMap: extensionsv1.HelmJSONValueMapType{
 			Tolerations: item.HelmJSONMap.Tolerations,
 		},
-		ResourcesMapping: a.resourceMappingItem(item.ResourcesMapping),
+		ResourcesMapping: c.resourceMappingItem(item.ResourcesMapping),
 	}
 }
 
-func (a *addon) resourceMappingItem(item *extensionsv1alpha1.ResourceMappingItem) *extensionsv1.ResourceMappingItem {
+func (c *addonConvertor) resourceMappingItem(item *extensionsv1alpha1.ResourceMappingItem) *extensionsv1.ResourceMappingItem {
 	if item == nil {
 		return nil
 	}
@@ -169,46 +171,46 @@ func (a *addon) resourceMappingItem(item *extensionsv1alpha1.ResourceMappingItem
 	return newItem
 }
 
-func (a *addon) helmValuesMappingExtraItem(items []extensionsv1alpha1.HelmValuesMappingExtraItem) []extensionsv1.HelmValuesMappingExtraItem {
+func (c *addonConvertor) helmValuesMappingExtraItem(items []extensionsv1alpha1.HelmValuesMappingExtraItem) []extensionsv1.HelmValuesMappingExtraItem {
 	if len(items) == 0 {
 		return nil
 	}
 	newItems := make([]extensionsv1.HelmValuesMappingExtraItem, 0)
 	for _, item := range items {
 		newItems = append(newItems, extensionsv1.HelmValuesMappingExtraItem{
-			HelmValuesMappingItem: a.helmValuesMappingItem(item.HelmValuesMappingItem),
+			HelmValuesMappingItem: c.helmValuesMappingItem(item.HelmValuesMappingItem),
 			Name:                  item.Name,
 		})
 	}
 	return newItems
 }
 
-func (a *addon) defaultInstallValues(items []extensionsv1alpha1.AddonDefaultInstallSpecItem) []extensionsv1.AddonDefaultInstallSpecItem {
+func (c *addonConvertor) defaultInstallValues(items []extensionsv1alpha1.AddonDefaultInstallSpecItem) []extensionsv1.AddonDefaultInstallSpecItem {
 	if items == nil {
 		return nil
 	}
 	newItems := make([]extensionsv1.AddonDefaultInstallSpecItem, 0)
 	for _, item := range items {
 		newItems = append(newItems, extensionsv1.AddonDefaultInstallSpecItem{
-			AddonInstallSpec: *a.installSpec(&item.AddonInstallSpec),
-			Selectors:        a.selectorRequirement(item.Selectors),
+			AddonInstallSpec: *c.installSpec(&item.AddonInstallSpec),
+			Selectors:        c.selectorRequirement(item.Selectors),
 		})
 	}
 	return newItems
 }
 
-func (a *addon) installSpec(spec *extensionsv1alpha1.AddonInstallSpec) *extensionsv1.AddonInstallSpec {
+func (c *addonConvertor) installSpec(spec *extensionsv1alpha1.AddonInstallSpec) *extensionsv1.AddonInstallSpec {
 	if spec == nil {
 		return nil
 	}
 	return &extensionsv1.AddonInstallSpec{
-		AddonInstallSpecItem: a.addonInstallSpecItem(spec.AddonInstallSpecItem),
+		AddonInstallSpecItem: c.addonInstallSpecItem(spec.AddonInstallSpecItem),
 		Enabled:              spec.Enabled,
-		ExtraItems:           a.extraItems(spec.ExtraItems),
+		ExtraItems:           c.extraItems(spec.ExtraItems),
 	}
 }
 
-func (a *addon) addonInstallSpecItem(item extensionsv1alpha1.AddonInstallSpecItem) extensionsv1.AddonInstallSpecItem {
+func (c *addonConvertor) addonInstallSpecItem(item extensionsv1alpha1.AddonInstallSpecItem) extensionsv1.AddonInstallSpecItem {
 	return extensionsv1.AddonInstallSpecItem{
 		Replicas:     item.Replicas,
 		PVEnabled:    item.PVEnabled,
@@ -221,31 +223,31 @@ func (a *addon) addonInstallSpecItem(item extensionsv1alpha1.AddonInstallSpecIte
 	}
 }
 
-func (a *addon) extraItems(items []extensionsv1alpha1.AddonInstallExtraItem) []extensionsv1.AddonInstallExtraItem {
+func (c *addonConvertor) extraItems(items []extensionsv1alpha1.AddonInstallExtraItem) []extensionsv1.AddonInstallExtraItem {
 	if len(items) == 0 {
 		return nil
 	}
 	newItems := make([]extensionsv1.AddonInstallExtraItem, 0)
 	for _, item := range items {
 		newItems = append(newItems, extensionsv1.AddonInstallExtraItem{
-			AddonInstallSpecItem: a.addonInstallSpecItem(item.AddonInstallSpecItem),
+			AddonInstallSpecItem: c.addonInstallSpecItem(item.AddonInstallSpecItem),
 			Name:                 item.Name,
 		})
 	}
 	return newItems
 }
 
-func (a *addon) installable(spec *extensionsv1alpha1.InstallableSpec) *extensionsv1.InstallableSpec {
+func (c *addonConvertor) installable(spec *extensionsv1alpha1.InstallableSpec) *extensionsv1.InstallableSpec {
 	if spec == nil {
 		return nil
 	}
 	return &extensionsv1.InstallableSpec{
-		Selectors:   a.selectorRequirement(spec.Selectors),
+		Selectors:   c.selectorRequirement(spec.Selectors),
 		AutoInstall: spec.AutoInstall,
 	}
 }
 
-func (a *addon) selectorRequirement(selectors []extensionsv1alpha1.SelectorRequirement) []extensionsv1.SelectorRequirement {
+func (c *addonConvertor) selectorRequirement(selectors []extensionsv1alpha1.SelectorRequirement) []extensionsv1.SelectorRequirement {
 	if len(selectors) == 0 {
 		return nil
 	}
@@ -260,7 +262,7 @@ func (a *addon) selectorRequirement(selectors []extensionsv1alpha1.SelectorRequi
 	return newSelectors
 }
 
-func (a *addon) cliPlugins(plugins []extensionsv1alpha1.CliPlugin) []extensionsv1.CliPlugin {
+func (c *addonConvertor) cliPlugins(plugins []extensionsv1alpha1.CliPlugin) []extensionsv1.CliPlugin {
 	if plugins == nil {
 		return nil
 	}

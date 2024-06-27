@@ -18,21 +18,17 @@ package multiversion
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"strings"
 
-	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/cmd/helmhook/hook"
-	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/client/clientset/versioned"
 )
 
 // covert appsv1alpha1.clusterversion resources to appsv1.componentversion
@@ -119,151 +115,43 @@ var (
 )
 
 func init() {
-	hook.RegisterCRDConversion(cvGVR, hook.NewNoVersion(1, 0), &cvConvertor{},
+	hook.RegisterCRDConversion(cvGVR, hook.NewNoVersion(1, 0), cvHandler(),
 		hook.NewNoVersion(0, 7),
 		hook.NewNoVersion(0, 8),
 		hook.NewNoVersion(0, 9))
 }
 
-type cvConvertor struct {
-	namespaces []string // TODO: namespaces
-
-	cvs           map[string]*appsv1alpha1.ClusterVersion
-	errors        map[string]error
-	unused        sets.Set[string]
-	native        sets.Set[string]
-	beenConverted sets.Set[string]
-	toBeConverted sets.Set[string]
+func cvHandler() hook.ConversionHandler {
+	return &convertor{
+		sourceKind: &cvConvertor{},
+		targetKind: &cvConvertor{},
+	}
 }
 
-func (c *cvConvertor) Convert(ctx context.Context, cli hook.CRClient) ([]client.Object, error) {
-	cvList, err := cli.KBClient.AppsV1alpha1().ClusterVersions().List(ctx, metav1.ListOptions{})
+type cvConvertor struct{}
+
+func (c *cvConvertor) kind() string {
+	return "ClusterVersion"
+}
+
+func (c *cvConvertor) list(ctx context.Context, cli *versioned.Clientset, _ string) ([]client.Object, error) {
+	list, err := cli.AppsV1alpha1().ClusterVersions().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
-
-	for i, cv := range cvList.Items {
-		c.cvs[cv.GetName()] = &cvList.Items[i]
-
-		used, err1 := c.used(ctx, cli, cv.GetName(), c.namespaces)
-		if err1 != nil {
-			c.errors[cv.GetName()] = err1
-			continue
-		}
-		if !used {
-			c.unused.Insert(cv.GetName())
-			continue
-		}
-
-		cmpvsv1, err2 := c.existed(ctx, cli, &cvList.Items[i])
-		switch {
-		case err2 != nil:
-			c.errors[cv.GetName()] = err2
-		case len(cmpvsv1) == 0:
-			c.toBeConverted.Insert(cv.GetName())
-		case c.converted(cmpvsv1):
-			c.beenConverted.Insert(cv.GetName())
-		default:
-			c.native.Insert(cv.GetName())
-		}
+	addons := make([]client.Object, 0)
+	for i := range list.Items {
+		addons = append(addons, &list.Items[i])
 	}
-	c.dump()
-
-	objects := make([]client.Object, 0)
-	for name := range c.toBeConverted {
-		objects = append(objects, c.convert(c.cvs[name])...)
-	}
-	return objects, nil
+	return addons, nil
 }
 
-func (c *cvConvertor) used(ctx context.Context, cli hook.CRClient, cvName string, namespaces []string) (bool, error) {
-	selectors := []string{
-		fmt.Sprintf("%s=%s", constant.AppManagedByLabelKey, constant.AppName),
-		fmt.Sprintf("%s=%s", constant.AppVersionLabelKey, cvName),
-	}
-	opts := metav1.ListOptions{
-		LabelSelector: strings.Join(selectors, ","),
-	}
-
-	used := false
-	for _, namespace := range namespaces {
-		compList, err := cli.KBClient.AppsV1alpha1().Clusters(namespace).List(ctx, opts)
-		if err != nil {
-			return false, err
-		}
-		used = used || (len(compList.Items) > 0)
-	}
-	return used, nil
+func (c *cvConvertor) get(ctx context.Context, cli *versioned.Clientset, _, name string) (client.Object, error) {
+	return nil, apierrors.NewNotFound(cvGVR.GroupResource(), name)
 }
 
-func (c *cvConvertor) existed(ctx context.Context, cli hook.CRClient, cv *appsv1alpha1.ClusterVersion) ([]*appsv1.ComponentVersion, error) {
-	cmpvs := c.convert(cv)
-	for _, cmpv := range cmpvs {
-		obj, err := cli.KBClient.AppsV1().ComponentVersions().Get(ctx, cmpv.GetName(), metav1.GetOptions{})
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				return nil, nil
-			}
-			return nil, err
-		}
-	}
-	return cmpvs, nil
-}
-
-func (c *cvConvertor) converted(cmpvs []*appsv1.ComponentVersion) bool {
-	converted := false
-	for _, cmpv := range cmpvs {
-		if cmpv != nil && cmpv.GetAnnotations() != nil {
-			_, ok := cmpv.GetAnnotations()[convertedFromAnnotationKey]
-			converted = converted && ok
-		}
-	}
-	return converted
-}
-
-func (c *cvConvertor) dump() {
-	hook.Log("ClusterVersion conversion to v1 status")
-	hook.Log("\tunused ClusterVersions")
-	hook.Log(c.doubleTableFormat(sets.List(c.unused)))
-	hook.Log("\thas native ClusterVersions defined")
-	hook.Log(c.doubleTableFormat(sets.List(c.native)))
-	hook.Log("\thas been converted ClusterVersions")
-	hook.Log(c.doubleTableFormat(sets.List(c.beenConverted)))
-	hook.Log("\tto be converted ClusterVersions")
-	hook.Log(c.doubleTableFormat(sets.List(c.toBeConverted)))
-	hook.Log("\terror occurred when perform pre-check")
-	hook.Log(c.doubleTableFormat(maps.Keys(c.errors), c.errors))
-}
-
-func (c *cvConvertor) doubleTableFormat(items []string, errors ...map[string]error) string {
-	formattedErr := func(key string) string {
-		if len(errors) == 0 {
-			return ""
-		}
-		if err, ok := errors[0][key]; ok {
-			return fmt.Sprintf(": %s", err.Error())
-		}
-		return ""
-	}
-	var sb strings.Builder
-	for _, item := range items {
-		sb.WriteString("\t\t" + item + formattedErr(item) + "\n")
-	}
-	return sb.String()
-}
-
-func (c *cvConvertor) convert(cv *appsv1alpha1.ClusterVersion) []client.Object {
-	// TODO: filter labels & annotations
-	labels := func() map[string]string {
-		return cv.GetLabels()
-	}
-	annotations := func() map[string]string {
-		m := map[string]string{}
-		maps.Copy(m, cv.GetAnnotations())
-		b, _ := json.Marshal(cv)
-		m[convertedFromAnnotationKey] = string(b)
-		return m
-	}
+func (c *cvConvertor) convert(source client.Object) []client.Object {
+	cv := source.(*appsv1alpha1.ClusterVersion)
 
 	versions := map[string][]appsv1.ComponentVersionRelease{}
 	for _, v := range cv.Spec.ComponentVersions {
@@ -291,11 +179,6 @@ func (c *cvConvertor) convert(cv *appsv1alpha1.ClusterVersion) []client.Object {
 	objects := make([]client.Object, 0)
 	for compDefRef := range versions {
 		obj := &appsv1.ComponentVersion{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:        c.cmpvName(cv, compDefRef),
-				Labels:      labels(),
-				Annotations: annotations(),
-			},
 			Spec: appsv1.ComponentVersionSpec{
 				Releases: versions[compDefRef],
 				CompatibilityRules: []appsv1.ComponentVersionCompatibilityRule{

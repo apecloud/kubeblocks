@@ -21,8 +21,11 @@ package component
 
 import (
 	"context"
+	"fmt"
 	"maps"
 	"reflect"
+	"strconv"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -160,4 +163,22 @@ func GenerateAllPodNamesToSet(
 		podSet[insName] = appsv1alpha1.GetInstanceTemplateName(clusterName, fullCompName, insName)
 	}
 	return podSet
+}
+
+func GetTemplateNameAndOrdinal(workloadName, podName string) (string, int32, error) {
+	podSuffix := strings.Replace(podName, workloadName+"-", "", 1)
+	suffixArr := strings.Split(podSuffix, "-")
+	templateName := ""
+	indexStr := ""
+	if len(suffixArr) == 2 {
+		templateName = suffixArr[0]
+		indexStr = suffixArr[1]
+	} else {
+		indexStr = suffixArr[0]
+	}
+	index, err := strconv.Atoi(indexStr)
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to obtain pod ordinal")
+	}
+	return templateName, int32(index), nil
 }

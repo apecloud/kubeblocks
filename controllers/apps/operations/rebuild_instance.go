@@ -424,7 +424,6 @@ func (r rebuildInstanceOpsHandler) getPVCMapAndVolumes(opsRes *OpsResource,
 		// key: source pvc name, value: tmp pvc
 		pvcMap       = map[string]*corev1.PersistentVolumeClaim{}
 		volumePVCMap = map[string]string{}
-		pvcLabels    = r.getWellKnownLabels(synthesizedComp)
 	)
 	for _, volume := range targetPod.Spec.Volumes {
 		if volume.PersistentVolumeClaim != nil {
@@ -443,6 +442,7 @@ func (r rebuildInstanceOpsHandler) getPVCMapAndVolumes(opsRes *OpsResource,
 		if sourcePVCName == "" {
 			return nil, nil, nil, intctrlutil.NewFatalError("")
 		}
+		pvcLabels := r.getWellKnownLabels(synthesizedComp)
 		tmpPVC := &corev1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("%s-%s-%d", rebuildPrefix, common.CutString(synthesizedComp.Name+"-"+vct.Name, 30), index),

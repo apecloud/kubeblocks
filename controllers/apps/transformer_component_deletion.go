@@ -74,6 +74,7 @@ func (t *componentDeletionTransformer) Transform(ctx graph.TransformContext, dag
 
 	// step2: do the pre-terminate action if needed
 	if err := component.ReconcileCompPreTerminate(reqCtx, transCtx.Client, graphCli, cluster, comp, dag); err != nil {
+		reqCtx.Log.Info("failed to reconcile component pre-terminate action", "component", comp.Name, "error", err)
 		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeExpectedInProcess) {
 			// waiting for the preTerminate action to be done, and watch the action finish event to trigger the next reconcile
 			return nil

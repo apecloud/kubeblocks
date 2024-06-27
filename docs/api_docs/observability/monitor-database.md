@@ -56,9 +56,9 @@ Here is an example of enabling the `prometheus` addon. You can enable other moni
    ```bash
    helm list -A
    >
-   NAME                          NAMESPACE   REVISION    UPDATED                                 STATUS      CHART                           APP VERSION
+   NAME         NAMESPACE   REVISION    UPDATED                                 STATUS      CHART                APP VERSION
    ......
-   prometheus                  	kb-system	1       	   2024-05-31 12:01:52.872584 +0800 CST    deployed	 prometheus-15.16.1          	   2.39.1 
+   prometheus   kb-system   1           2024-05-31 12:01:52.872584 +0800 CST    deployed    prometheus-15.16.1   2.39.1 
    ```
 
 ### Enable the monitoring function for a database
@@ -92,7 +92,7 @@ componentSpecs:
     monitor: false # Change this value
 ```
 
-### View the dashboardß
+### View the dashboard
 
 Use the `grafana` addon provided by KubeBlocks to view the dashboard.
 

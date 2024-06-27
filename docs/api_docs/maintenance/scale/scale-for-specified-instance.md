@@ -19,8 +19,9 @@ To specify the instance to be offloaded, use `OfflineInstances`.
 
 ***Steps：***
 
-Use OpsRequest to specify the instance to scale.
-```
+Use an OpsRequest to specify the instance to scale.
+
+```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
@@ -35,12 +36,14 @@ spec:
   ttlSecondsAfterSucceed: 0
   type: HorizontalScaling
 ```
+
 The OpsRequest Controller directly overrides the values of `replicas` and `offlineInstances` in the request, mapping them to the corresponding fields in the Cluster object. Eventually, the Cluster Controller completes the task of offlining the instance named `foo-bar-1`.
 
 ***Example：***
+
 In the scenario of the above section, the PostgreSQL instance status is as follows:
 
-```
+```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
@@ -51,6 +54,7 @@ spec:
     replicas: 3
 # ...
 ```
+
 When we scale it down to 2 replica and offload the `foo-bar-1`, we can update as follows:
 ```
 apiVersion: apps.kubeblocks.io/v1alpha1

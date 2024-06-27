@@ -75,7 +75,7 @@ kbcli cluster describe-config pulsar
    下面以 `zookeeper` 为例。
 
    ```bash
-   kbcli cluster configure pulsar --component=zookeeper --set PULSAR_MEM="-XX:MinRAMPercentage=50 -XX:MaxRAMPercentage=70" 
+   kbcli cluster configure pulsar --components=zookeeper --set PULSAR_MEM="-XX:MinRAMPercentage=50 -XX:MaxRAMPercentage=70" 
    ```
 
 3. 验证配置。
@@ -101,7 +101,7 @@ kbcli cluster describe-config pulsar
 1. 获取配置信息。
 
    ```bash
-   kbcli cluster desc-config pulsar --component=broker
+   kbcli cluster desc-config pulsar --components=broker
    
    ConfigSpecs Meta:
    CONFIG-SPEC-NAME         FILE                   ENABLED   TEMPLATE                   CONSTRAINT                   RENDERED                               COMPONENT   CLUSTER
@@ -113,7 +113,7 @@ kbcli cluster describe-config pulsar
 2. 配置参数。
 
    ```bash
-   kbcli cluster configure pulsar --component=broker --config-spec=broker-config --set brokerShutdownTimeoutMs=66600
+   kbcli cluster configure pulsar --components=broker --config-spec=broker-config --set brokerShutdownTimeoutMs=66600
    >
    Will updated configure file meta:
      ConfigSpec: broker-config          ConfigFile: broker.conf        ComponentName: broker        ClusterName: pulsar
@@ -157,7 +157,7 @@ Linux 和 macOS 系统可以使用 vi 编辑器编辑配置文件，Windows 系�
 
    :::note
 
-   如果集群中有多个组件，请使用 `--component` 参数指定一个组件。
+   如果集群中有多个组件，请使用 `--components` 参数指定一个组件。
 
    :::
 
@@ -189,7 +189,7 @@ Linux 和 macOS 系统可以使用 vi 编辑器编辑配置文件，Windows 系�
 1. 获取包含配置文件的 configMap。下面以 `broker` 组件为例。
    
     ```bash
-    kbcli cluster desc-config pulsar --component=broker
+    kbcli cluster desc-config pulsar --components=broker
 
     ConfigSpecs Meta:
     CONFIG-SPEC-NAME         FILE                   ENABLED   TEMPLATE                   CONSTRAINT                   RENDERED                               COMPONENT   CLUSTER

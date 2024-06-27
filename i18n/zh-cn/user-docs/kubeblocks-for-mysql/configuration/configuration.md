@@ -207,7 +207,7 @@ Linux 和 macOS 系统可以使用 vi 编辑器编辑配置文件，Windows 系�
    :::note
 
    * ApeCloud MySQL 目前支持多个模板，需通过 `--config-spec` 指定一个配置模板。执行 `kbcli cluster describe-config mysql-cluster` 查看所有模板的名称。
-   * 如果集群中有多个组件，请使用 `--component` 参数指定一个组件。
+   * 如果集群中有多个组件，请使用 `--components` 参数指定一个组件。
 
    :::
 

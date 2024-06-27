@@ -176,7 +176,7 @@ Linux 和 macOS 系统可以使用 vi 编辑器编辑配置文件，Windows 系�
 
    :::note
 
-   如果集群中有多个组件，请使用 `--component` 参数指定一个组件。
+   如果集群中有多个组件，请使用 `--components` 参数指定一个组件。
 
    :::
 

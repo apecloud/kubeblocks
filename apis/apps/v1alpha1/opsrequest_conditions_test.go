@@ -20,7 +20,9 @@ import (
 	"testing"
 
 	"github.com/pkg/errors"
+	"github.com/sethvargo/go-password/password"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestNewAllCondition(t *testing.T) {
@@ -62,5 +64,23 @@ func TestSetStatusCondition(t *testing.T) {
 	checkCondition := meta.FindStatusCondition(opsRequest.Status.Conditions, progressingCondition.Type)
 	if checkCondition == nil {
 		t.Errorf(`Condition: %s should exist in OpsRequest.status.conditions`, progressingCondition.Type)
+	}
+}
+
+func createTestOpsRequest(clusterName, opsRequestName string, opsType OpsType) *OpsRequest {
+	randomStr, _ := password.Generate(6, 0, 0, true, false)
+	return &OpsRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      opsRequestName + randomStr,
+			Namespace: "default",
+			Labels: map[string]string{
+				"app.kubernetes.io/instance": clusterName,
+				"ops.kubeblocks.io/ops-type": string(opsType),
+			},
+		},
+		Spec: OpsRequestSpec{
+			ClusterName: clusterName,
+			Type:        opsType,
+		},
 	}
 }

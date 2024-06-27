@@ -28,19 +28,29 @@ import (
 
 type AppsV1Interface interface {
 	RESTClient() rest.Interface
+	ClustersGetter
 	ClusterDefinitionsGetter
+	ComponentsGetter
 	ComponentDefinitionsGetter
 	ComponentVersionsGetter
 	ServiceDescriptorsGetter
 }
 
-// AppsV1Client is used to interact with features provided by the apps group.
+// AppsV1Client is used to interact with features provided by the apps.kubeblocks.io group.
 type AppsV1Client struct {
 	restClient rest.Interface
 }
 
+func (c *AppsV1Client) Clusters(namespace string) ClusterInterface {
+	return newClusters(c, namespace)
+}
+
 func (c *AppsV1Client) ClusterDefinitions() ClusterDefinitionInterface {
 	return newClusterDefinitions(c)
+}
+
+func (c *AppsV1Client) Components(namespace string) ComponentInterface {
+	return newComponents(c, namespace)
 }
 
 func (c *AppsV1Client) ComponentDefinitions() ComponentDefinitionInterface {

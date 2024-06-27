@@ -31,7 +31,7 @@ type ExtensionsV1Interface interface {
 	AddonsGetter
 }
 
-// ExtensionsV1Client is used to interact with features provided by the extensions group.
+// ExtensionsV1Client is used to interact with features provided by the extensions.kubeblocks.io group.
 type ExtensionsV1Client struct {
 	restClient rest.Interface
 }

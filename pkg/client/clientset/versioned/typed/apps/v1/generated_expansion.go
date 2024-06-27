@@ -18,7 +18,11 @@ limitations under the License.
 
 package v1
 
+type ClusterExpansion interface{}
+
 type ClusterDefinitionExpansion interface{}
+
+type ComponentExpansion interface{}
 
 type ComponentDefinitionExpansion interface{}
 

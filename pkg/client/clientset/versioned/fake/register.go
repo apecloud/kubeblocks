@@ -39,15 +39,15 @@ var scheme = runtime.NewScheme()
 var codecs = serializer.NewCodecFactory(scheme)
 
 var localSchemeBuilder = runtime.SchemeBuilder{
-	appsv1.AddToScheme,
 	appsv1alpha1.AddToScheme,
 	appsv1beta1.AddToScheme,
+	appsv1.AddToScheme,
 	dataprotectionv1alpha1.AddToScheme,
-	extensionsv1.AddToScheme,
 	extensionsv1alpha1.AddToScheme,
+	extensionsv1.AddToScheme,
 	storagev1alpha1.AddToScheme,
-	workloadsv1.AddToScheme,
 	workloadsv1alpha1.AddToScheme,
+	workloadsv1.AddToScheme,
 }
 
 // AddToScheme adds all types of this clientset into the given scheme. This allows composition

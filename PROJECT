@@ -20,6 +20,15 @@ resources:
   version: v1alpha1
 - api:
     crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: kubeblocks.io
+  group: apps
+  kind: Cluster
+  path: github.com/apecloud/kubeblocks/apis/apps/v1
+  version: v1
+- api:
+    crdVersion: v1
   controller: true
   domain: kubeblocks.io
   group: apps
@@ -250,6 +259,15 @@ resources:
     defaulting: true
     validation: true
     webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: kubeblocks.io
+  group: apps
+  kind: Component
+  path: github.com/apecloud/kubeblocks/apis/apps/v1
+  version: v1
 - api:
     crdVersion: v1
   controller: true

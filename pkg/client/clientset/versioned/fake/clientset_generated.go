@@ -95,11 +95,6 @@ var (
 	_ testing.FakeClient  = &Clientset{}
 )
 
-// AppsV1 retrieves the AppsV1Client
-func (c *Clientset) AppsV1() appsv1.AppsV1Interface {
-	return &fakeappsv1.FakeAppsV1{Fake: &c.Fake}
-}
-
 // AppsV1alpha1 retrieves the AppsV1alpha1Client
 func (c *Clientset) AppsV1alpha1() appsv1alpha1.AppsV1alpha1Interface {
 	return &fakeappsv1alpha1.FakeAppsV1alpha1{Fake: &c.Fake}
@@ -110,14 +105,14 @@ func (c *Clientset) AppsV1beta1() appsv1beta1.AppsV1beta1Interface {
 	return &fakeappsv1beta1.FakeAppsV1beta1{Fake: &c.Fake}
 }
 
+// AppsV1 retrieves the AppsV1Client
+func (c *Clientset) AppsV1() appsv1.AppsV1Interface {
+	return &fakeappsv1.FakeAppsV1{Fake: &c.Fake}
+}
+
 // DataprotectionV1alpha1 retrieves the DataprotectionV1alpha1Client
 func (c *Clientset) DataprotectionV1alpha1() dataprotectionv1alpha1.DataprotectionV1alpha1Interface {
 	return &fakedataprotectionv1alpha1.FakeDataprotectionV1alpha1{Fake: &c.Fake}
-}
-
-// ExtensionsV1 retrieves the ExtensionsV1Client
-func (c *Clientset) ExtensionsV1() extensionsv1.ExtensionsV1Interface {
-	return &fakeextensionsv1.FakeExtensionsV1{Fake: &c.Fake}
 }
 
 // ExtensionsV1alpha1 retrieves the ExtensionsV1alpha1Client
@@ -125,17 +120,22 @@ func (c *Clientset) ExtensionsV1alpha1() extensionsv1alpha1.ExtensionsV1alpha1In
 	return &fakeextensionsv1alpha1.FakeExtensionsV1alpha1{Fake: &c.Fake}
 }
 
+// ExtensionsV1 retrieves the ExtensionsV1Client
+func (c *Clientset) ExtensionsV1() extensionsv1.ExtensionsV1Interface {
+	return &fakeextensionsv1.FakeExtensionsV1{Fake: &c.Fake}
+}
+
 // StorageV1alpha1 retrieves the StorageV1alpha1Client
 func (c *Clientset) StorageV1alpha1() storagev1alpha1.StorageV1alpha1Interface {
 	return &fakestoragev1alpha1.FakeStorageV1alpha1{Fake: &c.Fake}
 }
 
-// WorkloadsV1 retrieves the WorkloadsV1Client
-func (c *Clientset) WorkloadsV1() workloadsv1.WorkloadsV1Interface {
-	return &fakeworkloadsv1.FakeWorkloadsV1{Fake: &c.Fake}
-}
-
 // WorkloadsV1alpha1 retrieves the WorkloadsV1alpha1Client
 func (c *Clientset) WorkloadsV1alpha1() workloadsv1alpha1.WorkloadsV1alpha1Interface {
 	return &fakeworkloadsv1alpha1.FakeWorkloadsV1alpha1{Fake: &c.Fake}
+}
+
+// WorkloadsV1 retrieves the WorkloadsV1Client
+func (c *Clientset) WorkloadsV1() workloadsv1.WorkloadsV1Interface {
+	return &fakeworkloadsv1.FakeWorkloadsV1{Fake: &c.Fake}
 }

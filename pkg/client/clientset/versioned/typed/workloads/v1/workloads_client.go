@@ -31,7 +31,7 @@ type WorkloadsV1Interface interface {
 	InstanceSetsGetter
 }
 
-// WorkloadsV1Client is used to interact with features provided by the workloads group.
+// WorkloadsV1Client is used to interact with features provided by the workloads.kubeblocks.io group.
 type WorkloadsV1Client struct {
 	restClient rest.Interface
 }

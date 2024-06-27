@@ -88,7 +88,7 @@ func (c *cmpdConvertor) convert(source client.Object) []client.Object {
 				Vars:                   c.vars(cmpd.Spec.Vars),
 				Volumes:                c.volumes(cmpd.Spec.Volumes),
 				HostNetwork:            c.hostNetwork(cmpd.Spec.HostNetwork),
-				Services:               c.services(cmpd.Spec.Services),
+				Services:               componentServices(cmpd.Spec.Services),
 				Configs:                c.configs(cmpd.Spec.Configs),
 				Scripts:                c.scripts(cmpd.Spec.Scripts),
 				MetricExporter:         c.exporter(cmpd.Spec.Exporter),
@@ -299,7 +299,7 @@ func (c *cmpdConvertor) hostNetwork(hostNetwork *appsv1alpha1.HostNetwork) *apps
 	return newHostNetwork
 }
 
-func (c *cmpdConvertor) services(services []appsv1alpha1.ComponentService) []appsv1.ComponentService {
+func componentServices(services []appsv1alpha1.ComponentService) []appsv1.ComponentService {
 	if len(services) == 0 {
 		return nil
 	}

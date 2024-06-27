@@ -431,6 +431,13 @@ func (r rebuildInstanceOpsHandler) getPVCMapAndVolumes(opsRes *OpsResource,
 			volumePVCMap[volume.Name] = volume.PersistentVolumeClaim.ClaimName
 		}
 	}
+	// backup's ready, then start to check restore
+	workloadName := constant.GenerateWorkloadNamePattern(opsRes.Cluster.Name, synthesizedComp.Name)
+	templateName, _, err := component.GetTemplateNameAndOrdinal(workloadName, targetPod.Name)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	// TODO: create pvc by the volumeClaimTemplates of instance template if it is necessary.
 	for i, vct := range synthesizedComp.VolumeClaimTemplates {
 		sourcePVCName := volumePVCMap[vct.Name]
 		if sourcePVCName == "" {
@@ -447,7 +454,7 @@ func (r rebuildInstanceOpsHandler) getPVCMapAndVolumes(opsRes *OpsResource,
 			},
 			Spec: vct.Spec,
 		}
-		factory.BuildPersistentVolumeClaimLabels(synthesizedComp, tmpPVC, vct.Name)
+		factory.BuildPersistentVolumeClaimLabels(synthesizedComp, tmpPVC, vct.Name, templateName)
 		pvcMap[sourcePVCName] = tmpPVC
 		// build volumes and volumeMount
 		volumes = append(volumes, corev1.Volume{

@@ -35,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
@@ -141,14 +142,21 @@ func (d *baseDataClone) CloneData(realDataClone dataClone) ([]client.Object, []c
 			status, d.cluster.Name, d.component.Name))
 	}
 	// backup's ready, then start to check restore
-	for i := *d.itsObj.Spec.Replicas; i < d.component.Replicas; i++ {
-		restoreStatus, err := realDataClone.CheckRestoreStatus(i)
+	currentPodNames := generatePodNamesByITS(d.itsObj)
+	desiredPodNames := generatePodNames(d.component)
+	for _, podName := range desiredPodNames {
+		if slices.Contains(currentPodNames, podName) {
+			continue
+		}
+		_, ordinal := instanceset.ParseParentNameAndOrdinal(podName)
+		startingIndex := int32(ordinal)
+		restoreStatus, err := realDataClone.CheckRestoreStatus(startingIndex)
 		if err != nil {
 			return nil, nil, err
 		}
 		switch restoreStatus {
 		case "":
-			restoreObjs, err := realDataClone.restore(i)
+			restoreObjs, err := realDataClone.restore(startingIndex)
 			if err != nil {
 				return nil, nil, err
 			}

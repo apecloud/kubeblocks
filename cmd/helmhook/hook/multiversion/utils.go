@@ -18,13 +18,14 @@ package multiversion
 
 import (
 	"fmt"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strings"
 
-	"github.com/apecloud/kubeblocks/cmd/helmhook/hook"
 	"golang.org/x/exp/maps"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/apecloud/kubeblocks/cmd/helmhook/hook"
 )
 
 // func used(ctx context.Context, cli hook.CRClient, cdName string, namespaces []string) (bool, error) {
@@ -74,9 +75,9 @@ func (s *stat) error(name string, err error) {
 	s.errors[name] = err
 }
 
-func (s *stat) unused(name string) {
-	s.unuseds.Insert(name)
-}
+// func (s *stat) unused(name string) {
+//	s.unuseds.Insert(name)
+// }
 
 func (s *stat) native(name string) {
 	s.natives.Insert(name)

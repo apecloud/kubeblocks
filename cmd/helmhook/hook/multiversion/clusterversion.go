@@ -18,7 +18,6 @@ package multiversion
 
 import (
 	"context"
-	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -196,9 +195,9 @@ func (c *cvConvertor) convert(source client.Object) []client.Object {
 	return objects
 }
 
-func (c *cvConvertor) cmpvName(cv *appsv1alpha1.ClusterVersion, compDefRef string) string {
-	return fmt.Sprintf("%s-%s", cv.Spec.ClusterDefinitionRef, compDefRef)
-}
+// func (c *cvConvertor) cmpvName(cv *appsv1alpha1.ClusterVersion, compDefRef string) string {
+//	return fmt.Sprintf("%s-%s", cv.Spec.ClusterDefinitionRef, compDefRef)
+// }
 
 func (c *cvConvertor) releaseName(cv *appsv1alpha1.ClusterVersion) string {
 	return cv.GetName()

@@ -338,6 +338,12 @@ spec:
 
 ### Restart
 
+:::note
+
+Currently, restarting a Redis Cluster is not supported.
+
+:::
+
 ```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest

@@ -131,8 +131,6 @@ var _ = BeforeSuite(func() {
 
 	eventRecorder = k8sManager.GetEventRecorderFor("event-controller")
 
-	appsv1alpha1.RegisterWebhookManager(k8sManager)
-
 	testCtx = testutil.NewDefaultTestContext(ctx, k8sClient, testEnv)
 
 	go func() {

@@ -424,18 +424,25 @@ func (r rebuildInstanceOpsHandler) getPVCMapAndVolumes(opsRes *OpsResource,
 		// key: source pvc name, value: tmp pvc
 		pvcMap       = map[string]*corev1.PersistentVolumeClaim{}
 		volumePVCMap = map[string]string{}
-		pvcLabels    = r.getWellKnownLabels(synthesizedComp)
 	)
 	for _, volume := range targetPod.Spec.Volumes {
 		if volume.PersistentVolumeClaim != nil {
 			volumePVCMap[volume.Name] = volume.PersistentVolumeClaim.ClaimName
 		}
 	}
+	// backup's ready, then start to check restore
+	workloadName := constant.GenerateWorkloadNamePattern(opsRes.Cluster.Name, synthesizedComp.Name)
+	templateName, _, err := component.GetTemplateNameAndOrdinal(workloadName, targetPod.Name)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	// TODO: create pvc by the volumeClaimTemplates of instance template if it is necessary.
 	for i, vct := range synthesizedComp.VolumeClaimTemplates {
 		sourcePVCName := volumePVCMap[vct.Name]
 		if sourcePVCName == "" {
 			return nil, nil, nil, intctrlutil.NewFatalError("")
 		}
+		pvcLabels := r.getWellKnownLabels(synthesizedComp)
 		tmpPVC := &corev1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("%s-%s-%d", rebuildPrefix, common.CutString(synthesizedComp.Name+"-"+vct.Name, 30), index),
@@ -447,7 +454,7 @@ func (r rebuildInstanceOpsHandler) getPVCMapAndVolumes(opsRes *OpsResource,
 			},
 			Spec: vct.Spec,
 		}
-		factory.BuildPersistentVolumeClaimLabels(synthesizedComp, tmpPVC, vct.Name)
+		factory.BuildPersistentVolumeClaimLabels(synthesizedComp, tmpPVC, vct.Name, templateName)
 		pvcMap[sourcePVCName] = tmpPVC
 		// build volumes and volumeMount
 		volumes = append(volumes, corev1.Volume{

@@ -124,7 +124,7 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 	// TODO(xingran): synthesizedComp.VolumeTypes has been removed, and the following code needs to be refactored.
 	if len(itsObj.Spec.VolumeClaimTemplates) > 0 && len(itsObj.GetLabels()) > 0 {
 		for index, vct := range itsObj.Spec.VolumeClaimTemplates {
-			BuildPersistentVolumeClaimLabels(synthesizedComp, &vct, vct.Name)
+			BuildPersistentVolumeClaimLabels(synthesizedComp, &vct, vct.Name, "")
 			itsObj.Spec.VolumeClaimTemplates[index] = vct
 		}
 	}
@@ -181,7 +181,7 @@ func setDefaultResourceLimits(its *workloads.InstanceSet) {
 
 // BuildPersistentVolumeClaimLabels builds a pvc name label, and synchronize the labels from component to pvc.
 func BuildPersistentVolumeClaimLabels(component *component.SynthesizedComponent, pvc *corev1.PersistentVolumeClaim,
-	pvcTplName string) {
+	pvcTplName, templateName string) {
 	// strict args checking.
 	if pvc == nil || component == nil {
 		return
@@ -196,6 +196,9 @@ func BuildPersistentVolumeClaimLabels(component *component.SynthesizedComponent,
 			pvc.Labels[constant.VolumeTypeLabelKey] = string(t.Type)
 			break
 		}
+	}
+	if templateName != "" {
+		pvc.Labels[constant.KBAppComponentInstanceTemplateLabelKey] = templateName
 	}
 }
 
@@ -328,6 +331,7 @@ func BuildPVC(cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent,
 	vct *corev1.PersistentVolumeClaimTemplate,
 	pvcKey types.NamespacedName,
+	templateName,
 	snapshotName string) *corev1.PersistentVolumeClaim {
 	wellKnownLabels := constant.GetKBWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
 	pvcBuilder := builder.NewPVCBuilder(pvcKey.Namespace, pvcKey.Name).
@@ -347,7 +351,7 @@ func BuildPVC(cluster *appsv1alpha1.Cluster,
 		})
 	}
 	pvc := pvcBuilder.GetObject()
-	BuildPersistentVolumeClaimLabels(component, pvc, vct.Name)
+	BuildPersistentVolumeClaimLabels(component, pvc, vct.Name, templateName)
 	return pvc
 }
 

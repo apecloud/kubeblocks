@@ -526,60 +526,6 @@ func main() {
 	}
 	// +kubebuilder:scaffold:builder
 
-	if viper.GetBool("enable_webhooks") {
-		appsv1alpha1.RegisterWebhookManager(mgr)
-
-		if err = (&appsv1alpha1.Cluster{}).SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "Cluster")
-			os.Exit(1)
-		}
-
-		if err = (&appsv1alpha1.ClusterDefinition{}).SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "ClusterDefinition")
-			os.Exit(1)
-		}
-
-		if err = (&appsv1alpha1.ClusterVersion{}).SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "ClusterVersion")
-			os.Exit(1)
-		}
-
-		if err = (&appsv1alpha1.Component{}).SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "Component")
-			os.Exit(1)
-		}
-
-		if err = (&appsv1alpha1.ComponentDefinition{}).SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "ComponentDefinition")
-			os.Exit(1)
-		}
-
-		if err = (&appsv1alpha1.ComponentVersion{}).SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "ComponentVersion")
-			os.Exit(1)
-		}
-
-		if err = (&appsv1alpha1.OpsRequest{}).SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "OpsRequest")
-			os.Exit(1)
-		}
-
-		if err = (&workloadsv1alpha1.InstanceSet{}).SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "InstanceSet")
-			os.Exit(1)
-		}
-
-		if err = (&appsv1alpha1.ServiceDescriptor{}).SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "ServiceDescriptor")
-			os.Exit(1)
-		}
-
-		if err = (&appsv1beta1.ConfigConstraint{}).SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "ConfigConstraint")
-			os.Exit(1)
-		}
-	}
-
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")
 		os.Exit(1)

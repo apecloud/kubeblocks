@@ -76,12 +76,18 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	transCtx.EventRecorder.Eventf(cluster, corev1.EventTypeNormal, constant.ReasonDeletingCR, "Deleting %s: %s",
 		strings.ToLower(cluster.GetObjectKind().GroupVersionKind().Kind), cluster.GetName())
 
-	// delete components in the order that topology defined.
-	if err := deleteCompsInOrder4Terminate(transCtx, dag); err != nil {
+	// firstly, delete components in the order that topology defined.
+	deleteCompSet, err := deleteCompsInOrder4Terminate(transCtx, dag)
+	if err != nil {
 		return err
 	}
+	if len(deleteCompSet) > 0 {
+		// wait for the components to be deleted to trigger the next reconcile
+		transCtx.Logger.Info(fmt.Sprintf("wait for the components to be deleted: %v", deleteCompSet))
+		return nil
+	}
 
-	// list all objects owned by this cluster in cache, and delete them all
+	// then list all the others objects owned by this cluster in cache, and delete them all
 	ml := getAppInstanceML(*cluster)
 
 	toDeleteObjs := func(objs owningObjects) []client.Object {
@@ -120,10 +126,6 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	for _, o := range delObjs {
 		// skip the objects owned by the component and InstanceSet controller
 		if shouldSkipObjOwnedByComp(o, *cluster) || isOwnedByInstanceSet(o) {
-			continue
-		}
-		// skip component objects since they are deleted in the previous step.
-		if _, ok := o.(*appsv1alpha1.Component); ok {
 			continue
 		}
 		graphCli.Delete(dag, o, inUniversalContext4G())
@@ -215,16 +217,20 @@ func shouldSkipObjOwnedByComp(obj client.Object, cluster appsv1alpha1.Cluster) b
 	return true
 }
 
-func deleteCompsInOrder4Terminate(transCtx *clusterTransformContext, dag *graph.DAG) error {
+func deleteCompsInOrder4Terminate(transCtx *clusterTransformContext, dag *graph.DAG) (sets.Set[string], error) {
 	compNameSet, err := component.GetClusterComponentShortNameSet(transCtx.Context, transCtx.Client, transCtx.Cluster)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if len(compNameSet) == 0 {
-		return nil
+		return nil, nil
 	}
 	if err = loadNCheckClusterDefinition(transCtx, transCtx.Cluster); err != nil {
-		return err
+		return nil, err
 	}
-	return deleteCompsInOrder(transCtx, dag, compNameSet, true)
+	err = deleteCompsInOrder(transCtx, dag, compNameSet, true)
+	if err != nil {
+		return nil, err
+	}
+	return compNameSet, nil
 }

@@ -117,6 +117,14 @@ Use the `grafana` addon provided by KubeBlocks to view the dashboard.
 3. Open the web browser and enter the address `127.0.0.1:3000` to visit the dashboard.
 4. Enter the username and password obtained from step 1.
 
+:::note
+
+If there is no data in the dashboard, you can check whether the job is `kubeblocks-service`. Enter `kubeblocks-service` in the job field and press the enter button.
+
+![monitoring](./../../img/api-monitoring.png)
+
+:::
+
 ### (Optional) Enable remote write
 
 KubeBlocks supports the `victoria-metrics-agent` addon to enable you to remotely write the data to your VM. Compared with the native Prometheus, [vmgent](https://docs.victoriametrics.com/vmagent.html) is lighter.

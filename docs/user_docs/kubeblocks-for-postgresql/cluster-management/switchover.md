@@ -42,10 +42,10 @@ You can switch over a secondary of a PostgreSQL PrimaeySecondary database to the
     kbcli cluster promote mycluster --instance='mycluster-postgresql-2'
     ```
 
-* If there are multiple components, you can use `--component` to specify a component.
+* If there are multiple components, you can use `--components` to specify a component.
 
     ```bash
-    kbcli cluster promote mycluster --instance='mycluster-postgresql-2' --component='postgresql'
+    kbcli cluster promote mycluster --instance='mycluster-postgresql-2' --components='postgresql'
     ```
 
 

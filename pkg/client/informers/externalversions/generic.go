@@ -21,11 +21,14 @@ package externalversions
 import (
 	"fmt"
 
+	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	v1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	v1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	extensionsv1 "github.com/apecloud/kubeblocks/apis/extensions/v1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
+	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
@@ -57,7 +60,21 @@ func (f *genericInformer) Lister() cache.GenericLister {
 // TODO extend this to unknown resources with a client pool
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
-	// Group=apps.kubeblocks.io, Version=v1alpha1
+	// Group=apps.kubeblocks.io, Version=v1
+	case v1.SchemeGroupVersion.WithResource("clusters"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1().Clusters().Informer()}, nil
+	case v1.SchemeGroupVersion.WithResource("clusterdefinitions"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1().ClusterDefinitions().Informer()}, nil
+	case v1.SchemeGroupVersion.WithResource("components"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1().Components().Informer()}, nil
+	case v1.SchemeGroupVersion.WithResource("componentdefinitions"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1().ComponentDefinitions().Informer()}, nil
+	case v1.SchemeGroupVersion.WithResource("componentversions"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1().ComponentVersions().Informer()}, nil
+	case v1.SchemeGroupVersion.WithResource("servicedescriptors"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1().ServiceDescriptors().Informer()}, nil
+
+		// Group=apps.kubeblocks.io, Version=v1alpha1
 	case v1alpha1.SchemeGroupVersion.WithResource("backuppolicytemplates"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().BackupPolicyTemplates().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("clusters"):
@@ -101,6 +118,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	case dataprotectionv1alpha1.SchemeGroupVersion.WithResource("storageproviders"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Dataprotection().V1alpha1().StorageProviders().Informer()}, nil
 
+		// Group=extensions.kubeblocks.io, Version=v1
+	case extensionsv1.SchemeGroupVersion.WithResource("addons"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Extensions().V1().Addons().Informer()}, nil
+
 		// Group=extensions.kubeblocks.io, Version=v1alpha1
 	case extensionsv1alpha1.SchemeGroupVersion.WithResource("addons"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Extensions().V1alpha1().Addons().Informer()}, nil
@@ -108,6 +129,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		// Group=storage.kubeblocks.io, Version=v1alpha1
 	case storagev1alpha1.SchemeGroupVersion.WithResource("storageproviders"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Storage().V1alpha1().StorageProviders().Informer()}, nil
+
+		// Group=workloads.kubeblocks.io, Version=v1
+	case workloadsv1.SchemeGroupVersion.WithResource("instancesets"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Workloads().V1().InstanceSets().Informer()}, nil
 
 		// Group=workloads.kubeblocks.io, Version=v1alpha1
 	case workloadsv1alpha1.SchemeGroupVersion.WithResource("instancesets"):

@@ -37,6 +37,765 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: AGE
       type: date
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: Addon is the Schema for the add-ons API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: AddonSpec defines the desired state of Addon
+            properties:
+              cliPlugins:
+                description: Specifies the CLI plugin installation specifications.
+                items:
+                  properties:
+                    description:
+                      description: Provides a brief description of the plugin.
+                      type: string
+                    indexRepository:
+                      description: Defines the index repository of the plugin.
+                      type: string
+                    name:
+                      description: Specifies the name of the plugin.
+                      type: string
+                  required:
+                  - indexRepository
+                  - name
+                  type: object
+                type: array
+              defaultInstallValues:
+                description: Specifies the default installation parameters.
+                items:
+                  properties:
+                    enabled:
+                      description: Can be set to true if there are no specific installation
+                        attributes to be set.
+                      type: boolean
+                    extras:
+                      description: Specifies the installation specifications for extra
+                        items.
+                      items:
+                        properties:
+                          name:
+                            description: Specifies the name of the item.
+                            type: string
+                          persistentVolumeEnabled:
+                            description: Indicates whether the Persistent Volume is
+                              enabled or not.
+                            type: boolean
+                          replicas:
+                            description: Specifies the number of replicas.
+                            format: int32
+                            type: integer
+                          resources:
+                            description: Specifies the resource requirements.
+                            properties:
+                              limits:
+                                additionalProperties:
+                                  anyOf:
+                                  - type: integer
+                                  - type: string
+                                  pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                  x-kubernetes-int-or-string: true
+                                description: |-
+                                  Limits describes the maximum amount of compute resources allowed.
+                                  More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/.
+                                type: object
+                              requests:
+                                additionalProperties:
+                                  anyOf:
+                                  - type: integer
+                                  - type: string
+                                  pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                  x-kubernetes-int-or-string: true
+                                description: |-
+                                  Requests describes the minimum amount of compute resources required.
+                                  If Requests is omitted for a container, it defaults to Limits if that is explicitly specified;
+                                  otherwise, it defaults to an implementation-defined value.
+                                  More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/.
+                                type: object
+                            type: object
+                          storageClass:
+                            description: Specifies the name of the storage class.
+                            type: string
+                          tolerations:
+                            description: Specifies the tolerations in a JSON array
+                              string format.
+                            type: string
+                        required:
+                        - name
+                        type: object
+                      type: array
+                      x-kubernetes-list-map-keys:
+                      - name
+                      x-kubernetes-list-type: map
+                    persistentVolumeEnabled:
+                      description: Indicates whether the Persistent Volume is enabled
+                        or not.
+                      type: boolean
+                    replicas:
+                      description: Specifies the number of replicas.
+                      format: int32
+                      type: integer
+                    resources:
+                      description: Specifies the resource requirements.
+                      properties:
+                        limits:
+                          additionalProperties:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                            x-kubernetes-int-or-string: true
+                          description: |-
+                            Limits describes the maximum amount of compute resources allowed.
+                            More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/.
+                          type: object
+                        requests:
+                          additionalProperties:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                            x-kubernetes-int-or-string: true
+                          description: |-
+                            Requests describes the minimum amount of compute resources required.
+                            If Requests is omitted for a container, it defaults to Limits if that is explicitly specified;
+                            otherwise, it defaults to an implementation-defined value.
+                            More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/.
+                          type: object
+                      type: object
+                    selectors:
+                      description: |-
+                        Indicates the default selectors for add-on installations. If multiple selectors are provided,
+                        all selectors must evaluate to true.
+                      items:
+                        properties:
+                          key:
+                            description: |-
+                              The selector key. Valid values are KubeVersion, KubeGitVersion and KubeProvider.
+
+
+                              - `KubeVersion` the semver expression of Kubernetes versions, i.e., v1.24.
+                              - `KubeGitVersion` may contain distro. info., i.e., v1.24.4+eks.
+                              - `KubeProvider` the Kubernetes provider, i.e., aws, gcp, azure, huaweiCloud, tencentCloud etc.
+                            enum:
+                            - KubeGitVersion
+                            - KubeVersion
+                            - KubeProvider
+                            type: string
+                          operator:
+                            description: |-
+                              Represents a key's relationship to a set of values.
+                              Valid operators are Contains, NotIn, DoesNotContain, MatchRegex, and DoesNoteMatchRegex.
+
+
+                              Possible enum values:
+
+
+                              - `Contains` line contains a string.
+                              - `DoesNotContain` line does not contain a string.
+                              - `MatchRegex` line contains a match to the regular expression.
+                              - `DoesNotMatchRegex` line does not contain a match to the regular expression.
+                            enum:
+                            - Contains
+                            - DoesNotContain
+                            - MatchRegex
+                            - DoesNotMatchRegex
+                            type: string
+                          values:
+                            description: Represents an array of string values. This
+                              serves as an "OR" expression to the operator.
+                            items:
+                              type: string
+                            type: array
+                        required:
+                        - key
+                        - operator
+                        type: object
+                      type: array
+                    storageClass:
+                      description: Specifies the name of the storage class.
+                      type: string
+                    tolerations:
+                      description: Specifies the tolerations in a JSON array string
+                        format.
+                      type: string
+                  type: object
+                minItems: 1
+                type: array
+              description:
+                description: Specifies the description of the add-on.
+                type: string
+              helm:
+                description: |-
+                  Represents the Helm installation specifications. This is only processed
+                  when the type is set to 'helm'.
+                properties:
+                  chartLocationURL:
+                    description: Specifies the URL location of the Helm Chart.
+                    type: string
+                  chartsImage:
+                    description: Defines the image of Helm charts.
+                    type: string
+                  chartsPathInImage:
+                    description: |-
+                      Defines the path of Helm charts in the image. This path is used to copy
+                      Helm charts from the image to the shared volume. The default path is "/charts".
+                    type: string
+                  installOptions:
+                    additionalProperties:
+                      type: string
+                    description: Defines the options for Helm release installation.
+                    type: object
+                  installValues:
+                    description: Defines the set values for Helm release installation.
+                    properties:
+                      configMapRefs:
+                        description: |-
+                          Selects a key from a ConfigMap item list. The value can be
+                          a JSON or YAML string content. Use a key name with ".json", ".yaml", or ".yml"
+                          extension to specify a content type.
+                        items:
+                          properties:
+                            key:
+                              description: Specifies the key to be selected.
+                              type: string
+                            name:
+                              description: Defines the name of the object being referred
+                                to.
+                              pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                              type: string
+                          required:
+                          - key
+                          - name
+                          type: object
+                        type: array
+                      secretRefs:
+                        description: |-
+                          Selects a key from a Secrets item list. The value can be
+                          a JSON or YAML string content. Use a key name with ".json", ".yaml", or ".yml"
+                          extension to specify a content type.
+                        items:
+                          properties:
+                            key:
+                              description: Specifies the key to be selected.
+                              type: string
+                            name:
+                              description: Defines the name of the object being referred
+                                to.
+                              pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                              type: string
+                          required:
+                          - key
+                          - name
+                          type: object
+                        type: array
+                      setJSONValues:
+                        description: JSON values set during Helm installation. Multiple
+                          or separate values can be specified with commas (key1=jsonval1,key2=jsonval2).
+                        items:
+                          type: string
+                        type: array
+                      setValues:
+                        description: Values set during Helm installation. Multiple
+                          or separate values can be specified with commas (key1=val1,key2=val2).
+                        items:
+                          type: string
+                        type: array
+                      urls:
+                        description: Specifies the URL location of the values file.
+                        items:
+                          type: string
+                        type: array
+                    type: object
+                  valuesMapping:
+                    description: Defines the mapping of add-on normalized resources
+                      parameters to Helm values' keys.
+                    properties:
+                      extras:
+                        description: Helm value mapping items for extra items.
+                        items:
+                          properties:
+                            jsonMap:
+                              description: |-
+                                Defines the "key" mapping values. The valid key is tolerations.
+                                Enum values explained:
+
+
+                                - `tolerations` sets the toleration mapping key.
+                              properties:
+                                tolerations:
+                                  description: Specifies the toleration mapping key.
+                                  type: string
+                              type: object
+                            name:
+                              description: Name of the item.
+                              type: string
+                            resources:
+                              description: Sets resources related mapping keys.
+                              properties:
+                                cpu:
+                                  description: Specifies the key used for mapping
+                                    both CPU requests and limits.
+                                  properties:
+                                    limits:
+                                      description: Specifies the mapping key for the
+                                        limit value.
+                                      type: string
+                                    requests:
+                                      description: Specifies the mapping key for the
+                                        request value.
+                                      type: string
+                                  type: object
+                                memory:
+                                  description: Specifies the key used for mapping
+                                    both Memory requests and limits.
+                                  properties:
+                                    limits:
+                                      description: Specifies the mapping key for the
+                                        limit value.
+                                      type: string
+                                    requests:
+                                      description: Specifies the mapping key for the
+                                        request value.
+                                      type: string
+                                  type: object
+                                storage:
+                                  description: Specifies the key used for mapping
+                                    the storage size value.
+                                  type: string
+                              type: object
+                            valueMap:
+                              description: |-
+                                Defines the "key" mapping values. Valid keys include `replicaCount`,
+                                `persistentVolumeEnabled`, and `storageClass`.
+                                Enum values explained:
+
+
+                                - `replicaCount` sets the replicaCount value mapping key.
+                                - `persistentVolumeEnabled` sets the persistent volume enabled mapping key.
+                                - `storageClass` sets the storageClass mapping key.
+                              properties:
+                                persistentVolumeEnabled:
+                                  description: Indicates whether the persistent volume
+                                    is enabled in the Helm values map.
+                                  type: string
+                                replicaCount:
+                                  description: Defines the key for setting the replica
+                                    count in the Helm values map.
+                                  type: string
+                                storageClass:
+                                  description: Specifies the key for setting the storage
+                                    class in the Helm values map.
+                                  type: string
+                              type: object
+                          required:
+                          - name
+                          type: object
+                        type: array
+                        x-kubernetes-list-map-keys:
+                        - name
+                        x-kubernetes-list-type: map
+                      jsonMap:
+                        description: |-
+                          Defines the "key" mapping values. The valid key is tolerations.
+                          Enum values explained:
+
+
+                          - `tolerations` sets the toleration mapping key.
+                        properties:
+                          tolerations:
+                            description: Specifies the toleration mapping key.
+                            type: string
+                        type: object
+                      resources:
+                        description: Sets resources related mapping keys.
+                        properties:
+                          cpu:
+                            description: Specifies the key used for mapping both CPU
+                              requests and limits.
+                            properties:
+                              limits:
+                                description: Specifies the mapping key for the limit
+                                  value.
+                                type: string
+                              requests:
+                                description: Specifies the mapping key for the request
+                                  value.
+                                type: string
+                            type: object
+                          memory:
+                            description: Specifies the key used for mapping both Memory
+                              requests and limits.
+                            properties:
+                              limits:
+                                description: Specifies the mapping key for the limit
+                                  value.
+                                type: string
+                              requests:
+                                description: Specifies the mapping key for the request
+                                  value.
+                                type: string
+                            type: object
+                          storage:
+                            description: Specifies the key used for mapping the storage
+                              size value.
+                            type: string
+                        type: object
+                      valueMap:
+                        description: |-
+                          Defines the "key" mapping values. Valid keys include `replicaCount`,
+                          `persistentVolumeEnabled`, and `storageClass`.
+                          Enum values explained:
+
+
+                          - `replicaCount` sets the replicaCount value mapping key.
+                          - `persistentVolumeEnabled` sets the persistent volume enabled mapping key.
+                          - `storageClass` sets the storageClass mapping key.
+                        properties:
+                          persistentVolumeEnabled:
+                            description: Indicates whether the persistent volume is
+                              enabled in the Helm values map.
+                            type: string
+                          replicaCount:
+                            description: Defines the key for setting the replica count
+                              in the Helm values map.
+                            type: string
+                          storageClass:
+                            description: Specifies the key for setting the storage
+                              class in the Helm values map.
+                            type: string
+                        type: object
+                    type: object
+                required:
+                - chartLocationURL
+                type: object
+                x-kubernetes-validations:
+                - message: chartsImage is required when chartLocationURL starts with
+                    'file://'
+                  rule: 'self.chartLocationURL.startsWith(''file://'') ? has(self.chartsImage)
+                    : true'
+              install:
+                description: Defines the installation parameters.
+                properties:
+                  enabled:
+                    description: Can be set to true if there are no specific installation
+                      attributes to be set.
+                    type: boolean
+                  extras:
+                    description: Specifies the installation specifications for extra
+                      items.
+                    items:
+                      properties:
+                        name:
+                          description: Specifies the name of the item.
+                          type: string
+                        persistentVolumeEnabled:
+                          description: Indicates whether the Persistent Volume is
+                            enabled or not.
+                          type: boolean
+                        replicas:
+                          description: Specifies the number of replicas.
+                          format: int32
+                          type: integer
+                        resources:
+                          description: Specifies the resource requirements.
+                          properties:
+                            limits:
+                              additionalProperties:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                x-kubernetes-int-or-string: true
+                              description: |-
+                                Limits describes the maximum amount of compute resources allowed.
+                                More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/.
+                              type: object
+                            requests:
+                              additionalProperties:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                x-kubernetes-int-or-string: true
+                              description: |-
+                                Requests describes the minimum amount of compute resources required.
+                                If Requests is omitted for a container, it defaults to Limits if that is explicitly specified;
+                                otherwise, it defaults to an implementation-defined value.
+                                More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/.
+                              type: object
+                          type: object
+                        storageClass:
+                          description: Specifies the name of the storage class.
+                          type: string
+                        tolerations:
+                          description: Specifies the tolerations in a JSON array string
+                            format.
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
+                  persistentVolumeEnabled:
+                    description: Indicates whether the Persistent Volume is enabled
+                      or not.
+                    type: boolean
+                  replicas:
+                    description: Specifies the number of replicas.
+                    format: int32
+                    type: integer
+                  resources:
+                    description: Specifies the resource requirements.
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: |-
+                          Limits describes the maximum amount of compute resources allowed.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/.
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: |-
+                          Requests describes the minimum amount of compute resources required.
+                          If Requests is omitted for a container, it defaults to Limits if that is explicitly specified;
+                          otherwise, it defaults to an implementation-defined value.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/.
+                        type: object
+                    type: object
+                  storageClass:
+                    description: Specifies the name of the storage class.
+                    type: string
+                  tolerations:
+                    description: Specifies the tolerations in a JSON array string
+                      format.
+                    type: string
+                type: object
+              installable:
+                description: |-
+                  Represents the installable specifications of the add-on. This includes
+                  the selector and auto-install settings.
+                properties:
+                  autoInstall:
+                    default: false
+                    description: Indicates whether an add-on should be installed automatically.
+                    type: boolean
+                  selectors:
+                    description: |-
+                      Specifies the selectors for add-on installation. If multiple selectors are provided,
+                      they must all evaluate to true for the add-on to be installed.
+                    items:
+                      properties:
+                        key:
+                          description: |-
+                            The selector key. Valid values are KubeVersion, KubeGitVersion and KubeProvider.
+
+
+                            - `KubeVersion` the semver expression of Kubernetes versions, i.e., v1.24.
+                            - `KubeGitVersion` may contain distro. info., i.e., v1.24.4+eks.
+                            - `KubeProvider` the Kubernetes provider, i.e., aws, gcp, azure, huaweiCloud, tencentCloud etc.
+                          enum:
+                          - KubeGitVersion
+                          - KubeVersion
+                          - KubeProvider
+                          type: string
+                        operator:
+                          description: |-
+                            Represents a key's relationship to a set of values.
+                            Valid operators are Contains, NotIn, DoesNotContain, MatchRegex, and DoesNoteMatchRegex.
+
+
+                            Possible enum values:
+
+
+                            - `Contains` line contains a string.
+                            - `DoesNotContain` line does not contain a string.
+                            - `MatchRegex` line contains a match to the regular expression.
+                            - `DoesNotMatchRegex` line does not contain a match to the regular expression.
+                          enum:
+                          - Contains
+                          - DoesNotContain
+                          - MatchRegex
+                          - DoesNotMatchRegex
+                          type: string
+                        values:
+                          description: Represents an array of string values. This
+                            serves as an "OR" expression to the operator.
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - key
+                      - operator
+                      type: object
+                    type: array
+                required:
+                - autoInstall
+                type: object
+              provider:
+                description: Specifies the provider of the add-on.
+                type: string
+              type:
+                description: Defines the type of the add-on. The only valid value
+                  is 'helm'.
+                enum:
+                - Helm
+                type: string
+              version:
+                description: Indicates the version of the add-on.
+                type: string
+            required:
+            - defaultInstallValues
+            - type
+            type: object
+          status:
+            description: AddonStatus defines the observed state of an add-on.
+            properties:
+              conditions:
+                description: Provides a detailed description of the current state
+                  of add-on API installation.
+                items:
+                  description: "Condition contains details for one aspect of the current
+                    state of this API Resource.\n---\nThis struct is intended for
+                    direct use as an array at the field path .status.conditions.  For
+                    example,\n\n\n\ttype FooStatus struct{\n\t    // Represents the
+                    observations of a foo's current state.\n\t    // Known .status.conditions.type
+                    are: \"Available\", \"Progressing\", and \"Degraded\"\n\t    //
+                    +patchMergeKey=type\n\t    // +patchStrategy=merge\n\t    // +listType=map\n\t
+                    \   // +listMapKey=type\n\t    Conditions []metav1.Condition `json:\"conditions,omitempty\"
+                    patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`\n\n\n\t
+                    \   // other fields\n\t}"
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: |-
+                        type of condition in CamelCase or in foo.example.com/CamelCase.
+                        ---
+                        Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be
+                        useful (see .node.status.conditions), the ability to deconflict is important.
+                        The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              observedGeneration:
+                description: |-
+                  Represents the most recent generation observed for this add-on. It corresponds
+                  to the add-on's generation, which is updated on mutation by the API Server.
+                format: int64
+                type: integer
+              phase:
+                description: |-
+                  Defines the current installation phase of the add-on. It can take one of
+                  the following values: `Disabled`, `Enabled`, `Failed`, `Enabling`, `Disabling`.
+                enum:
+                - Disabled
+                - Enabled
+                - Failed
+                - Enabling
+                - Disabling
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+  - additionalPrinterColumns:
+    - description: addon types
+      jsonPath: .spec.type
+      name: TYPE
+      type: string
+    - description: addon version
+      jsonPath: .spec.version
+      name: VERSION
+      type: string
+    - description: addon provider
+      jsonPath: .spec.provider
+      name: PROVIDER
+      type: string
+    - description: status phase
+      jsonPath: .status.phase
+      name: STATUS
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
     name: v1alpha1
     schema:
       openAPIV3Schema:
@@ -777,6 +1536,6 @@ spec:
             type: object
         type: object
     served: true
-    storage: true
+    storage: false
     subresources:
       status: {}

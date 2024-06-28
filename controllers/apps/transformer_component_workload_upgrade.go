@@ -123,7 +123,7 @@ func (t *componentWorkloadUpgradeTransformer) Transform(ctx graph.TransformConte
 	if legacyFound {
 		// set status.observedGeneration to zero to trigger a creation reconciliation loop of the component controller.
 		comp.Status.ObservedGeneration = 0
-		return graph.ErrPrematureStop
+		return errPrematureStopWithSetCompOwnership(transCtx.Component, dag, graphCli)
 	}
 	return nil
 }

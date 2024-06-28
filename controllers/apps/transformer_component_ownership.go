@@ -44,7 +44,10 @@ func (f *componentOwnershipTransformer) Transform(ctx graph.TransformContext, da
 	transCtx, _ := ctx.(*componentTransformContext)
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	comp := transCtx.Component
+	return setCompOwnership(comp, dag, graphCli)
+}
 
+func setCompOwnership(comp *appsv1alpha1.Component, dag *graph.DAG, graphCli model.GraphClient) error {
 	// find all objects that are not component and set ownership to the component
 	objects := graphCli.FindAll(dag, &appsv1alpha1.Component{}, &model.HaveDifferentTypeWithOption{})
 	for _, object := range objects {
@@ -60,7 +63,6 @@ func (f *componentOwnershipTransformer) Transform(ctx graph.TransformContext, da
 			return err
 		}
 	}
-
 	return nil
 }
 
@@ -99,4 +101,14 @@ func skipAddCompFinalizer(obj client.Object, comp *appsv1alpha1.Component) bool 
 		}
 	}
 	return false
+}
+
+// errPrematureStopWithSetCompOwnership is a helper function that sets component ownership and returns graph.ErrPrematureStop
+// TODO: remove this function to independent component transformer utils
+func errPrematureStopWithSetCompOwnership(comp *appsv1alpha1.Component, dag *graph.DAG, graphCli model.GraphClient) error {
+	err := setCompOwnership(comp, dag, graphCli)
+	if err != nil {
+		return err
+	}
+	return graph.ErrPrematureStop
 }

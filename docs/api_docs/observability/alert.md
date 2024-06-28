@@ -1,13 +1,11 @@
 ---
 title: Configure alert
 description: How to enable alert
-keywords: [mysql, alert, alert message, email alert]
+keywords: [alert, alert message, email alert]
 sidebar_position: 2
 ---
 
 # Configure alert
-
-## Configure alert
 
 Alerts are mainly used for daily error response to improve system availability. KubeBlocks uses the open-source version of Prometheus to configure alert rules and multiple notification channels. The alert capability of KubeBlocks can meet the operation and maintenance requirements of production-level online clusters.
 
@@ -17,7 +15,7 @@ The alert function is the same for all.
 
 :::
 
-### Alert rules
+## Alert rules
 
 KubeBlocks uses the open-source version of Prometheus to meet the needs of various data products. These alert rules provide the best practice for cluster operation and maintenance, which further improve alert accuracy and reduce the probability of false negatives and false positives by experience-based smoothing windows, alert thresholds, alert levels, and alert indicators.
 
@@ -41,7 +39,7 @@ alert: PostgreSQLTooManyConnections
 
 Configure alert rules as needed. For more details, please refer to [Prometheus alerting rules](https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/#defining-alerting-rules).
 
-### Notifications
+## Notifications
 
 The alert message notification of KubeBlocks mainly adopts the AlertManager native capability. After receiving the Prometheus alert, KubeBlocks performs steps including deduplication, grouping, silence, suppression, and routing, and finally sends it to the corresponding notification channel.
 

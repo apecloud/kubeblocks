@@ -28,7 +28,6 @@ import (
 // +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:storageversion
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cd
 // +kubebuilder:printcolumn:name="Topologies",type="string",JSONPath=".status.topologies",description="topologies"
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"

@@ -29,7 +29,6 @@ import (
 // +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:storageversion
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster
 // +kubebuilder:printcolumn:name="TYPE",type="string",JSONPath=".spec.type",description="addon types"
 // +kubebuilder:printcolumn:name="VERSION",type="string",JSONPath=".spec.version",description="addon version"

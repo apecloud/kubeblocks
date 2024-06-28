@@ -119,6 +119,7 @@ type ComponentVersionStatus struct {
 // +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:storageversion
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cmpv
 // +kubebuilder:printcolumn:name="Versions",type="string",JSONPath=".status.serviceVersions",description="service versions"
 // +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.phase",description="status phase"

@@ -128,7 +128,9 @@ func (r *RestoreManager) DoPrepareData(comp *component.SynthesizedComponent,
 		if err != nil {
 			return err
 		}
-		restores = append(restores, restore)
+		if restore != nil {
+			restores = append(restores, restore)
+		}
 	}
 	compReplicas := comp.Replicas - templateReplicas
 	if compReplicas > 0 {
@@ -137,7 +139,9 @@ func (r *RestoreManager) DoPrepareData(comp *component.SynthesizedComponent,
 		if err != nil {
 			return err
 		}
-		restores = append(restores, restore)
+		if restore != nil {
+			restores = append(restores, restore)
+		}
 	}
 	return r.createRestoreAndWait(compObj, restores...)
 }

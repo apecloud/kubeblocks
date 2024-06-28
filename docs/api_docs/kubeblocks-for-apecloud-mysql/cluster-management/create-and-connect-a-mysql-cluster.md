@@ -49,7 +49,7 @@ cat <<EOF | kubectl apply -f -
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: acmysql-cluster
+  name: mycluster
   namespace: default
 spec:
   clusterDefinitionRef: apecloud-mysql

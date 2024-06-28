@@ -18,6 +18,8 @@ package multiversion
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +29,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/cmd/helmhook/hook"
 	"github.com/apecloud/kubeblocks/pkg/client/clientset/versioned"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 // covert appsv1alpha1.componentdefinition resources to appsv1.componentdefinition
@@ -48,15 +51,16 @@ func init() {
 
 func cmpdHandler() hook.ConversionHandler {
 	return &convertor{
-		sourceKind: &cmpdConvertor{},
-		targetKind: &cmpdConvertor{},
+		kind: "ComponentDefinition",
+		source: &cmpdConvertor{
+			namespaces: []string{"default"}, // TODO: namespaces
+		},
+		target: &cmpdConvertor{},
 	}
 }
 
-type cmpdConvertor struct{}
-
-func (c *cmpdConvertor) kind() string {
-	return "ComponentDefinition"
+type cmpdConvertor struct {
+	namespaces []string
 }
 
 func (c *cmpdConvertor) list(ctx context.Context, cli *versioned.Clientset, _ string) ([]client.Object, error) {
@@ -69,6 +73,26 @@ func (c *cmpdConvertor) list(ctx context.Context, cli *versioned.Clientset, _ st
 		addons = append(addons, &list.Items[i])
 	}
 	return addons, nil
+}
+
+func (c *cmpdConvertor) used(ctx context.Context, cli *versioned.Clientset, _, name string) (bool, error) {
+	selectors := []string{
+		fmt.Sprintf("%s=%s", constant.AppManagedByLabelKey, constant.AppName),
+		fmt.Sprintf("%s=%s", constant.ComponentDefinitionLabelKey, name),
+	}
+	opts := metav1.ListOptions{
+		LabelSelector: strings.Join(selectors, ","),
+	}
+
+	used := false
+	for _, namespace := range c.namespaces {
+		compList, err := cli.AppsV1alpha1().Components(namespace).List(ctx, opts)
+		if err != nil {
+			return false, err
+		}
+		used = used || (len(compList.Items) > 0)
+	}
+	return used, nil
 }
 
 func (c *cmpdConvertor) get(ctx context.Context, cli *versioned.Clientset, _, name string) (client.Object, error) {

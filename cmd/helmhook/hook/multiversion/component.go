@@ -47,17 +47,14 @@ func init() {
 
 func compHandler() hook.ConversionHandler {
 	return &convertor{
+		kind:       "Component",
+		source:     &compConvertor{},
+		target:     &compConvertor{},
 		namespaces: []string{"default"}, // TODO: namespaces
-		sourceKind: &compConvertor{},
-		targetKind: &compConvertor{},
 	}
 }
 
 type compConvertor struct{}
-
-func (c *compConvertor) kind() string {
-	return "Component"
-}
 
 func (c *compConvertor) list(ctx context.Context, cli *versioned.Clientset, namespace string) ([]client.Object, error) {
 	list, err := cli.AppsV1alpha1().Components(namespace).List(ctx, metav1.ListOptions{})
@@ -69,6 +66,10 @@ func (c *compConvertor) list(ctx context.Context, cli *versioned.Clientset, name
 		addons = append(addons, &list.Items[i])
 	}
 	return addons, nil
+}
+
+func (c *compConvertor) used(context.Context, *versioned.Clientset, string, string) (bool, error) {
+	return true, nil
 }
 
 func (c *compConvertor) get(ctx context.Context, cli *versioned.Clientset, namespace, name string) (client.Object, error) {

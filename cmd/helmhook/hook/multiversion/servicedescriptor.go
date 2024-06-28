@@ -44,17 +44,14 @@ func init() {
 
 func sdHandler() hook.ConversionHandler {
 	return &convertor{
+		kind:       "ServiceDescriptor",
+		source:     &sdConvertor{},
+		target:     &sdConvertor{},
 		namespaces: []string{"default"}, // TODO: namespaces
-		sourceKind: &sdConvertor{},
-		targetKind: &sdConvertor{},
 	}
 }
 
 type sdConvertor struct{}
-
-func (c *sdConvertor) kind() string {
-	return "ServiceDescriptor"
-}
 
 func (c *sdConvertor) list(ctx context.Context, cli *versioned.Clientset, namespace string) ([]client.Object, error) {
 	list, err := cli.AppsV1alpha1().ServiceDescriptors(namespace).List(ctx, metav1.ListOptions{})
@@ -66,6 +63,10 @@ func (c *sdConvertor) list(ctx context.Context, cli *versioned.Clientset, namesp
 		addons = append(addons, &list.Items[i])
 	}
 	return addons, nil
+}
+
+func (c *sdConvertor) used(context.Context, *versioned.Clientset, string, string) (bool, error) {
+	return true, nil
 }
 
 func (c *sdConvertor) get(ctx context.Context, cli *versioned.Clientset, namespace, name string) (client.Object, error) {

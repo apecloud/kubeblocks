@@ -44,16 +44,13 @@ func init() {
 
 func addonHandler() hook.ConversionHandler {
 	return &convertor{
-		sourceKind: &addonConvertor{},
-		targetKind: &addonConvertor{},
+		kind:   "Addon",
+		source: &addonConvertor{},
+		target: &addonConvertor{},
 	}
 }
 
 type addonConvertor struct{}
-
-func (c *addonConvertor) kind() string {
-	return "Addon"
-}
 
 func (c *addonConvertor) list(ctx context.Context, cli *versioned.Clientset, _ string) ([]client.Object, error) {
 	addonList, err := cli.ExtensionsV1alpha1().Addons().List(ctx, metav1.ListOptions{})
@@ -65,6 +62,10 @@ func (c *addonConvertor) list(ctx context.Context, cli *versioned.Clientset, _ s
 		addons = append(addons, &addonList.Items[i])
 	}
 	return addons, nil
+}
+
+func (c *addonConvertor) used(context.Context, *versioned.Clientset, string, string) (bool, error) {
+	return true, nil
 }
 
 func (c *addonConvertor) get(ctx context.Context, cli *versioned.Clientset, _, name string) (client.Object, error) {

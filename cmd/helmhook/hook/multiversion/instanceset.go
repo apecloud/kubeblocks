@@ -42,17 +42,14 @@ func init() {
 
 func itsHandler() hook.ConversionHandler {
 	return &convertor{
+		kind:       "InstanceSet",
+		source:     &itsConvertor{},
+		target:     &itsConvertor{},
 		namespaces: []string{"default"}, // TODO: namespaces
-		sourceKind: &itsConvertor{},
-		targetKind: &itsConvertor{},
 	}
 }
 
 type itsConvertor struct{}
-
-func (c *itsConvertor) kind() string {
-	return "InstanceSet"
-}
 
 func (c *itsConvertor) list(ctx context.Context, cli *versioned.Clientset, namespace string) ([]client.Object, error) {
 	list, err := cli.WorkloadsV1alpha1().InstanceSets(namespace).List(ctx, metav1.ListOptions{})
@@ -64,6 +61,10 @@ func (c *itsConvertor) list(ctx context.Context, cli *versioned.Clientset, names
 		addons = append(addons, &list.Items[i])
 	}
 	return addons, nil
+}
+
+func (c *itsConvertor) used(context.Context, *versioned.Clientset, string, string) (bool, error) {
+	return true, nil
 }
 
 func (c *itsConvertor) get(ctx context.Context, cli *versioned.Clientset, namespace, name string) (client.Object, error) {

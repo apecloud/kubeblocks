@@ -28,6 +28,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/cmd/helmhook/hook"
 	"github.com/apecloud/kubeblocks/pkg/client/clientset/versioned"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 // covert appsv1alpha1.clusterversion resources to appsv1.componentversion
@@ -122,15 +123,16 @@ func init() {
 
 func cvHandler() hook.ConversionHandler {
 	return &convertor{
-		sourceKind: &cvConvertor{},
-		targetKind: &cvConvertor{},
+		kind: "ClusterVersion",
+		source: &cvConvertor{
+			namespaces: []string{"default"}, // TODO: namespaces
+		},
+		target: &cvConvertor{},
 	}
 }
 
-type cvConvertor struct{}
-
-func (c *cvConvertor) kind() string {
-	return "ClusterVersion"
+type cvConvertor struct {
+	namespaces []string
 }
 
 func (c *cvConvertor) list(ctx context.Context, cli *versioned.Clientset, _ string) ([]client.Object, error) {
@@ -145,7 +147,12 @@ func (c *cvConvertor) list(ctx context.Context, cli *versioned.Clientset, _ stri
 	return addons, nil
 }
 
+func (c *cvConvertor) used(ctx context.Context, cli *versioned.Clientset, _, name string) (bool, error) {
+	return checkUsedByCluster(ctx, cli, constant.AppVersionLabelKey, name, c.namespaces)
+}
+
 func (c *cvConvertor) get(ctx context.Context, cli *versioned.Clientset, _, name string) (client.Object, error) {
+	// there is no cv in v1 version.
 	return nil, apierrors.NewNotFound(cvGVR.GroupResource(), name)
 }
 

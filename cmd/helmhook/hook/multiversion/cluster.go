@@ -46,17 +46,14 @@ func init() {
 
 func clusterHandler() hook.ConversionHandler {
 	return &convertor{
+		kind:       "Cluster",
+		source:     &clusterConvertor{},
+		target:     &clusterConvertor{},
 		namespaces: []string{"default"}, // TODO: namespaces
-		sourceKind: &clusterConvertor{},
-		targetKind: &clusterConvertor{},
 	}
 }
 
 type clusterConvertor struct{}
-
-func (c *clusterConvertor) kind() string {
-	return "Cluster"
-}
 
 func (c *clusterConvertor) list(ctx context.Context, cli *versioned.Clientset, namespace string) ([]client.Object, error) {
 	list, err := cli.AppsV1alpha1().Clusters(namespace).List(ctx, metav1.ListOptions{})
@@ -68,6 +65,10 @@ func (c *clusterConvertor) list(ctx context.Context, cli *versioned.Clientset, n
 		addons = append(addons, &list.Items[i])
 	}
 	return addons, nil
+}
+
+func (c *clusterConvertor) used(context.Context, *versioned.Clientset, string, string) (bool, error) {
+	return true, nil
 }
 
 func (c *clusterConvertor) get(ctx context.Context, cli *versioned.Clientset, namespace, name string) (client.Object, error) {

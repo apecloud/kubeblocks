@@ -19,6 +19,7 @@ package multiversion
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -27,6 +28,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/cmd/helmhook/hook"
 	"github.com/apecloud/kubeblocks/pkg/client/clientset/versioned"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 // covert appsv1alpha1.clusterdefinition resources to:
@@ -47,15 +49,16 @@ func init() {
 
 func cdHandler() hook.ConversionHandler {
 	return &convertor{
-		sourceKind: &cdConvertor{},
-		targetKind: &cdConvertor{},
+		kind: "ClusterDefinition",
+		source: &cdConvertor{
+			namespaces: []string{"default"}, // TODO: namespaces
+		},
+		target: &cdConvertor{},
 	}
 }
 
-type cdConvertor struct{}
-
-func (c *cdConvertor) kind() string {
-	return "ClusterDefinition"
+type cdConvertor struct {
+	namespaces []string
 }
 
 func (c *cdConvertor) list(ctx context.Context, cli *versioned.Clientset, _ string) ([]client.Object, error) {
@@ -68,6 +71,10 @@ func (c *cdConvertor) list(ctx context.Context, cli *versioned.Clientset, _ stri
 		addons = append(addons, &list.Items[i])
 	}
 	return addons, nil
+}
+
+func (c *cdConvertor) used(ctx context.Context, cli *versioned.Clientset, _, name string) (bool, error) {
+	return checkUsedByCluster(ctx, cli, constant.AppNameLabelKey, name, c.namespaces)
 }
 
 func (c *cdConvertor) get(ctx context.Context, cli *versioned.Clientset, _, name string) (client.Object, error) {
@@ -112,6 +119,27 @@ func (c *cdConvertor) topologies(topologies []appsv1alpha1.ClusterTopology) []ap
 		newTopologies = append(newTopologies, topology)
 	}
 	return newTopologies
+}
+
+// checkUsedByCluster checks if a resource is used by any cluster in the given namespaces.
+func checkUsedByCluster(ctx context.Context, cli *versioned.Clientset, labelKey, resourceName string, namespaces []string) (bool, error) {
+	selectors := []string{
+		fmt.Sprintf("%s=%s", constant.AppManagedByLabelKey, constant.AppName),
+		fmt.Sprintf("%s=%s", labelKey, resourceName),
+	}
+	opts := metav1.ListOptions{
+		LabelSelector: strings.Join(selectors, ","),
+	}
+
+	used := false
+	for _, namespace := range namespaces {
+		clusterList, err := cli.AppsV1alpha1().Clusters(namespace).List(ctx, opts)
+		if err != nil {
+			return false, err
+		}
+		used = used || (len(clusterList.Items) > 0)
+	}
+	return used, nil
 }
 
 func generatedCmpdName(clusterDef, compDef string) string {

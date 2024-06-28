@@ -43,16 +43,13 @@ func init() {
 
 func cmpvHandler() hook.ConversionHandler {
 	return &convertor{
-		sourceKind: &cmpvConvertor{},
-		targetKind: &cmpvConvertor{},
+		kind:   "ComponentVersion",
+		source: &cmpvConvertor{},
+		target: &cmpvConvertor{},
 	}
 }
 
 type cmpvConvertor struct{}
-
-func (c *cmpvConvertor) kind() string {
-	return "ComponentVersion"
-}
 
 func (c *cmpvConvertor) list(ctx context.Context, cli *versioned.Clientset, _ string) ([]client.Object, error) {
 	list, err := cli.AppsV1alpha1().ComponentVersions().List(ctx, metav1.ListOptions{})
@@ -64,6 +61,11 @@ func (c *cmpvConvertor) list(ctx context.Context, cli *versioned.Clientset, _ st
 		addons = append(addons, &list.Items[i])
 	}
 	return addons, nil
+}
+
+func (c *cmpvConvertor) used(context.Context, *versioned.Clientset, string, string) (bool, error) {
+	// there is no simple way to check if a cmpv is used by any component
+	return true, nil
 }
 
 func (c *cmpvConvertor) get(ctx context.Context, cli *versioned.Clientset, _, name string) (client.Object, error) {

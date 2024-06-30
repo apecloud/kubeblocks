@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"sync"
@@ -169,7 +170,7 @@ func (opsMgr *OpsManager) Reconcile(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		return 0, opsMgr.handleOpsCompleted(reqCtx, cli, opsRes, opsRequestPhase,
 			appsv1alpha1.NewCancelFailedCondition(opsRequest, err), appsv1alpha1.NewFailedCondition(opsRequest, err))
 	default:
-		return requeueAfter, nil
+		return opsMgr.handleOpsIsRunningTimedOut(reqCtx, cli, opsRes, requeueAfter)
 	}
 }
 
@@ -229,6 +230,36 @@ func (opsMgr *OpsManager) validateDependOnSuccessfulOps(reqCtx intctrlutil.Reque
 		}
 	}
 	return true, nil
+}
+
+// handleOpsIsRunningTimedOut handles if the opsRequest is timed out.
+func (opsMgr *OpsManager) handleOpsIsRunningTimedOut(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	opsRes *OpsResource,
+	requeueAfter time.Duration) (time.Duration, error) {
+	timeoutSeconds := opsRes.OpsRequest.Spec.TimeoutSeconds
+	if timeoutSeconds == nil || *timeoutSeconds == 0 {
+		return requeueAfter, nil
+	}
+	checkTimedOut := func(startTime metav1.Time) (time.Duration, error) {
+		timeoutPoint := startTime.Add(time.Duration(*timeoutSeconds))
+		if time.Now().After(timeoutPoint) {
+			return 0, PatchOpsStatus(reqCtx.Ctx, cli, opsRes, appsv1alpha1.OpsAbortedPhase,
+				appsv1alpha1.NewAbortedCondition(fmt.Sprintf("Aborted due to exceeding the specified timeout period (timeoutSeconds)")))
+		}
+		if requeueAfter != 0 {
+			return requeueAfter, nil
+		}
+		return timeoutPoint.Sub(time.Now()), nil
+	}
+	if !opsRes.OpsRequest.Spec.Cancel {
+		return checkTimedOut(opsRes.OpsRequest.Status.StartTimestamp)
+	}
+	if opsRes.OpsRequest.Status.CancelTimestamp.IsZero() {
+		return requeueAfter, nil
+	}
+	// After canceling opsRequest, recalculate whether the opsRequest runs out of time based on the cancellation time point
+	return checkTimedOut(opsRes.OpsRequest.Status.CancelTimestamp)
 }
 
 func GetOpsManager() *OpsManager {

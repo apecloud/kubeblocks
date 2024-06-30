@@ -884,5 +884,41 @@ var _ = Describe("OpsRequest Controller", func() {
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(restartOps2))).Should(Equal(appsv1alpha1.OpsRunningPhase))
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(exposeOps2))).Should(Equal(appsv1alpha1.OpsSucceedPhase))
 		})
+
+		FIt("test opsRequest timeout", func() {
+			By("create cluster and mock it to running")
+			replicas := int32(3)
+			createMysqlCluster(replicas)
+			mockCompRunning(replicas, false)
+
+			By("create a opsRequest and specified the timeoutSeconds to 1")
+			ops := testapps.NewOpsRequestObj("restart-ops-1", testCtx.DefaultNamespace,
+				clusterObj.Name, appsv1alpha1.HorizontalScalingType)
+			ops.Spec.TimeoutSeconds = pointer.Int32(1)
+			ops.Spec.HorizontalScalingList = []appsv1alpha1.HorizontalScaling{
+				{
+					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: mysqlCompName},
+					ScaleOut:     &appsv1alpha1.ScaleOut{ReplicaChanger: appsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)}},
+				},
+			}
+			testapps.CreateOpsRequest(ctx, testCtx, ops)
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops))).Should(Equal(appsv1alpha1.OpsRunningPhase))
+
+			By("create a next opsRequest")
+			ops1 := createRestartOps(clusterObj.Name, 2, true)
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).Should(Equal(appsv1alpha1.OpsPendingPhase))
+
+			By("mock timeout")
+			time.Sleep(time.Second)
+			Expect(testapps.ChangeObj(&testCtx, ops, func(ops *appsv1alpha1.OpsRequest) {
+				ops.Annotations = map[string]string{
+					constant.ReconcileAnnotationKey: ops.ResourceVersion,
+				}
+			})).Should(Succeed())
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops))).Should(Equal(appsv1alpha1.OpsAbortedPhase))
+
+			By("expect for the next ops is running")
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).ShouldNot(Equal(appsv1alpha1.OpsPendingPhase))
+		})
 	})
 })

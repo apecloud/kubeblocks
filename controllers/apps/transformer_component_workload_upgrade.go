@@ -90,12 +90,17 @@ func (t *componentWorkloadUpgradeTransformer) Transform(ctx graph.TransformConte
 				object.GetLabels()[instanceset.WorkloadsManagedByLabelKey] = workloads.Kind
 				object.GetLabels()[instanceset.WorkloadsInstanceLabelKey] = comp.Name
 
-				// fix ownerReference and finalizer of Service and ConfigMap:
+				// fix labels, ownerReference and finalizer of Service and ConfigMap:
 				// assume all the OwnerReferences and Finalizers were set by the KubeBlocks.
 				// set them to empty and the InstanceSet Controller will fix them.
 				if isSvc || isCM {
 					object.SetOwnerReferences([]metav1.OwnerReference{})
 					object.SetFinalizers([]string{})
+					delete(object.GetLabels(), constant.AppManagedByLabelKey)
+					delete(object.GetLabels(), constant.AppNameLabelKey)
+					delete(object.GetLabels(), constant.AppComponentLabelKey)
+					delete(object.GetLabels(), constant.AppInstanceLabelKey)
+					delete(object.GetLabels(), constant.KBAppComponentLabelKey)
 				}
 
 				// fix revision of Pods

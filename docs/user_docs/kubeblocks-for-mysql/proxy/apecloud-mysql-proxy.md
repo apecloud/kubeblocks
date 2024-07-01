@@ -67,7 +67,7 @@ ApeCloud MySQL Proxy is routed through the `vtgate` component, and the way the M
 Run the command below to connect to the Proxy Cluster.
 
 ```bash
-kbcli cluster connect myproxy --component vtgate
+kbcli cluster connect myproxy --components vtgate
 ```
 
 ### Connect Proxy Cluster by MySQL Server
@@ -100,7 +100,7 @@ while true; do date; kubectl port-forward svc/vt-mysql 3306:3306; sleep 0.5; don
 
 ## Configure Proxy Cluster parameters
 
-VTGate, VTConsensus, and VTTablet support parameter configuration. You can configure VTGate and VTConsensus by using `--component` to specify a component and configure VTTablet by using `--component=mysql --config-specs=vttablet-config` to specify both a component and a configuration file template since VTTablet is the sidecar of the MySQL component.
+VTGate, VTConsensus, and VTTablet support parameter configuration. You can configure VTGate and VTConsensus by using `--components` to specify a component and configure VTTablet by using `--components=mysql --config-specs=vttablet-config` to specify both a component and a configuration file template since VTTablet is the sidecar of the MySQL component.
 
 ### View parameter details
 
@@ -108,29 +108,29 @@ VTGate, VTConsensus, and VTTablet support parameter configuration. You can confi
 
    ```bash
    # vtgate
-   kbcli cluster describe-config myproxy --component vtgate --show-detai
+   kbcli cluster describe-config myproxy --components vtgate --show-detai
    
    # vtcontroller
-   kbcli cluster describe-config myproxy --component vtcontroller --show-detail
+   kbcli cluster describe-config myproxy --components vtcontroller --show-detail
    
    # vttablet
-   kbcli cluster describe-config myproxy --component mysql --show-detail --config-specs vttablet-config
+   kbcli cluster describe-config myproxy --components mysql --show-detail --config-specs vttablet-config
    ```
 
 * View the parameter descriptions.
 
    ```bash
    # vtgate
-   kbcli cluster explain-config myproxy --component vtgate
+   kbcli cluster explain-config myproxy --components vtgate
 
    # vttablet
-   kbcli cluster explain-config myproxy --component mysql --config-specs=vttablet-config
+   kbcli cluster explain-config myproxy --components mysql --config-specs=vttablet-config
    ```
 
 * View the definition of a specified parameter.
 
    ```bash
-   kbcli cluster explain-config myproxy --component vtgate --param=healthcheck_timeout
+   kbcli cluster explain-config myproxy --components vtgate --param=healthcheck_timeout
    ```
 
 ### Reconfigure parameters
@@ -138,7 +138,7 @@ VTGate, VTConsensus, and VTTablet support parameter configuration. You can confi
 1. View the current values in the MySQL Server.
 
    ```bash
-   kbcli cluster connect myproxy --component=vtgate
+   kbcli cluster connect myproxy --components=vtgate
    ```
 
    ```bash
@@ -157,16 +157,16 @@ VTGate, VTConsensus, and VTTablet support parameter configuration. You can confi
 
       ```bash
       # vtgate
-      kbcli cluster configure myproxy --component vtgate --set=healthcheck_timeout=2s
+      kbcli cluster configure myproxy --components vtgate --set=healthcheck_timeout=2s
 
       # vttablet
-      kbcli cluster configure myproxy --set=health_check_interval=4s --component=mysql --config-spec=vttablet-config
+      kbcli cluster configure myproxy --set=health_check_interval=4s --components=mysql --config-spec=vttablet-config
       ```
 
    * By editing the parameter configuration file
 
       ```bash
-      kbcli cluster edit-config myproxy --component vtgate
+      kbcli cluster edit-config myproxy --components vtgate
       ```
 
     :::note
@@ -199,9 +199,9 @@ View the log of different components.
 
 ```bash
 kbcli cluster list-logs myproxy
-kbcli cluster list-logs myproxy --component vtgate
-kbcli cluster list-logs myproxy --component vtcontroller
-kbcli cluster list-logs myproxy --component mysql
+kbcli cluster list-logs myproxy --components vtgate
+kbcli cluster list-logs myproxy --components vtcontroller
+kbcli cluster list-logs myproxy --components mysql
 ```
 
 View the log of a Pod.
@@ -256,13 +256,13 @@ In the production environment, all monitoring addons are disabled by default whe
 You can enable the read-write splitting function.
 
 ```bash
-kbcli cluster configure myproxy --component vtgate --set=read_write_splitting_policy=random
+kbcli cluster configure myproxy --components vtgate --set=read_write_splitting_policy=random
 ```
 
 You can also set the ratio for read-write splitting and here is an example of directing 70% flow to the read-only node.
 
 ```bash
-kbcli cluster configure myproxy --component vtgate --set=read_write_splitting_ratio=70
+kbcli cluster configure myproxy --components vtgate --set=read_write_splitting_ratio=70
 ```
 
 Moreover, you can [use Grafana](#monitoring) or run `show workload` to view the flow distribution.
@@ -276,5 +276,5 @@ show workload;
 Run the command below to implement transparent failover.
 
 ```bash
-kbcli cluster configure myproxy --component vtgate --set=enable_buffer=true
+kbcli cluster configure myproxy --components vtgate --set=enable_buffer=true
 ```

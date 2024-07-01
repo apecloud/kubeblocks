@@ -94,7 +94,7 @@ The K8s services provided by the cloud providers include both internal and exter
 This tutorial takes Cillium Cluster Mesh as an example. Deploy Cillium as the overlay mode and the cluster configuration for each data plane clusters is as follows:
 
 | Cluster | Context | Name  | ID | CIDR        |
-|---------|---------|-------|----|-------------|
+|:-------:|:-------:|:-----:|:--:|:-----------:|
 | 1       | k8s-1   | k8s-1 | 1  | 10.1.0.0/16 |
 | 2       | k8s-2   | k8s-2 | 2  | 10.2.0.0/16 |
 | 3       | k8s-3   | k8s-3 | 3  | 10.3.0.0/16 |
@@ -164,7 +164,7 @@ Here takes MetalLB as an example for providing LoadBalancer Services.
 1. Prepare the LB subnet for the data plane. This subnet needs to be reachable by client routing, and it should be different for each k8s cluster:
 
    | Cluster | Context | Name  | ID | CIDR        |
-   |---------|---------|-------|----|-------------|
+   |:-------:|:-------:|:-----:|:--:|:-----------:|
    | 1       | k8s-1   | k8s-1 | 1  | 10.4.0.0/16 |
    | 2       | k8s-2   | k8s-2 | 2  | 10.5.0.0/16 |
    | 3       | k8s-3   | k8s-3 | 3  | 10.6.0.0/16 |
@@ -353,7 +353,7 @@ TBD
 
 #### Cluster failure
 
-When a Kubernetes cluster becomes unavailable due to a failure, the instance itself will perform service switching in the data plane through its own high availability mechanism. The switchover of client traffic depends on the selected North-South traffic solution (TODO: to be supplemented).
+When a Kubernetes cluster becomes unavailable due to a failure, the instance itself will perform service switching in the data plane through its own high availability mechanism. The switchover of client traffic depends on the selected North-South traffic solution (TBD).
 
 On the control plane, since Kubeblocks cannot independently determine the availability of a K8s cluster, user intervention is required to provide information and explicitly mark a cluster as unavailable. During this period, the management and status display of both new and existing instances may be affected (depending on the specific type of failure).
 

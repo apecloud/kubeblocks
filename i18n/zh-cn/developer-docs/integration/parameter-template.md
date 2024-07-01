@@ -142,7 +142,7 @@ KubeBlocks 具有强大的渲染能力，能让你快速定制一个 ***自适�
    kbcli 提供了 `describe-config` 子命令来查看集群的配置信息。
 
    ```bash
-   kbcli cluster describe-config mycluster --component mysql-compdef
+   kbcli cluster describe-config mycluster --components mysql-compdef
    >
    ConfigSpecs Meta:
    CONFIG-SPEC-NAME   FILE     ENABLED   TEMPLATE                       CONSTRAINT   RENDERED                               COMPONENT       CLUSTER

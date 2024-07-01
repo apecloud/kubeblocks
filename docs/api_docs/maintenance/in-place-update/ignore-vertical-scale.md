@@ -3,7 +3,7 @@ title: Enable in-place update
 description: Enable in-place update
 keywords: [in-place update]
 sidebar_position: 2
-sidebar_label: Overview on in-place update
+sidebar_label: Enable in-place update
 ---
 
 # Enable in-place update

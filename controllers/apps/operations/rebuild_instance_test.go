@@ -92,6 +92,7 @@ var _ = Describe("OpsUtil functions", func() {
 					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
 					Instances:    instances,
 					BackupName:   backupName,
+					InPlace:      true,
 				},
 			}
 			opsRequest := testapps.CreateOpsRequest(ctx, testCtx, ops)

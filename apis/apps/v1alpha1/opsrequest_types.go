@@ -251,6 +251,11 @@ type RebuildInstance struct {
 	// +kubebuilder:validation:Required
 	Instances []Instance `json:"instances"`
 
+	// When it is set to true, the instance will be rebuilt in-place.
+	// By default, a new pod will be created. Once the new pod is ready to serve,
+	// the instance that require rebuilding will be taken offline.
+	InPlace bool `json:"inPlace,omitempty"`
+
 	// Indicates the name of the Backup custom resource from which to recover the instance.
 	// Defaults to an empty PersistentVolume if unspecified.
 	//

@@ -113,8 +113,8 @@ var _ = Describe("OpsUtil functions", func() {
 				pgRes *progressResource,
 				compStatus *appsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
 				return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus,
-					func(pod *corev1.Pod, inteface ComponentOpsInteface, opsStartTime metav1.Time, s string) bool {
-						return !pod.CreationTimestamp.Before(&opsStartTime)
+					func(ops *appsv1alpha1.OpsRequest, pod *corev1.Pod, compOps ComponentOpsInterface, s string) bool {
+						return !pod.CreationTimestamp.Before(&ops.Status.StartTimestamp)
 					})
 			}
 

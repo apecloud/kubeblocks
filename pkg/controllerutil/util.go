@@ -185,7 +185,7 @@ func DeleteOwnedResources[T generics.Object, PT generics.PObject[T], L generics.
 	return nil
 }
 
-func updateList[E any](src, dst *[]E, f func(E) func(E) bool, replaceOnly bool) {
+func MergeList[E any](src, dst *[]E, f func(E) func(E) bool) {
 	if len(*src) == 0 {
 		return
 	}
@@ -194,16 +194,8 @@ func updateList[E any](src, dst *[]E, f func(E) func(E) bool, replaceOnly bool) 
 		index := slices.IndexFunc(*dst, f(item))
 		if index >= 0 {
 			(*dst)[index] = item
-		} else if !replaceOnly {
+		} else {
 			*dst = append(*dst, item)
 		}
 	}
-}
-
-func MergeList[E any](src, dst *[]E, f func(E) func(E) bool) {
-	updateList(src, dst, f, false)
-}
-
-func ReplaceList[E any](src, dst *[]E, f func(E) func(E) bool) {
-	updateList(src, dst, f, true)
 }

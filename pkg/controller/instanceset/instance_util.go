@@ -378,11 +378,8 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		mergeMap(&newSvc.Spec.Selector, &oldSvc.Spec.Selector)
 		oldSvc.Spec.Type = newSvc.Spec.Type
 		oldSvc.Spec.PublishNotReadyAddresses = newSvc.Spec.PublishNotReadyAddresses
-		intctrlutil.ReplaceList(&newSvc.Spec.Ports, &oldSvc.Spec.Ports, func(port corev1.ServicePort) func(corev1.ServicePort) bool {
-			return func(item corev1.ServicePort) bool {
-				return item.Port == port.Port
-			}
-		})
+		// ignore NodePort&LB svc here, instanceSet only supports default headless svc
+		oldSvc.Spec.Ports = newSvc.Spec.Ports
 		return oldSvc
 	}
 

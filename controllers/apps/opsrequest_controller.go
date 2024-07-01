@@ -74,6 +74,7 @@ func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		Log:      log.FromContext(ctx).WithValues("opsRequest", req.NamespacedName),
 		Recorder: r.Recorder,
 	}
+	reqCtx.Log.Info("reconcile", "opsRequest", req.NamespacedName)
 	opsCtrlHandler := &opsControllerHandler{}
 	return opsCtrlHandler.Handle(reqCtx, &operations.OpsResource{Recorder: r.Recorder},
 		r.fetchOpsRequest,

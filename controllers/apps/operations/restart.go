@@ -106,11 +106,11 @@ func (r restartOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, 
 }
 
 func (r restartOpsHandler) podApplyCompOps(
+	ops *appsv1alpha1.OpsRequest,
 	pod *corev1.Pod,
-	compOps ComponentOpsInteface,
-	opsStartTime metav1.Time,
+	compOps ComponentOpsInterface,
 	insTemplateName string) bool {
-	return !pod.CreationTimestamp.Before(&opsStartTime)
+	return !pod.CreationTimestamp.Before(&ops.Status.StartTimestamp)
 }
 
 // restartStatefulSet restarts statefulSet workload

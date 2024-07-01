@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
-	"fmt"
 	"slices"
 	"strings"
 	"sync"
@@ -245,7 +244,8 @@ func (opsMgr *OpsManager) handleOpsIsRunningTimedOut(reqCtx intctrlutil.RequestC
 		timeoutPoint := startTime.Add(time.Duration(*timeoutSeconds))
 		if !time.Now().Before(timeoutPoint) {
 			return 0, PatchOpsStatus(reqCtx.Ctx, cli, opsRes, appsv1alpha1.OpsAbortedPhase,
-				appsv1alpha1.NewAbortedCondition(fmt.Sprintf("Aborted due to exceeding the specified timeout period (timeoutSeconds)")))
+
+				appsv1alpha1.NewAbortedCondition("Aborted due to exceeding the specified timeout period (timeoutSeconds)"))
 		}
 		if requeueAfter != 0 {
 			return requeueAfter, nil

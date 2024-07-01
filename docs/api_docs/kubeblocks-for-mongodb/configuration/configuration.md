@@ -7,7 +7,7 @@ sidebar_position: 1
 
 # Configure cluster parameters
 
-This guide shows how to configure cluster parameters by creating an opsRequest.
+This guide shows how to configure cluster parameters.
 
 ## Before you start
 
@@ -166,4 +166,5 @@ You can also view the details of this configuration file and parameters.
     * When `Dynamic` is `true`, it means the effectiveness type of parameters is **dynamic** and can be configured online.
     * When `Dynamic` is `false`, it means the effectiveness type of parameters is **static** and a pod restarting is required to make the configuration effective.
   * Description: It describes the parameter definition.
+
 :::

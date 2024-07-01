@@ -276,7 +276,63 @@ ls /vtdataroot
 
 ## Monitoring
 
-kubectl TBD
+You can monitor the performance of the proxy cluster.
+
+1. Enable the monitoring addons.
+
+   For the testing/demo environment, run the commands below to enable the monitoring addons provided by KubeBlocks.
+
+   ```bash
+   helm install prometheus kubeblocks/prometheus --namespace kb-system --create-namespace
+   helm install prometheus kubeblocks/prometheus --namespace kb-system --create-namespace
+   helm install prometheus kubeblocks/prometheus --namespace kb-system --create-namespace
+   ```
+
+   For the production environment, you can integrate the monitoring components. For details, you can refer to the relevant docs provided by the monitoring tools.
+
+2. Check whether the monitoring function of this proxy cluster is enabled.
+
+   ```bash
+   kubectl get cluster myproxy -o yaml
+   ```
+
+   If the output YAML file shows `monitor:true`, the monitoring function of this proxy cluster is enabled.
+
+   If the monitoring function is not enabled, run the command below to enable it first.
+
+   ```bash
+   kubectl patch cluster mycluster -n demo --type "json" -p '[{"op":"add","path":"/spec/componentSpecs/0/monitor","value":true}]'
+   ```
+
+3. View the dashboard.
+
+   For the testing/demo environment, run the commands below to view the Grafana dashboard.
+
+   ```bash
+   # 1. Get the username and password 
+   kubectl get secret grafana -n kb-system -o jsonpath='{.data.admin-user}' |base64 -d
+
+   kubectl get secret grafana -n kb-system -o jsonpath='{.data.admin-password}' |base64 -d
+
+   # 2. Connect to the Grafana dashboard
+   kubectl port-forward svc/grafana -n kb-system 3000:8
+
+   # 3. Open the web browser and enter the address 127.0.0.1:3000 to visit the dashboard.
+
+   # 4. Enter the username and password obtained from step 1.
+   ```
+
+   For the production environment, you can view the dashboard of the corresponding cluster via Grafana Web Console. For more detailed information, see [the Grafana dashboard documentation](https://grafana.com/docs/grafana/latest/dashboards/).
+
+:::note
+
+1. If there is no data in the dashboard, you can check whether the job is `kubeblocks-service`. Enter `kubeblocks-service` in the job field and press the enter button.
+
+   ![Monitoring dashboard](./../../../img/api-monitoring.png)
+
+2. For more details on the monitoring function, you can refer to [Monitoring](./../../observability/monitor-database.md).
+
+:::
 
 ## Read-write splitting
 

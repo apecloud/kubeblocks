@@ -6,6 +6,9 @@ sidebar_position: 2
 sidebar_label: Scale
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Scale for a MySQL cluster
 
 You can scale a MySQL cluster in two ways, vertical scaling and horizontal scaling.

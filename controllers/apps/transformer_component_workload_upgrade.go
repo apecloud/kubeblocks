@@ -61,10 +61,11 @@ func (t *componentWorkloadUpgradeTransformer) Transform(ctx graph.TransformConte
 	legacyFound := false
 
 	// update pod & pvc & svc labels
-	objectList := []client.ObjectList{&corev1.PersistentVolumeClaimList{}, &corev1.ServiceList{}, &corev1.PodList{}}
+	objectList := []client.ObjectList{&corev1.PersistentVolumeClaimList{}, &corev1.PodList{}, &corev1.ServiceList{}, &corev1.ConfigMapList{}}
 	ml := constant.GetComponentWellKnownLabels(synthesizeComp.ClusterName, synthesizeComp.Name)
 	inNS := client.InNamespace(comp.Namespace)
 	defaultHeadlessSvc := constant.GenerateDefaultComponentHeadlessServiceName(synthesizeComp.ClusterName, synthesizeComp.Name)
+	envCM := instanceset.GetEnvConfigMapName(constant.GenerateClusterComponentName(synthesizeComp.ClusterName, synthesizeComp.Name))
 	var revision string
 	for _, list := range objectList {
 		if err := graphCli.List(transCtx.Context, list, client.MatchingLabels(ml), inNS); err == nil {
@@ -75,13 +76,29 @@ func (t *componentWorkloadUpgradeTransformer) Transform(ctx graph.TransformConte
 				if _, ok := object.GetLabels()[instanceset.WorkloadsManagedByLabelKey]; ok {
 					continue
 				}
-				if _, ok := object.(*corev1.Service); ok && object.GetName() != defaultHeadlessSvc {
+				_, isSvc := object.(*corev1.Service)
+				if isSvc && object.GetName() != defaultHeadlessSvc {
+					continue
+				}
+				_, isCM := object.(*corev1.ConfigMap)
+				if isCM && object.GetName() != envCM {
 					continue
 				}
 				legacyFound = true
-				object.SetOwnerReferences([]metav1.OwnerReference{})
+
+				// fix labels
 				object.GetLabels()[instanceset.WorkloadsManagedByLabelKey] = workloads.Kind
 				object.GetLabels()[instanceset.WorkloadsInstanceLabelKey] = comp.Name
+
+				// fix ownerReference and finalizer of Service and ConfigMap:
+				// assume all the OwnerReferences and Finalizers were set by the KubeBlocks.
+				// set them to empty and the InstanceSet Controller will fix them.
+				if isSvc || isCM {
+					object.SetOwnerReferences([]metav1.OwnerReference{})
+					object.SetFinalizers([]string{})
+				}
+
+				// fix revision of Pods
 				if _, ok := object.(*corev1.Pod); ok {
 					if revision == "" {
 						revision, err = buildRevision(synthesizeComp, compDef)

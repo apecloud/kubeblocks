@@ -63,7 +63,11 @@ type componentWorkloadOps struct {
 	// runningITS is a snapshot of the InstanceSet that is already running
 	runningITS *workloads.InstanceSet
 	// protoITS is the InstanceSet object that is rebuilt from scratch during each reconcile process
-	protoITS *workloads.InstanceSet
+	protoITS              *workloads.InstanceSet
+	desiredCompPodNames   []string
+	runningItsPodNames    []string
+	desiredCompPodNameSet sets.Set[string]
+	runningItsPodNameSet  sets.Set[string]
 }
 
 var _ graph.Transformer = &componentWorkloadTransformer{}
@@ -300,6 +304,7 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, synthesizeComp *comp
 	itsObjCopy.Spec.Instances = itsProto.Spec.Instances
 	itsObjCopy.Spec.OfflineInstances = itsProto.Spec.OfflineInstances
 	itsObjCopy.Spec.MinReadySeconds = itsProto.Spec.MinReadySeconds
+	itsObjCopy.Spec.VolumeClaimTemplates = itsProto.Spec.VolumeClaimTemplates
 
 	if itsProto.Spec.UpdateStrategy.Type != "" || itsProto.Spec.UpdateStrategy.RollingUpdate != nil {
 		updateUpdateStrategy(itsObjCopy, itsProto)
@@ -396,8 +401,8 @@ func (r *componentWorkloadOps) expandVolume() error {
 // horizontalScale handles workload horizontal scale
 func (r *componentWorkloadOps) horizontalScale() error {
 	its := r.runningITS
-	ret := r.horizontalScaling(r.synthesizeComp, its)
-	if ret == 0 {
+	doScaleOut, doScaleIn := r.horizontalScaling()
+	if !doScaleOut && !doScaleIn {
 		if err := r.postScaleIn(); err != nil {
 			return err
 		}
@@ -406,11 +411,12 @@ func (r *componentWorkloadOps) horizontalScale() error {
 		}
 		return nil
 	}
-	if ret < 0 {
+	if doScaleIn {
 		if err := r.scaleIn(its); err != nil {
 			return err
 		}
-	} else {
+	}
+	if doScaleOut {
 		if err := r.scaleOut(its); err != nil {
 			return err
 		}
@@ -420,14 +426,30 @@ func (r *componentWorkloadOps) horizontalScale() error {
 		corev1.EventTypeNormal,
 		"HorizontalScale",
 		"start horizontal scale component %s of cluster %s from %d to %d",
-		r.synthesizeComp.Name, r.cluster.Name, int(r.synthesizeComp.Replicas)-ret, r.synthesizeComp.Replicas)
+		r.synthesizeComp.Name, r.cluster.Name, int(*its.Spec.Replicas), r.synthesizeComp.Replicas)
 
 	return nil
 }
 
 // < 0 for scale in, > 0 for scale out, and == 0 for nothing
-func (r *componentWorkloadOps) horizontalScaling(synthesizeComp *component.SynthesizedComponent, itsObj *workloads.InstanceSet) int {
-	return int(synthesizeComp.Replicas - *itsObj.Spec.Replicas)
+func (r *componentWorkloadOps) horizontalScaling() (bool, bool) {
+	var (
+		doScaleOut bool
+		doScaleIn  bool
+	)
+	for _, podName := range r.desiredCompPodNames {
+		if _, ok := r.runningItsPodNameSet[podName]; !ok {
+			doScaleOut = true
+			break
+		}
+	}
+	for _, podName := range r.runningItsPodNames {
+		if _, ok := r.desiredCompPodNameSet[podName]; !ok {
+			doScaleIn = true
+			break
+		}
+	}
+	return doScaleOut, doScaleIn
 }
 
 func (r *componentWorkloadOps) postScaleIn() error {
@@ -571,10 +593,9 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 
 	// TODO: Move memberLeave to the ITS controller. Instead of performing a switchover, we can directly scale down the non-leader nodes. This is because the pod ordinal is not guaranteed to be continuous.
 	podsToMemberLeave := make([]*corev1.Pod, 0)
-	genPodNamesByDefault := generatePodNames(r.synthesizeComp)
 	for _, pod := range pods {
 		// if the pod not exists in the generated pod names, it should be a member that needs to leave
-		if slices.Contains(genPodNamesByDefault, pod.Name) {
+		if _, ok := r.desiredCompPodNameSet[pod.Name]; ok {
 			continue
 		}
 		podsToMemberLeave = append(podsToMemberLeave, pod)
@@ -613,11 +634,9 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 }
 
 func (r *componentWorkloadOps) deletePVCs4ScaleIn(itsObj *workloads.InstanceSet) error {
-	desiredPodNames := generatePodNames(r.synthesizeComp)
-	currentPodNames := generatePodNamesByITS(itsObj)
 	graphCli := model.NewGraphClient(r.cli)
-	for _, podName := range currentPodNames {
-		if slices.Contains(desiredPodNames, podName) {
+	for _, podName := range r.runningItsPodNames {
+		if _, ok := r.desiredCompPodNameSet[podName]; ok {
 			continue
 		}
 		for _, vct := range itsObj.Spec.VolumeClaimTemplates {
@@ -640,11 +659,11 @@ func (r *componentWorkloadOps) deletePVCs4ScaleIn(itsObj *workloads.InstanceSet)
 }
 
 func (r *componentWorkloadOps) expandVolumes(vctName string, proto *corev1.PersistentVolumeClaimTemplate) error {
-	for i := *r.runningITS.Spec.Replicas - 1; i >= 0; i-- {
+	for _, pod := range r.runningItsPodNames {
 		pvc := &corev1.PersistentVolumeClaim{}
 		pvcKey := types.NamespacedName{
 			Namespace: r.cluster.Namespace,
-			Name:      fmt.Sprintf("%s-%s-%d", vctName, r.runningITS.Name, i),
+			Name:      fmt.Sprintf("%s-%s", vctName, pod),
 		}
 		pvcNotFound := false
 		if err := r.cli.Get(r.reqCtx.Ctx, pvcKey, pvc, inDataContext4C()); err != nil {
@@ -899,13 +918,19 @@ func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,
 	runningITS *workloads.InstanceSet,
 	protoITS *workloads.InstanceSet,
 	dag *graph.DAG) *componentWorkloadOps {
+	compPodNames := generatePodNames(synthesizeComp)
+	itsPodNames := generatePodNamesByITS(runningITS)
 	return &componentWorkloadOps{
-		cli:            cli,
-		reqCtx:         reqCtx,
-		cluster:        cluster,
-		synthesizeComp: synthesizeComp,
-		runningITS:     runningITS,
-		protoITS:       protoITS,
-		dag:            dag,
+		cli:                   cli,
+		reqCtx:                reqCtx,
+		cluster:               cluster,
+		synthesizeComp:        synthesizeComp,
+		runningITS:            runningITS,
+		protoITS:              protoITS,
+		dag:                   dag,
+		desiredCompPodNames:   compPodNames,
+		runningItsPodNames:    itsPodNames,
+		desiredCompPodNameSet: sets.New(compPodNames...),
+		runningItsPodNameSet:  sets.New(itsPodNames...),
 	}
 }

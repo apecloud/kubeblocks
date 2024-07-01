@@ -162,7 +162,7 @@ For Linux and macOS, you can edit configuration files by vi. For Windows, you ca
 
    :::note
 
-   If there are multiple components in a cluster, use `--component` to specify a component.
+   If there are multiple components in a cluster, use `--components` to specify a component.
 
    :::
 

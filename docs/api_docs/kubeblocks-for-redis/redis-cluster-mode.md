@@ -338,17 +338,7 @@ spec:
 
 ### Restart
 
-```yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: OpsRequest
-metadata:
-  name: restart-redisc
-spec:
-  clusterName: redisc
-  restart:
-  - componentName: shard
-  type: Restart
-```
+Currently, restarting a Redis Cluster is not supported and it will be supported in the future.
 
 ### Stop/Start
 

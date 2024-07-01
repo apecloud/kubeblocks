@@ -272,8 +272,6 @@ var _ = BeforeSuite(func() {
 
 	testCtx = testutil.NewDefaultTestContext(ctx, k8sClient, testEnv)
 
-	appsv1alpha1.RegisterWebhookManager(k8sManager)
-
 	go func() {
 		defer GinkgoRecover()
 		err = k8sManager.Start(ctx)

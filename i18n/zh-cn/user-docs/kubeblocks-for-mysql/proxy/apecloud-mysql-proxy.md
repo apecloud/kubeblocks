@@ -127,7 +127,7 @@ ApeCloud MySQL 代理通过 `vtgate` 组件进行路由，MySQL 服务器访问 
 执行以下命令连接到代理集群。
 
 ```bash
-kbcli cluster connect myproxy --component vtgate
+kbcli cluster connect myproxy --components vtgate
 ```
 
 </TabItem>
@@ -200,7 +200,7 @@ while true; do date; kubectl port-forward svc/vt-mysql 3306:3306; sleep 0.5; don
 
 ## 配置代理集群参数
 
-VTGate、VTConsensus 和 VTTablet 都支持参数配置。你可以使用 `--component` 参数指定组件来配置 VTGate 和 VTConsensus，使用 `--component=mysql --config-specs=vttablet-config` 同时指定组件和配置文件模板来配置 VTTablet，因为 VTTablet 是 MySQL 组件的附属组件。
+VTGate、VTConsensus 和 VTTablet 都支持参数配置。你可以使用 `--components` 参数指定组件来配置 VTGate 和 VTConsensus，使用 `--components=mysql --config-specs=vttablet-config` 同时指定组件和配置文件模板来配置 VTTablet，因为 VTTablet 是 MySQL 组件的附属组件。
 
 ### 查看参数详情
 
@@ -208,10 +208,10 @@ VTGate、VTConsensus 和 VTTablet 都支持参数配置。你可以使用 `--com
 
    ```bash
    # vtgate
-   kbcli cluster describe-config myproxy --component vtgate --show-detai
+   kbcli cluster describe-config myproxy --components vtgate --show-detai
    
    # vtcontroller
-   kbcli cluster describe-config myproxy --component vtcontroller --show-detail
+   kbcli cluster describe-config myproxy --components vtcontroller --show-detail
    
    # vttablet
    kbcli cluster describe-config myproxy --component mysql --show-detail --config-specs vttablet-config
@@ -221,16 +221,16 @@ VTGate、VTConsensus 和 VTTablet 都支持参数配置。你可以使用 `--com
 
    ```bash
    # vtgate
-   kbcli cluster explain-config myproxy --component vtgate
+   kbcli cluster explain-config myproxy --components vtgate
 
    # vttablet
-   kbcli cluster explain-config myproxy --component mysql --config-specs=vttablet-config
+   kbcli cluster explain-config myproxy --components mysql --config-specs=vttablet-config
    ```
 
 * 查看指定参数的定义。
 
    ```bash
-   kbcli cluster explain-config myproxy --component vtgate --param=healthcheck_timeout
+   kbcli cluster explain-config myproxy --components vtgate --param=healthcheck_timeout
    ```
 
 ### 重新配置参数
@@ -238,7 +238,7 @@ VTGate、VTConsensus 和 VTTablet 都支持参数配置。你可以使用 `--com
 1. 查看 MySQL 服务器中的当前值。
 
    ```bash
-   kbcli cluster connect myproxy --component=vtgate
+   kbcli cluster connect myproxy --components=vtgate
    ```
 
    ```bash
@@ -257,16 +257,16 @@ VTGate、VTConsensus 和 VTTablet 都支持参数配置。你可以使用 `--com
 
       ```bash
       # vtgate
-      kbcli cluster configure myproxy --component vtgate --set=healthcheck_timeout=2s
+      kbcli cluster configure myproxy --components vtgate --set=healthcheck_timeout=2s
 
       # vttablet
-      kbcli cluster configure myproxy --set=health_check_interval=4s --component=mysql --config-spec=vttablet-config
+      kbcli cluster configure myproxy --set=health_check_interval=4s --components=mysql --config-spec=vttablet-config
       ```
 
    * 编辑参数配置文件。
 
       ```bash
-      kbcli cluster edit-config myproxy --component vtgate
+      kbcli cluster edit-config myproxy --components vtgate
       ```
 
     :::note
@@ -303,9 +303,9 @@ VTGate、VTConsensus 和 VTTablet 都支持参数配置。你可以使用 `--com
 
 ```bash
 kbcli cluster list-logs myproxy
-kbcli cluster list-logs myproxy --component vtgate
-kbcli cluster list-logs myproxy --component vtcontroller
-kbcli cluster list-logs myproxy --component mysql
+kbcli cluster list-logs myproxy --components vtgate
+kbcli cluster list-logs myproxy --components vtcontroller
+kbcli cluster list-logs myproxy --components mysql
 ```
 
 查看 Pod 日志。
@@ -393,13 +393,13 @@ ls /vtdataroot
 你可以启用读写分离功能。
 
 ```bash
-kbcli cluster configure myproxy --component vtgate --set=read_write_splitting_policy=random
+kbcli cluster configure myproxy --components vtgate --set=read_write_splitting_policy=random
 ```
 
 还可以设置读写分离的比例。如下是设置 70% 的流量导向只读节点的例子。
 
 ```bash
-kbcli cluster configure myproxy --component vtgate --set=read_write_splitting_ratio=70
+kbcli cluster configure myproxy --components vtgate --set=read_write_splitting_ratio=70
 ```
 
 此外，你还可以[使用 Grafana](#监控) 或执行 `show workload` 来查看流量分布。
@@ -413,5 +413,5 @@ show workload;
 执行以下命令，实现透明的故障切换。
 
 ```bash
-kbcli cluster configure myproxy --component vtgate --set=enable_buffer=true
+kbcli cluster configure myproxy --components vtgate --set=enable_buffer=true
 ```

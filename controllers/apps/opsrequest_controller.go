@@ -180,6 +180,9 @@ func (r *OpsRequestReconciler) handleOpsRequestByPhase(reqCtx intctrlutil.Reques
 		if err := r.annotateRelatedOps(reqCtx, opsRes.OpsRequest); err != nil {
 			return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 		}
+		if err := r.cleanupOpsAnnotationForCluster(reqCtx, opsRes.Cluster); err != nil {
+			return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
+		}
 		return intctrlutil.ResultToP(intctrlutil.Reconciled())
 	}
 }
@@ -331,16 +334,22 @@ func (r *OpsRequestReconciler) handleOpsReqDeletedDuringRunning(reqCtx intctrlut
 		return err
 	}
 	for _, cluster := range clusterList.Items {
-		opsRequestSlice, _ := opsutil.GetOpsRequestSliceFromCluster(&cluster)
-		index, _ := operations.GetOpsRecorderFromSlice(opsRequestSlice, reqCtx.Req.Name)
-		if index == -1 {
-			continue
+		if err := r.cleanupOpsAnnotationForCluster(reqCtx, &cluster); err != nil {
+			return err
 		}
-		// if the OpsRequest is abnormal, we should clear the OpsRequest annotation in referencing cluster.
-		opsRequestSlice = slices.Delete(opsRequestSlice, index, index+1)
-		return opsutil.UpdateClusterOpsAnnotations(reqCtx.Ctx, r.Client, &cluster, opsRequestSlice)
 	}
 	return nil
+}
+
+func (r *OpsRequestReconciler) cleanupOpsAnnotationForCluster(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster) error {
+	opsRequestSlice, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
+	index, _ := operations.GetOpsRecorderFromSlice(opsRequestSlice, reqCtx.Req.Name)
+	if index == -1 {
+		return nil
+	}
+	// if the OpsRequest is abnormal, we should clear the OpsRequest annotation in referencing cluster.
+	opsRequestSlice = slices.Delete(opsRequestSlice, index, index+1)
+	return opsutil.UpdateClusterOpsAnnotations(reqCtx.Ctx, r.Client, cluster, opsRequestSlice)
 }
 
 func (r *OpsRequestReconciler) getRunningOpsRequestsFromCluster(cluster *appsv1alpha1.Cluster) []reconcile.Request {

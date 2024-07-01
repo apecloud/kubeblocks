@@ -131,7 +131,7 @@ The monitoring function is enabled by default when a database is created. The op
 * For the existing cluster with the monitoring function disabled, you can update it to enable the monitor function by the `update` command.
 
     ```bash
-    kbcli cluster update mycluster --monitoring-interval=15s
+    kbcli cluster update mycluster --monitoring-interval=15
     ```
 
 You can view the dashboard of the corresponding cluster via Grafana Web Console. For more detailed information, see the [Grafana dashboard documentation](https://grafana.com/docs/grafana/latest/dashboards/).

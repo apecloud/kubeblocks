@@ -92,6 +92,7 @@ var mockLorryClient = func(mock func(*lorry.MockClientMockRecorder)) {
 var mockLorryClientDefault = func() {
 	mockLorryClient(func(recorder *lorry.MockClientMockRecorder) {
 		recorder.CreateUser(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+		recorder.DescribeUser(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
 		recorder.GrantUserRole(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	})
 }
@@ -875,6 +876,9 @@ var _ = Describe("Component Controller", func() {
 		}
 
 		By("Checking the resize operation finished")
+		Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(its), func(its *workloads.InstanceSet) {
+			testk8s.MockInstanceSetReady(its, mockPods...)
+		})()).ShouldNot(HaveOccurred())
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
 		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))

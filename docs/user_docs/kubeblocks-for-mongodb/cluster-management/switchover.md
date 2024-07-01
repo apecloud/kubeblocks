@@ -42,10 +42,10 @@ You can switch over a secondary of a MongoDB ReplicaSet to the primary role, and
     kbcli cluster promote mycluster --instance='mycluster-mongodb-2'
     ```
 
-* If there are multiple components, you can use `--component` to specify a component.
+* If there are multiple components, you can use `--components` to specify a component.
 
     ```bash
-    kbcli cluster promote mycluster --instance='mycluster-mongodb-2' --component='mongodb'
+    kbcli cluster promote mycluster --instance='mycluster-mongodb-2' --components='mongodb'
     ```
 
 

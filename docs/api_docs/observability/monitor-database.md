@@ -56,9 +56,9 @@ Here is an example of enabling the `prometheus` addon. You can enable other moni
    ```bash
    helm list -A
    >
-   NAME                          NAMESPACE   REVISION    UPDATED                                 STATUS      CHART                           APP VERSION
+   NAME         NAMESPACE   REVISION    UPDATED                                 STATUS      CHART                APP VERSION
    ......
-   prometheus                  	kb-system	1       	   2024-05-31 12:01:52.872584 +0800 CST    deployed	 prometheus-15.16.1          	   2.39.1 
+   prometheus   kb-system   1           2024-05-31 12:01:52.872584 +0800 CST    deployed    prometheus-15.16.1   2.39.1 
    ```
 
 ### Enable the monitoring function for a database
@@ -92,7 +92,7 @@ componentSpecs:
     monitor: false # Change this value
 ```
 
-### View the dashboardß
+### View the dashboard
 
 Use the `grafana` addon provided by KubeBlocks to view the dashboard.
 
@@ -116,6 +116,14 @@ Use the `grafana` addon provided by KubeBlocks to view the dashboard.
 
 3. Open the web browser and enter the address `127.0.0.1:3000` to visit the dashboard.
 4. Enter the username and password obtained from step 1.
+
+:::note
+
+If there is no data in the dashboard, you can check whether the job is `kubeblocks-service`. Enter `kubeblocks-service` in the job field and press the enter button.
+
+![monitoring](./../../img/api-monitoring.png)
+
+:::
 
 ### (Optional) Enable remote write
 

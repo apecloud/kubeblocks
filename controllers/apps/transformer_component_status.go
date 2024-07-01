@@ -27,6 +27,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -44,6 +45,9 @@ import (
 const (
 	// componentPhaseTransition the event reason indicates that the component transits to a new phase.
 	componentPhaseTransition = "ComponentPhaseTransition"
+
+	// defaultRoleProbeTimeoutAfterPodsReady the default role probe timeout for application when all pods of component are ready.
+	defaultRoleProbeTimeoutAfterPodsReady int32 = 60
 )
 
 // componentStatusTransformer computes the current status: read the underlying workload status and update the component status
@@ -313,8 +317,18 @@ func (r *componentStatusHandler) isScaleOutFailed() (bool, error) {
 	} else if status == backupStatusFailed {
 		return true, nil
 	}
-	for i := *r.runningITS.Spec.Replicas; i < r.synthesizeComp.Replicas; i++ {
-		if status, err := d.CheckRestoreStatus(i); err != nil {
+	desiredPodNames := generatePodNames(r.synthesizeComp)
+	currentPodNameSet := sets.New(generatePodNamesByITS(r.runningITS)...)
+	for _, podName := range desiredPodNames {
+		if _, ok := currentPodNameSet[podName]; ok {
+			continue
+		}
+		// backup's ready, then start to check restore
+		templateName, index, err := component.GetTemplateNameAndOrdinal(r.runningITS.Name, podName)
+		if err != nil {
+			return false, err
+		}
+		if status, err := d.CheckRestoreStatus(templateName, index); err != nil {
 			return false, err
 		} else if status == dpv1alpha1.RestorePhaseFailed {
 			return true, nil
@@ -368,7 +382,7 @@ func (r *componentStatusHandler) hasFailedPod() (bool, appsv1alpha1.ComponentMes
 	if len(r.runningITS.Status.MembersStatus) == int(r.runningITS.Status.Replicas) {
 		return false, nil
 	}
-	probeTimeoutDuration := time.Duration(appsv1alpha1.DefaultRoleProbeTimeoutAfterPodsReady) * time.Second
+	probeTimeoutDuration := time.Duration(defaultRoleProbeTimeoutAfterPodsReady) * time.Second
 	condition := meta.FindStatusCondition(r.runningITS.Status.Conditions, string(workloads.InstanceReady))
 	if time.Now().After(condition.LastTransitionTime.Add(probeTimeoutDuration)) {
 		messages.SetObjectMessage(workloads.Kind, r.runningITS.Name, "Role probe timeout, check whether the application is available")

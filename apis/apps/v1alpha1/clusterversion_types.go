@@ -206,3 +206,38 @@ func (r ClusterVersionSpec) GetDefNameMappingComponents() map[string]*ClusterCom
 	}
 	return m
 }
+
+// GetInconsistentComponentsInfo get clusterVersion invalid component name and no containers component compared with clusterDefinitionDef
+func (r *ClusterVersion) GetInconsistentComponentsInfo(clusterDef *ClusterDefinition) ([]string, []string) {
+
+	var (
+		// clusterDefinition components to map. the value of map represents whether there is a default containers
+		componentMap              = map[string]bool{}
+		notFoundComponentDefNames = make([]string, 0)
+		noContainersComponent     = make([]string, 0)
+	)
+
+	for _, v := range clusterDef.Spec.ComponentDefs {
+		if v.PodSpec == nil || v.PodSpec.Containers == nil || len(v.PodSpec.Containers) == 0 {
+			componentMap[v.Name] = false
+		} else {
+			componentMap[v.Name] = true
+		}
+	}
+	// get not found component name in clusterDefinition
+	for _, v := range r.Spec.ComponentVersions {
+		if _, ok := componentMap[v.ComponentDefRef]; !ok {
+			notFoundComponentDefNames = append(notFoundComponentDefNames, v.ComponentDefRef)
+		} else if (len(v.VersionsCtx.Containers) > 0) ||
+			(len(v.VersionsCtx.InitContainers) > 0) {
+			componentMap[v.ComponentDefRef] = true
+		}
+	}
+	// get no containers components in clusterDefinition and clusterVersion
+	for k, v := range componentMap {
+		if !v {
+			noContainersComponent = append(noContainersComponent, k)
+		}
+	}
+	return notFoundComponentDefNames, noContainersComponent
+}

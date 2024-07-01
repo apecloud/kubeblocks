@@ -363,6 +363,16 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	}
 
 	copyAndMergeSvc := func(oldSvc *corev1.Service, newSvc *corev1.Service) client.Object {
+		intctrlutil.MergeList(&newSvc.Finalizers, &oldSvc.Finalizers, func(finalizer string) func(string) bool {
+			return func(item string) bool {
+				return finalizer == item
+			}
+		})
+		intctrlutil.MergeList(&newSvc.OwnerReferences, &oldSvc.OwnerReferences, func(reference metav1.OwnerReference) func(metav1.OwnerReference) bool {
+			return func(item metav1.OwnerReference) bool {
+				return reference.UID == item.UID
+			}
+		})
 		mergeMap(&newSvc.Annotations, &oldSvc.Annotations)
 		mergeMap(&newSvc.Labels, &oldSvc.Labels)
 		mergeMap(&newSvc.Spec.Selector, &oldSvc.Spec.Selector)
@@ -377,6 +387,16 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	}
 
 	copyAndMergeCm := func(oldCm, newCm *corev1.ConfigMap) client.Object {
+		intctrlutil.MergeList(&newCm.Finalizers, &oldCm.Finalizers, func(finalizer string) func(string) bool {
+			return func(item string) bool {
+				return finalizer == item
+			}
+		})
+		intctrlutil.MergeList(&newCm.OwnerReferences, &oldCm.OwnerReferences, func(reference metav1.OwnerReference) func(metav1.OwnerReference) bool {
+			return func(item metav1.OwnerReference) bool {
+				return reference.UID == item.UID
+			}
+		})
 		oldCm.Data = newCm.Data
 		oldCm.BinaryData = newCm.BinaryData
 		return oldCm

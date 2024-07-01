@@ -243,7 +243,7 @@ func (opsMgr *OpsManager) handleOpsIsRunningTimedOut(reqCtx intctrlutil.RequestC
 	}
 	checkTimedOut := func(startTime metav1.Time) (time.Duration, error) {
 		timeoutPoint := startTime.Add(time.Duration(*timeoutSeconds))
-		if time.Now().After(timeoutPoint) {
+		if !time.Now().Before(timeoutPoint) {
 			return 0, PatchOpsStatus(reqCtx.Ctx, cli, opsRes, appsv1alpha1.OpsAbortedPhase,
 				appsv1alpha1.NewAbortedCondition(fmt.Sprintf("Aborted due to exceeding the specified timeout period (timeoutSeconds)")))
 		}

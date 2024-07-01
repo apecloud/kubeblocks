@@ -208,7 +208,7 @@ The following steps take configuring MySQL Standalone as an example.
    :::note
 
    * Since ApeCloud MySQL currently supports multiple templates, it is required to use `--config-spec` to specify a configuration template. You can run `kbcli cluster describe-config mysql-cluster` to view all template names.
-   * If there are multiple components in a cluster, use `--component` to specify a component.
+   * If there are multiple components in a cluster, use `--components` to specify a component.
 
    :::
 

@@ -44,15 +44,14 @@ If you do not need to enable backup encryption by default, or if you need to use
     --from-literal=secretKey='your secret key'
     ```
 
-2. Patch the BackupPolicy to enable encryption.
-Remember to reference the key created before.
+2. Patch the BackupPolicy to enable encryption. Remember to reference the key created before.
 
     ```bash
     kubectl --type merge patch backuppolicy mysqlcluster-mysql-backup-policy \
     -p '{"spec":{"encryptionConfig":{"algorithm":"AES-256-CFB","passPhraseSecretKeyRef":{"name":"backup-encryption","key":"secretKey"}}}}'
     ```
 
-Complete. Now you can perform backups and restores as usual.
+Now you can perform backups and restores as usual.
 
 :::note
 

@@ -250,7 +250,7 @@ func (opsMgr *OpsManager) handleOpsIsRunningTimedOut(reqCtx intctrlutil.RequestC
 		if requeueAfter != 0 {
 			return requeueAfter, nil
 		}
-		return timeoutPoint.Sub(time.Now()), nil
+		return time.Until(timeoutPoint), nil
 	}
 	if !opsRes.OpsRequest.Spec.Cancel {
 		return checkTimedOut(opsRes.OpsRequest.Status.StartTimestamp)

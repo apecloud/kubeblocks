@@ -8,8 +8,12 @@ metadata:
 spec:
   # Specifies the name of the ClusterDefinition to use when creating a Cluster.
   clusterDefinitionRef: redis
-  # Refers to the ClusterVersion name. Deprecated since v0.9, use ComponentVersion instead. This field is maintained for backward compatibility and its use is discouraged. Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
-  clusterVersionRef: redis-7.0.6
+  # Specifies the redis cluster topology defined in ClusterDefinition.Spec.topologies, support standalone, replication, and replication-twemproxy.
+  # - `standalone`: single redis instance
+  # - `replication`: primary-secondary replication with redis sentinel, refer: https://redis.io/docs/management/sentinel
+  # - `replication-twemproxy`: primary-secondary replication with sentinel and twemproxy, it is just a demo for how to use twemproxy with redis, not recommended for production
+  topology: replication  
+  # Specifies the behavior when a Cluster is deleted.
   # Specifies the behavior when a Cluster is deleted.
   # - `DoNotTerminate`: Prevents deletion of the Cluster. This policy ensures that all resources remain intact.
   # - `Halt`: Deletes Cluster resources like Pods and Services but retains Persistent Volume Claims (PVCs), allowing for data preservation while stopping other operations.
@@ -38,7 +42,6 @@ spec:
   # ClusterComponentSpec defines the specifications for a Component in a Cluster.
   componentSpecs:
   - name: redis
-    componentDefRef: redis
     disableExporter: true
     enabledLogs:
     - running
@@ -59,8 +62,7 @@ spec:
         resources:
           requests:
             storage: 30Gi
-  - componentDefRef: redis-sentinel
-    name: redis-sentinel
+  - name: redis-sentinel
     replicas: 3
     resources:
       limits:

@@ -27,10 +27,13 @@ import (
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -102,6 +105,7 @@ func (r *BackupScheduleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	} else {
 		b.Owns(&batchv1beta1.CronJob{})
 	}
+	b.Watches(&dpv1alpha1.Backup{}, handler.EnqueueRequestsFromMapFunc(r.parseBackup))
 	return b.Complete(r)
 }
 
@@ -211,4 +215,21 @@ func (r *BackupScheduleReconciler) patchScheduleMetadata(
 	}
 	backupSchedule.Labels[dptypes.BackupPolicyLabelKey] = backupSchedule.Spec.BackupPolicyName
 	return r.Client.Patch(reqCtx.Ctx, backupSchedule, patch)
+}
+
+func (r *BackupScheduleReconciler) parseBackup(ctx context.Context, object client.Object) []reconcile.Request {
+	backup := object.(*dpv1alpha1.Backup)
+	backupScheduleName := dptypes.BackupScheduleLabelKey
+	if backup.Labels[dptypes.BackupTypeLabelKey] == string(dpv1alpha1.BackupTypeContinuous) &&
+		backupScheduleName != "" {
+		return []reconcile.Request{
+			{
+				NamespacedName: types.NamespacedName{
+					Namespace: backup.Namespace,
+					Name:      backupScheduleName,
+				},
+			},
+		}
+	}
+	return []reconcile.Request{}
 }

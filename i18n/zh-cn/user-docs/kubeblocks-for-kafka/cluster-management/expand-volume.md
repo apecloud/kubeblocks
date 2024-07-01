@@ -26,7 +26,7 @@ kbcli cluster list kafka
 kbcli cluster volume-expand --storage=30G --components=kafka --volume-claim-templates=data kafka
 ```
 
-- `--component-names` 表示需扩容的组件名称。
+- `--components` 表示需扩容的组件名称。
 - `--volume-claim-templates` 表示组件中的 VolumeClaimTemplate 名称。
 - `--storage` 表示磁盘需扩容至的大小。
 

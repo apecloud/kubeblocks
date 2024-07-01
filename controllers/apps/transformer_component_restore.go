@@ -41,6 +41,7 @@ var _ graph.Transformer = &componentRestoreTransformer{}
 
 func (t *componentRestoreTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
+	graphCli, _ := transCtx.Client.(model.GraphClient)
 	synthesizedComp := transCtx.SynthesizeComponent
 	if synthesizedComp.Annotations[constant.RestoreFromBackupAnnotationKey] == "" {
 		return nil
@@ -53,7 +54,7 @@ func (t *componentRestoreTransformer) Transform(ctx graph.TransformContext, dag 
 	commitError := func(err error) error {
 		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting) {
 			transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeNormal, string(intctrlutil.ErrorTypeNeedWaiting), err.Error())
-			return graph.ErrPrematureStop
+			return errPrematureStopWithSetCompOwnership(transCtx.Component, dag, graphCli)
 		}
 		return err
 	}

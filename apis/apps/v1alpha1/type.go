@@ -22,8 +22,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
 const (
@@ -674,12 +672,6 @@ const (
 	MixedCases LetterCase = "MixedCases"
 )
 
-var webhookMgr *webhookManager
-
-type webhookManager struct {
-	client client.Client
-}
-
 // UpgradePolicy defines the policy of reconfiguring.
 // +enum
 // +kubebuilder:validation:Enum={simple,parallel,rolling,autoReload,operatorSyncUpdate,dynamicReloadBeginRestart}
@@ -763,10 +755,6 @@ type BaseBackupType string
 // +enum
 // +kubebuilder:validation:Enum={pre,post}
 type BackupStatusUpdateStage string
-
-func RegisterWebhookManager(mgr manager.Manager) {
-	webhookMgr = &webhookManager{mgr.GetClient()}
-}
 
 var (
 	ErrWorkloadTypeIsUnknown   = errors.New("workloadType is unknown")

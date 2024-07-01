@@ -197,8 +197,9 @@ func renderActionCmdJob(ctx context.Context, cli client.Reader, actionCtx *Actio
 						Name:      jobName,
 					},
 					Spec: corev1.PodSpec{
-						Volumes:       volumes,
-						RestartPolicy: corev1.RestartPolicyNever,
+						Volumes:            volumes,
+						RestartPolicy:      corev1.RestartPolicyNever,
+						ServiceAccountName: tplPod.Spec.ServiceAccountName,
 						Containers: []corev1.Container{
 							{
 								Name:            kbLifecycleActionJobContainerName,
@@ -474,7 +475,7 @@ func setActionDoneAnnotation(graphCli model.GraphClient, actionCtx *ActionContex
 	timeStr := time.Now().Format(time.RFC3339Nano)
 	actionCtx.component.Annotations[actionDoneKey] = timeStr
 	graphCli.Update(dag, compObj, actionCtx.component, &model.ReplaceIfExistingOption{})
-	return nil
+	return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting for component %s annotation %s to be updated", actionCtx.component.Name, actionDoneKey)
 }
 
 // cleanActionJob cleans the action job by name.

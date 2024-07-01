@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -29,14 +28,9 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
-	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
@@ -47,57 +41,10 @@ const (
 
 // log is for logging in this package.
 var (
-	opsRequestLog           = logf.Log.WithName("opsrequest-resource")
 	opsRequestAnnotationKey = "kubeblocks.io/ops-request"
 	// OpsRequestBehaviourMapper records the opsRequest behaviour according to the OpsType.
 	OpsRequestBehaviourMapper = map[OpsType]OpsRequestBehaviour{}
 )
-
-func (r *OpsRequest) SetupWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).
-		For(r).
-		Complete()
-}
-
-// TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-// +kubebuilder:webhook:path=/validate-apps-kubeblocks-io-v1alpha1-opsrequest,mutating=false,failurePolicy=fail,sideEffects=None,groups=apps.kubeblocks.io,resources=opsrequests,verbs=create;update,versions=v1alpha1,name=vopsrequest.kb.io,admissionReviewVersions=v1
-
-var _ webhook.Validator = &OpsRequest{}
-
-// ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *OpsRequest) ValidateCreate() (admission.Warnings, error) {
-	opsRequestLog.Info("validate create", "name", r.Name)
-	return nil, r.validateEntry(true)
-}
-
-// ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *OpsRequest) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
-	opsRequestLog.Info("validate update", "name", r.Name)
-	lastOpsRequest := old.(*OpsRequest).DeepCopy()
-	// if no spec updated, we should skip validation.
-	// if not, we can not delete the OpsRequest when cluster has been deleted.
-	// because when cluster not existed, r.validate will report an error.
-	if reflect.DeepEqual(lastOpsRequest.Spec, r.Spec) {
-		return nil, nil
-	}
-
-	if r.IsComplete() {
-		return nil, fmt.Errorf("update OpsRequest: %s is forbidden when status.Phase is %s", r.Name, r.Status.Phase)
-	}
-
-	// Keep the cancel consistent between the two opsRequest for comparing the diff.
-	lastOpsRequest.Spec.Cancel = r.Spec.Cancel
-	if !reflect.DeepEqual(lastOpsRequest.Spec, r.Spec) && r.Status.Phase != "" {
-		return nil, fmt.Errorf("update OpsRequest: %s is forbidden except for cancel when status.Phase is %s", r.Name, r.Status.Phase)
-	}
-	return nil, r.validateEntry(false)
-}
-
-// ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *OpsRequest) ValidateDelete() (admission.Warnings, error) {
-	opsRequestLog.Info("validate delete", "name", r.Name)
-	return nil, nil
-}
 
 // IsComplete checks if opsRequest has been completed.
 func (r *OpsRequest) IsComplete(phases ...OpsPhase) bool {
@@ -119,6 +66,19 @@ func (r *OpsRequest) IsComplete(phases ...OpsPhase) bool {
 func (r *OpsRequest) Force() bool {
 	// ops of type 'Start' do not support force execution.
 	return r.Spec.Force && r.Spec.Type != StartType
+}
+
+// Validate validates OpsRequest
+func (r *OpsRequest) Validate(ctx context.Context,
+	k8sClient client.Client,
+	cluster *Cluster,
+	needCheckClusterPhase bool) error {
+	if needCheckClusterPhase {
+		if err := r.validateClusterPhase(cluster); err != nil {
+			return err
+		}
+	}
+	return r.validateOps(ctx, k8sClient, cluster)
 }
 
 // validateClusterPhase validates whether the current cluster state supports the OpsRequest
@@ -157,61 +117,6 @@ func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 		return fmt.Errorf("OpsRequest.spec.type=%s is forbidden when Cluster.status.phase=%s", r.Spec.Type, cluster.Status.Phase)
 	}
 	return nil
-}
-
-// getCluster gets cluster with webhook client
-func (r *OpsRequest) getCluster(ctx context.Context, k8sClient client.Client) (*Cluster, error) {
-	if k8sClient == nil {
-		return nil, nil
-	}
-	cluster := &Cluster{}
-	// get cluster resource
-	if err := k8sClient.Get(ctx, types.NamespacedName{Namespace: r.Namespace, Name: r.Spec.GetClusterName()}, cluster); err != nil {
-		return nil, fmt.Errorf("get cluster: %s failed, err: %s", r.Spec.GetClusterName(), err.Error())
-	}
-	return cluster, nil
-}
-
-func (r *OpsRequest) getConfigMap(ctx context.Context,
-	k8sClient client.Client,
-	cmName string) (*corev1.ConfigMap, error) {
-	cmObj := &corev1.ConfigMap{}
-	cmKey := client.ObjectKey{
-		Namespace: r.Namespace,
-		Name:      cmName,
-	}
-
-	if err := k8sClient.Get(ctx, cmKey, cmObj); err != nil {
-		return nil, err
-	}
-	return cmObj, nil
-}
-
-// Validate validates OpsRequest
-func (r *OpsRequest) Validate(ctx context.Context,
-	k8sClient client.Client,
-	cluster *Cluster,
-	needCheckClusterPhase bool) error {
-	if needCheckClusterPhase {
-		if err := r.validateClusterPhase(cluster); err != nil {
-			return err
-		}
-	}
-	return r.validateOps(ctx, k8sClient, cluster)
-}
-
-// ValidateEntry OpsRequest webhook validate entry
-func (r *OpsRequest) validateEntry(isCreate bool) error {
-	if webhookMgr == nil || webhookMgr.client == nil {
-		return nil
-	}
-	ctx := context.Background()
-	k8sClient := webhookMgr.client
-	cluster, err := r.getCluster(ctx, k8sClient)
-	if err != nil {
-		return err
-	}
-	return r.Validate(ctx, k8sClient, cluster, isCreate)
 }
 
 // validateOps validates ops attributes
@@ -386,6 +291,21 @@ func (r *OpsRequest) validateReconfigureParams(ctx context.Context,
 		}
 	}
 	return nil
+}
+
+func (r *OpsRequest) getConfigMap(ctx context.Context,
+	k8sClient client.Client,
+	cmName string) (*corev1.ConfigMap, error) {
+	cmObj := &corev1.ConfigMap{}
+	cmKey := client.ObjectKey{
+		Namespace: r.Namespace,
+		Name:      cmName,
+	}
+
+	if err := k8sClient.Get(ctx, cmKey, cmObj); err != nil {
+		return nil, err
+	}
+	return cmObj, nil
 }
 
 // compareRequestsAndLimits compares the resource requests and limits

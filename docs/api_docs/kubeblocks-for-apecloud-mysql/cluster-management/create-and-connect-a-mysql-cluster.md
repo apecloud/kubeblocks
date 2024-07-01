@@ -18,7 +18,7 @@ This tutorial shows how to create and connect to an ApeCloud MySQL cluster.
 * Make sure the `apecloud-mysql` cluster definition is installed. If the cluster definition is not available, refer to [this doc](./../../overview/supported-addons.md#install-addons) to enable it first.
 
   ```bash
-  kubectl get clusterdefinition mysql
+  kubectl get clusterdefinition apecloud-mysql
   >
   NAME             TOPOLOGIES   SERVICEREFS   STATUS      AGE
   apecloud-mysql                              Available   27m
@@ -49,7 +49,7 @@ cat <<EOF | kubectl apply -f -
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: acmysql-cluster
+  name: mycluster
   namespace: default
 spec:
   clusterDefinitionRef: apecloud-mysql

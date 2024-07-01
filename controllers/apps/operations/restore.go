@@ -211,5 +211,8 @@ func (r RestoreOpsHandler) getClusterObjFromBackup(backup *dpv1alpha1.Backup, op
 		services = append(services, svc)
 	}
 	cluster.Spec.Services = services
+	for i := range cluster.Spec.ComponentSpecs {
+		cluster.Spec.ComponentSpecs[i].OfflineInstances = nil
+	}
 	return cluster, nil
 }

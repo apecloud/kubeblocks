@@ -116,9 +116,7 @@ var _ = Describe("clusterDeletionTransformer", func() {
 
 		transformer := &clusterDeletionTransformer{}
 		err := transformer.Transform(transCtx, dag)
-		Expect(err).ShouldNot(BeNil())
-		Expect(err.Error()).Should(ContainSubstring("not all sub-resources deleted"))
-
+		Expect(err).Should(BeNil())
 		Expect(dag.Vertices()).Should(HaveLen(1 + 3))
 	})
 
@@ -126,6 +124,7 @@ var _ = Describe("clusterDeletionTransformer", func() {
 		transformer := &clusterDeletionTransformer{}
 		err := transformer.Transform(transCtx, dag)
 		Expect(err).ShouldNot(BeNil())
+		Expect(err.Error()).Should(ContainSubstring("are not ready"))
 		Expect(dag.Vertices()).Should(HaveLen(1 + 1))
 
 		// delete component 1
@@ -136,6 +135,7 @@ var _ = Describe("clusterDeletionTransformer", func() {
 		dag = newDag(transCtx.Client.(model.GraphClient))
 		err = transformer.Transform(transCtx, dag)
 		Expect(err).ShouldNot(BeNil())
+		Expect(err.Error()).Should(ContainSubstring("are not ready"))
 		Expect(dag.Vertices()).Should(HaveLen(1 + 1))
 
 		// delete component 2
@@ -144,7 +144,7 @@ var _ = Describe("clusterDeletionTransformer", func() {
 		})
 		dag = newDag(transCtx.Client.(model.GraphClient))
 		err = transformer.Transform(transCtx, dag)
-		Expect(err).ShouldNot(BeNil())
+		Expect(err).Should(BeNil())
 		Expect(dag.Vertices()).Should(HaveLen(1 + 1))
 
 		// delete component 3

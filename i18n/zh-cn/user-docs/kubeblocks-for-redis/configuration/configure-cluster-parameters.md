@@ -16,7 +16,7 @@ KubeBlocks 提供了一套默认的配置生成策略，适用于在 KubeBlocks 
 查看集群的当前配置文件。
  
 ```bash
-kbcli cluster describe-config redis-cluster --component=redis
+kbcli cluster describe-config redis-cluster --components=redis
 ```
 
 从元信息中可以看到，集群 `redis-cluster` 有一个名为 `redis.cnf` 的配置文件。
@@ -26,19 +26,19 @@ kbcli cluster describe-config redis-cluster --component=redis
 * 查看当前配置文件的详细信息。
 
   ```bash
-  kbcli cluster describe-config redis-cluster --component=redis --show-detail
+  kbcli cluster describe-config redis-cluster --components=redis --show-detail
   ```
 
 * 查看参数描述。
 
   ```bash
-  kbcli cluster explain-config redis-cluster --component=redis |head -n 20
+  kbcli cluster explain-config redis-cluster --components=redis |head -n 20
   ```
 
 * 查看指定参数的用户指南。
 
   ```bash
-  kbcli cluster explain-config redis-cluster --component=redis --param=acllog-max-len
+  kbcli cluster explain-config redis-cluster --components=redis --param=acllog-max-len
   ```
 
   <details>
@@ -86,7 +86,7 @@ kbcli cluster describe-config redis-cluster --component=redis
 2. 调整 `acllog-max-len` 的值。
 
    ```bash
-   kbcli cluster configure redis-cluster --component=redis --set=acllog-max-len=256
+   kbcli cluster configure redis-cluster --components=redis --set=acllog-max-len=256
    ```
 
    :::note
@@ -173,7 +173,7 @@ Linux 和 macOS 系统可以使用 vi 编辑器编辑配置文件，Windows 系�
 
    :::note
 
-   如果集群中有多个组件，请使用 `--component` 参数指定一个组件。
+   如果集群中有多个组件，请使用 `--components` 参数指定一个组件。
 
    :::
 
@@ -203,7 +203,7 @@ Linux 和 macOS 系统可以使用 vi 编辑器编辑配置文件，Windows 系�
 查看参数配置历史记录。
 
 ```bash
-kbcli cluster describe-config redis-cluster --component=redis
+kbcli cluster describe-config redis-cluster --components=redis
 ```
 
 <details>

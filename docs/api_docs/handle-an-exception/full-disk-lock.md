@@ -9,7 +9,7 @@ sidebar_label: Full disk lock
 
 The full disk lock function of KubeBlocks ensures the stability and availability of a database. This function triggers a disk lock when the disk usage reaches a set threshold, thereby pausing write operations and only allowing read operations. Such a mechanism prevents a database from being affected by disk space exhaustion.
 
-## Lock/unlock mechanism
+## Mechanism of lock/unlock
 
 When the space water level of any configured volume exceeds the defined threshold, the instance is locked (read-only). Meanwhile, the system sends a related warning event, including the specific threshold and space usage information of each volume.
 
@@ -19,7 +19,7 @@ When the space water level of all configured volumes falls below the defined thr
 
 1. The full disk lock function currently supports global (ClusterDefinition) enabling or disabling and does not support Cluster dimension control. Dynamically enabling or disabling this function may affect the existing Cluster instances that use this ClusterDefinition and cause them to restart. Please operate with caution.
 
-2. The full disk locking function relies on the read permission (get & list) of the two system resource nodes and nodes/stats. If you create an instance via kbcli, make sure to grant the controller administrative rights to the ClusterRoleBinding.
+2. The full disk lock function relies on the read permission (get & list) of the two system resource nodes and nodes/stats. If you create an instance via kbcli, make sure to grant the controller administrative rights to the ClusterRoleBinding.
 
 3. Currently, full disk lock is available for ApeCloud MySQL, PostgreSQL and MongoDB.
 

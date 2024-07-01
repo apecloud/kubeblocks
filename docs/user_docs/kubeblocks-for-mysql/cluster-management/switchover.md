@@ -46,10 +46,10 @@ You can switch over a follower of an ApeCloud MySQL RaftGroup to the leader role
     kbcli cluster promote mycluster --instance='mycluster-mysql-2'
     ```
 
-* If there are multiple components, you can use `--component` to specify a component.
+* If there are multiple components, you can use `--components` to specify a component.
 
     ```bash
-    kbcli cluster promote mycluster --instance='mycluster-mysql-2' --component='apecloud-mysql'
+    kbcli cluster promote mycluster --instance='mycluster-mysql-2' --components='apecloud-mysql'
     ```
 
 

@@ -22,6 +22,7 @@ package operations
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -40,6 +41,10 @@ import (
 )
 
 type RestoreOpsHandler struct{}
+type RestoredResources struct {
+	cluster    *appsv1alpha1.Cluster
+	secretList *corev1.SecretList
+}
 
 var _ OpsHandler = RestoreOpsHandler{}
 
@@ -62,19 +67,28 @@ func (r RestoreOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx,
 
 // Action implements the restore action.
 func (r RestoreOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	var cluster *appsv1alpha1.Cluster
+	var restoredResources *RestoredResources
 	var err error
 
 	opsRequest := opsRes.OpsRequest
 
 	// restore the cluster from the backup
-	if cluster, err = r.restoreClusterFromBackup(reqCtx, cli, opsRequest); err != nil {
+	if restoredResources, err = r.restoreClusterFromBackup(reqCtx, cli, opsRequest); err != nil {
 		return err
 	}
+	cluster := restoredResources.cluster
+	secretList := restoredResources.secretList
 
-	// create cluster
+	// create cluster and secrets
 	if err = cli.Create(reqCtx.Ctx, cluster); err != nil {
 		return err
+	}
+	if secretList != nil {
+		for _, secret := range secretList.Items {
+			if err = cli.Create(reqCtx.Ctx, &secret); err != nil {
+				return err
+			}
+		}
 	}
 	opsRes.Cluster = cluster
 
@@ -131,9 +145,9 @@ func (r RestoreOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, 
 	return nil
 }
 
-func (r RestoreOpsHandler) restoreClusterFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *appsv1alpha1.OpsRequest) (*appsv1alpha1.Cluster, error) {
+func (r RestoreOpsHandler) restoreClusterFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *appsv1alpha1.OpsRequest) (*RestoredResources, error) {
 	backupName := opsRequest.Spec.GetRestore().BackupName
-
+	restoredResources := &RestoredResources{}
 	// check if the backup exists
 	backup := &dpv1alpha1.Backup{}
 	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{
@@ -169,7 +183,10 @@ func (r RestoreOpsHandler) restoreClusterFromBackup(reqCtx intctrlutil.RequestCt
 		},
 	}
 	util.SetOpsRequestToCluster(clusterObj, opsRequestSlice)
-	return clusterObj, nil
+	restoredResources.cluster = clusterObj
+	// get the secret objects from backup
+	restoredResources.secretList, err = r.getSecretObjsFromBackup(backup, opsRequest)
+	return restoredResources, err
 }
 
 func (r RestoreOpsHandler) getClusterObjFromBackup(backup *dpv1alpha1.Backup, opsRequest *appsv1alpha1.OpsRequest) (*appsv1alpha1.Cluster, error) {
@@ -215,4 +232,53 @@ func (r RestoreOpsHandler) getClusterObjFromBackup(backup *dpv1alpha1.Backup, op
 		cluster.Spec.ComponentSpecs[i].OfflineInstances = nil
 	}
 	return cluster, nil
+}
+
+func (r RestoreOpsHandler) getSecretObjsFromBackup(backup *dpv1alpha1.Backup, opsRequest *appsv1alpha1.OpsRequest) (*corev1.SecretList, error) {
+	secretList := &corev1.SecretList{}
+	// use the Secrets snapshot to restore firstly
+	secretStrings, ok := backup.Annotations[constant.SecretsSnapshotAnnotationsKey]
+	if !ok {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf("missing secrets snapshot annotation in backup %s, %s is empty in Annotations", backup.Name, constant.SecretsSnapshotAnnotationsKey))
+	}
+	if err := json.Unmarshal([]byte(secretStrings), &secretList); err != nil {
+		return nil, err
+	}
+
+	restoreSpec := opsRequest.Spec.GetRestore()
+	// set the restore annotation to Secrets
+	restoreAnnotation, err := restore.GetRestoreFromBackupAnnotation(backup, restoreSpec.VolumeRestorePolicy, restoreSpec.RestorePointInTime, restoreSpec.DeferPostReadyUntilClusterRunning)
+	if err != nil {
+		return nil, err
+	}
+	clusterName := opsRequest.Spec.GetClusterName()
+
+	newSecretList := &corev1.SecretList{}
+	for i, _ := range secretList.Items {
+		if secretList.Items[i].Annotations == nil {
+			secretList.Items[i].Annotations = map[string]string{}
+		}
+		secretList.Items[i].Annotations[constant.RestoreFromBackupAnnotationKey] = restoreAnnotation
+		newSecret, err := r.rerenderRestoredSecretByNewCluster(&secretList.Items[i], &clusterName)
+		if err != nil {
+			return nil, err
+		}
+		newSecretList.Items = append(newSecretList.Items, *newSecret)
+	}
+	return newSecretList, nil
+}
+
+func (r RestoreOpsHandler) rerenderRestoredSecretByNewCluster(secret *corev1.Secret, newClusterName *string) (*corev1.Secret, error) {
+	// replace cluster name
+	accountSecretPattern := `^\w+(-\w+-account-\w+$)`
+	regex, _ := regexp.Compile(accountSecretPattern)
+	if matched := regex.MatchString(secret.Name); matched {
+		secret.Name = regex.ReplaceAllString(secret.Name, *newClusterName+"${1}")
+	}
+	// replace secret labels
+	newLabels := constant.GetClusterWellKnownLabels(*newClusterName)
+	for k, v := range newLabels {
+		secret.Labels[k] = v
+	}
+	return secret, nil
 }

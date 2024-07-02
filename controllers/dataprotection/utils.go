@@ -225,6 +225,18 @@ func getCluster(ctx context.Context,
 	return cluster
 }
 
+// getSecrets gets the secrets and will ignore the error.
+func getSecrets(ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster) *corev1.SecretList {
+	secretList := &corev1.SecretList{}
+	labels := constant.GetClusterWellKnownLabels(cluster.Name)
+	if err := cli.List(ctx, secretList, client.InNamespace(cluster.Namespace), client.MatchingLabels(labels)); err != nil {
+		return nil
+	}
+	return secretList
+}
+
 func getClusterLabelKeys() []string {
 	return []string{constant.AppInstanceLabelKey, constant.KBAppComponentLabelKey, constant.KBAppShardingNameLabelKey}
 }

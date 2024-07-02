@@ -103,7 +103,7 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	}
 	if runningITS != nil {
 		*protoITS.Spec.Selector = *runningITS.Spec.Selector
-		protoITS.Spec.Template.Labels = runningITS.Spec.Template.Labels
+		protoITS.Spec.Template.Labels = intctrlutil.MergeMetadataMaps(runningITS.Spec.Template.Labels, synthesizeComp.UserDefinedLabels)
 	}
 	transCtx.ProtoWorkload = protoITS
 
@@ -288,7 +288,9 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, synthesizeComp *comp
 		})
 	}
 	mergeMetadataMap(itsObjCopy.Annotations, &itsProto.Annotations)
+	mergeMetadataMap(itsObjCopy.Labels, &itsProto.Labels)
 	itsObjCopy.Annotations = itsProto.Annotations
+	itsObjCopy.Labels = itsProto.Labels
 
 	// keep the original template annotations.
 	// if annotations exist and are replaced, the its will be updated.

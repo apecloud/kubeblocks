@@ -97,7 +97,9 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 	itsName := constant.GenerateWorkloadNamePattern(clusterName, compName)
 	itsBuilder := builder.NewInstanceSetBuilder(namespace, itsName).
 		AddLabelsInMap(mergeLabels).
+		AddLabelsInMap(synthesizedComp.UserDefinedLabels).
 		AddAnnotationsInMap(mergeAnnotations).
+		AddAnnotationsInMap(synthesizedComp.UserDefinedAnnotations).
 		AddMatchLabelsInMap(labels).
 		SetReplicas(synthesizedComp.Replicas).
 		SetMinReadySeconds(synthesizedComp.MinReadySeconds).

@@ -88,6 +88,13 @@ type OpsRequestSpec struct {
 	// +optional
 	PreConditionDeadlineSeconds *int32 `json:"preConditionDeadlineSeconds,omitempty"`
 
+	// Specifies the maximum duration (in seconds) that an opsRequest is allowed to run.
+	// If the opsRequest runs longer than this duration, its phase will be marked as Aborted.
+	// If this value is not set or set to 0, the timeout will be ignored and the opsRequest will run indefinitely.
+	// +optional
+	// +kubebuilder:Minimum=0
+	TimeoutSeconds *int32 `json:"timeoutSeconds,omitempty"`
+
 	// Exactly one of its members must be set.
 	SpecificOpsRequest `json:",inline"`
 }

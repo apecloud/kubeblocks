@@ -2697,6 +2697,20 @@ If set to 0 (default), pre-conditions must be satisfied immediately for the OpsR
 </tr>
 <tr>
 <td>
+<code>timeoutSeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the maximum duration (in seconds) that an opsRequest is allowed to run.
+If the opsRequest runs longer than this duration, its phase will be marked as Aborted.
+If this value is not set or set to 0, the timeout will be ignored and the opsRequest will run indefinitely.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>SpecificOpsRequest</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">
@@ -14389,6 +14403,20 @@ int32
 <p>Specifies the maximum time in seconds that the OpsRequest will wait for its pre-conditions to be met
 before it aborts the operation.
 If set to 0 (default), pre-conditions must be satisfied immediately for the OpsRequest to proceed.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>timeoutSeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the maximum duration (in seconds) that an opsRequest is allowed to run.
+If the opsRequest runs longer than this duration, its phase will be marked as Aborted.
+If this value is not set or set to 0, the timeout will be ignored and the opsRequest will run indefinitely.</p>
 </td>
 </tr>
 <tr>

@@ -31,6 +31,7 @@ import (
 // +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:storageversion
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cmpd
 // +kubebuilder:printcolumn:name="SERVICE",type="string",JSONPath=".spec.serviceKind",description="service"
 // +kubebuilder:printcolumn:name="SERVICE-VERSION",type="string",JSONPath=".spec.serviceVersion",description="service version"

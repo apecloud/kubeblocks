@@ -755,6 +755,9 @@ func PatchBackupObjectMeta(
 		if err := setClusterSnapshotAnnotation(request.Backup, cluster); err != nil {
 			return false, err
 		}
+		if err := setSecretSnapshotAnnotation(request.Ctx, request.Client, request.Backup, cluster); err != nil {
+			return false, err
+		}
 		if err := setConnectionPasswordAnnotation(request); err != nil {
 			return false, err
 		}
@@ -891,5 +894,48 @@ func setClusterSnapshotAnnotation(backup *dpv1alpha1.Backup, cluster *appsv1alph
 		backup.Annotations = map[string]string{}
 	}
 	backup.Annotations[constant.ClusterSnapshotAnnotationKey] = *clusterString
+	return nil
+}
+
+// getSecretListObjectString gets the secret objects of the cluster and convert it to string.
+func getSecretListObjectString(ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster) (*string, error) {
+	// fetch secret objects
+	secretList := getSecrets(ctx, cli, cluster)
+	secretListString := ""
+	for i, _ := range secretList.Items {
+		oldAnnotations := secretList.Items[i].Annotations
+		secretList.Items[i].ObjectMeta = metav1.ObjectMeta{
+			Namespace:   secretList.Items[i].Namespace,
+			Name:        secretList.Items[i].Name,
+			Labels:      secretList.Items[i].Labels,
+			Annotations: nil,
+		}
+		if v, ok := oldAnnotations[constant.ExtraEnvAnnotationKey]; ok {
+			secretList.Items[i].Annotations = map[string]string{
+				constant.ExtraEnvAnnotationKey: v,
+			}
+		}
+	}
+	secretListBytes, err := json.Marshal(secretList)
+	if err != nil {
+		return nil, err
+	}
+	secretListString = string(secretListBytes)
+	return &secretListString, nil
+}
+
+// setSecretSnapshotAnnotation sets the snapshot of secret to the backup's annotations.
+func setSecretSnapshotAnnotation(ctx context.Context,
+	cli client.Client, backup *dpv1alpha1.Backup, cluster *appsv1alpha1.Cluster) error {
+	secretListString, err := getSecretListObjectString(ctx, cli, cluster)
+	if err != nil || secretListString == nil {
+		return err
+	}
+	if backup.Annotations == nil {
+		backup.Annotations = map[string]string{}
+	}
+	backup.Annotations[constant.SecretsSnapshotAnnotationsKey] = *secretListString
 	return nil
 }

@@ -73,9 +73,7 @@ func checkAndTriggerReRender(ctx context.Context, synthesizedComp component.Synt
 		return nil
 	}
 
-	synthesizedComp.CharacterType = "kafka"
 	tlsKeyword := plan.GetTLSKeyWord(synthesizedComp.CharacterType)
-
 	if tlsKeyword == "unsupported-character-type" {
 		return nil
 	}

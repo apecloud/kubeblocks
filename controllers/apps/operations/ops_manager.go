@@ -169,7 +169,7 @@ func (opsMgr *OpsManager) Reconcile(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		return 0, opsMgr.handleOpsCompleted(reqCtx, cli, opsRes, opsRequestPhase,
 			appsv1alpha1.NewCancelFailedCondition(opsRequest, err), appsv1alpha1.NewFailedCondition(opsRequest, err))
 	default:
-		return opsMgr.handleOpsIsRunningTimedOut(reqCtx, cli, opsRes, requeueAfter)
+		return opsMgr.checkAndHandleOpsTimeout(reqCtx, cli, opsRes, requeueAfter)
 	}
 }
 
@@ -232,7 +232,7 @@ func (opsMgr *OpsManager) validateDependOnSuccessfulOps(reqCtx intctrlutil.Reque
 }
 
 // handleOpsIsRunningTimedOut handles if the opsRequest is timed out.
-func (opsMgr *OpsManager) handleOpsIsRunningTimedOut(reqCtx intctrlutil.RequestCtx,
+func (opsMgr *OpsManager) checkAndHandleOpsTimeout(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
 	requeueAfter time.Duration) (time.Duration, error) {
@@ -240,26 +240,15 @@ func (opsMgr *OpsManager) handleOpsIsRunningTimedOut(reqCtx intctrlutil.RequestC
 	if timeoutSeconds == nil || *timeoutSeconds == 0 {
 		return requeueAfter, nil
 	}
-	checkTimedOut := func(startTime metav1.Time) (time.Duration, error) {
-		timeoutPoint := startTime.Add(time.Duration(*timeoutSeconds))
-		if !time.Now().Before(timeoutPoint) {
-			return 0, PatchOpsStatus(reqCtx.Ctx, cli, opsRes, appsv1alpha1.OpsAbortedPhase,
-
-				appsv1alpha1.NewAbortedCondition("Aborted due to exceeding the specified timeout period (timeoutSeconds)"))
-		}
-		if requeueAfter != 0 {
-			return requeueAfter, nil
-		}
-		return time.Until(timeoutPoint), nil
+	timeoutPoint := opsRes.OpsRequest.Status.StartTimestamp.Add(time.Duration(*timeoutSeconds))
+	if !time.Now().Before(timeoutPoint) {
+		return 0, PatchOpsStatus(reqCtx.Ctx, cli, opsRes, appsv1alpha1.OpsAbortedPhase,
+			appsv1alpha1.NewAbortedCondition("Aborted due to exceeding the specified timeout period (timeoutSeconds)"))
 	}
-	if !opsRes.OpsRequest.Spec.Cancel {
-		return checkTimedOut(opsRes.OpsRequest.Status.StartTimestamp)
-	}
-	if opsRes.OpsRequest.Status.CancelTimestamp.IsZero() {
+	if requeueAfter != 0 {
 		return requeueAfter, nil
 	}
-	// After canceling opsRequest, recalculate whether the opsRequest runs out of time based on the cancellation time point
-	return checkTimedOut(opsRes.OpsRequest.Status.CancelTimestamp)
+	return time.Until(timeoutPoint), nil
 }
 
 func GetOpsManager() *OpsManager {

@@ -338,7 +338,7 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 		return 0, 0, err
 	}
 	workloadName := constant.GenerateWorkloadNamePattern(opsRes.Cluster.Name, veHelper.fullComponentName)
-	instanceNames := instanceset.GenerateInstanceNamesFromTemplate(workloadName, veHelper.templateName, int32(veHelper.expectCount), veHelper.offlineInstanceNames)
+	instanceNames := instanceset.GenerateInstanceNamesFromTemplate(workloadName, veHelper.templateName, int32(veHelper.expectCount), veHelper.offlineInstanceNames, nil)
 	instanceNameSet := sets.New(instanceNames...)
 	for _, v := range pvcList.Items {
 		if _, ok := instanceNameSet[strings.Replace(v.Name, veHelper.vctName+"-", "", 1)]; !ok {

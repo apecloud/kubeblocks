@@ -57,7 +57,10 @@ func (a *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*k
 
 	svc := buildSvc(*its, labels, selectors)
 	headLessSvc := buildHeadlessSvc(*its, labels, headlessSelectors)
-	envConfig := buildEnvConfigMap(*its, labels)
+	envConfig, err := buildEnvConfigMap(*its, labels)
+	if err != nil {
+		return nil, err
+	}
 	var objects []client.Object
 	if svc != nil {
 		objects = append(objects, svc)

@@ -121,14 +121,14 @@ func (vs verticalScalingHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, 
 				if !ok {
 					continue
 				}
-				templatePodNames := instanceset.GenerateInstanceNamesFromTemplate(workloadName, ins.Name, replicas, pgRes.clusterComponent.OfflineInstances)
+				templatePodNames := instanceset.GenerateInstanceNamesFromTemplate(workloadName, ins.Name, replicas, pgRes.clusterComponent.OfflineInstances, nil)
 				for _, podName := range templatePodNames {
 					updatedPodSet[podName] = ins.Name
 				}
 				break
 			}
 			if vs.verticalScalingComp(verticalScaling) && templateReplicasCnt < pgRes.clusterComponent.Replicas {
-				podNames := instanceset.GenerateInstanceNamesFromTemplate(workloadName, "", pgRes.clusterComponent.Replicas-templateReplicasCnt, pgRes.clusterComponent.OfflineInstances)
+				podNames := instanceset.GenerateInstanceNamesFromTemplate(workloadName, "", pgRes.clusterComponent.Replicas-templateReplicasCnt, pgRes.clusterComponent.OfflineInstances, nil)
 				for _, podName := range podNames {
 					updatedPodSet[podName] = ""
 				}

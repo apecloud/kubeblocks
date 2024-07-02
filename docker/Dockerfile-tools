@@ -86,6 +86,7 @@ RUN GRPC_HEALTH_PROBE_VERSION=v0.4.13  GOOS=${TARGETOS} GOARCH=${TARGETARCH} && 
     wget -qO/bin/grpc_health_probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/${GRPC_HEALTH_PROBE_VERSION}/grpc_health_probe-${GOOS}-${GOARCH}
 
 
+# Use the static binary of curl instead of the Alpine package, as curl may be injected into the kb-agent container, which uses the Actions image.
 FROM --platform=${TARGETPLATFORM} tarampampam/curl:8.6.0 as binary-downloader
 
 # Use alpine with tag 20230329 is corresponding to "edge" tag (latest release to date is 3.18) as of 20230625

@@ -83,13 +83,16 @@ func getHeadlessSvcName(itsName string) string {
 	return strings.Join([]string{itsName, "headless"}, "-")
 }
 
-func buildEnvConfigMap(its workloads.InstanceSet, labels map[string]string) *corev1.ConfigMap {
-	envData := buildEnvConfigData(its)
+func buildEnvConfigMap(its workloads.InstanceSet, labels map[string]string) (*corev1.ConfigMap, error) {
+	envData, err := buildEnvConfigData(its)
+	if err != nil {
+		return nil, err
+	}
 	annotations := ParseAnnotationsOfScope(ConfigMapScope, its.Annotations)
 	return builder.NewConfigMapBuilder(its.Namespace, GetEnvConfigMapName(its.Name)).
 		AddAnnotationsInMap(annotations).
 		AddLabelsInMap(labels).
-		SetData(envData).GetObject()
+		SetData(envData).GetObject(), nil
 }
 
 func BuildPodTemplate(its *workloads.InstanceSet, envConfigName string) *corev1.PodTemplateSpec {
@@ -465,7 +468,7 @@ func injectCustomRoleProbeContainer(its *workloads.InstanceSet, template *corev1
 	}
 }
 
-func buildEnvConfigData(its workloads.InstanceSet) map[string]string {
+func buildEnvConfigData(its workloads.InstanceSet) (map[string]string, error) {
 	envData := map[string]string{}
 	svcName := getHeadlessSvcName(its.Name)
 	uid := string(its.UID)
@@ -504,16 +507,19 @@ func buildEnvConfigData(its workloads.InstanceSet) map[string]string {
 		}
 	}
 	// generate all pod names
-	generatePodNames := func() []string {
+	generatePodNames := func() ([]string, error) {
 		var instances []InstanceTemplate
 		for i := range its.Spec.Instances {
 			instances = append(instances, &its.Spec.Instances[i])
 		}
-		return GenerateAllInstanceNames(its.Name, *its.Spec.Replicas, instances, its.Spec.OfflineInstances)
+		return GenerateAllInstanceNamesWithTemplatesOrdinals(its.Name, *its.Spec.Replicas, instances, its.Spec.OfflineInstances, its.Spec.TemplatesOrdinals)
 	}
 
 	// all pod names
-	podNames := generatePodNames()
+	podNames, err := generatePodNames()
+	if err != nil {
+		return nil, err
+	}
 
 	prefix := constant.KBPrefix + "_ITS_"
 	envData[prefix+"N"] = strReplicas
@@ -546,5 +552,5 @@ func buildEnvConfigData(its workloads.InstanceSet) map[string]string {
 
 	}
 
-	return envData
+	return envData, nil
 }

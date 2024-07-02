@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -199,7 +200,11 @@ func buildInstanceName2TemplateMap(itsExt *instanceSetExt) (map[string]*instance
 	allNameTemplateMap := make(map[string]*instanceTemplateExt)
 	var instanceNameList []string
 	for _, template := range instanceTemplateList {
-		instanceNames := GenerateInstanceNamesFromTemplate(itsExt.its.Name, template.Name, template.Replicas, itsExt.its.Spec.OfflineInstances)
+		ordinalList, err := GetOrdinalListByTemplateName(itsExt.its.Spec.TemplatesOrdinals, template.Name)
+		if err != nil {
+			return nil, err
+		}
+		instanceNames := GenerateInstanceNamesFromTemplate(itsExt.its.Name, template.Name, template.Replicas, itsExt.its.Spec.OfflineInstances, ordinalList)
 		instanceNameList = append(instanceNameList, instanceNames...)
 		for _, name := range instanceNames {
 			allNameTemplateMap[name] = template
@@ -221,12 +226,12 @@ func GenerateAllInstanceNames(parentName string, replicas int32, templates []Ins
 	instanceNameList := make([]string, 0)
 	for _, template := range templates {
 		replicas := template.GetReplicas()
-		names := GenerateInstanceNamesFromTemplate(parentName, template.GetName(), replicas, offlineInstances)
+		names := GenerateInstanceNamesFromTemplate(parentName, template.GetName(), replicas, offlineInstances, nil)
 		instanceNameList = append(instanceNameList, names...)
 		totalReplicas += replicas
 	}
 	if totalReplicas < replicas {
-		names := GenerateInstanceNamesFromTemplate(parentName, "", replicas-totalReplicas, offlineInstances)
+		names := GenerateInstanceNamesFromTemplate(parentName, "", replicas-totalReplicas, offlineInstances, nil)
 		instanceNameList = append(instanceNameList, names...)
 	}
 	getNameNOrdinalFunc := func(i int) (string, int) {
@@ -236,18 +241,58 @@ func GenerateAllInstanceNames(parentName string, replicas int32, templates []Ins
 	return instanceNameList
 }
 
-func GenerateInstanceNamesFromTemplate(parentName, templateName string, replicas int32, offlineInstances []string) []string {
-	instanceNames, _ := GenerateInstanceNames(parentName, templateName, replicas, 0, offlineInstances)
+func GenerateAllInstanceNamesWithTemplatesOrdinals(parentName string, replicas int32, templates []InstanceTemplate, offlineInstances []string, templatesOrdinals []workloads.InstanceTemplateOrdinals) ([]string, error) {
+	totalReplicas := int32(0)
+	instanceNameList := make([]string, 0)
+	for _, template := range templates {
+		replicas := template.GetReplicas()
+		ordinalList := make([]int32, 0)
+		var err error
+		if len(templatesOrdinals) > 0 {
+			ordinalList, err = GetOrdinalListByTemplateName(templatesOrdinals, template.GetName())
+			if err != nil {
+				return nil, err
+			}
+		}
+		names := GenerateInstanceNamesFromTemplate(parentName, template.GetName(), replicas, offlineInstances, ordinalList)
+		instanceNameList = append(instanceNameList, names...)
+		totalReplicas += replicas
+	}
+	if totalReplicas < replicas {
+		ordinalList := make([]int32, 0)
+		var err error
+		if len(templatesOrdinals) > 0 {
+			ordinalList, err = GetOrdinalListByTemplateName(templatesOrdinals, "")
+			if err != nil {
+				return nil, err
+			}
+		}
+		names := GenerateInstanceNamesFromTemplate(parentName, "", replicas-totalReplicas, offlineInstances, ordinalList)
+		instanceNameList = append(instanceNameList, names...)
+	}
+	getNameNOrdinalFunc := func(i int) (string, int) {
+		return ParseParentNameAndOrdinal(instanceNameList[i])
+	}
+	baseSort(instanceNameList, getNameNOrdinalFunc, nil, true)
+	return instanceNameList, nil
+}
+
+func GenerateInstanceNamesFromTemplate(parentName, templateName string, replicas int32, offlineInstances []string, ordinalList []int32) []string {
+	instanceNames := GenerateInstanceNames(parentName, templateName, replicas, 0, offlineInstances, ordinalList)
 	return instanceNames
 }
 
 // GenerateInstanceNames generates instance names based on certain rules:
 // The naming convention for instances (pods) based on the Parent Name, InstanceTemplate Name, and ordinal.
 // The constructed instance name follows the pattern: $(parent.name)-$(template.name)-$(ordinal).
+// If the user specifies ordinalList, then use ordinalList to generate instance names.
 func GenerateInstanceNames(parentName, templateName string,
-	replicas int32, ordinal int32, offlineInstances []string) ([]string, int32) {
-	usedNames := sets.New(offlineInstances...)
+	replicas int32, ordinal int32, offlineInstances []string, ordinalList []int32) []string {
+	if len(ordinalList) > 0 {
+		return GenerateInstanceNamesWithOrdinalList(parentName, templateName, offlineInstances, ordinalList)
+	}
 	var instanceNameList []string
+	usedNames := sets.New(offlineInstances...)
 	for count := int32(0); count < replicas; count++ {
 		var name string
 		for {
@@ -263,7 +308,65 @@ func GenerateInstanceNames(parentName, templateName string,
 			}
 		}
 	}
-	return instanceNameList, ordinal
+	return instanceNameList
+}
+
+// GenerateInstanceNamesWithOrdinalList generates instance names based on ordinalList and offlineInstances.
+func GenerateInstanceNamesWithOrdinalList(parentName, templateName string, offlineInstances []string, ordinalList []int32) []string {
+	var instanceNameList []string
+	usedNames := sets.New(offlineInstances...)
+	for _, ordinal := range ordinalList {
+		var name string
+		if len(templateName) == 0 {
+			name = fmt.Sprintf("%s-%d", parentName, ordinal)
+		} else {
+			name = fmt.Sprintf("%s-%s-%d", parentName, templateName, ordinal)
+		}
+		if usedNames.Has(name) {
+			continue
+		}
+		instanceNameList = append(instanceNameList, name)
+	}
+	return instanceNameList
+}
+
+func GetOrdinalListByTemplateName(templatesOrdinals []workloads.InstanceTemplateOrdinals, name string) ([]int32, error) {
+	if len(templatesOrdinals) == 0 {
+		return nil, nil
+	}
+	ordinals, err := GetOrdinalsByTemplateName(templatesOrdinals, name)
+	if err != nil {
+		return nil, err
+	}
+	return ConvertOrdinalsToOrdinalList(ordinals)
+}
+
+func GetOrdinalsByTemplateName(templatesOrdinals []workloads.InstanceTemplateOrdinals, name string) (workloads.Ordinals, error) {
+	for _, templateOrdinals := range templatesOrdinals {
+		if templateOrdinals.Name == name {
+			return templateOrdinals.Ordinals, nil
+		}
+	}
+	return workloads.Ordinals{}, fmt.Errorf("template %s not found", name)
+}
+
+func ConvertOrdinalsToOrdinalList(ordinals workloads.Ordinals) ([]int32, error) {
+	ordinalList := sets.New(ordinals.Discrete...)
+	for _, item := range ordinals.Ranges {
+		start := item.Start
+		end := item.End
+
+		if start > end {
+			return nil, fmt.Errorf("range's end(%v) must >= start(%v)", end, start)
+		}
+
+		for ordinal := start; ordinal <= end; ordinal++ {
+			ordinalList.Insert(ordinal)
+		}
+	}
+	sortedOrdinalList := ordinalList.UnsortedList()
+	slices.Sort(sortedOrdinalList)
+	return sortedOrdinalList, nil
 }
 
 func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent *workloads.InstanceSet, revision string) (*instance, error) {

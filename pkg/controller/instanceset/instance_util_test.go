@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -393,7 +394,7 @@ var _ = Describe("instance util test", func() {
 	})
 
 	Context("GenerateInstanceNamesFromTemplate", func() {
-		It("should work well", func() {
+		It("should work well, without ordinalList", func() {
 			parentName := "foo"
 			templateName := "bar"
 			templates := []*instanceTemplateExt{
@@ -410,7 +411,7 @@ var _ = Describe("instance util test", func() {
 
 			var instanceNameList []string
 			for _, template := range templates {
-				instanceNames := GenerateInstanceNamesFromTemplate(parentName, template.Name, template.Replicas, offlineInstances)
+				instanceNames := GenerateInstanceNamesFromTemplate(parentName, template.Name, template.Replicas, offlineInstances, nil)
 				instanceNameList = append(instanceNameList, instanceNames...)
 			}
 			getNameNOrdinalFunc := func(i int) (string, int) {
@@ -418,6 +419,33 @@ var _ = Describe("instance util test", func() {
 			}
 			baseSort(instanceNameList, getNameNOrdinalFunc, nil, true)
 			podNamesExpected := []string{"foo-1", "foo-2", "foo-bar-0", "foo-bar-2"}
+			Expect(instanceNameList).Should(Equal(podNamesExpected))
+		})
+		It("should work well, with ordinalList", func() {
+			parentName := "foo"
+			templateName := "bar"
+			templates := []*instanceTemplateExt{
+				{
+					Name:     "",
+					Replicas: 2,
+				},
+				{
+					Replicas: 2,
+					Name:     templateName,
+				},
+			}
+			offlineInstances := []string{"foo-bar-1", "foo-0"}
+			ordinalList := []int32{0, 1}
+			var instanceNameList []string
+			for _, template := range templates {
+				instanceNames := GenerateInstanceNamesFromTemplate(parentName, template.Name, template.Replicas, offlineInstances, ordinalList)
+				instanceNameList = append(instanceNameList, instanceNames...)
+			}
+			getNameNOrdinalFunc := func(i int) (string, int) {
+				return ParseParentNameAndOrdinal(instanceNameList[i])
+			}
+			baseSort(instanceNameList, getNameNOrdinalFunc, nil, true)
+			podNamesExpected := []string{"foo-1", "foo-bar-0"}
 			Expect(instanceNameList).Should(Equal(podNamesExpected))
 		})
 	})
@@ -440,6 +468,296 @@ var _ = Describe("instance util test", func() {
 
 			podNamesExpected := []string{"foo-1", "foo-2", "foo-bar-0", "foo-bar-2", "foo-foo-0"}
 			Expect(instanceNameList).Should(Equal(podNamesExpected))
+		})
+	})
+
+	Context("GenerateAllInstanceNamesWithTemplatesOrdinals", func() {
+		It("without templatesOrdinals", func() {
+			parentName := "foo"
+			templatesFoo := &workloads.InstanceTemplate{
+				Name:     "foo",
+				Replicas: pointer.Int32(1),
+			}
+			templateBar := &workloads.InstanceTemplate{
+				Name:     "bar",
+				Replicas: pointer.Int32(2),
+			}
+			var templates []InstanceTemplate
+			templates = append(templates, templatesFoo, templateBar)
+			offlineInstances := []string{"foo-bar-1", "foo-0"}
+			instanceNameList, err := GenerateAllInstanceNamesWithTemplatesOrdinals(parentName, 5, templates, offlineInstances, nil)
+			Expect(err).Should(BeNil())
+
+			podNamesExpected := []string{"foo-1", "foo-2", "foo-bar-0", "foo-bar-2", "foo-foo-0"}
+			Expect(instanceNameList).Should(Equal(podNamesExpected))
+		})
+		It("with templatesOrdinals, without offlineInstances", func() {
+			parentName := "foo"
+			templatesFoo := &workloads.InstanceTemplate{
+				Name:     "foo",
+				Replicas: pointer.Int32(1),
+			}
+			templateBar := &workloads.InstanceTemplate{
+				Name:     "bar",
+				Replicas: pointer.Int32(2),
+			}
+			templateOrdinals := []workloads.InstanceTemplateOrdinals{
+				{
+					Name: "",
+					Ordinals: workloads.Ordinals{
+						Ranges: []workloads.Range{
+							{
+								Start: 1,
+								End:   2,
+							},
+						},
+					},
+				},
+				{
+					Name: "foo",
+					Ordinals: workloads.Ordinals{
+						Discrete: []int32{0},
+					},
+				},
+				{
+					Name: "bar",
+					Ordinals: workloads.Ordinals{
+						Ranges: []workloads.Range{
+							{
+								Start: 2,
+								End:   3,
+							},
+						},
+						Discrete: []int32{0},
+					},
+				},
+			}
+			var templates []InstanceTemplate
+			templates = append(templates, templatesFoo, templateBar)
+			instanceNameList, err := GenerateAllInstanceNamesWithTemplatesOrdinals(parentName, 5, templates, nil, templateOrdinals)
+			Expect(err).Should(BeNil())
+
+			podNamesExpected := []string{"foo-1", "foo-2", "foo-bar-0", "foo-bar-2", "foo-bar-3", "foo-foo-0"}
+			Expect(instanceNameList).Should(Equal(podNamesExpected))
+		})
+		It("with templatesOrdinals, with offlineInstances", func() {
+			parentName := "foo"
+			templatesFoo := &workloads.InstanceTemplate{
+				Name:     "foo",
+				Replicas: pointer.Int32(1),
+			}
+			templateBar := &workloads.InstanceTemplate{
+				Name:     "bar",
+				Replicas: pointer.Int32(2),
+			}
+			templateOrdinals := []workloads.InstanceTemplateOrdinals{
+				{
+					Name: "",
+					Ordinals: workloads.Ordinals{
+						Ranges: []workloads.Range{
+							{
+								Start: 1,
+								End:   2,
+							},
+						},
+					},
+				},
+				{
+					Name: "foo",
+					Ordinals: workloads.Ordinals{
+						Discrete: []int32{0},
+					},
+				},
+				{
+					Name: "bar",
+					Ordinals: workloads.Ordinals{
+						Ranges: []workloads.Range{
+							{
+								Start: 2,
+								End:   3,
+							},
+						},
+						Discrete: []int32{0},
+					},
+				},
+			}
+			var templates []InstanceTemplate
+			templates = append(templates, templatesFoo, templateBar)
+			offlineInstances := []string{"foo-bar-1", "foo-0", "foo-bar-3"}
+			instanceNameList, err := GenerateAllInstanceNamesWithTemplatesOrdinals(parentName, 5, templates, offlineInstances, templateOrdinals)
+			Expect(err).Should(BeNil())
+
+			podNamesExpected := []string{"foo-1", "foo-2", "foo-bar-0", "foo-bar-2", "foo-foo-0"}
+			Expect(instanceNameList).Should(Equal(podNamesExpected))
+		})
+	})
+
+	Context("GetOrdinalListByTemplateName", func() {
+		It("should work well", func() {
+			templateOrdinals := []workloads.InstanceTemplateOrdinals{
+				{
+					Name: "",
+					Ordinals: workloads.Ordinals{
+						Ranges: []workloads.Range{
+							{
+								Start: 1,
+								End:   2,
+							},
+						},
+					},
+				},
+				{
+					Name: "foo",
+					Ordinals: workloads.Ordinals{
+						Discrete: []int32{0},
+					},
+				},
+				{
+					Name: "bar",
+					Ordinals: workloads.Ordinals{
+						Ranges: []workloads.Range{
+							{
+								Start: 2,
+								End:   3,
+							},
+						},
+						Discrete: []int32{0},
+					},
+				},
+			}
+			templateNameDefault := ""
+			templateNameFoo := "foo"
+			templateNameBar := "bar"
+			templateNameNotFound := "foobar"
+
+			ordinalListDefault, err := GetOrdinalListByTemplateName(templateOrdinals, templateNameDefault)
+			Expect(err).Should(BeNil())
+			ordinalListDefaultExpected := []int32{1, 2}
+			Expect(ordinalListDefault).Should(Equal(ordinalListDefaultExpected))
+
+			ordinalListFoo, err := GetOrdinalListByTemplateName(templateOrdinals, templateNameFoo)
+			Expect(err).Should(BeNil())
+			ordinalListFooExpected := []int32{0}
+			Expect(ordinalListFoo).Should(Equal(ordinalListFooExpected))
+
+			ordinalListBar, err := GetOrdinalListByTemplateName(templateOrdinals, templateNameBar)
+			Expect(err).Should(BeNil())
+			ordinalListBarExpected := []int32{0, 2, 3}
+			Expect(ordinalListBar).Should(Equal(ordinalListBarExpected))
+
+			ordinalListNotFound, err := GetOrdinalListByTemplateName(templateOrdinals, templateNameNotFound)
+			Expect(ordinalListNotFound).Should(BeNil())
+			errExpected := fmt.Errorf("template %s not found", templateNameNotFound)
+			Expect(err).Should(Equal(errExpected))
+		})
+	})
+
+	Context("GetOrdinalsByTemplateName", func() {
+		It("should work well", func() {
+			templateOrdinals := []workloads.InstanceTemplateOrdinals{
+				{
+					Name: "",
+					Ordinals: workloads.Ordinals{
+						Ranges: []workloads.Range{
+							{
+								Start: 1,
+								End:   2,
+							},
+						},
+					},
+				},
+				{
+					Name: "foo",
+					Ordinals: workloads.Ordinals{
+						Discrete: []int32{0},
+					},
+				},
+				{
+					Name: "bar",
+					Ordinals: workloads.Ordinals{
+						Ranges: []workloads.Range{
+							{
+								Start: 2,
+								End:   3,
+							},
+						},
+						Discrete: []int32{0},
+					},
+				},
+			}
+			templateNameDefault := ""
+			templateNameFoo := "foo"
+			templateNameBar := "bar"
+			templateNameNotFound := "foobar"
+
+			ordinalsDefault, err := GetOrdinalsByTemplateName(templateOrdinals, templateNameDefault)
+			Expect(err).Should(BeNil())
+			ordinalsDefaultExpected := workloads.Ordinals{
+				Ranges: []workloads.Range{
+					{
+						Start: 1,
+						End:   2,
+					},
+				},
+			}
+			Expect(ordinalsDefault).Should(Equal(ordinalsDefaultExpected))
+
+			ordinalsFoo, err := GetOrdinalsByTemplateName(templateOrdinals, templateNameFoo)
+			Expect(err).Should(BeNil())
+			ordinalsFooExpected := workloads.Ordinals{
+				Discrete: []int32{0},
+			}
+			Expect(ordinalsFoo).Should(Equal(ordinalsFooExpected))
+
+			ordinalsBar, err := GetOrdinalsByTemplateName(templateOrdinals, templateNameBar)
+			Expect(err).Should(BeNil())
+			ordinalsBarExpected := workloads.Ordinals{
+				Ranges: []workloads.Range{
+					{
+						Start: 2,
+						End:   3,
+					},
+				},
+				Discrete: []int32{0},
+			}
+			Expect(ordinalsBar).Should(Equal(ordinalsBarExpected))
+
+			ordinalsNotFound, err := GetOrdinalsByTemplateName(templateOrdinals, templateNameNotFound)
+			Expect(ordinalsNotFound).Should(Equal(workloads.Ordinals{}))
+			errExpected := fmt.Errorf("template %s not found", templateNameNotFound)
+			Expect(err).Should(Equal(errExpected))
+		})
+	})
+
+	Context("ConvertOrdinalsToOrdinalList", func() {
+		It("should work well", func() {
+			ordinals := workloads.Ordinals{
+				Ranges: []workloads.Range{
+					{
+						Start: 2,
+						End:   4,
+					},
+				},
+				Discrete: []int32{0, 6},
+			}
+			ordinalList, err := ConvertOrdinalsToOrdinalList(ordinals)
+			Expect(err).Should(BeNil())
+			sets.NewInt32(ordinalList...).Equal(sets.NewInt32(0, 2, 3, 4, 6))
+		})
+		It("rightNumber must >= leftNumber", func() {
+			ordinals := workloads.Ordinals{
+				Ranges: []workloads.Range{
+					{
+						Start: 4,
+						End:   2,
+					},
+				},
+				Discrete: []int32{0},
+			}
+			ordinalList, err := ConvertOrdinalsToOrdinalList(ordinals)
+			errExpected := fmt.Errorf("range's end(%v) must >= start(%v)", 2, 4)
+			Expect(err).Should(Equal(errExpected))
+			Expect(ordinalList).Should(BeNil())
 		})
 	})
 

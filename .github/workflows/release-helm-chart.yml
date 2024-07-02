@@ -58,6 +58,16 @@ jobs:
       ENABLE_JIHU: false
     secrets: inherit
 
+  release-addons-cluster-chart:
+    needs: [ release-chart ]
+    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.62
+    with:
+      GITHUB_REPO: "apecloud/kubeblocks-addons"
+      BRANCH_NAME: "${{ github.ref }}"
+      WORKFLOW_ID: "release-addons-cluster-chart.yml"
+      APECD_REF: "v0.1.62"
+    secrets: inherit
+
   release-charts-image:
     needs: [ release-version, release-addons-chart ]
     uses: apecloud/apecloud-cd/.github/workflows/release-image-cache.yml@v0.1.24

@@ -909,10 +909,13 @@ func getRunningVolumes(ctx context.Context, cli client.Client, synthesizedComp *
 }
 
 func buildInstanceSetPlacementAnnotation(comp *appsv1alpha1.Component, its *workloads.InstanceSet) {
-	if its.Annotations == nil {
-		its.Annotations = make(map[string]string)
+	p := placement(comp)
+	if len(p) > 0 {
+		if its.Annotations == nil {
+			its.Annotations = make(map[string]string)
+		}
+		its.Annotations[constant.KBAppMultiClusterPlacementKey] = p
 	}
-	its.Annotations[constant.KBAppMultiClusterPlacementKey] = placement(comp)
 }
 
 func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,

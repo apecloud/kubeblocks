@@ -254,7 +254,7 @@ func (r RestoreOpsHandler) getSecretObjsFromBackup(backup *dpv1alpha1.Backup, op
 	clusterName := opsRequest.Spec.GetClusterName()
 
 	newSecretList := &corev1.SecretList{}
-	for i, _ := range secretList.Items {
+	for i := range secretList.Items {
 		if secretList.Items[i].Annotations == nil {
 			secretList.Items[i].Annotations = map[string]string{}
 		}

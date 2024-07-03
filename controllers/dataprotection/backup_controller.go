@@ -904,7 +904,7 @@ func getSecretListObjectString(ctx context.Context,
 	// fetch secret objects
 	secretList := getSecrets(ctx, cli, cluster)
 	secretListString := ""
-	for i, _ := range secretList.Items {
+	for i := range secretList.Items {
 		oldAnnotations := secretList.Items[i].Annotations
 		secretList.Items[i].ObjectMeta = metav1.ObjectMeta{
 			Namespace:   secretList.Items[i].Namespace,

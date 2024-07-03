@@ -63,7 +63,7 @@ jobs:
     uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.62
     with:
       GITHUB_REPO: "apecloud/kubeblocks-addons"
-      BRANCH_NAME: "${{ github.ref }}"
+      BRANCH_NAME: "${{ github.ref_name }}"
       WORKFLOW_ID: "release-addons-cluster-chart.yml"
       APECD_REF: "v0.1.62"
     secrets: inherit

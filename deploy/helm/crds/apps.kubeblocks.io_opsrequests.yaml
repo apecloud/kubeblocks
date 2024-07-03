@@ -326,9 +326,9 @@ spec:
                             description: "Routes service traffic to pods with matching
                               label keys and values. If specified, the service will
                               only be exposed to pods matching the selector. \n Note:
-                              At least one of 'roleSelector' or 'podSelector' must
-                              be specified. If both are specified, a pod must match
-                              both conditions to be selected."
+                              If the component has roles, at least one of 'roleSelector'
+                              or 'podSelector' must be specified. If both are specified,
+                              a pod must match both conditions to be selected."
                             type: object
                             x-kubernetes-map-type: atomic
                           ports:
@@ -418,9 +418,10 @@ spec:
                           roleSelector:
                             description: "Specifies a role to target with the service.
                               If specified, the service will only be exposed to pods
-                              with the matching role. \n Note: At least one of 'roleSelector'
-                              or 'podSelector' must be specified. If both are specified,
-                              a pod must match both conditions to be selected."
+                              with the matching role. \n Note: If the component has
+                              roles, at least one of 'roleSelector' or 'podSelector'
+                              must be specified. If both are specified, a pod must
+                              match both conditions to be selected."
                             type: string
                           serviceType:
                             description: "Determines how the Service is exposed. Defaults

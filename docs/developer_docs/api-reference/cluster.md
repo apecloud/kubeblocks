@@ -15515,7 +15515,7 @@ string
 <em>(Optional)</em>
 <p>Specifies a role to target with the service.
 If specified, the service will only be exposed to pods with the matching role.</p>
-<p>Note: At least one of &lsquo;roleSelector&rsquo; or &lsquo;podSelector&rsquo; must be specified.
+<p>Note: If the component has roles, at least one of &lsquo;roleSelector&rsquo; or &lsquo;podSelector&rsquo; must be specified.
 If both are specified, a pod must match both conditions to be selected.</p>
 </td>
 </tr>
@@ -15530,7 +15530,7 @@ map[string]string
 <em>(Optional)</em>
 <p>Routes service traffic to pods with matching label keys and values.
 If specified, the service will only be exposed to pods matching the selector.</p>
-<p>Note: At least one of &lsquo;roleSelector&rsquo; or &lsquo;podSelector&rsquo; must be specified.
+<p>Note: If the component has roles, at least one of &lsquo;roleSelector&rsquo; or &lsquo;podSelector&rsquo; must be specified.
 If both are specified, a pod must match both conditions to be selected.</p>
 </td>
 </tr>

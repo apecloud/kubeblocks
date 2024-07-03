@@ -25,6 +25,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -36,6 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
+	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
 var _ = Describe("OpsUtil functions", func() {
@@ -77,7 +79,7 @@ var _ = Describe("OpsUtil functions", func() {
 	AfterEach(cleanEnv)
 
 	Context("Test Rebuild-Instance opsRequest", func() {
-		createRebuildInstanceOps := func(backupName string, instanceNames ...string) *appsv1alpha1.OpsRequest {
+		createRebuildInstanceOps := func(backupName string, inPlace bool, instanceNames ...string) *appsv1alpha1.OpsRequest {
 			opsName := "rebuild-instance-" + testCtx.GetRandomStr()
 			ops := testapps.NewOpsRequestObj(opsName, testCtx.DefaultNamespace,
 				clusterName, appsv1alpha1.RebuildInstanceType)
@@ -92,7 +94,7 @@ var _ = Describe("OpsUtil functions", func() {
 					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
 					Instances:    instances,
 					BackupName:   backupName,
-					InPlace:      true,
+					InPlace:      inPlace,
 				},
 			}
 			opsRequest := testapps.CreateOpsRequest(ctx, testCtx, ops)
@@ -100,7 +102,7 @@ var _ = Describe("OpsUtil functions", func() {
 			return opsRequest
 		}
 
-		prepareOpsRes := func(backupName string) *OpsResource {
+		prepareOpsRes := func(backupName string, inPlace bool) *OpsResource {
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
 			podList := initInstanceSetPods(ctx, k8sClient, opsRes)
 
@@ -112,7 +114,7 @@ var _ = Describe("OpsUtil functions", func() {
 			}
 
 			By("Test the functions in ops_util.go")
-			opsRes.OpsRequest = createRebuildInstanceOps(backupName, podList[0].Name, podList[1].Name)
+			opsRes.OpsRequest = createRebuildInstanceOps(backupName, inPlace, podList[0].Name, podList[1].Name)
 			return opsRes
 		}
 
@@ -152,7 +154,7 @@ var _ = Describe("OpsUtil functions", func() {
 
 		It("test rebuild instance when cluster/component are mismatched", func() {
 			By("init operations resources ")
-			opsRes := prepareOpsRes("")
+			opsRes := prepareOpsRes("", true)
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 
 			By("fake cluster phase to Abnormal and component phase to Running")
@@ -242,7 +244,7 @@ var _ = Describe("OpsUtil functions", func() {
 
 		It("test rebuild instance with no backup", func() {
 			By("init operations resources ")
-			opsRes := prepareOpsRes("")
+			opsRes := prepareOpsRes("", true)
 			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsRunningPhase
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 
@@ -310,7 +312,7 @@ var _ = Describe("OpsUtil functions", func() {
 					},
 				}
 			})).Should(Succeed())
-			opsRes := prepareOpsRes(backup.Name)
+			opsRes := prepareOpsRes(backup.Name, true)
 			if ignoreRoleCheck {
 				Expect(testapps.ChangeObj(&testCtx, opsRes.OpsRequest, func(request *appsv1alpha1.OpsRequest) {
 					if request.Annotations == nil {
@@ -370,6 +372,46 @@ var _ = Describe("OpsUtil functions", func() {
 
 		It("test rebuild instance with backup and ignore role check", func() {
 			testRebuildInstanceWithBackup(true)
+		})
+
+		FIt("rebuild instance with horizontal scaling", func() {
+			By("init operations resources ")
+			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			podList := initInstanceSetPods(ctx, k8sClient, opsRes)
+			opsRes.OpsRequest = createRebuildInstanceOps("", false, podList[0].Name, podList[1].Name)
+
+			By("fake cluster/component phase to Abnormal")
+			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsCreatingPhase
+			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
+				compStatus := opsRes.Cluster.Status.Components[consensusComp]
+				compStatus.Phase = appsv1alpha1.AbnormalClusterCompPhase
+				opsRes.Cluster.Status.Phase = appsv1alpha1.AbnormalClusterPhase
+				opsRes.Cluster.Status.Components[consensusComp] = compStatus
+			})).Should(Succeed())
+
+			By("fake pods are available")
+			for i := range podList {
+				Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKey{Name: podList[i].Name, Namespace: opsRes.Cluster.Namespace}, func(pod *corev1.Pod) {
+					pod.Status.Conditions = nil
+				})()).Should(Succeed())
+			}
+
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+
+			By("expect opsRequest is failed when no available pod")
+			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsCreatingPhase
+			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsFailedPhase))
+			Expect(opsRes.OpsRequest.Status.Conditions[0].Message).Should(ContainSubstring("Due to insufficient available instances"))
+
+			By("mock the leader pod is available")
+			testk8s.MockPodAvailable(podList[0], metav1.Now())
+			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsCreatingPhase
+			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsCreatingPhase))
+			/*	opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsRunningPhase
+				_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+				Expect(opsRes.Cluster.Spec.GetComponentByName(consensusComp).Replicas).Should(BeEquivalentTo(5))*/
 		})
 
 	})

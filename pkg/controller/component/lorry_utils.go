@@ -216,7 +216,7 @@ func buildLorryInitContainer() *corev1.Container {
 	container.Image = viper.GetString(constant.KBToolsImage)
 	container.Name = constant.LorryInitContainerName
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
-	container.Command = []string{"cp", "-r", "/bin/lorry", "/config", "/kubeblocks/"}
+	container.Command = []string{"cp", "-r", "/bin/lorry", "/config", "/bin/curl", "/kubeblocks/"}
 	container.StartupProbe = nil
 	container.ReadinessProbe = nil
 	volumeMount := corev1.VolumeMount{Name: "kubeblocks", MountPath: "/kubeblocks"}

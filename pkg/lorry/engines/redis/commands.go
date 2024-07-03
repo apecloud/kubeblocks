@@ -43,10 +43,11 @@ func NewCommands() engines.ClusterCommands {
 			Container: "redis",
 		},
 		examples: map[models.ClientType]engines.BuildConnectExample{
+			// Display Username and Password in kbcli
 			models.CLI: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# redis client connection example
-redis-cli -h %s -p %s
-`, info.Host, info.Port)
+redis-cli -h %s -p %s --user %s --pass %s
+`, info.Host, info.Port, info.User, info.Password)
 			},
 		},
 	}

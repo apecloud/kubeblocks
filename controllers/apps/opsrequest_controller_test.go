@@ -833,8 +833,9 @@ var _ = Describe("OpsRequest Controller", func() {
 						Switch:        exposeSwitch,
 						Services: []appsv1alpha1.OpsService{
 							{
-								Name:        "svc1",
-								ServiceType: corev1.ServiceTypeLoadBalancer,
+								Name:         "svc1",
+								ServiceType:  corev1.ServiceTypeLoadBalancer,
+								RoleSelector: constant.Leader,
 								Ports: []corev1.ServicePort{
 									{Name: "port1", Port: 3306, TargetPort: intstr.IntOrString{Type: intstr.String, StrVal: "mysql"}},
 								},

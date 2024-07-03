@@ -103,7 +103,7 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	}
 	if runningITS != nil {
 		*protoITS.Spec.Selector = *runningITS.Spec.Selector
-		protoITS.Spec.Template.Labels = runningITS.Spec.Template.Labels
+		protoITS.Spec.Template.Labels = intctrlutil.MergeMetadataMaps(runningITS.Spec.Template.Labels, synthesizeComp.UserDefinedLabels)
 	}
 	transCtx.ProtoWorkload = protoITS
 
@@ -876,10 +876,13 @@ func getRunningVolumes(ctx context.Context, cli client.Client, synthesizedComp *
 }
 
 func buildInstanceSetPlacementAnnotation(comp *appsv1alpha1.Component, its *workloads.InstanceSet) {
-	if its.Annotations == nil {
-		its.Annotations = make(map[string]string)
+	p := placement(comp)
+	if len(p) > 0 {
+		if its.Annotations == nil {
+			its.Annotations = make(map[string]string)
+		}
+		its.Annotations[constant.KBAppMultiClusterPlacementKey] = p
 	}
-	its.Annotations[constant.KBAppMultiClusterPlacementKey] = placement(comp)
 }
 
 func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,

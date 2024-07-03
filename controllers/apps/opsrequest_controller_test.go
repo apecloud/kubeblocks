@@ -910,11 +910,6 @@ var _ = Describe("OpsRequest Controller", func() {
 
 			By("mock timeout")
 			time.Sleep(time.Second)
-			Expect(testapps.ChangeObj(&testCtx, ops, func(ops *appsv1alpha1.OpsRequest) {
-				ops.Annotations = map[string]string{
-					constant.ReconcileAnnotationKey: ops.ResourceVersion,
-				}
-			})).Should(Succeed())
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops))).Should(Equal(appsv1alpha1.OpsAbortedPhase))
 
 			By("expect for the next ops is running")

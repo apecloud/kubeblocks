@@ -24,6 +24,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -374,13 +375,14 @@ var _ = Describe("OpsUtil functions", func() {
 			testRebuildInstanceWithBackup(true)
 		})
 
-		FIt("rebuild instance with horizontal scaling", func() {
+		It("rebuild instance with horizontal scaling", func() {
 			By("init operations resources ")
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
-			podList := initInstanceSetPods(ctx, k8sClient, opsRes)
-			opsRes.OpsRequest = createRebuildInstanceOps("", false, podList[0].Name, podList[1].Name)
+			its := testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusComp)
+			podList := testapps.MockInstanceSetPods(&testCtx, its, opsRes.Cluster, consensusComp)
+			opsRes.OpsRequest = createRebuildInstanceOps("", false, podList[1].Name, podList[2].Name)
 
-			By("fake cluster/component phase to Abnormal")
+			By("mock cluster/component phase to Abnormal")
 			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsCreatingPhase
 			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
 				compStatus := opsRes.Cluster.Status.Components[consensusComp]
@@ -389,7 +391,7 @@ var _ = Describe("OpsUtil functions", func() {
 				opsRes.Cluster.Status.Components[consensusComp] = compStatus
 			})).Should(Succeed())
 
-			By("fake pods are available")
+			By("mock pods are available")
 			for i := range podList {
 				Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKey{Name: podList[i].Name, Namespace: opsRes.Cluster.Namespace}, func(pod *corev1.Pod) {
 					pod.Status.Conditions = nil
@@ -398,20 +400,47 @@ var _ = Describe("OpsUtil functions", func() {
 
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 
-			By("expect opsRequest is failed when no available pod")
-			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsCreatingPhase
+			By("save last configuration")
+			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase
+			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+
+			By("expect opsRequest is failed when not existing available pod")
 			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsFailedPhase))
-			Expect(opsRes.OpsRequest.Status.Conditions[0].Message).Should(ContainSubstring("Due to insufficient available instances"))
+			Expect(opsRes.OpsRequest.Status.Conditions[2].Message).Should(ContainSubstring("Due to insufficient available instances"))
 
 			By("mock the leader pod is available")
-			testk8s.MockPodAvailable(podList[0], metav1.Now())
+			Expect(testapps.ChangeObjStatus(&testCtx, podList[0], func() {
+				testk8s.MockPodAvailable(podList[0], metav1.Now())
+			})).Should(Succeed())
 			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsCreatingPhase
 			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsCreatingPhase))
-			/*	opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsRunningPhase
-				_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
-				Expect(opsRes.Cluster.Spec.GetComponentByName(consensusComp).Replicas).Should(BeEquivalentTo(5))*/
+
+			By("expect to scale out two replicas ")
+			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsRunningPhase
+			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(opsRes.Cluster.Spec.GetComponentByName(consensusComp).Replicas).Should(BeEquivalentTo(5))
+
+			By("mock the new pods to available")
+			podPrefix := constant.GenerateWorkloadNamePattern(clusterName, consensusComp)
+			testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp, podPrefix+"-3", "follower", "Readonly")
+			testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp, podPrefix+"-4", "follower", "Readonly")
+
+			By("expect specified instances to take offline")
+			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			compSpec := opsRes.Cluster.Spec.GetComponentByName(consensusComp)
+			Expect(compSpec.Replicas).Should(BeEquivalentTo(3))
+			Expect(slices.Contains(compSpec.OfflineInstances, podList[1].Name)).Should(BeTrue())
+			Expect(slices.Contains(compSpec.OfflineInstances, podList[2].Name)).Should(BeTrue())
+
+			By("delete the pods and expect opsRequest is succeed")
+			testk8s.MockPodIsTerminating(ctx, testCtx, podList[1])
+			testk8s.RemovePodFinalizer(ctx, testCtx, podList[1])
+			testk8s.MockPodIsTerminating(ctx, testCtx, podList[2])
+			testk8s.RemovePodFinalizer(ctx, testCtx, podList[2])
+			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsSucceedPhase))
 		})
 
 	})

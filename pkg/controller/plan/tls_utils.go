@@ -22,6 +22,7 @@ package plan
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"strings"
 	"text/template"
 
@@ -50,23 +51,29 @@ func ComposeTLSSecret(namespace, clusterName, componentName string) (*v1.Secret,
 		SetStringData(map[string]string{}).
 		GetObject()
 
-	const tpl = `{{- $cert := genCA "KubeBlocks" 36500 }}
-{{ $cert.Cert }}
-{{ $cert.Key }}
-`
-	out, err := buildFromTemplate(tpl, nil)
+	// use ca gen cert
+	// IP: 127.0.0.1
+	// DNS: localhost and *.<clusterName>-<componentName>-headless.<namespace>.svc.cluster.local
+	SignedCertTpl := fmt.Sprintf(`
+	{{- $ca := genCA "KubeBlocks" 36500 -}}
+	{{- $cert := genSignedCert "%s peer" (list "127.0.0.1") (list "localhost" "*.%s-%s-headless.%s.svc.cluster.local") 36500 $ca -}}
+	{{- $ca.Cert -}}
+	{{- print "___spliter___" -}}
+	{{- $cert.Cert -}}
+	{{- print "___spliter___" -}}
+	{{- $cert.Key -}}
+`, componentName, clusterName, componentName, namespace)
+	out, err := buildFromTemplate(SignedCertTpl, nil)
 	if err != nil {
 		return nil, err
 	}
-	index := strings.Index(out, "-----BEGIN RSA PRIVATE KEY-----")
-	if index < 0 {
+	parts := strings.Split(out, "___spliter___")
+	if len(parts) != 3 {
 		return nil, errors.Errorf("wrong cert format: %s", out)
 	}
-	cert := out[:index]
-	key := out[index:]
-	secret.StringData[constant.CAName] = cert
-	secret.StringData[constant.CertName] = cert
-	secret.StringData[constant.KeyName] = key
+	secret.StringData[constant.CAName] = parts[0]
+	secret.StringData[constant.CertName] = parts[1]
+	secret.StringData[constant.KeyName] = parts[2]
 	return secret, nil
 }
 

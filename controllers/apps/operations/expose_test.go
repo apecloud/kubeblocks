@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -80,8 +81,9 @@ var _ = Describe("", func() {
 					Switch:        appsv1alpha1.EnableExposeSwitch,
 					Services: []appsv1alpha1.OpsService{
 						{
-							Name:        testapps.ServiceVPCName,
-							ServiceType: corev1.ServiceTypeLoadBalancer,
+							Name:         testapps.ServiceVPCName,
+							ServiceType:  corev1.ServiceTypeLoadBalancer,
+							RoleSelector: constant.Leader,
 						},
 					},
 				},

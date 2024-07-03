@@ -51,7 +51,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30          Delete                    VolumeExpanding        Jan 29,2023 14:35 UTC+0800
    ```
 
-   * STATUS=VolumeExpanding: it means the volume expansion is in progress.
+   * STATUS=Updating: it means the volume expansion is in progress.
    * STATUS=Running: it means the volume expansion operation has been applied.
 
 3. Check whether the corresponding resources change.

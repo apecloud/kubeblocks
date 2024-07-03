@@ -17,11 +17,9 @@ This tutorial shows how to create and connect to a MySQL cluster.
 
 ### Before you start
 
-* [Install kbcli](./../../installation/install-with-kbcli/install-kbcli.md) if you want to create and connect a MySQL cluster by kbcli.
+* [Install kbcli](./../../installation/install-with-kbcli/install-kbcli.md).
 * [Install KubeBlocks by kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md).
 * Make sure the ApeCloud MySQL addon is enabled.
-  
-
   
   ```bash
   kbcli addon list
@@ -32,11 +30,7 @@ This tutorial shows how to create and connect to a MySQL cluster.
   ...
   ```
 
-
-
 * View all the database types and versions available for creating a cluster.
-
-
 
   ```bash
   kbcli clusterdefinition list
@@ -72,23 +66,29 @@ If you only have one node for deploying a RaftGroup Cluster, set the `availabili
 kbcli cluster create mysql --mode raftGroup --availability-policy none <clustername>
 ```
 
+If you want to specify a cluster version, you can first view the available versions and use `--clusterversion` to specify a version.
+
+```bash
+kbcli clusterversion list
+
+kbcli cluster create mysql mycluster --cluster-version ac-mysql-8.0.30
+```
+
 :::note
 
 * In the production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
-* Run the command below to view the flags for creating a MySQL cluster and the default values.
+* View more flags for creating a MySQL cluster to create a cluster with customized specifications.
   
   ```bash
-  kbcli cluster create mysql -h
+  kbcli cluster create mysql --help
   ```
 
 :::
 
-
 ## Connect to a MySQL Cluster
-
 
 ```bash
 kbcli cluster connect <clustername>  --namespace <name>
 ```
 
-For the detailed database connection guide, refer to [Connect database](./../../connect_database/overview-of-database-connection.md). 
+For the detailed database connection guide, refer to [Connect database](./../../connect_database/overview-of-database-connection.md).

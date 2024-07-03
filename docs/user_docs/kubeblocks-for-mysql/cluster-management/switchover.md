@@ -32,8 +32,6 @@ You can initiate a switchover for an ApeCloud MySQL RaftGroup by executing the k
 
 You can switch over a follower of an ApeCloud MySQL RaftGroup to the leader role, and the former leader instance to a follower.
 
-
-
 * Initiate a switchover with no leader instance specified.
 
     ```bash
@@ -52,7 +50,6 @@ You can switch over a follower of an ApeCloud MySQL RaftGroup to the leader role
     kbcli cluster promote mycluster --instance='mycluster-mysql-2' --components='apecloud-mysql'
     ```
 
-
 ## Verify the switchover
 
 Check the instance status to verify whether the switchover is performed successfully.
@@ -60,8 +57,6 @@ Check the instance status to verify whether the switchover is performed successf
 ```bash
 kbcli cluster list-instances
 ```
-
-
 
 ## Handle an exception
 

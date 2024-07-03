@@ -18,11 +18,7 @@ All pods restart in the order of learner -> follower -> leader and the leader ma
 
 ## Steps
 
-1. Restart a cluster.
-
-   You can use `kbcli` or create an OpsRequest to restart a cluster.
-  
-   **Option 1.** (**Recommended**) Use kbcli
+1. Restart a cluster.  
 
    Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
 
@@ -34,8 +30,6 @@ All pods restart in the order of learner -> follower -> leader and the leader ma
    - `components` describes the component name that needs to be restarted.
    - `ttlSecondsAfterSucceed` describes the time to live of an OpsRequest job after the restarting succeeds.
 
-  
-
 2. Check the cluster status to validate the restarting.
 
    ```bash
@@ -45,5 +39,5 @@ All pods restart in the order of learner -> follower -> leader and the leader ma
    mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30        Delete                    Running        Jan 29,2023 14:29 UTC+0800
    ```
 
-   - STATUS=Restarting: it means the cluster restart is in progress.
+   - STATUS=Updating: it means the cluster restart is in progress.
    - STATUS=Running: it means the cluster has been restarted.

@@ -259,7 +259,7 @@ For more LogCLI and LogQL grammar, refer to the [Loki official documentation](ht
       kubectl port-forward svc/loki-gateway 3100:80 -n kb-system
       ```
 
-   3. Use the LogCLi tool to query log data.
+   3. Use the LogCLI tool to query log data.
 
       ```bash
       kbcli logcli query '{exporter="OTLP"}'

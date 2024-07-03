@@ -6,7 +6,6 @@ sidebar_position: 7
 sidebar_label: Delete protection
 ---
 
-
 # Delete a MySQL Cluster
 
 ## Termination policy
@@ -26,7 +25,6 @@ The termination policy determines how you delete a cluster.
 
 To check the termination policy, execute the following command.
 
-
 ```bash
 kbcli cluster list mysql-cluster
 >
@@ -34,13 +32,10 @@ NAME            NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-P
 mysql-cluster   default     apecloud-mysql       ac-mysql-8.0.30   Delete               Running   Feb 06,2023 18:27 UTC+0800
 ```
 
-
 ## Step
 
 Run the command below to delete a specified cluster.
 
-
 ```bash
 kbcli cluster delete mysql-cluster
 ```
-

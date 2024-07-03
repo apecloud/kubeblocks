@@ -10,6 +10,12 @@ sidebar_label: Scale
 
 You can scale a MySQL cluster in two ways, vertical scaling and horizontal scaling.
 
+:::note
+
+After vertical scaling or horizontal scaling is performed, KubeBlocks automatically matches the appropriate configuration template based on the new specification. This is the KubeBlocks dynamic configuration feature. This feature simplifies the process of configuring parameters, saves time and effort and reduces performance issues caused by incorrect configuration. For detailed instructions, refer to [Configuration](./../configuration/configuration.md).
+
+:::
+
 ## Vertical scaling
 
 You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, if you need to change the resource class from 1C2G to 2C4G, vertical scaling is what you need.
@@ -33,22 +39,19 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
 
 ### Steps
 
-1. Change configuration. There are 3 ways to apply vertical scaling.
+1. Change configuration.
 
+    Configure the parameters `--components`, `--memory`, and `--cpu` and run the command.
 
-   Configure the parameters `--components`, `--memory`, and `--cpu` and run the command.
+    ```bash
+    kbcli cluster vscale mysql-cluster \
+    --components="mysql" \
+    --memory="4Gi" --cpu="2" \
+    ```
 
-   ```bash
-   kbcli cluster vscale mysql-cluster \
-   --components="mysql" \
-   --memory="4Gi" --cpu="2" \
-   ```
-
-   - `--components` describes the component name ready for vertical scaling.
-   - `--memory` describes the requested and limited size of the component memory.
-   - `--cpu` describes the requested and limited size of the component CPU.
-
-   
+    - `--components` describes the component name ready for vertical scaling.
+    - `--memory` describes the requested and limited size of the component memory.
+    - `--cpu` describes the requested and limited size of the component CPU.
 
 2. Check the cluster status to validate the vertical scaling.
 
@@ -59,16 +62,11 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
     mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30        Delete                    VerticalScaling        Jan 29,2023 14:29 UTC+0800
     ```
 
-   - STATUS=VerticalScaling: it means the vertical scaling is in progress.
-   - STATUS=Running: it means the vertical scaling operation has been applied.
-   - STATUS=Abnormal: it means the vertical scaling is abnormal. The reason may be that the number of the normal instances is less than that of the total instance or the leader instance is running properly while others are abnormal.
-     > To solve the problem, you can manually check whether this error is caused by insufficient resources. Then if AutoScaling is supported by the Kubernetes cluster, the system recovers when there are enough resources. Otherwise, you can create enough resources and troubleshoot with `kubectl describe` command.
+    - STATUS=Updating: it means the vertical scaling is in progress.
+    - STATUS=Running: it means the vertical scaling operation has been applied.
+    - STATUS=Abnormal: it means the vertical scaling is abnormal. The reason may be that the number of the normal instances is less than that of the total instance or the leader instance is running properly while others are abnormal.
 
-    :::note
-
-    Vertical scaling does not synchronize parameters related to CPU and memory and it is required to manually call the OpsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
-
-    :::
+       To solve the problem, you can manually check whether this error is caused by insufficient resources. Then if AutoScaling is supported by the Kubernetes cluster, the system recovers when there are enough resources. Otherwise, you can create enough resources and troubleshoot with `kubectl describe` command.
 
 3. Check whether the corresponding resources change.
 
@@ -93,30 +91,28 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
 
 ### Steps
 
-1. Change configuration. There are 3 ways to apply horizontal scaling.
+1. Change configuration.
 
-   Configure the parameters `--components` and `--replicas`, and run the command.
+    Configure the parameters `--components` and `--replicas`, and run the command.
 
-   ```bash
-   kbcli cluster hscale mysql-cluster \
-   --components="mysql" --replicas=3
-   ```
+    ```bash
+    kbcli cluster hscale mysql-cluster \
+    --components="mysql" --replicas=3
+    ```
 
-   - `--components` describes the component name ready for horizontal scaling.
-   - `--replicas` describes the replica amount of the specified components.
-
-   
+    - `--components` describes the component name ready for horizontal scaling.
+    - `--replicas` describes the replica amount of the specified components.
 
 2. Validate the horizontal scaling operation.
 
-   Check the cluster STATUS to identify the horizontal scaling status.
+    Check the cluster STATUS to identify the horizontal scaling status.
 
-   ```bash
-   kbcli cluster list mysql-cluster
-   ```
+    ```bash
+    kbcli cluster list mysql-cluster
+    ```
 
-   - STATUS=HorizontalScaling: it means horizontal scaling is in progress.
-   - STATUS=Running: it means horizontal scaling has been applied.
+    - STATUS=Updating: it means horizontal scaling is in progress.
+    - STATUS=Running: it means horizontal scaling has been applied.
 
 3. Check whether the corresponding resources change.
 
@@ -148,26 +144,26 @@ This exception occurs because the `VolumeSnapshotClass` is not configured. This 
 
 1. Configure the VolumeSnapshotClass by running the command below.
 
-   ```bash
-   kubectl create -f - <<EOF
-   apiVersion: snapshot.storage.k8s.io/v1
-   kind: VolumeSnapshotClass
-   metadata:
-     name: csi-aws-vsc
-     annotations:
-       snapshot.storage.kubernetes.io/is-default-class: "true"
-   driver: ebs.csi.aws.com
-   deletionPolicy: Delete
-   EOF
-   ```
+    ```bash
+    kubectl create -f - <<EOF
+    apiVersion: snapshot.storage.k8s.io/v1
+    kind: VolumeSnapshotClass
+    metadata:
+      name: csi-aws-vsc
+      annotations:
+        snapshot.storage.kubernetes.io/is-default-class: "true"
+    driver: ebs.csi.aws.com
+    deletionPolicy: Delete
+    EOF
+    ```
 
 2. Delete the wrong backup (volumesnapshot is generated by backup) and volumesnapshot resources.
 
-   ```bash
-   kubectl delete backup -l app.kubernetes.io/instance=mysql-cluster
+    ```bash
+    kubectl delete backup -l app.kubernetes.io/instance=mysql-cluster
    
-   kubectl delete volumesnapshot -l app.kubernetes.io/instance=mysql-cluster
-   ```
+    kubectl delete volumesnapshot -l app.kubernetes.io/instance=mysql-cluster
+    ```
 
 ***Result***
 

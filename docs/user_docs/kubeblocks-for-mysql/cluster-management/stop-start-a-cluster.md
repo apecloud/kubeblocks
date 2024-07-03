@@ -18,13 +18,10 @@ Configure the name of your cluster and run the command below to stop this cluste
 kbcli cluster stop mysql-cluster
 ```
 
-
 ## Start a cluster
-  
 
 Configure the name of your cluster and run the command below to start this cluster.
 
 ```bash
 kbcli cluster start mysql-cluster
 ```
-

@@ -15,25 +15,12 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 Configure the name of your cluster and run the command below to stop this cluster.
 
 ```bash
-kbcli cluster stop <name>
-```
-
-***Example***
-
-```bash
 kbcli cluster stop pg-cluster
 ```
 
 ## Start a cluster
-  
 
 Configure the name of your cluster and run the command below to start this cluster.
-
-```bash
-kbcli cluster start <name>
-```
-
-***Example***
 
 ```bash
 kbcli cluster start pg-cluster

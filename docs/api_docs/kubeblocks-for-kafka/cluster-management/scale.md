@@ -151,7 +151,7 @@ There are two ways to apply vertical scaling.
 </TabItem>
 
 </Tabs>
-  
+
 ## Horizontal scaling
 
 Horizontal scaling changes the amount of pods. For example, you can apply horizontal scaling to scale pods up from three to five. The scaling process includes the backup and restoration of data.
@@ -160,7 +160,7 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
 
 - Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
 - You are not recommended to perform horizontal scaling on the controller node, including the controller node both in combined mode and separated node.
-- When scaling in horizontally, you must know the topic partition storage. If the topic has only one replication, data loss may caused when you scale in broker.
+- When scaling horizontally, you must know the topic partition storage. If the topic has only one replication, data loss may caused when you scale in broker.
 
   ```bash
   kubectl get cluster mycluster -n demo  

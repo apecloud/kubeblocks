@@ -63,7 +63,6 @@ ApeCloud MySQL Proxy is routed through the `vtgate` component, and the way the M
 
 ### Connect Proxy Cluster by VTGate
 
-
 Run the command below to connect to the Proxy Cluster.
 
 ```bash
@@ -72,13 +71,11 @@ kbcli cluster connect myproxy --components vtgate
 
 ### Connect Proxy Cluster by MySQL Server
 
-
 Run the command below to connect to the MySQL Server.
 
 ```bash
 kbcli cluster connect myproxy
 ```
-
 
 :::note
 
@@ -215,7 +212,6 @@ View the log of a container in a Pod.
 ```bash
 kbcli cluster logs myproxy --instance myproxy-mysql-0 -c vttablet
 ```
-
 
 ## Monitoring
 

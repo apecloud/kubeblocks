@@ -156,10 +156,6 @@ func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCt
 		cli.Update(dag, nil, objCopy, &model.ReplaceIfExistingOption{})
 	}
 
-	// to work around that the scaled PVC will be deleted at object action.
-	if err := updateVolumes(reqCtx, t.Client, synthesizeComp, runningITS, dag); err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -176,8 +172,6 @@ func (t *componentWorkloadTransformer) handleWorkloadUpdate(reqCtx intctrlutil.R
 	if err := cwo.horizontalScale(); err != nil {
 		return err
 	}
-
-	// dag = cwo.dag
 
 	return nil
 }
@@ -855,31 +849,6 @@ func (r *componentWorkloadOps) buildProtoITSWorkloadVertex() *model.ObjectVertex
 		v, _ := vertex.(*model.ObjectVertex)
 		if v.Obj == r.protoITS {
 			return v
-		}
-	}
-	return nil
-}
-
-func updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, synthesizeComp *component.SynthesizedComponent,
-	itsObj *workloads.InstanceSet, dag *graph.DAG) error {
-	graphCli := model.NewGraphClient(cli)
-
-	// PVCs which have been added to the dag because of volume expansion.
-	pvcNameSet := sets.New[string]()
-	for _, obj := range graphCli.FindAll(dag, &corev1.PersistentVolumeClaim{}) {
-		pvcNameSet.Insert(obj.GetName())
-	}
-
-	for _, vct := range synthesizeComp.VolumeClaimTemplates {
-		pvcs, err := getRunningVolumes(reqCtx.Ctx, cli, synthesizeComp, itsObj, vct.Name)
-		if err != nil {
-			return err
-		}
-		for _, pvc := range pvcs {
-			if pvcNameSet.Has(pvc.Name) {
-				continue
-			}
-			graphCli.Noop(dag, pvc)
 		}
 	}
 	return nil

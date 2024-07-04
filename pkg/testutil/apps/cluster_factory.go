@@ -328,3 +328,9 @@ func (factory *MockClusterFactory) AddUserConfigmapVolume(name, mountPoint, resN
 		userResourcesRefs.ConfigMapRefs = append(userResourcesRefs.ConfigMapRefs, cmResource)
 	})
 }
+
+func (factory *MockClusterFactory) SetState(state *appsv1alpha1.State) *MockClusterFactory {
+	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
+		comp.State = state
+	})
+}

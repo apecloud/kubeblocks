@@ -255,6 +255,11 @@ type ComponentSpec struct {
 	//
 	// +optional
 	DisableExporter *bool `json:"disableExporter,omitempty"`
+
+	// Specifies the expected state of the Component.
+	//
+	// +optional
+	State *State `json:"state,omitempty"`
 }
 
 // ComponentStatus represents the observed state of a Component within the Cluster.

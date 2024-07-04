@@ -99,7 +99,8 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluste
 		SetInstances(compSpec.Instances).
 		SetOfflineInstances(compSpec.OfflineInstances).
 		SetRuntimeClassName(cluster.Spec.RuntimeClassName).
-		SetSystemAccounts(compSpec.SystemAccounts)
+		SetSystemAccounts(compSpec.SystemAccounts).
+		SetState(compSpec.State)
 	if labels != nil {
 		compBuilder.AddLabelsInMap(labels)
 	}

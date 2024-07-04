@@ -170,3 +170,8 @@ func (builder *ComponentBuilder) SetRuntimeClassName(runtimeClassName *string) *
 	}
 	return builder
 }
+
+func (builder *ComponentBuilder) SetState(state *appsv1alpha1.State) *ComponentBuilder {
+	builder.get().Spec.State = state
+	return builder
+}

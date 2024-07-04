@@ -5217,6 +5217,18 @@ spec:
                   - name
                   type: object
                 type: array
+              state:
+                description: Specifies the expected state of the Component.
+                properties:
+                  state:
+                    description: Represents the state mode of the object.
+                    enum:
+                    - Running
+                    - Stopped
+                    type: string
+                required:
+                - state
+                type: object
               systemAccounts:
                 description: Overrides system accounts defined in referenced ComponentDefinition.
                 items:

@@ -20,14 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
-	"encoding/json"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -55,40 +53,20 @@ func (start StartOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCt
 
 // Action modifies Cluster.spec.components[*].replicas from the opsRequest
 func (start StartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	cluster := opsRes.Cluster
-	componentReplicasMap, err := getComponentReplicasSnapshot(cluster.Annotations)
-	if err != nil {
-		return intctrlutil.NewFatalError(err.Error())
-	}
-	applyReplicas := func(compSpec *appsv1alpha1.ClusterComponentSpec, componentName string) {
-		componentKey := getComponentKeyForStartSnapshot(componentName, "")
-		replicasOfSnapshot := componentReplicasMap[componentKey]
-		if replicasOfSnapshot == 0 {
-			return
-		}
-		// only reset the component whose replicas number is 0
-		if compSpec.Replicas == 0 {
-			compSpec.Replicas = replicasOfSnapshot
-			for i := range compSpec.Instances {
-				componentKey = getComponentKeyForStartSnapshot(componentName, compSpec.Instances[i].Name)
-				replicasOfSnapshot = componentReplicasMap[componentKey]
-				if replicasOfSnapshot == 0 {
-					continue
-				}
-				compSpec.Instances[i].Replicas = &replicasOfSnapshot
+	var (
+		cluster   = opsRes.Cluster
+		startComp = func(compSpec *appsv1alpha1.ClusterComponentSpec) {
+			compSpec.State = &appsv1alpha1.State{
+				Mode: appsv1alpha1.StateModeRunning,
 			}
 		}
-	}
+	)
 	for i := range cluster.Spec.ComponentSpecs {
-		compSpec := &cluster.Spec.ComponentSpecs[i]
-		applyReplicas(compSpec, compSpec.Name)
+		startComp(&cluster.Spec.ComponentSpecs[i])
 	}
 	for i := range cluster.Spec.ShardingSpecs {
-		shardingSpec := &cluster.Spec.ShardingSpecs[i]
-		applyReplicas(&shardingSpec.Template, shardingSpec.Name)
+		startComp(&cluster.Spec.ShardingSpecs[i].Template)
 	}
-	// delete the replicas snapshot of components from the cluster.
-	delete(cluster.Annotations, constant.SnapShotForStartAnnotationKey)
 	return cli.Update(reqCtx.Ctx, cluster)
 }
 
@@ -110,44 +88,5 @@ func (start StartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli 
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
 func (start StartOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	componentReplicasMap, err := getComponentReplicasSnapshot(opsRes.Cluster.Annotations)
-	if err != nil {
-		return intctrlutil.NewFatalError(err.Error())
-	}
-	if err = start.setOpsAnnotation(reqCtx, cli, opsRes, componentReplicasMap); err != nil {
-		return err
-	}
-	saveLastConfigurationForStopAndStart(opsRes)
 	return nil
-}
-
-// setOpsAnnotation sets the replicas snapshot of components before stopping the cluster to the annotations of this opsRequest.
-func (start StartOpsHandler) setOpsAnnotation(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, componentReplicasMap map[string]int32) error {
-	annotations := opsRes.OpsRequest.Annotations
-	if annotations == nil {
-		annotations = map[string]string{}
-	}
-	componentReplicasSnapshot, err := json.Marshal(componentReplicasMap)
-	if err != nil {
-		return err
-	}
-	if _, ok := opsRes.OpsRequest.Annotations[constant.SnapShotForStartAnnotationKey]; !ok {
-		patch := client.MergeFrom(opsRes.OpsRequest.DeepCopy())
-		annotations[constant.SnapShotForStartAnnotationKey] = string(componentReplicasSnapshot)
-		opsRes.OpsRequest.Annotations = annotations
-		return cli.Patch(reqCtx.Ctx, opsRes.OpsRequest, patch)
-	}
-	return nil
-}
-
-// getComponentReplicasSnapshot gets the replicas snapshot of components from annotations.
-func getComponentReplicasSnapshot(annotations map[string]string) (map[string]int32, error) {
-	componentReplicasMap := map[string]int32{}
-	snapshotForStart := annotations[constant.SnapShotForStartAnnotationKey]
-	if len(snapshotForStart) != 0 {
-		if err := json.Unmarshal([]byte(snapshotForStart), &componentReplicasMap); err != nil {
-			return componentReplicasMap, err
-		}
-	}
-	return componentReplicasMap, nil
 }

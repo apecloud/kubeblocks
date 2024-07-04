@@ -296,12 +296,12 @@ You can monitor the performance of the proxy cluster.
    kubectl get cluster myproxy -o yaml
    ```
 
-   If the output YAML file shows `monitor:true`, the monitoring function of this proxy cluster is enabled.
+   If the output YAML file shows `disableExporter: false`, the monitoring function of this proxy cluster is enabled.
 
    If the monitoring function is not enabled, run the command below to enable it first.
 
    ```bash
-   kubectl patch cluster mycluster -n demo --type "json" -p '[{"op":"add","path":"/spec/componentSpecs/0/monitor","value":true}]'
+   kubectl patch cluster mycluster -n demo --type "json" -p '[{"op":"add","path":"/spec/componentSpecs/0/disableExporter","value":false}]'
    ```
 
 3. View the dashboard.

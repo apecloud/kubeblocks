@@ -53,7 +53,7 @@ spec:
   componentSpecs:
   - name: postgresql
     componentDefRef: postgresql
-    monitor: false  
+    disableExporter: true  
     replicas: 0
     volumeClaimTemplates:
     - name: data
@@ -110,7 +110,7 @@ spec:
   componentSpecs:
   - name: postgresql
     componentDefRef: postgresql
-    monitor: false  
+    disableExporter: true  
     replicas: 1
     volumeClaimTemplates:
     - name: data

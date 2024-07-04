@@ -32,7 +32,7 @@ KubeBlock Playground supports the following built-in monitoring addons:
    ...
    ```
 
-2. Check whether the monitoring function of the cluster is enabled. If the monitoring function is enabled, the output shows `monitor: true`.
+2. Check whether the monitoring function of the cluster is enabled. If the monitoring function is enabled, the output shows `disableExporter: false`.
 
    ```bash
    kubectl get cluster mycluster -o yaml
@@ -45,13 +45,13 @@ KubeBlock Playground supports the following built-in monitoring addons:
      ......
      componentSpecs:
      ......
-       monitor: true
+       disableExporter: false
    ```
 
-   If `monitor: true` is not shown in the output, it means the monitoring function of this cluster is not enabled and you need to enable it first.
+   If `disableExporter: false` is not shown in the output, it means the monitoring function of this cluster is not enabled and you need to enable it first.
 
    ```bash
-   kbcli cluster update mycluster --monitor=true
+   kbcli cluster update mycluster --disableExporter=false
    ```
 
 3. View the dashboard list.

@@ -14,7 +14,7 @@ You can expand the storage volume size of each pod.
 Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
 
 ```bash
-kbcli cluster list pulsar
+kbcli cluster list pulsar-cluster
 ```
 
 ## Steps
@@ -32,7 +32,7 @@ kbcli cluster list pulsar
     - Expand volume for `journal`.
 
       ```bash
-      kbcli cluster volume-expand pulsar --storage=40Gi --components=bookies -t journal  
+      kbcli cluster volume-expand pulsar-cluster --storage=40Gi --components=bookies -t journal  
       ```
 
       - `--components` describes the component name for volume expansion.
@@ -42,7 +42,7 @@ kbcli cluster list pulsar
     - Expand volume for `ledger`.
 
       ```bash
-      kbcli cluster volume-expand pulsar --storage=200Gi --components=bookies -t ledgers  
+      kbcli cluster volume-expand pulsar-cluster --storage=200Gi --components=bookies -t ledgers  
       ```
 
 
@@ -52,11 +52,11 @@ kbcli cluster list pulsar
    kubectl get ops  
    ```
 
-   * STATUS=VolumeExpanding: it means the volume expansion is in progress.
+   * STATUS=Updating: it means the volume expansion is in progress.
    * STATUS=Running: it means the volume expansion operation has been applied.
 
 3. Check whether the corresponding resources change.
 
     ```bash
-    kbcli cluster describe pulsar
+    kbcli cluster describe pulsar-cluster
     ```

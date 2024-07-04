@@ -35,7 +35,7 @@ pg-cluster        default          postgresql            postgresql-14.8.0      
 
    ```bash
    kbcli cluster volume-expand pg-cluster --components="postgresql" \
-   --volume-claim-templates="data" --storage="2Gi"
+   --volume-claim-templates="data" --storage="20Gi"
    ```
 
    - `--components` describes the component name for volume expansion.
@@ -47,8 +47,8 @@ pg-cluster        default          postgresql            postgresql-14.8.0      
    ```bash
    kbcli cluster list pg-cluster
    >
-   NAME              NAMESPACE        CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS                 CREATED-TIME
-   pg-cluster        default          postgresql                postgresql-14.8.0        Delete                    VolumeExpanding        Apr 10,2023 16:27 UTC+0800
+   NAME              NAMESPACE        CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS          CREATED-TIME
+   pg-cluster        default          postgresql                postgresql-14.8.0        Delete                    Updating        Apr 10,2023 16:27 UTC+0800
    ```
 
    * STATUS=Updating: it means the volume expansion is in progress.

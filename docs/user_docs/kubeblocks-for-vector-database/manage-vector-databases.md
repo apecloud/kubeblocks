@@ -88,17 +88,64 @@ If your cluster is on AWS, install the AWS Load Balancer Controller first.
 
 ## Monitor the vector database
 
-Open the grafana monitor web page.
+For the testing environment, you can run the command below to open the Grafana monitor web page.
 
-```bash
-kbcli dashboard open kubeblocks-grafana
-```
+1. View all built-in addons and make sure the monitoring addons are enabled. If the monitoring addons are not enabled, [enable these addons](./../overview/supported-addons.md#use-addons) first.
 
-When executing this command, browser is opened and you can see the dashboard.
+   ```bash
+   # View all addons supported
+   kbcli addon list
+   ...
+   grafana                        Helm   Enabled                   true                                                                                    
+   alertmanager-webhook-adaptor   Helm   Enabled                   true                                                                                    
+   prometheus                     Helm   Enabled    alertmanager   true 
+   ...
+   ```
 
-## Scaling
+2. Check whether the monitoring function of the cluster is enabled. If the monitoring function is enabled, the output shows `disableExporter: false`.
 
-Scaling function for vector databases is also supported.
+   ```bash
+   kubectl get cluster mycluster -o yaml
+   >
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: Cluster
+   metadata:
+   ......
+   spec:
+     ......
+     componentSpecs:
+     ......
+       disableExporter: false
+   ```
+
+   If `disableExporter: false` is not shown in the output, it means the monitoring function of this cluster is not enabled and you need to enable it first.
+
+   ```bash
+   kbcli cluster update mycluster --disableExporter=false
+   ```
+
+3. View the dashboard list.
+
+   ```bash
+   kbcli dashboard list
+   >
+   NAME                                 NAMESPACE   PORT    CREATED-TIME
+   kubeblocks-grafana                   kb-system   13000   Jul 24,2023 11:38 UTC+0800
+   kubeblocks-prometheus-alertmanager   kb-system   19093   Jul 24,2023 11:38 UTC+0800
+   kubeblocks-prometheus-server         kb-system   19090   Jul 24,2023 11:38 UTC+0800
+   ```
+
+4. Open and view the web console of a monitoring dashboard. For example,
+
+   ```bash
+   kbcli dashboard open kubeblocks-grafana
+   ```
+
+For the production environment, it is highly recommended to build your monitoring system or purchase a third-party monitoring service and you can refer to [the monitoring document](./../observability/monitor-database.md#for-production-environment) for details.
+
+## Scale
+
+The scaling function for vector databases is also supported.
 
 ### Scale horizontally
 
@@ -149,7 +196,7 @@ To check whether the scaling is done, use the following command.
 kbcli cluster describe qdrant
 ```
 
-## Volume Expanding
+## Volume Expansion
 
 ***Steps:***
 
@@ -157,7 +204,7 @@ kbcli cluster describe qdrant
 kbcli cluster volume-expand qdrant --storage=40Gi --components=qdrant -t data
 ```
 
-The volume expanding may take a few minutes.
+The volume expansion may take a few minutes.
 
 The `kbcli cluster volume-expand` command print the `opsname`, to check the progress of volume expanding, you can use the following command with the `opsname`.
 
@@ -165,7 +212,7 @@ The `kbcli cluster volume-expand` command print the `opsname`, to check the prog
 kubectl get ops qdrant-volumeexpansion-5pbd2
 >
 NAME                           TYPE              CLUSTER   STATUS   PROGRESS   AGE
-qdrant-volumeexpansion-5pbd2   VolumeExpansion   qdrant    Running  -/-        67s
+qdrant-volumeexpansion-5pbd2   VolumeExpansion   qdrant    Running  1/1        67s
 ```
 
 To check whether the expanding is done, use the following command.
@@ -176,4 +223,4 @@ kbcli cluster describe qdrant
 
 ## Backup and restore
 
-The backup and restore operations for qdrant are the same with those of other clusters. Remember to use `--method` parameter.
+The backup and restore operations for Qdrant are the same as those of other clusters and you can refer to [the backup and restore documents](./../backup-and-restore/introduction.md) for details. Remember to use `--method` parameter.

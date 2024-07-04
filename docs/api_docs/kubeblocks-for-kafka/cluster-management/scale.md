@@ -77,7 +77,7 @@ There are two ways to apply vertical scaling.
     Component Def Ref:  kafka
     Enabled Logs:
       running
-    Monitor:   false
+    DisableExporter:   true
     Name:      kafka
     Replicas:  2
     Resources:
@@ -136,7 +136,7 @@ There are two ways to apply vertical scaling.
     Component Def Ref:  kafka
     Enabled Logs:
       running
-    Monitor:   false
+    DisableExporter:   true
     Name:      kafka
     Replicas:  2
     Resources:
@@ -213,7 +213,7 @@ There are two ways to apply horizontal scaling.
     Component Def Ref:  kafka
     Enabled Logs:
       running
-    Monitor:   false
+    DisableExporter:   true
     Name:      kafka
     Replicas:  2
     Resources:
@@ -267,7 +267,7 @@ There are two ways to apply horizontal scaling.
     Component Def Ref:  kafka
     Enabled Logs:
       running
-    Monitor:   false
+    DisableExporter:   true
     Name:      kafka
     Replicas:  2
     Resources:

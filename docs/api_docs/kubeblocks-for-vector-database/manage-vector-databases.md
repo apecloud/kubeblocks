@@ -13,7 +13,7 @@ import TabItem from '@theme/TabItem';
 
 The popularity of generative AI (Generative AI) has aroused widespread attention and completely ignited the vector database (Vector Database) market. KubeBlocks supports the management of vector databases, such as Qdrant, Milvus, and Weaviate.
 
-In this chapter, we take Qdrant as an example to show how to manage vector databases with KubeBlocks.
+In this chapter, we take Qdrant as an example to show how to manage vector databases with KubeBlocks. This chapter illustrates how to create and manage a Qdrant cluster by `kubectl` or a YAML file. You can find the YAML examples in [the GitHub repository](https://github.com/apecloud/kubeblocks/tree/main/examples/qdrant).
 
 ## Before you start
 
@@ -69,7 +69,7 @@ spec:
   componentSpecs:
   - name: qdrant
     componentDefRef: qdrant
-    monitor: false
+    disableExporter: true
     serviceAccountName: kb-qdrant-cluster
     replicas: 2
     resources:
@@ -103,6 +103,7 @@ EOF
 | `spec.componentSpecs`                 | It is the list of components that define the cluster components. This field allows customized configuration of each component within a cluster.   |
 | `spec.componentSpecs.componentDefRef` | It is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition apecloud-mysql -o json \| jq '.spec.componentDefs[].name'`.   |
 | `spec.componentSpecs.name`            | It specifies the name of the component.     |
+| `spec.componentSpecs.disableExporter` | It defines whether the monitoring function is enabled. |
 | `spec.componentSpecs.replicas`        | It specifies the number of replicas of the component.  |
 | `spec.componentSpecs.resources`       | It specifies the resource requirements of the component.  |
 
@@ -399,7 +400,7 @@ There are two ways to apply vertical scaling.
     ```bash
     kubectl describe cluster mycluster -n demo
     ```
-    
+
 </TabItem>
 </Tabs>
 
@@ -549,7 +550,7 @@ spec:
   componentSpecs:
   - name: qdrant
     componentDefRef: qdrant
-    monitor: false  
+    disableExporter: true  
     replicas: 0
     volumeClaimTemplates:
     - name: data
@@ -606,7 +607,7 @@ spec:
   componentSpecs:
   - name: postgresql
     componentDefRef: qdrant
-    monitor: false  
+    disableExporter: true  
     replicas: 1
     volumeClaimTemplates:
     - name: data

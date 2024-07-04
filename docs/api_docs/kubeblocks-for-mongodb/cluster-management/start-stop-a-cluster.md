@@ -55,7 +55,7 @@ spec:
   componentSpecs:
   - name: mongodb
     componentDefRef: mongodb
-    monitor: false  
+    disableExporter: true  
     replicas: 0
     volumeClaimTemplates:
     - name: data
@@ -114,7 +114,7 @@ spec:
   componentSpecs:
   - name: mongodb
     componentDefRef: mongodb
-    monitor: false  
+    disableExporter: true  
     replicas: 1
     volumeClaimTemplates:
     - name: data

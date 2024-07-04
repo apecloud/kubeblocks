@@ -8,7 +8,7 @@ sidebar_label: Scale
 
 # Scale for an ApeCloud MySQL cluster
 
-You can scale a MySQL cluster in two ways, vertical scaling and horizontal scaling.
+You can scale an ApeCloud MySQL cluster in two ways, vertical scaling and horizontal scaling.
 
 :::note
 
@@ -58,8 +58,8 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
     ```bash
     kbcli cluster list mysql-cluster
     >
-    NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS                 CREATED-TIME
-    mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30        Delete                    VerticalScaling        Jan 29,2023 14:29 UTC+0800
+    NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS          CREATED-TIME
+    mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30        Delete                    Updating        Jan 29,2023 14:29 UTC+0800
     ```
 
     - STATUS=Updating: it means the vertical scaling is in progress.

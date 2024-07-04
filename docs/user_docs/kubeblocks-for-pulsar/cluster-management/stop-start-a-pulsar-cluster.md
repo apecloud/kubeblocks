@@ -1,12 +1,12 @@
 ---
-title: Stop/Start a Redis cluster
-description: How to start/stop a Redis cluster
-keywords: [redis, stop a cluster, start a cluster]
+title: Stop/Start a Pulsar cluster
+description: How to start/stop a Pulsar cluster
+keywords: [pulsar, stop a cluster, start a cluster]
 sidebar_position: 5
 sidebar_label: Stop/Start
 ---
 
-# Stop/Start a Redis Cluster
+# Stop/Start a Pulsar Cluster
 
 You can stop/start a cluster to save computing resources. When a cluster is stopped, the computing resources of this cluster are released, which means the pods of Kubernetes are released, but the storage resources are reserved. Start this cluster again if you want to restore the cluster resources from the original storage by snapshots.
 
@@ -15,7 +15,7 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 1. Configure the name of your cluster and run the command below to stop this cluster.
 
    ```bash
-   kbcli cluster stop redis-cluster
+   kbcli cluster stop pulsar-cluster
    ```
 
 2. Check the status of the cluster to see whether it is stopped.
@@ -29,7 +29,7 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 1. Configure the name of your cluster and run the command below to start this cluster.
 
    ```bash
-   kbcli cluster start redis-cluster
+   kbcli cluster start pulsar-cluster
    ```
 
 2. Check the status of the cluster to see whether it is running again.

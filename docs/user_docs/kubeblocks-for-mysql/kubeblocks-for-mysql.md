@@ -1,11 +1,11 @@
 ---
-title: KubeBlocks for MySQL
-description: Feature list of KubeBlocks for MySQL
+title: KubeBlocks for ApeCloud MySQL
+description: Feature list of KubeBlocks for ApeCloud MySQL
 keywords: [apecloud, mysql, introduction, feature]
 sidebar_position: 1
 ---
 
-# KubeBlocks for MySQL
+# KubeBlocks for ApeCloud MySQL
 
 * [Introduction](./apecloud-mysql-intro/apecloud-mysql-intro.md)
 * [Cluster Management](./cluster-management/create-and-connect-a-mysql-cluster.md)

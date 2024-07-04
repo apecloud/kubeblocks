@@ -19,7 +19,7 @@ This tutorial shows how to create and connect to a MySQL cluster.
 
 * [Install kbcli](./../../installation/install-with-kbcli/install-kbcli.md).
 * [Install KubeBlocks by kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md).
-* Make sure the ApeCloud MySQL addon is enabled.
+* Make sure the ApeCloud MySQL addon is enabled. If this addon is not enabled, [enable it](./../../overview/supported-addons.md#use-addons) first.
   
   ```bash
   kbcli addon list
@@ -46,7 +46,7 @@ This tutorial shows how to create and connect to a MySQL cluster.
 
 ### Create a cluster
 
-KubeBlocks supports creating two types of MySQL clusters: Standalone and RaftGroup Cluster. Standalone only supports one replica and can be used in scenarios with lower requirements for availability. For scenarios with high availability requirements, it is recommended to create a RaftGroup Cluster, which creates a cluster with three replicas. And to ensure high availability, all replicas are distributed on different nodes by default.
+KubeBlocks supports creating two types of MySQL clusters: Standalone and RaftGroup Cluster. Standalone only supports one replica and can be used in scenarios with lower requirements for availability. For scenarios with high availability requirements, it is recommended to create a RaftGroup Cluster, which creates a cluster with three replicas. To ensure high availability, all replicas are distributed on different nodes by default.
 
 Create a Standalone.
 

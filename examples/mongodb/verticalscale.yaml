@@ -13,7 +13,7 @@ spec:
     # VerticalScaling refers to the process of adjusting the compute resources (e.g., CPU, memory) allocated to a Component. It defines the parameters required for the operation.
     requests:
       cpu: '1'
-      memory: 1Gi
+      memory: 1.5Gi
     limits:
       cpu: '1'
-      memory: 1Gi
+      memory: 1.5Gi

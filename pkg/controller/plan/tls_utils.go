@@ -52,12 +52,12 @@ func ComposeTLSSecret(namespace, clusterName, componentName string) (*v1.Secret,
 		GetObject()
 
 	// use ca gen cert
-	// IP: 127.0.0.1
+	// IP: 127.0.0.1 and ::1
 	// DNS: localhost and *.<clusterName>-<componentName>-headless.<namespace>.svc.cluster.local
 	const spliter = "___spliter___"
 	SignedCertTpl := fmt.Sprintf(`
 	{{- $ca := genCA "KubeBlocks" 36500 -}}
-	{{- $cert := genSignedCert "%s peer" (list "127.0.0.1") (list "localhost" "*.%s-%s-headless.%s.svc.cluster.local") 36500 $ca -}}
+	{{- $cert := genSignedCert "%s peer" (list "127.0.0.1" "::1") (list "localhost" "*.%s-%s-headless.%s.svc.cluster.local") 36500 $ca -}}
 	{{- $ca.Cert -}}
 	{{- print "%s" -}}
 	{{- $cert.Cert -}}

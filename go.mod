@@ -75,7 +75,7 @@ require (
 	k8s.io/apimachinery v0.29.0
 	k8s.io/apiserver v0.29.0
 	k8s.io/cli-runtime v0.28.3
-	k8s.io/client-go v12.0.0+incompatible
+	k8s.io/client-go v0.29.0
 	k8s.io/code-generator v0.28.3
 	k8s.io/component-helpers v0.28.3
 	k8s.io/cri-api v0.28.3

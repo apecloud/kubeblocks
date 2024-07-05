@@ -18,7 +18,7 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
 
 ***Steps***
 
-1. Execute the following command to create a Qdrant cluster. You can change the `cluster-definition` value as any other databases supported.
+1. Execute the following command to create a Weaviate cluster. You can change the `cluster-definition` value as any other databases supported.
 
    ```bash
    kbcli cluster create weaviate --cluster-definition=weaviate
@@ -36,45 +36,39 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
    kbcli cluster list
    >
    NAME     NAMESPACE   CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    CREATED-TIME
-   weaviate   default     weaviate               weaviate-1.1.0   Delete               Running   Aug 15,2023 23:03 UTC+0800
+   weaviate        default     weaviate             weaviate-1.18.0       Delete               Creating          Jul 05,2024 17:42 UTC+0800   
    ```
 
 3. Check the cluster information.
 
    ```bash
-   kbcli cluster describe weaviate
-   >
-   Name: weaviate         Created Time: Aug 15,2023 23:03 UTC+0800
-   NAMESPACE   CLUSTER-DEFINITION   VERSION        STATUS    TERMINATION-POLICY
-   default     weaviate               weaviate-1.1.0   Running   Delete
+    kbcli cluster describe weaviate
 
-   Endpoints:
-   COMPONENT   MODE        INTERNAL                                       EXTERNAL
-   weaviate      ReadWrite   weaviate-weaviate.default.svc.cluster.local:6333   <none>
-                           weaviate-weaviate.default.svc.cluster.local:6334
+      Name: weaviate	 Created Time: Jul 05,2024 17:42 UTC+0800
+      NAMESPACE   CLUSTER-DEFINITION   VERSION           STATUS     TERMINATION-POLICY   
+      default     weaviate             weaviate-1.18.0   Creating   Delete               
 
-   Topology:
-   COMPONENT   INSTANCE          ROLE     STATUS    AZ       NODE                   CREATED-TIME
-   weaviate      weaviate-weaviate-0   <none>   Running   <none>   x-worker3/172.20.0.3   Aug 15,2023 23:03 UTC+0800
-   weaviate      weaviate-weaviate-1   <none>   Running   <none>   x-worker2/172.20.0.5   Aug 15,2023 23:03 UTC+0800
-   weaviate      weaviate-weaviate-2   <none>   Running   <none>   x-worker/172.20.0.2    Aug 15,2023 23:04 UTC+0800
+      Endpoints:
+      COMPONENT   MODE        INTERNAL                                           EXTERNAL   
+      weaviate    ReadWrite   weaviate-weaviate.default.svc.cluster.local:8080   <none>     
 
-   Resources Allocation:
-   COMPONENT   DEDICATED   CPU(REQUEST/LIMIT)   MEMORY(REQUEST/LIMIT)   STORAGE-SIZE   STORAGE-CLASS
-   weaviate      false       1 / 1                1Gi / 1Gi               data:20Gi      standard
+      Topology:
+      COMPONENT   INSTANCE              ROLE     STATUS    AZ       NODE     CREATED-TIME                 
+      weaviate    weaviate-weaviate-0   <none>   Pending   <none>   <none>   Jul 05,2024 17:42 UTC+0800   
 
-   Images:
-   COMPONENT   TYPE     IMAGE
-   weaviate      weaviate   docker.io/weaviate/weaviate:latest
+      Resources Allocation:
+      COMPONENT   DEDICATED   CPU(REQUEST/LIMIT)   MEMORY(REQUEST/LIMIT)   STORAGE-SIZE   STORAGE-CLASS     
+      weaviate    false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
 
-   Data Protection:
-   AUTO-BACKUP   BACKUP-SCHEDULE   TYPE     BACKUP-TTL   LAST-SCHEDULE   RECOVERABLE-TIME
-   Disabled      <none>            <none>   7d           <none>          <none>
+      Images:
+      COMPONENT   TYPE       IMAGE                                        
+      weaviate    weaviate   docker.io/semitechnologies/weaviate:1.19.6   
 
-   Show cluster events: kbcli cluster list-events -n default weaviate
+      Data Protection:
+      BACKUP-REPO   AUTO-BACKUP   BACKUP-SCHEDULE   BACKUP-METHOD   BACKUP-RETENTION  
    ```
 
-## Connect to a Qdrant cluster
+## Connect to a Weaviate cluster
 
 Qdrant provides both HTTP and gRPC protocols for client access on ports 6333 and 6334 respectively. Depending on where the client is, different connection options are offered to connect to the Qdrant cluster.
 
@@ -85,8 +79,8 @@ If your cluster is on AWS, install the AWS Load Balancer Controller first.
 :::
 
 - If your client is inside a K8s cluster, run `kbcli cluster describe weaviate` to get the ClusterIP address of the cluster or the corresponding K8s cluster domain name.
-- If your client is outside the K8s cluster but in the same VPC as the server, run `kbcli cluster expose qdant --enable=true --type=vpc` to get a VPC load balancer address for the database cluster.
-- If your client is outside the VPC, run `kbcli cluster expose qdant --enable=true --type=internet` to open a public network reachable address for the database cluster.
+- If your client is outside the K8s cluster but in the same VPC as the server, run `kbcli cluster expose weaviate --enable=true --type=vpc` to get a VPC load balancer address for the database cluster.
+- If your client is outside the VPC, run `kbcli cluster expose weaviate --enable=true --type=internet` to open a public network reachable address for the database cluster.
 
 ## Monitor the database
 

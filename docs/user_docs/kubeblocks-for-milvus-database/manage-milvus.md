@@ -12,14 +12,13 @@ Milvus is a highly flexible, reliable, and blazing-fast cloud-native, open-sourc
 
 KubeBlocks supports the management of Milvus.
 
-In this chapter, we take Qdrant as an example to show how to manage vector databases with KubeBlocks.
 Before you start, [install kbcli](./../installation/install-with-kbcli/install-kbcli.md) and [install KubeBlocks](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md).
 
 ## Create a cluster
 
 ***Steps***
 
-1. Execute the following command to create a Qdrant cluster. You can change the `cluster-definition` value as any other databases supported.
+1. Execute the following command to create a Milvus cluster. You can change the `cluster-definition` value as any other databases supported.
 
    ```bash
    kbcli cluster create milvus --cluster-definition=milvus
@@ -37,40 +36,55 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
    kbcli cluster list
    >
    NAME     NAMESPACE   CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    CREATED-TIME
-   milvus   default     milvus               milvus-1.1.0   Delete               Running   Aug 15,2023 23:03 UTC+0800
+   milvus          default     milvus-2.3.2                               Delete               Creating          Jul 05,2024 17:35 UTC+0800   
    ```
 
 3. Check the cluster information.
-
    ```bash
    kbcli cluster describe milvus
-   >
-   Name: milvus         Created Time: Aug 15,2023 23:03 UTC+0800
-   NAMESPACE   CLUSTER-DEFINITION   VERSION        STATUS    TERMINATION-POLICY
-   default     milvus               milvus-1.1.0   Running   Delete
+   Name: milvus	 Created Time: Jul 05,2024 17:35 UTC+0800
+   NAMESPACE   CLUSTER-DEFINITION   VERSION   STATUS     TERMINATION-POLICY   
+   default     milvus-2.3.2                   Creating   Delete               
 
    Endpoints:
-   COMPONENT   MODE        INTERNAL                                       EXTERNAL
-   milvus      ReadWrite   milvus-milvus.default.svc.cluster.local:6333   <none>
-                           milvus-milvus.default.svc.cluster.local:6334
+   COMPONENT   MODE        INTERNAL                                        EXTERNAL   
+   milvus      ReadWrite   milvus-milvus.default.svc.cluster.local:19530   <none>     
+   minio       ReadWrite   milvus-minio.default.svc.cluster.local:9000     <none>     
+   proxy       ReadWrite   milvus-proxy.default.svc.cluster.local:19530    <none>     
+                           milvus-proxy.default.svc.cluster.local:9091                
 
    Topology:
-   COMPONENT   INSTANCE          ROLE     STATUS    AZ       NODE                   CREATED-TIME
-   milvus      milvus-milvus-0   <none>   Running   <none>   x-worker3/172.20.0.3   Aug 15,2023 23:03 UTC+0800
-   milvus      milvus-milvus-1   <none>   Running   <none>   x-worker2/172.20.0.5   Aug 15,2023 23:03 UTC+0800
-   milvus      milvus-milvus-2   <none>   Running   <none>   x-worker/172.20.0.2    Aug 15,2023 23:04 UTC+0800
+   COMPONENT   INSTANCE             ROLE     STATUS    AZ       NODE     CREATED-TIME                 
+   etcd        milvus-etcd-0        <none>   Pending   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
+   minio       milvus-minio-0       <none>   Pending   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
+   milvus      milvus-milvus-0      <none>   Pending   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
+   indexnode   milvus-indexnode-0   <none>   Pending   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
+   mixcoord    milvus-mixcoord-0    <none>   Pending   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
+   querynode   milvus-querynode-0   <none>   Pending   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
+   datanode    milvus-datanode-0    <none>   Pending   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
+   proxy       milvus-proxy-0       <none>   Pending   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
 
    Resources Allocation:
-   COMPONENT   DEDICATED   CPU(REQUEST/LIMIT)   MEMORY(REQUEST/LIMIT)   STORAGE-SIZE   STORAGE-CLASS
-   milvus      false       1 / 1                1Gi / 1Gi               data:20Gi      standard
+   COMPONENT   DEDICATED   CPU(REQUEST/LIMIT)   MEMORY(REQUEST/LIMIT)   STORAGE-SIZE   STORAGE-CLASS     
+   milvus      false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
+   etcd        false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
+   minio       false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
+   proxy       false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
+   mixcoord    false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
+   datanode    false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
+   indexnode   false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
+   querynode   false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
 
    Images:
-   COMPONENT   TYPE     IMAGE
-   milvus      milvus   docker.io/milvus/milvus:latest
-
-   Data Protection:
-   AUTO-BACKUP   BACKUP-SCHEDULE   TYPE     BACKUP-TTL   LAST-SCHEDULE   RECOVERABLE-TIME
-   Disabled      <none>            <none>   7d           <none>          <none>
+   COMPONENT   TYPE        IMAGE                                                
+   milvus      milvus      milvusdb/milvus:v2.3.2                               
+   etcd        etcd        docker.io/milvusdb/etcd:3.5.5-r2                     
+   minio       minio       docker.io/minio/minio:RELEASE.2022-03-17T06-34-49Z   
+   proxy       proxy       milvusdb/milvus:v2.3.2                               
+   mixcoord    mixcoord    milvusdb/milvus:v2.3.2                               
+   datanode    datanode    milvusdb/milvus:v2.3.2                               
+   indexnode   indexnode   milvusdb/milvus:v2.3.2                               
+   querynode   querynode   milvusdb/milvus:v2.3.2                               
 
    Show cluster events: kbcli cluster list-events -n default milvus
    ```

@@ -21,7 +21,6 @@ package dataprotection
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -752,10 +751,7 @@ func PatchBackupObjectMeta(
 	// TODO(ldm): we should remove this dependency of cluster in the future
 	cluster := getCluster(request.Ctx, request.Client, targetPod)
 	if cluster != nil {
-		if err := setClusterSnapshotAnnotation(request.Backup, cluster); err != nil {
-			return false, err
-		}
-		if err := setSecretSnapshotAnnotation(request.Ctx, request.Client, request.Backup, cluster); err != nil {
+		if err := setSnapshotAnnotation(request.Ctx, request.Client, request.Backup, cluster); err != nil {
 			return false, err
 		}
 		if err := setConnectionPasswordAnnotation(request); err != nil {
@@ -873,28 +869,8 @@ func getClusterObjectString(cluster *appsv1alpha1.Cluster) (*string, error) {
 			constant.ExtraEnvAnnotationKey: v,
 		}
 	}
-	clusterBytes, err := json.Marshal(newCluster)
-	if err != nil {
-		return nil, err
-	}
-	clusterString := string(clusterBytes)
-	return &clusterString, nil
-}
-
-// setClusterSnapshotAnnotation sets the snapshot of cluster to the backup's annotations.
-func setClusterSnapshotAnnotation(backup *dpv1alpha1.Backup, cluster *appsv1alpha1.Cluster) error {
-	clusterString, err := getClusterObjectString(cluster)
-	if err != nil {
-		return err
-	}
-	if clusterString == nil {
-		return nil
-	}
-	if backup.Annotations == nil {
-		backup.Annotations = map[string]string{}
-	}
-	backup.Annotations[constant.ClusterSnapshotAnnotationKey] = *clusterString
-	return nil
+	clusterString, err := getObjectString(newCluster)
+	return clusterString, err
 }
 
 // getSecretListObjectString gets the secret objects of the cluster and convert it to string.
@@ -902,39 +878,30 @@ func getSecretListObjectString(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster) (*string, error) {
 	// fetch secret objects
-	secretList := getSecrets(ctx, cli, cluster)
-	secretListString := ""
+	secretList, _ := listObjectsOfClusterWithErrorIgnored(ctx, cli, cluster, &corev1.SecretList{}).(*corev1.SecretList)
 	for i := range secretList.Items {
-		oldAnnotations := secretList.Items[i].Annotations
-		secretList.Items[i].ObjectMeta = metav1.ObjectMeta{
-			Namespace:   secretList.Items[i].Namespace,
-			Name:        secretList.Items[i].Name,
-			Labels:      secretList.Items[i].Labels,
-			Annotations: nil,
-		}
-		if v, ok := oldAnnotations[constant.ExtraEnvAnnotationKey]; ok {
-			secretList.Items[i].Annotations = map[string]string{
-				constant.ExtraEnvAnnotationKey: v,
-			}
-		}
+		clearObjectMeta(&secretList.Items[i].ObjectMeta)
 	}
-	secretListBytes, err := json.Marshal(secretList)
-	if err != nil {
-		return nil, err
-	}
-	secretListString = string(secretListBytes)
-	return &secretListString, nil
+	secretListString, err := getObjectString(secretList)
+	return secretListString, err
 }
 
-// setSecretSnapshotAnnotation sets the snapshot of secret to the backup's annotations.
-func setSecretSnapshotAnnotation(ctx context.Context,
+// setSnapshotAnnotation sets the snapshot of cluster to the backup's annotations.
+func setSnapshotAnnotation(ctx context.Context,
 	cli client.Client, backup *dpv1alpha1.Backup, cluster *appsv1alpha1.Cluster) error {
+	if backup.Annotations == nil {
+		backup.Annotations = map[string]string{}
+	}
+
+	clusterString, err := getClusterObjectString(cluster)
+	if err != nil || clusterString == nil {
+		return err
+	}
+	backup.Annotations[constant.ClusterSnapshotAnnotationKey] = *clusterString
+
 	secretListString, err := getSecretListObjectString(ctx, cli, cluster)
 	if err != nil || secretListString == nil {
 		return err
-	}
-	if backup.Annotations == nil {
-		backup.Annotations = map[string]string{}
 	}
 	backup.Annotations[constant.SecretsSnapshotAnnotationsKey] = *secretListString
 	return nil

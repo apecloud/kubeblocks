@@ -225,16 +225,44 @@ func getCluster(ctx context.Context,
 	return cluster
 }
 
-// getSecrets gets the secrets and will ignore the error.
-func getSecrets(ctx context.Context,
+// listObjectsOfClusterWithErrorIgnored list the objects and will ignore the error.
+func listObjectsOfClusterWithErrorIgnored(ctx context.Context,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster) *corev1.SecretList {
-	secretList := &corev1.SecretList{}
+	cluster *appsv1alpha1.Cluster,
+	object client.ObjectList) client.ObjectList {
 	labels := constant.GetClusterWellKnownLabels(cluster.Name)
-	if err := cli.List(ctx, secretList, client.InNamespace(cluster.Namespace), client.MatchingLabels(labels)); err != nil {
+	if err := cli.List(ctx, object, client.InNamespace(cluster.Namespace), client.MatchingLabels(labels)); err != nil {
 		return nil
 	}
-	return secretList
+	return object
+}
+
+func clearObjectMeta(object *metav1.ObjectMeta) {
+	oleAnnotations := object.GetAnnotations()
+	newObjectMeta := metav1.ObjectMeta{
+		Namespace:   object.Namespace,
+		Name:        object.Name,
+		Labels:      object.Labels,
+		Annotations: nil,
+	}
+	if v, ok := oleAnnotations[constant.ExtraEnvAnnotationKey]; ok {
+		newObjectMeta.Annotations = map[string]string{
+			constant.ExtraEnvAnnotationKey: v,
+		}
+	}
+	return
+}
+
+func getObjectString(object any) (*string, error) {
+	if object == nil {
+		return nil, nil
+	}
+	objectBytes, err := json.Marshal(object)
+	if err != nil {
+		return nil, err
+	}
+	objectString := string(objectBytes)
+	return &objectString, nil
 }
 
 func getClusterLabelKeys() []string {

@@ -47,7 +47,7 @@ The example below configures systemLog.verbosity to 1.
 1. Adjust the values of `systemLog.verbosity` to 1.
 
    ```bash
-   kbcli cluster configure mongodb-cluster --components mongodb --config-spec mongodb-config --config-file mongodb.conf --set systemLog.verbosity=1
+   kbcli cluster configure mongodb-cluster --components mongodb --config-specs mongodb-config --config-file mongodb.conf --set systemLog.verbosity=1
    >
    Warning: The parameter change you modified needs to be restarted, which may cause the cluster to be unavailable for a period of time. Do you need to continue...
    Please type "yes" to confirm: yes

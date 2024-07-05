@@ -14,7 +14,7 @@ import TabItem from '@theme/TabItem';
 ## Before you start
 
 1. [Install KubeBlocks](./../../installation/install-kubeblocks.md).
-2. Prepare an ApeCloud MySQL RaftGroup named `mycluster` for demonstrating how to enable the proxy function for an existing cluster. Refer to [Create a MySQL cluster](./../cluster-management/create-and-connect-a-mysql-cluster.md) for details.
+2. Prepare an ApeCloud MySQL RaftGroup named `mycluster` for demonstrating how to enable the proxy function for an existing cluster. Refer to [Create a MySQL cluster](./../cluster-management/create-and-connect-an-apecloud-mysql-cluster.md) for details.
 
 ## Create a Proxy Cluster
 
@@ -36,40 +36,103 @@ import TabItem from '@theme/TabItem';
    helm repo update
    ```
 
-4. View all versions of ApeCloud MySQL Proxy.
+4. Install etcd to create the external service reference.
 
-   ```bash
-   helm search repo kubeblocks/apecloud-mysql --devel --versions
-   ```
+   1. View all versions of etcd.
 
-5. (Optional) If you disable the `apecloud-mysql` addon when installing KuebBlocks, run the command below to specify a version and install the cluster definition of ApeCloud MySQL. Skip this step if you install KubeBlocks with the default settings.
+       ```bash
+       helm search repo kubeblocks/etcd --devel --versions
+       ```
 
-   ```bash
-   helm install myproxy kubeblocks/apecloud-mysql --version=v0.9.0
-   ```
+   2. Install the etcd addon.
 
-6. Create an ApeCloud MySQL Proxy Cluster.
+       ```bash
+       helm install etcd kubeblocks/etcd --version=v0.6.5
+       ```
 
-   ```bash
-   helm install myproxy kubeblocks/apecloud-mysql-cluster --version=v0.9.0 --set mode=raftGroup,proxyEnabled=true 
-   ```
+   3. Install the etcd cluster.
+
+       ```bash
+       helm install etcd-cluster kubeblocks/etcd-cluster 
+       ```
+
+   4. view the status of the etcd cluster and make sure it is running.
+
+       ```bash
+       kubectl get cluster
+       >
+       NAME           CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS     AGE
+       etcd-cluster   etcd                 etcd-v3.5.6   Halt                 Runing     10s
+       ```
+
+   5. View the service address of this etcd clsuter.
+
+       ```bash
+       kubectl get service
+       >
+       NAME                             TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)                                                  AGE
+       etcd-cluster-etcd                ClusterIP   10.110.23.89   <none>        2379/TCP                                                 55s
+       etcd-cluster-etcd-headless       ClusterIP   None           <none>        2379/TCP,2380/TCP,3501/TCP,50001/TCP                     55s
+       kubernetes                       ClusterIP   10.96.0.1      <none>        443/TCP                                                  13m
+       ```
+
+       You can combine the service address to get the endpoint or you can use the IP of the service address as the access address. 
+
+       Here is an example of combining the service address.
+
+       ```bash
+       etcd-cluster-etcd.default.svc.cluster.local:2379
+       ```
+
+5. Create an ApeCloud MySQL Proxy Cluster.
+   1. View all versions of ApeCloud MySQL Proxy.
+
+       ```bash
+       helm search repo kubeblocks/apecloud-mysql --devel --versions
+       ```
+
+   2. (Optional) If you disable the `apecloud-mysql` addon when installing KuebBlocks, run the command below to specify a version and install the cluster definition of ApeCloud MySQL. Skip this step if you install KubeBlocks with the default settings.
+
+       ```bash
+       helm install myproxy kubeblocks/apecloud-mysql --version=v0.9.0
+       ```
+
+   3. Create an ApeCloud MySQL Proxy Cluster.
+
+       ```bash
+       helm install myproxy kubeblocks/apecloud-mysql-cluster --version=v0.9.0 --set mode=raftGroup,proxyEnabled=true,etcd.serviceReference.endpoint="etcd-cluster-etcd.default.svc.cluster.local:2379"
+       ```
 
 :::note
 
 If you only have one node for deploying a RaftGroup Cluster, set the `extra.availability-policy` as `none` when creating a RaftGroup Cluster.
 
 ```bash
-helm install myproxy kubeblocks/apecloud-mysql-cluster --version=v0.9.0 --set mode=raftGroup,proxyEnabled=true --set extra.availabilityPolicy=none
+helm install myproxy kubeblocks/apecloud-mysql-cluster --version=v0.9.0 --set mode=raftGroup,proxyEnabled=true,etcd.serviceReference.endpoint="etcd-cluster-etcd.default.svc.cluster.local:2379" --set extra.availabilityPolicy=none
 ```
 
 :::
+
+6. Check the status of the clusters.
+
+   ```bash
+   kubectl get cluster
+
+   kubectl get pods
+   ```
+
+   You can also enter the etcd container or wesql-scale container to view the configuration of wesql-scale or to check the availability of the etcd service.
+
+   ```bash
+   etcdctl --endpoints=http://etcd-cluster-etcd.default.svc.cluster.local:2379 get /vitess --prefix --keys-only
+   ```
 
 ## Enable/Disable Proxy dynamically
 
 As its name suggests, ApeCloud MySQL Proxy in nature is a database proxy. An ApeCloud MySQL RaftGroup Cluster that already exists can be switched to an ApeCloud MySQL Proxy Cluster by setting `proxyEnabled=true`.
 
 ```bash
-helm upgrade mycluster kubeblocks/apecloud-mysql-cluster --set mode=raftGroup,proxyEnabled=true
+helm upgrade mycluster kubeblocks/apecloud-mysql-cluster --set mode=raftGroup,proxyEnabled=true,etcd.serviceReference.endpoint="etcd-cluster-etcd.default.svc.cluster.local:2379"
 ```
 
 If you want to disable proxy, run the command below.

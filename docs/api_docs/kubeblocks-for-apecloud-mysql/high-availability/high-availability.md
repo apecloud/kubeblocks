@@ -7,9 +7,9 @@ sidebar_position: 1
 
 # Failure simulation and automatic recovery
 
-As an open-source data management platform, KubeBlocks supports two database forms, ReplicationSet and ConsensusSet. ReplicationSet can be used for single source with multiple replicas, and non-automatic switching database management, such as MySQL and Redis. ConsensusSet can be used for database management with multiple replicas and automatic switching capabilities, such as ApeCloud MySQL RaftGroup Cluster with multiple replicas, MongoDB, etc. The ConsensusSet database management capability has been released in KubeBlocks v0.3.0, and ReplicationSet is under development.
+As an open-source data management platform, Kubeblocks currently supports over thirty database engines and is continuously expanding. Due to the varying high availability capabilities of databases, KubeBlocks has designed and implemented a high availability (HA) system for database instances. The KubeBlocks HA system uses a unified HA framework to provide high availability for databases, allowing different databases on KubeBlocks to achieve similar high availability capabilities and experiences.
 
-This guide takes ApeCloud MySQL as an example to introduce the high availability capability of the database in the form of ConsensusSet. This capability is also applicable to other database engines.
+This tutorial uses Apecloud MySQL as an example to demonstrate its fault simulation and recovery capabilities.
 
 ## Recovery simulation
 
@@ -22,7 +22,7 @@ The faults here are all simulated by deleting pods. When there are sufficient re
 ### Before you start
 
 * [Install KubeBlocks](./../../installation/install-kubeblocks.md).
-* [Create an ApeCloud MySQL RaftGroup Cluster](./../cluster-management/create-and-connect-a-mysql-cluster.md).
+* [Create an ApeCloud MySQL RaftGroup Cluster](./../cluster-management/create-and-connect-an-apecloud-mysql-cluster.md).
 * Run `kubectl get cd apecloud-mysql -o yaml` to check whether _rolechangedprobe_ is enabled in the ApeCloud MySQL RaftGroup Cluster (it is enabled by default). If the following configuration exists, it indicates that it is enabled:
 
   ```bash

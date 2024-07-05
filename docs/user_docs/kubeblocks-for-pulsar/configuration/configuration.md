@@ -113,7 +113,7 @@ The following steps take the configuration of dynamic parameter `brokerShutdownT
 2. Configure parameters.
 
    ```bash
-   kbcli cluster configure pulsar --components=broker --config-spec=broker-config --set brokerShutdownTimeoutMs=66600
+   kbcli cluster configure pulsar --components=broker --config-specs=broker-config --set brokerShutdownTimeoutMs=66600
    >
    Will updated configure file meta:
      ConfigSpec: broker-config          ConfigFile: broker.conf        ComponentName: broker        ClusterName: pulsar
@@ -132,7 +132,7 @@ The following steps take the configuration of dynamic parameter `brokerShutdownT
      Name: pulsar-cluster-reconfiguring-qxw8s        NameSpace: default        Cluster: pulsar        Type: Reconfiguring
 
    Command:
-     kbcli cluster configure pulsar-cluster --components=broker --config-spec=broker-config --config-file=broker.conf --set brokerShutdownTimeoutMs=66600 --namespace=default
+     kbcli cluster configure pulsar-cluster --components=broker --config-specs=broker-config --config-file=broker.conf --set brokerShutdownTimeoutMs=66600 --namespace=default
 
    Status:
      Start Time:         Jul 20,2023 09:53 UTC+0800

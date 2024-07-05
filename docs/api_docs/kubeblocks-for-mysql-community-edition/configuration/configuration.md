@@ -185,10 +185,10 @@ You can also view the details of this configuration file and parameters.
 * View the user guide of a specified parameter.
   
   ```bash
-  kbcli cluster explain-config mycluster --param=innodb_buffer_pool_size --config-spec=mysql-consensusset-config -n demo
+  kbcli cluster explain-config mycluster --param=innodb_buffer_pool_size --config-specs=mysql-replication-config -n demo
   ```
 
-  `--config-spec` is required to specify a configuration template since ApeCloud MySQL currently supports multiple templates. You can run `kbcli cluster describe-config mycluster` to view the all template names.
+  `--config-specs` is required to specify a configuration template since ApeCloud MySQL currently supports multiple templates. You can run `kbcli cluster describe-config mycluster` to view the all template names.
 
   <details>
 
@@ -196,7 +196,7 @@ You can also view the details of this configuration file and parameters.
 
   ```bash
   template meta:
-    ConfigSpec: mysql-consensusset-config        ComponentName: mysql        ClusterName: mycluster
+    ConfigSpec: mysql-replication-config        ComponentName: mysql        ClusterName: mycluster
 
   Configure Constraint:
     Parameter Name:     innodb_buffer_pool_size

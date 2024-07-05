@@ -137,10 +137,10 @@ You can also view the details of this configuration file and parameters.
 * View the user guide of a specified parameter.
   
   ```bash
-  kbcli cluster explain-config mycluster --param=systemLog.verbosity --config-spec=mongodb-config -n demo
+  kbcli cluster explain-config mycluster --param=systemLog.verbosity --config-specs=mongodb-config -n demo
   ```
 
-  `--config-spec` is required to specify a configuration template since ApeCloud MySQL currently supports multiple templates. You can run `kbcli cluster describe-config mycluster` to view the all template names.
+  `--config-specs` is required to specify a configuration template since ApeCloud MySQL currently supports multiple templates. You can run `kbcli cluster describe-config mycluster` to view the all template names.
 
   <details>
 

@@ -128,7 +128,7 @@ The example below takes configuring `max_connections` as an example.
      Name: pg-cluster-reconfiguring-fq6q7 NameSpace: default Cluster: pg-cluster Type: Reconfiguring
 
    Command:
-     kbcli cluster configure pg-cluster --components=postgresql --config-spec=postgresql-configuration --config-file=postgresql.conf --set max_connections=100 --namespace=default
+     kbcli cluster configure pg-cluster --components=postgresql --config-specs=postgresql-configuration --config-file=postgresql.conf --set max_connections=100 --namespace=default
 
    Status:
      Start Time:         Mar 17,2023 19:25 UTC+0800

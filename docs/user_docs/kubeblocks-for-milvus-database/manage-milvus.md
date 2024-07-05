@@ -24,7 +24,7 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
    kbcli cluster create milvus --cluster-definition=milvus
    ```
 
-   If you want to create a Qdrant cluster with multiple replicas. Use the following command and set the replica numbers.
+   If you want to create a Milvus cluster with multiple replicas. Use the following command and set the replica numbers.
 
    ```bash
    kbcli cluster create milvus --cluster-definition=milvus --set replicas=3

@@ -880,7 +880,8 @@ func getSecretListObjectString(ctx context.Context,
 	// fetch secret objects
 	secretList, _ := listObjectsOfClusterWithErrorIgnored(ctx, cli, cluster, &corev1.SecretList{}).(*corev1.SecretList)
 	for i := range secretList.Items {
-		clearObjectMeta(&secretList.Items[i].ObjectMeta)
+		secretObjectMeta := &secretList.Items[i].ObjectMeta
+		secretList.Items[i].ObjectMeta = *cleanObjectMeta(secretObjectMeta)
 	}
 	secretListString, err := getObjectString(secretList)
 	return secretListString, err

@@ -250,7 +250,6 @@ func clearObjectMeta(object *metav1.ObjectMeta) {
 			constant.ExtraEnvAnnotationKey: v,
 		}
 	}
-	return
 }
 
 func getObjectString(object any) (*string, error) {

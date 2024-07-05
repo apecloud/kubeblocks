@@ -159,6 +159,11 @@ func (w *WorkloadAction) buildPodSpec(actionCtx ActionContext,
 				volumeMounts = append(volumeMounts, volumeMount)
 			}
 		}
+		if len(podInfoExtractor.VolumeMounts) > 0 {
+			podSpec.NodeSelector = map[string]string{
+				corev1.LabelHostname: targetPod.Spec.NodeName,
+			}
+		}
 	}
 	// inject container envs, volumeMounts and resource.
 	for i := range podSpec.Containers {

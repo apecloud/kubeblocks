@@ -1,15 +1,16 @@
 ---
-title: Manage Vector Databases with KubeBlocks
+title: Manage Qdrant with KubeBlocks
 description: How to manage vector databases on KubeBlocks
-keywords: [qdrant, milvus,weaviate]
+keywords: [qdrant, vector database, control plane]
 sidebar_position: 1
-sidebar_label: Manage Vector Databases with KubeBlocks
+sidebar_label: Manage Qdrant with KubeBlocks
 ---
-# Manage Vector Databases with KubeBlocks
+# Manage Qdrant with KubeBlocks
 
-The popularity of generative AI (Generative AI) has aroused widespread attention and completely ignited the vector database (Vector Database) market. KubeBlocks supports the management of vector databases, such as Qdrant, Milvus, and Weaviate.
+The popularity of generative AI (Generative AI) has aroused widespread attention and completely ignited the vector database (Vector Database) market. Qdrant (read: quadrant) is a vector similarity search engine and vector database. It provides a production-ready service with a convenient API to store, search, and manage points—vectors with an additional payload Qdrant is tailored to extended filtering support. It makes it useful for all sorts of neural-network or semantic-based matching, faceted search, and other applications.
 
-In this chapter, we take Qdrant as an example to show how to manage vector databases with KubeBlocks.
+KubeBlocks supports the management of Qdrant.
+
 Before you start, [install kbcli](./../installation/install-with-kbcli/install-kbcli.md) and [install KubeBlocks](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md).
 
 ## Create a cluster
@@ -72,7 +73,7 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
    Show cluster events: kbcli cluster list-events -n default qdrant
    ```
 
-## Connect to a vector database cluster
+## Connect to a Qdrant cluster
 
 Qdrant provides both HTTP and gRPC protocols for client access on ports 6333 and 6334 respectively. Depending on where the client is, different connection options are offered to connect to the Qdrant cluster.
 
@@ -86,7 +87,7 @@ If your cluster is on AWS, install the AWS Load Balancer Controller first.
 - If your client is outside the K8s cluster but in the same VPC as the server, run `kbcli cluster expose qdant --enable=true --type=vpc` to get a VPC load balancer address for the database cluster.
 - If your client is outside the VPC, run `kbcli cluster expose qdant --enable=true --type=internet` to open a public network reachable address for the database cluster.
 
-## Monitor the vector database
+## Monitor the database
 
 For the testing environment, you can run the command below to open the Grafana monitor web page.
 

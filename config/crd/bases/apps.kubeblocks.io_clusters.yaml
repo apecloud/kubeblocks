@@ -4977,7 +4977,7 @@ spec:
 
 
                         Defaults:
-                        If not specified, and if any of the role probe, volume protection, and data protection features is enabled,
+                        If not specified, and if any of the role probe, volume protection, and data protection features are enabled,
                         KubeBlocks automatically assigns a default ServiceAccount named "kb-{cluster.name}",
                         bound to a default role installed together with KubeBlocks.
 
@@ -13652,7 +13652,7 @@ spec:
 
 
                             Defaults:
-                            If not specified, and if any of the role probe, volume protection, and data protection features is enabled,
+                            If not specified, and if any of the role probe, volume protection, and data protection features are enabled,
                             KubeBlocks automatically assigns a default ServiceAccount named "kb-{cluster.name}",
                             bound to a default role installed together with KubeBlocks.
 

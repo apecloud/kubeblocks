@@ -5095,7 +5095,7 @@ string
 This ServiceAccount is used to grant necessary permissions for the Component&rsquo;s Pods to interact
 with other Kubernetes resources, such as modifying Pod labels or sending events.</p>
 <p>Defaults:
-If not specified, and if any of the role probe, volume protection, and data protection features is enabled,
+If not specified, and if any of the role probe, volume protection, and data protection features are enabled,
 KubeBlocks automatically assigns a default ServiceAccount named &ldquo;kb-&#123;cluster.name&#125;&rdquo;,
 bound to a default role installed together with KubeBlocks.</p>
 <p>Future Changes:

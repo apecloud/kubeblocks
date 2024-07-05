@@ -776,7 +776,7 @@ type ClusterComponentSpec struct {
 	// with other Kubernetes resources, such as modifying Pod labels or sending events.
 	//
 	// Defaults:
-	// If not specified, and if any of the role probe, volume protection, and data protection features is enabled,
+	// If not specified, and if any of the role probe, volume protection, and data protection features are enabled,
 	// KubeBlocks automatically assigns a default ServiceAccount named "kb-{cluster.name}",
 	// bound to a default role installed together with KubeBlocks.
 	//

@@ -100,9 +100,12 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 	return nil
 }
 
-func isProbesEnabled(compDef *appsv1alpha1.ComponentDefinition) bool {
-	// TODO(component): lorry
-	return compDef.Spec.LifecycleActions != nil && compDef.Spec.LifecycleActions.RoleProbe != nil
+func isLifecycleActionsEnabled(compDef *appsv1alpha1.ComponentDefinition) bool {
+	// TODO(component): in KB 0.9, LifeCycleActions is executed throuth lorry, and
+	// lorry requires the service account to have the permission defined in "kubeblocks-cluster-pod-role".
+	// In KB 1.0, LifeCycleActions is executed throuth the kb-agent, and it does not require the permission anymore.
+	// So, we can remove this check in KB 1.0.
+	return compDef.Spec.LifecycleActions != nil
 }
 
 func isDataProtectionEnabled(backupTpl *appsv1alpha1.BackupPolicyTemplate, cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component) bool {
@@ -263,7 +266,7 @@ func buildServiceAccount(transCtx *componentTransformContext) (*corev1.ServiceAc
 	dataProtectionEnable := isDataProtectionEnabled(backupPolicyTPL, cluster, comp)
 	if serviceAccountName == "" {
 		// If probe, volume protection, and data protection are disabled at the same tme, then do not create a service account.
-		if !isProbesEnabled(compDef) && !volumeProtectionEnable && !dataProtectionEnable {
+		if !isLifecycleActionsEnabled(compDef) && !volumeProtectionEnable && !dataProtectionEnable {
 			return nil, false, nil
 		}
 		// use cluster.name to keep compatible with existed clusters

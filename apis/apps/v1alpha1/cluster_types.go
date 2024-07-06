@@ -1682,6 +1682,11 @@ func (t *InstanceTemplate) GetReplicas() int32 {
 	return defaultInstanceTemplateReplicas
 }
 
+// GetOrdinals TODO(free6om): Remove after resolving the circular dependencies between apps and workloads.
+func (t *InstanceTemplate) GetOrdinals() workloads.Ordinals {
+	return workloads.Ordinals{}
+}
+
 // GetClusterUpRunningPhases returns Cluster running or partially running phases.
 func GetClusterUpRunningPhases() []ClusterPhase {
 	return []ClusterPhase{

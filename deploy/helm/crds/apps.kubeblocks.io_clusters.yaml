@@ -2957,9 +2957,12 @@ spec:
                         by the running Component. This ServiceAccount is used to grant
                         necessary permissions for the Component's Pods to interact
                         with other Kubernetes resources, such as modifying Pod labels
-                        or sending events. \n Defaults: If not specified, KubeBlocks
-                        automatically assigns a default ServiceAccount named \"kb-{cluster.name}\",
-                        bound to a default role installed together with KubeBlocks.
+                        or sending events. \n Defaults: To perform certain operational
+                        tasks, agent sidecars running in Pods require specific RBAC
+                        permissions. The service account will be bound to a default
+                        role named \"kubeblocks-cluster-pod-role\" which is installed
+                        together with KubeBlocks. If not specified, KubeBlocks automatically
+                        assigns a default ServiceAccount named \"kb-{cluster.name}\"
                         \n Future Changes: Future versions might change the default
                         ServiceAccount creation strategy to one per Component, potentially
                         revising the naming to \"kb-{cluster.name}-{component.name}\".
@@ -8713,16 +8716,19 @@ spec:
                             by the running Component. This ServiceAccount is used
                             to grant necessary permissions for the Component's Pods
                             to interact with other Kubernetes resources, such as modifying
-                            Pod labels or sending events. \n Defaults: If not specified,
+                            Pod labels or sending events. \n Defaults: To perform
+                            certain operational tasks, agent sidecars running in Pods
+                            require specific RBAC permissions. The service account
+                            will be bound to a default role named \"kubeblocks-cluster-pod-role\"
+                            which is installed together with KubeBlocks. If not specified,
                             KubeBlocks automatically assigns a default ServiceAccount
-                            named \"kb-{cluster.name}\", bound to a default role installed
-                            together with KubeBlocks. \n Future Changes: Future versions
-                            might change the default ServiceAccount creation strategy
-                            to one per Component, potentially revising the naming
-                            to \"kb-{cluster.name}-{component.name}\". \n Users can
-                            override the automatic ServiceAccount assignment by explicitly
-                            setting the name of an existed ServiceAccount in this
-                            field."
+                            named \"kb-{cluster.name}\" \n Future Changes: Future
+                            versions might change the default ServiceAccount creation
+                            strategy to one per Component, potentially revising the
+                            naming to \"kb-{cluster.name}-{component.name}\". \n Users
+                            can override the automatic ServiceAccount assignment by
+                            explicitly setting the name of an existed ServiceAccount
+                            in this field."
                           type: string
                         serviceRefs:
                           description: "Defines a list of ServiceRef for a Component,

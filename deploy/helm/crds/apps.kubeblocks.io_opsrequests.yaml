@@ -3635,10 +3635,11 @@ spec:
                 - message: forbidden to update spec.switchover
                   rule: self == oldSelf
               timeoutSeconds:
-                description: |-
-                  Specifies the maximum duration (in seconds) that an opsRequest is allowed to run.
-                  If the opsRequest runs longer than this duration, its phase will be marked as Aborted.
-                  If this value is not set or set to 0, the timeout will be ignored and the opsRequest will run indefinitely.
+                description: Specifies the maximum duration (in seconds) that an opsRequest
+                  is allowed to run. If the opsRequest runs longer than this duration,
+                  its phase will be marked as Aborted. If this value is not set or
+                  set to 0, the timeout will be ignored and the opsRequest will run
+                  indefinitely.
                 format: int32
                 type: integer
               ttlSecondsAfterSucceed:

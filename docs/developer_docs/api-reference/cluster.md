@@ -5322,8 +5322,9 @@ string
 This ServiceAccount is used to grant necessary permissions for the Component&rsquo;s Pods to interact
 with other Kubernetes resources, such as modifying Pod labels or sending events.</p>
 <p>Defaults:
-If not specified, KubeBlocks automatically assigns a default ServiceAccount named &ldquo;kb-&#123;cluster.name&#125;&rdquo;,
-bound to a default role installed together with KubeBlocks.</p>
+To perform certain operational tasks, agent sidecars running in Pods require specific RBAC permissions.
+The service account will be bound to a default role named &ldquo;kubeblocks-cluster-pod-role&rdquo; which is installed together with KubeBlocks.
+If not specified, KubeBlocks automatically assigns a default ServiceAccount named &ldquo;kb-&#123;cluster.name&#125;&rdquo;</p>
 <p>Future Changes:
 Future versions might change the default ServiceAccount creation strategy to one per Component,
 potentially revising the naming to &ldquo;kb-&#123;cluster.name&#125;-&#123;component.name&#125;&rdquo;.</p>

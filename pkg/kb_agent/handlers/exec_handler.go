@@ -21,10 +21,10 @@ package handlers
 
 import (
 	"context"
+	"github.com/pkg/errors"
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
@@ -63,6 +63,7 @@ func (h *ExecHandler) Do(ctx context.Context, setting util.HandlerSpec, args map
 	}
 
 	output, err := h.Executor.ExecCommand(ctx, setting.Command, envs)
+
 	if err != nil {
 		return nil, errors.Wrap(err, "ExecHandler executes action failed")
 	}

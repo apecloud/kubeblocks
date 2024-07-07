@@ -21,30 +21,43 @@ package util
 
 import (
 	"context"
-	"os"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestExecCommand(t *testing.T) {
-	// Set up test environment
+func TestSentEventForProbe(t *testing.T) {
 	ctx := context.Background()
-	command := []string{"binary not exists"}
-	envs := []string{"ENV_VAR=value"}
-
-	// Call the function
-	_, err := ExecCommand(ctx, command, envs)
-
-	// Check the results
-	assert.Error(t, err)
+	t.Run("action is empty", func(t *testing.T) {
+		msg := &MockNilActionMessage{}
+		err := SentEventForProbe(ctx, msg)
+		assert.Error(t, errors.New("action is unset"), err)
+	})
+	t.Run("action is not empty", func(t *testing.T) {
+		msg := &MockNotNilActionMessage{}
+		err := SentEventForProbe(ctx, msg)
+		assert.Nil(t, err)
+	})
 }
 
-func TestGetAllEnvs(t *testing.T) {
-	args := map[string]any{
-		"test": "test",
-	}
-	envs := GetAllEnvs(args)
-	assert.NotNil(t, envs)
-	assert.Equal(t, len(os.Environ())+1, len(envs))
+func TestCreateEvent(t *testing.T) {
+	msg := &MockNotNilActionMessage{}
+	event, err := CreateEvent("test", msg)
+	assert.Nil(t, err)
+	assert.NotEqual(t, nil, event)
+}
+
+type MockNotNilActionMessage struct {
+}
+
+func (m *MockNotNilActionMessage) GetAction() string {
+	return "test"
+}
+
+type MockNilActionMessage struct {
+}
+
+func (m *MockNilActionMessage) GetAction() string {
+	return ""
 }

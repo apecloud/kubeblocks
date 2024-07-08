@@ -276,6 +276,36 @@ spec:
                 - password
                 - username
                 type: object
+              defaultTemplateOrdinals:
+                description: "Specifies the desired Ordinals of the default template.
+                  The Ordinals used to specify the ordinal of the instance (pod) names
+                  to be generated under the default template. \n For example, if Ordinals
+                  is {ranges: [{start: 0, end: 1}], discrete: [7]}, then the instance
+                  names generated under the default template would be $(cluster.name)-$(component.name)-0、$(cluster.name)-$(component.name)-1
+                  and $(cluster.name)-$(component.name)-7"
+                properties:
+                  discrete:
+                    items:
+                      format: int32
+                      type: integer
+                    type: array
+                  ranges:
+                    items:
+                      description: Range represents a range with a start and an end
+                        value. It is used to define a continuous segment.
+                      properties:
+                        end:
+                          format: int32
+                          type: integer
+                        start:
+                          format: int32
+                          type: integer
+                      required:
+                      - end
+                      - start
+                      type: object
+                    type: array
+                type: object
               instances:
                 description: "Overrides values in default Template. \n Instance is
                   the fundamental unit managed by KubeBlocks. It represents a Pod
@@ -465,6 +495,37 @@ spec:
                       additionalProperties:
                         type: string
                       description: Defines NodeSelector to override.
+                      type: object
+                    ordinals:
+                      description: "Specifies the desired Ordinals of this InstanceTemplate.
+                        The Ordinals used to specify the ordinal of the instance (pod)
+                        names to be generated under this InstanceTemplate. \n For
+                        example, if Ordinals is {ranges: [{start: 0, end: 1}], discrete:
+                        [7]}, then the instance names generated under this InstanceTemplate
+                        would be $(cluster.name)-$(component.name)-$(template.name)-0、$(cluster.name)-$(component.name)-$(template.name)-1
+                        and $(cluster.name)-$(component.name)-$(template.name)-7"
+                      properties:
+                        discrete:
+                          items:
+                            format: int32
+                            type: integer
+                          type: array
+                        ranges:
+                          items:
+                            description: Range represents a range with a start and
+                              an end value. It is used to define a continuous segment.
+                            properties:
+                              end:
+                                format: int32
+                                type: integer
+                              start:
+                                format: int32
+                                type: integer
+                            required:
+                            - end
+                            - start
+                            type: object
+                          type: array
                       type: object
                     replicas:
                       default: 1

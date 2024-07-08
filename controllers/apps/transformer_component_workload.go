@@ -166,7 +166,10 @@ func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCt
 
 func (t *componentWorkloadTransformer) handleWorkloadUpdate(reqCtx intctrlutil.RequestCtx, dag *graph.DAG,
 	cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, obj, its *workloads.InstanceSet) error {
-	cwo := newComponentWorkloadOps(reqCtx, t.Client, cluster, synthesizeComp, obj, its, dag)
+	cwo, err := newComponentWorkloadOps(reqCtx, t.Client, cluster, synthesizeComp, obj, its, dag)
+	if err != nil {
+		return err
+	}
 
 	// handle expand volume
 	if err := cwo.expandVolume(); err != nil {
@@ -924,9 +927,15 @@ func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,
 	synthesizeComp *component.SynthesizedComponent,
 	runningITS *workloads.InstanceSet,
 	protoITS *workloads.InstanceSet,
-	dag *graph.DAG) *componentWorkloadOps {
-	compPodNames := generatePodNames(synthesizeComp)
-	itsPodNames := generatePodNamesByITS(runningITS)
+	dag *graph.DAG) (*componentWorkloadOps, error) {
+	compPodNames, err := generatePodNames(synthesizeComp)
+	if err != nil {
+		return nil, err
+	}
+	itsPodNames, err := generatePodNamesByITS(runningITS)
+	if err != nil {
+		return nil, err
+	}
 	return &componentWorkloadOps{
 		cli:                   cli,
 		reqCtx:                reqCtx,
@@ -939,5 +948,5 @@ func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,
 		runningItsPodNames:    itsPodNames,
 		desiredCompPodNameSet: sets.New(compPodNames...),
 		runningItsPodNameSet:  sets.New(itsPodNames...),
-	}
+	}, nil
 }

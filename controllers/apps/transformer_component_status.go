@@ -308,8 +308,15 @@ func (t *componentStatusTransformer) isScaleOutFailed(transCtx *componentTransfo
 	} else if status == backupStatusFailed {
 		return true, nil
 	}
-	desiredPodNames := generatePodNames(t.synthesizeComp)
-	currentPodNameSet := sets.New(generatePodNamesByITS(t.runningITS)...)
+	desiredPodNames, err := generatePodNames(t.synthesizeComp)
+	if err != nil {
+		return false, err
+	}
+	currentPodNames, err := generatePodNamesByITS(t.runningITS)
+	if err != nil {
+		return false, err
+	}
+	currentPodNameSet := sets.New(currentPodNames...)
 	for _, podName := range desiredPodNames {
 		if _, ok := currentPodNameSet[podName]; ok {
 			continue

@@ -1,5 +1,5 @@
 ---
-title: Manage Qdrant with KubeBlocks
+title: Manage Weaviate with KubeBlocks
 description: How to manage vector databases on KubeBlocks
 keywords: [weaviate, vector database, control plane]
 sidebar_position: 1
@@ -24,7 +24,7 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
    kbcli cluster create weaviate --cluster-definition=weaviate
    ```
 
-   If you want to create a Qdrant cluster with multiple replicas. Use the following command and set the replica numbers.
+   If you want to create a Weaviate cluster with multiple replicas. Use the following command and set the replica numbers.
 
    ```bash
    kbcli cluster create weaviate --cluster-definition=weaviate --set replicas=3
@@ -70,7 +70,7 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
 
 ## Connect to a Weaviate cluster
 
-Qdrant provides both HTTP and gRPC protocols for client access on ports 6333 and 6334 respectively. Depending on where the client is, different connection options are offered to connect to the Qdrant cluster.
+Weaviate provides both HTTP and gRPC protocols for client access on ports 6333 and 6334 respectively. Depending on where the client is, different connection options are offered to connect to the Weaviate cluster.
 
 :::note
 
@@ -219,4 +219,4 @@ kbcli cluster describe weaviate
 
 ## Backup and restore
 
-The backup and restore operations for Qdrant are the same as those of other clusters and you can refer to [the backup and restore documents](./../backup-and-restore/introduction.md) for details. Remember to use `--method` parameter.
+The backup and restore operations for Weaviate are the same as those of other clusters and you can refer to [the backup and restore documents](./../backup-and-restore/introduction.md) for details. Remember to use `--method` parameter.

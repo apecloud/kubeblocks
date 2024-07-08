@@ -50,19 +50,19 @@ KubeBlocks supports creating two types of MongoDB clusters: Standalone and Repli
 Create a Standalone.
 
 ```bash
-kbcli cluster create mongodb <clustername>
+kbcli cluster create <clustername> --cluster-definition mongodb
 ```
 
 Create a ReplicatSet.
 
 ```bash
-kbcli cluster create mongodb --mode replicaset <clustername>
+kbcli cluster create <clustername> --cluster-definition mongodb --mode replicaset 
 ```
 
 If you only have one node for deploying a ReplicaSet, set the `availability-policy` as `none` when creating a ReplicaSet.
 
 ```bash
-kbcli cluster create mongodb --mode replicaset --availability-policy none <clustername>
+kbcli cluster create <clustername> --cluster-definition mongodb --mode replicaset --availability-policy none
 ```
 
 If you want to specify a cluster version, you can first view the available versions and use `--version` to specify a version.
@@ -70,7 +70,7 @@ If you want to specify a cluster version, you can first view the available versi
 ```bash
 kbcli clusterversion list
 
-kbcli cluster create mongodb <clustername> --version mongodb-6.0
+kbcli cluster create <clustername> --cluster-definition mongodb --version mongodb-6.0
 ```
 
 :::note
@@ -79,7 +79,7 @@ kbcli cluster create mongodb <clustername> --version mongodb-6.0
 * View more flags for creating a MongoDB cluster to create a cluster with customized specifications.
 
   ```bash
-  kbcli cluster create mongodb --help
+  kbcli cluster create --help
   ```
 
 :::

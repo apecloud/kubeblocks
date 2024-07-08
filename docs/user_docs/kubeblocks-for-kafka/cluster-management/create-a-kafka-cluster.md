@@ -38,7 +38,7 @@ This document shows how to create a Kafka cluster.
 The cluster creation command is simply `kbcli cluster create`. Further, you can customize your cluster resources as demanded by using the `--set` flag.
 
 ```bash
-kbcli cluster create kafka
+kbcli cluster create kafka --cluster-definition kafka
 ```
 
 See the table below for detailed descriptions of customizable parameters, setting the `--termination-policy` is necessary, and you are strongly recommended to turn on the monitor and enable all logs.

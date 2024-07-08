@@ -6,9 +6,6 @@ sidebar_position: 2
 sidebar_label: ApeCloud MySQL Proxy Cluster
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 # ApeCloud MySQL Proxy
 
 ## Before you start
@@ -106,22 +103,9 @@ It is recommended to use kbcli to create an ApeCloud MySQL Proxy Cluster.
 
 As its name suggests, ApeCloud MySQL Proxy in nature is a database proxy. An ApeCloud MySQL RaftGroup Cluster can be switched to an ApeCloud MySQL Proxy Cluster by setting `proxyEnabled=true`.
 
-<Tabs>
-<TabItem value="kbcli" label="kbcli" default>
-
-Coming soon...
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
-
 ```bash
 helm upgrade mycluster kubeblocks/apecloud-mysql-cluster --set mode=raftGroup,proxyEnabled=true
 ```
-
-</TabItem>
-
-</Tabs>
 
 ## Connect Proxy Cluster
 

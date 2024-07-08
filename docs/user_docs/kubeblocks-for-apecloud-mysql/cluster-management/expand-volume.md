@@ -47,8 +47,8 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    ```bash
    kbcli cluster list mysql-cluster
    >
-   NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS                 CREATED-TIME
-   mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30          Delete                    VolumeExpanding        Jan 29,2023 14:35 UTC+0800
+   NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS          CREATED-TIME
+   mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30          Delete                    Updating        Jan 29,2023 14:35 UTC+0800
    ```
 
    * STATUS=Updating: it means the volume expansion is in progress.

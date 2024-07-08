@@ -53,19 +53,19 @@ KubeBlocks supports creating two types of Redis clusters: Standalone and Replica
 Create a Standalone.
 
 ```bash
-kbcli cluster create redis --mode standalone <clustername>
+kbcli cluster create --cluster-definition redis --mode standalone <clustername>
 ```
 
 Create a Replication Cluster.
 
 ```bash
-kbcli cluster create redis --mode replication <clustername>
+kbcli cluster create --cluster-definition redis --mode replication <clustername>
 ```
 
 If you only have one node for deploying a Replication, set the `availability-policy` as `none` when creating a Replication Cluster.
 
 ```bash
-kbcli cluster create redis --mode replication --availability-policy none <clustername>
+kbcli cluster create --cluster-definition redis --mode replication --availability-policy none <clustername>
 ```
 
 If you want to specify a cluster version, you can first view the available versions and use `--version` to specify a version.
@@ -73,7 +73,7 @@ If you want to specify a cluster version, you can first view the available versi
 ```bash
 kbcli clusterversion list
 
-kbcli cluster create redis <clustername> --version redis-7.2.4
+kbcli cluster create --cluster-definition redis --version redis-7.2.4 <clustername>
 ```
 
 :::note
@@ -82,7 +82,7 @@ kbcli cluster create redis <clustername> --version redis-7.2.4
 * View more flags for creating a Redis cluster to create a cluster with customized specifications.
 
   ```bash
-  kbcli cluster create redis --help
+  kbcli cluster create --help
   ```
 
 :::

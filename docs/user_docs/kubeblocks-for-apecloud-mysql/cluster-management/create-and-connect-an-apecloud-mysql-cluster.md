@@ -51,19 +51,19 @@ KubeBlocks supports creating two types of MySQL clusters: Standalone and RaftGro
 Create a Standalone.
 
 ```bash
-kbcli cluster create mysql <clustername>
+kbcli cluster create <clustername> --cluster-definition apecloud-mysql
 ```
 
 Create a RaftGroup Cluster.
 
 ```bash
-kbcli cluster create mysql --mode raftGroup <clustername>
+kbcli cluster create <clustername> --cluster-definition apecloud-mysql --mode raftGroup <clustername>
 ```
 
 If you only have one node for deploying a RaftGroup Cluster, set the `availability-policy` as `none` when creating a RaftGroup Cluster.
 
 ```bash
-kbcli cluster create mysql --mode raftGroup --availability-policy none <clustername>
+kbcli cluster create <clustername> --cluster-definition apecloud-mysql --mode raftGroup --availability-policy none 
 ```
 
 If you want to specify a cluster version, you can first view the available versions and use `--clusterversion` to specify a version.
@@ -71,7 +71,7 @@ If you want to specify a cluster version, you can first view the available versi
 ```bash
 kbcli clusterversion list
 
-kbcli cluster create mysql mycluster --cluster-version ac-mysql-8.0.30
+kbcli cluster create <clustername> --cluster-definition apecloud-mysql --cluster-version ac-mysql-8.0.30
 ```
 
 :::note
@@ -80,7 +80,7 @@ kbcli cluster create mysql mycluster --cluster-version ac-mysql-8.0.30
 * View more flags for creating a MySQL cluster to create a cluster with customized specifications.
   
   ```bash
-  kbcli cluster create mysql --help
+  kbcli cluster create --help
   ```
 
 :::

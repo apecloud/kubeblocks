@@ -71,7 +71,7 @@ If you want to specify a cluster version, you can first view the available versi
 ```bash
 kbcli clusterversion list
 
-kbcli cluster create mysql mycluster --cluster-version mysql-8.0.30
+kbcli cluster create mycluster --cluster-definition mysql --cluster-version mysql-8.0.30
 ```
 
 :::note

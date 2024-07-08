@@ -86,7 +86,7 @@ If you use AWS EKS, you may want to access to the Kafka cluster from EC2 instanc
 1. Set the value of `host-network-accessible` as true.
 
     ```bash
-    kbcli cluster create kafka kafka-cluster --host-network-accessible=true
+    kbcli cluster create kafka-cluster --cluster-definition kafka --host-network-accessible=true
     ```
 
 2. Get the corresponding ELB address.
@@ -120,7 +120,7 @@ The current version only supports Kafka broker with a single replica (combined: 
 1. Set the `--publicly-accessible` value as true when creating cluster.
 
     ```bash
-    kbcli cluster create kafka kafka-cluster --publicly-accessible=true
+    kbcli cluster create kafka-cluster --cluster-definition kafka --publicly-accessible=true
     ```
 
 2. Get the corresponding ELB address.

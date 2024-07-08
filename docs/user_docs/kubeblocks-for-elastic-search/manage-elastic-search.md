@@ -1,15 +1,15 @@
 ---
-title: Manage Elastic Search with KubeBlocks
-description: How to manage Elastic Search on KubeBlocks
-keywords: [qdrant, elasticsearch,weaviate]
+title: Manage Elasticsearch with KubeBlocks
+description: How to manage Elasticsearch on KubeBlocks
+keywords: [elasticsearch]
 sidebar_position: 1
-sidebar_label: Manage Vector Databases with KubeBlocks
+sidebar_label: Manage Elasticsearch Databases with KubeBlocks
 ---
-# Manage Elastic Search with KubeBlocks
+# Manage Elasticsearch with KubeBlocks
 
 Elasticsearch is a distributed, RESTful search and analytics engine that is capable of solving an ever-growing number of use cases. As the heart of the Elastic Stack, Elasticsearch stores your data centrally, allowing you to search it quickly, tune relevancy, perform sophisticated analytics, and easily scale.
 
-KubeBlocks supports the management of Elastic Search.
+KubeBlocks supports the management of Elasticsearch.
 
 Before you start, [install kbcli](./../installation/install-with-kbcli/install-kbcli.md) and [install KubeBlocks](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md).
 
@@ -23,7 +23,7 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
    kbcli cluster create elasticsearch --cluster-definition=elasticsearch
    ```
 
-   If you want to create a Elastic Search cluster with multiple replicas. Use the following command and set the replica numbers.
+   If you want to create a Elasticsearch cluster with multiple replicas. Use the following command and set the replica numbers.
 
    ```bash
    kbcli cluster create elasticsearch --cluster-definition=elasticsearch --set replicas=3
@@ -34,7 +34,7 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
    ```bash
    kbcli cluster list
    >
-   NAME     NAMESPACE   CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    CREATED-TIME
+   NAME            NAMESPACE   CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    CREATED-TIME
    elasticsearch   default     elasticsearch        elasticsearch-8.8.2   Delete               Creating          Jul 05,2024 16:51 UTC+0800   
    ```
 
@@ -91,9 +91,9 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
     Show cluster events: kbcli cluster list-events -n default elasticsearch
    ```
 
-## Connect to a elasticsearch cluster
+## Connect to a Elasticsearch cluster
 
-Elastic search provides both HTTP and gRPC protocols for client access on ports 6333 and 6334 respectively. Depending on where the client is, different connection options are offered to connect to the Qdrant cluster.
+Elasticsearch provides both HTTP and gRPC protocols for client access on ports 6333 and 6334 respectively. Depending on where the client is, different connection options are offered to connect to the Qdrant cluster.
 
 :::note
 
@@ -105,7 +105,7 @@ If your cluster is on AWS, install the AWS Load Balancer Controller first.
 - If your client is outside the K8s cluster but in the same VPC as the server, run `kbcli cluster expose qdant --enable=true --type=vpc` to get a VPC load balancer address for the database cluster.
 - If your client is outside the VPC, run `kbcli cluster expose qdant --enable=true --type=internet` to open a public network reachable address for the database cluster.
 
-## Monitor the elasticsearch cluster
+## Monitor the Elasticsearch cluster
 
 For the testing environment, you can run the command below to open the Grafana monitor web page.
 

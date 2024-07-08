@@ -1,7 +1,7 @@
 ---
 title: Manage Vector Databases with KubeBlocks
 description: How to manage vector databases on KubeBlocks
-keywords: [qdrant, milvus,weaviate]
+keywords: [milvus, milvus,weaviate]
 sidebar_position: 1
 sidebar_label: Manage Vector Databases with KubeBlocks
 ---
@@ -91,7 +91,7 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
 
 ## Connect to a vector database cluster
 
-Qdrant provides both HTTP and gRPC protocols for client access on ports 6333 and 6334 respectively. Depending on where the client is, different connection options are offered to connect to the Qdrant cluster.
+Milvus provides both HTTP and gRPC protocols for client access on ports 6333 and 6334 respectively. Depending on where the client is, different connection options are offered to connect to the Milvus cluster.
 
 :::note
 
@@ -240,4 +240,4 @@ kbcli cluster describe milvus
 
 ## Backup and restore
 
-The backup and restore operations for Qdrant are the same as those of other clusters and you can refer to [the backup and restore documents](./../backup-and-restore/introduction.md) for details. Remember to use `--method` parameter.
+The backup and restore operations for Milvus are the same as those of other clusters and you can refer to [the backup and restore documents](./../backup-and-restore/introduction.md) for details. Remember to use `--method` parameter.

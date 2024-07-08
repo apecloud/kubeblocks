@@ -32,11 +32,9 @@ From the meta information, the cluster `mongodb-cluster` has a configuration fil
 
 You can also view the details of this configuration file and parameters.
 
-* View the details of the current configuration file.
-
-   ```bash
-   kbcli cluster describe-config mongodb-cluster --show-detail
-   ```
+```bash
+kbcli cluster describe-config mongodb-cluster --show-detail
+```
 
 ## Configure parameters
 

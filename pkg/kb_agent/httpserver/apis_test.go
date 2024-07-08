@@ -20,7 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package httpserver
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -38,18 +41,11 @@ func TestEndpoints(t *testing.T) {
 
 func TestActionHandler(t *testing.T) {
 	actionHandlerSpecs := map[string]util.HandlerSpec{
-		"success": {
-			Command: []string{"echo", "hello"},
-		},
 		"test": {
 			GPRC: map[string]string{"test": "test"},
 		},
-		"failed": {
-			TimeoutSeconds: 0,
-			Command:        nil,
-			GPRC:           nil,
-			CronJob:        nil,
-		},
+		"success": {},
+		"failed":  {},
 	}
 	actionJSON, _ := json.Marshal(actionHandlerSpecs)
 	viper.Set(constant.KBEnvActionHandlers, string(actionJSON))
@@ -59,7 +55,7 @@ func TestActionHandler(t *testing.T) {
 		reqCtx := &fasthttp.RequestCtx{}
 		reqCtx.Request.Header.SetMethod(fasthttp.MethodPost)
 		reqCtx.Request.Header.SetContentType("application/json")
-		reqCtx.Request.SetBody([]byte(`{"action":"test"`)) // Malformed JSON
+		reqCtx.Request.SetBody([]byte(`{"action":"test"`))
 		actionHandler(reqCtx)
 		assert.Equal(t, fasthttp.StatusBadRequest, reqCtx.Response.StatusCode())
 		assert.JSONEq(t, `{"errorCode":"ERR_MALFORMED_REQUEST","message":"unmarshal HTTP body failed: unexpected end of JSON input"}`, string(reqCtx.Response.Body()))
@@ -80,33 +76,53 @@ func TestActionHandler(t *testing.T) {
 		reqCtx.Request.Header.SetMethod(fasthttp.MethodPost)
 		reqCtx.Request.Header.SetContentType("application/json")
 		reqCtx.Request.SetBody([]byte(`{"action":"test"}`))
-		actionJSON, _ := json.Marshal(actionHandlerSpecs)
-		viper.Set(constant.KBEnvActionHandlers, string(actionJSON))
-		assert.Nil(t, handlers.InitHandlers())
 		actionHandler(reqCtx)
 		assert.Equal(t, fasthttp.StatusNotImplemented, reqCtx.Response.StatusCode())
 		assert.JSONEq(t, `{"errorCode":"ERR_ACTION_FAILED","message":"action exec failed: not implemented"}`, string(reqCtx.Response.Body()))
 	})
 
 	t.Run("action exec failed", func(t *testing.T) {
+		msg := "action exec failed"
 		reqCtx := &fasthttp.RequestCtx{}
 		reqCtx.Request.Header.SetMethod(fasthttp.MethodPost)
 		reqCtx.Request.Header.SetContentType("application/json")
 		reqCtx.Request.SetBody([]byte(`{"action":"failed"}`))
-		actionJSON, _ := json.Marshal(actionHandlerSpecs)
-		viper.Set(constant.KBEnvActionHandlers, string(actionJSON))
-		assert.Nil(t, handlers.InitHandlers())
+		mockHandler := &MockHandler{
+			DoFunc: func(ctx context.Context, setting util.HandlerSpec, args map[string]interface{}) (*handlers.Response, error) {
+				return nil, errors.New(msg)
+			},
+		}
+		handlers.SetDefaultHandler(mockHandler)
 		actionHandler(reqCtx)
 		assert.Equal(t, fasthttp.StatusInternalServerError, reqCtx.Response.StatusCode())
 	})
 
 	t.Run("action exec success", func(t *testing.T) {
+		msg := "action exec success"
 		reqCtx := &fasthttp.RequestCtx{}
 		reqCtx.Request.Header.SetMethod(fasthttp.MethodPost)
 		reqCtx.Request.Header.SetContentType("application/json")
 		reqCtx.Request.SetBody([]byte(`{"action":"success"}`))
+		mockHandler := &MockHandler{
+			DoFunc: func(ctx context.Context, setting util.HandlerSpec, args map[string]interface{}) (*handlers.Response, error) {
+				return &handlers.Response{Message: msg}, nil
+			},
+		}
+		handlers.SetDefaultHandler(mockHandler)
 		actionHandler(reqCtx)
 		assert.Equal(t, fasthttp.StatusOK, reqCtx.Response.StatusCode())
-		assert.JSONEq(t, `{"message":"hello\n"}`, string(reqCtx.Response.Body()))
+		expectedResponse := fmt.Sprintf(`{"message":"%s"}`, msg)
+		assert.Equal(t, expectedResponse, string(reqCtx.Response.Body()))
 	})
+}
+
+type MockHandler struct {
+	DoFunc func(ctx context.Context, setting util.HandlerSpec, args map[string]interface{}) (*handlers.Response, error)
+}
+
+func (h *MockHandler) Do(ctx context.Context, setting util.HandlerSpec, args map[string]interface{}) (*handlers.Response, error) {
+	if h.DoFunc != nil {
+		return h.DoFunc(ctx, setting, args)
+	}
+	return nil, handlers.ErrNotImplemented
 }

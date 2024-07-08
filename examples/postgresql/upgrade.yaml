@@ -1,0 +1,13 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: pg-upgrade
+  namespace: default
+spec:
+  # Specifies the name of the Cluster resource that this operation is targeting.
+  clusterName: pg-cluster
+  type: Upgrade
+  # Specifies the cluster version by specifying clusterVersionRef.
+  upgrade:
+    # A reference to the name of the ClusterVersion.
+    clusterVersionRef: postgresql-12.15.0

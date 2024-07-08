@@ -13,5 +13,4 @@ This tutorial illustrates how to create and manage a PostgreSQL cluster by `kube
 * [Cluster Management](./cluster-management/create-and-connect-a-postgresql-cluster.md)
 * [Configuration](./configuration/configuration.md)
 * [High Availability](./high-availability/high-availability.md)
-* [Migration](./migration/feature-and-limit-list-pg.md)
 * [PostgreSQL Connection Pool](./postgresql-connection-pool/postgresql-connection-pool.md)

@@ -61,8 +61,8 @@ import TabItem from '@theme/TabItem';
        ```bash
        kubectl get cluster
        >
-       NAME           CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS     AGE
-       etcd-cluster   etcd                 etcd-v3.5.6   Halt                 Runing     10s
+       NAME           CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS      AGE
+       etcd-cluster   etcd                 etcd-v3.5.6   Halt                 Running     10s
        ```
 
    5. View the service address of this etcd clsuter.

@@ -30,7 +30,7 @@ kbcli cluster list kafka-cluster
    - `--volume-claim-templates` describes the VolumeClaimTemplate names in components.
    - `--storage` describes the volume storage size.
 
-2. Validate the volume exapnsion.
+2. Validate the volume expansion.
 
    ```bash
    kbcli cluster list kafka-cluster

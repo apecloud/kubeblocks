@@ -76,7 +76,7 @@ helm install redisc xxxxx(chart remote address) --set mode=cluster --set nodePor
 
 </TabItem>
 
-<TabItem value=YAML" label="YAML">
+<TabItem value="YAML" label="YAML">
 
 ```bash
 kubectl apply -f redis-cluster-example.yaml

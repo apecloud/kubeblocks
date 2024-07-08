@@ -28,7 +28,6 @@ func TestStartNonBlocking(t *testing.T) {
 			config:    config,
 			endpoints: Endpoints(),
 		}
-		// 如果path 文件存在，删除
 		_ = os.Remove(config.UnixDomainSocket + "/kb_agent.socket")
 		err := s.StartNonBlocking()
 		assert.Nil(t, err)

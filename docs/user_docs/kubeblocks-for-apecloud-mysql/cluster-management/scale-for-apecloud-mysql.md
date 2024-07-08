@@ -1,6 +1,5 @@
 ---
-title: Scale for a MySQL cluster
-description: How to scale a MySQL cluster, horizontal scaling, vertical scaling
+title: Scale for an ApeCloudto scale a MySQL cluster, horizontal scaling, vertical scaling
 keywords: [mysql, horizontal scaling, vertical scaling]
 sidebar_position: 2
 sidebar_label: Scale

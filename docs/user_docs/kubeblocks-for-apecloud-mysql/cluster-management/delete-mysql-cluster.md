@@ -1,12 +1,12 @@
 ---
-title: Delete a MySQL Cluster
-description: How to delete a MySQL Cluster
-keywords: [mysql, delete a cluster]
+title: Delete an ApeCloud MySQL Cluster
+description: How to delete an ApeCloud MySQL Cluster
+keywords: [mysql, delete an apecloud cluster]
 sidebar_position: 7
 sidebar_label: Delete protection
 ---
 
-# Delete a MySQL Cluster
+# Delete an ApeCloud MySQL Cluster
 
 ## Termination policy
 

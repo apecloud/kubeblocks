@@ -1,12 +1,12 @@
 ---
 title: Restart MySQL cluster
-description: How to restart a MySQL cluster
+description: How to restart an ApeCloud MySQL cluster
 keywords: [mysql, restart, restart a cluster]
 sidebar_position: 4
 sidebar_label: Restart
 ---
 
-# Restart MySQL cluster
+# Restart an ApeCloud MySQL cluster
 
 You can restart all pods of the cluster. When an exception occurs in a database, you can try to restart it.
 

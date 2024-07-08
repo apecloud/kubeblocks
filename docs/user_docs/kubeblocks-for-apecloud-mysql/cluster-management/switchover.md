@@ -1,7 +1,7 @@
 ---
-title: Switch over a MySQL cluster
-description: How to switch over a MySQL cluster
-keywords: [mysql, switch over a cluster, switchover]
+title: Switch over an ApeCloud MySQL cluster
+description: How to switch over an ApeCloud MySQL cluster
+keywords: [mysql, switch over an apecloud cluster, switchover]
 sidebar_position: 6
 sidebar_label: Switchover
 ---
@@ -9,7 +9,7 @@ sidebar_label: Switchover
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Switch over a MySQL cluster
+# Switch over an ApeCloud MySQL cluster
 
 You can initiate a switchover for an ApeCloud MySQL RaftGroup by executing the kbcli or kubectl command. Then KubeBlocks switches the instance roles.
 

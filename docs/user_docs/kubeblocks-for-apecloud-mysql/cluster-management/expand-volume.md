@@ -1,6 +1,6 @@
 ---
 title: Expand volume
-description: How to expand the volume of a MySQL cluster
+description: How to expand the volume of an ApeCloud MySQL cluster
 sidebar_position: 3
 sidebar_label: Expand volume
 ---

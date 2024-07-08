@@ -1,7 +1,7 @@
 ---
-title: Create and connect to a MySQL Cluster
-description: How to create and connect to a MySQL cluster
-keywords: [mysql, create a mysql cluster, connect to a mysql cluster]
+title: Create and connect to an ApeCloud MySQL Cluster
+description: How to create and connect to an ApeCloud MySQL cluster
+keywords: [mysql, create an apecloud mysql cluster, connect to a mysql cluster]
 sidebar_position: 1
 sidebar_label: Create and connect
 ---
@@ -9,9 +9,9 @@ sidebar_label: Create and connect
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Create and connect to a MySQL cluster
+# Create and connect to an ApeCloud MySQL cluster
 
-This tutorial shows how to create and connect to a MySQL cluster.
+This tutorial shows how to create and connect to an ApeCloud MySQL cluster.
 
 ## Create a MySQL cluster
 
@@ -85,7 +85,7 @@ kbcli cluster create mysql mycluster --cluster-version ac-mysql-8.0.30
 
 :::
 
-## Connect to a MySQL Cluster
+## Connect to an ApeCloud MySQL Cluster
 
 ```bash
 kbcli cluster connect <clustername>  --namespace <name>

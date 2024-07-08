@@ -110,7 +110,7 @@ func TestActionHandler(t *testing.T) {
 	})
 
 	// TODO Possible unreachable branch
-	//t.Run("action exec empty", func(t *testing.T) {
+	//	t.Run("action exec empty", func(t *testing.T) {
 	//	reqCtx := &fasthttp.RequestCtx{}
 	//	reqCtx.Request.Header.SetMethod(fasthttp.MethodPost)
 	//	reqCtx.Request.Header.SetContentType("application/json")

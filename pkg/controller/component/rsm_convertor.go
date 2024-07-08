@@ -154,15 +154,25 @@ func AppsInstanceToWorkloadInstance(instance *appsv1alpha1.InstanceTemplate) *wo
 	if instance == nil {
 		return nil
 	}
+	var schedulingPolicy *workloads.SchedulingPolicy
+	if instance.SchedulingPolicy != nil {
+		schedulingPolicy = &workloads.SchedulingPolicy{
+			SchedulerName:             instance.SchedulingPolicy.SchedulerName,
+			NodeSelector:              instance.SchedulingPolicy.NodeSelector,
+			NodeName:                  instance.SchedulingPolicy.NodeName,
+			Affinity:                  instance.SchedulingPolicy.Affinity,
+			Tolerations:               instance.SchedulingPolicy.Tolerations,
+			TopologySpreadConstraints: instance.SchedulingPolicy.TopologySpreadConstraints,
+		}
+	}
+
 	return &workloads.InstanceTemplate{
 		Name:                 instance.Name,
 		Replicas:             instance.Replicas,
 		Annotations:          instance.Annotations,
 		Labels:               instance.Labels,
 		Image:                instance.Image,
-		NodeName:             instance.NodeName,
-		NodeSelector:         instance.NodeSelector,
-		Tolerations:          instance.Tolerations,
+		SchedulingPolicy:     schedulingPolicy,
 		Resources:            instance.Resources,
 		Env:                  instance.Env,
 		Volumes:              instance.Volumes,

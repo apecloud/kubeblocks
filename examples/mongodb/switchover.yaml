@@ -1,0 +1,16 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: mongo-switchover
+spec:
+  # Specifies the name of the Cluster resource that this operation is targeting.
+  clusterName: mongo-cluster
+  type: Switchover
+  # Lists Switchover objects, each specifying a Component to perform the switchover operation.
+  switchover:
+    # Specifies the name of the Component.
+  - componentName: mongodb
+    # Specifies the instance to become the primary or leader during a switchover operation. The value of `instanceName` can be either: 
+    # - "*" (wildcard value): - Indicates no specific instance is designated as the primary or leader.
+    # - A valid instance name (pod name)
+    instanceName: '*'

@@ -4977,8 +4977,9 @@ spec:
 
 
                         Defaults:
-                        If not specified, KubeBlocks automatically assigns a default ServiceAccount named "kb-{cluster.name}",
-                        bound to a default role installed together with KubeBlocks.
+                        To perform certain operational tasks, agent sidecars running in Pods require specific RBAC permissions.
+                        The service account will be bound to a default role named "kubeblocks-cluster-pod-role" which is installed together with KubeBlocks.
+                        If not specified, KubeBlocks automatically assigns a default ServiceAccount named "kb-{cluster.name}"
 
 
                         Future Changes:
@@ -13663,8 +13664,9 @@ spec:
 
 
                             Defaults:
-                            If not specified, KubeBlocks automatically assigns a default ServiceAccount named "kb-{cluster.name}",
-                            bound to a default role installed together with KubeBlocks.
+                            To perform certain operational tasks, agent sidecars running in Pods require specific RBAC permissions.
+                            The service account will be bound to a default role named "kubeblocks-cluster-pod-role" which is installed together with KubeBlocks.
+                            If not specified, KubeBlocks automatically assigns a default ServiceAccount named "kb-{cluster.name}"
 
 
                             Future Changes:

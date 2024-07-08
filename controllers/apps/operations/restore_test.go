@@ -124,6 +124,21 @@ var _ = Describe("Restore OpsRequest", func() {
 			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsSucceedPhase))
 		})
 		It("test restore when cluster has system Accounts", func() {
+			By("mock opsRequest.cluster with secret")
+			Expect(testapps.ChangeObj(&testCtx, backup, func(backup *dpv1alpha1.Backup) {
+				opsRes.Cluster.ResourceVersion = ""
+				passwordConfig := &appsv1alpha1.PasswordConfig{
+					Length: 29,
+				}
+				opsRes.Cluster.Spec.ComponentSpecs[0].SystemAccounts = []appsv1alpha1.ComponentSystemAccount{
+					{
+						Name:           account,
+						PasswordConfig: passwordConfig,
+						SecretRef:      nil,
+					},
+				}
+			})).Should(Succeed())
+
 			By("mock backup annotations and labels")
 			Expect(testapps.ChangeObj(&testCtx, backup, func(backup *dpv1alpha1.Backup) {
 				backup.Labels = map[string]string{
@@ -131,7 +146,6 @@ var _ = Describe("Restore OpsRequest", func() {
 					constant.KBAppComponentLabelKey: consensusComp,
 				}
 				opsRes.Cluster.ResourceVersion = ""
-
 				secretName := constant.GenerateAccountSecretName(opsRes.Cluster.Name, consensusComp, account)
 				labels := constant.GetComponentWellKnownLabels(opsRes.Cluster.Name, consensusComp)
 				secret := builder.NewSecretBuilder(opsRes.Cluster.Namespace, secretName).

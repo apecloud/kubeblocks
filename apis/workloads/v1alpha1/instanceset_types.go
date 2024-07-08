@@ -25,6 +25,19 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+// Range represents a range with a start and an end value.
+// It is used to define a continuous segment.
+type Range struct {
+	Start int32 `json:"start"`
+	End   int32 `json:"end"`
+}
+
+// Ordinals represents a combination of continuous segments and individual values.
+type Ordinals struct {
+	Ranges   []Range `json:"ranges,omitempty"`
+	Discrete []int32 `json:"discrete,omitempty"`
+}
+
 // InstanceTemplate allows customization of individual replica configurations within a Component,
 // without altering the base component template defined in ClusterComponentSpec.
 // It enables the application of distinct settings to specific instances (replicas),
@@ -49,6 +62,15 @@ type InstanceTemplate struct {
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
+
+	// Specifies the desired Ordinals of this InstanceTemplate.
+	// The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.
+	//
+	// For example, if Ordinals is {ranges: [{start: 0, end: 1}], discrete: [7]},
+	// then the instance names generated under this InstanceTemplate would be
+	// $(cluster.name)-$(component.name)-$(template.name)-0、$(cluster.name)-$(component.name)-$(template.name)-1 and
+	// $(cluster.name)-$(component.name)-$(template.name)-7
+	Ordinals Ordinals `json:"ordinals,omitempty"`
 
 	// Specifies a map of key-value pairs to be merged into the Pod's existing annotations.
 	// Existing keys will have their values overwritten, while new keys will be added to the annotations.
@@ -125,6 +147,14 @@ type InstanceSetSpec struct {
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
+
+	// Specifies the desired Ordinals of the default template.
+	// The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the default template.
+	//
+	// For example, if Ordinals is {ranges: [{start: 0, end: 1}], discrete: [7]},
+	// then the instance names generated under the default template would be
+	// $(cluster.name)-$(component.name)-0、$(cluster.name)-$(component.name)-1 and $(cluster.name)-$(component.name)-7
+	DefaultTemplateOrdinals Ordinals `json:"defaultTemplateOrdinals,omitempty"`
 
 	// Defines the minimum number of seconds a newly created pod should be ready
 	// without any of its container crashing to be considered available.
@@ -641,6 +671,10 @@ func (t *InstanceTemplate) GetReplicas() int32 {
 		return *t.Replicas
 	}
 	return defaultInstanceTemplateReplicas
+}
+
+func (t *InstanceTemplate) GetOrdinals() Ordinals {
+	return t.Ordinals
 }
 
 func init() {

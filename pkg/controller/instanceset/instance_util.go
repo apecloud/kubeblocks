@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -34,6 +35,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -49,6 +51,7 @@ import (
 type InstanceTemplate interface {
 	GetName() string
 	GetReplicas() int32
+	GetOrdinals() workloads.Ordinals
 }
 
 type instanceTemplateExt struct {
@@ -199,7 +202,14 @@ func buildInstanceName2TemplateMap(itsExt *instanceSetExt) (map[string]*instance
 	allNameTemplateMap := make(map[string]*instanceTemplateExt)
 	var instanceNameList []string
 	for _, template := range instanceTemplateList {
-		instanceNames := GenerateInstanceNamesFromTemplate(itsExt.its.Name, template.Name, template.Replicas, itsExt.its.Spec.OfflineInstances)
+		ordinalList, err := GetOrdinalListByTemplateName(itsExt.its, template.Name)
+		if err != nil {
+			return nil, err
+		}
+		instanceNames, err := GenerateInstanceNamesFromTemplate(itsExt.its.Name, template.Name, template.Replicas, itsExt.its.Spec.OfflineInstances, ordinalList)
+		if err != nil {
+			return nil, err
+		}
 		instanceNameList = append(instanceNameList, instanceNames...)
 		for _, name := range instanceNames {
 			allNameTemplateMap[name] = template
@@ -216,36 +226,53 @@ func buildInstanceName2TemplateMap(itsExt *instanceSetExt) (map[string]*instance
 	return allNameTemplateMap, nil
 }
 
-func GenerateAllInstanceNames(parentName string, replicas int32, templates []InstanceTemplate, offlineInstances []string) []string {
+func GenerateAllInstanceNames(parentName string, replicas int32, templates []InstanceTemplate, offlineInstances []string, defaultTemplateOrdinals workloads.Ordinals) ([]string, error) {
 	totalReplicas := int32(0)
 	instanceNameList := make([]string, 0)
 	for _, template := range templates {
 		replicas := template.GetReplicas()
-		names := GenerateInstanceNamesFromTemplate(parentName, template.GetName(), replicas, offlineInstances)
+		ordinalList, err := ConvertOrdinalsToSortedList(template.GetOrdinals())
+		if err != nil {
+			return nil, err
+		}
+		names, err := GenerateInstanceNamesFromTemplate(parentName, template.GetName(), replicas, offlineInstances, ordinalList)
+		if err != nil {
+			return nil, err
+		}
 		instanceNameList = append(instanceNameList, names...)
 		totalReplicas += replicas
 	}
 	if totalReplicas < replicas {
-		names := GenerateInstanceNamesFromTemplate(parentName, "", replicas-totalReplicas, offlineInstances)
+		ordinalList, err := ConvertOrdinalsToSortedList(defaultTemplateOrdinals)
+		if err != nil {
+			return nil, err
+		}
+		names, err := GenerateInstanceNamesFromTemplate(parentName, "", replicas-totalReplicas, offlineInstances, ordinalList)
+		if err != nil {
+			return nil, err
+		}
 		instanceNameList = append(instanceNameList, names...)
 	}
 	getNameNOrdinalFunc := func(i int) (string, int) {
 		return ParseParentNameAndOrdinal(instanceNameList[i])
 	}
 	baseSort(instanceNameList, getNameNOrdinalFunc, nil, true)
-	return instanceNameList
+	return instanceNameList, nil
 }
 
-func GenerateInstanceNamesFromTemplate(parentName, templateName string, replicas int32, offlineInstances []string) []string {
-	instanceNames, _ := GenerateInstanceNames(parentName, templateName, replicas, 0, offlineInstances)
-	return instanceNames
+func GenerateInstanceNamesFromTemplate(parentName, templateName string, replicas int32, offlineInstances []string, ordinalList []int32) ([]string, error) {
+	instanceNames, err := GenerateInstanceNames(parentName, templateName, replicas, 0, offlineInstances, ordinalList)
+	return instanceNames, err
 }
 
 // GenerateInstanceNames generates instance names based on certain rules:
 // The naming convention for instances (pods) based on the Parent Name, InstanceTemplate Name, and ordinal.
 // The constructed instance name follows the pattern: $(parent.name)-$(template.name)-$(ordinal).
 func GenerateInstanceNames(parentName, templateName string,
-	replicas int32, ordinal int32, offlineInstances []string) ([]string, int32) {
+	replicas int32, ordinal int32, offlineInstances []string, ordinalList []int32) ([]string, error) {
+	if len(ordinalList) > 0 {
+		return GenerateInstanceNamesWithOrdinalList(parentName, templateName, replicas, offlineInstances, ordinalList)
+	}
 	usedNames := sets.New(offlineInstances...)
 	var instanceNameList []string
 	for count := int32(0); count < replicas; count++ {
@@ -263,7 +290,74 @@ func GenerateInstanceNames(parentName, templateName string,
 			}
 		}
 	}
-	return instanceNameList, ordinal
+	return instanceNameList, nil
+}
+
+// GenerateInstanceNamesWithOrdinalList generates instance names based on ordinalList and offlineInstances.
+func GenerateInstanceNamesWithOrdinalList(parentName, templateName string,
+	replicas int32, offlineInstances []string, ordinalList []int32) ([]string, error) {
+	var instanceNameList []string
+	usedNames := sets.New(offlineInstances...)
+	for _, ordinal := range ordinalList {
+		var name string
+		if len(templateName) == 0 {
+			name = fmt.Sprintf("%s-%d", parentName, ordinal)
+		} else {
+			name = fmt.Sprintf("%s-%s-%d", parentName, templateName, ordinal)
+		}
+		if usedNames.Has(name) {
+			continue
+		}
+		instanceNameList = append(instanceNameList, name)
+	}
+	if int32(len(instanceNameList)) != replicas {
+		errorMessage := fmt.Sprintf("for template '%s', expected %d instance names but generated %d: [%s]",
+			templateName, replicas, len(instanceNameList), strings.Join(instanceNameList, ", "))
+		return instanceNameList, fmt.Errorf(errorMessage)
+	}
+	return instanceNameList, nil
+}
+
+func GetOrdinalListByTemplateName(its *workloads.InstanceSet, templateName string) ([]int32, error) {
+	ordinals, err := GetOrdinalsByTemplateName(its, templateName)
+	if err != nil {
+		return nil, err
+	}
+	return ConvertOrdinalsToSortedList(ordinals)
+}
+
+func GetOrdinalsByTemplateName(its *workloads.InstanceSet, templateName string) (workloads.Ordinals, error) {
+	if templateName == "" {
+		return its.Spec.DefaultTemplateOrdinals, nil
+	}
+	for _, template := range its.Spec.Instances {
+		if template.Name == templateName {
+			return template.Ordinals, nil
+		}
+	}
+	return workloads.Ordinals{}, fmt.Errorf("template %s not found", templateName)
+}
+
+func ConvertOrdinalsToSortedList(ordinals workloads.Ordinals) ([]int32, error) {
+	ordinalList := sets.New(ordinals.Discrete...)
+	for _, item := range ordinals.Ranges {
+		start := item.Start
+		end := item.End
+
+		if start > end {
+			return nil, fmt.Errorf("range's end(%v) must >= start(%v)", end, start)
+		}
+
+		for ordinal := start; ordinal <= end; ordinal++ {
+			if ordinalList.Has(ordinal) {
+				klog.Warningf("Overlap detected: ordinal %v already exists in the ordinals", ordinal)
+			}
+			ordinalList.Insert(ordinal)
+		}
+	}
+	sortedOrdinalList := ordinalList.UnsortedList()
+	slices.Sort(sortedOrdinalList)
+	return sortedOrdinalList, nil
 }
 
 func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent *workloads.InstanceSet, revision string) (*instance, error) {
@@ -467,6 +561,19 @@ func validateSpec(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) err
 	// sum of spec.templates[*].replicas should not greater than spec.replicas
 	if replicasInTemplates > *its.Spec.Replicas {
 		err = fmt.Errorf("total replicas in instances(%d) should not greater than replicas in spec(%d)", replicasInTemplates, *its.Spec.Replicas)
+		if tree != nil {
+			tree.EventRecorder.Event(its, corev1.EventTypeWarning, EventReasonInvalidSpec, err.Error())
+		}
+		return err
+	}
+
+	// try to generate all pod names
+	var instances []InstanceTemplate
+	for i := range its.Spec.Instances {
+		instances = append(instances, &its.Spec.Instances[i])
+	}
+	_, err = GenerateAllInstanceNames(its.Name, *its.Spec.Replicas, instances, its.Spec.OfflineInstances, its.Spec.DefaultTemplateOrdinals)
+	if err != nil {
 		if tree != nil {
 			tree.EventRecorder.Event(its, corev1.EventTypeWarning, EventReasonInvalidSpec, err.Error())
 		}

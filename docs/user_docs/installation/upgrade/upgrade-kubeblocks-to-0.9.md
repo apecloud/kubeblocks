@@ -19,7 +19,7 @@ Execute `kbcli version` to check the current KubeBlocks version you are running,
 
 :::
 
-## Compatability
+## Compatibility
 
 KubeBlocks 0.9 is compatible with KubeBlocks 0.8 APIs, but compatibility with APIs from versions prior to v0.8 is not guaranteed. If you are using addons from KubeBlocks 0.7 or earlier (v0.7., 0.6., etc), DO [upgrade KubeBlocks and all addons to v0.8 first](./upgrade-kubeblocks-to-0.8.md) to ensure service availability before upgrading to v0.9.
 

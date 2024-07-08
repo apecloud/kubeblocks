@@ -129,7 +129,7 @@ func (cli *K8sExecClient) Request(ctx context.Context, operation, method string,
 		body := strings.ReplaceAll(string(jsonData), "'", "\\'")
 		curlCmd += fmt.Sprintf(" -d '%s'", body)
 	}
-	cmd := []string{"sh", "-c", curlCmd}
+	cmd := []string{"sh", "-c", "PATH=/kubeblocks:$PATH " + curlCmd}
 
 	// redirect output to strBuffer to be parsed later
 	if err = cli.k8sExec(cmd, &strBuffer, &errBuffer); err != nil {

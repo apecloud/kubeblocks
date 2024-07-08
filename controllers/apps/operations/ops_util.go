@@ -268,8 +268,8 @@ func abortEarlierOpsRequestWithSameKind(reqCtx intctrlutil.RequestCtx,
 			// abort the opsRequest that matches the abort condition.
 			patch := client.MergeFrom(earlierOps.DeepCopy())
 			earlierOps.Status.Phase = appsv1alpha1.OpsAbortedPhase
-			abortedCondition := appsv1alpha1.NewAbortedCondition(earlierOps)
-			earlierOps.SetStatusCondition(abortedCondition)
+			abortedCondition := appsv1alpha1.NewAbortedCondition(fmt.Sprintf(`Aborted as a result of the latest opsRequest "%s" being overridden`, earlierOps.Name))
+			earlierOps.SetStatusCondition(*abortedCondition)
 			earlierOps.Status.CompletionTimestamp = metav1.Time{Time: time.Now()}
 			if err = cli.Status().Patch(reqCtx.Ctx, earlierOps, patch); err != nil {
 				return err

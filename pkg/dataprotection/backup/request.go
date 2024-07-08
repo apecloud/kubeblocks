@@ -418,7 +418,7 @@ func (r *Request) BuildJobActionPodSpec(targetPod *corev1.Pod,
 	}
 
 	if r.ActionSet != nil {
-		container.EnvFrom = r.ActionSet.Spec.EnvFrom
+		container.EnvFrom = append(container.EnvFrom, r.ActionSet.Spec.EnvFrom...)
 	}
 
 	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)

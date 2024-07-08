@@ -103,7 +103,7 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	}
 	if runningITS != nil {
 		*protoITS.Spec.Selector = *runningITS.Spec.Selector
-		protoITS.Spec.Template.Labels = runningITS.Spec.Template.Labels
+		protoITS.Spec.Template.Labels = intctrlutil.MergeMetadataMaps(runningITS.Spec.Template.Labels, synthesizeComp.UserDefinedLabels)
 	}
 	transCtx.ProtoWorkload = protoITS
 
@@ -156,16 +156,15 @@ func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCt
 		cli.Update(dag, nil, objCopy, &model.ReplaceIfExistingOption{})
 	}
 
-	// to work around that the scaled PVC will be deleted at object action.
-	if err := updateVolumes(reqCtx, t.Client, synthesizeComp, runningITS, dag); err != nil {
-		return err
-	}
 	return nil
 }
 
 func (t *componentWorkloadTransformer) handleWorkloadUpdate(reqCtx intctrlutil.RequestCtx, dag *graph.DAG,
 	cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, obj, its *workloads.InstanceSet) error {
-	cwo := newComponentWorkloadOps(reqCtx, t.Client, cluster, synthesizeComp, obj, its, dag)
+	cwo, err := newComponentWorkloadOps(reqCtx, t.Client, cluster, synthesizeComp, obj, its, dag)
+	if err != nil {
+		return err
+	}
 
 	// handle expand volume
 	if err := cwo.expandVolume(); err != nil {
@@ -176,8 +175,6 @@ func (t *componentWorkloadTransformer) handleWorkloadUpdate(reqCtx intctrlutil.R
 	if err := cwo.horizontalScale(); err != nil {
 		return err
 	}
-
-	// dag = cwo.dag
 
 	return nil
 }
@@ -860,31 +857,6 @@ func (r *componentWorkloadOps) buildProtoITSWorkloadVertex() *model.ObjectVertex
 	return nil
 }
 
-func updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, synthesizeComp *component.SynthesizedComponent,
-	itsObj *workloads.InstanceSet, dag *graph.DAG) error {
-	graphCli := model.NewGraphClient(cli)
-
-	// PVCs which have been added to the dag because of volume expansion.
-	pvcNameSet := sets.New[string]()
-	for _, obj := range graphCli.FindAll(dag, &corev1.PersistentVolumeClaim{}) {
-		pvcNameSet.Insert(obj.GetName())
-	}
-
-	for _, vct := range synthesizeComp.VolumeClaimTemplates {
-		pvcs, err := getRunningVolumes(reqCtx.Ctx, cli, synthesizeComp, itsObj, vct.Name)
-		if err != nil {
-			return err
-		}
-		for _, pvc := range pvcs {
-			if pvcNameSet.Has(pvc.Name) {
-				continue
-			}
-			graphCli.Noop(dag, pvc)
-		}
-	}
-	return nil
-}
-
 func getRunningVolumes(ctx context.Context, cli client.Client, synthesizedComp *component.SynthesizedComponent,
 	itsObj *workloads.InstanceSet, vctName string) ([]*corev1.PersistentVolumeClaim, error) {
 	pvcs, err := component.ListOwnedPVCs(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
@@ -920,9 +892,15 @@ func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,
 	synthesizeComp *component.SynthesizedComponent,
 	runningITS *workloads.InstanceSet,
 	protoITS *workloads.InstanceSet,
-	dag *graph.DAG) *componentWorkloadOps {
-	compPodNames := generatePodNames(synthesizeComp)
-	itsPodNames := generatePodNamesByITS(runningITS)
+	dag *graph.DAG) (*componentWorkloadOps, error) {
+	compPodNames, err := generatePodNames(synthesizeComp)
+	if err != nil {
+		return nil, err
+	}
+	itsPodNames, err := generatePodNamesByITS(runningITS)
+	if err != nil {
+		return nil, err
+	}
 	return &componentWorkloadOps{
 		cli:                   cli,
 		reqCtx:                reqCtx,
@@ -935,5 +913,5 @@ func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,
 		runningItsPodNames:    itsPodNames,
 		desiredCompPodNameSet: sets.New(compPodNames...),
 		runningItsPodNameSet:  sets.New(itsPodNames...),
-	}
+	}, nil
 }

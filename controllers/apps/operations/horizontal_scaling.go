@@ -102,16 +102,22 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 		lastCompConfiguration := opsRes.OpsRequest.Status.LastConfiguration.Components[obj.GetComponentName()]
 		if horizontalScaling.ScaleIn != nil && len(horizontalScaling.ScaleIn.OnlineInstancesToOffline) > 0 {
 			// check if the instances are online.
-			currPodSet := intctrlcomp.GenerateAllPodNamesToSet(*lastCompConfiguration.Replicas, lastCompConfiguration.Instances, lastCompConfiguration.OfflineInstances,
+			currPodSet, err := intctrlcomp.GenerateAllPodNamesToSet(*lastCompConfiguration.Replicas, lastCompConfiguration.Instances, lastCompConfiguration.OfflineInstances,
 				opsRes.Cluster.Name, obj.GetComponentName())
+			if err != nil {
+				return err
+			}
 			for _, onlineIns := range horizontalScaling.ScaleIn.OnlineInstancesToOffline {
 				if _, ok := currPodSet[onlineIns]; !ok {
 					return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" specified in onlineInstancesToOffline is not online`, onlineIns))
 				}
 			}
 		}
-		replicas, instances, offlineInstances := hs.getExpectedCompValues(opsRes, compSpec.DeepCopy(),
+		replicas, instances, offlineInstances, err := hs.getExpectedCompValues(opsRes, compSpec.DeepCopy(),
 			lastCompConfiguration, horizontalScaling)
+		if err != nil {
+			return err
+		}
 		var insReplicas int32
 		for _, v := range instances {
 			insReplicas += v.GetReplicas()
@@ -142,7 +148,11 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.Request
 		compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
 		lastCompConfiguration := opsRes.OpsRequest.Status.LastConfiguration.Components[pgRes.compOps.GetComponentName()]
 		horizontalScaling := pgRes.compOps.(appsv1alpha1.HorizontalScaling)
-		pgRes.createdPodSet, pgRes.deletedPodSet = hs.getCreateAndDeletePodSet(opsRes, lastCompConfiguration, *pgRes.clusterComponent, horizontalScaling, pgRes.fullComponentName)
+		var err error
+		pgRes.createdPodSet, pgRes.deletedPodSet, err = hs.getCreateAndDeletePodSet(opsRes, lastCompConfiguration, *pgRes.clusterComponent, horizontalScaling, pgRes.fullComponentName)
+		if err != nil {
+			return 0, 0, err
+		}
 		pgRes.noWaitComponentCompleted = true
 		return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
 	}
@@ -170,13 +180,22 @@ func (hs horizontalScalingOpsHandler) getCreateAndDeletePodSet(opsRes *OpsResour
 	lastCompConfiguration appsv1alpha1.LastComponentConfiguration,
 	currCompSpec appsv1alpha1.ClusterComponentSpec,
 	horizontalScaling appsv1alpha1.HorizontalScaling,
-	fullCompName string) (map[string]string, map[string]string) {
+	fullCompName string) (map[string]string, map[string]string, error) {
 	clusterName := opsRes.Cluster.Name
-	lastPodSet := intctrlcomp.GenerateAllPodNamesToSet(*lastCompConfiguration.Replicas,
+	lastPodSet, err := intctrlcomp.GenerateAllPodNamesToSet(*lastCompConfiguration.Replicas,
 		lastCompConfiguration.Instances, lastCompConfiguration.OfflineInstances, clusterName, fullCompName)
-	expectReplicas, expectInstanceTpls, expectOfflineInstances := hs.getExpectedCompValues(opsRes, &currCompSpec, lastCompConfiguration, horizontalScaling)
-	currPodSet := intctrlcomp.GenerateAllPodNamesToSet(expectReplicas, expectInstanceTpls,
+	if err != nil {
+		return nil, nil, err
+	}
+	expectReplicas, expectInstanceTpls, expectOfflineInstances, err := hs.getExpectedCompValues(opsRes, &currCompSpec, lastCompConfiguration, horizontalScaling)
+	if err != nil {
+		return nil, nil, err
+	}
+	currPodSet, err := intctrlcomp.GenerateAllPodNamesToSet(expectReplicas, expectInstanceTpls,
 		expectOfflineInstances, clusterName, fullCompName)
+	if err != nil {
+		return nil, nil, err
+	}
 	createPodSet := map[string]string{}
 	deletePodSet := map[string]string{}
 	for k := range currPodSet {
@@ -191,9 +210,9 @@ func (hs horizontalScalingOpsHandler) getCreateAndDeletePodSet(opsRes *OpsResour
 	}
 	if opsRes.OpsRequest.Status.Phase == appsv1alpha1.OpsCancellingPhase {
 		// when cancelling this opsRequest, revert the changes.
-		return deletePodSet, createPodSet
+		return deletePodSet, createPodSet, nil
 	}
-	return createPodSet, deletePodSet
+	return createPodSet, deletePodSet, nil
 }
 
 // Cancel this function defines the cancel horizontalScaling action.
@@ -241,14 +260,24 @@ func (hs horizontalScalingOpsHandler) Cancel(reqCtx intctrlutil.RequestCtx, cli 
 // checkIntersectionWithEarlierOps checks if the pod deleted by the current ops is a pod created by another ops
 func (hs horizontalScalingOpsHandler) checkIntersectionWithEarlierOps(opsRes *OpsResource, earlierOps *appsv1alpha1.OpsRequest,
 	currOpsHScaling, earlierOpsHScaling appsv1alpha1.HorizontalScaling) error {
-	getCreatedOrDeletedPodSet := func(ops *appsv1alpha1.OpsRequest, hScaling appsv1alpha1.HorizontalScaling) (map[string]string, map[string]string) {
+	getCreatedOrDeletedPodSet := func(ops *appsv1alpha1.OpsRequest, hScaling appsv1alpha1.HorizontalScaling) (map[string]string, map[string]string, error) {
 		lastCompSnapshot := ops.Status.LastConfiguration.Components[earlierOpsHScaling.ComponentName]
 		compSpec := getComponentSpecOrShardingTemplate(opsRes.Cluster, earlierOpsHScaling.ComponentName).DeepCopy()
-		compSpec.Replicas, compSpec.Instances, compSpec.OfflineInstances = hs.getExpectedCompValues(opsRes, compSpec, lastCompSnapshot, hScaling)
+		var err error
+		compSpec.Replicas, compSpec.Instances, compSpec.OfflineInstances, err = hs.getExpectedCompValues(opsRes, compSpec, lastCompSnapshot, hScaling)
+		if err != nil {
+			return nil, nil, err
+		}
 		return hs.getCreateAndDeletePodSet(opsRes, lastCompSnapshot, *compSpec, hScaling, hScaling.ComponentName)
 	}
-	createdPodSetForEarlier, _ := getCreatedOrDeletedPodSet(earlierOps, earlierOpsHScaling)
-	_, deletedPodSetForCurrent := getCreatedOrDeletedPodSet(opsRes.OpsRequest, currOpsHScaling)
+	createdPodSetForEarlier, _, err := getCreatedOrDeletedPodSet(earlierOps, earlierOpsHScaling)
+	if err != nil {
+		return err
+	}
+	_, deletedPodSetForCurrent, err := getCreatedOrDeletedPodSet(opsRes.OpsRequest, currOpsHScaling)
+	if err != nil {
+		return err
+	}
 	for deletedPod := range deletedPodSetForCurrent {
 		if _, ok := createdPodSetForEarlier[deletedPod]; ok {
 			errMsg := fmt.Sprintf(`instance "%s" cannot be taken offline as it has been created by another running opsRequest "%s"`,
@@ -264,7 +293,7 @@ func (hs horizontalScalingOpsHandler) getExpectedCompValues(
 	opsRes *OpsResource,
 	compSpec *appsv1alpha1.ClusterComponentSpec,
 	lastCompConfiguration appsv1alpha1.LastComponentConfiguration,
-	horizontalScaling appsv1alpha1.HorizontalScaling) (int32, []appsv1alpha1.InstanceTemplate, []string) {
+	horizontalScaling appsv1alpha1.HorizontalScaling) (int32, []appsv1alpha1.InstanceTemplate, []string, error) {
 	compReplicas := compSpec.Replicas
 	compInstanceTpls := compSpec.Instances
 	compOfflineInstances := compSpec.OfflineInstances
@@ -274,10 +303,13 @@ func (hs horizontalScalingOpsHandler) getExpectedCompValues(
 		compOfflineInstances = lastCompConfiguration.OfflineInstances
 	}
 	expectOfflineInstances := hs.getCompExpectedOfflineInstances(compOfflineInstances, horizontalScaling)
-	hs.autoSyncReplicaChanges(opsRes, horizontalScaling, compReplicas, compInstanceTpls, expectOfflineInstances)
+	err := hs.autoSyncReplicaChanges(opsRes, horizontalScaling, compReplicas, compInstanceTpls, expectOfflineInstances)
+	if err != nil {
+		return 0, nil, nil, err
+	}
 	return hs.getCompExpectReplicas(horizontalScaling, compReplicas),
 		hs.getCompExpectedInstances(compInstanceTpls, horizontalScaling),
-		expectOfflineInstances
+		expectOfflineInstances, nil
 }
 
 // autoSyncReplicaChanges auto-sync the replicaChanges of the component and instance templates.
@@ -286,7 +318,7 @@ func (hs horizontalScalingOpsHandler) autoSyncReplicaChanges(
 	horizontalScaling appsv1alpha1.HorizontalScaling,
 	compReplicas int32,
 	compInstanceTpls []appsv1alpha1.InstanceTemplate,
-	compExpectOfflineInstances []string) {
+	compExpectOfflineInstances []string) error {
 	// sync the replicaChanges for component and instance template.
 	getSyncedInstancesAndReplicaChanges := func(offlineOrOnlineInsCountMap map[string]int32,
 		replicaChanger appsv1alpha1.ReplicaChanger,
@@ -324,8 +356,11 @@ func (hs horizontalScalingOpsHandler) autoSyncReplicaChanges(
 	scaleOut := horizontalScaling.ScaleOut
 	if scaleOut != nil {
 		// get the pod set when removing the specified instances from offlineInstances slice
-		podSet := intctrlcomp.GenerateAllPodNamesToSet(compReplicas, compInstanceTpls, compExpectOfflineInstances,
+		podSet, err := intctrlcomp.GenerateAllPodNamesToSet(compReplicas, compInstanceTpls, compExpectOfflineInstances,
 			opsRes.Cluster.Name, horizontalScaling.ComponentName)
+		if err != nil {
+			return err
+		}
 		onlineInsCountMap := map[string]int32{}
 		for _, insName := range scaleOut.OfflineInstancesToOnline {
 			if _, ok := podSet[insName]; !ok {
@@ -337,6 +372,7 @@ func (hs horizontalScalingOpsHandler) autoSyncReplicaChanges(
 		}
 		scaleOut.Instances, scaleOut.ReplicaChanges = getSyncedInstancesAndReplicaChanges(onlineInsCountMap, scaleOut.ReplicaChanger, scaleOut.NewInstances)
 	}
+	return nil
 }
 
 // getCompExpectReplicas gets the expected replicas for the component.

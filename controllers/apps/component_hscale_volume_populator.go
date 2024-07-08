@@ -74,6 +74,14 @@ func newDataClone(reqCtx intctrlutil.RequestCtx,
 	if component == nil {
 		return nil, nil
 	}
+	desiredPodNames, err := generatePodNames(component)
+	if err != nil {
+		return nil, err
+	}
+	currentPodNames, err := generatePodNamesByITS(itsObj)
+	if err != nil {
+		return nil, err
+	}
 	if component.HorizontalScalePolicy == nil {
 		return &dummyDataClone{
 			baseDataClone{
@@ -84,8 +92,8 @@ func newDataClone(reqCtx intctrlutil.RequestCtx,
 				itsObj:            itsObj,
 				itsProto:          itsProto,
 				backupKey:         backupKey,
-				desiredPodNames:   generatePodNames(component),
-				currentPodNameSet: sets.New(generatePodNamesByITS(itsObj)...),
+				desiredPodNames:   desiredPodNames,
+				currentPodNameSet: sets.New(currentPodNames...),
 			},
 		}, nil
 	}
@@ -99,8 +107,8 @@ func newDataClone(reqCtx intctrlutil.RequestCtx,
 				itsObj:            itsObj,
 				itsProto:          itsProto,
 				backupKey:         backupKey,
-				desiredPodNames:   generatePodNames(component),
-				currentPodNameSet: sets.New(generatePodNamesByITS(itsObj)...),
+				desiredPodNames:   desiredPodNames,
+				currentPodNameSet: sets.New(currentPodNames...),
 			},
 		}, nil
 	}
@@ -188,7 +196,10 @@ func (d *baseDataClone) isPVCExists(pvcKey types.NamespacedName) (bool, error) {
 }
 
 func (d *baseDataClone) checkAllPVCsExist() (bool, error) {
-	desiredPodNames := generatePodNames(d.component)
+	desiredPodNames, err := generatePodNames(d.component)
+	if err != nil {
+		return true, err
+	}
 	for _, podName := range desiredPodNames {
 		for _, vct := range d.component.VolumeClaimTemplates {
 			pvcKey := types.NamespacedName{

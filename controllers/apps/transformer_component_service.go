@@ -153,7 +153,10 @@ func (t *componentServiceTransformer) buildPodService(comp *appsv1alpha1.Compone
 }
 
 func (t *componentServiceTransformer) podsNameNOrdinal(synthesizeComp *component.SynthesizedComponent) (map[string]int, error) {
-	podNames := generatePodNames(synthesizeComp)
+	podNames, err := generatePodNames(synthesizeComp)
+	if err != nil {
+		return nil, err
+	}
 	pods := make(map[string]int)
 	for _, name := range podNames {
 		ordinal, err := func() (int, error) {
@@ -276,15 +279,15 @@ func (t *componentServiceTransformer) createOrUpdateServiceInUnique(ctx graph.Tr
 	return createOrUpdateService(ctx, dag, graphCli, service, owner)
 }
 
-func generatePodNames(synthesizeComp *component.SynthesizedComponent) []string {
+func generatePodNames(synthesizeComp *component.SynthesizedComponent) ([]string, error) {
 	return component.GenerateAllPodNames(synthesizeComp.Replicas, synthesizeComp.Instances,
 		synthesizeComp.OfflineInstances, synthesizeComp.ClusterName, synthesizeComp.Name)
 }
 
-func generatePodNamesByITS(its *workloads.InstanceSet) []string {
+func generatePodNamesByITS(its *workloads.InstanceSet) ([]string, error) {
 	var templates []instanceset.InstanceTemplate
 	for i := range its.Spec.Instances {
 		templates = append(templates, &its.Spec.Instances[i])
 	}
-	return instanceset.GenerateAllInstanceNames(its.Name, *its.Spec.Replicas, templates, its.Spec.OfflineInstances)
+	return instanceset.GenerateAllInstanceNames(its.Name, *its.Spec.Replicas, templates, its.Spec.OfflineInstances, workloads.Ordinals{})
 }

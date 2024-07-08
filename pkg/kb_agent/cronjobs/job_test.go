@@ -21,11 +21,12 @@ package cronjobs
 
 import (
 	"fmt"
+	"testing"
+	"time"
+
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 	"github.com/stretchr/testify/assert"
-	"testing"
-	"time"
 )
 
 func TestNewJob(t *testing.T) {

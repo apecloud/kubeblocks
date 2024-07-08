@@ -21,9 +21,10 @@ package handlers
 
 import (
 	"context"
+	"testing"
+
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestNewExecHandler(t *testing.T) {

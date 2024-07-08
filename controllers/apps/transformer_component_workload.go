@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -146,16 +147,30 @@ func (t *componentWorkloadTransformer) reconcileWorkload(synthesizedComp *compon
 	// build configuration template annotations to workload
 	configuration.BuildConfigTemplateAnnotations(protoITS, synthesizedComp)
 
-	// mark proto its as stopped if the component is stopped
-	if isCompStopped(synthesizedComp) {
-		t.stopWorkload(protoITS)
-	}
+	t.stopOrRestartWorkload(synthesizedComp, comp, protoITS)
 
 	return nil
 }
 
+func (t *componentWorkloadTransformer) stopOrRestartWorkload(synthesizedComp *component.SynthesizedComponent,
+	comp *appsv1alpha1.Component, protoITS *workloads.InstanceSet) {
+	switch {
+	// mark proto its as stopped if the component is stopped
+	case isCompStopped(synthesizedComp):
+		t.stopWorkload(protoITS)
+	// restart proto its
+	case isCompRestart(synthesizedComp, comp):
+		t.restartWorkload(synthesizedComp, protoITS)
+	}
+}
+
 func isCompStopped(synthesizedComp *component.SynthesizedComponent) bool {
 	return synthesizedComp.State != nil && synthesizedComp.State.Mode == appsv1alpha1.StateModeStopped
+}
+
+func isCompRestart(synthesizedComp *component.SynthesizedComponent, comp *appsv1alpha1.Component) bool {
+	return synthesizedComp.State != nil && synthesizedComp.State.Mode == appsv1alpha1.StateModeRunning &&
+		synthesizedComp.State.Generation != nil && *synthesizedComp.State.Generation > comp.Status.ObservedGeneration
 }
 
 func (t *componentWorkloadTransformer) stopWorkload(protoITS *workloads.InstanceSet) {
@@ -166,6 +181,24 @@ func (t *componentWorkloadTransformer) stopWorkload(protoITS *workloads.Instance
 		protoITS.Spec.Instances[i].Replicas = zero
 	}
 	// TODO: how about offline instances?
+}
+
+func (t *componentWorkloadTransformer) restartWorkload(synthesizedComp *component.SynthesizedComponent,
+	protoITS *workloads.InstanceSet) {
+	annotations := protoITS.Spec.Template.Annotations
+	if annotations == nil {
+		annotations = map[string]string{}
+	}
+	generation, ok := annotations[constant.RestartAnnotationKey]
+	if ok {
+		current, err := strconv.ParseInt(generation, 10, 64)
+		// skip restart if the current generation is not less than the requested
+		if err == nil && current >= *synthesizedComp.State.Generation {
+			return
+		}
+	}
+	annotations[constant.RestartAnnotationKey] = fmt.Sprintf("%d", *synthesizedComp.State.Generation)
+	protoITS.Spec.Template.Annotations = annotations
 }
 
 func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCtx, cli model.GraphClient, dag *graph.DAG,

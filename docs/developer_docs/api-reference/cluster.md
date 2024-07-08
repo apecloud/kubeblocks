@@ -19740,6 +19740,19 @@ StateMode
 <p>Represents the state mode of the object.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>generation</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents the generation of the state.
+If the generation is updated later than the previous one with Running mode, the underlying workload will be restarted.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.StateMode">StateMode

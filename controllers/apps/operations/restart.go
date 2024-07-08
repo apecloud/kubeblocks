@@ -21,12 +21,10 @@ package operations
 
 import (
 	"fmt"
-	"reflect"
 	"time"
 
-	appv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -35,9 +33,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-type restartOpsHandler struct {
-	compOpsHelper componentOpsHelper
-}
+type restartOpsHandler struct{}
 
 var _ OpsHandler = restartOpsHandler{}
 
@@ -71,32 +67,39 @@ func (r restartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		}); err != nil {
 		return err
 	}
-	r.compOpsHelper = newComponentOpsHelper(opsRes.OpsRequest.Spec.RestartList)
-	componentKindList := []client.ObjectList{
-		&appv1.StatefulSetList{},
-		&workloads.InstanceSetList{},
+
+	match := func(compName string) *appsv1alpha1.ClusterComponentSpec {
+		for i, spec := range opsRes.Cluster.Spec.ComponentSpecs {
+			if spec.Name == compName {
+				return &opsRes.Cluster.Spec.ComponentSpecs[i]
+			}
+		}
+		for i, spec := range opsRes.Cluster.Spec.ShardingSpecs {
+			if spec.Name == compName {
+				return &opsRes.Cluster.Spec.ShardingSpecs[i].Template
+			}
+		}
+		return nil
 	}
-	for _, objectList := range componentKindList {
-		if err := r.restartComponent(reqCtx, cli, opsRes, objectList); err != nil {
-			return err
+	restart := func(spec *appsv1alpha1.ClusterComponentSpec) {
+		spec.State = &appsv1alpha1.State{
+			Mode:       appsv1alpha1.StateModeRunning,
+			Generation: func() *int64 { g := opsRes.Cluster.Generation + 1; return &g }(),
 		}
 	}
-	return nil
+	for _, comp := range opsRes.OpsRequest.Spec.RestartList {
+		if spec := match(comp.ComponentName); spec != nil {
+			restart(spec)
+		}
+	}
+	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
 }
 
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for restart opsRequest.
 func (r restartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
-	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.RestartList)
-	handleRestartProgress := func(reqCtx intctrlutil.RequestCtx,
-		cli client.Client,
-		opsRes *OpsResource,
-		pgRes *progressResource,
-		compStatus *appsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
-		return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus, r.podApplyCompOps)
-	}
-	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes,
-		"restart", handleRestartProgress)
+	helper := newComponentOpsHelper(opsRes.OpsRequest.Spec.RestartList)
+	return helper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "restart", r.progress)
 }
 
 // SaveLastConfiguration this operation only restart the pods of the component, no changes for Cluster.spec.
@@ -105,60 +108,32 @@ func (r restartOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, 
 	return nil
 }
 
-func (r restartOpsHandler) podApplyCompOps(
-	ops *appsv1alpha1.OpsRequest,
-	pod *corev1.Pod,
-	compOps ComponentOpsInterface,
-	insTemplateName string) bool {
-	return !pod.CreationTimestamp.Before(&ops.Status.StartTimestamp)
-}
-
-// restartStatefulSet restarts statefulSet workload
-func (r restartOpsHandler) restartComponent(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, objList client.ObjectList) error {
-	if err := cli.List(reqCtx.Ctx, objList,
-		client.InNamespace(opsRes.Cluster.Namespace),
-		client.MatchingLabels{constant.AppInstanceLabelKey: opsRes.Cluster.Name}); err != nil {
-		return err
+func (r restartOpsHandler) progress(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	opsRes *OpsResource,
+	pgRes *progressResource,
+	_ *appsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
+	// TODO: generation check
+	itsKey := types.NamespacedName{
+		Namespace: opsRes.Cluster.Namespace,
+		Name:      constant.GenerateWorkloadNamePattern(opsRes.Cluster.Name, pgRes.fullComponentName),
+	}
+	its := &workloads.InstanceSet{}
+	if err := cli.Get(reqCtx.Ctx, itsKey, its); err != nil {
+		return 0, 0, err
 	}
 
-	items := reflect.ValueOf(objList).Elem().FieldByName("Items")
-	l := items.Len()
-	for i := 0; i < l; i++ {
-		// get the underlying object
-		object := items.Index(i).Addr().Interface().(client.Object)
-		template := items.Index(i).FieldByName("Spec").FieldByName("Template").Addr().Interface().(*corev1.PodTemplateSpec)
-		if r.isRestarted(opsRes, object, template) {
-			continue
-		}
-		if err := cli.Update(reqCtx.Ctx, object); err != nil {
-			return err
-		}
+	if its.Spec.Replicas == nil {
+		return 0, 0, fmt.Errorf("its.spec.replicas is nil")
 	}
-	return nil
-}
+	if its.Generation != its.Status.ObservedGeneration {
+		return 0, 0, fmt.Errorf("its is still in progress, generation: %d, observed: %d", its.Generation, its.Status.ObservedGeneration)
+	}
 
-// isRestarted checks whether the component has been restarted
-func (r restartOpsHandler) isRestarted(opsRes *OpsResource, object client.Object, podTemplate *corev1.PodTemplateSpec) bool {
-	cName := object.GetLabels()[constant.KBAppComponentLabelKey]
-	shardingName := object.GetLabels()[constant.KBAppShardingNameLabelKey]
-	if shardingName != "" {
-		if _, ok := r.compOpsHelper.componentOpsSet[shardingName]; !ok {
-			return true
-		}
-	} else {
-		if _, ok := r.compOpsHelper.componentOpsSet[cName]; !ok {
-			return true
-		}
+	expected := pgRes.clusterComponent.Replicas
+	if expected != *its.Spec.Replicas {
+		return 0, 0, fmt.Errorf("its spec has not updated yet, expected: %d, actual: %d", expected, *its.Spec.Replicas)
 	}
-	if podTemplate.Annotations == nil {
-		podTemplate.Annotations = map[string]string{}
-	}
-	hasRestarted := true
-	startTimestamp := opsRes.OpsRequest.Status.StartTimestamp
-	stsRestartTimeStamp := podTemplate.Annotations[constant.RestartAnnotationKey]
-	if res, _ := time.Parse(time.RFC3339, stsRestartTimeStamp); startTimestamp.After(res) {
-		podTemplate.Annotations[constant.RestartAnnotationKey] = startTimestamp.Format(time.RFC3339)
-		hasRestarted = false
-	}
-	return hasRestarted
+	// TODO: ready?
+	return expected, its.Status.UpdatedReplicas, nil
 }

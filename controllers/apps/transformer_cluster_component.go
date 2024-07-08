@@ -192,7 +192,7 @@ func getRunningCompObject(transCtx *clusterTransformContext, cluster *appsv1alph
 // copyAndMergeComponent merges two component objects for updating:
 // 1. new a component object targetCompObj by copying from oldCompObj
 // 2. merge all fields can be updated from newCompObj into targetCompObj
-func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component) *appsv1alpha1.Component {
+func copyAndMergeComponent(cluster *appsv1alpha1.Cluster, oldCompObj, newCompObj *appsv1alpha1.Component) *appsv1alpha1.Component {
 	compObjCopy := oldCompObj.DeepCopy()
 	compProto := newCompObj
 
@@ -225,7 +225,7 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component) *apps
 	compObjCopy.Spec.OfflineInstances = compProto.Spec.OfflineInstances
 	compObjCopy.Spec.RuntimeClassName = compProto.Spec.RuntimeClassName
 	compObjCopy.Spec.DisableExporter = compProto.Spec.DisableExporter
-	compObjCopy.Spec.State = compProto.Spec.State
+	compObjCopy.Spec.State = updateCompState(cluster, compObjCopy, compProto)
 
 	if reflect.DeepEqual(oldCompObj.Annotations, compObjCopy.Annotations) &&
 		reflect.DeepEqual(oldCompObj.Labels, compObjCopy.Labels) &&
@@ -233,6 +233,33 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component) *apps
 		return nil
 	}
 	return compObjCopy
+}
+
+func updateCompState(cluster *appsv1alpha1.Cluster, running, proto *appsv1alpha1.Component) *appsv1alpha1.State {
+	state := proto.Spec.State
+	if state == nil {
+		return nil
+	}
+	if state.Mode != appsv1alpha1.StateModeRunning || state.Generation == nil {
+		return state
+	}
+	update := func() bool {
+		sg := *state.Generation
+		return sg > cluster.Status.ObservedGeneration
+	}
+	generation := func() *int64 {
+		if update() {
+			return func() *int64 { g := running.Generation + 1; return &g }()
+		}
+		if running.Spec.State == nil {
+			return nil
+		}
+		return running.Spec.State.Generation
+	}
+	return &appsv1alpha1.State{
+		Mode:       state.Mode,
+		Generation: generation(),
+	}
 }
 
 const (
@@ -547,7 +574,7 @@ func (h *updateCompHandler) handle(transCtx *clusterTransformContext, dag *graph
 	if buildErr != nil {
 		return buildErr
 	}
-	if newCompObj := copyAndMergeComponent(runningComp, comp); newCompObj != nil {
+	if newCompObj := copyAndMergeComponent(cluster, runningComp, comp); newCompObj != nil {
 		graphCli.Update(dag, runningComp, newCompObj)
 	}
 	return nil

@@ -5220,6 +5220,12 @@ spec:
               state:
                 description: Specifies the expected state of the Component.
                 properties:
+                  generation:
+                    description: |-
+                      Represents the generation of the state.
+                      If the generation is updated later than the previous one with Running mode, the underlying workload will be restarted.
+                    format: int64
+                    type: integer
                   state:
                     description: Represents the state mode of the object.
                     enum:

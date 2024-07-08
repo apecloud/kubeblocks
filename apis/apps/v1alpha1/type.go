@@ -344,8 +344,11 @@ type State struct {
 	// +kubebuilder:validation:Required
 	Mode StateMode `json:"state"`
 
-	//// +optional
-	// Generation *int64 `json:"generation,omitempty"`
+	// Represents the generation of the state.
+	// If the generation is updated later than the previous one with Running mode, the underlying workload will be restarted.
+	//
+	// +optional
+	Generation *int64 `json:"generation,omitempty"`
 }
 
 // OpsPhase defines opsRequest phase.

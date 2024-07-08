@@ -32,7 +32,6 @@ import (
 )
 
 var _ = Describe("Restart OpsRequest", func() {
-
 	var (
 		randomStr             = testCtx.GetRandomStr()
 		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr

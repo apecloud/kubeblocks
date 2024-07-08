@@ -64,16 +64,6 @@ func TestActionHandler(t *testing.T) {
 		assert.JSONEq(t, `{"errorCode":"ERR_MALFORMED_REQUEST","message":"unmarshal HTTP body failed: unexpected end of JSON input"}`, string(reqCtx.Response.Body()))
 	})
 
-	//t.Run("marshal request data field", func(t *testing.T) {
-	//	reqCtx := &fasthttp.RequestCtx{}
-	//	reqCtx.Request.Header.SetMethod(fasthttp.MethodPost)
-	//	reqCtx.Request.Header.SetContentType("application/json")
-	//	reqCtx.Request.SetBody([]byte(`{"data":}`))
-	//	actionHandler(reqCtx)
-	//	assert.Equal(t, fasthttp.StatusInternalServerError, reqCtx.Response.StatusCode())
-	//	assert.JSONEq(t, `{"errorCode":"ERR_MALFORMED_REQUEST_DATA","message":"marshal request data field: json: unsupported type: func()"}`, string(reqCtx.Response.Body()))
-	//})
-
 	t.Run("no action in request", func(t *testing.T) {
 		reqCtx := &fasthttp.RequestCtx{}
 		reqCtx.Request.Header.SetMethod(fasthttp.MethodPost)
@@ -108,25 +98,6 @@ func TestActionHandler(t *testing.T) {
 		actionHandler(reqCtx)
 		assert.Equal(t, fasthttp.StatusInternalServerError, reqCtx.Response.StatusCode())
 	})
-
-	// TODO Possible unreachable branch
-	//	t.Run("action exec empty", func(t *testing.T) {
-	//	reqCtx := &fasthttp.RequestCtx{}
-	//	reqCtx.Request.Header.SetMethod(fasthttp.MethodPost)
-	//	reqCtx.Request.Header.SetContentType("application/json")
-	//	reqCtx.Request.SetBody([]byte(`{"action":"empty"}`))
-	//	actionHandlerSpecs := map[string]util.HandlerSpec{
-	//		"empty": {
-	//			Command: []string{},
-	//		},
-	//	}
-	//	actionJSON, _ := json.Marshal(actionHandlerSpecs)
-	//	viper.Set(constant.KBEnvActionHandlers, string(actionJSON))
-	//	assert.Nil(t, handlers.InitHandlers())
-	//	actionHandler(reqCtx)
-	//	assert.Equal(t, fasthttp.StatusNoContent, reqCtx.Response.StatusCode())
-	//	assert.JSONEq(t, `null`, string(reqCtx.Response.Body()))
-	//})
 
 	t.Run("action exec success", func(t *testing.T) {
 		reqCtx := &fasthttp.RequestCtx{}

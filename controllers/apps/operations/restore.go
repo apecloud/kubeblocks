@@ -255,14 +255,14 @@ func (r RestoreOpsHandler) getSecretObjsFromBackup(backup *dpv1alpha1.Backup, op
 
 	newSecretList := &corev1.SecretList{}
 	for i := range secretList.Items {
-		if secretList.Items[i].Annotations == nil {
-			secretList.Items[i].Annotations = map[string]string{}
-		}
-		secretList.Items[i].Annotations[constant.RestoreFromBackupAnnotationKey] = restoreAnnotation
 		newSecret, err := r.rerenderRestoredSecretByNewCluster(&secretList.Items[i], &clusterName)
 		if err != nil {
 			return nil, err
 		}
+		if secretList.Items[i].Annotations == nil {
+			secretList.Items[i].Annotations = map[string]string{}
+		}
+		secretList.Items[i].Annotations[constant.RestoreFromBackupAnnotationKey] = restoreAnnotation
 		newSecretList.Items = append(newSecretList.Items, *newSecret)
 	}
 	return newSecretList, nil
@@ -270,7 +270,9 @@ func (r RestoreOpsHandler) getSecretObjsFromBackup(backup *dpv1alpha1.Backup, op
 
 func (r RestoreOpsHandler) rerenderRestoredSecretByNewCluster(secret *corev1.Secret, newClusterName *string) (*corev1.Secret, error) {
 	// replace cluster name
-	accountSecretPattern := `^\w+(-\w+-account-\w+$)`
+	oldClusterName := secret.Labels[constant.AppInstanceLabelKey]
+	componentName := secret.Labels[constant.KBAppComponentLabelKey]
+	accountSecretPattern := `^` + oldClusterName + `(-` + componentName + `-account-\w+$)`
 	regex, _ := regexp.Compile(accountSecretPattern)
 	if matched := regex.MatchString(secret.Name); matched {
 		secret.Name = regex.ReplaceAllString(secret.Name, *newClusterName+"${1}")

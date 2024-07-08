@@ -32,6 +32,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -74,9 +75,11 @@ var _ = Describe("Restore OpsRequest", func() {
 
 	Context("Test OpsRequest for Restore", func() {
 		var (
-			opsRes *OpsResource
-			reqCtx intctrlutil.RequestCtx
-			backup *dpv1alpha1.Backup
+			opsRes   *OpsResource
+			reqCtx   intctrlutil.RequestCtx
+			backup   *dpv1alpha1.Backup
+			account  string
+			password []byte
 		)
 		BeforeEach(func() {
 			By("init operations resources ")
@@ -88,6 +91,10 @@ var _ = Describe("Restore OpsRequest", func() {
 				SetBackupPolicyName(testdp.BackupPolicyName).
 				SetBackupMethod(testdp.VSBackupMethodName).
 				Create(&testCtx).GetObject()
+
+			By("set system account")
+			account = "test"
+			password, _ = json.Marshal("testPwd")
 
 			Expect(testapps.ChangeObjStatus(&testCtx, backup, func() {
 				backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
@@ -116,7 +123,61 @@ var _ = Describe("Restore OpsRequest", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsSucceedPhase))
 		})
+		It("test restore when cluster has system Accounts", func() {
+			By("mock backup annotations and labels")
+			Expect(testapps.ChangeObj(&testCtx, backup, func(backup *dpv1alpha1.Backup) {
+				backup.Labels = map[string]string{
+					dptypes.BackupTypeLabelKey:      string(dpv1alpha1.BackupTypeFull),
+					constant.KBAppComponentLabelKey: consensusComp,
+				}
+				opsRes.Cluster.ResourceVersion = ""
 
+				secretName := constant.GenerateAccountSecretName(opsRes.Cluster.Name, consensusComp, account)
+				labels := constant.GetComponentWellKnownLabels(opsRes.Cluster.Name, consensusComp)
+				secret := builder.NewSecretBuilder(opsRes.Cluster.Namespace, secretName).
+					AddLabelsInMap(labels).
+					AddLabels(constant.AppManagedByLabelKey, constant.AppName).
+					AddLabels(constant.AppInstanceLabelKey, opsRes.Cluster.Name).
+					AddLabels(constant.KBAppComponentLabelKey, consensusComp).
+					AddLabels(constant.ClusterAccountLabelKey, account).
+					PutData(constant.AccountNameForSecret, []byte(account)).
+					PutData(constant.AccountPasswdForSecret, password).
+					SetImmutable(true).
+					GetObject()
+				secretList := &corev1.SecretList{Items: []corev1.Secret{
+					*secret,
+				}}
+				clusterBytes, _ := json.Marshal(opsRes.Cluster)
+				secretListBytes, _ := json.Marshal(secretList)
+
+				backup.Annotations = map[string]string{
+					constant.ClusterSnapshotAnnotationKey:  string(clusterBytes),
+					constant.SecretsSnapshotAnnotationsKey: string(secretListBytes),
+				}
+			})).Should(Succeed())
+
+			By("create Restore OpsRequest")
+			opsRes.OpsRequest = createRestoreOpsObj(restoreClusterName, "restore-ops-"+randomStr, backupName)
+			// set ops phase to Pending
+			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase
+
+			By("mock restore OpsRequest is Running")
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
+
+			By("test restore action")
+			restoreHandler := RestoreOpsHandler{}
+			_ = restoreHandler.Action(reqCtx, k8sClient, opsRes)
+
+			By("the Secret should be restored correctly")
+			restoredSecretName := constant.GenerateAccountSecretName(restoreClusterName, consensusComp, account)
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: restoredSecretName, Namespace: opsRes.OpsRequest.Namespace}, func(g Gomega, restoreSecret *corev1.Secret) {
+				Expect(restoreSecret.Data[constant.AccountNameForSecret]).Should(Equal([]byte(account)))
+				Expect(restoreSecret.Data[constant.AccountPasswdForSecret]).Should(Equal(password))
+			})).Should(Succeed())
+
+		})
 		It("test if source cluster exists services", func() {
 			By("mock backup annotations and labels")
 			opsRes.Cluster.Spec.Services = []appsv1alpha1.ClusterService{

@@ -20,12 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package httpserver
 
 import (
+	"os"
+	"testing"
+
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/valyala/fasthttp"
-	"os"
-	"testing"
 )
 
 func TestNewServer(t *testing.T) {

@@ -145,7 +145,7 @@ type SharedResource struct {
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// Defines the type of the shared resource.
+	// Defines the source of the shared resource.
 	//
 	// +kubebuilder:validation:Required
 	ResourceFrom *ResourceFrom `json:"resourceFrom"`

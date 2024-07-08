@@ -9716,7 +9716,7 @@ spec:
                               resource.
                             type: string
                           resourceFrom:
-                            description: Defines the type of the shared resource.
+                            description: Defines the source of the shared resource.
                             properties:
                               systemAccountSource:
                                 description: Defines the system account that the shared

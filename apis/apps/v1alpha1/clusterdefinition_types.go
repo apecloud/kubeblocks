@@ -89,6 +89,80 @@ type ClusterDefinitionSpec struct {
 	// +kubebuilder:validation:MaxItems=128
 	// +optional
 	Topologies []ClusterTopology `json:"topologies,omitempty"`
+
+	// Defines sharding definitions for the cluster.
+	//
+	// +optional
+	ShardingDefs []ShardingDefinition `json:"shardingDefs,omitempty"`
+}
+
+type ShardingDefinition struct {
+	// Name is the unique identifier for the sharding definition.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Template is the template name or name prefix of the ComponentDefinition.
+	//
+	// +kubebuilder:validation:Required
+	Template string `json:"template"`
+
+	// Defines the upper limit of the number of shards supported by the ShardingDefinition.
+	//
+	// It defines the maximum number of sets that can be created for the Sharding.
+	// This field allows you to set a limit on the scalability of the Sharding, preventing it from exceeding a certain number of shards.
+	//
+	// This field is immutable.
+	//
+	// +optional
+	ShardsLimit *ShardsLimit `json:"shardsLimit,omitempty"`
+
+	// Defines the shared resources that can be shared across multiple components within the Sharding.
+	//
+	// +optional
+	SharedResources []SharedResource `json:"sharedResources,omitempty"`
+}
+
+// ShardsLimit defines the upper limit of the number of shards supported by the Sharding.
+//
+// +kubebuilder:validation:XValidation:rule="self.minShards >= 0 && self.maxShards <= 2048",message="the minimum and maximum limit of shards should be in the range of [0, 2048]"
+// +kubebuilder:validation:XValidation:rule="self.minShards <= self.maxShards",message="the minimum shards limit should be no greater than the maximum"
+type ShardsLimit struct {
+	// The minimum limit of shards.
+	//
+	// +kubebuilder:validation:Required
+	MinShards int32 `json:"minShards"`
+
+	// The maximum limit of shards.
+	//
+	// +kubebuilder:validation:Required
+	MaxShards int32 `json:"maxShards"`
+}
+
+type SharedResource struct {
+	// Name is the unique identifier for the shared resource.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Defines the type of the shared resource.
+	//
+	// +kubebuilder:validation:Required
+	ResourceFrom *ResourceFrom `json:"resourceFrom"`
+}
+
+type ResourceFrom struct {
+	// Defines the system account that the shared resource is derived from.
+	//
+	// +optional
+	SystemAccountSource *SystemAccountSource `json:"systemAccountSource,omitempty"`
+}
+
+type SystemAccountSource struct {
+	// The name of the system account defined in the ComponentDefinition.Spec.SystemAccounts[x].Name.
+	//
+	// +kubebuilder:validation:Required
+	AccountName string `json:"accountName"`
 }
 
 // ClusterTopology represents the definition for a specific cluster topology.
@@ -100,11 +174,18 @@ type ClusterTopology struct {
 	// +kubebuilder:validation:MaxLength=32
 	Name string `json:"name"`
 
-	// Components specifies the components in the topology.
+	// Sharding specifies the sharding configuration for the topology.
 	//
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=128
+	// +optional
+	Shardings []ClusterTopologySharding `json:"shardings"`
+
+	// Components specifies the components in the topology.
+	//
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=128
+	// +optional
 	Components []ClusterTopologyComponent `json:"components"`
 
 	// Specifies the sequence in which components within a cluster topology are
@@ -121,12 +202,36 @@ type ClusterTopology struct {
 	Default bool `json:"default,omitempty"`
 }
 
+type ClusterTopologySharding struct {
+	// Defines the unique identifier of the sharding within the cluster topology.
+	// It follows IANA Service naming rules and is used as part of the Service's DNS name.
+	// The name must start with a lowercase letter, can contain lowercase letters, numbers,
+	// and hyphens, and must end with a lowercase letter or number.
+	// The name must be unique within the Components and Shardings of the ClusterTopology.
+	//
+	// Cannot be updated once set.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=16
+	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
+	Name string `json:"name"`
+
+	// Specifies the name the ShardingDefinition defined in the ClusterDefinition.Spec.ShardingDefs[x].Name.
+	//
+	// Once set, this field cannot be updated.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=64
+	ShardingDef string `json:"shardingDef"`
+}
+
 // ClusterTopologyComponent defines a Component within a ClusterTopology.
 type ClusterTopologyComponent struct {
 	// Defines the unique identifier of the component within the cluster topology.
 	// It follows IANA Service naming rules and is used as part of the Service's DNS name.
 	// The name must start with a lowercase letter, can contain lowercase letters, numbers,
 	// and hyphens, and must end with a lowercase letter or number.
+	// The name must be unique within the Components and Shardings of the ClusterTopology.
 	//
 	// Cannot be updated once set.
 	//

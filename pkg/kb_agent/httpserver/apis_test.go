@@ -50,8 +50,8 @@ func TestActionHandler(t *testing.T) {
 			CronJob:        nil,
 		},
 	}
-	actionJson, _ := json.Marshal(actionHandlerSpecs)
-	viper.Set(constant.KBEnvActionHandlers, string(actionJson))
+	actionJSON, _ := json.Marshal(actionHandlerSpecs)
+	viper.Set(constant.KBEnvActionHandlers, string(actionJSON))
 	assert.Nil(t, handlers.InitHandlers())
 
 	t.Run("unmarshal HTTP body failed", func(t *testing.T) {
@@ -89,8 +89,8 @@ func TestActionHandler(t *testing.T) {
 		reqCtx.Request.Header.SetMethod(fasthttp.MethodPost)
 		reqCtx.Request.Header.SetContentType("application/json")
 		reqCtx.Request.SetBody([]byte(`{"action":"test"}`))
-		actionJson, _ := json.Marshal(actionHandlerSpecs)
-		viper.Set(constant.KBEnvActionHandlers, string(actionJson))
+		actionJSON, _ := json.Marshal(actionHandlerSpecs)
+		viper.Set(constant.KBEnvActionHandlers, string(actionJSON))
 		assert.Nil(t, handlers.InitHandlers())
 		actionHandler(reqCtx)
 		assert.Equal(t, fasthttp.StatusNotImplemented, reqCtx.Response.StatusCode())
@@ -102,8 +102,8 @@ func TestActionHandler(t *testing.T) {
 		reqCtx.Request.Header.SetMethod(fasthttp.MethodPost)
 		reqCtx.Request.Header.SetContentType("application/json")
 		reqCtx.Request.SetBody([]byte(`{"action":"failed"}`))
-		actionJson, _ := json.Marshal(actionHandlerSpecs)
-		viper.Set(constant.KBEnvActionHandlers, string(actionJson))
+		actionJSON, _ := json.Marshal(actionHandlerSpecs)
+		viper.Set(constant.KBEnvActionHandlers, string(actionJSON))
 		assert.Nil(t, handlers.InitHandlers())
 		actionHandler(reqCtx)
 		assert.Equal(t, fasthttp.StatusInternalServerError, reqCtx.Response.StatusCode())
@@ -120,8 +120,8 @@ func TestActionHandler(t *testing.T) {
 	//			Command: []string{},
 	//		},
 	//	}
-	//	actionJson, _ := json.Marshal(actionHandlerSpecs)
-	//	viper.Set(constant.KBEnvActionHandlers, string(actionJson))
+	//	actionJSON, _ := json.Marshal(actionHandlerSpecs)
+	//	viper.Set(constant.KBEnvActionHandlers, string(actionJSON))
 	//	assert.Nil(t, handlers.InitHandlers())
 	//	actionHandler(reqCtx)
 	//	assert.Equal(t, fasthttp.StatusNoContent, reqCtx.Response.StatusCode())

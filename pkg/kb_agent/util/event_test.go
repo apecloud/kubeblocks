@@ -20,20 +20,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package util
 
 import (
+	"context"
 	"errors"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestSentEventForProbe(t *testing.T) {
+	ctx := context.Background()
 	t.Run("action is empty", func(t *testing.T) {
 		msg := &MockNilActionMessage{}
-		err := SentEventForProbe(nil, msg)
+		err := SentEventForProbe(ctx, msg)
 		assert.Error(t, errors.New("action is unset"), err)
 	})
 	t.Run("action is not empty", func(t *testing.T) {
 		msg := &MockNotNilActionMessage{}
-		err := SentEventForProbe(nil, msg)
+		err := SentEventForProbe(ctx, msg)
 		assert.Nil(t, err)
 	})
 }

@@ -42,8 +42,8 @@ func TestNewManager(t *testing.T) {
 		},
 		"test": {},
 	}
-	actionJson, _ := json.Marshal(actionHandlerSpecs)
-	viper.Set(constant.KBEnvActionHandlers, string(actionJson))
+	actionJSON, _ := json.Marshal(actionHandlerSpecs)
+	viper.Set(constant.KBEnvActionHandlers, string(actionJSON))
 	assert.Nil(t, handlers.InitHandlers())
 	t.Run("NewManager", func(t *testing.T) {
 		manager, err := NewManager()

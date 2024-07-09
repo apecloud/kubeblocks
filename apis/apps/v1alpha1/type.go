@@ -118,6 +118,7 @@ type LegacyRenderedTemplateSpec struct {
 type ComponentConfigSpec struct {
 	ComponentTemplateSpec `json:",inline"`
 
+	// Deprecated: keys has been deprecated since 1.0.0
 	// Specifies the configuration files within the ConfigMap that support dynamic updates.
 	//
 	// A configuration template (provided in the form of a ConfigMap) may contain templates for multiple
@@ -148,6 +149,8 @@ type ComponentConfigSpec struct {
 	// +optional
 	LegacyRenderedConfigSpec *LegacyRenderedTemplateSpec `json:"legacyRenderedConfigSpec,omitempty"`
 
+	// Deprecated: configConstraint has been deprecated since 1.0.0
+	//
 	// Specifies the name of the referenced configuration constraints object.
 	//
 	// +kubebuilder:validation:MaxLength=63

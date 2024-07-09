@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package apps
+package configuration
 
 import (
 	"context"
@@ -36,9 +36,9 @@ type ParametersDescriptionReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=apps.kubeblocks.io,resources=parametersdescriptions,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=apps.kubeblocks.io,resources=parametersdescriptions/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=apps.kubeblocks.io,resources=parametersdescriptions/finalizers,verbs=update
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=parametersdescriptions,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=parametersdescriptions/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=parametersdescriptions/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.

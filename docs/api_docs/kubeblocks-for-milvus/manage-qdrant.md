@@ -1,15 +1,15 @@
 ---
-title: Manage Qdrant with KubeBlocks
-description: How to manage Qdrant on KubeBlocks
+title: Manage Milvus with KubeBlocks
+description: How to manage Milvus on KubeBlocks
 keywords: [qdrant, milvus, weaviate]
 sidebar_position: 1
-sidebar_label: Manage Qdrant with KubeBlocks
+sidebar_label: Manage Milvus with KubeBlocks
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Manage Qdrant with KubeBlocks
+# Manage Milvus with KubeBlocks
 
 The popularity of generative AI (Generative AI) has aroused widespread attention and completely ignited the vector database (Vector Database) market. KubeBlocks supports the management of vector databases, such as Qdrant, Milvus, and Weaviate.
 

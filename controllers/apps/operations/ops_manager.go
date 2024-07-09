@@ -67,6 +67,14 @@ func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, o
 			return &ctrl.Result{}, patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error())
 		}
 	} else {
+		// validate entry condition for OpsRequest, check if the cluster is in the right phase
+		if err = validateOpsWaitingPhase(opsRes.Cluster, opsRequest, opsBehaviour); err != nil {
+			// check if the error is caused by WaitForClusterPhaseErr  error
+			if _, ok := err.(*WaitForClusterPhaseErr); ok {
+				return intctrlutil.ResultToP(intctrlutil.RequeueAfter(time.Second, reqCtx.Log, ""))
+			}
+			return &ctrl.Result{}, patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error())
+		}
 		// validate OpsRequest.spec
 		// if the operation will create a new cluster, don't validate the cluster
 		if err = opsRequest.Validate(reqCtx.Ctx, cli, opsRes.Cluster, !opsBehaviour.IsClusterCreation); err != nil {
@@ -77,14 +85,6 @@ func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, o
 	if opsRequest.Status.Phase == appsv1alpha1.OpsPendingPhase {
 		if opsRequest.Spec.Cancel {
 			return &ctrl.Result{}, PatchOpsStatus(reqCtx.Ctx, cli, opsRes, appsv1alpha1.OpsCancelledPhase)
-		}
-		// validate entry condition for OpsRequest, check if the cluster is in the right phase
-		if err = validateOpsWaitingPhase(opsRes.Cluster, opsRequest, opsBehaviour); err != nil {
-			// check if the error is caused by WaitForClusterPhaseErr  error
-			if _, ok := err.(*WaitForClusterPhaseErr); ok {
-				return intctrlutil.ResultToP(intctrlutil.RequeueAfter(time.Second, reqCtx.Log, ""))
-			}
-			return &ctrl.Result{}, patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error())
 		}
 		// TODO: abort last OpsRequest if using 'force' and intersecting with cluster component name or shard name.
 		if opsBehaviour.QueueByCluster || opsBehaviour.QueueBySelf {

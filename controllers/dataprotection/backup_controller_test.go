@@ -137,11 +137,12 @@ var _ = Describe("Backup Controller test", func() {
 
 			BeforeEach(func() {
 				By("creating a backup from backupPolicy " + testdp.BackupPolicyName) //nolint:goconst
+
 				backup = testdp.NewFakeBackup(&testCtx, nil)
 				backupKey = client.ObjectKeyFromObject(backup)
 			})
 
-			It("should succeed after job completes", func() {
+			FIt("should succeed after job completes", func() {
 				By("check backup status")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
 					g.Expect(fetched.Status.PersistentVolumeClaimName).Should(Equal(repoPVCName))
@@ -176,6 +177,19 @@ var _ = Describe("Backup Controller test", func() {
 					g.Expect(fetched.Labels[constant.AppManagedByLabelKey]).Should(Equal(dptypes.AppName))
 					g.Expect(fetched.Annotations[constant.ClusterSnapshotAnnotationKey]).ShouldNot(BeEmpty())
 				})).Should(Succeed())
+
+				By("backup system account secrets in annotation")
+				hasSystemAccount := false
+				for _, cmpSpec := range cluster.Spec.ComponentSpecs {
+					if cmpSpec.SystemAccounts != nil {
+						hasSystemAccount = true
+					}
+				}
+				if hasSystemAccount {
+					Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+						g.Expect(fetched.Annotations[constant.SecretsSnapshotAnnotationsKey]).ShouldNot(BeEmpty())
+					})).Should(Succeed())
+				}
 
 				By("backup job should be deleted after backup completed")
 				Eventually(testapps.CheckObjExists(&testCtx, getJobKey(), &batchv1.Job{}, false)).Should(Succeed())

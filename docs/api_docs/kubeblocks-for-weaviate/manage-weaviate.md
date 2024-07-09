@@ -1,38 +1,37 @@
 ---
-title: Manage Milvus with KubeBlocks
-description: How to manage Milvus on KubeBlocks
+title: Manage Weaviate with KubeBlocks
+description: How to manage Weaviate on KubeBlocks
 keywords: [qdrant, milvus, weaviate]
 sidebar_position: 1
-sidebar_label: Manage Milvus with KubeBlocks
+sidebar_label: Manage Weaviate with KubeBlocks
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Manage Milvus with KubeBlocks
+# Manage Weaviate with KubeBlocks
 
-The popularity of generative AI (Generative AI) has aroused widespread attention and completely ignited the vector database (Vector Database) market. KubeBlocks supports the management of vector databases, such as Qdrant, Milvus, and Weaviate.
+The popularity of generative AI (Generative AI) has aroused widespread attention and completely ignited the vector database (Vector Database) market. Weaviate is an open-source vector database that simplifies the development of AI applications. Built-in vector and hybrid search, easy-to-connect machine learning models, and a focus on data privacy enable developers of all levels to build, iterate, and scale AI capabilities faster.
 
-In this chapter, we take Qdrant as an example to show how to manage vector databases with KubeBlocks. This chapter illustrates how to create and manage a Qdrant cluster by `kubectl` or a YAML file. You can find the YAML examples in [the GitHub repository](https://github.com/apecloud/kubeblocks/tree/main/examples/qdrant).
 
 ## Before you start
 
 * [Install KubeBlocks](./../installation/install-kubeblocks.md).
 * View all the database types and versions available for creating a cluster.
   
-  Make sure the `qdrant` cluster definition is installed. If the cluster definition is not available, refer to [this doc](./../overview/supported-addons.md#install-addons) to enable it first.
+  Make sure the `weaviate` cluster definition is installed. If the cluster definition is not available, refer to [this doc](./../overview/supported-addons.md#install-addons) to enable it first.
 
   ```bash
-  kubectl get clusterdefinition qdrant
+  kubectl get clusterdefinition weaviate
   >
   NAME         TOPOLOGIES   SERVICEREFS   STATUS      AGE
-  qdrant                                  Available   30m
+  weaviate                                  Available   30m
   ```
 
   View all available versions for creating a cluster.
 
   ```bash
-  kubectl get clusterversions -l clusterdefinition.kubeblocks.io/name=qdrant
+  kubectl get clusterversions -l clusterdefinition.kubeblocks.io/name=weaviate
   ```
 
 * To keep things isolated, create a separate namespace called `demo` throughout this tutorial.
@@ -153,7 +152,7 @@ Check whether the cluster STATUS is `Running`. Otherwise, the following operatio
 kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
-mycluster   qdrant               qdrant-1.5.0   Halt                 Running   47m
+mycluster   weaviate               weaviate-1.5.0   Halt                 Running   47m
 ```
 
 #### Steps
@@ -249,7 +248,7 @@ In the example below, a snapshot exception occurs.
 Status:
   conditions: 
   - lastTransitionTime: "2024-04-25T17:40:26Z"
-    message: VolumeSnapshot/mycluster-qdrant-scaling-dbqgp: Failed to set default snapshot
+    message: VolumeSnapshot/mycluster-weaviate-scaling-dbqgp: Failed to set default snapshot
       class with error cannot find default snapshot class
     reason: ApplyResourcesFailed
     status: "False"
@@ -307,7 +306,7 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
-mycluster   qdrant               qdrant-1.5.0   Halt                 Running   47m
+mycluster   weaviate               weaviate-1.5.0   Halt                 Running   47m
 ```
 
 #### Steps
@@ -414,7 +413,7 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    AGE
-mycluster   qdrant               qdrant-1.5.0      Delete               Running   4m29s
+mycluster   weaviate               weaviate-1.5.0      Delete               Running   4m29s
 ```
 
 

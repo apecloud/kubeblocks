@@ -7,9 +7,10 @@ sidebar_position: 1
 
 # KubeBlocks for PostgreSQL
 
+This tutorial illustrates how to create and manage a PostgreSQL cluster by `kubectl` or a YAML file. You can find the YAML examples in [the GitHub repository](https://github.com/apecloud/kubeblocks/tree/main/examples/postgresql).
+
 * [Introduction](./introduction/introduction.md)
 * [Cluster Management](./cluster-management/create-and-connect-a-postgresql-cluster.md)
 * [Configuration](./configuration/configuration.md)
 * [High Availability](./high-availability/high-availability.md)
-* [Migration](./migration/feature-and-limit-list-pg.md)
 * [PostgreSQL Connection Pool](./postgresql-connection-pool/postgresql-connection-pool.md)

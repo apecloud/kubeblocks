@@ -35,13 +35,13 @@ redis-cluster        default          redis                     redis-7.0.6     
 
 ## Steps
 
-1. Change configuration. There are 3 ways to apply volume expansion.
+1. Change configuration.
 
    Configure the values of `--components`, `--volume-claim-templates`, and `--storage`, and run the command below to expand the volume.
 
    ```bash
    kbcli cluster volume-expand redis-cluster --components="redis" \
-   --volume-claim-templates="data" --storage="2Gi"
+   --volume-claim-templates="data" --storage="20Gi"
    ```
 
    - `--components` describes the component name for volume expansion.
@@ -51,17 +51,11 @@ redis-cluster        default          redis                     redis-7.0.6     
 2. Validate the volume expansion.
 
    ```bash
-   kbcli cluster list <name>
-   ```
-
-   ***Example***
-
-   ```bash
    kbcli cluster list redis-cluster
    >
-   NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS                 CREATED-TIME
-   redis-cluster        default          redis                     redis-7.0.6              Delete                    VolumeExpanding        Apr 10,2023 16:27 UTC+0800
+   NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS          CREATED-TIME
+   redis-cluster        default          redis                     redis-7.0.6              Delete                    Updating        Apr 10,2023 16:27 UTC+0800
    ```
 
-   - STATUS=VolumeExpanding: it means the volume expansion is in progress.
+   - STATUS=Updating: it means the volume expansion is in progress.
    - STATUS=Running: it means the volume expansion operation has been applied.

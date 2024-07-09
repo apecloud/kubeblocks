@@ -17,9 +17,11 @@ Kafka Server's JVM Heap configuration, production environment can refer to the [
 ```
 
 - Combined mode
-    When creating a Kafka Cluster, specify the `--broker-heap` parameter.
+  
+  When creating a Kafka Cluster, specify the `--broker-heap` parameter.
 - Separated mode
-    When creating a Kafka Cluster, specify the component parameters with the `--broker-heap`; specify controller with the `--controller-heap` parameter.
+  
+  When creating a Kafka Cluster, specify the component parameters with the `--broker-heap`; specify controller with the `--controller-heap` parameter.
 
 :::note
 
@@ -29,7 +31,7 @@ When modifying the Java Heap configuration, attention should be paid to the reso
 
 ## Hardware resources
 
-It is recommended to use the following hardware resource in a production environment:
+It is recommended to use the following hardware resources in a production environment:
 
 - `-cpu` >= 16 cores
 - `-memory` >= 64Gi

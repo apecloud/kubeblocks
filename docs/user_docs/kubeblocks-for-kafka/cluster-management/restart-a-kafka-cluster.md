@@ -20,11 +20,7 @@ Restarting a Kafka cluster triggers a concurrent restart and the leader may chan
 ## Steps
 
 1. Restart a cluster.
-
-  You can use `kbcli` or create an OpsRequest to restart a cluster.
   
-   **Option 1.** (**Recommended**) Use kbcli
-
    Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
 
    ```bash
@@ -35,24 +31,16 @@ Restarting a Kafka cluster triggers a concurrent restart and the leader may chan
    - `components` describes the component name that needs to be restarted.
    - `ttlSecondsAfterSucceed` describes the time to live of an OpsRequest job after the restarting succeeds.
 
-
 2. Validate the restarting.
 
    Run the command below to check the cluster status to check the restarting status.
 
    ```bash
-   kbcli cluster list <name>
-   ```
-
-   ***Example***
-
-   ```bash
    kbcli cluster list cluster-name
    >
-   NAME    CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS     AGE
-   kafka      kafka                                kafka-3.3.2    Delete                               Running    19m
+   NAME    CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS     AGE
+   kafka   kafka                kafka-3.3.2    Delete               Running    19m
    ```
 
    * STATUS=Restarting: it means the cluster restart is in progress.
    * STATUS=Running: it means the cluster has been restarted.
-

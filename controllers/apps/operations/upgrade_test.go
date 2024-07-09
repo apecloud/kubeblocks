@@ -47,7 +47,6 @@ var _ = Describe("Upgrade OpsRequest", func() {
 		release3    = testapps.ReleaseID("r3")
 		release4    = testapps.ReleaseID("r4")
 	)
-	const mysqlImageForUpdate = "docker.io/apecloud/apecloud-mysql-server:8.0.30"
 	cleanEnv := func() {
 		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,

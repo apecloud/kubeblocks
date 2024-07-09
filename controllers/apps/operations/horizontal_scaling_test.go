@@ -85,7 +85,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 		commonHScaleConsensusCompTest := func(reqCtx intctrlutil.RequestCtx,
 			changeClusterSpec func(cluster *appsv1alpha1.Cluster),
 			horizontalScaling appsv1alpha1.HorizontalScaling) (*OpsResource, []*corev1.Pod) {
-			By("init operations resources with CLusterDefinition/ClusterVersion/Hybrid components Cluster/consensus Pods")
+			By("init operations resources with CLusterDefinition/Hybrid components Cluster/consensus Pods")
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterName)
 			its := testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusComp)
 			if changeClusterSpec != nil {
@@ -481,7 +481,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 		}
 
 		It("test offline the specified pod but it is not online", func() {
-			By("init operations resources with CLusterDefinition/ClusterVersion/Hybrid components Cluster/consensus Pods")
+			By("init operations resources with CLusterDefinition/Hybrid components Cluster/consensus Pods")
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterName)
 			testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusComp)
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
@@ -501,7 +501,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 		})
 
 		It("test run multi horizontalScaling opsRequest with force flag", func() {
-			By("init operations resources with CLusterDefinition/ClusterVersion/Hybrid components Cluster/consensus Pods")
+			By("init operations resources with CLusterDefinition/Hybrid components Cluster/consensus Pods")
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterName)
 			testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusComp)
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}

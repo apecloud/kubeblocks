@@ -152,11 +152,7 @@ func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 	if !needCheck {
 		return nil
 	}
-	// if TTLSecondsBeforeAbort is not set or 0, return error
-	if r.Spec.PreConditionDeadlineSeconds == nil || *r.Spec.PreConditionDeadlineSeconds == 0 {
-		return fmt.Errorf("OpsRequest.spec.type=%s is forbidden when Cluster.status.phase=%s", r.Spec.Type, cluster.Status.Phase)
-	}
-	return nil
+	return fmt.Errorf("OpsRequest.spec.type=%s is forbidden when Cluster.status.phase=%s", r.Spec.Type, cluster.Status.Phase)
 }
 
 // getCluster gets cluster with webhook client

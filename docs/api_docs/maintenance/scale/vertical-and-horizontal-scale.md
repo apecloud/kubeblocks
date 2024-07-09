@@ -6,11 +6,14 @@ sidebar_position: 2
 sidebar_label: Scale
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Scale for a MySQL cluster
 
 You can scale a MySQL cluster in two ways, vertical scaling and horizontal scaling.
 
-From v0.9.0, for MySQL and PostgreSQL, after vertical scaling or horizontal scaling is performed, KubeBlocks automatically matches the appropriate configuration template based on the new specification. This is the KubeBlocks dynamic configuration feature. This feature simplifies the process of configuring parameters, saves time and effort and reduces performance issues caused by incorrect configuration. For detailed instructions, refer to [Configuration](./../configuration/configuration.md).
+From v0.9.0, for MySQL and PostgreSQL, after vertical scaling or horizontal scaling is performed, KubeBlocks automatically matches the appropriate configuration template based on the new specification. This is the KubeBlocks dynamic configuration feature. This feature simplifies the process of configuring parameters, saves time and effort and reduces performance issues caused by incorrect configuration. For detailed instructions, refer to [Configuration](./../../kubeblocks-for-apecloud-mysql/configuration/configuration.md).
 
 ## Vertical scaling
 
@@ -133,12 +136,6 @@ There are two ways to apply vertical scaling.
 ## Horizontal scaling
 
 Horizontal scaling changes the amount of pods. For example, you can apply horizontal scaling to scale pods up from three to five. The scaling process includes the backup and restore of data.
-
-:::note
-
-From v0.9.0, after horizontal scaling is performed, KubeBlocks will automatically adjust part of the parameters of the database instance to more appropriate values. It is recommended to back up and record your custom parameter settings so that you can restore them if needed.
-
-:::
 
 ### Before you start
 

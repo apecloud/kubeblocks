@@ -75,7 +75,7 @@ kbcli cluster describe-config pulsar
    We take `zookeeper` as an example.
 
    ```bash
-   kbcli cluster configure pulsar --component=zookeeper --set PULSAR_MEM="-XX:MinRAMPercentage=50 -XX:MaxRAMPercentage=70" 
+   kbcli cluster configure pulsar --components=zookeeper --set PULSAR_MEM="-XX:MinRAMPercentage=50 -XX:MaxRAMPercentage=70" 
    ```
 
 3. Verify the configuration.
@@ -101,7 +101,7 @@ The following steps take the configuration of dynamic parameter `brokerShutdownT
 1. Get configuration information.
 
    ```bash
-   kbcli cluster desc-config pulsar --component=broker
+   kbcli cluster desc-config pulsar --components=broker
    
    ConfigSpecs Meta:
    CONFIG-SPEC-NAME         FILE                   ENABLED   TEMPLATE                   CONSTRAINT                   RENDERED                               COMPONENT   CLUSTER
@@ -113,7 +113,7 @@ The following steps take the configuration of dynamic parameter `brokerShutdownT
 2. Configure parameters.
 
    ```bash
-   kbcli cluster configure pulsar --component=broker --config-spec=broker-config --set brokerShutdownTimeoutMs=66600
+   kbcli cluster configure pulsar --components=broker --config-spec=broker-config --set brokerShutdownTimeoutMs=66600
    >
    Will updated configure file meta:
      ConfigSpec: broker-config          ConfigFile: broker.conf        ComponentName: broker        ClusterName: pulsar
@@ -157,7 +157,7 @@ For Linux and macOS, you can edit configuration files by vi. For Windows, you ca
 
    :::note
 
-   If there are multiple components in a cluster, use `--component` to specify a component.
+   If there are multiple components in a cluster, use `--components` to specify a component.
 
    :::
 
@@ -189,7 +189,7 @@ Using kubectl to configure pulsar cluster requires modifying the configuration f
 1. Get the configmap where the configuration file is located. Take `broker` component as an example.
 
     ```bash
-    kbcli cluster desc-config pulsar --component=broker
+    kbcli cluster desc-config pulsar --components=broker
 
     ConfigSpecs Meta:
     CONFIG-SPEC-NAME         FILE                   ENABLED   TEMPLATE                   CONSTRAINT                   RENDERED                               COMPONENT   CLUSTER

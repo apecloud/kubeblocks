@@ -11990,6 +11990,20 @@ If set to 0 (default), pre-conditions must be satisfied immediately for the OpsR
 </tr>
 <tr>
 <td>
+<code>timeoutSeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the maximum duration (in seconds) that an opsRequest is allowed to run.
+If the opsRequest runs longer than this duration, its phase will be marked as Aborted.
+If this value is not set or set to 0, the timeout will be ignored and the opsRequest will run indefinitely.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>SpecificOpsRequest</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">
@@ -14374,8 +14388,9 @@ string
 This ServiceAccount is used to grant necessary permissions for the Component&rsquo;s Pods to interact
 with other Kubernetes resources, such as modifying Pod labels or sending events.</p>
 <p>Defaults:
-If not specified, KubeBlocks automatically assigns a default ServiceAccount named &ldquo;kb-&#123;cluster.name&#125;&rdquo;,
-bound to a default role installed together with KubeBlocks.</p>
+To perform certain operational tasks, agent sidecars running in Pods require specific RBAC permissions.
+The service account will be bound to a default role named &ldquo;kubeblocks-cluster-pod-role&rdquo; which is installed together with KubeBlocks.
+If not specified, KubeBlocks automatically assigns a default ServiceAccount named &ldquo;kb-&#123;cluster.name&#125;&rdquo;</p>
 <p>Future Changes:
 Future versions might change the default ServiceAccount creation strategy to one per Component,
 potentially revising the naming to &ldquo;kb-&#123;cluster.name&#125;-&#123;component.name&#125;&rdquo;.</p>
@@ -23686,6 +23701,20 @@ If set to 0 (default), pre-conditions must be satisfied immediately for the OpsR
 </tr>
 <tr>
 <td>
+<code>timeoutSeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the maximum duration (in seconds) that an opsRequest is allowed to run.
+If the opsRequest runs longer than this duration, its phase will be marked as Aborted.
+If this value is not set or set to 0, the timeout will be ignored and the opsRequest will run indefinitely.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>SpecificOpsRequest</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">
@@ -24054,7 +24083,7 @@ string
 <em>(Optional)</em>
 <p>Specifies a role to target with the service.
 If specified, the service will only be exposed to pods with the matching role.</p>
-<p>Note: At least one of &lsquo;roleSelector&rsquo; or &lsquo;podSelector&rsquo; must be specified.
+<p>Note: If the component has roles, at least one of &lsquo;roleSelector&rsquo; or &lsquo;podSelector&rsquo; must be specified.
 If both are specified, a pod must match both conditions to be selected.</p>
 </td>
 </tr>
@@ -24069,7 +24098,7 @@ map[string]string
 <em>(Optional)</em>
 <p>Routes service traffic to pods with matching label keys and values.
 If specified, the service will only be exposed to pods matching the selector.</p>
-<p>Note: At least one of &lsquo;roleSelector&rsquo; or &lsquo;podSelector&rsquo; must be specified.
+<p>Note: If the component has roles, at least one of &lsquo;roleSelector&rsquo; or &lsquo;podSelector&rsquo; must be specified.
 If both are specified, a pod must match both conditions to be selected.</p>
 </td>
 </tr>

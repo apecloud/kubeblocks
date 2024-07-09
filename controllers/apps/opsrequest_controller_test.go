@@ -833,8 +833,9 @@ var _ = Describe("OpsRequest Controller", func() {
 						Switch:        exposeSwitch,
 						Services: []appsv1alpha1.OpsService{
 							{
-								Name:        "svc1",
-								ServiceType: corev1.ServiceTypeLoadBalancer,
+								Name:         "svc1",
+								ServiceType:  corev1.ServiceTypeLoadBalancer,
+								RoleSelector: constant.Leader,
 								Ports: []corev1.ServicePort{
 									{Name: "port1", Port: 3306, TargetPort: intstr.IntOrString{Type: intstr.String, StrVal: "mysql"}},
 								},
@@ -883,6 +884,37 @@ var _ = Describe("OpsRequest Controller", func() {
 			By("expect restartOps2 to Running and exposeOps2 to Succeed")
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(restartOps2))).Should(Equal(appsv1alpha1.OpsRunningPhase))
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(exposeOps2))).Should(Equal(appsv1alpha1.OpsSucceedPhase))
+		})
+
+		It("test opsRequest timeout", func() {
+			By("create cluster and mock it to running")
+			replicas := int32(3)
+			createMysqlCluster(replicas)
+			mockCompRunning(replicas, false)
+
+			By("create a opsRequest and specified the timeoutSeconds to 1")
+			ops := testapps.NewOpsRequestObj("restart-ops-1", testCtx.DefaultNamespace,
+				clusterObj.Name, appsv1alpha1.HorizontalScalingType)
+			ops.Spec.TimeoutSeconds = pointer.Int32(1)
+			ops.Spec.HorizontalScalingList = []appsv1alpha1.HorizontalScaling{
+				{
+					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: mysqlCompName},
+					ScaleOut:     &appsv1alpha1.ScaleOut{ReplicaChanger: appsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)}},
+				},
+			}
+			testapps.CreateOpsRequest(ctx, testCtx, ops)
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops))).Should(Equal(appsv1alpha1.OpsRunningPhase))
+
+			By("create a next opsRequest")
+			ops1 := createRestartOps(clusterObj.Name, 2, true)
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).Should(Equal(appsv1alpha1.OpsPendingPhase))
+
+			By("mock timeout")
+			time.Sleep(time.Second)
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops))).Should(Equal(appsv1alpha1.OpsAbortedPhase))
+
+			By("expect for the next ops is running")
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).ShouldNot(Equal(appsv1alpha1.OpsPendingPhase))
 		})
 	})
 })

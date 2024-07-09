@@ -165,7 +165,7 @@ func handleComponentStatusProgress(
 	opsRes *OpsResource,
 	pgRes *progressResource,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus,
-	podApplyOps func(*corev1.Pod, ComponentOpsInteface, metav1.Time, string) bool) (int32, int32, error) {
+	podApplyOps func(*appsv1alpha1.OpsRequest, *corev1.Pod, ComponentOpsInterface, string) bool) (int32, int32, error) {
 	var (
 		pods             []*corev1.Pod
 		clusterComponent = pgRes.clusterComponent
@@ -195,7 +195,7 @@ func handleComponentStatusProgress(
 		return expectReplicas, completedCount, err
 	}
 	if opsRes.OpsRequest.Status.Phase == appsv1alpha1.OpsCancellingPhase {
-		completedCount = handleCancelProgressForPodsRollingUpdate(opsRes, pods, pgRes, compStatus, minReadySeconds)
+		completedCount = handleCancelProgressForPodsRollingUpdate(opsRes, pods, pgRes, compStatus, minReadySeconds, podApplyOps)
 	} else {
 		completedCount = handleProgressForPodsRollingUpdate(opsRes, pods, pgRes, compStatus, minReadySeconds, podApplyOps)
 	}
@@ -213,19 +213,20 @@ func handleProgressForPodsRollingUpdate(
 	pgRes *progressResource,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus,
 	minReadySeconds int32,
-	podApplyOps func(*corev1.Pod, ComponentOpsInteface, metav1.Time, string) bool) int32 {
+	podApplyOps func(*appsv1alpha1.OpsRequest, *corev1.Pod, ComponentOpsInterface, string) bool) int32 {
 	opsRequest := opsRes.OpsRequest
-	opsStartTime := opsRequest.Status.StartTimestamp
 	var completedCount int32
 	for _, v := range pods {
 		objectKey := getProgressObjectKey(constant.PodKind, v.Name)
 		progressDetail := appsv1alpha1.ProgressStatusDetail{ObjectKey: objectKey}
-		if podProcessedSuccessful(pgRes, opsStartTime, v, minReadySeconds, podApplyOps) {
+		if podProcessedSuccessful(pgRes, opsRequest, v, minReadySeconds, podApplyOps) {
 			completedCount += 1
 			handleSucceedProgressDetail(opsRes, pgRes, compStatus, progressDetail)
 			continue
 		}
-		if podIsPendingDuringOperation(opsStartTime, v) {
+		// no re-create the pod or no any changes applied in place.
+		if notRecreatedDuringOperation(opsRequest.Status.StartTimestamp, v) &&
+			!podApplyOps(opsRequest, v, pgRes.compOps, v.Name) {
 			handlePendingProgressDetail(opsRes, compStatus, progressDetail)
 			continue
 		}
@@ -240,7 +241,8 @@ func handleCancelProgressForPodsRollingUpdate(
 	pods []*corev1.Pod,
 	pgRes *progressResource,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus,
-	minReadySeconds int32) int32 {
+	minReadySeconds int32,
+	podApplyOps func(*appsv1alpha1.OpsRequest, *corev1.Pod, ComponentOpsInterface, string) bool) int32 {
 	var newProgressDetails []appsv1alpha1.ProgressStatusDetail
 	for _, v := range compStatus.ProgressDetails {
 		// remove the pending progressDetail
@@ -249,19 +251,18 @@ func handleCancelProgressForPodsRollingUpdate(
 		}
 	}
 	compStatus.ProgressDetails = newProgressDetails
-	opsCancelTime := opsRes.OpsRequest.Status.CancelTimestamp
 	pgRes.opsMessageKey = fmt.Sprintf("%s with rollback", pgRes.opsMessageKey)
 	var completedCount int32
 	for _, pod := range pods {
 		objectKey := getProgressObjectKey(constant.PodKind, pod.Name)
 		progressDetail := appsv1alpha1.ProgressStatusDetail{ObjectKey: objectKey}
-		if !pod.CreationTimestamp.Before(&opsCancelTime) &&
-			podIsAvailable(pgRes, pod, minReadySeconds) {
+		if podProcessedSuccessful(pgRes, opsRes.OpsRequest, pod, minReadySeconds, podApplyOps) {
 			completedCount += 1
 			handleSucceedProgressDetail(opsRes, pgRes, compStatus, progressDetail)
 			continue
 		}
-		if podIsPendingDuringOperation(opsCancelTime, pod) {
+		if notRecreatedDuringOperation(opsRes.OpsRequest.Status.CancelTimestamp, pod) &&
+			!podApplyOps(opsRes.OpsRequest, pod, pgRes.compOps, pgRes.updatedPodSet[pod.Name]) {
 			continue
 		}
 		completedCount += handleFailedOrProcessingProgressDetail(opsRes, pgRes, compStatus, progressDetail, pod)
@@ -335,8 +336,8 @@ func handleFailedOrProcessingProgressDetail(opsRes *OpsResource,
 	return completedCount
 }
 
-// podIsPendingDuringOperation checks if pod is pending during the component's operation.
-func podIsPendingDuringOperation(opsStartTime metav1.Time, pod *corev1.Pod) bool {
+// notRecreatedDuringOperation checks if pod is re-created during the component's operation.
+func notRecreatedDuringOperation(opsStartTime metav1.Time, pod *corev1.Pod) bool {
 	return pod.CreationTimestamp.Before(&opsStartTime) && pod.DeletionTimestamp.IsZero()
 }
 
@@ -344,17 +345,17 @@ func podIsPendingDuringOperation(opsStartTime metav1.Time, pod *corev1.Pod) bool
 // 1. the pod is recreated after OpsRequest.status.startTime and pod is available.
 // 2. the component is running and pod is available.
 func podProcessedSuccessful(pgRes *progressResource,
-	opsStartTime metav1.Time,
+	opsRequest *appsv1alpha1.OpsRequest,
 	pod *corev1.Pod,
 	minReadySeconds int32,
-	podApplyOps func(*corev1.Pod, ComponentOpsInteface, metav1.Time, string) bool) bool {
+	podApplyOps func(*appsv1alpha1.OpsRequest, *corev1.Pod, ComponentOpsInterface, string) bool) bool {
 	if !pod.DeletionTimestamp.IsZero() {
 		return false
 	}
 	if !podIsAvailable(pgRes, pod, minReadySeconds) {
 		return false
 	}
-	return podApplyOps(pod, pgRes.compOps, opsStartTime, pgRes.updatedPodSet[pod.Name])
+	return podApplyOps(opsRequest, pod, pgRes.compOps, pgRes.updatedPodSet[pod.Name])
 }
 
 func getProgressProcessingMessage(opsMessageKey, objectKey, componentName string) string {

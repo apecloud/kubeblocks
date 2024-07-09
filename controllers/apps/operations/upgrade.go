@@ -64,7 +64,7 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		opsRes.Cluster.Spec.ClusterVersionRef = *opsRes.OpsRequest.Spec.Upgrade.ClusterVersionRef
 	} else {
 		compOpsHelper = newComponentOpsHelper(upgradeSpec.Components)
-		if err := compOpsHelper.updateClusterComponentsAndShardings(opsRes.Cluster, func(compSpec *appsv1alpha1.ClusterComponentSpec, obj ComponentOpsInteface) error {
+		if err := compOpsHelper.updateClusterComponentsAndShardings(opsRes.Cluster, func(compSpec *appsv1alpha1.ClusterComponentSpec, obj ComponentOpsInterface) error {
 			upgradeComp := obj.(appsv1alpha1.UpgradeComponent)
 			if u.needUpdateCompDef(upgradeComp, opsRes.Cluster) {
 				compSpec.ComponentDef = *upgradeComp.ComponentDefinitionName
@@ -130,9 +130,10 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		}
 		return false
 	}
-	podApplyCompOps := func(pod *corev1.Pod,
-		compOps ComponentOpsInteface,
-		opsStartTime metav1.Time,
+	podApplyCompOps := func(
+		ops *appsv1alpha1.OpsRequest,
+		pod *corev1.Pod,
+		compOps ComponentOpsInterface,
 		insTemplateName string) bool {
 		if u.existClusterVersion(opsRes.OpsRequest) {
 			// TODO: remove this deprecated API after v0.9
@@ -172,7 +173,7 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 func (u upgradeOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	opsRes.OpsRequest.Status.LastConfiguration.ClusterVersionRef = opsRes.Cluster.Spec.ClusterVersionRef
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.Upgrade.Components)
-	compOpsHelper.saveLastConfigurations(opsRes, func(compSpec appsv1alpha1.ClusterComponentSpec, comOps ComponentOpsInteface) appsv1alpha1.LastComponentConfiguration {
+	compOpsHelper.saveLastConfigurations(opsRes, func(compSpec appsv1alpha1.ClusterComponentSpec, comOps ComponentOpsInterface) appsv1alpha1.LastComponentConfiguration {
 		return appsv1alpha1.LastComponentConfiguration{
 			ComponentDefinitionName: compSpec.ComponentDef,
 			ServiceVersion:          compSpec.ServiceVersion,

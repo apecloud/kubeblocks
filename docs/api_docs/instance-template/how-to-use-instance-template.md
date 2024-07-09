@@ -1,14 +1,24 @@
+---
+title: Apply instance template
+description: Apply instance template
+keywords: [apply instance template, instance template]
+sidebar_position: 2
+sidebar_label: Apply instance template
+---
+
 # Apply instance template
 
-Instance template can be applied to many scenarios. In this section, we take RisingWave cluster as an example.
-KubeBlocks supports the management of RisingWave clusters. The RisingWave addon is contributed by the RisingWave official team.  For RisingWave to function optimally, it relies on an external storage solution, such as AWS S3 or Alibaba Cloud OSS, to serve as its state backend. When creating a RisingWave cluster, it is necessary to configure credentials and other information for the external storage to ensure normal operation, and these information may vary for each cluster.
+Instance templates can be applied to many scenarios. In this section, we take a RisingWave cluster as an example.
 
-In the official image of RisingWave, these information can be injected via environment variables. Therefore, in KubeBlocks 0.9, we can configure corresponding environment variables in the instance template and set the values of these environment variables each time a cluster is created, so as to inject credential information into the container of RisingWave.
+KubeBlocks supports the management of RisingWave clusters. The RisingWave addon is contributed by the RisingWave official team. For RisingWave to function optimally, it relies on an external storage solution, such as AWS S3 or Alibaba Cloud OSS, to serve as its state backend. When creating a RisingWave cluster, it is necessary to configure credentials and other information for the external storage to ensure normal operation, and this information may vary for each cluster.
+
+In the official image of RisingWave, this information can be injected via environment variables. Therefore, in KubeBlocks 0.9, we can configure corresponding environment variables in the instance template and set the values of these environment variables each time a cluster is created, so as to inject credential information into the container of RisingWave.
 
 ## An example
 
-In the default template of RisingWave addon, the environment viriables are configured as follows:
-```
+In the default template of RisingWave addon, the environment variables are configured as follows:
+
+```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
@@ -49,8 +59,10 @@ spec:
           value: 0.0.0.0:1222
 # ...
 ```
+
 After adding an instance template to the cluster resources:
-```
+
+```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
@@ -94,59 +106,78 @@ spec:
         value: "{{ .Values.risingwave.metaStore.etcd.authentication.enabled}}"
 # ...
 ```
+
 In the example above, we added an instance template through the `instances` field, named `instance`. This template defines several environment variables such as `RW_STATE_STORE` and `AWS_REGION`. These environment variables will be appended by KubeBlocks to the list of environment variables defined in the default template. Consequently, the rendered instance will contain both the default template and all the environment variables defined in this instance template.
 
 Additionally, the `replicas` field in the instance template is identical to that in the `componentSpec` (both are `{{ .Values.risingwave.compute.replicas }}`), indicating that after overriding the default template, this instance template will be used to render all instances within this component.
 
-## Detailed information of instance template
+## Detailed information on instance template
 
-- `Name` field: For each component, multiple instance templates can be defined. Template name is configured with `Name` field, and must remain unique within the same component.
+- `Name` field: For each component, multiple instance templates can be defined. The template name is configured with the `Name` field and must remain unique within the same component.
 - `Replica` field: Each template can set the number of instances rendered based on that template via the `Replicas` field, of which the default value is 1. The sum of `Replicas` for all instance templates within the same component must be less than or equal to the `Replicas` value of the component. If the number of instances rendered based on the instance templates is less than the total number required by the component, the remaining instances will be rendered using the default template.
 
-The pattern for the names of instances rendered based on instance templates is `$(cluster name)-$(component name)-$(instance template name)-ordinal`. For example, in the above RisingWave cluster, the cluster name is `risingwave`, the component name is `compute`, the instance template name is `instance`, and the number of `Replicas` is 3. Therefore, the rendered instance names are: risingwave-compute-instance-0, risingwave-compute-instance-1, risingwave-compute-instance-2.
+The pattern for the names of instances rendered based on instance templates is `$(cluster name)-$(component name)-$(instance template name)-ordinal`. For example, in the above RisingWave cluster, the cluster name is `risingwave`, the component name is `compute`, the instance template name is `instance`, and the number of `Replicas` is 3. Therefore, the rendered instance names are risingwave-compute-instance-0, risingwave-compute-instance-1, and risingwave-compute-instance-2.
 
-Instance templates can be used during cluster creation and can be updated during operations period. Specifically, this includes adding, deleting, or updating instance templates. Updating instance templates may update, delete, or reconstruct instances. You are recommended to carefully evaluate whether the final changes meet expectations before performing updates.
+Instance templates can be used during cluster creation and can be updated during the operations period. Specifically, this includes adding, deleting, or updating instance templates. Updating instance templates may update, delete, or reconstruct instances. You are recommended to carefully evaluate whether the final changes meet expectations before performing updates.
 
 ### Annotations
-The `Annotations` in the instance template are used to override the `Annotations` field in the default template. If a Key in the `Annotations` of the instance template already exists in the default template, the `value` corresponding to the Key will use the value in the instance template; if the Key does not exist in the default template, the Key and Value will be added to the final `Annotations`. 
+
+The `Annotations` in the instance template are used to override the `Annotations` field in the default template. If a Key in the `Annotations` of the instance template already exists in the default template, the `value` corresponding to the Key will use the value in the instance template; if the Key does not exist in the default template, the Key and Value will be added to the final `Annotations`.
+
 ***Example:***
+
 The `annotations` in the default template are:
-```
+
+```yaml
 annotations:
   "foo0": "bar0"
   "foo1": "bar"
 ```
+
 And `annotations` in the instance templates are:
-```
+
+```yaml
 annotations:
   "foo1": "bar1"
   "foo2": "bar2"
 ```
+
 Then, after rendering, the actual annotations are:
-```
+
+```yaml
 annotations:
   "foo0": "bar0"
   "foo1": "bar1"
   "foo2": "bar2"
 ```
-...note
-KubeBlocks adds system `Annotations`, and do not overwrite them.
-...
 
+:::note
+
+KubeBlocks adds system `Annotations`, and do not overwrite them.
+
+:::
 
 ### Labels
-You can also set `Labels` with instance template.
+
+You can also set `Labels` with the instance template.
+
 Similar to `Annotations`, `Labels` in instance templates follow the same overriding logic applied to existing labels.
-...note
+
+:::note
+
 KubeBlocks adds system `Labels`, and do not overwrite them.
-...
+
+:::
 
 ### Image
+
 The `Image` field in the instance template is used to override the `Image` field of the first container in the default template.
 
-...note:
-`Image` field should be used with caution: for statefulset like databases, changing the `Image` often involves compatibility issues with data formats. When changing this field, please ensure that the image version in the instance template is fully compatible with that in the default template.
-...
+:::note
+
+`Image` field should be used with caution: for the StatefulSet like databases, changing the `Image` often involves compatibility issues with data formats. When changing this field, please ensure that the image version in the instance template is fully compatible with that in the default template.
+
+:::
 
 With KubeBlocks version 0.9 and above, detailed design for image versions is provided through `ComponentVersion`. It is recommended to manage versions using `ComponentVersion`.
 

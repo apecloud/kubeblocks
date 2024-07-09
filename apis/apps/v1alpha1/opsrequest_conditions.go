@@ -111,13 +111,13 @@ func NewCancelFailedCondition(ops *OpsRequest, err error) *metav1.Condition {
 }
 
 // NewAbortedCondition creates a condition for aborted phase.
-func NewAbortedCondition(ops *OpsRequest) metav1.Condition {
-	return metav1.Condition{
+func NewAbortedCondition(message string) *metav1.Condition {
+	return &metav1.Condition{
 		Type:               ConditionTypeAborted,
 		Status:             metav1.ConditionTrue,
 		Reason:             ConditionTypeAborted,
 		LastTransitionTime: metav1.Now(),
-		Message:            fmt.Sprintf(`Aborted as a result of the latest opsRequest "%s"`, ops.Name),
+		Message:            message,
 	}
 }
 

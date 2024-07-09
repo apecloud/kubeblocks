@@ -88,6 +88,13 @@ type OpsRequestSpec struct {
 	// +optional
 	PreConditionDeadlineSeconds *int32 `json:"preConditionDeadlineSeconds,omitempty"`
 
+	// Specifies the maximum duration (in seconds) that an opsRequest is allowed to run.
+	// If the opsRequest runs longer than this duration, its phase will be marked as Aborted.
+	// If this value is not set or set to 0, the timeout will be ignored and the opsRequest will run indefinitely.
+	// +optional
+	// +kubebuilder:Minimum=0
+	TimeoutSeconds *int32 `json:"timeoutSeconds,omitempty"`
+
 	// Exactly one of its members must be set.
 	SpecificOpsRequest `json:",inline"`
 }
@@ -737,7 +744,7 @@ type OpsService struct {
 	// Specifies a role to target with the service.
 	// If specified, the service will only be exposed to pods with the matching role.
 	//
-	// Note: At least one of 'roleSelector' or 'podSelector' must be specified.
+	// Note: If the component has roles, at least one of 'roleSelector' or 'podSelector' must be specified.
 	// If both are specified, a pod must match both conditions to be selected.
 	//
 	// +optional
@@ -746,7 +753,7 @@ type OpsService struct {
 	// Routes service traffic to pods with matching label keys and values.
 	// If specified, the service will only be exposed to pods matching the selector.
 	//
-	// Note: At least one of 'roleSelector' or 'podSelector' must be specified.
+	// Note: If the component has roles, at least one of 'roleSelector' or 'podSelector' must be specified.
 	// If both are specified, a pod must match both conditions to be selected.
 	//
 	// +optional

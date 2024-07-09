@@ -79,7 +79,6 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluste
 	}
 	compBuilder := builder.NewComponentBuilder(cluster.Namespace, compName, compDefName).
 		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
-		AddAnnotations(constant.KBAppMultiClusterPlacementKey, cluster.Annotations[constant.KBAppMultiClusterPlacementKey]).
 		AddLabelsInMap(constant.GetComponentWellKnownLabels(cluster.Name, compSpec.Name)).
 		AddLabels(constant.KBAppClusterUIDLabelKey, string(cluster.UID)).
 		SetServiceVersion(compSpec.ServiceVersion).
@@ -106,6 +105,12 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluste
 	}
 	if annotations != nil {
 		compBuilder.AddAnnotationsInMap(annotations)
+	}
+	if cluster.Annotations != nil {
+		p, ok := cluster.Annotations[constant.KBAppMultiClusterPlacementKey]
+		if ok {
+			compBuilder.AddAnnotations(constant.KBAppMultiClusterPlacementKey, p)
+		}
 	}
 	if !IsGenerated(compBuilder.GetObject()) {
 		compBuilder.SetServices(compSpec.Services)

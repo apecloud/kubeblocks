@@ -57,7 +57,7 @@ This document shows how to create a Kafka cluster.
     apiVersion: apps.kubeblocks.io/v1alpha1
     kind: Cluster
     metadata:
-      name: kafka-cluster
+      name: mycluster
       namespace: demo
       annotations:
         "kubeblocks.io/extra-env": '{"KB_KAFKA_ENABLE_SASL":"false","KB_KAFKA_BROKER_HEAP":"-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64","KB_KAFKA_CONTROLLER_HEAP":"-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64","KB_KAFKA_PUBLIC_ACCESS":"false", "KB_KAFKA_BROKER_NODEPORT": "false"}'

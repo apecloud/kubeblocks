@@ -385,7 +385,7 @@ spec:
                               If specified, the service will only be exposed to pods matching the selector.
 
 
-                              Note: At least one of 'roleSelector' or 'podSelector' must be specified.
+                              Note: If the component has roles, at least one of 'roleSelector' or 'podSelector' must be specified.
                               If both are specified, a pod must match both conditions to be selected.
                             type: object
                             x-kubernetes-map-type: atomic
@@ -485,7 +485,7 @@ spec:
                               If specified, the service will only be exposed to pods with the matching role.
 
 
-                              Note: At least one of 'roleSelector' or 'podSelector' must be specified.
+                              Note: If the component has roles, at least one of 'roleSelector' or 'podSelector' must be specified.
                               If both are specified, a pod must match both conditions to be selected.
                             type: string
                           serviceType:
@@ -4528,6 +4528,13 @@ spec:
                 x-kubernetes-validations:
                 - message: forbidden to update spec.switchover
                   rule: self == oldSelf
+              timeoutSeconds:
+                description: |-
+                  Specifies the maximum duration (in seconds) that an opsRequest is allowed to run.
+                  If the opsRequest runs longer than this duration, its phase will be marked as Aborted.
+                  If this value is not set or set to 0, the timeout will be ignored and the opsRequest will run indefinitely.
+                format: int32
+                type: integer
               ttlSecondsAfterSucceed:
                 description: |-
                   Specifies the duration in seconds that an OpsRequest will remain in the system after successfully completing

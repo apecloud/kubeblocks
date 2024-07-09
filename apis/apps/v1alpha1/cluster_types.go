@@ -776,8 +776,9 @@ type ClusterComponentSpec struct {
 	// with other Kubernetes resources, such as modifying Pod labels or sending events.
 	//
 	// Defaults:
-	// If not specified, KubeBlocks automatically assigns a default ServiceAccount named "kb-{cluster.name}",
-	// bound to a default role installed together with KubeBlocks.
+	// To perform certain operational tasks, agent sidecars running in Pods require specific RBAC permissions.
+	// The service account will be bound to a default role named "kubeblocks-cluster-pod-role" which is installed together with KubeBlocks.
+	// If not specified, KubeBlocks automatically assigns a default ServiceAccount named "kb-{cluster.name}"
 	//
 	// Future Changes:
 	// Future versions might change the default ServiceAccount creation strategy to one per Component,
@@ -1680,6 +1681,11 @@ func (t *InstanceTemplate) GetReplicas() int32 {
 		return *t.Replicas
 	}
 	return defaultInstanceTemplateReplicas
+}
+
+// GetOrdinals TODO(free6om): Remove after resolving the circular dependencies between apps and workloads.
+func (t *InstanceTemplate) GetOrdinals() workloads.Ordinals {
+	return workloads.Ordinals{}
 }
 
 // GetClusterUpRunningPhases returns Cluster running or partially running phases.

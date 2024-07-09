@@ -34,17 +34,17 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-type ComponentOpsInteface interface {
+type ComponentOpsInterface interface {
 	GetComponentName() string
 }
 
 type componentOpsHelper struct {
-	componentOpsSet map[string]ComponentOpsInteface
+	componentOpsSet map[string]ComponentOpsInterface
 }
 
-func newComponentOpsHelper[T ComponentOpsInteface](compOpsList []T) componentOpsHelper {
+func newComponentOpsHelper[T ComponentOpsInterface](compOpsList []T) componentOpsHelper {
 	compOpsHelper := componentOpsHelper{
-		componentOpsSet: make(map[string]ComponentOpsInteface),
+		componentOpsSet: make(map[string]ComponentOpsInterface),
 	}
 	for i := range compOpsList {
 		compOps := compOpsList[i]
@@ -54,7 +54,7 @@ func newComponentOpsHelper[T ComponentOpsInteface](compOpsList []T) componentOps
 }
 
 func (c componentOpsHelper) updateClusterComponentsAndShardings(cluster *appsv1alpha1.Cluster,
-	updateFunc func(compSpec *appsv1alpha1.ClusterComponentSpec, compOpsItem ComponentOpsInteface) error) error {
+	updateFunc func(compSpec *appsv1alpha1.ClusterComponentSpec, compOpsItem ComponentOpsInterface) error) error {
 	updateComponentSpecs := func(compSpec *appsv1alpha1.ClusterComponentSpec, componentName string) error {
 		if obj, ok := c.componentOpsSet[componentName]; ok {
 			if err := updateFunc(compSpec, obj); err != nil {
@@ -81,7 +81,7 @@ func (c componentOpsHelper) updateClusterComponentsAndShardings(cluster *appsv1a
 }
 
 func (c componentOpsHelper) saveLastConfigurations(opsRes *OpsResource,
-	buildLastCompConfiguration func(compSpec appsv1alpha1.ClusterComponentSpec, obj ComponentOpsInteface) appsv1alpha1.LastComponentConfiguration) {
+	buildLastCompConfiguration func(compSpec appsv1alpha1.ClusterComponentSpec, obj ComponentOpsInterface) appsv1alpha1.LastComponentConfiguration) {
 	setLastCompConfiguration := func(compSpec appsv1alpha1.ClusterComponentSpec,
 		lastConfiguration *appsv1alpha1.LastConfiguration,
 		componentName string) {
@@ -175,7 +175,7 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 		opsRequest.Status.Components = map[string]appsv1alpha1.OpsRequestComponentStatus{}
 	}
 	var progressResources []progressResource
-	setProgressResource := func(compSpec *appsv1alpha1.ClusterComponentSpec, compOps ComponentOpsInteface,
+	setProgressResource := func(compSpec *appsv1alpha1.ClusterComponentSpec, compOps ComponentOpsInterface,
 		fullComponentName string, isShardingComponent bool) error {
 		var componentDefinition *appsv1alpha1.ComponentDefinition
 		if compSpec.ComponentDef != "" {
@@ -195,7 +195,7 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 		})
 		return nil
 	}
-	getCompOps := func(componentName string) (ComponentOpsInteface, bool) {
+	getCompOps := func(componentName string) (ComponentOpsInterface, bool) {
 		if len(c.componentOpsSet) == 0 {
 			return appsv1alpha1.ComponentOps{ComponentName: componentName}, true
 		}

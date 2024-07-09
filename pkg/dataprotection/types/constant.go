@@ -144,3 +144,7 @@ const (
 	DataprotectionAPIGroup = "dataprotection.kubeblocks.io"
 	KopiaRepoFolderName    = "kopia"
 )
+
+const (
+	LogCollectorOutput = "Log Collector Output"
+)

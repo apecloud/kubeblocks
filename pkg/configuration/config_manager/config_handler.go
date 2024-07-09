@@ -45,7 +45,7 @@ type configVolumeHandleMeta struct {
 	reloadType appsv1beta1.DynamicReloadType
 	configSpec appsv1alpha1.ComponentTemplateSpec
 
-	formatterConfig *appsv1beta1.FormatterConfig
+	formatterConfig *appsv1beta1.FileFormatConfig
 }
 
 func (s *configVolumeHandleMeta) OnlineUpdate(_ context.Context, _ string, _ map[string]string) error {
@@ -346,7 +346,7 @@ func (s *shellCommandHandler) isDownwardAPITrigger() bool {
 	return s.downwardAPITrigger
 }
 
-func createConfigVolumeMeta(configSpecName string, reloadType appsv1beta1.DynamicReloadType, mountPoint []string, formatterConfig *appsv1beta1.FormatterConfig) configVolumeHandleMeta {
+func createConfigVolumeMeta(configSpecName string, reloadType appsv1beta1.DynamicReloadType, mountPoint []string, formatterConfig *appsv1beta1.FileFormatConfig) configVolumeHandleMeta {
 	return configVolumeHandleMeta{
 		reloadType: reloadType,
 		mountPoint: mountPoint,
@@ -359,8 +359,8 @@ func createConfigVolumeMeta(configSpecName string, reloadType appsv1beta1.Dynami
 
 func isShellCommand(configMeta *ConfigSpecInfo) bool {
 	return configMeta != nil &&
-		configMeta.DynamicReloadAction != nil &&
-		configMeta.DynamicReloadAction.ShellTrigger != nil
+		configMeta.ReloadAction != nil &&
+		configMeta.ReloadAction.ShellTrigger != nil
 }
 
 func isBatchReloadMode(shellAction *appsv1beta1.ShellTrigger) bool {
@@ -368,11 +368,11 @@ func isBatchReloadMode(shellAction *appsv1beta1.ShellTrigger) bool {
 }
 
 func isValidBatchReload(shellAction *appsv1beta1.ShellTrigger) bool {
-	return isBatchReloadMode(shellAction) && len(shellAction.BatchParametersTemplate) > 0
+	return isBatchReloadMode(shellAction) && len(shellAction.BatchParamsFormatterTemplate) > 0
 }
 
 func isBatchReload(configMeta *ConfigSpecInfo) bool {
-	return isShellCommand(configMeta) && isBatchReloadMode(configMeta.DynamicReloadAction.ShellTrigger)
+	return isShellCommand(configMeta) && isBatchReloadMode(configMeta.ReloadAction.ShellTrigger)
 }
 
 func getBatchInputTemplate(configMeta *ConfigSpecInfo) string {
@@ -380,9 +380,9 @@ func getBatchInputTemplate(configMeta *ConfigSpecInfo) string {
 		return ""
 	}
 
-	shellAction := configMeta.DynamicReloadAction.ShellTrigger
+	shellAction := configMeta.ReloadAction.ShellTrigger
 	if isValidBatchReload(shellAction) {
-		return shellAction.BatchParametersTemplate
+		return shellAction.BatchParamsFormatterTemplate
 	}
 	return ""
 }
@@ -396,9 +396,9 @@ func CreateExecHandler(command []string, mountPoint string, configMeta *ConfigSp
 		return nil, err
 	}
 
-	var formatterConfig *appsv1beta1.FormatterConfig
-	if backupPath != "" && configMeta != nil && configMeta.DynamicReloadAction != nil {
-		if err := backupConfigFiles([]string{configMeta.MountPoint}, filter, backupPath); err != nil {
+	var formatterConfig *appsv1beta1.FileFormatConfig
+	if backupPath != "" && configMeta != nil && configMeta.ReloadAction != nil {
+		if err := checkAndBackup(*configMeta, []string{configMeta.MountPoint}, filter, backupPath); err != nil {
 			return nil, err
 		}
 		formatterConfig = &configMeta.FormatterConfig
@@ -422,6 +422,16 @@ func CreateExecHandler(command []string, mountPoint string, configMeta *ConfigSp
 		batchInputTemplate:     getBatchInputTemplate(configMeta),
 	}
 	return shellTrigger, nil
+}
+
+func checkAndBackup(configMeta ConfigSpecInfo, dirs []string, filter regexFilter, backupPath string) error {
+	if isSyncReloadAction(configMeta) {
+		return nil
+	}
+	if err := backupConfigFiles(dirs, filter, backupPath); err != nil {
+		return err
+	}
+	return nil
 }
 
 func fromConfigSpecInfo(meta *ConfigSpecInfo) string {
@@ -581,9 +591,9 @@ func CreateCombinedHandler(config string, backupPath string) (ConfigHandler, err
 		case appsv1beta1.ShellType:
 			h, err = shellHandler(configMeta, tmpPath)
 		case appsv1beta1.UnixSignalType:
-			h, err = signalHandler(configMeta.DynamicReloadAction.UnixSignalTrigger, configMeta.MountPoint)
+			h, err = signalHandler(configMeta.ReloadAction.UnixSignalTrigger, configMeta.MountPoint)
 		case appsv1beta1.TPLScriptType:
-			h, err = tplHandler(configMeta.DynamicReloadAction.TPLScriptTrigger, configMeta, tmpPath)
+			h, err = tplHandler(configMeta.ReloadAction.TPLScriptTrigger, configMeta, tmpPath)
 		}
 		if err != nil {
 			return nil, err

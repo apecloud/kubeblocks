@@ -9,7 +9,6 @@ sidebar_label: Uninstall KubeBlocks and kbcli
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-
 # Uninstall KubeBlocks and kbcli
 
 Uninstallation order:
@@ -28,44 +27,9 @@ Uninstallation order:
 
 Uninstall KubeBlocks if you want to delete KubeBlocks after your trial.
 
-<Tabs>
-<TabItem value="kbcli" label="kbcli" default>
-
 ```bash
 kbcli kubeblocks uninstall
 ```
-
-</TabItem>
-
-<TabItem value="Helm" label="Helm" default>
-
-Delete all the clusters and resources created before performing the following command, otherwise the uninstallation may not be successful.
-
-```bash
-helm uninstall kubeblocks --namespace kb-system
-```
-
-Helm does not delete CRD objects. You can delete the ones KubeBlocks created with the following commands:
-```bash
-kubectl get crd -o name | grep kubeblocks.io | xargs kubectl delete
-```
-
-
-</TabItem>
-
-<TabItem value="YAML" label="YAML" default>
-
-You can generate YAMLs from the KubeBlocks chart and uninstall using kubectl.
-
-```bash
-helm template kubeblocks kubeblocks/kubeblocks --namespace kb-system | kubectl delete -f -
-```
-
-
-</TabItem>
-
-</Tabs>
-
 
 ## Uninstall kbcli
 

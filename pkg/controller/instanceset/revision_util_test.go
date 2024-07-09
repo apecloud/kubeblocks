@@ -332,12 +332,12 @@ var _ = Describe("revision util test", func() {
                             },
                             {
                                 "configMapRef": {
-                                    "name": "redis-test-redis-rsm-env",
+                                    "name": "redis-test-redis-its-env",
                                     "optional": false
                                 }
                             }
                         ],
-                        "image": "infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/redis-stack-server:7.0.6-RC8",
+                        "image": "apecloud-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/redis-stack-server:7.0.6-RC8",
                         "imagePullPolicy": "IfNotPresent",
                         "lifecycle": {
                             "preStop": {
@@ -550,12 +550,12 @@ var _ = Describe("revision util test", func() {
                             },
                             {
                                 "configMapRef": {
-                                    "name": "redis-test-redis-rsm-env",
+                                    "name": "redis-test-redis-its-env",
                                     "optional": false
                                 }
                             }
                         ],
-                        "image": "infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/agamotto:0.1.2-beta.1",
+                        "image": "apecloud-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/agamotto:0.1.2-beta.1",
                         "imagePullPolicy": "IfNotPresent",
                         "name": "metrics",
                         "ports": [
@@ -770,12 +770,12 @@ var _ = Describe("revision util test", func() {
                             },
                             {
                                 "configMapRef": {
-                                    "name": "redis-test-redis-rsm-env",
+                                    "name": "redis-test-redis-its-env",
                                     "optional": false
                                 }
                             }
                         ],
-                        "image": "infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/kubeblocks-tools:0.8.1",
+                        "image": "apecloud-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/kubeblocks-tools:0.8.1",
                         "imagePullPolicy": "IfNotPresent",
                         "name": "kb-checkrole",
                         "ports": [
@@ -962,7 +962,7 @@ var _ = Describe("revision util test", func() {
 			Expect(err).Should(Succeed())
 			cr, err := NewRevision(its)
 			Expect(err).Should(Succeed())
-			Expect(cr.Name).Should(Equal("redis-test-redis-7665b47874"))
+			Expect(cr.Name).Should(Equal("redis-test-redis-59996f5569"))
 		})
 	})
 
@@ -975,9 +975,9 @@ var _ = Describe("revision util test", func() {
 				"pod-3": "revision-3",
 				"pod-4": "revision-4",
 			}
-			revisions, err := buildUpdateRevisions(updateRevisions)
+			revisions, err := buildRevisions(updateRevisions)
 			Expect(err).Should(BeNil())
-			decodeRevisions, err := getUpdateRevisions(revisions)
+			decodeRevisions, err := GetRevisions(revisions)
 			Expect(err).Should(BeNil())
 			Expect(decodeRevisions).Should(Equal(updateRevisions))
 		})

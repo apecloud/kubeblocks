@@ -48,10 +48,10 @@ import TabItem from '@theme/TabItem';
     kbcli cluster promote mycluster --instance='mycluster-mysql-2'
     ```
 
-* 如果有多个组件，可以使用 `--component` 参数指定一个组件。
+* 如果有多个组件，可以使用 `--components` 参数指定一个组件。
 
     ```bash
-    kbcli cluster promote mycluster --instance='mycluster-mysql-2' --component='apecloud-mysql'
+    kbcli cluster promote mycluster --instance='mycluster-mysql-2' --components='apecloud-mysql'
     ```
 
 </TabItem>

@@ -21,13 +21,12 @@ package component
 
 import (
 	"encoding/json"
-	"reflect"
+	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -42,28 +41,21 @@ var _ = Describe("Lorry Utils", func() {
 		var component *SynthesizedComponent
 		var lorryHTTPPort int
 		var lorryGRPCPort int
-		var clusterDefProbe *appsv1alpha1.ClusterDefinitionProbe
 
 		BeforeEach(func() {
 			lorryHTTPPort = 3501
 			lorryGRPCPort = 50001
 
-			clusterDefProbe = &appsv1alpha1.ClusterDefinitionProbe{}
-			clusterDefProbe.PeriodSeconds = 1
-			clusterDefProbe.TimeoutSeconds = 1
-			clusterDefProbe.FailureThreshold = 1
-
 			component = &SynthesizedComponent{}
 			component.CharacterType = "mysql"
-			component.Services = append(component.Services, corev1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "mysql",
-				},
-				Spec: corev1.ServiceSpec{
-					Ports: []corev1.ServicePort{{
-						Protocol: corev1.ProtocolTCP,
-						Port:     3306,
-					}},
+			component.ComponentServices = append(component.ComponentServices, appsv1alpha1.ComponentService{
+				Service: appsv1alpha1.Service{
+					Spec: corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{{
+							Protocol: corev1.ProtocolTCP,
+							Port:     3306,
+						}},
+					},
 				},
 			})
 			component.Roles = []appsv1alpha1.ReplicaRole{
@@ -86,11 +78,6 @@ var _ = Describe("Lorry Utils", func() {
 					Votable:     false,
 				},
 			}
-			// component.Probes = &appsv1alpha1.ClusterDefinitionProbes{
-			// 	RunningProbe: &appsv1alpha1.ClusterDefinitionProbe{},
-			// 	StatusProbe:  &appsv1alpha1.ClusterDefinitionProbe{},
-			// 	RoleProbe:    &appsv1alpha1.ClusterDefinitionProbe{},
-			// }
 			component.LifecycleActions = &appsv1alpha1.ComponentLifecycleActions{
 				RoleProbe: &appsv1alpha1.RoleProbe{},
 			}
@@ -174,17 +161,14 @@ var _ = Describe("Lorry Utils", func() {
 				Ctx: ctx,
 				Log: logger,
 			}
-			zeroWatermark := 0
-			component.VolumeProtection = &appsv1alpha1.VolumeProtectionSpec{
-				HighWatermark: 90,
-				Volumes: []appsv1alpha1.ProtectedVolume{
-					{
-						Name: "volume-001",
-					},
-					{
-						Name:          "volume-002",
-						HighWatermark: &zeroWatermark,
-					},
+			component.Volumes = []appsv1alpha1.ComponentVolume{
+				{
+					Name:          "volume-001",
+					HighWatermark: 90,
+				},
+				{
+					Name:          "volume-002",
+					HighWatermark: 0,
 				},
 			}
 			defaultBuiltInHandler := appsv1alpha1.MySQLBuiltinActionHandler
@@ -206,17 +190,14 @@ var _ = Describe("Lorry Utils", func() {
 				Ctx: ctx,
 				Log: logger,
 			}
-			zeroWatermark := 0
-			component.VolumeProtection = &appsv1alpha1.VolumeProtectionSpec{
-				HighWatermark: 90,
-				Volumes: []appsv1alpha1.ProtectedVolume{
-					{
-						Name: "volume-001",
-					},
-					{
-						Name:          "volume-002",
-						HighWatermark: &zeroWatermark,
-					},
+			component.Volumes = []appsv1alpha1.ComponentVolume{
+				{
+					Name:          "volume-001",
+					HighWatermark: 90,
+				},
+				{
+					Name:          "volume-002",
+					HighWatermark: 0,
 				},
 			}
 			defaultBuiltInHandler := appsv1alpha1.MySQLBuiltinActionHandler
@@ -237,7 +218,69 @@ var _ = Describe("Lorry Utils", func() {
 					break
 				}
 			}
-			Expect(reflect.DeepEqual(component.VolumeProtection, spec)).Should(BeTrue())
+			Expect(spec.Volumes).Should(HaveLen(1))
+			Expect(*spec.Volumes[0].HighWatermark).Should(Equal(90))
 		})
 	})
 })
+
+func TestGetAvailableContainerPorts(t *testing.T) {
+	var containers []corev1.Container
+
+	tests := []struct {
+		inputPort  int32
+		outputPort int32
+	}{{
+		inputPort:  80, // 80 is a privileged port
+		outputPort: 80,
+	}, {
+		inputPort:  65536, // 65536 is an invalid port
+		outputPort: minAvailPort,
+	}, {
+		inputPort:  3306, // 3306 is a qualified port
+		outputPort: 3306,
+	}}
+
+	for _, test := range tests {
+		containerPorts := []int32{test.inputPort}
+		foundPorts, err := getAvailableContainerPorts(containers, containerPorts)
+		if err != nil {
+			t.Error("expect getAvailableContainerPorts success")
+		}
+		if len(foundPorts) != 1 || foundPorts[0] != test.outputPort {
+			t.Error("expect getAvailableContainerPorts returns", test.outputPort)
+		}
+	}
+}
+
+func TestGetAvailableContainerPortsPartlyOccupied(t *testing.T) {
+	var containers []corev1.Container
+
+	destPort := 3306
+	for p := minAvailPort; p < destPort; p++ {
+		containers = append(containers, corev1.Container{Ports: []corev1.ContainerPort{{ContainerPort: int32(p)}}})
+	}
+
+	containerPorts := []int32{minAvailPort + 1}
+	foundPorts, err := getAvailableContainerPorts(containers, containerPorts)
+	if err != nil {
+		t.Error("expect getAvailableContainerPorts success")
+	}
+	if len(foundPorts) != 1 || foundPorts[0] != int32(destPort) {
+		t.Error("expect getAvailableContainerPorts returns 3306")
+	}
+}
+
+func TestGetAvailableContainerPortsFullyOccupied(t *testing.T) {
+	var containers []corev1.Container
+
+	for p := minAvailPort; p <= maxAvailPort; p++ {
+		containers = append(containers, corev1.Container{Ports: []corev1.ContainerPort{{ContainerPort: int32(p)}}})
+	}
+
+	containerPorts := []int32{3306}
+	_, err := getAvailableContainerPorts(containers, containerPorts)
+	if err == nil {
+		t.Error("expect getAvailableContainerPorts return error")
+	}
+}

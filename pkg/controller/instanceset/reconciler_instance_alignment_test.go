@@ -20,9 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -30,7 +33,6 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
 var _ = Describe("replicas alignment reconciler test", func() {
@@ -54,8 +56,8 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ResultSatisfied))
 
 			By("prepare current tree")
-			// desired: bar-hello-0, bar-foo-0, bar-foo-1, bar-0, bar-1, bar-2, bar-3
-			// current: bar-foo-0, bar-1
+			// desired: bar-0, bar-1, bar-2, bar-3, bar-foo-0, bar-foo-1, bar-hello-0
+			// current: bar-1, bar-foo-0
 			replicas := int32(7)
 			its.Spec.Replicas = &replicas
 			nameHello := "hello"
@@ -71,8 +73,10 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			}
 			its.Spec.Instances = append(its.Spec.Instances, instanceFoo)
 			podFoo0 := builder.NewPodBuilder(namespace, its.Name+"-foo-0").GetObject()
+			pvcFoo0 := builder.NewPVCBuilder(namespace, volumeClaimTemplates[0].Name+"-"+podFoo0.Name).GetObject()
 			podBar1 := builder.NewPodBuilder(namespace, "bar-1").GetObject()
-			Expect(tree.Add(podFoo0, podBar1)).Should(Succeed())
+			pvcBar1 := builder.NewPVCBuilder(namespace, volumeClaimTemplates[0].Name+"-"+podBar1.Name).GetObject()
+			Expect(tree.Add(podFoo0, pvcFoo0, podBar1, pvcBar1)).Should(Succeed())
 
 			By("update revisions")
 			revisionUpdateReconciler := NewRevisionUpdateReconciler()
@@ -87,18 +91,17 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			// desired: bar-0, bar-1, bar-foo-0
 			pods := newTree.List(&corev1.Pod{})
 			Expect(pods).Should(HaveLen(3))
-			currentPodSnapshot := make(model.ObjectSnapshot)
-			for _, object := range pods {
-				name, err := model.GetGVKName(object)
-				Expect(err).Should(BeNil())
-				currentPodSnapshot[*name] = object
-			}
+			pvcs := newTree.List(&corev1.PersistentVolumeClaim{})
+			Expect(pvcs).Should(HaveLen(3))
 			podBar0 := builder.NewPodBuilder(namespace, "bar-0").GetObject()
 			for _, object := range []client.Object{podFoo0, podBar0, podBar1} {
-				name, err := model.GetGVKName(object)
-				Expect(err).Should(BeNil())
-				_, ok := currentPodSnapshot[*name]
-				Expect(ok).Should(BeTrue())
+				Expect(slices.IndexFunc(pods, func(item client.Object) bool {
+					return item.GetName() == object.GetName()
+				})).Should(BeNumerically(">=", 0))
+				Expect(slices.IndexFunc(pvcs, func(item client.Object) bool {
+					expectedPVCName := fmt.Sprintf("%s-%s", volumeClaimTemplates[0].Name, object.GetName())
+					return expectedPVCName == item.GetName()
+				})).Should(BeNumerically(">=", 0))
 			}
 
 			By("do reconcile with Parallel policy")
@@ -109,25 +112,23 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			parallelITS.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
 			newTree, err = reconciler.Reconcile(parallelTree)
 			Expect(err).Should(BeNil())
-			// desired: bar-hello-0, bar-foo-0, bar-foo-1, bar-0, bar-1, bar-2, bar-3
+			// desired: bar-0, bar-1, bar-2, bar-3, bar-foo-0, bar-foo-1, bar-hello-0
 			pods = newTree.List(&corev1.Pod{})
 			Expect(pods).Should(HaveLen(7))
-			currentPodSnapshot = make(model.ObjectSnapshot)
-			for _, object := range pods {
-				name, err := model.GetGVKName(object)
-				Expect(err).Should(BeNil())
-				currentPodSnapshot[*name] = object
-			}
-
+			pvcs = newTree.List(&corev1.PersistentVolumeClaim{})
+			Expect(pvcs).Should(HaveLen(7))
 			podHello := builder.NewPodBuilder(namespace, its.Name+"-hello-0").GetObject()
 			podFoo1 := builder.NewPodBuilder(namespace, its.Name+"-foo-1").GetObject()
 			podBar2 := builder.NewPodBuilder(namespace, "bar-2").GetObject()
 			podBar3 := builder.NewPodBuilder(namespace, "bar-3").GetObject()
 			for _, object := range []client.Object{podHello, podFoo0, podFoo1, podBar0, podBar1, podBar2, podBar3} {
-				name, err := model.GetGVKName(object)
-				Expect(err).Should(BeNil())
-				_, ok := currentPodSnapshot[*name]
-				Expect(ok).Should(BeTrue())
+				Expect(slices.IndexFunc(pods, func(item client.Object) bool {
+					return item.GetName() == object.GetName()
+				})).Should(BeNumerically(">=", 0))
+				Expect(slices.IndexFunc(pvcs, func(item client.Object) bool {
+					expectedPVCName := fmt.Sprintf("%s-%s", volumeClaimTemplates[0].Name, object.GetName())
+					return expectedPVCName == item.GetName()
+				})).Should(BeNumerically(">=", 0))
 			}
 		})
 	})

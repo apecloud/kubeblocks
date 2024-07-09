@@ -20,72 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package testutil
 
 import (
-	"fmt"
-	"reflect"
 	"strings"
 
 	"github.com/onsi/gomega"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/testutil"
-	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
-
-// NewFakeInstanceSet creates a fake ITS workload object for testing.
-func NewFakeInstanceSet(name string, replicas int) *workloads.InstanceSet {
-	template := corev1.PodTemplateSpec{
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
-				{
-					Name:  "nginx",
-					Image: "nginx",
-				},
-			},
-		},
-	}
-
-	template.Labels = map[string]string{"foo": "bar"}
-	itsReplicas := int32(replicas)
-	Revision := name + "-d5df5b8d6"
-	return &workloads.InstanceSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: corev1.NamespaceDefault,
-		},
-		Spec: workloads.InstanceSetSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"foo": "bar"},
-			},
-			Replicas:    &itsReplicas,
-			Template:    template,
-			ServiceName: "governingsvc",
-		},
-		Status: workloads.InstanceSetStatus{
-			InitReplicas: itsReplicas,
-			StatefulSetStatus: appsv1.StatefulSetStatus{
-				AvailableReplicas:  itsReplicas,
-				ObservedGeneration: 0,
-				ReadyReplicas:      itsReplicas,
-				UpdatedReplicas:    itsReplicas,
-				CurrentRevision:    Revision,
-				UpdateRevision:     Revision,
-			},
-		},
-	}
-}
-
-// NewFakeInstanceSetPod creates a fake pod of the ITS workload for testing.
-func NewFakeInstanceSetPod(its *workloads.InstanceSet, ordinal int) *corev1.Pod {
-	pod := &corev1.Pod{}
-	pod.Name = fmt.Sprintf("%s-%d", its.Name, ordinal)
-	return pod
-}
 
 // MockInstanceSetReady mocks the ITS workload to ready state.
 func MockInstanceSetReady(its *workloads.InstanceSet, pods ...*corev1.Pod) {
@@ -93,7 +38,6 @@ func MockInstanceSetReady(its *workloads.InstanceSet, pods ...*corev1.Pod) {
 	its.Status.ReadyInitReplicas = *its.Spec.Replicas
 	its.Status.AvailableReplicas = *its.Spec.Replicas
 	its.Status.ObservedGeneration = its.Generation
-	its.Status.CurrentGeneration = its.Generation
 	its.Status.Replicas = *its.Spec.Replicas
 	its.Status.ReadyReplicas = *its.Spec.Replicas
 	its.Status.CurrentRevision = its.Status.UpdateRevision
@@ -157,25 +101,4 @@ func ListAndCheckInstanceSetWithComponent(testCtx *testutil.TestContext, key typ
 		g.Expect(itsList.Items).ShouldNot(gomega.BeEmpty())
 	}).Should(gomega.Succeed())
 	return itsList
-}
-
-func PatchInstanceSetStatus(testCtx *testutil.TestContext, stsName string, status workloads.InstanceSetStatus) {
-	objectKey := client.ObjectKey{Name: stsName, Namespace: testCtx.DefaultNamespace}
-	gomega.Expect(testapps.GetAndChangeObjStatus(testCtx, objectKey, func(newITS *workloads.InstanceSet) {
-		newITS.Status = status
-	})()).Should(gomega.Succeed())
-	gomega.Eventually(testapps.CheckObj(testCtx, objectKey, func(g gomega.Gomega, newITS *workloads.InstanceSet) {
-		g.Expect(reflect.DeepEqual(newITS.Status, status)).Should(gomega.BeTrue())
-	})).Should(gomega.Succeed())
-}
-
-func InitInstanceSetStatus(testCtx testutil.TestContext, its *workloads.InstanceSet, controllerRevision string) {
-	gomega.Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
-		its.Status.InitReplicas = *its.Spec.Replicas
-		its.Status.Replicas = *its.Spec.Replicas
-		its.Status.UpdateRevision = controllerRevision
-		its.Status.CurrentRevision = controllerRevision
-		its.Status.ObservedGeneration = its.Generation
-		its.Status.CurrentGeneration = its.Generation
-	})).Should(gomega.Succeed())
 }

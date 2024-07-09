@@ -14,14 +14,12 @@ You can expand the storage volume size of each pod.
 Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
 
 ```bash
-kbcli cluster list pulsar
+kbcli cluster list pulsar-cluster
 ```
 
 ## Steps
 
 1. Change configuration. There are 3 ways to apply volume expansion.
-
-    **Option 1.** (**Recommended**) Use kbcli
 
     Configure the values of `--components`, `--volume-claim-templates`, and `--storage`, and run the command below to expand the volume.
 
@@ -34,7 +32,7 @@ kbcli cluster list pulsar
     - Expand volume for `journal`.
 
       ```bash
-      kbcli cluster volume-expand pulsar --storage=40Gi --components=bookies -t journal  
+      kbcli cluster volume-expand pulsar-cluster --storage=40Gi --components=bookies -t journal  
       ```
 
       - `--components` describes the component name for volume expansion.
@@ -44,37 +42,9 @@ kbcli cluster list pulsar
     - Expand volume for `ledger`.
 
       ```bash
-      kbcli cluster volume-expand pulsar --storage=200Gi --components=bookies -t ledgers  
+      kbcli cluster volume-expand pulsar-cluster --storage=200Gi --components=bookies -t ledgers  
       ```
 
-    **Option 2.** Create an OpsRequest
-
-    Change the value of storage according to your need and run the command below to expand the volume of a cluster.
-
-    ```bash
-    kubectl apply -f - <<EOF
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: OpsRequest
-    metadata:
-      generateName: pulsar-volume-expand-
-    spec:
-      clusterRef: pulsar
-      type: VolumeExpansion
-      volumeExpansion:
-      - componentName: bookies
-        volumeClaimTemplates:
-        - name: ledgers
-          storage: "200Gi"
-        - name: journal
-          storage: "40Gi"      
-    EOF
-    ```
-
-    **Option 3.** Edit cluster with `kubectl`.
-
-    ```bash
-    kubectl edit cluster pulsar
-    ```
 
 2. Validate the volume expansion operation.
 
@@ -82,11 +52,11 @@ kbcli cluster list pulsar
    kubectl get ops  
    ```
 
-   * STATUS=VolumeExpanding: it means the volume expansion is in progress.
+   * STATUS=Updating: it means the volume expansion is in progress.
    * STATUS=Running: it means the volume expansion operation has been applied.
 
 3. Check whether the corresponding resources change.
 
     ```bash
-    kbcli cluster describe pulsar
+    kbcli cluster describe pulsar-cluster
     ```

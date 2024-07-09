@@ -29,11 +29,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
 
 func TestReflect(t *testing.T) {
@@ -119,4 +122,25 @@ func TestIsPolicyV1DiscoveryNotFoundError(t *testing.T) {
 
 	// wrapped policy/v1 not-found error
 	assert.True(t, isPolicyV1DiscoveryNotFoundError(fmt.Errorf("%w", discoveryErr)))
+}
+
+func TestIsOwnedByInstanceSet(t *testing.T) {
+	its := &workloads.InstanceSet{}
+	assert.False(t, isOwnedByInstanceSet(its))
+
+	its.OwnerReferences = []metav1.OwnerReference{
+		{
+			Kind:       workloads.Kind,
+			Controller: pointer.Bool(true),
+		},
+	}
+	assert.True(t, isOwnedByInstanceSet(its))
+
+	its.OwnerReferences = []metav1.OwnerReference{
+		{
+			Kind:       reflect.TypeOf(appsv1alpha1.Cluster{}).Name(),
+			Controller: pointer.Bool(true),
+		},
+	}
+	assert.False(t, isOwnedByInstanceSet(its))
 }

@@ -4,132 +4,13 @@ kind: MutatingWebhookConfiguration
 metadata:
   name: mutating-webhook-configuration
 webhooks:
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /mutate-workloads-kubeblocks-io-v1alpha1-instanceset
-  failurePolicy: Fail
-  name: minstanceset.kb.io
-  rules:
-  - apiGroups:
-    - workloads.kubeblocks.io
-    apiVersions:
-    - v1alpha1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - instancesets
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /mutate-apps-kubeblocks-io-v1alpha1-clusterdefinition
-  failurePolicy: Fail
-  name: mclusterdefinition.kb.io
-  rules:
-  - apiGroups:
-    - apps.kubeblocks.io
-    apiVersions:
-    - v1alpha1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - clusterdefinitions
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /mutate-apps-kubeblocks-io-v1alpha1-component
-  failurePolicy: Fail
-  name: mcomponent.kb.io
-  rules:
-  - apiGroups:
-    - apps.kubeblocks.io
-    apiVersions:
-    - v1alpha1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - components
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /mutate-apps-kubeblocks-io-v1alpha1-componentdefinition
-  failurePolicy: Fail
-  name: mcomponentdefinition.kb.io
-  rules:
-  - apiGroups:
-    - apps.kubeblocks.io
-    apiVersions:
-    - v1alpha1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - componentdefinitions
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /mutate-apps-kubeblocks-io-v1alpha1-componentversion
-  failurePolicy: Fail
-  name: mcomponentversion.kb.io
-  rules:
-  - apiGroups:
-    - apps.kubeblocks.io
-    apiVersions:
-    - v1alpha1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - componentversions
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /mutate-apps-kubeblocks-io-v1alpha1-servicedescriptor
-  failurePolicy: Fail
-  name: mservicedescriptor.kb.io
-  rules:
-  - apiGroups:
-    - apps.kubeblocks.io
-    apiVersions:
-    - v1alpha1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - servicedescriptors
-  sideEffects: None
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
   name: validating-webhook-configuration
 webhooks:
+<<<<<<< HEAD
 - admissionReviewVersions:
   - v1
   clientConfig:
@@ -310,3 +191,5 @@ webhooks:
     resources:
     - servicedescriptors
   sideEffects: None
+=======
+>>>>>>> main

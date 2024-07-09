@@ -12,149 +12,28 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
 ## Stop a cluster
 
-### Option 1. (Recommended) Use kbcli
+1. Configure the name of your cluster and run the command below to stop this cluster.
 
-Configure the name of your cluster and run the command below to stop this cluster.
+   ```bash
+   kbcli cluster stop redis-cluster
+   ```
 
-```bash
-kbcli cluster stop <name>
-```
+2. Check the status of the cluster to see whether it is stopped.
 
-***Example***
-
-```bash
-kbcli cluster stop redis-cluster
-```
-
-### Option 2. Create an OpsRequest
-
-Run the command below to stop a cluster.
-```bash
-kubectl apply -f - <<EOF
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: OpsRequest
-metadata:
-  generateName: stop-
-spec:
-  # cluster ref
-  clusterRef: redis-cluster
-  type: Stop
-EOF
-```
-
-### Option 3. Change the YAML file of the cluster
-
-Configure replicas as 0 to delete pods.
-
-```yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: Cluster
-metadata:
-  name: redis-cluster
-spec:
-  clusterDefinitionRef: redis
-  clusterVersionRef: redis-7.0.6
-  terminationPolicy: Delete
-  componentSpecs:
-  - name: redis
-    componentDefRef: redis
-    monitor: true  
-    replicas: 0
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        storageClassName: standard
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi
-  - name: redis-sentinel
-    componentDefRef: redis-sentinel
-    monitor: true  
-    replicas: 0
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        storageClassName: standard
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi
-```
+    ```bash
+    kbcli cluster list
+    ```
 
 ## Start a cluster
   
-### Option 1. (Recommended) Use kbcli
+1. Configure the name of your cluster and run the command below to start this cluster.
 
-Configure the name of your cluster and run the command below to start this cluster.
+   ```bash
+   kbcli cluster start redis-cluster
+   ```
 
-```bash
-kbcli cluster start <name>
-```
+2. Check the status of the cluster to see whether it is running again.
 
-***Example***
-
-```bash
-kbcli cluster start redis-cluster
-```
-
-### Option 2. Create an OpsRequest
-
-Run the command below to start a cluster.
-
-```yaml
-kubectl apply -f - <<EOF
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: OpsRequest
-metadata:
-  generateName: start-
-spec:
-  # cluster ref
-  clusterRef: redis-cluster
-  type: Start
-EOF 
-```
-
-### Option 3. Change the YAML file of the cluster
-
-Change replicas back to the original amount to start this cluster again.
-
-```yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: Cluster
-metadata:
-    name: redis-cluster
-spec:
-  clusterDefinitionRef: redis
-  clusterVersionRef: redis-7.0.6
-  terminationPolicy: Delete
-  componentSpecs:
-  - name: redis
-    componentDefRef: redis
-    monitor: true  
-    replicas: 2
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        storageClassName: standard
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi
-  - name: redis-sentinel
-    componentDefRef: redis-sentinel
-    monitor: true  
-    replicas: 3
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        storageClassName: standard
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi
-```
+    ```bash
+    kbcli cluster list
+    ```

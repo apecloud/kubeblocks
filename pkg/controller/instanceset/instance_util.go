@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -34,6 +35,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -43,8 +45,14 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
+
+type InstanceTemplate interface {
+	GetName() string
+	GetReplicas() int32
+	GetOrdinals() workloads.Ordinals
+}
 
 type instanceTemplateExt struct {
 	Name     string
@@ -95,7 +103,7 @@ func ParseParentNameAndOrdinal(s string) (string, int) {
 }
 
 // sortObjects sorts objects by their role priority and name
-// e.g.: unknown -> empty -> learner -> follower1 -> follower2 -> leader, with follower1.Name < follower2.Name
+// e.g.: unknown -> empty -> learner -> follower1 -> follower2 -> leader, with follower1.Name > follower2.Name
 // reverse it if reverse==true
 func sortObjects[T client.Object](objects []T, rolePriorityMap map[string]int, reverse bool) {
 	getRolePriorityFunc := func(i int) int {
@@ -105,10 +113,10 @@ func sortObjects[T client.Object](objects []T, rolePriorityMap map[string]int, r
 	getNameNOrdinalFunc := func(i int) (string, int) {
 		return ParseParentNameAndOrdinal(objects[i].GetName())
 	}
-	BaseSort(objects, getNameNOrdinalFunc, getRolePriorityFunc, reverse)
+	baseSort(objects, getNameNOrdinalFunc, getRolePriorityFunc, reverse)
 }
 
-func BaseSort(x any, getNameNOrdinalFunc func(i int) (string, int), getRolePriorityFunc func(i int) int, reverse bool) {
+func baseSort(x any, getNameNOrdinalFunc func(i int) (string, int), getRolePriorityFunc func(i int) int, reverse bool) {
 	if getRolePriorityFunc == nil {
 		getRolePriorityFunc = func(_ int) int {
 			return 0
@@ -126,9 +134,9 @@ func BaseSort(x any, getNameNOrdinalFunc func(i int) (string, int), getRolePrior
 		name1, ordinal1 := getNameNOrdinalFunc(i)
 		name2, ordinal2 := getNameNOrdinalFunc(j)
 		if name1 != name2 {
-			return name1 < name2
+			return name1 > name2
 		}
-		return ordinal1 < ordinal2
+		return ordinal1 > ordinal2
 	})
 }
 
@@ -194,7 +202,14 @@ func buildInstanceName2TemplateMap(itsExt *instanceSetExt) (map[string]*instance
 	allNameTemplateMap := make(map[string]*instanceTemplateExt)
 	var instanceNameList []string
 	for _, template := range instanceTemplateList {
-		instanceNames := GenerateInstanceNamesFromTemplate(itsExt.its.Name, template.Name, template.Replicas, itsExt.its.Spec.OfflineInstances)
+		ordinalList, err := GetOrdinalListByTemplateName(itsExt.its, template.Name)
+		if err != nil {
+			return nil, err
+		}
+		instanceNames, err := GenerateInstanceNamesFromTemplate(itsExt.its.Name, template.Name, template.Replicas, itsExt.its.Spec.OfflineInstances, ordinalList)
+		if err != nil {
+			return nil, err
+		}
 		instanceNameList = append(instanceNameList, instanceNames...)
 		for _, name := range instanceNames {
 			allNameTemplateMap[name] = template
@@ -211,16 +226,53 @@ func buildInstanceName2TemplateMap(itsExt *instanceSetExt) (map[string]*instance
 	return allNameTemplateMap, nil
 }
 
-func GenerateInstanceNamesFromTemplate(parentName, templateName string, replicas int32, offlineInstances []string) []string {
-	instanceNames, _ := generateInstanceNames(parentName, templateName, replicas, 0, offlineInstances)
-	return instanceNames
+func GenerateAllInstanceNames(parentName string, replicas int32, templates []InstanceTemplate, offlineInstances []string, defaultTemplateOrdinals workloads.Ordinals) ([]string, error) {
+	totalReplicas := int32(0)
+	instanceNameList := make([]string, 0)
+	for _, template := range templates {
+		replicas := template.GetReplicas()
+		ordinalList, err := ConvertOrdinalsToSortedList(template.GetOrdinals())
+		if err != nil {
+			return nil, err
+		}
+		names, err := GenerateInstanceNamesFromTemplate(parentName, template.GetName(), replicas, offlineInstances, ordinalList)
+		if err != nil {
+			return nil, err
+		}
+		instanceNameList = append(instanceNameList, names...)
+		totalReplicas += replicas
+	}
+	if totalReplicas < replicas {
+		ordinalList, err := ConvertOrdinalsToSortedList(defaultTemplateOrdinals)
+		if err != nil {
+			return nil, err
+		}
+		names, err := GenerateInstanceNamesFromTemplate(parentName, "", replicas-totalReplicas, offlineInstances, ordinalList)
+		if err != nil {
+			return nil, err
+		}
+		instanceNameList = append(instanceNameList, names...)
+	}
+	getNameNOrdinalFunc := func(i int) (string, int) {
+		return ParseParentNameAndOrdinal(instanceNameList[i])
+	}
+	baseSort(instanceNameList, getNameNOrdinalFunc, nil, true)
+	return instanceNameList, nil
 }
 
-// generateInstanceNames generates instance names based on certain rules:
+func GenerateInstanceNamesFromTemplate(parentName, templateName string, replicas int32, offlineInstances []string, ordinalList []int32) ([]string, error) {
+	instanceNames, err := GenerateInstanceNames(parentName, templateName, replicas, 0, offlineInstances, ordinalList)
+	return instanceNames, err
+}
+
+// GenerateInstanceNames generates instance names based on certain rules:
 // The naming convention for instances (pods) based on the Parent Name, InstanceTemplate Name, and ordinal.
 // The constructed instance name follows the pattern: $(parent.name)-$(template.name)-$(ordinal).
-func generateInstanceNames(parentName, templateName string,
-	replicas int32, ordinal int32, offlineInstances []string) ([]string, int32) {
+func GenerateInstanceNames(parentName, templateName string,
+	replicas int32, ordinal int32, offlineInstances []string, ordinalList []int32) ([]string, error) {
+	if len(ordinalList) > 0 {
+		return GenerateInstanceNamesWithOrdinalList(parentName, templateName, replicas, offlineInstances, ordinalList)
+	}
 	usedNames := sets.New(offlineInstances...)
 	var instanceNameList []string
 	for count := int32(0); count < replicas; count++ {
@@ -238,14 +290,81 @@ func generateInstanceNames(parentName, templateName string,
 			}
 		}
 	}
-	return instanceNameList, ordinal
+	return instanceNameList, nil
+}
+
+// GenerateInstanceNamesWithOrdinalList generates instance names based on ordinalList and offlineInstances.
+func GenerateInstanceNamesWithOrdinalList(parentName, templateName string,
+	replicas int32, offlineInstances []string, ordinalList []int32) ([]string, error) {
+	var instanceNameList []string
+	usedNames := sets.New(offlineInstances...)
+	for _, ordinal := range ordinalList {
+		var name string
+		if len(templateName) == 0 {
+			name = fmt.Sprintf("%s-%d", parentName, ordinal)
+		} else {
+			name = fmt.Sprintf("%s-%s-%d", parentName, templateName, ordinal)
+		}
+		if usedNames.Has(name) {
+			continue
+		}
+		instanceNameList = append(instanceNameList, name)
+	}
+	if int32(len(instanceNameList)) != replicas {
+		errorMessage := fmt.Sprintf("for template '%s', expected %d instance names but generated %d: [%s]",
+			templateName, replicas, len(instanceNameList), strings.Join(instanceNameList, ", "))
+		return instanceNameList, fmt.Errorf(errorMessage)
+	}
+	return instanceNameList, nil
+}
+
+func GetOrdinalListByTemplateName(its *workloads.InstanceSet, templateName string) ([]int32, error) {
+	ordinals, err := GetOrdinalsByTemplateName(its, templateName)
+	if err != nil {
+		return nil, err
+	}
+	return ConvertOrdinalsToSortedList(ordinals)
+}
+
+func GetOrdinalsByTemplateName(its *workloads.InstanceSet, templateName string) (workloads.Ordinals, error) {
+	if templateName == "" {
+		return its.Spec.DefaultTemplateOrdinals, nil
+	}
+	for _, template := range its.Spec.Instances {
+		if template.Name == templateName {
+			return template.Ordinals, nil
+		}
+	}
+	return workloads.Ordinals{}, fmt.Errorf("template %s not found", templateName)
+}
+
+func ConvertOrdinalsToSortedList(ordinals workloads.Ordinals) ([]int32, error) {
+	ordinalList := sets.New(ordinals.Discrete...)
+	for _, item := range ordinals.Ranges {
+		start := item.Start
+		end := item.End
+
+		if start > end {
+			return nil, fmt.Errorf("range's end(%v) must >= start(%v)", end, start)
+		}
+
+		for ordinal := start; ordinal <= end; ordinal++ {
+			if ordinalList.Has(ordinal) {
+				klog.Warningf("Overlap detected: ordinal %v already exists in the ordinals", ordinal)
+			}
+			ordinalList.Insert(ordinal)
+		}
+	}
+	sortedOrdinalList := ordinalList.UnsortedList()
+	slices.Sort(sortedOrdinalList)
+	return sortedOrdinalList, nil
 }
 
 func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent *workloads.InstanceSet, revision string) (*instance, error) {
 	// 1. build a pod from template
 	var err error
 	if len(revision) == 0 {
-		revision, err = buildInstanceTemplateRevision(template, parent)
+		revision, err = BuildInstanceTemplateRevision(&template.PodTemplateSpec, parent)
 		if err != nil {
 			return nil, err
 		}
@@ -261,7 +380,7 @@ func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent 
 		GetObject()
 	// Set these immutable fields only on initial Pod creation, not updates.
 	pod.Spec.Hostname = pod.Name
-	pod.Spec.Subdomain = parent.Spec.ServiceName
+	pod.Spec.Subdomain = getHeadlessSvcName(parent.Name)
 
 	// 2. build pvcs from template
 	pvcMap := make(map[string]*corev1.PersistentVolumeClaim)
@@ -274,6 +393,9 @@ func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent 
 			AddLabels(constant.VolumeClaimTemplateNameLabelKey, claimTemplate.Name).
 			SetSpec(*claimTemplate.Spec.DeepCopy()).
 			GetObject()
+		if template.Name != "" {
+			pvc.Labels[constant.KBAppComponentInstanceTemplateLabelKey] = template.Name
+		}
 		pvcMap[pvcName] = pvc
 		pvcNameMap[pvcName] = claimTemplate.Name
 	}
@@ -289,7 +411,7 @@ func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent 
 			}).GetObject()
 		volumeList = append(volumeList, *volume)
 	}
-	mergeList(&volumeList, &pod.Spec.Volumes, func(item corev1.Volume) func(corev1.Volume) bool {
+	intctrlutil.MergeList(&volumeList, &pod.Spec.Volumes, func(item corev1.Volume) func(corev1.Volume) bool {
 		return func(v corev1.Volume) bool {
 			return v.Name == item.Name
 		}
@@ -305,6 +427,27 @@ func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent 
 	return inst, nil
 }
 
+func buildInstancePVCByTemplate(name string, template *instanceTemplateExt, parent *workloads.InstanceSet) []*corev1.PersistentVolumeClaim {
+	// 2. build pvcs from template
+	var pvcs []*corev1.PersistentVolumeClaim
+	labels := getMatchLabels(parent.Name)
+	for _, claimTemplate := range template.VolumeClaimTemplates {
+		pvcName := fmt.Sprintf("%s-%s", claimTemplate.Name, name)
+		pvc := builder.NewPVCBuilder(parent.Namespace, pvcName).
+			AddLabelsInMap(template.Labels).
+			AddLabelsInMap(labels).
+			AddLabels(constant.VolumeClaimTemplateNameLabelKey, claimTemplate.Name).
+			SetSpec(*claimTemplate.Spec.DeepCopy()).
+			GetObject()
+		if template.Name != "" {
+			pvc.Labels[constant.KBAppComponentInstanceTemplateLabelKey] = template.Name
+		}
+		pvcs = append(pvcs, pvc)
+	}
+
+	return pvcs
+}
+
 // copyAndMerge merges two objects for updating:
 // 1. new an object targetObj by copying from oldObj
 // 2. merge all fields can be updated from newObj into targetObj
@@ -313,40 +456,38 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		return nil
 	}
 
-	// mergeMetadataMap keeps the original elements.
-	mergeMetadataMap := func(originalMap map[string]string, targetMap map[string]string) map[string]string {
-		if targetMap == nil && originalMap == nil {
-			return nil
-		}
-		if targetMap == nil {
-			targetMap = map[string]string{}
-		}
-		for k, v := range originalMap {
-			// if the element not exist in targetMap, copy it from original.
-			if _, ok := (targetMap)[k]; !ok {
-				(targetMap)[k] = v
-			}
-		}
-		return targetMap
-	}
-
-	copyAndMergeSts := func(oldSts, newSts *appsv1.StatefulSet) client.Object {
-		oldSts.Labels = mergeMetadataMap(oldSts.Labels, newSts.Labels)
-		// if annotations exist and are replaced, the StatefulSet will be updated.
-		oldSts.Annotations = mergeMetadataMap(oldSts.Annotations, newSts.Annotations)
-		oldSts.Spec.Template = newSts.Spec.Template
-		oldSts.Spec.Replicas = newSts.Spec.Replicas
-		oldSts.Spec.UpdateStrategy = newSts.Spec.UpdateStrategy
-		return oldSts
-	}
-
 	copyAndMergeSvc := func(oldSvc *corev1.Service, newSvc *corev1.Service) client.Object {
-		oldSvc.Annotations = mergeMetadataMap(oldSvc.Annotations, newSvc.Annotations)
-		oldSvc.Spec = newSvc.Spec
+		intctrlutil.MergeList(&newSvc.Finalizers, &oldSvc.Finalizers, func(finalizer string) func(string) bool {
+			return func(item string) bool {
+				return finalizer == item
+			}
+		})
+		intctrlutil.MergeList(&newSvc.OwnerReferences, &oldSvc.OwnerReferences, func(reference metav1.OwnerReference) func(metav1.OwnerReference) bool {
+			return func(item metav1.OwnerReference) bool {
+				return reference.UID == item.UID
+			}
+		})
+		mergeMap(&newSvc.Annotations, &oldSvc.Annotations)
+		mergeMap(&newSvc.Labels, &oldSvc.Labels)
+		mergeMap(&newSvc.Spec.Selector, &oldSvc.Spec.Selector)
+		oldSvc.Spec.Type = newSvc.Spec.Type
+		oldSvc.Spec.PublishNotReadyAddresses = newSvc.Spec.PublishNotReadyAddresses
+		// ignore NodePort&LB svc here, instanceSet only supports default headless svc
+		oldSvc.Spec.Ports = newSvc.Spec.Ports
 		return oldSvc
 	}
 
 	copyAndMergeCm := func(oldCm, newCm *corev1.ConfigMap) client.Object {
+		intctrlutil.MergeList(&newCm.Finalizers, &oldCm.Finalizers, func(finalizer string) func(string) bool {
+			return func(item string) bool {
+				return finalizer == item
+			}
+		})
+		intctrlutil.MergeList(&newCm.OwnerReferences, &oldCm.OwnerReferences, func(reference metav1.OwnerReference) func(metav1.OwnerReference) bool {
+			return func(item metav1.OwnerReference) bool {
+				return reference.UID == item.UID
+			}
+		})
 		oldCm.Data = newCm.Data
 		oldCm.BinaryData = newCm.BinaryData
 		return oldCm
@@ -362,17 +503,26 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		// resources.request.storage only supports volume expansion.
 		if reflect.DeepEqual(oldPVC.Spec.AccessModes, newPVC.Spec.AccessModes) &&
 			oldPVC.Spec.Resources.Requests.Storage().Cmp(*newPVC.Spec.Resources.Requests.Storage()) >= 0 {
-			return nil
+			return oldPVC
 		}
 		oldPVC.Spec.AccessModes = newPVC.Spec.AccessModes
-		oldPVC.Spec.Resources.Requests[corev1.ResourceStorage] = *newPVC.Spec.Resources.Requests.Storage()
+		if newPVC.Spec.Resources.Requests == nil {
+			return oldPVC
+		}
+		if _, ok := newPVC.Spec.Resources.Requests[corev1.ResourceStorage]; !ok {
+			return oldPVC
+		}
+		requests := oldPVC.Spec.Resources.Requests
+		if requests == nil {
+			requests = make(corev1.ResourceList)
+		}
+		requests[corev1.ResourceStorage] = *newPVC.Spec.Resources.Requests.Storage()
+		oldPVC.Spec.Resources.Requests = requests
 		return oldPVC
 	}
 
 	targetObj := oldObj.DeepCopyObject()
 	switch o := newObj.(type) {
-	case *appsv1.StatefulSet:
-		return copyAndMergeSts(targetObj.(*appsv1.StatefulSet), o)
 	case *corev1.Service:
 		return copyAndMergeSvc(targetObj.(*corev1.Service), o)
 	case *corev1.ConfigMap:
@@ -400,20 +550,41 @@ func validateSpec(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) err
 		}
 		replicasInTemplates += replicas
 		if templateNames.Has(template.Name) {
-			return fmt.Errorf("duplicate instance template name: %s", template.Name)
+			err = fmt.Errorf("duplicate instance template name: %s", template.Name)
+			if tree != nil {
+				tree.EventRecorder.Event(its, corev1.EventTypeWarning, EventReasonInvalidSpec, err.Error())
+			}
+			return err
 		}
 		templateNames.Insert(template.Name)
 	}
 	// sum of spec.templates[*].replicas should not greater than spec.replicas
 	if replicasInTemplates > *its.Spec.Replicas {
-		return fmt.Errorf("total replicas in instances(%d) should not greater than replicas in spec(%d)", replicasInTemplates, *its.Spec.Replicas)
+		err = fmt.Errorf("total replicas in instances(%d) should not greater than replicas in spec(%d)", replicasInTemplates, *its.Spec.Replicas)
+		if tree != nil {
+			tree.EventRecorder.Event(its, corev1.EventTypeWarning, EventReasonInvalidSpec, err.Error())
+		}
+		return err
+	}
+
+	// try to generate all pod names
+	var instances []InstanceTemplate
+	for i := range its.Spec.Instances {
+		instances = append(instances, &its.Spec.Instances[i])
+	}
+	_, err = GenerateAllInstanceNames(its.Name, *its.Spec.Replicas, instances, its.Spec.OfflineInstances, its.Spec.DefaultTemplateOrdinals)
+	if err != nil {
+		if tree != nil {
+			tree.EventRecorder.Event(its, corev1.EventTypeWarning, EventReasonInvalidSpec, err.Error())
+		}
+		return err
 	}
 
 	return nil
 }
 
-func buildInstanceTemplateRevision(template *instanceTemplateExt, parent *workloads.InstanceSet) (string, error) {
-	podTemplate := filterInPlaceFields(&template.PodTemplateSpec)
+func BuildInstanceTemplateRevision(template *corev1.PodTemplateSpec, parent *workloads.InstanceSet) (string, error) {
+	podTemplate := filterInPlaceFields(template)
 	its := builder.NewInstanceSetBuilder(parent.Namespace, parent.Name).
 		SetUID(parent.UID).
 		AddAnnotationsInMap(parent.Annotations).
@@ -429,14 +600,15 @@ func buildInstanceTemplateRevision(template *instanceTemplateExt, parent *worklo
 }
 
 func buildInstanceTemplateExts(itsExt *instanceSetExt) []*instanceTemplateExt {
-	envConfigName := rsm.GetEnvConfigMapName(itsExt.its.Name)
-	defaultTemplate := rsm.BuildPodTemplate(itsExt.its, envConfigName)
-	makeInstanceTemplateExt := func() *instanceTemplateExt {
+	envConfigName := GetEnvConfigMapName(itsExt.its.Name)
+	defaultTemplate := BuildPodTemplate(itsExt.its, envConfigName)
+	makeInstanceTemplateExt := func(templateName string) *instanceTemplateExt {
 		var claims []corev1.PersistentVolumeClaim
 		for _, template := range itsExt.its.Spec.VolumeClaimTemplates {
 			claims = append(claims, *template.DeepCopy())
 		}
 		return &instanceTemplateExt{
+			Name:                 templateName,
 			PodTemplateSpec:      *defaultTemplate.DeepCopy(),
 			VolumeClaimTemplates: claims,
 		}
@@ -444,11 +616,10 @@ func buildInstanceTemplateExts(itsExt *instanceSetExt) []*instanceTemplateExt {
 
 	var instanceTemplateExtList []*instanceTemplateExt
 	for _, template := range itsExt.instanceTemplates {
-		templateExt := makeInstanceTemplateExt()
+		templateExt := makeInstanceTemplateExt(template.Name)
 		buildInstanceTemplateExt(*template, templateExt)
 		instanceTemplateExtList = append(instanceTemplateExtList, templateExt)
 	}
-
 	return instanceTemplateExtList
 }
 
@@ -544,12 +715,14 @@ func buildInstanceTemplateExt(template workloads.InstanceTemplate, templateExt *
 		replicas = *template.Replicas
 	}
 	templateExt.Replicas = replicas
-	if template.NodeName != nil {
-		templateExt.Spec.NodeName = *template.NodeName
+	if template.SchedulingPolicy != nil && template.SchedulingPolicy.NodeName != "" {
+		templateExt.Spec.NodeName = template.SchedulingPolicy.NodeName
 	}
 	mergeMap(&template.Annotations, &templateExt.Annotations)
 	mergeMap(&template.Labels, &templateExt.Labels)
-	mergeMap(&template.NodeSelector, &templateExt.Spec.NodeSelector)
+	if template.SchedulingPolicy != nil {
+		mergeMap(&template.SchedulingPolicy.NodeSelector, &templateExt.Spec.NodeSelector)
+	}
 	if len(templateExt.Spec.Containers) > 0 {
 		if template.Image != nil {
 			templateExt.Spec.Containers[0].Image = *template.Image
@@ -561,7 +734,7 @@ func buildInstanceTemplateExt(template workloads.InstanceTemplate, templateExt *
 			mergeCPUNMemory(&src.Requests, &dst.Requests)
 		}
 		if template.Env != nil {
-			mergeList(&template.Env, &templateExt.Spec.Containers[0].Env,
+			intctrlutil.MergeList(&template.Env, &templateExt.Spec.Containers[0].Env,
 				func(item corev1.EnvVar) func(corev1.EnvVar) bool {
 					return func(env corev1.EnvVar) bool {
 						return env.Name == item.Name
@@ -569,25 +742,36 @@ func buildInstanceTemplateExt(template workloads.InstanceTemplate, templateExt *
 				})
 		}
 	}
-	mergeList(&template.Tolerations, &templateExt.Spec.Tolerations,
-		func(item corev1.Toleration) func(corev1.Toleration) bool {
-			return func(t corev1.Toleration) bool {
-				return reflect.DeepEqual(item, t)
-			}
-		})
-	mergeList(&template.Volumes, &templateExt.Spec.Volumes,
+
+	if template.SchedulingPolicy != nil {
+		intctrlutil.MergeList(&template.SchedulingPolicy.Tolerations, &templateExt.Spec.Tolerations,
+			func(item corev1.Toleration) func(corev1.Toleration) bool {
+				return func(t corev1.Toleration) bool {
+					return reflect.DeepEqual(item, t)
+				}
+			})
+		intctrlutil.MergeList(&template.SchedulingPolicy.TopologySpreadConstraints, &templateExt.Spec.TopologySpreadConstraints,
+			func(item corev1.TopologySpreadConstraint) func(corev1.TopologySpreadConstraint) bool {
+				return func(t corev1.TopologySpreadConstraint) bool {
+					return reflect.DeepEqual(item, t)
+				}
+			})
+		mergeAffinity(&template.SchedulingPolicy.Affinity, &templateExt.Spec.Affinity)
+	}
+
+	intctrlutil.MergeList(&template.Volumes, &templateExt.Spec.Volumes,
 		func(item corev1.Volume) func(corev1.Volume) bool {
 			return func(v corev1.Volume) bool {
 				return v.Name == item.Name
 			}
 		})
-	mergeList(&template.VolumeMounts, &templateExt.Spec.Containers[0].VolumeMounts,
+	intctrlutil.MergeList(&template.VolumeMounts, &templateExt.Spec.Containers[0].VolumeMounts,
 		func(item corev1.VolumeMount) func(corev1.VolumeMount) bool {
 			return func(vm corev1.VolumeMount) bool {
 				return vm.Name == item.Name
 			}
 		})
-	mergeList(&template.VolumeClaimTemplates, &templateExt.VolumeClaimTemplates,
+	intctrlutil.MergeList(&template.VolumeClaimTemplates, &templateExt.VolumeClaimTemplates,
 		func(item corev1.PersistentVolumeClaim) func(corev1.PersistentVolumeClaim) bool {
 			return func(claim corev1.PersistentVolumeClaim) bool {
 				return claim.Name == item.Name
@@ -607,6 +791,106 @@ func mergeCPUNMemory(s, d *corev1.ResourceList) {
 			(*d)[k] = v
 		}
 	}
+}
+
+// TODO: merge with existing mergeAffinity function which locates at pkg/controller/scheduling/scheduling_utils.go
+func mergeAffinity(affinity1Ptr, affinity2Ptr **corev1.Affinity) {
+	if affinity1Ptr == nil || *affinity1Ptr == nil {
+		return
+	}
+	if *affinity2Ptr == nil {
+		*affinity2Ptr = &corev1.Affinity{}
+	}
+	affinity1 := *affinity1Ptr
+	affinity2 := *affinity2Ptr
+
+	// Merge PodAffinity
+	mergePodAffinity(&affinity1.PodAffinity, &affinity2.PodAffinity)
+
+	// Merge PodAntiAffinity
+	mergePodAntiAffinity(&affinity1.PodAntiAffinity, &affinity2.PodAntiAffinity)
+
+	// Merge NodeAffinity
+	mergeNodeAffinity(&affinity1.NodeAffinity, &affinity2.NodeAffinity)
+}
+
+func mergePodAffinity(podAffinity1Ptr, podAffinity2Ptr **corev1.PodAffinity) {
+	if podAffinity1Ptr == nil || *podAffinity1Ptr == nil {
+		return
+	}
+	if *podAffinity2Ptr == nil {
+		*podAffinity2Ptr = &corev1.PodAffinity{}
+	}
+	podAffinity1 := *podAffinity1Ptr
+	podAffinity2 := *podAffinity2Ptr
+
+	intctrlutil.MergeList(&podAffinity1.RequiredDuringSchedulingIgnoredDuringExecution, &podAffinity2.RequiredDuringSchedulingIgnoredDuringExecution,
+		func(item corev1.PodAffinityTerm) func(corev1.PodAffinityTerm) bool {
+			return func(t corev1.PodAffinityTerm) bool {
+				return reflect.DeepEqual(item, t)
+			}
+		})
+	intctrlutil.MergeList(&podAffinity1.PreferredDuringSchedulingIgnoredDuringExecution, &podAffinity2.PreferredDuringSchedulingIgnoredDuringExecution,
+		func(item corev1.WeightedPodAffinityTerm) func(corev1.WeightedPodAffinityTerm) bool {
+			return func(t corev1.WeightedPodAffinityTerm) bool {
+				return reflect.DeepEqual(item, t)
+			}
+		})
+}
+
+func mergePodAntiAffinity(podAntiAffinity1Ptr, podAntiAffinity2Ptr **corev1.PodAntiAffinity) {
+	if podAntiAffinity1Ptr == nil || *podAntiAffinity1Ptr == nil {
+		return
+	}
+	if *podAntiAffinity2Ptr == nil {
+		*podAntiAffinity2Ptr = &corev1.PodAntiAffinity{}
+	}
+	podAntiAffinity1 := *podAntiAffinity1Ptr
+	podAntiAffinity2 := *podAntiAffinity2Ptr
+
+	intctrlutil.MergeList(&podAntiAffinity1.RequiredDuringSchedulingIgnoredDuringExecution, &podAntiAffinity2.RequiredDuringSchedulingIgnoredDuringExecution,
+		func(item corev1.PodAffinityTerm) func(corev1.PodAffinityTerm) bool {
+			return func(t corev1.PodAffinityTerm) bool {
+				return reflect.DeepEqual(item, t)
+			}
+		})
+	intctrlutil.MergeList(&podAntiAffinity1.PreferredDuringSchedulingIgnoredDuringExecution, &podAntiAffinity2.PreferredDuringSchedulingIgnoredDuringExecution,
+		func(item corev1.WeightedPodAffinityTerm) func(corev1.WeightedPodAffinityTerm) bool {
+			return func(t corev1.WeightedPodAffinityTerm) bool {
+				return reflect.DeepEqual(item, t)
+			}
+		})
+}
+
+func mergeNodeAffinity(nodeAffinity1Ptr, nodeAffinity2Ptr **corev1.NodeAffinity) {
+	if nodeAffinity1Ptr == nil || *nodeAffinity1Ptr == nil {
+		return
+	}
+	if *nodeAffinity2Ptr == nil {
+		*nodeAffinity2Ptr = &corev1.NodeAffinity{}
+	}
+	nodeAffinity1 := *nodeAffinity1Ptr
+	nodeAffinity2 := *nodeAffinity2Ptr
+
+	if nodeAffinity1.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+		if nodeAffinity2.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+			nodeAffinity2.RequiredDuringSchedulingIgnoredDuringExecution = &corev1.NodeSelector{}
+		}
+		intctrlutil.MergeList(&nodeAffinity1.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms,
+			&nodeAffinity2.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms,
+			func(item corev1.NodeSelectorTerm) func(corev1.NodeSelectorTerm) bool {
+				return func(t corev1.NodeSelectorTerm) bool {
+					return reflect.DeepEqual(item, t)
+				}
+			})
+	}
+	intctrlutil.MergeList(&nodeAffinity1.PreferredDuringSchedulingIgnoredDuringExecution,
+		&nodeAffinity2.PreferredDuringSchedulingIgnoredDuringExecution,
+		func(item corev1.PreferredSchedulingTerm) func(corev1.PreferredSchedulingTerm) bool {
+			return func(t corev1.PreferredSchedulingTerm) bool {
+				return reflect.DeepEqual(item, t)
+			}
+		})
 }
 
 func buildInstanceSetExt(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) (*instanceSetExt, error) {

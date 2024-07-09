@@ -41,10 +41,14 @@ type Manager struct {
 	engines.DBManagerBase
 	client         redis.UniversalClient
 	clientSettings *Settings
+	sentinelClient *redis.SentinelClient
 
-	ctx     context.Context
-	cancel  context.CancelFunc
-	startAt time.Time
+	ctx                     context.Context
+	cancel                  context.CancelFunc
+	startAt                 time.Time
+	role                    string
+	roleSubscribeUpdateTime int64
+	roleProbePeriod         int64
 }
 
 var _ engines.DBManager = &Manager{}
@@ -65,7 +69,8 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 		return nil, err
 	}
 	mgr := &Manager{
-		DBManagerBase: *managerBase,
+		DBManagerBase:   *managerBase,
+		roleProbePeriod: int64(viper.GetInt(constant.KBEnvRoleProbePeriod)),
 	}
 
 	mgr.startAt = time.Now()
@@ -74,12 +79,16 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 		Password: redisPasswd,
 		Username: redisUser,
 	}
-	mgr.client, mgr.clientSettings, err = ParseClientFromProperties(map[string]string(properties), defaultSettings)
+	mgr.client, mgr.clientSettings, err = ParseClientFromProperties(properties, defaultSettings)
 	if err != nil {
 		return nil, err
 	}
 
+	mgr.sentinelClient = newSentinelClient(mgr.clientSettings, mgr.ClusterCompName)
+
 	mgr.ctx, mgr.cancel = context.WithCancel(context.Background())
+
+	go mgr.SubscribeRoleChange(mgr.ctx)
 	return mgr, nil
 }
 

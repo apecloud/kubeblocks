@@ -45,6 +45,21 @@ func (builder *ComponentBuilder) SetServiceVersion(serviceVersion string) *Compo
 	return builder
 }
 
+func (builder *ComponentBuilder) SetLabels(labels map[string]string) *ComponentBuilder {
+	builder.get().Spec.Labels = labels
+	return builder
+}
+
+func (builder *ComponentBuilder) SetAnnotations(annotations map[string]string) *ComponentBuilder {
+	builder.get().Spec.Annotations = annotations
+	return builder
+}
+
+func (builder *ComponentBuilder) SetEnv(env []corev1.EnvVar) *ComponentBuilder {
+	builder.get().Spec.Env = env
+	return builder
+}
+
 func (builder *ComponentBuilder) SetSchedulingPolicy(schedulingPolicy *appsv1alpha1.SchedulingPolicy) *ComponentBuilder {
 	builder.get().Spec.SchedulingPolicy = schedulingPolicy
 	return builder
@@ -52,6 +67,11 @@ func (builder *ComponentBuilder) SetSchedulingPolicy(schedulingPolicy *appsv1alp
 
 func (builder *ComponentBuilder) SetReplicas(replicas int32) *ComponentBuilder {
 	builder.get().Spec.Replicas = replicas
+	return builder
+}
+
+func (builder *ComponentBuilder) SetConfigs(configs []appsv1alpha1.ClusterComponentConfig) *ComponentBuilder {
+	builder.get().Spec.Configs = configs
 	return builder
 }
 
@@ -65,13 +85,8 @@ func (builder *ComponentBuilder) SetResources(resources corev1.ResourceRequireme
 	return builder
 }
 
-func (builder *ComponentBuilder) SetSidecarContainers(sidecars []string) *ComponentBuilder {
-	builder.get().Spec.Sidecars = sidecars
-	return builder
-}
-
-func (builder *ComponentBuilder) SetMonitor(monitorEnabled *bool) *ComponentBuilder {
-	builder.get().Spec.MonitorEnabled = monitorEnabled
+func (builder *ComponentBuilder) SetDisableExporter(disableExporter *bool) *ComponentBuilder {
+	builder.get().Spec.DisableExporter = disableExporter
 	return builder
 }
 
@@ -104,6 +119,11 @@ func (builder *ComponentBuilder) SetVolumeClaimTemplates(volumeClaimTemplates []
 	return builder
 }
 
+func (builder *ComponentBuilder) SetVolumes(volumes []corev1.Volume) *ComponentBuilder {
+	builder.get().Spec.Volumes = volumes
+	return builder
+}
+
 func (builder *ComponentBuilder) SetServices(services []appsv1alpha1.ClusterComponentService) *ComponentBuilder {
 	toCompService := func(svc appsv1alpha1.ClusterComponentService) appsv1alpha1.ComponentService {
 		return appsv1alpha1.ComponentService{
@@ -123,6 +143,11 @@ func (builder *ComponentBuilder) SetServices(services []appsv1alpha1.ClusterComp
 	return builder
 }
 
+func (builder *ComponentBuilder) SetSystemAccounts(systemAccounts []appsv1alpha1.ComponentSystemAccount) *ComponentBuilder {
+	builder.get().Spec.SystemAccounts = systemAccounts
+	return builder
+}
+
 func (builder *ComponentBuilder) SetServiceRefs(serviceRefs []appsv1alpha1.ServiceRef) *ComponentBuilder {
 	builder.get().Spec.ServiceRefs = serviceRefs
 	return builder
@@ -138,7 +163,10 @@ func (builder *ComponentBuilder) SetOfflineInstances(offlineInstances []string) 
 	return builder
 }
 
-func (builder *ComponentBuilder) SetRuntimeClassName(runtimeClassName string) *ComponentBuilder {
-	builder.get().Spec.RuntimeClassName = &runtimeClassName
+func (builder *ComponentBuilder) SetRuntimeClassName(runtimeClassName *string) *ComponentBuilder {
+	if runtimeClassName != nil {
+		className := *runtimeClassName
+		builder.get().Spec.RuntimeClassName = &className
+	}
 	return builder
 }

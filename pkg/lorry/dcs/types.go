@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -231,20 +232,32 @@ type DBState struct {
 	Extra       map[string]string
 }
 type Member struct {
-	Index     string
-	Name      string
-	Role      string
-	PodIP     string
-	DBPort    string
-	LorryPort string
-	HAPort    string
-	UID       string
-	UseIP     bool
-	resource  any
+	Index         string
+	Name          string
+	Role          string
+	PodIP         string
+	DBPort        string
+	LorryPort     string
+	HAPort        string
+	UID           string
+	UseIP         bool
+	resource      any
+	ComponentName string
 }
 
 func (m *Member) GetName() string {
 	return m.Name
+}
+
+func (m *Member) IsLorryReady() bool {
+	if m.PodIP == "" {
+		return false
+	}
+	ready, err := util.IsTCPReady(m.PodIP, m.LorryPort)
+	if err != nil {
+		return false
+	}
+	return ready
 }
 
 // func newMember(index string, name string, role string, url string) *Member {

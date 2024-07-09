@@ -71,7 +71,7 @@ func ReadObjectTree[T client.Object](ctx context.Context, reader client.Reader, 
 		for i := 0; i < l; i++ {
 			// get the underlying object
 			object := items.Index(i).Addr().Interface().(client.Object)
-			if !model.IsOwnerOf(root, object) {
+			if len(object.GetOwnerReferences()) > 0 && !model.IsOwnerOf(root, object) {
 				continue
 			}
 			if err := tree.Add(object); err != nil {

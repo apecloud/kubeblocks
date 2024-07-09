@@ -44,12 +44,13 @@ import (
 func ComposeTLSSecret(namespace, clusterName, componentName string) (*v1.Secret, error) {
 	name := GenerateTLSSecretName(clusterName, componentName)
 	secret := builder.NewSecretBuilder(namespace, name).
+		AddLabels(constant.AppManagedByLabelKey, constant.AppName).
 		AddLabels(constant.AppInstanceLabelKey, clusterName).
-		AddLabels(constant.KBManagedByKey, constant.AppName).
+		AddLabels(constant.KBAppComponentLabelKey, componentName).
 		SetStringData(map[string]string{}).
 		GetObject()
 
-	const tpl = `{{- $cert := genCA "KubeBlocks" 3650 }}
+	const tpl = `{{- $cert := genCA "KubeBlocks" 36500 }}
 {{ $cert.Cert }}
 {{ $cert.Key }}
 `

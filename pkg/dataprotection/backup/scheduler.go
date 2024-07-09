@@ -22,9 +22,9 @@ package backup
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"sort"
 
-	"golang.org/x/exp/slices"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -101,7 +101,13 @@ func (s *Scheduler) handleSchedulePolicy(index int) error {
 				if err = s.reconfigure(schedulePolicy); err != nil {
 					return err
 				}
-				return s.reconcileForContinuous(schedulePolicy)
+				var targetSelectorLabels map[string]string
+				if method.Target != nil {
+					targetSelectorLabels = method.Target.PodSelector.MatchLabels
+				} else if s.BackupPolicy.Spec.Target != nil {
+					targetSelectorLabels = s.BackupPolicy.Spec.Target.PodSelector.MatchLabels
+				}
+				return s.reconcileForContinuous(schedulePolicy, targetSelectorLabels)
 			}
 		}
 	}
@@ -281,11 +287,29 @@ func (s *Scheduler) generateBackupName(schedulePolicy *dpv1alpha1.SchedulePolicy
 	return backupNamePrefix + "-$(date -u +'%Y%m%d%H%M%S')"
 }
 
-func (s *Scheduler) reconcileForContinuous(schedulePolicy *dpv1alpha1.SchedulePolicy) error {
-	backupName := GenerateCRNameByBackupSchedule(s.BackupSchedule, schedulePolicy.BackupMethod)
+func (s *Scheduler) getGenerateContinuousBackup(schedulePolicy *dpv1alpha1.SchedulePolicy) (*dpv1alpha1.Backup, error) {
 	backup := &dpv1alpha1.Backup{}
+	backupName := GenerateCRNameByBackupSchedule(s.BackupSchedule, schedulePolicy.BackupMethod)
 	exists, err := intctrlutil.CheckResourceExists(s.Ctx, s.Client, client.ObjectKey{Name: backupName,
 		Namespace: s.BackupSchedule.Namespace}, backup)
+	if err != nil {
+		return nil, err
+	}
+	if exists {
+		return backup, nil
+	}
+	// if no backup found, check if existing legacy backup.
+	backupName = GenerateLegacyCRNameByBackupSchedule(s.BackupSchedule, schedulePolicy.BackupMethod)
+	if _, err = intctrlutil.CheckResourceExists(s.Ctx, s.Client, client.ObjectKey{Name: backupName,
+		Namespace: s.BackupSchedule.Namespace}, backup); err != nil {
+		return nil, err
+	}
+	return backup, nil
+}
+
+func (s *Scheduler) reconcileForContinuous(schedulePolicy *dpv1alpha1.SchedulePolicy,
+	targetSelectorLabels map[string]string) error {
+	backup, err := s.getGenerateContinuousBackup(schedulePolicy)
 	if err != nil {
 		return err
 	}
@@ -293,15 +317,18 @@ func (s *Scheduler) reconcileForContinuous(schedulePolicy *dpv1alpha1.SchedulePo
 	if backup.Labels == nil {
 		backup.Labels = map[string]string{}
 	}
-	backup.Labels[constant.AppManagedByLabelKey] = constant.AppName
+	for k, v := range targetSelectorLabels {
+		backup.Labels[k] = v
+	}
+	backup.Labels[constant.AppManagedByLabelKey] = dptypes.AppName
 	backup.Labels[dptypes.BackupScheduleLabelKey] = s.BackupSchedule.Name
 	backup.Labels[dptypes.BackupTypeLabelKey] = string(dpv1alpha1.BackupTypeContinuous)
 	backup.Labels[dptypes.AutoBackupLabelKey] = "true"
-	if !exists {
+	if backup.Name == "" {
 		if boolptr.IsSetToFalse(schedulePolicy.Enabled) {
 			return nil
 		}
-		backup.Name = backupName
+		backup.Name = GenerateCRNameByBackupSchedule(s.BackupSchedule, schedulePolicy.BackupMethod)
 		backup.Namespace = s.BackupSchedule.Namespace
 		backup.Spec.BackupMethod = schedulePolicy.BackupMethod
 		backup.Spec.BackupPolicyName = s.BackupSchedule.Spec.BackupPolicyName
@@ -310,10 +337,8 @@ func (s *Scheduler) reconcileForContinuous(schedulePolicy *dpv1alpha1.SchedulePo
 	}
 
 	// notice to reconcile backup CR
-	if boolptr.IsSetToTrue(schedulePolicy.Enabled) && slices.Contains([]dpv1alpha1.BackupPhase{
-		dpv1alpha1.BackupPhaseCompleted, dpv1alpha1.BackupPhaseFailed},
-		backup.Status.Phase) {
-		// if schedule is enabled and backup already is Completed/Failed, update phase to running
+	if boolptr.IsSetToTrue(schedulePolicy.Enabled) && backup.Status.Phase == dpv1alpha1.BackupPhaseCompleted {
+		// if schedule is enabled and backup already is Completed, update phase to running
 		backup.Status.Phase = dpv1alpha1.BackupPhaseRunning
 		backup.Status.FailureReason = ""
 		return s.Client.Status().Patch(s.Ctx, backup, patch)
@@ -373,6 +398,14 @@ func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 		return intctrlutil.NewFatalError(fmt.Sprintf(`spec.target and spec.targets can not be empty in backupPOlicy "%s"`, s.BackupPolicy.Name))
 	}
 	targetPodSelector := targets[0].PodSelector
+	clusterName := targetPodSelector.MatchLabels[constant.AppInstanceLabelKey]
+	cluster := &appsv1alpha1.Cluster{}
+	if err := s.Client.Get(s.Ctx, client.ObjectKey{Name: clusterName, Namespace: s.BackupSchedule.Namespace}, cluster); err != nil {
+		return err
+	}
+	if !slices.Contains(appsv1alpha1.GetReconfiguringRunningPhases(), cluster.Status.Phase) {
+		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting for the cluster %s to be available.", clusterName)
+	}
 	ops := appsv1alpha1.OpsRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: s.BackupSchedule.Name + "-",
@@ -382,19 +415,21 @@ func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 			},
 		},
 		Spec: appsv1alpha1.OpsRequestSpec{
-			Type:       appsv1alpha1.ReconfiguringType,
-			ClusterRef: targetPodSelector.MatchLabels[constant.AppInstanceLabelKey],
-			Reconfigure: &appsv1alpha1.Reconfigure{
-				ComponentOps: appsv1alpha1.ComponentOps{
-					ComponentName: targetPodSelector.MatchLabels[constant.KBAppComponentLabelKey],
-				},
-				Configurations: []appsv1alpha1.ConfigurationItem{
-					{
-						Name: configRef.Name,
-						Keys: []appsv1alpha1.ParameterConfig{
-							{
-								Key:        configRef.Key,
-								Parameters: parameters,
+			Type:        appsv1alpha1.ReconfiguringType,
+			ClusterName: clusterName,
+			SpecificOpsRequest: appsv1alpha1.SpecificOpsRequest{
+				Reconfigure: &appsv1alpha1.Reconfigure{
+					ComponentOps: appsv1alpha1.ComponentOps{
+						ComponentName: targetPodSelector.MatchLabels[constant.KBAppComponentLabelKey],
+					},
+					Configurations: []appsv1alpha1.ConfigurationItem{
+						{
+							Name: configRef.Name,
+							Keys: []appsv1alpha1.ParameterConfig{
+								{
+									Key:        configRef.Key,
+									Parameters: parameters,
+								},
 							},
 						},
 					},

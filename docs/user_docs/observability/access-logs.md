@@ -14,7 +14,7 @@ The KubeBlocks log enhancement function uses methods similar to kubectl exec and
 ## Before you start
 
 - The container image supports `tail` and `xargs` commands.
-- Install KubeBlocks: You can install KubeBlocks by [kbcli](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or by [Helm](./../installation/install-with-helm/install-kubeblocks-with-helm.md).
+- [Install KubeBlocks](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md).
 - In this guide, we take the MySQL engine as an example, the operation is the same for all database engines.
 
 ## Steps
@@ -26,7 +26,7 @@ The KubeBlocks log enhancement function uses methods similar to kubectl exec and
      * If you create a cluster by running the `kbcli cluster create` command, add the `--enable-all-logs=true` option to enable the log enhancement function. When this option is `true`, all the log types defined by `spec.componentDefs.logConfigs` in `ClusterDefinition` are enabled automatically.
 
        ```bash
-       kbcli cluster create mysql --enable-all-logs=true mycluster
+       kbcli cluster create mycluster --cluster-definition apecloud-mysql --enable-all-logs=true
        ```
 
    * Update this cluster if you did not enable it when creating a cluster.

@@ -91,7 +91,7 @@ func (p *pipeline) Prepare() *pipeline {
 		ctx := p.ctx
 		templateBuilder := newTemplateBuilder(p.ClusterName, p.Namespace, p.Context, p.Client)
 		// Prepare built-in objects and built-in functions
-		templateBuilder.injectBuiltInObjectsAndFunctions(ctx.PodSpec, ctx.SynthesizedComponent.ConfigTemplates, ctx.SynthesizedComponent, ctx.Cache, ctx.Cluster)
+		templateBuilder.injectBuiltInObjectsAndFunctions(ctx.PodSpec, ctx.SynthesizedComponent, ctx.Cache, ctx.Cluster)
 		p.renderWrapper = newTemplateRenderWrapper(p.Context, ctx.Client, templateBuilder, ctx.Cluster, ctx.Component)
 		return
 	}
@@ -267,8 +267,7 @@ func (p *updatePipeline) PrepareForTemplate() *updatePipeline {
 		}
 		templateBuilder := newTemplateBuilder(p.ClusterName, p.Namespace, p.Context, p.Client)
 		// Prepare built-in objects and built-in functions
-		templateBuilder.injectBuiltInObjectsAndFunctions(p.ctx.PodSpec,
-			[]appsv1alpha1.ComponentConfigSpec{*p.configSpec}, p.ctx.SynthesizedComponent, p.ctx.Cache, p.ctx.Cluster)
+		templateBuilder.injectBuiltInObjectsAndFunctions(p.ctx.PodSpec, p.ctx.SynthesizedComponent, p.ctx.Cache, p.ctx.Cluster)
 		p.renderWrapper = newTemplateRenderWrapper(p.Context, p.Client, templateBuilder, p.ctx.Cluster, p.ctx.Component)
 		return
 	}
@@ -321,7 +320,7 @@ func (p *updatePipeline) ApplyParameters() *updatePipeline {
 
 		p.configPatch, _, err = core.CreateConfigPatch(cm.Data,
 			newData,
-			p.ConfigConstraintObj.Spec.FormatterConfig.Format,
+			p.ConfigConstraintObj.Spec.FileFormatConfig.Format,
 			p.configSpec.Keys,
 			false)
 		if err != nil {

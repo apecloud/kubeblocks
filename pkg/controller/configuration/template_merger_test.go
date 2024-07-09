@@ -108,7 +108,7 @@ max_connections=666
 			testClusterName,
 			"default", nil, nil)
 		templateBuilder.injectBuiltInObjectsAndFunctions(
-			&corev1.PodSpec{}, nil, &component.SynthesizedComponent{}, nil,
+			&corev1.PodSpec{}, &component.SynthesizedComponent{}, nil,
 			&appsv1alpha1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testClusterName,
@@ -142,7 +142,7 @@ max_connections=666
 			mergedData, err := mergerConfigTemplate(importedTemplate, templateBuilder, configSpec, tmpCM.Data, ctx, mockClient.Client())
 			Expect(err).To(Succeed())
 
-			configReaders, err := cfgcore.LoadRawConfigObject(mergedData, configConstraintObj.Spec.FormatterConfig, configSpec.Keys)
+			configReaders, err := cfgcore.LoadRawConfigObject(mergedData, configConstraintObj.Spec.FileFormatConfig, configSpec.Keys)
 			Expect(err).Should(Succeed())
 			Expect(configReaders).Should(HaveLen(1))
 			configObject := configReaders[testConfigName]
@@ -171,7 +171,7 @@ max_connections=666
 			Expect(err).Should(Succeed())
 			Expect(reflect.DeepEqual(mergedData, updatedCMObject.Data)).Should(BeTrue())
 
-			configReaders, err := cfgcore.LoadRawConfigObject(mergedData, configConstraintObj.Spec.FormatterConfig, configSpec.Keys)
+			configReaders, err := cfgcore.LoadRawConfigObject(mergedData, configConstraintObj.Spec.FileFormatConfig, configSpec.Keys)
 			Expect(err).Should(Succeed())
 			Expect(configReaders).Should(HaveLen(1))
 			configObject := configReaders[testConfigName]

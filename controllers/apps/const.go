@@ -25,12 +25,6 @@ const (
 	opsDefinitionFinalizerName       = "opsdefinition.kubeblocks.io/finalizer"
 	componentDefinitionFinalizerName = "componentdefinition.kubeblocks.io/finalizer"
 	componentVersionFinalizerName    = "componentversion.kubeblocks.io/finalizer"
-
-	// annotations keys
-	// debugClusterAnnotationKey is used when one wants to debug the cluster.
-	// If debugClusterAnnotationKey = 'on',
-	// logs will be recorded in more details, and some ephemeral pods (esp. those created by jobs) will retain after execution.
-	debugClusterAnnotationKey = "cluster.kubeblocks.io/debug"
 )
 
 const (

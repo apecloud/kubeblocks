@@ -38,12 +38,13 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/configuration/openapi"
 	"github.com/apecloud/kubeblocks/pkg/configuration/validate"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
 type ValidateConfigMap func(configTpl, ns string) (*corev1.ConfigMap, error)
-type ValidateConfigSchema func(tpl *appsv1beta1.ConfigSchema) (bool, error)
+type ValidateConfigSchema func(tpl *appsv1beta1.ParametersSchema) (bool, error)
 
 func checkConfigLabels(object client.Object, requiredLabs []string) bool {
 	labels := object.GetLabels()
@@ -84,7 +85,7 @@ func getConfigMapByTemplateName(cli client.Client, ctx intctrlutil.RequestCtx, t
 
 func checkConfigConstraint(ctx intctrlutil.RequestCtx, configConstraint *appsv1beta1.ConfigConstraint) (bool, error) {
 	// validate configuration template
-	validateConfigSchema := func(ccSchema *appsv1beta1.ConfigSchema) (bool, error) {
+	validateConfigSchema := func(ccSchema *appsv1beta1.ParametersSchema) (bool, error) {
 		if ccSchema == nil || len(ccSchema.CUE) == 0 {
 			return true, nil
 		}
@@ -94,8 +95,8 @@ func checkConfigConstraint(ctx intctrlutil.RequestCtx, configConstraint *appsv1b
 	}
 
 	// validate schema
-	if ok, err := validateConfigSchema(configConstraint.Spec.ConfigSchema); !ok || err != nil {
-		ctx.Log.Error(err, "failed to validate template schema!", "configMapName", fmt.Sprintf("%v", configConstraint.Spec.ConfigSchema))
+	if ok, err := validateConfigSchema(configConstraint.Spec.ParametersSchema); !ok || err != nil {
+		ctx.Log.Error(err, "failed to validate template schema!", "configMapName", fmt.Sprintf("%v", configConstraint.Spec.ParametersSchema))
 		return ok, err
 	}
 	return true, nil
@@ -159,7 +160,7 @@ func batchDeleteConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx
 		labels := client.MatchingLabels{
 			core.GenerateTPLUniqLabelKeyWithConfig(configSpec.Name): configSpec.TemplateRef,
 		}
-		if ok, err := validateConfigMapOwners(cli, ctx, labels, validator, &appsv1alpha1.ClusterDefinitionList{}); err != nil {
+		if ok, err := validateConfigMapOwners(cli, ctx, labels, validator, &appsv1alpha1.ClusterDefinitionList{}, &appsv1alpha1.ComponentDefinitionList{}); err != nil {
 			return err
 		} else if !ok {
 			continue
@@ -243,6 +244,8 @@ func handleConfigTemplate(object client.Object, handler ConfigTemplateHandler, h
 	switch cr := object.(type) {
 	case *appsv1alpha1.ClusterDefinition:
 		configTemplates, err = getConfigTemplateFromCD(cr, handler2...)
+	case *appsv1alpha1.ComponentDefinition:
+		configTemplates = getConfigTemplateFromComponentDef(cr)
 	default:
 		return false, core.MakeError("not support CR type: %v", cr)
 	}
@@ -281,6 +284,19 @@ func getConfigTemplateFromCD(clusterDef *appsv1alpha1.ClusterDefinition, validat
 	return configTemplates, nil
 }
 
+func getConfigTemplateFromComponentDef(componentDef *appsv1alpha1.ComponentDefinition) []appsv1alpha1.ComponentConfigSpec {
+	configTemplates := make([]appsv1alpha1.ComponentConfigSpec, 0)
+	// For compatibility with the previous lifecycle management of configurationSpec.TemplateRef,
+	// it is necessary to convert ScriptSpecs to ConfigSpecs,
+	// ensuring that the script-related configmap is not allowed to be deleted.
+	for _, scriptSpec := range componentDef.Spec.Scripts {
+		configTemplates = append(configTemplates, appsv1alpha1.ComponentConfigSpec{
+			ComponentTemplateSpec: scriptSpec,
+		})
+	}
+	return append(configTemplates, componentDef.Spec.Configs...)
+}
+
 func checkConfigTemplate(client client.Client, ctx intctrlutil.RequestCtx, obj client.Object) (bool, error) {
 	handler := func(configSpecs []appsv1alpha1.ComponentConfigSpec) (bool, error) {
 		return validateConfigTemplate(client, ctx, configSpecs)
@@ -291,17 +307,7 @@ func checkConfigTemplate(client client.Client, ctx intctrlutil.RequestCtx, obj c
 func updateLabelsByConfigSpec[T generics.Object, PT generics.PObject[T]](cli client.Client, ctx intctrlutil.RequestCtx, obj PT) (bool, error) {
 	handler := func(configSpecs []appsv1alpha1.ComponentConfigSpec) (bool, error) {
 		patch := client.MergeFrom(PT(obj.DeepCopy()))
-		labels := obj.GetLabels()
-		if labels == nil {
-			labels = map[string]string{}
-		}
-		for _, configSpec := range configSpecs {
-			labels[core.GenerateTPLUniqLabelKeyWithConfig(configSpec.Name)] = configSpec.TemplateRef
-			if len(configSpec.ConfigConstraintRef) != 0 {
-				labels[core.GenerateConstraintsUniqLabelKeyWithConfig(configSpec.ConfigConstraintRef)] = configSpec.ConfigConstraintRef
-			}
-		}
-		obj.SetLabels(labels)
+		configuration.BuildConfigConstraintLabels(obj, configSpecs)
 		return true, cli.Patch(ctx.Ctx, obj, patch)
 	}
 	return handleConfigTemplate(obj, handler)
@@ -339,10 +345,10 @@ func validateConfigTemplate(cli client.Client, ctx intctrlutil.RequestCtx, confi
 			logger.Error(err, "failed to validate config template!")
 			return false, err
 		}
-		if configConstraint == nil || configConstraint.Spec.DynamicReloadAction == nil {
+		if configConstraint == nil || configConstraint.Spec.ReloadAction == nil {
 			continue
 		}
-		if err := cfgcm.ValidateReloadOptions(configConstraint.Spec.DynamicReloadAction, cli, ctx.Ctx); err != nil {
+		if err := cfgcm.ValidateReloadOptions(configConstraint.Spec.ReloadAction, cli, ctx.Ctx); err != nil {
 			return false, err
 		}
 		if !validateConfigConstraintStatus(configConstraint.Status) {
@@ -365,7 +371,7 @@ func updateConfigConstraintStatus(cli client.Client, ctx intctrlutil.RequestCtx,
 	return cli.Status().Patch(ctx.Ctx, configConstraint, patch)
 }
 
-func createConfigPatch(cfg *corev1.ConfigMap, formatter *appsv1beta1.FormatterConfig, cmKeys []string) (*core.ConfigPatchInfo, bool, error) {
+func createConfigPatch(cfg *corev1.ConfigMap, formatter *appsv1beta1.FileFormatConfig, cmKeys []string) (*core.ConfigPatchInfo, bool, error) {
 	// support full update
 	if formatter == nil {
 		return nil, true, nil
@@ -379,13 +385,13 @@ func createConfigPatch(cfg *corev1.ConfigMap, formatter *appsv1beta1.FormatterCo
 }
 
 func updateConfigSchema(cc *appsv1beta1.ConfigConstraint, cli client.Client, ctx context.Context) error {
-	schema := cc.Spec.ConfigSchema
+	schema := cc.Spec.ParametersSchema
 	if schema == nil || schema.CUE == "" {
 		return nil
 	}
 
 	// Because the conversion of cue to openAPISchema is restricted, and the definition of some cue may not be converted into openAPISchema, and won't return error.
-	openAPISchema, err := openapi.GenerateOpenAPISchema(schema.CUE, cc.Spec.ConfigSchemaTopLevelKey)
+	openAPISchema, err := openapi.GenerateOpenAPISchema(schema.CUE, schema.TopLevelKey)
 	if err != nil {
 		return err
 	}
@@ -397,6 +403,6 @@ func updateConfigSchema(cc *appsv1beta1.ConfigConstraint, cli client.Client, ctx
 	}
 
 	ccPatch := client.MergeFrom(cc.DeepCopy())
-	cc.Spec.ConfigSchema.SchemaInJSON = openAPISchema
+	cc.Spec.ParametersSchema.SchemaInJSON = openAPISchema
 	return cli.Patch(ctx, cc, ccPatch)
 }

@@ -25,14 +25,18 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
 var _ = Describe("OpsUtil functions", func() {
@@ -57,6 +61,8 @@ var _ = Describe("OpsUtil functions", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.InstanceSetSignature, true, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.ConfigMapSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
 	}
 
@@ -68,9 +74,13 @@ var _ = Describe("OpsUtil functions", func() {
 		It("Test ops_util functions", func() {
 			By("init operations resources ")
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterName)
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusComp)
 
 			By("Test the functions in ops_util.go")
-			opsRes.OpsRequest = createHorizontalScaling(clusterName, 1, nil)
+			opsRes.OpsRequest = createHorizontalScaling(clusterName, appsv1alpha1.HorizontalScaling{
+				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+				Replicas:     pointer.Int32(1),
+			})
 			Expect(patchValidateErrorCondition(ctx, k8sClient, opsRes, "validate error")).Should(Succeed())
 			Expect(PatchOpsHandlerNotSupported(ctx, k8sClient, opsRes)).Should(Succeed())
 			Expect(isOpsRequestFailedPhase(appsv1alpha1.OpsFailedPhase)).Should(BeTrue())
@@ -80,10 +90,16 @@ var _ = Describe("OpsUtil functions", func() {
 		It("Test opsRequest failed cases", func() {
 			By("init operations resources ")
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterName)
-
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusComp)
+			pods := testapps.MockInstanceSetPods(&testCtx, nil, opsRes.Cluster, consensusComp)
+			time.Sleep(time.Second)
 			By("Test the functions in ops_util.go")
-			opsRes.OpsRequest = createHorizontalScaling(clusterName, 1, nil)
+			ops := testapps.NewOpsRequestObj("restart-ops-"+randomStr, testCtx.DefaultNamespace,
+				clusterName, appsv1alpha1.RestartType)
+			ops.Spec.RestartList = []appsv1alpha1.ComponentOps{{ComponentName: consensusComp}}
+			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
 			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsRunningPhase
+			opsRes.OpsRequest.Status.StartTimestamp = metav1.Now()
 
 			By("mock component failed")
 			clusterComp := opsRes.Cluster.Status.Components[consensusComp]
@@ -91,19 +107,87 @@ var _ = Describe("OpsUtil functions", func() {
 			opsRes.Cluster.Status.SetComponentStatus(consensusComp, clusterComp)
 
 			By("expect for opsRequest is running")
+			handleRestartProgress := func(reqCtx intctrlutil.RequestCtx,
+				cli client.Client,
+				opsRes *OpsResource,
+				pgRes *progressResource,
+				compStatus *appsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
+				return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus,
+					func(ops *appsv1alpha1.OpsRequest, pod *corev1.Pod, compOps ComponentOpsInterface, s string) bool {
+						return !pod.CreationTimestamp.Before(&ops.Status.StartTimestamp)
+					})
+			}
+
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
-			opsPhase, _, err := reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes, "test", syncOverrideByOpsForScaleReplicas, handleComponentStatusProgress)
+			compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.RestartList)
+
+			opsPhase, _, err := compOpsHelper.reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes,
+				"test", handleRestartProgress)
 			Expect(err).Should(BeNil())
 			Expect(opsPhase).Should(Equal(appsv1alpha1.OpsRunningPhase))
 
-			By("mock component failed time reaches the threshold, expect for opsRequest is Failed")
-			compStatus := opsRes.OpsRequest.Status.Components[consensusComp]
-			compStatus.LastFailedTime = metav1.Time{Time: compStatus.LastFailedTime.Add(-1 * componentFailedTimeout).Add(-1 * time.Second)}
-			opsRes.OpsRequest.Status.Components[consensusComp] = compStatus
-			opsPhase, _, err = reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes, "test", syncOverrideByOpsForScaleReplicas, handleComponentStatusProgress)
+			By("mock one pod recreates failed, expect for opsRequest is Failed")
+			testk8s.MockPodIsTerminating(ctx, testCtx, pods[2])
+			testk8s.RemovePodFinalizer(ctx, testCtx, pods[2])
+			// recreate it
+			pod := testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp, pods[2].Name, "follower", "Readonly")
+			// mock pod is failed
+			testk8s.MockPodIsFailed(ctx, testCtx, pod)
+			opsPhase, _, err = compOpsHelper.reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes, "test", handleRestartProgress)
 			Expect(err).Should(BeNil())
 			Expect(opsPhase).Should(Equal(appsv1alpha1.OpsFailedPhase))
+		})
 
+		It("Test opsRequest with disable ha", func() {
+			By("init operations resources ")
+			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterName)
+
+			By("Test the functions in ops_util.go")
+			ops := testapps.NewOpsRequestObj("restart-ops-"+randomStr, testCtx.DefaultNamespace,
+				clusterName, appsv1alpha1.RestartType)
+			ops.Spec.RestartList = []appsv1alpha1.ComponentOps{{ComponentName: consensusComp}}
+			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
+			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.OpsRequest, func() {
+				opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsCreatingPhase
+				opsRes.OpsRequest.Status.StartTimestamp = metav1.Time{Time: time.Now()}
+			})).Should(Succeed())
+
+			By("create ha configmap and do horizontalScaling with disable ha")
+			haConfigName := "ha-config"
+			haConfig := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      haConfigName,
+					Namespace: testCtx.DefaultNamespace,
+					Annotations: map[string]string{
+						"enable": "true",
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, haConfig)).Should(Succeed())
+			opsRes.OpsRequest.Annotations = map[string]string{
+				constant.DisableHAAnnotationKey: haConfigName,
+			}
+
+			By("mock instance set")
+			its := testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusComp)
+
+			By("expect to disable ha")
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(haConfig), func(g Gomega, cm *corev1.ConfigMap) {
+				cm.Annotations["enable"] = "false"
+			})).Should(Succeed())
+
+			By("mock restart ops to succeed and expect to enable ha")
+			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsRunningPhase
+			_ = testapps.MockInstanceSetPods(&testCtx, its, opsRes.Cluster, consensusComp)
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsSucceedPhase))
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(haConfig), func(g Gomega, cm *corev1.ConfigMap) {
+				cm.Annotations["enable"] = "true"
+			})).Should(Succeed())
 		})
 
 		It("Test opsRequest Queue functions", func() {
@@ -112,7 +196,10 @@ var _ = Describe("OpsUtil functions", func() {
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterName)
 
 			runHscaleOps := func(expectPhase appsv1alpha1.OpsPhase) *appsv1alpha1.OpsRequest {
-				ops := createHorizontalScaling(clusterName, 1, nil)
+				ops := createHorizontalScaling(clusterName, appsv1alpha1.HorizontalScaling{
+					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+					Replicas:     pointer.Int32(1),
+				})
 				opsRes.OpsRequest = ops
 				_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 				Expect(err).ShouldNot(HaveOccurred())
@@ -156,6 +243,62 @@ var _ = Describe("OpsUtil functions", func() {
 				// expect cluster's opsRequest queue is empty
 				g.Expect(opsSlice).Should(BeEmpty())
 			})
+		})
+
+		It("Test opsRequest dependency", func() {
+			By("init operations resources ")
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterName)
+
+			By("create a first horizontal opsRequest")
+			ops1 := createHorizontalScaling(clusterName, appsv1alpha1.HorizontalScaling{
+				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+				ScaleIn: &appsv1alpha1.ScaleIn{
+					ReplicaChanger: appsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)},
+				},
+			})
+			opsRes.OpsRequest = ops1
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsCreatingPhase))
+
+			By("create another horizontal opsRequest with force flag and dependent the first opsRequest")
+			ops2 := createHorizontalScaling(clusterName, appsv1alpha1.HorizontalScaling{
+				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+				ScaleOut: &appsv1alpha1.ScaleOut{
+					ReplicaChanger: appsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)},
+				},
+			})
+			ops2.Annotations = map[string]string{constant.OpsDependentOnSuccessfulOpsAnnoKey: ops1.Name}
+			ops2.Spec.Force = true
+			opsRes.OpsRequest = ops2
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsPendingPhase))
+			// expect the dependent ops has been annotated
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(ops1), func(g Gomega, ops *appsv1alpha1.OpsRequest) {
+				g.Expect(ops.Annotations[constant.RelatedOpsAnnotationKey]).Should(Equal(ops2.Name))
+			})).Should(Succeed())
+
+			By("expect for the ops is Creating when dependent ops is succeed")
+			Expect(testapps.ChangeObjStatus(&testCtx, ops1, func() {
+				ops1.Status.Phase = appsv1alpha1.OpsSucceedPhase
+			})).Should(Succeed())
+
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsCreatingPhase))
+
+			By("expect for the ops is Cancelled when dependent ops is Failed")
+			Expect(testapps.ChangeObjStatus(&testCtx, ops1, func() {
+				ops1.Status.Phase = appsv1alpha1.OpsFailedPhase
+			})).Should(Succeed())
+
+			ops2.Annotations = map[string]string{constant.OpsDependentOnSuccessfulOpsAnnoKey: ops1.Name}
+			ops2.Status.Phase = appsv1alpha1.OpsPendingPhase
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops2))).Should(Equal(appsv1alpha1.OpsCancelledPhase))
 		})
 	})
 })

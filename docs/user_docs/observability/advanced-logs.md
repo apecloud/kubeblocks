@@ -16,25 +16,25 @@ The `advanced logs` function can better retain log clues at problem sites, suppo
 
 The advanced logs function supports storing log data to the Loki server in the cluster and the remote AWS S3 service. The data stored in Loki supports `logcli` client and Grafana console access and display. The data stored in S3 supports importing and integrating with other systems for further processing and analysis.
 
-## Add-on introduction
+## Addon introduction
 
-Agamotto, Loki, Prometheus, and other components related to observability are managed by KubeBlocks as add-ons. Each of these add-ons has its specialties.
+Agamotto, Loki, Prometheus, and other components related to observability are managed by KubeBlocks as addons. Each of these addons has its specialties.
 
-* Agamotto is a collection add-on that collects performance and logs.
-* Loki is a storage add-on that stores log data.
-* Grafana is a front-end display add-on that displays the observed data.
-* Logcli is a front-end search add-on that provides the native LogQL query capability. It is installed by `kbcli plugin`.
+* Agamotto is a collection addon that collects performance and logs.
+* Loki is a storage addon that stores log data.
+* Grafana is a front-end display addon that displays the observed data.
+* Logcli is a front-end search addon that provides the native LogQL query capability. It is installed by `kbcli plugin`.
 
 ## Before you start
 
 * [Install kubectl](https://kubernetes.io/docs/tasks/tools/).
-* [Install KubeBlocks by kbcli](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [install KubeBlocks by Helm](./../installation/install-with-helm/install-kubeblocks-with-helm.md).
+* [Install KubeBlocks](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md).
 
 ## Enable advanced logs function
 
 ### Enable Loki
 
-The Loki add-on stores the log data and accepts the search request from the front end. Refer to the [Loki official documentation](https://grafana.com/docs/loki/latest/) for details.
+The Loki addon stores the log data and accepts the search request from the front end. Refer to the [Loki official documentation](https://grafana.com/docs/loki/latest/) for details.
 
 :::caution
 
@@ -42,13 +42,13 @@ Before enabling the advanced logs function, deploy a Loki node first and then ap
 
 :::
 
-1. View the Loki add-on status to check whether it is enabled.
+1. View the Loki addon status to check whether it is enabled.
 
    ```bash
    kbcli addon list | grep loki
    ```
 
-2. If this add-on is not enabled, run the command below to enable this add-on.
+2. If this addon is not enabled, run the command below to enable this addon.
 
    This command runs Loki in the `statefulset` mode. KubeBlocks deploys a single-node Loki of the single binary type, i.e. the `target` in the configuration is `all`, uses a 10-GB PV to store data, and starts a `loki-gateway` service to receive data.
 
@@ -73,7 +73,7 @@ Before enabling the advanced logs function, deploy a Loki node first and then ap
 
    ![Loki in Grafana](./../../img/observability-loki-dashboard.png)
 
-4. (Optional) Disable the Loki add-on.
+4. (Optional) Disable the Loki addon.
 
    ```bash
    kbcli disabled loki
@@ -124,13 +124,13 @@ After the log collection function is enabled, Agamotto detects two localhost fol
 * `/var/log/pods` directory: it stores the standard output of the storage container and the error logs. The file path pattern follows `/var/log/pods/**/**/*.log`.
 * `/var/log/kubeblocks` directory: it can customize the storage of log files storage. By default, KubeBlocks stores the logs of database engines, such as error log and slow log. The file path pattern follows `/var/log/kubeblocks/**/**/*.log`.
 
-1. View the Agamotto add-on status to check whether it is enabled.
+1. View the Agamotto addon status to check whether it is enabled.
 
    ```bash
    kbcli addon list | grep agamotto
    ```
 
-2. If this add-on is not enabled, run the command below to enable this add-on.
+2. If this addon is not enabled, run the command below to enable this addon.
 
    ```bash
    kbcli addon enable agamotto
@@ -166,7 +166,7 @@ After the log collection function is enabled, Agamotto detects two localhost fol
 
    The target bucket of the remote S3 creates a directory named after the filename, which stores the real-time data Partition of the corresponding log (partitioned by 5 minutes or 5 MB).
 
-5. (Optional) Disable the Agamotto add-on.
+5. (Optional) Disable the Agamotto addon.
 
    ```bash
    kbcli addon disable agamotto
@@ -176,7 +176,7 @@ After the log collection function is enabled, Agamotto detects two localhost fol
 
 :::note
 
-In the production environment, all monitoring add-ons are disabled by default when installing KubeBlocks and Grafana is also included. You can enable Grafana but it is highly recommended to build your monitoring system or purchase a third-party monitoring service for safety and stability concerns. For integrating a third-party monitoring service, refer to [Integrate a third party monitoring service](./monitor-database.md#for-production-environment).
+In the production environment, all monitoring addons are disabled by default when installing KubeBlocks and Grafana is also included. You can enable Grafana but it is highly recommended to build your monitoring system or purchase a third-party monitoring service for safety and stability concerns. For integrating a third-party monitoring service, refer to [Integrate a third party monitoring service](./monitor-database.md#for-production-environment).
 
 :::
 
@@ -259,7 +259,7 @@ For more LogCLI and LogQL grammar, refer to the [Loki official documentation](ht
       kubectl port-forward svc/loki-gateway 3100:80 -n kb-system
       ```
 
-   3. Use the LogCLi tool to query log data.
+   3. Use the LogCLI tool to query log data.
 
       ```bash
       kbcli logcli query '{exporter="OTLP"}'

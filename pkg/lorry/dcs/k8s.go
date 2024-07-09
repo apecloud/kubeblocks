@@ -186,9 +186,19 @@ func (store *KubernetesStore) GetCluster() (*Cluster, error) {
 	}
 
 	var members []Member
-	if store.cluster != nil && int(replicas) == len(store.cluster.Members) {
-		members = store.cluster.Members
-	} else {
+	if store.cluster != nil {
+		hasPodIP := true
+		for _, m := range store.cluster.Members {
+			if m.PodIP == "" {
+				hasPodIP = false
+				break
+			}
+		}
+		if hasPodIP && int(replicas) == len(store.cluster.Members) {
+			members = store.cluster.Members
+		}
+	}
+	if len(members) == 0 {
 		members, err = store.GetMembers()
 		if err != nil {
 			return nil, err
@@ -242,12 +252,18 @@ func (store *KubernetesStore) GetMembers() ([]Member, error) {
 	}
 
 	store.logger.Info(fmt.Sprintf("podlist: %d", len(podList.Items)))
-	members := make([]Member, len(podList.Items))
-	for i, pod := range podList.Items {
-		member := &members[i]
+	members := make([]Member, 0, len(podList.Items))
+	for _, pod := range podList.Items {
+		componentName := pod.Labels[constant.KBAppComponentLabelKey]
+		if componentName == "" {
+			// it is not a member pod
+			continue
+		}
+		member := Member{}
 		member.Name = pod.Name
 		// member.Name = fmt.Sprintf("%s.%s-headless.%s.svc", pod.Name, store.clusterCompName, store.namespace)
 		member.Role = pod.Labels[constant.RoleLabelKey]
+		member.ComponentName = componentName
 		member.PodIP = pod.Status.PodIP
 		member.DBPort = getDBPort(&pod)
 		member.LorryPort = getLorryPort(&pod)
@@ -257,6 +273,7 @@ func (store *KubernetesStore) GetMembers() ([]Member, error) {
 			member.UseIP = true
 		}
 		member.resource = pod.DeepCopy()
+		members = append(members, member)
 	}
 
 	return members, nil

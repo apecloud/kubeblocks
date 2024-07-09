@@ -20,15 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"context"
 	"fmt"
 	"reflect"
-	"strconv"
 	"strings"
 
 	"github.com/spf13/viper"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
-	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -38,16 +37,13 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/configuration/core"
-	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	rsmcore "github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	"github.com/apecloud/kubeblocks/pkg/generics"
 	lorry "github.com/apecloud/kubeblocks/pkg/lorry/client"
 )
 
@@ -67,7 +63,11 @@ type componentWorkloadOps struct {
 	// runningITS is a snapshot of the InstanceSet that is already running
 	runningITS *workloads.InstanceSet
 	// protoITS is the InstanceSet object that is rebuilt from scratch during each reconcile process
-	protoITS *workloads.InstanceSet
+	protoITS              *workloads.InstanceSet
+	desiredCompPodNames   []string
+	runningItsPodNames    []string
+	desiredCompPodNameSet sets.Set[string]
+	runningItsPodNameSet  sets.Set[string]
 }
 
 var _ graph.Transformer = &componentWorkloadTransformer{}
@@ -103,14 +103,14 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	}
 	if runningITS != nil {
 		*protoITS.Spec.Selector = *runningITS.Spec.Selector
-		protoITS.Spec.Template.Labels = runningITS.Spec.Template.Labels
+		protoITS.Spec.Template.Labels = intctrlutil.MergeMetadataMaps(runningITS.Spec.Template.Labels, synthesizeComp.UserDefinedLabels)
 	}
 	transCtx.ProtoWorkload = protoITS
 
 	buildInstanceSetPlacementAnnotation(transCtx.Component, protoITS)
 
 	// build configuration template annotations to workload
-	buildInstanceSetConfigTplAnnotations(protoITS, synthesizeComp)
+	configuration.BuildConfigTemplateAnnotations(protoITS, synthesizeComp)
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	if runningITS == nil {
@@ -156,16 +156,15 @@ func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCt
 		cli.Update(dag, nil, objCopy, &model.ReplaceIfExistingOption{})
 	}
 
-	// to work around that the scaled PVC will be deleted at object action.
-	if err := updateVolumes(reqCtx, t.Client, synthesizeComp, runningITS, dag); err != nil {
-		return err
-	}
 	return nil
 }
 
 func (t *componentWorkloadTransformer) handleWorkloadUpdate(reqCtx intctrlutil.RequestCtx, dag *graph.DAG,
 	cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, obj, its *workloads.InstanceSet) error {
-	cwo := newComponentWorkloadOps(reqCtx, t.Client, cluster, synthesizeComp, obj, its, dag)
+	cwo, err := newComponentWorkloadOps(reqCtx, t.Client, cluster, synthesizeComp, obj, its, dag)
+	if err != nil {
+		return err
+	}
 
 	// handle expand volume
 	if err := cwo.expandVolume(); err != nil {
@@ -176,8 +175,6 @@ func (t *componentWorkloadTransformer) handleWorkloadUpdate(reqCtx intctrlutil.R
 	if err := cwo.horizontalScale(); err != nil {
 		return err
 	}
-
-	// dag = cwo.dag
 
 	return nil
 }
@@ -296,7 +293,6 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, synthesizeComp *comp
 	itsObjCopy.Spec.Template = *itsProto.Spec.Template.DeepCopy()
 	itsObjCopy.Spec.Replicas = itsProto.Spec.Replicas
 	itsObjCopy.Spec.Service = updateService(itsObjCopy, itsProto)
-	itsObjCopy.Spec.AlternativeServices = itsProto.Spec.AlternativeServices
 	itsObjCopy.Spec.Roles = itsProto.Spec.Roles
 	itsObjCopy.Spec.RoleProbe = itsProto.Spec.RoleProbe
 	itsObjCopy.Spec.MembershipReconfiguration = itsProto.Spec.MembershipReconfiguration
@@ -304,17 +300,19 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, synthesizeComp *comp
 	itsObjCopy.Spec.Credential = itsProto.Spec.Credential
 	itsObjCopy.Spec.Instances = itsProto.Spec.Instances
 	itsObjCopy.Spec.OfflineInstances = itsProto.Spec.OfflineInstances
+	itsObjCopy.Spec.MinReadySeconds = itsProto.Spec.MinReadySeconds
+	itsObjCopy.Spec.VolumeClaimTemplates = itsProto.Spec.VolumeClaimTemplates
 
 	if itsProto.Spec.UpdateStrategy.Type != "" || itsProto.Spec.UpdateStrategy.RollingUpdate != nil {
 		updateUpdateStrategy(itsObjCopy, itsProto)
 	}
 
 	intctrlutil.ResolvePodSpecDefaultFields(oldITS.Spec.Template.Spec, &itsObjCopy.Spec.Template.Spec)
-	DelayUpdateInstanceSetSystemFields(oldITS.Spec, &itsObjCopy.Spec)
+	delayUpdateInstanceSetSystemFields(oldITS.Spec, &itsObjCopy.Spec)
 
 	isSpecUpdated := !reflect.DeepEqual(&oldITS.Spec, &itsObjCopy.Spec)
 	if isSpecUpdated {
-		UpdateInstanceSetSystemFields(itsProto.Spec, &itsObjCopy.Spec)
+		updateInstanceSetSystemFields(itsProto.Spec, &itsObjCopy.Spec)
 	}
 
 	isLabelsUpdated := !reflect.DeepEqual(oldITS.Labels, itsObjCopy.Labels)
@@ -399,61 +397,71 @@ func (r *componentWorkloadOps) expandVolume() error {
 
 // horizontalScale handles workload horizontal scale
 func (r *componentWorkloadOps) horizontalScale() error {
-	sts := rsmcore.ConvertInstanceSetToSTS(r.runningITS)
-	if sts.Status.ReadyReplicas == r.synthesizeComp.Replicas {
-		return nil
-	}
-	ret := r.horizontalScaling(r.synthesizeComp, sts)
-	if ret == 0 {
+	its := r.runningITS
+	doScaleOut, doScaleIn := r.horizontalScaling()
+	if !doScaleOut && !doScaleIn {
 		if err := r.postScaleIn(); err != nil {
 			return err
 		}
-		if err := r.postScaleOut(sts); err != nil {
+		if err := r.postScaleOut(its); err != nil {
 			return err
 		}
 		return nil
 	}
-	if ret < 0 {
-		if err := r.scaleIn(sts); err != nil {
-			return err
-		}
-	} else {
-		if err := r.scaleOut(sts); err != nil {
+	if doScaleIn {
+		if err := r.scaleIn(its); err != nil {
 			return err
 		}
 	}
-
-	if err := r.updatePodReplicaLabel4Scaling(r.synthesizeComp.Replicas); err != nil {
-		return err
+	if doScaleOut {
+		if err := r.scaleOut(its); err != nil {
+			return err
+		}
 	}
 
 	r.reqCtx.Recorder.Eventf(r.cluster,
 		corev1.EventTypeNormal,
 		"HorizontalScale",
 		"start horizontal scale component %s of cluster %s from %d to %d",
-		r.synthesizeComp.Name, r.cluster.Name, int(r.synthesizeComp.Replicas)-ret, r.synthesizeComp.Replicas)
+		r.synthesizeComp.Name, r.cluster.Name, int(*its.Spec.Replicas), r.synthesizeComp.Replicas)
 
 	return nil
 }
 
 // < 0 for scale in, > 0 for scale out, and == 0 for nothing
-func (r *componentWorkloadOps) horizontalScaling(synthesizeComp *component.SynthesizedComponent, stsObj *apps.StatefulSet) int {
-	return int(synthesizeComp.Replicas - *stsObj.Spec.Replicas)
+func (r *componentWorkloadOps) horizontalScaling() (bool, bool) {
+	var (
+		doScaleOut bool
+		doScaleIn  bool
+	)
+	for _, podName := range r.desiredCompPodNames {
+		if _, ok := r.runningItsPodNameSet[podName]; !ok {
+			doScaleOut = true
+			break
+		}
+	}
+	for _, podName := range r.runningItsPodNames {
+		if _, ok := r.desiredCompPodNameSet[podName]; !ok {
+			doScaleIn = true
+			break
+		}
+	}
+	return doScaleOut, doScaleIn
 }
 
 func (r *componentWorkloadOps) postScaleIn() error {
 	return nil
 }
 
-func (r *componentWorkloadOps) postScaleOut(stsObj *apps.StatefulSet) error {
+func (r *componentWorkloadOps) postScaleOut(itsObj *workloads.InstanceSet) error {
 	var (
 		snapshotKey = types.NamespacedName{
-			Namespace: stsObj.Namespace,
-			Name:      constant.GenerateResourceNameWithScalingSuffix(stsObj.Name),
+			Namespace: itsObj.Namespace,
+			Name:      constant.GenerateResourceNameWithScalingSuffix(itsObj.Name),
 		}
 	)
 
-	d, err := newDataClone(r.reqCtx, r.cli, r.cluster, r.synthesizeComp, stsObj, stsObj, snapshotKey)
+	d, err := newDataClone(r.reqCtx, r.cli, r.cluster, r.synthesizeComp, itsObj, itsObj, snapshotKey)
 	if err != nil {
 		return err
 	}
@@ -473,7 +481,7 @@ func (r *componentWorkloadOps) postScaleOut(stsObj *apps.StatefulSet) error {
 	return nil
 }
 
-func (r *componentWorkloadOps) scaleIn(stsObj *apps.StatefulSet) error {
+func (r *componentWorkloadOps) scaleIn(itsObj *workloads.InstanceSet) error {
 	// if scale in to 0, do not delete pvcs
 	if r.synthesizeComp.Replicas == 0 {
 		r.reqCtx.Log.Info("scale in to 0, keep all PVCs")
@@ -485,25 +493,24 @@ func (r *componentWorkloadOps) scaleIn(stsObj *apps.StatefulSet) error {
 		r.reqCtx.Log.Info(fmt.Sprintf("leave member at scaling-in error, retry later: %s", err.Error()))
 		return err
 	}
-	return r.deletePVCs4ScaleIn(stsObj)
+	return r.deletePVCs4ScaleIn(itsObj)
 }
 
-func (r *componentWorkloadOps) scaleOut(stsObj *apps.StatefulSet) error {
+func (r *componentWorkloadOps) scaleOut(itsObj *workloads.InstanceSet) error {
 	var (
 		backupKey = types.NamespacedName{
-			Namespace: stsObj.Namespace,
-			Name:      constant.GenerateResourceNameWithScalingSuffix(stsObj.Name),
+			Namespace: itsObj.Namespace,
+			Name:      constant.GenerateResourceNameWithScalingSuffix(itsObj.Name),
 		}
 	)
 
-	// sts's replicas=0 means it's starting not scaling, skip all the scaling work.
-	if *stsObj.Spec.Replicas == 0 {
+	// its's replicas=0 means it's starting not scaling, skip all the scaling work.
+	if *itsObj.Spec.Replicas == 0 {
 		return nil
 	}
 	graphCli := model.NewGraphClient(r.cli)
 	graphCli.Noop(r.dag, r.protoITS)
-	stsProto := rsmcore.ConvertInstanceSetToSTS(r.protoITS)
-	d, err := newDataClone(r.reqCtx, r.cli, r.cluster, r.synthesizeComp, stsObj, stsProto, backupKey)
+	d, err := newDataClone(r.reqCtx, r.cli, r.cluster, r.synthesizeComp, itsObj, r.protoITS, backupKey)
 	if err != nil {
 		return err
 	}
@@ -519,7 +526,7 @@ func (r *componentWorkloadOps) scaleOut(stsObj *apps.StatefulSet) error {
 	if succeed {
 		// pvcs are ready, ITS.replicas should be updated
 		graphCli.Update(r.dag, nil, r.protoITS)
-		return r.postScaleOut(stsObj)
+		return r.postScaleOut(itsObj)
 	} else {
 		graphCli.Noop(r.dag, r.protoITS)
 		// update objs will trigger reconcile, no need to requeue error
@@ -537,27 +544,8 @@ func (r *componentWorkloadOps) scaleOut(stsObj *apps.StatefulSet) error {
 	}
 }
 
-func (r *componentWorkloadOps) updatePodReplicaLabel4Scaling(replicas int32) error {
-	graphCli := model.NewGraphClient(r.cli)
-	pods, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.cluster.Namespace,
-		constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name), inDataContext4C())
-	if err != nil {
-		return err
-	}
-	for _, pod := range pods {
-		obj := pod.DeepCopy()
-		if obj.Annotations == nil {
-			obj.Annotations = make(map[string]string)
-		}
-		obj.Annotations[constant.ComponentReplicasAnnotationKey] = strconv.Itoa(int(replicas))
-		graphCli.Update(r.dag, nil, obj, inDataContext4G())
-	}
-	return nil
-}
-
 func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
-	pods, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.cluster.Namespace,
-		constant.GetComponentWellKnownLabels(r.cluster.Name, r.synthesizeComp.Name), inDataContext4C())
+	pods, err := component.ListOwnedPods(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, r.cluster.Name, r.synthesizeComp.Name)
 	if err != nil {
 		return err
 	}
@@ -602,10 +590,9 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 
 	// TODO: Move memberLeave to the ITS controller. Instead of performing a switchover, we can directly scale down the non-leader nodes. This is because the pod ordinal is not guaranteed to be continuous.
 	podsToMemberLeave := make([]*corev1.Pod, 0)
-	genPodNamesByDefault := generatePodNames(r.synthesizeComp)
 	for _, pod := range pods {
 		// if the pod not exists in the generated pod names, it should be a member that needs to leave
-		if slices.Contains(genPodNamesByDefault, pod.Name) {
+		if _, ok := r.desiredCompPodNameSet[pod.Name]; ok {
 			continue
 		}
 		podsToMemberLeave = append(podsToMemberLeave, pod)
@@ -643,20 +630,23 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 	return err // TODO: use requeue-after
 }
 
-func (r *componentWorkloadOps) deletePVCs4ScaleIn(stsObj *apps.StatefulSet) error {
+func (r *componentWorkloadOps) deletePVCs4ScaleIn(itsObj *workloads.InstanceSet) error {
 	graphCli := model.NewGraphClient(r.cli)
-	for i := r.synthesizeComp.Replicas; i < *stsObj.Spec.Replicas; i++ {
-		for _, vct := range stsObj.Spec.VolumeClaimTemplates {
+	for _, podName := range r.runningItsPodNames {
+		if _, ok := r.desiredCompPodNameSet[podName]; ok {
+			continue
+		}
+		for _, vct := range itsObj.Spec.VolumeClaimTemplates {
 			pvcKey := types.NamespacedName{
-				Namespace: stsObj.Namespace,
-				Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
+				Namespace: itsObj.Namespace,
+				Name:      fmt.Sprintf("%s-%s", vct.Name, podName),
 			}
 			pvc := corev1.PersistentVolumeClaim{}
 			if err := r.cli.Get(r.reqCtx.Ctx, pvcKey, &pvc, inDataContext4C()); err != nil {
 				return err
 			}
-			// Since there are no order guarantee between updating STS and deleting PVCs, if there is any error occurred
-			// after updating STS and before deleting PVCs, the PVCs intended to scale-in will be leaked.
+			// Since there are no order guarantee between updating ITS and deleting PVCs, if there is any error occurred
+			// after updating ITS and before deleting PVCs, the PVCs intended to scale-in will be leaked.
 			// For simplicity, the updating dependency is added between them to guarantee that the PVCs to scale-in
 			// will be deleted or the scaling-in operation will be failed.
 			graphCli.Delete(r.dag, &pvc, inDataContext4G())
@@ -666,11 +656,11 @@ func (r *componentWorkloadOps) deletePVCs4ScaleIn(stsObj *apps.StatefulSet) erro
 }
 
 func (r *componentWorkloadOps) expandVolumes(vctName string, proto *corev1.PersistentVolumeClaimTemplate) error {
-	for i := *r.runningITS.Spec.Replicas - 1; i >= 0; i-- {
+	for _, pod := range r.runningItsPodNames {
 		pvc := &corev1.PersistentVolumeClaim{}
 		pvcKey := types.NamespacedName{
 			Namespace: r.cluster.Namespace,
-			Name:      fmt.Sprintf("%s-%s-%d", vctName, r.runningITS.Name, i),
+			Name:      fmt.Sprintf("%s-%s", vctName, pod),
 		}
 		pvcNotFound := false
 		if err := r.cli.Get(r.reqCtx.Ctx, pvcKey, pvc, inDataContext4C()); err != nil {
@@ -740,15 +730,20 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 
 	// step 1: update pv to retain
 	pv := &corev1.PersistentVolume{}
-	pvKey := types.NamespacedName{
-		Namespace: pvcKey.Namespace,
-		Name:      newPVC.Spec.VolumeName,
-	}
-	if err := r.cli.Get(r.reqCtx.Ctx, pvKey, pv, inDataContext4C()); err != nil {
-		if apierrors.IsNotFound(err) {
-			pvNotFound = true
-		} else {
-			return err
+	if len(newPVC.Spec.VolumeName) == 0 {
+		// the PV may be under provisioning
+		pvNotFound = true
+	} else {
+		pvKey := types.NamespacedName{
+			Namespace: pvcKey.Namespace,
+			Name:      newPVC.Spec.VolumeName,
+		}
+		if err := r.cli.Get(r.reqCtx.Ctx, pvKey, pv, inDataContext4C()); err != nil {
+			if apierrors.IsNotFound(err) {
+				pvNotFound = true
+			} else {
+				return err
+			}
 		}
 	}
 
@@ -862,92 +857,33 @@ func (r *componentWorkloadOps) buildProtoITSWorkloadVertex() *model.ObjectVertex
 	return nil
 }
 
-func updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, synthesizeComp *component.SynthesizedComponent,
-	itsObj *workloads.InstanceSet, dag *graph.DAG) error {
-	graphCli := model.NewGraphClient(cli)
-	getRunningVolumes := func(vctName string) ([]*corev1.PersistentVolumeClaim, error) {
-		labels := constant.GetComponentWellKnownLabels(synthesizeComp.ClusterName, synthesizeComp.Name)
-		pvcs, err := component.ListObjWithLabelsInNamespace(reqCtx.Ctx, cli,
-			generics.PersistentVolumeClaimSignature, itsObj.Namespace, labels, inDataContext4C())
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				return nil, nil
-			}
-			return nil, err
+func getRunningVolumes(ctx context.Context, cli client.Client, synthesizedComp *component.SynthesizedComponent,
+	itsObj *workloads.InstanceSet, vctName string) ([]*corev1.PersistentVolumeClaim, error) {
+	pvcs, err := component.ListOwnedPVCs(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, nil
 		}
-		matchedPVCs := make([]*corev1.PersistentVolumeClaim, 0)
-		prefix := fmt.Sprintf("%s-%s", vctName, itsObj.Name)
-		for _, pvc := range pvcs {
-			if strings.HasPrefix(pvc.Name, prefix) {
-				matchedPVCs = append(matchedPVCs, pvc)
-			}
-		}
-		return matchedPVCs, nil
+		return nil, err
 	}
-
-	// PVCs which have been added to the dag because of volume expansion.
-	pvcNameSet := sets.New[string]()
-	for _, obj := range graphCli.FindAll(dag, &corev1.PersistentVolumeClaim{}) {
-		pvcNameSet.Insert(obj.GetName())
-	}
-
-	for _, vct := range synthesizeComp.VolumeClaimTemplates {
-		pvcs, err := getRunningVolumes(vct.Name)
-		if err != nil {
-			return err
-		}
-		for _, pvc := range pvcs {
-			if pvcNameSet.Has(pvc.Name) {
-				continue
-			}
-			graphCli.Noop(dag, pvc)
+	matchedPVCs := make([]*corev1.PersistentVolumeClaim, 0)
+	prefix := fmt.Sprintf("%s-%s", vctName, itsObj.Name)
+	for _, pvc := range pvcs {
+		if strings.HasPrefix(pvc.Name, prefix) {
+			matchedPVCs = append(matchedPVCs, pvc)
 		}
 	}
-	return nil
+	return matchedPVCs, nil
 }
 
 func buildInstanceSetPlacementAnnotation(comp *appsv1alpha1.Component, its *workloads.InstanceSet) {
-	if its.Annotations == nil {
-		its.Annotations = make(map[string]string)
-	}
-	its.Annotations[constant.KBAppMultiClusterPlacementKey] = placement(comp)
-}
-
-// buildInstanceSetConfigTplAnnotations builds config tpl annotations for ITS
-func buildInstanceSetConfigTplAnnotations(its *workloads.InstanceSet, synthesizedComp *component.SynthesizedComponent) {
-	configTplAnnotations := make(map[string]string)
-	for _, configTplSpec := range synthesizedComp.ConfigTemplates {
-		configTplAnnotations[core.GenerateTPLUniqLabelKeyWithConfig(configTplSpec.Name)] = core.GetComponentCfgName(synthesizedComp.ClusterName, synthesizedComp.Name, configTplSpec.Name)
-	}
-	for _, scriptTplSpec := range synthesizedComp.ScriptTemplates {
-		configTplAnnotations[core.GenerateTPLUniqLabelKeyWithConfig(scriptTplSpec.Name)] = core.GetComponentCfgName(synthesizedComp.ClusterName, synthesizedComp.Name, scriptTplSpec.Name)
-	}
-	updateInstanceSetAnnotationsWithTemplate(its, configTplAnnotations)
-}
-
-func updateInstanceSetAnnotationsWithTemplate(its *workloads.InstanceSet, allTemplateAnnotations map[string]string) {
-	// full configmap upgrade
-	existLabels := make(map[string]string)
-	annotations := its.GetAnnotations()
-	if annotations == nil {
-		annotations = make(map[string]string)
-	}
-	for key, val := range annotations {
-		if strings.HasPrefix(key, constant.ConfigurationTplLabelPrefixKey) {
-			existLabels[key] = val
+	p := placement(comp)
+	if len(p) > 0 {
+		if its.Annotations == nil {
+			its.Annotations = make(map[string]string)
 		}
+		its.Annotations[constant.KBAppMultiClusterPlacementKey] = p
 	}
-
-	// delete not exist configmap label
-	deletedLabels := cfgutil.MapKeyDifference(existLabels, allTemplateAnnotations)
-	for l := range deletedLabels.Iter() {
-		delete(annotations, l)
-	}
-
-	for key, val := range allTemplateAnnotations {
-		annotations[key] = val
-	}
-	its.SetAnnotations(annotations)
 }
 
 func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,
@@ -956,14 +892,26 @@ func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,
 	synthesizeComp *component.SynthesizedComponent,
 	runningITS *workloads.InstanceSet,
 	protoITS *workloads.InstanceSet,
-	dag *graph.DAG) *componentWorkloadOps {
-	return &componentWorkloadOps{
-		cli:            cli,
-		reqCtx:         reqCtx,
-		cluster:        cluster,
-		synthesizeComp: synthesizeComp,
-		runningITS:     runningITS,
-		protoITS:       protoITS,
-		dag:            dag,
+	dag *graph.DAG) (*componentWorkloadOps, error) {
+	compPodNames, err := generatePodNames(synthesizeComp)
+	if err != nil {
+		return nil, err
 	}
+	itsPodNames, err := generatePodNamesByITS(runningITS)
+	if err != nil {
+		return nil, err
+	}
+	return &componentWorkloadOps{
+		cli:                   cli,
+		reqCtx:                reqCtx,
+		cluster:               cluster,
+		synthesizeComp:        synthesizeComp,
+		runningITS:            runningITS,
+		protoITS:              protoITS,
+		dag:                   dag,
+		desiredCompPodNames:   compPodNames,
+		runningItsPodNames:    itsPodNames,
+		desiredCompPodNameSet: sets.New(compPodNames...),
+		runningItsPodNameSet:  sets.New(itsPodNames...),
+	}, nil
 }

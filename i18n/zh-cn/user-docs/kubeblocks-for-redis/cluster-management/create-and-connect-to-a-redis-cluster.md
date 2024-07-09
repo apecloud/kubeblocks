@@ -21,7 +21,7 @@ KubeBlocks 支持 Redis 单机版和 Redis 主备版集群。
 
 ### 开始之前
 
-* 如果想通过 kbcli 创建和连接 MySQL 集群，请[安装 kbcli](./../../installation/install-with-kbcli/install-kbcli.md)。
+* 如果想通过 kbcli 创建和连接 Redis 集群，请[安装 kbcli](./../../installation/install-with-kbcli/install-kbcli.md)。
 * 用 [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md) 安装 KubeBlocks。
 * 确保 Redis 引擎已启用。
   
@@ -109,7 +109,7 @@ KubeBlocks 支持创建两种 Redis 集群：单机版（Standalone）和主备�
 创建 Redis 单机版。
 
 ```bash
-kbcli cluster create redis <clustername>
+kbcli cluster create redis --mode standalone <clustername>
 ```
 
 创建 Redis 主备版。

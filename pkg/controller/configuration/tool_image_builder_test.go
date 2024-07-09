@@ -60,7 +60,6 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 
 			cfgManagerParams := &cfgcm.CfgManagerBuildParams{
 				ManagerName:   constant.ConfigSidecarName,
-				CharacterType: clusterComponent.CharacterType,
 				ComponentName: clusterComponent.Name,
 				SecreteName:   constant.GenerateDefaultConnCredential(clusterObj.Name),
 				Image:         viper.GetString(constant.KBToolsImage),
@@ -70,10 +69,10 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 					ConfigSpecInfo: cfgcm.ConfigSpecInfo{
 						ConfigSpec:      clusterComponent.ConfigTemplates[0],
 						ReloadType:      appsv1beta1.TPLScriptType,
-						FormatterConfig: appsv1beta1.FormatterConfig{},
+						FormatterConfig: appsv1beta1.FileFormatConfig{},
 					},
-					ToolsImageSpec: &appsv1beta1.ReloadToolsImage{
-						MountPoint: "/opt/images",
+					ToolsImageSpec: &appsv1beta1.ToolsSetup{
+						MountPoint: "/opt/tools",
 						ToolConfigs: []appsv1beta1.ToolConfig{
 							{
 								Name:    "test",
@@ -84,6 +83,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 								Name:    "test2",
 								Image:   "",
 								Command: noneCommand,
+								// AsContainerImage: cfgutil.ToPointer(true),
 							},
 							{
 								Name:    "test3",
@@ -103,7 +103,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 					Policy:      appsv1alpha1.NoneMergePolicy,
 				},
 			}
-			Expect(buildConfigToolsContainer(cfgManagerParams, &its.Spec.Template.Spec, clusterComponent)).Should(Succeed())
+			Expect(buildReloadToolsContainer(cfgManagerParams, &its.Spec.Template.Spec)).Should(Succeed())
 			Expect(4).Should(BeEquivalentTo(len(cfgManagerParams.ToolsContainers)))
 			Expect("test_images").Should(BeEquivalentTo(cfgManagerParams.ToolsContainers[0].Image))
 			Expect(its.Spec.Template.Spec.Containers[0].Image).Should(BeEquivalentTo(cfgManagerParams.ToolsContainers[1].Image))

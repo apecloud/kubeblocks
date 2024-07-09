@@ -30,7 +30,6 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 )
 
 // updateReconciler handles the updates of instances based on the UpdateStrategy.
@@ -112,7 +111,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	// TODO(free6om): compute updateCount from PodManagementPolicy(Serial/OrderedReady, Parallel, BestEffortParallel).
 	// align MemberUpdateStrategy with PodManagementPolicy if it has nil value.
 	itsForPlan := getInstanceSetForUpdatePlan(its)
-	plan := rsm.NewUpdatePlan(*itsForPlan, oldPodList, IsPodUpdated)
+	plan := NewUpdatePlan(*itsForPlan, oldPodList, IsPodUpdated)
 	podsToBeUpdated, err := plan.Execute()
 	if err != nil {
 		return nil, err
@@ -121,8 +120,8 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 
 	updatingPods := 0
 	updatedPods := 0
-	priorities := rsm.ComposeRolePriorityMap(its.Spec.Roles)
-	sortObjects(oldPodList, priorities, true)
+	priorities := ComposeRolePriorityMap(its.Spec.Roles)
+	sortObjects(oldPodList, priorities, false)
 	for _, pod := range oldPodList {
 		if updatingPods >= updateCount || updatingPods >= unavailable {
 			break

@@ -161,14 +161,10 @@ func (r *ConfigurationReconciler) runTasks(taskCtx TaskContext, tasks []Task) (e
 	} else {
 		// build synthesized component for native component
 		synthesizedComp, err = component.BuildSynthesizedComponent(taskCtx.reqCtx, r.Client, taskCtx.fetcher.ClusterObj, taskCtx.fetcher.ComponentDefObj, taskCtx.fetcher.ComponentObj)
+		if err == nil {
+			err = buildTemplateVars(taskCtx.reqCtx.Ctx, r.Client, taskCtx.fetcher.ComponentDefObj, synthesizedComp)
+		}
 	}
-	if err != nil {
-		return err
-	}
-
-	// HACK for hostNetwork
-	// TODO: define the api to inject dynamic info of the cluster components
-	dependencyObjs, err := component.GetHostNetworkRelatedComponents(synthesizedComp.PodSpec, taskCtx.reqCtx.Ctx, r.Client, taskCtx.fetcher.ClusterObj)
 	if err != nil {
 		return err
 	}
@@ -177,7 +173,7 @@ func (r *ConfigurationReconciler) runTasks(taskCtx TaskContext, tasks []Task) (e
 	patch := client.MergeFrom(configuration.DeepCopy())
 	revision := strconv.FormatInt(configuration.GetGeneration(), 10)
 	for _, task := range tasks {
-		if err := task.Do(taskCtx.fetcher, synthesizedComp, dependencyObjs, revision); err != nil {
+		if err := task.Do(taskCtx.fetcher, synthesizedComp, revision); err != nil {
 			errs = append(errs, err)
 			continue
 		}
@@ -237,4 +233,16 @@ func isReconcileStatus(phase appsv1alpha1.ConfigurationPhase) bool {
 
 func isFinishStatus(phase appsv1alpha1.ConfigurationPhase) bool {
 	return phase == appsv1alpha1.CFinishedPhase || phase == appsv1alpha1.CFailedAndPausePhase
+}
+
+func buildTemplateVars(ctx context.Context, cli client.Reader,
+	compDef *appsv1alpha1.ComponentDefinition, synthesizedComp *component.SynthesizedComponent) error {
+	if compDef != nil && len(compDef.Spec.Vars) > 0 {
+		templateVars, _, err := component.ResolveTemplateNEnvVars(ctx, cli, synthesizedComp, compDef.Spec.Vars)
+		if err != nil {
+			return err
+		}
+		synthesizedComp.TemplateVars = templateVars
+	}
+	return nil
 }

@@ -375,7 +375,7 @@ func (r *VolumePopulatorReconciler) getPopulatePVC(reqCtx intctrlutil.RequestCtx
 					return nil, err
 				}
 				if target.PodSelector.Strategy == dpv1alpha1.PodSelectionStrategyAny || sourceTargetPodName != "" {
-					snapshotGroup := dprestore.GetVolumeSnapshotsBySourcePod(backupSet.Backup, sourceTargetPodName)
+					snapshotGroup := dprestore.GetVolumeSnapshotsBySourcePod(backupSet.Backup, target, sourceTargetPodName)
 					if snapshotGroup == nil {
 						message := fmt.Sprintf(`can not found the volumeSnapshot in status.actions, sourceTargetPod is "%s"`, sourceTargetPodName)
 						return nil, intctrlutil.NewFatalError(message)

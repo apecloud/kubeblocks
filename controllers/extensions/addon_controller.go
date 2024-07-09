@@ -99,6 +99,10 @@ func (r *AddonReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return ctrlerihandler.NewTypeHandler(&genIDProceedCheckStage{stageCtx: buildStageCtx(next...)})
 	}
 
+	metadataCheckStageBuilder := func(next ...ctrlerihandler.Handler) ctrlerihandler.Handler {
+		return ctrlerihandler.NewTypeHandler(&metadataCheckStage{stageCtx: buildStageCtx(next...)})
+	}
+
 	installableCheckStageBuilder := func(next ...ctrlerihandler.Handler) ctrlerihandler.Handler {
 		return ctrlerihandler.NewTypeHandler(&installableCheckStage{stageCtx: buildStageCtx(next...)})
 	}
@@ -122,6 +126,7 @@ func (r *AddonReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	handlers := ctrlerihandler.Chain(
 		fetchNDeletionCheckStageBuilder,
 		genIDProceedStageBuilder,
+		metadataCheckStageBuilder,
 		installableCheckStageBuilder,
 		autoInstallCheckStageBuilder,
 		enabledAutoValuesStageBuilder,

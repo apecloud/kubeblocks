@@ -38,10 +38,9 @@ const (
 	ServiceVPCName      = "vpc-lb"
 	ServiceInternetName = "internet-lb"
 
-	ReplicationPodRoleVolume         = "pod-role"
-	ReplicationRoleLabelFieldPath    = "metadata.labels['kubeblocks.io/role']"
-	DefaultReplicationCandidateIndex = 0
-	DefaultReplicationReplicas       = 2
+	ReplicationPodRoleVolume      = "pod-role"
+	ReplicationRoleLabelFieldPath = "metadata.labels['kubeblocks.io/role']"
+	DefaultReplicationReplicas    = 2
 
 	ApeCloudMySQLImage        = "docker.io/apecloud/apecloud-mysql-server:latest"
 	DefaultMySQLContainerName = "mysql"
@@ -174,12 +173,16 @@ var (
 		VolumeProtectionSpec: &appsv1alpha1.VolumeProtectionSpec{},
 		Service:              &defaultMySQLService,
 		PodSpec: &corev1.PodSpec{
-			Containers: []corev1.Container{defaultMySQLContainer},
+			Containers: []corev1.Container{
+				defaultMySQLContainer,
+			},
 		},
-		VolumeTypes: []appsv1alpha1.VolumeTypeSpec{{
-			Name: DataVolumeName,
-			Type: appsv1alpha1.VolumeTypeData,
-		}},
+		VolumeTypes: []appsv1alpha1.VolumeTypeSpec{
+			{
+				Name: DataVolumeName,
+				Type: appsv1alpha1.VolumeTypeData,
+			},
+		},
 	}
 
 	defaultConsensusSpec = appsv1alpha1.ConsensusSetSpec{
@@ -218,12 +221,16 @@ var (
 		VolumeProtectionSpec: &appsv1alpha1.VolumeProtectionSpec{},
 		Service:              &defaultMySQLService,
 		PodSpec: &corev1.PodSpec{
-			Containers: []corev1.Container{defaultMySQLContainer},
+			Containers: []corev1.Container{
+				defaultMySQLContainer,
+			},
 		},
-		VolumeTypes: []appsv1alpha1.VolumeTypeSpec{{
-			Name: DataVolumeName,
-			Type: appsv1alpha1.VolumeTypeData,
-		}},
+		VolumeTypes: []appsv1alpha1.VolumeTypeSpec{
+			{
+				Name: DataVolumeName,
+				Type: appsv1alpha1.VolumeTypeData,
+			},
+		},
 	}
 
 	defaultComponentDefSpec = appsv1alpha1.ComponentDefinitionSpec{
@@ -327,6 +334,11 @@ var (
 				Writable:    false,
 				Votable:     false,
 			},
+		},
+		Exporter: &appsv1alpha1.Exporter{
+			ScrapePath:   "metrics",
+			ScrapePort:   "http-metric",
+			ScrapeScheme: appsv1alpha1.HTTPProtocol,
 		},
 		LifecycleActions: &appsv1alpha1.ComponentLifecycleActions{
 			PostProvision: defaultLifecycleActionHandler,

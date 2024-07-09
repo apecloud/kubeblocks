@@ -103,6 +103,12 @@ func (f *MockBackupPolicyTemplateFactory) AddBackupMethod(name string, snapshotV
 	return f
 }
 
+func (f *MockBackupPolicyTemplateFactory) SetComponentDef(compDefs ...string) *MockBackupPolicyTemplateFactory {
+	backupPolicy := f.getLastBackupPolicy()
+	backupPolicy.ComponentDefs = compDefs
+	return f
+}
+
 func (f *MockBackupPolicyTemplateFactory) SetBackupMethodVolumes(names []string) *MockBackupPolicyTemplateFactory {
 	backupMethod := f.getLastBackupMethod()
 	backupMethod.TargetVolumes.Volumes = names

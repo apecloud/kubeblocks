@@ -43,7 +43,7 @@
         },
         {
             "groupName": "backup",
-            "packages": ["dataprotection.kubeblocks.io", "storage.kubeblocks.io"],
+            "packages": ["dataprotection.kubeblocks.io"],
             "order": 2
         },
         {

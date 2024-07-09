@@ -27,7 +27,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	"golang.org/x/exp/slices"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -93,7 +92,7 @@ var _ = Describe("builder", func() {
 		return clusterObj, clusterDefObj, key
 	}
 
-	newStsObj := func() *appsv1.StatefulSet {
+	newItsObj := func() *workloads.InstanceSet {
 		container := corev1.Container{
 			Name: "mysql",
 			VolumeMounts: []corev1.VolumeMount{{
@@ -101,7 +100,7 @@ var _ = Describe("builder", func() {
 				MountPath: "/mnt/config",
 			}},
 		}
-		return testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, "mock-sts", clusterName, mysqlCompName).
+		return testapps.NewInstanceSetFactory(testCtx.DefaultNamespace, "mock-its", clusterName, mysqlCompName).
 			AddAppNameLabel("mock-app").
 			AddAppInstanceLabel(clusterName).
 			AddAppComponentLabel(mysqlCompName).
@@ -142,15 +141,15 @@ var _ = Describe("builder", func() {
 	Context("has helper function which builds specific object from cue template", func() {
 		It("builds PVC correctly", func() {
 			snapshotName := "test-snapshot-name"
-			sts := newStsObj()
+			its := newItsObj()
 			_, cluster, synthesizedComponent := newClusterObjs(nil)
 			pvcKey := types.NamespacedName{
 				Namespace: "default",
 				Name:      "data-mysql-01-replicasets-0",
 			}
-			pvc := BuildPVC(cluster, synthesizedComponent, &synthesizedComponent.VolumeClaimTemplates[0], pvcKey, snapshotName)
+			pvc := BuildPVC(cluster, synthesizedComponent, &synthesizedComponent.VolumeClaimTemplates[0], pvcKey, "", snapshotName)
 			Expect(pvc).ShouldNot(BeNil())
-			Expect(pvc.Spec.AccessModes).Should(Equal(sts.Spec.VolumeClaimTemplates[0].Spec.AccessModes))
+			Expect(pvc.Spec.AccessModes).Should(Equal(its.Spec.VolumeClaimTemplates[0].Spec.AccessModes))
 			Expect(pvc.Spec.Resources).Should(Equal(synthesizedComponent.VolumeClaimTemplates[0].Spec.Resources))
 			Expect(pvc.Spec.StorageClassName).Should(Equal(synthesizedComponent.VolumeClaimTemplates[0].Spec.StorageClassName))
 			Expect(pvc.Labels[constant.VolumeTypeLabelKey]).ShouldNot(BeEmpty())
@@ -198,7 +197,7 @@ var _ = Describe("builder", func() {
 			headlessSvcFQDN := fmt.Sprintf("%s-%s-headless", cluster.Name, synthesizedComponent.Name)
 			var mysqlPort corev1.ServicePort
 			var paxosPort corev1.ServicePort
-			for _, s := range synthesizedComponent.Services[0].Spec.Ports {
+			for _, s := range synthesizedComponent.ComponentServices[0].Spec.Ports {
 				switch s.Name {
 				case "mysql":
 					mysqlPort = s
@@ -343,24 +342,22 @@ var _ = Describe("builder", func() {
 				ManagerName:   "cfgmgr",
 				SecreteName:   "test-secret",
 				ComponentName: synthesizedComponent.Name,
-				CharacterType: synthesizedComponent.CharacterType,
 				Image:         constant.KBToolsImage,
 				Args:          []string{},
 				Envs:          []corev1.EnvVar{},
 				Volumes:       []corev1.VolumeMount{},
 				Cluster:       cluster,
 			}
-			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam, synthesizedComponent)
+			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam)
 			Expect(err).Should(BeNil())
 			Expect(configmap).ShouldNot(BeNil())
 			Expect(configmap.SecurityContext).Should(BeNil())
 		})
 
 		It("builds config manager sidecar container correctly", func() {
-			_, cluster, synthesizedComponent := newClusterObjs(nil)
+			_, cluster, _ := newClusterObjs(nil)
 			sidecarRenderedParam := &cfgcm.CfgManagerBuildParams{
 				ManagerName:           "cfgmgr",
-				CharacterType:         mysqlCharacterType,
 				SecreteName:           "test-secret",
 				Image:                 constant.KBToolsImage,
 				ShareProcessNamespace: true,
@@ -369,7 +366,7 @@ var _ = Describe("builder", func() {
 				Volumes:               []corev1.VolumeMount{},
 				Cluster:               cluster,
 			}
-			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam, synthesizedComponent)
+			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam)
 			Expect(err).Should(BeNil())
 			Expect(configmap).ShouldNot(BeNil())
 			Expect(configmap.SecurityContext).ShouldNot(BeNil())
@@ -387,7 +384,7 @@ var _ = Describe("builder", func() {
 		})
 
 		It("builds cfg manager tools  correctly", func() {
-			_, cluster, synthesizedComponent := newClusterObjs(nil)
+			_, cluster, _ := newClusterObjs(nil)
 			cfgManagerParams := &cfgcm.CfgManagerBuildParams{
 				ManagerName:               constant.ConfigSidecarName,
 				SecreteName:               constant.GenerateDefaultConnCredential(cluster.Name),
@@ -399,7 +396,7 @@ var _ = Describe("builder", func() {
 				{Name: "test-tool", Image: "test-image", Command: []string{"sh"}},
 			}
 
-			obj, err := BuildCfgManagerToolsContainer(cfgManagerParams, synthesizedComponent, toolContainers, map[string]cfgcm.ConfigSpecMeta{})
+			obj, err := BuildCfgManagerToolsContainer(cfgManagerParams, toolContainers, map[string]cfgcm.ConfigSpecMeta{})
 			Expect(err).Should(BeNil())
 			Expect(obj).ShouldNot(BeEmpty())
 		})

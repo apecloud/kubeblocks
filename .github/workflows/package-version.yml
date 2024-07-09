@@ -1,4 +1,4 @@
-name: PACKAGE-VERSION
+name: Package Version
 
 on:
   workflow_dispatch:

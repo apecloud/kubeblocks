@@ -21,6 +21,7 @@ package component
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 
@@ -36,15 +37,16 @@ import (
 )
 
 const (
-	dataVolume = "data"
+	dataVolume   = "data"
+	minAvailPort = 1
+	maxAvailPort = 65535
 )
 
 var (
 	// default probe setting for volume protection.
-	defaultVolumeProtectionProbe = appsv1alpha1.ClusterDefinitionProbe{
-		PeriodSeconds:    60,
-		TimeoutSeconds:   5,
-		FailureThreshold: 3,
+	defaultVolumeProtectionProbe = appsv1alpha1.RoleProbe{
+		PeriodSeconds:  60,
+		TimeoutSeconds: 5,
 	}
 )
 
@@ -162,7 +164,7 @@ func adaptLorryIfCustomHandlerDefined(synthesizeComp *SynthesizedComponent, lorr
 
 func buildBasicContainer(lorryHTTPPort int) *corev1.Container {
 	return builder.NewContainerBuilder("string").
-		SetImage("infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/google_containers/pause:3.6").
+		SetImage("apecloud-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/pause:3.6").
 		SetImagePullPolicy(corev1.PullIfNotPresent).
 		AddCommands("/pause").
 		SetStartupProbe(corev1.Probe{
@@ -196,6 +198,19 @@ func buildLorryServiceContainer(synthesizeComp *SynthesizedComponent, container 
 	}
 
 	buildLorryEnvs(container, synthesizeComp, clusterCompSpec)
+
+	// set lorry container ports to host network
+	if synthesizeComp.HostNetwork != nil {
+		if synthesizeComp.HostNetwork.ContainerPorts == nil {
+			synthesizeComp.HostNetwork.ContainerPorts = make([]appsv1alpha1.HostNetworkContainerPort, 0)
+		}
+		synthesizeComp.HostNetwork.ContainerPorts = append(
+			synthesizeComp.HostNetwork.ContainerPorts,
+			appsv1alpha1.HostNetworkContainerPort{
+				Container: container.Name,
+				Ports:     []string{constant.LorryHTTPPortName, constant.LorryGRPCPortName},
+			})
+	}
 }
 
 func buildLorryInitContainer() *corev1.Container {
@@ -203,7 +218,7 @@ func buildLorryInitContainer() *corev1.Container {
 	container.Image = viper.GetString(constant.KBToolsImage)
 	container.Name = constant.LorryInitContainerName
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
-	container.Command = []string{"cp", "-r", "/bin/lorry", "/config", "/kubeblocks/"}
+	container.Command = []string{"cp", "-r", "/bin/lorry", "/config", "/bin/curl", "/kubeblocks/"}
 	container.StartupProbe = nil
 	container.ReadinessProbe = nil
 	volumeMount := corev1.VolumeMount{Name: "kubeblocks", MountPath: "/kubeblocks"}
@@ -256,10 +271,8 @@ func buildLorryEnvs(container *corev1.Container, synthesizeComp *SynthesizedComp
 		}
 	}
 
-	// pass the volume protection spec to lorry container through env.
-	// TODO(xingran & leon):  volume protection should be based on componentDefinition.Spec.Volume
 	if volumeProtectionEnabled(synthesizeComp) {
-		envs = append(envs, buildEnv4VolumeProtection(*synthesizeComp.VolumeProtection))
+		envs = append(envs, buildEnv4VolumeProtection(synthesizeComp))
 	}
 	envs = append(envs, buildEnv4CronJobs(synthesizeComp)...)
 
@@ -278,10 +291,19 @@ func buildRoleProbeContainer(roleChangedContainer *corev1.Container, roleProbe *
 	probe.TimeoutSeconds = roleProbe.TimeoutSeconds
 	probe.FailureThreshold = 3
 	roleChangedContainer.ReadinessProbe = probe
+	roleChangedContainer.Env = append(roleChangedContainer.Env, corev1.EnvVar{
+		Name:  constant.KBEnvRoleProbePeriod,
+		Value: strconv.Itoa(int(roleProbe.PeriodSeconds)),
+	})
 }
 
 func volumeProtectionEnabled(component *SynthesizedComponent) bool {
-	return component.VolumeProtection != nil
+	for _, v := range component.Volumes {
+		if v.HighWatermark > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func buildVolumeProtectionProbeContainer(c *corev1.Container, probeSvcHTTPPort int) {
@@ -293,7 +315,7 @@ func buildVolumeProtectionProbeContainer(c *corev1.Container, probeSvcHTTPPort i
 	probe.HTTPGet = httpGet
 	probe.PeriodSeconds = defaultVolumeProtectionProbe.PeriodSeconds
 	probe.TimeoutSeconds = defaultVolumeProtectionProbe.TimeoutSeconds
-	probe.FailureThreshold = defaultVolumeProtectionProbe.FailureThreshold
+	probe.FailureThreshold = 3
 	c.ReadinessProbe = probe
 }
 
@@ -304,6 +326,7 @@ func buildEnv4DBAccount(synthesizeComp *SynthesizedComponent, clusterCompSpec *a
 	)
 
 	for index, sysAccount := range synthesizeComp.SystemAccounts {
+		// use first init account
 		if sysAccount.InitAccount {
 			sysInitAccount = &synthesizeComp.SystemAccounts[index]
 			break
@@ -348,7 +371,17 @@ func buildEnv4DBAccount(synthesizeComp *SynthesizedComponent, clusterCompSpec *a
 	return envs
 }
 
-func buildEnv4VolumeProtection(spec appsv1alpha1.VolumeProtectionSpec) corev1.EnvVar {
+func buildEnv4VolumeProtection(synthesizedComp *SynthesizedComponent) corev1.EnvVar {
+	spec := &appsv1alpha1.VolumeProtectionSpec{}
+	for i, v := range synthesizedComp.Volumes {
+		if v.HighWatermark > 0 {
+			spec.Volumes = append(spec.Volumes, appsv1alpha1.ProtectedVolume{
+				Name:          v.Name,
+				HighWatermark: &synthesizedComp.Volumes[i].HighWatermark,
+			})
+		}
+	}
+
 	value, err := json.Marshal(spec)
 	if err != nil {
 		panic(fmt.Sprintf("marshal volume protection spec error: %s", err.Error()))
@@ -484,4 +517,57 @@ func getMainContainer(containers []corev1.Container) *corev1.Container {
 		return &containers[0]
 	}
 	return nil
+}
+
+// get available container ports, increased by one if conflict with exist ports
+// util no conflicts.
+func getAvailableContainerPorts(containers []corev1.Container, containerPorts []int32) ([]int32, error) {
+	set, err := getAllContainerPorts(containers)
+	if err != nil {
+		return nil, err
+	}
+
+	iterAvailPort := func(p int32) (int32, error) {
+		// The TCP/IP port numbers below 1024 are privileged ports, which are special
+		// in that normal users are not allowed to run servers on them.
+		// Ports below 1024 can be allocated, as the port manager will automatically reallocate ports under 100.
+		if p < minAvailPort || p > maxAvailPort {
+			p = minAvailPort
+		}
+		sentinel := p
+		for {
+			if _, ok := set[p]; !ok {
+				set[p] = true
+				return p, nil
+			}
+			p++
+			if p == sentinel {
+				return -1, errors.New("no available port for container")
+			}
+			if p > maxAvailPort {
+				p = minAvailPort
+			}
+		}
+	}
+
+	for i, p := range containerPorts {
+		if containerPorts[i], err = iterAvailPort(p); err != nil {
+			return []int32{}, err
+		}
+	}
+	return containerPorts, nil
+}
+
+func getAllContainerPorts(containers []corev1.Container) (map[int32]bool, error) {
+	set := map[int32]bool{}
+	for _, container := range containers {
+		for _, v := range container.Ports {
+			_, ok := set[v.ContainerPort]
+			if ok {
+				return nil, fmt.Errorf("containerPorts conflict: [%+v]", v.ContainerPort)
+			}
+			set[v.ContainerPort] = true
+		}
+	}
+	return set, nil
 }

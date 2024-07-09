@@ -144,7 +144,11 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		Expect(err).Should(BeNil())
 	}
 
-	testVolumeExpansion := func(reqCtx intctrlutil.RequestCtx, clusterObject *appsv1alpha1.Cluster, opsRes *OpsResource, randomStr string) {
+	testVolumeExpansion := func(reqCtx intctrlutil.RequestCtx,
+		clusterObject *appsv1alpha1.Cluster,
+		opsRes *OpsResource,
+		requestStorage,
+		actualStorage string) {
 		// mock cluster is Running to support volume expansion ops
 		Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
 			clusterObject.Status.Phase = appsv1alpha1.RunningClusterPhase
@@ -152,7 +156,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 
 		// init resources for volume expansion
 		comp := clusterObject.Spec.GetComponentByName(consensusCompName)
-		newOps, pvcNames := initResourcesForVolumeExpansion(clusterObject, opsRes, "3Gi", int(comp.Replicas))
+		newOps, pvcNames := initResourcesForVolumeExpansion(clusterObject, opsRes, requestStorage, int(comp.Replicas))
 
 		By("mock run volumeExpansion action and reconcileAction")
 		mockVolumeExpansionActionAndReconcile(reqCtx, opsRes, newOps, pvcNames)
@@ -186,12 +190,8 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 			By("mock pvc resizing succeed")
 			// mock pvc volumeExpansion succeed
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
-				pvc.Status.Capacity = corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("3Gi")}
+				pvc.Status.Capacity = corev1.ResourceList{corev1.ResourceStorage: resource.MustParse(actualStorage)}
 			})()).ShouldNot(HaveOccurred())
-
-			Eventually(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, tmpPVC *corev1.PersistentVolumeClaim) {
-				g.Expect(tmpPVC.Status.Capacity[corev1.ResourceStorage] == resource.MustParse("3Gi")).Should(BeTrue())
-			})).Should(Succeed())
 		}
 
 		// waiting for OpsRequest.status.phase is succeed
@@ -241,8 +241,11 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 				}
 			})).ShouldNot(HaveOccurred())
 
-			By("Test VolumeExpansion")
-			testVolumeExpansion(reqCtx, clusterObject, opsRes, randomStr)
+			By("Test VolumeExpansion with consistent storageSize")
+			testVolumeExpansion(reqCtx, clusterObject, opsRes, "3Gi", "3Gi")
+
+			By("Test VolumeExpansion with inconsistent storageSize but it is valid")
+			testVolumeExpansion(reqCtx, clusterObject, opsRes, "5G", "5Gi")
 
 			By("Test delete the Running VolumeExpansion OpsRequest")
 			testDeleteRunningVolumeExpansion(clusterObject, opsRes)

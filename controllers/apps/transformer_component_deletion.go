@@ -34,12 +34,11 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	wlv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -75,6 +74,7 @@ func (t *componentDeletionTransformer) Transform(ctx graph.TransformContext, dag
 
 	// step2: do the pre-terminate action if needed
 	if err := component.ReconcileCompPreTerminate(reqCtx, transCtx.Client, graphCli, cluster, comp, dag); err != nil {
+		reqCtx.Log.Info("failed to reconcile component pre-terminate action", "component", comp.Name, "error", err)
 		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeExpectedInProcess) {
 			// waiting for the preTerminate action to be done, and watch the action finish event to trigger the next reconcile
 			return nil
@@ -133,6 +133,21 @@ func (t *componentDeletionTransformer) handleCompDeleteWhenClusterDelete(transCt
 func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTransformContext, graphCli model.GraphClient,
 	dag *graph.DAG, comp *appsv1alpha1.Component, matchLabels map[string]string, toDeleteKinds []client.ObjectList) error {
 
+	// firstly, delete the workloads owned by the component
+	workloads, err := model.ReadCacheSnapshot(transCtx, comp, matchLabels, compOwnedWorkloadKinds()...)
+	if err != nil {
+		return newRequeueError(requeueDuration, err.Error())
+	}
+	if len(workloads) > 0 {
+		for _, workload := range workloads {
+			graphCli.Delete(dag, workload)
+		}
+		// wait for the workloads to be deleted to trigger the next reconcile
+		transCtx.Logger.Info(fmt.Sprintf("wait for the workloads to be deleted: %v", workloads))
+		return nil
+	}
+
+	// secondly, delete the other sub-resources owned by the component
 	snapshot, err := model.ReadCacheSnapshot(transCtx, comp, matchLabels, toDeleteKinds...)
 	if err != nil {
 		return newRequeueError(requeueDuration, err.Error())
@@ -140,7 +155,7 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 	if len(snapshot) > 0 {
 		// delete the sub-resources owned by the component before deleting the component
 		for _, object := range snapshot {
-			if rsm.IsOwnedByRsm(object) {
+			if isOwnedByInstanceSet(object) {
 				continue
 			}
 			graphCli.Delete(dag, object)
@@ -149,6 +164,12 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 		return newRequeueError(time.Second*1, "not all component sub-resources deleted")
 	} else {
 		graphCli.Delete(dag, comp)
+	}
+
+	// release the allocated host-network ports for the component
+	pm := intctrlutil.GetPortManager()
+	if err = pm.ReleaseByPrefix(comp.Name); err != nil {
+		return newRequeueError(time.Second*1, fmt.Sprintf("release host ports for component %s error: %s", comp.Name, err.Error()))
 	}
 
 	// fast return, that is stopping the plan.Build() stage and jump to plan.Execute() directly
@@ -168,15 +189,22 @@ func (t *componentDeletionTransformer) getCluster(transCtx *componentTransformCo
 	return cluster, nil
 }
 
+func compOwnedWorkloadKinds() []client.ObjectList {
+	return []client.ObjectList{
+		&wlv1alpha1.InstanceSetList{},
+	}
+}
+
 func compOwnedKinds() []client.ObjectList {
 	return []client.ObjectList{
-		&workloads.InstanceSetList{},
+		&wlv1alpha1.InstanceSetList{},
 		&policyv1.PodDisruptionBudgetList{},
 		&corev1.ServiceList{},
 		&corev1.ServiceAccountList{},
 		&rbacv1.RoleBindingList{},
 		&batchv1.JobList{},
 		&dpv1alpha1.RestoreList{},
+		&dpv1alpha1.BackupList{},
 		&appsv1alpha1.ConfigurationList{},
 	}
 }

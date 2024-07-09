@@ -230,9 +230,9 @@ func NewReconfigurePolicy(cc *appsv1beta1.ConfigConstraintSpec, cfgPatch *core.C
 		// make decision
 		switch {
 		case !dynamicUpdate: // static parameters update
-		case configmanager.IsAutoReload(cc.DynamicReloadAction): // if core support hot update, don't need to do anything
+		case configmanager.IsAutoReload(cc.ReloadAction): // if core support hot update, don't need to do anything
 			policy = appsv1alpha1.AsyncDynamicReloadPolicy
-		case enableSyncTrigger(cc.DynamicReloadAction): // sync config-manager exec hot update
+		case enableSyncTrigger(cc.ReloadAction): // sync config-manager exec hot update
 			policy = appsv1alpha1.SyncDynamicReloadPolicy
 		default: // config-manager auto trigger to hot update
 			policy = appsv1alpha1.AsyncDynamicReloadPolicy
@@ -242,7 +242,7 @@ func NewReconfigurePolicy(cc *appsv1beta1.ConfigConstraintSpec, cfgPatch *core.C
 	// if not specify policy, or cannot decision policy, use default policy.
 	if policy == appsv1alpha1.NonePolicy {
 		policy = appsv1alpha1.NormalPolicy
-		if cc.NeedDynamicReloadAction() && enableSyncTrigger(cc.DynamicReloadAction) {
+		if cc.NeedDynamicReloadAction() && enableSyncTrigger(cc.ReloadAction) {
 			policy = appsv1alpha1.DynamicReloadAndRestartPolicy
 		}
 	}
@@ -257,17 +257,17 @@ func enableAutoDecision(restart bool, policy appsv1alpha1.UpgradePolicy) bool {
 	return !restart && policy == appsv1alpha1.NonePolicy
 }
 
-func enableSyncTrigger(options *appsv1beta1.DynamicReloadAction) bool {
-	if options == nil {
+func enableSyncTrigger(reloadAction *appsv1beta1.ReloadAction) bool {
+	if reloadAction == nil {
 		return false
 	}
 
-	if options.TPLScriptTrigger != nil {
-		return !core.IsWatchModuleForTplTrigger(options.TPLScriptTrigger)
+	if reloadAction.TPLScriptTrigger != nil {
+		return !core.IsWatchModuleForTplTrigger(reloadAction.TPLScriptTrigger)
 	}
 
-	if options.ShellTrigger != nil {
-		return !core.IsWatchModuleForShellTrigger(options.ShellTrigger)
+	if reloadAction.ShellTrigger != nil {
+		return !core.IsWatchModuleForShellTrigger(reloadAction.ShellTrigger)
 	}
 	return false
 }

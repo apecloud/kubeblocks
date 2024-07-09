@@ -12,7 +12,7 @@ versionOverride:
 ## @param image.imagePullSecrets KubeBlocks image pull secrets
 ## @param image.tools.repository KubeBlocks tools image repository
 image:
-  registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
+  registry: apecloud-registry.cn-zhangjiakou.cr.aliyuncs.com
   repository: apecloud/kubeblocks
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
@@ -27,7 +27,7 @@ image:
 ##
 replicaCount: 1
 
-## MaxConcurrentReconciles for component, rsm and opsRequest controllers.
+## MaxConcurrentReconciles for component, instanceSet and opsRequest controllers.
 ##
 reconcileWorkers: ""
 
@@ -125,10 +125,12 @@ managedNamespaces:
 multiCluster:
   # Configure the kubeconfig secret. The config content should be in the item with the key kubeconfig.
   kubeConfig:
-  # Configure the contexts to use, multiple contexts are separated by commas.
-  contexts:
   # The path to which kubeconfig is mounted.
   mountPath: /var/run/secrets/kubeblocks.io/multicluster
+  # Configure the contexts to use, multiple contexts are separated by commas.
+  contexts:
+  # Configure the contexts to be disabled.
+  contextsDisabled:
 
 ## Logger settings
 ##
@@ -294,7 +296,6 @@ affinity:
           operator: In
           values:
           - "true"
-
 ## @param data plane settings
 ##
 dataPlane:
@@ -314,6 +315,9 @@ dataPlane:
             operator: In
             values:
             - "true"
+
+# Add extra pod labels to KubeBlocks Deployment
+extraLabels: {}
 
 ## AdmissionWebhooks settings
 ##
@@ -337,6 +341,11 @@ dataProtection:
   # using the default key can potentially lead to the exposure of database passwords
   # if 'get/list' role of the backup CR are compromised.
   encryptionKey: ""
+  encryptionKeySecretKeyRef:
+    name: ""
+    key: ""
+  enableBackupEncryption: false
+  backupEncryptionAlgorithm: ""
   gcFrequencySeconds: 3600
   ## MaxConcurrentReconciles for backup controller.
   reconcileWorkers: ""
@@ -363,6 +372,29 @@ dataProtection:
     datasafed:
       repository: apecloud/datasafed
       tag: "0.2.0"
+  ## @param toleration
+  tolerations:
+  - key: kb-controller
+    operator: Equal
+    value: "true"
+    effect: NoSchedule
+  ## @param affinity
+  ##
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        preference:
+          matchExpressions:
+          - key: kb-controller
+            operator: In
+            values:
+            - "true"
+  ## @param topologySpreadConstraints
+  topologySpreadConstraints: []
+
+  # Add extra pod labels to KubeBlocks-DataProtection Deployment
+  extraLabels: {}
 
 ## BackupRepo settings
 ##
@@ -402,7 +434,7 @@ addonController:
 
 
 ## @param keepAddons - keep Addon CR objects when delete this chart.
-keepAddons: false
+keepAddons: true
 
 ## @param addonChartLocationBase - KubeBlocks official addon's chart location base, to be released in an air-gapped environment.
 ## if url has prefix "file://", KubeBlocks will use the helm charts copied from the addonChartsImage.
@@ -1279,7 +1311,7 @@ prometheus:
               annotations:
                 summary: 'MongoDB is Down'
                 description: 'MongoDB instance is down\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}'
-      
+
             - alert: MongodbRestarted
               expr: 'mongodb_instance_uptime_seconds < 60'
               for: 0m
@@ -1288,7 +1320,7 @@ prometheus:
               annotations:
                 summary: 'Mongodb has just been restarted (< 60s)'
                 description: 'Mongodb has just been restarted {{ $value | printf "%.1f" }} seconds ago\n LABELS = {{ $labels }}'
-      
+
             - alert: MongodbReplicaMemberUnhealthy
               expr: 'max_over_time(mongodb_rs_members_health[1m]) == 0'
               for: 0m
@@ -1297,7 +1329,7 @@ prometheus:
               annotations:
                 summary: 'Mongodb replica member is unhealthy'
                 description: 'MongoDB replica member is not healthy\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}'
-      
+
             - alert: MongodbReplicationLag
               expr: '(mongodb_rs_members_optimeDate{member_state="PRIMARY"} - on (pod) group_right mongodb_rs_members_optimeDate{member_state="SECONDARY"}) / 1000 > 10'
               for: 0m
@@ -1306,7 +1338,7 @@ prometheus:
               annotations:
                 summary: 'MongoDB replication lag (> 10s)'
                 description: 'Mongodb replication lag is more than 10s\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}'
-      
+
             - alert: MongodbReplicationHeadroom
               expr: 'sum(avg(mongodb_mongod_replset_oplog_head_timestamp - mongodb_mongod_replset_oplog_tail_timestamp)) - sum(avg(mongodb_rs_members_optimeDate{member_state="PRIMARY"} - on (pod) group_right mongodb_rs_members_optimeDate{member_state="SECONDARY"})) <= 0'
               for: 0m
@@ -1315,7 +1347,7 @@ prometheus:
               annotations:
                 summary: 'MongoDB replication headroom (< 0)'
                 description: 'MongoDB replication headroom is <= 0\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}'
-      
+
             - alert: MongodbNumberCursorsOpen
               expr: 'mongodb_ss_metrics_cursor_open{csr_type="total"} > 10 * 1000'
               for: 2m
@@ -1324,16 +1356,16 @@ prometheus:
               annotations:
                 summary: 'MongoDB opened cursors num (> 10k)'
                 description: 'Too many cursors opened by MongoDB for clients (> 10k)\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}'
-      
+
             - alert: MongodbCursorsTimeouts
               expr: 'increase(mongodb_ss_metrics_cursor_timedOut[1m]) > 100'
               for: 2m
               labels:
                 severity: warning
               annotations:
-                summary: 'MongoDB cursors timeouts (>100/minute)' 
+                summary: 'MongoDB cursors timeouts (>100/minute)'
                 description: 'Too many cursors are timing out (> 100/minute)\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}'
-      
+
             - alert: MongodbTooManyConnections
               expr: 'avg by(pod) (rate(mongodb_ss_connections{conn_type="current"}[1m])) / avg by(pod) (sum (mongodb_ss_connections) by(pod)) * 100 > 80'
               for: 2m
@@ -1342,7 +1374,7 @@ prometheus:
               annotations:
                 summary: 'MongoDB too many connections (> 80%)'
                 description: 'Too many connections (> 80%)\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}'
-      
+
             - alert: MongodbVirtualMemoryUsage
               expr: '(sum(mongodb_ss_mem_virtual) BY (pod) / sum(mongodb_ss_mem_resident) BY (pod)) > 100'
               for: 2m
@@ -1597,7 +1629,6 @@ grafana:
   defaultDashboardsTimezone:
 
   adminUser: admin
-  adminPassword: kubeblocks
 
   sidecar:
     image:
@@ -1739,19 +1770,6 @@ snapshot-controller:
 kubeblocks-csi-driver:
   enabled: false
 
-
-cloudProvider:
-  ## cloudProvider secret settings
-  ## @param cloudProvider.accessKey -- S3 Access Key.
-  ## @param cloudProvider.secretKey -- S3 Secret Key.
-  ## @param cloudProvider.region -- S3 region.
-  ## @param cloudProvider.cloud -- cloud name: [aws,aliyun].
-  ## @param cloudProvider.bucket -- S3 Bucket.
-  accessKey: ""
-  secretKey: ""
-  region: ""
-  name: ""
-  bucket: ""
 
 ## csi-s3 settings
 ## ref: https://artifacthub.io/packages/helm/cloudve/csi-s3#configuration
@@ -1908,3 +1926,122 @@ hostPorts:
   - "10259"
   - "2379-2380"
   - "30000-32767"
+
+controllers:
+  apps:
+    enabled: true
+  workloads:
+    enabled: true
+  experimental:
+    enabled: false
+
+featureGates:
+  ignoreConfigTemplateDefaultMode:
+    enabled: false
+  ignorePodVerticalScaling:
+    enabled: false
+
+vmagent:
+
+  ## overwrite vmagent scrape_configs
+  config:
+    scrape_configs:
+      # Scrape config for kubeblocks managed service endpoints.
+      #
+      # The relabeling allows the actual service scrape endpoint to be configured
+      # via the following annotations:
+      #
+      # * `monitor.kubeblocks.io/scrape`: Only scrape services that have a value of
+      # `true`.
+      # * `monitor.kubeblocks.io/scheme`: If the metrics endpoint is secured then you will need
+      # to set this to `https` & most likely set the `tls_config` of the scrape config.
+      # * `monitor.kubeblocks.io/path`: If the metrics path is not `/metrics` override this.
+      # * `monitor.kubeblocks.io/port`: If the metrics are exposed on a different port to the
+      # service then set this appropriately.
+      # * `monitor.kubeblocks.io/param_<parameter>`: If the metrics endpoint uses parameters
+      # then you can set any parameter
+      - job_name: 'kubeblocks-service'
+        honor_labels: true
+
+        kubernetes_sd_configs:
+          - role: endpoints
+
+        relabel_configs:
+          - source_labels: [ __meta_kubernetes_service_label_app_kubernetes_io_managed_by ]
+            action: keep
+            regex: kubeblocks
+          - source_labels: [ __meta_kubernetes_service_label_monitor_kubeblocks_io_managed_by ]
+            action: drop
+            regex: agamotto
+          - source_labels: [ __meta_kubernetes_service_annotation_monitor_kubeblocks_io_scrape ]
+            action: keep
+            regex: true
+          - source_labels: [ __meta_kubernetes_service_annotation_monitor_kubeblocks_io_scheme ]
+            action: replace
+            target_label: __scheme__
+            regex: (https?)
+          - source_labels: [ __meta_kubernetes_service_annotation_monitor_kubeblocks_io_path ]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [ __address__, __meta_kubernetes_service_annotation_monitor_kubeblocks_io_port ]
+            action: replace
+            target_label: __address__
+            regex: (.+?)(?::\d+)?;(\d+)
+            replacement: $1:$2
+          - action: labelmap
+            regex: __meta_kubernetes_service_annotation_monitor_kubeblocks_io_param_(.+)
+            replacement: __param_$1
+          - action: labelmap
+            regex: __meta_kubernetes_service_label_(.+)
+          - source_labels: [ __meta_kubernetes_namespace ]
+            action: replace
+            target_label: namespace
+          - source_labels: [ __meta_kubernetes_service_name ]
+            action: replace
+            target_label: service
+          - source_labels: [ __meta_kubernetes_pod_node_name ]
+            action: replace
+            target_label: node
+          - source_labels: [ __meta_kubernetes_pod_name ]
+            action: replace
+            target_label: pod
+          - source_labels: [ __meta_kubernetes_pod_phase ]
+            regex: Pending|Succeeded|Failed|Completed
+            action: drop
+
+      - job_name: 'kubeblocks-agamotto'
+        honor_labels: true
+
+        kubernetes_sd_configs:
+          - role: endpoints
+
+        relabel_configs:
+          - source_labels: [ __meta_kubernetes_service_label_monitor_kubeblocks_io_managed_by ]
+            action: keep
+            regex: agamotto
+          - source_labels: [ __meta_kubernetes_service_annotation_monitor_kubeblocks_io_scrape ]
+            action: keep
+            regex: true
+          - source_labels: [ __meta_kubernetes_service_annotation_monitor_kubeblocks_io_scheme ]
+            action: replace
+            target_label: __scheme__
+            regex: (https?)
+          - source_labels: [ __meta_kubernetes_service_annotation_monitor_kubeblocks_io_path ]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [ __address__, __meta_kubernetes_service_annotation_monitor_kubeblocks_io_port ]
+            action: replace
+            target_label: __address__
+            regex: (.+?)(?::\d+)?;(\d+)
+            replacement: $1:$2
+          - action: labelmap
+            regex: __meta_kubernetes_service_annotation_monitor_kubeblocks_io_param_(.+)
+            replacement: __param_$1
+          - source_labels: [ __meta_kubernetes_pod_phase ]
+            regex: Pending|Succeeded|Failed|Completed
+            action: drop
+
+crd:
+  enabled: true

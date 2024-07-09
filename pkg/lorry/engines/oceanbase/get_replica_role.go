@@ -55,8 +55,7 @@ func (mgr *Manager) GetReplicaRoleForMember(ctx context.Context, cluster *dcs.Cl
 
 	db := mgr.DB
 	if member != nil && member.Name != mgr.CurrentMemberName {
-		addr := cluster.GetMemberAddrWithPort(*member)
-		db, err = config.GetDBConnWithAddr(addr)
+		db, err = config.GetMemberRootDBConn(cluster, member)
 		if err != nil {
 			return "", errors.Wrap(err, "new db connection failed")
 		}
@@ -64,7 +63,7 @@ func (mgr *Manager) GetReplicaRoleForMember(ctx context.Context, cluster *dcs.Cl
 
 	rows, err := db.QueryContext(ctx, sql)
 	if err != nil {
-		mgr.Logger.Error(err, fmt.Sprintf("error executing %s", sql))
+		mgr.Logger.Info("error executing", "sql", sql, "error", err.Error())
 		return "", errors.Wrapf(err, "error executing %s", sql)
 	}
 
@@ -85,5 +84,6 @@ func (mgr *Manager) GetReplicaRoleForMember(ctx context.Context, cluster *dcs.Cl
 	if isReady {
 		return role, nil
 	}
-	return "", errors.Errorf("exec sql %s failed: no data returned", sql)
+	mgr.Logger.Info("no data returned", "sql", sql)
+	return "", nil
 }

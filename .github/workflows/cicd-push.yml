@@ -1,4 +1,4 @@
-name: CICD-PUSH
+name: CICD Push
 
 on:
   push:
@@ -63,6 +63,7 @@ jobs:
           fetch-depth: 0
       - name: install pcregrep
         run: |
+          sudo rm /etc/apt/sources.list.d/microsoft-prod.list
           sudo apt-get update
           sudo apt-get install pcregrep
 
@@ -255,6 +256,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: install lib
         run: |
+          sudo rm /etc/apt/sources.list.d/microsoft-prod.list
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             libbtrfs-dev \

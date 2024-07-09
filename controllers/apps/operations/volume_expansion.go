@@ -22,26 +22,35 @@ package operations
 import (
 	"fmt"
 	"reflect"
-	"regexp"
-	"strconv"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-type volumeExpansionOpsHandler struct{}
+type volumeExpansionOpsHandler struct {
+}
+
+type volumeExpansionHelper struct {
+	compOps              ComponentOpsInterface
+	fullComponentName    string
+	templateName         string
+	vctName              string
+	expectCount          int
+	offlineInstanceNames []string
+}
 
 var _ OpsHandler = volumeExpansionOpsHandler{}
-
-var pvcNameRegex = regexp.MustCompile("(.*)-([0-9]+)$")
 
 const (
 	// VolumeExpansionTimeOut volume expansion timeout.
@@ -65,25 +74,34 @@ func (ve volumeExpansionOpsHandler) ActionStartedCondition(reqCtx intctrlutil.Re
 
 // Action modifies Cluster.spec.components[*].VolumeClaimTemplates[*].spec.resources
 func (ve volumeExpansionOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	var (
-		volumeExpansionMap = opsRes.OpsRequest.Spec.ToVolumeExpansionListToMap()
-		volumeExpansionOps appsv1alpha1.VolumeExpansion
-		ok                 bool
-	)
-	for index, component := range opsRes.Cluster.Spec.ComponentSpecs {
-		if volumeExpansionOps, ok = volumeExpansionMap[component.Name]; !ok {
-			continue
-		}
-		compSpec := &opsRes.Cluster.Spec.ComponentSpecs[index]
-		for _, v := range volumeExpansionOps.VolumeClaimTemplates {
-			for i, vct := range component.VolumeClaimTemplates {
-				if vct.Name != v.Name {
-					continue
+	applyVolumeExpansion := func(compSpec *appsv1alpha1.ClusterComponentSpec, obj ComponentOpsInterface) error {
+		setVolumeStorage := func(volumeExpansionVCTs []appsv1alpha1.OpsRequestVolumeClaimTemplate,
+			targetVCTs []appsv1alpha1.ClusterComponentVolumeClaimTemplate) {
+			for _, v := range volumeExpansionVCTs {
+				for i, vct := range targetVCTs {
+					if vct.Name != v.Name {
+						continue
+					}
+					targetVCTs[i].Spec.Resources.Requests[corev1.ResourceStorage] = v.Storage
 				}
-				compSpec.VolumeClaimTemplates[i].
-					Spec.Resources.Requests[corev1.ResourceStorage] = v.Storage
 			}
 		}
+		volumeExpansion := obj.(appsv1alpha1.VolumeExpansion)
+		setVolumeStorage(volumeExpansion.VolumeClaimTemplates, compSpec.VolumeClaimTemplates)
+		// update the vct of the instances.
+		for _, v := range volumeExpansion.Instances {
+			for i := range compSpec.Instances {
+				if compSpec.Instances[i].Name == v.Name {
+					setVolumeStorage(v.VolumeClaimTemplates, compSpec.Instances[i].VolumeClaimTemplates)
+					break
+				}
+			}
+		}
+		return nil
+	}
+	compOpsSet := newComponentOpsHelper(opsRes.OpsRequest.Spec.VolumeExpansionList)
+	if err := compOpsSet.updateClusterComponentsAndShardings(opsRes.Cluster, applyVolumeExpansion); err != nil {
+		return err
 	}
 	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
 }
@@ -101,27 +119,86 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 		succeedProgressCount   int
 		completedProgressCount int
 	)
-
+	getTemplateReplicas := func(templates []appsv1alpha1.InstanceTemplate) int32 {
+		var replicaCount int32
+		for _, v := range templates {
+			replicaCount += v.GetReplicas()
+		}
+		return replicaCount
+	}
 	patch := client.MergeFrom(opsRequest.DeepCopy())
 	if opsRequest.Status.Components == nil {
 		ve.initComponentStatus(opsRequest)
 	}
+	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.VolumeExpansionList)
 	storageMap := ve.getRequestStorageMap(opsRequest)
+	var veHelpers []volumeExpansionHelper
+	setVeHelpers := func(compSpec appsv1alpha1.ClusterComponentSpec, compOps ComponentOpsInterface, fullComponentName string) {
+		volumeExpansion := compOps.(appsv1alpha1.VolumeExpansion)
+		if len(volumeExpansion.VolumeClaimTemplates) > 0 {
+			expectReplicas := compSpec.Replicas - getTemplateReplicas(compSpec.Instances)
+			for _, vct := range volumeExpansion.VolumeClaimTemplates {
+				veHelpers = append(veHelpers, volumeExpansionHelper{
+					compOps:              compOps,
+					fullComponentName:    fullComponentName,
+					expectCount:          int(expectReplicas),
+					vctName:              vct.Name,
+					offlineInstanceNames: compSpec.OfflineInstances,
+				})
+			}
+		}
+		if len(volumeExpansion.Instances) > 0 {
+			for _, ins := range compSpec.Instances {
+				for _, vct := range ins.VolumeClaimTemplates {
+					veHelpers = append(veHelpers, volumeExpansionHelper{
+						compOps:              compOps,
+						fullComponentName:    fullComponentName,
+						expectCount:          int(ins.GetReplicas()),
+						vctName:              vct.Name,
+						offlineInstanceNames: compSpec.OfflineInstances,
+					})
+				}
+			}
+		}
+	}
+	for _, compSpec := range opsRes.Cluster.Spec.ComponentSpecs {
+		compOps, ok := compOpsHelper.componentOpsSet[compSpec.Name]
+		if !ok {
+			continue
+		}
+		setVeHelpers(compSpec, compOps, compSpec.Name)
+	}
+	for _, shardingSpec := range opsRes.Cluster.Spec.ShardingSpecs {
+		compOps, ok := compOpsHelper.componentOpsSet[shardingSpec.Name]
+		if !ok {
+			continue
+		}
+		shardingComps, err := intctrlutil.ListShardingComponents(reqCtx.Ctx, cli, opsRes.Cluster, shardingSpec.Name)
+		if err != nil {
+			return opsRequestPhase, 0, err
+		}
+		for _, v := range shardingComps {
+			setVeHelpers(shardingSpec.Template, compOps, v.Labels[constant.KBAppComponentLabelKey])
+		}
+	}
 	// reconcile the status.components. when the volume expansion is successful,
 	// sync the volumeClaimTemplate status and component phase On the OpsRequest and Cluster.
-	for _, v := range opsRequest.Spec.VolumeExpansionList {
-		compStatus := opsRequest.Status.Components[v.ComponentName]
-		for _, vct := range v.VolumeClaimTemplates {
-			succeedCount, expectCount, completedCount, err := ve.handleVCTExpansionProgress(reqCtx, cli, opsRes,
-				&compStatus, storageMap, v.ComponentName, vct.Name)
-			if err != nil {
-				return "", requeueAfter, err
-			}
-			expectProgressCount += expectCount
-			succeedProgressCount += succeedCount
-			completedProgressCount += completedCount
+	for _, veHelper := range veHelpers {
+		opsCompStatus := opsRequest.Status.Components[veHelper.compOps.GetComponentName()]
+		key := getComponentVCTKey(veHelper.compOps.GetComponentName(), veHelper.templateName, veHelper.vctName)
+		requestStorage, ok := storageMap[key]
+		if !ok {
+			continue
 		}
-		opsRequest.Status.Components[v.ComponentName] = compStatus
+		succeedCount, completedCount, err := ve.handleVCTExpansionProgress(reqCtx, cli, opsRes,
+			&opsCompStatus, requestStorage, veHelper)
+		if err != nil {
+			return "", requeueAfter, err
+		}
+		expectProgressCount += veHelper.expectCount
+		succeedProgressCount += succeedCount
+		completedProgressCount += completedCount
+		opsRequest.Status.Components[veHelper.compOps.GetComponentName()] = opsCompStatus
 	}
 	if completedProgressCount != expectProgressCount {
 		requeueAfter = time.Minute
@@ -141,13 +218,13 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 		} else {
 			opsRequestPhase = appsv1alpha1.OpsFailedPhase
 		}
-	} else {
-		// check whether the volume expansion operation has timed out
-		if time.Now().After(opsRequest.Status.StartTimestamp.Add(VolumeExpansionTimeOut)) {
-			// if volume expansion timed out
-			opsRequestPhase = appsv1alpha1.OpsFailedPhase
-			err = errors.New(fmt.Sprintf("Timed out waiting for volume expansion to complete, the timeout value is %g minutes", VolumeExpansionTimeOut.Minutes()))
-		}
+		return opsRequestPhase, requeueAfter, err
+	}
+	// check whether the volume expansion operation has timed out
+	if time.Now().After(opsRequest.Status.StartTimestamp.Add(VolumeExpansionTimeOut)) {
+		// if volume expansion timed out
+		opsRequestPhase = appsv1alpha1.OpsFailedPhase
+		err = errors.New(fmt.Sprintf("Timed out waiting for volume expansion to complete, the timeout value is %g minutes", VolumeExpansionTimeOut.Minutes()))
 	}
 	return opsRequestPhase, requeueAfter, err
 }
@@ -155,50 +232,74 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
 func (ve volumeExpansionOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	opsRequest := opsRes.OpsRequest
-	componentNameSet := opsRequest.GetComponentNameSet()
+	compOpsHelper := newComponentOpsHelper(opsRequest.Spec.VolumeExpansionList)
 	storageMap := ve.getRequestStorageMap(opsRequest)
-	lastComponentInfo := map[string]appsv1alpha1.LastComponentConfiguration{}
-	for _, v := range opsRes.Cluster.Spec.ComponentSpecs {
-		if _, ok := componentNameSet[v.Name]; !ok {
-			continue
-		}
-		lastVCTs := make([]appsv1alpha1.OpsRequestVolumeClaimTemplate, 0)
-		for _, vct := range v.VolumeClaimTemplates {
-			key := getComponentVCTKey(v.Name, vct.Name)
-			if _, ok := storageMap[key]; !ok {
-				continue
+	compOpsHelper.saveLastConfigurations(opsRes, func(compSpec appsv1alpha1.ClusterComponentSpec, comOps ComponentOpsInterface) appsv1alpha1.LastComponentConfiguration {
+		getLastVCTs := func(vcts []appsv1alpha1.ClusterComponentVolumeClaimTemplate, templateName string) []appsv1alpha1.ClusterComponentVolumeClaimTemplate {
+			lastVCTs := make([]appsv1alpha1.ClusterComponentVolumeClaimTemplate, 0)
+			for _, vct := range vcts {
+				key := getComponentVCTKey(comOps.GetComponentName(), comOps.GetComponentName(), templateName)
+				if _, ok := storageMap[key]; !ok {
+					continue
+				}
+				lastVCTs = append(lastVCTs, vct)
 			}
-			lastVCTs = append(lastVCTs, appsv1alpha1.OpsRequestVolumeClaimTemplate{
-				Name:    vct.Name,
-				Storage: vct.Spec.Resources.Requests[corev1.ResourceStorage],
+			return lastVCTs
+		}
+		volumeExpansion := comOps.(appsv1alpha1.VolumeExpansion)
+		// save the last vcts of the instances
+		var instanceTemplates []appsv1alpha1.InstanceTemplate
+		for _, v := range volumeExpansion.Instances {
+			for _, ins := range compSpec.Instances {
+				if ins.Name != v.Name {
+					continue
+				}
+				instanceTemplates = append(instanceTemplates, appsv1alpha1.InstanceTemplate{
+					VolumeClaimTemplates: getLastVCTs(ins.VolumeClaimTemplates, ins.Name),
+				})
+			}
+		}
+		// save the last vcts of the componnet
+		lastVCTS := getLastVCTs(compSpec.VolumeClaimTemplates, "")
+		var convertedLastVCTs []appsv1alpha1.OpsRequestVolumeClaimTemplate
+		for _, v := range lastVCTS {
+			convertedLastVCTs = append(convertedLastVCTs, appsv1alpha1.OpsRequestVolumeClaimTemplate{
+				Name:    v.Name,
+				Storage: v.Spec.Resources.Requests[corev1.ResourceStorage],
 			})
 		}
-		lastComponentInfo[v.Name] = appsv1alpha1.LastComponentConfiguration{
-			VolumeClaimTemplates: lastVCTs,
+		return appsv1alpha1.LastComponentConfiguration{
+			VolumeClaimTemplates: convertedLastVCTs,
+			Instances:            instanceTemplates,
 		}
-	}
-	opsRequest.Status.LastConfiguration.Components = lastComponentInfo
+	})
 	return nil
 }
 
 // pvcIsResizing when pvc start resizing, it will set conditions type to Resizing/FileSystemResizePending
 func (ve volumeExpansionOpsHandler) pvcIsResizing(pvc *corev1.PersistentVolumeClaim) bool {
-	var isResizing bool
 	for _, condition := range pvc.Status.Conditions {
 		if condition.Type == corev1.PersistentVolumeClaimResizing || condition.Type == corev1.PersistentVolumeClaimFileSystemResizePending {
-			isResizing = true
-			break
+			return true
 		}
 	}
-	return isResizing
+	return false
 }
 
 func (ve volumeExpansionOpsHandler) getRequestStorageMap(opsRequest *appsv1alpha1.OpsRequest) map[string]resource.Quantity {
 	storageMap := map[string]resource.Quantity{}
+	setStorageMap := func(vct appsv1alpha1.OpsRequestVolumeClaimTemplate, compOps appsv1alpha1.ComponentOps, templateName string) {
+		key := getComponentVCTKey(compOps.GetComponentName(), templateName, vct.Name)
+		storageMap[key] = vct.Storage
+	}
 	for _, v := range opsRequest.Spec.VolumeExpansionList {
 		for _, vct := range v.VolumeClaimTemplates {
-			key := getComponentVCTKey(v.ComponentName, vct.Name)
-			storageMap[key] = vct.Storage
+			setStorageMap(vct, v.ComponentOps, "")
+		}
+		for _, ins := range v.Instances {
+			for _, vct := range ins.VolumeClaimTemplates {
+				setStorageMap(vct, v.ComponentOps, ins.Name)
+			}
 		}
 	}
 	return storageMap
@@ -217,48 +318,42 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 	cli client.Client,
 	opsRes *OpsResource,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus,
-	storageMap map[string]resource.Quantity,
-	componentName, vctName string) (int, int, int, error) {
+	requestStorage resource.Quantity,
+	veHelper volumeExpansionHelper) (int, int, error) {
 	var (
 		succeedCount   int
-		expectCount    int
 		completedCount int
 		err            error
 	)
+	matchingLabels := client.MatchingLabels{
+		constant.AppInstanceLabelKey:             opsRes.Cluster.Name,
+		constant.VolumeClaimTemplateNameLabelKey: veHelper.vctName,
+		constant.KBAppComponentLabelKey:          veHelper.fullComponentName,
+	}
+	if veHelper.templateName != "" {
+		matchingLabels[constant.KBAppComponentInstanceTemplateLabelKey] = veHelper.templateName
+	}
 	pvcList := &corev1.PersistentVolumeClaimList{}
-	if err = cli.List(reqCtx.Ctx, pvcList, client.MatchingLabels{
-		constant.AppInstanceLabelKey:    opsRes.Cluster.Name,
-		constant.KBAppComponentLabelKey: componentName,
-	}, client.InNamespace(opsRes.Cluster.Namespace)); err != nil {
-		return 0, 0, 0, err
+	if err = cli.List(reqCtx.Ctx, pvcList, matchingLabels, client.InNamespace(opsRes.Cluster.Namespace)); err != nil {
+		return 0, 0, err
 	}
-	comp := opsRes.Cluster.Spec.GetComponentByName(componentName)
-	if comp == nil {
-		err = fmt.Errorf("comp %s of cluster %s not found", componentName, opsRes.Cluster.Name)
-		return 0, 0, 0, err
+	workloadName := constant.GenerateWorkloadNamePattern(opsRes.Cluster.Name, veHelper.fullComponentName)
+	instanceNames, err := instanceset.GenerateInstanceNamesFromTemplate(workloadName, veHelper.templateName, int32(veHelper.expectCount), veHelper.offlineInstanceNames, nil)
+	if err != nil {
+		return 0, 0, err
 	}
-	expectCount = int(comp.Replicas)
-	vctKey := getComponentVCTKey(componentName, vctName)
-	requestStorage := storageMap[vctKey]
-	var ordinal int
+	instanceNameSet := sets.New(instanceNames...)
 	for _, v := range pvcList.Items {
-		// VolumeClaimTemplateNameLabelKeyForLegacy is deprecated: only compatible with version 0.5, will be removed in 0.7?
-		if v.Labels[constant.VolumeClaimTemplateNameLabelKey] != vctName &&
-			v.Labels[constant.VolumeClaimTemplateNameLabelKeyForLegacy] != vctName {
+		if _, ok := instanceNameSet[strings.Replace(v.Name, veHelper.vctName+"-", "", 1)]; !ok {
 			continue
 		}
-		// filter PVC(s) with ordinal no larger than comp.Replicas - 1, which left by scale-in
-		ordinal, err = getPVCOrdinal(v.Name)
-		if err != nil {
-			return 0, 0, 0, err
-		}
-		if ordinal > expectCount-1 {
+		if v.Labels[constant.KBAppComponentInstanceTemplateLabelKey] != veHelper.templateName {
 			continue
 		}
 		objectKey := getPVCProgressObjectKey(v.Name)
 		progressDetail := findStatusProgressDetail(compStatus.ProgressDetails, objectKey)
 		if progressDetail == nil {
-			progressDetail = &appsv1alpha1.ProgressStatusDetail{ObjectKey: objectKey, Group: vctName}
+			progressDetail = &appsv1alpha1.ProgressStatusDetail{ObjectKey: objectKey, Group: veHelper.vctName}
 		}
 		if progressDetail.Status == appsv1alpha1.FailedProgressStatus {
 			completedCount += 1
@@ -266,41 +361,38 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 		}
 		currStorageSize := v.Status.Capacity.Storage()
 		// should check if the spec.resources.requests.storage equals to the requested storage
+		// and current storage size is greater than or equal to request storage size.
 		// and pvc is bound if the pvc is re-created for recovery.
-		if currStorageSize.Cmp(requestStorage) == 0 &&
+		if currStorageSize.Cmp(requestStorage) >= 0 &&
 			v.Spec.Resources.Requests.Storage().Cmp(requestStorage) == 0 &&
 			v.Status.Phase == corev1.ClaimBound {
 			succeedCount += 1
 			completedCount += 1
-			message := fmt.Sprintf("Successfully expand volume: %s in Component: %s", objectKey, componentName)
+			message := fmt.Sprintf("Successfully expand volume: %s in component: %s", objectKey, veHelper.compOps.GetComponentName())
 			progressDetail.SetStatusAndMessage(appsv1alpha1.SucceedProgressStatus, message)
 			setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, *progressDetail)
 			continue
 		}
 		if ve.pvcIsResizing(&v) {
-			message := fmt.Sprintf("Start expanding volume: %s in Component: %s ", objectKey, componentName)
+			message := fmt.Sprintf("Start expanding volume: %s in component: %s", objectKey, veHelper.compOps.GetComponentName())
 			progressDetail.SetStatusAndMessage(appsv1alpha1.ProcessingProgressStatus, message)
 		} else {
-			message := fmt.Sprintf("Waiting for an external controller to process the pvc: %s in Component: %s ", objectKey, componentName)
+			message := fmt.Sprintf("Waiting for an external controller to process the pvc: %s in component: %s", objectKey, veHelper.compOps.GetComponentName())
 			progressDetail.SetStatusAndMessage(appsv1alpha1.PendingProgressStatus, message)
 		}
 		setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, *progressDetail)
 	}
-	return succeedCount, expectCount, completedCount, nil
+	return succeedCount, completedCount, nil
 }
 
-func getComponentVCTKey(componentName, vctName string) string {
-	return fmt.Sprintf("%s/%s", componentName, vctName)
+func getComponentVCTKey(compoName, insTemplateName, vctName string) string {
+	var instanceNameKey string
+	if insTemplateName != "" {
+		instanceNameKey = "." + insTemplateName
+	}
+	return fmt.Sprintf("%s%s.%s", compoName, instanceNameKey, vctName)
 }
 
 func getPVCProgressObjectKey(pvcName string) string {
 	return fmt.Sprintf("PVC/%s", pvcName)
-}
-
-func getPVCOrdinal(pvcName string) (int, error) {
-	subMatches := pvcNameRegex.FindStringSubmatch(pvcName)
-	if len(subMatches) < 3 {
-		return 0, fmt.Errorf("wrong pvc name: %s", pvcName)
-	}
-	return strconv.Atoi(subMatches[2])
 }

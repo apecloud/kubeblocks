@@ -21,7 +21,6 @@ package controllerutil
 
 import (
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -39,30 +38,7 @@ import (
 const (
 	// PodContainerFailedTimeout the timeout for container of pod failures, the component phase will be set to Failed/Abnormal after this time.
 	PodContainerFailedTimeout = 10 * time.Second
-
-	// PodScheduledFailedTimeout timeout for scheduling failure.
-	PodScheduledFailedTimeout = 30 * time.Second
 )
-
-// statefulPodRegex is a regular expression that extracts the parent StatefulSet and ordinal from the Name of a Pod
-var statefulPodRegex = regexp.MustCompile("(.*)-([0-9]+)$")
-
-// GetParentNameAndOrdinal gets the name of pod's parent StatefulSet and pod's ordinal as extracted from its Name. If
-// the Pod was not created by a StatefulSet, its parent is considered to be empty string, and its ordinal is considered
-// to be -1.
-func GetParentNameAndOrdinal(pod *corev1.Pod) (string, int) {
-	parent := ""
-	ordinal := -1
-	subMatches := statefulPodRegex.FindStringSubmatch(pod.Name)
-	if len(subMatches) < 3 {
-		return parent, ordinal
-	}
-	parent = subMatches[1]
-	if i, err := strconv.ParseInt(subMatches[2], 10, 32); err == nil {
-		ordinal = int(i)
-	}
-	return parent, ordinal
-}
 
 // GetContainerByConfigSpec searches for container using the configmap of config from the pod
 //
@@ -403,11 +379,6 @@ func PodIsReadyWithLabel(pod corev1.Pod) bool {
 	return PodIsReady(&pod)
 }
 
-// PodIsControlledByLatestRevision checks if the pod is controlled by latest controller revision.
-func PodIsControlledByLatestRevision(pod *corev1.Pod, sts *appsv1.StatefulSet) bool {
-	return GetPodRevision(pod) == sts.Status.UpdateRevision && sts.Status.ObservedGeneration == sts.Generation
-}
-
 // GetPodRevision gets the revision of Pod by inspecting the StatefulSetRevisionLabel. If pod has no revision empty
 // string is returned.
 func GetPodRevision(pod *corev1.Pod) string {
@@ -577,9 +548,6 @@ func GetPodContainer(pod *corev1.Pod, containerName string) *corev1.Container {
 
 // IsPodFailedAndTimedOut checks if the pod is failed and timed out.
 func IsPodFailedAndTimedOut(pod *corev1.Pod) (bool, bool, string) {
-	if isFailed, isTimedOut, message := isPodScheduledFailedAndTimedOut(pod); isFailed {
-		return isFailed, isTimedOut, message
-	}
 	initContainerFailed, message := isAnyContainerFailed(pod.Status.InitContainerStatuses)
 	if initContainerFailed {
 		return initContainerFailed, isContainerFailedAndTimedOut(pod, corev1.PodInitialized), message
@@ -587,20 +555,6 @@ func IsPodFailedAndTimedOut(pod *corev1.Pod) (bool, bool, string) {
 	containerFailed, message := isAnyContainerFailed(pod.Status.ContainerStatuses)
 	if containerFailed {
 		return containerFailed, isContainerFailedAndTimedOut(pod, corev1.ContainersReady), message
-	}
-	return false, false, ""
-}
-
-// IsPodScheduledFailedAndTimedOut checks whether the unscheduled pod has timed out.
-func isPodScheduledFailedAndTimedOut(pod *corev1.Pod) (bool, bool, string) {
-	for _, cond := range pod.Status.Conditions {
-		if cond.Type != corev1.PodScheduled {
-			continue
-		}
-		if cond.Status == corev1.ConditionTrue {
-			return false, false, ""
-		}
-		return true, time.Now().After(cond.LastTransitionTime.Add(PodScheduledFailedTimeout)), cond.Message
 	}
 	return false, false, ""
 }

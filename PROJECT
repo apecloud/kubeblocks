@@ -79,10 +79,6 @@ resources:
   kind: OpsRequest
   path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
   version: v1alpha1
-  webhooks:
-    defaulting: true
-    validation: true
-    webhookVersion: v1
 - api:
     crdVersion: v1
   controller: true
@@ -123,10 +119,6 @@ resources:
   kind: InstanceSet
   path: github.com/apecloud/kubeblocks/apis/workloads/v1alpha1
   version: v1alpha1
-  webhooks:
-    defaulting: true
-    validation: true
-    webhookVersion: v1
 - api:
     crdVersion: v1
   controller: true
@@ -169,10 +161,6 @@ resources:
   kind: ServiceDescriptor
   path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
   version: v1alpha1
-  webhooks:
-    defaulting: true
-    validation: true
-    webhookVersion: v1
 - api:
     crdVersion: v1
     namespaced: true
@@ -190,10 +178,6 @@ resources:
   kind: ComponentDefinition
   path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
   version: v1alpha1
-  webhooks:
-    defaulting: true
-    validation: true
-    webhookVersion: v1
 - api:
     crdVersion: v1
     namespaced: true
@@ -203,10 +187,6 @@ resources:
   kind: Component
   path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
   version: v1alpha1
-  webhooks:
-    defaulting: true
-    validation: true
-    webhookVersion: v1
 - api:
     crdVersion: v1
   controller: true
@@ -223,10 +203,6 @@ resources:
   kind: ComponentVersion
   path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
   version: v1alpha1
-  webhooks:
-    defaulting: true
-    validation: true
-    webhookVersion: v1
 - api:
     crdVersion: v1
   domain: kubeblocks.io
@@ -234,8 +210,21 @@ resources:
   kind: ConfigConstraint
   path: github.com/apecloud/kubeblocks/apis/apps/v1beta1
   version: v1
-  webhooks:
-    conversion: true
-    validation: true
-    webhookVersion: v1
+- api:
+    crdVersion: v1
+  controller: true
+  domain: kubeblocks.io
+  group: dataprotection
+  kind: StorageProvider
+  path: github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: kubeblocks.io
+  group: experimental
+  kind: NodeCountScaler
+  path: github.com/apecloud/kubeblocks/apis/experimental/v1alpha1
+  version: v1alpha1
 version: "3"

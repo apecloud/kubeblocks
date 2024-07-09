@@ -312,11 +312,11 @@ var _ = Describe("config_util", func() {
 			configConstraintObj := testapps.NewCustomizedObj("resources/mysql-config-constraint.yaml",
 				&appsv1beta1.ConfigConstraint{}, func(cc *appsv1beta1.ConfigConstraint) {
 					if ccContext, err := testdata.GetTestDataFileContent("cue_testdata/pg14.cue"); err == nil {
-						cc.Spec.ConfigSchema = &appsv1beta1.ConfigSchema{
+						cc.Spec.ParametersSchema = &appsv1beta1.ParametersSchema{
 							CUE: string(ccContext),
 						}
 					}
-					cc.Spec.FormatterConfig = &appsv1beta1.FormatterConfig{
+					cc.Spec.FileFormatConfig = &appsv1beta1.FileFormatConfig{
 						Format: appsv1beta1.Properties,
 					}
 				})
@@ -382,7 +382,7 @@ var _ = Describe("config_util", func() {
 
 				option := core.CfgOption{
 					Type:    core.CfgTplType,
-					CfgType: tt.args.configConstraint.FormatterConfig.Format,
+					CfgType: tt.args.configConstraint.FileFormatConfig.Format,
 				}
 
 				patch, err := core.CreateMergePatch(&core.ConfigResource{
@@ -477,6 +477,57 @@ func TestCheckAndPatchPayload(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("CheckAndPatchPayload() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_filterImmutableParameters(t *testing.T) {
+	type args struct {
+		parameters      map[string]any
+		immutableParams []string
+	}
+	tests := []struct {
+		name string
+		args args
+		want map[string]any
+	}{{
+		name: "test",
+		args: args{
+			parameters: map[string]any{
+				"a": "b",
+				"c": "d",
+			},
+		},
+		want: map[string]any{
+			"a": "b",
+			"c": "d",
+		},
+	}, {
+		name: "test",
+		args: args{
+			parameters: map[string]any{
+				"a": "b",
+				"c": "d",
+			},
+			immutableParams: []string{"a", "d"},
+		},
+		want: map[string]any{
+			"c": "d",
+		},
+	}, {
+		name: "test",
+		args: args{
+			parameters:      map[string]any{},
+			immutableParams: []string{"a", "d"},
+		},
+		want: map[string]any{},
+	},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := filterImmutableParameters(tt.args.parameters, tt.args.immutableParams); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("filterImmutableParameters() = %v, want %v", got, tt.want)
 			}
 		})
 	}

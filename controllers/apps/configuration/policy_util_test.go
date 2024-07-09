@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/sethvargo/go-password/password"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -44,16 +43,15 @@ import (
 
 var (
 	defaultNamespace = "default"
-	stsSchemaKind    = appsv1.SchemeGroupVersion.WithKind("StatefulSet")
+	itsSchemaKind    = workloads.GroupVersion.WithKind(workloads.Kind)
 )
 
 func newMockInstanceSet(replicas int, name string, labels map[string]string) workloads.InstanceSet {
 	uid, _ := password.Generate(12, 12, 0, true, false)
-	serviceName, _ := password.Generate(12, 0, 0, true, false)
 	return workloads.InstanceSet{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       "InstanceSet",
-			APIVersion: "workloads.kubeblocks.io/v1alpha1",
+			Kind:       workloads.Kind,
+			APIVersion: workloads.GroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -80,7 +78,6 @@ func newMockInstanceSet(replicas int, name string, labels map[string]string) wor
 						}}},
 				},
 			},
-			ServiceName: serviceName,
 		},
 	}
 }
@@ -90,9 +87,9 @@ type ParamsOps func(params *reconfigureParams)
 func withMockInstanceSet(replicas int, labels map[string]string) ParamsOps {
 	return func(params *reconfigureParams) {
 		rand, _ := password.Generate(12, 8, 0, true, false)
-		stsName := "test_" + rand
+		itsName := "test_" + rand
 		params.InstanceSetUnits = []workloads.InstanceSet{
-			newMockInstanceSet(replicas, stsName, labels),
+			newMockInstanceSet(replicas, itsName, labels),
 		}
 	}
 }
@@ -121,10 +118,10 @@ func withConfigSpec(configSpecName string, data map[string]string) ParamsOps {
 	}
 }
 
-func withConfigConstraintSpec(formatter *appsv1beta1.FormatterConfig) ParamsOps {
+func withConfigConstraintSpec(formatter *appsv1beta1.FileFormatConfig) ParamsOps {
 	return func(params *reconfigureParams) {
 		params.ConfigConstraint = &appsv1beta1.ConfigConstraintSpec{
-			FormatterConfig: formatter,
+			FileFormatConfig: formatter,
 		}
 	}
 }
@@ -150,7 +147,7 @@ func withConfigPatch(patch map[string]string) ParamsOps {
 			Key:           "for_test",
 			UpdatedParams: transKeyPair(patch),
 		}})
-		configPatch, _, _ := core.CreateConfigPatch(mockEmptyData(newConfigData), newConfigData, cc.FormatterConfig.Format, nil, false)
+		configPatch, _, _ := core.CreateConfigPatch(mockEmptyData(newConfigData), newConfigData, cc.FileFormatConfig.Format, nil, false)
 		params.ConfigPatch = configPatch
 	}
 }
@@ -224,7 +221,7 @@ func newMockPodsWithInstanceSet(its *workloads.InstanceSet, replicas int, option
 	pods := make([]corev1.Pod, replicas)
 	for i := 0; i < replicas; i++ {
 		pods[i] = newMockPod(its.Name+"-"+fmt.Sprint(i), &its.Spec.Template.Spec)
-		pods[i].OwnerReferences = []metav1.OwnerReference{newControllerRef(its, stsSchemaKind)}
+		pods[i].OwnerReferences = []metav1.OwnerReference{newControllerRef(its, itsSchemaKind)}
 		pods[i].Status.PodIP = "1.1.1.1"
 	}
 	for _, customFn := range options {

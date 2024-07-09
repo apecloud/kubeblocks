@@ -32,7 +32,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
 
-var _ = Describe("replicated_state_machine builder", func() {
+var _ = Describe("instance_set builder", func() {
 	It("should work well", func() {
 		const (
 			name                         = "foo"
@@ -41,7 +41,6 @@ var _ = Describe("replicated_state_machine builder", func() {
 			selectorKey2, selectorValue2 = "foo-2", "bar-2"
 			selectorKey3, selectorValue3 = "foo-3", "bar-3"
 			selectorKey4, selectorValue4 = "foo-4", "bar-4"
-			serviceName                  = "foo"
 			replicas                     = int32(5)
 			minReadySeconds              = int32(11)
 			port                         = int32(12345)
@@ -139,22 +138,6 @@ var _ = Describe("replicated_state_machine builder", func() {
 				},
 			},
 		}
-		alternativeServices := []corev1.Service{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "bar",
-				},
-				Spec: corev1.ServiceSpec{
-					Ports: []corev1.ServicePort{
-						{
-							Name:     "bar",
-							Protocol: corev1.ProtocolTCP,
-							Port:     port,
-						},
-					},
-				},
-			},
-		}
 		paused := true
 		credential := workloads.Credential{
 			Username: workloads.CredentialVar{Value: "foo"},
@@ -176,7 +159,6 @@ var _ = Describe("replicated_state_machine builder", func() {
 			AddMatchLabel(selectorKey1, selectorValue1).
 			AddMatchLabels(selectorKey2, selectorValue2, selectorKey3, selectorValue3).
 			AddMatchLabelsInMap(selectors).
-			SetServiceName(serviceName).
 			SetRoles([]workloads.ReplicaRole{role}).
 			SetMembershipReconfiguration(&reconfiguration).
 			SetTemplate(template).
@@ -190,7 +172,6 @@ var _ = Describe("replicated_state_machine builder", func() {
 			AddCustomHandler(action).
 			SetMemberUpdateStrategy(&memberUpdateStrategy).
 			SetService(service).
-			SetAlternativeServices(alternativeServices).
 			SetPaused(paused).
 			SetCredential(credential).
 			SetInstances(instances).
@@ -206,7 +187,6 @@ var _ = Describe("replicated_state_machine builder", func() {
 		Expect(its.Spec.Selector.MatchLabels[selectorKey2]).Should(Equal(selectorValue2))
 		Expect(its.Spec.Selector.MatchLabels[selectorKey3]).Should(Equal(selectorValue3))
 		Expect(its.Spec.Selector.MatchLabels[selectorKey4]).Should(Equal(selectorValue4))
-		Expect(its.Spec.ServiceName).Should(Equal(serviceName))
 		Expect(its.Spec.Roles).Should(HaveLen(1))
 		Expect(its.Spec.Roles[0]).Should(Equal(role))
 		Expect(its.Spec.MembershipReconfiguration).ShouldNot(BeNil())
@@ -231,8 +211,6 @@ var _ = Describe("replicated_state_machine builder", func() {
 		Expect(*its.Spec.MemberUpdateStrategy).Should(Equal(memberUpdateStrategy))
 		Expect(its.Spec.Service).ShouldNot(BeNil())
 		Expect(its.Spec.Service).Should(BeEquivalentTo(service))
-		Expect(its.Spec.AlternativeServices).ShouldNot(BeNil())
-		Expect(its.Spec.AlternativeServices).Should(Equal(alternativeServices))
 		Expect(its.Spec.Paused).Should(Equal(paused))
 		Expect(its.Spec.Credential).ShouldNot(BeNil())
 		Expect(*its.Spec.Credential).Should(Equal(credential))

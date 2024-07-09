@@ -156,21 +156,28 @@ func GenerateBackupJobName(backup *dpv1alpha1.Backup, prefix string) string {
 	return name
 }
 
-// GenerateCRNameByBackupSchedule generate a CR name which is created by BackupSchedule, such as CronJob Backup.
-func GenerateCRNameByBackupSchedule(backupSchedule *dpv1alpha1.BackupSchedule, method string) string {
-	name := fmt.Sprintf("%s-%s", generateUniqueNameWithBackupSchedule(backupSchedule), backupSchedule.Namespace)
+func generateBaseCRNameByBackupSchedule(uniqueNameWithBackupSchedule, backupScheduleNS, method string) string {
+	name := fmt.Sprintf("%s-%s", uniqueNameWithBackupSchedule, backupScheduleNS)
 	if len(name) > 30 {
 		name = strings.TrimSuffix(name[:30], "-")
 	}
 	return fmt.Sprintf("%s-%s", name, method)
 }
 
-func generateUniqueNameWithBackupSchedule(backupSchedule *dpv1alpha1.BackupSchedule) string {
-	uniqueName := backupSchedule.Name
+// GenerateCRNameByBackupSchedule generate a CR name which is created by BackupSchedule, such as CronJob Backup.
+func GenerateCRNameByBackupSchedule(backupSchedule *dpv1alpha1.BackupSchedule, method string) string {
+	uid := backupSchedule.UID[:8]
 	if len(backupSchedule.OwnerReferences) > 0 {
-		uniqueName = fmt.Sprintf("%s-%s", backupSchedule.OwnerReferences[0].UID[:8], backupSchedule.OwnerReferences[0].Name)
+		uid = backupSchedule.OwnerReferences[0].UID[:8]
 	}
-	return uniqueName
+	uniqueNameWithBackupSchedule := fmt.Sprintf("%s-%s", uid, backupSchedule.Name)
+	return generateBaseCRNameByBackupSchedule(uniqueNameWithBackupSchedule, backupSchedule.Namespace, method)
+}
+
+// GenerateLegacyCRNameByBackupSchedule generate a legacy CR name which is created by BackupSchedule, such as CronJob Backup.
+func GenerateLegacyCRNameByBackupSchedule(backupSchedule *dpv1alpha1.BackupSchedule, method string) string {
+	uniqueNameWithBackupSchedule := fmt.Sprintf("%s-%s", backupSchedule.UID[:8], backupSchedule.Name)
+	return generateBaseCRNameByBackupSchedule(uniqueNameWithBackupSchedule, backupSchedule.Namespace, method)
 }
 
 // BuildBaseBackupPath builds the path to storage backup data in backup repository.

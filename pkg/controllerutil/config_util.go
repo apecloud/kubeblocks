@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"reflect"
+	"slices"
 
 	"github.com/StudioSol/set"
 	corev1 "k8s.io/api/core/v1"
@@ -54,7 +55,7 @@ type Result struct {
 func MergeAndValidateConfigs(configConstraint appsv1beta1.ConfigConstraintSpec, baseConfigs map[string]string, cmKey []string, updatedParams []core.ParamPairs) (map[string]string, error) {
 	var (
 		err error
-		fc  = configConstraint.FormatterConfig
+		fc  = configConstraint.FileFormatConfig
 
 		newCfg         map[string]string
 		configOperator core.ConfigOperator
@@ -74,7 +75,11 @@ func MergeAndValidateConfigs(configConstraint appsv1beta1.ConfigConstraintSpec, 
 
 	// merge param to config file
 	for _, params := range updatedParams {
-		if err := configOperator.MergeFrom(params.UpdatedParams, core.NewCfgOptions(params.Key, core.WithFormatterConfig(fc))); err != nil {
+		validUpdatedParameters := filterImmutableParameters(params.UpdatedParams, configConstraint.ImmutableParameters)
+		if len(validUpdatedParameters) == 0 {
+			continue
+		}
+		if err := configOperator.MergeFrom(validUpdatedParameters, core.NewCfgOptions(params.Key, core.WithFormatterConfig(fc))); err != nil {
 			return nil, err
 		}
 		updatedKeys.Add(params.Key)
@@ -210,4 +215,18 @@ func ResourcesPayloadForComponent(resources corev1.ResourceRequirements) any {
 		"limits":   resources.Limits,
 		"requests": resources.Requests,
 	}
+}
+
+func filterImmutableParameters(parameters map[string]any, immutableParams []string) map[string]any {
+	if len(immutableParams) == 0 || len(parameters) == 0 {
+		return parameters
+	}
+
+	validParameters := make(map[string]any, len(parameters))
+	for key, val := range parameters {
+		if !slices.Contains(immutableParams, key) {
+			validParameters[key] = val
+		}
+	}
+	return validParameters
 }

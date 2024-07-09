@@ -181,9 +181,8 @@ func (r *LogCollectionReconciler) patchBackupStatus(reqCtx intctrlutil.RequestCt
 	if errorLogs == "" {
 		return nil
 	}
-	patch := client.MergeFrom(backup.DeepCopy())
 	backup.Status.FailureReason = errorLogs
-	return r.Client.Status().Patch(reqCtx.Ctx, backup, patch)
+	return r.Client.Status().Update(reqCtx.Ctx, backup)
 }
 
 func (r *LogCollectionReconciler) patchRestoreStatus(reqCtx intctrlutil.RequestCtx, job *batchv1.Job, restoreName string) error {
@@ -197,16 +196,14 @@ func (r *LogCollectionReconciler) patchRestoreStatus(reqCtx intctrlutil.RequestC
 		return nil
 	}
 
-	patch := client.MergeFrom(restore.DeepCopy())
 	objectKey := dprestore.BuildJobKeyForActionStatus(job.Name)
-	logPrefix := "Collection logs"
 	var hasPatchedLogs bool
 	doLogsPatch := func(actions []dpv1alpha1.RestoreStatusAction) error {
 		for i := range actions {
 			if actions[i].ObjectKey != objectKey {
 				continue
 			}
-			if strings.HasPrefix(actions[i].Message, logPrefix) {
+			if strings.HasPrefix(actions[i].Message, dptypes.LogCollectorOutput) {
 				hasPatchedLogs = true
 				return nil
 			}
@@ -217,7 +214,7 @@ func (r *LogCollectionReconciler) patchRestoreStatus(reqCtx intctrlutil.RequestC
 			if errorLogs == "" {
 				return nil
 			}
-			actions[i].Message = fmt.Sprintf("%s: %s", logPrefix, errorLogs)
+			actions[i].Message = fmt.Sprintf("%s: %s", dptypes.LogCollectorOutput, errorLogs)
 			break
 		}
 		return nil
@@ -231,7 +228,7 @@ func (r *LogCollectionReconciler) patchRestoreStatus(reqCtx intctrlutil.RequestC
 	if hasPatchedLogs {
 		return nil
 	}
-	return r.Client.Status().Patch(reqCtx.Ctx, restore, patch)
+	return r.Client.Status().Update(reqCtx.Ctx, restore)
 }
 
 type failedJobUpdatePredicate struct {

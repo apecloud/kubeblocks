@@ -166,15 +166,27 @@ var _ = Describe("Restore", func() {
 
 			clusterCompDefObj := clusterDef.Spec.ComponentDefs[0]
 			synthesizedComponent = &component.SynthesizedComponent{
-				WorkloadType:          appsv1alpha1.Consensus,
 				PodSpec:               clusterCompDefObj.PodSpec,
-				Probes:                clusterCompDefObj.Probes,
 				LogConfigs:            clusterCompDefObj.LogConfigs,
 				HorizontalScalePolicy: clusterCompDefObj.HorizontalScalePolicy,
 				VolumeClaimTemplates:  cluster.Spec.ComponentSpecs[0].ToVolumeClaimTemplates(),
 				Name:                  mysqlCompName,
 				VolumeTypes:           []appsv1alpha1.VolumeTypeSpec{{Name: testapps.DataVolumeName, Type: appsv1alpha1.VolumeTypeData}},
 				Replicas:              1,
+				Roles: []appsv1alpha1.ReplicaRole{
+					{
+						Name:        "leader",
+						Serviceable: true,
+						Writable:    true,
+						Votable:     true,
+					},
+					{
+						Name:        "follower",
+						Serviceable: true,
+						Writable:    false,
+						Votable:     true,
+					},
+				},
 			}
 			By("create component object")
 			compObj = testapps.NewComponentFactory(testCtx.DefaultNamespace, cluster.Name+"-"+synthesizedComponent.Name, "").
@@ -226,7 +238,7 @@ var _ = Describe("Restore", func() {
 			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).Should(BeTrue())
 
 			By("mock restore of prepareData stage to Completed")
-			restoreMeta := restoreMGR.GetRestoreObjectMeta(synthesizedComponent, dpv1alpha1.PrepareData)
+			restoreMeta := restoreMGR.GetRestoreObjectMeta(synthesizedComponent, dpv1alpha1.PrepareData, "")
 			namedspace := types.NamespacedName{Name: restoreMeta.Name, Namespace: restoreMeta.Namespace}
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, namedspace, func(restore *dpv1alpha1.Restore) {
 				restore.Status.Phase = dpv1alpha1.RestorePhaseCompleted
@@ -250,7 +262,7 @@ var _ = Describe("Restore", func() {
 			_ = restoreMGR.DoRestore(synthesizedComponent, compObj, false)
 
 			// check if restore CR of postReady stage is created.
-			restoreMeta = restoreMGR.GetRestoreObjectMeta(synthesizedComponent, dpv1alpha1.PostReady)
+			restoreMeta = restoreMGR.GetRestoreObjectMeta(synthesizedComponent, dpv1alpha1.PostReady, "")
 			namedspace = types.NamespacedName{Name: restoreMeta.Name, Namespace: restoreMeta.Namespace}
 			Eventually(testapps.CheckObjExists(&testCtx, namedspace,
 				&dpv1alpha1.Restore{}, true)).Should(Succeed())

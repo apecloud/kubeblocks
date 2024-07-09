@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/apimachinery/pkg/version"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -168,9 +167,6 @@ var _ = Describe("instance util test", func() {
 			Expect(policy).Should(Equal(InPlaceUpdatePolicy))
 
 			By("build a pod without revision updated, with basic mutable and resources fields updated")
-			kubeVersion := viper.GetString(constant.CfgKeyServerInfo)
-			defer viper.Set(constant.CfgKeyServerInfo, kubeVersion)
-			viper.Set(constant.CfgKeyServerInfo, version.Info{GitVersion: "v1.29.3"})
 			pod4 := pod3.DeepCopy()
 			randInt := rand.Int()
 			requests := corev1.ResourceList{
@@ -179,7 +175,7 @@ var _ = Describe("instance util test", func() {
 			pod4.Spec.Containers[0].Resources.Requests = requests
 			policy, err = getPodUpdatePolicy(its, pod4)
 			Expect(err).Should(BeNil())
-			Expect(policy).Should(Equal(InPlaceUpdatePolicy))
+			Expect(policy).Should(Equal(RecreatePolicy))
 
 			By("build a pod without revision updated, with resources fields updated")
 			pod5 := pod1.DeepCopy()
@@ -190,7 +186,7 @@ var _ = Describe("instance util test", func() {
 			pod5.Spec.Containers[0].Resources.Requests = requests
 			policy, err = getPodUpdatePolicy(its, pod5)
 			Expect(err).Should(BeNil())
-			Expect(policy).Should(Equal(InPlaceUpdatePolicy))
+			Expect(policy).Should(Equal(RecreatePolicy))
 
 			By("build a pod without revision updated, with resources fields updated, with IgnorePodVerticalScaling enabled")
 			ignorePodVerticalScaling := viper.GetBool(FeatureGateIgnorePodVerticalScaling)

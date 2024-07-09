@@ -25,6 +25,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -52,6 +53,10 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 		setProvisioningStartedCondition(&cluster.Status.Conditions, cluster.Name, cluster.Generation, err)
 	}()
 
+	if err = t.validateSpec(cluster); err != nil {
+		return err
+	}
+
 	// build all component specs
 	transCtx.ComponentSpecs, err = t.buildCompSpecs(transCtx, cluster)
 	if err != nil {
@@ -68,6 +73,22 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 	// update the resolved component definitions and service versions to cluster spec.
 	t.updateCompSpecs(transCtx)
 
+	return nil
+}
+
+func (t *ClusterAPINormalizationTransformer) validateSpec(cluster *appsv1alpha1.Cluster) error {
+	if len(cluster.Spec.ShardingSpecs) == 0 {
+		return nil
+	}
+	shardCompNameMap := map[string]sets.Empty{}
+	for _, v := range cluster.Spec.ShardingSpecs {
+		shardCompNameMap[v.Name] = sets.Empty{}
+	}
+	for _, v := range cluster.Spec.ComponentSpecs {
+		if _, ok := shardCompNameMap[v.Name]; ok {
+			return fmt.Errorf(`duplicate component name "%s" in spec.shardingSpec`, v.Name)
+		}
+	}
 	return nil
 }
 

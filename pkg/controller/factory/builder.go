@@ -25,7 +25,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -35,6 +34,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/klog/v2"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
@@ -45,13 +45,13 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-// BuildInstanceSet builds a InstanceSet object from SynthesizedComponent.
+// BuildInstanceSet builds an InstanceSet object from SynthesizedComponent.
 func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, componentDef *appsv1alpha1.ComponentDefinition) (*workloads.InstanceSet, error) {
 	var (
 		clusterDefName     = synthesizedComp.ClusterDefName
@@ -86,7 +86,9 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 		AddLabelsInMap(labels).
 		AddLabelsInMap(compDefLabel).
 		AddLabelsInMap(constant.GetAppVersionLabel(compDefName)).
-		AddAnnotations(constant.ComponentReplicasAnnotationKey, replicasStr)
+		AddLabelsInMap(synthesizedComp.UserDefinedLabels).
+		AddAnnotations(constant.ComponentReplicasAnnotationKey, replicasStr).
+		AddAnnotationsInMap(synthesizedComp.UserDefinedAnnotations)
 	template := corev1.PodTemplateSpec{
 		ObjectMeta: podBuilder.GetObject().ObjectMeta,
 		Spec:       *synthesizedComp.PodSpec.DeepCopy(),
@@ -97,7 +99,6 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 		AddLabelsInMap(mergeLabels).
 		AddAnnotationsInMap(mergeAnnotations).
 		AddMatchLabelsInMap(labels).
-		SetServiceName(constant.GenerateServiceNamePattern(itsName)).
 		SetReplicas(synthesizedComp.Replicas).
 		SetMinReadySeconds(synthesizedComp.MinReadySeconds).
 		SetTemplate(template)
@@ -119,11 +120,11 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 		return nil, err
 	}
 
-	// update sts.spec.volumeClaimTemplates[].metadata.labels
+	// update its.spec.volumeClaimTemplates[].metadata.labels
 	// TODO(xingran): synthesizedComp.VolumeTypes has been removed, and the following code needs to be refactored.
 	if len(itsObj.Spec.VolumeClaimTemplates) > 0 && len(itsObj.GetLabels()) > 0 {
 		for index, vct := range itsObj.Spec.VolumeClaimTemplates {
-			BuildPersistentVolumeClaimLabels(synthesizedComp, &vct, vct.Name)
+			BuildPersistentVolumeClaimLabels(synthesizedComp, &vct, vct.Name, "")
 			itsObj.Spec.VolumeClaimTemplates[index] = vct
 		}
 	}
@@ -142,60 +143,32 @@ func vctToPVC(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeC
 
 // getMonitorAnnotations returns the annotations for the monitor.
 func getMonitorAnnotations(synthesizedComp *component.SynthesizedComponent, componentDef *appsv1alpha1.ComponentDefinition) map[string]string {
-	if !synthesizedComp.MonitorEnabled || componentDef == nil || !isSupportedMonitor(componentDef, synthesizedComp) {
+	if synthesizedComp.DisableExporter == nil || *synthesizedComp.DisableExporter || componentDef == nil {
 		return nil
 	}
 
-	var container *corev1.Container
-	var monitor *appsv1alpha1.PrometheusScrapeConfig
-	if hasBuiltinMonitor(componentDef) {
-		monitor, container = getBuiltinContainer(synthesizedComp, componentDef.Spec.BuiltinMonitorContainer)
-	} else if hasMetricsSidecar(synthesizedComp) {
-		monitor, container = getMetricsSidecarContainer(synthesizedComp.Sidecars, componentDef.Spec.SidecarContainerSpecs)
-	}
-
-	if monitor == nil {
+	exporter := component.GetExporter(componentDef.Spec)
+	if exporter == nil {
 		return nil
 	}
-	return rsm.AddAnnotationScope(rsm.HeadlessServiceScope, intctrlutil.GetScrapeAnnotations(*monitor, container))
-}
 
-func isSupportedMonitor(componentDef *appsv1alpha1.ComponentDefinition, synthesizedComp *component.SynthesizedComponent) bool {
-	return hasMetricsSidecar(synthesizedComp) || hasBuiltinMonitor(componentDef)
-}
-
-func hasBuiltinMonitor(componentDef *appsv1alpha1.ComponentDefinition) bool {
-	return componentDef.Spec.BuiltinMonitorContainer != nil
-}
-
-func hasMetricsSidecar(comp *component.SynthesizedComponent) bool {
-	return len(comp.Sidecars) > 0
-}
-
-func getMetricsSidecarContainer(sidecars []string, containerSpecs []appsv1alpha1.SidecarContainerSpec) (*appsv1alpha1.PrometheusScrapeConfig, *corev1.Container) {
-	for i := range containerSpecs {
-		spec := &containerSpecs[i]
-		if slices.Contains(sidecars, spec.Name) && isMetricsContainer(spec) {
-			return spec.Monitor.ScrapeConfig, &spec.Container
-		}
+	// Node: If it is an old addon, containerName may be empty.
+	container := getBuiltinContainer(synthesizedComp, exporter.ContainerName)
+	if container == nil && exporter.ScrapePort == "" && exporter.TargetPort == nil {
+		klog.Warningf("invalid exporter port and ignore for component: %s, componentDef: %s", synthesizedComp.Name, componentDef.Name)
+		return nil
 	}
-	return nil, nil
+	return instanceset.AddAnnotationScope(instanceset.HeadlessServiceScope, common.GetScrapeAnnotations(*exporter, container))
 }
 
-func getBuiltinContainer(synthesizedComp *component.SynthesizedComponent, builtinMonitorContainer *appsv1alpha1.BuiltinMonitorContainerRef) (*appsv1alpha1.PrometheusScrapeConfig, *corev1.Container) {
+func getBuiltinContainer(synthesizedComp *component.SynthesizedComponent, containerName string) *corev1.Container {
 	containers := synthesizedComp.PodSpec.Containers
 	for i := range containers {
-		if containers[i].Name == builtinMonitorContainer.Name {
-			return &builtinMonitorContainer.PrometheusScrapeConfig, &containers[i]
+		if containers[i].Name == containerName {
+			return &containers[i]
 		}
 	}
-	return nil, nil
-}
-
-func isMetricsContainer(sidecarContainer *appsv1alpha1.SidecarContainerSpec) bool {
-	return sidecarContainer.Monitor != nil &&
-		sidecarContainer.Monitor.SidecarKind == appsv1alpha1.MetricsKind &&
-		sidecarContainer.Monitor.ScrapeConfig != nil
+	return nil
 }
 
 func setDefaultResourceLimits(its *workloads.InstanceSet) {
@@ -206,9 +179,9 @@ func setDefaultResourceLimits(its *workloads.InstanceSet) {
 	}
 }
 
-// BuildPersistentVolumeClaimLabels builds a pvc name label, and synchronize the labels from sts to pvc.
+// BuildPersistentVolumeClaimLabels builds a pvc name label, and synchronize the labels from component to pvc.
 func BuildPersistentVolumeClaimLabels(component *component.SynthesizedComponent, pvc *corev1.PersistentVolumeClaim,
-	pvcTplName string) {
+	pvcTplName, templateName string) {
 	// strict args checking.
 	if pvc == nil || component == nil {
 		return
@@ -218,13 +191,14 @@ func BuildPersistentVolumeClaimLabels(component *component.SynthesizedComponent,
 	}
 	pvc.Labels[constant.VolumeClaimTemplateNameLabelKey] = pvcTplName
 
-	if component.VolumeTypes != nil {
-		for _, t := range component.VolumeTypes {
-			if t.Name == pvcTplName {
-				pvc.Labels[constant.VolumeTypeLabelKey] = string(t.Type)
-				break
-			}
+	for _, t := range component.VolumeTypes {
+		if t.Name == pvcTplName {
+			pvc.Labels[constant.VolumeTypeLabelKey] = string(t.Type)
+			break
 		}
+	}
+	if templateName != "" {
+		pvc.Labels[constant.KBAppComponentInstanceTemplateLabelKey] = templateName
 	}
 }
 
@@ -295,7 +269,7 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 	uuidHex := hex.EncodeToString(uuidBytes)
 	randomPassword := randomString(8)
 	strongRandomPasswd := strongRandomString(16)
-	restorePassword := GetRestorePassword(cluster, synthesizedComp)
+	restorePassword := GetRestorePassword(synthesizedComp)
 	// check if a connection password is specified during recovery.
 	// if exists, replace the random password
 	if restorePassword != "" {
@@ -313,8 +287,8 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 		constant.EnvPlaceHolder(constant.KBEnvClusterCompName): constant.GenerateClusterComponentName(cluster.Name, synthesizedComp.Name),
 		"$(HEADLESS_SVC_FQDN)":                                 constant.GenerateDefaultComponentHeadlessServiceName(cluster.Name, synthesizedComp.Name),
 	}
-	if len(synthesizedComp.Services) > 0 {
-		for _, p := range synthesizedComp.Services[0].Spec.Ports {
+	if len(synthesizedComp.ComponentServices) > 0 {
+		for _, p := range synthesizedComp.ComponentServices[0].Spec.Ports {
 			m[fmt.Sprintf("$(SVC_PORT_%s)", p.Name)] = strconv.Itoa(int(p.Port))
 		}
 	}
@@ -330,8 +304,8 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 }
 
 // GetRestorePassword gets restore password if exists during recovery.
-func GetRestorePassword(cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent) string {
-	valueString := cluster.Annotations[constant.RestoreFromBackupAnnotationKey]
+func GetRestorePassword(synthesizedComp *component.SynthesizedComponent) string {
+	valueString := synthesizedComp.Annotations[constant.RestoreFromBackupAnnotationKey]
 	if len(valueString) == 0 {
 		return ""
 	}
@@ -357,6 +331,7 @@ func BuildPVC(cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent,
 	vct *corev1.PersistentVolumeClaimTemplate,
 	pvcKey types.NamespacedName,
+	templateName,
 	snapshotName string) *corev1.PersistentVolumeClaim {
 	wellKnownLabels := constant.GetKBWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
 	pvcBuilder := builder.NewPVCBuilder(pvcKey.Namespace, pvcKey.Name).
@@ -376,7 +351,7 @@ func BuildPVC(cluster *appsv1alpha1.Cluster,
 		})
 	}
 	pvc := pvcBuilder.GetObject()
-	BuildPersistentVolumeClaimLabels(component, pvc, vct.Name)
+	BuildPersistentVolumeClaimLabels(component, pvc, vct.Name, templateName)
 	return pvc
 }
 
@@ -414,7 +389,7 @@ func BuildConfigMapWithTemplate(cluster *appsv1alpha1.Cluster,
 		GetObject()
 }
 
-func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams, component *component.SynthesizedComponent) (*corev1.Container, error) {
+func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams) (*corev1.Container, error) {
 	var env []corev1.EnvVar
 	env = append(env, corev1.EnvVar{
 		Name: "CONFIG_MANAGER_POD_IP",
@@ -425,44 +400,17 @@ func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams,
 			},
 		},
 	})
-	if len(sidecarRenderedParam.CharacterType) > 0 {
-		env = append(env, corev1.EnvVar{
-			Name:  "DB_TYPE",
-			Value: sidecarRenderedParam.CharacterType,
-		})
-	}
-	// TODO: Remove hard coding
-	if sidecarRenderedParam.CharacterType == "mysql" {
-		env = append(env, corev1.EnvVar{
-			Name: "MYSQL_USER",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					Key:                  "username",
-					LocalObjectReference: corev1.LocalObjectReference{Name: sidecarRenderedParam.SecreteName},
-				},
-			},
-		},
-			corev1.EnvVar{
-				Name: "MYSQL_PASSWORD",
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						Key:                  "password",
-						LocalObjectReference: corev1.LocalObjectReference{Name: sidecarRenderedParam.SecreteName},
-					},
-				},
-			},
-			corev1.EnvVar{
-				Name:  "DATA_SOURCE_NAME",
-				Value: "$(MYSQL_USER):$(MYSQL_PASSWORD)@(localhost:3306)/",
-			},
-		)
-	}
 	containerBuilder := builder.NewContainerBuilder(sidecarRenderedParam.ManagerName).
 		AddCommands("env").
 		AddArgs("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$(TOOLS_PATH)").
-		AddArgs("/bin/reloader").
+		AddArgs(getSidecarBinaryPath(sidecarRenderedParam)).
 		AddArgs(sidecarRenderedParam.Args...).
 		AddEnv(env...).
+		AddPorts(corev1.ContainerPort{
+			Name:          constant.ConfigManagerPortName,
+			ContainerPort: sidecarRenderedParam.ContainerPort,
+			Protocol:      "TCP",
+		}).
 		SetImage(sidecarRenderedParam.Image).
 		SetImagePullPolicy(corev1.PullIfNotPresent).
 		AddVolumeMounts(sidecarRenderedParam.Volumes...)
@@ -475,7 +423,14 @@ func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams,
 	return containerBuilder.GetObject(), nil
 }
 
-func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams, component *component.SynthesizedComponent, toolsMetas []appsv1beta1.ToolConfig, toolsMap map[string]cfgcm.ConfigSpecMeta) ([]corev1.Container, error) {
+func getSidecarBinaryPath(buildParams *cfgcm.CfgManagerBuildParams) string {
+	if buildParams.ConfigManagerReloadPath != "" {
+		return buildParams.ConfigManagerReloadPath
+	}
+	return constant.ConfigManagerToolPath
+}
+
+func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams, toolsMetas []appsv1beta1.ToolConfig, toolsMap map[string]cfgcm.ConfigSpecMeta) ([]corev1.Container, error) {
 	toolContainers := make([]corev1.Container, 0, len(toolsMetas))
 	for _, toolConfig := range toolsMetas {
 		toolContainerBuilder := builder.NewContainerBuilder(toolConfig.Name).

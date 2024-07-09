@@ -218,7 +218,7 @@ This mapping relation refers to mapping an external component to an individual K
      clusterVersionRef: pulsar-2.11.2
      componentSpecs:
      - componentDefRef: zookeeper
-       monitor: false
+       disableExporter: true
        name: zookeeper
        noCreatePDB: false
        replicas: 3

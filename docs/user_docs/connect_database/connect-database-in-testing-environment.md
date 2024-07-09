@@ -8,7 +8,7 @@ sidebar_label: Testing environment
 
 # Connect database in testing environment
 
-## Procedure 1. Use kbcli cluster connect command
+## Option 1. Use kbcli cluster connect command
 
 You can use the `kbcli cluster connect` command and specify the cluster name to be connected.
 
@@ -18,7 +18,7 @@ kbcli cluster connect ${cluster-name}
 
 The lower-level command is actually `kubectl exec`. The command is functional as long as the K8s API server is accessible.
 
-## Procedure 2. Connect database with CLI or SDK client
+## Option 2. Connect database with CLI or SDK client
 
 Execute the following command to get the network information of the targeted database and connect it with the printed IP address.
 

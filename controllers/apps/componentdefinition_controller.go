@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsconfig "github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -46,9 +47,9 @@ type ComponentDefinitionReconciler struct {
 	Recorder record.EventRecorder
 }
 
-//+kubebuilder:rbac:groups=apps.kubeblocks.io,resources=componentdefinitions,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=apps.kubeblocks.io,resources=componentdefinitions/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=apps.kubeblocks.io,resources=componentdefinitions/finalizers,verbs=update
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=componentdefinitions,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=componentdefinitions/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=componentdefinitions/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -153,7 +154,6 @@ func (r *ComponentDefinitionReconciler) validate(cli client.Client, rctx intctrl
 		r.validateHostNetwork,
 		r.validateServices,
 		r.validateConfigs,
-		r.validateScripts,
 		r.validatePolicyRules,
 		r.validateLabels,
 		r.validateReplicasLimit,
@@ -268,16 +268,8 @@ func (r *ComponentDefinitionReconciler) validateServices(cli client.Client, rctx
 }
 
 func (r *ComponentDefinitionReconciler) validateConfigs(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition) error {
-	// if err := appsconfig.ReconcileConfigSpecsForReferencedCR(r.Client, rctx, dbClusterDef); err != nil {
-	//	return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, err.Error())
-	// }
-	return nil
-}
-
-func (r *ComponentDefinitionReconciler) validateScripts(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition) error {
-	return nil
+	compDef *appsv1alpha1.ComponentDefinition) error {
+	return appsconfig.ReconcileConfigSpecsForReferencedCR(cli, rctx, compDef)
 }
 
 func (r *ComponentDefinitionReconciler) validatePolicyRules(cli client.Client, rctx intctrlutil.RequestCtx,
@@ -306,10 +298,6 @@ func (r *ComponentDefinitionReconciler) validateSystemAccounts(cli client.Client
 	if !checkUniqueItemWithValue(cmpd.Spec.SystemAccounts, "Name", nil) {
 		return fmt.Errorf("duplicate system accounts are not allowed")
 	}
-	if !checkUniqueItemWithValue(cmpd.Spec.SystemAccounts, "InitAccount", true) {
-		return fmt.Errorf("multiple system init accounts are not allowed")
-	}
-
 	for _, account := range cmpd.Spec.SystemAccounts {
 		if !account.InitAccount && len(account.Statement) == 0 && account.SecretRef == nil {
 			return fmt.Errorf("the Statement or SecretRef must be provided to create system account: %s", account.Name)
@@ -469,5 +457,6 @@ func getBuiltinActionHandlers() []appsv1alpha1.BuiltinActionHandlerType {
 		appsv1alpha1.OfficialPostgresqlBuiltinActionHandler,
 		appsv1alpha1.ApeCloudPostgresqlBuiltinActionHandler,
 		appsv1alpha1.PolarDBXBuiltinActionHandler,
+		appsv1alpha1.CustomActionHandler,
 	}
 }

@@ -140,7 +140,7 @@ var _ = Describe("", func() {
 				Image:           testapps.ApeCloudMySQLImage,
 				ImagePullPolicy: corev1.PullIfNotPresent,
 			}
-			sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace,
+			its := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
 				clusterObj.Name+"-"+consensusComp, clusterObj.Name, consensusComp).
 				AddFinalizers([]string{constant.DBClusterFinalizerName}).
 				AddContainer(container).
@@ -155,10 +155,10 @@ var _ = Describe("", func() {
 				leaderPod   *corev1.Pod
 				followerPod *corev1.Pod
 			)
-			for i := int32(0); i < *sts.Spec.Replicas; i++ {
-				pod := testapps.NewPodFactory(testCtx.DefaultNamespace, fmt.Sprintf("%s-%d", sts.Name, i)).
+			for i := int32(0); i < *its.Spec.Replicas; i++ {
+				pod := testapps.NewPodFactory(testCtx.DefaultNamespace, fmt.Sprintf("%s-%d", its.Name, i)).
 					AddContainer(container).
-					AddLabelsInMap(sts.Labels).
+					AddLabelsInMap(its.Labels).
 					AddRoleLabel(defaultRole(i)).
 					Create(&testCtx).GetObject()
 				if pod.Labels[constant.RoleLabelKey] == constant.Leader {

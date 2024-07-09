@@ -78,7 +78,7 @@ func trimNestedField(updatedParams any, trimField string) (any, error) {
 }
 
 // ValidateConfigPatch Verifies if the changed parameters have been removed
-func ValidateConfigPatch(patch *ConfigPatchInfo, formatCfg *appsv1beta1.FormatterConfig) error {
+func ValidateConfigPatch(patch *ConfigPatchInfo, formatCfg *appsv1beta1.FileFormatConfig) error {
 	if !patch.IsModify || len(patch.UpdateConfig) == 0 {
 		return nil
 	}
@@ -100,7 +100,7 @@ func IsUpdateDynamicParameters(cc *appsv1beta1.ConfigConstraintSpec, cfg *Config
 		return false, nil
 	}
 
-	updatedParams, err := getUpdateParameterList(cfg, NestedPrefixField(cc.FormatterConfig))
+	updatedParams, err := getUpdateParameterList(cfg, NestedPrefixField(cc.FileFormatConfig))
 	if err != nil {
 		return false, err
 	}

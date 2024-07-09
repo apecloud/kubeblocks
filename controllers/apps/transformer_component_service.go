@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -30,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -37,11 +39,15 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 )
 
 var (
 	ordinalRegexpPattern = `-\d+$`
 	ordinalRegexp        = regexp.MustCompile(ordinalRegexpPattern)
+
+	multiClusterServicePlacementInMirror = "mirror"
+	multiClusterServicePlacementInUnique = "unique"
 )
 
 // componentServiceTransformer handles component services.
@@ -60,6 +66,11 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 
 	synthesizeComp := transCtx.SynthesizeComponent
+	runningServices, err := t.listOwnedServices(transCtx.Context, transCtx.Client, transCtx.Component, synthesizeComp)
+	if err != nil {
+		return err
+	}
+
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for _, service := range synthesizeComp.ComponentServices {
 		// component controller does not handle the default headless service; the default headless service is managed by the InstanceSet.
@@ -71,13 +82,33 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 			return err
 		}
 		for _, svc := range services {
-			if err = createOrUpdateService(ctx, dag, graphCli, svc, transCtx.ComponentOrig); err != nil {
+			if err = t.createOrUpdateService(ctx, dag, graphCli, &service, svc, transCtx.ComponentOrig); err != nil {
 				return err
 			}
+			delete(runningServices, svc.Name)
 		}
 	}
-	// TODO: delete orphaned services
+
+	for svc := range runningServices {
+		graphCli.Delete(dag, runningServices[svc], inDataContext4G())
+	}
+
 	return nil
+}
+
+func (t *componentServiceTransformer) listOwnedServices(ctx context.Context, cli client.Reader,
+	comp *appsv1alpha1.Component, synthesizedComp *component.SynthesizedComponent) (map[string]*corev1.Service, error) {
+	services, err := component.ListOwnedServices(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
+	if err != nil {
+		return nil, err
+	}
+	owned := make(map[string]*corev1.Service)
+	for i, svc := range services {
+		if model.IsOwnerOf(comp, svc) {
+			owned[svc.Name] = services[i]
+		}
+	}
+	return owned, nil
 }
 
 func (t *componentServiceTransformer) buildCompService(comp *appsv1alpha1.Component,
@@ -86,10 +117,14 @@ func (t *componentServiceTransformer) buildCompService(comp *appsv1alpha1.Compon
 		return nil, nil
 	}
 
-	if service.PodService == nil || !*service.PodService {
-		return t.buildServices(comp, synthesizeComp, []*appsv1alpha1.ComponentService{service})
+	if t.isPodService(service) {
+		return t.buildPodService(comp, synthesizeComp, service)
 	}
-	return t.buildPodService(comp, synthesizeComp, service)
+	return t.buildServices(comp, synthesizeComp, []*appsv1alpha1.ComponentService{service})
+}
+
+func (t *componentServiceTransformer) isPodService(service *appsv1alpha1.ComponentService) bool {
+	return service.PodService != nil && *service.PodService
 }
 
 func (t *componentServiceTransformer) buildPodService(comp *appsv1alpha1.Component,
@@ -118,7 +153,10 @@ func (t *componentServiceTransformer) buildPodService(comp *appsv1alpha1.Compone
 }
 
 func (t *componentServiceTransformer) podsNameNOrdinal(synthesizeComp *component.SynthesizedComponent) (map[string]int, error) {
-	podNames := generatePodNames(synthesizeComp)
+	podNames, err := generatePodNames(synthesizeComp)
+	if err != nil {
+		return nil, err
+	}
 	pods := make(map[string]int)
 	for _, name := range podNames {
 		ordinal, err := func() (int, error) {
@@ -208,31 +246,48 @@ func (t *componentServiceTransformer) skipDefaultHeadlessSvc(synthesizeComp *com
 	return svcName == defaultHeadlessSvcName
 }
 
-func generatePodNames(synthesizeComp *component.SynthesizedComponent) []string {
-	templateReplicas := func(template appsv1alpha1.InstanceTemplate) int32 {
-		replicas := int32(1)
-		if template.Replicas != nil {
-			replicas = *template.Replicas
-		}
-		return replicas
+func (t *componentServiceTransformer) createOrUpdateService(ctx graph.TransformContext, dag *graph.DAG,
+	graphCli model.GraphClient, compService *appsv1alpha1.ComponentService, service *corev1.Service, owner client.Object) error {
+	var (
+		kind       string
+		podService = t.isPodService(compService)
+	)
+
+	if service.Annotations != nil {
+		kind = service.Annotations[constant.MultiClusterServicePlacementKey]
+		delete(service.Annotations, constant.MultiClusterServicePlacementKey)
+	}
+	if podService && len(kind) > 0 && kind != multiClusterServicePlacementInMirror && kind != multiClusterServicePlacementInUnique {
+		return fmt.Errorf("invalid multi-cluster pod-service placement kind %s for service %s", kind, service.Name)
 	}
 
-	templateReplicasCnt := int32(0)
-	for _, template := range synthesizeComp.Instances {
-		if len(template.Name) > 0 {
-			templateReplicasCnt += templateReplicas(template)
-		}
+	if podService && kind == multiClusterServicePlacementInUnique {
+		return t.createOrUpdateServiceInUnique(ctx, dag, graphCli, service, owner)
 	}
+	return createOrUpdateService(ctx, dag, graphCli, service, owner)
+}
 
-	podNames := make([]string, 0)
-	workloadName := constant.GenerateWorkloadNamePattern(synthesizeComp.ClusterName, synthesizeComp.Name)
-	for _, template := range synthesizeComp.Instances {
-		templateNames := instanceset.GenerateInstanceNamesFromTemplate(workloadName, template.Name, templateReplicas(template), synthesizeComp.OfflineInstances)
-		podNames = append(podNames, templateNames...)
+func (t *componentServiceTransformer) createOrUpdateServiceInUnique(ctx graph.TransformContext, dag *graph.DAG,
+	graphCli model.GraphClient, service *corev1.Service, owner client.Object) error {
+	// hack the pod placement strategy.
+	ordinal := func() int {
+		subs := strings.Split(service.GetName(), "-")
+		o, _ := strconv.Atoi(subs[len(subs)-1])
+		return o
 	}
-	if templateReplicasCnt < synthesizeComp.Replicas {
-		names := instanceset.GenerateInstanceNamesFromTemplate(workloadName, "", synthesizeComp.Replicas-templateReplicasCnt, synthesizeComp.OfflineInstances)
-		podNames = append(podNames, names...)
+	multicluster.Assign(ctx.GetContext(), service, ordinal)
+	return createOrUpdateService(ctx, dag, graphCli, service, owner)
+}
+
+func generatePodNames(synthesizeComp *component.SynthesizedComponent) ([]string, error) {
+	return component.GenerateAllPodNames(synthesizeComp.Replicas, synthesizeComp.Instances,
+		synthesizeComp.OfflineInstances, synthesizeComp.ClusterName, synthesizeComp.Name)
+}
+
+func generatePodNamesByITS(its *workloads.InstanceSet) ([]string, error) {
+	var templates []instanceset.InstanceTemplate
+	for i := range its.Spec.Instances {
+		templates = append(templates, &its.Spec.Instances[i])
 	}
-	return podNames
+	return instanceset.GenerateAllInstanceNames(its.Name, *its.Spec.Replicas, templates, its.Spec.OfflineInstances, workloads.Ordinals{})
 }

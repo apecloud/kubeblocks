@@ -73,3 +73,6 @@ test/e2e/*.txt
 
 # ignore mirrord
 .mirrord
+
+# ignore client-sdk-gen temp directory
+hack/github.com/

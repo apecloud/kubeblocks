@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package util
 
 import (
+	"errors"
 	"strings"
 )
 
@@ -75,6 +76,9 @@ const (
 
 	DataDumpOperation OperationKind = "dataDump"
 	DataLoadOperation OperationKind = "dataLoad"
+
+	LegacyEventFieldPath = "spec.containers{kb-checkrole}"
+	LorryEventFieldPath  = "spec.containers{lorry}"
 
 	// this is a general script template, which can be used for all kinds of exec request to databases.
 	DataScriptRequestTpl string = `
@@ -137,3 +141,5 @@ func NewProbeError(msg string) error {
 		message: msg,
 	}
 }
+
+var ErrNotImplemented = errors.New("not implemented")

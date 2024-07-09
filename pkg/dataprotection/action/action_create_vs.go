@@ -45,6 +45,8 @@ type CreateVolumeSnapshotAction struct {
 	// Name is the Name of the action.
 	Name string
 
+	TargetName string
+
 	// the target pod index.
 	Index int
 
@@ -100,11 +102,15 @@ func (c *CreateVolumeSnapshotAction) Execute(actCtx ActionContext) (*dpv1alpha1.
 		snap            *vsv1.VolumeSnapshot
 		totalSize       = &resource.Quantity{}
 		volumeSnapshots []dpv1alpha1.VolumeSnapshotStatus
+		prefix          = c.ObjectMeta.Name
 	)
+	if c.TargetName != "" {
+		prefix += "-" + c.TargetName
+	}
 	for _, w := range c.PersistentVolumeClaimWrappers {
 		key := client.ObjectKey{
 			Namespace: w.PersistentVolumeClaim.Namespace,
-			Name:      utils.GetBackupVolumeSnapshotName(c.ObjectMeta.Name, w.VolumeName, c.Index),
+			Name:      utils.GetBackupVolumeSnapshotName(prefix, w.VolumeName, c.Index),
 		}
 		// create volume snapshot
 		if err = c.createVolumeSnapshotIfNotExist(actCtx, &w.PersistentVolumeClaim, key); err != nil {

@@ -35,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
@@ -61,7 +62,9 @@ func (r *mockReader) List(ctx context.Context, list client.ObjectList, opts ...c
 	if len(r.objs) > 0 {
 		objs := reflect.MakeSlice(items.Type(), 0, 0)
 		for i := range r.objs {
-			objs = reflect.Append(objs, reflect.ValueOf(r.objs[i]).Elem())
+			if reflect.TypeOf(r.objs[i]).Elem().AssignableTo(items.Type().Elem()) {
+				objs = reflect.Append(objs, reflect.ValueOf(r.objs[i]).Elem())
+			}
 		}
 		items.Set(objs)
 	}
@@ -70,15 +73,16 @@ func (r *mockReader) List(ctx context.Context, list client.ObjectList, opts ...c
 
 var _ = Describe("cluster component transformer test", func() {
 	const (
-		clusterDefName          = "test-clusterdef"
-		clusterTopologyDefault  = "test-topology-default"
-		clusterTopologyNoOrders = "test-topology-no-orders"
-		compDefName             = "test-compdef"
-		clusterName             = "test-cluster"
-		comp1aName              = "comp-1a"
-		comp1bName              = "comp-1b"
-		comp2aName              = "comp-2a"
-		comp2bName              = "comp-2b"
+		clusterDefName                     = "test-clusterdef"
+		clusterTopologyDefault             = "test-topology-default"
+		clusterTopologyNoOrders            = "test-topology-no-orders"
+		clusterTopologyProvisionNUpdateOOD = "test-topology-ood"
+		compDefName                        = "test-compdef"
+		clusterName                        = "test-cluster"
+		comp1aName                         = "comp-1a"
+		comp1bName                         = "comp-1b"
+		comp2aName                         = "comp-2a"
+		comp2bName                         = "comp-2b"
 	)
 
 	var (
@@ -140,6 +144,37 @@ var _ = Describe("cluster component transformer test", func() {
 					{
 						Name:    comp2bName,
 						CompDef: compDefName,
+					},
+				},
+			}).
+			AddClusterTopology(appsv1alpha1.ClusterTopology{
+				Name: clusterTopologyProvisionNUpdateOOD,
+				Components: []appsv1alpha1.ClusterTopologyComponent{
+					{
+						Name:    comp1aName,
+						CompDef: compDefName,
+					},
+					{
+						Name:    comp1bName,
+						CompDef: compDefName,
+					},
+					{
+						Name:    comp2aName,
+						CompDef: compDefName,
+					},
+					{
+						Name:    comp2bName,
+						CompDef: compDefName,
+					},
+				},
+				Orders: &appsv1alpha1.ClusterTopologyOrders{
+					Provision: []string{
+						fmt.Sprintf("%s,%s", comp1aName, comp1bName),
+						fmt.Sprintf("%s,%s", comp2aName, comp2bName),
+					},
+					Update: []string{
+						fmt.Sprintf("%s,%s", comp2aName, comp2bName),
+						fmt.Sprintf("%s,%s", comp1aName, comp1bName),
 					},
 				},
 			}).
@@ -455,6 +490,52 @@ var _ = Describe("cluster component transformer test", func() {
 			comp := objs[0].(*appsv1alpha1.Component)
 			Expect(component.ShortName(transCtx.Cluster.Name, comp.Name)).Should(Equal(comp2aName))
 			Expect(graphCli.IsAction(dag, comp, model.ActionUpdatePtr())).Should(BeTrue())
+		})
+
+		It("w/ orders provision & update - OOD", func() {
+			transformer, transCtx, dag := newTransformerNCtx(clusterTopologyProvisionNUpdateOOD)
+
+			// mock first two components status as running
+			reader := &mockReader{
+				objs: []client.Object{
+					mockCompObj(transCtx, comp1aName, func(comp *appsv1alpha1.Component) {
+						comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+					}),
+					mockCompObj(transCtx, comp1bName, func(comp *appsv1alpha1.Component) {
+						comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+					}),
+				},
+			}
+			transCtx.Client = model.NewGraphClient(reader)
+
+			// comp2aName and comp2bName are not ready (exist) when updating comp1aName and comp1bName
+			err := transformer.Transform(transCtx, dag)
+			Expect(err).ShouldNot(BeNil())
+			Expect(ictrlutil.IsDelayedRequeueError(err)).Should(BeTrue())
+
+			// check the last two components under provisioning
+			graphCli := transCtx.Client.(model.GraphClient)
+			objs := graphCli.FindAll(dag, &appsv1alpha1.Component{})
+			Expect(len(objs)).Should(Equal(2))
+			for _, obj := range objs {
+				comp := obj.(*appsv1alpha1.Component)
+				Expect(component.ShortName(transCtx.Cluster.Name, comp.Name)).Should(Or(Equal(comp2aName), Equal(comp2bName)))
+				Expect(graphCli.IsAction(dag, comp, model.ActionCreatePtr())).Should(BeTrue())
+			}
+
+			// mock last two components status as running
+			reader.objs = append(reader.objs, []client.Object{
+				mockCompObj(transCtx, comp2aName, func(comp *appsv1alpha1.Component) {
+					comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+				}),
+				mockCompObj(transCtx, comp2bName, func(comp *appsv1alpha1.Component) {
+					comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+				}),
+			}...)
+
+			// try again
+			err = transformer.Transform(transCtx, dag)
+			Expect(err).Should(BeNil())
 		})
 	})
 })

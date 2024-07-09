@@ -203,10 +203,10 @@ func (builder *ComponentDefinitionBuilder) SetReplicasLimit(minReplicas, maxRepl
 	return builder
 }
 
-func (builder *ComponentDefinitionBuilder) AddSystemAccount(accountName string, isSystemInitAccount bool, statement string) *ComponentDefinitionBuilder {
+func (builder *ComponentDefinitionBuilder) AddSystemAccount(accountName string, initAccount bool, statement string) *ComponentDefinitionBuilder {
 	account := appsv1alpha1.SystemAccount{
 		Name:        accountName,
-		InitAccount: isSystemInitAccount,
+		InitAccount: initAccount,
 		Statement:   statement,
 	}
 	if builder.get().Spec.SystemAccounts == nil {
@@ -231,11 +231,6 @@ func (builder *ComponentDefinitionBuilder) AddRole(name string, serviceable, wri
 		builder.get().Spec.Roles = make([]appsv1alpha1.ReplicaRole, 0)
 	}
 	builder.get().Spec.Roles = append(builder.get().Spec.Roles, role)
-	return builder
-}
-
-func (builder *ComponentDefinitionBuilder) SetRoleArbitrator(arbitrator *appsv1alpha1.RoleArbitrator) *ComponentDefinitionBuilder {
-	builder.get().Spec.RoleArbitrator = arbitrator
 	return builder
 }
 

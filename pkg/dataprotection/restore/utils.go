@@ -22,6 +22,7 @@ package restore
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -34,7 +35,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -50,6 +50,13 @@ func SetRestoreCondition(restore *dpv1alpha1.Restore, status metav1.ConditionSta
 		Status:  status,
 	}
 	meta.SetStatusCondition(&restore.Status.Conditions, condition)
+}
+func SetRestoreCheckBackupRepoCondition(restore *dpv1alpha1.Restore, reason, message string) {
+	status := metav1.ConditionFalse
+	if reason == ReasonCheckBackupRepoSuccessfully {
+		status = metav1.ConditionTrue
+	}
+	SetRestoreCondition(restore, status, ConditionTypeRestoreCheckBackupRepo, reason, message)
 }
 
 // SetRestoreValidationCondition sets restore condition which type is ConditionTypeRestoreValidationPassed.
@@ -110,7 +117,9 @@ func SetRestoreStatusAction(actions *[]dpv1alpha1.RestoreStatusAction,
 	if existingAction.Status != statusAction.Status {
 		existingAction.Status = statusAction.Status
 		existingAction.EndTime = statusAction.EndTime
-		existingAction.Message = statusAction.Message
+		if !strings.HasPrefix(existingAction.Message, dptypes.LogCollectorOutput) {
+			existingAction.Message = statusAction.Message
+		}
 	}
 }
 
@@ -295,7 +304,7 @@ func FormatRestoreTimeAndValidate(restoreTimeStr string, continuousBackup *dpv1a
 			return restoreTimeStr, err
 		}
 	}
-	restoreTimeStr = restoreTime.Format(time.RFC3339)
+	restoreTimeStr = restoreTime.UTC().Format(time.RFC3339)
 	// TODO: check with Recoverable time
 	if !isTimeInRange(restoreTime, continuousBackup.Status.TimeRange.Start.Time, continuousBackup.Status.TimeRange.End.Time) {
 		return restoreTimeStr, fmt.Errorf("restore-to-time is out of time range, you can view the recoverable time: \n"+
@@ -308,7 +317,7 @@ func isTimeInRange(t time.Time, start time.Time, end time.Time) bool {
 	return !t.Before(start) && !t.After(end)
 }
 
-func GetRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, cluster *appsv1alpha1.Cluster, volumeRestorePolicy, restoreTime string, effectiveCommonComponentDef bool) (string, error) {
+func GetRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, volumeRestorePolicy, restoreTime string, doReadyRestoreAfterClusterRunning bool) (string, error) {
 	componentName := backup.Labels[constant.KBAppShardingNameLabelKey]
 	if len(componentName) == 0 {
 		componentName = backup.Labels[constant.KBAppComponentLabelKey]
@@ -320,6 +329,7 @@ func GetRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, cluster *appsv1al
 	restoreInfoMap[constant.BackupNameKeyForRestore] = backup.Name
 	restoreInfoMap[constant.BackupNamespaceKeyForRestore] = backup.Namespace
 	restoreInfoMap[constant.VolumeRestorePolicyKeyForRestore] = volumeRestorePolicy
+	restoreInfoMap[constant.DoReadyRestoreAfterClusterRunning] = strconv.FormatBool(doReadyRestoreAfterClusterRunning)
 	if restoreTime != "" {
 		restoreInfoMap[constant.RestoreTimeKeyForRestore] = restoreTime
 	}
@@ -329,33 +339,6 @@ func GetRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, cluster *appsv1al
 	}
 	restoreForClusterMap := map[string]map[string]string{}
 	restoreForClusterMap[componentName] = restoreInfoMap
-	if effectiveCommonComponentDef {
-		// build restore annotation for all components which refer to the common componentDef.
-		compSpecs := cluster.Spec.ComponentSpecs
-		for i := range cluster.Spec.ShardingSpecs {
-			compSpecs = append(compSpecs, cluster.Spec.ShardingSpecs[i].Template)
-		}
-		getCompDefOfCompSpec := func(compSpec appsv1alpha1.ClusterComponentSpec) string {
-			if compSpec.ComponentDef != "" {
-				return compSpec.ComponentDef
-			}
-			return compSpec.ComponentDefRef
-		}
-		getCompDef := func() string {
-			for i := range compSpecs {
-				if compSpecs[i].Name == componentName {
-					return getCompDefOfCompSpec(compSpecs[i])
-				}
-			}
-			return ""
-		}
-		backupCompDef := getCompDef()
-		for i := range compSpecs {
-			if getCompDefOfCompSpec(compSpecs[i]) == backupCompDef {
-				restoreForClusterMap[compSpecs[i].Name] = restoreInfoMap
-			}
-		}
-	}
 	bytes, err := json.Marshal(restoreForClusterMap)
 	if err != nil {
 		return "", err
@@ -387,19 +370,23 @@ func GetSourcePodNameFromTarget(target *dpv1alpha1.BackupStatusTarget,
 }
 
 // GetVolumeSnapshotsBySourcePod gets the volume snapshots of the backup and group by source target pod.
-func GetVolumeSnapshotsBySourcePod(backup *dpv1alpha1.Backup, sourcePodName string) map[string]string {
+func GetVolumeSnapshotsBySourcePod(backup *dpv1alpha1.Backup, target *dpv1alpha1.BackupStatusTarget, sourcePodName string) map[string]string {
 	actions := backup.Status.Actions
 	for i := range actions {
 		if len(actions[i].VolumeSnapshots) == 0 {
 			continue
 		}
-		if sourcePodName == "" || sourcePodName == actions[i].TargetPodName {
-			snapshotGroup := map[string]string{}
-			for _, v := range actions[i].VolumeSnapshots {
-				snapshotGroup[v.VolumeName] = v.Name
-			}
-			return snapshotGroup
+		if len(target.SelectedTargetPods) > 0 && !slices.Contains(target.SelectedTargetPods, actions[i].TargetPodName) {
+			continue
 		}
+		if sourcePodName != "" && sourcePodName != actions[i].TargetPodName {
+			continue
+		}
+		snapshotGroup := map[string]string{}
+		for _, v := range actions[i].VolumeSnapshots {
+			snapshotGroup[v.VolumeName] = v.Name
+		}
+		return snapshotGroup
 	}
 	return nil
 }

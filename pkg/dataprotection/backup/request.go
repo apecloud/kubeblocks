@@ -234,6 +234,7 @@ func (r *Request) buildCreateVolumeSnapshotAction(targetPod *corev1.Pod, name st
 		Name:          name,
 		Index:         index,
 		TargetPodName: targetPod.Name,
+		TargetName:    r.Target.Name,
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: r.Backup.Namespace,
 			Name:      r.Backup.Name,
@@ -312,7 +313,8 @@ func (r *Request) BuildJobActionPodSpec(targetPod *corev1.Pod,
 	// and envs from actionSet. Latter will override former for the same name.
 	// env from backupMethod has the highest priority.
 	buildEnv := func() []corev1.EnvVar {
-		envVars := []corev1.EnvVar{
+		envVars := targetPod.Spec.Containers[0].Env
+		envVars = append(envVars, []corev1.EnvVar{
 			{
 				Name:  dptypes.DPBackupName,
 				Value: r.Backup.Name,
@@ -342,7 +344,7 @@ func (r *Request) BuildJobActionPodSpec(targetPod *corev1.Pod,
 				Name:  dptypes.DPTTL,
 				Value: r.Spec.RetentionPeriod.String(),
 			},
-		}
+		}...)
 		envVars = append(envVars, utils.BuildEnvByCredential(targetPod, r.Target.ConnectionCredential)...)
 		if r.ActionSet != nil {
 			envVars = append(envVars, r.ActionSet.Spec.Env...)
@@ -402,6 +404,7 @@ func (r *Request) BuildJobActionPodSpec(targetPod *corev1.Pod,
 		Image:           common.Expand(job.Image, common.MappingFuncFor(utils.CovertEnvToMap(env))),
 		Command:         job.Command,
 		Env:             env,
+		EnvFrom:         targetPod.Spec.Containers[0].EnvFrom,
 		VolumeMounts:    buildVolumeMounts(),
 		ImagePullPolicy: corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy)),
 		SecurityContext: &corev1.SecurityContext{
@@ -415,7 +418,7 @@ func (r *Request) BuildJobActionPodSpec(targetPod *corev1.Pod,
 	}
 
 	if r.ActionSet != nil {
-		container.EnvFrom = r.ActionSet.Spec.EnvFrom
+		container.EnvFrom = append(container.EnvFrom, r.ActionSet.Spec.EnvFrom...)
 	}
 
 	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)

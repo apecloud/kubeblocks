@@ -31,7 +31,7 @@ type ConfigConstraintSpec struct {
 	// Dynamic reloading is triggered only if both of the following conditions are met:
 	//
 	// 1. The modified parameters are listed in the `dynamicParameters` field.
-	//    If `dynamicParameterSelectedPolicy` is set to "all", modifications to `staticParameters`
+	//    If `reloadStaticParamsBeforeRestart` is set to true, modifications to `staticParameters`
 	//    can also trigger a reload.
 	// 2. `reloadOptions` is set.
 	//
@@ -63,15 +63,15 @@ type ConfigConstraintSpec struct {
 	// Configures whether the dynamic reload specified in `reloadOptions` applies only to dynamic parameters or
 	// to all parameters (including static parameters).
 	//
-	// - "dynamic" (default): Only modifications to the dynamic parameters listed in `dynamicParameters`
+	// - false (default): Only modifications to the dynamic parameters listed in `dynamicParameters`
 	//   will trigger a dynamic reload.
-	// - "all": Modifications to both dynamic parameters listed in `dynamicParameters` and static parameters
+	// - true: Modifications to both dynamic parameters listed in `dynamicParameters` and static parameters
 	//   listed in `staticParameters` will trigger a dynamic reload.
-	//   The "all" option is for certain engines that require static parameters to be set
+	//   The "true" option is for certain engines that require static parameters to be set
 	//   via SQL statements before they can take effect on restart.
 	//
 	// +optional
-	DynamicParameterSelectedPolicy *appsv1beta1.DynamicParameterSelectedPolicy `json:"dynamicParameterSelectedPolicy,omitempty"`
+	ReloadStaticParamsBeforeRestart *bool `json:"reloadStaticParamsBeforeRestart,omitempty"`
 
 	// Specifies the tools container image used by ShellTrigger for dynamic reload.
 	// If the dynamic reload action is triggered by a ShellTrigger, this field is required.
@@ -82,7 +82,7 @@ type ConfigConstraintSpec struct {
 	// This ensures that the tools are available to the 'config-manager' sidecar.
 	//
 	// +optional
-	ToolsImageSpec *appsv1beta1.ReloadToolsImage `json:"toolsImageSpec,omitempty"`
+	ToolsImageSpec *appsv1beta1.ToolsSetup `json:"toolsImageSpec,omitempty"`
 
 	// Specifies a list of actions to execute specified commands based on Pod labels.
 	//
@@ -97,7 +97,7 @@ type ConfigConstraintSpec struct {
 	//   to reflect the new role.
 	//
 	// +optional
-	DownwardAPIOptions []appsv1beta1.DownwardAction `json:"downwardAPIOptions,omitempty"`
+	DownwardAPIOptions []appsv1beta1.DownwardAPIChangeTriggeredAction `json:"downwardAPIOptions,omitempty"`
 
 	// A list of ScriptConfig Object.
 	//
@@ -170,7 +170,7 @@ type ConfigConstraintSpec struct {
 	//    sectionName: mysqld
 	// ```
 	// +kubebuilder:validation:Required
-	FormatterConfig *appsv1beta1.FormatterConfig `json:"formatterConfig"`
+	FormatterConfig *appsv1beta1.FileFormatConfig `json:"formatterConfig"`
 }
 
 // ConfigConstraintStatus represents the observed state of a ConfigConstraint.
@@ -243,15 +243,6 @@ type ReloadOptions struct {
 	AutoTrigger *appsv1beta1.AutoTrigger `json:"autoTrigger,omitempty"`
 }
 
-// ConfigConstraint manages the parameters across multiple configuration files contained in a single configure template.
-// These configuration files should have the same format (e.g. ini, xml, properties, json).
-//
-// It provides the following functionalities:
-//
-// 1. **Parameter Value Validation**: Validates and ensures compliance of parameter values with defined constraints.
-// 2. **Dynamic Reload on Modification**: Monitors parameter changes and triggers dynamic reloads to apply updates.
-// 3. **Parameter Rendering in Templates**: Injects parameters into templates to generate up-to-date configuration files.
-//
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:openapi-gen=true
@@ -260,6 +251,15 @@ type ReloadOptions struct {
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cc
 // +kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="status phase"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
+
+// ConfigConstraint manages the parameters across multiple configuration files contained in a single configure template.
+// These configuration files should have the same format (e.g. ini, xml, properties, json).
+//
+// It provides the following functionalities:
+//
+// 1. **Parameter Value Validation**: Validates and ensures compliance of parameter values with defined constraints.
+// 2. **Dynamic Reload on Modification**: Monitors parameter changes and triggers dynamic reloads to apply updates.
+// 3. **Parameter Rendering in Templates**: Injects parameters into templates to generate up-to-date configuration files.
 type ConfigConstraint struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

@@ -20,12 +20,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
+	"encoding/json"
+	"time"
+
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // statusReconciler computes the current status
@@ -48,28 +55,35 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
 	// 1. get all pods
 	pods := tree.List(&corev1.Pod{})
-	var podList []corev1.Pod
+	var podList []*corev1.Pod
 	for _, object := range pods {
 		pod, _ := object.(*corev1.Pod)
-		podList = append(podList, *pod)
+		podList = append(podList, pod)
 	}
 	// 2. calculate status summary
-	updateRevisions, err := getUpdateRevisions(its.Status.UpdateRevisions)
+	updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
 	if err != nil {
 		return nil, err
 	}
 	replicas := int32(0)
 	currentReplicas, updatedReplicas := int32(0), int32(0)
 	readyReplicas, availableReplicas := int32(0), int32(0)
-	for i := range podList {
-		pod := &podList[i]
+	notReadyNames := sets.New[string]()
+	notAvailableNames := sets.New[string]()
+	currentRevisions := map[string]string{}
+	for _, pod := range podList {
+		currentRevisions[pod.Name] = getPodRevision(pod)
 		if isCreated(pod) {
+			notReadyNames.Insert(pod.Name)
 			replicas++
 		}
-		if isRunningAndReady(pod) {
+		if isRunningAndReady(pod) && !isTerminating(pod) {
 			readyReplicas++
+			notReadyNames.Delete(pod.Name)
 			if isRunningAndAvailable(pod, its.Spec.MinReadySeconds) {
 				availableReplicas++
+			} else {
+				notAvailableNames.Insert(pod.Name)
 			}
 		}
 		if isCreated(pod) && !isTerminating(pod) {
@@ -90,20 +104,178 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	its.Status.AvailableReplicas = availableReplicas
 	its.Status.CurrentReplicas = currentReplicas
 	its.Status.UpdatedReplicas = updatedReplicas
-	its.Status.CurrentGeneration = its.Generation
+	its.Status.CurrentRevisions, _ = buildRevisions(currentRevisions)
 	// all pods have been updated
 	totalReplicas := int32(1)
 	if its.Spec.Replicas != nil {
 		totalReplicas = *its.Spec.Replicas
 	}
 	if its.Status.Replicas == totalReplicas && its.Status.UpdatedReplicas == totalReplicas {
-		its.Status.CurrentRevisions = its.Status.UpdateRevisions
 		its.Status.CurrentRevision = its.Status.UpdateRevision
 		its.Status.CurrentReplicas = totalReplicas
 	}
+	readyCondition, err := buildReadyCondition(its, readyReplicas >= replicas, notReadyNames)
+	if err != nil {
+		return nil, err
+	}
+	meta.SetStatusCondition(&its.Status.Conditions, *readyCondition)
 
-	// 3. set members status
-	rsm.SetMembersStatus(its, &podList)
+	availableCondition, err := buildAvailableCondition(its, availableReplicas >= replicas, notAvailableNames)
+	if err != nil {
+		return nil, err
+	}
+	meta.SetStatusCondition(&its.Status.Conditions, *availableCondition)
 
+	// 3. set InstanceFailure condition
+	failureCondition, err := buildFailureCondition(its, podList)
+	if err != nil {
+		return nil, err
+	}
+	if failureCondition != nil {
+		meta.SetStatusCondition(&its.Status.Conditions, *failureCondition)
+	} else {
+		meta.RemoveStatusCondition(&its.Status.Conditions, string(workloads.InstanceFailure))
+	}
+
+	// 4. set members status
+	setMembersStatus(its, podList)
+
+	// 5. set readyWithoutPrimary
+	// TODO(free6om): should put this field to the spec
+	setReadyWithPrimary(its, podList)
+
+	if its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
+		return tree, intctrlutil.NewDelayedRequeueError(time.Second, "requeue for right status update")
+	}
 	return tree, nil
+}
+
+func buildConditionMessageWithNames(podNames []string) ([]byte, error) {
+	baseSort(podNames, func(i int) (string, int) {
+		return ParseParentNameAndOrdinal(podNames[i])
+	}, nil, true)
+	return json.Marshal(podNames)
+}
+
+func buildReadyCondition(its *workloads.InstanceSet, ready bool, notReadyNames sets.Set[string]) (*metav1.Condition, error) {
+	condition := &metav1.Condition{
+		Type:               string(workloads.InstanceReady),
+		Status:             metav1.ConditionTrue,
+		ObservedGeneration: its.Generation,
+		Reason:             workloads.ReasonReady,
+	}
+	if !ready {
+		condition.Status = metav1.ConditionFalse
+		condition.Reason = workloads.ReasonNotReady
+		message, err := buildConditionMessageWithNames(notReadyNames.UnsortedList())
+		if err != nil {
+			return nil, err
+		}
+		condition.Message = string(message)
+	}
+	return condition, nil
+}
+
+func buildAvailableCondition(its *workloads.InstanceSet, available bool, notAvailableNames sets.Set[string]) (*metav1.Condition, error) {
+	condition := &metav1.Condition{
+		Type:               string(workloads.InstanceAvailable),
+		Status:             metav1.ConditionTrue,
+		ObservedGeneration: its.Generation,
+		Reason:             workloads.ReasonAvailable,
+	}
+	if !available {
+		condition.Status = metav1.ConditionFalse
+		condition.Reason = workloads.ReasonNotAvailable
+		message, err := buildConditionMessageWithNames(notAvailableNames.UnsortedList())
+		if err != nil {
+			return nil, err
+		}
+		condition.Message = string(message)
+	}
+	return condition, nil
+}
+
+func buildFailureCondition(its *workloads.InstanceSet, pods []*corev1.Pod) (*metav1.Condition, error) {
+	var failureNames []string
+	for _, pod := range pods {
+		if isTerminating(pod) {
+			continue
+		}
+		// Kubernetes says the Pod is 'Failed'
+		if pod.Status.Phase == corev1.PodFailed {
+			failureNames = append(failureNames, pod.Name)
+			continue
+		}
+		// KubeBlocks says the Pod is 'Failed'
+		isFailed, isTimedOut, _ := intctrlutil.IsPodFailedAndTimedOut(pod)
+		if isFailed && isTimedOut {
+			failureNames = append(failureNames, pod.Name)
+		}
+	}
+	if len(failureNames) == 0 {
+		return nil, nil
+	}
+	message, err := buildConditionMessageWithNames(failureNames)
+	if err != nil {
+		return nil, err
+	}
+	return &metav1.Condition{
+		Type:               string(workloads.InstanceFailure),
+		Status:             metav1.ConditionTrue,
+		ObservedGeneration: its.Generation,
+		Reason:             workloads.ReasonInstanceFailure,
+		Message:            string(message),
+	}, nil
+}
+
+func setReadyWithPrimary(its *workloads.InstanceSet, pods []*corev1.Pod) {
+	readyWithoutPrimary := false
+	for _, pod := range pods {
+		if value, ok := pod.Labels[constant.ReadyWithoutPrimaryKey]; ok && value == "true" {
+			readyWithoutPrimary = true
+			break
+		}
+	}
+	its.Status.ReadyWithoutPrimary = readyWithoutPrimary
+}
+
+func setMembersStatus(its *workloads.InstanceSet, pods []*corev1.Pod) {
+	// no roles defined
+	if its.Spec.Roles == nil {
+		return
+	}
+	// compose new status
+	newMembersStatus := make([]workloads.MemberStatus, 0)
+	roleMap := composeRoleMap(*its)
+	for _, pod := range pods {
+		if !intctrlutil.PodIsReadyWithLabel(*pod) {
+			continue
+		}
+		roleName := getRoleName(pod)
+		role, ok := roleMap[roleName]
+		if !ok {
+			continue
+		}
+		memberStatus := workloads.MemberStatus{
+			PodName:     pod.Name,
+			ReplicaRole: &role,
+		}
+		newMembersStatus = append(newMembersStatus, memberStatus)
+	}
+
+	// sort and set
+	rolePriorityMap := ComposeRolePriorityMap(its.Spec.Roles)
+	sortMembersStatus(newMembersStatus, rolePriorityMap)
+	its.Status.MembersStatus = newMembersStatus
+}
+
+func sortMembersStatus(membersStatus []workloads.MemberStatus, rolePriorityMap map[string]int) {
+	getRolePriorityFunc := func(i int) int {
+		role := membersStatus[i].ReplicaRole.Name
+		return rolePriorityMap[role]
+	}
+	getNameNOrdinalFunc := func(i int) (string, int) {
+		return ParseParentNameAndOrdinal(membersStatus[i].PodName)
+	}
+	baseSort(membersStatus, getNameNOrdinalFunc, getRolePriorityFunc, true)
 }

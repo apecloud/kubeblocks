@@ -97,7 +97,18 @@ func buildVolumeMountForContainers(podSpec *corev1.PodSpec, resourceRefs appsv1a
 func newVolumeMount(podSpec *corev1.PodSpec, res appsv1alpha1.ResourceMeta) {
 	for i := range podSpec.Containers {
 		container := &podSpec.Containers[i]
-		if slices.Contains(res.AsVolumeFrom, container.Name) {
+		if !slices.Contains(res.AsVolumeFrom, container.Name) {
+			continue
+		}
+		// check if the volume mount already exists
+		exists := false
+		for _, vm := range container.VolumeMounts {
+			if vm.Name == res.Name {
+				exists = true
+				break
+			}
+		}
+		if !exists {
 			container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
 				Name:      res.Name,
 				MountPath: res.MountPoint,

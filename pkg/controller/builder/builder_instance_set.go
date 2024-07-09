@@ -80,11 +80,6 @@ func (builder *InstanceSetBuilder) AddMatchLabelsInMap(labels map[string]string)
 	return builder
 }
 
-func (builder *InstanceSetBuilder) SetServiceName(serviceName string) *InstanceSetBuilder {
-	builder.get().Spec.ServiceName = serviceName
-	return builder
-}
-
 func (builder *InstanceSetBuilder) SetRoles(roles []workloads.ReplicaRole) *InstanceSetBuilder {
 	builder.get().Spec.Roles = roles
 	return builder
@@ -151,11 +146,6 @@ func (builder *InstanceSetBuilder) SetRoleProbe(roleProbe *workloads.RoleProbe) 
 
 func (builder *InstanceSetBuilder) SetService(service *corev1.Service) *InstanceSetBuilder {
 	builder.get().Spec.Service = service
-	return builder
-}
-
-func (builder *InstanceSetBuilder) SetAlternativeServices(services []corev1.Service) *InstanceSetBuilder {
-	builder.get().Spec.AlternativeServices = services
 	return builder
 }
 

@@ -44,8 +44,9 @@ var _ OpsHandler = BackupOpsHandler{}
 func init() {
 	// ToClusterPhase is not defined, because 'backup' does not affect the cluster phase.
 	backupBehaviour := OpsBehaviour{
-		FromClusterPhases: appsv1alpha1.GetClusterUpRunningPhases(),
-		OpsHandler:        BackupOpsHandler{},
+		FromClusterPhases: []appsv1alpha1.ClusterPhase{appsv1alpha1.RunningClusterPhase,
+			appsv1alpha1.UpdatingClusterPhase, appsv1alpha1.AbnormalClusterPhase},
+		OpsHandler: BackupOpsHandler{},
 	}
 
 	opsMgr := GetOpsManager()
@@ -106,9 +107,9 @@ func (b BackupOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, c
 func buildBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *appsv1alpha1.OpsRequest, cluster *appsv1alpha1.Cluster) (*dpv1alpha1.Backup, error) {
 	var err error
 
-	backupSpec := opsRequest.Spec.BackupSpec
+	backupSpec := opsRequest.Spec.GetBackup()
 	if backupSpec == nil {
-		backupSpec = &appsv1alpha1.BackupSpec{}
+		backupSpec = &appsv1alpha1.Backup{}
 	}
 
 	if len(backupSpec.BackupName) == 0 {

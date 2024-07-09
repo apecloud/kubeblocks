@@ -21,6 +21,7 @@ package constant
 
 import (
 	"fmt"
+	"strings"
 )
 
 // GenerateClusterComponentName generates the cluster component name.
@@ -30,7 +31,8 @@ func GenerateClusterComponentName(clusterName, compName string) string {
 
 // GenerateAccountSecretName generates the secret name of system accounts.
 func GenerateAccountSecretName(clusterName, compName, name string) string {
-	return fmt.Sprintf("%s-%s-account-%s", clusterName, compName, name)
+	replacedName := strings.ReplaceAll(name, "_", "-")
+	return fmt.Sprintf("%s-%s-account-%s", clusterName, compName, replacedName)
 }
 
 // GenerateClusterServiceName generates the service name for cluster.
@@ -88,25 +90,9 @@ func GenerateWorkloadNamePattern(clusterName, compName string) string {
 	return fmt.Sprintf("%s-%s", clusterName, compName)
 }
 
-// GenerateServiceNamePattern generates the service name pattern
-func GenerateServiceNamePattern(rsmName string) string {
-	return fmt.Sprintf("%s-headless", rsmName)
-}
-
 // GeneratePodName generates the connection credential name for component.
 func GeneratePodName(clusterName, compName string, ordinal int) string {
 	return fmt.Sprintf("%s-%d", GenerateClusterComponentName(clusterName, compName), ordinal)
-}
-
-// GeneratePodSubDomain generates the connection credential name for component.
-func GeneratePodSubDomain(clusterName, compName string) string {
-	return GenerateDefaultComponentHeadlessServiceName(clusterName, compName)
-}
-
-// GeneratePodFQDN generates the connection credential name for component.
-func GeneratePodFQDN(namespace, clusterName, compName string, ordinal int) string {
-	return fmt.Sprintf("%s.%s.%s.svc",
-		GeneratePodName(clusterName, compName, ordinal), GeneratePodSubDomain(clusterName, compName), namespace)
 }
 
 // GenerateVirtualComponentDefinition generates the virtual component definition name.

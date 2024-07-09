@@ -55,13 +55,13 @@ func (t *clusterComponentTransformer) Transform(ctx graph.TransformContext, dag 
 		return nil
 	}
 
-	allCompsReady, err := checkAllCompsReady(transCtx, transCtx.Cluster)
+	allCompsUpToDate, err := checkAllCompsUpToDate(transCtx, transCtx.Cluster)
 	if err != nil {
 		return err
 	}
 
-	// if all component objects ready and cluster is not updating, skip reconciling components
-	if !transCtx.OrigCluster.IsUpdating() && allCompsReady {
+	// if the cluster is not updating and all components are up-to-date, skip the reconciliation
+	if !transCtx.OrigCluster.IsUpdating() && allCompsUpToDate {
 		return nil
 	}
 
@@ -86,14 +86,18 @@ func (t *clusterComponentTransformer) reconcileComponents(transCtx *clusterTrans
 	updateCompSet := protoCompSet.Intersection(runningCompSet)
 	deleteCompSet := runningCompSet.Difference(protoCompSet)
 
-	// component objects to be deleted
-	if err := t.handleCompsDelete(transCtx, dag, protoCompSpecMap, deleteCompSet, transCtx.Labels, transCtx.Annotations); err != nil {
+	// component objects to be deleted (scale-in)
+	if err := deleteCompsInOrder(transCtx, dag, deleteCompSet, false); err != nil {
 		return err
 	}
 
 	// component objects to be updated
+	var delayedErr error
 	if err := t.handleCompsUpdate(transCtx, dag, protoCompSpecMap, updateCompSet, transCtx.Labels, transCtx.Annotations); err != nil {
-		return err
+		if !ictrlutil.IsDelayedRequeueError(err) {
+			return err
+		}
+		delayedErr = err
 	}
 
 	// component objects to be created
@@ -101,31 +105,35 @@ func (t *clusterComponentTransformer) reconcileComponents(transCtx *clusterTrans
 		return err
 	}
 
-	return nil
+	return delayedErr
 }
 
 func (t *clusterComponentTransformer) handleCompsCreate(transCtx *clusterTransformContext, dag *graph.DAG,
 	protoCompSpecMap map[string]*appsv1alpha1.ClusterComponentSpec, createCompSet sets.Set[string],
 	protoCompLabelsMap, protoCompAnnotationsMap map[string]map[string]string) error {
 	handler := newCompHandler(transCtx, protoCompSpecMap, protoCompLabelsMap, protoCompAnnotationsMap, createOp)
-	return t.handleComps(transCtx, dag, createCompSet, handler)
-}
-
-func (t *clusterComponentTransformer) handleCompsDelete(transCtx *clusterTransformContext, dag *graph.DAG,
-	protoCompSpecMap map[string]*appsv1alpha1.ClusterComponentSpec, deleteCompSet sets.Set[string],
-	protoCompLabelsMap, protoCompAnnotationsMap map[string]map[string]string) error {
-	handler := newCompHandler(transCtx, protoCompSpecMap, protoCompLabelsMap, protoCompAnnotationsMap, deleteOp)
-	return t.handleComps(transCtx, dag, deleteCompSet, handler)
+	return handleCompsInOrder(transCtx, dag, createCompSet, handler)
 }
 
 func (t *clusterComponentTransformer) handleCompsUpdate(transCtx *clusterTransformContext, dag *graph.DAG,
 	protoCompSpecMap map[string]*appsv1alpha1.ClusterComponentSpec, updateCompSet sets.Set[string],
 	protoCompLabelsMap, protoCompAnnotationsMap map[string]map[string]string) error {
 	handler := newCompHandler(transCtx, protoCompSpecMap, protoCompLabelsMap, protoCompAnnotationsMap, updateOp)
-	return t.handleComps(transCtx, dag, updateCompSet, handler)
+	return handleCompsInOrder(transCtx, dag, updateCompSet, handler)
 }
 
-func (t *clusterComponentTransformer) handleComps(transCtx *clusterTransformContext, dag *graph.DAG,
+func deleteCompsInOrder(transCtx *clusterTransformContext, dag *graph.DAG, deleteCompSet sets.Set[string], terminate bool) error {
+	handler := newCompHandler(transCtx, nil, nil, nil, deleteOp)
+	if h, ok := handler.(*parallelDeleteCompHandler); ok {
+		h.terminate = terminate
+	}
+	if h, ok := handler.(*orderedDeleteCompHandler); ok {
+		h.terminate = terminate
+	}
+	return handleCompsInOrder(transCtx, dag, deleteCompSet, handler)
+}
+
+func handleCompsInOrder(transCtx *clusterTransformContext, dag *graph.DAG,
 	compNameSet sets.Set[string], handler compConditionalHandler) error {
 	var unmatched []string
 	for _, compName := range handler.ordered(sets.List(compNameSet)) {
@@ -142,12 +150,12 @@ func (t *clusterComponentTransformer) handleComps(transCtx *clusterTransformCont
 		}
 	}
 	if len(unmatched) > 0 {
-		return fmt.Errorf("retry later: %s are not ready", strings.Join(unmatched, ","))
+		return ictrlutil.NewDelayedRequeueError(0, fmt.Sprintf("retry later: %s are not ready", strings.Join(unmatched, ",")))
 	}
 	return nil
 }
 
-func checkAllCompsReady(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) (bool, error) {
+func checkAllCompsUpToDate(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) (bool, error) {
 	compList := &appsv1alpha1.ComponentList{}
 	labels := constant.GetClusterWellKnownLabels(cluster.Name)
 	if err := transCtx.Client.List(transCtx.Context, compList, client.InNamespace(cluster.Namespace), client.MatchingLabels(labels)); err != nil {
@@ -155,6 +163,15 @@ func checkAllCompsReady(transCtx *clusterTransformContext, cluster *appsv1alpha1
 	}
 	if len(compList.Items) != len(transCtx.ComponentSpecs) {
 		return false, nil
+	}
+	for _, comp := range compList.Items {
+		kbGeneration, ok := comp.Annotations[constant.KubeBlocksGenerationKey]
+		if !ok {
+			return false, nil
+		}
+		if comp.Generation != comp.Status.ObservedGeneration || kbGeneration != strconv.FormatInt(cluster.Generation, 10) {
+			return false, nil
+		}
 	}
 	return true, nil
 }
@@ -189,8 +206,12 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component) *apps
 	compObjCopy.Spec.CompDef = compProto.Spec.CompDef
 	compObjCopy.Spec.ServiceVersion = compProto.Spec.ServiceVersion
 	compObjCopy.Spec.ServiceRefs = compProto.Spec.ServiceRefs
+	compObjCopy.Spec.Labels = compProto.Spec.Labels
+	compObjCopy.Spec.Annotations = compProto.Spec.Annotations
+	compObjCopy.Spec.Env = compProto.Spec.Env
 	compObjCopy.Spec.Resources = compProto.Spec.Resources
 	compObjCopy.Spec.VolumeClaimTemplates = compProto.Spec.VolumeClaimTemplates
+	compObjCopy.Spec.Volumes = compProto.Spec.Volumes
 	compObjCopy.Spec.Services = compProto.Spec.Services
 	compObjCopy.Spec.Replicas = compProto.Spec.Replicas
 	compObjCopy.Spec.Configs = compProto.Spec.Configs
@@ -203,8 +224,7 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component) *apps
 	compObjCopy.Spec.Instances = compProto.Spec.Instances
 	compObjCopy.Spec.OfflineInstances = compProto.Spec.OfflineInstances
 	compObjCopy.Spec.RuntimeClassName = compProto.Spec.RuntimeClassName
-	compObjCopy.Spec.Sidecars = compProto.Spec.Sidecars
-	compObjCopy.Spec.MonitorEnabled = compProto.Spec.MonitorEnabled
+	compObjCopy.Spec.DisableExporter = compProto.Spec.DisableExporter
 
 	if reflect.DeepEqual(oldCompObj.Annotations, compObjCopy.Annotations) &&
 		reflect.DeepEqual(oldCompObj.Labels, compObjCopy.Labels) &&
@@ -481,7 +501,9 @@ func (h *createCompHandler) initClusterCompStatus(cluster *appsv1alpha1.Cluster,
 	cluster.Status.Components[compName] = appsv1alpha1.ClusterComponentStatus{}
 }
 
-type deleteCompHandler struct{}
+type deleteCompHandler struct {
+	terminate bool // vs scale-in
+}
 
 func (h *deleteCompHandler) handle(transCtx *clusterTransformContext, dag *graph.DAG, compName string) error {
 	cluster := transCtx.Cluster
@@ -494,14 +516,16 @@ func (h *deleteCompHandler) handle(transCtx *clusterTransformContext, dag *graph
 		return nil
 	}
 	transCtx.Logger.Info(fmt.Sprintf("deleting component %s", comp.Name))
-	compCopy := comp.DeepCopy()
-	if comp.Annotations == nil {
-		comp.Annotations = make(map[string]string)
-	}
-	// update the scale-in annotation to component before deleting
-	comp.Annotations[constant.ComponentScaleInAnnotationKey] = trueVal
 	deleteCompVertex := graphCli.Do(dag, nil, comp, model.ActionDeletePtr(), nil)
-	graphCli.Do(dag, compCopy, comp, model.ActionUpdatePtr(), deleteCompVertex)
+	if !h.terminate { // scale-in
+		compCopy := comp.DeepCopy()
+		if comp.Annotations == nil {
+			comp.Annotations = make(map[string]string)
+		}
+		// update the scale-in annotation to component before deleting
+		comp.Annotations[constant.ComponentScaleInAnnotationKey] = trueVal
+		graphCli.Do(dag, compCopy, comp, model.ActionUpdatePtr(), deleteCompVertex)
+	}
 	return nil
 }
 

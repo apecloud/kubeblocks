@@ -44,7 +44,7 @@ var _ = Describe("TemplateWrapperTest", func() {
 
 	mockTemplateWrapper := func() renderWrapper {
 		mockConfigTemplater := newTemplateBuilder(clusterName, testCtx.DefaultNamespace, ctx, mockK8sCli.Client())
-		mockConfigTemplater.injectBuiltInObjectsAndFunctions(&corev1.PodSpec{}, clusterComponent.ConfigTemplates, clusterComponent, nil, clusterObj)
+		mockConfigTemplater.injectBuiltInObjectsAndFunctions(&corev1.PodSpec{}, clusterComponent, nil, clusterObj)
 		return newTemplateRenderWrapper(ctx, mockK8sCli.Client(), mockConfigTemplater, clusterObj, componentObj)
 	}
 
@@ -128,7 +128,7 @@ var _ = Describe("TemplateWrapperTest", func() {
 						Name: configSpecName,
 					},
 					Spec: appsv1beta1.ConfigConstraintSpec{
-						FormatterConfig: &appsv1beta1.FormatterConfig{
+						FileFormatConfig: &appsv1beta1.FileFormatConfig{
 							Format: appsv1beta1.Ini,
 						},
 					},

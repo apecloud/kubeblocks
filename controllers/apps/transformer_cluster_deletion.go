@@ -20,26 +20,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 	"strings"
 	"time"
 
+	"golang.org/x/exp/maps"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // clusterDeletionTransformer handles cluster deletion
@@ -60,7 +60,6 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 
 	// list all kinds to be deleted based on v1alpha1.TerminationPolicyType
 	var toDeleteNamespacedKinds, toDeleteNonNamespacedKinds []client.ObjectList
-	var toPreserveKinds []client.ObjectList
 	switch cluster.Spec.TerminationPolicy {
 	case appsv1alpha1.DoNotTerminate:
 		transCtx.EventRecorder.Eventf(cluster, corev1.EventTypeWarning, "DoNotTerminate",
@@ -68,7 +67,6 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 		return graph.ErrPrematureStop
 	case appsv1alpha1.Halt:
 		toDeleteNamespacedKinds, toDeleteNonNamespacedKinds = kindsForHalt()
-		toPreserveKinds = haltPreserveKinds()
 	case appsv1alpha1.Delete:
 		toDeleteNamespacedKinds, toDeleteNonNamespacedKinds = kindsForDelete()
 	case appsv1alpha1.WipeOut:
@@ -78,16 +76,19 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	transCtx.EventRecorder.Eventf(cluster, corev1.EventTypeNormal, constant.ReasonDeletingCR, "Deleting %s: %s",
 		strings.ToLower(cluster.GetObjectKind().GroupVersionKind().Kind), cluster.GetName())
 
-	// list all objects owned by this cluster in cache, and delete them all
-	// there is chance that objects leak occurs because of cache stale
-	// ignore the problem currently
-	// TODO: GC the leaked objects
-	ml := getAppInstanceML(*cluster)
-
-	// handle preserved objects update vertex
-	if err := preserveClusterObjects(transCtx.Context, transCtx.Client, graphCli, dag, cluster, ml, toPreserveKinds); err != nil {
+	// firstly, delete components in the order that topology defined.
+	deleteCompSet, err := deleteCompsInOrder4Terminate(transCtx, dag)
+	if err != nil {
 		return err
 	}
+	if len(deleteCompSet) > 0 {
+		// wait for the components to be deleted to trigger the next reconcile
+		transCtx.Logger.Info(fmt.Sprintf("wait for the components to be deleted: %v", deleteCompSet))
+		return nil
+	}
+
+	// then list all the others objects owned by this cluster in cache, and delete them all
+	ml := getAppInstanceML(*cluster)
 
 	toDeleteObjs := func(objs owningObjects) []client.Object {
 		var delObjs []client.Object
@@ -121,42 +122,28 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	}
 	delObjs = append(delObjs, toDeleteObjs(nonNamespacedObjs)...)
 
+	delKindMap := map[string]sets.Empty{}
 	for _, o := range delObjs {
-		// skip the objects owned by the component and rsm controller
-		if shouldSkipObjOwnedByComp(o, *cluster) || rsm.IsOwnedByRsm(o) {
+		// skip the objects owned by the component and InstanceSet controller
+		if shouldSkipObjOwnedByComp(o, *cluster) || isOwnedByInstanceSet(o) {
 			continue
 		}
 		graphCli.Delete(dag, o, inUniversalContext4G())
+		delKindMap[o.GetObjectKind().GroupVersionKind().Kind] = sets.Empty{}
 	}
+
 	// set cluster action to noop until all the sub-resources deleted
 	if len(delObjs) == 0 {
 		graphCli.Delete(dag, cluster)
 	} else {
+		transCtx.Logger.Info(fmt.Sprintf("deleting the sub-resource kinds: %v", maps.Keys(delKindMap)))
 		graphCli.Status(dag, cluster, transCtx.Cluster)
 		// requeue since pvc isn't owned by cluster, and deleting it won't trigger event
 		return newRequeueError(time.Second*1, "not all sub-resources deleted")
 	}
 
-	// release the allocated host ports
-	// TODO release ports if scale in the components
-	// TODO release ports one by one without using prefix
-	pm := intctrlutil.GetPortManager()
-	for _, comp := range transCtx.Cluster.Spec.ComponentSpecs {
-		if err = pm.ReleaseByPrefix(fmt.Sprintf("%s-%s", transCtx.Cluster.Name, comp.Name)); err != nil {
-			return newRequeueError(time.Second*1, "release host ports failed")
-		}
-	}
-
 	// fast return, that is stopping the plan.Build() stage and jump to plan.Execute() directly
 	return graph.ErrPrematureStop
-}
-
-func haltPreserveKinds() []client.ObjectList {
-	return []client.ObjectList{
-		&corev1.PersistentVolumeClaimList{},
-		&corev1.SecretList{},
-		&corev1.ConfigMapList{},
-	}
 }
 
 func kindsForDoNotTerminate() ([]client.ObjectList, []client.ObjectList) {
@@ -199,12 +186,6 @@ func kindsForWipeOut() ([]client.ObjectList, []client.ObjectList) {
 	return append(namespacedKinds, namespacedKindsPlus...), nonNamespacedKinds
 }
 
-// preserveClusterObjects preserves the objects owned by the cluster when the cluster is being deleted
-func preserveClusterObjects(ctx context.Context, cli client.Reader, graphCli model.GraphClient, dag *graph.DAG,
-	cluster *appsv1alpha1.Cluster, ml client.MatchingLabels, toPreserveKinds []client.ObjectList) error {
-	return preserveObjects(ctx, cli, graphCli, dag, cluster, ml, toPreserveKinds, constant.DBClusterFinalizerName, constant.LastAppliedClusterAnnotationKey)
-}
-
 // shouldSkipObjOwnedByComp is used to judge whether the object owned by component should be skipped when deleting the cluster
 func shouldSkipObjOwnedByComp(obj client.Object, cluster appsv1alpha1.Cluster) bool {
 	ownByComp := isOwnedByComp(obj)
@@ -234,4 +215,22 @@ func shouldSkipObjOwnedByComp(obj client.Object, cluster appsv1alpha1.Cluster) b
 		}
 	}
 	return true
+}
+
+func deleteCompsInOrder4Terminate(transCtx *clusterTransformContext, dag *graph.DAG) (sets.Set[string], error) {
+	compNameSet, err := component.GetClusterComponentShortNameSet(transCtx.Context, transCtx.Client, transCtx.Cluster)
+	if err != nil {
+		return nil, err
+	}
+	if len(compNameSet) == 0 {
+		return nil, nil
+	}
+	if err = loadNCheckClusterDefinition(transCtx, transCtx.Cluster); err != nil {
+		return nil, err
+	}
+	err = deleteCompsInOrder(transCtx, dag, compNameSet, true)
+	if err != nil {
+		return nil, err
+	}
+	return compNameSet, nil
 }

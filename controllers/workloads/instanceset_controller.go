@@ -22,7 +22,6 @@ package workloads
 import (
 	"context"
 
-	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -38,14 +37,12 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/handler"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
-	"github.com/apecloud/kubeblocks/pkg/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-// InstanceSetReconciler reconciles a InstanceSet object
+// InstanceSetReconciler reconciles an InstanceSet object
 type InstanceSetReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
@@ -55,10 +52,6 @@ type InstanceSetReconciler struct {
 // +kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=instancesets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=instancesets/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=instancesets/finalizers,verbs=update
-
-// +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete;deletecollection
-// +kubebuilder:rbac:groups=apps,resources=statefulsets/status,verbs=get
-// +kubebuilder:rbac:groups=apps,resources=statefulsets/finalizers,verbs=update
 
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete;deletecollection
 // +kubebuilder:rbac:groups=core,resources=pods/status,verbs=get
@@ -87,96 +80,25 @@ type InstanceSetReconciler struct {
 func (r *InstanceSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithValues("InstanceSet", req.NamespacedName)
 
-	provider, err := instanceset.CurrentReplicaProvider(ctx, r.Client, req.NamespacedName)
-	if err != nil {
-		return ctrl.Result{}, err
+	err := kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
+		Prepare(instanceset.NewTreeLoader()).
+		Do(instanceset.NewFixMetaReconciler()).
+		Do(instanceset.NewDeletionReconciler()).
+		Do(instanceset.NewStatusReconciler()).
+		Do(instanceset.NewRevisionUpdateReconciler()).
+		Do(instanceset.NewAssistantObjectReconciler()).
+		Do(instanceset.NewReplicasAlignmentReconciler()).
+		Do(instanceset.NewUpdateReconciler()).
+		Commit()
+	if re, ok := err.(intctrlutil.DelayedRequeueError); ok {
+		return intctrlutil.RequeueAfter(re.RequeueAfter(), logger, re.Reason())
 	}
-	if provider == instanceset.PodProvider {
-		err = kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
-			Prepare(instanceset.NewTreeLoader()).
-			Do(instanceset.NewFixMetaReconciler()).
-			Do(instanceset.NewDeletionReconciler()).
-			Do(instanceset.NewStatusReconciler()).
-			Do(instanceset.NewRevisionUpdateReconciler()).
-			Do(instanceset.NewAssistantObjectReconciler()).
-			Do(instanceset.NewReplicasAlignmentReconciler()).
-			Do(instanceset.NewUpdateReconciler()).
-			Commit()
-		return ctrl.Result{}, err
+	requeue := false
+	if apierrors.IsConflict(err) {
+		requeue = true
+		err = nil
 	}
-
-	reqCtx := intctrlutil.RequestCtx{
-		Ctx:      ctx,
-		Req:      req,
-		Log:      logger,
-		Recorder: r.Recorder,
-	}
-
-	reqCtx.Log.V(1).Info("reconcile", "InstanceSet", req.NamespacedName)
-
-	requeueError := func(err error) (ctrl.Result, error) {
-		if re, ok := err.(model.RequeueError); ok {
-			return intctrlutil.RequeueAfter(re.RequeueAfter(), reqCtx.Log, re.Reason())
-		}
-		if apierrors.IsConflict(err) {
-			return intctrlutil.Requeue(reqCtx.Log, err.Error())
-		}
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
-
-	// the InstanceSet reconciliation loop is a two-phase model: plan Build and plan Execute
-	// Init stage
-	planBuilder := rsm.NewRSMPlanBuilder(reqCtx, r.Client, req)
-	if err := planBuilder.Init(); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
-
-	// Build stage
-	// what you should do in most cases is writing your transformer.
-	//
-	// here are the how-to tips:
-	// 1. one transformer for one scenario
-	// 2. try not to modify the current transformers, make a new one
-	// 3. transformers are independent with each-other, with some exceptions.
-	//    Which means transformers' order is not important in most cases.
-	//    If you don't know where to put your transformer, append it to the end and that would be ok.
-	// 4. don't use client.Client for object write, use client.ReadonlyClient for object read.
-	//    If you do need to create/update/delete object, make your intent operation a model.ObjectVertex and put it into the DAG.
-	//
-	// TODO: transformers are vertices, theirs' dependencies are edges, make plan Build stage a DAG.
-	plan, err := planBuilder.
-		AddTransformer(
-			// fix meta
-			&rsm.FixMetaTransformer{},
-			// handle deletion
-			// handle cluster deletion first
-			&rsm.ObjectDeletionTransformer{},
-			// handle secondary objects generation
-			&rsm.ObjectGenerationTransformer{},
-			// handle status
-			&rsm.ObjectStatusTransformer{},
-			// handle MemberUpdateStrategy
-			&rsm.UpdateStrategyTransformer{},
-			// handle member reconfiguration
-			&rsm.MemberReconfigurationTransformer{},
-			// always safe to put your transformer below
-		).
-		Build()
-	if err != nil {
-		return requeueError(err)
-	}
-	// TODO: define error categories in Build stage and handle them here like this:
-	// switch errBuild.(type) {
-	// case NOTFOUND:
-	// case ALREADYEXISY:
-	// }
-
-	// Execute stage
-	if err = plan.Execute(); err != nil {
-		return requeueError(err)
-	}
-
-	return intctrlutil.Reconciled()
+	return ctrl.Result{Requeue: requeue}, err
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -194,41 +116,18 @@ func (r *InstanceSetReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterM
 }
 
 func (r *InstanceSetReconciler) setupWithManager(mgr ctrl.Manager, ctx *handler.FinderContext) error {
-	if viper.GetBool(rsm.FeatureGateRSMCompatibilityMode) {
-		nameLabels := []string{constant.AppInstanceLabelKey, constant.KBAppComponentLabelKey}
-		delegatorFinder := handler.NewDelegatorFinder(&workloads.InstanceSet{}, nameLabels)
-		ownerFinder := handler.NewOwnerFinder(&appsv1.StatefulSet{})
-		stsHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
-		jobHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
-		// pod owned by legacy StatefulSet
-		stsPodHandler := handler.NewBuilder(ctx).AddFinder(ownerFinder).AddFinder(delegatorFinder).Build()
-
-		return intctrlutil.NewNamespacedControllerManagedBy(mgr).
-			For(&workloads.InstanceSet{}).
-			WithOptions(controller.Options{
-				MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
-			}).
-			Watches(&appsv1.StatefulSet{}, stsHandler).
-			Watches(&batchv1.Job{}, jobHandler).
-			Watches(&corev1.Pod{}, stsPodHandler).
-			Owns(&corev1.Pod{}).
-			Owns(&corev1.PersistentVolumeClaim{}).
-			Complete(r)
-	}
-
-	stsOwnerFinder := handler.NewOwnerFinder(&appsv1.StatefulSet{})
-	itsOwnerFinder := handler.NewOwnerFinder(&workloads.InstanceSet{})
-	podHandler := handler.NewBuilder(ctx).AddFinder(stsOwnerFinder).AddFinder(itsOwnerFinder).Build()
+	itsFinder := handler.NewLabelFinder(&workloads.InstanceSet{}, instanceset.WorkloadsManagedByLabelKey, workloads.Kind, instanceset.WorkloadsInstanceLabelKey)
+	podHandler := handler.NewBuilder(ctx).AddFinder(itsFinder).Build()
 	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
 		For(&workloads.InstanceSet{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
 		}).
-		Owns(&appsv1.StatefulSet{}).
-		Owns(&batchv1.Job{}).
 		Watches(&corev1.Pod{}, podHandler).
-		Owns(&corev1.Pod{}).
 		Owns(&corev1.PersistentVolumeClaim{}).
+		Owns(&batchv1.Job{}).
+		Owns(&corev1.Service{}).
+		Owns(&corev1.ConfigMap{}).
 		Complete(r)
 }
 
@@ -236,10 +135,6 @@ func (r *InstanceSetReconciler) setupWithMultiClusterManager(mgr ctrl.Manager,
 	multiClusterMgr multicluster.Manager, ctx *handler.FinderContext) error {
 	nameLabels := []string{constant.AppInstanceLabelKey, constant.KBAppComponentLabelKey}
 	delegatorFinder := handler.NewDelegatorFinder(&workloads.InstanceSet{}, nameLabels)
-	ownerFinder := handler.NewOwnerFinder(&appsv1.StatefulSet{})
-	stsHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
-	// pod owned by legacy StatefulSet
-	stsPodHandler := handler.NewBuilder(ctx).AddFinder(ownerFinder).AddFinder(delegatorFinder).Build()
 	// TODO: modify handler.getObjectFromKey to support running Job in data clusters
 	jobHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
 
@@ -249,9 +144,7 @@ func (r *InstanceSetReconciler) setupWithMultiClusterManager(mgr ctrl.Manager,
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
 		})
 
-	multiClusterMgr.Watch(b, &appsv1.StatefulSet{}, stsHandler).
-		Watch(b, &corev1.Pod{}, stsPodHandler).
-		Watch(b, &batchv1.Job{}, jobHandler).
+	multiClusterMgr.Watch(b, &batchv1.Job{}, jobHandler).
 		Own(b, &corev1.Pod{}, &workloads.InstanceSet{}).
 		Own(b, &corev1.PersistentVolumeClaim{}, &workloads.InstanceSet{})
 

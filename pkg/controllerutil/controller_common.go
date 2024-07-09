@@ -211,17 +211,6 @@ func RecordCreatedEvent(r record.EventRecorder, cr client.Object) {
 	}
 }
 
-// WorkloadFilterPredicate provides filter predicate for workload objects, i.e., deployment/statefulset/pod/pvc.
-func WorkloadFilterPredicate(object client.Object) bool {
-	_, containCompNameLabelKey := object.GetLabels()[constant.KBAppComponentLabelKey]
-	return ManagedByKubeBlocksFilterPredicate(object) && containCompNameLabelKey
-}
-
-// ManagedByKubeBlocksFilterPredicate provides filter predicate for objects managed by kubeBlocks.
-func ManagedByKubeBlocksFilterPredicate(object client.Object) bool {
-	return object.GetLabels()[constant.AppManagedByLabelKey] == constant.AppName
-}
-
 // IgnoreIsAlreadyExists returns errors if 'err' is not type of AlreadyExists
 func IgnoreIsAlreadyExists(err error) error {
 	if !apierrors.IsAlreadyExists(err) {
@@ -255,7 +244,7 @@ func SetOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer st
 			return err
 		}
 	}
-	if !controllerutil.ContainsFinalizer(obj, finalizer) {
+	if len(finalizer) > 0 && !controllerutil.ContainsFinalizer(obj, finalizer) {
 		// pvc objects do not need to add finalizer
 		_, ok := obj.(*corev1.PersistentVolumeClaim)
 		if !ok {
@@ -515,6 +504,20 @@ func (pm *PortManager) delete(keys []string) error {
 		delete(pm.used, port)
 	}
 	return nil
+}
+
+func (pm *PortManager) GetPort(key string) (int32, error) {
+	pm.Lock()
+	defer pm.Unlock()
+
+	if value, ok := pm.cm.Data[key]; ok {
+		port, err := pm.parsePort(value)
+		if err != nil {
+			return 0, err
+		}
+		return port, nil
+	}
+	return 0, nil
 }
 
 func (pm *PortManager) UsePort(key string, port int32) error {

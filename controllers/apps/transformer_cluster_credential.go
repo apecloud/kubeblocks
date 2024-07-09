@@ -24,8 +24,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
-
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -93,8 +93,15 @@ func (t *clusterConnCredentialTransformer) buildSynthesizedComponent(transCtx *c
 				continue
 			}
 			return &component.SynthesizedComponent{
-				Name:     compSpec.Name,
-				Services: []corev1.Service{{Spec: compDef.Service.ToSVCSpec()}},
+				Name:        compSpec.Name,
+				Annotations: transCtx.Cluster.Annotations,
+				ComponentServices: []appsv1alpha1.ComponentService{
+					{
+						Service: appsv1alpha1.Service{
+							Spec: compDef.Service.ToSVCSpec(),
+						},
+					},
+				},
 			}
 		}
 	}

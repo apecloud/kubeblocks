@@ -208,8 +208,8 @@ The initialization takes about 20 minutes. If the installation fails after a lon
 Make sure you have all the followings prepared.
 
 * Alibaba Cloud account.
-* [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
-* [Install kbcli](./../installation/install-with-kbcli/install-kbcli.md)
+* [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl).
+* [Install kbcli](./../installation/install-with-kbcli/install-kbcli.md).
   
 ### Configure ACK environment
 

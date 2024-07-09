@@ -22,18 +22,18 @@ package dataprotection
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils/boolptr"
 	"github.com/apecloud/kubeblocks/pkg/testutil"
@@ -91,9 +91,9 @@ func NewFakeBackupPolicy(testCtx *testutil.TestContext,
 }
 
 func NewFakeStorageProvider(testCtx *testutil.TestContext,
-	change func(sp *storagev1alpha1.StorageProvider)) *storagev1alpha1.StorageProvider {
+	change func(sp *dpv1alpha1.StorageProvider)) *dpv1alpha1.StorageProvider {
 	sp := testapps.CreateCustomizedObj(testCtx, "backup/storageprovider.yaml",
-		&storagev1alpha1.StorageProvider{}, func(obj *storagev1alpha1.StorageProvider) {
+		&dpv1alpha1.StorageProvider{}, func(obj *dpv1alpha1.StorageProvider) {
 			obj.Name = StorageProviderName
 			if change != nil {
 				change(obj)
@@ -101,9 +101,9 @@ func NewFakeStorageProvider(testCtx *testutil.TestContext,
 		})
 	// the storage provider controller is not running, so set the status manually
 	Expect(testapps.ChangeObjStatus(testCtx, sp, func() {
-		sp.Status.Phase = storagev1alpha1.StorageProviderReady
+		sp.Status.Phase = dpv1alpha1.StorageProviderReady
 		meta.SetStatusCondition(&sp.Status.Conditions, metav1.Condition{
-			Type:   storagev1alpha1.ConditionTypeCSIDriverInstalled,
+			Type:   dpv1alpha1.ConditionTypeCSIDriverInstalled,
 			Status: metav1.ConditionTrue,
 			Reason: "CSIDriverInstalled",
 		})

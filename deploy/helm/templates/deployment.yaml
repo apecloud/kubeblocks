@@ -12,6 +12,9 @@ spec:
   selector:
     matchLabels:
       {{- include "kubeblocks.selectorLabels" . | nindent 6 }}
+      {{- with .Values.extraLabels }}
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
   {{- if .Values.updateStrategy }}
   strategy:
     {{ toYaml .Values.updateStrategy | nindent 4 | trim }}
@@ -24,6 +27,9 @@ spec:
       {{- end }}
       labels:
         {{- include "kubeblocks.selectorLabels" . | nindent 8 }}
+        {{- with .Values.extraLabels }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       priorityClassName: {{ template "kubeblocks.priorityClassName" . }}
       {{- with .Values.image.imagePullSecrets }}
@@ -63,8 +69,9 @@ spec:
             - "--zap-encoder={{ . }}"
             {{- end }}
             - "--extensions={{- default "true" ( include "kubeblocks.addonControllerEnabled" . ) }}"
-            - "--apps=true"
-            - "--workloads=true"
+            - "--apps={{ ne .Values.controllers.apps.enabled false }}"
+            - "--workloads={{ ne .Values.controllers.workloads.enabled false }}"
+            - "--experimental={{- default "false" .Values.controllers.experimental.enabled }}"
             {{- with .Values.managedNamespaces }}
             - "--managed-namespaces={{ . }}"
             {{- end }}
@@ -73,6 +80,9 @@ spec:
             {{- end }}
             {{- if .Values.multiCluster.contexts }}
             - "--multi-cluster-contexts={{ .Values.multiCluster.contexts }}"
+            {{- end }}
+            {{- if .Values.multiCluster.contextsDisabled }}
+            - "--multi-cluster-contexts-disabled={{ .Values.multiCluster.contextsDisabled }}"
             {{- end }}
           env:
             - name: CM_NAMESPACE
@@ -139,8 +149,13 @@ spec:
             - name: DP_ENCRYPTION_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "kubeblocks.fullname" . }}-secret
-                  key: dataProtectionEncryptionKey
+                  {{- include "dataprotection.encryptionKeySecretKeyRef" . | nindent 18 }}
+            {{- if .Values.dataProtection.enableBackupEncryption }}
+            - name: DP_BACKUP_ENCRYPTION_SECRET_KEY_REF
+              value: {{ include "dataprotection.encryptionKeySecretKeyRef" . | fromYaml | toJson | quote }}
+            - name: DP_BACKUP_ENCRYPTION_ALGORITHM
+              value: {{ include "dataprotection.backupEncryptionAlgorithm" . }}
+            {{- end }}
             - name: KUBE_PROVIDER
               value: {{ .Values.provider | quote }}
             - name: HOST_PORT_INCLUDE_RANGES
@@ -151,6 +166,14 @@ spec:
               value: {{ include "kubeblocks.fullname" . }}-host-ports
             {{- if .Values.serviceMonitor.goRuntime.enabled }}
             - name: ENABLED_RUNTIME_METRICS
+              value: "true"
+            {{- end }}
+            {{- if .Values.featureGates.ignoreConfigTemplateDefaultMode.enabled }}
+            - name: IGNORE_CONFIG_TEMPLATE_DEFAULT_MODE
+              value: "true"
+            {{- end }}
+            {{- if .Values.featureGates.ignorePodVerticalScaling.enabled }}
+            - name: IGNORE_POD_VERTICAL_SCALING
               value: "true"
             {{- end }}
           {{- with .Values.securityContext }}

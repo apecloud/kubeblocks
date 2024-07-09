@@ -68,15 +68,15 @@ var cache map[string]*OperationResult = make(map[string]*OperationResult)
 
 func NewHTTPClientWithPod(pod *corev1.Pod) (*HTTPClient, error) {
 	logger := ctrl.Log.WithName("Lorry HTTP client")
-	ip := pod.Status.PodIP
-	if ip == "" {
-		return nil, fmt.Errorf("pod %v has no ip", pod.Name)
-	}
-
 	port, err := intctrlutil.GetLorryHTTPPort(pod)
 	if err != nil {
 		logger.Info("not lorry in the pod, just return nil without error")
 		return nil, nil
+	}
+
+	ip := pod.Status.PodIP
+	if ip == "" {
+		return nil, fmt.Errorf("pod %v has no ip", pod.Name)
 	}
 
 	// don't use default http-client

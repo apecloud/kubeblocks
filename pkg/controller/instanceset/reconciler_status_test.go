@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
+	"encoding/json"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -32,6 +33,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 var _ = Describe("status reconciler test", func() {
@@ -45,6 +47,7 @@ var _ = Describe("status reconciler test", func() {
 			SetMinReadySeconds(minReadySeconds).
 			SetRoles(roles).
 			GetObject()
+		priorityMap = ComposeRolePriorityMap(its.Spec.Roles)
 	})
 
 	Context("PreCondition & Reconcile", func() {
@@ -102,43 +105,49 @@ var _ = Describe("status reconciler test", func() {
 			Expect(its.Status.AvailableReplicas).Should(BeEquivalentTo(0))
 			Expect(its.Status.UpdatedReplicas).Should(BeEquivalentTo(0))
 			Expect(its.Status.CurrentReplicas).Should(BeEquivalentTo(0))
-			Expect(its.Status.CurrentRevisions).Should(HaveLen(0))
-			Expect(its.Status.CurrentGeneration).Should(BeEquivalentTo(its.Generation))
 
 			By("make all pods ready with old revision")
 			condition := corev1.PodCondition{
 				Type:               corev1.PodReady,
 				Status:             corev1.ConditionTrue,
-				LastTransitionTime: metav1.NewTime(time.Now().Add(-1 * minReadySeconds * time.Second)),
+				LastTransitionTime: metav1.NewTime(time.Now()),
 			}
-			makePodAvailableWithOldRevision := func(pod *corev1.Pod, revision string) {
+			makePodAvailableWithRevision := func(pod *corev1.Pod, revision string, updatePodAvailable bool) {
 				pod.Labels[appsv1.ControllerRevisionHashLabelKey] = revision
 				pod.Status.Phase = corev1.PodRunning
-				pod.Status.Conditions = append(pod.Status.Conditions, condition)
+				if updatePodAvailable {
+					condition.LastTransitionTime = metav1.NewTime(time.Now().Add(-1 * minReadySeconds * time.Second))
+				}
+				pod.Status.Conditions = []corev1.PodCondition{condition}
 			}
 			pods := newTree.List(&corev1.Pod{})
+			currentRevisionMap := map[string]string{}
+			oldRevision := "old-revision"
 			for _, object := range pods {
 				pod, ok := object.(*corev1.Pod)
 				Expect(ok).Should(BeTrue())
-				makePodAvailableWithOldRevision(pod, "old-revision")
+				makePodAvailableWithRevision(pod, oldRevision, false)
+				currentRevisionMap[pod.Name] = oldRevision
 			}
 			_, err = reconciler.Reconcile(newTree)
-			Expect(err).Should(BeNil())
+			Expect(intctrlutil.IsDelayedRequeueError(err)).Should(BeTrue())
 			Expect(its.Status.Replicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.ReadyReplicas).Should(BeEquivalentTo(replicas))
-			Expect(its.Status.AvailableReplicas).Should(BeEquivalentTo(replicas))
+			Expect(its.Status.AvailableReplicas).Should(BeEquivalentTo(0))
 			Expect(its.Status.UpdatedReplicas).Should(BeEquivalentTo(0))
 			Expect(its.Status.CurrentReplicas).Should(BeEquivalentTo(replicas))
-			Expect(its.Status.CurrentRevisions).Should(HaveLen(0))
-			Expect(its.Status.CurrentGeneration).Should(BeEquivalentTo(its.Generation))
+			currentRevisions, _ := buildRevisions(currentRevisionMap)
+			Expect(its.Status.CurrentRevisions).Should(Equal(currentRevisions))
+			Expect(its.Status.Conditions[1].Type).Should(BeEquivalentTo(workloads.InstanceAvailable))
+			Expect(its.Status.Conditions[1].Status).Should(BeEquivalentTo(corev1.ConditionFalse))
 
 			By("make all pods available with latest revision")
-			updateRevisions, err := getUpdateRevisions(its.Status.UpdateRevisions)
+			updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
 			Expect(err).Should(BeNil())
 			for _, object := range pods {
 				pod, ok := object.(*corev1.Pod)
 				Expect(ok).Should(BeTrue())
-				makePodAvailableWithOldRevision(pod, updateRevisions[pod.Name])
+				makePodAvailableWithRevision(pod, updateRevisions[pod.Name], true)
 			}
 			_, err = reconciler.Reconcile(newTree)
 			Expect(err).Should(BeNil())
@@ -148,7 +157,109 @@ var _ = Describe("status reconciler test", func() {
 			Expect(its.Status.UpdatedReplicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.CurrentReplicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.CurrentRevisions).Should(Equal(its.Status.UpdateRevisions))
-			Expect(its.Status.CurrentGeneration).Should(BeEquivalentTo(its.Generation))
+			Expect(its.Status.Conditions).Should(HaveLen(2))
+			Expect(its.Status.Conditions[1].Type).Should(BeEquivalentTo(workloads.InstanceAvailable))
+			Expect(its.Status.Conditions[1].Status).Should(BeEquivalentTo(corev1.ConditionTrue))
+
+			By("make all pods failed")
+			for _, object := range pods {
+				pod, ok := object.(*corev1.Pod)
+				Expect(ok).Should(BeTrue())
+				pod.Status.Phase = corev1.PodFailed
+			}
+			_, err = reconciler.Reconcile(newTree)
+			Expect(err).Should(BeNil())
+			Expect(its.Status.Replicas).Should(BeEquivalentTo(replicas))
+			Expect(its.Status.ReadyReplicas).Should(BeEquivalentTo(0))
+			Expect(its.Status.AvailableReplicas).Should(BeEquivalentTo(0))
+			Expect(its.Status.UpdatedReplicas).Should(BeEquivalentTo(replicas))
+			Expect(its.Status.CurrentReplicas).Should(BeEquivalentTo(replicas))
+			Expect(its.Status.CurrentRevisions).Should(Equal(its.Status.UpdateRevisions))
+			Expect(its.Status.Conditions).Should(HaveLen(3))
+			failureNames := []string{"bar-0", "bar-1", "bar-2", "bar-3", "bar-foo-0", "bar-foo-1", "bar-hello-0"}
+			message, err := json.Marshal(failureNames)
+			Expect(err).Should(BeNil())
+			Expect(its.Status.Conditions[0].Type).Should(BeEquivalentTo(workloads.InstanceReady))
+			Expect(its.Status.Conditions[0].Status).Should(BeEquivalentTo(metav1.ConditionFalse))
+			Expect(its.Status.Conditions[0].Reason).Should(BeEquivalentTo(workloads.ReasonNotReady))
+			Expect(its.Status.Conditions[0].Message).Should(BeEquivalentTo(message))
+			Expect(its.Status.Conditions[2].Type).Should(BeEquivalentTo(workloads.InstanceFailure))
+			Expect(its.Status.Conditions[2].Reason).Should(BeEquivalentTo(workloads.ReasonInstanceFailure))
+			Expect(its.Status.Conditions[2].Message).Should(BeEquivalentTo(message))
+		})
+	})
+
+	Context("setMembersStatus function", func() {
+		It("should work well", func() {
+			pods := []*corev1.Pod{
+				builder.NewPodBuilder(namespace, "pod-0").AddLabels(RoleLabelKey, "follower").GetObject(),
+				builder.NewPodBuilder(namespace, "pod-1").AddLabels(RoleLabelKey, "leader").GetObject(),
+				builder.NewPodBuilder(namespace, "pod-2").AddLabels(RoleLabelKey, "follower").GetObject(),
+			}
+			readyCondition := corev1.PodCondition{
+				Type:   corev1.PodReady,
+				Status: corev1.ConditionTrue,
+			}
+			pods[0].Status.Conditions = append(pods[0].Status.Conditions, readyCondition)
+			pods[1].Status.Conditions = append(pods[1].Status.Conditions, readyCondition)
+			oldMembersStatus := []workloads.MemberStatus{
+				{
+					PodName:     "pod-0",
+					ReplicaRole: &workloads.ReplicaRole{Name: "leader"},
+				},
+				{
+					PodName:     "pod-1",
+					ReplicaRole: &workloads.ReplicaRole{Name: "follower"},
+				},
+				{
+					PodName:     "pod-2",
+					ReplicaRole: &workloads.ReplicaRole{Name: "follower"},
+				},
+			}
+			replicas := int32(3)
+			its.Spec.Replicas = &replicas
+			its.Status.MembersStatus = oldMembersStatus
+			setMembersStatus(its, pods)
+
+			Expect(its.Status.MembersStatus).Should(HaveLen(2))
+			Expect(its.Status.MembersStatus[0].PodName).Should(Equal("pod-1"))
+			Expect(its.Status.MembersStatus[0].ReplicaRole.Name).Should(Equal("leader"))
+			Expect(its.Status.MembersStatus[1].PodName).Should(Equal("pod-0"))
+			Expect(its.Status.MembersStatus[1].ReplicaRole.Name).Should(Equal("follower"))
+		})
+	})
+
+	Context("sortMembersStatus function", func() {
+		It("should work well", func() {
+			// 2(learner)->1(learner)->4(logger)->0(follower)->3(leader)
+			membersStatus := []workloads.MemberStatus{
+				{
+					PodName:     "pod-0",
+					ReplicaRole: &workloads.ReplicaRole{Name: "follower"},
+				},
+				{
+					PodName:     "pod-1",
+					ReplicaRole: &workloads.ReplicaRole{Name: "learner"},
+				},
+				{
+					PodName:     "pod-2",
+					ReplicaRole: &workloads.ReplicaRole{Name: "learner"},
+				},
+				{
+					PodName:     "pod-3",
+					ReplicaRole: &workloads.ReplicaRole{Name: "leader"},
+				},
+				{
+					PodName:     "pod-4",
+					ReplicaRole: &workloads.ReplicaRole{Name: "logger"},
+				},
+			}
+			expectedOrder := []string{"pod-3", "pod-0", "pod-4", "pod-1", "pod-2"}
+
+			sortMembersStatus(membersStatus, priorityMap)
+			for i, status := range membersStatus {
+				Expect(status.PodName).Should(Equal(expectedOrder[i]))
+			}
 		})
 	})
 })

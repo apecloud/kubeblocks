@@ -20,79 +20,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
-	"context"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/golang/mock/gomock"
-	"golang.org/x/exp/slices"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
-	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("utils test", func() {
-	Context("mergeList", func() {
-		It("should work well", func() {
-			src := []corev1.Volume{
-				{
-					Name: "pvc1",
-					VolumeSource: corev1.VolumeSource{
-						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "pvc1-pod-0",
-						},
-					},
-				},
-				{
-					Name: "pvc2",
-					VolumeSource: corev1.VolumeSource{
-						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "pvc2-pod-0",
-						},
-					},
-				},
-			}
-			dst := []corev1.Volume{
-				{
-					Name: "pvc0",
-					VolumeSource: corev1.VolumeSource{
-						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "pvc0-pod-0",
-						},
-					},
-				},
-				{
-					Name: "pvc1",
-					VolumeSource: corev1.VolumeSource{
-						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "pvc-pod-0",
-						},
-					},
-				},
-			}
-			mergeList(&src, &dst, func(v corev1.Volume) func(corev1.Volume) bool {
-				return func(volume corev1.Volume) bool {
-					return v.Name == volume.Name
-				}
-			})
-
-			Expect(dst).Should(HaveLen(3))
-			slices.SortStableFunc(dst, func(a, b corev1.Volume) bool {
-				return a.Name < b.Name
-			})
-			Expect(dst[0].Name).Should(Equal("pvc0"))
-			Expect(dst[1].Name).Should(Equal("pvc1"))
-			Expect(dst[1].PersistentVolumeClaim).ShouldNot(BeNil())
-			Expect(dst[1].PersistentVolumeClaim.ClaimName).Should(Equal("pvc1-pod-0"))
-			Expect(dst[2].Name).Should(Equal("pvc2"))
-		})
+	BeforeEach(func() {
+		its = builder.NewInstanceSetBuilder(namespace, name).
+			SetService(&corev1.Service{}).
+			SetRoles(roles).
+			GetObject()
+		priorityMap = ComposeRolePriorityMap(its.Spec.Roles)
 	})
 
 	Context("mergeMap", func() {
@@ -115,51 +60,176 @@ var _ = Describe("utils test", func() {
 		})
 	})
 
-	Context("CurrentProvider", func() {
+	Context("ComposeRolePriorityMap function", func() {
 		It("should work well", func() {
-			if viper.IsSet(FeatureGateRSMReplicaProvider) {
-				provider := viper.GetString(FeatureGateRSMReplicaProvider)
-				defer func() {
-					viper.Set(FeatureGateRSMReplicaProvider, provider)
-				}()
+			priorityList := []int{
+				leaderPriority,
+				followerReadonlyPriority,
+				followerNonePriority,
+				learnerPriority,
+			}
+			Expect(priorityMap).ShouldNot(BeZero())
+			Expect(priorityMap).Should(HaveLen(len(roles) + 1))
+			for i, role := range roles {
+				Expect(priorityMap[role.Name]).Should(Equal(priorityList[i]))
+			}
+		})
+	})
+
+	Context("SortPods function", func() {
+		It("should work well", func() {
+			pods := []corev1.Pod{
+				*builder.NewPodBuilder(namespace, "pod-0").AddLabels(RoleLabelKey, "follower").GetObject(),
+				*builder.NewPodBuilder(namespace, "pod-1").AddLabels(RoleLabelKey, "logger").GetObject(),
+				*builder.NewPodBuilder(namespace, "pod-2").GetObject(),
+				*builder.NewPodBuilder(namespace, "pod-3").AddLabels(RoleLabelKey, "learner").GetObject(),
+				*builder.NewPodBuilder(namespace, "pod-4").AddLabels(RoleLabelKey, "candidate").GetObject(),
+				*builder.NewPodBuilder(namespace, "pod-5").AddLabels(RoleLabelKey, "leader").GetObject(),
+				*builder.NewPodBuilder(namespace, "pod-6").AddLabels(RoleLabelKey, "learner").GetObject(),
+			}
+			expectedOrder := []string{"pod-4", "pod-2", "pod-6", "pod-3", "pod-1", "pod-0", "pod-5"}
+
+			SortPods(pods, priorityMap, false)
+			for i, pod := range pods {
+				Expect(pod.Name).Should(Equal(expectedOrder[i]))
+			}
+		})
+	})
+
+	Context("getRoleName function", func() {
+		It("should work well", func() {
+			pod := builder.NewPodBuilder(namespace, name).AddLabels(RoleLabelKey, "LEADER").GetObject()
+			role := getRoleName(pod)
+			Expect(role).Should(Equal("leader"))
+		})
+	})
+
+	Context("AddAnnotationScope function", func() {
+		It("should work well", func() {
+			By("call with a nil map")
+			var annotations map[string]string
+			Expect(AddAnnotationScope(HeadlessServiceScope, annotations)).Should(BeNil())
+
+			By("call with an empty map")
+			annotations = make(map[string]string, 0)
+			scopedAnnotations := AddAnnotationScope(HeadlessServiceScope, annotations)
+			Expect(scopedAnnotations).ShouldNot(BeNil())
+			Expect(scopedAnnotations).Should(HaveLen(0))
+
+			By("call with none empty map")
+			annotations["foo"] = "bar"
+			annotations["foo/bar"] = "foo.bar"
+			annotations["foo.bar/bar"] = "foo.bar.bar"
+			scopedAnnotations = AddAnnotationScope(HeadlessServiceScope, annotations)
+			Expect(scopedAnnotations).ShouldNot(BeNil())
+			Expect(scopedAnnotations).Should(HaveLen(len(annotations)))
+			for k, v := range annotations {
+				nk := fmt.Sprintf("%s%s", k, HeadlessServiceScope)
+				nv, ok := scopedAnnotations[nk]
+				Expect(ok).Should(BeTrue())
+				Expect(nv).Should(Equal(v))
+			}
+		})
+	})
+
+	Context("ParseAnnotationsOfScope function", func() {
+		It("should work well", func() {
+			By("call with a nil map")
+			var scopedAnnotations map[string]string
+			Expect(ParseAnnotationsOfScope(HeadlessServiceScope, scopedAnnotations)).Should(BeNil())
+
+			By("call with an empty map")
+			scopedAnnotations = make(map[string]string, 0)
+			annotations := ParseAnnotationsOfScope(HeadlessServiceScope, scopedAnnotations)
+			Expect(annotations).ShouldNot(BeNil())
+			Expect(annotations).Should(HaveLen(0))
+
+			By("call with RootScope")
+			scopedAnnotations["foo"] = "bar"
+			scopedAnnotations["foo.bar"] = "foo.bar"
+			headlessK := "foo.headless.its"
+			scopedAnnotations[headlessK] = headlessK
+			annotations = ParseAnnotationsOfScope(RootScope, scopedAnnotations)
+			Expect(annotations).ShouldNot(BeNil())
+			Expect(annotations).Should(HaveLen(2))
+			delete(scopedAnnotations, headlessK)
+			for k, v := range scopedAnnotations {
+				nv, ok := annotations[k]
+				Expect(ok).Should(BeTrue())
+				Expect(nv).Should(Equal(v))
 			}
 
-			controller, k8sMock := testutil.SetupK8sMock()
-			defer controller.Finish()
-			root := builder.NewStatefulSetBuilder("foo", "bar").GetObject()
+			By("call with none RootScope")
+			scopedAnnotations[headlessK] = headlessK
+			annotations = ParseAnnotationsOfScope(HeadlessServiceScope, scopedAnnotations)
+			Expect(annotations).Should(HaveLen(1))
+			Expect(annotations["foo"]).Should(Equal(headlessK))
+		})
+	})
 
-			By("No StatefulSet found")
-			k8sMock.EXPECT().
-				Get(gomock.Any(), gomock.Any(), &appsv1.StatefulSet{}, gomock.Any()).
-				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *appsv1.StatefulSet, _ ...client.GetOption) error {
-					return apierrors.NewNotFound(schema.GroupResource{}, "bar")
-				}).Times(1)
-			provider, err := CurrentReplicaProvider(context.Background(), k8sMock, client.ObjectKeyFromObject(root))
-			Expect(err).Should(BeNil())
-			Expect(provider).Should(Equal(defaultReplicaProvider))
+	Context("IsInstanceSetReady", func() {
+		It("should work well", func() {
+			By("set its to nil")
+			its = nil
+			Expect(IsInstanceSetReady(its)).Should(BeFalse())
 
-			By("ReplicaProvider set")
-			viper.Set(FeatureGateRSMReplicaProvider, string(StatefulSetProvider))
-			k8sMock.EXPECT().
-				Get(gomock.Any(), gomock.Any(), &appsv1.StatefulSet{}, gomock.Any()).
-				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *appsv1.StatefulSet, _ ...client.GetOption) error {
-					return apierrors.NewNotFound(schema.GroupResource{}, "bar")
-				}).Times(1)
-			provider, err = CurrentReplicaProvider(context.Background(), k8sMock, client.ObjectKeyFromObject(root))
-			Expect(err).Should(BeNil())
-			Expect(provider).Should(Equal(StatefulSetProvider))
+			By("set its to not initialized")
+			replicas := int32(3)
+			its = builder.NewInstanceSetBuilder(namespace, name).
+				SetService(&corev1.Service{}).
+				SetRoles(roles).
+				SetReplicas(replicas).
+				GetObject()
+			its.Status = workloads.InstanceSetStatus{
+				InitReplicas: replicas,
+			}
+			Expect(IsInstanceSetReady(its)).Should(BeFalse())
 
-			By("StatefulSet found")
-			viper.Set(FeatureGateRSMReplicaProvider, string(PodProvider))
-			k8sMock.EXPECT().
-				Get(gomock.Any(), gomock.Any(), &appsv1.StatefulSet{}, gomock.Any()).
-				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *appsv1.StatefulSet, _ ...client.GetOption) error {
-					*obj = *root
-					return nil
-				}).Times(1)
-			provider, err = CurrentReplicaProvider(context.Background(), k8sMock, client.ObjectKeyFromObject(root))
-			Expect(err).Should(BeNil())
-			Expect(provider).Should(Equal(StatefulSetProvider))
+			By("set its.status.observedGeneration to not equal generation")
+			its.Status.ReadyInitReplicas = replicas
+			its.Generation = 1
+			Expect(IsInstanceSetReady(its)).Should(BeFalse())
+
+			By("set its.status.replicas to not as expected")
+			its.Status.ObservedGeneration = its.Generation
+			its.Status.Replicas = replicas - 1
+			Expect(IsInstanceSetReady(its)).Should(BeFalse())
+
+			By("set spec.minReadySeconds to not zero")
+			its.Status.Replicas = replicas
+			its.Status.ReadyReplicas = replicas
+			its.Status.UpdatedReplicas = replicas
+			its.Status.AvailableReplicas = replicas - 1
+			its.Spec.MinReadySeconds = int32(5)
+			Expect(IsInstanceSetReady(its)).Should(BeFalse())
+
+			By("set its to role-less")
+			its.Status.AvailableReplicas = replicas
+			its.Spec.Roles = nil
+			its.Spec.RoleProbe = nil
+			Expect(IsInstanceSetReady(its)).Should(BeTrue())
+
+			By("set its to role-ful")
+			its.Spec.Roles = roles
+			its.Spec.RoleProbe = &workloads.RoleProbe{}
+			Expect(IsInstanceSetReady(its)).Should(BeFalse())
+
+			By("set membersStatus to ready")
+			its.Status.MembersStatus = []workloads.MemberStatus{
+				{
+					PodName:     name + "-0",
+					ReplicaRole: &roles[0],
+				},
+				{
+					PodName:     name + "-1",
+					ReplicaRole: &roles[1],
+				},
+				{
+					PodName:     name + "-2",
+					ReplicaRole: &roles[2],
+				},
+			}
+			Expect(IsInstanceSetReady(its)).Should(BeTrue())
 		})
 	})
 })

@@ -16,7 +16,7 @@ From v0.6.0, KubeBlocks supports `kbcli cluster configure` and `kbcli cluster ed
 View the current configuration file of a cluster.
 
 ```bash
-kbcli cluster describe-config redis-cluster --component=redis
+kbcli cluster describe-config redis-cluster --components=redis
 ```
 
 From the meta information, the cluster `redis-cluster` has a configuration file named `redis.cnf`.
@@ -26,19 +26,19 @@ You can also view the details of this configuration file and parameters.
 * View the details of the current configuration file.
 
   ```bash
-  kbcli cluster describe-config redis-cluster --component=redis --show-detail
+  kbcli cluster describe-config redis-cluster --components=redis --show-detail
   ```
 
 * View the parameter description.
 
   ```bash
-  kbcli cluster explain-config redis-cluster --component=redis |head -n 20
+  kbcli cluster explain-config redis-cluster --components=redis |head -n 20
   ```
 
 * View the user guide of a specified parameter.
 
   ```bash
-  kbcli cluster explain-config redis-cluster --component=redis --param=acllog-max-len
+  kbcli cluster explain-config redis-cluster --components=redis --param=acllog-max-len
   ```
 
   <details>
@@ -86,7 +86,7 @@ The example below configures `acllog-max-len`.
 2. Adjust the values of `acllog-max-len`.
 
    ```bash
-   kbcli cluster configure redis-cluster --component=redis --set=acllog-max-len=256
+   kbcli cluster configure redis-cluster --components=redis --set=acllog-max-len=256
    ```
 
    :::note
@@ -126,7 +126,7 @@ The example below configures `acllog-max-len`.
      Name: redis-cluster-reconfiguring-zjztm	NameSpace: default	Cluster: redis-cluster	Type: Reconfiguring
 
    Command:
-     kbcli cluster configure redis-cluster --components=redis --config-spec=redis-replication-config --config-file=redis.conf --set acllog-max-len=256 --namespace=default
+     kbcli cluster configure redis-cluster --components=redis --config-specs=redis-replication-config --config-file=redis.conf --set acllog-max-len=256 --namespace=default
 
    Status:
      Start Time:         Apr 17,2023 17:22 UTC+0800
@@ -203,7 +203,7 @@ After the configuration is completed, you can search the configuration history a
 View the parameter configuration history.
 
 ```bash
-kbcli cluster describe-config redis-cluster --component=redis
+kbcli cluster describe-config redis-cluster --components=redis
 ```
 
 <details>

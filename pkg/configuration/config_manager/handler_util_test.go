@@ -34,13 +34,14 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
-	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
 func TestIsSupportReload(t *testing.T) {
 	type args struct {
-		reload *appsv1beta1.DynamicReloadAction
+		reload *appsv1beta1.ReloadAction
 	}
 	tests := []struct {
 		name string
@@ -55,13 +56,13 @@ func TestIsSupportReload(t *testing.T) {
 	}, {
 		name: "reload_test_with_empty_reload_options",
 		args: args{
-			reload: &appsv1beta1.DynamicReloadAction{},
+			reload: &appsv1beta1.ReloadAction{},
 		},
 		want: false,
 	}, {
 		name: "reload_test_with_unix_signal",
 		args: args{
-			reload: &appsv1beta1.DynamicReloadAction{
+			reload: &appsv1beta1.ReloadAction{
 				UnixSignalTrigger: &appsv1beta1.UnixSignalTrigger{
 					ProcessName: "test",
 					Signal:      appsv1beta1.SIGHUP,
@@ -72,7 +73,7 @@ func TestIsSupportReload(t *testing.T) {
 	}, {
 		name: "reload_test_with_shell",
 		args: args{
-			reload: &appsv1beta1.DynamicReloadAction{
+			reload: &appsv1beta1.ReloadAction{
 				ShellTrigger: &appsv1beta1.ShellTrigger{
 					Command: strings.Fields("pg_ctl reload"),
 				},
@@ -82,7 +83,7 @@ func TestIsSupportReload(t *testing.T) {
 	}, {
 		name: "reload_test_with_tpl_script",
 		args: args{
-			reload: &appsv1beta1.DynamicReloadAction{
+			reload: &appsv1beta1.ReloadAction{
 				TPLScriptTrigger: &appsv1beta1.TPLScriptTrigger{
 					ScriptConfig: appsv1beta1.ScriptConfig{
 						ScriptConfigMapRef: "cm",
@@ -95,7 +96,7 @@ func TestIsSupportReload(t *testing.T) {
 	}, {
 		name: "auto_trigger_reload_test_with_process_name",
 		args: args{
-			reload: &appsv1beta1.DynamicReloadAction{
+			reload: &appsv1beta1.ReloadAction{
 				AutoTrigger: &appsv1beta1.AutoTrigger{
 					ProcessName: "test",
 				},
@@ -105,7 +106,7 @@ func TestIsSupportReload(t *testing.T) {
 	}, {
 		name: "auto_trigger_reload_test",
 		args: args{
-			reload: &appsv1beta1.DynamicReloadAction{
+			reload: &appsv1beta1.ReloadAction{
 				AutoTrigger: &appsv1beta1.AutoTrigger{},
 			},
 		},
@@ -133,14 +134,14 @@ var _ = Describe("Handler Util Test", func() {
 		DeferCleanup(mockK8sCli.Finish)
 	})
 
-	mockConfigConstraint := func(ccName string, reloadOptions *appsv1beta1.DynamicReloadAction) *appsv1beta1.ConfigConstraint {
+	mockConfigConstraint := func(ccName string, reloadOptions *appsv1beta1.ReloadAction) *appsv1beta1.ConfigConstraint {
 		return &appsv1beta1.ConfigConstraint{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: ccName,
 			},
 			Spec: appsv1beta1.ConfigConstraintSpec{
-				DynamicReloadAction: reloadOptions,
-				FormatterConfig: &appsv1beta1.FormatterConfig{
+				ReloadAction: reloadOptions,
+				FileFormatConfig: &appsv1beta1.FileFormatConfig{
 					Format: appsv1beta1.Properties,
 				},
 			}}
@@ -161,12 +162,12 @@ var _ = Describe("Handler Util Test", func() {
 	Context("TestValidateReloadOptions", func() {
 		It("Should succeed with no error", func() {
 			mockK8sCli.MockGetMethod(
-				testutil.WithFailed(cfgutil.MakeError("failed to get resource."), testutil.WithTimes(1)),
+				testutil.WithFailed(cfgcore.MakeError("failed to get resource."), testutil.WithTimes(1)),
 				testutil.WithSucceed(testutil.WithTimes(1)),
 			)
 
 			type args struct {
-				reloadAction *appsv1beta1.DynamicReloadAction
+				reloadAction *appsv1beta1.ReloadAction
 				cli          client.Client
 				ctx          context.Context
 			}
@@ -177,7 +178,7 @@ var _ = Describe("Handler Util Test", func() {
 			}{{
 				name: "unixSignalTest",
 				args: args{
-					reloadAction: &appsv1beta1.DynamicReloadAction{
+					reloadAction: &appsv1beta1.ReloadAction{
 						UnixSignalTrigger: &appsv1beta1.UnixSignalTrigger{
 							Signal: appsv1beta1.SIGHUP,
 						}},
@@ -186,7 +187,7 @@ var _ = Describe("Handler Util Test", func() {
 			}, {
 				name: "unixSignalTest",
 				args: args{
-					reloadAction: &appsv1beta1.DynamicReloadAction{
+					reloadAction: &appsv1beta1.ReloadAction{
 						UnixSignalTrigger: &appsv1beta1.UnixSignalTrigger{
 							Signal: "SIGNOEXIST",
 						}},
@@ -195,7 +196,7 @@ var _ = Describe("Handler Util Test", func() {
 			}, {
 				name: "shellTest",
 				args: args{
-					reloadAction: &appsv1beta1.DynamicReloadAction{
+					reloadAction: &appsv1beta1.ReloadAction{
 						ShellTrigger: &appsv1beta1.ShellTrigger{
 							Command: nil,
 						}},
@@ -204,7 +205,7 @@ var _ = Describe("Handler Util Test", func() {
 			}, {
 				name: "shellTest",
 				args: args{
-					reloadAction: &appsv1beta1.DynamicReloadAction{
+					reloadAction: &appsv1beta1.ReloadAction{
 						ShellTrigger: &appsv1beta1.ShellTrigger{
 							Command: strings.Fields("go"),
 						}},
@@ -213,7 +214,7 @@ var _ = Describe("Handler Util Test", func() {
 			}, {
 				name: "TPLScriptTest",
 				args: args{
-					reloadAction: &appsv1beta1.DynamicReloadAction{
+					reloadAction: &appsv1beta1.ReloadAction{
 						TPLScriptTrigger: &appsv1beta1.TPLScriptTrigger{
 							ScriptConfig: appsv1beta1.ScriptConfig{
 								ScriptConfigMapRef: "test",
@@ -226,7 +227,7 @@ var _ = Describe("Handler Util Test", func() {
 			}, {
 				name: "TPLScriptTest",
 				args: args{
-					reloadAction: &appsv1beta1.DynamicReloadAction{
+					reloadAction: &appsv1beta1.ReloadAction{
 						TPLScriptTrigger: &appsv1beta1.TPLScriptTrigger{
 							ScriptConfig: appsv1beta1.ScriptConfig{
 								ScriptConfigMapRef: "test",
@@ -239,7 +240,7 @@ var _ = Describe("Handler Util Test", func() {
 			}, {
 				name: "autoTriggerTest",
 				args: args{
-					reloadAction: &appsv1beta1.DynamicReloadAction{
+					reloadAction: &appsv1beta1.ReloadAction{
 						AutoTrigger: &appsv1beta1.AutoTrigger{
 							ProcessName: "test",
 						}},
@@ -248,7 +249,7 @@ var _ = Describe("Handler Util Test", func() {
 			}, {
 				name: "autoTriggerTest",
 				args: args{
-					reloadAction: &appsv1beta1.DynamicReloadAction{
+					reloadAction: &appsv1beta1.ReloadAction{
 						AutoTrigger: &appsv1beta1.AutoTrigger{}},
 				},
 				wantErr: false,
@@ -298,7 +299,7 @@ var _ = Describe("Handler Util Test", func() {
 
 		It("normal test", func() {
 			ccName := "config_constraint"
-			cc := mockConfigConstraint(ccName, &appsv1beta1.DynamicReloadAction{
+			cc := mockConfigConstraint(ccName, &appsv1beta1.ReloadAction{
 				UnixSignalTrigger: &appsv1beta1.UnixSignalTrigger{
 					ProcessName: "test",
 					Signal:      appsv1beta1.SIGHUP,
@@ -316,12 +317,12 @@ var _ = Describe("Handler Util Test", func() {
 			Expect(len(configSpecs)).Should(BeEquivalentTo(1))
 			Expect(configSpecs[0].ConfigSpec).Should(BeEquivalentTo(mockConfigSpec(ccName)))
 			Expect(configSpecs[0].ReloadType).Should(BeEquivalentTo(appsv1beta1.UnixSignalType))
-			Expect(configSpecs[0].FormatterConfig).Should(BeEquivalentTo(*cc.Spec.FormatterConfig))
+			Expect(configSpecs[0].FormatterConfig).Should(BeEquivalentTo(*cc.Spec.FileFormatConfig))
 		})
 
 		It("auto trigger test", func() {
 			ccName := "auto_trigger_config_constraint"
-			cc := mockConfigConstraint(ccName, &appsv1beta1.DynamicReloadAction{
+			cc := mockConfigConstraint(ccName, &appsv1beta1.ReloadAction{
 				AutoTrigger: &appsv1beta1.AutoTrigger{
 					ProcessName: "test",
 				},
@@ -341,7 +342,7 @@ var _ = Describe("Handler Util Test", func() {
 
 	Context("TestFromReloadTypeConfig", func() {
 		It("TestSignalTrigger", func() {
-			Expect(appsv1beta1.UnixSignalType).Should(BeEquivalentTo(FromReloadTypeConfig(&appsv1beta1.DynamicReloadAction{
+			Expect(appsv1beta1.UnixSignalType).Should(BeEquivalentTo(FromReloadTypeConfig(&appsv1beta1.ReloadAction{
 				UnixSignalTrigger: &appsv1beta1.UnixSignalTrigger{
 					ProcessName: "test",
 					Signal:      appsv1beta1.SIGHUP,
@@ -349,21 +350,21 @@ var _ = Describe("Handler Util Test", func() {
 		})
 
 		It("TestAutoTrigger", func() {
-			Expect(appsv1beta1.AutoType).Should(BeEquivalentTo(FromReloadTypeConfig(&appsv1beta1.DynamicReloadAction{
+			Expect(appsv1beta1.AutoType).Should(BeEquivalentTo(FromReloadTypeConfig(&appsv1beta1.ReloadAction{
 				AutoTrigger: &appsv1beta1.AutoTrigger{
 					ProcessName: "test",
 				}})))
 		})
 
 		It("TestShellTrigger", func() {
-			Expect(appsv1beta1.ShellType).Should(BeEquivalentTo(FromReloadTypeConfig(&appsv1beta1.DynamicReloadAction{
+			Expect(appsv1beta1.ShellType).Should(BeEquivalentTo(FromReloadTypeConfig(&appsv1beta1.ReloadAction{
 				ShellTrigger: &appsv1beta1.ShellTrigger{
 					Command: []string{"/bin/true"},
 				}})))
 		})
 
 		It("TestTplScriptsTrigger", func() {
-			Expect(appsv1beta1.TPLScriptType).Should(BeEquivalentTo(FromReloadTypeConfig(&appsv1beta1.DynamicReloadAction{
+			Expect(appsv1beta1.TPLScriptType).Should(BeEquivalentTo(FromReloadTypeConfig(&appsv1beta1.ReloadAction{
 				TPLScriptTrigger: &appsv1beta1.TPLScriptTrigger{
 					ScriptConfig: appsv1beta1.ScriptConfig{
 						ScriptConfigMapRef: "test",
@@ -373,13 +374,13 @@ var _ = Describe("Handler Util Test", func() {
 		})
 
 		It("TestInvalidTrigger", func() {
-			Expect("").Should(BeEquivalentTo(FromReloadTypeConfig(&appsv1beta1.DynamicReloadAction{})))
+			Expect("").Should(BeEquivalentTo(FromReloadTypeConfig(&appsv1beta1.ReloadAction{})))
 		})
 	})
 
 	Context("TestValidateReloadOptions", func() {
 		It("TestSignalTrigger", func() {
-			Expect(ValidateReloadOptions(&appsv1beta1.DynamicReloadAction{
+			Expect(ValidateReloadOptions(&appsv1beta1.ReloadAction{
 				UnixSignalTrigger: &appsv1beta1.UnixSignalTrigger{
 					ProcessName: "test",
 					Signal:      appsv1beta1.SIGHUP,
@@ -388,7 +389,7 @@ var _ = Describe("Handler Util Test", func() {
 		})
 
 		It("TestSignalTrigger", func() {
-			Expect(ValidateReloadOptions(&appsv1beta1.DynamicReloadAction{
+			Expect(ValidateReloadOptions(&appsv1beta1.ReloadAction{
 				AutoTrigger: &appsv1beta1.AutoTrigger{
 					ProcessName: "test",
 				}}, nil, nil),
@@ -396,7 +397,7 @@ var _ = Describe("Handler Util Test", func() {
 		})
 
 		It("TestShellTrigger", func() {
-			Expect(ValidateReloadOptions(&appsv1beta1.DynamicReloadAction{
+			Expect(ValidateReloadOptions(&appsv1beta1.ReloadAction{
 				ShellTrigger: &appsv1beta1.ShellTrigger{
 					Command: []string{"/bin/true"},
 				}}, nil, nil),
@@ -417,7 +418,7 @@ var _ = Describe("Handler Util Test", func() {
 			}), testutil.WithTimes(2)))
 
 			By("Test valid")
-			Expect(ValidateReloadOptions(&appsv1beta1.DynamicReloadAction{
+			Expect(ValidateReloadOptions(&appsv1beta1.ReloadAction{
 				TPLScriptTrigger: &appsv1beta1.TPLScriptTrigger{
 					ScriptConfig: appsv1beta1.ScriptConfig{
 						ScriptConfigMapRef: testName1,
@@ -427,7 +428,7 @@ var _ = Describe("Handler Util Test", func() {
 			).Should(Succeed())
 
 			By("Test invalid")
-			Expect(ValidateReloadOptions(&appsv1beta1.DynamicReloadAction{
+			Expect(ValidateReloadOptions(&appsv1beta1.ReloadAction{
 				TPLScriptTrigger: &appsv1beta1.TPLScriptTrigger{
 					ScriptConfig: appsv1beta1.ScriptConfig{
 						ScriptConfigMapRef: testName2,
@@ -438,15 +439,16 @@ var _ = Describe("Handler Util Test", func() {
 		})
 
 		It("TestInvalidTrigger", func() {
-			Expect(ValidateReloadOptions(&appsv1beta1.DynamicReloadAction{}, nil, nil)).ShouldNot(Succeed())
+			Expect(ValidateReloadOptions(&appsv1beta1.ReloadAction{}, nil, nil)).ShouldNot(Succeed())
 		})
 	})
 })
 
 func TestFilterSubPathVolumeMount(t *testing.T) {
-	createConfigMeta := func(volumeName string, reloadType appsv1beta1.DynamicReloadType) ConfigSpecMeta {
+	createConfigMeta := func(volumeName string, reloadType appsv1beta1.DynamicReloadType, reloadAction *appsv1beta1.ReloadAction) ConfigSpecMeta {
 		return ConfigSpecMeta{ConfigSpecInfo: ConfigSpecInfo{
-			ReloadType: reloadType,
+			ReloadAction: reloadAction,
+			ReloadType:   reloadType,
 			ConfigSpec: appsv1alpha1.ComponentConfigSpec{
 				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
 					VolumeName: volumeName,
@@ -465,9 +467,19 @@ func TestFilterSubPathVolumeMount(t *testing.T) {
 		name: "test1",
 		args: args{
 			metas: []ConfigSpecMeta{
-				createConfigMeta("test1", appsv1beta1.UnixSignalType),
-				createConfigMeta("test2", appsv1beta1.ShellType),
-				createConfigMeta("test3", appsv1beta1.TPLScriptType),
+				createConfigMeta("test1", appsv1beta1.UnixSignalType, &appsv1beta1.ReloadAction{
+					UnixSignalTrigger: &appsv1beta1.UnixSignalTrigger{},
+				}),
+				createConfigMeta("test2", appsv1beta1.ShellType, &appsv1beta1.ReloadAction{
+					ShellTrigger: &appsv1beta1.ShellTrigger{
+						Sync: cfgutil.ToPointer(true),
+					},
+				}),
+				createConfigMeta("test3", appsv1beta1.TPLScriptType, &appsv1beta1.ReloadAction{
+					TPLScriptTrigger: &appsv1beta1.TPLScriptTrigger{
+						Sync: cfgutil.ToPointer(true),
+					},
+				}),
 			},
 			volumes: []corev1.VolumeMount{
 				{Name: "test1", SubPath: "test1"},
@@ -476,15 +488,30 @@ func TestFilterSubPathVolumeMount(t *testing.T) {
 			},
 		},
 		want: []ConfigSpecMeta{
-			createConfigMeta("test3", appsv1beta1.TPLScriptType),
+			createConfigMeta("test2", appsv1beta1.ShellType, &appsv1beta1.ReloadAction{
+				ShellTrigger: &appsv1beta1.ShellTrigger{
+					Sync: cfgutil.ToPointer(true),
+				},
+			}),
+			createConfigMeta("test3", appsv1beta1.TPLScriptType, &appsv1beta1.ReloadAction{
+				TPLScriptTrigger: &appsv1beta1.TPLScriptTrigger{
+					Sync: cfgutil.ToPointer(true),
+				},
+			}),
 		},
 	}, {
 		name: "test2",
 		args: args{
 			metas: []ConfigSpecMeta{
-				createConfigMeta("test1", appsv1beta1.UnixSignalType),
-				createConfigMeta("test2", appsv1beta1.ShellType),
-				createConfigMeta("test3", appsv1beta1.TPLScriptType),
+				createConfigMeta("test1", appsv1beta1.UnixSignalType, &appsv1beta1.ReloadAction{
+					UnixSignalTrigger: &appsv1beta1.UnixSignalTrigger{},
+				}),
+				createConfigMeta("test2", appsv1beta1.ShellType, &appsv1beta1.ReloadAction{
+					ShellTrigger: &appsv1beta1.ShellTrigger{},
+				}),
+				createConfigMeta("test3", appsv1beta1.TPLScriptType, &appsv1beta1.ReloadAction{
+					TPLScriptTrigger: &appsv1beta1.TPLScriptTrigger{},
+				}),
 			},
 			volumes: []corev1.VolumeMount{
 				{Name: "test1"},
@@ -493,29 +520,72 @@ func TestFilterSubPathVolumeMount(t *testing.T) {
 			},
 		},
 		want: []ConfigSpecMeta{
-			createConfigMeta("test1", appsv1beta1.UnixSignalType),
-			createConfigMeta("test2", appsv1beta1.ShellType),
-			createConfigMeta("test3", appsv1beta1.TPLScriptType),
+			createConfigMeta("test1", appsv1beta1.UnixSignalType, &appsv1beta1.ReloadAction{
+				UnixSignalTrigger: &appsv1beta1.UnixSignalTrigger{},
+			}),
+			createConfigMeta("test2", appsv1beta1.ShellType, &appsv1beta1.ReloadAction{
+				ShellTrigger: &appsv1beta1.ShellTrigger{},
+			}),
+			createConfigMeta("test3", appsv1beta1.TPLScriptType, &appsv1beta1.ReloadAction{
+				TPLScriptTrigger: &appsv1beta1.TPLScriptTrigger{},
+			}),
 		},
 	}, {
 		name: "test3",
 		args: args{
 			metas: []ConfigSpecMeta{
-				createConfigMeta("test1", appsv1beta1.UnixSignalType),
-				createConfigMeta("test2", appsv1beta1.ShellType),
-				createConfigMeta("test3", appsv1beta1.TPLScriptType),
+				createConfigMeta("test1", appsv1beta1.UnixSignalType, &appsv1beta1.ReloadAction{
+					UnixSignalTrigger: &appsv1beta1.UnixSignalTrigger{},
+				}),
+				createConfigMeta("test2", appsv1beta1.ShellType, &appsv1beta1.ReloadAction{
+					ShellTrigger: &appsv1beta1.ShellTrigger{},
+				}),
+				createConfigMeta("test3", appsv1beta1.TPLScriptType, &appsv1beta1.ReloadAction{
+					TPLScriptTrigger: &appsv1beta1.TPLScriptTrigger{},
+				}),
 			},
 			volumes: []corev1.VolumeMount{},
 		},
 		want: []ConfigSpecMeta{
-			createConfigMeta("test1", appsv1beta1.UnixSignalType),
-			createConfigMeta("test2", appsv1beta1.ShellType),
-			createConfigMeta("test3", appsv1beta1.TPLScriptType),
+			createConfigMeta("test1", appsv1beta1.UnixSignalType, &appsv1beta1.ReloadAction{
+				UnixSignalTrigger: &appsv1beta1.UnixSignalTrigger{},
+			}),
+			createConfigMeta("test2", appsv1beta1.ShellType, &appsv1beta1.ReloadAction{
+				ShellTrigger: &appsv1beta1.ShellTrigger{},
+			}),
+			createConfigMeta("test3", appsv1beta1.TPLScriptType, &appsv1beta1.ReloadAction{
+				TPLScriptTrigger: &appsv1beta1.TPLScriptTrigger{},
+			}),
 		},
+	}, {
+		name: "test4",
+		args: args{
+			metas: []ConfigSpecMeta{
+				createConfigMeta("test1", appsv1beta1.UnixSignalType, &appsv1beta1.ReloadAction{
+					UnixSignalTrigger: &appsv1beta1.UnixSignalTrigger{},
+				}),
+				createConfigMeta("test2", appsv1beta1.ShellType, &appsv1beta1.ReloadAction{
+					ShellTrigger: &appsv1beta1.ShellTrigger{
+						Sync: cfgutil.ToPointer(false),
+					},
+				}),
+				createConfigMeta("test3", appsv1beta1.TPLScriptType, &appsv1beta1.ReloadAction{
+					TPLScriptTrigger: &appsv1beta1.TPLScriptTrigger{
+						Sync: cfgutil.ToPointer(false),
+					},
+				}),
+			},
+			volumes: []corev1.VolumeMount{
+				{Name: "test1", SubPath: "test1"},
+				{Name: "test2", SubPath: "test2"},
+				{Name: "test3", SubPath: "test3"},
+			},
+		},
+		want: nil,
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, FilterSubPathVolumeMount(tt.args.metas, tt.args.volumes), "FilterSubPathVolumeMount(%v, %v)", tt.args.metas, tt.args.volumes)
+			assert.Equalf(t, tt.want, FilterSupportReloadActionConfigSpecs(tt.args.metas, tt.args.volumes), "FilterSupportReloadActionConfigSpecs(%v, %v)", tt.args.metas, tt.args.volumes)
 		})
 	}
 }

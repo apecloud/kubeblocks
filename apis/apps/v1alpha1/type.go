@@ -22,8 +22,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
 const (
@@ -32,6 +30,8 @@ const (
 	ClusterKind           = "Cluster"
 	ComponentKind         = "Component"
 	OpsRequestKind        = "OpsRequestKind"
+
+	defaultInstanceTemplateReplicas = 1
 )
 
 type ComponentTemplateSpec struct {
@@ -44,13 +44,14 @@ type ComponentTemplateSpec struct {
 
 	// Specifies the name of the referenced configuration template ConfigMap object.
 	//
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +optional
 	TemplateRef string `json:"templateRef"`
 
 	// Specifies the namespace of the referenced configuration template ConfigMap object.
 	// An empty namespace is equivalent to the "default" namespace.
+	//
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
 	// +kubebuilder:default="default"
@@ -60,25 +61,27 @@ type ComponentTemplateSpec struct {
 	// Refers to the volume name of PodTemplate. The configuration file produced through the configuration
 	// template will be mounted to the corresponding volume. Must be a DNS_LABEL name.
 	// The volume name must be defined in podSpec.containers[*].volumeMounts.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	VolumeName string `json:"volumeName"`
 
-	// Deprecated: DefaultMode is deprecated since 0.9.0 and will be removed in 0.10.0
-	// for scripts, auto set 0555
-	// for configs, auto set 0444
-	// Refers to the mode bits used to set permissions on created files by default.
+	// The operator attempts to set default file permissions for scripts (0555) and configurations (0444).
+	// However, certain database engines may require different file permissions.
+	// You can specify the desired file permissions here.
 	//
-	// Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
-	// YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
-	// Defaults to 0644.
+	// Must be specified as an octal value between 0000 and 0777 (inclusive),
+	// or as a decimal value between 0 and 511 (inclusive).
+	// YAML supports both octal and decimal values for file permissions.
 	//
-	// Directories within the path are not affected by this setting.
-	// This might be in conflict with other options that affect the file
-	// mode, like fsGroup, and the result can be other mode bits set.
+	// Please note that this setting only affects the permissions of the files themselves.
+	// Directories within the specified path are not impacted by this setting.
+	// It's important to be aware that this setting might conflict with other options
+	// that influence the file mode, such as fsGroup.
+	// In such cases, the resulting file mode may have additional bits set.
+	// Refers to documents of k8s.ConfigMapVolumeSource.defaultMode for more information.
 	//
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0 and will be removed in 0.10.0"
 	// +optional
 	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,3,opt,name=defaultMode"`
 }
@@ -154,7 +157,6 @@ type ComponentConfigSpec struct {
 	// +optional
 	ConfigConstraintRef string `json:"constraintRef,omitempty"`
 
-	// Deprecated: AsEnvFrom has been deprecated since 0.9.0 and will be removed in 0.10.0
 	// Specifies the containers to inject the ConfigMap parameters as environment variables.
 	//
 	// This is useful when application images accept parameters through environment variables and
@@ -164,7 +166,8 @@ type ComponentConfigSpec struct {
 	// variables converted from the ConfigMap into these designated containers. This provides a flexible way to
 	// pass the configuration items from the ConfigMap to the container without modifying the image.
 	//
-	// Note: The field name `asEnvFrom` may be changed to `injectEnvTo` in future versions for better clarity.
+	// Deprecated: `asEnvFrom` has been deprecated since 0.9.0 and will be removed in 0.10.0.
+	// Use `injectEnvTo` instead.
 	//
 	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0 and will be removed in 0.10.0"
 	// +listType=set
@@ -319,7 +322,7 @@ const (
 
 // OpsPhase defines opsRequest phase.
 // +enum
-// +kubebuilder:validation:Enum={Pending,Creating,Running,Cancelling,Cancelled,Failed,Succeed}
+// +kubebuilder:validation:Enum={Pending,Creating,Running,Cancelling,Cancelled,Aborted,Failed,Succeed}
 type OpsPhase string
 
 const (
@@ -330,6 +333,7 @@ const (
 	OpsSucceedPhase    OpsPhase = "Succeed"
 	OpsCancelledPhase  OpsPhase = "Cancelled"
 	OpsFailedPhase     OpsPhase = "Failed"
+	OpsAbortedPhase    OpsPhase = "Aborted"
 )
 
 // PodSelectionPolicy pod selection strategy.
@@ -637,20 +641,6 @@ const (
 	AnyPods ProvisionScope = "AnyPods"
 )
 
-// KBAccountType is used for bitwise operation.
-type KBAccountType uint8
-
-// System accounts represented in bit.
-const (
-	KBAccountInvalid        KBAccountType = 0
-	KBAccountAdmin                        = 1
-	KBAccountDataprotection               = 1 << 1
-	KBAccountProbe                        = 1 << 2
-	KBAccountMonitor                      = 1 << 3
-	KBAccountReplicator                   = 1 << 4
-	KBAccountMAX                          = KBAccountReplicator // KBAccountMAX indicates the max value of KBAccountType, used for validation.
-)
-
 // AccountName defines system account names.
 // +enum
 // +kubebuilder:validation:Enum={kbadmin,kbdataprotection,kbprobe,kbmonitoring,kbreplicator}
@@ -663,22 +653,6 @@ const (
 	MonitorAccount        AccountName = "kbmonitoring"
 	ReplicatorAccount     AccountName = "kbreplicator"
 )
-
-func (r AccountName) GetAccountID() KBAccountType {
-	switch r {
-	case AdminAccount:
-		return KBAccountAdmin
-	case DataprotectionAccount:
-		return KBAccountDataprotection
-	case ProbeAccount:
-		return KBAccountProbe
-	case MonitorAccount:
-		return KBAccountMonitor
-	case ReplicatorAccount:
-		return KBAccountReplicator
-	}
-	return KBAccountInvalid
-}
 
 // LetterCase defines the available cases to be used in password generation.
 //
@@ -696,12 +670,6 @@ const (
 	// MixedCases represents the use of a mix of both lower and upper case letters.
 	MixedCases LetterCase = "MixedCases"
 )
-
-var webhookMgr *webhookManager
-
-type webhookManager struct {
-	client client.Client
-}
 
 // UpgradePolicy defines the policy of reconfiguring.
 // +enum
@@ -787,12 +755,6 @@ type BaseBackupType string
 // +kubebuilder:validation:Enum={pre,post}
 type BackupStatusUpdateStage string
 
-func RegisterWebhookManager(mgr manager.Manager) {
-	webhookMgr = &webhookManager{mgr.GetClient()}
-}
-
-type ComponentNameSet map[string]struct{}
-
 var (
 	ErrWorkloadTypeIsUnknown   = errors.New("workloadType is unknown")
 	ErrWorkloadTypeIsStateless = errors.New("workloadType should not be stateless")
@@ -814,7 +776,7 @@ type HostNetwork struct {
 }
 
 type HostNetworkContainerPort struct {
-	// Container specifies the target container within the pod.
+	// Container specifies the target container within the Pod.
 	//
 	// +required
 	Container string `json:"container"`
@@ -865,9 +827,7 @@ type ComponentService struct {
 	// When set to true, a set of Services will be automatically generated for each Pod,
 	// and the `roleSelector` field will be ignored.
 	//
-	// The names of the generated Services will follow the same naming pattern: `$(serviceName)-$(podOrdinal)`.
-	//
-	// The podOrdinal is zero-based, meaning it starts from 0 for the first Pod and increments for each subsequent Pod.
+	// The names of the generated Services will follow the same suffix naming pattern: `$(serviceName)-$(podOrdinal)`.
 	// The total number of generated Services will be equal to the number of replicas specified for the Component.
 	//
 	// Example usage:
@@ -875,7 +835,8 @@ type ComponentService struct {
 	// ```yaml
 	// name: my-service
 	// serviceName: my-service
-	// generatePodOrdinalService: true
+	// podService: true
+	// disableAutoProvision: true
 	// spec:
 	//   type: NodePort
 	//   ports:
@@ -926,6 +887,9 @@ type Service struct {
 	// Only one default service name is allowed.
 	// Cannot be updated.
 	//
+	// +kubebuilder:validation:MaxLength=25
+	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
+	//
 	// +optional
 	ServiceName string `json:"serviceName,omitempty"`
 
@@ -953,8 +917,8 @@ type Service struct {
 	// This means that the service will select and route traffic to Pods with the label
 	// "kubeblocks.io/role" set to "leader".
 	//
-	// Note that if `generatePodOrdinalService` sets to true, RoleSelector will be ignored.
-	// The `generatePodOrdinalService` flag takes precedence over `roleSelector` and generates a service for each Pod.
+	// Note that if `podService` sets to true, RoleSelector will be ignored.
+	// The `podService` flag takes precedence over `roleSelector` and generates a service for each Pod.
 	//
 	// +optional
 	RoleSelector string `json:"roleSelector,omitempty"`
@@ -981,7 +945,8 @@ type Service struct {
 // EnvVar represents a variable present in the env of Pod/Action or the template of config/script.
 type EnvVar struct {
 	// Name of the variable. Must be a C_IDENTIFIER.
-	// +required
+	//
+	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
 	// Optional: no more than one of the following may be specified.
@@ -1000,8 +965,27 @@ type EnvVar struct {
 	Value string `json:"value,omitempty"`
 
 	// Source for the variable's value. Cannot be used if value is not empty.
+	//
 	// +optional
 	ValueFrom *VarSource `json:"valueFrom,omitempty"`
+
+	// A Go template expression that will be applied to the resolved value of the var.
+	//
+	// The expression will only be evaluated if the var is successfully resolved to a non-credential value.
+	//
+	// The resolved value can be accessed by its name within the expression, system vars and other user-defined
+	// non-credential vars can be used within the expression in the same way.
+	// Notice that, when accessing vars by its name, you should replace all the "-" in the name with "_", because of
+	// that "-" is not a valid identifier in Go.
+	//
+	// All expressions are evaluated in the order the vars are defined. If a var depends on any vars that also
+	// have expressions defined, be careful about the evaluation order as it may use intermediate values.
+	//
+	// The result of evaluation will be used as the final value of the var. If the expression fails to evaluate,
+	// the resolving of var will also be considered failed.
+	//
+	// +optional
+	Expression *string `json:"expression,omitempty"`
 }
 
 // VarSource represents a source for the value of an EnvVar.
@@ -1014,9 +998,9 @@ type VarSource struct {
 	// +optional
 	SecretKeyRef *corev1.SecretKeySelector `json:"secretKeyRef,omitempty"`
 
-	// Selects a defined var of a Pod.
+	// Selects a defined var of host-network resources.
 	// +optional
-	PodVarRef *PodVarSelector `json:"podVarRef,omitempty"`
+	HostNetworkVarRef *HostNetworkVarSelector `json:"hostNetworkVarRef,omitempty"`
 
 	// Selects a defined var of a Service.
 	// +optional
@@ -1029,6 +1013,10 @@ type VarSource struct {
 	// Selects a defined var of a ServiceRef.
 	// +optional
 	ServiceRefVarRef *ServiceRefVarSelector `json:"serviceRefVarRef,omitempty"`
+
+	// Selects a defined var of a Component.
+	// +optional
+	ComponentVarRef *ComponentVarSelector `json:"componentVarRef,omitempty"`
 }
 
 // VarOption defines whether a variable is required or optional.
@@ -1049,27 +1037,36 @@ type NamedVar struct {
 	Option *VarOption `json:"option,omitempty"`
 }
 
-// PodVars defines the vars that can be referenced from a Pod.
-type PodVars struct {
-	// +optional
-	Container *ContainerVars `json:"container,omitempty"`
-}
-
 // ContainerVars defines the vars that can be referenced from a Container.
 type ContainerVars struct {
 	// The name of the container.
-	// +required
+	//
+	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
 	// Container port to reference.
+	//
 	// +optional
 	Port *NamedVar `json:"port,omitempty"`
+}
+
+// HostNetworkVars defines the vars that can be referenced from host-network resources.
+type HostNetworkVars struct {
+	// +optional
+	Container *ContainerVars `json:"container,omitempty"`
 }
 
 // ServiceVars defines the vars that can be referenced from a Service.
 type ServiceVars struct {
 	// +optional
 	Host *VarOption `json:"host,omitempty"`
+
+	// LoadBalancer represents the LoadBalancer ingress point of the service.
+	//
+	// If multiple ingress points are available, the first one will be used automatically, choosing between IP and Hostname.
+	//
+	// +optional
+	LoadBalancer *VarOption `json:"loadBalancer,omitempty"`
 
 	// Port references a port or node-port defined in the service.
 	//
@@ -1096,17 +1093,20 @@ type ServiceRefVars struct {
 	Endpoint *VarOption `json:"endpoint,omitempty"`
 
 	// +optional
+	Host *VarOption `json:"host,omitempty"`
+
+	// +optional
 	Port *VarOption `json:"port,omitempty"`
 
 	CredentialVars `json:",inline"`
 }
 
-// PodVarSelector selects a var from a Pod.
-type PodVarSelector struct {
-	// The pod to select from.
+// HostNetworkVarSelector selects a var from host-network resources.
+type HostNetworkVarSelector struct {
+	// The component to select from.
 	ClusterObjectReference `json:",inline"`
 
-	PodVars `json:",inline"`
+	HostNetworkVars `json:",inline"`
 }
 
 // ServiceVarSelector selects a var from a Service.
@@ -1134,18 +1134,53 @@ type ServiceRefVarSelector struct {
 	ServiceRefVars `json:",inline"`
 }
 
-// ClusterObjectReference defines information to let you locate the referenced object inside the same cluster.
+// ComponentVarSelector selects a var from a Component.
+type ComponentVarSelector struct {
+	// The Component to select from.
+	ClusterObjectReference `json:",inline"`
+
+	ComponentVars `json:",inline"`
+}
+
+type ComponentVars struct {
+	// Reference to the name of the Component object.
+	//
+	// +optional
+	ComponentName *VarOption `json:"componentName,omitempty"`
+
+	// Reference to the replicas of the component.
+	//
+	// +optional
+	Replicas *VarOption `json:"replicas,omitempty"`
+
+	// Reference to the instanceName list of the component.
+	// and the value will be presented in the following format: instanceName1,instanceName2,...
+	//
+	// +optional
+	InstanceNames *VarOption `json:"instanceNames,omitempty"`
+
+	// Reference to the pod FQDN list of the component.
+	// The value will be presented in the following format: FQDN1,FQDN2,...
+	//
+	// +optional
+	PodFQDNs *VarOption `json:"podFQDNs,omitempty"`
+}
+
+// ClusterObjectReference defines information to let you locate the referenced object inside the same Cluster.
 type ClusterObjectReference struct {
 	// CompDef specifies the definition used by the component that the referent object resident in.
 	// If not specified, the component itself will be used.
+	//
 	// +optional
 	CompDef string `json:"compDef,omitempty"`
 
 	// Name of the referent object.
+	//
 	// +optional
 	Name string `json:"name,omitempty"`
 
 	// Specify whether the object must be defined.
+	//
 	// +optional
 	Optional *bool `json:"optional,omitempty"`
 
@@ -1159,7 +1194,8 @@ type ClusterObjectReference struct {
 // MultipleClusterObjectOption defines the options for handling multiple cluster objects matched.
 type MultipleClusterObjectOption struct {
 	// Define the strategy for handling multiple cluster objects.
-	// +required
+	//
+	// +kubebuilder:validation:Required
 	Strategy MultipleClusterObjectStrategy `json:"strategy"`
 
 	// Define the options for handling combined variables.
@@ -1219,34 +1255,23 @@ type MultipleClusterObjectValueFormatFlatten struct {
 	// Pair delimiter.
 	//
 	// +kubebuilder:default=","
-	// +required
+	// +kubebuilder:validation:Required
 	Delimiter string `json:"delimiter"`
 
 	// Key-value delimiter.
 	//
 	// +kubebuilder:default=":"
-	// +required
+	// +kubebuilder:validation:Required
 	KeyValueDelimiter string `json:"keyValueDelimiter"`
 }
 
-// PrometheusProtocol defines the protocol of prometheus scrape metrics.
+// PrometheusScheme defines the protocol of prometheus scrape metrics.
 //
 // +enum
 // +kubebuilder:validation:Enum={http,https}
-type PrometheusProtocol string
+type PrometheusScheme string
 
 const (
-	HTTPProtocol  = "http"
-	HTTPSProtocol = "https"
-)
-
-// MonitorKind defines the kind of monitor.
-// +enum
-// +kubebuilder:validation:Enum={metrics,logs,traces}
-type MonitorKind string
-
-const (
-	MetricsKind = "metrics"
-	LogsKind    = "logs"
-	TracesKind  = "traces"
+	HTTPProtocol  PrometheusScheme = "http"
+	HTTPSProtocol PrometheusScheme = "https"
 )

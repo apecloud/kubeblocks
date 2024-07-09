@@ -270,7 +270,7 @@ NON-STOP NYAN CAT is a demo application to observe how the database cluster exce
 
    </details>
 
-2. Check the NYAN CAT add-on status and when its status is `Enabled`, this application is ready.
+2. Check the NYAN CAT addon status and when its status is `Enabled`, this application is ready.
 
    ```bash
    kbcli addon list | grep nyancat 

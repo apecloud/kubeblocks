@@ -246,6 +246,9 @@ var _ = Describe("build service references", func() {
 			endpoint := appsv1alpha1.CredentialVar{
 				Value: "mock-endpoint",
 			}
+			host := appsv1alpha1.CredentialVar{
+				Value: "mock-host",
+			}
 			port := appsv1alpha1.CredentialVar{
 				Value: "mock-port",
 			}
@@ -259,6 +262,7 @@ var _ = Describe("build service references", func() {
 			}
 			externalServiceDescriptor := testapps.NewServiceDescriptorFactory(testCtx.DefaultNamespace, externalServiceDescriptorName).
 				SetEndpoint(endpoint).
+				SetHost(host).
 				SetPort(port).
 				SetAuth(auth).
 				Create(&testCtx).GetObject()
@@ -293,10 +297,11 @@ var _ = Describe("build service references", func() {
 					Namespace: namespace,
 				},
 				Data: map[string][]byte{
-					constant.ServiceDescriptorPasswordKey: []byte("NHpycWZsMnI="),
-					constant.ServiceDescriptorUsernameKey: []byte("cm9vdA=="),
-					constant.ServiceDescriptorEndpointKey: []byte("my-mysql-0.default.svc.cluster.local"),
+					constant.ServiceDescriptorEndpointKey: []byte("my-mysql-0.default.svc.cluster.local:3306"),
+					constant.ServiceDescriptorHostKey:     []byte("my-mysql-0.default.svc.cluster.local"),
 					constant.ServiceDescriptorPortKey:     []byte("3306"),
+					constant.ServiceDescriptorUsernameKey: []byte("cm9vdA=="),
+					constant.ServiceDescriptorPasswordKey: []byte("NHpycWZsMnI="),
 				},
 			}
 			Expect(testCtx.CheckedCreateObj(ctx, secret)).Should(Succeed())
@@ -310,6 +315,9 @@ var _ = Describe("build service references", func() {
 			Expect(serviceReferences[redisServiceRefDeclarationName].Spec.Endpoint).ShouldNot(BeNil())
 			Expect(serviceReferences[redisServiceRefDeclarationName].Spec.Endpoint.Value).ShouldNot(BeEmpty())
 			Expect(serviceReferences[redisServiceRefDeclarationName].Spec.Endpoint.ValueFrom).Should(BeNil())
+			Expect(serviceReferences[redisServiceRefDeclarationName].Spec.Host).ShouldNot(BeNil())
+			Expect(serviceReferences[redisServiceRefDeclarationName].Spec.Host.Value).ShouldNot(BeEmpty())
+			Expect(serviceReferences[redisServiceRefDeclarationName].Spec.Host.ValueFrom).Should(BeNil())
 			Expect(serviceReferences[redisServiceRefDeclarationName].Spec.Port).ShouldNot(BeNil())
 			Expect(serviceReferences[redisServiceRefDeclarationName].Spec.Port.Value).ShouldNot(BeEmpty())
 			Expect(serviceReferences[redisServiceRefDeclarationName].Spec.Port.ValueFrom).Should(BeNil())
@@ -324,6 +332,7 @@ var _ = Describe("build service references", func() {
 			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Endpoint.Value).Should(BeEmpty())
 			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Endpoint.ValueFrom).ShouldNot(BeNil())
 			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Endpoint.ValueFrom.SecretKeyRef).ShouldNot(BeNil())
+			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Host).Should(BeNil()) // reference to a legacy cluster
 			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Port).ShouldNot(BeNil())
 			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Port.Value).Should(BeEmpty())
 			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Port.ValueFrom).ShouldNot(BeNil())
@@ -387,6 +396,7 @@ var _ = Describe("build service references", func() {
 		})
 
 		It("has service-ref not defined", func() {
+			// for generated components, undefined service-refs are ignored by default.
 			err := buildServiceReferencesWithoutResolve(testCtx.Ctx, testCtx.Cli, synthesizedComp, compDef, comp)
 			Expect(err).Should(Succeed())
 			Expect(synthesizedComp.ServiceReferences).Should(HaveLen(0))
@@ -395,6 +405,12 @@ var _ = Describe("build service references", func() {
 			err = buildServiceReferencesWithoutResolve(testCtx.Ctx, testCtx.Cli, synthesizedComp, compDef, comp)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("service-ref for %s is not defined", serviceRefDeclaration.Name))
+
+			// set the service-ref as optional
+			compDef.Spec.ServiceRefDeclarations[0].Optional = func() *bool { optional := true; return &optional }()
+			err = buildServiceReferencesWithoutResolve(testCtx.Ctx, testCtx.Cli, synthesizedComp, compDef, comp)
+			Expect(err).Should(Succeed())
+			Expect(synthesizedComp.ServiceReferences).Should(HaveLen(0))
 		})
 
 		It("service vars - cluster service", func() {
@@ -441,7 +457,9 @@ var _ = Describe("build service references", func() {
 			serviceDescriptor := synthesizedComp.ServiceReferences[serviceRefDeclaration.Name]
 			Expect(serviceDescriptor).Should(Not(BeNil()))
 			Expect(serviceDescriptor.Spec.Endpoint).Should(Not(BeNil()))
-			Expect(serviceDescriptor.Spec.Endpoint.Value).Should(Equal(reader.objs[0].GetName()))
+			Expect(serviceDescriptor.Spec.Endpoint.Value).Should(Equal(fmt.Sprintf("%s:%s", reader.objs[0].GetName(), "2379")))
+			Expect(serviceDescriptor.Spec.Host).Should(Not(BeNil()))
+			Expect(serviceDescriptor.Spec.Host.Value).Should(Equal(reader.objs[0].GetName()))
 			Expect(serviceDescriptor.Spec.Port).Should(Not(BeNil()))
 			Expect(serviceDescriptor.Spec.Port.Value).Should(Equal("2379"))
 			Expect(serviceDescriptor.Spec.Auth).Should(BeNil())
@@ -492,7 +510,9 @@ var _ = Describe("build service references", func() {
 			serviceDescriptor := synthesizedComp.ServiceReferences[serviceRefDeclaration.Name]
 			Expect(serviceDescriptor).Should(Not(BeNil()))
 			Expect(serviceDescriptor.Spec.Endpoint).Should(Not(BeNil()))
-			Expect(serviceDescriptor.Spec.Endpoint.Value).Should(Equal(reader.objs[0].GetName()))
+			Expect(serviceDescriptor.Spec.Endpoint.Value).Should(Equal(fmt.Sprintf("%s:%s", reader.objs[0].GetName(), "2380")))
+			Expect(serviceDescriptor.Spec.Host).Should(Not(BeNil()))
+			Expect(serviceDescriptor.Spec.Host.Value).Should(Equal(reader.objs[0].GetName()))
 			Expect(serviceDescriptor.Spec.Port).Should(Not(BeNil()))
 			Expect(serviceDescriptor.Spec.Port.Value).Should(Equal("2380"))
 			Expect(serviceDescriptor.Spec.Auth).Should(BeNil())
@@ -534,16 +554,44 @@ var _ = Describe("build service references", func() {
 				}
 			}
 			reader := &mockReader{
-				cli:  testCtx.Cli,
-				objs: []client.Object{newPodService(0), newPodService(1), newPodService(2)},
+				cli: testCtx.Cli,
+				objs: []client.Object{
+					newPodService(0),
+					newPodService(1),
+					newPodService(2),
+					&appsv1alpha1.Component{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: namespace,
+							Name:      FullName(etcdCluster, etcdComponent),
+						},
+						Spec: appsv1alpha1.ComponentSpec{
+							CompDef: "test-compdef",
+						},
+					},
+					&appsv1alpha1.ComponentDefinition{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "test-compdef",
+						},
+						Spec: appsv1alpha1.ComponentDefinitionSpec{
+							Services: []appsv1alpha1.ComponentService{
+								{
+									Service: appsv1alpha1.Service{
+										Name:        "peer",
+										ServiceName: "peer",
+									},
+								},
+							},
+						},
+					},
+				},
 			}
 
-			endpoints, ports := make([]string, 0), make([]string, 0)
+			hosts, ports := make([]string, 0), make([]string, 0)
 			for i := 0; i < 3; i++ {
-				endpoints = append(endpoints, reader.objs[i].GetName())
+				hosts = append(hosts, reader.objs[i].GetName())
 				ports = append(ports, fmt.Sprintf("%s:%s", reader.objs[i].GetName(), "2380"))
 			}
-			expectedEndpointValue, expectedPortValue := strings.Join(endpoints, ","), strings.Join(ports, ",")
+			expectedHostValue, expectedPortValue := strings.Join(hosts, ","), strings.Join(ports, ",")
 
 			err := buildServiceReferencesWithoutResolve(testCtx.Ctx, reader, synthesizedComp, compDef, comp)
 			Expect(err).Should(Succeed())
@@ -552,7 +600,9 @@ var _ = Describe("build service references", func() {
 			serviceDescriptor := synthesizedComp.ServiceReferences[serviceRefDeclaration.Name]
 			Expect(serviceDescriptor).Should(Not(BeNil()))
 			Expect(serviceDescriptor.Spec.Endpoint).Should(Not(BeNil()))
-			Expect(serviceDescriptor.Spec.Endpoint.Value).Should(Equal(expectedEndpointValue))
+			Expect(serviceDescriptor.Spec.Endpoint.Value).Should(Equal(expectedPortValue))
+			Expect(serviceDescriptor.Spec.Host).Should(Not(BeNil()))
+			Expect(serviceDescriptor.Spec.Host.Value).Should(Equal(expectedHostValue))
 			Expect(serviceDescriptor.Spec.Port).Should(Not(BeNil()))
 			Expect(serviceDescriptor.Spec.Port.Value).Should(Equal(expectedPortValue))
 			Expect(serviceDescriptor.Spec.Auth).Should(BeNil())
@@ -607,6 +657,7 @@ var _ = Describe("build service references", func() {
 			Expect(serviceDescriptor.Spec.Auth.Password.ValueFrom.SecretKeyRef.Name).Should(Equal(reader.objs[0].GetName()))
 			Expect(serviceDescriptor.Spec.Auth.Password.ValueFrom.SecretKeyRef.Key).Should(Equal(constant.AccountPasswdForSecret))
 			Expect(serviceDescriptor.Spec.Endpoint).Should(BeNil())
+			Expect(serviceDescriptor.Spec.Host).Should(BeNil())
 			Expect(serviceDescriptor.Spec.Port).Should(BeNil())
 		})
 
@@ -654,6 +705,7 @@ var _ = Describe("build service references", func() {
 			Expect(serviceDescriptor.Spec.Auth.Password.Value).Should(Equal("password"))
 			Expect(serviceDescriptor.Spec.Auth.Password.ValueFrom).Should(BeNil())
 			Expect(serviceDescriptor.Spec.Endpoint).Should(BeNil())
+			Expect(serviceDescriptor.Spec.Host).Should(BeNil())
 			Expect(serviceDescriptor.Spec.Port).Should(BeNil())
 		})
 	})

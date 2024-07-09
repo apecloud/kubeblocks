@@ -23,69 +23,30 @@ During the vertical scaling process, all pods restart in the order of learner ->
 Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
 
 ```bash
-kbcli cluster list pulsar
+kbcli cluster list pulsar-cluster
 ```
 
 ### Steps
 
 1. Change configuration. There are 3 ways to apply vertical scaling.
 
-   **Option 1.** (**Recommended**) Use kbcli
-
    Configure the parameters `--components`, `--memory`, and `--cpu` and run the command.
 
    ```bash
-   kbcli cluster vscale pulsar --cpu=3 --memory=10Gi --components=broker,bookies  
+   kbcli cluster vscale pulsar-cluster --cpu=3 --memory=10Gi --components=broker,bookies  
    ```
 
    - `--components` describes the component name ready for vertical scaling.
    - `--memory` describes the requested and limited size of the component memory.
    - `--cpu` describes the requested and limited size of the component CPU.
 
-   **Option 2.** Create an OpsRequest
-  
-   Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
-
-   ```bash
-   kubectl create -f -<< EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: OpsRequest
-   metadata:
-     generateName: pulsar-vscale-
-   spec:
-     clusterRef: pulsar
-     type: VerticalScaling
-     verticalScaling:
-     - componentName: broker
-       requests:
-         memory: "10Gi"
-         cpu: 3
-       limits:
-         memory: "10Gi"
-         cpu: 3
-     - componentName: bookies
-       requests:
-         memory: "10Gi"
-         cpu: 3
-       limits:
-         memory: "10Gi"
-         cpu: 3      
-   EOF
-   ```
-  
-   **Option 3.** Edit Pulsar cluster with `kubectl`.
-
-   ```bash
-   kubectl edit cluster pulsar
-   ```
-
 2. Check the cluster status to validate the vertical scaling.
 
     ```bash
-    kbcli cluster list pulsar
+    kbcli cluster list pulsar-cluster
     ```
 
-   - STATUS=VerticalScaling: it means the vertical scaling is in progress.
+   - STATUS=updating: it means the vertical scaling is in progress.
    - STATUS=Running: it means the vertical scaling operation has been applied.
    - STATUS=Abnormal: it means the vertical scaling is abnormal. The reason may be that the number of the normal instances is less than that of the total instance or the leader instance is running properly while others are abnormal.
      > To solve the problem, you can manually check whether this error is caused by insufficient resources. Then if AutoScaling is supported by the Kubernetes cluster, the system recovers when there are enough resources. Otherwise, you can create enough resources and troubleshoot with `kubectl describe` command.
@@ -99,7 +60,7 @@ kbcli cluster list pulsar
 3. Check whether the corresponding resources change.
 
     ```bash
-    kbcli cluster describe pulsar
+    kbcli cluster describe pulsar-cluster
     ```
 
 ## Horizontal scaling
@@ -113,46 +74,18 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
 
 ### Steps
 
-1. Change configuration. There are 3 ways to apply horizontal scaling.
-
-   **Option 1.** (**Recommended**) Use kbcli
+1. Change configuration.
 
    Configure the parameters `--components` and `--replicas`, and run the command.
 
    ```bash
-   kbcli cluster hscale pulsar --replicas=5 --components=broker,bookies                  Running        Jan 29,2023 14:29 UTC+0800
+   kbcli cluster hscale pulsar-cluster --replicas=5 --components=broker,bookies    
    ```
 
    - `--components` describes the component name ready for horizontal scaling.
    - `--replicas` describes the replicas with the specified components.
 
-   **Option 2.** Create an OpsRequest
-
-   Apply an OpsRequest to a specified cluster. Configure the parameters according to your needs.
-
-    ```bash
-    kubectl create -f -<< EOF
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: OpsRequest
-    metadata:
-      generateName: pulsar-horizontalscaling-
-    spec:
-      clusterRef: pulsar
-      type: HorizontalScaling  
-      horizontalScaling:
-      - componentName: broker
-        replicas: 5
-      - componentName: bookies
-        replicas: 5
-    EOF
-    ```
-
-   **Option 3.** Edit cluster with `kubectl`.
-
-   ```bash
-   kubectl edit cluster pulsar
-   ```
-  
+   
 2. Validate the horizontal scaling operation.
 
    Check the cluster STATUS to identify the horizontal scaling status.
@@ -160,14 +93,14 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
    ```bash
    kubectl get ops
    >
-   NAME                             TYPE               CLUSTER   STATUS    PROGRESS   AGE
-   pulsar-horizontalscaling-9lfvc   HorizontalScaling  pulsar    Succeed   3/3        8m49s
+   NAME                                     TYPE      CLUSTER   STATUS    PROGRESS   AGE
+   pulsar-cluster-horizontalscaling-9lfvc   Updating  pulsar    Succeed   3/3        8m49s
    ```
 
 3. Check whether the corresponding resources change.
 
    ```bash
-   kbcli cluster describe mysql-cluster
+   kbcli cluster describe pulsar-cluster
    ```
 
 ### Handle the snapshot exception
@@ -180,7 +113,7 @@ In the example below, a snapshot exception occurs.
 Status:
   conditions: 
   - lastTransitionTime: "2023-02-08T04:20:26Z"
-    message: VolumeSnapshot/mysql-cluster-mysql-scaling-dbqgp: Failed to set default snapshot
+    message: VolumeSnapshot/pulsar-cluster-pulsar-scaling-dbqgp: Failed to set default snapshot
       class with error cannot find default snapshot class
     reason: ApplyResourcesFailed
     status: "False"
@@ -211,9 +144,9 @@ This exception occurs because the `VolumeSnapshotClass` is not configured. This 
 2. Delete the wrong backup (volumesnapshot is generated by backup) and volumesnapshot resources.
 
    ```bash
-   kubectl delete backup -l app.kubernetes.io/instance=mysql-cluster
+   kubectl delete backup -l app.kubernetes.io/instance=pulsar-cluster
    
-   kubectl delete volumesnapshot -l app.kubernetes.io/instance=mysql-cluster
+   kubectl delete volumesnapshot -l app.kubernetes.io/instance=pulsar-cluster
    ```
 
 ***Result***

@@ -47,42 +47,34 @@ type SynthesizedComponent struct {
 	TLSConfig            *v1alpha1.TLSConfig                    `json:"tlsConfig"`
 	ServiceAccountName   string                                 `json:"serviceAccountName,omitempty"`
 	// TODO: remove this later
-	ComponentRefEnvs  []corev1.EnvVar                        `json:"componentRefEnvs,omitempty"`
-	ServiceReferences map[string]*v1alpha1.ServiceDescriptor `json:"serviceReferences,omitempty"`
-	TemplateVars      map[string]any                         `json:"templateVars,omitempty"`
-	EnvVars           []corev1.EnvVar                        `json:"envVars,omitempty"`
-	EnvFromSources    []corev1.EnvFromSource                 `json:"envFromSources,omitempty"`
-	Instances         []v1alpha1.InstanceTemplate            `json:"instances,omitempty"`
-	OfflineInstances  []string                               `json:"offlineInstances,omitempty"`
-
-	// The following fields were introduced with the ComponentDefinition and Component API in KubeBlocks version 0.8.0
-	Roles               []v1alpha1.ReplicaRole              `json:"roles,omitempty"`
-	Labels              map[string]string                   `json:"labels,omitempty"`
-	Annotations         map[string]string                   `json:"annotations,omitempty"`
-	UpdateStrategy      *v1alpha1.UpdateStrategy            `json:"updateStrategy,omitempty"`
-	PodManagementPolicy *appsv1.PodManagementPolicyType     `json:"podManagementPolicy,omitempty"`
-	PolicyRules         []rbacv1.PolicyRule                 `json:"policyRules,omitempty"`
-	LifecycleActions    *v1alpha1.ComponentLifecycleActions `json:"lifecycleActions,omitempty"`
-	SystemAccounts      []v1alpha1.SystemAccount            `json:"systemAccounts,omitempty"`
-	RoleArbitrator      *v1alpha1.RoleArbitrator            `json:"roleArbitrator,omitempty"`
-	Volumes             []v1alpha1.ComponentVolume          `json:"volumes,omitempty"`
-	HostNetwork         *v1alpha1.HostNetwork               `json:"hostNetwork,omitempty"`
-	ComponentServices   []v1alpha1.ComponentService         `json:"componentServices,omitempty"`
-	MinReadySeconds     int32                               `json:"minReadySeconds,omitempty"`
-	Sidecars            []string                            `json:"sidecars,omitempty"`
-	MonitorEnabled      bool                                `json:"monitorEnabled,omitempty"`
-
-	// TODO(xingran): The following fields will be deprecated after version 0.8.0 and will be replaced with a new data structure.
-	Probes           *v1alpha1.ClusterDefinitionProbes `json:"probes,omitempty"`           // The Probes will be replaced with LifecycleActions.RoleProbe in the future.
-	VolumeTypes      []v1alpha1.VolumeTypeSpec         `json:"volumeTypes,omitempty"`      // The VolumeTypes will be replaced with Volumes in the future.
-	VolumeProtection *v1alpha1.VolumeProtectionSpec    `json:"volumeProtection,omitempty"` // The VolumeProtection will be replaced with Volumes in the future.
-	Services         []corev1.Service                  `json:"services,omitempty"`         // The Services will be replaced with ComponentServices in the future.
-	TLS              bool                              `json:"tls"`                        // The TLS will be replaced with TLSConfig in the future.
+	ComponentRefEnvs       []corev1.EnvVar                        `json:"componentRefEnvs,omitempty"`
+	ServiceReferences      map[string]*v1alpha1.ServiceDescriptor `json:"serviceReferences,omitempty"`
+	UserDefinedLabels      map[string]string
+	UserDefinedAnnotations map[string]string
+	TemplateVars           map[string]any                      `json:"templateVars,omitempty"`
+	EnvVars                []corev1.EnvVar                     `json:"envVars,omitempty"`
+	EnvFromSources         []corev1.EnvFromSource              `json:"envFromSources,omitempty"`
+	Instances              []v1alpha1.InstanceTemplate         `json:"instances,omitempty"`
+	OfflineInstances       []string                            `json:"offlineInstances,omitempty"`
+	Roles                  []v1alpha1.ReplicaRole              `json:"roles,omitempty"`
+	Labels                 map[string]string                   `json:"labels,omitempty"`
+	Annotations            map[string]string                   `json:"annotations,omitempty"`
+	UpdateStrategy         *v1alpha1.UpdateStrategy            `json:"updateStrategy,omitempty"`
+	PodManagementPolicy    *appsv1.PodManagementPolicyType     `json:"podManagementPolicy,omitempty"`
+	PolicyRules            []rbacv1.PolicyRule                 `json:"policyRules,omitempty"`
+	LifecycleActions       *v1alpha1.ComponentLifecycleActions `json:"lifecycleActions,omitempty"`
+	SystemAccounts         []v1alpha1.SystemAccount            `json:"systemAccounts,omitempty"`
+	Volumes                []v1alpha1.ComponentVolume          `json:"volumes,omitempty"`
+	HostNetwork            *v1alpha1.HostNetwork               `json:"hostNetwork,omitempty"`
+	ComponentServices      []v1alpha1.ComponentService         `json:"componentServices,omitempty"`
+	MinReadySeconds        int32                               `json:"minReadySeconds,omitempty"`
+	Sidecars               []string                            `json:"sidecars,omitempty"`
+	DisableExporter        *bool                               `json:"disableExporter,omitempty"`
 
 	// TODO(xingran): The following fields will be deprecated after KubeBlocks version 0.8.0
 	ClusterDefName        string                          `json:"clusterDefName,omitempty"`     // the name of the clusterDefinition
-	ClusterCompDefName    string                          `json:"clusterCompDefName,omitempty"` // the name of the clusterDefinition.Spec.ComponentDefs[*].Name or cluster.Spec.ComponentSpecs[*].ComponentDefRef
+	ClusterCompDefName    string                          `json:"clusterCompDefName,omitempty"` // the name of the clusterDefinition.Spec.ComponentDefs[*].Name
 	CharacterType         string                          `json:"characterType,omitempty"`
-	WorkloadType          v1alpha1.WorkloadType           `json:"workloadType,omitempty"`
 	HorizontalScalePolicy *v1alpha1.HorizontalScalePolicy `json:"horizontalScalePolicy,omitempty"`
+	VolumeTypes           []v1alpha1.VolumeTypeSpec       `json:"volumeTypes,omitempty"` // The VolumeTypes will be replaced with Volumes in the future.
 }

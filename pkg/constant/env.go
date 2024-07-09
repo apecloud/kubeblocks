@@ -84,6 +84,7 @@ const (
 	KBEnvWorkloadType    = "KB_WORKLOAD_TYPE"
 	KBEnvBuiltinHandler  = "KB_BUILTIN_HANDLER"
 	KBEnvActionCommands  = "KB_ACTION_COMMANDS"
+	KBEnvActionHandlers  = "KB_ACTION_HANDLERS"
 	KBEnvCronJobs        = "KB_CRON_JOBS"
 	KBEnvCharacterType   = "KB_SERVICE_CHARACTER_TYPE"
 	KBEnvServiceUser     = "KB_SERVICE_USER"
@@ -112,6 +113,7 @@ const (
 	// KBEnvRsmRoleUpdateMechanism defines the method to send events: DirectAPIServerEventUpdate(through lorry service), ReadinessProbeEventUpdate(through kubelet service)
 	KBEnvRsmRoleUpdateMechanism = "KB_RSM_ROLE_UPDATE_MECHANISM"
 	KBEnvRoleProbeTimeout       = "KB_RSM_ROLE_PROBE_TIMEOUT"
+	KBEnvRoleProbePeriod        = "KB_RSM_ROLE_PROBE_PERIOD"
 
 	KBEnvVolumeProtectionSpec = "KB_VOLUME_PROTECTION_SPEC"
 )

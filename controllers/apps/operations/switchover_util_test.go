@@ -69,7 +69,7 @@ var _ = Describe("Switchover Util", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced resources
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.StatefulSetSignature, true, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.InstanceSetSignature, true, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 
@@ -91,7 +91,7 @@ var _ = Describe("Switchover Util", func() {
 			Image:           testapps.DefaultRedisImageName,
 			ImagePullPolicy: corev1.PullIfNotPresent,
 		}
-		sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace,
+		its := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
 			clusterObj.Name+"-"+testapps.DefaultRedisCompSpecName, clusterObj.Name, testapps.DefaultRedisCompSpecName).
 			AddFinalizers([]string{constant.DBClusterFinalizerName}).
 			AddContainer(container).
@@ -102,10 +102,10 @@ var _ = Describe("Switchover Util", func() {
 			Create(&testCtx).GetObject()
 
 		By("Creating Pods of replication workloadType.")
-		for i := int32(0); i < *sts.Spec.Replicas; i++ {
-			_ = testapps.NewPodFactory(testCtx.DefaultNamespace, fmt.Sprintf("%s-%d", sts.Name, i)).
+		for i := int32(0); i < *its.Spec.Replicas; i++ {
+			_ = testapps.NewPodFactory(testCtx.DefaultNamespace, fmt.Sprintf("%s-%d", its.Name, i)).
 				AddContainer(container).
-				AddLabelsInMap(sts.Labels).
+				AddLabelsInMap(its.Labels).
 				AddRoleLabel(defaultRole(i)).
 				Create(&testCtx).GetObject()
 		}
@@ -124,19 +124,19 @@ var _ = Describe("Switchover Util", func() {
 		Expect(synthesizedComp).ShouldNot(BeNil())
 
 		By("Test opsSwitchover.Instance is already primary, and do not need to do switchover.")
-		needSwitchover, err := needDoSwitchover(testCtx.Ctx, k8sClient, clusterObj, synthesizedComp, opsSwitchover)
+		needSwitchover, err := needDoSwitchover(testCtx.Ctx, k8sClient, synthesizedComp, opsSwitchover)
 		Expect(err).Should(Succeed())
 		Expect(needSwitchover).Should(BeFalse())
 
 		By("Test opsSwitchover.Instance is not primary, and need to do switchover.")
 		opsSwitchover.InstanceName = fmt.Sprintf("%s-%s-%d", clusterObj.Name, testapps.DefaultRedisCompSpecName, 1)
-		needSwitchover, err = needDoSwitchover(testCtx.Ctx, k8sClient, clusterObj, synthesizedComp, opsSwitchover)
+		needSwitchover, err = needDoSwitchover(testCtx.Ctx, k8sClient, synthesizedComp, opsSwitchover)
 		Expect(err).Should(Succeed())
 		Expect(needSwitchover).Should(BeTrue())
 
 		By("Test opsSwitchover.Instance is *, and need to do switchover.")
 		opsSwitchover.InstanceName = "*"
-		needSwitchover, err = needDoSwitchover(testCtx.Ctx, k8sClient, clusterObj, synthesizedComp, opsSwitchover)
+		needSwitchover, err = needDoSwitchover(testCtx.Ctx, k8sClient, synthesizedComp, opsSwitchover)
 		Expect(err).Should(Succeed())
 		Expect(needSwitchover).Should(BeTrue())
 	}
@@ -155,7 +155,7 @@ var _ = Describe("Switchover Util", func() {
 			Image:           testapps.DefaultRedisImageName,
 			ImagePullPolicy: corev1.PullIfNotPresent,
 		}
-		sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace,
+		its := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
 			clusterObj.Name+"-"+testapps.DefaultRedisCompSpecName, clusterObj.Name, testapps.DefaultRedisCompSpecName).
 			AddFinalizers([]string{constant.DBClusterFinalizerName}).
 			AddContainer(container).
@@ -166,10 +166,10 @@ var _ = Describe("Switchover Util", func() {
 			Create(&testCtx).GetObject()
 
 		By("Creating Pods of replication workloadType.")
-		for i := int32(0); i < *sts.Spec.Replicas; i++ {
-			_ = testapps.NewPodFactory(testCtx.DefaultNamespace, fmt.Sprintf("%s-%d", sts.Name, i)).
+		for i := int32(0); i < *its.Spec.Replicas; i++ {
+			_ = testapps.NewPodFactory(testCtx.DefaultNamespace, fmt.Sprintf("%s-%d", its.Name, i)).
 				AddContainer(container).
-				AddLabelsInMap(sts.Labels).
+				AddLabelsInMap(its.Labels).
 				AddRoleLabel(defaultRole(i)).
 				Create(&testCtx).GetObject()
 		}

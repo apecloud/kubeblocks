@@ -131,8 +131,6 @@ var _ = BeforeSuite(func() {
 
 	eventRecorder = k8sManager.GetEventRecorderFor("event-controller")
 
-	appsv1alpha1.RegisterWebhookManager(k8sManager)
-
 	testCtx = testutil.NewDefaultTestContext(ctx, k8sClient, testEnv)
 
 	go func() {
@@ -177,15 +175,15 @@ func initOperationsResources(clusterDefinitionName, clusterName string) (*OpsRes
 	return opsRes, clusterDef, clusterObject
 }
 
-func initConsensusPods(ctx context.Context, cli client.Client, opsRes *OpsResource, clusterName string) []corev1.Pod {
+func initInstanceSetPods(ctx context.Context, cli client.Client, opsRes *OpsResource) []*corev1.Pod {
 	// mock the pods of consensusSet component
-	testapps.MockConsensusComponentPods(&testCtx, nil, clusterName, consensusComp)
-	podList, err := intctrlcomp.GetComponentPodList(ctx, cli, *opsRes.Cluster, consensusComp)
+	testapps.MockInstanceSetPods(&testCtx, nil, opsRes.Cluster, consensusComp)
+	pods, err := intctrlcomp.ListOwnedPods(ctx, cli, opsRes.Cluster.Namespace, opsRes.Cluster.Name, consensusComp)
 	Expect(err).Should(Succeed())
 	// the opsRequest will use startTime to check some condition.
 	// if there is no sleep for 1 second, unstable error may occur.
 	time.Sleep(time.Second)
-	return podList.Items
+	return pods
 }
 
 func mockComponentIsOperating(cluster *appsv1alpha1.Cluster, expectPhase appsv1alpha1.ClusterComponentPhase, compNames ...string) {

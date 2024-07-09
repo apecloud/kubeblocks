@@ -34,6 +34,7 @@ type DataprotectionV1alpha1Interface interface {
 	BackupReposGetter
 	BackupSchedulesGetter
 	RestoresGetter
+	StorageProvidersGetter
 }
 
 // DataprotectionV1alpha1Client is used to interact with features provided by the dataprotection.kubeblocks.io group.
@@ -63,6 +64,10 @@ func (c *DataprotectionV1alpha1Client) BackupSchedules(namespace string) BackupS
 
 func (c *DataprotectionV1alpha1Client) Restores(namespace string) RestoreInterface {
 	return newRestores(c, namespace)
+}
+
+func (c *DataprotectionV1alpha1Client) StorageProviders() StorageProviderInterface {
+	return newStorageProviders(c)
 }
 
 // NewForConfig creates a new DataprotectionV1alpha1Client for the given config.

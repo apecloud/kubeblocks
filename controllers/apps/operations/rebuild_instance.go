@@ -49,13 +49,15 @@ const (
 	rebuildFromAnnotation  = "apps.kubeblocks.io/rebuild-from"
 	rebuildTmpPVCNameLabel = "apps.kubeblocks.io/rebuild-tmp-pvc"
 
-	waitingForInstanceReadyMessage = "Waiting for the rebuilding instance to be ready"
+	waitingForInstanceReadyMessage   = "Waiting for the rebuilding instance to be ready"
+	waitingForPostReadyRestorePrefix = "Waiting for postReady Restore"
+
+	ignoreRoleCheckAnnotationKey = "kubeblocks.io/ignore-role-check"
 )
 
 type rebuildInstanceOpsHandler struct{}
 
 type instanceHelper struct {
-	comp      *appsv1alpha1.ClusterComponentSpec
 	targetPod *corev1.Pod
 	backup    *dpv1alpha1.Backup
 	instance  appsv1alpha1.Instance
@@ -102,20 +104,16 @@ func (r rebuildInstanceOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli cli
 			appsv1alpha1.AbnormalClusterCompPhase, appsv1alpha1.UpdatingClusterCompPhase}, compStatus.Phase) {
 			return intctrlutil.NewFatalError(fmt.Sprintf(`the phase of component "%s" can not be %s`, v.ComponentName, compStatus.Phase))
 		}
-		comp := opsRes.Cluster.Spec.GetComponentByName(v.ComponentName)
-		synthesizedComp, err := component.BuildSynthesizedComponentWrapper(reqCtx, cli, opsRes.Cluster, comp)
-		if err != nil {
-			return err
-		}
 		for _, ins := range v.Instances {
 			targetPod := &corev1.Pod{}
-			if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: ins.Name, Namespace: opsRes.Cluster.Namespace}, targetPod); err != nil {
+			if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: ins.Name, Namespace: opsRes.Cluster.Namespace}, targetPod); err != nil {
 				return err
 			}
-			isAvailable, err := r.instanceIsAvailable(synthesizedComp, targetPod)
+			synthesizedComp, err := r.buildSynthesizedComponent(reqCtx, cli, opsRes.Cluster, targetPod.Labels[constant.KBAppComponentLabelKey])
 			if err != nil {
 				return err
 			}
+			isAvailable, _ := r.instanceIsAvailable(synthesizedComp, targetPod, "")
 			if isAvailable {
 				return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" is availabled, can not rebuild it`, ins.Name))
 			}
@@ -156,7 +154,6 @@ func (r rebuildInstanceOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx
 	}
 	for _, v := range opsRes.OpsRequest.Spec.RebuildFrom {
 		compStatus := opsRes.OpsRequest.Status.Components[v.ComponentName]
-		comp := opsRes.Cluster.Spec.GetComponentByName(v.ComponentName)
 		for i, instance := range v.Instances {
 			expectCount += 1
 			progressDetail := r.getInstanceProgressDetail(compStatus, instance.Name)
@@ -168,7 +165,7 @@ func (r rebuildInstanceOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx
 				continue
 			}
 			// rebuild instance
-			completed, err := r.rebuildInstance(reqCtx, cli, opsRes, comp, v.EnvForRestore, &progressDetail, instance, v.BackupName, i)
+			completed, err := r.rebuildInstance(reqCtx, cli, opsRes, v.RestoreEnv, &progressDetail, instance, v.BackupName, i)
 			if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
 				// If a fatal error occurs, this instance rebuilds failed.
 				progressDetail.SetStatusAndMessage(appsv1alpha1.FailedProgressStatus, err.Error())
@@ -204,13 +201,12 @@ func (r rebuildInstanceOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx
 func (r rebuildInstanceOpsHandler) rebuildInstance(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
-	comp *appsv1alpha1.ClusterComponentSpec,
 	envForRestore []corev1.EnvVar,
 	progressDetail *appsv1alpha1.ProgressStatusDetail,
 	instance appsv1alpha1.Instance,
 	backupName string,
 	index int) (bool, error) {
-	insHelper, err := r.prepareInstanceHelper(reqCtx, cli, opsRes, comp, envForRestore, instance, backupName, index)
+	insHelper, err := r.prepareInstanceHelper(reqCtx, cli, opsRes, envForRestore, instance, backupName, index)
 	if err != nil {
 		return false, err
 	}
@@ -220,18 +216,34 @@ func (r rebuildInstanceOpsHandler) rebuildInstance(reqCtx intctrlutil.RequestCtx
 	return r.rebuildInstanceWithBackup(reqCtx, cli, opsRes, insHelper, progressDetail)
 }
 
+func (r rebuildInstanceOpsHandler) buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	componentName string) (*component.SynthesizedComponent, error) {
+	compSpec := getComponentSpecOrShardingTemplate(cluster, componentName)
+	if compSpec.ComponentDef == "" {
+		// TODO: remove after 0.9
+		return component.BuildSynthesizedComponentWrapper(reqCtx, cli, cluster, compSpec)
+	}
+	comp, compDef, err := component.GetCompNCompDefByName(reqCtx.Ctx, cli, cluster.Namespace, constant.GenerateClusterComponentName(cluster.Name, componentName))
+	if err != nil {
+		return nil, err
+	}
+	return component.BuildSynthesizedComponent(reqCtx, cli, cluster, compDef, comp)
+}
+
 func (r rebuildInstanceOpsHandler) prepareInstanceHelper(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
-	comp *appsv1alpha1.ClusterComponentSpec,
 	envForRestore []corev1.EnvVar,
 	instance appsv1alpha1.Instance,
 	backupName string,
 	index int) (*instanceHelper, error) {
 	var (
-		backup    *dpv1alpha1.Backup
-		actionSet *dpv1alpha1.ActionSet
-		err       error
+		backup          *dpv1alpha1.Backup
+		actionSet       *dpv1alpha1.ActionSet
+		synthesizedComp *component.SynthesizedComponent
+		err             error
 	)
 	if backupName != "" {
 		// prepare backup infos
@@ -257,7 +269,7 @@ func (r rebuildInstanceOpsHandler) prepareInstanceHelper(reqCtx intctrlutil.Requ
 	if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: instance.Name, Namespace: opsRes.Cluster.Namespace}, targetPod); err != nil {
 		return nil, err
 	}
-	synthesizedComp, err := component.BuildSynthesizedComponentWrapper(reqCtx, cli, opsRes.Cluster, comp)
+	synthesizedComp, err = r.buildSynthesizedComponent(reqCtx, cli, opsRes.Cluster, targetPod.Labels[constant.KBAppComponentLabelKey])
 	if err != nil {
 		return nil, err
 	}
@@ -268,7 +280,6 @@ func (r rebuildInstanceOpsHandler) prepareInstanceHelper(reqCtx intctrlutil.Requ
 	}
 	return &instanceHelper{
 		index:           index,
-		comp:            comp,
 		backup:          backup,
 		instance:        instance,
 		actionSet:       actionSet,
@@ -299,7 +310,7 @@ func (r rebuildInstanceOpsHandler) rebuildInstanceWithNoBackup(reqCtx intctrluti
 	}
 
 	// 3. waiting for new instance is available.
-	return r.instanceIsAvailable(insHelper.synthesizedComp, insHelper.targetPod)
+	return r.instanceIsAvailable(insHelper.synthesizedComp, insHelper.targetPod, opsRes.OpsRequest.Annotations[ignoreRoleCheckAnnotationKey])
 }
 
 // rebuildPodWithBackup rebuild instance with backup.
@@ -311,7 +322,7 @@ func (r rebuildInstanceOpsHandler) rebuildInstanceWithBackup(reqCtx intctrlutil.
 
 	getRestore := func(stage dpv1alpha1.RestoreStage) (*dpv1alpha1.Restore, string, error) {
 		restoreName := fmt.Sprintf("%s-%s-%s-%s-%d", insHelper.rebuildPrefix, strings.ToLower(string(stage)),
-			common.CutString(opsRes.OpsRequest.Name, 10), insHelper.comp.Name, insHelper.index)
+			common.CutString(opsRes.OpsRequest.Name, 10), insHelper.synthesizedComp.Name, insHelper.index)
 		restore := &dpv1alpha1.Restore{}
 		if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: restoreName, Namespace: opsRes.Cluster.Namespace}, restore); err != nil {
 			return nil, restoreName, client.IgnoreNotFound(err)
@@ -328,7 +339,7 @@ func (r rebuildInstanceOpsHandler) rebuildInstanceWithBackup(reqCtx intctrlutil.
 			// create Restore CR
 			if stage == dpv1alpha1.PostReady {
 				//  waiting for the pod is available and do PostReady restore.
-				available, err := r.instanceIsAvailable(insHelper.synthesizedComp, insHelper.targetPod)
+				available, err := r.instanceIsAvailable(insHelper.synthesizedComp, insHelper.targetPod, opsRes.OpsRequest.Annotations[ignoreRoleCheckAnnotationKey])
 				if err != nil || !available {
 					return false, err
 				}
@@ -340,7 +351,7 @@ func (r rebuildInstanceOpsHandler) rebuildInstanceWithBackup(reqCtx intctrlutil.
 			return false, intctrlutil.NewFatalError(fmt.Sprintf(`pod "%s" rebuild failed, due to the Restore "%s" is Failed`, insHelper.targetPod.Name, restoreName))
 		}
 		if restore.Status.Phase != dpv1alpha1.RestorePhaseCompleted {
-			progressDetail.Message = fmt.Sprintf(`Waiting for Restore "%s" to be completed`, restoreName)
+			progressDetail.Message = fmt.Sprintf(`Waiting for %s Restore "%s" to be completed`, stage, restoreName)
 			return false, nil
 		}
 		return true, nil
@@ -360,7 +371,8 @@ func (r rebuildInstanceOpsHandler) rebuildInstanceWithBackup(reqCtx intctrlutil.
 	if err != nil || !completed {
 		return false, err
 	}
-	if progressDetail.Message != waitingForInstanceReadyMessage {
+	if progressDetail.Message != waitingForInstanceReadyMessage &&
+		!strings.HasPrefix(progressDetail.Message, waitingForPostReadyRestorePrefix) {
 		// 2. rebuild source pvcs and recreate the instance by deleting it.
 		return false, r.rebuildSourcePVCsAndRecreateInstance(reqCtx, cli, opsRes.OpsRequest, progressDetail, insHelper)
 	}
@@ -368,7 +380,7 @@ func (r rebuildInstanceOpsHandler) rebuildInstanceWithBackup(reqCtx intctrlutil.
 		// 3. do PostReady restore
 		return waitRestoreCompleted(dpv1alpha1.PostReady)
 	}
-	return r.instanceIsAvailable(insHelper.synthesizedComp, insHelper.targetPod)
+	return r.instanceIsAvailable(insHelper.synthesizedComp, insHelper.targetPod, opsRes.OpsRequest.Annotations[ignoreRoleCheckAnnotationKey])
 }
 
 // rebuildInstancePVByPod rebuilds the new instance pvs by a temp pod.
@@ -377,7 +389,7 @@ func (r rebuildInstanceOpsHandler) rebuildInstancePVByPod(reqCtx intctrlutil.Req
 	opsRes *OpsResource,
 	insHelper *instanceHelper,
 	progressDetail *appsv1alpha1.ProgressStatusDetail) (bool, error) {
-	rebuildPodName := fmt.Sprintf("%s-%s-%s-%d", insHelper.rebuildPrefix, common.CutString(opsRes.OpsRequest.Name, 20), insHelper.comp.Name, insHelper.index)
+	rebuildPodName := fmt.Sprintf("%s-%s-%s-%d", insHelper.rebuildPrefix, common.CutString(opsRes.OpsRequest.Name, 20), insHelper.synthesizedComp.Name, insHelper.index)
 	rebuildPod := &corev1.Pod{}
 	exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, cli, client.ObjectKey{Name: rebuildPodName, Namespace: opsRes.Cluster.Namespace}, rebuildPod)
 	if err != nil {
@@ -394,10 +406,10 @@ func (r rebuildInstanceOpsHandler) rebuildInstancePVByPod(reqCtx intctrlutil.Req
 }
 
 func (r rebuildInstanceOpsHandler) getWellKnownLabels(synthesizedComp *component.SynthesizedComponent) map[string]string {
-	if synthesizedComp.ClusterDefName != "" {
-		return constant.GetKBWellKnownLabels(synthesizedComp.ClusterDefName, synthesizedComp.ClusterName, synthesizedComp.Name)
+	if synthesizedComp.CompDefName != "" {
+		return constant.GetKBWellKnownLabelsWithCompDef(synthesizedComp.CompDefName, synthesizedComp.ClusterName, synthesizedComp.Name)
 	}
-	return constant.GetKBWellKnownLabelsWithCompDef(synthesizedComp.CompDefName, synthesizedComp.ClusterName, synthesizedComp.Name)
+	return constant.GetKBWellKnownLabels(synthesizedComp.ClusterDefName, synthesizedComp.ClusterName, synthesizedComp.Name)
 }
 
 // getPVCMapAndVolumes gets the pvc map and the volume infos.
@@ -412,18 +424,25 @@ func (r rebuildInstanceOpsHandler) getPVCMapAndVolumes(opsRes *OpsResource,
 		// key: source pvc name, value: tmp pvc
 		pvcMap       = map[string]*corev1.PersistentVolumeClaim{}
 		volumePVCMap = map[string]string{}
-		pvcLabels    = r.getWellKnownLabels(synthesizedComp)
 	)
 	for _, volume := range targetPod.Spec.Volumes {
 		if volume.PersistentVolumeClaim != nil {
 			volumePVCMap[volume.Name] = volume.PersistentVolumeClaim.ClaimName
 		}
 	}
+	// backup's ready, then start to check restore
+	workloadName := constant.GenerateWorkloadNamePattern(opsRes.Cluster.Name, synthesizedComp.Name)
+	templateName, _, err := component.GetTemplateNameAndOrdinal(workloadName, targetPod.Name)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	// TODO: create pvc by the volumeClaimTemplates of instance template if it is necessary.
 	for i, vct := range synthesizedComp.VolumeClaimTemplates {
 		sourcePVCName := volumePVCMap[vct.Name]
 		if sourcePVCName == "" {
 			return nil, nil, nil, intctrlutil.NewFatalError("")
 		}
+		pvcLabels := r.getWellKnownLabels(synthesizedComp)
 		tmpPVC := &corev1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("%s-%s-%d", rebuildPrefix, common.CutString(synthesizedComp.Name+"-"+vct.Name, 30), index),
@@ -435,7 +454,7 @@ func (r rebuildInstanceOpsHandler) getPVCMapAndVolumes(opsRes *OpsResource,
 			},
 			Spec: vct.Spec,
 		}
-		factory.BuildPersistentVolumeClaimLabels(synthesizedComp, tmpPVC, vct.Name)
+		factory.BuildPersistentVolumeClaimLabels(synthesizedComp, tmpPVC, vct.Name, templateName)
 		pvcMap[sourcePVCName] = tmpPVC
 		// build volumes and volumeMount
 		volumes = append(volumes, corev1.Volume{
@@ -646,7 +665,11 @@ func (r rebuildInstanceOpsHandler) rebuildSourcePVCsAndRecreateInstance(reqCtx i
 	}
 	// update progress message and recreate the target instance by deleting it.
 	progressDetail.Message = waitingForInstanceReadyMessage
-	return intctrlutil.BackgroundDeleteObject(cli, reqCtx.Ctx, insHelper.targetPod)
+	var options []client.DeleteOption
+	if opsRequest.Spec.Force {
+		options = append(options, client.GracePeriodSeconds(0))
+	}
+	return intctrlutil.BackgroundDeleteObject(cli, reqCtx.Ctx, insHelper.targetPod, options...)
 }
 
 func (r rebuildInstanceOpsHandler) getRestoredPV(reqCtx intctrlutil.RequestCtx,
@@ -766,7 +789,8 @@ func (r rebuildInstanceOpsHandler) removePVCFinalizer(reqCtx intctrlutil.Request
 // instanceIsAvailable checks if the instance is available.
 func (r rebuildInstanceOpsHandler) instanceIsAvailable(
 	synthesizedComp *component.SynthesizedComponent,
-	targetPod *corev1.Pod) (bool, error) {
+	targetPod *corev1.Pod,
+	ignoreRoleCheckAnnotation string) (bool, error) {
 	if !targetPod.DeletionTimestamp.IsZero() {
 		return false, nil
 	}
@@ -778,7 +802,7 @@ func (r rebuildInstanceOpsHandler) instanceIsAvailable(
 		return false, nil
 	}
 	// If roleProbe is not defined, return true.
-	if synthesizedComp.Roles == nil && !slices.Contains([]appsv1alpha1.WorkloadType{appsv1alpha1.Consensus, appsv1alpha1.Replication}, synthesizedComp.WorkloadType) {
+	if len(synthesizedComp.Roles) == 0 || ignoreRoleCheckAnnotation == "true" {
 		return true, nil
 	}
 	// check if the role detection is successfully.

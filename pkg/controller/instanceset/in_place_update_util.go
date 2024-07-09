@@ -24,7 +24,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/rogpeppe/go-internal/semver"
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -33,7 +32,7 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -46,15 +45,6 @@ const (
 )
 
 func supportPodVerticalScaling() bool {
-	kubeVersion, err := utils.GetKubeVersion()
-	// if the Kubernetes version is unknown, assume pod vertical scaling is not supported.
-	if err != nil {
-		return false
-	}
-	if semver.Compare(kubeVersion, "v1.29") >= 0 {
-		return true
-	}
-
 	return utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling)
 }
 
@@ -131,7 +121,7 @@ func mergeInPlaceFields(src, dst *corev1.Pod) {
 	dst.Spec.ActiveDeadlineSeconds = src.Spec.ActiveDeadlineSeconds
 	// according to the Pod API spec, tolerations can only be appended.
 	// means old tolerations must be in new toleration list.
-	mergeList(&src.Spec.Tolerations, &dst.Spec.Tolerations, func(item corev1.Toleration) func(corev1.Toleration) bool {
+	intctrlutil.MergeList(&src.Spec.Tolerations, &dst.Spec.Tolerations, func(item corev1.Toleration) func(corev1.Toleration) bool {
 		return func(t corev1.Toleration) bool {
 			return reflect.DeepEqual(item, t)
 		}
@@ -281,7 +271,12 @@ func equalResourcesInPlaceFields(old, new *corev1.Pod) bool {
 			return false
 		}
 		oc := old.Spec.Containers[index]
-		if !equalField(oc.Resources.Requests, nc.Resources.Requests) {
+		realRequests := nc.Resources.Requests
+		// 'requests' defaults to Limits if that is explicitly specified, see: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#resources
+		if realRequests == nil {
+			realRequests = nc.Resources.Limits
+		}
+		if !equalField(oc.Resources.Requests, realRequests) {
 			return false
 		}
 		if !equalField(oc.Resources.Limits, nc.Resources.Limits) {
@@ -292,7 +287,7 @@ func equalResourcesInPlaceFields(old, new *corev1.Pod) bool {
 }
 
 func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (PodUpdatePolicy, error) {
-	updateRevisions, err := getUpdateRevisions(its.Status.UpdateRevisions)
+	updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
 	if err != nil {
 		return NoOpsPolicy, err
 	}

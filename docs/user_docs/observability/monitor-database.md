@@ -11,19 +11,19 @@ With the built-in database observability, you can observe the database health st
 
 ## For Playground/test
 
-KubeBlocks integrates open-source monitoring components, such as Prometheus, AlertManager, and Grafana, by add-ons and adopts the custom `apecloud-otel-collector` to collect the monitoring indicators of databases and host machines. All monitoring add-ons are enabled when KubeBlocks Playground is deployed.
+KubeBlocks integrates open-source monitoring components, such as Prometheus, AlertManager, and Grafana, by addons and adopts the custom `apecloud-otel-collector` to collect the monitoring indicators of databases and host machines. All monitoring addons are enabled when KubeBlocks Playground is deployed.
 
-KubeBlock Playground supports the following built-in monitoring add-ons:
+KubeBlock Playground supports the following built-in monitoring addons:
 
-* `prometheus`: it includes Prometheus and AlertManager add-ons.
-* `grafana`: it includes Grafana monitoring add-ons.
-* `alertmanager-webhook-adaptor`: it includes the notification extension add-on and is used to extend the notification capability of AlertManager. Currently, the custom bots of Feishu, DingTalk, and Wechat Enterprise are supported.
+* `prometheus`: it includes Prometheus and AlertManager addons.
+* `grafana`: it includes Grafana monitoring addons.
+* `alertmanager-webhook-adaptor`: it includes the notification extension addon and is used to extend the notification capability of AlertManager. Currently, the custom bots of Feishu, DingTalk, and Wechat Enterprise are supported.
 * `apecloud-otel-collector`: it is used to collect the indicators of databases and the host machine.
 
-1. View all built-in add-ons and make sure the monitoring add-ons are enabled.
+1. View all built-in addons and make sure the monitoring addons are enabled. If the monitoring addons are not enabled, [enable these addons](./../overview/supported-addons.md#use-addons) first.
 
    ```bash
-   # View all add-ons supported
+   # View all addons supported
    kbcli addon list
    ...
    grafana                        Helm   Enabled                   true                                                                                    
@@ -32,7 +32,29 @@ KubeBlock Playground supports the following built-in monitoring add-ons:
    ...
    ```
 
-2. View the dashboard list.
+2. Check whether the monitoring function of the cluster is enabled. If the monitoring function is enabled, the output shows `disableExporter: false`.
+
+   ```bash
+   kubectl get cluster mycluster -o yaml
+   >
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: Cluster
+   metadata:
+   ......
+   spec:
+     ......
+     componentSpecs:
+     ......
+       disableExporter: false
+   ```
+
+   If `disableExporter: false` is not shown in the output, it means the monitoring function of this cluster is not enabled and you need to enable it first.
+
+   ```bash
+   kbcli cluster update mycluster --disableExporter=false
+   ```
+
+3. View the dashboard list.
 
    ```bash
    kbcli dashboard list
@@ -43,7 +65,7 @@ KubeBlock Playground supports the following built-in monitoring add-ons:
    kubeblocks-prometheus-server         kb-system   19090   Jul 24,2023 11:38 UTC+0800
    ```
 
-3. Open and view the web console of a monitoring dashboard. For example,
+4. Open and view the web console of a monitoring dashboard. For example,
 
    ```bash
    kbcli dashboard open kubeblocks-grafana
@@ -53,9 +75,43 @@ KubeBlock Playground supports the following built-in monitoring add-ons:
 
 In the production environment, it is highly recommended to build your monitoring system or purchase a third-party monitoring service.
 
-### Enable monitoring function
+### Integrate dashboard and alert rules
 
-KubeBlocks provides an add-on, `victoria-metrics-agent`, to push the monitoring data to a third-party monitoring system compatible with the Prometheus Remote Write protocol. Compared with the native Prometheus, [vmgent](https://docs.victoriametrics.com/vmagent.html) is lighter and supports the horizontal extension.
+Kubeblocks provides Grafana Dashboards and Prometheus AlertRules for mainstream engines, which you can obtain from [the repository](https://github.com/apecloud/kubeblocks-mixin), or convert and customize according to your needs.
+
+For the importing method, refer to the tutorials of your third-party monitoring service.
+
+### Enable the monitoring function for a database
+
+Check whether the monitoring function of the cluster is enabled. If the monitoring function is enabled, the output shows `monitor: true`.
+
+```bash
+kubectl get cluster mycluster -o yaml
+>
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+......
+spec:
+   ......
+   componentSpecs:
+   ......
+      monitor: true
+```
+
+If `monitor: true` is not shown in the output, it means the monitoring function of this cluster is not enabled and you need to enable it first.
+
+```bash
+kbcli cluster update mycluster --monitor=true
+```
+
+### View the dashboard
+
+You can view the dashboard of the corresponding cluster via Grafana Web Console. For more detailed information, see the [Grafana dashboard documentation](https://grafana.com/docs/grafana/latest/dashboards/).
+
+### (Optional) Enable remote write
+
+Remote write is an optional step and you can enable it based on your actual needs. KubeBlocks provides an addon, `victoria-metrics-agent`, to push the monitoring data to a third-party monitoring system compatible with the Prometheus Remote Write protocol. Compared with the native Prometheus, [vmgent](https://docs.victoriametrics.com/vmagent.html) is lighter and supports the horizontal extension.
 
 1. Enable data push.
 
@@ -84,7 +140,7 @@ KubeBlocks provides an add-on, `victoria-metrics-agent`, to push the monitoring 
    kbcli addon enable victoria-metrics-agent --set "extraArgs.remoteWrite\.aws\.region=<your AMP region>,extraArgs.remoteWrite\.aws\.accessKey=<your accessKey>,extraArgs.remoteWrite\.aws\.secretKey=<your secretKey>,remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}"
    ```
 
-2. (Optional) Horizontally scale the `victoria-metrics-agent` add-on.
+2. (Optional) Horizontally scale the `victoria-metrics-agent` addon.
 
    When the amount of database instances continues to increase, a single-node vmagent becomes the bottleneck. This problem can be solved by scaling vmagent. The multiple-node vmagent automatically divides the task of data collection according to the Hash strategy.
 
@@ -92,46 +148,8 @@ KubeBlocks provides an add-on, `victoria-metrics-agent`, to push the monitoring 
    kbcli addon enable victoria-metrics-agent --replicas <replica count> --set remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}
    ```
 
-3. (Optional) Disable the `victoria-metrics-agent` add-on.
+3. (Optional) Disable the `victoria-metrics-agent` addon.
 
    ```bash
    kbcli addon disable victoria-metrics-agent
    ```
-
-### Integrate Dashboard and Alert Rules
-
-Kubeblocks provides Grafana Dashboards and Prometheus AlertRules for mainstream engines, which you can obtain from [the repository](https://github.com/apecloud/kubeblocks-mixin), or convert and customize according to your needs.
-
-For the importing method, refer to the tutorials of your third-party monitoring service.
-
-## Enable the monitoring function for a database
-
-The monitoring function is enabled by default when a database is created. The open-source or customized Exporter is injected after the monitoring function is enabled. This Exporter can be found by Prometheus server automatically and scrape monitoring indicators at regular intervals. You can change mysql as `postgresql`, `mongodb`, `redis` to create a cluster of other database engines.
-
-* For a new cluster, run the command below to create a database cluster.
-
-    ```bash
-    # Search the cluster definition
-    kbcli clusterdefinition list 
-
-    # Create a cluster
-    kbcli cluster create mysql <clustername> 
-    ```
-
- :::note
-
- You can change `--monitoring-interval` as `0` to disable the monitoring function but it is not recommended.
-
- ```bash
- kbcli cluster create mysql mycluster --monitoring-interval=0
- ```
-
- :::
-
-* For the existing cluster with the monitoring function disabled, you can update it to enable the monitor function by the `update` command.
-
-    ```bash
-    kbcli cluster update mycluster --monitoring-interval=15s
-    ```
-
-You can view the dashboard of the corresponding cluster via Grafana Web Console. For more detailed information, see the [Grafana dashboard documentation](https://grafana.com/docs/grafana/latest/dashboards/).

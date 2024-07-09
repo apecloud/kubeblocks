@@ -23,16 +23,22 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
+
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
@@ -91,6 +97,7 @@ func (s *CheckRole) Init(ctx context.Context) error {
 	// lorry utilizes the pod readiness probe to trigger role probe and 'timeoutSeconds' is directly copied from the 'probe.timeoutSeconds' field of pod.
 	// here we give 80% of the total time to role probe job and leave the remaining 20% to kubelet to handle the readiness probe related tasks.
 	s.Timeout = time.Duration(timeoutSeconds) * (800 * time.Millisecond)
+	s.OriRole = "waitForStart"
 	actionJSON := viper.GetString(constant.KBEnvActionCommands)
 	if actionJSON != "" {
 		actionCommands := map[string][]string{}
@@ -105,7 +112,6 @@ func (s *CheckRole) Init(ctx context.Context) error {
 		}
 	}
 	return nil
-
 }
 
 func (s *CheckRole) IsReadonly(ctx context.Context) bool {
@@ -156,10 +162,31 @@ func (s *CheckRole) Do(ctx context.Context, _ *operations.OpsRequest) (*operatio
 		return resp, nil
 	}
 
-	resp.Data["role"] = role
 	if s.OriRole == role {
 		return nil, nil
 	}
+
+	// When network partition occurs, the new primary needs to send global role change information to the controller.
+	isLeader, err := manager.IsLeader(ctx, cluster)
+	if err != nil {
+		if err != models.ErrNotImplemented {
+			return nil, err
+		}
+		isLeader = models.IsLikelyPrimaryRole(role)
+	}
+
+	if isLeader {
+		// we need to get latest member info to build global role snapshot
+		members, err := s.dcsStore.GetMembers()
+		if err != nil {
+			return nil, err
+		}
+		cluster.Members = members
+		resp.Data["role"] = s.buildGlobalRoleSnapshot(cluster, manager, role)
+	} else {
+		resp.Data["role"] = role
+	}
+
 	resp.Data["event"] = util.OperationSuccess
 	s.OriRole = role
 	err = util.SentEventForProbe(ctx, resp.Data)
@@ -172,7 +199,8 @@ func (s *CheckRole) Do(ctx context.Context, _ *operations.OpsRequest) (*operatio
 // of report events to reduce the possibility of event conflicts.
 func (s *CheckRole) roleValidate(role string) (bool, string) {
 	if role == "" {
-		return false, "role is none"
+		// some time db replica may not have role, e.g. oceanbase
+		return true, ""
 	}
 	// do not validate them when db roles setting is missing
 	if len(s.DBRoles) == 0 {
@@ -191,4 +219,41 @@ func (s *CheckRole) roleValidate(role string) (bool, string) {
 		msg = fmt.Sprintf("role %s is not configured in cluster definition %v", role, s.DBRoles)
 	}
 	return isValid, msg
+}
+
+func (s *CheckRole) buildGlobalRoleSnapshot(cluster *dcs.Cluster, mgr engines.DBManager, role string) string {
+	currentMemberName := mgr.GetCurrentMemberName()
+	roleSnapshot := &common.GlobalRoleSnapshot{
+		Version: strconv.FormatInt(metav1.NowMicro().UnixMicro(), 10),
+		PodRoleNamePairs: []common.PodRoleNamePair{
+			{
+				PodName:  currentMemberName,
+				RoleName: role,
+				PodUID:   cluster.GetMemberWithName(currentMemberName).UID,
+			},
+		},
+	}
+
+	for _, member := range cluster.Members {
+		s.logger.V(1).Info("check member", "member", member.Name, "role", member.Role)
+		if member.Name != currentMemberName {
+			// get old primary and set it's role to none
+			if strings.EqualFold(member.Role, role) {
+				s.logger.Info("there is a another leader", "member", member.Name)
+				if member.IsLorryReady() {
+					s.logger.Info("another leader's lorry is online, just ignore", "member", member.Name)
+					continue
+				}
+				s.logger.Info("reset old leader role to none", "member", member.Name)
+				roleSnapshot.PodRoleNamePairs = append(roleSnapshot.PodRoleNamePairs, common.PodRoleNamePair{
+					PodName:  member.Name,
+					RoleName: "",
+					PodUID:   cluster.GetMemberWithName(member.Name).UID,
+				})
+			}
+		}
+	}
+
+	b, _ := json.Marshal(roleSnapshot)
+	return string(b)
 }

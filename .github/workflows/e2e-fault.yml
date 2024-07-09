@@ -1,4 +1,4 @@
-name: E2E Fault Test
+name: Test E2E Fault
 
 on:
   workflow_dispatch:

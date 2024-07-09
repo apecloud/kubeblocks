@@ -15,45 +15,26 @@ You can expand the storage volume size of each pod.
 Run the command below to check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
 
 ```bash
-kbcli cluster list kafka  
+kbcli cluster list kafka-cluster
 ```
 
-## Option 1. Use kbcli
+## Steps
 
-Use `kbcli cluster volume-expand` command, configure the resources required and enter the cluster name again to expand the volume.
+1. Use `kbcli cluster volume-expand` command, configure the resources required and enter the cluster name again to expand the volume.
 
-```bash
-kbcli cluster volume-expand --storage=30G --components=kafka --volume-claim-templates=data kafka
-```
+   ```bash
+   kbcli cluster volume-expand --storage=30G --components=kafka --volume-claim-templates=data kafka-cluster
+   ```
 
-- `--components` describes the component name for volume expansion.
-- `--volume-claim-templates` describes the VolumeClaimTemplate names in components.
-- `--storage` describes the volume storage size.
+   - `--components` describes the component name for volume expansion.
+   - `--volume-claim-templates` describes the VolumeClaimTemplate names in components.
+   - `--storage` describes the volume storage size.
 
-## Option 2. Change the YAML file of the cluster
+2. Validate the volume expansion.
 
-Change the value of `spec.components.volumeClaimTemplates.spec.resources` in the cluster YAML file. `spec.components.volumeClaimTemplates.spec.resources` is the storage resource information of the pod and changing this value triggers the volume expansion of a cluster.
-
-```yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: Cluster
-metadata:
-  name: kafka
-  namespace: default
-spec:
-  clusterDefinitionRef: kafka
-  clusterVersionRef: kafka-3.3.2
-  componentSpecs:
-  - name: kafka 
-    componentDefRef: kafka
-    replicas: 1
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi # Change the volume storage size.
-  terminationPolicy: Halt
-```
+   ```bash
+   kbcli cluster list kafka-cluster
+   >
+   NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS          CREATED-TIME
+   kafka-cluster        default          redis                     kafka-3.3.2              Delete                    Updating        May 11,2023 15:27 UTC+0800
+   ```

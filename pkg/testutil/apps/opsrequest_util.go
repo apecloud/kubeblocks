@@ -32,17 +32,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/testutil"
 )
 
-// CreateRestartOpsRequest creates an OpsRequest of restart type for testing.
-func CreateRestartOpsRequest(testCtx *testutil.TestContext, clusterName, opsRequestName string, componentNames []string) *appsv1alpha1.OpsRequest {
-	opsRequest := NewOpsRequestObj(opsRequestName, testCtx.DefaultNamespace, clusterName, appsv1alpha1.RestartType)
-	componentList := make([]appsv1alpha1.ComponentOps, len(componentNames))
-	for i := range componentNames {
-		componentList[i] = appsv1alpha1.ComponentOps{ComponentName: componentNames[i]}
-	}
-	opsRequest.Spec.RestartList = componentList
-	return CreateK8sResource(testCtx, opsRequest).(*appsv1alpha1.OpsRequest)
-}
-
 // NewOpsRequestObj only generates the OpsRequest Object, instead of actually creating this resource.
 func NewOpsRequestObj(opsRequestName, namespace, clusterName string, opsType appsv1alpha1.OpsType) *appsv1alpha1.OpsRequest {
 	return &appsv1alpha1.OpsRequest{
@@ -55,8 +44,8 @@ func NewOpsRequestObj(opsRequestName, namespace, clusterName string, opsType app
 			},
 		},
 		Spec: appsv1alpha1.OpsRequestSpec{
-			ClusterRef: clusterName,
-			Type:       opsType,
+			ClusterName: clusterName,
+			Type:        opsType,
 		},
 	}
 }
@@ -67,19 +56,6 @@ func CreateOpsRequest(ctx context.Context, testCtx testutil.TestContext, opsRequ
 	// wait until cluster created
 	gomega.Eventually(CheckObjExists(&testCtx, client.ObjectKeyFromObject(opsRequest), opsRequest, true)).Should(gomega.Succeed())
 	return opsRequest
-}
-
-// GetOpsRequestCompPhase gets the component phase of testing OpsRequest for verification.
-func GetOpsRequestCompPhase(ctx context.Context, testCtx testutil.TestContext, opsName, componentName string) func(g gomega.Gomega) appsv1alpha1.ClusterComponentPhase {
-	return func(g gomega.Gomega) appsv1alpha1.ClusterComponentPhase {
-		tmpOps := &appsv1alpha1.OpsRequest{}
-		g.Expect(testCtx.Cli.Get(ctx, client.ObjectKey{Name: opsName,
-			Namespace: testCtx.DefaultNamespace}, tmpOps)).Should(gomega.Succeed())
-		if tmpOps.Status.Components == nil {
-			return ""
-		}
-		return tmpOps.Status.Components[componentName].Phase
-	}
 }
 
 // GetOpsRequestPhase gets the testing opsRequest phase for verification.

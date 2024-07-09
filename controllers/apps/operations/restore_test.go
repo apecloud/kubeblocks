@@ -155,37 +155,24 @@ var _ = Describe("Restore OpsRequest", func() {
 					constant.KBAppComponentLabelKey: consensusComp,
 				}
 				opsRes.Cluster.ResourceVersion = ""
-				secretName := constant.GenerateAccountSecretName(opsRes.Cluster.Name, consensusComp, account[0])
-				labels := constant.GetComponentWellKnownLabels(opsRes.Cluster.Name, consensusComp)
-				secretItem0 := builder.NewSecretBuilder(opsRes.Cluster.Namespace, secretName).
-					AddLabelsInMap(labels).
-					AddLabels(constant.AppManagedByLabelKey, constant.AppName).
-					AddLabels(constant.AppInstanceLabelKey, opsRes.Cluster.Name).
-					AddLabels(constant.KBAppComponentLabelKey, consensusComp).
-					AddLabels(constant.ClusterAccountLabelKey, account[0]).
-					PutData(constant.AccountNameForSecret, []byte(account[0])).
-					PutData(constant.AccountPasswdForSecret, password[0]).
-					SetImmutable(true).
-					GetObject()
-				secretName = constant.GenerateAccountSecretName(opsRes.Cluster.Name, consensusComp, account[1])
-				labels = constant.GetComponentWellKnownLabels(opsRes.Cluster.Name, consensusComp)
-				secretItem1 := builder.NewSecretBuilder(opsRes.Cluster.Namespace, secretName).
-					AddLabelsInMap(labels).
-					AddLabels(constant.AppManagedByLabelKey, constant.AppName).
-					AddLabels(constant.AppInstanceLabelKey, opsRes.Cluster.Name).
-					AddLabels(constant.KBAppComponentLabelKey, consensusComp).
-					AddLabels(constant.ClusterAccountLabelKey, account[1]).
-					PutData(constant.AccountNameForSecret, []byte(account[1])).
-					PutData(constant.AccountPasswdForSecret, password[1]).
-					SetImmutable(true).
-					GetObject()
-				secretList := &corev1.SecretList{Items: []corev1.Secret{
-					*secretItem0,
-					*secretItem1,
-				}}
+				secretList := &corev1.SecretList{Items: make([]corev1.Secret, 2)}
+				for i := 0; i < 2; i++ {
+					secretName := constant.GenerateAccountSecretName(opsRes.Cluster.Name, consensusComp, account[i])
+					labels := constant.GetComponentWellKnownLabels(opsRes.Cluster.Name, consensusComp)
+					secretList.Items[i] = *builder.NewSecretBuilder(opsRes.Cluster.Namespace, secretName).
+						AddLabelsInMap(labels).
+						AddLabels(constant.AppManagedByLabelKey, constant.AppName).
+						AddLabels(constant.AppInstanceLabelKey, opsRes.Cluster.Name).
+						AddLabels(constant.KBAppComponentLabelKey, consensusComp).
+						AddLabels(constant.ClusterAccountLabelKey, account[i]).
+						PutData(constant.AccountNameForSecret, []byte(account[i])).
+						PutData(constant.AccountPasswdForSecret, password[i]).
+						SetImmutable(true).
+						GetObject()
+				}
+
 				clusterBytes, _ := json.Marshal(opsRes.Cluster)
 				secretListBytes, _ := json.Marshal(secretList)
-
 				backup.Annotations = map[string]string{
 					constant.ClusterSnapshotAnnotationKey:  string(clusterBytes),
 					constant.SecretsSnapshotAnnotationsKey: string(secretListBytes),
@@ -214,7 +201,6 @@ var _ = Describe("Restore OpsRequest", func() {
 					Expect(restoreSecret.Data[constant.AccountPasswdForSecret]).Should(Equal(password[i]))
 				})).Should(Succeed())
 			}
-
 		})
 		It("test if source cluster exists services", func() {
 			By("mock backup annotations and labels")

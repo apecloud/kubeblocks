@@ -34,7 +34,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	wlv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -191,13 +191,13 @@ func (t *componentDeletionTransformer) getCluster(transCtx *componentTransformCo
 
 func compOwnedWorkloadKinds() []client.ObjectList {
 	return []client.ObjectList{
-		&wlv1alpha1.InstanceSetList{},
+		&workloads.InstanceSetList{},
 	}
 }
 
 func compOwnedKinds() []client.ObjectList {
 	return []client.ObjectList{
-		&wlv1alpha1.InstanceSetList{},
+		&workloads.InstanceSetList{},
 		&policyv1.PodDisruptionBudgetList{},
 		&corev1.ServiceList{},
 		&corev1.ServiceAccountList{},

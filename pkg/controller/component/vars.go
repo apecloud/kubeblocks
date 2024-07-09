@@ -39,7 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
@@ -1159,7 +1159,7 @@ func resolveComponentInstanceNamesRef(ctx context.Context, cli client.Reader, sy
 		comp := obj.(*appsv1alpha1.Component)
 		var templates []instanceset.InstanceTemplate
 		for i := range comp.Spec.Instances {
-			templates = append(templates, &comp.Spec.Instances[i])
+			templates = append(templates, toV1InstanceTemplate(comp.Spec.Instances[i]))
 		}
 		instanceNameList, err := instanceset.GenerateAllInstanceNames(comp.Name, comp.Spec.Replicas, templates, comp.Spec.OfflineInstances, workloads.Ordinals{})
 		if err != nil {
@@ -1176,7 +1176,7 @@ func resolveComponentPodFQDNsRef(ctx context.Context, cli client.Reader, synthes
 		comp := obj.(*appsv1alpha1.Component)
 		var templates []instanceset.InstanceTemplate
 		for i := range comp.Spec.Instances {
-			templates = append(templates, &comp.Spec.Instances[i])
+			templates = append(templates, toV1InstanceTemplate(comp.Spec.Instances[i]))
 		}
 		clusterDomainFn := func(name string) string {
 			return fmt.Sprintf("%s.%s", name, viper.GetString(constant.KubernetesClusterDomainEnv))

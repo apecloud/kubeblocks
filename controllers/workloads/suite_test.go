@@ -38,7 +38,7 @@ import (
 
 	// +kubebuilder:scaffold:imports
 
-	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/testutil"
 )
 
@@ -75,7 +75,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
-	err = workloadsv1alpha1.AddToScheme(scheme.Scheme)
+	err = workloads.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:scheme

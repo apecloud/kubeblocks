@@ -31,7 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -131,7 +131,7 @@ func GenerateAllPodNames(
 	workloadName := constant.GenerateWorkloadNamePattern(clusterName, fullCompName)
 	var templates []instanceset.InstanceTemplate
 	for i := range instances {
-		templates = append(templates, &instances[i])
+		templates = append(templates, toV1InstanceTemplate(instances[i]))
 	}
 	return instanceset.GenerateAllInstanceNames(workloadName, compReplicas, templates, offlineInstances, workloads.Ordinals{})
 }
@@ -172,4 +172,11 @@ func GetTemplateNameAndOrdinal(workloadName, podName string) (string, int32, err
 		return "", 0, fmt.Errorf("failed to obtain pod ordinal")
 	}
 	return templateName, int32(index), nil
+}
+
+func toV1InstanceTemplate(template appsv1alpha1.InstanceTemplate) instanceset.InstanceTemplate {
+	return &workloads.InstanceTemplate{
+		Name:     template.Name,
+		Replicas: template.Replicas,
+	}
 }

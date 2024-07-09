@@ -24,13 +24,13 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-func delayUpdateInstanceSetSystemFields(obj v1alpha1.InstanceSetSpec, pobj *v1alpha1.InstanceSetSpec) {
+func delayUpdateInstanceSetSystemFields(obj workloads.InstanceSetSpec, pobj *workloads.InstanceSetSpec) {
 	delayUpdatePodSpecSystemFields(obj.Template.Spec, &pobj.Template.Spec)
 
 	if pobj.RoleProbe != nil && obj.RoleProbe != nil {
@@ -50,7 +50,7 @@ func delayUpdatePodSpecSystemFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 	updateLorryContainer(obj.Containers, pobj.Containers)
 }
 
-func updateInstanceSetSystemFields(obj v1alpha1.InstanceSetSpec, pobj *v1alpha1.InstanceSetSpec) {
+func updateInstanceSetSystemFields(obj workloads.InstanceSetSpec, pobj *workloads.InstanceSetSpec) {
 	updatePodSpecSystemFields(obj.Template.Spec, &pobj.Template.Spec)
 	if pobj.RoleProbe != nil && obj.RoleProbe != nil {
 		pobj.RoleProbe.FailureThreshold = obj.RoleProbe.FailureThreshold

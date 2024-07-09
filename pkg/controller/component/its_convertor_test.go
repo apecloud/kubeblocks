@@ -24,7 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloadsalpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
 var _ = Describe("Test InstanceSet Convertor", func() {
@@ -55,7 +55,7 @@ var _ = Describe("Test InstanceSet Convertor", func() {
 			convertor := &itsRoleProbeConvertor{}
 			res, err := convertor.convert(synComp)
 			Expect(err).Should(Succeed())
-			probe := res.(*workloadsalpha1.RoleProbe)
+			probe := res.(*workloads.RoleProbe)
 			Expect(probe.CustomHandler[0].Command).Should(BeEquivalentTo(command))
 			Expect(probe.CustomHandler[0].Args).Should(BeEquivalentTo(args))
 		})

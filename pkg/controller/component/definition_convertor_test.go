@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/apiutil"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -736,16 +736,16 @@ var _ = Describe("Component Definition Convertor", func() {
 			It("InstanceSet spec roles convertor", func() {
 				convertor := &compDefRolesConvertor{}
 				clusterCompDef.RSMSpec = &appsv1alpha1.RSMSpec{
-					Roles: []workloads.ReplicaRole{
+					Roles: []workloadsv1alpha1.ReplicaRole{
 						{
 							Name:       "mock-leader",
-							AccessMode: workloads.ReadWriteMode,
+							AccessMode: workloadsv1alpha1.ReadWriteMode,
 							CanVote:    true,
 							IsLeader:   true,
 						},
 						{
 							Name:       "mock-follower",
-							AccessMode: workloads.ReadonlyMode,
+							AccessMode: workloadsv1alpha1.ReadonlyMode,
 							CanVote:    true,
 							IsLeader:   false,
 						},
@@ -898,8 +898,8 @@ var _ = Describe("Component Definition Convertor", func() {
 					"mock-its-role-probe-args",
 				}
 				clusterCompDef.RSMSpec = &appsv1alpha1.RSMSpec{
-					RoleProbe: &workloads.RoleProbe{
-						CustomHandler: []workloads.Action{
+					RoleProbe: &workloadsv1alpha1.RoleProbe{
+						CustomHandler: []workloadsv1alpha1.Action{
 							{
 								Image:   "mock-its-role-probe-image",
 								Command: mockCommand,

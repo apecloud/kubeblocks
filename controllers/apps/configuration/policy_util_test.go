@@ -35,7 +35,8 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -161,17 +162,17 @@ func withCDComponent(compType appsv1alpha1.WorkloadType, tpls []appsv1alpha1.Com
 		}
 		if compType == appsv1alpha1.Consensus || compType == appsv1alpha1.Replication {
 			params.Component.RSMSpec = &appsv1alpha1.RSMSpec{
-				Roles: []workloads.ReplicaRole{
+				Roles: []workloadsv1alpha1.ReplicaRole{
 					{
 						Name:       "leader",
 						IsLeader:   true,
-						AccessMode: workloads.ReadWriteMode,
+						AccessMode: workloadsv1alpha1.ReadWriteMode,
 						CanVote:    true,
 					},
 					{
 						Name:       "follower",
 						IsLeader:   false,
-						AccessMode: workloads.ReadonlyMode,
+						AccessMode: workloadsv1alpha1.ReadonlyMode,
 						CanVote:    true,
 					},
 				},

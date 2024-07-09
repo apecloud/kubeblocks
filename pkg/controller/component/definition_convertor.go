@@ -25,7 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/apiutil"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -267,7 +267,7 @@ func (c *compDefServicesConvertor) roleSelector(clusterCompDef *appsv1alpha1.Clu
 	// if rsmSpec is not nil, pick the one with AccessMode == ReadWrite as the primary.
 	if clusterCompDef.RSMSpec != nil && clusterCompDef.RSMSpec.Roles != nil {
 		for _, role := range clusterCompDef.RSMSpec.Roles {
-			if role.AccessMode == workloads.ReadWriteMode {
+			if string(role.AccessMode) == string(workloads.ReadWriteMode) {
 				return role.Name
 			}
 		}
@@ -450,8 +450,8 @@ func (c *compDefRolesConvertor) convertInstanceSetRole(clusterCompDef *appsv1alp
 	for _, workloadRole := range clusterCompDef.RSMSpec.Roles {
 		roles = append(roles, appsv1alpha1.ReplicaRole{
 			Name:        workloadRole.Name,
-			Serviceable: workloadRole.AccessMode != workloads.NoneMode,
-			Writable:    workloadRole.AccessMode == workloads.ReadWriteMode,
+			Serviceable: string(workloadRole.AccessMode) != string(workloads.NoneMode),
+			Writable:    string(workloadRole.AccessMode) == string(workloads.ReadWriteMode),
 			Votable:     workloadRole.CanVote,
 		})
 	}

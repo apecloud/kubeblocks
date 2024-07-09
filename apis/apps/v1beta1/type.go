@@ -107,3 +107,14 @@ const (
 	SIGPWR    SignalType = "SIGPWR"
 	SIGSYS    SignalType = "SIGSYS"
 )
+
+// ParametersDescPhase defines the ParametersDescription CR .status.phase
+// +enum
+// +kubebuilder:validation:Enum={Available,Unavailable, Deleting}
+type ParametersDescPhase string
+
+const (
+	PDAvailablePhase   ParametersDescPhase = "Available"
+	PDUnavailablePhase ParametersDescPhase = "Unavailable"
+	PDDeletingPhase    ParametersDescPhase = "Deleting"
+)

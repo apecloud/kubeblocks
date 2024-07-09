@@ -29,6 +29,7 @@ import (
 type AppsV1beta1Interface interface {
 	RESTClient() rest.Interface
 	ConfigConstraintsGetter
+	ParametersDescriptionsGetter
 }
 
 // AppsV1beta1Client is used to interact with features provided by the apps.kubeblocks.io group.
@@ -38,6 +39,10 @@ type AppsV1beta1Client struct {
 
 func (c *AppsV1beta1Client) ConfigConstraints() ConfigConstraintInterface {
 	return newConfigConstraints(c)
+}
+
+func (c *AppsV1beta1Client) ParametersDescriptions() ParametersDescriptionInterface {
+	return newParametersDescriptions(c)
 }
 
 // NewForConfig creates a new AppsV1beta1Client for the given config.

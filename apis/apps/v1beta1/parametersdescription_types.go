@@ -28,22 +28,44 @@ import (
 
 // ParametersDescriptionSpec defines the desired state of ParametersDescription
 type ParametersDescriptionSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	// Foo is an example field of ParametersDescription. Edit parametersdescription_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// Specifies the name of the configuration name.
+	//
+	// +kubebuilder:validation:Required
+	ConfigName string `json:"configName"`
 }
 
 // ParametersDescriptionStatus defines the observed state of ParametersDescription
 type ParametersDescriptionStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// The most recent generation number of the ParamsDesc object that has been observed by the controller.
+	//
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// Specifies the status of the configuration template.
+	// When set to PDAvailablePhase, the ParamsDesc can be referenced by ComponentDefinition.
+	//
+	// +optional
+	Phase ParametersDescPhase `json:"phase,omitempty"`
+
+	// Represents a list of detailed status of the ParametersDescription object.
+	//
+	// This field is crucial for administrators and developers to monitor and respond to changes within the ParametersDescription.
+	// It provides a history of state transitions and a snapshot of the current state that can be used for
+	// automated logic or direct inspection.
+	//
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-//+kubebuilder:resource:scope=Cluster
+// +genclient
+// +k8s:openapi-gen=true
+// +genclient:nonNamespaced
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:resource:scope=Cluster
+// +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=paramsdesc
+// +kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="status phase"
+// +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // ParametersDescription is the Schema for the parametersdescriptions API
 type ParametersDescription struct {
@@ -54,7 +76,7 @@ type ParametersDescription struct {
 	Status ParametersDescriptionStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // ParametersDescriptionList contains a list of ParametersDescription
 type ParametersDescriptionList struct {

@@ -49,7 +49,7 @@ type ServiceDescriptorSpec struct {
 
 	// Specifies the endpoint of the external service.
 	//
-	// If the service is exposed via a cluster, the endpoint will be provided in the format of <host>:<port>.
+	// If the service is exposed via a cluster, the endpoint will be provided in the format of `host:port`.
 	//
 	// +optional
 	Endpoint *CredentialVar `json:"endpoint,omitempty"`

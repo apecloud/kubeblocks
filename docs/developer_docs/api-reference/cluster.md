@@ -3039,7 +3039,7 @@ CredentialVar
 <td>
 <em>(Optional)</em>
 <p>Specifies the endpoint of the external service.</p>
-<p>If the service is exposed via a cluster, the endpoint will be provided in the format of <host>:<port>.</p>
+<p>If the service is exposed via a cluster, the endpoint will be provided in the format of <code>host:port</code>.</p>
 </td>
 </tr>
 <tr>
@@ -13310,47 +13310,16 @@ string
 </tr>
 <tr>
 <td>
-<code>nodeName</code><br/>
+<code>schedulingPolicy</code><br/>
 <em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the name of the node where the Pod should be scheduled.
-If set, the Pod will be directly assigned to the specified node, bypassing the Kubernetes scheduler.
-This is useful for controlling Pod placement on specific nodes.</p>
-<p>Important considerations:
-- <code>nodeName</code> bypasses default scheduling constraints (e.g., resource requirements, node selectors, affinity rules).
-- It is the user&rsquo;s responsibility to ensure the node is suitable for the Pod.
-- If the node is unavailable, the Pod will remain in &ldquo;Pending&rdquo; state until the node is available or the Pod is deleted.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>nodeSelector</code><br/>
-<em>
-map[string]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines NodeSelector to override.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>tolerations</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#toleration-v1-core">
-[]Kubernetes core/v1.Toleration
+<a href="#apps.kubeblocks.io/v1alpha1.SchedulingPolicy">
+SchedulingPolicy
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Tolerations specifies a list of tolerations to be applied to the Pod, allowing it to tolerate node taints.
-This field can be used to add new tolerations or override existing ones.</p>
+<p>Specifies the scheduling policy for the Component.</p>
 </td>
 </tr>
 <tr>
@@ -18375,6 +18344,116 @@ Sample duration format:</p>
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.SchedulingPolicy">SchedulingPolicy
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.InstanceTemplate">InstanceTemplate</a>)
+</p>
+<div>
+<p>SchedulingPolicy the scheduling policy.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>schedulerName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>If specified, the Pod will be dispatched by specified scheduler.
+If not specified, the Pod will be dispatched by default scheduler.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>nodeSelector</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>NodeSelector is a selector which must be true for the Pod to fit on a node.
+Selector which must match a node&rsquo;s labels for the Pod to be scheduled on that node.
+More info: <a href="https://kubernetes.io/docs/concepts/configuration/assign-pod-node/">https://kubernetes.io/docs/concepts/configuration/assign-pod-node/</a></p>
+</td>
+</tr>
+<tr>
+<td>
+<code>nodeName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>NodeName is a request to schedule this Pod onto a specific node. If it is non-empty,
+the scheduler simply schedules this Pod onto that node, assuming that it fits resource
+requirements.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>affinity</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#affinity-v1-core">
+Kubernetes core/v1.Affinity
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a group of affinity scheduling rules of the Cluster, including NodeAffinity, PodAffinity, and PodAntiAffinity.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>tolerations</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#toleration-v1-core">
+[]Kubernetes core/v1.Toleration
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Allows Pods to be scheduled onto nodes with matching taints.
+Each toleration in the array allows the Pod to tolerate node taints based on
+specified <code>key</code>, <code>value</code>, <code>effect</code>, and <code>operator</code>.</p>
+<ul>
+<li>The <code>key</code>, <code>value</code>, and <code>effect</code> identify the taint that the toleration matches.</li>
+<li>The <code>operator</code> determines how the toleration matches the taint.</li>
+</ul>
+<p>Pods with matching tolerations are allowed to be scheduled on tainted nodes, typically reserved for specific purposes.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>topologySpreadConstraints</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#topologyspreadconstraint-v1-core">
+[]Kubernetes core/v1.TopologySpreadConstraint
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>TopologySpreadConstraints describes how a group of Pods ought to spread across topology
+domains. Scheduler will schedule Pods in a way which abides by the constraints.
+All topologySpreadConstraints are ANDed.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ScriptFrom">ScriptFrom
 </h3>
 <p>
@@ -19224,7 +19303,7 @@ CredentialVar
 <td>
 <em>(Optional)</em>
 <p>Specifies the endpoint of the external service.</p>
-<p>If the service is exposed via a cluster, the endpoint will be provided in the format of <host>:<port>.</p>
+<p>If the service is exposed via a cluster, the endpoint will be provided in the format of <code>host:port</code>.</p>
 </td>
 </tr>
 <tr>
@@ -24829,47 +24908,16 @@ string
 </tr>
 <tr>
 <td>
-<code>nodeName</code><br/>
+<code>schedulingPolicy</code><br/>
 <em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the name of the node where the Pod should be scheduled.
-If set, the Pod will be directly assigned to the specified node, bypassing the Kubernetes scheduler.
-This is useful for controlling Pod placement on specific nodes.</p>
-<p>Important considerations:
-- <code>nodeName</code> bypasses default scheduling constraints (e.g., resource requirements, node selectors, affinity rules).
-- It is the user&rsquo;s responsibility to ensure the node is suitable for the Pod.
-- If the node is unavailable, the Pod will remain in &ldquo;Pending&rdquo; state until the node is available or the Pod is deleted.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>nodeSelector</code><br/>
-<em>
-map[string]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines NodeSelector to override.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>tolerations</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#toleration-v1-core">
-[]Kubernetes core/v1.Toleration
+<a href="#workloads.kubeblocks.io/v1alpha1.SchedulingPolicy">
+SchedulingPolicy
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Tolerations specifies a list of tolerations to be applied to the Pod, allowing it to tolerate node taints.
-This field can be used to add new tolerations or override existing ones.</p>
+<p>Specifies the scheduling policy for the Component.</p>
 </td>
 </tr>
 <tr>
@@ -25404,6 +25452,117 @@ RoleUpdateMechanism
 </tr><tr><td><p>&#34;ReadinessProbeEventUpdate&#34;</p></td>
 <td></td>
 </tr></tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1alpha1.SchedulingPolicy">SchedulingPolicy
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.InstanceTemplate">InstanceTemplate</a>)
+</p>
+<div>
+<p>SchedulingPolicy the scheduling policy.
+Deprecated: Unify with apps/v1alpha1.SchedulingPolicy</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>schedulerName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>If specified, the Pod will be dispatched by specified scheduler.
+If not specified, the Pod will be dispatched by default scheduler.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>nodeSelector</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>NodeSelector is a selector which must be true for the Pod to fit on a node.
+Selector which must match a node&rsquo;s labels for the Pod to be scheduled on that node.
+More info: <a href="https://kubernetes.io/docs/concepts/configuration/assign-pod-node/">https://kubernetes.io/docs/concepts/configuration/assign-pod-node/</a></p>
+</td>
+</tr>
+<tr>
+<td>
+<code>nodeName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>NodeName is a request to schedule this Pod onto a specific node. If it is non-empty,
+the scheduler simply schedules this Pod onto that node, assuming that it fits resource
+requirements.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>affinity</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#affinity-v1-core">
+Kubernetes core/v1.Affinity
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a group of affinity scheduling rules of the Cluster, including NodeAffinity, PodAffinity, and PodAntiAffinity.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>tolerations</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#toleration-v1-core">
+[]Kubernetes core/v1.Toleration
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Allows Pods to be scheduled onto nodes with matching taints.
+Each toleration in the array allows the Pod to tolerate node taints based on
+specified <code>key</code>, <code>value</code>, <code>effect</code>, and <code>operator</code>.</p>
+<ul>
+<li>The <code>key</code>, <code>value</code>, and <code>effect</code> identify the taint that the toleration matches.</li>
+<li>The <code>operator</code> determines how the toleration matches the taint.</li>
+</ul>
+<p>Pods with matching tolerations are allowed to be scheduled on tainted nodes, typically reserved for specific purposes.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>topologySpreadConstraints</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#topologyspreadconstraint-v1-core">
+[]Kubernetes core/v1.TopologySpreadConstraint
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>TopologySpreadConstraints describes how a group of Pods ought to spread across topology
+domains. Scheduler will schedule Pods in a way which abides by the constraints.
+All topologySpreadConstraints are ANDed.</p>
+</td>
+</tr>
+</tbody>
 </table>
 <hr/>
 <p><em>

@@ -53,7 +53,7 @@ spec:
   componentSpecs:
   - name: pulsar
     componentDefRef: pulsar
-    monitor: false  
+    disableExporter: true 
     replicas: 0
     volumeClaimTemplates:
     - name: data
@@ -110,7 +110,7 @@ spec:
   componentSpecs:
   - name: pulsar
     componentDefRef: pulsar
-    monitor: false  
+    disableExporter: true  
     replicas: 1
     volumeClaimTemplates:
     - name: data

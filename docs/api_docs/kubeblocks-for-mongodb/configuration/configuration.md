@@ -7,7 +7,7 @@ sidebar_position: 1
 
 # Configure cluster parameters
 
-This guide shows how to configure cluster parameters by creating an opsRequest.
+This guide shows how to configure cluster parameters.
 
 ## Before you start
 
@@ -137,10 +137,10 @@ You can also view the details of this configuration file and parameters.
 * View the user guide of a specified parameter.
   
   ```bash
-  kbcli cluster explain-config mycluster --param=systemLog.verbosity --config-spec=mongodb-config -n demo
+  kbcli cluster explain-config mycluster --param=systemLog.verbosity --config-specs=mongodb-config -n demo
   ```
 
-  `--config-spec` is required to specify a configuration template since ApeCloud MySQL currently supports multiple templates. You can run `kbcli cluster describe-config mycluster` to view the all template names.
+  `--config-specs` is required to specify a configuration template since ApeCloud MySQL currently supports multiple templates. You can run `kbcli cluster describe-config mycluster` to view the all template names.
 
   <details>
 
@@ -166,4 +166,5 @@ You can also view the details of this configuration file and parameters.
     * When `Dynamic` is `true`, it means the effectiveness type of parameters is **dynamic** and can be configured online.
     * When `Dynamic` is `false`, it means the effectiveness type of parameters is **static** and a pod restarting is required to make the configuration effective.
   * Description: It describes the parameter definition.
+
 :::

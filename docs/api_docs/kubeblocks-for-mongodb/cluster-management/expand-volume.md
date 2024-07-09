@@ -6,6 +6,9 @@ sidebar_position: 3
 sidebar_label: Expand volume
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Expand volume
 
 You can expand the storage volume size of each pod.

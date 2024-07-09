@@ -201,3 +201,4 @@ kbcli migration terminate ${migration-task-name}
    ```bash
    kubectl delete crd migrationtasks.datamigration.apecloud.io migrationtemplates.datamigration.apecloud.io serialjobs.common.apecloud.io
    ```
+

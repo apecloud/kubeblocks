@@ -126,7 +126,7 @@ The example below configures `acllog-max-len`.
      Name: redis-cluster-reconfiguring-zjztm	NameSpace: default	Cluster: redis-cluster	Type: Reconfiguring
 
    Command:
-     kbcli cluster configure redis-cluster --components=redis --config-spec=redis-replication-config --config-file=redis.conf --set acllog-max-len=256 --namespace=default
+     kbcli cluster configure redis-cluster --components=redis --config-specs=redis-replication-config --config-file=redis.conf --set acllog-max-len=256 --namespace=default
 
    Status:
      Start Time:         Apr 17,2023 17:22 UTC+0800

@@ -74,6 +74,14 @@ type InstanceSetSpec struct {
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
 
+	// Specifies the desired Ordinals of the default template.
+	// The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the default template.
+	//
+	// For example, if Ordinals is {ranges: [{start: 0, end: 1}], discrete: [7]},
+	// then the instance names generated under the default template would be
+	// $(cluster.name)-$(component.name)-0、$(cluster.name)-$(component.name)-1 and $(cluster.name)-$(component.name)-7
+	DefaultTemplateOrdinals Ordinals `json:"defaultTemplateOrdinals,omitempty"`
+
 	// Defines the minimum number of seconds a newly created pod should be ready
 	// without any of its container crashing to be considered available.
 	// Defaults to 0, meaning the pod will be considered available as soon as it is ready.
@@ -313,6 +321,15 @@ type InstanceTemplate struct {
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
 
+	// Specifies the desired Ordinals of this InstanceTemplate.
+	// The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.
+	//
+	// For example, if Ordinals is {ranges: [{start: 0, end: 1}], discrete: [7]},
+	// then the instance names generated under this InstanceTemplate would be
+	// $(cluster.name)-$(component.name)-$(template.name)-0、$(cluster.name)-$(component.name)-$(template.name)-1 and
+	// $(cluster.name)-$(component.name)-$(template.name)-7
+	Ordinals Ordinals `json:"ordinals,omitempty"`
+
 	// Specifies a map of key-value pairs to be merged into the Pod's existing annotations.
 	// Existing keys will have their values overwritten, while new keys will be added to the annotations.
 	//
@@ -360,6 +377,19 @@ type InstanceTemplate struct {
 	// Add new or override existing volume claim templates.
 	// +optional
 	VolumeClaimTemplates []corev1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty"`
+}
+
+// Ordinals represents a combination of continuous segments and individual values.
+type Ordinals struct {
+	Ranges   []Range `json:"ranges,omitempty"`
+	Discrete []int32 `json:"discrete,omitempty"`
+}
+
+// Range represents a range with a start and an end value.
+// It is used to define a continuous segment.
+type Range struct {
+	Start int32 `json:"start"`
+	End   int32 `json:"end"`
 }
 
 // SchedulingPolicy the scheduling policy.
@@ -631,4 +661,54 @@ type MemberStatus struct {
 	//
 	// +optional
 	ReplicaRole *ReplicaRole `json:"role,omitempty"`
+}
+
+type ConditionType string
+
+const (
+	// InstanceReady is added in an instance set when at least one of its instances(pods) is in a Ready condition.
+	// ConditionStatus will be True if all its instances(pods) are in a Ready condition.
+	// Or, a NotReady reason with not ready instances encoded in the Message filed will be set.
+	InstanceReady ConditionType = "InstanceReady"
+
+	// InstanceAvailable ConditionStatus will be True if all instances(pods) are in the ready condition
+	// and continue for "MinReadySeconds" seconds. Otherwise, it will be set to False.
+	InstanceAvailable ConditionType = "InstanceAvailable"
+
+	// InstanceFailure is added in an instance set when at least one of its instances(pods) is in a `Failed` phase.
+	InstanceFailure ConditionType = "InstanceFailure"
+)
+
+const (
+	// ReasonNotReady is a reason for condition InstanceReady.
+	ReasonNotReady = "NotReady"
+
+	// ReasonReady is a reason for condition InstanceReady.
+	ReasonReady = "Ready"
+
+	// ReasonNotAvailable is a reason for condition InstanceAvailable.
+	ReasonNotAvailable = "NotAvailable"
+
+	// ReasonAvailable is a reason for condition InstanceAvailable.
+	ReasonAvailable = "Available"
+
+	// ReasonInstanceFailure is a reason for condition InstanceFailure.
+	ReasonInstanceFailure = "InstanceFailure"
+)
+
+const defaultInstanceTemplateReplicas = 1
+
+func (t *InstanceTemplate) GetName() string {
+	return t.Name
+}
+
+func (t *InstanceTemplate) GetReplicas() int32 {
+	if t.Replicas != nil {
+		return *t.Replicas
+	}
+	return defaultInstanceTemplateReplicas
+}
+
+func (t *InstanceTemplate) GetOrdinals() Ordinals {
+	return t.Ordinals
 }

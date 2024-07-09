@@ -152,7 +152,6 @@ var _ = Describe("OpsUtil functions", func() {
 				opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsCreatingPhase
 				opsRes.OpsRequest.Status.StartTimestamp = metav1.Time{Time: time.Now()}
 			})).Should(Succeed())
-			time.Sleep(time.Second * 2)
 			By("create ha configmap and do horizontalScaling with disable ha")
 			haConfigName := "ha-config"
 			haConfig := &corev1.ConfigMap{

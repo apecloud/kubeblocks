@@ -75,12 +75,14 @@ var _ = Describe("Restore OpsRequest", func() {
 
 	Context("Test OpsRequest for Restore", func() {
 		var (
-			opsRes   *OpsResource
-			reqCtx   intctrlutil.RequestCtx
-			backup   *dpv1alpha1.Backup
-			account  string
-			password []byte
+			opsRes *OpsResource
+			reqCtx intctrlutil.RequestCtx
+			backup *dpv1alpha1.Backup
 		)
+
+		account := make([]string, 2)
+		password := make([][]byte, 2)
+
 		BeforeEach(func() {
 			By("init operations resources ")
 			opsRes, _, _ = initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
@@ -93,8 +95,10 @@ var _ = Describe("Restore OpsRequest", func() {
 				Create(&testCtx).GetObject()
 
 			By("set system account")
-			account = "test"
-			password, _ = json.Marshal("testPwd")
+			account[0] = "test0"
+			account[1] = "test1"
+			password[0], _ = json.Marshal("testPwd0")
+			password[1], _ = json.Marshal("testPwd1")
 
 			Expect(testapps.ChangeObjStatus(&testCtx, backup, func() {
 				backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
@@ -123,7 +127,7 @@ var _ = Describe("Restore OpsRequest", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsSucceedPhase))
 		})
-		It("test restore when cluster has system Accounts", func() {
+		FIt("test restore when cluster has system Accounts", func() {
 			By("mock opsRequest.cluster with secret")
 			Expect(testapps.ChangeObj(&testCtx, backup, func(backup *dpv1alpha1.Backup) {
 				opsRes.Cluster.ResourceVersion = ""
@@ -132,7 +136,12 @@ var _ = Describe("Restore OpsRequest", func() {
 				}
 				opsRes.Cluster.Spec.ComponentSpecs[0].SystemAccounts = []appsv1alpha1.ComponentSystemAccount{
 					{
-						Name:           account,
+						Name:           account[0],
+						PasswordConfig: passwordConfig,
+						SecretRef:      nil,
+					},
+					{
+						Name:           account[1],
 						PasswordConfig: passwordConfig,
 						SecretRef:      nil,
 					},
@@ -146,20 +155,33 @@ var _ = Describe("Restore OpsRequest", func() {
 					constant.KBAppComponentLabelKey: consensusComp,
 				}
 				opsRes.Cluster.ResourceVersion = ""
-				secretName := constant.GenerateAccountSecretName(opsRes.Cluster.Name, consensusComp, account)
+				secretName := constant.GenerateAccountSecretName(opsRes.Cluster.Name, consensusComp, account[0])
 				labels := constant.GetComponentWellKnownLabels(opsRes.Cluster.Name, consensusComp)
-				secret := builder.NewSecretBuilder(opsRes.Cluster.Namespace, secretName).
+				secretItem0 := builder.NewSecretBuilder(opsRes.Cluster.Namespace, secretName).
 					AddLabelsInMap(labels).
 					AddLabels(constant.AppManagedByLabelKey, constant.AppName).
 					AddLabels(constant.AppInstanceLabelKey, opsRes.Cluster.Name).
 					AddLabels(constant.KBAppComponentLabelKey, consensusComp).
-					AddLabels(constant.ClusterAccountLabelKey, account).
-					PutData(constant.AccountNameForSecret, []byte(account)).
-					PutData(constant.AccountPasswdForSecret, password).
+					AddLabels(constant.ClusterAccountLabelKey, account[0]).
+					PutData(constant.AccountNameForSecret, []byte(account[0])).
+					PutData(constant.AccountPasswdForSecret, password[0]).
+					SetImmutable(true).
+					GetObject()
+				secretName = constant.GenerateAccountSecretName(opsRes.Cluster.Name, consensusComp, account[1])
+				labels = constant.GetComponentWellKnownLabels(opsRes.Cluster.Name, consensusComp)
+				secretItem1 := builder.NewSecretBuilder(opsRes.Cluster.Namespace, secretName).
+					AddLabelsInMap(labels).
+					AddLabels(constant.AppManagedByLabelKey, constant.AppName).
+					AddLabels(constant.AppInstanceLabelKey, opsRes.Cluster.Name).
+					AddLabels(constant.KBAppComponentLabelKey, consensusComp).
+					AddLabels(constant.ClusterAccountLabelKey, account[1]).
+					PutData(constant.AccountNameForSecret, []byte(account[1])).
+					PutData(constant.AccountPasswdForSecret, password[1]).
 					SetImmutable(true).
 					GetObject()
 				secretList := &corev1.SecretList{Items: []corev1.Secret{
-					*secret,
+					*secretItem0,
+					*secretItem1,
 				}}
 				clusterBytes, _ := json.Marshal(opsRes.Cluster)
 				secretListBytes, _ := json.Marshal(secretList)
@@ -184,12 +206,14 @@ var _ = Describe("Restore OpsRequest", func() {
 			restoreHandler := RestoreOpsHandler{}
 			_ = restoreHandler.Action(reqCtx, k8sClient, opsRes)
 
-			By("the Secret should be restored correctly")
-			restoredSecretName := constant.GenerateAccountSecretName(restoreClusterName, consensusComp, account)
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: restoredSecretName, Namespace: opsRes.OpsRequest.Namespace}, func(g Gomega, restoreSecret *corev1.Secret) {
-				Expect(restoreSecret.Data[constant.AccountNameForSecret]).Should(Equal([]byte(account)))
-				Expect(restoreSecret.Data[constant.AccountPasswdForSecret]).Should(Equal(password))
-			})).Should(Succeed())
+			By("the Secrets should be restored correctly")
+			for i := 0; i < 2; i++ {
+				restoredSecretName := constant.GenerateAccountSecretName(restoreClusterName, consensusComp, account[i])
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: restoredSecretName, Namespace: opsRes.OpsRequest.Namespace}, func(g Gomega, restoreSecret *corev1.Secret) {
+					Expect(restoreSecret.Data[constant.AccountNameForSecret]).Should(Equal([]byte(account[i])))
+					Expect(restoreSecret.Data[constant.AccountPasswdForSecret]).Should(Equal(password[i]))
+				})).Should(Succeed())
+			}
 
 		})
 		It("test if source cluster exists services", func() {

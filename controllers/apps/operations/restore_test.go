@@ -127,7 +127,7 @@ var _ = Describe("Restore OpsRequest", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsSucceedPhase))
 		})
-		FIt("test restore when cluster has system Accounts", func() {
+		It("test restore when cluster has system Accounts", func() {
 			By("mock opsRequest.cluster with secret")
 			Expect(testapps.ChangeObj(&testCtx, backup, func(backup *dpv1alpha1.Backup) {
 				opsRes.Cluster.ResourceVersion = ""

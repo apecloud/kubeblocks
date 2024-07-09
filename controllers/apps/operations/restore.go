@@ -73,7 +73,7 @@ func (r RestoreOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	opsRequest := opsRes.OpsRequest
 
 	// restore the cluster from the backup
-	if restoredResources, err = r.restoreClusterFromBackup(reqCtx, cli, opsRequest); err != nil {
+	if restoredResources, err = r.restoreResourceFromBackup(reqCtx, cli, opsRequest); err != nil {
 		return err
 	}
 	cluster := restoredResources.cluster
@@ -145,7 +145,7 @@ func (r RestoreOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, 
 	return nil
 }
 
-func (r RestoreOpsHandler) restoreClusterFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *appsv1alpha1.OpsRequest) (*RestoredResources, error) {
+func (r RestoreOpsHandler) restoreResourceFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *appsv1alpha1.OpsRequest) (*RestoredResources, error) {
 	backupName := opsRequest.Spec.GetRestore().BackupName
 	restoredResources := &RestoredResources{}
 	// check if the backup exists
@@ -239,7 +239,7 @@ func (r RestoreOpsHandler) getSecretObjsFromBackup(backup *dpv1alpha1.Backup, op
 	// use the Secrets snapshot to restore firstly
 	secretStrings, ok := backup.Annotations[constant.SecretsSnapshotAnnotationsKey]
 	if !ok {
-		return nil, intctrlutil.NewFatalError(fmt.Sprintf("missing secrets snapshot annotation in backup %s, %s is empty in Annotations", backup.Name, constant.SecretsSnapshotAnnotationsKey))
+		return nil, nil
 	}
 	if err := json.Unmarshal([]byte(secretStrings), &secretList); err != nil {
 		return nil, err

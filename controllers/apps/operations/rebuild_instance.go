@@ -250,7 +250,7 @@ func (r rebuildInstanceOpsHandler) rebuildInstancesInPlace(reqCtx intctrlutil.Re
 			continue
 		}
 		// rebuild instance
-		completed, err := r.rebuildInstance(reqCtx, cli, opsRes, &progressDetail, rebuildInstance, instance, i)
+		completed, err := r.rebuildInstanceInPlace(reqCtx, cli, opsRes, &progressDetail, rebuildInstance, instance, i)
 		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
 			// If a fatal error occurs, this instance rebuilds failed.
 			progressDetail.SetStatusAndMessage(appsv1alpha1.FailedProgressStatus, err.Error())
@@ -271,7 +271,7 @@ func (r rebuildInstanceOpsHandler) rebuildInstancesInPlace(reqCtx intctrlutil.Re
 }
 
 // rebuildInstance rebuilds the instance.
-func (r rebuildInstanceOpsHandler) rebuildInstance(reqCtx intctrlutil.RequestCtx,
+func (r rebuildInstanceOpsHandler) rebuildInstanceInPlace(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
 	progressDetail *appsv1alpha1.ProgressStatusDetail,

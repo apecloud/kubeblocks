@@ -20148,6 +20148,35 @@ spec:
                         or when scaling down. It only used when `PodManagementPolicy` is set to `Parallel`.
                         The default Concurrency is 100%.
                       x-kubernetes-int-or-string: true
+                    parameters:
+                      description: Specifies the user-defined configuration template
+                        or parameters.
+                      items:
+                        properties:
+                          name:
+                            description: |-
+                              Defines the unique identifier of the config file name.
+
+
+                              It must be a string of maximum 63 characters, and can only include lowercase alphanumeric characters,
+                              hyphens, and periods.
+                              The name must start and end with an alphanumeric character.
+                            maxLength: 63
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                            type: string
+                          parameters:
+                            additionalProperties:
+                              type: string
+                            description: Specifies the user-defined configuration
+                              parameters.
+                            type: object
+                        required:
+                        - name
+                        type: object
+                      type: array
+                      x-kubernetes-list-map-keys:
+                      - name
+                      x-kubernetes-list-type: map
                     podUpdatePolicy:
                       description: |-
                         PodUpdatePolicy indicates how pods should be updated
@@ -21789,6 +21818,47 @@ spec:
                       - BestEffortParallel
                       - Parallel
                       type: string
+                    userConfigTemplates:
+                      additionalProperties:
+                        properties:
+                          namespace:
+                            default: default
+                            description: |-
+                              Specifies the namespace of the referenced configuration template ConfigMap object.
+                              An empty namespace is equivalent to the "default" namespace.
+                            pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
+                            type: string
+                          policy:
+                            default: none
+                            description: Defines the strategy for merging externally
+                              imported templates into component templates.
+                            enum:
+                            - patch
+                            - replace
+                            - none
+                            type: string
+                          templateName:
+                            description: Specifies the name of the referenced configuration
+                              template ConfigMap object.
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                            type: string
+                          templateRef:
+                            description: |-
+                              Deprecated: Use `templateName` instead.
+                              Specifies the name of the referenced configuration template ConfigMap object.
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                            type: string
+                        required:
+                        - templateRef
+                        type: object
+                      description: |-
+                        Specifies the user-defined configuration template.
+
+
+                        When provided, the `userConfigTemplates` overrides the default configuration template in the ComponentDefinition
+                        specified in `spec.configs[*].templateRef`.
+                        This allows users to customize the configuration template according to their specific requirements.
+                      type: object
                     userResourceRefs:
                       description: |-
                         Allows users to specify custom ConfigMaps and Secrets to be mounted as volumes
@@ -29369,6 +29439,35 @@ spec:
                             or when scaling down. It only used when `PodManagementPolicy` is set to `Parallel`.
                             The default Concurrency is 100%.
                           x-kubernetes-int-or-string: true
+                        parameters:
+                          description: Specifies the user-defined configuration template
+                            or parameters.
+                          items:
+                            properties:
+                              name:
+                                description: |-
+                                  Defines the unique identifier of the config file name.
+
+
+                                  It must be a string of maximum 63 characters, and can only include lowercase alphanumeric characters,
+                                  hyphens, and periods.
+                                  The name must start and end with an alphanumeric character.
+                                maxLength: 63
+                                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                                type: string
+                              parameters:
+                                additionalProperties:
+                                  type: string
+                                description: Specifies the user-defined configuration
+                                  parameters.
+                                type: object
+                            required:
+                            - name
+                            type: object
+                          type: array
+                          x-kubernetes-list-map-keys:
+                          - name
+                          x-kubernetes-list-type: map
                         podUpdatePolicy:
                           description: |-
                             PodUpdatePolicy indicates how pods should be updated
@@ -31022,6 +31121,47 @@ spec:
                           - BestEffortParallel
                           - Parallel
                           type: string
+                        userConfigTemplates:
+                          additionalProperties:
+                            properties:
+                              namespace:
+                                default: default
+                                description: |-
+                                  Specifies the namespace of the referenced configuration template ConfigMap object.
+                                  An empty namespace is equivalent to the "default" namespace.
+                                pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
+                                type: string
+                              policy:
+                                default: none
+                                description: Defines the strategy for merging externally
+                                  imported templates into component templates.
+                                enum:
+                                - patch
+                                - replace
+                                - none
+                                type: string
+                              templateName:
+                                description: Specifies the name of the referenced
+                                  configuration template ConfigMap object.
+                                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                                type: string
+                              templateRef:
+                                description: |-
+                                  Deprecated: Use `templateName` instead.
+                                  Specifies the name of the referenced configuration template ConfigMap object.
+                                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                                type: string
+                            required:
+                            - templateRef
+                            type: object
+                          description: |-
+                            Specifies the user-defined configuration template.
+
+
+                            When provided, the `userConfigTemplates` overrides the default configuration template in the ComponentDefinition
+                            specified in `spec.configs[*].templateRef`.
+                            This allows users to customize the configuration template according to their specific requirements.
+                          type: object
                         userResourceRefs:
                           description: |-
                             Allows users to specify custom ConfigMaps and Secrets to be mounted as volumes

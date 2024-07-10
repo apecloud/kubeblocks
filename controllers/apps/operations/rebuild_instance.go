@@ -103,7 +103,7 @@ func (r rebuildInstanceOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli cli
 			}
 			instanceNames = append(instanceNames, ins.Name)
 		}
-		if !v.InPlace {
+		if len(v.Instances) > 0 && !v.InPlace {
 			if synthesizedComp.Name != v.ComponentName {
 				return intctrlutil.NewFatalError("sharding cluster only supports to rebuild instance in place")
 			}

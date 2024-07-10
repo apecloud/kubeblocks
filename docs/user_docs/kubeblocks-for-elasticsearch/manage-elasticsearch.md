@@ -3,7 +3,7 @@ title: Manage Elasticsearch with KubeBlocks
 description: How to manage Elasticsearch on KubeBlocks
 keywords: [elasticsearch]
 sidebar_position: 1
-sidebar_label: Manage Elasticsearch Databases with KubeBlocks
+sidebar_label: Manage Elasticsearch with KubeBlocks
 ---
 # Manage Elasticsearch with KubeBlocks
 
@@ -34,7 +34,7 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
    ```bash
    kbcli cluster list
    >
-   NAME            NAMESPACE   CLUSTER-DEFINITION   VERSION               TERMINATION-POLICY   STATUS    CREATED-TIME
+   NAME            NAMESPACE   CLUSTER-DEFINITION   VERSION               TERMINATION-POLICY   STATUS            CREATED-TIME
    elasticsearch   default     elasticsearch        elasticsearch-8.8.2   Delete               Creating          Jul 05,2024 16:51 UTC+0800   
    ```
 
@@ -181,7 +181,7 @@ The `kbcli cluster hscale` command print the `opsname`, to check the progress of
 ```bash
 kubectl get ops elasticsearch-horizontalscaling-xpdwz
 >
-NAME                             TYPE                CLUSTER   STATUS    PROGRESS   AGE
+NAME                                    TYPE                CLUSTER          STATUS    PROGRESS   AGE
 elasticsearch-horizontalscaling-xpdwz   HorizontalScaling   elasticsearch    Running   0/2        16s
 ```
 
@@ -205,7 +205,7 @@ The `kbcli cluster vscale` command print the `opsname`, to check the progress of
 ```bash
 kubectl get ops elasticsearch-verticalscaling-rpw2l
 >
-NAME                           TYPE              CLUSTER   STATUS    PROGRESS   AGE
+NAME                                  TYPE              CLUSTER          STATUS    PROGRESS   AGE
 elasticsearch-verticalscaling-rpw2l   VerticalScaling   elasticsearch    Running   1/5        44s
 ```
 
@@ -240,6 +240,30 @@ To check whether the expanding is done, use the following command.
 kbcli cluster describe elasticsearch
 ```
 
-## Backup and restore
+## Restart
 
-The backup and restore operations for Qdrant are the same as those of other clusters and you can refer to [the backup and restore documents](./../backup-and-restore/introduction.md) for details. Remember to use `--method` parameter.
+1. Restart a cluster.
+
+   Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
+
+   ```bash
+   kbcli cluster restart elasticsearch --components="elasticsearch" \
+   --ttlSecondsAfterSucceed=30
+   ```
+
+   - `components` describes the component name that needs to be restarted.
+   - `ttlSecondsAfterSucceed` describes the time to live of an OpsRequest job after the restarting succeeds.
+
+2. Validate the restarting.
+
+   Run the command below to check the cluster status to check the restarting status.
+
+   ```bash
+   kbcli cluster list elasticsearch
+   >
+   NAME            NAMESPACE   CLUSTER-DEFINITION          VERSION               TERMINATION-POLICY   STATUS    CREATED-TIME
+   elasticsearch   default     elasticsearch               elasticsearch-8.8.2   Delete               Running   Jul 05,2024 17:51 UTC+0800
+   ```
+
+   * STATUS=Updating: it means the cluster restart is in progress.
+   * STATUS=Running: it means the cluster has been restarted.

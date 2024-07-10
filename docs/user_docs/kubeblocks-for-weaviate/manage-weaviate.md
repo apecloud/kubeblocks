@@ -1,9 +1,9 @@
 ---
 title: Manage Weaviate with KubeBlocks
-description: How to manage vector databases on KubeBlocks
+description: How to manage Weaviate on KubeBlocks
 keywords: [weaviate, vector database, control plane]
 sidebar_position: 1
-sidebar_label: Manage Qdrant with KubeBlocks
+sidebar_label: Manage Weaviate with KubeBlocks
 ---
 # Manage Weaviate with KubeBlocks
 
@@ -217,6 +217,31 @@ To check whether the expanding is done, use the following command.
 kbcli cluster describe weaviate
 ```
 
-## Backup and restore
+## Restart
 
-The backup and restore operations for Weaviate are the same as those of other clusters and you can refer to [the backup and restore documents](./../backup-and-restore/introduction.md) for details. Remember to use `--method` parameter.
+1. Restart a cluster.
+
+   Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
+
+   ```bash
+   kbcli cluster restart weaviate --components="weaviate" \
+   --ttlSecondsAfterSucceed=30
+   ```
+
+   - `components` describes the component name that needs to be restarted.
+   - `ttlSecondsAfterSucceed` describes the time to live of an OpsRequest job after the restarting succeeds.
+
+2. Validate the restarting.
+
+   Run the command below to check the cluster status to check the restarting status.
+
+   ```bash
+   kbcli cluster list weaviate
+   >
+   NAME       NAMESPACE   CLUSTER-DEFINITION     VERSION            TERMINATION-POLICY   STATUS    CREATED-TIME
+   weaviate   default     weaviate               weaviate-1.18.0    Delete               Running   Jul 05,2024 18:42 UTC+0800
+   ```
+
+   * STATUS=Updating: it means the cluster restart is in progress.
+   * STATUS=Running: it means the cluster has been restarted.
+   * 

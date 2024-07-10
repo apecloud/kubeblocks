@@ -1,11 +1,11 @@
 ---
-title: Manage MIlvus with KubeBlocks
+title: Manage Milvus with KubeBlocks
 description: How to manage Milvus on KubeBlocks
 keywords: [milvus, milvus,weaviate]
 sidebar_position: 1
 sidebar_label: Manage Milvus with KubeBlocks
 ---
-# Manage milvus with KubeBlocks
+# Manage Milvus with KubeBlocks
 
 The popularity of generative AI (Generative AI) has aroused widespread attention and completely ignited the vector database (Vector Database) market.
 
@@ -22,13 +22,13 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
 1. Execute the following command to create a Milvus cluster. You can change the `cluster-definition` value as any other databases supported.
 
    ```bash
-   kbcli cluster create milvus --cluster-definition=milvus
+   kbcli cluster create milvus --cluster-definition=milvus-2.3.2
    ```
 
    If you want to create a Milvus cluster with multiple replicas. Use the following command and set the replica numbers.
 
    ```bash
-   kbcli cluster create milvus --cluster-definition=milvus --set replicas=3
+   kbcli cluster create milvus --cluster-definition=milvus-2.3.2 --set replicas=3
    ```
 
 2. Check whether the cluster is created.
@@ -36,8 +36,8 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
    ```bash
    kbcli cluster list
    >
-   NAME     NAMESPACE   CLUSTER-DEFINITION   VERSION               TERMINATION-POLICY   STATUS    CREATED-TIME
-   milvus   default     milvus               milvus-2.3.2          Delete               Creating          Jul 05,2024 17:35 UTC+0800   
+   NAME     NAMESPACE   CLUSTER-DEFINITION        VERSION               TERMINATION-POLICY   STATUS            CREATED-TIME
+   milvus   default     milvus-2.3.2              milvus-2.3.2          Delete               Creating          Jul 05,2024 17:35 UTC+0800   
    ```
 
 3. Check the cluster information.
@@ -240,6 +240,30 @@ To check whether the expanding is done, use the following command.
 kbcli cluster describe milvus
 ```
 
-## Backup and restore
+## Restart
 
-The backup and restore operations for Milvus are the same as those of other clusters and you can refer to [the backup and restore documents](./../backup-and-restore/introduction.md) for details. Remember to use `--method` parameter.
+1. Restart a cluster.
+
+   Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
+
+   ```bash
+   kbcli cluster restart milvus --components="milvus" \
+   --ttlSecondsAfterSucceed=30
+   ```
+
+   - `components` describes the component name that needs to be restarted.
+   - `ttlSecondsAfterSucceed` describes the time to live of an OpsRequest job after the restarting succeeds.
+
+2. Validate the restarting.
+
+   Run the command below to check the cluster status to check the restarting status.
+
+   ```bash
+   kbcli cluster list milvus
+   >
+   NAME     NAMESPACE   CLUSTER-DEFINITION     VERSION         TERMINATION-POLICY   STATUS    CREATED-TIME
+   milvus   default     milvus-2.3.2           milvus-2.3.2    Delete               Running   Jul 05,2024 18:35 UTC+0800
+   ```
+
+   * STATUS=Updating: it means the cluster restart is in progress.
+   * STATUS=Running: it means the cluster has been restarted.

@@ -514,21 +514,6 @@ ClusterDefinitionSpec
 <table>
 <tr>
 <td>
-<code>type</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the well-known database type, such as mysql, redis, or mongodb.</p>
-<p>Deprecated since v0.9.
-This field is maintained for backward compatibility and its use is discouraged.
-Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>componentDefs</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">
@@ -5726,21 +5711,6 @@ and will not affect the life cycle of the pod. default values are 60 seconds.</p
 </tr>
 </thead>
 <tbody>
-<tr>
-<td>
-<code>type</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the well-known database type, such as mysql, redis, or mongodb.</p>
-<p>Deprecated since v0.9.
-This field is maintained for backward compatibility and its use is discouraged.
-Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
-</td>
-</tr>
 <tr>
 <td>
 <code>componentDefs</code><br/>

@@ -1,36 +1,34 @@
 ---
-title: Manage Weaviate with KubeBlocks
-description: How to manage Weaviate on KubeBlocks
-keywords: [qdrant, milvus, weaviate]
+title: Manage Elasticsearch with KubeBlocks
+description: How to manage Elasticsearch on KubeBlocks
+keywords: [elasticsearch]
 sidebar_position: 1
-sidebar_label: Manage Weaviate with KubeBlocks
+sidebar_label: Manage Elasticsearch with KubeBlocks
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Manage Weaviate with KubeBlocks
-
-The popularity of generative AI (Generative AI) has aroused widespread attention and completely ignited the vector database (Vector Database) market. Weaviate is an open-source vector database that simplifies the development of AI applications. Built-in vector and hybrid search, easy-to-connect machine learning models, and a focus on data privacy enable developers of all levels to build, iterate, and scale AI capabilities faster.
+# Manage Elasticsearch with KubeBlocks
 
 ## Before you start
 
 * [Install KubeBlocks](./../installation/install-kubeblocks.md).
 * View all the database types and versions available for creating a cluster.
   
-  Make sure the `weaviate` cluster definition is installed. If the cluster definition is not available, refer to [this doc](./../overview/supported-addons.md#install-addons) to enable it first.
+  Make sure the `elasticsearch` cluster definition is installed. If the cluster definition is not available, refer to [this doc](./../overview/supported-addons.md#install-addons) to enable it first.
 
   ```bash
-  kubectl get clusterdefinition weaviate
+  kubectl get clusterdefinition qdrant
   >
-  NAME         TOPOLOGIES   SERVICEREFS   STATUS      AGE
-  weaviate                                Available   30m
+  NAME                TOPOLOGIES   SERVICEREFS   STATUS      AGE
+  elasticsearch                                  Available   30m
   ```
 
   View all available versions for creating a cluster.
 
   ```bash
-  kubectl get clusterversions -l clusterdefinition.kubeblocks.io/name=weaviate
+  kubectl get clusterversions -l clusterdefinition.kubeblocks.io/name=elasticsearch
   ```
 
 * To keep things isolated, create a separate namespace called `demo` throughout this tutorial.
@@ -49,28 +47,34 @@ apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   name: mycluster
-  namespace: default
+  namespace: demo
 spec:
+  clusterDefinitionRef: qdrant
+  clusterVersionRef: qdrant-1.8.1
+  terminationPolicy: Delete
   affinity:
     podAntiAffinity: Preferred
-    tenancy: SharedNode
     topologyKeys:
-    - "null"
-  clusterDefinitionRef: weaviate
-  clusterVersionRef: weaviate-1.18.0
+    - kubernetes.io/hostname
+    tenancy: SharedNode
+  tolerations:
+    - key: kb-data
+      operator: Equal
+      value: 'true'
+      effect: NoSchedule
   componentSpecs:
-  - componentDefRef: weaviate
+  - name: qdrant
+    componentDefRef: qdrant
     disableExporter: true
-    name: weaviate
-    replicas: 1
+    serviceAccountName: kb-qdrant-cluster
+    replicas: 2
     resources:
       limits:
-        cpu: "1"
-        memory: 1Gi
+        cpu: '0.5'
+        memory: 0.5Gi
       requests:
-        cpu: "1"
-        memory: 1Gi
-    serviceAccountName: kb-mycluster
+        cpu: '0.5'
+        memory: 0.5Gi
     volumeClaimTemplates:
     - name: data
       spec:
@@ -79,13 +83,6 @@ spec:
         resources:
           requests:
             storage: 20Gi
-  resources:
-    cpu: "0"
-    memory: "0"
-  storage:
-    size: "0"
-  terminationPolicy: Delete
-status: {}
 EOF
 ```
 
@@ -120,7 +117,21 @@ kubectl get cluster mycluster -n demo -o yaml
 
 ## Connect to a vector database cluster
 
-Weaviate provides client access on port 8080. You can also port forward the service to connect to a database from your local machine.
+Qdrant provides both HTTP and gRPC protocols for client access on ports 6333 and 6334 respectively. You can also port forward the service to connect to a database from your local machine.
+
+1. Run the following command to port forward the service.
+
+   ```bash
+   kubectl port-forward svc/mycluster-qdrant 6333:6333 -n demo
+   ```
+
+2. Open a new terminal and run the following command to connect to the database.
+
+   ```bash
+   curl http://127.0.0.1:6333/collections
+   ```
+
+   Refer to [the official Qdrant documents](https://qdrant.tech/documentation/) for the cluster operations.
 
 ## Scaling
 
@@ -137,8 +148,8 @@ Check whether the cluster STATUS is `Running`. Otherwise, the following operatio
 ```bash
 kubectl get cluster mycluster -n demo
 >
-NAME        CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY     STATUS    AGE
-mycluster   weaviate             weaviate-1.18.0   Delete                 Running   47m
+NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
+mycluster   qdrant               qdrant-1.5.0   Halt                 Running   47m
 ```
 
 #### Steps
@@ -162,7 +173,7 @@ There are two ways to apply horizontal scaling.
      clusterName: mycluster
      type: HorizontalScaling
      horizontalScaling:
-     - componentName: weaviate
+     - componentName: qdrant
        replicas: 1
    EOF
    ```
@@ -198,12 +209,12 @@ There are two ways to apply horizontal scaling.
      name: mycluster
      namespace: demo
    spec:
-     clusterDefinitionRef: weaviate
-     clusterVersionRef: weaviate-1.18.0
+     clusterDefinitionRef: qdrant
+     clusterVersionRef: qdrant-1.5.0
      componentSpecs:
-     - name: weaviate
-       componentDefRef: weaviate
-       replicas: 2 # Change the amount
+     - name: qdrant
+       componentDefRef: qdrant
+       replicas: 1 # Change the amount
        volumeClaimTemplates:
        - name: data
          spec:
@@ -212,7 +223,7 @@ There are two ways to apply horizontal scaling.
            resources:
              requests:
                storage: 1Gi
-    terminationPolicy: Delete
+    terminationPolicy: Halt
    ```
 
 2. Check whether the corresponding resources change.
@@ -234,7 +245,7 @@ In the example below, a snapshot exception occurs.
 Status:
   conditions: 
   - lastTransitionTime: "2024-04-25T17:40:26Z"
-    message: VolumeSnapshot/mycluster-weaviate-scaling-dbqgp: Failed to set default snapshot
+    message: VolumeSnapshot/mycluster-qdrant-scaling-dbqgp: Failed to set default snapshot
       class with error cannot find default snapshot class
     reason: ApplyResourcesFailed
     status: "False"
@@ -278,6 +289,12 @@ The horizontal scaling continues after backup and volumesnapshot are deleted and
 
 You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, if you need to change the resource class from 1C2G to 2C4G, vertical scaling is what you need.
 
+:::note
+
+During the vertical scaling process, all pods restart in the order of learner -> follower -> leader and the leader pod may change after the restarting.
+
+:::
+
 #### Before you start
 
 Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
@@ -285,8 +302,8 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 ```bash
 kubectl get cluster mycluster -n demo
 >
-NAME        CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY     STATUS    AGE
-mycluster   weaviate             weaviate-1.18.0   Delete                 Running   47m
+NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
+mycluster   qdrant               qdrant-1.5.0   Halt                 Running   47m
 ```
 
 #### Steps
@@ -310,7 +327,7 @@ There are two ways to apply vertical scaling.
      clusterName: mycluster
      type: VerticalScaling
      verticalScaling:
-     - componentName: weaviate
+     - componentName: qdrant
        requests:
          memory: "2Gi"
          cpu: "1"
@@ -350,11 +367,11 @@ There are two ways to apply vertical scaling.
      name: mycluster
      namespace: demo
    spec:
-     clusterDefinitionRef: weaviate
-     clusterVersionRef: weaviate-1.18.0
+     clusterDefinitionRef: qdrant
+     clusterVersionRef: qdrant-1.5.0
      componentSpecs:
-     - name: weaviate
-       componentDefRef: weaviate
+     - name: qdrant
+       componentDefRef: qdrant
        replicas: 1
        resources: # Change the values of resources.
          requests:
@@ -392,9 +409,10 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 ```bash
 kubectl get cluster mycluster -n demo
 >
-NAME        CLUSTER-DEFINITION   VERSION              TERMINATION-POLICY   STATUS    AGE
-mycluster   weaviate             weaviate-1.18.0      Delete               Running   4m29s
+NAME        CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    AGE
+mycluster   qdrant               qdrant-1.5.0      Delete               Running   4m29s
 ```
+
 
 ### Steps
 
@@ -417,7 +435,7 @@ There are two ways to apply volume expansion.
       clusterName: mycluster
       type: VolumeExpansion
       volumeExpansion:
-      - componentName: weaviate
+      - componentName: qdrant
         volumeClaimTemplates:
         - name: data
           storage: "40Gi"
@@ -443,7 +461,7 @@ There are two ways to apply volume expansion.
 
 </TabItem>
 
-<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML fil">
 
 1. Change the value of `spec.componentSpecs.volumeClaimTemplates.spec.resources` in the cluster YAML file.
 
@@ -457,11 +475,11 @@ There are two ways to apply volume expansion.
      name: mycluster
      namespace: demo
    spec:
-     clusterDefinitionRef: weaviate
-     clusterVersionRef: weaviate-1.18.0
+     clusterDefinitionRef: qdrant
+     clusterVersionRef: qdrant-1.5.0
      componentSpecs:
-     - name: weaviate
-       componentDefRef: weaviate
+     - name: qdrant
+       componentDefRef: qdrant
        replicas: 2
        volumeClaimTemplates:
        - name: data
@@ -522,12 +540,12 @@ metadata:
     name: mycluster
     namespace: demo
 spec:
-  clusterDefinitionRef: weaviate
-  clusterVersionRef: weaviate-1.18.0
+  clusterDefinitionRef: qdrant
+  clusterVersionRef: qdrant-1.8.1
   terminationPolicy: Delete
   componentSpecs:
-  - name: weaviate
-    componentDefRef: weaviate
+  - name: qdrant
+    componentDefRef: qdrant
     disableExporter: true  
     replicas: 0
     volumeClaimTemplates:
@@ -579,12 +597,12 @@ metadata:
     name: mycluster
     namespace: demo
 spec:
-  clusterDefinitionRef: weaviate
-  clusterVersionRef: weaviate-1.18.0
+  clusterDefinitionRef: qdrant
+  clusterVersionRef: qdrant-1.8.1
   terminationPolicy: Delete
   componentSpecs:
-  - name: weaviate
-    componentDefRef: weaviate
+  - name: qdrant
+    componentDefRef: qdrant
     disableExporter: true  
     replicas: 1
     volumeClaimTemplates:
@@ -602,34 +620,8 @@ spec:
 
 </Tabs>
 
-## Restart
+## Backup and restore
 
-1. Restart a cluster.
+The backup and restore operations for Qdrant are the same with those of other clusters.
 
-   ```bash
-   kubectl apply -f - <<EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: OpsRequest
-   metadata:
-     name: ops-restart
-     namespace: demo
-   spec:
-     clusterName: mycluster
-     type: Restart 
-     restart:
-     - componentName: weaviate
-   EOF
-   ```
-
-2. Check the pod and operation status to validate the restarting.
-
-   ```bash
-   kubectl get pod -n demo
-
-   kubectl get ops ops-restart -n demo
-   ```
-
-   During the restarting process, there are two status types for pods.
-
-   - STATUS=Terminating: it means the cluster restart is in progress.
-   - STATUS=Running: it means the cluster has been restarted.
+You can refer to the [backup and restore docs](./../maintenance/backup-and-restore/introduction.md) for details.

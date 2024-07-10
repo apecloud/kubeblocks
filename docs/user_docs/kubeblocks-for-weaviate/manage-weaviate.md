@@ -35,8 +35,8 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
    ```bash
    kbcli cluster list
    >
-   NAME     NAMESPACE   CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    CREATED-TIME
-   weaviate        default     weaviate             weaviate-1.18.0       Delete               Creating          Jul 05,2024 17:42 UTC+0800   
+   NAME            NAMESPACE   CLUSTER-DEFINITION   VERSION               TERMINATION-POLICY   STATUS           CREATED-TIME
+   weaviate        default     weaviate             weaviate-1.18.0       Delete               Running          Jul 05,2024 17:42 UTC+0800   
    ```
 
 3. Check the cluster information.
@@ -45,27 +45,27 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
     kbcli cluster describe weaviate
 
       Name: weaviate	 Created Time: Jul 05,2024 17:42 UTC+0800
-      NAMESPACE   CLUSTER-DEFINITION   VERSION           STATUS     TERMINATION-POLICY   
-      default     weaviate             weaviate-1.18.0   Creating   Delete               
+      NAMESPACE   CLUSTER-DEFINITION   VERSION           STATUS    TERMINATION-POLICY
+      default     weaviate             weaviate-1.18.0   Running   Delete
 
       Endpoints:
-      COMPONENT   MODE        INTERNAL                                           EXTERNAL   
-      weaviate    ReadWrite   weaviate-weaviate.default.svc.cluster.local:8080   <none>     
+      COMPONENT   MODE        INTERNAL                                      EXTERNAL
+      weaviate    ReadWrite   myw-weaviate.default.svc.cluster.local:8080   <none>
 
       Topology:
-      COMPONENT   INSTANCE              ROLE     STATUS    AZ       NODE     CREATED-TIME                 
-      weaviate    weaviate-weaviate-0   <none>   Pending   <none>   <none>   Jul 05,2024 17:42 UTC+0800   
+      COMPONENT   INSTANCE         ROLE     STATUS    AZ       NODE                    CREATED-TIME
+      weaviate    myw-weaviate-0   <none>   Running   <none>   minikube/192.168.49.2   Jul 05,2024 17:42 UTC+0800
 
       Resources Allocation:
-      COMPONENT   DEDICATED   CPU(REQUEST/LIMIT)   MEMORY(REQUEST/LIMIT)   STORAGE-SIZE   STORAGE-CLASS     
-      weaviate    false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
+      COMPONENT   DEDICATED   CPU(REQUEST/LIMIT)   MEMORY(REQUEST/LIMIT)   STORAGE-SIZE   STORAGE-CLASS
+      weaviate    false       1 / 1                1Gi / 1Gi               data:20Gi      standard
 
       Images:
-      COMPONENT   TYPE       IMAGE                                        
-      weaviate    weaviate   docker.io/semitechnologies/weaviate:1.19.6   
+      COMPONENT   TYPE       IMAGE
+      weaviate    weaviate   docker.io/semitechnologies/weaviate:1.19.6
 
       Data Protection:
-      BACKUP-REPO   AUTO-BACKUP   BACKUP-SCHEDULE   BACKUP-METHOD   BACKUP-RETENTION  
+      BACKUP-REPO   AUTO-BACKUP   BACKUP-SCHEDULE   BACKUP-METHOD   BACKUP-RETENTION   RECOVERABLE-TIME 
    ```
 
 ## Connect to a Weaviate cluster

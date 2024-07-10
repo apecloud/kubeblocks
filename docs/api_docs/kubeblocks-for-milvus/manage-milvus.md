@@ -19,7 +19,7 @@ Milvus is a highly flexible, reliable, and blazing-fast cloud-native, open-sourc
 * [Install KubeBlocks](./../installation/install-kubeblocks.md).
 * View all the database types and versions available for creating a cluster.
   
-  Make sure the `mi lü us` cluster definition is installed. If the cluster definition is not available, refer to [this doc](./../overview/supported-addons.md#install-addons) to enable it first.
+  Make sure the `milvus` cluster definition is installed. If the cluster definition is not available, refer to [this doc](./../overview/supported-addons.md#install-addons) to enable it first.
 
   ```bash
   kubectl get clusterdefinition milvus
@@ -52,32 +52,25 @@ metadata:
   name: mycluster
   namespace: demo
 spec:
-  clusterDefinitionRef: qdrant
-  clusterVersionRef: qdrant-1.8.1
-  terminationPolicy: Delete
   affinity:
     podAntiAffinity: Preferred
-    topologyKeys:
-    - kubernetes.io/hostname
     tenancy: SharedNode
-  tolerations:
-    - key: kb-data
-      operator: Equal
-      value: 'true'
-      effect: NoSchedule
+    topologyKeys: 
+    - kubernetes.io/hostname
+  clusterDefinitionRef: milvus-2.3.2
   componentSpecs:
-  - name: qdrant
-    componentDefRef: qdrant
+  - componentDefRef: milvus
     disableExporter: true
-    serviceAccountName: kb-qdrant-cluster
-    replicas: 2
+    name: milvus
+    replicas: 1
     resources:
       limits:
-        cpu: '0.5'
-        memory: 0.5Gi
+        cpu: "1"
+        memory: 1Gi
       requests:
-        cpu: '0.5'
-        memory: 0.5Gi
+        cpu: "1"
+        memory: 1Gi
+    serviceAccountName: kb-mycluster
     volumeClaimTemplates:
     - name: data
       spec:
@@ -86,6 +79,153 @@ spec:
         resources:
           requests:
             storage: 20Gi
+  - componentDefRef: etcd
+    disableExporter: true
+    name: etcd
+    replicas: 1
+    resources:
+      limits:
+        cpu: "1"
+        memory: 1Gi
+      requests:
+        cpu: "1"
+        memory: 1Gi
+    serviceAccountName: kb-mycluster
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+  - componentDefRef: minio
+    disableExporter: true
+    name: minio
+    replicas: 1
+    resources:
+      limits:
+        cpu: "1"
+        memory: 1Gi
+      requests:
+        cpu: "1"
+        memory: 1Gi
+    serviceAccountName: kb-mycluster
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+  - componentDefRef: proxy
+    disableExporter: true
+    name: proxy
+    replicas: 1
+    resources:
+      limits:
+        cpu: "1"
+        memory: 1Gi
+      requests:
+        cpu: "1"
+        memory: 1Gi
+    serviceAccountName: kb-mycluster
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+  - componentDefRef: mixcoord
+    disableExporter: true
+    name: mixcoord
+    replicas: 1
+    resources:
+      limits:
+        cpu: "1"
+        memory: 1Gi
+      requests:
+        cpu: "1"
+        memory: 1Gi
+    serviceAccountName: kb-mycluster
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+  - componentDefRef: datanode
+    disableExporter: true
+    name: datanode
+    replicas: 1
+    resources:
+      limits:
+        cpu: "1"
+        memory: 1Gi
+      requests:
+        cpu: "1"
+        memory: 1Gi
+    serviceAccountName: kb-mycluster
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+  - componentDefRef: indexnode
+    disableExporter: true
+    name: indexnode
+    replicas: 1
+    resources:
+      limits:
+        cpu: "1"
+        memory: 1Gi
+      requests:
+        cpu: "1"
+        memory: 1Gi
+    serviceAccountName: kb-mycluster
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+  - componentDefRef: querynode
+    disableExporter: true
+    name: querynode
+    replicas: 1
+    resources:
+      limits:
+        cpu: "1"
+        memory: 1Gi
+      requests:
+        cpu: "1"
+        memory: 1Gi
+    serviceAccountName: kb-mycluster
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+  resources:
+    cpu: "0"
+    memory: "0"
+  storage:
+    size: "0"
+  terminationPolicy: Delete
+status: {}
 EOF
 ```
 
@@ -134,168 +274,9 @@ Qdrant provides both HTTP and gRPC protocols for client access on ports 6333 and
    curl http://127.0.0.1:6333/collections
    ```
 
-
 ## Scaling
 
-Scaling function for vector databases is also supported.
-
-### Scale horizontally
-
-Horizontal scaling changes the amount of pods. For example, you can apply horizontal scaling to scale pods up from three to five. The scaling process includes the backup and restore of data.
-
-#### Before you start
-
-Check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
-
-```bash
-kubectl get cluster mycluster -n demo
->
-NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
-mycluster   milvus               milvus-1.5.0   Halt                 Running   47m
-```
-
-#### Steps
-
-There are two ways to apply horizontal scaling.
-
-<Tabs>
-
-<TabItem value="OpsRequest" label="OpsRequest" default>
-
-1. Apply an OpsRequest to a specified cluster. Configure the parameters according to your needs.
-
-   ```bash
-   kubectl apply -f - <<EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: OpsRequest
-   metadata:
-     name: ops-horizontal-scaling
-     namespace: demo
-   spec:
-     clusterName: mycluster
-     type: HorizontalScaling
-     horizontalScaling:
-     - componentName: milvus
-       replicas: 1
-   EOF
-   ```
-
-2. Check the operation status to validate the horizontal scaling status.
-
-   ```bash
-   kubectl get ops -n demo
-   >
-   NAMESPACE   NAME                     TYPE                CLUSTER     STATUS    PROGRESS   AGE
-   demo        ops-horizontal-scaling   HorizontalScaling   mycluster   Succeed   3/3        6m
-   ```
-
-   If an error occurs to the horizontal scaling operation, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
-
-3. Check whether the corresponding resources change.
-
-    ```bash
-    kubectl describe cluster mycluster -n demo
-    ```
-
-</TabItem>
-  
-<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
-
-1. Change the configuration of `spec.componentSpecs.replicas` in the YAML file. `spec.componentSpecs.replicas` stands for the pod amount and changing this value triggers a horizontal scaling of a cluster.
-
-   ```yaml
-   kubectl edit cluster mycluster -n demo
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
-   spec:
-     clusterDefinitionRef: milvus
-     clusterVersionRef: milvus-1.5.0
-     componentSpecs:
-     - name: milvus
-       componentDefRef: milvus
-       replicas: 1 # Change the amount
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 1Gi
-    terminationPolicy: Halt
-   ```
-
-2. Check whether the corresponding resources change.
-
-    ```bash
-    kubectl describe cluster mycluster -n demo
-    ```
-
-</TabItem>
-
-</Tabs>
-
-#### Handle the snapshot exception
-
-If `STATUS=ConditionsError` occurs during the horizontal scaling process, you can find the cause from `cluster.status.condition.message` for troubleshooting.
-In the example below, a snapshot exception occurs.
-
-```bash
-Status:
-  conditions: 
-  - lastTransitionTime: "2024-04-25T17:40:26Z"
-    message: VolumeSnapshot/mycluster-milvus-scaling-dbqgp: Failed to set default snapshot
-      class with error cannot find default snapshot class
-    reason: ApplyResourcesFailed
-    status: "False"
-    type: ApplyResources
-```
-
-***Reason***
-
-This exception occurs because the `VolumeSnapshotClass` is not configured. This exception can be fixed after configuring `VolumeSnapshotClass`, but the horizontal scaling cannot continue to run. It is because the wrong backup (volumesnapshot is generated by backup) and volumesnapshot generated before still exist. First, delete these two wrong resources and then KubeBlocks re-generates new resources.
-
-***Steps:***
-
-1. Configure the VolumeSnapshotClass by running the command below.
-
-   ```bash
-   kubectl create -f - <<EOF
-   apiVersion: snapshot.storage.k8s.io/v1
-   kind: VolumeSnapshotClass
-   metadata:
-     name: csi-aws-vsc
-     annotations:
-       snapshot.storage.kubernetes.io/is-default-class: "true"
-   driver: ebs.csi.aws.com
-   deletionPolicy: Delete
-   EOF
-   ```
-
-2. Delete the wrong backup (volumesnapshot is generated by backup) and volumesnapshot resources.
-
-   ```bash
-   kubectl delete backup -l app.kubernetes.io/instance=mycluster
-   
-   kubectl delete volumesnapshot -l app.kubernetes.io/instance=mycluster
-   ```
-
-***Result***
-
-The horizontal scaling continues after backup and volumesnapshot are deleted and the cluster restores to running status.
-
-### Scale vertically
-
-You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, if you need to change the resource class from 1C2G to 2C4G, vertical scaling is what you need.
-
-:::note
-
-During the vertical scaling process, all pods restart in the order of learner -> follower -> leader and the leader pod may change after the restarting.
-
-:::
+You can vertically scale a weaviate cluster by changing resource requirements and limits (CPU and storage). For example, if you need to change the resource class from 1C2G to 2C4G, vertical scaling is what you need.
 
 #### Before you start
 
@@ -304,8 +285,8 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 ```bash
 kubectl get cluster mycluster -n demo
 >
-NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
-mycluster   milvus               milvus-1.5.0   Halt                 Running   47m
+NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY     STATUS    AGE
+mycluster   milvus               milvus-1.5.0   Delete                 Running   47m
 ```
 
 #### Steps
@@ -370,7 +351,7 @@ There are two ways to apply vertical scaling.
      namespace: demo
    spec:
      clusterDefinitionRef: milvus
-     clusterVersionRef: milvus-1.5.0
+     clusterVersionRef: milvus-2.3.2
      componentSpecs:
      - name: milvus
        componentDefRef: milvus
@@ -412,9 +393,8 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    AGE
-mycluster   milvus               milvus-1.5.0      Delete               Running   4m29s
+mycluster   milvus               milvus-2.3.3      Delete               Running   4m29s
 ```
-
 
 ### Steps
 
@@ -478,7 +458,7 @@ There are two ways to apply volume expansion.
      namespace: demo
    spec:
      clusterDefinitionRef: milvus
-     clusterVersionRef: milvus-1.5.0
+     clusterVersionRef: milvus-2.3.3
      componentSpecs:
      - name: milvus
        componentDefRef: milvus
@@ -504,7 +484,7 @@ There are two ways to apply volume expansion.
 
 </Tabs>
 
-## Stop/Start PostgreSQL Cluster
+## Stop/Start a Cluster
 
 You can stop/start a cluster to save computing resources. When a cluster is stopped, the computing resources of this cluster are released, which means the pods of Kubernetes are released, but the storage resources are reserved. Start this cluster again if you want to restore the cluster resources from the original storage by snapshots.
 
@@ -603,7 +583,7 @@ spec:
   clusterVersionRef: milvus-1.8.1
   terminationPolicy: Delete
   componentSpecs:
-  - name: postgresql
+  - name: milvus
     componentDefRef: milvus
     disableExporter: true  
     replicas: 1
@@ -622,8 +602,34 @@ spec:
 
 </Tabs>
 
-## Backup and restore
+## Restart
 
-The backup and restore operations for Qdrant are the same with those of other clusters.
+1. Restart a cluster.
 
-You can refer to the [backup and restore docs](./../maintenance/backup-and-restore/introduction.md) for details.
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: ops-restart
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     type: Restart 
+     restart:
+     - componentName: milvus
+   EOF
+   ```
+
+2. Check the pod and operation status to validate the restarting.
+
+   ```bash
+   kubectl get pod -n demo
+
+   kubectl get ops ops-restart -n demo
+   ```
+
+   During the restarting process, there are two status types for pods.
+
+   - STATUS=Terminating: it means the cluster restart is in progress.
+   - STATUS=Running: it means the cluster has been restarted.

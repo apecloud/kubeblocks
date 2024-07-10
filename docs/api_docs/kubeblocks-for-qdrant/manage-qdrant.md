@@ -506,7 +506,7 @@ There are two ways to apply volume expansion.
 
 </Tabs>
 
-## Stop/Start PostgreSQL Cluster
+## Stop/Start a cluster
 
 You can stop/start a cluster to save computing resources. When a cluster is stopped, the computing resources of this cluster are released, which means the pods of Kubernetes are released, but the storage resources are reserved. Start this cluster again if you want to restore the cluster resources from the original storage by snapshots.
 
@@ -605,7 +605,7 @@ spec:
   clusterVersionRef: qdrant-1.8.1
   terminationPolicy: Delete
   componentSpecs:
-  - name: postgresql
+  - name: qdrant
     componentDefRef: qdrant
     disableExporter: true  
     replicas: 1

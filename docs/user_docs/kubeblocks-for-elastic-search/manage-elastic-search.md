@@ -34,7 +34,7 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
    ```bash
    kbcli cluster list
    >
-   NAME            NAMESPACE   CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    CREATED-TIME
+   NAME            NAMESPACE   CLUSTER-DEFINITION   VERSION               TERMINATION-POLICY   STATUS    CREATED-TIME
    elasticsearch   default     elasticsearch        elasticsearch-8.8.2   Delete               Creating          Jul 05,2024 16:51 UTC+0800   
    ```
 

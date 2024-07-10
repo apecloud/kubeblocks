@@ -1,6 +1,6 @@
 ---
 title: Manage Qdrant with KubeBlocks
-description: How to manage vector databases on KubeBlocks
+description: How to manage Qdrant on KubeBlocks
 keywords: [qdrant, vector database, control plane]
 sidebar_position: 1
 sidebar_label: Manage Qdrant with KubeBlocks
@@ -84,8 +84,8 @@ If your cluster is on AWS, install the AWS Load Balancer Controller first.
 :::
 
 - If your client is inside a K8s cluster, run `kbcli cluster describe qdrant` to get the ClusterIP address of the cluster or the corresponding K8s cluster domain name.
-- If your client is outside the K8s cluster but in the same VPC as the server, run `kbcli cluster expose qdant --enable=true --type=vpc` to get a VPC load balancer address for the database cluster.
-- If your client is outside the VPC, run `kbcli cluster expose qdant --enable=true --type=internet` to open a public network reachable address for the database cluster.
+- If your client is outside the K8s cluster but in the same VPC as the server, run `kbcli cluster expose qdrant --enable=true --type=vpc` to get a VPC load balancer address for the database cluster.
+- If your client is outside the VPC, run `kbcli cluster expose qdrant --enable=true --type=internet` to open a public network reachable address for the database cluster.
 
 ## Monitor the database
 

@@ -63,7 +63,7 @@ kbcli cluster create mycluster --cluster-definition mysql --set replicas=2
 If you only have one node for deploying a Replication Cluster, set the `availability-policy` as `none` when creating a Replication Cluster.
 
 ```bash
-kbcli cluster create mycluster --cluster-definition mysql --set replicas=2 --availability-policy none 
+kbcli cluster create mycluster --cluster-definition mysql --set replicas=2 --topology-keys null
 ```
 
 If you want to specify a cluster version, you can first view the available versions and use `--clusterversion` to specify a version.

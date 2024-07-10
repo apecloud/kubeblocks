@@ -924,6 +924,24 @@ type ClusterComponentSpec struct {
 	//
 	// +optional
 	Stop *bool `json:"stop,omitempty"`
+
+	// Specifies the user-defined configuration template.
+	//
+	// When provided, the `userConfigTemplates` overrides the default configuration template in the ComponentDefinition
+	// specified in `spec.configs[*].templateRef`.
+	// This allows users to customize the configuration template according to their specific requirements.
+	//
+	// +optional
+	UserConfigTemplates map[string]ConfigTemplateExtension `json:"userConfigTemplates,omitempty"`
+
+	// Specifies the user-defined configuration template or parameters.
+	//
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	ComponentParameters []ComponentParameters `json:"parameters,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 }
 
 type ComponentMessageMap map[string]string

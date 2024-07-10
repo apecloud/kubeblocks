@@ -76,7 +76,7 @@ func (r RestoreOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	}
 	cluster := restoredResources.cluster
 
-	// create cluster and secrets
+	// create cluster
 	if err = cli.Create(reqCtx.Ctx, cluster); err != nil {
 		return err
 	}
@@ -175,8 +175,7 @@ func (r RestoreOpsHandler) restoreResourceFromBackup(reqCtx intctrlutil.RequestC
 	}
 	util.SetOpsRequestToCluster(clusterObj, opsRequestSlice)
 	restoredResources.cluster = clusterObj
-	// get the secret objects from backup
-	return restoredResources, err
+	return restoredResources, nil
 }
 
 func (r RestoreOpsHandler) getClusterObjFromBackup(backup *dpv1alpha1.Backup, opsRequest *appsv1alpha1.OpsRequest) (*appsv1alpha1.Cluster, error) {

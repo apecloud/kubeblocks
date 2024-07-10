@@ -187,7 +187,7 @@ var _ = Describe("Backup Controller test", func() {
 				}
 				if hasSystemAccount {
 					Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
-						g.Expect(fetched.Annotations[constant.SecretsSnapshotAnnotationsKey]).ShouldNot(BeEmpty())
+						g.Expect(fetched.Annotations[constant.EncryptedSystemAccounts]).ShouldNot(BeEmpty())
 					})).Should(Succeed())
 				}
 

@@ -269,7 +269,13 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 	uuidHex := hex.EncodeToString(uuidBytes)
 	randomPassword := randomString(8)
 	strongRandomPasswd := strongRandomString(16)
-	restorePassword := GetRestorePassword(synthesizedComp)
+	var rootAccount appsv1alpha1.SystemAccount
+	for _, account := range synthesizedComp.SystemAccounts {
+		if account.InitAccount {
+			rootAccount = account
+		}
+	}
+	restorePassword := GetRestoreSystemAccountPassword(synthesizedComp, rootAccount)
 	// check if a connection password is specified during recovery.
 	// if exists, replace the random password
 	if restorePassword != "" {

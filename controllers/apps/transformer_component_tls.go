@@ -73,6 +73,7 @@ func checkAndTriggerReRender(ctx context.Context, synthesizedComp component.Synt
 		return nil
 	}
 
+	// TODO: (good-first-issue) don't hard code the tls keyword
 	tlsKeyword := plan.GetTLSKeyWord(synthesizedComp.CharacterType)
 	if tlsKeyword == "unsupported-character-type" {
 		return nil
@@ -146,6 +147,7 @@ func buildTLSCert(ctx context.Context, cli client.Reader, synthesizedComp compon
 			return err
 		}
 	case appsv1alpha1.IssuerKubeBlocks:
+		// TODO: (good-first-issue) should check if the secret exists, skip if already exists
 		secret, err := plan.ComposeTLSSecret(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
 		if err != nil {
 			return err

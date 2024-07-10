@@ -3846,6 +3846,7 @@ spec:
                         required:
                         - name
                         type: object
+                      minItems: 1
                       type: array
                     restoreEnv:
                       description: |-

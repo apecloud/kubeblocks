@@ -248,6 +248,7 @@ type RebuildInstance struct {
 
 	// Specifies the instances (Pods) that need to be rebuilt, typically operating as standbys.
 	//
+	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:Required
 	Instances []Instance `json:"instances"`
 

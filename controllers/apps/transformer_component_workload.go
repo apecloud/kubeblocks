@@ -493,7 +493,7 @@ func (r *componentWorkloadOps) postScaleOut(itsObj *workloads.InstanceSet) error
 	if d != nil {
 		// clean backup resources.
 		// there will not be any backup resources other than scale out.
-		tmpObjs, err := d.ClearTmpResources()
+		tmpObjs, err := d.GetTmpResources()
 		if err != nil {
 			return err
 		}
@@ -834,6 +834,11 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 
 	updatePVCByRecreateFromStep := func(fromStep pvcRecreateStep) {
 		lastVertex := r.buildProtoITSWorkloadVertex()
+		// The steps here are decremented in reverse order because during the plan execution, dag.WalkReverseTopoOrder
+		// is called to execute all vertices on the graph according to the reverse topological order.
+		// Therefore, the vertices need to maintain the following edge linkages:
+		// root -> its -> step5 -> step4 -> step3 -> step2 -> step1
+		// So that, during execution, the sequence becomes step1 -> step2 -> step3 -> step4 -> step5
 		for step := pvRestorePolicyStep; step >= fromStep && step >= pvPolicyRetainStep; step-- {
 			lastVertex = addStepMap[step](lastVertex, step)
 		}

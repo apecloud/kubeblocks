@@ -243,13 +243,7 @@ func buildDataScriptJobs(reqCtx intctrlutil.RequestCtx, cli client.Client, clust
 
 		// parse username and password
 		secretFrom := ops.Spec.ScriptSpec.Secret
-		if secretFrom == nil {
-			secretFrom = &appsv1alpha1.ScriptSecret{
-				Name:        constant.GenerateDefaultConnCredential(cluster.Name),
-				PasswordKey: "password",
-				UsernameKey: "username",
-			}
-		}
+
 		// verify secrets exist
 		if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: secretFrom.Name}, &corev1.Secret{}); err != nil {
 			return nil, intctrlutil.NewFatalError(err.Error())

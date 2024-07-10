@@ -289,47 +289,39 @@ func (c *itsCredentialConvertor) convert(args ...any) (any, error) {
 		return nil, err
 	}
 
-	// use first init account as the default credential
-	var sysInitAccount *appsv1alpha1.SystemAccount
-	for index, sysAccount := range synthesizeComp.SystemAccounts {
-		if sysAccount.InitAccount {
-			sysInitAccount = &synthesizeComp.SystemAccounts[index]
-			break
+	credential := func(sysAccount appsv1alpha1.SystemAccount) *workloads.Credential {
+		secretName := constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, sysAccount.Name)
+		return &workloads.Credential{
+			Username: workloads.CredentialVar{
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: secretName,
+						},
+						Key: constant.AccountNameForSecret,
+					},
+				},
+			},
+			Password: workloads.CredentialVar{
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: secretName,
+						},
+						Key: constant.AccountPasswdForSecret,
+					},
+				},
+			},
 		}
 	}
-	if sysInitAccount == nil && len(synthesizeComp.CompDefName) != 0 {
-		return nil, nil
-	}
 
-	var secretName string
-	if sysInitAccount != nil {
-		secretName = constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, sysInitAccount.Name)
-	} else {
-		secretName = constant.GenerateDefaultConnCredential(synthesizeComp.ClusterName)
+	// use first init account as the default credential
+	for index, sysAccount := range synthesizeComp.SystemAccounts {
+		if sysAccount.InitAccount {
+			return credential(synthesizeComp.SystemAccounts[index]), nil
+		}
 	}
-	credential := &workloads.Credential{
-		Username: workloads.CredentialVar{
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: secretName,
-					},
-					Key: constant.AccountNameForSecret,
-				},
-			},
-		},
-		Password: workloads.CredentialVar{
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: secretName,
-					},
-					Key: constant.AccountPasswdForSecret,
-				},
-			},
-		},
-	}
-	return credential, nil
+	return nil, nil
 }
 
 func (c *itsMembershipReconfigurationConvertor) convert(args ...any) (any, error) {

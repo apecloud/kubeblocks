@@ -180,80 +180,6 @@ var _ = Describe("builder", func() {
 			Expect(pvc.Labels[constant.VolumeTypeLabelKey]).ShouldNot(BeEmpty())
 		})
 
-		It("builds Conn. Credential correctly", func() {
-			var (
-				clusterDefObj                             = testapps.NewClusterDefFactoryWithConnCredential("conn-cred", mysqlCompDefName).GetObject()
-				clusterDef, cluster, synthesizedComponent = newClusterObjs(clusterDefObj)
-			)
-			credential := BuildConnCredential(clusterDef, cluster, synthesizedComponent)
-			Expect(credential).ShouldNot(BeNil())
-			Expect(credential.Labels[constant.KBAppClusterDefTypeLabelKey]).Should(BeEmpty())
-			By("setting type")
-			characterType := "test-character-type"
-			clusterDef.Spec.Type = characterType
-			credential = BuildConnCredential(clusterDef, cluster, synthesizedComponent)
-			Expect(credential).ShouldNot(BeNil())
-			Expect(credential.Labels[constant.KBAppClusterDefTypeLabelKey]).Should(Equal(characterType))
-			// "username":      "root",
-			// "SVC_FQDN":      "$(SVC_FQDN)",
-			// "RANDOM_PASSWD": "$(RANDOM_PASSWD)",
-			// "tcpEndpoint":   "tcp:$(SVC_FQDN):$(SVC_PORT_mysql)",
-			// "paxosEndpoint": "paxos:$(SVC_FQDN):$(SVC_PORT_paxos)",
-			// "UUID":          "$(UUID)",
-			// "UUID_B64":      "$(UUID_B64)",
-			// "UUID_STR_B64":  "$(UUID_STR_B64)",
-			// "UUID_HEX":      "$(UUID_HEX)",
-			Expect(credential.StringData).ShouldNot(BeEmpty())
-			Expect(credential.StringData["username"]).Should(Equal("root"))
-
-			for _, v := range []string{
-				"SVC_FQDN",
-				"RANDOM_PASSWD",
-				"UUID",
-				"UUID_B64",
-				"UUID_STR_B64",
-				"UUID_HEX",
-				"HEADLESS_SVC_FQDN",
-			} {
-				Expect(credential.StringData[v]).ShouldNot(BeEquivalentTo(fmt.Sprintf("$(%s)", v)))
-			}
-			Expect(credential.StringData["RANDOM_PASSWD"]).Should(HaveLen(8))
-			svcFQDN := fmt.Sprintf("%s-%s", cluster.Name, synthesizedComponent.Name)
-			headlessSvcFQDN := fmt.Sprintf("%s-%s-headless", cluster.Name, synthesizedComponent.Name)
-			var mysqlPort corev1.ServicePort
-			var paxosPort corev1.ServicePort
-			for _, s := range synthesizedComponent.ComponentServices[0].Spec.Ports {
-				switch s.Name {
-				case "mysql":
-					mysqlPort = s
-				case "paxos":
-					paxosPort = s
-				}
-			}
-			Expect(credential.StringData["SVC_FQDN"]).Should(Equal(svcFQDN))
-			Expect(credential.StringData["HEADLESS_SVC_FQDN"]).Should(Equal(headlessSvcFQDN))
-			Expect(credential.StringData["tcpEndpoint"]).Should(Equal(fmt.Sprintf("tcp:%s:%d", svcFQDN, mysqlPort.Port)))
-			Expect(credential.StringData["paxosEndpoint"]).Should(Equal(fmt.Sprintf("paxos:%s:%d", svcFQDN, paxosPort.Port)))
-
-		})
-
-		It("builds Conn. Credential during restoring from backup", func() {
-			originalPassword := "test-passw0rd"
-			encryptionKey := "encryptionKey"
-			viper.Set(constant.CfgKeyDPEncryptionKey, encryptionKey)
-			var (
-				clusterDefObj                             = testapps.NewClusterDefFactoryWithConnCredential("conn-cred", mysqlCompDefName).GetObject()
-				clusterDef, cluster, synthesizedComponent = newClusterObjs(clusterDefObj)
-			)
-			e := intctrlutil.NewEncryptor(encryptionKey)
-			ciphertext, _ := e.Encrypt([]byte(originalPassword))
-			cluster.Annotations[constant.RestoreFromBackupAnnotationKey] = fmt.Sprintf(`{"%s":{"%s":"%s"}}`,
-				synthesizedComponent.Name, constant.ConnectionPassword, ciphertext)
-			credential := BuildConnCredential(clusterDef, cluster, synthesizedComponent)
-			Expect(credential).ShouldNot(BeNil())
-			Expect(credential.StringData["RANDOM_PASSWD"]).Should(Equal(originalPassword))
-		})
-
 		It("builds InstanceSet correctly", func() {
 			clusterDef, cluster, synthesizedComponent := newClusterObjs(nil)
 
@@ -365,7 +291,6 @@ var _ = Describe("builder", func() {
 			_, cluster, synthesizedComponent := newClusterObjs(nil)
 			sidecarRenderedParam := &cfgcm.CfgManagerBuildParams{
 				ManagerName:   "cfgmgr",
-				SecreteName:   "test-secret",
 				ComponentName: synthesizedComponent.Name,
 				Image:         constant.KBToolsImage,
 				Args:          []string{},
@@ -383,7 +308,6 @@ var _ = Describe("builder", func() {
 			_, cluster, _ := newClusterObjs(nil)
 			sidecarRenderedParam := &cfgcm.CfgManagerBuildParams{
 				ManagerName:           "cfgmgr",
-				SecreteName:           "test-secret",
 				Image:                 constant.KBToolsImage,
 				ShareProcessNamespace: true,
 				Args:                  []string{},
@@ -412,7 +336,6 @@ var _ = Describe("builder", func() {
 			_, cluster, _ := newClusterObjs(nil)
 			cfgManagerParams := &cfgcm.CfgManagerBuildParams{
 				ManagerName:               constant.ConfigSidecarName,
-				SecreteName:               constant.GenerateDefaultConnCredential(cluster.Name),
 				Image:                     viper.GetString(constant.KBToolsImage),
 				Cluster:                   cluster,
 				ConfigLazyRenderedVolumes: make(map[string]corev1.VolumeMount),

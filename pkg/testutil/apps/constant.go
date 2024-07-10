@@ -105,29 +105,6 @@ var (
 		},
 	}
 
-	// defaultSvc value are corresponding to defaultMySQLContainer.Ports name mapping and
-	// corresponding to defaultConnectionCredential variable placeholder
-	defaultSvcSpec = appsv1alpha1.ServiceSpec{
-		Ports: []appsv1alpha1.ServicePort{
-			{
-				Name: "mysql",
-				TargetPort: intstr.IntOrString{
-					Type:   intstr.String,
-					StrVal: "mysql",
-				},
-				Port: 3306,
-			},
-			{
-				Name: "paxos",
-				TargetPort: intstr.IntOrString{
-					Type:   intstr.String,
-					StrVal: "paxos",
-				},
-				Port: 13306,
-			},
-		},
-	}
-
 	defaultMySQLContainer = corev1.Container{
 		Name:            DefaultMySQLContainerName,
 		Image:           ApeCloudMySQLImage,

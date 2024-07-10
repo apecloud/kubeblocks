@@ -61,29 +61,24 @@ var _ = Describe("build service references", func() {
 	}
 
 	var (
-		mockClient          *testutil.K8sClientMockHelper
-		clusterDef          *appsv1alpha1.ClusterDefinition
-		clusterVersion      *appsv1alpha1.ClusterVersion
-		cluster             *appsv1alpha1.Cluster
-		beReferencedCluster *appsv1alpha1.Cluster
+		mockClient     *testutil.K8sClientMockHelper
+		clusterDef     *appsv1alpha1.ClusterDefinition
+		clusterVersion *appsv1alpha1.ClusterVersion
+		cluster        *appsv1alpha1.Cluster
 	)
 
 	var (
 		namespace                        = "default"
 		clusterName                      = "cluster"
-		beReferencedClusterName          = "cluster-be-referenced"
 		clusterDefName                   = "test-cd"
 		clusterVersionName               = "test-cv"
 		nginxCompName                    = "nginx"
 		nginxCompDefName                 = "nginx"
-		mysqlCompName                    = "mysql"
-		mysqlCompDefName                 = "mysql"
 		externalServiceDescriptorName    = "mock-external-service-descriptor-name"
 		externalServiceDescriptorKind    = "redis"
 		externalServiceDescriptorVersion = "7.0.1"
 		internalClusterServiceRefKind    = "mysql"
 		internalClusterServiceRefVersion = "8.0.2"
-		secretName                       = constant.GenerateDefaultConnCredential(beReferencedClusterName)
 		redisServiceRefDeclarationName   = "redis"
 		mysqlServiceRefDeclarationName   = "mysql"
 	)
@@ -225,20 +220,11 @@ var _ = Describe("build service references", func() {
 		})
 
 		It("generate service descriptor test", func() {
-			By("Create cluster and beReferencedCluster object")
-			beReferencedCluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, beReferencedClusterName,
-				clusterDef.Name, clusterVersion.Name).
-				AddComponent(mysqlCompName, mysqlCompDefName).
-				Create(&testCtx).GetObject()
-
+			By("Create cluster")
 			serviceRefs := []appsv1alpha1.ServiceRef{
 				{
 					Name:              redisServiceRefDeclarationName,
 					ServiceDescriptor: externalServiceDescriptorName,
-				},
-				{
-					Name:    mysqlServiceRefDeclarationName,
-					Cluster: beReferencedCluster.Name,
 				},
 			}
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
@@ -301,27 +287,11 @@ var _ = Describe("build service references", func() {
 				externalServiceDescriptor.Spec.ServiceVersion = externalServiceDescriptorVersion
 			})).Should(Succeed())
 
-			By("GenServiceReferences succeed because external service descriptor found and internal cluster reference found")
-			secret := &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      secretName,
-					Namespace: namespace,
-				},
-				Data: map[string][]byte{
-					constant.ServiceDescriptorEndpointKey: []byte("my-mysql-0.default.svc.cluster.local:3306"),
-					constant.ServiceDescriptorHostKey:     []byte("my-mysql-0.default.svc.cluster.local"),
-					constant.ServiceDescriptorPortKey:     []byte("3306"),
-					constant.ServiceDescriptorUsernameKey: []byte("cm9vdA=="),
-					constant.ServiceDescriptorPasswordKey: []byte("NHpycWZsMnI="),
-				},
-			}
-			Expect(testCtx.CheckedCreateObj(ctx, secret)).Should(Succeed())
-			Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: secret.Name,
-				Namespace: secret.Namespace}, secret)).Should(Succeed())
+			By("GenServiceReferences succeed because external service descriptor found")
 			serviceReferences, err = buildServiceReferences4Test(testCtx.Ctx, testCtx.Cli, clusterDef, nil, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
 			Expect(serviceReferences).ShouldNot(BeNil())
-			Expect(len(serviceReferences)).Should(Equal(2))
+			Expect(len(serviceReferences)).Should(Equal(1))
 			Expect(serviceReferences[redisServiceRefDeclarationName]).ShouldNot(BeNil())
 			Expect(serviceReferences[redisServiceRefDeclarationName].Spec.Endpoint).ShouldNot(BeNil())
 			Expect(serviceReferences[redisServiceRefDeclarationName].Spec.Endpoint.Value).ShouldNot(BeEmpty())
@@ -337,24 +307,6 @@ var _ = Describe("build service references", func() {
 			Expect(serviceReferences[redisServiceRefDeclarationName].Spec.Auth.Username.ValueFrom).Should(BeNil())
 			Expect(serviceReferences[redisServiceRefDeclarationName].Spec.Auth.Password.Value).ShouldNot(BeEmpty())
 			Expect(serviceReferences[redisServiceRefDeclarationName].Spec.Auth.Password.ValueFrom).Should(BeNil())
-
-			Expect(serviceReferences[mysqlServiceRefDeclarationName]).ShouldNot(BeNil())
-			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Endpoint).ShouldNot(BeNil())
-			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Endpoint.Value).Should(BeEmpty())
-			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Endpoint.ValueFrom).ShouldNot(BeNil())
-			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Endpoint.ValueFrom.SecretKeyRef).ShouldNot(BeNil())
-			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Host).Should(BeNil()) // reference to a legacy cluster
-			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Port).ShouldNot(BeNil())
-			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Port.Value).Should(BeEmpty())
-			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Port.ValueFrom).ShouldNot(BeNil())
-			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Port.ValueFrom.SecretKeyRef).ShouldNot(BeNil())
-			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Auth).ShouldNot(BeNil())
-			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Username.Value).Should(BeEmpty())
-			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Username.ValueFrom).ShouldNot(BeNil())
-			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Username.ValueFrom.SecretKeyRef).ShouldNot(BeNil())
-			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Password.Value).Should(BeEmpty())
-			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Password.ValueFrom).ShouldNot(BeNil())
-			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Password.ValueFrom.SecretKeyRef).ShouldNot(BeNil())
 		})
 	})
 

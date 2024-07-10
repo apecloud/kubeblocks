@@ -64,7 +64,6 @@ var _ = Describe("service reference", func() {
 		clusterDef                    *appsv1alpha1.ClusterDefinition
 		clusterVersion                *appsv1alpha1.ClusterVersion
 		cluster                       *appsv1alpha1.Cluster
-		beReferencedCluster           *appsv1alpha1.Cluster
 		beReferencedServiceDescriptor *appsv1alpha1.ServiceDescriptor
 	)
 
@@ -76,8 +75,6 @@ var _ = Describe("service reference", func() {
 		clusterVersionName               = "test-clusterversion"
 		nginxCompName                    = "nginx"
 		nginxCompDefName                 = "nginx"
-		mysqlCompName                    = "mysql"
-		mysqlCompDefName                 = "mysql"
 		externalServiceDescriptorName    = "mock-external-service-descriptor-name"
 		externalServiceDescriptorKind    = "redis"
 		externalServiceDescriptorVersion = "7.0.1"
@@ -203,34 +200,10 @@ var _ = Describe("service reference", func() {
 				sd.Status.Phase = appsv1alpha1.AvailablePhase
 			})).Should(Succeed())
 
-		By("mock a cluster and the (conn credential) secret for referenced")
-		secret := &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      constant.GenerateDefaultConnCredential(beReferencedClusterName),
-				Namespace: namespace,
-			},
-			Data: map[string][]byte{
-				constant.ServiceDescriptorEndpointKey: []byte(serviceRefEndpointValue),
-				constant.ServiceDescriptorHostKey:     []byte(serviceRefHostValue),
-				constant.ServiceDescriptorPortKey:     []byte(serviceRefPortValue),
-				constant.ServiceDescriptorUsernameKey: []byte(serviceRefUsernameValue),
-				constant.ServiceDescriptorPasswordKey: []byte(serviceRefPasswordValue),
-			},
-		}
-		Expect(testCtx.CheckedCreateObj(ctx, secret)).Should(Succeed())
-		beReferencedCluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, beReferencedClusterName, clusterDef.Name, clusterVersion.Name).
-			AddComponent(mysqlCompName, mysqlCompDefName).
-			Create(&testCtx).
-			GetObject()
-
 		serviceRefs := []appsv1alpha1.ServiceRef{
 			{
 				Name:              redisServiceRefDeclarationName,
 				ServiceDescriptor: beReferencedServiceDescriptor.Name,
-			},
-			{
-				Name:    mysqlServiceRefDeclarationName,
-				Cluster: beReferencedCluster.Name,
 			},
 		}
 		cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
@@ -274,16 +247,6 @@ var _ = Describe("service reference", func() {
 			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Auth.Username.ValueFrom.ConfigMapKeyRef).ShouldNot(BeNil())
 			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Auth.Password.Value).Should(BeEmpty())
 			Expect(component.ServiceReferences[redisServiceRefDeclarationName].Spec.Auth.Password.ValueFrom.ConfigMapKeyRef).ShouldNot(BeNil())
-
-			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Endpoint.Value).Should(Equal(serviceRefEndpointValue))
-			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Endpoint.ValueFrom).Should(BeNil())
-			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Host).Should(BeNil()) // reference to a legacy cluster
-			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Port.Value).Should(Equal(serviceRefPortValue))
-			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Port.ValueFrom).Should(BeNil())
-			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Username.Value).Should(BeEmpty())
-			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Username.ValueFrom.SecretKeyRef).ShouldNot(BeNil())
-			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Password.Value).Should(BeEmpty())
-			Expect(component.ServiceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Password.ValueFrom.SecretKeyRef).ShouldNot(BeNil())
 		})
 	})
 })

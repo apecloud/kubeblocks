@@ -172,42 +172,6 @@ var _ = Describe("Component", func() {
 			Expect(synthesizeComp.ComponentServices[1].Spec.Type).Should(BeEquivalentTo("LoadBalancer"))
 		})
 
-		It("Test replace secretRef env placeholder token", func() {
-			By("mock connect credential and do replace placeholder token")
-			credentialMap := GetEnvReplacementMapForConnCredential(cluster.Name)
-			mockEnvs := []corev1.EnvVar{
-				{
-					Name: mysqlSecretUserEnvName,
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							Key: "username",
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: constant.KBConnCredentialPlaceHolder,
-							},
-						},
-					},
-				},
-				{
-					Name: mysqlSecretPasswdEnvName,
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							Key: "password",
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: constant.KBConnCredentialPlaceHolder,
-							},
-						},
-					},
-				},
-			}
-			mockEnvs = ReplaceSecretEnvVars(credentialMap, mockEnvs)
-			Expect(len(mockEnvs)).Should(Equal(2))
-			for _, env := range mockEnvs {
-				Expect(env.ValueFrom).ShouldNot(BeNil())
-				Expect(env.ValueFrom.SecretKeyRef).ShouldNot(BeNil())
-				Expect(env.ValueFrom.SecretKeyRef.Name).Should(Equal(constant.GenerateDefaultConnCredential(cluster.Name)))
-			}
-		})
-
 		It("should not fill component if none of simplified api is present", func() {
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx: ctx,

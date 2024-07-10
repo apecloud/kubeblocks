@@ -242,9 +242,6 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		return nil, err
 	}
 
-	// replace podSpec containers env default credential placeholder
-	replaceContainerPlaceholderTokens(synthesizeComp, GetEnvReplacementMapForConnCredential(synthesizeComp.ClusterName))
-
 	return synthesizeComp, nil
 }
 
@@ -759,23 +756,6 @@ func doContainerAttrOverride(compContainer *corev1.Container, container corev1.C
 	}
 }
 
-// GetEnvReplacementMapForConnCredential gets the replacement map for connect credential
-// TODO: deprecated, will be removed later.
-func GetEnvReplacementMapForConnCredential(clusterName string) map[string]string {
-	return map[string]string{
-		constant.KBConnCredentialPlaceHolder: constant.GenerateDefaultConnCredential(clusterName),
-	}
-}
-
-func replaceContainerPlaceholderTokens(component *SynthesizedComponent, namedValuesMap map[string]string) {
-	// replace env[].valueFrom.secretKeyRef.name variables
-	for _, cc := range [][]corev1.Container{component.PodSpec.InitContainers, component.PodSpec.Containers} {
-		for _, c := range cc {
-			c.Env = ReplaceSecretEnvVars(namedValuesMap, c.Env)
-		}
-	}
-}
-
 // GetReplacementMapForBuiltInEnv gets the replacement map for KubeBlocks built-in environment variables.
 func GetReplacementMapForBuiltInEnv(clusterName, clusterUID, componentName string) map[string]string {
 	cc := constant.GenerateClusterComponentName(clusterName, componentName)
@@ -804,22 +784,6 @@ func ReplaceNamedVars(namedValuesMap map[string]string, targetVar string, limits
 		targetVar = r
 	}
 	return targetVar
-}
-
-// ReplaceSecretEnvVars replaces the env secret value with namedValues and returns new envs
-func ReplaceSecretEnvVars(namedValuesMap map[string]string, envs []corev1.EnvVar) []corev1.EnvVar {
-	newEnvs := make([]corev1.EnvVar, 0, len(envs))
-	for _, e := range envs {
-		if e.ValueFrom == nil || e.ValueFrom.SecretKeyRef == nil {
-			continue
-		}
-		name := ReplaceNamedVars(namedValuesMap, e.ValueFrom.SecretKeyRef.Name, 1, false)
-		if name != e.ValueFrom.SecretKeyRef.Name {
-			e.ValueFrom.SecretKeyRef.Name = name
-		}
-		newEnvs = append(newEnvs, e)
-	}
-	return newEnvs
 }
 
 // overrideSwitchoverSpecAttr overrides the attributes in switchoverSpec with the attributes of SwitchoverShortSpec in clusterVersion.

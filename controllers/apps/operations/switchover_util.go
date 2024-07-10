@@ -360,8 +360,6 @@ func buildSwitchoverEnvs(ctx context.Context,
 		return nil, errors.New("switchover spec withCandidate and withoutCandidate can't be nil at the same time")
 	}
 
-	// replace secret env and merge envs defined in SwitchoverSpec
-	replaceSwitchoverConnCredentialEnv(synthesizeComp.LifecycleActions.Switchover, cluster.Name, synthesizeComp.Name)
 	var switchoverEnvs []corev1.EnvVar
 	switch switchover.InstanceName {
 	case KBSwitchoverCandidateInstanceForAnyPod:
@@ -385,21 +383,6 @@ func buildSwitchoverEnvs(ctx context.Context,
 	switchoverCandidateEnvs := buildSwitchoverCandidateEnv(cluster, synthesizeComp.Name, switchover)
 	switchoverEnvs = append(switchoverEnvs, switchoverCandidateEnvs...)
 	return switchoverEnvs, nil
-}
-
-// replaceSwitchoverConnCredentialEnv replaces the connection credential environment variables for the switchover job.
-func replaceSwitchoverConnCredentialEnv(switchoverSpec *appsv1alpha1.ComponentSwitchover, clusterName, componentName string) {
-	if switchoverSpec == nil {
-		return
-	}
-	connCredentialMap := component.GetEnvReplacementMapForConnCredential(clusterName)
-	replaceEnvVars := func(action *appsv1alpha1.Action) {
-		if action != nil {
-			action.Env = component.ReplaceSecretEnvVars(connCredentialMap, action.Env)
-		}
-	}
-	replaceEnvVars(switchoverSpec.WithCandidate)
-	replaceEnvVars(switchoverSpec.WithoutCandidate)
 }
 
 // buildSwitchoverWorkloadEnvs builds the replication or consensus workload environment variables for the switchover job.

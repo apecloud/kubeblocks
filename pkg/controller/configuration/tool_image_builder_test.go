@@ -63,7 +63,6 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 			cfgManagerParams := &cfgcm.CfgManagerBuildParams{
 				ManagerName:   constant.ConfigSidecarName,
 				ComponentName: clusterComponent.Name,
-				SecreteName:   constant.GenerateDefaultConnCredential(clusterObj.Name),
 				Image:         viper.GetString(constant.KBToolsImage),
 				Volumes:       make([]corev1.VolumeMount, 0),
 				Cluster:       clusterObj,

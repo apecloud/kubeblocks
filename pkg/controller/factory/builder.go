@@ -20,20 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package factory
 
 import (
-	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"path/filepath"
 	"strconv"
-	"strings"
 
-	"github.com/google/uuid"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/klog/v2"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -200,107 +194,6 @@ func BuildPersistentVolumeClaimLabels(component *component.SynthesizedComponent,
 	if templateName != "" {
 		pvc.Labels[constant.KBAppComponentInstanceTemplateLabelKey] = templateName
 	}
-}
-
-func randomString(length int) string {
-	return rand.String(length)
-}
-
-func strongRandomString(length int) string {
-	str, _ := common.GeneratePassword(length, 3, 3, false, "")
-	return str
-}
-
-func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster,
-	synthesizedComp *component.SynthesizedComponent) *corev1.Secret {
-	wellKnownLabels := constant.GetKBWellKnownLabels(clusterDefinition.Name, cluster.Name, "")
-	delete(wellKnownLabels, constant.KBAppComponentLabelKey)
-	credentialBuilder := builder.NewSecretBuilder(cluster.Namespace, constant.GenerateDefaultConnCredential(cluster.Name)).
-		AddLabelsInMap(wellKnownLabels).
-		SetStringData(clusterDefinition.Spec.ConnectionCredential)
-	if len(clusterDefinition.Spec.Type) > 0 {
-		credentialBuilder.AddLabelsInMap(constant.GetClusterDefTypeLabel(clusterDefinition.Spec.Type))
-	}
-	connCredential := credentialBuilder.GetObject()
-
-	if len(connCredential.StringData) == 0 {
-		return connCredential
-	}
-
-	replaceVarObjects := func(k, v *string, i int, origValue string, varObjectsMap map[string]string) {
-		toReplace := origValue
-		for j, r := range varObjectsMap {
-			replaced := strings.ReplaceAll(toReplace, j, r)
-			if replaced == toReplace {
-				continue
-			}
-			toReplace = replaced
-			// replace key
-			if i == 0 {
-				delete(connCredential.StringData, origValue)
-				*k = replaced
-			} else {
-				*v = replaced
-			}
-		}
-	}
-
-	// REVIEW: perhaps handles value replacement at `func mergeComponents`
-	replaceData := func(varObjectsMap map[string]string) {
-		copyStringData := connCredential.DeepCopy().StringData
-		for k, v := range copyStringData {
-			for i, vv := range []string{k, v} {
-				if !strings.Contains(vv, "$(") {
-					continue
-				}
-				replaceVarObjects(&k, &v, i, vv, varObjectsMap)
-			}
-			connCredential.StringData[k] = v
-		}
-	}
-
-	// TODO: do JIT value generation for lower CPU resources
-	// 1st pass replace variables
-	uuidVal := uuid.New()
-	uuidBytes := uuidVal[:]
-	uuidStr := uuidVal.String()
-	uuidB64 := base64.RawStdEncoding.EncodeToString(uuidBytes)
-	uuidStrB64 := base64.RawStdEncoding.EncodeToString([]byte(strings.ReplaceAll(uuidStr, "-", "")))
-	uuidHex := hex.EncodeToString(uuidBytes)
-	randomPassword := randomString(8)
-	strongRandomPasswd := strongRandomString(16)
-	restorePassword := GetRestorePassword(synthesizedComp)
-	// check if a connection password is specified during recovery.
-	// if exists, replace the random password
-	if restorePassword != "" {
-		randomPassword = restorePassword
-		strongRandomPasswd = restorePassword
-	}
-	m := map[string]string{
-		"$(RANDOM_PASSWD)":        randomPassword,
-		"$(STRONG_RANDOM_PASSWD)": strongRandomPasswd,
-		"$(UUID)":                 uuidStr,
-		"$(UUID_B64)":             uuidB64,
-		"$(UUID_STR_B64)":         uuidStrB64,
-		"$(UUID_HEX)":             uuidHex,
-		"$(SVC_FQDN)":             constant.GenerateDefaultComponentServiceName(cluster.Name, synthesizedComp.Name),
-		constant.EnvPlaceHolder(constant.KBEnvClusterCompName): constant.GenerateClusterComponentName(cluster.Name, synthesizedComp.Name),
-		"$(HEADLESS_SVC_FQDN)":                                 constant.GenerateDefaultComponentHeadlessServiceName(cluster.Name, synthesizedComp.Name),
-	}
-	if len(synthesizedComp.ComponentServices) > 0 {
-		for _, p := range synthesizedComp.ComponentServices[0].Spec.Ports {
-			m[fmt.Sprintf("$(SVC_PORT_%s)", p.Name)] = strconv.Itoa(int(p.Port))
-		}
-	}
-	replaceData(m)
-
-	// 2nd pass replace $(CONN_CREDENTIAL) variables
-	m = map[string]string{}
-	for k, v := range connCredential.StringData {
-		m[fmt.Sprintf("$(CONN_CREDENTIAL).%s", k)] = v
-	}
-	replaceData(m)
-	return connCredential
 }
 
 // GetRestorePassword gets restore password if exists during recovery.

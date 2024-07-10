@@ -337,8 +337,6 @@ func buildEnv4DBAccount(synthesizeComp *SynthesizedComponent, clusterCompSpec *a
 		if sysInitAccount != nil {
 			secretName = constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, sysInitAccount.Name)
 		}
-	} else {
-		secretName = constant.GenerateDefaultConnCredential(synthesizeComp.ClusterName)
 	}
 	envs := []corev1.EnvVar{}
 	if secretName == "" {

@@ -518,28 +518,9 @@ func (r *clusterBackupPolicyTransformer) buildBackupTarget(
 	}
 	// build the target connection credential
 	cc := dpv1alpha1.ConnectionCredential{}
-	switch {
-	case len(comp.compSpec.ComponentDef) > 0 && len(targetTpl.Account) > 0:
-		cc.SecretName = constant.GenerateAccountSecretName(clusterName, comp.fullComponentName, targetTpl.Account)
-		cc.PasswordKey = constant.AccountPasswdForSecret
-		cc.UsernameKey = constant.AccountNameForSecret
-	case len(comp.compSpec.ComponentDef) == 0 && len(comp.compSpec.ComponentDefRef) > 0:
-		// TODO: remove HACK code in version 0.9, only no componentDef can using connect credential
-		cc.SecretName = constant.GenerateDefaultConnCredential(clusterName)
-		ccKey := targetTpl.ConnectionCredentialKey
-		if ccKey.PasswordKey != nil {
-			cc.PasswordKey = *ccKey.PasswordKey
-		}
-		if ccKey.UsernameKey != nil {
-			cc.UsernameKey = *ccKey.UsernameKey
-		}
-		if ccKey.PortKey != nil {
-			cc.PortKey = *ccKey.PortKey
-		}
-		if ccKey.HostKey != nil {
-			cc.HostKey = *ccKey.HostKey
-		}
-	}
+	cc.SecretName = constant.GenerateAccountSecretName(clusterName, comp.fullComponentName, targetTpl.Account)
+	cc.PasswordKey = constant.AccountPasswdForSecret
+	cc.UsernameKey = constant.AccountNameForSecret
 	if cc.SecretName != "" {
 		target.ConnectionCredential = &cc
 	}

@@ -128,22 +128,6 @@ var _ = Describe("ClusterDefinition Controller", func() {
 					g.Expect(cv.Status.ObservedGeneration).To(BeEquivalentTo(1))
 					g.Expect(cv.Status.ClusterDefGeneration).To(Equal(cdGen))
 				})).Should(Succeed())
-
-			By("updating clusterDefinition's spec which then update clusterVersion's status")
-			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
-				func(cd *appsv1alpha1.ClusterDefinition) {
-					cd.Spec.ConnectionCredential["root"] = "password"
-				})).Should(Succeed())
-
-			By("Check ClusterVersion.Status as updated")
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterVersionObj),
-				func(g Gomega, cv *appsv1alpha1.ClusterVersion) {
-					g.Expect(cv.Status.Phase).To(Equal(appsv1alpha1.AvailablePhase))
-					g.Expect(cv.Status.Message).To(Equal(""))
-					g.Expect(cv.Status.ClusterDefGeneration > cdGen).To(BeTrue())
-				})).Should(Succeed())
-
-			// TODO: update components to break @validateClusterVersion, and transit ClusterVersion.Status.Phase to UnavailablePhase
 		})
 	})
 

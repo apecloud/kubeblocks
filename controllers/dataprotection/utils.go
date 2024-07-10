@@ -237,23 +237,6 @@ func listObjectsOfClusterWithErrorIgnored(ctx context.Context,
 	return object
 }
 
-// cleanObjectMeta return a clean objectMeta with only namespace, name, labels and some annotations.
-func cleanObjectMeta(oldObjectMeta *metav1.ObjectMeta) *metav1.ObjectMeta {
-	oleAnnotations := oldObjectMeta.GetAnnotations()
-	newObjectMeta := &metav1.ObjectMeta{
-		Namespace:   oldObjectMeta.Namespace,
-		Name:        oldObjectMeta.Name,
-		Labels:      oldObjectMeta.Labels,
-		Annotations: nil,
-	}
-	if v, ok := oleAnnotations[constant.ExtraEnvAnnotationKey]; ok {
-		newObjectMeta.Annotations = map[string]string{
-			constant.ExtraEnvAnnotationKey: v,
-		}
-	}
-	return newObjectMeta
-}
-
 // getObjectString transfer object to string
 func getObjectString(object any) (*string, error) {
 	if object == nil {

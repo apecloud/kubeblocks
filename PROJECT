@@ -301,7 +301,7 @@ resources:
   controller: true
   domain: kubeblocks.io
   group: apps
-  kind: ParametersDescription
+  kind: ParametersDefinition
   path: github.com/apecloud/kubeblocks/apis/apps/v1beta1
   version: v1beta1
 version: "3"

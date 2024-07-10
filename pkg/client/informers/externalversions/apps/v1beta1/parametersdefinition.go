@@ -32,58 +32,58 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 )
 
-// ParametersDescriptionInformer provides access to a shared informer and lister for
-// ParametersDescriptions.
-type ParametersDescriptionInformer interface {
+// ParametersDefinitionInformer provides access to a shared informer and lister for
+// ParametersDefinitions.
+type ParametersDefinitionInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1beta1.ParametersDescriptionLister
+	Lister() v1beta1.ParametersDefinitionLister
 }
 
-type parametersDescriptionInformer struct {
+type parametersDefinitionInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
 }
 
-// NewParametersDescriptionInformer constructs a new informer for ParametersDescription type.
+// NewParametersDefinitionInformer constructs a new informer for ParametersDefinition type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewParametersDescriptionInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredParametersDescriptionInformer(client, resyncPeriod, indexers, nil)
+func NewParametersDefinitionInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredParametersDefinitionInformer(client, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredParametersDescriptionInformer constructs a new informer for ParametersDescription type.
+// NewFilteredParametersDefinitionInformer constructs a new informer for ParametersDefinition type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredParametersDescriptionInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredParametersDefinitionInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1beta1().ParametersDescriptions().List(context.TODO(), options)
+				return client.AppsV1beta1().ParametersDefinitions().List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1beta1().ParametersDescriptions().Watch(context.TODO(), options)
+				return client.AppsV1beta1().ParametersDefinitions().Watch(context.TODO(), options)
 			},
 		},
-		&appsv1beta1.ParametersDescription{},
+		&appsv1beta1.ParametersDefinition{},
 		resyncPeriod,
 		indexers,
 	)
 }
 
-func (f *parametersDescriptionInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredParametersDescriptionInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *parametersDefinitionInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredParametersDefinitionInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *parametersDescriptionInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&appsv1beta1.ParametersDescription{}, f.defaultInformer)
+func (f *parametersDefinitionInformer) Informer() cache.SharedIndexInformer {
+	return f.factory.InformerFor(&appsv1beta1.ParametersDefinition{}, f.defaultInformer)
 }
 
-func (f *parametersDescriptionInformer) Lister() v1beta1.ParametersDescriptionLister {
-	return v1beta1.NewParametersDescriptionLister(f.Informer().GetIndexer())
+func (f *parametersDefinitionInformer) Lister() v1beta1.ParametersDefinitionLister {
+	return v1beta1.NewParametersDefinitionLister(f.Informer().GetIndexer())
 }

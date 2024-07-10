@@ -52,7 +52,7 @@ patchesStrategicMerge:
 #- patches/webhook_in_opsdefinitions.yaml
 #- patches/webhook_in_componentversions.yaml
 #- patches/webhook_in_nodecountscalers.yaml
-#- patches/webhook_in_parametersdescriptions.yaml
+#- patches/webhook_in_parametersdefinitions.yaml
 #+kubebuilder:scaffold:crdkustomizewebhookpatch
 
 # [CERTMANAGER] To enable cert-manager, uncomment all the sections with [CERTMANAGER] prefix.
@@ -80,7 +80,7 @@ patchesStrategicMerge:
 #- patches/cainjection_in_opsdefinitions.yaml
 #- patches/cainjection_in_componentversions.yaml
 #- patches/cainjection_in_nodecountscalers.yaml
-#- patches/cainjection_in_parametersdescriptions.yaml
+#- patches/cainjection_in_parametersdefinitions.yaml
 #+kubebuilder:scaffold:crdkustomizecainjectionpatch
 
 # the following config is for teaching kustomize how to do kustomization for CRDs.

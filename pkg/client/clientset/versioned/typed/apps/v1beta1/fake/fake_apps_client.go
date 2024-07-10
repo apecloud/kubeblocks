@@ -32,8 +32,8 @@ func (c *FakeAppsV1beta1) ConfigConstraints() v1beta1.ConfigConstraintInterface 
 	return &FakeConfigConstraints{c}
 }
 
-func (c *FakeAppsV1beta1) ParametersDescriptions() v1beta1.ParametersDescriptionInterface {
-	return &FakeParametersDescriptions{c}
+func (c *FakeAppsV1beta1) ParametersDefinitions() v1beta1.ParametersDefinitionInterface {
+	return &FakeParametersDefinitions{c}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

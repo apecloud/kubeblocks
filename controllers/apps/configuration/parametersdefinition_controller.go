@@ -23,6 +23,7 @@ import (
 	"context"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -30,26 +31,27 @@ import (
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 )
 
-// ParametersDescriptionReconciler reconciles a ParametersDescription object
-type ParametersDescriptionReconciler struct {
+// ParametersDefinitionReconciler reconciles a ParametersDefinition object
+type ParametersDefinitionReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
-// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=parametersdescriptions,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=parametersdescriptions/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=parametersdescriptions/finalizers,verbs=update
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=parametersdefinitions,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=parametersdefinitions/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=parametersdefinitions/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
-// the ParametersDescription object against the actual cluster state, and then
+// the ParametersDefinition object against the actual cluster state, and then
 // perform operations to make the cluster state reflect the state specified by
 // the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.4/pkg/reconcile
-func (r *ParametersDescriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *ParametersDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 
 	// TODO(user): your logic here
@@ -58,8 +60,8 @@ func (r *ParametersDescriptionReconciler) Reconcile(ctx context.Context, req ctr
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *ParametersDescriptionReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *ParametersDefinitionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&appsv1beta1.ParametersDescription{}).
+		For(&appsv1beta1.ParametersDefinition{}).
 		Complete(r)
 }

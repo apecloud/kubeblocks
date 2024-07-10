@@ -479,9 +479,10 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&configuration.ParametersDescriptionReconciler{
-			Client: mgr.GetClient(),
-			Scheme: mgr.GetScheme(),
+		if err = (&configuration.ParametersDefinitionReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("parameters-definition-controller"),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "ParametersDescription")
 			os.Exit(1)

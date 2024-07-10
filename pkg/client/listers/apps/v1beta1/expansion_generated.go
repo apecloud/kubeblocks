@@ -22,6 +22,6 @@ package v1beta1
 // ConfigConstraintLister.
 type ConfigConstraintListerExpansion interface{}
 
-// ParametersDescriptionListerExpansion allows custom methods to be added to
-// ParametersDescriptionLister.
-type ParametersDescriptionListerExpansion interface{}
+// ParametersDefinitionListerExpansion allows custom methods to be added to
+// ParametersDefinitionLister.
+type ParametersDefinitionListerExpansion interface{}

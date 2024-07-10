@@ -20,4 +20,4 @@ package v1beta1
 
 type ConfigConstraintExpansion interface{}
 
-type ParametersDescriptionExpansion interface{}
+type ParametersDefinitionExpansion interface{}

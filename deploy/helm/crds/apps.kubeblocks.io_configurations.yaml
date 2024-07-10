@@ -140,8 +140,11 @@ spec:
                             as a secret.
                           type: boolean
                         constraintRef:
-                          description: Specifies the name of the referenced configuration
-                            constraints object.
+                          description: |-
+                            Deprecated: configConstraint has been deprecated since 1.0.0
+
+
+                            Specifies the name of the referenced configuration constraints object.
                           maxLength: 63
                           pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                           type: string
@@ -183,6 +186,7 @@ spec:
                           x-kubernetes-list-type: set
                         keys:
                           description: |-
+                            Deprecated: keys has been deprecated since 1.0.0
                             Specifies the configuration files within the ConfigMap that support dynamic updates.
 
 

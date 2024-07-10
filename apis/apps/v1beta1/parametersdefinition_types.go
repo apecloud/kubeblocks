@@ -26,8 +26,8 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// ParametersDescriptionSpec defines the desired state of ParametersDescription
-type ParametersDescriptionSpec struct {
+// ParametersDefinitionSpec defines the desired state of ParametersDefinition
+type ParametersDefinitionSpec struct {
 	// Specifies the config file name in the config template.
 	//
 	// +kubebuilder:validation:Required
@@ -172,8 +172,8 @@ type ParametersDescriptionSpec struct {
 	ImmutableParameters []string `json:"immutableParameters,omitempty"`
 }
 
-// ParametersDescriptionStatus defines the observed state of ParametersDescription
-type ParametersDescriptionStatus struct {
+// ParametersDefinitionStatus defines the observed state of ParametersDefinition
+type ParametersDefinitionStatus struct {
 	// The most recent generation number of the ParamsDesc object that has been observed by the controller.
 	//
 	// +optional
@@ -201,29 +201,29 @@ type ParametersDescriptionStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
-// +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=paramsdesc
+// +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=paramsdef
 // +kubebuilder:printcolumn:name="FILE",type="string",JSONPath=".spec.fileName",description="config file name"
 // +kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="status phase"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
-// ParametersDescription is the Schema for the parametersdescriptions API
-type ParametersDescription struct {
+// ParametersDefinition is the Schema for the parametersdefinitions API
+type ParametersDefinition struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ParametersDescriptionSpec   `json:"spec,omitempty"`
-	Status ParametersDescriptionStatus `json:"status,omitempty"`
+	Spec   ParametersDefinitionSpec   `json:"spec,omitempty"`
+	Status ParametersDefinitionStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// ParametersDescriptionList contains a list of ParametersDescription
-type ParametersDescriptionList struct {
+// ParametersDefinitionList contains a list of ParametersDefinition
+type ParametersDefinitionList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ParametersDescription `json:"items"`
+	Items           []ParametersDefinition `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&ParametersDescription{}, &ParametersDescriptionList{})
+	SchemeBuilder.Register(&ParametersDefinition{}, &ParametersDefinitionList{})
 }

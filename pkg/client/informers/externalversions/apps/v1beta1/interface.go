@@ -26,8 +26,8 @@ import (
 type Interface interface {
 	// ConfigConstraints returns a ConfigConstraintInformer.
 	ConfigConstraints() ConfigConstraintInformer
-	// ParametersDescriptions returns a ParametersDescriptionInformer.
-	ParametersDescriptions() ParametersDescriptionInformer
+	// ParametersDefinitions returns a ParametersDefinitionInformer.
+	ParametersDefinitions() ParametersDefinitionInformer
 }
 
 type version struct {
@@ -46,7 +46,7 @@ func (v *version) ConfigConstraints() ConfigConstraintInformer {
 	return &configConstraintInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
-// ParametersDescriptions returns a ParametersDescriptionInformer.
-func (v *version) ParametersDescriptions() ParametersDescriptionInformer {
-	return &parametersDescriptionInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+// ParametersDefinitions returns a ParametersDefinitionInformer.
+func (v *version) ParametersDefinitions() ParametersDefinitionInformer {
+	return &parametersDefinitionInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }

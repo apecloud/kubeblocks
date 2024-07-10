@@ -728,22 +728,6 @@ const (
 	Noop SwitchPolicyType = "Noop"
 )
 
-// VolumeType defines the type of volume, specifically distinguishing between volumes used for backup data and those used for logs.
-//
-// +enum
-// +kubebuilder:validation:Enum={data,log}
-type VolumeType string
-
-const (
-	// VolumeTypeData indicates a volume designated for storing backup data. This type of volume is optimized for the
-	// storage and retrieval of data backups, ensuring data persistence and reliability.
-	VolumeTypeData VolumeType = "data"
-
-	// VolumeTypeLog indicates a volume designated for storing logs. This type of volume is optimized for log data,
-	// facilitating efficient log storage, retrieval, and management.
-	VolumeTypeLog VolumeType = "log"
-)
-
 // BaseBackupType the base backup type, keep synchronized with the BaseBackupType of the data protection API.
 //
 // +enum

@@ -40,7 +40,6 @@ const (
 	RoleLabelKey                           = "kubeblocks.io/role"              // RoleLabelKey consensusSet and replicationSet role label key
 	AccessModeLabelKey                     = "workloads.kubeblocks.io/access-mode"
 	ReadyWithoutPrimaryKey                 = "kubeblocks.io/ready-without-primary"
-	VolumeTypeLabelKey                     = "kubeblocks.io/volume-type"
 	ClusterAccountLabelKey                 = "account.kubeblocks.io/name"
 	KBAppClusterUIDLabelKey                = "apps.kubeblocks.io/cluster-uid"
 	KBAppComponentLabelKey                 = "apps.kubeblocks.io/component-name"

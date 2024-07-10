@@ -622,7 +622,6 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 		synthesizeComp.ClusterCompDefName = clusterCompDef.Name
 		synthesizeComp.CharacterType = clusterCompDef.CharacterType
 		synthesizeComp.HorizontalScalePolicy = clusterCompDef.HorizontalScalePolicy
-		synthesizeComp.VolumeTypes = clusterCompDef.VolumeTypes
 	}
 
 	buildClusterCompServices := func() {

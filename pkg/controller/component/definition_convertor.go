@@ -169,39 +169,7 @@ func (c *compDefVarsConvertor) convertHostNetworkVars(clusterCompDef *appsv1alph
 type compDefVolumesConvertor struct{}
 
 func (c *compDefVolumesConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	if clusterCompDef.VolumeTypes == nil {
-		return nil, nil
-	}
-
-	volumes := make([]appsv1alpha1.ComponentVolume, 0)
-	for _, vol := range clusterCompDef.VolumeTypes {
-		volumes = append(volumes, appsv1alpha1.ComponentVolume{
-			Name: vol.Name,
-		})
-	}
-
-	if clusterCompDef.VolumeProtectionSpec != nil {
-		defaultHighWatermark := clusterCompDef.VolumeProtectionSpec.HighWatermark
-		highWatermark := func(v appsv1alpha1.ProtectedVolume) int {
-			if v.HighWatermark != nil {
-				return *v.HighWatermark
-			}
-			return defaultHighWatermark
-		}
-		setHighWatermark := func(protectedVol appsv1alpha1.ProtectedVolume) {
-			for i, v := range volumes {
-				if v.Name == protectedVol.Name {
-					volumes[i].HighWatermark = highWatermark(protectedVol)
-					break
-				}
-			}
-		}
-		for _, v := range clusterCompDef.VolumeProtectionSpec.Volumes {
-			setHighWatermark(v)
-		}
-	}
-	return volumes, nil
+	return nil, nil
 }
 
 // compDefHostNetworkConvertor converts the given object into ComponentDefinition.Spec.HostNetwork.

@@ -177,7 +177,6 @@ var _ = Describe("builder", func() {
 			Expect(pvc.Spec.AccessModes).Should(Equal(its.Spec.VolumeClaimTemplates[0].Spec.AccessModes))
 			Expect(pvc.Spec.Resources).Should(Equal(synthesizedComponent.VolumeClaimTemplates[0].Spec.Resources))
 			Expect(pvc.Spec.StorageClassName).Should(Equal(synthesizedComponent.VolumeClaimTemplates[0].Spec.StorageClassName))
-			Expect(pvc.Labels[constant.VolumeTypeLabelKey]).ShouldNot(BeEmpty())
 		})
 
 		It("builds Conn. Credential correctly", func() {
@@ -268,8 +267,6 @@ var _ = Describe("builder", func() {
 			Expect(err).Should(BeNil())
 			Expect(its).ShouldNot(BeNil())
 			Expect(*its.Spec.Replicas).Should(Equal(int32(0)))
-			Expect(its.Spec.VolumeClaimTemplates[0].Labels[constant.VolumeTypeLabelKey]).
-				Should(Equal(string(appsv1alpha1.VolumeTypeData)))
 
 			By("set workload type to Replication")
 			clusterDef.Spec.ComponentDefs[0].WorkloadType = appsv1alpha1.Replication

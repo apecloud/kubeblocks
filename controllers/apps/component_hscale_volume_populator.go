@@ -475,8 +475,8 @@ func backupVCT(component *component.SynthesizedComponent) *corev1.PersistentVolu
 	}
 	vct := component.VolumeClaimTemplates[0]
 	for _, tmpVct := range component.VolumeClaimTemplates {
-		for _, volumeType := range component.VolumeTypes {
-			if volumeType.Type == appsv1alpha1.VolumeTypeData && volumeType.Name == tmpVct.Name {
+		for _, volume := range component.Volumes {
+			if volume.NeedSnapshot && volume.Name == tmpVct.Name {
 				vct = tmpVct
 				break
 			}

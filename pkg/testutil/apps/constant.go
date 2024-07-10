@@ -89,7 +89,6 @@ var (
 				TimeoutSeconds:   5,
 			},
 		},
-		VolumeProtectionSpec: &appsv1alpha1.VolumeProtectionSpec{},
 		PodSpec: &corev1.PodSpec{
 			Containers: []corev1.Container{{
 				Name:      DefaultNginxContainerName,
@@ -173,17 +172,10 @@ var (
 				TimeoutSeconds:   5,
 			},
 		},
-		VolumeProtectionSpec: &appsv1alpha1.VolumeProtectionSpec{},
-		Service:              &defaultMySQLService,
+		Service: &defaultMySQLService,
 		PodSpec: &corev1.PodSpec{
 			Containers: []corev1.Container{
 				defaultMySQLContainer,
-			},
-		},
-		VolumeTypes: []appsv1alpha1.VolumeTypeSpec{
-			{
-				Name: DataVolumeName,
-				Type: appsv1alpha1.VolumeTypeData,
 			},
 		},
 	}
@@ -221,17 +213,10 @@ var (
 				TimeoutSeconds:   5,
 			},
 		},
-		VolumeProtectionSpec: &appsv1alpha1.VolumeProtectionSpec{},
-		Service:              &defaultMySQLService,
+		Service: &defaultMySQLService,
 		PodSpec: &corev1.PodSpec{
 			Containers: []corev1.Container{
 				defaultMySQLContainer,
-			},
-		},
-		VolumeTypes: []appsv1alpha1.VolumeTypeSpec{
-			{
-				Name: DataVolumeName,
-				Type: appsv1alpha1.VolumeTypeData,
 			},
 		},
 	}
@@ -450,12 +435,7 @@ var (
 				TimeoutSeconds:   5,
 			},
 		},
-		VolumeProtectionSpec: &appsv1alpha1.VolumeProtectionSpec{},
-		Service:              &defaultRedisService,
-		VolumeTypes: []appsv1alpha1.VolumeTypeSpec{{
-			Name: DataVolumeName,
-			Type: appsv1alpha1.VolumeTypeData,
-		}},
+		Service: &defaultRedisService,
 		PodSpec: &corev1.PodSpec{
 			Volumes: []corev1.Volume{
 				{

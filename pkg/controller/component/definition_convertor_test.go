@@ -40,10 +40,8 @@ var _ = Describe("Component Definition Convertor", func() {
 
 			clusterName = "mysql-test"
 
-			defaultHighWatermark = 90
-			lowerHighWatermark   = 85
-			dataVolumeName       = "data"
-			logVolumeName        = "log"
+			dataVolumeName = "data"
+			logVolumeName  = "log"
 
 			defaultVolumeMode = int32(0555)
 
@@ -245,16 +243,6 @@ var _ = Describe("Component Definition Convertor", func() {
 						},
 					},
 				},
-				VolumeTypes: []appsv1alpha1.VolumeTypeSpec{
-					{
-						Name: dataVolumeName,
-						Type: appsv1alpha1.VolumeTypeData,
-					},
-					{
-						Name: logVolumeName,
-						Type: appsv1alpha1.VolumeTypeLog,
-					},
-				},
 				CustomLabelSpecs: []appsv1alpha1.CustomLabelSpec{
 					{
 						Key:   "scope",
@@ -269,16 +257,7 @@ var _ = Describe("Component Definition Convertor", func() {
 						},
 					},
 				},
-				SwitchoverSpec: &appsv1alpha1.SwitchoverSpec{},
-				VolumeProtectionSpec: &appsv1alpha1.VolumeProtectionSpec{
-					HighWatermark: defaultHighWatermark,
-					Volumes: []appsv1alpha1.ProtectedVolume{
-						{
-							Name:          logVolumeName,
-							HighWatermark: &lowerHighWatermark,
-						},
-					},
-				},
+				SwitchoverSpec:         &appsv1alpha1.SwitchoverSpec{},
 				ComponentDefRef:        []appsv1alpha1.ComponentDefRef{},
 				ServiceRefDeclarations: []appsv1alpha1.ServiceRefDeclaration{},
 			}
@@ -401,48 +380,11 @@ var _ = Describe("Component Definition Convertor", func() {
 		})
 
 		Context("volumes", func() {
-			It("w/o volume types", func() {
-				clusterCompDefCopy := clusterCompDef.DeepCopy()
-				clusterCompDefCopy.VolumeTypes = nil
-
-				convertor := &compDefVolumesConvertor{}
-				res, err := convertor.convert(clusterCompDefCopy)
-				Expect(err).Should(Succeed())
-				Expect(res).Should(BeNil())
-			})
-
-			It("w/o volume protection", func() {
-				clusterCompDefCopy := clusterCompDef.DeepCopy()
-				clusterCompDefCopy.VolumeProtectionSpec = nil
-
-				convertor := &compDefVolumesConvertor{}
-				res, err := convertor.convert(clusterCompDefCopy)
-				Expect(err).Should(Succeed())
-
-				expectedVolumes := make([]appsv1alpha1.ComponentVolume, 0)
-				for _, vol := range clusterCompDef.VolumeTypes {
-					expectedVolumes = append(expectedVolumes, appsv1alpha1.ComponentVolume{Name: vol.Name})
-				}
-				Expect(res).Should(BeEquivalentTo(expectedVolumes))
-			})
-
 			It("ok", func() {
 				convertor := &compDefVolumesConvertor{}
 				res, err := convertor.convert(clusterCompDef)
 				Expect(err).Should(Succeed())
-
-				expectedVolumes := make([]appsv1alpha1.ComponentVolume, 0)
-				for _, vol := range clusterCompDef.VolumeTypes {
-					highWatermark := 0
-					if vol.Name == logVolumeName {
-						highWatermark = lowerHighWatermark
-					}
-					expectedVolumes = append(expectedVolumes, appsv1alpha1.ComponentVolume{
-						Name:          vol.Name,
-						HighWatermark: highWatermark,
-					})
-				}
-				Expect(res).Should(BeEquivalentTo(expectedVolumes))
+				Expect(res).Should(BeNil())
 			})
 		})
 

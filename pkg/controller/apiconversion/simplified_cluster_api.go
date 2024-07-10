@@ -68,11 +68,6 @@ func fillSimplifiedClusterAPI(cluster *appsv1alpha1.Cluster, clusterCompDef *app
 		clusterCompSpec.Replicas = *cluster.Spec.Replicas
 	}
 	dataVolumeName := "data"
-	for _, v := range clusterCompDef.VolumeTypes {
-		if v.Type == appsv1alpha1.VolumeTypeData {
-			dataVolumeName = v.Name
-		}
-	}
 	if !cluster.Spec.Resources.CPU.IsZero() || !cluster.Spec.Resources.Memory.IsZero() {
 		clusterCompSpec.Resources.Limits = corev1.ResourceList{}
 	}

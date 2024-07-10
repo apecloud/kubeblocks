@@ -337,6 +337,10 @@ func GetRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, volumeRestorePoli
 	if connectionPassword != "" {
 		restoreInfoMap[constant.ConnectionPassword] = connectionPassword
 	}
+	encryptedSystemAccounts := backup.Annotations[constant.EncryptedSystemAccountsAnnotationKey]
+	if encryptedSystemAccounts != "" {
+		restoreInfoMap[constant.EncryptedSystemAccounts] = encryptedSystemAccounts
+	}
 	restoreForClusterMap := map[string]map[string]string{}
 	restoreForClusterMap[componentName] = restoreInfoMap
 	bytes, err := json.Marshal(restoreForClusterMap)

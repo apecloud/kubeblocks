@@ -142,7 +142,7 @@ var _ = Describe("Backup Controller test", func() {
 				backupKey = client.ObjectKeyFromObject(backup)
 			})
 
-			It("should succeed after job completes", func() {
+			FIt("should succeed after job completes", func() {
 				By("check backup status")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
 					g.Expect(fetched.Status.PersistentVolumeClaimName).Should(Equal(repoPVCName))

@@ -751,7 +751,10 @@ func PatchBackupObjectMeta(
 	// TODO(ldm): we should remove this dependency of cluster in the future
 	cluster := getCluster(request.Ctx, request.Client, targetPod)
 	if cluster != nil {
-		if err := setSnapshotAnnotation(request.Ctx, request.Client, request.Backup, cluster); err != nil {
+		if err := setSnapshotAnnotation(request, cluster); err != nil {
+			return false, err
+		}
+		if err := setEncryptedSystemAccountsAnnotation(request, cluster); err != nil {
 			return false, err
 		}
 		if err := setConnectionPasswordAnnotation(request); err != nil {
@@ -853,6 +856,42 @@ func setConnectionPasswordAnnotation(request *dpbackup.Request) error {
 	return nil
 }
 
+func setEncryptedSystemAccountsAnnotation(request *dpbackup.Request, cluster *appsv1alpha1.Cluster) error {
+	var (
+		usernameKey = "username"
+		passwordKey = "password"
+	)
+	// fetch secret objects
+	secretList, _ := listObjectsOfClusterWithErrorIgnored(request.Ctx, request.Client, cluster, &corev1.SecretList{}).(*corev1.SecretList)
+	// store the data of secrets in a map data structure, which contains the name of the component, the username, and the encrypted password.
+	secretMap := map[string]map[string]string{}
+	for i := range secretList.Items {
+		componentName, ok := secretList.Items[i].Labels[constant.KBAppComponentLabelKey]
+		if !ok {
+			continue
+		}
+		userName := string(secretList.Items[i].Data[usernameKey])
+		e := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
+		encryptedPwd, err := e.Encrypt(secretList.Items[i].Data[passwordKey])
+		if err != nil {
+			return err
+		}
+		if secretMap[componentName] == nil {
+			secretMap[componentName] = make(map[string]string)
+		}
+		secretMap[componentName][userName] = encryptedPwd
+	}
+	// convert to string
+	secretMapString, err := getObjectString(secretMap)
+	if err != nil {
+		return err
+	}
+	if secretMapString != nil || *secretMapString != "" {
+		request.Backup.Annotations[constant.EncryptedSystemAccountsAnnotationKey] = *secretMapString
+	}
+	return nil
+}
+
 // getClusterObjectString gets the cluster object and convert it to string.
 func getClusterObjectString(cluster *appsv1alpha1.Cluster) (*string, error) {
 	// maintain only the cluster's spec and name/namespace.
@@ -873,37 +912,15 @@ func getClusterObjectString(cluster *appsv1alpha1.Cluster) (*string, error) {
 	return clusterString, err
 }
 
-// getSecretListObjectString gets the secret objects of the cluster and convert it to string.
-func getSecretListObjectString(ctx context.Context,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster) (*string, error) {
-	// fetch secret objects
-	secretList, _ := listObjectsOfClusterWithErrorIgnored(ctx, cli, cluster, &corev1.SecretList{}).(*corev1.SecretList)
-	for i := range secretList.Items {
-		secretObjectMeta := &secretList.Items[i].ObjectMeta
-		secretList.Items[i].ObjectMeta = *cleanObjectMeta(secretObjectMeta)
-	}
-	secretListString, err := getObjectString(secretList)
-	return secretListString, err
-}
-
 // setSnapshotAnnotation sets the snapshot of cluster to the backup's annotations.
-func setSnapshotAnnotation(ctx context.Context,
-	cli client.Client, backup *dpv1alpha1.Backup, cluster *appsv1alpha1.Cluster) error {
-	if backup.Annotations == nil {
-		backup.Annotations = map[string]string{}
+func setSnapshotAnnotation(request *dpbackup.Request, cluster *appsv1alpha1.Cluster) error {
+	if request.Backup.Annotations == nil {
+		request.Backup.Annotations = map[string]string{}
 	}
-
 	clusterString, err := getClusterObjectString(cluster)
 	if err != nil || clusterString == nil {
 		return err
 	}
-	backup.Annotations[constant.ClusterSnapshotAnnotationKey] = *clusterString
-
-	secretListString, err := getSecretListObjectString(ctx, cli, cluster)
-	if err != nil || secretListString == nil {
-		return err
-	}
-	backup.Annotations[constant.SecretsSnapshotAnnotationsKey] = *secretListString
+	request.Backup.Annotations[constant.ClusterSnapshotAnnotationKey] = *clusterString
 	return nil
 }

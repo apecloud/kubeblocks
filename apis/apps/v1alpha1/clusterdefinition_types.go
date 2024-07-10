@@ -535,11 +535,6 @@ type ClusterComponentDefinition struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// Description of the component definition.
-	//
-	// +optional
-	Description string `json:"description,omitempty"`
-
 	// Defines the type of the workload.
 	//
 	// - `Stateless` describes stateless applications.
@@ -655,13 +650,6 @@ type ClusterComponentDefinition struct {
 	// +listMapKey=name
 	// +optional
 	VolumeTypes []VolumeTypeSpec `json:"volumeTypes,omitempty"`
-
-	// Used for custom label tags which you want to add to the component resources.
-	//
-	// +listType=map
-	// +listMapKey=key
-	// +optional
-	CustomLabelSpecs []CustomLabelSpec `json:"customLabelSpecs,omitempty"`
 
 	// Defines command to do switchover.
 	// In particular, when workloadType=Replication, the command defined in switchoverSpec will only be executed under
@@ -1240,39 +1228,6 @@ type CommandExecutorItem struct {
 	//
 	// +optional
 	Args []string `json:"args,omitempty"`
-}
-
-// CustomLabelSpec is deprecated since v0.8.
-type CustomLabelSpec struct {
-	// The key of the label.
-	//
-	// +kubebuilder:validation:Required
-	Key string `json:"key"`
-
-	// The value of the label.
-	//
-	// +kubebuilder:validation:Required
-	Value string `json:"value"`
-
-	// The resources that will be patched with the label.
-	//
-	// +kubebuilder:validation:Required
-	Resources []GVKResource `json:"resources,omitempty"`
-}
-
-// GVKResource is deprecated since v0.8.
-type GVKResource struct {
-	// Represents the GVK of a resource, such as "v1/Pod", "apps/v1/StatefulSet", etc.
-	// When a resource matching this is found by the selector, a custom label will be added if it doesn't already exist,
-	// or updated if it does.
-	//
-	// +kubebuilder:validation:Required
-	GVK string `json:"gvk"`
-
-	// A label query used to filter a set of resources.
-	//
-	// +optional
-	Selector map[string]string `json:"selector,omitempty"`
 }
 
 // TODO(API):

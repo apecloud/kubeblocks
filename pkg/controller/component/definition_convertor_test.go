@@ -67,7 +67,6 @@ var _ = Describe("Component Definition Convertor", func() {
 		BeforeEach(func() {
 			clusterCompDef = &appsv1alpha1.ClusterComponentDefinition{
 				Name:          "mysql",
-				Description:   "component definition convertor",
 				WorkloadType:  appsv1alpha1.Consensus,
 				CharacterType: "mysql",
 				ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{
@@ -255,20 +254,6 @@ var _ = Describe("Component Definition Convertor", func() {
 						Type: appsv1alpha1.VolumeTypeLog,
 					},
 				},
-				CustomLabelSpecs: []appsv1alpha1.CustomLabelSpec{
-					{
-						Key:   "scope",
-						Value: "scope",
-						Resources: []appsv1alpha1.GVKResource{
-							{
-								GVK: "v1/pod",
-								Selector: map[string]string{
-									"managed-by": "kubeblocks",
-								},
-							},
-						},
-					},
-				},
 				SwitchoverSpec: &appsv1alpha1.SwitchoverSpec{},
 				VolumeProtectionSpec: &appsv1alpha1.VolumeProtectionSpec{
 					HighWatermark: defaultHighWatermark,
@@ -295,7 +280,7 @@ var _ = Describe("Component Definition Convertor", func() {
 			convertor := &compDefDescriptionConvertor{}
 			res, err := convertor.convert(clusterCompDef)
 			Expect(err).Should(Succeed())
-			Expect(res).Should(Equal(clusterCompDef.Description))
+			Expect(res).Should(BeEmpty())
 		})
 
 		It("service kind", func() {
@@ -624,13 +609,7 @@ var _ = Describe("Component Definition Convertor", func() {
 			convertor := &compDefLabelsConvertor{}
 			res, err := convertor.convert(clusterCompDef)
 			Expect(err).Should(Succeed())
-
-			labels := res.(map[string]string)
-			expectedLabels := map[string]string{}
-			for _, item := range clusterCompDef.CustomLabelSpecs {
-				expectedLabels[item.Key] = item.Value
-			}
-			Expect(labels).Should(BeEquivalentTo(expectedLabels))
+			Expect(res).Should(BeNil())
 		})
 
 		Context("system accounts", func() {

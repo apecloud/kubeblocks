@@ -17,8 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"strings"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -555,37 +553,10 @@ type ClusterComponentDefinition struct {
 	// +optional
 	CharacterType string `json:"characterType,omitempty"`
 
-	// Defines the template of configurations.
-	//
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
-	// +optional
-	ConfigSpecs []ComponentConfigSpec `json:"configSpecs,omitempty"`
-
-	// Defines the template of scripts.
-	//
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
-	// +optional
-	ScriptSpecs []ComponentTemplateSpec `json:"scriptSpecs,omitempty"`
-
 	// Settings for health checks.
 	//
 	// +optional
 	Probes *ClusterDefinitionProbes `json:"probes,omitempty"`
-
-	// Specify the logging files which can be observed and configured by cluster users.
-	//
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
-	// +optional
-	LogConfigs []LogConfig `json:"logConfigs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// Defines the pod spec template of component.
 	//
@@ -1318,30 +1289,6 @@ type ClusterDefinitionList struct {
 
 func init() {
 	SchemeBuilder.Register(&ClusterDefinition{}, &ClusterDefinitionList{})
-}
-
-// ValidateEnabledLogConfigs validates enabledLogs against component compDefName, and returns the invalid logNames undefined in ClusterDefinition.
-func (r *ClusterDefinition) ValidateEnabledLogConfigs(compDefName string, enabledLogs []string) []string {
-	invalidLogNames := make([]string, 0, len(enabledLogs))
-	logTypes := make(map[string]struct{})
-	for _, comp := range r.Spec.ComponentDefs {
-		if !strings.EqualFold(compDefName, comp.Name) {
-			continue
-		}
-		for _, logConfig := range comp.LogConfigs {
-			logTypes[logConfig.Name] = struct{}{}
-		}
-	}
-	// imply that all values in enabledLogs config are invalid.
-	if len(logTypes) == 0 {
-		return enabledLogs
-	}
-	for _, name := range enabledLogs {
-		if _, ok := logTypes[name]; !ok {
-			invalidLogNames = append(invalidLogNames, name)
-		}
-	}
-	return invalidLogNames
 }
 
 // GetComponentDefByName gets component definition from ClusterDefinition with compDefName

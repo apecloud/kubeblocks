@@ -107,16 +107,11 @@ func mockReconcileResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint, 
 	By("Create a clusterDefinition obj")
 	clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
 		AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
-		AddConfigTemplate(configSpecName, configmap.Name, constraint.Name, testCtx.DefaultNamespace, configVolumeName).
-		AddLabels(core.GenerateTPLUniqLabelKeyWithConfig(configSpecName), configmap.Name,
-			core.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
 		Create(&testCtx).GetObject()
 
 	By("Create a clusterVersion obj")
 	clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
 		AddComponentVersion(statefulCompDefName).
-		AddLabels(core.GenerateTPLUniqLabelKeyWithConfig(configSpecName), configmap.Name,
-			core.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
 		Create(&testCtx).GetObject()
 
 	By("Creating a cluster")

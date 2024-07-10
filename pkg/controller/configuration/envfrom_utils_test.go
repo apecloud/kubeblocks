@@ -66,7 +66,6 @@ var _ = Describe("ConfigEnvFrom test", func() {
 
 		clusterDef = testapps.NewClusterDefFactory(clusterDefName).
 			AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
-			AddConfigTemplate(cm.Name, cm.Name, configConstraint.Name, testCtx.DefaultNamespace, "mysql-config", testapps.DefaultMySQLContainerName).
 			GetObject()
 		clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
 			AddComponentVersion(mysqlCompDefName).
@@ -113,43 +112,5 @@ var _ = Describe("ConfigEnvFrom test", func() {
 			Expect(injectTemplateEnvFrom(cluster, synthesizeComp, podSpec, k8sMockClient.Client(), reqCtx.Ctx, nil)).ShouldNot(Succeed())
 			Expect(injectTemplateEnvFrom(cluster, synthesizeComp, podSpec, k8sMockClient.Client(), reqCtx.Ctx, nil)).Should(Succeed())
 		})
-
-		It("should SyncEnvConfigmap success", func() {
-			configSpec := clusterDef.Spec.ComponentDefs[0].ConfigSpecs[0]
-			configSpec.Keys = []string{"env-config"}
-
-			cmObj := origCMObject.DeepCopy()
-			cmObj.SetName(core.GenerateEnvFromName(origCMObject.Name))
-			k8sMockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult([]client.Object{
-				cmObj,
-				configConstraint,
-			}), testutil.WithAnyTimes()))
-			k8sMockClient.MockPatchMethod(testutil.WithFailed(core.MakeError("failed to patch"), testutil.WithTimes(1)),
-				testutil.WithSucceed(), testutil.WithAnyTimes())
-
-			Expect(SyncEnvConfigmap(configSpec, origCMObject, &configConstraint.Spec, k8sMockClient.Client(), ctx)).ShouldNot(Succeed())
-			Expect(SyncEnvConfigmap(configSpec, origCMObject, &configConstraint.Spec, k8sMockClient.Client(), ctx)).Should(Succeed())
-		})
-
-		It("SyncEnvConfigmap abnormal test", func() {
-			configSpec := clusterDef.Spec.ComponentDefs[0].ConfigSpecs[0]
-			configSpec.InjectEnvTo = nil
-			Expect(SyncEnvConfigmap(configSpec, origCMObject, &configConstraint.Spec, k8sMockClient.Client(), ctx)).Should(Succeed())
-
-			configSpec.InjectEnvTo = nil
-			cmObj := origCMObject.DeepCopy()
-			cmObj.SetName(core.GenerateEnvFromName(origCMObject.Name))
-			k8sMockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult([]client.Object{
-				cmObj,
-				configConstraint,
-			}), testutil.WithAnyTimes()))
-			k8sMockClient.MockPatchMethod(testutil.WithSucceed(testutil.WithAnyTimes()))
-
-			configSpec = clusterDef.Spec.ComponentDefs[0].ConfigSpecs[0]
-			configSpec.Keys = []string{"env-config", "not-exist"}
-			Expect(SyncEnvConfigmap(configSpec, origCMObject, &configConstraint.Spec, k8sMockClient.Client(), ctx)).Should(Succeed())
-		})
-
 	})
-
 })

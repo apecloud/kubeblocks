@@ -36,7 +36,6 @@ const clusterDefName = "test-clusterdef"
 const clusterVersionName = "test-clusterversion"
 const clusterName = "test-cluster"
 const mysqlCompDefName = "replicasets"
-const scriptConfigName = "test-script-config"
 const configSpecName = "test-config-spec"
 const mysqlCompName = "mysql"
 const mysqlConfigName = "mysql-component-config"
@@ -47,8 +46,6 @@ const testConfigContent = "test-config-content"
 func allFieldsClusterDefObj(needCreate bool) *appsv1alpha1.ClusterDefinition {
 	clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
 		AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
-		AddScriptTemplate(scriptConfigName, mysqlScriptsConfigName, testCtx.DefaultNamespace, testapps.ScriptsVolumeName, nil).
-		AddConfigTemplate(configSpecName, mysqlConfigName, mysqlConfigConstraintName, testCtx.DefaultNamespace, testapps.ConfVolumeName).
 		GetObject()
 	if needCreate {
 		Expect(testCtx.CreateObj(testCtx.Ctx, clusterDefObj)).Should(Succeed())

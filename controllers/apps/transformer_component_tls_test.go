@@ -21,24 +21,18 @@ package apps
 
 import (
 	"context"
-	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
-	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
-	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
 var _ = Describe("TLS self-signed cert function", func() {
@@ -49,7 +43,6 @@ var _ = Describe("TLS self-signed cert function", func() {
 		statefulCompDefName = "mysql"
 		statefulCompName    = "mysql"
 		mysqlContainerName  = "mysql"
-		configSpecName      = "mysql-config-tpl"
 	)
 
 	ctx := context.Background()
@@ -79,21 +72,10 @@ var _ = Describe("TLS self-signed cert function", func() {
 
 	Context("tls is enabled/disabled", func() {
 		BeforeEach(func() {
-			configMapObj := testapps.CheckedCreateCustomizedObj(&testCtx,
-				"resources/mysql-tls-config-template.yaml",
-				&corev1.ConfigMap{},
-				testCtx.UseDefaultNamespace(),
-				testapps.WithAnnotations(constant.CMInsEnableRerenderTemplateKey, "true"))
-
-			configConstraintObj := testapps.CheckedCreateCustomizedObj(&testCtx,
-				"resources/mysql-config-constraint.yaml",
-				&appsv1beta1.ConfigConstraint{})
-
 			By("Create a clusterDef obj")
 			testapps.NewClusterDefFactory(clusterDefName).
 				SetConnectionCredential(map[string]string{"username": "root", "password": ""}, nil).
 				AddComponentDef(testapps.ConsensusMySQLComponent, statefulCompDefName).
-				AddConfigTemplate(configSpecName, configMapObj.Name, configConstraintObj.Name, testCtx.DefaultNamespace, testapps.ConfVolumeName).
 				AddContainerEnv(mysqlContainerName, corev1.EnvVar{Name: "MYSQL_ALLOW_EMPTY_PASSWORD", Value: "yes"}).
 				CheckedCreate(&testCtx).GetObject()
 
@@ -152,65 +134,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 
 		Context("when switch between disabled and enabled", func() {
 			It("should handle tls settings properly", func() {
-				By("create cluster with tls disabled")
-				clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefName, clusterVersionName).
-					WithRandomName().
-					AddComponent(statefulCompName, statefulCompDefName).
-					SetReplicas(3).
-					SetTLS(false).
-					Create(&testCtx).
-					GetObject()
-				clusterKey := client.ObjectKeyFromObject(clusterObj)
-				Eventually(k8sClient.Get(ctx, clusterKey, clusterObj)).Should(Succeed())
-				Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
-				Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
-
-				itsList := testk8s.ListAndCheckInstanceSet(&testCtx, clusterKey)
-				its := itsList.Items[0]
-				cd := &appsv1alpha1.ClusterDefinition{}
-				Expect(k8sClient.Get(ctx, types.NamespacedName{Name: clusterDefName, Namespace: testCtx.DefaultNamespace}, cd)).Should(Succeed())
-				cmName := cfgcore.GetInstanceCMName(&its, &cd.Spec.ComponentDefs[0].ConfigSpecs[0].ComponentTemplateSpec)
-				cmKey := client.ObjectKey{Namespace: its.Namespace, Name: cmName}
-				hasTLSSettings := func() bool {
-					cm := &corev1.ConfigMap{}
-					Expect(k8sClient.Get(ctx, cmKey, cm)).Should(Succeed())
-					tlsKeyWord := plan.GetTLSKeyWord("mysql")
-					for _, cfgFile := range cm.Data {
-						index := strings.Index(cfgFile, tlsKeyWord)
-						if index >= 0 {
-							return true
-						}
-					}
-					return false
-				}
-
-				Eventually(hasTLSSettings).Should(BeFalse())
-
-				By("update tls to enabled")
-				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterObj), clusterObj)).Should(Succeed())
-				patch := client.MergeFrom(clusterObj.DeepCopy())
-				clusterObj.Spec.ComponentSpecs[0].TLS = true
-				clusterObj.Spec.ComponentSpecs[0].Issuer = &appsv1alpha1.Issuer{Name: appsv1alpha1.IssuerKubeBlocks}
-				Expect(k8sClient.Patch(ctx, clusterObj, patch)).Should(Succeed())
-				Eventually(hasTLSSettings).Should(BeTrue())
-
-				By("update tls to disabled")
-				patch = client.MergeFrom(clusterObj.DeepCopy())
-				clusterObj.Spec.ComponentSpecs[0].TLS = false
-				clusterObj.Spec.ComponentSpecs[0].Issuer = nil
-				Expect(k8sClient.Patch(ctx, clusterObj, patch)).Should(Succeed())
-				Eventually(hasTLSSettings).Should(BeFalse())
-
-				By("delete a cluster cleanly when tls enabled")
-				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterObj), clusterObj)).Should(Succeed())
-				patch = client.MergeFrom(clusterObj.DeepCopy())
-				clusterObj.Spec.ComponentSpecs[0].TLS = true
-				clusterObj.Spec.ComponentSpecs[0].Issuer = &appsv1alpha1.Issuer{Name: appsv1alpha1.IssuerKubeBlocks}
-				Expect(k8sClient.Patch(ctx, clusterObj, patch)).Should(Succeed())
-				Eventually(hasTLSSettings).Should(BeTrue())
-
-				testapps.DeleteObject(&testCtx, clusterKey, &appsv1alpha1.Cluster{})
-				Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, false)).Should(Succeed())
+				// TODO(v1.0): config template
 			})
 		})
 	})

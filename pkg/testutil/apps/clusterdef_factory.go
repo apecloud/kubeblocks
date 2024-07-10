@@ -105,55 +105,6 @@ func (factory *MockClusterDefFactory) AddServicePort(port int32) *MockClusterDef
 	return factory
 }
 
-func (factory *MockClusterDefFactory) AddScriptTemplate(name,
-	configTemplateRef, namespace, volumeName string, mode *int32) *MockClusterDefFactory {
-	comp := factory.getLastCompDef()
-	if comp == nil {
-		return nil
-	}
-	comp.ScriptSpecs = append(comp.ScriptSpecs,
-		appsv1alpha1.ComponentTemplateSpec{
-			Name:        name,
-			TemplateRef: configTemplateRef,
-			Namespace:   namespace,
-			VolumeName:  volumeName,
-			DefaultMode: mode,
-		})
-	return factory
-}
-
-func (factory *MockClusterDefFactory) AddConfigTemplate(name,
-	configTemplateRef, configConstraintRef, namespace, volumeName string, injectEnvTo ...string) *MockClusterDefFactory {
-	comp := factory.getLastCompDef()
-	if comp == nil {
-		return nil
-	}
-	comp.ConfigSpecs = append(comp.ConfigSpecs,
-		appsv1alpha1.ComponentConfigSpec{
-			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-				Name:        name,
-				TemplateRef: configTemplateRef,
-				Namespace:   namespace,
-				VolumeName:  volumeName,
-			},
-			ConfigConstraintRef: configConstraintRef,
-			InjectEnvTo:         injectEnvTo,
-		})
-	return factory
-}
-
-func (factory *MockClusterDefFactory) AddLogConfig(name, filePathPattern string) *MockClusterDefFactory {
-	comp := factory.getLastCompDef()
-	if comp == nil {
-		return nil
-	}
-	comp.LogConfigs = append(comp.LogConfigs, appsv1alpha1.LogConfig{
-		FilePathPattern: filePathPattern,
-		Name:            name,
-	})
-	return factory
-}
-
 func (factory *MockClusterDefFactory) AddContainerEnv(containerName string, envVar corev1.EnvVar) *MockClusterDefFactory {
 	comp := factory.getLastCompDef()
 	if comp == nil {

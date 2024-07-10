@@ -25,17 +25,10 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
-	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var _ = Describe("ClusterDefinition Controller", func() {
@@ -44,10 +37,6 @@ var _ = Describe("ClusterDefinition Controller", func() {
 		clusterVersionName  = "test-clusterversion"
 		compDefinitionName  = "test-component-definition"
 		statefulCompDefName = "replicasets"
-
-		configVolumeName = "mysql-config"
-
-		cmName = "mysql-tree-node-template-8.0"
 	)
 
 	var (
@@ -84,19 +73,6 @@ var _ = Describe("ClusterDefinition Controller", func() {
 	AfterEach(func() {
 		cleanEnv()
 	})
-
-	assureCfgTplConfigMapObj := func() *corev1.ConfigMap {
-		By("Create a configmap and config template obj")
-		cm := testapps.CreateCustomizedObj(&testCtx, "config/config-template.yaml", &corev1.ConfigMap{},
-			testCtx.UseDefaultNamespace())
-
-		cfgTpl := testapps.CreateCustomizedObj(&testCtx, "config/config-constraint.yaml",
-			&appsv1beta1.ConfigConstraint{})
-		Expect(testapps.ChangeObjStatus(&testCtx, cfgTpl, func() {
-			cfgTpl.Status.Phase = appsv1beta1.CCAvailablePhase
-		})).Should(Succeed())
-		return cm
-	}
 
 	Context("with no ConfigSpec", func() {
 		BeforeEach(func() {
@@ -144,55 +120,6 @@ var _ = Describe("ClusterDefinition Controller", func() {
 				})).Should(Succeed())
 
 			// TODO: update components to break @validateClusterVersion, and transit ClusterVersion.Status.Phase to UnavailablePhase
-		})
-	})
-
-	Context("with ConfigSpec", func() {
-		BeforeEach(func() {
-			By("Create a clusterDefinition obj")
-			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
-				AddConfigTemplate(cmName, cmName, cmName, testCtx.DefaultNamespace, configVolumeName).
-				Create(&testCtx).GetObject()
-
-			By("Create a clusterVersion obj")
-			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponentVersion(statefulCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-				Create(&testCtx).GetObject()
-		})
-
-		It("should stop proceeding the status of clusterDefinition if configmap is invalid or doesn't exist", func() {
-			By("check the reconciler set the status phase as unavailable if configmap doesn't exist.")
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
-				func(g Gomega, cd *appsv1alpha1.ClusterDefinition) {
-					g.Expect(cd.Status.ObservedGeneration).Should(Equal(cd.Generation))
-					g.Expect(cd.Status.Phase).Should(Equal(appsv1alpha1.UnavailablePhase))
-				})).Should(Succeed())
-
-			assureCfgTplConfigMapObj()
-
-			By("check the reconciler update Status.ObservedGeneration after configmap is created.")
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
-				func(g Gomega, cd *appsv1alpha1.ClusterDefinition) {
-					g.Expect(cd.Status.ObservedGeneration).Should(Equal(cd.Generation))
-					g.Expect(cd.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
-
-					// check labels and finalizers
-					g.Expect(cd.Finalizers).ShouldNot(BeEmpty())
-					configCMLabel := cfgcore.GenerateTPLUniqLabelKeyWithConfig(cmName)
-					configConstraintLabel := cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(cmName)
-					g.Expect(cd.Labels[configCMLabel]).Should(BeEquivalentTo(cmName))
-					g.Expect(cd.Labels[configConstraintLabel]).Should(BeEquivalentTo(cmName))
-				})).Should(Succeed())
-
-			By("check the reconciler update configmap.Finalizer after configmap is created.")
-			cmKey := types.NamespacedName{
-				Namespace: testCtx.DefaultNamespace,
-				Name:      cmName,
-			}
-			Eventually(testapps.CheckObj(&testCtx, cmKey, func(g Gomega, cmObj *corev1.ConfigMap) {
-				g.Expect(controllerutil.ContainsFinalizer(cmObj, constant.ConfigFinalizerName)).To(BeTrue())
-			})).Should(Succeed())
 		})
 	})
 

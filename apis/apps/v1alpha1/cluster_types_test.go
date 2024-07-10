@@ -24,12 +24,10 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/yaml"
-
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var _ = Describe("", func() {
@@ -207,53 +205,6 @@ var _ = Describe("", func() {
 		Expect(ComponentPodsAreReady(&ready)).Should(BeTrue())
 	})
 })
-
-func TestValidateEnabledLogs(t *testing.T) {
-	cluster := &Cluster{}
-	clusterDef := &ClusterDefinition{}
-	clusterByte := `
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: Cluster
-metadata:
-  name: wesql
-spec:
-  clusterVersionRef: cluster-version-consensus
-  clusterDefinitionRef: cluster-definition-consensus
-  componentSpecs:
-    - name: wesql-test
-      componentDefRef: replicasets
-      enabledLogs: [error, slow]
-`
-	clusterDefByte := `
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: ClusterDefinition
-metadata:
-  name: cluster-definition-consensus
-spec:
-  componentDefs:
-    - name: replicasets
-      workloadType: Consensus
-      logConfigs:
-        - name: error
-          filePathPattern: /log/mysql/mysqld.err
-        - name: slow
-          filePathPattern: /log/mysql/*slow.log
-      podSpec:
-        containers:
-          - name: mysql
-            imagePullPolicy: IfNotPresent`
-	_ = yaml.Unmarshal([]byte(clusterByte), cluster)
-	_ = yaml.Unmarshal([]byte(clusterDefByte), clusterDef)
-	// normal case
-	if err := cluster.Spec.ValidateEnabledLogs(clusterDef); err != nil {
-		t.Error("Expected empty conditionList")
-	}
-	// corner case
-	cluster.Spec.ComponentSpecs[0].EnabledLogs = []string{"error-test", "slow"}
-	if err := cluster.Spec.ValidateEnabledLogs(clusterDef); err == nil {
-		t.Error("Expected one element conditionList")
-	}
-}
 
 func TestGetMessage(t *testing.T) {
 	podKey := "Pod/test-01"

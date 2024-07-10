@@ -27,7 +27,6 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/apiutil"
-	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 )
@@ -291,31 +290,21 @@ func (c *compDefServicesConvertor) roleSelector(clusterCompDef *appsv1alpha1.Clu
 type compDefConfigsConvertor struct{}
 
 func (c *compDefConfigsConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	var clusterCompVer *appsv1alpha1.ClusterComponentVersion
-	if len(args) > 1 {
-		clusterCompVer = args[1].(*appsv1alpha1.ClusterComponentVersion)
-	}
-	if clusterCompVer == nil {
-		return clusterCompDef.ConfigSpecs, nil
-	}
-	return cfgcore.MergeConfigTemplates(clusterCompVer.ConfigSpecs, clusterCompDef.ConfigSpecs), nil
+	return nil, nil
 }
 
 // compDefLogConfigsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.LogConfigs.
 type compDefLogConfigsConvertor struct{}
 
 func (c *compDefLogConfigsConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	return clusterCompDef.LogConfigs, nil
+	return nil, nil
 }
 
 // compDefScriptsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Scripts.
 type compDefScriptsConvertor struct{}
 
 func (c *compDefScriptsConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	return clusterCompDef.ScriptSpecs, nil
+	return nil, nil
 }
 
 // compDefPolicyRulesConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.PolicyRules.

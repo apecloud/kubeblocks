@@ -242,8 +242,6 @@ func handleConfigTemplate(object client.Object, handler ConfigTemplateHandler, h
 		configTemplates []appsv1alpha1.ComponentConfigSpec
 	)
 	switch cr := object.(type) {
-	case *appsv1alpha1.ClusterDefinition:
-		configTemplates, err = getConfigTemplateFromCD(cr, handler2...)
 	case *appsv1alpha1.ClusterVersion:
 		configTemplates = getConfigTemplateFromCV(cr)
 	case *appsv1alpha1.ComponentDefinition:
@@ -270,30 +268,6 @@ func getConfigTemplateFromCV(appVer *appsv1alpha1.ClusterVersion) []appsv1alpha1
 		}
 	}
 	return configTemplates
-}
-
-func getConfigTemplateFromCD(clusterDef *appsv1alpha1.ClusterDefinition, validators ...ComponentValidateHandler) ([]appsv1alpha1.ComponentConfigSpec, error) {
-	configTemplates := make([]appsv1alpha1.ComponentConfigSpec, 0)
-	for _, component := range clusterDef.Spec.ComponentDefs {
-		// For compatibility with the previous lifecycle management of configurationSpec.TemplateRef, it is necessary to convert ScriptSpecs to ConfigSpecs,
-		// ensuring that the script-related configmap is not allowed to be deleted.
-		for _, scriptSpec := range component.ScriptSpecs {
-			configTemplates = append(configTemplates, appsv1alpha1.ComponentConfigSpec{
-				ComponentTemplateSpec: scriptSpec,
-			})
-		}
-		if len(component.ConfigSpecs) == 0 {
-			continue
-		}
-		configTemplates = append(configTemplates, component.ConfigSpecs...)
-		// Check reload configure config template
-		for _, validator := range validators {
-			if err := validator(&component); err != nil {
-				return nil, err
-			}
-		}
-	}
-	return configTemplates, nil
 }
 
 func getConfigTemplateFromComponentDef(componentDef *appsv1alpha1.ComponentDefinition) []appsv1alpha1.ComponentConfigSpec {

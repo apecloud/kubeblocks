@@ -4258,34 +4258,6 @@ string
 </tr>
 <tr>
 <td>
-<code>configSpecs</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ComponentConfigSpec">
-[]ComponentConfigSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the template of configurations.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>scriptSpecs</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ComponentTemplateSpec">
-[]ComponentTemplateSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the template of scripts.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>probes</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterDefinitionProbes">
@@ -4296,20 +4268,6 @@ ClusterDefinitionProbes
 <td>
 <em>(Optional)</em>
 <p>Settings for health checks.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>logConfigs</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.LogConfig">
-[]LogConfig
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specify the logging files which can be observed and configured by cluster users.</p>
 </td>
 </tr>
 <tr>
@@ -7166,7 +7124,7 @@ MatchExpressions
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentConfigSpec">ComponentConfigSpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>, <a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentVersion">ClusterComponentVersion</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ConfigurationItemDetail">ConfigurationItemDetail</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentVersion">ClusterComponentVersion</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ConfigurationItemDetail">ConfigurationItemDetail</a>)
 </p>
 <div>
 </div>
@@ -9289,7 +9247,7 @@ ProvisionSecretRef
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentTemplateSpec">ComponentTemplateSpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentConfigSpec">ComponentConfigSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentConfigSpec">ComponentConfigSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
 </p>
 <div>
 </div>
@@ -13273,7 +13231,7 @@ Then the controller will interact with these actions via GRPCAction calls.</p>
 <h3 id="apps.kubeblocks.io/v1alpha1.LogConfig">LogConfig
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
 </p>
 <div>
 </div>

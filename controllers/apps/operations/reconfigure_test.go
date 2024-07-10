@@ -24,19 +24,14 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/spf13/cast"
-
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/builder"
-	configutil "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -80,77 +75,10 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		opsRes.Cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
 	}
 
-	assureCfgTplObj := func(tplName, cmName, ns string) (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint) {
-		By("Assuring an cm obj")
-		cfgCM := testapps.NewCustomizedObj("operations_config/config-template.yaml",
-			&corev1.ConfigMap{}, testapps.WithNamespacedName(cmName, ns))
-		cfgTpl := testapps.NewCustomizedObj("operations_config/config-constraint.yaml",
-			&appsv1beta1.ConfigConstraint{}, testapps.WithNamespacedName(tplName, ns))
-		Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())
-		Expect(testCtx.CheckedCreateObj(ctx, cfgTpl)).Should(Succeed())
-
-		return cfgCM, cfgTpl
-	}
-
-	assureConfigInstanceObj := func(clusterName, componentName, ns string, cdComponent *appsv1alpha1.ClusterComponentDefinition) (*appsv1alpha1.Configuration, *corev1.ConfigMap) {
-		if len(cdComponent.ConfigSpecs) == 0 {
-			return nil, nil
-		}
-
-		By("create configuration cr")
-		configuration := builder.NewConfigurationBuilder(testCtx.DefaultNamespace, core.GenerateComponentConfigurationName(clusterName, componentName)).
-			ClusterRef(clusterName).
-			Component(componentName)
-		for _, configSpec := range cdComponent.ConfigSpecs {
-			configuration.AddConfigurationItem(configSpec)
-		}
-		Expect(testCtx.CheckedCreateObj(ctx, configuration.GetObject())).Should(Succeed())
-
-		// update status
-		By("update configuration status")
-		revision := "1"
-		Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(configuration.GetObject()),
-			func(config *appsv1alpha1.Configuration) {
-				revision = cast.ToString(config.GetGeneration())
-				for _, item := range config.Spec.ConfigItemDetails {
-					configutil.CheckAndUpdateItemStatus(config, item, revision)
-				}
-			})).Should(Succeed())
-
-		By("create configmap for configSpecs")
-		var cmObj *corev1.ConfigMap
-		for _, configSpec := range cdComponent.ConfigSpecs {
-			cmInsName := core.GetComponentCfgName(clusterName, componentName, configSpec.Name)
-			By("create configmap: " + cmInsName)
-			cfgCM := testapps.NewCustomizedObj("operations_config/config-template.yaml",
-				&corev1.ConfigMap{},
-				testapps.WithNamespacedName(cmInsName, ns),
-				testapps.WithLabels(
-					constant.AppNameLabelKey, clusterName,
-					constant.ConfigurationRevision, revision,
-					constant.AppInstanceLabelKey, clusterName,
-					constant.KBAppComponentLabelKey, componentName,
-					constant.CMConfigurationTemplateNameLabelKey, configSpec.TemplateRef,
-					constant.CMConfigurationConstraintsNameLabelKey, configSpec.ConfigConstraintRef,
-					constant.CMConfigurationSpecProviderLabelKey, configSpec.Name,
-					constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType,
-				),
-			)
-			Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())
-			cmObj = cfgCM
-		}
-		return configuration.GetObject(), cmObj
-	}
-
 	assureMockReconfigureData := func(policyName string) (*OpsResource, *appsv1alpha1.Configuration, *corev1.ConfigMap) {
 		By("init operations resources ")
-		opsRes, clusterDef, clusterObject := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+		opsRes, _, clusterObject := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
 
-		var (
-			cfgObj       *corev1.ConfigMap
-			config       *appsv1alpha1.Configuration
-			stsComponent *appsv1alpha1.ClusterComponentDefinition
-		)
 		By("Test Reconfigure")
 		{
 			// mock cluster is Running to support reconfiguring ops
@@ -160,34 +88,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			Expect(k8sClient.Status().Patch(ctx, clusterObject, patch)).Should(Succeed())
 		}
 
-		{
-			By("mock config tpl")
-			cmObj, tplObj := assureCfgTplObj("mysql-tpl-test", "mysql-cm-test", testCtx.DefaultNamespace)
-			By("update clusterdefinition tpl")
-			patch := client.MergeFrom(clusterDef.DeepCopy())
-			for i := range clusterDef.Spec.ComponentDefs {
-				component := &clusterDef.Spec.ComponentDefs[i]
-				if component.Name != consensusComp {
-					continue
-				}
-				stsComponent = component
-				component.ConfigSpecs = []appsv1alpha1.ComponentConfigSpec{{
-					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-						Name:        "mysql-test",
-						TemplateRef: cmObj.Name,
-						VolumeName:  "mysql-config",
-						Namespace:   testCtx.DefaultNamespace,
-					},
-					ConfigConstraintRef: tplObj.Name,
-				}}
-			}
-
-			Expect(k8sClient.Patch(ctx, clusterDef, patch)).Should(Succeed())
-			By("mock config cm object")
-			config, cfgObj = assureConfigInstanceObj(clusterName, consensusComp, testCtx.DefaultNamespace, stsComponent)
-		}
-
-		return opsRes, config, cfgObj
+		return opsRes, nil, nil
 	}
 
 	Context("Test Reconfigure", func() {

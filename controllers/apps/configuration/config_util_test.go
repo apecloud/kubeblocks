@@ -40,8 +40,6 @@ var _ = Describe("ConfigWrapper util test", func() {
 	const clusterDefName = "test-clusterdef"
 	const clusterVersionName = "test-clusterversion"
 	const statefulCompDefName = "replicasets"
-	const configSpecName = "mysql-config-tpl"
-	const configVolumeName = "mysql-config"
 
 	var (
 		// ctrl       *gomock.Controller
@@ -97,7 +95,6 @@ var _ = Describe("ConfigWrapper util test", func() {
 		By("Create a clusterDefinition obj")
 		clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 			AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
-			AddConfigTemplate(configSpecName, configMapObj.Name, configConstraintObj.Name, testCtx.DefaultNamespace, configVolumeName).
 			Create(&testCtx).GetObject()
 
 		By("Create a clusterVersion obj")
@@ -176,13 +173,6 @@ var _ = Describe("ConfigWrapper util test", func() {
 			_, err := handleConfigTemplate(clusterDefObj, func(templates []appsv1alpha1.ComponentConfigSpec) (bool, error) {
 				return true, nil
 			}, func(component *appsv1alpha1.ClusterComponentDefinition) error {
-				if len(component.ConfigSpecs) == 0 {
-					return nil
-				}
-				for i := range component.ConfigSpecs {
-					tpl := &component.ConfigSpecs[i]
-					tpl.ConfigConstraintRef = ""
-				}
 				return nil
 			})
 			Expect(err).Should(Succeed())

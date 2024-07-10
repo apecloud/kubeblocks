@@ -58,7 +58,6 @@ var _ = Describe("resource Fetcher", func() {
 		k8sMockClient = testutil.NewK8sMockClient()
 		clusterDef = testapps.NewClusterDefFactory(clusterDefName).
 			AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
-			AddConfigTemplate(mysqlConfigName, mysqlConfigName, mysqlConfigName, "default", mysqlVolumeName).
 			GetObject()
 		clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
 			AddComponentVersion(mysqlCompDefName).

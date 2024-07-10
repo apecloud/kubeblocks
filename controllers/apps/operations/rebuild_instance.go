@@ -485,7 +485,7 @@ func (r rebuildInstanceOpsHandler) offlineSpecifiedInstances(compSpec *appsv1alp
 	for _, insName := range instancesNeedToOffline {
 		compSpec.OfflineInstances = append(compSpec.OfflineInstances, insName)
 		templateName := appsv1alpha1.GetInstanceTemplateName(clusterName, compSpec.Name, insName)
-		if templateName == "" {
+		if templateName == constant.EmptyInsTemplateName {
 			continue
 		}
 		for j := range compSpec.Instances {

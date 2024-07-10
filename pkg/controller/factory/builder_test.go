@@ -187,13 +187,6 @@ var _ = Describe("builder", func() {
 			)
 			credential := BuildConnCredential(clusterDef, cluster, synthesizedComponent)
 			Expect(credential).ShouldNot(BeNil())
-			Expect(credential.Labels[constant.KBAppClusterDefTypeLabelKey]).Should(BeEmpty())
-			By("setting type")
-			characterType := "test-character-type"
-			clusterDef.Spec.Type = characterType
-			credential = BuildConnCredential(clusterDef, cluster, synthesizedComponent)
-			Expect(credential).ShouldNot(BeNil())
-			Expect(credential.Labels[constant.KBAppClusterDefTypeLabelKey]).Should(Equal(characterType))
 			// "username":      "root",
 			// "SVC_FQDN":      "$(SVC_FQDN)",
 			// "RANDOM_PASSWD": "$(RANDOM_PASSWD)",
@@ -314,7 +307,6 @@ var _ = Describe("builder", func() {
 
 			By("set workload type to Consensus")
 			clusterDef.Spec.ComponentDefs[0].WorkloadType = appsv1alpha1.Consensus
-			clusterDef.Spec.ComponentDefs[0].CharacterType = mysqlCharacterType
 			clusterDef.Spec.ComponentDefs[0].ConsensusSpec = appsv1alpha1.NewConsensusSetSpec()
 			clusterDef.Spec.ComponentDefs[0].ConsensusSpec.UpdateStrategy = appsv1alpha1.BestEffortParallelStrategy
 			cluster.Spec.ComponentSpecs[0].Replicas = 3

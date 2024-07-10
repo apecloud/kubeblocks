@@ -107,8 +107,8 @@ func CheckTLSSecretRef(ctx context.Context, cli client.Reader, namespace string,
 	return nil
 }
 
-func GetTLSKeyWord(cType string) string {
-	switch cType {
+func GetTLSKeyWord(kind string) string {
+	switch strings.ToLower(kind) {
 	case "mysql":
 		return "ssl_cert"
 	case "postgresql":

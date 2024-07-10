@@ -73,7 +73,7 @@ func checkAndTriggerReRender(ctx context.Context, synthesizedComp component.Synt
 		return nil
 	}
 
-	tlsKeyword := plan.GetTLSKeyWord(synthesizedComp.CharacterType)
+	tlsKeyword := plan.GetTLSKeyWord(synthesizedComp.ServiceKind)
 	if tlsKeyword == "unsupported-character-type" {
 		return nil
 	}

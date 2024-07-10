@@ -66,10 +66,9 @@ var _ = Describe("Component Definition Convertor", func() {
 
 		BeforeEach(func() {
 			clusterCompDef = &appsv1alpha1.ClusterComponentDefinition{
-				Name:          "mysql",
-				Description:   "component definition convertor",
-				WorkloadType:  appsv1alpha1.Consensus,
-				CharacterType: "mysql",
+				Name:         "mysql",
+				Description:  "component definition convertor",
+				WorkloadType: appsv1alpha1.Consensus,
 				ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{
 					{
 						ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
@@ -302,7 +301,7 @@ var _ = Describe("Component Definition Convertor", func() {
 			convertor := &compDefServiceKindConvertor{}
 			res, err := convertor.convert(clusterCompDef)
 			Expect(err).Should(Succeed())
-			Expect(res).Should(Equal(clusterCompDef.CharacterType))
+			Expect(res).Should(BeEmpty())
 		})
 
 		It("service version", func() {

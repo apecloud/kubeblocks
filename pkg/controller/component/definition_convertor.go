@@ -90,8 +90,7 @@ func (c *compDefDescriptionConvertor) convert(args ...any) (any, error) {
 type compDefServiceKindConvertor struct{}
 
 func (c *compDefServiceKindConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	return clusterCompDef.CharacterType, nil
+	return "", nil
 }
 
 // compDefServiceVersionConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.ServiceVersion.
@@ -531,38 +530,8 @@ func (c *compDefLifecycleActionsConvertor) convert(args ...any) (any, error) {
 	return lifecycleActions, nil // TODO
 }
 
-func (c *compDefLifecycleActionsConvertor) convertBuiltinActionHandler(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) appsv1alpha1.BuiltinActionHandlerType {
-	if clusterCompDef == nil || clusterCompDef.CharacterType == "" {
-		return appsv1alpha1.UnknownBuiltinActionHandler
-	}
-	switch clusterCompDef.CharacterType {
-	case constant.MySQLCharacterType:
-		if clusterCompDef.WorkloadType == appsv1alpha1.Consensus {
-			return appsv1alpha1.WeSQLBuiltinActionHandler
-		} else {
-			return appsv1alpha1.MySQLBuiltinActionHandler
-		}
-	case constant.PostgreSQLCharacterType:
-		if clusterCompDef.WorkloadType == appsv1alpha1.Consensus {
-			return appsv1alpha1.ApeCloudPostgresqlBuiltinActionHandler
-		} else {
-			return appsv1alpha1.PostgresqlBuiltinActionHandler
-		}
-	case constant.RedisCharacterType:
-		return appsv1alpha1.RedisBuiltinActionHandler
-	case constant.MongoDBCharacterType:
-		return appsv1alpha1.MongoDBBuiltinActionHandler
-	case constant.ETCDCharacterType:
-		return appsv1alpha1.ETCDBuiltinActionHandler
-	case constant.PolarDBXCharacterType:
-		return appsv1alpha1.PolarDBXBuiltinActionHandler
-	default:
-		return appsv1alpha1.UnknownBuiltinActionHandler
-	}
-}
-
 func (c *compDefLifecycleActionsConvertor) convertRoleProbe(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) *appsv1alpha1.RoleProbe {
-	builtinHandler := c.convertBuiltinActionHandler(clusterCompDef)
+	builtinHandler := appsv1alpha1.UnknownBuiltinActionHandler
 	// if RSMSpec has role probe CustomHandler, use it first.
 	if clusterCompDef.RSMSpec != nil && clusterCompDef.RSMSpec.RoleProbe != nil && len(clusterCompDef.RSMSpec.RoleProbe.CustomHandler) > 0 {
 		// TODO(xingran): RSMSpec.RoleProbe.CustomHandler support multiple images and commands, but ComponentDefinition.LifeCycleAction.RoleProbe only support one image and command now.

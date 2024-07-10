@@ -4246,18 +4246,6 @@ WorkloadType
 </tr>
 <tr>
 <td>
-<code>characterType</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines well-known database component name, such as mongos(mongodb), proxy(redis), mariadb(mysql).</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>configSpecs</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ComponentConfigSpec">

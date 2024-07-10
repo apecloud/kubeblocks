@@ -271,15 +271,7 @@ func handleCancelProgressForPodsRollingUpdate(
 }
 
 func needToCheckRole(pgRes *progressResource) bool {
-	var needCheckRole bool
-	if pgRes.componentDef != nil {
-		needCheckRole = len(pgRes.componentDef.Spec.Roles) > 0
-	} else if pgRes.clusterDef != nil {
-		// TODO: get the componentDefinition by clusterDefinition after v0.9
-		compDef := pgRes.clusterDef.GetComponentDefByName(pgRes.clusterComponent.ComponentDefRef)
-		needCheckRole = compDef != nil && (compDef.WorkloadType == appsv1alpha1.Replication || compDef.WorkloadType == appsv1alpha1.Consensus)
-	}
-	return needCheckRole
+	return len(pgRes.componentDef.Spec.Roles) > 0
 }
 
 func podIsAvailable(pgRes *progressResource, pod *corev1.Pod, minReadySeconds int32) bool {

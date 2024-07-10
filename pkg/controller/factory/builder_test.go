@@ -272,18 +272,13 @@ var _ = Describe("builder", func() {
 				Should(Equal(string(appsv1alpha1.VolumeTypeData)))
 
 			By("set workload type to Replication")
-			clusterDef.Spec.ComponentDefs[0].WorkloadType = appsv1alpha1.Replication
-			clusterDef.Spec.ComponentDefs[0].ReplicationSpec = &appsv1alpha1.ReplicationSetSpec{
-				StatefulSetSpec: appsv1alpha1.StatefulSetSpec{
-					UpdateStrategy: appsv1alpha1.SerialStrategy,
-				},
-			}
 			cluster.Spec.ComponentSpecs[0].Replicas = 2
 			replComponent := newAllFieldsSynthesizedComponent(clusterDef, nil, cluster)
 			its, err = BuildInstanceSet(replComponent, nil)
 			Expect(err).Should(BeNil())
 			Expect(its).ShouldNot(BeNil())
 			Expect(*its.Spec.Replicas).Should(BeEquivalentTo(2))
+
 			// test extra envs
 			Expect(its.Spec.Template.Spec.Containers).ShouldNot(BeEmpty())
 			for _, container := range its.Spec.Template.Spec.Containers {
@@ -313,10 +308,7 @@ var _ = Describe("builder", func() {
 			Expect(*its.Spec.MemberUpdateStrategy).Should(BeEquivalentTo(workloads.SerialUpdateStrategy))
 
 			By("set workload type to Consensus")
-			clusterDef.Spec.ComponentDefs[0].WorkloadType = appsv1alpha1.Consensus
 			clusterDef.Spec.ComponentDefs[0].CharacterType = mysqlCharacterType
-			clusterDef.Spec.ComponentDefs[0].ConsensusSpec = appsv1alpha1.NewConsensusSetSpec()
-			clusterDef.Spec.ComponentDefs[0].ConsensusSpec.UpdateStrategy = appsv1alpha1.BestEffortParallelStrategy
 			cluster.Spec.ComponentSpecs[0].Replicas = 3
 			csComponent := newAllFieldsSynthesizedComponent(clusterDef, nil, cluster)
 			its, err = BuildInstanceSet(csComponent, nil)
@@ -325,7 +317,7 @@ var _ = Describe("builder", func() {
 
 			// test roles
 			Expect(its.Spec.Roles).Should(HaveLen(1))
-			Expect(its.Spec.Roles[0].Name).Should(Equal(appsv1alpha1.DefaultLeader.Name))
+			Expect(its.Spec.Roles[0].Name).Should(Equal("leader"))
 
 			// test role probe
 			Expect(its.Spec.RoleProbe).ShouldNot(BeNil())

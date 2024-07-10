@@ -27,9 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/apiutil"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
@@ -68,7 +66,6 @@ var _ = Describe("Component Definition Convertor", func() {
 			clusterCompDef = &appsv1alpha1.ClusterComponentDefinition{
 				Name:          "mysql",
 				Description:   "component definition convertor",
-				WorkloadType:  appsv1alpha1.Consensus,
 				CharacterType: "mysql",
 				ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{
 					{
@@ -87,13 +84,6 @@ var _ = Describe("Component Definition Convertor", func() {
 						TemplateRef: "mysql-scripts",
 						VolumeName:  "scripts",
 						DefaultMode: &defaultVolumeMode,
-					},
-				},
-				Probes: &appsv1alpha1.ClusterDefinitionProbes{
-					RoleProbe: &appsv1alpha1.ClusterDefinitionProbe{
-						FailureThreshold: 3,
-						PeriodSeconds:    1,
-						TimeoutSeconds:   5,
 					},
 				},
 				LogConfigs: []appsv1alpha1.LogConfig{
@@ -176,25 +166,6 @@ var _ = Describe("Component Definition Convertor", func() {
 						},
 					},
 				},
-				StatelessSpec: nil,
-				StatefulSpec:  nil,
-				ConsensusSpec: &appsv1alpha1.ConsensusSetSpec{
-					Leader: appsv1alpha1.ConsensusMember{
-						Name:       constant.Leader,
-						AccessMode: appsv1alpha1.ReadWrite,
-					},
-					Followers: []appsv1alpha1.ConsensusMember{
-						{
-							Name:       constant.Follower,
-							AccessMode: appsv1alpha1.Readonly,
-						},
-					},
-					Learner: &appsv1alpha1.ConsensusMember{
-						Name:       constant.Learner,
-						AccessMode: appsv1alpha1.Readonly,
-					},
-				},
-				ReplicationSpec:       nil,
 				HorizontalScalePolicy: &appsv1alpha1.HorizontalScalePolicy{},
 				SystemAccounts: &appsv1alpha1.SystemAccountSpec{
 					CmdExecutorConfig: &appsv1alpha1.CmdExecutorConfig{
@@ -269,7 +240,6 @@ var _ = Describe("Component Definition Convertor", func() {
 						},
 					},
 				},
-				SwitchoverSpec: &appsv1alpha1.SwitchoverSpec{},
 				VolumeProtectionSpec: &appsv1alpha1.VolumeProtectionSpec{
 					HighWatermark: defaultHighWatermark,
 					Volumes: []appsv1alpha1.ProtectedVolume{
@@ -544,21 +514,7 @@ var _ = Describe("Component Definition Convertor", func() {
 				}
 				Expect(services[0].Spec.Type).Should(Equal(corev1.ServiceTypeClusterIP))
 				Expect(services[0].Spec.ClusterIP).Should(BeEmpty())
-				Expect(services[0].RoleSelector).Should(BeEquivalentTo(constant.Leader))
-
-				// consensus role selector
-				clusterCompDef.WorkloadType = appsv1alpha1.Consensus
-				clusterCompDef.ConsensusSpec = &appsv1alpha1.ConsensusSetSpec{
-					Leader: appsv1alpha1.ConsensusMember{
-						Name:       constant.Primary,
-						AccessMode: appsv1alpha1.ReadWrite,
-					},
-				}
-				res2, _ := convertor.convert(clusterCompDef, clusterName)
-				services2, ok2 := res2.([]appsv1alpha1.ComponentService)
-				Expect(ok2).Should(BeTrue())
-				Expect(services2).Should(HaveLen(1))
-				Expect(services2[0].RoleSelector).Should(BeEquivalentTo(constant.Primary))
+				Expect(services[0].RoleSelector).Should(BeEmpty())
 			})
 		})
 
@@ -665,117 +621,25 @@ var _ = Describe("Component Definition Convertor", func() {
 		})
 
 		Context("update strategy", func() {
-			It("w/o workload spec", func() {
-				clusterCompDef.ConsensusSpec = nil
-
-				convertor := &compDefUpdateStrategyConvertor{}
-				res, err := convertor.convert(clusterCompDef)
-				Expect(err).Should(Succeed())
-
-				strategy := res.(*appsv1alpha1.UpdateStrategy)
-				Expect(strategy).Should(BeNil())
-			})
-
 			It("ok", func() {
 				convertor := &compDefUpdateStrategyConvertor{}
 				res, err := convertor.convert(clusterCompDef)
 				Expect(err).Should(Succeed())
-
-				strategy := res.(*appsv1alpha1.UpdateStrategy)
-				Expect(*strategy).Should(BeEquivalentTo(clusterCompDef.ConsensusSpec.UpdateStrategy))
+				Expect(res).Should(BeNil())
 			})
 		})
 
 		Context("roles", func() {
-			It("non-consensus workload", func() {
-				clusterCompDef.WorkloadType = appsv1alpha1.Stateful
-
+			It("ok", func() {
 				convertor := &compDefRolesConvertor{}
 				res, err := convertor.convert(clusterCompDef)
 				Expect(err).Should(Succeed())
 				Expect(res).Should(BeNil())
-			})
-
-			It("w/o roles", func() {
-				clusterCompDef.ConsensusSpec = nil
-
-				convertor := &compDefRolesConvertor{}
-				res, err := convertor.convert(clusterCompDef)
-				Expect(err).Should(Succeed())
-				Expect(res).Should(BeNil())
-			})
-
-			It("w/ roles", func() {
-				convertor := &compDefRolesConvertor{}
-				res, err := convertor.convert(clusterCompDef)
-				Expect(err).Should(Succeed())
-
-				expectedRoles := []appsv1alpha1.ReplicaRole{
-					{
-						Name:        "leader",
-						Serviceable: true,
-						Writable:    true,
-						Votable:     true,
-					},
-					{
-						Name:        "follower",
-						Serviceable: true,
-						Writable:    false,
-						Votable:     true,
-					},
-					{
-						Name:        "learner",
-						Serviceable: true,
-						Writable:    false,
-						Votable:     false,
-					},
-				}
-				Expect(res).Should(BeEquivalentTo(expectedRoles))
-			})
-
-			It("InstanceSet spec roles convertor", func() {
-				convertor := &compDefRolesConvertor{}
-				clusterCompDef.RSMSpec = &appsv1alpha1.RSMSpec{
-					Roles: []workloads.ReplicaRole{
-						{
-							Name:       "mock-leader",
-							AccessMode: workloads.ReadWriteMode,
-							CanVote:    true,
-							IsLeader:   true,
-						},
-						{
-							Name:       "mock-follower",
-							AccessMode: workloads.ReadonlyMode,
-							CanVote:    true,
-							IsLeader:   false,
-						},
-					},
-				}
-				res, err := convertor.convert(clusterCompDef)
-				Expect(err).Should(Succeed())
-
-				expectedRoles := []appsv1alpha1.ReplicaRole{
-					{
-						Name:        "mock-leader",
-						Serviceable: true,
-						Writable:    true,
-						Votable:     true,
-					},
-					{
-						Name:        "mock-follower",
-						Serviceable: true,
-						Writable:    false,
-						Votable:     true,
-					},
-				}
-				Expect(res).Should(BeEquivalentTo(expectedRoles))
 			})
 		})
 
 		Context("lifecycle actions", func() {
-			It("w/o comp version", func() {
-				clusterCompDef.Probes.RoleProbe = nil
-
+			It("nil", func() {
 				convertor := &compDefLifecycleActionsConvertor{}
 				res, err := convertor.convert(clusterCompDef)
 				Expect(err).Should(Succeed())
@@ -783,65 +647,9 @@ var _ = Describe("Component Definition Convertor", func() {
 				actions := res.(*appsv1alpha1.ComponentLifecycleActions)
 				expectedActions := &appsv1alpha1.ComponentLifecycleActions{}
 				Expect(*actions).Should(BeEquivalentTo(*expectedActions))
-			})
-
-			It("w/ comp version", func() {
-				clusterCompDef.Probes.RoleProbe = nil
-				clusterCompVer := &appsv1alpha1.ClusterComponentVersion{}
-
-				convertor := &compDefLifecycleActionsConvertor{}
-				res, err := convertor.convert(clusterCompDef, clusterCompVer)
-				Expect(err).Should(Succeed())
-
-				actions := res.(*appsv1alpha1.ComponentLifecycleActions)
-				expectedActions := &appsv1alpha1.ComponentLifecycleActions{}
-				Expect(*actions).Should(BeEquivalentTo(*expectedActions))
-			})
-
-			It("switchover", func() {
-				clusterCompDef.Probes.RoleProbe = nil
-				convertor := &compDefLifecycleActionsConvertor{}
-				clusterCompDef.SwitchoverSpec = &appsv1alpha1.SwitchoverSpec{
-					WithCandidate: &appsv1alpha1.SwitchoverAction{
-						CmdExecutorConfig: &appsv1alpha1.CmdExecutorConfig{
-							CommandExecutorEnvItem: *commandExecutorEnvItem,
-							CommandExecutorItem:    *commandExecutorItem,
-						},
-						ScriptSpecSelectors: []appsv1alpha1.ScriptSpecSelector{
-							{
-								Name: "with-candidate",
-							},
-						},
-					},
-					WithoutCandidate: &appsv1alpha1.SwitchoverAction{
-						CmdExecutorConfig: &appsv1alpha1.CmdExecutorConfig{
-							CommandExecutorEnvItem: *commandExecutorEnvItem,
-							CommandExecutorItem:    *commandExecutorItem,
-						},
-						ScriptSpecSelectors: []appsv1alpha1.ScriptSpecSelector{
-							{
-								Name: "without-candidate",
-							},
-						},
-					},
-				}
-
-				res, err := convertor.convert(clusterCompDef)
-				Expect(err).Should(Succeed())
-				actions := res.(*appsv1alpha1.ComponentLifecycleActions)
-				Expect(actions.Switchover).ShouldNot(BeNil())
-				Expect(len(actions.Switchover.ScriptSpecSelectors)).Should(BeEquivalentTo(2))
-				Expect(actions.Switchover.WithCandidate).ShouldNot(BeNil())
-				Expect(actions.Switchover.WithCandidate.Image).Should(BeEquivalentTo(commandExecutorEnvItem.Image))
-				Expect(actions.Switchover.WithCandidate.Env).Should(BeEquivalentTo(commandExecutorEnvItem.Env))
-				Expect(actions.Switchover.WithCandidate.Exec.Command).Should(BeEquivalentTo(commandExecutorItem.Command))
-				Expect(actions.Switchover.WithCandidate.Exec.Args).Should(BeEquivalentTo(commandExecutorItem.Args))
-				Expect(actions.Switchover.WithoutCandidate).ShouldNot(BeNil())
 			})
 
 			It("post provision", func() {
-				clusterCompDef.Probes.RoleProbe = nil
-				clusterCompDef.SwitchoverSpec = nil
 				convertor := &compDefLifecycleActionsConvertor{}
 				clusterCompDef.PostStartSpec = &appsv1alpha1.PostStartAction{
 					CmdExecutorConfig: appsv1alpha1.CmdExecutorConfig{
@@ -865,59 +673,6 @@ var _ = Describe("Component Definition Convertor", func() {
 				Expect(actions.PostProvision.CustomHandler.Exec.Command).Should(BeEquivalentTo(commandExecutorItem.Command))
 				Expect(actions.PostProvision.CustomHandler.Exec.Args).Should(BeEquivalentTo(commandExecutorItem.Args))
 				Expect(*actions.PostProvision.CustomHandler.PreCondition).Should(BeEquivalentTo(appsv1alpha1.ComponentReadyPreConditionType))
-			})
-
-			It("role probe", func() {
-				convertor := &compDefLifecycleActionsConvertor{}
-				res, err := convertor.convert(clusterCompDef)
-				Expect(err).Should(Succeed())
-
-				actions := res.(*appsv1alpha1.ComponentLifecycleActions)
-				// mysql + consensus -> wesql
-				wesqlBuiltinHandler := func() *appsv1alpha1.BuiltinActionHandlerType {
-					handler := appsv1alpha1.WeSQLBuiltinActionHandler
-					return &handler
-				}
-				expectedRoleProbe := &appsv1alpha1.RoleProbe{
-					LifecycleActionHandler: appsv1alpha1.LifecycleActionHandler{
-						BuiltinHandler: wesqlBuiltinHandler(),
-					},
-					TimeoutSeconds: clusterCompDef.Probes.RoleProbe.TimeoutSeconds,
-					PeriodSeconds:  clusterCompDef.Probes.RoleProbe.PeriodSeconds,
-				}
-				Expect(actions.RoleProbe).ShouldNot(BeNil())
-				Expect(*actions.RoleProbe).Should(BeEquivalentTo(*expectedRoleProbe))
-			})
-
-			It("ITS spec role probe convertor", func() {
-				convertor := &compDefLifecycleActionsConvertor{}
-				mockCommand := []string{
-					"mock-its-role-probe-command",
-				}
-				mockArgs := []string{
-					"mock-its-role-probe-args",
-				}
-				clusterCompDef.RSMSpec = &appsv1alpha1.RSMSpec{
-					RoleProbe: &workloads.RoleProbe{
-						CustomHandler: []workloads.Action{
-							{
-								Image:   "mock-its-role-probe-image",
-								Command: mockCommand,
-								Args:    mockArgs,
-							},
-						},
-					},
-				}
-				res, err := convertor.convert(clusterCompDef)
-				Expect(err).Should(Succeed())
-
-				actions := res.(*appsv1alpha1.ComponentLifecycleActions)
-				Expect(actions.RoleProbe).ShouldNot(BeNil())
-				Expect(*actions.RoleProbe.BuiltinHandler).Should(BeEquivalentTo(appsv1alpha1.WeSQLBuiltinActionHandler))
-				Expect(actions.RoleProbe.CustomHandler).ShouldNot(BeNil())
-				Expect(actions.RoleProbe.CustomHandler.Image).Should(BeEquivalentTo("mock-its-role-probe-image"))
-				Expect(actions.RoleProbe.CustomHandler.Exec.Command).Should(BeEquivalentTo(mockCommand))
-				Expect(actions.RoleProbe.CustomHandler.Exec.Args).Should(BeEquivalentTo(mockArgs))
 			})
 		})
 

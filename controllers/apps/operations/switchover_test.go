@@ -96,40 +96,19 @@ var _ = Describe("", func() {
 
 	Context("Test OpsRequest", func() {
 		BeforeEach(func() {
-			By("Create a clusterDefinition obj with switchoverSpec.")
-			commandExecutorEnvItem := &appsv1alpha1.CommandExecutorEnvItem{
-				Image: testapps.ApeCloudMySQLImage,
-			}
-			commandExecutorItem := &appsv1alpha1.CommandExecutorItem{
-				Command: []string{"echo", "hello"},
-				Args:    []string{},
-			}
-			switchoverSpec := &appsv1alpha1.SwitchoverSpec{
-				WithCandidate: &appsv1alpha1.SwitchoverAction{
-					CmdExecutorConfig: &appsv1alpha1.CmdExecutorConfig{
-						CommandExecutorEnvItem: *commandExecutorEnvItem,
-						CommandExecutorItem:    *commandExecutorItem,
-					},
-				},
-				WithoutCandidate: &appsv1alpha1.SwitchoverAction{
-					CmdExecutorConfig: &appsv1alpha1.CmdExecutorConfig{
-						CommandExecutorEnvItem: *commandExecutorEnvItem,
-						CommandExecutorItem:    *commandExecutorItem,
-					},
-				},
-			}
+			By("Create a clusterDefinition obj.")
 			clusterDefObj = testapps.NewClusterDefFactory(consensusComp).
 				AddComponentDef(testapps.ConsensusMySQLComponent, consensusComp).
-				AddSwitchoverSpec(switchoverSpec).
 				Create(&testCtx).GetObject()
 
-			By("Create a clusterVersion obj with replication workloadType.")
+			By("Create a clusterVersion obj.")
 			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
 				AddComponentVersion(consensusComp).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
 				Create(&testCtx).GetObject()
 		})
 
-		It("Test switchover OpsRequest", func() {
+		// TODO(v1.0): workload and switchover have been removed from CD/CV.
+		PIt("Test switchover OpsRequest", func() {
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx:      testCtx.Ctx,
 				Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
@@ -157,7 +136,7 @@ var _ = Describe("", func() {
 				SetReplicas(2).
 				Create(&testCtx).GetObject()
 
-			By("Creating Pods of replication workloadType.")
+			By("Creating Pods of replication.")
 			var (
 				leaderPod   *corev1.Pod
 				followerPod *corev1.Pod

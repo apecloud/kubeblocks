@@ -138,7 +138,7 @@ var _ = Describe("Cluster Controller", func() {
 		return str
 	}
 
-	createAllWorkloadTypesClusterDef := func(noCreateAssociateCV ...bool) {
+	createAllTypesClusterDef := func(noCreateAssociateCV ...bool) {
 		By("Create a clusterDefinition obj")
 		clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 			AddComponentDef(testapps.ConsensusMySQLComponent, consensusCompDefName).
@@ -1089,7 +1089,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	Context("cluster provisioning", func() {
 		BeforeEach(func() {
-			createAllWorkloadTypesClusterDef()
+			createAllTypesClusterDef()
 		})
 
 		AfterEach(func() {
@@ -1138,7 +1138,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	Context("cluster component scale-in", func() {
 		BeforeEach(func() {
-			createAllWorkloadTypesClusterDef()
+			createAllTypesClusterDef()
 		})
 
 		AfterEach(func() {
@@ -1169,7 +1169,7 @@ var _ = Describe("Cluster Controller", func() {
 		)
 
 		BeforeEach(func() {
-			createAllWorkloadTypesClusterDef()
+			createAllTypesClusterDef()
 		})
 
 		AfterEach(func() {
@@ -1209,7 +1209,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	Context("cluster status", func() {
 		BeforeEach(func() {
-			createAllWorkloadTypesClusterDef()
+			createAllTypesClusterDef()
 		})
 
 		AfterEach(func() {
@@ -1289,7 +1289,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		BeforeEach(func() {
 			cleanEnv()
-			createAllWorkloadTypesClusterDef()
+			createAllTypesClusterDef()
 		})
 
 		createClusterWithBackup := func(backup *appsv1alpha1.ClusterBackup) {
@@ -1439,7 +1439,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	Context("cluster service", func() {
 		BeforeEach(func() {
-			createAllWorkloadTypesClusterDef()
+			createAllTypesClusterDef()
 		})
 
 		AfterEach(func() {
@@ -1461,7 +1461,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	Context("cluster affinity and toleration", func() {
 		BeforeEach(func() {
-			createAllWorkloadTypesClusterDef()
+			createAllTypesClusterDef()
 		})
 
 		AfterEach(func() {
@@ -1479,7 +1479,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	Context("cluster upgrade", func() {
 		BeforeEach(func() {
-			createAllWorkloadTypesClusterDef()
+			createAllTypesClusterDef()
 		})
 
 		AfterEach(func() {
@@ -1580,12 +1580,6 @@ func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition, compDe
 			SetBackupMethodVolumes([]string{"data"}).
 			AddSchedule(backupMethodName, "0 0 * * *", ttl, true).
 			AddSchedule(vsBackupMethodName, "0 0 * * *", ttl, true)
-		switch v.WorkloadType {
-		case appsv1alpha1.Consensus:
-			bpt.SetTargetRole("leader")
-		case appsv1alpha1.Replication:
-			bpt.SetTargetRole("primary")
-		}
 	}
 	bpt.Create(&testCtx)
 }

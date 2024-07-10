@@ -450,37 +450,6 @@ const (
 	BestEffortParallelStrategy UpdateStrategy = "BestEffortParallel"
 )
 
-var DefaultLeader = ConsensusMember{
-	Name:       "leader",
-	AccessMode: ReadWrite,
-}
-
-// WorkloadType defines the type of workload for the components of the ClusterDefinition.
-// It can be one of the following: `Stateless`, `Stateful`, `Consensus`, or `Replication`.
-//
-// Deprecated since v0.8.
-//
-// +enum
-// +kubebuilder:validation:Enum={Stateless,Stateful,Consensus,Replication}
-type WorkloadType string
-
-const (
-	// Stateless represents a workload type where components do not maintain state, and instances are interchangeable.
-	Stateless WorkloadType = "Stateless"
-
-	// Stateful represents a workload type where components maintain state, and each instance has a unique identity.
-	Stateful WorkloadType = "Stateful"
-
-	// Consensus represents a workload type involving distributed consensus algorithms for coordinated decision-making.
-	Consensus WorkloadType = "Consensus"
-
-	// Replication represents a workload type that involves replication, typically used for achieving high availability
-	// and fault tolerance.
-	Replication WorkloadType = "Replication"
-)
-
-var WorkloadTypes = []string{"Stateless", "Stateful", "Consensus", "Replication"}
-
 // TerminationPolicyType defines termination policy types.
 //
 // +enum

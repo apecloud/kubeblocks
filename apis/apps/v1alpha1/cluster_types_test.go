@@ -232,7 +232,6 @@ metadata:
 spec:
   componentDefs:
     - name: replicasets
-      workloadType: Consensus
       logConfigs:
         - name: error
           filePathPattern: /log/mysql/mysqld.err

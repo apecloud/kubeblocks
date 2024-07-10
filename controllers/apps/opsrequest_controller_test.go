@@ -135,7 +135,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		target corev1.ResourceRequirements
 	}
 
-	testVerticalScaleCPUAndMemory := func(workloadType testapps.ComponentDefTplType, scalingCtx verticalScalingContext) {
+	testVerticalScaleCPUAndMemory := func(compType testapps.ComponentDefTplType, scalingCtx verticalScalingContext) {
 		const opsName = "mysql-verticalscaling"
 
 		By("Create a cluster obj")
@@ -157,7 +157,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		// the opsRequest will use startTime to check some condition.
 		// if there is no sleep for 1 second, unstable error may occur.
 		time.Sleep(time.Second)
-		if workloadType == testapps.StatefulMySQLComponent {
+		if compType == testapps.StatefulMySQLComponent {
 			lastTransTime := metav1.NewTime(time.Now().Add(-1 * (defaultMinReadySeconds + 1) * time.Second))
 			Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
 				testk8s.MockPodAvailable(pod, lastTransTime)

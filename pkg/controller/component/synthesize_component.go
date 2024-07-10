@@ -25,7 +25,6 @@ import (
 	"strconv"
 	"strings"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -231,7 +230,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	buildRuntimeClassName(synthesizeComp, comp)
 
 	// build lorryContainer
-	// TODO(xingran): buildLorryContainers relies on synthesizeComp.CharacterType and synthesizeComp.WorkloadType, which will be deprecated in the future.
+	// TODO(xingran): buildLorryContainers relies on synthesizeComp.CharacterType, which will be deprecated in the future.
 	if err := buildLorryContainers(reqCtx, synthesizeComp, clusterCompSpec); err != nil {
 		reqCtx.Log.Error(err, "build lorry containers failed.")
 		return nil, err
@@ -647,24 +646,10 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 
-	buildPodManagementPolicy := func() {
-		var podManagementPolicy appsv1.PodManagementPolicyType
-		w := clusterCompDef.GetStatefulSetWorkload()
-		if w == nil {
-			podManagementPolicy = ""
-		} else {
-			podManagementPolicy, _ = w.FinalStsUpdateStrategy()
-		}
-		synthesizeComp.PodManagementPolicy = &podManagementPolicy
-	}
-
 	// build workload
 	buildWorkload()
 
 	buildClusterCompServices()
-
-	// build pod management policy
-	buildPodManagementPolicy()
 
 	// build componentRefEnvs
 	if err := buildComponentRef(clusterDef, cluster, clusterCompDef, synthesizeComp); err != nil {
@@ -820,30 +805,6 @@ func ReplaceSecretEnvVars(namedValuesMap map[string]string, envs []corev1.EnvVar
 		newEnvs = append(newEnvs, e)
 	}
 	return newEnvs
-}
-
-// overrideSwitchoverSpecAttr overrides the attributes in switchoverSpec with the attributes of SwitchoverShortSpec in clusterVersion.
-func overrideSwitchoverSpecAttr(switchoverSpec *appsv1alpha1.SwitchoverSpec, cvSwitchoverSpec *appsv1alpha1.SwitchoverShortSpec) {
-	if switchoverSpec == nil || cvSwitchoverSpec == nil || cvSwitchoverSpec.CmdExecutorConfig == nil {
-		return
-	}
-	applyCmdExecutorConfig := func(cmdExecutorConfig *appsv1alpha1.CmdExecutorConfig) {
-		if cmdExecutorConfig == nil {
-			return
-		}
-		if len(cvSwitchoverSpec.CmdExecutorConfig.Image) > 0 {
-			cmdExecutorConfig.Image = cvSwitchoverSpec.CmdExecutorConfig.Image
-		}
-		if len(cvSwitchoverSpec.CmdExecutorConfig.Env) > 0 {
-			cmdExecutorConfig.Env = cvSwitchoverSpec.CmdExecutorConfig.Env
-		}
-	}
-	if switchoverSpec.WithCandidate != nil {
-		applyCmdExecutorConfig(switchoverSpec.WithCandidate.CmdExecutorConfig)
-	}
-	if switchoverSpec.WithoutCandidate != nil {
-		applyCmdExecutorConfig(switchoverSpec.WithoutCandidate.CmdExecutorConfig)
-	}
 }
 
 func GetConfigSpecByName(synthesizedComp *SynthesizedComponent, configSpec string) *appsv1alpha1.ComponentConfigSpec {

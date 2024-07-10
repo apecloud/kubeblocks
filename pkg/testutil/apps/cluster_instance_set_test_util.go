@@ -64,7 +64,7 @@ func CreateConsensusMysqlCluster(
 	clusterDefName,
 	clusterVersionName,
 	clusterName,
-	workloadType,
+	compDefName,
 	consensusCompName string, pvcSize ...string) *appsv1alpha1.Cluster {
 	size := "2Gi"
 	if len(pvcSize) > 0 {
@@ -72,7 +72,7 @@ func CreateConsensusMysqlCluster(
 	}
 	pvcSpec := NewPVCSpec(size)
 	return NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-		AddComponent(consensusCompName, workloadType).SetReplicas(ConsensusReplicas).SetEnabledLogs(errorLogName).
+		AddComponent(consensusCompName, compDefName).SetReplicas(ConsensusReplicas).SetEnabledLogs(errorLogName).
 		AddVolumeClaimTemplate("data", pvcSpec).Create(testCtx).GetObject()
 }
 
@@ -84,8 +84,8 @@ func CreateConsensusMysqlClusterDef(testCtx *testutil.TestContext, clusterDefNam
 }
 
 // CreateConsensusMysqlClusterVersion creates a mysql clusterVersion with a component of ConsensusSet type.
-func CreateConsensusMysqlClusterVersion(testCtx *testutil.TestContext, clusterDefName, clusterVersionName, workloadType string) *appsv1alpha1.ClusterVersion {
-	return NewClusterVersionFactory(clusterVersionName, clusterDefName).AddComponentVersion(workloadType).AddContainerShort("mysql", ApeCloudMySQLImage).
+func CreateConsensusMysqlClusterVersion(testCtx *testutil.TestContext, clusterDefName, clusterVersionName, compDefName string) *appsv1alpha1.ClusterVersion {
+	return NewClusterVersionFactory(clusterVersionName, clusterDefName).AddComponentVersion(compDefName).AddContainerShort("mysql", ApeCloudMySQLImage).
 		Create(testCtx).GetObject()
 }
 

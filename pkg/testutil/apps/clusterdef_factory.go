@@ -220,15 +220,6 @@ func (factory *MockClusterDefFactory) AddSystemAccountSpec(sysAccounts *appsv1al
 	return factory
 }
 
-func (factory *MockClusterDefFactory) AddSwitchoverSpec(switchoverSpec *appsv1alpha1.SwitchoverSpec) *MockClusterDefFactory {
-	comp := factory.getLastCompDef()
-	if comp == nil {
-		return factory
-	}
-	comp.SwitchoverSpec = switchoverSpec
-	return factory
-}
-
 func (factory *MockClusterDefFactory) AddServiceRefDeclarations(serviceRefDeclarations []appsv1alpha1.ServiceRefDeclaration) *MockClusterDefFactory {
 	comp := factory.getLastCompDef()
 	if comp == nil {
@@ -253,15 +244,6 @@ func (factory *MockClusterDefFactory) AddContainerVolumeMounts(containerName str
 		return factory
 	}
 	comp.PodSpec.Containers = appendContainerVolumeMounts(comp.PodSpec.Containers, containerName, volumeMounts)
-	return factory
-}
-
-func (factory *MockClusterDefFactory) AddReplicationSpec(replicationSpec *appsv1alpha1.ReplicationSetSpec) *MockClusterDefFactory {
-	comp := factory.getLastCompDef()
-	if comp == nil {
-		return factory
-	}
-	comp.ReplicationSpec = replicationSpec
 	return factory
 }
 

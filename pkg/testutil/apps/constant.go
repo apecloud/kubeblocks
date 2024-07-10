@@ -80,15 +80,7 @@ var (
 	}
 
 	statelessNginxComponent = appsv1alpha1.ClusterComponentDefinition{
-		WorkloadType:  appsv1alpha1.Stateless,
-		CharacterType: "stateless",
-		Probes: &appsv1alpha1.ClusterDefinitionProbes{
-			RoleProbe: &appsv1alpha1.ClusterDefinitionProbe{
-				FailureThreshold: 3,
-				PeriodSeconds:    1,
-				TimeoutSeconds:   5,
-			},
-		},
+		CharacterType:        "stateless",
 		VolumeProtectionSpec: &appsv1alpha1.VolumeProtectionSpec{},
 		PodSpec: &corev1.PodSpec{
 			Containers: []corev1.Container{{
@@ -164,15 +156,7 @@ var (
 	}
 
 	statefulMySQLComponent = appsv1alpha1.ClusterComponentDefinition{
-		WorkloadType:  appsv1alpha1.Stateful,
-		CharacterType: "mysql",
-		Probes: &appsv1alpha1.ClusterDefinitionProbes{
-			RoleProbe: &appsv1alpha1.ClusterDefinitionProbe{
-				FailureThreshold: 3,
-				PeriodSeconds:    1,
-				TimeoutSeconds:   5,
-			},
-		},
+		CharacterType:        "mysql",
 		VolumeProtectionSpec: &appsv1alpha1.VolumeProtectionSpec{},
 		Service:              &defaultMySQLService,
 		PodSpec: &corev1.PodSpec{
@@ -188,20 +172,6 @@ var (
 		},
 	}
 
-	defaultConsensusSpec = appsv1alpha1.ConsensusSetSpec{
-		Leader: appsv1alpha1.ConsensusMember{
-			Name:       "leader",
-			AccessMode: appsv1alpha1.ReadWrite,
-		},
-		Followers: []appsv1alpha1.ConsensusMember{{
-			Name:       "follower",
-			AccessMode: appsv1alpha1.Readonly,
-		}},
-		StatefulSetSpec: appsv1alpha1.StatefulSetSpec{
-			UpdateStrategy: appsv1alpha1.BestEffortParallelStrategy,
-		},
-	}
-
 	defaultMySQLService = appsv1alpha1.ServiceSpec{
 		Ports: []appsv1alpha1.ServicePort{{
 			Name:     "mysql",
@@ -211,16 +181,7 @@ var (
 	}
 
 	consensusMySQLComponent = appsv1alpha1.ClusterComponentDefinition{
-		WorkloadType:  appsv1alpha1.Consensus,
-		CharacterType: "mysql",
-		ConsensusSpec: &defaultConsensusSpec,
-		Probes: &appsv1alpha1.ClusterDefinitionProbes{
-			RoleProbe: &appsv1alpha1.ClusterDefinitionProbe{
-				FailureThreshold: 3,
-				PeriodSeconds:    1,
-				TimeoutSeconds:   5,
-			},
-		},
+		CharacterType:        "mysql",
 		VolumeProtectionSpec: &appsv1alpha1.VolumeProtectionSpec{},
 		Service:              &defaultMySQLService,
 		PodSpec: &corev1.PodSpec{
@@ -441,15 +402,7 @@ var (
 	}
 
 	replicationRedisComponent = appsv1alpha1.ClusterComponentDefinition{
-		WorkloadType:  appsv1alpha1.Replication,
-		CharacterType: "redis",
-		Probes: &appsv1alpha1.ClusterDefinitionProbes{
-			RoleProbe: &appsv1alpha1.ClusterDefinitionProbe{
-				FailureThreshold: 3,
-				PeriodSeconds:    1,
-				TimeoutSeconds:   5,
-			},
-		},
+		CharacterType:        "redis",
 		VolumeProtectionSpec: &appsv1alpha1.VolumeProtectionSpec{},
 		Service:              &defaultRedisService,
 		VolumeTypes: []appsv1alpha1.VolumeTypeSpec{{

@@ -82,7 +82,7 @@ var _ = Describe("Prepare Test", func() {
 	)
 
 	Context("create cluster with component and component definition API, testing render configuration", func() {
-		createAllWorkloadTypesClusterDef := func(noCreateAssociateCV ...bool) {
+		createAllTypesClusterDef := func(noCreateAssociateCV ...bool) {
 			By("Create a clusterDefinition obj")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 				AddComponentDef(testapps.ConsensusMySQLComponent, mysqlClusterCompDefName).
@@ -108,7 +108,7 @@ var _ = Describe("Prepare Test", func() {
 		}
 
 		BeforeEach(func() {
-			createAllWorkloadTypesClusterDef()
+			createAllTypesClusterDef()
 
 			testapps.CreateCustomizedObj(&testCtx, "config/envfrom-config.yaml", &corev1.ConfigMap{}, testCtx.UseDefaultNamespace())
 			tpl := testapps.CreateCustomizedObj(&testCtx, "config/envfrom-constraint.yaml", &appsv1beta1.ConfigConstraint{})

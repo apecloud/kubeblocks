@@ -19,12 +19,9 @@ package v1alpha1
 import (
 	"strings"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
 
 // ClusterDefinitionSpec defines the desired state of ClusterDefinition.
@@ -523,8 +520,6 @@ type MonitorConfig struct {
 // has been replaced by ComponentDefinition.
 //
 // Deprecated: Use ComponentDefinition instead. This type is deprecated as of version 0.8.
-//
-// +kubebuilder:validation:XValidation:rule="has(self.workloadType) && self.workloadType == 'Consensus' ? (has(self.consensusSpec) || has(self.rsmSpec)) : !has(self.consensusSpec)",message="componentDefs.consensusSpec(deprecated) or componentDefs.rsmSpec(recommended) is required when componentDefs.workloadType is Consensus, and forbidden otherwise"
 type ClusterComponentDefinition struct {
 	// This name could be used as default name of `cluster.spec.componentSpecs.name`, and needs to conform with same
 	// validation rules as `cluster.spec.componentSpecs.name`, currently complying with IANA Service Naming rule.
@@ -539,16 +534,6 @@ type ClusterComponentDefinition struct {
 	//
 	// +optional
 	Description string `json:"description,omitempty"`
-
-	// Defines the type of the workload.
-	//
-	// - `Stateless` describes stateless applications.
-	// - `Stateful` describes common stateful applications.
-	// - `Consensus` describes applications based on consensus protocols, such as raft and paxos.
-	// - `Replication` describes applications based on the primary-secondary data replication protocol.
-	//
-	// +kubebuilder:validation:Required
-	WorkloadType WorkloadType `json:"workloadType"`
 
 	// Defines well-known database component name, such as mongos(mongodb), proxy(redis), mariadb(mysql).
 	//
@@ -573,11 +558,6 @@ type ClusterComponentDefinition struct {
 	// +optional
 	ScriptSpecs []ComponentTemplateSpec `json:"scriptSpecs,omitempty"`
 
-	// Settings for health checks.
-	//
-	// +optional
-	Probes *ClusterDefinitionProbes `json:"probes,omitempty"`
-
 	// Specify the logging files which can be observed and configured by cluster users.
 	//
 	// +patchMergeKey=name
@@ -597,37 +577,6 @@ type ClusterComponentDefinition struct {
 	//
 	// +optional
 	Service *ServiceSpec `json:"service,omitempty"`
-
-	// Defines spec for `Stateless` workloads.
-	//
-	// +kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use RSMSpec instead."
-	// +optional
-	StatelessSpec *StatelessSetSpec `json:"statelessSpec,omitempty"`
-
-	// Defines spec for `Stateful` workloads.
-	//
-	// +kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use RSMSpec instead."
-	// +optional
-	StatefulSpec *StatefulSetSpec `json:"statefulSpec,omitempty"`
-
-	// Defines spec for `Consensus` workloads. It's required if the workload type is `Consensus`.
-	//
-	// +kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use RSMSpec instead."
-	// +optional
-	ConsensusSpec *ConsensusSetSpec `json:"consensusSpec,omitempty"`
-
-	// Defines spec for `Replication` workloads.
-	//
-	// +kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use RSMSpec instead."
-	// +optional
-	ReplicationSpec *ReplicationSetSpec `json:"replicationSpec,omitempty"`
-
-	// Defines workload spec of this component.
-	// From KB 0.7.0, RSM(InstanceSetSpec) will be the underlying CR which powers all kinds of workload in KB.
-	// RSM is an enhanced stateful workload extension dedicated for heavy-state workloads like databases.
-	//
-	// +optional
-	RSMSpec *RSMSpec `json:"rsmSpec,omitempty"`
 
 	// Defines the behavior of horizontal scale.
 	//
@@ -662,13 +611,6 @@ type ClusterComponentDefinition struct {
 	// +listMapKey=key
 	// +optional
 	CustomLabelSpecs []CustomLabelSpec `json:"customLabelSpecs,omitempty"`
-
-	// Defines command to do switchover.
-	// In particular, when workloadType=Replication, the command defined in switchoverSpec will only be executed under
-	// the condition of cluster.componentSpecs[x].SwitchPolicy.type=Noop.
-	//
-	// +optional
-	SwitchoverSpec *SwitchoverSpec `json:"switchoverSpec,omitempty"`
 
 	// Defines the command to be executed when the component is ready, and the command will only be executed once after
 	// the component becomes ready.
@@ -707,46 +649,6 @@ type ClusterComponentDefinition struct {
 	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.10.0"
 	// +optional
 	Monitor *MonitorConfig `json:"monitor,omitempty"`
-}
-
-func (r *ClusterComponentDefinition) GetStatefulSetWorkload() StatefulSetWorkload {
-	switch r.WorkloadType {
-	case Stateless:
-		return nil
-	case Stateful:
-		return r.StatefulSpec
-	case Consensus:
-		return r.ConsensusSpec
-	case Replication:
-		return r.ReplicationSpec
-	}
-	panic("unreachable")
-}
-
-func (r *ClusterComponentDefinition) IsStatelessWorkload() bool {
-	return r.WorkloadType == Stateless
-}
-
-func (r *ClusterComponentDefinition) GetCommonStatefulSpec() (*StatefulSetSpec, error) {
-	if r.IsStatelessWorkload() {
-		return nil, ErrWorkloadTypeIsStateless
-	}
-	switch r.WorkloadType {
-	case Stateful:
-		return r.StatefulSpec, nil
-	case Consensus:
-		if r.ConsensusSpec != nil {
-			return &r.ConsensusSpec.StatefulSetSpec, nil
-		}
-	case Replication:
-		if r.ReplicationSpec != nil {
-			return &r.ReplicationSpec.StatefulSetSpec, nil
-		}
-	default:
-		panic("unreachable")
-		// return nil, ErrWorkloadTypeIsUnknown
-	}
-	return nil, nil
 }
 
 // ServiceSpec is deprecated since v0.8.
@@ -860,307 +762,6 @@ type HorizontalScalePolicy struct {
 	VolumeMountsName string `json:"volumeMountsName,omitempty"`
 }
 
-// ClusterDefinitionProbeCMDs is deprecated since v0.8.
-type ClusterDefinitionProbeCMDs struct {
-	// Defines write checks that are executed on the probe sidecar.
-	//
-	// +optional
-	Writes []string `json:"writes,omitempty"`
-
-	// Defines read checks that are executed on the probe sidecar.
-	//
-	// +optional
-	Queries []string `json:"queries,omitempty"`
-}
-
-// ClusterDefinitionProbe is deprecated since v0.8.
-type ClusterDefinitionProbe struct {
-	// How often (in seconds) to perform the probe.
-	//
-	// +kubebuilder:default=1
-	// +kubebuilder:validation:Minimum=1
-	PeriodSeconds int32 `json:"periodSeconds,omitempty"`
-
-	// Number of seconds after which the probe times out. Defaults to 1 second.
-	//
-	// +kubebuilder:default=1
-	// +kubebuilder:validation:Minimum=1
-	TimeoutSeconds int32 `json:"timeoutSeconds,omitempty"`
-
-	// Minimum consecutive failures for the probe to be considered failed after having succeeded.
-	//
-	// +kubebuilder:default=3
-	// +kubebuilder:validation:Minimum=2
-	FailureThreshold int32 `json:"failureThreshold,omitempty"`
-
-	// Commands used to execute for probe.
-	//
-	// +optional
-	Commands *ClusterDefinitionProbeCMDs `json:"commands,omitempty"`
-}
-
-// ClusterDefinitionProbes is deprecated since v0.8.
-type ClusterDefinitionProbes struct {
-	// Specifies the probe used for checking the running status of the component.
-	//
-	// +optional
-	RunningProbe *ClusterDefinitionProbe `json:"runningProbe,omitempty"`
-
-	// Specifies the probe used for checking the status of the component.
-	//
-	// +optional
-	StatusProbe *ClusterDefinitionProbe `json:"statusProbe,omitempty"`
-
-	// Specifies the probe used for checking the role of the component.
-	//
-	// +kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use RSMSpec instead."
-	// +optional
-	RoleProbe *ClusterDefinitionProbe `json:"roleProbe,omitempty"`
-
-	// Defines the timeout (in seconds) for the role probe after all pods of the component are ready.
-	// The system will check if the application is available in the pod.
-	// If pods exceed the InitializationTimeoutSeconds time without a role label, this component will enter the
-	// Failed/Abnormal phase.
-	//
-	// Note that this configuration will only take effect if the component supports RoleProbe
-	// and will not affect the life cycle of the pod. default values are 60 seconds.
-	//
-	// +kubebuilder:validation:Minimum=30
-	// +optional
-	RoleProbeTimeoutAfterPodsReady int32 `json:"roleProbeTimeoutAfterPodsReady,omitempty"`
-}
-
-// StatelessSetSpec is deprecated since v0.7.
-type StatelessSetSpec struct {
-	// Specifies the deployment strategy that will be used to replace existing pods with new ones.
-	//
-	// +patchStrategy=retainKeys
-	// +optional
-	UpdateStrategy appsv1.DeploymentStrategy `json:"updateStrategy,omitempty"`
-}
-
-// StatefulSetSpec is deprecated since v0.7.
-type StatefulSetSpec struct {
-	// Specifies the strategy for updating Pods.
-	// For workloadType=`Consensus`, the update strategy can be one of the following:
-	//
-	// - `Serial`: Updates Members sequentially to minimize component downtime.
-	// - `BestEffortParallel`: Updates Members in parallel to minimize component write downtime. Majority remains online
-	// at all times.
-	// - `Parallel`: Forces parallel updates.
-	//
-	// +kubebuilder:default=Serial
-	// +optional
-	UpdateStrategy UpdateStrategy `json:"updateStrategy,omitempty"`
-
-	// Controls the creation of pods during initial scale up, replacement of pods on nodes, and scaling down.
-	//
-	// - `OrderedReady`: Creates pods in increasing order (pod-0, then pod-1, etc). The controller waits until each pod
-	// is ready before continuing. Pods are removed in reverse order when scaling down.
-	// - `Parallel`: Creates pods in parallel to match the desired scale without waiting. All pods are deleted at once
-	// when scaling down.
-	//
-	// +optional
-	LLPodManagementPolicy appsv1.PodManagementPolicyType `json:"llPodManagementPolicy,omitempty"`
-
-	// Specifies the low-level StatefulSetUpdateStrategy to be used when updating Pods in the StatefulSet upon a
-	// revision to the Template.
-	// `UpdateStrategy` will be ignored if this is provided.
-	//
-	// +optional
-	LLUpdateStrategy *appsv1.StatefulSetUpdateStrategy `json:"llUpdateStrategy,omitempty"`
-}
-
-var _ StatefulSetWorkload = &StatefulSetSpec{}
-
-func (r *StatefulSetSpec) GetUpdateStrategy() UpdateStrategy {
-	if r == nil {
-		return SerialStrategy
-	}
-	return r.UpdateStrategy
-}
-
-func (r *StatefulSetSpec) FinalStsUpdateStrategy() (appsv1.PodManagementPolicyType, appsv1.StatefulSetUpdateStrategy) {
-	if r == nil {
-		r = &StatefulSetSpec{
-			UpdateStrategy: SerialStrategy,
-		}
-	}
-	return r.finalStsUpdateStrategy()
-}
-
-func (r *StatefulSetSpec) finalStsUpdateStrategy() (appsv1.PodManagementPolicyType, appsv1.StatefulSetUpdateStrategy) {
-	if r.LLUpdateStrategy != nil {
-		return r.LLPodManagementPolicy, *r.LLUpdateStrategy
-	}
-
-	zeroPartition := int32(0)
-	switch r.UpdateStrategy {
-	case BestEffortParallelStrategy:
-		m := intstr.FromString("49%")
-		return appsv1.ParallelPodManagement, appsv1.StatefulSetUpdateStrategy{
-			Type: appsv1.RollingUpdateStatefulSetStrategyType,
-			RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
-				// explicitly set the partition as 0 to avoid update workload unexpectedly.
-				Partition: &zeroPartition,
-				// alpha feature since v1.24
-				// ref: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#maximum-unavailable-pods
-				MaxUnavailable: &m,
-			},
-		}
-	case ParallelStrategy:
-		return appsv1.ParallelPodManagement, appsv1.StatefulSetUpdateStrategy{
-			Type: appsv1.RollingUpdateStatefulSetStrategyType,
-		}
-	case SerialStrategy:
-		fallthrough
-	default:
-		m := intstr.FromInt(1)
-		return appsv1.OrderedReadyPodManagement, appsv1.StatefulSetUpdateStrategy{
-			Type: appsv1.RollingUpdateStatefulSetStrategyType,
-			RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
-				// explicitly set the partition as 0 to avoid update workload unexpectedly.
-				Partition: &zeroPartition,
-				// alpha feature since v1.24
-				// ref: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#maximum-unavailable-pods
-				MaxUnavailable: &m,
-			},
-		}
-	}
-}
-
-// ConsensusSetSpec is deprecated since v0.7.
-type ConsensusSetSpec struct {
-	StatefulSetSpec `json:",inline"`
-
-	// Represents a single leader in the consensus set.
-	//
-	// +kubebuilder:validation:Required
-	Leader ConsensusMember `json:"leader"`
-
-	// Members of the consensus set that have voting rights but are not the leader.
-	//
-	// +optional
-	Followers []ConsensusMember `json:"followers,omitempty"`
-
-	// Represents a member of the consensus set that does not have voting rights.
-	//
-	// +optional
-	Learner *ConsensusMember `json:"learner,omitempty"`
-}
-
-var _ StatefulSetWorkload = &ConsensusSetSpec{}
-
-func (r *ConsensusSetSpec) GetUpdateStrategy() UpdateStrategy {
-	if r == nil {
-		return SerialStrategy
-	}
-	return r.UpdateStrategy
-}
-
-func (r *ConsensusSetSpec) FinalStsUpdateStrategy() (appsv1.PodManagementPolicyType, appsv1.StatefulSetUpdateStrategy) {
-	if r == nil {
-		r = NewConsensusSetSpec()
-	}
-	if r.LLUpdateStrategy != nil {
-		return r.LLPodManagementPolicy, *r.LLUpdateStrategy
-	}
-	_, s := r.StatefulSetSpec.finalStsUpdateStrategy()
-	// switch r.UpdateStrategy {
-	// case SerialStrategy, BestEffortParallelStrategy:
-	s.Type = appsv1.OnDeleteStatefulSetStrategyType
-	s.RollingUpdate = nil
-	// }
-	return appsv1.ParallelPodManagement, s
-}
-
-func NewConsensusSetSpec() *ConsensusSetSpec {
-	return &ConsensusSetSpec{
-		Leader: DefaultLeader,
-		StatefulSetSpec: StatefulSetSpec{
-			UpdateStrategy: SerialStrategy,
-		},
-	}
-}
-
-// ConsensusMember is deprecated since v0.7.
-type ConsensusMember struct {
-	// Specifies the name of the consensus member.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=leader
-	Name string `json:"name"`
-
-	// Specifies the services that this member is capable of providing.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=ReadWrite
-	AccessMode AccessMode `json:"accessMode"`
-
-	// Indicates the number of Pods that perform this role.
-	// The default is 1 for `Leader`, 0 for `Learner`, others for `Followers`.
-	//
-	// +kubebuilder:default=0
-	// +kubebuilder:validation:Minimum=0
-	// +optional
-	Replicas *int32 `json:"replicas,omitempty"`
-}
-
-// RSMSpec is deprecated since v0.8.
-type RSMSpec struct {
-	// Specifies a list of roles defined within the system.
-	//
-	// +optional
-	Roles []workloads.ReplicaRole `json:"roles,omitempty"`
-
-	// Defines the method used to probe a role.
-	//
-	// +optional
-	RoleProbe *workloads.RoleProbe `json:"roleProbe,omitempty"`
-
-	// Indicates the actions required for dynamic membership reconfiguration.
-	//
-	// +optional
-	MembershipReconfiguration *workloads.MembershipReconfiguration `json:"membershipReconfiguration,omitempty"`
-
-	// Describes the strategy for updating Members (Pods).
-	//
-	// - `Serial`: Updates Members sequentially to ensure minimum component downtime.
-	// - `BestEffortParallel`: Updates Members in parallel to ensure minimum component write downtime.
-	// - `Parallel`: Forces parallel updates.
-	//
-	// +kubebuilder:validation:Enum={Serial,BestEffortParallel,Parallel}
-	// +optional
-	MemberUpdateStrategy *workloads.MemberUpdateStrategy `json:"memberUpdateStrategy,omitempty"`
-}
-
-// ReplicationSetSpec is deprecated since v0.7.
-type ReplicationSetSpec struct {
-	StatefulSetSpec `json:",inline"`
-}
-
-var _ StatefulSetWorkload = &ReplicationSetSpec{}
-
-func (r *ReplicationSetSpec) GetUpdateStrategy() UpdateStrategy {
-	if r == nil {
-		return SerialStrategy
-	}
-	return r.UpdateStrategy
-}
-
-func (r *ReplicationSetSpec) FinalStsUpdateStrategy() (appsv1.PodManagementPolicyType, appsv1.StatefulSetUpdateStrategy) {
-	if r == nil {
-		r = &ReplicationSetSpec{}
-	}
-	if r.LLUpdateStrategy != nil {
-		return r.LLPodManagementPolicy, *r.LLUpdateStrategy
-	}
-	_, s := r.StatefulSetSpec.finalStsUpdateStrategy()
-	s.Type = appsv1.OnDeleteStatefulSetStrategyType
-	s.RollingUpdate = nil
-	return appsv1.ParallelPodManagement, s
-}
-
 // PostStartAction is deprecated since v0.8.
 type PostStartAction struct {
 	// Specifies the  post-start command to be executed.
@@ -1171,34 +772,6 @@ type PostStartAction struct {
 	// Used to select the script that need to be referenced.
 	// When defined, the scripts defined in scriptSpecs can be referenced within the CmdExecutorConfig.
 	//
-	// +optional
-	ScriptSpecSelectors []ScriptSpecSelector `json:"scriptSpecSelectors,omitempty"`
-}
-
-// SwitchoverSpec is deprecated since v0.8.
-type SwitchoverSpec struct {
-	// Represents the action of switching over to a specified candidate primary or leader instance.
-	//
-	// +optional
-	WithCandidate *SwitchoverAction `json:"withCandidate,omitempty"`
-
-	// Represents the action of switching over without specifying a candidate primary or leader instance.
-	//
-	// +optional
-	WithoutCandidate *SwitchoverAction `json:"withoutCandidate,omitempty"`
-}
-
-// SwitchoverAction is deprecated since v0.8.
-type SwitchoverAction struct {
-	// Specifies the switchover command.
-	//
-	// +kubebuilder:validation:Required
-	CmdExecutorConfig *CmdExecutorConfig `json:"cmdExecutorConfig"`
-
-	// Used to select the script that need to be referenced.
-	// When defined, the scripts defined in scriptSpecs can be referenced within the SwitchoverAction.CmdExecutorConfig.
-	//
-	// +kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.9.0"
 	// +optional
 	ScriptSpecSelectors []ScriptSpecSelector `json:"scriptSpecSelectors,omitempty"`
 }

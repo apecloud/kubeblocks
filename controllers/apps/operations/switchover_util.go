@@ -46,7 +46,6 @@ const (
 
 	KBSwitchoverCandidateInstanceForAnyPod = "*"
 
-	KBJobTTLSecondsAfterFinished  = 5
 	KBSwitchoverJobLabelKey       = "kubeblocks.io/switchover-job"
 	KBSwitchoverJobLabelValue     = "kb-switchover-job"
 	KBSwitchoverJobNamePrefix     = "kb-switchover-job"
@@ -56,14 +55,6 @@ const (
 
 	KBSwitchoverCandidateName = "KB_SWITCHOVER_CANDIDATE_NAME"
 	KBSwitchoverCandidateFqdn = "KB_SWITCHOVER_CANDIDATE_FQDN"
-
-	// KBSwitchoverReplicationPrimaryPodIP and the others Replication and Consensus switchover constants will be deprecated in the future, use KBSwitchoverLeaderPodIP instead.
-	KBSwitchoverReplicationPrimaryPodIP   = "KB_REPLICATION_PRIMARY_POD_IP"
-	KBSwitchoverReplicationPrimaryPodName = "KB_REPLICATION_PRIMARY_POD_NAME"
-	KBSwitchoverReplicationPrimaryPodFqdn = "KB_REPLICATION_PRIMARY_POD_FQDN"
-	KBSwitchoverConsensusLeaderPodIP      = "KB_CONSENSUS_LEADER_POD_IP"
-	KBSwitchoverConsensusLeaderPodName    = "KB_CONSENSUS_LEADER_POD_NAME"
-	KBSwitchoverConsensusLeaderPodFqdn    = "KB_CONSENSUS_LEADER_POD_FQDN"
 
 	KBSwitchoverLeaderPodIP   = "KB_LEADER_POD_IP"
 	KBSwitchoverLeaderPodName = "KB_LEADER_POD_NAME"
@@ -427,34 +418,6 @@ func buildSwitchoverWorkloadEnvs(ctx context.Context,
 		},
 		{
 			Name:  KBSwitchoverLeaderPodFqdn,
-			Value: fmt.Sprintf("%s.%s", pod.Name, svcName),
-		},
-	}...)
-
-	// TODO(xingran): backward compatibility for the old env based on workloadType, it will be removed in the future
-	workloadEnvs = append(workloadEnvs, []corev1.EnvVar{
-		{
-			Name:  KBSwitchoverReplicationPrimaryPodIP,
-			Value: pod.Status.PodIP,
-		},
-		{
-			Name:  KBSwitchoverReplicationPrimaryPodName,
-			Value: pod.Name,
-		},
-		{
-			Name:  KBSwitchoverReplicationPrimaryPodFqdn,
-			Value: fmt.Sprintf("%s.%s", pod.Name, svcName),
-		},
-		{
-			Name:  KBSwitchoverConsensusLeaderPodIP,
-			Value: pod.Status.PodIP,
-		},
-		{
-			Name:  KBSwitchoverConsensusLeaderPodName,
-			Value: pod.Name,
-		},
-		{
-			Name:  KBSwitchoverConsensusLeaderPodFqdn,
 			Value: fmt.Sprintf("%s.%s", pod.Name, svcName),
 		},
 	}...)

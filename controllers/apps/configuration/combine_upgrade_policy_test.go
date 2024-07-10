@@ -58,7 +58,7 @@ var _ = Describe("Reconfigure CombineSyncPolicy", func() {
 					"key": "value",
 				}),
 				withClusterComponent(2),
-				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ComponentConfigSpec{{
+				withCDComponent("consensus", []appsv1alpha1.ComponentConfigSpec{{
 					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
 						Name:       "for_test",
 						VolumeName: "test_volume",
@@ -82,7 +82,7 @@ var _ = Describe("Reconfigure CombineSyncPolicy", func() {
 					"key": "value",
 				}),
 				withClusterComponent(2),
-				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ComponentConfigSpec{{
+				withCDComponent("consensus", []appsv1alpha1.ComponentConfigSpec{{
 					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
 						Name:       "for_test",
 						VolumeName: "test_volume",

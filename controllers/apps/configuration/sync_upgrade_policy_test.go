@@ -70,7 +70,7 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 					"a": "c b e f",
 				}),
 				withClusterComponent(3),
-				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ComponentConfigSpec{{
+				withCDComponent("consensus", []appsv1alpha1.ComponentConfigSpec{{
 					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
 						Name:       "for_test",
 						VolumeName: "test_volume",
@@ -127,7 +127,7 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 					"a": "c b e f",
 				}),
 				withClusterComponent(3),
-				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ComponentConfigSpec{{
+				withCDComponent("consensus", []appsv1alpha1.ComponentConfigSpec{{
 					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
 						Name:       "for_test",
 						VolumeName: "test_volume",

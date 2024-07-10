@@ -365,14 +365,6 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 			if clusterCompDef == nil {
 				return false, fmt.Errorf("referenced cluster component definition is not defined: %s", clusterCompDefRefName)
 			}
-			switch clusterCompDef.WorkloadType {
-			case appsv1alpha1.Replication, appsv1alpha1.Consensus:
-				return true, nil
-			case appsv1alpha1.Stateful:
-				if clusterCompDef.RSMSpec != nil {
-					return len(clusterCompDef.RSMSpec.Roles) > 0, nil
-				}
-			}
 		}
 		return false, nil
 	}

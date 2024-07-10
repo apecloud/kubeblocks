@@ -156,15 +156,6 @@ func (t *clusterServiceTransformer) convertLegacyClusterCompSpecServices(transCt
 				legacyService.Name = legacyServiceName
 				legacyService.ServiceName = legacyServiceName
 			}
-			switch clusterCompDef.WorkloadType {
-			case appsv1alpha1.Replication:
-				legacyService.RoleSelector = constant.Primary
-			case appsv1alpha1.Consensus:
-				legacyService.RoleSelector = constant.Leader
-				if clusterCompDef.ConsensusSpec != nil {
-					legacyService.RoleSelector = clusterCompDef.ConsensusSpec.Leader.Name
-				}
-			}
 			convertedServices = append(convertedServices, *legacyService)
 		}
 	}

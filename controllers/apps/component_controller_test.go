@@ -219,7 +219,7 @@ var _ = Describe("Component Controller", func() {
 	}
 
 	// test function helpers
-	createAllWorkloadTypesClusterDef := func(noCreateAssociateCV ...bool) {
+	createAllTypesClusterDef := func(noCreateAssociateCV ...bool) {
 		By("Create a clusterDefinition obj")
 		clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 			AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
@@ -2061,7 +2061,7 @@ var _ = Describe("Component Controller", func() {
 
 	Context("component resources provisioning", func() {
 		BeforeEach(func() {
-			createAllWorkloadTypesClusterDef()
+			createAllTypesClusterDef()
 			createBackupPolicyTpl(clusterDefObj, compDefName)
 		})
 
@@ -2129,7 +2129,7 @@ var _ = Describe("Component Controller", func() {
 	Context("scale-out with different backup methods", func() {
 		BeforeEach(func() {
 			cleanEnv()
-			createAllWorkloadTypesClusterDef()
+			createAllTypesClusterDef()
 			createBackupPolicyTpl(clusterDefObj, compDefName)
 		})
 
@@ -2196,7 +2196,7 @@ var _ = Describe("Component Controller", func() {
 		})
 	})
 
-	When("creating cluster with all workloadTypes (being Stateless|Stateful|Consensus|Replication) component", func() {
+	When("creating cluster with all type components", func() {
 		compNameNDef := map[string]string{
 			statelessCompName:   statelessCompDefName,
 			statefulCompName:    statefulCompDefName,
@@ -2205,7 +2205,7 @@ var _ = Describe("Component Controller", func() {
 		}
 
 		BeforeEach(func() {
-			createAllWorkloadTypesClusterDef()
+			createAllTypesClusterDef()
 			createBackupPolicyTpl(clusterDefObj, compDefName)
 		})
 
@@ -2222,7 +2222,7 @@ var _ = Describe("Component Controller", func() {
 		}
 	})
 
-	When("creating cluster with stateful workloadTypes (being Stateful|Consensus|Replication) component", func() {
+	When("creating cluster with stateful type components", func() {
 		var (
 			mockStorageClass *storagev1.StorageClass
 		)
@@ -2234,7 +2234,7 @@ var _ = Describe("Component Controller", func() {
 		}
 
 		BeforeEach(func() {
-			createAllWorkloadTypesClusterDef()
+			createAllTypesClusterDef()
 			createBackupPolicyTpl(clusterDefObj, compDefName)
 			mockStorageClass = testk8s.CreateMockStorageClass(&testCtx, testk8s.DefaultStorageClassName)
 		})
@@ -2301,9 +2301,9 @@ var _ = Describe("Component Controller", func() {
 		}
 	})
 
-	When("creating cluster with workloadType=consensus component", func() {
+	When("creating cluster with a component", func() {
 		BeforeEach(func() {
-			createAllWorkloadTypesClusterDef()
+			createAllTypesClusterDef()
 			createBackupPolicyTpl(clusterDefObj, compDefName)
 		})
 
@@ -2328,7 +2328,7 @@ var _ = Describe("Component Controller", func() {
 	Context("reconcile component with definition and version", func() {
 		BeforeEach(func() {
 			cleanEnv()
-			createAllWorkloadTypesClusterDef()
+			createAllTypesClusterDef()
 		})
 
 		testImageUnchangedAfterNewReleasePublished := func(release appsv1alpha1.ComponentVersionRelease) {

@@ -1230,11 +1230,6 @@ type OpsRequestComponentStatus struct {
 	// +optional
 	ProgressDetails []ProgressStatusDetail `json:"progressDetails,omitempty"`
 
-	// Records the workload type of Component in ClusterDefinition.
-	// Deprecated and should be removed in the future version.
-	// +optional
-	WorkloadType WorkloadType `json:"workloadType,omitempty"`
-
 	// Provides an explanation for the Component being in its current state.
 	// +kubebuilder:validation:MaxLength=1024
 	// +optional

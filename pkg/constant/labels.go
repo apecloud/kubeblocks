@@ -52,7 +52,6 @@ const (
 	VolumeClaimTemplateNameLabelKey        = "apps.kubeblocks.io/vct-name"
 	KBAppComponentInstanceTemplateLabelKey = "apps.kubeblocks.io/instance-template"
 	KBAppServiceVersionKey                 = "apps.kubeblocks.io/service-version"
-	WorkloadTypeLabelKey                   = "apps.kubeblocks.io/workload-type"
 	KBAppPodNameLabelKey                   = "apps.kubeblocks.io/pod-name"
 	ClusterDefLabelKey                     = "clusterdefinition.kubeblocks.io/name"
 	ClusterVerLabelKey                     = "clusterversion.kubeblocks.io/name"

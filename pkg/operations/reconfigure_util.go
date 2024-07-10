@@ -211,12 +211,12 @@ func formatConfigPatchToMessage(configPatch *core.ConfigPatchInfo, execStatus *c
 func updateFileContent(item *appsv1alpha1.ConfigurationItemDetail, key string, content string) {
 	params, ok := item.ConfigFileParams[key]
 	if !ok {
-		item.ConfigFileParams[key] = appsv1alpha1.ConfigParams{
+		item.ConfigFileParams[key] = appsv1alpha1.ParametersInFile{
 			Content: &content,
 		}
 		return
 	}
-	item.ConfigFileParams[key] = appsv1alpha1.ConfigParams{
+	item.ConfigFileParams[key] = appsv1alpha1.ParametersInFile{
 		Parameters: params.Parameters,
 		Content:    &content,
 	}
@@ -232,13 +232,13 @@ func updateParameters(item *appsv1alpha1.ConfigurationItemDetail, key string, pa
 
 	params, ok := item.ConfigFileParams[key]
 	if !ok {
-		item.ConfigFileParams[key] = appsv1alpha1.ConfigParams{
+		item.ConfigFileParams[key] = appsv1alpha1.ParametersInFile{
 			Parameters: updatedParams,
 		}
 		return
 	}
 
-	item.ConfigFileParams[key] = appsv1alpha1.ConfigParams{
+	item.ConfigFileParams[key] = appsv1alpha1.ParametersInFile{
 		Content:    params.Content,
 		Parameters: mergeMaps(params.Parameters, updatedParams),
 	}

@@ -82,7 +82,7 @@ type ConfigurationItemDetail struct {
 	// This allows users to override the default configuration according to their specific needs.
 	//
 	// +optional
-	ConfigFileParams map[string]ConfigParams `json:"configFileParams,omitempty"`
+	ConfigFileParams map[string]ParametersInFile `json:"configFileParams,omitempty"`
 }
 
 // ConfigurationSpec defines the desired state of a Configuration resource.

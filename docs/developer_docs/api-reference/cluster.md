@@ -2935,33 +2935,6 @@ The modes can be <code>None</code>, <code>Readonly</code>, or <code>ReadWrite</c
 </td>
 </tr></tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.AccountName">AccountName
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SystemAccountConfig">SystemAccountConfig</a>)
-</p>
-<div>
-<p>AccountName defines system account names.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;kbadmin&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;kbdataprotection&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;kbmonitoring&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;kbprobe&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;kbreplicator&#34;</p></td>
-<td></td>
-</tr></tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.Action">Action
 </h3>
 <p>
@@ -4328,20 +4301,6 @@ Kubernetes core/v1.PodSpec
 </tr>
 <tr>
 <td>
-<code>service</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ServiceSpec">
-ServiceSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the service spec.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>statelessSpec</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.StatelessSetSpec">
@@ -4428,20 +4387,6 @@ HorizontalScalePolicy
 </tr>
 <tr>
 <td>
-<code>systemAccounts</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.SystemAccountSpec">
-SystemAccountSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines system accounts needed to manage the component, and the statement to create them.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>volumeTypes</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.VolumeTypeSpec">
@@ -4491,21 +4436,6 @@ SwitchoverSpec
 <p>Defines command to do switchover.
 In particular, when workloadType=Replication, the command defined in switchoverSpec will only be executed under
 the condition of cluster.componentSpecs[x].SwitchPolicy.type=Noop.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>postStartSpec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.PostStartAction">
-PostStartAction
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the command to be executed when the component is ready, and the command will only be executed once after
-the component becomes ready.</p>
 </td>
 </tr>
 <tr>
@@ -6964,7 +6894,7 @@ int64
 <h3 id="apps.kubeblocks.io/v1alpha1.CmdExecutorConfig">CmdExecutorConfig
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.PostStartAction">PostStartAction</a>, <a href="#apps.kubeblocks.io/v1alpha1.SwitchoverAction">SwitchoverAction</a>, <a href="#apps.kubeblocks.io/v1alpha1.SystemAccountSpec">SystemAccountSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SwitchoverAction">SwitchoverAction</a>)
 </p>
 <div>
 <p>CmdExecutorConfig specifies how to perform creation and deletion statements.</p>
@@ -15311,7 +15241,7 @@ The supported property types include:
 <h3 id="apps.kubeblocks.io/v1alpha1.PasswordConfig">PasswordConfig
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentSystemAccount">ComponentSystemAccount</a>, <a href="#apps.kubeblocks.io/v1alpha1.SystemAccount">SystemAccount</a>, <a href="#apps.kubeblocks.io/v1alpha1.SystemAccountSpec">SystemAccountSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentSystemAccount">ComponentSystemAccount</a>, <a href="#apps.kubeblocks.io/v1alpha1.SystemAccount">SystemAccount</a>)
 </p>
 <div>
 <p>PasswordConfig helps provide to customize complexity of password generation pattern.</p>
@@ -15744,52 +15674,6 @@ RefNamespaceName
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.PostStartAction">PostStartAction
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>)
-</p>
-<div>
-<p>PostStartAction is deprecated since v0.8.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>cmdExecutorConfig</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.CmdExecutorConfig">
-CmdExecutorConfig
-</a>
-</em>
-</td>
-<td>
-<p>Specifies the  post-start command to be executed.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>scriptSpecSelectors</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ScriptSpecSelector">
-[]ScriptSpecSelector
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Used to select the script that need to be referenced.
-When defined, the scripts defined in scriptSpecs can be referenced within the CmdExecutorConfig.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.PreCheckResult">PreCheckResult
 </h3>
 <p>
@@ -16160,129 +16044,10 @@ If the value is invalid, it will be ignored and the component level threshold wi
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ProvisionPolicy">ProvisionPolicy
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SystemAccountConfig">SystemAccountConfig</a>)
-</p>
-<div>
-<p>ProvisionPolicy defines the policy details for creating accounts.</p>
-<p>Deprecated since v0.9.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>type</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ProvisionPolicyType">
-ProvisionPolicyType
-</a>
-</em>
-</td>
-<td>
-<p>Specifies the method to provision an account.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>scope</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ProvisionScope">
-ProvisionScope
-</a>
-</em>
-</td>
-<td>
-<p>Defines the scope within which the account is provisioned.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>statements</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ProvisionStatements">
-ProvisionStatements
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The statement to provision an account.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>secretRef</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ProvisionSecretRef">
-ProvisionSecretRef
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The external secret to refer.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ProvisionPolicyType">ProvisionPolicyType
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ProvisionPolicy">ProvisionPolicy</a>)
-</p>
-<div>
-<p>ProvisionPolicyType defines the policy for creating accounts.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;CreateByStmt&#34;</p></td>
-<td><p>CreateByStmt will create account w.r.t. deletion and creation statement given by provider.</p>
-</td>
-</tr><tr><td><p>&#34;ReferToExisting&#34;</p></td>
-<td><p>ReferToExisting will not create account, but create a secret by copying data from referred secret file.</p>
-</td>
-</tr></tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ProvisionScope">ProvisionScope
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ProvisionPolicy">ProvisionPolicy</a>)
-</p>
-<div>
-<p>ProvisionScope defines the scope of provision within a component.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;AllPods&#34;</p></td>
-<td><p>AllPods indicates that accounts will be created for all pods within the component.</p>
-</td>
-</tr><tr><td><p>&#34;AnyPods&#34;</p></td>
-<td><p>AnyPods indicates that accounts will be created only on a single pod within the component.</p>
-</td>
-</tr></tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ProvisionSecretRef">ProvisionSecretRef
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentSystemAccount">ComponentSystemAccount</a>, <a href="#apps.kubeblocks.io/v1alpha1.ProvisionPolicy">ProvisionPolicy</a>, <a href="#apps.kubeblocks.io/v1alpha1.SystemAccount">SystemAccount</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentSystemAccount">ComponentSystemAccount</a>, <a href="#apps.kubeblocks.io/v1alpha1.SystemAccount">SystemAccount</a>)
 </p>
 <div>
 <p>ProvisionSecretRef represents the reference to a secret.</p>
@@ -16315,63 +16080,6 @@ string
 </td>
 <td>
 <p>The namespace where the secret is located.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ProvisionStatements">ProvisionStatements
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ProvisionPolicy">ProvisionPolicy</a>)
-</p>
-<div>
-<p>ProvisionStatements defines the statements used to create accounts.</p>
-<p>Deprecated since v0.9.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>creation</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies the statement required to create a new account with the necessary privileges.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>update</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the statement required to update the password of an existing account.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>deletion</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the statement required to delete an existing account.
-Typically used in conjunction with the creation statement to delete an account before recreating it.
-For example, one might use a <code>drop user if exists</code> statement followed by a <code>create user</code> statement to ensure a fresh account.</p>
-<p>Deprecated: This field is deprecated and the update statement should be used instead.</p>
 </td>
 </tr>
 </tbody>
@@ -17863,7 +17571,7 @@ In these cases, the script must be executed on all replica Pods matching the sel
 <h3 id="apps.kubeblocks.io/v1alpha1.ScriptSpecSelector">ScriptSpecSelector
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentSwitchover">ComponentSwitchover</a>, <a href="#apps.kubeblocks.io/v1alpha1.PostStartAction">PostStartAction</a>, <a href="#apps.kubeblocks.io/v1alpha1.SwitchoverAction">SwitchoverAction</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentSwitchover">ComponentSwitchover</a>, <a href="#apps.kubeblocks.io/v1alpha1.SwitchoverAction">SwitchoverAction</a>)
 </p>
 <div>
 </div>
@@ -18592,103 +18300,6 @@ int64
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ServicePort">ServicePort
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ServiceSpec">ServiceSpec</a>)
-</p>
-<div>
-<p>ServicePort is deprecated since v0.8.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>The name of this port within the service. This must be a DNS_LABEL.
-All ports within a ServiceSpec must have unique names. When considering
-the endpoints for a Service, this must match the &lsquo;name&rsquo; field in the
-EndpointPort.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>protocol</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#protocol-v1-core">
-Kubernetes core/v1.Protocol
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The IP protocol for this port. Supports &ldquo;TCP&rdquo;, &ldquo;UDP&rdquo;, and &ldquo;SCTP&rdquo;.
-Default is TCP.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>appProtocol</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The application protocol for this port.
-This field follows standard Kubernetes label syntax.
-Un-prefixed names are reserved for IANA standard service names (as per
-RFC-6335 and <a href="https://www.iana.org/assignments/service-names)">https://www.iana.org/assignments/service-names)</a>.
-Non-standard protocols should use prefixed names such as
-mycompany.com/my-custom-protocol.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>port</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<p>The port that will be exposed by this service.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>targetPort</code><br/>
-<em>
-<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
-Kubernetes api utils intstr.IntOrString
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Number or name of the port to access on the pods targeted by the service.</p>
-<p>Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.</p>
-<ul>
-<li>If this is a string, it will be looked up as a named port in the target Pod&rsquo;s container ports.</li>
-<li>If this is not specified, the value of the <code>port</code> field is used (an identity map).</li>
-</ul>
-<p>This field is ignored for services with clusterIP=None, and should be
-omitted or set equal to the <code>port</code> field.</p>
-<p>More info: <a href="https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service">https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service</a></p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ServiceRef">ServiceRef
 </h3>
 <p>
@@ -19181,39 +18792,6 @@ CredentialVars
 <p>
 (Members of <code>CredentialVars</code> are embedded into this type.)
 </p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ServiceSpec">ServiceSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>)
-</p>
-<div>
-<p>ServiceSpec is deprecated since v0.8.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>ports</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ServicePort">
-[]ServicePort
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The list of ports that are exposed by this service.
-More info: <a href="https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies">https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies</a></p>
 </td>
 </tr>
 </tbody>
@@ -20089,51 +19667,6 @@ ProvisionSecretRef
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.SystemAccountConfig">SystemAccountConfig
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SystemAccountSpec">SystemAccountSpec</a>)
-</p>
-<div>
-<p>SystemAccountConfig specifies how to create and delete system accounts.</p>
-<p>Deprecated since v0.9.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.AccountName">
-AccountName
-</a>
-</em>
-</td>
-<td>
-<p>The unique identifier of a system account.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>provisionPolicy</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ProvisionPolicy">
-ProvisionPolicy
-</a>
-</em>
-</td>
-<td>
-<p>Outlines the strategy for creating the account.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.SystemAccountShortSpec">SystemAccountShortSpec
 </h3>
 <p>
@@ -20163,65 +19696,6 @@ CommandExecutorEnvItem
 </td>
 <td>
 <p>Configures the method for obtaining the client SDK and executing statements.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.SystemAccountSpec">SystemAccountSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>)
-</p>
-<div>
-<p>SystemAccountSpec specifies information to create system accounts.</p>
-<p>Deprecated since v0.8, be replaced by <code>componentDefinition.spec.systemAccounts</code> and
-<code>componentDefinition.spec.lifecycleActions.accountProvision</code>.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>cmdExecutorConfig</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.CmdExecutorConfig">
-CmdExecutorConfig
-</a>
-</em>
-</td>
-<td>
-<p>Configures how to obtain the client SDK and execute statements.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>passwordConfig</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.PasswordConfig">
-PasswordConfig
-</a>
-</em>
-</td>
-<td>
-<p>Defines the pattern used to generate passwords for system accounts.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>accounts</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.SystemAccountConfig">
-[]SystemAccountConfig
-</a>
-</em>
-</td>
-<td>
-<p>Defines the configuration settings for system accounts.</p>
 </td>
 </tr>
 </tbody>

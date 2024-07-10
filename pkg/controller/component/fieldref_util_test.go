@@ -111,12 +111,8 @@ var _ = Describe("ComponentRef Fields Tests", func() {
 
 			By("lookup service name, should fail")
 			_, err := resolveServiceRef(cluster.Name, components, componentDef)
-			if componentDef.Service != nil {
-				Expect(err).To(BeNil())
-			} else {
-				Expect(err).NotTo(BeNil())
-				Expect(err.Error()).To(ContainSubstring("does not have service"))
-			}
+			Expect(err).NotTo(BeNil())
+			Expect(err.Error()).To(ContainSubstring("does not have service"))
 		})
 
 		It("test invalid serviceRef with multiple components", func() {
@@ -139,26 +135,6 @@ var _ = Describe("ComponentRef Fields Tests", func() {
 			_, err := resolveServiceRef(cluster.Name, components, componentDef)
 			Expect(err).NotTo(BeNil())
 			Expect(err.Error()).To(ContainSubstring("expect one component but got"))
-		})
-
-		It("test serviceRef with correct setting", func() {
-			clusterDef := clusterDefBuilder.AddNamedServicePort("mysql", 3306).GetObject()
-
-			By("add one component to cluster")
-			clusterBuilder = clusterBuilder.
-				AddComponent(mysqlCompName, mysqlCompDefName).
-				AddComponent(referredCompName, referredCompDefName)
-			cluster := clusterBuilder.GetObject()
-
-			componentDef := clusterDef.GetComponentDefByName(referredCompDefName)
-			Expect(componentDef).NotTo(BeNil())
-			components := cluster.Spec.GetDefNameMappingComponents()[referredCompDefName]
-			Expect(len(components)).To(Equal(1))
-
-			By("lookup service name, should fail")
-			value, err := resolveServiceRef(cluster.Name, components, componentDef)
-			Expect(err).To(BeNil())
-			Expect(value).To(Equal(fmt.Sprintf("%s-%s", cluster.Name, referredCompName)))
 		})
 
 		It("test headlessServiceSvc", func() {

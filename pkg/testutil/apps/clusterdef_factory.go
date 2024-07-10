@@ -62,14 +62,14 @@ func NewClusterDefFactory(name string) *MockClusterDefFactory {
 				ComponentDefs: []appsv1alpha1.ClusterComponentDefinition{},
 			},
 		}, f)
-	f.SetConnectionCredential(getDefaultConnectionCredential(), nil)
+	f.SetConnectionCredential(getDefaultConnectionCredential())
 	return f
 }
 
 func NewClusterDefFactoryWithConnCredential(name, compDefName string) *MockClusterDefFactory {
 	f := NewClusterDefFactory(name)
 	f.AddComponentDef(StatefulMySQLComponent, compDefName)
-	f.SetConnectionCredential(getDefaultConnectionCredential(), &defaultSvcSpec)
+	f.SetConnectionCredential(getDefaultConnectionCredential())
 	return f
 }
 
@@ -88,20 +88,6 @@ func (factory *MockClusterDefFactory) AddComponentDef(tplType ComponentDefTplTyp
 	factory.Get().Spec.ComponentDefs = append(factory.Get().Spec.ComponentDefs, *component)
 	comp := factory.getLastCompDef()
 	comp.Name = compDefName
-	return factory
-}
-
-func (factory *MockClusterDefFactory) AddServicePort(port int32) *MockClusterDefFactory {
-	comp := factory.getLastCompDef()
-	if comp == nil {
-		return nil
-	}
-	comp.Service = &appsv1alpha1.ServiceSpec{
-		Ports: []appsv1alpha1.ServicePort{{
-			Protocol: corev1.ProtocolTCP,
-			Port:     port,
-		}},
-	}
 	return factory
 }
 
@@ -179,18 +165,9 @@ func (factory *MockClusterDefFactory) AddHorizontalScalePolicy(policy appsv1alph
 	return factory
 }
 
-func (factory *MockClusterDefFactory) SetConnectionCredential(
-	connectionCredential map[string]string, svc *appsv1alpha1.ServiceSpec) *MockClusterDefFactory {
+func (factory *MockClusterDefFactory) SetConnectionCredential(connectionCredential map[string]string) *MockClusterDefFactory {
 	factory.Get().Spec.ConnectionCredential = connectionCredential
-	factory.SetServiceSpec(svc)
 	return factory
-}
-
-func (factory *MockClusterDefFactory) get1stCompDef() *appsv1alpha1.ClusterComponentDefinition {
-	if len(factory.Get().Spec.ComponentDefs) == 0 {
-		return nil
-	}
-	return &factory.Get().Spec.ComponentDefs[0]
 }
 
 func (factory *MockClusterDefFactory) getLastCompDef() *appsv1alpha1.ClusterComponentDefinition {
@@ -200,24 +177,6 @@ func (factory *MockClusterDefFactory) getLastCompDef() *appsv1alpha1.ClusterComp
 	}
 	comps := factory.Get().Spec.ComponentDefs
 	return &comps[l-1]
-}
-
-func (factory *MockClusterDefFactory) SetServiceSpec(svc *appsv1alpha1.ServiceSpec) *MockClusterDefFactory {
-	comp := factory.get1stCompDef()
-	if comp == nil {
-		return factory
-	}
-	comp.Service = svc
-	return factory
-}
-
-func (factory *MockClusterDefFactory) AddSystemAccountSpec(sysAccounts *appsv1alpha1.SystemAccountSpec) *MockClusterDefFactory {
-	comp := factory.getLastCompDef()
-	if comp == nil {
-		return factory
-	}
-	comp.SystemAccounts = sysAccounts
-	return factory
 }
 
 func (factory *MockClusterDefFactory) AddSwitchoverSpec(switchoverSpec *appsv1alpha1.SwitchoverSpec) *MockClusterDefFactory {
@@ -274,29 +233,6 @@ func (factory *MockClusterDefFactory) AddComponentRef(ref *appsv1alpha1.Componen
 		comp.ComponentDefRef = make([]appsv1alpha1.ComponentDefRef, 0)
 	}
 	comp.ComponentDefRef = append(comp.ComponentDefRef, *ref)
-	return factory
-}
-
-func (factory *MockClusterDefFactory) AddNamedServicePort(name string, port int32) *MockClusterDefFactory {
-	comp := factory.getLastCompDef()
-	if comp == nil {
-		return nil
-	}
-	if comp.Service != nil {
-		comp.Service.Ports = append(comp.Service.Ports, appsv1alpha1.ServicePort{
-			Name:     name,
-			Protocol: corev1.ProtocolTCP,
-			Port:     port,
-		})
-		return factory
-	}
-	comp.Service = &appsv1alpha1.ServiceSpec{
-		Ports: []appsv1alpha1.ServicePort{{
-			Name:     name,
-			Protocol: corev1.ProtocolTCP,
-			Port:     port,
-		}},
-	}
 	return factory
 }
 

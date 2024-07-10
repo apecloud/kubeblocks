@@ -22,14 +22,11 @@ package component
 import (
 	"fmt"
 
-	corev1 "k8s.io/api/core/v1"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/apiutil"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 )
 
 // TODO(component): type check
@@ -241,50 +238,7 @@ func convertHostNetwork(clusterCompDef *appsv1alpha1.ClusterComponentDefinition)
 type compDefServicesConvertor struct{}
 
 func (c *compDefServicesConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	if clusterCompDef.Service == nil {
-		return nil, nil
-	}
-
-	svc := builder.NewServiceBuilder("", "").
-		SetType(corev1.ServiceTypeClusterIP).
-		AddPorts(clusterCompDef.Service.ToSVCSpec().Ports...).
-		GetObject()
-	services := []appsv1alpha1.ComponentService{
-		{
-			Service: appsv1alpha1.Service{
-				Name:         "default",
-				ServiceName:  "",
-				Spec:         svc.Spec,
-				RoleSelector: c.roleSelector(clusterCompDef),
-			},
-		},
-	}
-	return services, nil
-}
-
-func (c *compDefServicesConvertor) roleSelector(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) string {
-	// if rsmSpec is not nil, pick the one with AccessMode == ReadWrite as the primary.
-	if clusterCompDef.RSMSpec != nil && clusterCompDef.RSMSpec.Roles != nil {
-		for _, role := range clusterCompDef.RSMSpec.Roles {
-			if role.AccessMode == workloads.ReadWriteMode {
-				return role.Name
-			}
-		}
-	}
-
-	// convert the leader name w.r.t workload type.
-	switch clusterCompDef.WorkloadType {
-	case appsv1alpha1.Consensus:
-		if clusterCompDef.ConsensusSpec == nil {
-			return constant.Leader
-		}
-		return clusterCompDef.ConsensusSpec.Leader.Name
-	case appsv1alpha1.Replication:
-		return constant.Primary
-	default:
-		return ""
-	}
+	return nil, nil
 }
 
 // compDefConfigsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Configs.
@@ -351,23 +305,7 @@ func (c *compDefReplicasLimitConvertor) convert(args ...any) (any, error) {
 type compDefSystemAccountsConvertor struct{}
 
 func (c *compDefSystemAccountsConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	if clusterCompDef.SystemAccounts == nil {
-		return nil, nil
-	}
-
-	accounts := make([]appsv1alpha1.SystemAccount, 0)
-	for _, account := range clusterCompDef.SystemAccounts.Accounts {
-		accounts = append(accounts, appsv1alpha1.SystemAccount{
-			Name:                     string(account.Name),
-			PasswordGenerationPolicy: clusterCompDef.SystemAccounts.PasswordConfig,
-			SecretRef:                account.ProvisionPolicy.SecretRef,
-		})
-		if account.ProvisionPolicy.Statements != nil {
-			accounts[len(accounts)-1].Statement = account.ProvisionPolicy.Statements.CreationStatement
-		}
-	}
-	return accounts, nil
+	return nil, nil
 }
 
 // compDefUpdateStrategyConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.UpdateStrategy.
@@ -514,10 +452,6 @@ func (c *compDefLifecycleActionsConvertor) convert(args ...any) (any, error) {
 		lifecycleActions.Switchover = c.convertSwitchover(clusterCompDef.SwitchoverSpec, clusterCompVer)
 	}
 
-	if clusterCompDef.PostStartSpec != nil {
-		lifecycleActions.PostProvision = c.convertPostProvision(clusterCompDef.PostStartSpec)
-	}
-
 	lifecycleActions.PreTerminate = nil
 	lifecycleActions.MemberJoin = nil
 	lifecycleActions.MemberLeave = nil
@@ -606,25 +540,6 @@ func (c *compDefLifecycleActionsConvertor) convertRoleProbe(clusterCompDef *apps
 		},
 	}
 	return roleProbe
-}
-
-func (c *compDefLifecycleActionsConvertor) convertPostProvision(postStart *appsv1alpha1.PostStartAction) *appsv1alpha1.LifecycleActionHandler {
-	if postStart == nil {
-		return nil
-	}
-
-	defaultPreCondition := appsv1alpha1.ComponentReadyPreConditionType
-	return &appsv1alpha1.LifecycleActionHandler{
-		CustomHandler: &appsv1alpha1.Action{
-			Image: postStart.CmdExecutorConfig.Image,
-			Exec: &appsv1alpha1.ExecAction{
-				Command: postStart.CmdExecutorConfig.Command,
-				Args:    postStart.CmdExecutorConfig.Args,
-			},
-			Env:          postStart.CmdExecutorConfig.Env,
-			PreCondition: &defaultPreCondition,
-		},
-	}
 }
 
 func (c *compDefLifecycleActionsConvertor) convertSwitchover(switchover *appsv1alpha1.SwitchoverSpec,

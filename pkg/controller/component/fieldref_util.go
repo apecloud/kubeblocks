@@ -121,9 +121,6 @@ func resolveFieldRef(valueFrom *appsv1alpha1.ComponentValueFrom, components []ap
 }
 
 func resolveServiceRef(clusterName string, components []appsv1alpha1.ClusterComponentSpec, componentDef *appsv1alpha1.ClusterComponentDefinition) (string, error) {
-	if componentDef.Service == nil {
-		return "", fmt.Errorf("componentDef %s does not have service", componentDef.Name)
-	}
 	if len(components) != 1 {
 		return "", fmt.Errorf("expect one component but got %d for componentDef %s", len(components), componentDef.Name)
 	}

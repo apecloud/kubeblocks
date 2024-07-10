@@ -23,14 +23,12 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/apiutil"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	corev1 "k8s.io/api/core/v1"
 )
 
 var _ = Describe("Component Definition Convertor", func() {
@@ -156,26 +154,6 @@ var _ = Describe("Component Definition Convertor", func() {
 						},
 					},
 				},
-				Service: &appsv1alpha1.ServiceSpec{
-					Ports: []appsv1alpha1.ServicePort{
-						{
-							Name: "mysql",
-							Port: 3306,
-							TargetPort: intstr.IntOrString{
-								Type:   intstr.String,
-								StrVal: "mysql",
-							},
-						},
-						{
-							Name: "paxos",
-							Port: 13306,
-							TargetPort: intstr.IntOrString{
-								Type:   intstr.String,
-								StrVal: "paxos",
-							},
-						},
-					},
-				},
 				StatelessSpec: nil,
 				StatefulSpec:  nil,
 				ConsensusSpec: &appsv1alpha1.ConsensusSetSpec{
@@ -196,55 +174,6 @@ var _ = Describe("Component Definition Convertor", func() {
 				},
 				ReplicationSpec:       nil,
 				HorizontalScalePolicy: &appsv1alpha1.HorizontalScalePolicy{},
-				SystemAccounts: &appsv1alpha1.SystemAccountSpec{
-					CmdExecutorConfig: &appsv1alpha1.CmdExecutorConfig{
-						CommandExecutorEnvItem: appsv1alpha1.CommandExecutorEnvItem{
-							Image: "image",
-							Env: []corev1.EnvVar{
-								{
-									Name:  "user",
-									Value: "user",
-								},
-								{
-									Name:  "password",
-									Value: "password",
-								},
-							},
-						},
-						CommandExecutorItem: appsv1alpha1.CommandExecutorItem{
-							Command: []string{"mysql"},
-							Args:    []string{"create user"},
-						},
-					},
-					PasswordConfig: appsv1alpha1.PasswordConfig{
-						Length:     16,
-						NumDigits:  8,
-						NumSymbols: 8,
-						LetterCase: appsv1alpha1.MixedCases,
-					},
-					Accounts: []appsv1alpha1.SystemAccountConfig{
-						{
-							Name: appsv1alpha1.AdminAccount,
-							ProvisionPolicy: appsv1alpha1.ProvisionPolicy{
-								Type:  appsv1alpha1.CreateByStmt,
-								Scope: appsv1alpha1.AnyPods,
-								Statements: &appsv1alpha1.ProvisionStatements{
-									CreationStatement: "creation-statement",
-								},
-							},
-						},
-						{
-							Name: appsv1alpha1.ReplicatorAccount,
-							ProvisionPolicy: appsv1alpha1.ProvisionPolicy{
-								Type: appsv1alpha1.ReferToExisting,
-								SecretRef: &appsv1alpha1.ProvisionSecretRef{
-									Name:      "refer-to-existing",
-									Namespace: "default",
-								},
-							},
-						},
-					},
-				},
 				VolumeTypes: []appsv1alpha1.VolumeTypeSpec{
 					{
 						Name: dataVolumeName,
@@ -516,49 +445,11 @@ var _ = Describe("Component Definition Convertor", func() {
 		})
 
 		Context("services", func() {
-			It("w/o service defined", func() {
-				clusterCompDef.Service = nil
-
-				convertor := &compDefServicesConvertor{}
-				res, err := convertor.convert(clusterCompDef, clusterName)
-				Expect(err).Should(Succeed())
-				Expect(res).Should(BeNil())
-			})
-
 			It("ok", func() {
 				convertor := &compDefServicesConvertor{}
 				res, err := convertor.convert(clusterCompDef, clusterName)
 				Expect(err).Should(Succeed())
-
-				services, ok := res.([]appsv1alpha1.ComponentService)
-				Expect(ok).Should(BeTrue())
-				Expect(services).Should(HaveLen(1))
-
-				// service
-				Expect(services[0].ServiceName).Should(BeEmpty())
-				Expect(services[0].Spec.Ports).Should(HaveLen(len(clusterCompDef.Service.Ports)))
-				for i := range services[0].Spec.Ports {
-					Expect(services[0].Spec.Ports[i].Name).Should(Equal(clusterCompDef.Service.Ports[i].Name))
-					Expect(services[0].Spec.Ports[i].Port).Should(Equal(clusterCompDef.Service.Ports[i].Port))
-					Expect(services[0].Spec.Ports[i].TargetPort).Should(Equal(clusterCompDef.Service.Ports[i].TargetPort))
-				}
-				Expect(services[0].Spec.Type).Should(Equal(corev1.ServiceTypeClusterIP))
-				Expect(services[0].Spec.ClusterIP).Should(BeEmpty())
-				Expect(services[0].RoleSelector).Should(BeEquivalentTo(constant.Leader))
-
-				// consensus role selector
-				clusterCompDef.WorkloadType = appsv1alpha1.Consensus
-				clusterCompDef.ConsensusSpec = &appsv1alpha1.ConsensusSetSpec{
-					Leader: appsv1alpha1.ConsensusMember{
-						Name:       constant.Primary,
-						AccessMode: appsv1alpha1.ReadWrite,
-					},
-				}
-				res2, _ := convertor.convert(clusterCompDef, clusterName)
-				services2, ok2 := res2.([]appsv1alpha1.ComponentService)
-				Expect(ok2).Should(BeTrue())
-				Expect(services2).Should(HaveLen(1))
-				Expect(services2[0].RoleSelector).Should(BeEquivalentTo(constant.Primary))
+				Expect(res).Should(BeNil())
 			})
 		})
 
@@ -634,33 +525,11 @@ var _ = Describe("Component Definition Convertor", func() {
 		})
 
 		Context("system accounts", func() {
-			It("w/o accounts", func() {
-				clusterCompDef.SystemAccounts = nil
-
+			It("ok", func() {
 				convertor := &compDefSystemAccountsConvertor{}
 				res, err := convertor.convert(clusterCompDef)
 				Expect(err).Should(Succeed())
 				Expect(res).Should(BeNil())
-			})
-
-			It("w/ accounts", func() {
-				convertor := &compDefSystemAccountsConvertor{}
-				res, err := convertor.convert(clusterCompDef)
-				Expect(err).Should(Succeed())
-
-				expectedAccounts := []appsv1alpha1.SystemAccount{
-					{
-						Name:                     string(clusterCompDef.SystemAccounts.Accounts[0].Name),
-						PasswordGenerationPolicy: clusterCompDef.SystemAccounts.PasswordConfig,
-						Statement:                clusterCompDef.SystemAccounts.Accounts[0].ProvisionPolicy.Statements.CreationStatement,
-					},
-					{
-						Name:                     string(clusterCompDef.SystemAccounts.Accounts[1].Name),
-						PasswordGenerationPolicy: clusterCompDef.SystemAccounts.PasswordConfig,
-						SecretRef:                clusterCompDef.SystemAccounts.Accounts[1].ProvisionPolicy.SecretRef,
-					},
-				}
-				Expect(res).Should(BeEquivalentTo(expectedAccounts))
 			})
 		})
 
@@ -837,34 +706,6 @@ var _ = Describe("Component Definition Convertor", func() {
 				Expect(actions.Switchover.WithCandidate.Exec.Command).Should(BeEquivalentTo(commandExecutorItem.Command))
 				Expect(actions.Switchover.WithCandidate.Exec.Args).Should(BeEquivalentTo(commandExecutorItem.Args))
 				Expect(actions.Switchover.WithoutCandidate).ShouldNot(BeNil())
-			})
-
-			It("post provision", func() {
-				clusterCompDef.Probes.RoleProbe = nil
-				clusterCompDef.SwitchoverSpec = nil
-				convertor := &compDefLifecycleActionsConvertor{}
-				clusterCompDef.PostStartSpec = &appsv1alpha1.PostStartAction{
-					CmdExecutorConfig: appsv1alpha1.CmdExecutorConfig{
-						CommandExecutorEnvItem: *commandExecutorEnvItem,
-						CommandExecutorItem:    *commandExecutorItem,
-					},
-					ScriptSpecSelectors: []appsv1alpha1.ScriptSpecSelector{
-						{
-							Name: "post-start",
-						},
-					},
-				}
-				res, err := convertor.convert(clusterCompDef)
-				Expect(err).Should(Succeed())
-
-				actions := res.(*appsv1alpha1.ComponentLifecycleActions)
-				Expect(actions.PostProvision).ShouldNot(BeNil())
-				Expect(actions.PostProvision.CustomHandler).ShouldNot(BeNil())
-				Expect(actions.PostProvision.CustomHandler.Image).Should(BeEquivalentTo(commandExecutorEnvItem.Image))
-				Expect(actions.PostProvision.CustomHandler.Env).Should(BeEquivalentTo(commandExecutorEnvItem.Env))
-				Expect(actions.PostProvision.CustomHandler.Exec.Command).Should(BeEquivalentTo(commandExecutorItem.Command))
-				Expect(actions.PostProvision.CustomHandler.Exec.Args).Should(BeEquivalentTo(commandExecutorItem.Args))
-				Expect(*actions.PostProvision.CustomHandler.PreCondition).Should(BeEquivalentTo(appsv1alpha1.ComponentReadyPreConditionType))
 			})
 
 			It("role probe", func() {

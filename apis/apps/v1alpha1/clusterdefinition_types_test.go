@@ -126,17 +126,6 @@ var _ = Describe("", func() {
 		Expect(spec).Should(BeEquivalentTo(&r.ReplicationSpec.StatefulSetSpec))
 	})
 
-	It("test ToSVCSpec", func() {
-		r := ServiceSpec{
-			Ports: []ServicePort{
-				{
-					Name: "test-name",
-				},
-			},
-		}
-		Expect(r.ToSVCSpec().Ports[0].Name).Should(Equal(r.Ports[0].Name))
-	})
-
 	It("test GetUpdateStrategy", func() {
 		r := &StatefulSetSpec{}
 		r.UpdateStrategy = BestEffortParallelStrategy

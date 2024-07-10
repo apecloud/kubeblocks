@@ -615,46 +615,6 @@ type OpsRecorder struct {
 	QueueBySelf bool `json:"queueBySelf,omitempty"`
 }
 
-// ProvisionPolicyType defines the policy for creating accounts.
-//
-// +enum
-// +kubebuilder:validation:Enum={CreateByStmt,ReferToExisting}
-type ProvisionPolicyType string
-
-const (
-	// CreateByStmt will create account w.r.t. deletion and creation statement given by provider.
-	CreateByStmt ProvisionPolicyType = "CreateByStmt"
-
-	// ReferToExisting will not create account, but create a secret by copying data from referred secret file.
-	ReferToExisting ProvisionPolicyType = "ReferToExisting"
-)
-
-// ProvisionScope defines the scope of provision within a component.
-//
-// +enum
-type ProvisionScope string
-
-const (
-	// AllPods indicates that accounts will be created for all pods within the component.
-	AllPods ProvisionScope = "AllPods"
-
-	// AnyPods indicates that accounts will be created only on a single pod within the component.
-	AnyPods ProvisionScope = "AnyPods"
-)
-
-// AccountName defines system account names.
-// +enum
-// +kubebuilder:validation:Enum={kbadmin,kbdataprotection,kbprobe,kbmonitoring,kbreplicator}
-type AccountName string
-
-const (
-	AdminAccount          AccountName = "kbadmin"
-	DataprotectionAccount AccountName = "kbdataprotection"
-	ProbeAccount          AccountName = "kbprobe"
-	MonitorAccount        AccountName = "kbmonitoring"
-	ReplicatorAccount     AccountName = "kbreplicator"
-)
-
 // LetterCase defines the available cases to be used in password generation.
 //
 // +enum

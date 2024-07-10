@@ -334,17 +334,6 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 			}
 			return convertDefaultCompDefServicePorts(compDef.Spec.Services)
 		}
-		if cluster.Spec.ClusterDefRef != "" && clusterCompDefRefName != "" {
-			clusterDef, err := getClusterDefByName(reqCtx.Ctx, cli, cluster.Spec.ClusterDefRef)
-			if err != nil {
-				return nil, err
-			}
-			clusterCompDef := clusterDef.GetComponentDefByName(clusterCompDefRefName)
-			if clusterCompDef == nil || clusterCompDef.Service == nil {
-				return nil, fmt.Errorf("referenced cluster component definition or services is not defined: %s", clusterCompDefRefName)
-			}
-			return clusterCompDef.Service.ToSVCPorts(), nil
-		}
 		return nil, fmt.Errorf("component definition is not defined, cluster: %s, component: %s", cluster.Name, clusterCompSpecName)
 	}
 

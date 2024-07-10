@@ -97,35 +97,6 @@ var (
 				Resources: zeroResRequirements,
 			}},
 		},
-		Service: &appsv1alpha1.ServiceSpec{
-			Ports: []appsv1alpha1.ServicePort{{
-				Protocol: corev1.ProtocolTCP,
-				Port:     80,
-			}},
-		},
-	}
-
-	// defaultSvc value are corresponding to defaultMySQLContainer.Ports name mapping and
-	// corresponding to defaultConnectionCredential variable placeholder
-	defaultSvcSpec = appsv1alpha1.ServiceSpec{
-		Ports: []appsv1alpha1.ServicePort{
-			{
-				Name: "mysql",
-				TargetPort: intstr.IntOrString{
-					Type:   intstr.String,
-					StrVal: "mysql",
-				},
-				Port: 3306,
-			},
-			{
-				Name: "paxos",
-				TargetPort: intstr.IntOrString{
-					Type:   intstr.String,
-					StrVal: "paxos",
-				},
-				Port: 13306,
-			},
-		},
 	}
 
 	defaultMySQLContainer = corev1.Container{
@@ -174,7 +145,6 @@ var (
 			},
 		},
 		VolumeProtectionSpec: &appsv1alpha1.VolumeProtectionSpec{},
-		Service:              &defaultMySQLService,
 		PodSpec: &corev1.PodSpec{
 			Containers: []corev1.Container{
 				defaultMySQLContainer,
@@ -202,14 +172,6 @@ var (
 		},
 	}
 
-	defaultMySQLService = appsv1alpha1.ServiceSpec{
-		Ports: []appsv1alpha1.ServicePort{{
-			Name:     "mysql",
-			Protocol: corev1.ProtocolTCP,
-			Port:     3306,
-		}},
-	}
-
 	consensusMySQLComponent = appsv1alpha1.ClusterComponentDefinition{
 		WorkloadType:  appsv1alpha1.Consensus,
 		CharacterType: "mysql",
@@ -222,7 +184,6 @@ var (
 			},
 		},
 		VolumeProtectionSpec: &appsv1alpha1.VolumeProtectionSpec{},
-		Service:              &defaultMySQLService,
 		PodSpec: &corev1.PodSpec{
 			Containers: []corev1.Container{
 				defaultMySQLContainer,
@@ -382,13 +343,6 @@ var (
 		},
 	}
 
-	defaultRedisService = appsv1alpha1.ServiceSpec{
-		Ports: []appsv1alpha1.ServicePort{{
-			Protocol: corev1.ProtocolTCP,
-			Port:     6379,
-		}},
-	}
-
 	defaultReplicationRedisVolumeMounts = []corev1.VolumeMount{
 		{
 			Name:      DataVolumeName,
@@ -451,7 +405,6 @@ var (
 			},
 		},
 		VolumeProtectionSpec: &appsv1alpha1.VolumeProtectionSpec{},
-		Service:              &defaultRedisService,
 		VolumeTypes: []appsv1alpha1.VolumeTypeSpec{{
 			Name: DataVolumeName,
 			Type: appsv1alpha1.VolumeTypeData,

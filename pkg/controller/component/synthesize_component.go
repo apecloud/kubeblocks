@@ -666,12 +666,6 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 	// build pod management policy
 	buildPodManagementPolicy()
 
-	// build componentRefEnvs
-	if err := buildComponentRef(clusterDef, cluster, clusterCompDef, synthesizeComp); err != nil {
-		reqCtx.Log.Error(err, "failed to merge componentRef")
-		return err
-	}
-
 	return nil
 }
 

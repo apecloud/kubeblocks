@@ -489,8 +489,7 @@ func (c *compDefRolesConvertor) convertConsensusRole(clusterCompDef *appsv1alpha
 type compDefServiceRefDeclarationsConvertor struct{}
 
 func (c *compDefServiceRefDeclarationsConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	return clusterCompDef.ServiceRefDeclarations, nil
+	return nil, nil
 }
 
 // compDefLifecycleActionsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.LifecycleActions.

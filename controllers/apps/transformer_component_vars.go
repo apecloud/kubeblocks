@@ -107,11 +107,6 @@ func generatedComponent4LegacyCluster(transCtx *componentTransformContext) (bool
 
 func buildEnvVarsNData(synthesizedComp *component.SynthesizedComponent, vars []corev1.EnvVar, legacy bool) ([]corev1.EnvVar, map[string]string) {
 	envData := make(map[string]string)
-	if synthesizedComp != nil && synthesizedComp.ComponentRefEnvs != nil {
-		for _, env := range synthesizedComp.ComponentRefEnvs {
-			envData[env.Name] = env.Value
-		}
-	}
 
 	// for legacy cluster, don't move direct values into ConfigMap
 	if legacy {

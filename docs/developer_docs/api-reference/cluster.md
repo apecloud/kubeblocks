@@ -4524,35 +4524,6 @@ VolumeProtectionSpec
 </tr>
 <tr>
 <td>
-<code>componentDefRef</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ComponentDefRef">
-[]ComponentDefRef
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Used to inject values from other components into the current component. Values will be saved and updated in a
-configmap and mounted to the current component.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serviceRefDeclarations</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ServiceRefDeclaration">
-[]ServiceRefDeclaration
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Used to declare the service reference of the current component.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>exporter</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.Exporter">
@@ -7303,64 +7274,6 @@ or cluster topology. Examples:</p>
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ComponentDefRef">ComponentDefRef
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>)
-</p>
-<div>
-<p>ComponentDefRef is used to select the component and its fields to be referenced.</p>
-<p>Deprecated since v0.8.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>componentDefName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>The name of the componentDef to be selected.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>failurePolicy</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.FailurePolicyType">
-FailurePolicyType
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the policy to be followed in case of a failure in finding the component.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>componentRefEnv</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ComponentRefEnv">
-[]ComponentRefEnv
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The values that are to be injected as environment variables into each component.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec
 </h3>
 <p>
@@ -8503,62 +8416,6 @@ string
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ComponentRefEnv">ComponentRefEnv
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentDefRef">ComponentDefRef</a>)
-</p>
-<div>
-<p>ComponentRefEnv specifies name and value of an env.</p>
-<p>Deprecated since v0.8.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>The name of the env, it must be a C identifier.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>value</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The value of the env.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>valueFrom</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ComponentValueFrom">
-ComponentValueFrom
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The source from which the value of the env.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentResourceKey">ComponentResourceKey
 (<code>string</code> alias)</h3>
 <div>
@@ -9374,111 +9231,6 @@ Refers to documents of k8s.ConfigMapVolumeSource.defaultMode for more informatio
 </td>
 </tr>
 </tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ComponentValueFrom">ComponentValueFrom
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentRefEnv">ComponentRefEnv</a>)
-</p>
-<div>
-<p>ComponentValueFrom is deprecated since v0.8.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>type</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ComponentValueFromType">
-ComponentValueFromType
-</a>
-</em>
-</td>
-<td>
-<p>Specifies the source to select. It can be one of three types: <code>FieldRef</code>, <code>ServiceRef</code>, <code>HeadlessServiceRef</code>.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>fieldPath</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The jsonpath of the source to select when the Type is <code>FieldRef</code>.
-Two objects are registered in the jsonpath: <code>componentDef</code> and <code>components</code>:</p>
-<ul>
-<li><code>componentDef</code> is the component definition object specified in <code>componentRef.componentDefName</code>.</li>
-<li><code>components</code> are the component list objects referring to the component definition object.</li>
-</ul>
-</td>
-</tr>
-<tr>
-<td>
-<code>format</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the format of each headless service address.
-Three builtin variables can be used as placeholders: <code>$POD_ORDINAL</code>, <code>$POD_FQDN</code>, <code>$POD_NAME</code></p>
-<ul>
-<li><code>$POD_ORDINAL</code> represents the ordinal of the pod.</li>
-<li><code>$POD_FQDN</code> represents the fully qualified domain name of the pod.</li>
-<li><code>$POD_NAME</code> represents the name of the pod.</li>
-</ul>
-</td>
-</tr>
-<tr>
-<td>
-<code>joinWith</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The string used to join the values of headless service addresses.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ComponentValueFromType">ComponentValueFromType
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentValueFrom">ComponentValueFrom</a>)
-</p>
-<div>
-<p>ComponentValueFromType specifies the type of component value from which the data is derived.</p>
-<p>Deprecated since v0.8.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;FieldRef&#34;</p></td>
-<td><p>FromFieldRef refers to the value of a specific field in the object.</p>
-</td>
-</tr><tr><td><p>&#34;HeadlessServiceRef&#34;</p></td>
-<td><p>FromHeadlessServiceRef refers to a headless service within the same namespace as the object.</p>
-</td>
-</tr><tr><td><p>&#34;ServiceRef&#34;</p></td>
-<td><p>FromServiceRef refers to a service within the same namespace as the object.</p>
-</td>
-</tr></tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentVarSelector">ComponentVarSelector
 </h3>
@@ -11988,7 +11740,7 @@ in each OpsService definition.</p>
 <h3 id="apps.kubeblocks.io/v1alpha1.FailurePolicyType">FailurePolicyType
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentDefRef">ComponentDefRef</a>, <a href="#apps.kubeblocks.io/v1alpha1.OpsAction">OpsAction</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.OpsAction">OpsAction</a>)
 </p>
 <div>
 <p>FailurePolicyType specifies the type of failure policy.</p>
@@ -18894,7 +18646,7 @@ string
 <h3 id="apps.kubeblocks.io/v1alpha1.ServiceRefDeclaration">ServiceRefDeclaration
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
 </p>
 <div>
 <p>ServiceRefDeclaration represents a reference to a service that can be either provided by a KubeBlocks Cluster

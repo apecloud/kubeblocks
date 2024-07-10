@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
@@ -28,7 +27,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -36,7 +34,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
-	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
 var _ = Describe("build service references", func() {
@@ -61,105 +58,20 @@ var _ = Describe("build service references", func() {
 	}
 
 	var (
-		mockClient          *testutil.K8sClientMockHelper
-		clusterDef          *appsv1alpha1.ClusterDefinition
-		clusterVersion      *appsv1alpha1.ClusterVersion
-		cluster             *appsv1alpha1.Cluster
-		beReferencedCluster *appsv1alpha1.Cluster
-	)
-
-	var (
-		namespace                        = "default"
-		clusterName                      = "cluster"
-		beReferencedClusterName          = "cluster-be-referenced"
-		clusterDefName                   = "test-cd"
-		clusterVersionName               = "test-cv"
-		nginxCompName                    = "nginx"
-		nginxCompDefName                 = "nginx"
-		mysqlCompName                    = "mysql"
-		mysqlCompDefName                 = "mysql"
-		externalServiceDescriptorName    = "mock-external-service-descriptor-name"
-		externalServiceDescriptorKind    = "redis"
-		externalServiceDescriptorVersion = "7.0.1"
-		internalClusterServiceRefKind    = "mysql"
-		internalClusterServiceRefVersion = "8.0.2"
-		secretName                       = constant.GenerateDefaultConnCredential(beReferencedClusterName)
-		redisServiceRefDeclarationName   = "redis"
-		mysqlServiceRefDeclarationName   = "mysql"
+		namespace   = "default"
+		clusterName = "cluster"
 	)
 
 	BeforeEach(func() {
 		cleanEnv()
-		mockClient = testutil.NewK8sMockClient()
 	})
 
 	AfterEach(func() {
-		mockClient.Finish()
 		cleanEnv()
 	})
 
-	buildServiceReferences4Test := func(ctx context.Context,
-		cli client.Reader,
-		clusterDef *appsv1alpha1.ClusterDefinition,
-		clusterVer *appsv1alpha1.ClusterVersion,
-		cluster *appsv1alpha1.Cluster,
-		clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (map[string]*appsv1alpha1.ServiceDescriptor, error) {
-		var (
-			compDef *appsv1alpha1.ComponentDefinition
-			comp    *appsv1alpha1.Component
-			err     error
-		)
-		if compDef, err = BuildComponentDefinition(clusterDef, clusterVer, clusterCompSpec); err != nil {
-			return nil, err
-		}
-		if comp, err = BuildComponent(cluster, clusterCompSpec, nil, nil); err != nil {
-			return nil, err
-		}
-		synthesizedComp := &SynthesizedComponent{
-			Namespace:   namespace,
-			ClusterName: cluster.Name,
-		}
-		if err = buildServiceReferencesWithoutResolve(ctx, cli, synthesizedComp, compDef, comp); err != nil {
-			return nil, err
-		}
-		return synthesizedComp.ServiceReferences, nil
-	}
-
-	// for test GetContainerWithVolumeMount
-	Context("generate service descriptor test", func() {
-		BeforeEach(func() {
-			serviceRefDeclarations := []appsv1alpha1.ServiceRefDeclaration{
-				{
-					Name: redisServiceRefDeclarationName,
-					ServiceRefDeclarationSpecs: []appsv1alpha1.ServiceRefDeclarationSpec{
-						{
-							ServiceKind:    externalServiceDescriptorKind,
-							ServiceVersion: externalServiceDescriptorVersion,
-						},
-					},
-				},
-				{
-					Name: mysqlServiceRefDeclarationName,
-					ServiceRefDeclarationSpecs: []appsv1alpha1.ServiceRefDeclarationSpec{
-						{
-							ServiceKind:    internalClusterServiceRefKind,
-							ServiceVersion: internalClusterServiceRefVersion,
-						},
-					},
-				},
-			}
-			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.StatelessNginxComponent, nginxCompDefName).
-				AddServiceRefDeclarations(serviceRefDeclarations).
-				Create(&testCtx).GetObject()
-			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponentVersion(nginxCompDefName).
-				AddInitContainerShort("nginx-init", testapps.NginxImage).
-				AddContainerShort("nginx", testapps.NginxImage).
-				Create(&testCtx).GetObject()
-		})
-
-		It("serviceRefDeclaration serviceVersion regex validation test", func() {
+	Context("service descriptor", func() {
+		It("service version regex validation test", func() {
 			type versionCmp struct {
 				serviceRefDeclRegex      string
 				serviceDescriptorVersion string
@@ -222,139 +134,6 @@ var _ = Describe("build service references", func() {
 				match := verifyServiceVersion(tt.fields.serviceDescriptorVersion, tt.fields.serviceRefDeclRegex)
 				Expect(match).Should(Equal(tt.want))
 			}
-		})
-
-		It("generate service descriptor test", func() {
-			By("Create cluster and beReferencedCluster object")
-			beReferencedCluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, beReferencedClusterName,
-				clusterDef.Name, clusterVersion.Name).
-				AddComponent(mysqlCompName, mysqlCompDefName).
-				Create(&testCtx).GetObject()
-
-			serviceRefs := []appsv1alpha1.ServiceRef{
-				{
-					Name:              redisServiceRefDeclarationName,
-					ServiceDescriptor: externalServiceDescriptorName,
-				},
-				{
-					Name:    mysqlServiceRefDeclarationName,
-					Cluster: beReferencedCluster.Name,
-				},
-			}
-			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-				clusterDef.Name, clusterVersion.Name).
-				AddComponent(nginxCompName, nginxCompDefName).
-				SetServiceRefs(serviceRefs).
-				Create(&testCtx).GetObject()
-
-			By("GenServiceReferences failed because external service descriptor not found")
-			serviceReferences, err := buildServiceReferences4Test(testCtx.Ctx, testCtx.Cli, clusterDef, nil, cluster, &cluster.Spec.ComponentSpecs[0])
-			Expect(err).ShouldNot(Succeed())
-			Expect(apierrors.IsNotFound(err)).Should(BeTrue())
-			Expect(serviceReferences).Should(BeNil())
-
-			By("create external service descriptor")
-			endpoint := appsv1alpha1.CredentialVar{
-				Value: "mock-endpoint",
-			}
-			host := appsv1alpha1.CredentialVar{
-				Value: "mock-host",
-			}
-			port := appsv1alpha1.CredentialVar{
-				Value: "mock-port",
-			}
-			auth := appsv1alpha1.ConnectionCredentialAuth{
-				Username: &appsv1alpha1.CredentialVar{
-					Value: "mock-username",
-				},
-				Password: &appsv1alpha1.CredentialVar{
-					Value: "mock-password",
-				},
-			}
-			externalServiceDescriptor := testapps.NewServiceDescriptorFactory(testCtx.DefaultNamespace, externalServiceDescriptorName).
-				SetEndpoint(endpoint).
-				SetHost(host).
-				SetPort(port).
-				SetAuth(auth).
-				Create(&testCtx).GetObject()
-
-			By("GenServiceReferences failed because external service descriptor status is not available")
-			serviceReferences, err = buildServiceReferences4Test(testCtx.Ctx, testCtx.Cli, clusterDef, nil, cluster, &cluster.Spec.ComponentSpecs[0])
-			Expect(err).ShouldNot(Succeed())
-			Expect(err.Error()).Should(ContainSubstring("status is not available"))
-			Expect(serviceReferences).Should(BeNil())
-
-			By("update external service descriptor status to available")
-			Expect(testapps.ChangeObjStatus(&testCtx, externalServiceDescriptor, func() {
-				externalServiceDescriptor.Status.Phase = appsv1alpha1.AvailablePhase
-			})).Should(Succeed())
-
-			By("GenServiceReferences failed because external service descriptor kind and version not match")
-			serviceReferences, err = buildServiceReferences4Test(testCtx.Ctx, testCtx.Cli, clusterDef, nil, cluster, &cluster.Spec.ComponentSpecs[0])
-			Expect(err).ShouldNot(Succeed())
-			Expect(err.Error()).Should(ContainSubstring("kind or version is not match with"))
-			Expect(serviceReferences).Should(BeNil())
-
-			By("update external service descriptor kind and version")
-			Expect(testapps.ChangeObj(&testCtx, externalServiceDescriptor, func(externalServiceDescriptor *appsv1alpha1.ServiceDescriptor) {
-				externalServiceDescriptor.Spec.ServiceKind = externalServiceDescriptorKind
-				externalServiceDescriptor.Spec.ServiceVersion = externalServiceDescriptorVersion
-			})).Should(Succeed())
-
-			By("GenServiceReferences succeed because external service descriptor found and internal cluster reference found")
-			secret := &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      secretName,
-					Namespace: namespace,
-				},
-				Data: map[string][]byte{
-					constant.ServiceDescriptorEndpointKey: []byte("my-mysql-0.default.svc.cluster.local:3306"),
-					constant.ServiceDescriptorHostKey:     []byte("my-mysql-0.default.svc.cluster.local"),
-					constant.ServiceDescriptorPortKey:     []byte("3306"),
-					constant.ServiceDescriptorUsernameKey: []byte("cm9vdA=="),
-					constant.ServiceDescriptorPasswordKey: []byte("NHpycWZsMnI="),
-				},
-			}
-			Expect(testCtx.CheckedCreateObj(ctx, secret)).Should(Succeed())
-			Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: secret.Name,
-				Namespace: secret.Namespace}, secret)).Should(Succeed())
-			serviceReferences, err = buildServiceReferences4Test(testCtx.Ctx, testCtx.Cli, clusterDef, nil, cluster, &cluster.Spec.ComponentSpecs[0])
-			Expect(err).Should(Succeed())
-			Expect(serviceReferences).ShouldNot(BeNil())
-			Expect(len(serviceReferences)).Should(Equal(2))
-			Expect(serviceReferences[redisServiceRefDeclarationName]).ShouldNot(BeNil())
-			Expect(serviceReferences[redisServiceRefDeclarationName].Spec.Endpoint).ShouldNot(BeNil())
-			Expect(serviceReferences[redisServiceRefDeclarationName].Spec.Endpoint.Value).ShouldNot(BeEmpty())
-			Expect(serviceReferences[redisServiceRefDeclarationName].Spec.Endpoint.ValueFrom).Should(BeNil())
-			Expect(serviceReferences[redisServiceRefDeclarationName].Spec.Host).ShouldNot(BeNil())
-			Expect(serviceReferences[redisServiceRefDeclarationName].Spec.Host.Value).ShouldNot(BeEmpty())
-			Expect(serviceReferences[redisServiceRefDeclarationName].Spec.Host.ValueFrom).Should(BeNil())
-			Expect(serviceReferences[redisServiceRefDeclarationName].Spec.Port).ShouldNot(BeNil())
-			Expect(serviceReferences[redisServiceRefDeclarationName].Spec.Port.Value).ShouldNot(BeEmpty())
-			Expect(serviceReferences[redisServiceRefDeclarationName].Spec.Port.ValueFrom).Should(BeNil())
-			Expect(serviceReferences[redisServiceRefDeclarationName].Spec.Auth).ShouldNot(BeNil())
-			Expect(serviceReferences[redisServiceRefDeclarationName].Spec.Auth.Username.Value).ShouldNot(BeEmpty())
-			Expect(serviceReferences[redisServiceRefDeclarationName].Spec.Auth.Username.ValueFrom).Should(BeNil())
-			Expect(serviceReferences[redisServiceRefDeclarationName].Spec.Auth.Password.Value).ShouldNot(BeEmpty())
-			Expect(serviceReferences[redisServiceRefDeclarationName].Spec.Auth.Password.ValueFrom).Should(BeNil())
-
-			Expect(serviceReferences[mysqlServiceRefDeclarationName]).ShouldNot(BeNil())
-			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Endpoint).ShouldNot(BeNil())
-			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Endpoint.Value).Should(BeEmpty())
-			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Endpoint.ValueFrom).ShouldNot(BeNil())
-			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Endpoint.ValueFrom.SecretKeyRef).ShouldNot(BeNil())
-			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Host).Should(BeNil()) // reference to a legacy cluster
-			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Port).ShouldNot(BeNil())
-			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Port.Value).Should(BeEmpty())
-			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Port.ValueFrom).ShouldNot(BeNil())
-			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Port.ValueFrom.SecretKeyRef).ShouldNot(BeNil())
-			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Auth).ShouldNot(BeNil())
-			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Username.Value).Should(BeEmpty())
-			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Username.ValueFrom).ShouldNot(BeNil())
-			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Username.ValueFrom.SecretKeyRef).ShouldNot(BeNil())
-			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Password.Value).Should(BeEmpty())
-			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Password.ValueFrom).ShouldNot(BeNil())
-			Expect(serviceReferences[mysqlServiceRefDeclarationName].Spec.Auth.Password.ValueFrom.SecretKeyRef).ShouldNot(BeNil())
 		})
 	})
 

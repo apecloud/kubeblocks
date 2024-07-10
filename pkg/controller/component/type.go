@@ -28,26 +28,24 @@ import (
 )
 
 type SynthesizedComponent struct {
-	Namespace            string                                 `json:"namespace,omitempty"`
-	ClusterName          string                                 `json:"clusterName,omitempty"`
-	ClusterUID           string                                 `json:"clusterUID,omitempty"`
-	ClusterGeneration    string                                 `json:"clusterGeneration,omitempty"`
-	Comp2CompDefs        map[string]string                      `json:"comp2CompDefs,omitempty"` // {compName: compDefName}
-	Name                 string                                 `json:"name,omitempty"`          // the name of the component w/o clusterName prefix
-	FullCompName         string                                 `json:"fullCompName,omitempty"`  // the full name of the component w/ clusterName prefix
-	CompDefName          string                                 `json:"compDefName,omitempty"`   // the name of the componentDefinition
-	ServiceVersion       string                                 `json:"serviceVersion,omitempty"`
-	Replicas             int32                                  `json:"replicas"`
-	Resources            corev1.ResourceRequirements            `json:"resources,omitempty"`
-	PodSpec              *corev1.PodSpec                        `json:"podSpec,omitempty"`
-	VolumeClaimTemplates []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
-	LogConfigs           []v1alpha1.LogConfig                   `json:"logConfigs,omitempty"`
-	ConfigTemplates      []v1alpha1.ComponentConfigSpec         `json:"configTemplates,omitempty"`
-	ScriptTemplates      []v1alpha1.ComponentTemplateSpec       `json:"scriptTemplates,omitempty"`
-	TLSConfig            *v1alpha1.TLSConfig                    `json:"tlsConfig"`
-	ServiceAccountName   string                                 `json:"serviceAccountName,omitempty"`
-	// TODO: remove this later
-	ComponentRefEnvs       []corev1.EnvVar                        `json:"componentRefEnvs,omitempty"`
+	Namespace              string                                 `json:"namespace,omitempty"`
+	ClusterName            string                                 `json:"clusterName,omitempty"`
+	ClusterUID             string                                 `json:"clusterUID,omitempty"`
+	ClusterGeneration      string                                 `json:"clusterGeneration,omitempty"`
+	Comp2CompDefs          map[string]string                      `json:"comp2CompDefs,omitempty"` // {compName: compDefName}
+	Name                   string                                 `json:"name,omitempty"`          // the name of the component w/o clusterName prefix
+	FullCompName           string                                 `json:"fullCompName,omitempty"`  // the full name of the component w/ clusterName prefix
+	CompDefName            string                                 `json:"compDefName,omitempty"`   // the name of the componentDefinition
+	ServiceVersion         string                                 `json:"serviceVersion,omitempty"`
+	Replicas               int32                                  `json:"replicas"`
+	Resources              corev1.ResourceRequirements            `json:"resources,omitempty"`
+	PodSpec                *corev1.PodSpec                        `json:"podSpec,omitempty"`
+	VolumeClaimTemplates   []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
+	LogConfigs             []v1alpha1.LogConfig                   `json:"logConfigs,omitempty"`
+	ConfigTemplates        []v1alpha1.ComponentConfigSpec         `json:"configTemplates,omitempty"`
+	ScriptTemplates        []v1alpha1.ComponentTemplateSpec       `json:"scriptTemplates,omitempty"`
+	TLSConfig              *v1alpha1.TLSConfig                    `json:"tlsConfig"`
+	ServiceAccountName     string                                 `json:"serviceAccountName,omitempty"`
 	ServiceReferences      map[string]*v1alpha1.ServiceDescriptor `json:"serviceReferences,omitempty"`
 	UserDefinedLabels      map[string]string
 	UserDefinedAnnotations map[string]string

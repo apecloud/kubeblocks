@@ -1575,17 +1575,6 @@ func (r ClusterSpec) ValidateEnabledLogs(cd *ClusterDefinition) error {
 	return nil
 }
 
-// GetDefNameMappingComponents returns ComponentDefRef name mapping ClusterComponentSpec.
-func (r ClusterSpec) GetDefNameMappingComponents() map[string][]ClusterComponentSpec {
-	m := map[string][]ClusterComponentSpec{}
-	for _, c := range r.ComponentSpecs {
-		v := m[c.ComponentDefRef]
-		v = append(v, c)
-		m[c.ComponentDefRef] = v
-	}
-	return m
-}
-
 // GetMessage gets message map deep copy object.
 func (r ClusterComponentStatus) GetMessage() ComponentMessageMap {
 	messageMap := map[string]string{}

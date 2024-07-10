@@ -196,6 +196,42 @@ var _ = Describe("update reconciler test", func() {
 			_, err = reconciler.Reconcile(onDeleteTree)
 			Expect(err).Should(BeNil())
 			expectUpdatedPods(onDeleteTree, []string{})
+
+			// order: bar-hello-0, bar-foo-1, bar-foo-0, bar-3, bar-2, bar-1, bar-0
+			// expected: bar-hello-0 being deleted
+			By("reconcile with PodUpdatePolicy='PreferInPlace'")
+			preferInPlaceTree, err := newTree.DeepCopy()
+			Expect(err).Should(BeNil())
+			root, ok = preferInPlaceTree.GetRoot().(*workloads.InstanceSet)
+			Expect(ok).Should(BeTrue())
+			root.Spec.PodUpdatePolicy = workloads.PreferInPlacePodUpdatePolicyType
+			// try to add env to instanceHello to trigger the recreate
+			root.Spec.Instances[0].Env = []corev1.EnvVar{
+				{
+					Name:  "foo",
+					Value: "bar",
+				},
+			}
+			_, err = reconciler.Reconcile(preferInPlaceTree)
+			Expect(err).Should(BeNil())
+			expectUpdatedPods(preferInPlaceTree, []string{"bar-hello-0"})
+
+			By("reconcile with PodUpdatePolicy='StrictInPlace'")
+			strictInPlaceTree, err := newTree.DeepCopy()
+			Expect(err).Should(BeNil())
+			root, ok = strictInPlaceTree.GetRoot().(*workloads.InstanceSet)
+			Expect(ok).Should(BeTrue())
+			root.Spec.PodUpdatePolicy = workloads.StrictInPlacePodUpdatePolicyType
+			// try to add env to instanceHello to trigger the recreation
+			root.Spec.Instances[0].Env = []corev1.EnvVar{
+				{
+					Name:  "foo",
+					Value: "bar",
+				},
+			}
+			_, err = reconciler.Reconcile(strictInPlaceTree)
+			Expect(err).Should(BeNil())
+			expectUpdatedPods(strictInPlaceTree, []string{})
 		})
 	})
 })

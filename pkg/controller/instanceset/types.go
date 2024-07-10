@@ -62,7 +62,8 @@ const (
 )
 
 const (
-	EventReasonInvalidSpec = "InvalidSpec"
+	EventReasonInvalidSpec   = "InvalidSpec"
+	EventReasonStrictInPlace = "StrictInPlace"
 )
 
 const (

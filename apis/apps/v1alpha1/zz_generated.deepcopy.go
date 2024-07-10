@@ -676,6 +676,11 @@ func (in *ClusterComponentSpec) DeepCopyInto(out *ClusterComponentSpec) {
 		*out = new(UpdateStrategy)
 		**out = **in
 	}
+	if in.PodUpdatePolicy != nil {
+		in, out := &in.PodUpdatePolicy, &out.PodUpdatePolicy
+		*out = new(workloadsv1alpha1.PodUpdatePolicyType)
+		**out = **in
+	}
 	if in.UserResourceRefs != nil {
 		in, out := &in.UserResourceRefs, &out.UserResourceRefs
 		*out = new(UserResourceRefs)
@@ -2046,6 +2051,11 @@ func (in *ComponentSpec) DeepCopyInto(out *ComponentSpec) {
 		in, out := &in.EnabledLogs, &out.EnabledLogs
 		*out = make([]string, len(*in))
 		copy(*out, *in)
+	}
+	if in.PodUpdatePolicy != nil {
+		in, out := &in.PodUpdatePolicy, &out.PodUpdatePolicy
+		*out = new(workloadsv1alpha1.PodUpdatePolicyType)
+		**out = **in
 	}
 	if in.Affinity != nil {
 		in, out := &in.Affinity, &out.Affinity

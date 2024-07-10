@@ -126,6 +126,11 @@ type ParametersDefinitionSpec struct {
 	// +optional
 	AsEnvFrom *bool `json:"asEnvFrom,omitempty"`
 
+	// Specifies the policy when parameter be removed.
+	//
+	// +optional
+	// DeletedPolicy *ParameterDeletedPolicy `json:"deletedPolicy,omitempty"`
+
 	// Indicates whether to consolidate dynamic reload and restart actions into a single restart.
 	//
 	// - If true, updates requiring both actions will result in only a restart, merging the actions.
@@ -170,6 +175,21 @@ type ParametersDefinitionSpec struct {
 	// +listType=set
 	// +optional
 	ImmutableParameters []string `json:"immutableParameters,omitempty"`
+}
+
+type ParameterDeletedPolicy struct {
+
+	// Specifies the method to handle the deletion of a parameter.
+	//
+	// +kubebuilder:validation:Required
+	DeletedMethod ParameterDeletedMethod `json:"deletedMethod"`
+
+	// Specifies the value to use if DeletedMethod is PDPResetDefault.
+	// Example: pg
+	// SET configuration_parameter TO DEFAULT;
+	//
+	// +optional
+	DefaultValue *string `json:"defaultValue,omitempty"`
 }
 
 // ParametersDefinitionStatus defines the observed state of ParametersDefinition

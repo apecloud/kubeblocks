@@ -118,3 +118,14 @@ const (
 	PDUnavailablePhase ParametersDescPhase = "Unavailable"
 	PDDeletingPhase    ParametersDescPhase = "Deleting"
 )
+
+// ParameterDeletedMethod defines how to handle parameter remove
+// +enum
+// +kubebuilder:validation:Enum={Ignore,ForceRestart, Reset}
+type ParameterDeletedMethod string
+
+const (
+	PDPIgnore       ParameterDeletedMethod = "Ignore"
+	PDPRestart      ParameterDeletedMethod = "ForceRestart"
+	PDPResetDefault ParameterDeletedMethod = "Reset"
+)

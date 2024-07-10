@@ -168,9 +168,6 @@ spec:
                 required:
                 - format
                 type: object
-              fileName:
-                description: Specifies the config file name in the config template.
-                type: string
               immutableParameters:
                 description: |-
                   Lists the parameters that cannot be modified once set.
@@ -564,7 +561,6 @@ spec:
                 x-kubernetes-list-type: set
             required:
             - fileFormatConfig
-            - fileName
             type: object
           status:
             description: ParametersDefinitionStatus defines the observed state of

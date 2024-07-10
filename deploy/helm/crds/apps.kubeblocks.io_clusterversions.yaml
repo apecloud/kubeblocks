@@ -125,6 +125,9 @@ spec:
                               configuration files.
                               Some of these configuration files may support dynamic modification and reloading without requiring
                               a pod restart.
+
+
+                              If empty, all configuration files in the ConfigMap do not support parameter update, but they can be modified directly through configmap.
                             items:
                               properties:
                                 name:

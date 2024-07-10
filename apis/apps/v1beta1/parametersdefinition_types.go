@@ -24,14 +24,14 @@ import (
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+// NOTE: json tags are required. Any new fields you add must have json tags for the fields to be serialized.
 
 // ParametersDefinitionSpec defines the desired state of ParametersDefinition
 type ParametersDefinitionSpec struct {
 	// Specifies the config file name in the config template.
 	//
 	// +kubebuilder:validation:Required
-	FileName string `json:"fileName"`
+	// FileName string `json:"fileName"`
 
 	// Specifies the format of the configuration file and any associated parameters that are specific to the chosen format.
 	// Supported formats include `ini`, `xml`, `yaml`, `json`, `hcl`, `dotenv`, `properties`, and `toml`.

@@ -20155,7 +20155,7 @@ spec:
                         properties:
                           name:
                             description: |-
-                              Defines the unique identifier of the config file name.
+                              Specifies the config file name.
 
 
                               It must be a string of maximum 63 characters, and can only include lowercase alphanumeric characters,
@@ -29446,7 +29446,7 @@ spec:
                             properties:
                               name:
                                 description: |-
-                                  Defines the unique identifier of the config file name.
+                                  Specifies the config file name.
 
 
                                   It must be a string of maximum 63 characters, and can only include lowercase alphanumeric characters,

@@ -86,6 +86,7 @@ type Ordinals struct {
 	Ranges   []Range `json:"ranges,omitempty"`
 	Discrete []int32 `json:"discrete,omitempty"`
 }
+
 // InstanceTemplate allows customization of individual replica configurations within a Component,
 // without altering the base component template defined in ClusterComponentSpec.
 // It enables the application of distinct settings to specific instances (replicas),

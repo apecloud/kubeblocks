@@ -160,18 +160,20 @@ func isCompStopped(synthesizedComp *component.SynthesizedComponent) bool {
 
 func (t *componentWorkloadTransformer) stopWorkload(protoITS *workloads.InstanceSet) {
 	zero := func() *int32 { r := int32(0); return &r }()
-	// since its doesn't support stop, we achieve it by setting replicas to 0
+	// since its doesn't support stop, we achieve it by setting replicas to 0.
 	protoITS.Spec.Replicas = zero
 	for i := range protoITS.Spec.Instances {
 		protoITS.Spec.Instances[i].Replicas = zero
 	}
-	// TODO: how about offline instances?
 }
 
 func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCtx, cli model.GraphClient, dag *graph.DAG,
 	cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, runningITS, protoITS *workloads.InstanceSet) error {
-	if !isCompStopped(synthesizeComp) {
-		// TODO: should we support h-scal and volume expansion in the stopped state?
+	if isCompStopped(synthesizeComp) {
+		// Noop as a placeholder to avoid the workload been updated unexpectedly.
+		cli.Noop(dag, protoITS)
+	} else {
+		// postpone the update of the workload until the component is back to running.
 		if err := t.handleWorkloadUpdate(reqCtx, dag, cluster, synthesizeComp, runningITS, protoITS); err != nil {
 			return err
 		}

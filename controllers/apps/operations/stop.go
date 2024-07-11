@@ -63,10 +63,6 @@ func (stop StopOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		appsv1alpha1.StoppingClusterPhase}, opsRes.Cluster.Status.Phase) {
 		return nil
 	}
-	// TODO
-	// if _, ok := cluster.Annotations[constant.SnapShotForStartAnnotationKey]; ok {
-	//	return fmt.Errorf("wait for the cluster to start before continuing to stop the cluster")
-	// }
 
 	// abort earlier running vertical scaling opsRequest.
 	if err := abortEarlierOpsRequestWithSameKind(reqCtx, cli, opsRes, []appsv1alpha1.OpsType{appsv1alpha1.HorizontalScalingType,

@@ -1,7 +1,7 @@
 ---
 title: Manage Milvus with KubeBlocks
 description: How to manage Milvus on KubeBlocks
-keywords: [milvus, milvus, weaviate]
+keywords: [milvus, control plane]
 sidebar_position: 1
 sidebar_label: Manage Milvus with KubeBlocks
 ---
@@ -43,7 +43,7 @@ Milvus is a highly flexible, reliable, and blazing-fast cloud-native, open-sourc
 
 ## Create a cluster
 
-KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a Qdrant Replication cluster. Primary and Secondary are distributed on different nodes by default. But if you only have one node for deploying a Replication Cluster, set `spec.affinity.topologyKeys` as `null`.
+KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a Milvus cluster.
 
 ```yaml
 cat <<EOF | kubectl apply -f -
@@ -253,7 +253,7 @@ KubeBlocks operator watches for the `Cluster` CRD and creates the cluster and al
 kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=mycluster -n demo
 ```
 
-Run the following command to see the created Qdrant cluster object:
+Run the following command to see the created Milvus cluster object:
 
 ```bash
 kubectl get cluster mycluster -n demo -o yaml

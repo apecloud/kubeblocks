@@ -5,6 +5,7 @@ keywords: [elasticsearch]
 sidebar_position: 1
 sidebar_label: Manage Elasticsearch with KubeBlocks
 ---
+
 # Manage Elasticsearch with KubeBlocks
 
 Elasticsearch is a distributed, RESTful search and analytics engine that is capable of solving an ever-growing number of use cases. As the heart of the Elastic Stack, Elasticsearch stores your data centrally, allowing you to search it quickly, tune relevancy, perform sophisticated analytics, and easily scale.
@@ -17,7 +18,7 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
 
 ***Steps***
 
-1. Execute the following command to create a Qdrant cluster. You can change the `cluster-definition` value as any other databases supported.
+1. Execute the following command to create a cluster. You can change the `cluster-definition` value as any other databases supported.
 
    ```bash
    kbcli cluster create elasticsearch elasticsearch

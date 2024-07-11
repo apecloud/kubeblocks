@@ -1,7 +1,7 @@
 ---
 title: Manage Milvus with KubeBlocks
 description: How to manage Milvus on KubeBlocks
-keywords: [milvus, milvus,weaviate]
+keywords: [milvus, control plane]
 sidebar_position: 1
 sidebar_label: Manage Milvus with KubeBlocks
 ---

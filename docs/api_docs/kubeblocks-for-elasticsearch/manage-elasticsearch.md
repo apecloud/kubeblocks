@@ -39,7 +39,7 @@ import TabItem from '@theme/TabItem';
 
 ## Create a cluster
 
-KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a Qdrant Replication cluster. Primary and Secondary are distributed on different nodes by default. But if you only have one node for deploying a Replication Cluster, set `spec.affinity.topologyKeys` as `null`.
+KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a RaftGroup cluster. Pods are distributed on different nodes by default. But if you only have one node for deploying a RaftGroup Cluster, set `spec.affinity.topologyKeys` as `null`.
 
 ```yaml
 cat <<EOF | kubectl apply -f -
@@ -108,7 +108,7 @@ KubeBlocks operator watches for the `Cluster` CRD and creates the cluster and al
 kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=mycluster -n demo
 ```
 
-Run the following command to see the created Qdrant cluster object:
+Run the following command to see the created Elasticsearch cluster object:
 
 ```bash
 kubectl get cluster mycluster -n demo -o yaml

@@ -30,17 +30,18 @@ const (
 
 // action keys
 const (
-	RoleProbeAction     = "roleProbe"
-	RebuildAction       = "rebuild"
-	HealthyCheckAction  = "healthyCheck"
-	MemberJoinAction    = "memberJoin"
-	MemberLeaveAction   = "memberLeave"
-	ReadonlyAction      = "readonly"
-	ReadWriteAction     = "readwrite"
-	PostProvisionAction = "postProvision"
-	PreTerminateAction  = "preTerminate"
-	DataDumpAction      = "dataDump"
-	DataLoadAction      = "dataLoad"
+	RoleProbeAction        = "roleProbe"
+	RebuildAction          = "rebuild"
+	HealthyCheckAction     = "healthyCheck"
+	MemberJoinAction       = "memberJoin"
+	MemberLeaveAction      = "memberLeave"
+	ReadonlyAction         = "readonly"
+	ReadWriteAction        = "readwrite"
+	AccountProvisionAction = "accountProvision"
+	PostProvisionAction    = "postProvision"
+	PreTerminateAction     = "preTerminate"
+	DataDumpAction         = "dataDump"
+	DataLoadAction         = "dataLoad"
 )
 
 // action envs

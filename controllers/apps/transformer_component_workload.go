@@ -169,10 +169,7 @@ func (t *componentWorkloadTransformer) stopWorkload(protoITS *workloads.Instance
 
 func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCtx, cli model.GraphClient, dag *graph.DAG,
 	cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, runningITS, protoITS *workloads.InstanceSet) error {
-	if isCompStopped(synthesizeComp) {
-		// Noop as a placeholder to avoid the workload been updated unexpectedly.
-		cli.Noop(dag, protoITS)
-	} else {
+	if !isCompStopped(synthesizeComp) {
 		// postpone the update of the workload until the component is back to running.
 		if err := t.handleWorkloadUpdate(reqCtx, dag, cluster, synthesizeComp, runningITS, protoITS); err != nil {
 			return err

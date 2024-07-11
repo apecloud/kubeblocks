@@ -441,7 +441,7 @@ func getBuiltinActionHandler(synthesizeComp *SynthesizedComponent) appsv1alpha1.
 		synthesizeComp.LifecycleActions.DataDump,
 		synthesizeComp.LifecycleActions.DataLoad,
 		synthesizeComp.LifecycleActions.Reconfigure,
-		// synthesizeComp.LifecycleActions.AccountProvision,
+		synthesizeComp.LifecycleActions.AccountProvision,
 	}
 
 	hasAction := false
@@ -465,16 +465,16 @@ func getActionCommandsWithExecImageOrContainerName(synthesizeComp *SynthesizedCo
 	}
 
 	actions := map[string]*appsv1alpha1.LifecycleActionHandler{
-		constant.PostProvisionAction: synthesizeComp.LifecycleActions.PostProvision,
-		constant.PreTerminateAction:  synthesizeComp.LifecycleActions.PreTerminate,
-		constant.MemberJoinAction:    synthesizeComp.LifecycleActions.MemberJoin,
-		constant.MemberLeaveAction:   synthesizeComp.LifecycleActions.MemberLeave,
-		constant.ReadonlyAction:      synthesizeComp.LifecycleActions.Readonly,
-		constant.ReadWriteAction:     synthesizeComp.LifecycleActions.Readwrite,
-		constant.DataDumpAction:      synthesizeComp.LifecycleActions.DataDump,
-		constant.DataLoadAction:      synthesizeComp.LifecycleActions.DataLoad,
+		constant.PostProvisionAction:    synthesizeComp.LifecycleActions.PostProvision,
+		constant.PreTerminateAction:     synthesizeComp.LifecycleActions.PreTerminate,
+		constant.MemberJoinAction:       synthesizeComp.LifecycleActions.MemberJoin,
+		constant.MemberLeaveAction:      synthesizeComp.LifecycleActions.MemberLeave,
+		constant.ReadonlyAction:         synthesizeComp.LifecycleActions.Readonly,
+		constant.ReadWriteAction:        synthesizeComp.LifecycleActions.Readwrite,
+		constant.DataDumpAction:         synthesizeComp.LifecycleActions.DataDump,
+		constant.DataLoadAction:         synthesizeComp.LifecycleActions.DataLoad,
+		constant.AccountProvisionAction: synthesizeComp.LifecycleActions.AccountProvision,
 		// "reconfigure":                synthesizeComp.LifecycleActions.Reconfigure,
-		// "accountProvision": synthesizeComp.LifecycleActions.AccountProvision,
 	}
 
 	if synthesizeComp.LifecycleActions.RoleProbe != nil {

@@ -5203,18 +5203,11 @@ spec:
                         - name
                         type: object
                       type: array
-                    state:
-                      description: Specifies the expected State of the Component.
-                      properties:
-                        state:
-                          description: Represents the state mode of the object.
-                          enum:
-                          - Running
-                          - Stopped
-                          type: string
-                      required:
-                      - state
-                      type: object
+                    stop:
+                      description: |-
+                        Stop the Component.
+                        If set, all the computing resources will be released.
+                      type: boolean
                     switchPolicy:
                       description: |-
                         Defines the strategy for switchover and failover when workloadType is Replication.
@@ -13890,18 +13883,11 @@ spec:
                             - name
                             type: object
                           type: array
-                        state:
-                          description: Specifies the expected State of the Component.
-                          properties:
-                            state:
-                              description: Represents the state mode of the object.
-                              enum:
-                              - Running
-                              - Stopped
-                              type: string
-                          required:
-                          - state
-                          type: object
+                        stop:
+                          description: |-
+                            Stop the Component.
+                            If set, all the computing resources will be released.
+                          type: boolean
                         switchPolicy:
                           description: |-
                             Defines the strategy for switchover and failover when workloadType is Replication.

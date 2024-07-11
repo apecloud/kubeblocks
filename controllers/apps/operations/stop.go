@@ -78,9 +78,7 @@ func (stop StopOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	}
 
 	stopComp := func(compSpec *appsv1alpha1.ClusterComponentSpec) {
-		compSpec.State = &appsv1alpha1.State{
-			Mode: appsv1alpha1.StateModeStopped,
-		}
+		compSpec.Stop = func() *bool { b := true; return &b }()
 	}
 
 	for i := range cluster.Spec.ComponentSpecs {

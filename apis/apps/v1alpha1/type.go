@@ -321,33 +321,6 @@ const (
 	UnavailablePhase Phase = "Unavailable"
 )
 
-// StateMode represents the state mode of a CR object.
-//
-// +enum
-// +kubebuilder:validation:Enum={Running,Stopped}
-type StateMode string
-
-const (
-	// StateModeRunning indicates that the object is in a running state.
-	StateModeRunning StateMode = "Running"
-
-	// StateModeStopped indicates that the object is in a stopped state.
-	StateModeStopped StateMode = "Stopped"
-
-	// TODO: paused & halted
-)
-
-// State represents the state of a CR object.
-type State struct {
-	// Represents the state mode of the object.
-	//
-	// +kubebuilder:validation:Required
-	Mode StateMode `json:"state"`
-
-	//// +optional
-	// Generation *int64 `json:"generation,omitempty"`
-}
-
 // OpsPhase defines opsRequest phase.
 // +enum
 // +kubebuilder:validation:Enum={Pending,Creating,Running,Cancelling,Cancelled,Aborted,Failed,Succeed}

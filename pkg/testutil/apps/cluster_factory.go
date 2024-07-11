@@ -329,8 +329,8 @@ func (factory *MockClusterFactory) AddUserConfigmapVolume(name, mountPoint, resN
 	})
 }
 
-func (factory *MockClusterFactory) SetState(state *appsv1alpha1.State) *MockClusterFactory {
+func (factory *MockClusterFactory) SetStop(stop *bool) *MockClusterFactory {
 	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
-		comp.State = state
+		comp.Stop = stop
 	})
 }

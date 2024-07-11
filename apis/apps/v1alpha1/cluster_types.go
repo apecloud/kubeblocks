@@ -881,10 +881,11 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.10.0"
 	Monitor *bool `json:"monitor,omitempty"`
 
-	// Specifies the expected State of the Component.
+	// Stop the Component.
+	// If set, all the computing resources will be released.
 	//
 	// +optional
-	State *State `json:"state,omitempty"`
+	Stop *bool `json:"stop,omitempty"`
 }
 
 type ComponentMessageMap map[string]string

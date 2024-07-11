@@ -2396,25 +2396,21 @@ var _ = Describe("Component Controller", func() {
 
 		startComp := func() {
 			Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
-				cluster.Spec.ComponentSpecs[0].State = &appsv1alpha1.State{
-					Mode: appsv1alpha1.StateModeRunning,
-				}
+				cluster.Spec.ComponentSpecs[0].Stop = nil
 			})()).Should(Succeed())
 		}
 
 		stopComp := func() {
 			Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
-				cluster.Spec.ComponentSpecs[0].State = &appsv1alpha1.State{
-					Mode: appsv1alpha1.StateModeStopped,
-				}
+				cluster.Spec.ComponentSpecs[0].Stop = func() *bool { b := true; return &b }()
 			})()).Should(Succeed())
 		}
 
 		checkCompRunningAs := func(phase appsv1alpha1.ClusterComponentPhase) {
 			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
 				g.Expect(comp.Status.ObservedGeneration).To(BeEquivalentTo(comp.Generation))
-				if comp.Spec.State != nil {
-					g.Expect(comp.Spec.State.Mode).Should(Equal(appsv1alpha1.StateModeRunning))
+				if comp.Spec.Stop != nil {
+					g.Expect(*comp.Spec.Stop).Should(BeFalse())
 				}
 				g.Expect(comp.Status.Phase).Should(Equal(phase))
 			})).Should(Succeed())
@@ -2436,8 +2432,8 @@ var _ = Describe("Component Controller", func() {
 		checkCompStopped := func() {
 			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
 				g.Expect(comp.Status.ObservedGeneration).To(BeEquivalentTo(comp.Generation))
-				g.Expect(comp.Spec.State).ShouldNot(BeNil())
-				g.Expect(comp.Spec.State.Mode).Should(Equal(appsv1alpha1.StateModeStopped))
+				g.Expect(comp.Spec.Stop).ShouldNot(BeNil())
+				g.Expect(*comp.Spec.Stop).Should(BeTrue())
 				g.Expect(comp.Status.Phase).Should(Equal(appsv1alpha1.StoppedClusterCompPhase))
 			})).Should(Succeed())
 
@@ -2483,9 +2479,7 @@ var _ = Describe("Component Controller", func() {
 
 		It("h-scale a stopped component", func() {
 			createClusterObjV2WithPhase(defaultCompName, compDefObj.Name, func(f *testapps.MockClusterFactory) {
-				f.SetState(&appsv1alpha1.State{
-					Mode: appsv1alpha1.StateModeStopped,
-				})
+				f.SetStop(func() *bool { b := true; return &b }())
 			}, appsv1alpha1.StoppedClusterPhase)
 			checkCompStopped()
 

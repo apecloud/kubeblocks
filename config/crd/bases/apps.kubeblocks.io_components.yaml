@@ -5217,18 +5217,11 @@ spec:
                   - name
                   type: object
                 type: array
-              state:
-                description: Specifies the expected state of the Component.
-                properties:
-                  state:
-                    description: Represents the state mode of the object.
-                    enum:
-                    - Running
-                    - Stopped
-                    type: string
-                required:
-                - state
-                type: object
+              stop:
+                description: |-
+                  Stop the Component.
+                  If set, all the computing resources will be released.
+                type: boolean
               systemAccounts:
                 description: Overrides system accounts defined in referenced ComponentDefinition.
                 items:

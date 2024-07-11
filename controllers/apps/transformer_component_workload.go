@@ -155,7 +155,7 @@ func (t *componentWorkloadTransformer) reconcileWorkload(synthesizedComp *compon
 }
 
 func isCompStopped(synthesizedComp *component.SynthesizedComponent) bool {
-	return synthesizedComp.State != nil && synthesizedComp.State.Mode == appsv1alpha1.StateModeStopped
+	return synthesizedComp.Stop != nil && *synthesizedComp.Stop
 }
 
 func (t *componentWorkloadTransformer) stopWorkload(protoITS *workloads.InstanceSet) {

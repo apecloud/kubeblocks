@@ -91,8 +91,7 @@ var _ = Describe("Start OpsRequest", func() {
 			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			for _, v := range opsRes.Cluster.Spec.ComponentSpecs {
-				Expect(v.State).ShouldNot(BeNil())
-				Expect(v.State.Mode).Should(Equal(appsv1alpha1.StateModeRunning))
+				Expect(v.Stop).Should(BeNil())
 			}
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err == nil).Should(BeTrue())

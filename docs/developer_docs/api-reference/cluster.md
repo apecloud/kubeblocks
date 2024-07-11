@@ -1166,16 +1166,15 @@ bool
 </tr>
 <tr>
 <td>
-<code>state</code><br/>
+<code>stop</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.State">
-State
-</a>
+bool
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the expected state of the Component.</p>
+<p>Stop the Component.
+If set, all the computing resources will be released.</p>
 </td>
 </tr>
 </table>
@@ -5248,16 +5247,15 @@ Determines whether metrics exporter information is annotated on the Component&rs
 </tr>
 <tr>
 <td>
-<code>state</code><br/>
+<code>stop</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.State">
-State
-</a>
+bool
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the expected State of the Component.</p>
+<p>Stop the Component.
+If set, all the computing resources will be released.</p>
 </td>
 </tr>
 </tbody>
@@ -9101,16 +9099,15 @@ bool
 </tr>
 <tr>
 <td>
-<code>state</code><br/>
+<code>stop</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.State">
-State
-</a>
+bool
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the expected state of the Component.</p>
+<p>Stop the Component.
+If set, all the computing resources will be released.</p>
 </td>
 </tr>
 </tbody>
@@ -19710,60 +19707,6 @@ CustomOps
 </td>
 </tr>
 </tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.State">State
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>)
-</p>
-<div>
-<p>State represents the state of a CR object.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>state</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.StateMode">
-StateMode
-</a>
-</em>
-</td>
-<td>
-<p>Represents the state mode of the object.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.StateMode">StateMode
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.State">State</a>)
-</p>
-<div>
-<p>StateMode represents the state mode of a CR object.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;Running&#34;</p></td>
-<td><p>StateModeRunning indicates that the object is in a running state.</p>
-</td>
-</tr><tr><td><p>&#34;Stopped&#34;</p></td>
-<td><p>StateModeStopped indicates that the object is in a stopped state.</p>
-</td>
-</tr></tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.StatefulSetSpec">StatefulSetSpec
 </h3>

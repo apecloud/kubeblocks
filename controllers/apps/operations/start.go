@@ -56,9 +56,7 @@ func (start StartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	var (
 		cluster   = opsRes.Cluster
 		startComp = func(compSpec *appsv1alpha1.ClusterComponentSpec) {
-			compSpec.State = &appsv1alpha1.State{
-				Mode: appsv1alpha1.StateModeRunning,
-			}
+			compSpec.Stop = nil
 		}
 	)
 	for i := range cluster.Spec.ComponentSpecs {

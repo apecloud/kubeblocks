@@ -28,6 +28,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
@@ -89,7 +90,7 @@ func (s *CreateUser) Do(ctx context.Context, req *operations.OpsRequest) (*opera
 
 	if userInfo.RoleName != "" {
 		err := s.dbManager.GrantUserRole(ctx, userInfo.UserName, userInfo.RoleName)
-		if err != nil {
+		if err != nil && err != models.ErrNotImplemented {
 			s.logger.Info("executing grantRole error", "error", err.Error())
 			return resp, err
 		}

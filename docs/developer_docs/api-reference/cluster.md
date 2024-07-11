@@ -1164,6 +1164,19 @@ bool
 <p>These annotations allow the Prometheus installed by KubeBlocks to discover and scrape metrics from the exporter.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>stop</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Stop the Component.
+If set, all the computing resources will be released.</p>
+</td>
+</tr>
 </table>
 </td>
 </tr>
@@ -5232,6 +5245,19 @@ Determines whether metrics exporter information is annotated on the Component&rs
 <p>These annotations allow the Prometheus installed by KubeBlocks to discover and scrape metrics from the exporter.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>stop</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Stop the Component.
+If set, all the computing resources will be released.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterComponentStatus">ClusterComponentStatus
@@ -9069,6 +9095,19 @@ bool
 <li>&ldquo;monitor.kubeblocks.io/scheme&rdquo;</li>
 </ul>
 <p>These annotations allow the Prometheus installed by KubeBlocks to discover and scrape metrics from the exporter.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>stop</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Stop the Component.
+If set, all the computing resources will be released.</p>
 </td>
 </tr>
 </tbody>

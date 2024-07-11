@@ -12,12 +12,6 @@ sidebar_label: Scale
 
 You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, if you need to change the resource class from 1C2G to 2C4G, vertical scaling is what you need.
 
-:::note
-
-During the vertical scaling process, all pods restart in the order of learner -> follower -> leader, and the leader pod may change after restarting.
-
-:::
-
 ### Before you start
 
 Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
@@ -28,9 +22,7 @@ kbcli cluster list pulsar-cluster
 
 ### Steps
 
-1. Change configuration. There are 3 ways to apply vertical scaling.
-
-   Configure the parameters `--components`, `--memory`, and `--cpu` and run the command.
+1. Configure the parameters `--components`, `--memory`, and `--cpu` and run the command.
 
    ```bash
    kbcli cluster vscale pulsar-cluster --cpu=3 --memory=10Gi --components=broker,bookies  

@@ -13,17 +13,13 @@ You can restart all pods of the cluster. When an exception occurs in a database,
 
 :::note
 
-Restarting a Kafka cluster triggers a concurrent restart and the leader may change after the cluster restarts.
+Restarting a Pulsar cluster triggers a concurrent restart and the leader may change after the cluster restarts.
 
 :::
 
 ## Steps
 
-1. Restart a cluster.
-
-  You can use `kbcli` or create an OpsRequest to restart a cluster.
-  
-   Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
+1. Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
 
    ```bash
    kbcli cluster restart pulsar-cluster --components="pulsar" \

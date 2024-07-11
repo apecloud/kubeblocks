@@ -53,22 +53,16 @@ kbcli cluster describe-config ppulsar-cluster
 
 1. You need to specify the component name to configure parameters. Get the pulsar cluster component name.
 
-  ```bash
-  kbcli cluster list-components pulsar-cluster 
-  ```
-
-  ***Example***
-
-  ```bash
-  kbcli cluster list-components pulsar-cluster 
-
-  NAME               NAMESPACE   CLUSTER   TYPE               IMAGE
-  proxy              default     pulsar    pulsar-proxy       docker.io/apecloud/pulsar:2.11.2
-  broker             default     pulsar    pulsar-broker      docker.io/apecloud/pulsar:2.11.2
-  bookies-recovery   default     pulsar    bookies-recovery   docker.io/apecloud/pulsar:2.11.2
-  bookies            default     pulsar    bookies            docker.io/apecloud/pulsar:2.11.2
-  zookeeper          default     pulsar    zookeeper          docker.io/apecloud/pulsar:2.11.2
-  ```
+   ```bash
+   kbcli cluster list-components pulsar-cluster 
+   >
+   NAME               NAMESPACE   CLUSTER   TYPE               IMAGE
+   proxy              default     pulsar    pulsar-proxy       docker.io/apecloud/pulsar:2.11.2
+   broker             default     pulsar    pulsar-broker      docker.io/apecloud/pulsar:2.11.2
+   bookies-recovery   default     pulsar    bookies-recovery   docker.io/apecloud/pulsar:2.11.2
+   bookies            default     pulsar    bookies            docker.io/apecloud/pulsar:2.11.2
+   zookeeper          default     pulsar    zookeeper          docker.io/apecloud/pulsar:2.11.2
+   ```
 
 2. Configure parameters.
 
@@ -102,7 +96,7 @@ The following steps take the configuration of dynamic parameter `brokerShutdownT
 
    ```bash
    kbcli cluster desc-config pulsar-cluster --components=broker
-   
+   >
    ConfigSpecs Meta:
    CONFIG-SPEC-NAME         FILE                   ENABLED   TEMPLATE                   CONSTRAINT                   RENDERED                               COMPONENT   CLUSTER
    agamotto-configuration   agamotto-config.yaml   false     pulsar-agamotto-conf-tpl                                pulsar-broker-agamotto-configuration   broker      pulsar
@@ -147,7 +141,7 @@ The following steps take the configuration of dynamic parameter `brokerShutdownT
 
 For your convenience, KubeBlocks offers a tool `edit-config` to help you to configure parameter in a visualized way.
 
-For Linux and macOS, you can edit configuration files by vi. For Windows, you can edit files on notepad.
+For Linux and macOS, you can edit configuration files by vim. For Windows, you can edit files on notepad.
 
 1. Edit the configuration file.
 

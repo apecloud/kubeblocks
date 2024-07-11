@@ -9,12 +9,6 @@ sidebar_label: Expand volume
 
 You can expand the storage volume size of each pod.
 
-:::note
-
-Volume expansion triggers pod restart, all pods restart in the order of learner -> follower -> leader and the leader pod may change after the operation.
-
-:::
-
 ## Before you start
 
 Check whether the cluster status is `Running`. Otherwise, the following operations may fail.

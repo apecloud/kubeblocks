@@ -142,7 +142,7 @@ The scaling function for vector databases is also supported.
 Use the following command to perform horizontal scaling.
 
 ```bash
-kbcli cluster hscale weaviate --replicas=5 --components=weaviate
+kbcli cluster hscale weaviate --replicas=3 --components=weaviate
 ```
 
 Please wait a few seconds until the scaling process is over.

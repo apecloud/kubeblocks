@@ -18,7 +18,7 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
 
 ***Steps***
 
-1. Execute the following command to create a Qdrant cluster. You can change the `cluster-definition` value as any other databases supported.
+1. Execute the following command to create a Qdrant cluster. 
 
    ```bash
    kbcli cluster create qdrant --cluster-definition=qdrant
@@ -36,7 +36,7 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
    kbcli cluster list
    >
    NAME     NAMESPACE   CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    CREATED-TIME
-   qdrant   default     qdrant               qdrant-1.1.0   Delete               Running   Aug 15,2023 23:03 UTC+0800
+   qdrant   default     qdrant               qdrant-1.5.0   Delete               Running   Aug 15,2023 23:03 UTC+0800
    ```
 
 3. Check the cluster information.
@@ -46,7 +46,7 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
    >
    Name: qdrant         Created Time: Aug 15,2023 23:03 UTC+0800
    NAMESPACE   CLUSTER-DEFINITION   VERSION        STATUS    TERMINATION-POLICY
-   default     qdrant               qdrant-1.1.0   Running   Delete
+   default     qdrant               qdrant-1.5.0   Running   Delete
 
    Endpoints:
    COMPONENT   MODE        INTERNAL                                       EXTERNAL

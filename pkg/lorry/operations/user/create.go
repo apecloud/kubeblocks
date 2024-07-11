@@ -21,12 +21,15 @@ package user
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
@@ -36,8 +39,9 @@ import (
 
 type CreateUser struct {
 	operations.Base
-	dbManager engines.DBManager
-	logger    logr.Logger
+	builtinDBManager engines.DBManager
+	customDBManager  engines.DBManager
+	logger           logr.Logger
 }
 
 var createUser operations.Operation = &CreateUser{}
@@ -54,8 +58,23 @@ func (s *CreateUser) Init(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "get manager failed")
 	}
-	s.dbManager = dbManager
+	s.builtinDBManager = dbManager
 	s.logger = ctrl.Log.WithName("CreateUser")
+
+	actionJSON := viper.GetString(constant.KBEnvActionCommands)
+	if actionJSON != "" {
+		actionCommands := map[string][]string{}
+		err := json.Unmarshal([]byte(actionJSON), &actionCommands)
+		if err != nil {
+			s.logger.Info("get action commands failed", "error", err.Error())
+			return err
+		}
+		accoutProvisionCmd, ok := actionCommands[constant.AccountProvisionAction]
+		if ok && len(accoutProvisionCmd) > 0 {
+			s.Command = accoutProvisionCmd
+			s.customDBManager = register.GetCustomManager(nil)
+		}
+	}
 	return nil
 }
 
@@ -76,20 +95,28 @@ func (s *CreateUser) Do(ctx context.Context, req *operations.OpsRequest) (*opera
 	userInfo, _ := UserInfoParser(req)
 	resp := operations.NewOpsResponse(util.CreateUserOp)
 
-	user, err := s.dbManager.DescribeUser(ctx, userInfo.UserName)
+	user, err := s.builtinDBManager.DescribeUser(ctx, userInfo.UserName)
 	if err == nil && user != nil {
 		return resp.WithSuccess("account already exists")
 	}
 
-	err = s.dbManager.CreateUser(ctx, userInfo.UserName, userInfo.Password)
+	// for compatibility with old addons that specify accoutprovision action but not work actually.
+	err = s.builtinDBManager.CreateUser(ctx, userInfo.UserName, userInfo.Password, userInfo.Statement)
 	if err != nil {
+		if s.builtinDBManager != s.customDBManager && len(s.Command) > 0 {
+			err = s.customDBManager.CreateUser(ctx, userInfo.UserName, userInfo.Password, userInfo.Statement)
+			if err == nil {
+				return resp.WithSuccess("")
+			}
+			err = errors.Wrap(err, "create user failed")
+		}
 		err = errors.Cause(err)
 		s.logger.Info("executing CreateUser error", "error", err.Error())
 		return resp, err
 	}
 
 	if userInfo.RoleName != "" {
-		err := s.dbManager.GrantUserRole(ctx, userInfo.UserName, userInfo.RoleName)
+		err := s.builtinDBManager.GrantUserRole(ctx, userInfo.UserName, userInfo.RoleName)
 		if err != nil && err != models.ErrNotImplemented {
 			s.logger.Info("executing grantRole error", "error", err.Error())
 			return resp, err

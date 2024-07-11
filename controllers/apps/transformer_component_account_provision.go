@@ -209,7 +209,7 @@ func (t *componentAccountProvisionTransformer) buildLorryClient(transCtx *compon
 }
 
 func (t *componentAccountProvisionTransformer) provisionAccount(transCtx *componentTransformContext,
-	cond metav1.Condition, lorryCli lorry.Client, account appsv1alpha1.SystemAccount) error {
+	_ metav1.Condition, lorryCli lorry.Client, account appsv1alpha1.SystemAccount) error {
 
 	synthesizedComp := transCtx.SynthesizeComponent
 	secret, err := t.getAccountSecret(transCtx, synthesizedComp, account)
@@ -227,7 +227,7 @@ func (t *componentAccountProvisionTransformer) provisionAccount(transCtx *compon
 		return nil
 	}
 	// TODO: re-define the role
-	return lorryCli.CreateUser(transCtx.Context, string(username), string(password), string(lorryModel.SuperUserRole))
+	return lorryCli.CreateUser(transCtx.Context, string(username), string(password), string(lorryModel.SuperUserRole), account.Statement)
 }
 
 func (t *componentAccountProvisionTransformer) getAccountSecret(ctx graph.TransformContext,

@@ -267,7 +267,7 @@ func (mgr *Manager) Unlock(ctx context.Context) error {
 //
 // - KB_ACCOUNT_NAME: The name of the account to create.
 // - KB_ACCOUNT_PASSWORD: The password of the account to create.
-// - KB_ACCOUNT_STATEMEMNT: The statement used to create the account.
+// - KB_ACCOUNT_STATEMENT: The statement used to create the account.
 func (mgr *Manager) CreateUser(ctx context.Context, userName, password, statement string) error {
 	accountProvisionCmd, ok := mgr.actionCommands[constant.AccountProvisionAction]
 	if !ok || len(accountProvisionCmd) == 0 {

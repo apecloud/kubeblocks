@@ -141,7 +141,7 @@ func (r rebuildInstanceOpsHandler) validateRebuildInstanceWithHScale(reqCtx intc
 
 func (r rebuildInstanceOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.RebuildFrom)
-	getLastComponentInfo := func(compSpec appsv1alpha1.ClusterComponentSpec, comOps ComponentOpsInteface) appsv1alpha1.LastComponentConfiguration {
+	getLastComponentInfo := func(compSpec appsv1alpha1.ClusterComponentSpec, comOps ComponentOpsInterface) appsv1alpha1.LastComponentConfiguration {
 		lastCompConfiguration := appsv1alpha1.LastComponentConfiguration{
 			Replicas:         pointer.Int32(compSpec.Replicas),
 			Instances:        compSpec.Instances,
@@ -372,7 +372,7 @@ func (r rebuildInstanceOpsHandler) scaleOutCompReplicasAndSyncProgress(opsRes *O
 	scaleOutInsMap := map[string]string{}
 	setScaleOutInsMap := func(workloadName, templateName string,
 		replicas int32, offlineInstances []string, wrapper *rebuildInstanceWrapper) {
-		insNames := instanceset.GenerateInstanceNamesFromTemplate(workloadName, "", replicas, offlineInstances)
+		insNames, _ := instanceset.GenerateInstanceNamesFromTemplate(workloadName, "", replicas, offlineInstances, nil)
 		for i, insName := range wrapper.insNames {
 			scaleOutInsMap[insName] = insNames[int(replicas-wrapper.replicas)+i]
 		}
@@ -420,7 +420,7 @@ func (r rebuildInstanceOpsHandler) checkProgressForScalingOutPods(reqCtx intctrl
 	if err != nil {
 		return 0, 0, nil, err
 	}
-	currPodSet := component.GenerateAllPodNamesToSet(compSpec.Replicas, compSpec.Instances, compSpec.OfflineInstances,
+	currPodSet, _ := component.GenerateAllPodNamesToSet(compSpec.Replicas, compSpec.Instances, compSpec.OfflineInstances,
 		opsRes.Cluster.Name, compSpec.Name)
 	for _, instance := range rebuildInstance.Instances {
 		progressDetail := r.getInstanceProgressDetail(*compStatus, instance.Name)

@@ -114,9 +114,9 @@ func validateCompReplicas4Runtime(comp *appsv1alpha1.Component, compDef *appsv1a
 		if comp.Status.ObservedGeneration == 0 {
 			return defaultMinReplicas
 		}
-		return defaultMinReplicas4ScaleIn
+		return min(comp.Spec.Replicas, defaultMinReplicas4ScaleIn)
 	}()
-	
+
 	replicas := comp.Spec.Replicas
 	if replicas < minReplicas {
 		return fmt.Errorf("replicas %d is less than required min replicas %d", replicas, minReplicas)

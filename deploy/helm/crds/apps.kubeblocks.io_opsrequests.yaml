@@ -4362,10 +4362,10 @@ spec:
                       description: Specifies the name of the Component.
                       type: string
                     inPlace:
-                      description: |-
-                        When it is set to true, the instance will be rebuilt in-place.
-                        By default, a new pod will be created. Once the new pod is ready to serve,
-                        the instance that require rebuilding will be taken offline.
+                      description: When it is set to true, the instance will be rebuilt
+                        in-place. By default, a new pod will be created. Once the
+                        new pod is ready to serve, the instance that require rebuilding
+                        will be taken offline.
                       type: boolean
                     instances:
                       description: Specifies the instances (Pods) that need to be

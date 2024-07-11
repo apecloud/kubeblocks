@@ -180,6 +180,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		Instances:              comp.Spec.Instances,
 		OfflineInstances:       comp.Spec.OfflineInstances,
 		DisableExporter:        comp.Spec.DisableExporter,
+		Stop:                   comp.Spec.Stop,
 		PodManagementPolicy:    compDef.Spec.PodManagementPolicy,
 	}
 

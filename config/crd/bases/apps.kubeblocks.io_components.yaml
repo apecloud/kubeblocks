@@ -4387,6 +4387,10 @@ spec:
                   - name
                   type: object
                 type: array
+              stop:
+                description: Stop the Component. If set, all the computing resources
+                  will be released.
+                type: boolean
               systemAccounts:
                 description: Overrides system accounts defined in referenced ComponentDefinition.
                 items:

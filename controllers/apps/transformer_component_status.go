@@ -50,12 +50,7 @@ const (
 // componentStatusTransformer computes the current status: read the underlying workload status and update the component status
 type componentStatusTransformer struct {
 	client.Client
-}
 
-// componentStatusHandler handles the component status
-type componentStatusHandler struct {
-	cli            client.Client
-	reqCtx         intctrlutil.RequestCtx
 	cluster        *appsv1alpha1.Cluster
 	comp           *appsv1alpha1.Component
 	synthesizeComp *component.SynthesizedComponent
@@ -65,43 +60,32 @@ type componentStatusHandler struct {
 	runningITS *workloads.InstanceSet
 	// protoITS is the ITS object that is rebuilt from scratch during each reconcile process
 	protoITS *workloads.InstanceSet
-	// podsReady indicates if the component's underlying pods are ready
-	podsReady bool
 }
 
 var _ graph.Transformer = &componentStatusTransformer{}
 
 func (t *componentStatusTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
-	comp := transCtx.Component
 	if model.IsObjectDeleting(transCtx.ComponentOrig) {
 		return nil
 	}
+
+	comp := transCtx.Component
 	if transCtx.RunningWorkload == nil {
-		transCtx.Logger.Info(fmt.Sprintf("skip reconcile component status because underlying workload object not found, generation: %d", comp.Generation))
+		transCtx.Logger.Info(fmt.Sprintf("skip reconcile status because underlying workload not found, generation: %d", comp.Generation))
 		return nil
 	}
 
-	reqCtx := intctrlutil.RequestCtx{
-		Ctx:      transCtx.Context,
-		Log:      transCtx.Logger,
-		Recorder: transCtx.EventRecorder,
-	}
-	cluster := transCtx.Cluster
-	synthesizeComp := transCtx.SynthesizeComponent
-	runningITS, _ := transCtx.RunningWorkload.(*workloads.InstanceSet)
-	protoITS, _ := transCtx.ProtoWorkload.(*workloads.InstanceSet)
+	t.init(transCtx, dag)
+
 	switch {
 	case model.IsObjectUpdating(transCtx.ComponentOrig):
-		transCtx.Logger.Info(fmt.Sprintf("update component status after applying resources, generation: %d", comp.Generation))
+		transCtx.Logger.Info(fmt.Sprintf("update status after applying new spec, generation: %d", comp.Generation))
 		comp.Status.ObservedGeneration = comp.Generation
 	case model.IsObjectStatusUpdating(transCtx.ComponentOrig):
-		// reconcile the component status and sync the component status to cluster status
-		csh := newComponentStatusHandler(reqCtx, t.Client, cluster, comp, synthesizeComp, runningITS, protoITS, dag)
-		if err := csh.reconcileComponentStatus(); err != nil {
+		if err := t.reconcileStatus(transCtx); err != nil {
 			return err
 		}
-		comp = csh.comp
 	}
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
@@ -116,46 +100,52 @@ func (t *componentStatusTransformer) Transform(ctx graph.TransformContext, dag *
 	return nil
 }
 
-// reconcileComponentStatus reconciles component status.
-func (r *componentStatusHandler) reconcileComponentStatus() error {
-	if r.runningITS == nil {
+func (t *componentStatusTransformer) init(transCtx *componentTransformContext, dag *graph.DAG) {
+	t.cluster = transCtx.Cluster
+	t.comp = transCtx.Component
+	t.synthesizeComp = transCtx.SynthesizeComponent
+	t.runningITS = transCtx.RunningWorkload.(*workloads.InstanceSet)
+	t.protoITS = transCtx.ProtoWorkload.(*workloads.InstanceSet)
+	t.dag = dag
+}
+
+// reconcileStatus reconciles component status.
+func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransformContext) error {
+	if t.runningITS == nil {
 		return nil
 	}
 
 	// check if the ITS is deleting
 	isDeleting := func() bool {
-		return !r.runningITS.DeletionTimestamp.IsZero()
+		return !t.runningITS.DeletionTimestamp.IsZero()
 	}()
 
-	// check if the ITS replicas is zero
-	isZeroReplica := func() bool {
-		return (r.runningITS.Spec.Replicas == nil || *r.runningITS.Spec.Replicas == 0) && r.synthesizeComp.Replicas == 0
-	}()
+	stopped := isCompStopped(t.synthesizeComp)
 
-	hasComponentPod := func() bool {
-		return r.runningITS.Status.Replicas > 0
+	hasRunningPods := func() bool {
+		return t.runningITS.Status.Replicas > 0
 	}()
 
 	// check if the ITS is running
-	isITSUpdatedNRunning := r.isInstanceSetRunning()
+	isITSUpdatedNRunning := t.isInstanceSetRunning()
 
 	// check if all configTemplates are synced
-	isAllConfigSynced, err := r.isAllConfigSynced()
+	isAllConfigSynced, err := t.isAllConfigSynced(transCtx)
 	if err != nil {
 		return err
 	}
 
 	// check if the component has failed pod
-	hasFailedPod, messages := r.hasFailedPod()
+	hasFailedPod, messages := t.hasFailedPod()
 
 	// check if the component scale out failed
-	isScaleOutFailed, err := r.isScaleOutFailed()
+	isScaleOutFailed, err := t.isScaleOutFailed(transCtx)
 	if err != nil {
 		return err
 	}
 
 	// check if the volume expansion is running
-	hasRunningVolumeExpansion, hasFailedVolumeExpansion, err := r.hasVolumeExpansionRunning()
+	hasRunningVolumeExpansion, hasFailedVolumeExpansion, err := t.hasVolumeExpansionRunning(transCtx)
 	if err != nil {
 		return err
 	}
@@ -166,71 +156,67 @@ func (r *componentStatusHandler) reconcileComponentStatus() error {
 	}()
 
 	// check if the component is available
-	isComponentAvailable := r.isComponentAvailable()
+	isComponentAvailable := t.isComponentAvailable()
 
 	// check if the component is in creating phase
 	isInCreatingPhase := func() bool {
-		phase := r.comp.Status.Phase
+		phase := t.comp.Status.Phase
 		return phase == "" || phase == appsv1alpha1.CreatingClusterCompPhase
 	}()
 
-	r.reqCtx.Log.Info(
-		fmt.Sprintf("component status conditions, isInstanceSetRunning: %v, isAllConfigSynced: %v, hasRunningVolumeExpansion: %v, hasFailure: %v,  isInCreatingPhase: %v, isComponentAvailable: %v",
-			isITSUpdatedNRunning, isAllConfigSynced, hasRunningVolumeExpansion, hasFailure, isInCreatingPhase, isComponentAvailable))
+	transCtx.Logger.Info(
+		fmt.Sprintf("status conditions, creating: %v, available: %v, its running: %v, has failure: %v, updating: %v, config synced: %v",
+			isInCreatingPhase, isComponentAvailable, isITSUpdatedNRunning, hasFailure, hasRunningVolumeExpansion, isAllConfigSynced))
 
-	r.podsReady = false
 	switch {
 	case isDeleting:
-		r.setComponentStatusPhase(appsv1alpha1.DeletingClusterCompPhase, nil, "component is Deleting")
-	case isZeroReplica && hasComponentPod:
-		r.setComponentStatusPhase(appsv1alpha1.StoppingClusterCompPhase, nil, "component is Stopping")
-		r.podsReady = true
-	case isZeroReplica:
-		r.setComponentStatusPhase(appsv1alpha1.StoppedClusterCompPhase, nil, "component is Stopped")
-		r.podsReady = true
+		t.setComponentStatusPhase(transCtx, appsv1alpha1.DeletingClusterCompPhase, nil, "component is Deleting")
+	case stopped && hasRunningPods:
+		t.setComponentStatusPhase(transCtx, appsv1alpha1.StoppingClusterCompPhase, nil, "component is Stopping")
+	case stopped:
+		t.setComponentStatusPhase(transCtx, appsv1alpha1.StoppedClusterCompPhase, nil, "component is Stopped")
 	case isITSUpdatedNRunning && isAllConfigSynced && !hasRunningVolumeExpansion:
-		r.setComponentStatusPhase(appsv1alpha1.RunningClusterCompPhase, nil, "component is Running")
-		r.podsReady = true
+		t.setComponentStatusPhase(transCtx, appsv1alpha1.RunningClusterCompPhase, nil, "component is Running")
 	case !hasFailure && isInCreatingPhase:
-		r.setComponentStatusPhase(appsv1alpha1.CreatingClusterCompPhase, nil, "component is Creating")
+		t.setComponentStatusPhase(transCtx, appsv1alpha1.CreatingClusterCompPhase, nil, "component is Creating")
 	case !hasFailure:
-		r.setComponentStatusPhase(appsv1alpha1.UpdatingClusterCompPhase, nil, "component is Updating")
+		t.setComponentStatusPhase(transCtx, appsv1alpha1.UpdatingClusterCompPhase, nil, "component is Updating")
 	case !isComponentAvailable:
-		r.setComponentStatusPhase(appsv1alpha1.FailedClusterCompPhase, messages, "component is Failed")
+		t.setComponentStatusPhase(transCtx, appsv1alpha1.FailedClusterCompPhase, messages, "component is Failed")
 	default:
-		r.setComponentStatusPhase(appsv1alpha1.AbnormalClusterCompPhase, nil, "component is Abnormal")
+		t.setComponentStatusPhase(transCtx, appsv1alpha1.AbnormalClusterCompPhase, nil, "component is Abnormal")
 	}
 
 	return nil
 }
 
-func (r *componentStatusHandler) isWorkloadUpdated() bool {
-	if r.cluster == nil || r.runningITS == nil {
+func (t *componentStatusTransformer) isWorkloadUpdated() bool {
+	if t.cluster == nil || t.runningITS == nil {
 		return false
 	}
 	// check whether component spec has been sent to the underlying workload
-	itsComponentGeneration := r.runningITS.GetAnnotations()[constant.KubeBlocksGenerationKey]
-	return itsComponentGeneration == strconv.FormatInt(r.cluster.Generation, 10)
+	itsComponentGeneration := t.runningITS.GetAnnotations()[constant.KubeBlocksGenerationKey]
+	return itsComponentGeneration == strconv.FormatInt(t.cluster.Generation, 10)
 }
 
 // isComponentAvailable tells whether the component is basically available, ether working well or in a fragile state:
 // 1. at least one pod is available
 // 2. with latest revision
 // 3. and with leader role label set
-func (r *componentStatusHandler) isComponentAvailable() bool {
-	if !r.isWorkloadUpdated() {
+func (t *componentStatusTransformer) isComponentAvailable() bool {
+	if !t.isWorkloadUpdated() {
 		return false
 	}
-	if r.runningITS.Status.CurrentRevision != r.runningITS.Status.UpdateRevision {
+	if t.runningITS.Status.CurrentRevision != t.runningITS.Status.UpdateRevision {
 		return false
 	}
-	if r.runningITS.Status.AvailableReplicas <= 0 {
+	if t.runningITS.Status.AvailableReplicas <= 0 {
 		return false
 	}
-	if len(r.synthesizeComp.Roles) == 0 {
+	if len(t.synthesizeComp.Roles) == 0 {
 		return true
 	}
-	for _, status := range r.runningITS.Status.MembersStatus {
+	for _, status := range t.runningITS.Status.MembersStatus {
 		if status.ReplicaRole.IsLeader {
 			return true
 		}
@@ -239,36 +225,36 @@ func (r *componentStatusHandler) isComponentAvailable() bool {
 }
 
 // isRunning checks if the component underlying workload is running.
-func (r *componentStatusHandler) isInstanceSetRunning() bool {
-	if r.runningITS == nil {
+func (t *componentStatusTransformer) isInstanceSetRunning() bool {
+	if t.runningITS == nil {
 		return false
 	}
-	if !r.isWorkloadUpdated() {
+	if !t.isWorkloadUpdated() {
 		return false
 	}
-	return instanceset.IsInstanceSetReady(r.runningITS)
+	return instanceset.IsInstanceSetReady(t.runningITS)
 }
 
 // isAllConfigSynced checks if all configTemplates are synced.
-func (r *componentStatusHandler) isAllConfigSynced() (bool, error) {
+func (t *componentStatusTransformer) isAllConfigSynced(transCtx *componentTransformContext) (bool, error) {
 	var (
 		cmKey client.ObjectKey
 		cmObj = &corev1.ConfigMap{}
 	)
 
-	if len(r.synthesizeComp.ConfigTemplates) == 0 {
+	if len(t.synthesizeComp.ConfigTemplates) == 0 {
 		return true, nil
 	}
 
 	configurationKey := client.ObjectKey{
-		Namespace: r.cluster.Namespace,
-		Name:      cfgcore.GenerateComponentConfigurationName(r.cluster.Name, r.synthesizeComp.Name),
+		Namespace: t.cluster.Namespace,
+		Name:      cfgcore.GenerateComponentConfigurationName(t.cluster.Name, t.synthesizeComp.Name),
 	}
 	configuration := &appsv1alpha1.Configuration{}
-	if err := r.cli.Get(r.reqCtx.Ctx, configurationKey, configuration); err != nil {
+	if err := t.Client.Get(transCtx.Context, configurationKey, configuration); err != nil {
 		return false, err
 	}
-	for _, configSpec := range r.synthesizeComp.ConfigTemplates {
+	for _, configSpec := range t.synthesizeComp.ConfigTemplates {
 		item := configuration.Spec.GetConfigurationItem(configSpec.Name)
 		status := configuration.Status.GetItemStatus(configSpec.Name)
 		// for creating phase
@@ -276,10 +262,10 @@ func (r *componentStatusHandler) isAllConfigSynced() (bool, error) {
 			return false, nil
 		}
 		cmKey = client.ObjectKey{
-			Namespace: r.cluster.Namespace,
-			Name:      cfgcore.GetComponentCfgName(r.cluster.Name, r.synthesizeComp.Name, configSpec.Name),
+			Namespace: t.cluster.Namespace,
+			Name:      cfgcore.GetComponentCfgName(t.cluster.Name, t.synthesizeComp.Name, configSpec.Name),
 		}
-		if err := r.cli.Get(r.reqCtx.Ctx, cmKey, cmObj, inDataContext4C()); err != nil {
+		if err := t.Client.Get(transCtx.Context, cmKey, cmObj, inDataContext4C()); err != nil {
 			return false, err
 		}
 		if intctrlutil.GetConfigSpecReconcilePhase(cmObj, *item, status) != appsv1alpha1.CFinishedPhase {
@@ -290,22 +276,27 @@ func (r *componentStatusHandler) isAllConfigSynced() (bool, error) {
 }
 
 // isScaleOutFailed checks if the component scale out failed.
-func (r *componentStatusHandler) isScaleOutFailed() (bool, error) {
-	if r.runningITS == nil {
+func (t *componentStatusTransformer) isScaleOutFailed(transCtx *componentTransformContext) (bool, error) {
+	if t.runningITS == nil {
 		return false, nil
 	}
-	if r.runningITS.Spec.Replicas == nil {
+	if t.runningITS.Spec.Replicas == nil {
 		return false, nil
 	}
-	if r.synthesizeComp.Replicas <= *r.runningITS.Spec.Replicas {
+	if t.synthesizeComp.Replicas <= *t.runningITS.Spec.Replicas {
 		return false, nil
 	}
 
-	backupKey := types.NamespacedName{
-		Namespace: r.runningITS.Namespace,
-		Name:      constant.GenerateResourceNameWithScalingSuffix(r.runningITS.Name),
+	reqCtx := intctrlutil.RequestCtx{
+		Ctx:      transCtx.Context,
+		Log:      transCtx.Logger,
+		Recorder: transCtx.EventRecorder,
 	}
-	d, err := newDataClone(r.reqCtx, r.cli, r.cluster, r.synthesizeComp, r.runningITS, r.protoITS, backupKey)
+	backupKey := types.NamespacedName{
+		Namespace: t.runningITS.Namespace,
+		Name:      constant.GenerateResourceNameWithScalingSuffix(t.runningITS.Name),
+	}
+	d, err := newDataClone(reqCtx, t.Client, t.cluster, t.synthesizeComp, t.runningITS, t.protoITS, backupKey)
 	if err != nil {
 		return false, err
 	}
@@ -314,11 +305,11 @@ func (r *componentStatusHandler) isScaleOutFailed() (bool, error) {
 	} else if status == backupStatusFailed {
 		return true, nil
 	}
-	desiredPodNames, err := generatePodNames(r.synthesizeComp)
+	desiredPodNames, err := generatePodNames(t.synthesizeComp)
 	if err != nil {
 		return false, err
 	}
-	currentPodNames, err := generatePodNamesByITS(r.runningITS)
+	currentPodNames, err := generatePodNamesByITS(t.runningITS)
 	if err != nil {
 		return false, err
 	}
@@ -328,7 +319,7 @@ func (r *componentStatusHandler) isScaleOutFailed() (bool, error) {
 			continue
 		}
 		// backup's ready, then start to check restore
-		templateName, index, err := component.GetTemplateNameAndOrdinal(r.runningITS.Name, podName)
+		templateName, index, err := component.GetTemplateNameAndOrdinal(t.runningITS.Name, podName)
 		if err != nil {
 			return false, err
 		}
@@ -342,13 +333,13 @@ func (r *componentStatusHandler) isScaleOutFailed() (bool, error) {
 }
 
 // hasVolumeExpansionRunning checks if the volume expansion is running.
-func (r *componentStatusHandler) hasVolumeExpansionRunning() (bool, bool, error) {
+func (t *componentStatusTransformer) hasVolumeExpansionRunning(transCtx *componentTransformContext) (bool, bool, error) {
 	var (
 		running bool
 		failed  bool
 	)
-	for _, vct := range r.runningITS.Spec.VolumeClaimTemplates {
-		volumes, err := getRunningVolumes(r.reqCtx.Ctx, r.cli, r.synthesizeComp, r.runningITS, vct.Name)
+	for _, vct := range t.runningITS.Spec.VolumeClaimTemplates {
+		volumes, err := getRunningVolumes(transCtx.Context, t.Client, t.synthesizeComp, t.runningITS, vct.Name)
 		if err != nil {
 			return false, false, err
 		}
@@ -364,32 +355,32 @@ func (r *componentStatusHandler) hasVolumeExpansionRunning() (bool, bool, error)
 }
 
 // hasFailedPod checks if the instance set has failed pod.
-func (r *componentStatusHandler) hasFailedPod() (bool, appsv1alpha1.ComponentMessageMap) {
+func (t *componentStatusTransformer) hasFailedPod() (bool, appsv1alpha1.ComponentMessageMap) {
 	messages := appsv1alpha1.ComponentMessageMap{}
 	// check InstanceFailure condition
-	hasFailedPod := meta.IsStatusConditionTrue(r.runningITS.Status.Conditions, string(workloads.InstanceFailure))
+	hasFailedPod := meta.IsStatusConditionTrue(t.runningITS.Status.Conditions, string(workloads.InstanceFailure))
 	if hasFailedPod {
-		failureCondition := meta.FindStatusCondition(r.runningITS.Status.Conditions, string(workloads.InstanceFailure))
-		messages.SetObjectMessage(workloads.Kind, r.runningITS.Name, failureCondition.Message)
+		failureCondition := meta.FindStatusCondition(t.runningITS.Status.Conditions, string(workloads.InstanceFailure))
+		messages.SetObjectMessage(workloads.Kind, t.runningITS.Name, failureCondition.Message)
 		return true, messages
 	}
 
 	// check InstanceReady condition
-	if !meta.IsStatusConditionTrue(r.runningITS.Status.Conditions, string(workloads.InstanceReady)) {
+	if !meta.IsStatusConditionTrue(t.runningITS.Status.Conditions, string(workloads.InstanceReady)) {
 		return false, nil
 	}
 
 	// all instances are in Ready condition, check role probe
-	if len(r.runningITS.Spec.Roles) == 0 {
+	if len(t.runningITS.Spec.Roles) == 0 {
 		return false, nil
 	}
-	if len(r.runningITS.Status.MembersStatus) == int(r.runningITS.Status.Replicas) {
+	if len(t.runningITS.Status.MembersStatus) == int(t.runningITS.Status.Replicas) {
 		return false, nil
 	}
 	probeTimeoutDuration := time.Duration(appsv1alpha1.DefaultRoleProbeTimeoutAfterPodsReady) * time.Second
-	condition := meta.FindStatusCondition(r.runningITS.Status.Conditions, string(workloads.InstanceReady))
+	condition := meta.FindStatusCondition(t.runningITS.Status.Conditions, string(workloads.InstanceReady))
 	if time.Now().After(condition.LastTransitionTime.Add(probeTimeoutDuration)) {
-		messages.SetObjectMessage(workloads.Kind, r.runningITS.Name, "Role probe timeout, check whether the application is available")
+		messages.SetObjectMessage(workloads.Kind, t.runningITS.Name, "Role probe timeout, check whether the application is available")
 		return true, messages
 	}
 
@@ -397,7 +388,8 @@ func (r *componentStatusHandler) hasFailedPod() (bool, appsv1alpha1.ComponentMes
 }
 
 // setComponentStatusPhase sets the component phase and messages conditionally.
-func (r *componentStatusHandler) setComponentStatusPhase(phase appsv1alpha1.ClusterComponentPhase, statusMessage appsv1alpha1.ComponentMessageMap, phaseTransitionMsg string) {
+func (t *componentStatusTransformer) setComponentStatusPhase(transCtx *componentTransformContext,
+	phase appsv1alpha1.ClusterComponentPhase, statusMessage appsv1alpha1.ComponentMessageMap, phaseTransitionMsg string) {
 	updateFn := func(status *appsv1alpha1.ComponentStatus) error {
 		if status.Phase == phase {
 			return nil
@@ -412,47 +404,26 @@ func (r *componentStatusHandler) setComponentStatusPhase(phase appsv1alpha1.Clus
 		}
 		return nil
 	}
-	if err := r.updateComponentStatus(phaseTransitionMsg, updateFn); err != nil {
+	if err := t.updateComponentStatus(transCtx, phaseTransitionMsg, updateFn); err != nil {
 		panic(fmt.Sprintf("unexpected error occurred while updating component status: %s", err.Error()))
 	}
 }
 
 // updateComponentStatus updates the component status by @updateFn, with additional message to explain the transition occurred.
-func (r *componentStatusHandler) updateComponentStatus(phaseTransitionMsg string, updateFn func(status *appsv1alpha1.ComponentStatus) error) error {
+func (t *componentStatusTransformer) updateComponentStatus(transCtx *componentTransformContext,
+	phaseTransitionMsg string, updateFn func(status *appsv1alpha1.ComponentStatus) error) error {
 	if updateFn == nil {
 		return nil
 	}
-	phase := r.comp.Status.Phase
-	err := updateFn(&r.comp.Status)
+	phase := t.comp.Status.Phase
+	err := updateFn(&t.comp.Status)
 	if err != nil {
 		return err
 	}
-	if phase != r.comp.Status.Phase {
-		if r.reqCtx.Recorder != nil && phaseTransitionMsg != "" {
-			r.reqCtx.Recorder.Eventf(r.comp, corev1.EventTypeNormal, componentPhaseTransition, phaseTransitionMsg)
+	if phase != t.comp.Status.Phase {
+		if transCtx.EventRecorder != nil && phaseTransitionMsg != "" {
+			transCtx.EventRecorder.Eventf(t.comp, corev1.EventTypeNormal, componentPhaseTransition, phaseTransitionMsg)
 		}
 	}
 	return nil
-}
-
-// newComponentStatusHandler creates a new componentStatusHandler
-func newComponentStatusHandler(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	comp *appsv1alpha1.Component,
-	synthesizeComp *component.SynthesizedComponent,
-	runningITS *workloads.InstanceSet,
-	protoITS *workloads.InstanceSet,
-	dag *graph.DAG) *componentStatusHandler {
-	return &componentStatusHandler{
-		cli:            cli,
-		reqCtx:         reqCtx,
-		cluster:        cluster,
-		comp:           comp,
-		synthesizeComp: synthesizeComp,
-		runningITS:     runningITS,
-		protoITS:       protoITS,
-		dag:            dag,
-		podsReady:      false,
-	}
 }

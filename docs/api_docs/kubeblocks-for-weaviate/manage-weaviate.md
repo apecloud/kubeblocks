@@ -118,9 +118,13 @@ Run the following command to see the created Qdrant cluster object:
 kubectl get cluster mycluster -n demo -o yaml
 ```
 
-## Connect to a vector database cluster
+## Connect to a Weaviate cluster
 
-Weaviate provides client access on port 8080. You can also port forward the service to connect to a database from your local machine.
+Weaviate provides the HTTP protocol for client access on port 8080. You can visit the cluster by the local host.
+
+```bash
+curl http://localhost:8080/v1/meta | jq
+```
 
 ## Scaling
 

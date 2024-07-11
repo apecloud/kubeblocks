@@ -20,13 +20,7 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
 1. Execute the following command to create a Qdrant cluster. You can change the `cluster-definition` value as any other databases supported.
 
    ```bash
-   kbcli cluster create elasticsearch --cluster-definition=elasticsearch
-   ```
-
-   If you want to create a Elasticsearch cluster with multiple replicas. Use the following command and set the replica numbers.
-
-   ```bash
-   kbcli cluster create elasticsearch --cluster-definition=elasticsearch --set replicas=3
+   kbcli cluster create elasticsearch 
    ```
 
 2. Check whether the cluster is created.
@@ -93,17 +87,11 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
 
 ## Connect to a Elasticsearch cluster
 
-Elasticsearch provides both HTTP and gRPC protocols for client access on ports 6333 and 6334 respectively. Depending on where the client is, different connection options are offered to connect to the Qdrant cluster.
+Elasticsearch provides the HTTP protocol for client access on port 9200. You can visit the cluster by the local host.
 
-:::note
-
-If your cluster is on AWS, install the AWS Load Balancer Controller first.
-
-:::
-
-- If your client is inside a K8s cluster, run `kbcli cluster describe elasticsearch` to get the ClusterIP address of the cluster or the corresponding K8s cluster domain name.
-- If your client is outside the K8s cluster but in the same VPC as the server, run `kbcli cluster expose qdant --enable=true --type=vpc` to get a VPC load balancer address for the database cluster.
-- If your client is outside the VPC, run `kbcli cluster expose qdant --enable=true --type=internet` to open a public network reachable address for the database cluster.
+```bash
+curl http://127.0.0.1:9200/_cat/nodes?v
+```
 
 ## Monitor the Elasticsearch cluster
 

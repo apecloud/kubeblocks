@@ -115,22 +115,13 @@ Run the following command to see the created Qdrant cluster object:
 kubectl get cluster mycluster -n demo -o yaml
 ```
 
-## Connect to a vector database cluster
+## Connect to a Elasticsearch cluster
 
-Qdrant provides both HTTP and gRPC protocols for client access on ports 6333 and 6334 respectively. You can also port forward the service to connect to a database from your local machine.
+Elasticsearch provides the HTTP protocol for client access on port 9200. You can visit the cluster by the local host.
 
-1. Run the following command to port forward the service.
-
-   ```bash
-   kubectl port-forward svc/mycluster-qdrant 6333:6333 -n demo
-   ```
-
-2. Open a new terminal and run the following command to connect to the database.
-
-   ```bash
-   curl http://127.0.0.1:6333/collections
-   ```
-
+```bash
+curl http://127.0.0.1:9200/_cat/nodes?v
+```
 
 ## Scaling
 

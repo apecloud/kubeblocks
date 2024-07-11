@@ -57,14 +57,14 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
 
    Topology:
    COMPONENT   INSTANCE             ROLE     STATUS    AZ       NODE     CREATED-TIME                 
-   etcd        milvus-etcd-0        <none>   Pending   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
-   minio       milvus-minio-0       <none>   Pending   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
-   milvus      milvus-milvus-0      <none>   Pending   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
-   indexnode   milvus-indexnode-0   <none>   Pending   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
-   mixcoord    milvus-mixcoord-0    <none>   Pending   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
-   querynode   milvus-querynode-0   <none>   Pending   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
-   datanode    milvus-datanode-0    <none>   Pending   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
-   proxy       milvus-proxy-0       <none>   Pending   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
+   etcd        milvus-etcd-0        <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
+   minio       milvus-minio-0       <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
+   milvus      milvus-milvus-0      <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
+   indexnode   milvus-indexnode-0   <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
+   mixcoord    milvus-mixcoord-0    <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
+   querynode   milvus-querynode-0   <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
+   datanode    milvus-datanode-0    <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
+   proxy       milvus-proxy-0       <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
 
    Resources Allocation:
    COMPONENT   DEDICATED   CPU(REQUEST/LIMIT)   MEMORY(REQUEST/LIMIT)   STORAGE-SIZE   STORAGE-CLASS     
@@ -90,20 +90,6 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
 
    Show cluster events: kbcli cluster list-events -n default milvus
    ```
-
-## Connect to a vector database cluster
-
-Milvus provides both HTTP and gRPC protocols for client access on ports 6333 and 6334 respectively. Depending on where the client is, different connection options are offered to connect to the Milvus cluster.
-
-:::note
-
-If your cluster is on AWS, install the AWS Load Balancer Controller first.
-
-:::
-
-- If your client is inside a K8s cluster, run `kbcli cluster describe milvus` to get the ClusterIP address of the cluster or the corresponding K8s cluster domain name.
-- If your client is outside the K8s cluster but in the same VPC as the server, run `kbcli cluster expose qdant --enable=true --type=vpc` to get a VPC load balancer address for the database cluster.
-- If your client is outside the VPC, run `kbcli cluster expose qdant --enable=true --type=internet` to open a public network reachable address for the database cluster.
 
 ## Monitor the vector database
 

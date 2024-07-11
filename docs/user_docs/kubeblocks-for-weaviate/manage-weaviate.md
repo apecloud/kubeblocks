@@ -70,17 +70,11 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
 
 ## Connect to a Weaviate cluster
 
-Weaviate provides both HTTP and gRPC protocols for client access on ports 6333 and 6334 respectively. Depending on where the client is, different connection options are offered to connect to the Weaviate cluster.
+Weaviate provides the HTTP protocol for client access on port 8080. You can visit the cluster by the local host.
 
-:::note
-
-If your cluster is on AWS, install the AWS Load Balancer Controller first.
-
-:::
-
-- If your client is inside a K8s cluster, run `kbcli cluster describe weaviate` to get the ClusterIP address of the cluster or the corresponding K8s cluster domain name.
-- If your client is outside the K8s cluster but in the same VPC as the server, run `kbcli cluster expose weaviate --enable=true --type=vpc` to get a VPC load balancer address for the database cluster.
-- If your client is outside the VPC, run `kbcli cluster expose weaviate --enable=true --type=internet` to open a public network reachable address for the database cluster.
+```bash
+curl http://localhost:8080/v1/meta | jq
+```
 
 ## Monitor the database
 

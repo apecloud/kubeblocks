@@ -258,22 +258,6 @@ Run the following command to see the created Qdrant cluster object:
 kubectl get cluster mycluster -n demo -o yaml
 ```
 
-## Connect to a vector database cluster
-
-Qdrant provides both HTTP and gRPC protocols for client access on ports 6333 and 6334 respectively. You can also port forward the service to connect to a database from your local machine.
-
-1. Run the following command to port forward the service.
-
-   ```bash
-   kubectl port-forward svc/mycluster-milvus 6333:6333 -n demo
-   ```
-
-2. Open a new terminal and run the following command to connect to the database.
-
-   ```bash
-   curl http://127.0.0.1:6333/collections
-   ```
-
 ## Scaling
 
 You can vertically scale a weaviate cluster by changing resource requirements and limits (CPU and storage). For example, if you need to change the resource class from 1C2G to 2C4G, vertical scaling is what you need.

@@ -37,6 +37,10 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
+func ListOwnedWorkloads(ctx context.Context, cli client.Reader, namespace, clusterName, compName string) ([]*workloads.InstanceSet, error) {
+	return listWorkloads(ctx, cli, namespace, clusterName, compName)
+}
+
 func ListOwnedPods(ctx context.Context, cli client.Reader, namespace, clusterName, compName string,
 	opts ...client.ListOption) ([]*corev1.Pod, error) {
 	return listPods(ctx, cli, namespace, clusterName, compName, nil, opts...)

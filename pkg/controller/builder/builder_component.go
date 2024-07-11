@@ -185,3 +185,8 @@ func (builder *ComponentBuilder) SetRuntimeClassName(runtimeClassName *string) *
 	}
 	return builder
 }
+
+func (builder *ComponentBuilder) SetStop(stop *bool) *ComponentBuilder {
+	builder.get().Spec.Stop = stop
+	return builder
+}

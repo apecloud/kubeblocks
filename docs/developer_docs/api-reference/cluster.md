@@ -16501,6 +16501,19 @@ ComponentOps
 </tr>
 <tr>
 <td>
+<code>inPlace</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<p>When it is set to true, the instance will be rebuilt in-place.
+By default, a new pod will be created. Once the new pod is ready to serve,
+the instance that require rebuilding will be taken offline.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>backupName</code><br/>
 <em>
 string

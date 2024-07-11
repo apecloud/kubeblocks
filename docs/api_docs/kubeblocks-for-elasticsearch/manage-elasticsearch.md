@@ -19,7 +19,7 @@ import TabItem from '@theme/TabItem';
   Make sure the `elasticsearch` cluster definition is installed. If the cluster definition is not available, refer to [this doc](./../overview/supported-addons.md#install-addons) to enable it first.
 
   ```bash
-  kubectl get clusterdefinition qdrant
+  kubectl get clusterdefinition elasticsearch
   >
   NAME                TOPOLOGIES   SERVICEREFS   STATUS      AGE
   elasticsearch                                  Available   30m
@@ -131,7 +131,6 @@ Qdrant provides both HTTP and gRPC protocols for client access on ports 6333 and
    curl http://127.0.0.1:6333/collections
    ```
 
-   Refer to [the official Qdrant documents](https://qdrant.tech/documentation/) for the cluster operations.
 
 ## Scaling
 
@@ -149,7 +148,7 @@ Check whether the cluster STATUS is `Running`. Otherwise, the following operatio
 kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
-mycluster   qdrant               qdrant-1.5.0   Halt                 Running   47m
+mycluster   elasti               elasticsearch-1.5.0   Halt                 Running   47m
 ```
 
 #### Steps
@@ -303,7 +302,7 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
-mycluster   qdrant               qdrant-1.5.0   Halt                 Running   47m
+mycluster   elasticsearch               elasticsearch-1.5.0   Halt                 Running   47m
 ```
 
 #### Steps
@@ -410,7 +409,7 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    AGE
-mycluster   qdrant               qdrant-1.5.0      Delete               Running   4m29s
+mycluster   elasticsearch               elasticsearch-1.5.0      Delete               Running   4m29s
 ```
 
 

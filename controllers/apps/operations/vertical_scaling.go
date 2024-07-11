@@ -183,7 +183,7 @@ func (vs verticalScalingHandler) podApplyCompOps(
 		}
 		return true
 	}
-	if insTemplateName == "" {
+	if insTemplateName == constant.EmptyInsTemplateName {
 		return matchResources(pod.Spec.Containers[0].Resources, verticalScaling.ResourceRequirements)
 	}
 	for _, insTpl := range verticalScaling.Instances {

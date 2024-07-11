@@ -332,3 +332,5 @@ const (
 )
 
 const InvalidContainerPort int32 = 0
+
+const EmptyInsTemplateName = ""

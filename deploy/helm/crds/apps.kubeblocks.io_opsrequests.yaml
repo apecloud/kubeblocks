@@ -4361,6 +4361,12 @@ spec:
                     componentName:
                       description: Specifies the name of the Component.
                       type: string
+                    inPlace:
+                      description: |-
+                        When it is set to true, the instance will be rebuilt in-place.
+                        By default, a new pod will be created. Once the new pod is ready to serve,
+                        the instance that require rebuilding will be taken offline.
+                      type: boolean
                     instances:
                       description: Specifies the instances (Pods) that need to be
                         rebuilt, typically operating as standbys.
@@ -4378,6 +4384,7 @@ spec:
                         required:
                         - name
                         type: object
+                      minItems: 1
                       type: array
                     restoreEnv:
                       description: "Defines container environment variables for the

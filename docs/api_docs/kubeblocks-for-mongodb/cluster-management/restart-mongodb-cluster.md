@@ -35,7 +35,7 @@ You can restart all pods of the cluster. When an exception occurs in a database,
    kubectl get pod -n demo
    >
    NAME                  READY   STATUS            RESTARTS   AGE
-   mycluster-mongodb-0   4/4     Terminating       0          5m32s
+   mycluster-mongodb-0   3/4     Terminating       0          5m32s
 
    kubectl get ops ops-restart -n demo
    >

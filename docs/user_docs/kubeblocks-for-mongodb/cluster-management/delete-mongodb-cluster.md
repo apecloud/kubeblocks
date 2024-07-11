@@ -26,16 +26,13 @@ The termination policy determines how a cluster is deleted. Set the policy when 
 
 To check the termination policy, execute the following command.
 
-
 ```bash
 kbcli cluster list mongodb-cluster
 ```
 
-
 ## Steps
 
 Run the command below to delete a specified cluster.
-
 
 ```bash
 kbcli cluster delete mongodb-cluster

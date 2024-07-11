@@ -86,7 +86,7 @@ There are two ways to apply vertical scaling.
     Component Def Ref:  mongodb
     Enabled Logs:
       running
-    Monitor:   false
+    DisableExporter:   true
     Name:      mongodb
     Replicas:  1
     Resources:
@@ -100,7 +100,7 @@ There are two ways to apply vertical scaling.
 
 </TabItem>
 
-<TabItem value="Edit cluster YAML file" label="Edit Cluster YAML file">
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
 1. Change the configuration of `spec.components.resources` in the YAML file. 
 
@@ -122,7 +122,7 @@ There are two ways to apply vertical scaling.
      - componentDefRef: mongodb
        enabledLogs:
        - running
-       monitor: false
+       disableExporter: true
        name: mongodb
        replicas: 2
        resources:
@@ -144,7 +144,7 @@ There are two ways to apply vertical scaling.
     Component Def Ref:  mongodb
     Enabled Logs:
       running
-    Monitor:   false
+    DisableExporter:   true
     Name:      mongodb
     Replicas:  1
     Resources:

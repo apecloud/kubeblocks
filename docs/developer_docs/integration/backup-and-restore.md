@@ -294,7 +294,7 @@ KubeBlocks provides various data protection policies for stateful clusters, each
 
 :::note
 
-Refer to the data protection policies of KubeBlocks via [Termination Policy](./../../user_docs/kubeblocks-for-mysql/cluster-management/delete-mysql-cluster.md#termination-policy).
+Refer to the data protection policies of KubeBlocks via [Termination Policy](./../../user_docs/kubeblocks-for-apecloud-mysql/cluster-management/delete-mysql-cluster.md#termination-policy).
 
 :::
 

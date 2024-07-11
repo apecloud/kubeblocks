@@ -25,12 +25,6 @@ During the vertical scaling process, a concurrent restart is triggered and the l
 Run the command below to check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
 
 ```bash
-kbcli cluster list <name>
-```
-
-***Example***
-
-```bash
 kbcli cluster list redis-cluster
 >
 NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS         CREATED-TIME
@@ -39,11 +33,9 @@ redis-cluster        default          redis                     redis-7.0.6     
 
 ### Steps
 
-1. Change configuration. There are 3 ways to apply vertical scaling.
+1. Change configuration. 
 
    Configure the parameters `--components`, `--memory`, and `--cpu` and run the command.
-
-   ***Example***
 
    ```bash
    kbcli cluster vscale redis-cluster \
@@ -60,19 +52,13 @@ redis-cluster        default          redis                     redis-7.0.6     
    Check the cluster status to identify the vertical scaling status.
 
    ```bash
-   kbcli cluster list <name>
-   ```
-
-   ***Example***
-
-   ```bash
    kbcli cluster list redis-cluster
    >
-   NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS                 CREATED-TIME
-   redis-cluster        default          redis                     redis-7.0.6              Delete                    VerticalScaling        Apr 10,2023 16:27 UTC+0800
+   NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS          CREATED-TIME
+   redis-cluster        default          redis                     redis-7.0.6              Delete                    Updating        Apr 10,2023 16:27 UTC+0800
    ```
 
-   - STATUS=VerticalScaling: it means the vertical scaling is in progress.
+   - STATUS=Updating: it means the vertical scaling is in progress.
    - STATUS=Running: it means the vertical scaling operation has been applied.
    - STATUS=Abnormal: it means the vertical scaling is abnormal. The reason may be the normal instances number is less than the total instance number or the leader instance is running properly while others are abnormal.
      > To solve the problem, you can check manually to see whether resources are sufficient. If AutoScaling is supported, the system recovers when there are enough resources, otherwise, you can create enough resources and check the result with kubectl describe command.
@@ -98,12 +84,6 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
 Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
 
 ```bash
-kbcli cluster list <name>
-```
-
-***Example***
-
-```bash
 kbcli cluster list redis-cluster
 >
 NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS         CREATED-TIME
@@ -112,11 +92,9 @@ redis-cluster        default          redis                     redis-7.0.6     
 
 ### Steps
 
-1. Change configuration. There are 3 ways to apply horizontal scaling.
+1. Change configuration.
 
    Configure the parameters `--components` and `--replicas`, and run the command.
-
-   ***Example***
 
    ```bash
    kbcli cluster hscale redis-cluster \
@@ -126,25 +104,18 @@ redis-cluster        default          redis                     redis-7.0.6     
    - `--components` describes the component name ready for vertical scaling.
    - `--replicas` describes the replica amount of a specified component.
 
-
 2. Validate the horizontal scaling operation.
 
    Check the cluster STATUS to identify the horizontal scaling status.
 
    ```bash
-   kbcli cluster list <name>
-   ```
-
-   ***Example***
-
-   ```bash
    kbcli cluster list redis-cluster
    >
-   NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS                   CREATED-TIME
-   redis-cluster        default          redis                     redis-7.0.6              Delete                    HorizontalScaling        Apr 10,2023 16:58 UTC+0800
+   NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS          CREATED-TIME
+   redis-cluster        default          redis                     redis-7.0.6              Delete                    Updating        Apr 10,2023 16:58 UTC+0800
    ```
 
-   - STATUS=HorizontalScaling: it means horizontal scaling is in progress.
+   - STATUS=Updating: it means horizontal scaling is in progress.
    - STATUS=Running: it means horizontal scaling has been applied.
 
 ### Handle the snapshot exception

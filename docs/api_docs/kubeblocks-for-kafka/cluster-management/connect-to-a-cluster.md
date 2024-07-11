@@ -106,7 +106,7 @@ If you use AWS EKS, you may want to access to the Kafka cluster from EC2 instanc
       clusterVersionRef: kafka-3.3.2
       componentSpecs:
       - componentDefRef: kafka-server
-        monitor: false
+        disableExporter: true
         name: broker
         replicas: 1
         resources:
@@ -175,7 +175,7 @@ The current version only supports Kafka broker with a single replica (combined: 
       clusterVersionRef: kafka-3.3.2
       componentSpecs:
       - componentDefRef: kafka-server
-        monitor: false
+        disableExporter: true
         name: broker
         replicas: 1
         resources:

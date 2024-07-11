@@ -131,17 +131,8 @@ func (r rebuildInstanceOpsHandler) validateRebuildInstanceWithHScale(reqCtx intc
 			continue
 		}
 		available, _ := instanceIsAvailable(synthesizedComp, v, "")
-		if !available {
-			continue
-		}
-		if len(synthesizedComp.Roles) == 0 {
+		if available {
 			return nil
-		}
-		for _, role := range synthesizedComp.Roles {
-			// existing readWrite instance
-			if role.Writable && v.Labels[constant.RoleLabelKey] == role.Name {
-				return nil
-			}
 		}
 	}
 	return intctrlutil.NewFatalError("Due to insufficient available instances, cannot create a new pod for rebuilding instance. " +
@@ -204,6 +195,9 @@ func (r rebuildInstanceOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx
 		} else {
 			// rebuild instances with horizontal scaling
 			if subCompletedCount, subFailedCount, err = r.rebuildInstancesWithHScaling(reqCtx, cli, opsRes, v, &compStatus); err != nil {
+				if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
+					return appsv1alpha1.OpsFailedPhase, 0, err
+				}
 				return opsRequestPhase, 0, err
 			}
 		}
@@ -426,9 +420,14 @@ func (r rebuildInstanceOpsHandler) checkProgressForScalingOutPods(reqCtx intctrl
 	if err != nil {
 		return 0, 0, nil, err
 	}
+	currPodSet := component.GenerateAllPodNamesToSet(compSpec.Replicas, compSpec.Instances, compSpec.OfflineInstances,
+		opsRes.Cluster.Name, compSpec.Name)
 	for _, instance := range rebuildInstance.Instances {
 		progressDetail := r.getInstanceProgressDetail(*compStatus, instance.Name)
 		scalingOutPodName := r.getScalingOutPodNameFromMessage(progressDetail.Message)
+		if _, ok := currPodSet[scalingOutPodName]; !ok {
+			return 0, 0, nil, intctrlutil.NewFatalError(fmt.Sprintf(`the replicas of the component "%s" has been modifeied by another operation`, compSpec.Name))
+		}
 		pod := &corev1.Pod{}
 		if exist, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, cli,
 			client.ObjectKey{Name: scalingOutPodName, Namespace: opsRes.Cluster.Namespace}, pod); err != nil {

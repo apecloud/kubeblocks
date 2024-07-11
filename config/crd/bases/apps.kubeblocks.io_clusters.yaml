@@ -5203,6 +5203,11 @@ spec:
                         - name
                         type: object
                       type: array
+                    stop:
+                      description: |-
+                        Stop the Component.
+                        If set, all the computing resources will be released.
+                      type: boolean
                     switchPolicy:
                       description: |-
                         Defines the strategy for switchover and failover when workloadType is Replication.
@@ -13878,6 +13883,11 @@ spec:
                             - name
                             type: object
                           type: array
+                        stop:
+                          description: |-
+                            Stop the Component.
+                            If set, all the computing resources will be released.
+                          type: boolean
                         switchPolicy:
                           description: |-
                             Defines the strategy for switchover and failover when workloadType is Replication.

@@ -39,9 +39,8 @@ import (
 
 type CreateUser struct {
 	operations.Base
-	builtinDBManager engines.DBManager
-	customDBManager  engines.DBManager
-	logger           logr.Logger
+	dbManager engines.DBManager
+	logger    logr.Logger
 }
 
 var createUser operations.Operation = &CreateUser{}
@@ -54,11 +53,6 @@ func init() {
 }
 
 func (s *CreateUser) Init(ctx context.Context) error {
-	dbManager, err := register.GetDBManager(nil)
-	if err != nil {
-		return errors.Wrap(err, "get manager failed")
-	}
-	s.builtinDBManager = dbManager
 	s.logger = ctrl.Log.WithName("CreateUser")
 
 	actionJSON := viper.GetString(constant.KBEnvActionCommands)
@@ -72,9 +66,13 @@ func (s *CreateUser) Init(ctx context.Context) error {
 		accoutProvisionCmd, ok := actionCommands[constant.AccountProvisionAction]
 		if ok && len(accoutProvisionCmd) > 0 {
 			s.Command = accoutProvisionCmd
-			s.customDBManager = register.GetCustomManager(nil)
 		}
 	}
+	dbManager, err := register.GetDBManager(s.Command)
+	if err != nil {
+		return errors.Wrap(err, "get manager failed")
+	}
+	s.dbManager = dbManager
 	return nil
 }
 
@@ -95,28 +93,21 @@ func (s *CreateUser) Do(ctx context.Context, req *operations.OpsRequest) (*opera
 	userInfo, _ := UserInfoParser(req)
 	resp := operations.NewOpsResponse(util.CreateUserOp)
 
-	user, err := s.builtinDBManager.DescribeUser(ctx, userInfo.UserName)
+	user, err := s.dbManager.DescribeUser(ctx, userInfo.UserName)
 	if err == nil && user != nil {
 		return resp.WithSuccess("account already exists")
 	}
 
 	// for compatibility with old addons that specify accoutprovision action but not work actually.
-	err = s.builtinDBManager.CreateUser(ctx, userInfo.UserName, userInfo.Password, userInfo.Statement)
+	err = s.dbManager.CreateUser(ctx, userInfo.UserName, userInfo.Password, userInfo.Statement)
 	if err != nil {
-		if s.builtinDBManager != s.customDBManager && len(s.Command) > 0 {
-			err = s.customDBManager.CreateUser(ctx, userInfo.UserName, userInfo.Password, userInfo.Statement)
-			if err == nil {
-				return resp.WithSuccess("")
-			}
-			err = errors.Wrap(err, "create user failed")
-		}
 		err = errors.Cause(err)
 		s.logger.Info("executing CreateUser error", "error", err.Error())
 		return resp, err
 	}
 
 	if userInfo.RoleName != "" {
-		err := s.builtinDBManager.GrantUserRole(ctx, userInfo.UserName, userInfo.RoleName)
+		err := s.dbManager.GrantUserRole(ctx, userInfo.UserName, userInfo.RoleName)
 		if err != nil && err != models.ErrNotImplemented {
 			s.logger.Info("executing grantRole error", "error", err.Error())
 			return resp, err

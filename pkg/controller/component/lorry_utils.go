@@ -486,7 +486,7 @@ func getActionCommandsWithExecImageOrContainerName(synthesizeComp *SynthesizedCo
 	actionCommands := map[string][]string{}
 	for action, handler := range actions {
 		if handler != nil && handler.CustomHandler != nil && handler.CustomHandler.Exec != nil {
-			actionCommands[action] = handler.CustomHandler.Exec.Command
+			actionCommands[action] = append(handler.CustomHandler.Exec.Command, handler.CustomHandler.Exec.Args...)
 			if handler.CustomHandler.Image != "" {
 				toolImage = handler.CustomHandler.Image
 			}

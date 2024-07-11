@@ -93,7 +93,7 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
    Show cluster events: kbcli cluster list-events -n default milvus
    ```
 
-## Monitor the vector database
+## Monitor the database
 
 For the testing environment, you can run the command below to open the Grafana monitor web page.
 

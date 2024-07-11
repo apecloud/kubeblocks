@@ -375,7 +375,7 @@ There are two ways to apply vertical scaling.
            resources:
              requests:
                storage: 1Gi
-     terminationPolicy: Halt
+     terminationPolicy: Delete
    ```
 
 2. Check whether the corresponding resources change.
@@ -475,7 +475,7 @@ There are two ways to apply volume expansion.
            resources:
              requests:
                storage: 1Gi # Change the volume storage size.
-     terminationPolicy: Halt
+     terminationPolicy: Delete
    ```
 
 2. Check whether the corresponding cluster resources change.
@@ -515,7 +515,7 @@ EOF
 
 </TabItem>
 
-<TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
 Configure replicas as 0 to delete pods.
 
@@ -572,7 +572,7 @@ EOF
 
 </TabItem>
 
-<TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
 Change replicas back to the original amount to start this cluster again.
 

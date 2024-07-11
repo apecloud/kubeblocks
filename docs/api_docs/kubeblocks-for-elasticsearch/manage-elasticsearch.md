@@ -46,35 +46,33 @@ cat <<EOF | kubectl apply -f -
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: mycluster
-  namespace: demo
+  annotations:
+    kubeblocks.io/extra-env: '{"mdit-roles":"master,data,ingest,transform","mode":"multi-node"}'
+  labels:
+    app.kubernetes.io/instance: mycluster
+    app.kubernetes.io/version: 8.8.2
+    helm.sh/chart: elasticsearch-cluster-0.9.0
+  name: test
+  namespace: kubeblocks-cloud-ns
 spec:
-  clusterDefinitionRef: qdrant
-  clusterVersionRef: qdrant-1.8.1
-  terminationPolicy: Delete
   affinity:
-    podAntiAffinity: Preferred
+    podAntiAffinity: Required
+    tenancy: SharedNode
     topologyKeys:
     - kubernetes.io/hostname
-    tenancy: SharedNode
-  tolerations:
-    - key: kb-data
-      operator: Equal
-      value: 'true'
-      effect: NoSchedule
   componentSpecs:
-  - name: qdrant
-    componentDefRef: qdrant
+  - componentDef: elasticsearch-8.8
     disableExporter: true
-    serviceAccountName: kb-qdrant-cluster
-    replicas: 2
+    name: mdit
+    replicas: 3
     resources:
       limits:
-        cpu: '0.5'
-        memory: 0.5Gi
+        cpu: "1"
+        memory: 2Gi
       requests:
-        cpu: '0.5'
-        memory: 0.5Gi
+        cpu: "1"
+        memory: 2Gi
+    serviceAccountName: kb-mycluster
     volumeClaimTemplates:
     - name: data
       spec:
@@ -83,6 +81,7 @@ spec:
         resources:
           requests:
             storage: 20Gi
+  terminationPolicy: Delete
 EOF
 ```
 
@@ -138,8 +137,8 @@ Check whether the cluster STATUS is `Running`. Otherwise, the following operatio
 ```bash
 kubectl get cluster mycluster -n demo
 >
-NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
-mycluster   elasti               elasticsearch-1.5.0   Halt                 Running   47m
+NAME        CLUSTER-DEFINITION          VERSION               TERMINATION-POLICY    STATUS    AGE
+mycluster   elasticsearch               elasticsearch-8.8.2   Delete                Running   47m
 ```
 
 #### Steps
@@ -163,7 +162,7 @@ There are two ways to apply horizontal scaling.
      clusterName: mycluster
      type: HorizontalScaling
      horizontalScaling:
-     - componentName: qdrant
+     - componentName: elasticsearch
        replicas: 1
    EOF
    ```
@@ -199,11 +198,11 @@ There are two ways to apply horizontal scaling.
      name: mycluster
      namespace: demo
    spec:
-     clusterDefinitionRef: qdrant
-     clusterVersionRef: qdrant-1.5.0
+     clusterDefinitionRef: elasticsearch
+     clusterVersionRef: elasticsearch-8.8.2
      componentSpecs:
-     - name: qdrant
-       componentDefRef: qdrant
+     - name: elasticsearch
+       componentDefRef: elasticsearch
        replicas: 1 # Change the amount
        volumeClaimTemplates:
        - name: data
@@ -213,7 +212,7 @@ There are two ways to apply horizontal scaling.
            resources:
              requests:
                storage: 1Gi
-    terminationPolicy: Halt
+    terminationPolicy: Delete
    ```
 
 2. Check whether the corresponding resources change.
@@ -235,7 +234,7 @@ In the example below, a snapshot exception occurs.
 Status:
   conditions: 
   - lastTransitionTime: "2024-04-25T17:40:26Z"
-    message: VolumeSnapshot/mycluster-qdrant-scaling-dbqgp: Failed to set default snapshot
+    message: VolumeSnapshot/mycluster-elasticsearch-scaling-dbqgp: Failed to set default snapshot
       class with error cannot find default snapshot class
     reason: ApplyResourcesFailed
     status: "False"
@@ -292,8 +291,8 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 ```bash
 kubectl get cluster mycluster -n demo
 >
-NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
-mycluster   elasticsearch               elasticsearch-1.5.0   Halt                 Running   47m
+NAME        CLUSTER-DEFINITION   VERSION               TERMINATION-POLICY     STATUS    AGE
+mycluster   elasticsearch        elasticsearch-8.8.2   Delete                 Running   47m
 ```
 
 #### Steps
@@ -317,7 +316,7 @@ There are two ways to apply vertical scaling.
      clusterName: mycluster
      type: VerticalScaling
      verticalScaling:
-     - componentName: qdrant
+     - componentName: elasticsearch
        requests:
          memory: "2Gi"
          cpu: "1"
@@ -357,11 +356,11 @@ There are two ways to apply vertical scaling.
      name: mycluster
      namespace: demo
    spec:
-     clusterDefinitionRef: qdrant
-     clusterVersionRef: qdrant-1.5.0
+     clusterDefinitionRef: elasticsearch
+     clusterVersionRef: elasticsearch-8.8.2
      componentSpecs:
-     - name: qdrant
-       componentDefRef: qdrant
+     - name: elasticsearch
+       componentDefRef: elasticsearch
        replicas: 1
        resources: # Change the values of resources.
          requests:
@@ -378,7 +377,7 @@ There are two ways to apply vertical scaling.
            resources:
              requests:
                storage: 1Gi
-     terminationPolicy: Halt
+     terminationPolicy: Delete
    ```
 
 2. Check whether the corresponding resources change.
@@ -399,10 +398,9 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 ```bash
 kubectl get cluster mycluster -n demo
 >
-NAME        CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    AGE
-mycluster   elasticsearch               elasticsearch-1.5.0      Delete               Running   4m29s
+NAME        CLUSTER-DEFINITION   VERSION                  TERMINATION-POLICY   STATUS    AGE
+mycluster   elasticsearch        elasticsearch-8.8.2      Delete               Running   4m29s
 ```
-
 
 ### Steps
 
@@ -425,7 +423,7 @@ There are two ways to apply volume expansion.
       clusterName: mycluster
       type: VolumeExpansion
       volumeExpansion:
-      - componentName: qdrant
+      - componentName: elasticsearch
         volumeClaimTemplates:
         - name: data
           storage: "40Gi"
@@ -465,11 +463,11 @@ There are two ways to apply volume expansion.
      name: mycluster
      namespace: demo
    spec:
-     clusterDefinitionRef: qdrant
-     clusterVersionRef: qdrant-1.5.0
+     clusterDefinitionRef: elasticsearch
+     clusterVersionRef: elasticsearch-8.8.2
      componentSpecs:
-     - name: qdrant
-       componentDefRef: qdrant
+     - name: elasticsearch
+       componentDefRef: elasticsearch
        replicas: 2
        volumeClaimTemplates:
        - name: data
@@ -479,7 +477,7 @@ There are two ways to apply volume expansion.
            resources:
              requests:
                storage: 1Gi # Change the volume storage size.
-     terminationPolicy: Halt
+     terminationPolicy: Delete
    ```
 
 2. Check whether the corresponding cluster resources change.
@@ -519,7 +517,7 @@ EOF
 
 </TabItem>
 
-<TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
 Configure replicas as 0 to delete pods.
 
@@ -530,12 +528,12 @@ metadata:
     name: mycluster
     namespace: demo
 spec:
-  clusterDefinitionRef: qdrant
-  clusterVersionRef: qdrant-1.8.1
+  clusterDefinitionRef: elasticsearch
+  clusterVersionRef: elasticsearch-8.8.2
   terminationPolicy: Delete
   componentSpecs:
-  - name: qdrant
-    componentDefRef: qdrant
+  - name: elasticsearch
+    componentDefRef: elasticsearch
     disableExporter: true  
     replicas: 0
     volumeClaimTemplates:
@@ -576,7 +574,7 @@ EOF
 
 </TabItem>
 
-<TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
+<TabItem value="Edit cluster YAML filee" label="Edit cluster YAML file">
 
 Change replicas back to the original amount to start this cluster again.
 
@@ -587,12 +585,12 @@ metadata:
     name: mycluster
     namespace: demo
 spec:
-  clusterDefinitionRef: qdrant
-  clusterVersionRef: qdrant-1.8.1
+  clusterDefinitionRef: elasticsearch
+  clusterVersionRef: elasticsearch-8.8.2
   terminationPolicy: Delete
   componentSpecs:
-  - name: qdrant
-    componentDefRef: qdrant
+  - name: elasticsearch
+    componentDefRef: elasticsearch
     disableExporter: true  
     replicas: 1
     volumeClaimTemplates:
@@ -610,8 +608,34 @@ spec:
 
 </Tabs>
 
-## Backup and restore
+## Restart
 
-The backup and restore operations for Qdrant are the same with those of other clusters.
+1. Restart a cluster.
 
-You can refer to the [backup and restore docs](./../maintenance/backup-and-restore/introduction.md) for details.
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: ops-restart
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     type: Restart 
+     restart:
+     - componentName: elasticsearch
+   EOF
+   ```
+
+2. Check the pod and operation status to validate the restarting.
+
+   ```bash
+   kubectl get pod -n demo
+
+   kubectl get ops ops-restart -n demo
+   ```
+
+   During the restarting process, there are two status types for pods.
+
+   - STATUS=Terminating: it means the cluster restart is in progress.
+   - STATUS=Running: it means the cluster has been restarted.

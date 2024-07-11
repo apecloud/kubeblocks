@@ -70,7 +70,7 @@ spec:
   - name: qdrant
     componentDefRef: qdrant
     disableExporter: true
-    serviceAccountName: kb-qdrant-cluster
+    serviceAccountName: kb-mycluster
     replicas: 2
     resources:
       limits:
@@ -152,8 +152,8 @@ Check whether the cluster STATUS is `Running`. Otherwise, the following operatio
 ```bash
 kubectl get cluster mycluster -n demo
 >
-NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
-mycluster   qdrant               qdrant-1.5.0   Halt                 Running   47m
+NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY     STATUS    AGE
+mycluster   qdrant               qdrant-1.5.0   Delete                 Running   47m
 ```
 
 #### Steps
@@ -227,7 +227,7 @@ There are two ways to apply horizontal scaling.
            resources:
              requests:
                storage: 1Gi
-    terminationPolicy: Halt
+    terminationPolicy: Delete
    ```
 
 2. Check whether the corresponding resources change.
@@ -306,8 +306,8 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 ```bash
 kubectl get cluster mycluster -n demo
 >
-NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
-mycluster   qdrant               qdrant-1.5.0   Halt                 Running   47m
+NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY     STATUS    AGE
+mycluster   qdrant               qdrant-1.5.0   Delete                 Running   47m
 ```
 
 #### Steps
@@ -392,7 +392,7 @@ There are two ways to apply vertical scaling.
            resources:
              requests:
                storage: 1Gi
-     terminationPolicy: Halt
+     terminationPolicy: Delete
    ```
 
 2. Check whether the corresponding resources change.
@@ -416,7 +416,6 @@ kubectl get cluster mycluster -n demo
 NAME        CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    AGE
 mycluster   qdrant               qdrant-1.5.0      Delete               Running   4m29s
 ```
-
 
 ### Steps
 
@@ -493,7 +492,7 @@ There are two ways to apply volume expansion.
            resources:
              requests:
                storage: 1Gi # Change the volume storage size.
-     terminationPolicy: Halt
+     terminationPolicy: Delete
    ```
 
 2. Check whether the corresponding cluster resources change.
@@ -533,7 +532,7 @@ EOF
 
 </TabItem>
 
-<TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
 Configure replicas as 0 to delete pods.
 
@@ -590,7 +589,7 @@ EOF
 
 </TabItem>
 
-<TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
 Change replicas back to the original amount to start this cluster again.
 

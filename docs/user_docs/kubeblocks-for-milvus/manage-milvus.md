@@ -5,6 +5,7 @@ keywords: [milvus, milvus,weaviate]
 sidebar_position: 1
 sidebar_label: Manage Milvus with KubeBlocks
 ---
+
 # Manage Milvus with KubeBlocks
 
 The popularity of generative AI (Generative AI) has aroused widespread attention and completely ignited the vector database (Vector Database) market.
@@ -44,9 +45,10 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
 
    ```bash
    kbcli cluster describe milvus
+   >
    Name: milvus	 Created Time: Jul 05,2024 17:35 UTC+0800
-   NAMESPACE   CLUSTER-DEFINITION   VERSION   STATUS     TERMINATION-POLICY   
-   default     milvus-2.3.2                   Creating   Delete               
+   NAMESPACE   CLUSTER-DEFINITION   VERSION   STATUS    TERMINATION-POLICY   
+   default     milvus-2.3.2                   Running   Delete               
 
    Endpoints:
    COMPONENT   MODE        INTERNAL                                        EXTERNAL   
@@ -110,7 +112,7 @@ For the testing environment, you can run the command below to open the Grafana m
 2. Check whether the monitoring function of the cluster is enabled. If the monitoring function is enabled, the output shows `disableExporter: false`.
 
    ```bash
-   kubectl get cluster mycluster -o yaml
+   kubectl get cluster milvus -o yaml
    >
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
@@ -126,7 +128,7 @@ For the testing environment, you can run the command below to open the Grafana m
    If `disableExporter: false` is not shown in the output, it means the monitoring function of this cluster is not enabled and you need to enable it first.
 
    ```bash
-   kbcli cluster update mycluster --disableExporter=false
+   kbcli cluster update milvus --disableExporter=false
    ```
 
 3. View the dashboard list.

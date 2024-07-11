@@ -5,10 +5,10 @@ keywords: [weaviate, vector database, control plane]
 sidebar_position: 1
 sidebar_label: Manage Weaviate with KubeBlocks
 ---
+
 # Manage Weaviate with KubeBlocks
 
 The popularity of generative AI (Generative AI) has aroused widespread attention and completely ignited the vector database (Vector Database) market. Weaviate is an open-source vector database that simplifies the development of AI applications. Built-in vector and hybrid search, easy-to-connect machine learning models, and a focus on data privacy enable developers of all levels to build, iterate, and scale AI capabilities faster.
-
 
 KubeBlocks supports the management of Weaviate.
 
@@ -43,29 +43,29 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
 
    ```bash
     kbcli cluster describe weaviate
+    >
+    Name: weaviate	 Created Time: Jul 05,2024 17:42 UTC+0800
+    NAMESPACE   CLUSTER-DEFINITION   VERSION           STATUS    TERMINATION-POLICY
+    default     weaviate             weaviate-1.18.0   Running   Delete
 
-      Name: weaviate	 Created Time: Jul 05,2024 17:42 UTC+0800
-      NAMESPACE   CLUSTER-DEFINITION   VERSION           STATUS    TERMINATION-POLICY
-      default     weaviate             weaviate-1.18.0   Running   Delete
+    Endpoints:
+    COMPONENT   MODE        INTERNAL                                           EXTERNAL
+    weaviate    ReadWrite   weaviate-weaviate.default.svc.cluster.local:8080   <none>
 
-      Endpoints:
-      COMPONENT   MODE        INTERNAL                                      EXTERNAL
-      weaviate    ReadWrite   myw-weaviate.default.svc.cluster.local:8080   <none>
+    Topology:
+    COMPONENT   INSTANCE              ROLE     STATUS    AZ       NODE                    CREATED-TIME
+    weaviate    weaviate-weaviate-0   <none>   Running   <none>   minikube/192.168.49.2   Jul 05,2024 17:42 UTC+0800
 
-      Topology:
-      COMPONENT   INSTANCE         ROLE     STATUS    AZ       NODE                    CREATED-TIME
-      weaviate    myw-weaviate-0   <none>   Running   <none>   minikube/192.168.49.2   Jul 05,2024 17:42 UTC+0800
+    Resources Allocation:
+    COMPONENT   DEDICATED   CPU(REQUEST/LIMIT)   MEMORY(REQUEST/LIMIT)   STORAGE-SIZE   STORAGE-CLASS
+    weaviate    false       1 / 1                1Gi / 1Gi               data:20Gi      standard
 
-      Resources Allocation:
-      COMPONENT   DEDICATED   CPU(REQUEST/LIMIT)   MEMORY(REQUEST/LIMIT)   STORAGE-SIZE   STORAGE-CLASS
-      weaviate    false       1 / 1                1Gi / 1Gi               data:20Gi      standard
+    Images:
+    COMPONENT   TYPE       IMAGE
+    weaviate    weaviate   docker.io/semitechnologies/weaviate:1.19.6
 
-      Images:
-      COMPONENT   TYPE       IMAGE
-      weaviate    weaviate   docker.io/semitechnologies/weaviate:1.19.6
-
-      Data Protection:
-      BACKUP-REPO   AUTO-BACKUP   BACKUP-SCHEDULE   BACKUP-METHOD   BACKUP-RETENTION   RECOVERABLE-TIME 
+    Data Protection:
+    BACKUP-REPO   AUTO-BACKUP   BACKUP-SCHEDULE   BACKUP-METHOD   BACKUP-RETENTION   RECOVERABLE-TIME 
    ```
 
 ## Connect to a Weaviate cluster
@@ -95,7 +95,7 @@ For the testing environment, you can run the command below to open the Grafana m
 2. Check whether the monitoring function of the cluster is enabled. If the monitoring function is enabled, the output shows `disableExporter: false`.
 
    ```bash
-   kubectl get cluster mycluster -o yaml
+   kubectl get cluster weaviate -o yaml
    >
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
@@ -111,7 +111,7 @@ For the testing environment, you can run the command below to open the Grafana m
    If `disableExporter: false` is not shown in the output, it means the monitoring function of this cluster is not enabled and you need to enable it first.
 
    ```bash
-   kbcli cluster update mycluster --disableExporter=false
+   kbcli cluster update weaviate --disableExporter=false
    ```
 
 3. View the dashboard list.
@@ -152,7 +152,7 @@ The `kbcli cluster hscale` command print the `opsname`, to check the progress of
 ```bash
 kubectl get ops weaviate-horizontalscaling-xpdwz
 >
-NAME                             TYPE                CLUSTER   STATUS    PROGRESS   AGE
+NAME                               TYPE                CLUSTER     STATUS    PROGRESS   AGE
 weaviate-horizontalscaling-xpdwz   HorizontalScaling   weaviate    Running   0/2        16s
 ```
 
@@ -176,7 +176,7 @@ The `kbcli cluster vscale` command print the `opsname`, to check the progress of
 ```bash
 kubectl get ops weaviate-verticalscaling-rpw2l
 >
-NAME                           TYPE              CLUSTER   STATUS    PROGRESS   AGE
+NAME                             TYPE              CLUSTER     STATUS    PROGRESS   AGE
 weaviate-verticalscaling-rpw2l   VerticalScaling   weaviate    Running   1/5        44s
 ```
 
@@ -201,7 +201,7 @@ The `kbcli cluster volume-expand` command print the `opsname`, to check the prog
 ```bash
 kubectl get ops weaviate-volumeexpansion-5pbd2
 >
-NAME                           TYPE              CLUSTER   STATUS   PROGRESS   AGE
+NAME                             TYPE              CLUSTER     STATUS   PROGRESS   AGE
 weaviate-volumeexpansion-5pbd2   VolumeExpansion   weaviate    Running  1/1        67s
 ```
 
@@ -238,4 +238,3 @@ kbcli cluster describe weaviate
 
    * STATUS=Updating: it means the cluster restart is in progress.
    * STATUS=Running: it means the cluster has been restarted.
-   * 

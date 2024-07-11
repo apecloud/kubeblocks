@@ -20,7 +20,7 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
 1. Execute the following command to create a Qdrant cluster. You can change the `cluster-definition` value as any other databases supported.
 
    ```bash
-   kbcli cluster create elasticsearch 
+   kbcli cluster create elasticsearch elasticsearch
    ```
 
 2. Check whether the cluster is created.
@@ -38,8 +38,8 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
    kbcli cluster describe elasticsearch
    >
    Name: elasticsearch	 Created Time: Jul 05,2024 16:51 UTC+0800
-   NAMESPACE   CLUSTER-DEFINITION   VERSION               STATUS     TERMINATION-POLICY   
-   default     elasticsearch        elasticsearch-8.8.2   Creating   Delete               
+   NAMESPACE   CLUSTER-DEFINITION   VERSION               STATUS    TERMINATION-POLICY   
+   default     elasticsearch        elasticsearch-8.8.2   Running   Delete               
 
    Endpoints:
    COMPONENT       MODE        INTERNAL                                                     EXTERNAL   
@@ -57,11 +57,11 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
 
     Topology:
     COMPONENT       INSTANCE                        ROLE     STATUS    AZ       NODE     CREATED-TIME                 
-    master          elasticsearch-master-0          <none>   Pending   <none>   <none>   Jul 05,2024 16:51 UTC+0800   
-    data            elasticsearch-data-0            <none>   Pending   <none>   <none>   Jul 05,2024 16:51 UTC+0800   
-    ingest          elasticsearch-ingest-0          <none>   Pending   <none>   <none>   Jul 05,2024 16:51 UTC+0800   
-    elasticsearch   elasticsearch-elasticsearch-0   <none>   Pending   <none>   <none>   Jul 05,2024 16:51 UTC+0800   
-    coordinating    elasticsearch-coordinating-0    <none>   Pending   <none>   <none>   Jul 05,2024 16:51 UTC+0800   
+    master          elasticsearch-master-0          <none>   Running   <none>   <none>   Jul 05,2024 16:51 UTC+0800   
+    data            elasticsearch-data-0            <none>   Running   <none>   <none>   Jul 05,2024 16:51 UTC+0800   
+    ingest          elasticsearch-ingest-0          <none>   Running   <none>   <none>   Jul 05,2024 16:51 UTC+0800   
+    elasticsearch   elasticsearch-elasticsearch-0   <none>   Running   <none>   <none>   Jul 05,2024 16:51 UTC+0800   
+    coordinating    elasticsearch-coordinating-0    <none>   Running   <none>   <none>   Jul 05,2024 16:51 UTC+0800   
 
     Resources Allocation:
     COMPONENT       DEDICATED   CPU(REQUEST/LIMIT)   MEMORY(REQUEST/LIMIT)   STORAGE-SIZE   STORAGE-CLASS     
@@ -218,7 +218,7 @@ The `kbcli cluster volume-expand` command print the `opsname`, to check the prog
 ```bash
 kubectl get ops elasticsearch-volumeexpansion-5pbd2
 >
-NAME                           TYPE              CLUSTER   STATUS   PROGRESS   AGE
+NAME                                  TYPE              CLUSTER          STATUS   PROGRESS   AGE
 elasticsearch-volumeexpansion-5pbd2   VolumeExpansion   elasticsearch    Running  1/1        67s
 ```
 

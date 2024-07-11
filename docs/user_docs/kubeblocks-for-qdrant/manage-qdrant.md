@@ -5,6 +5,7 @@ keywords: [qdrant, vector database, control plane]
 sidebar_position: 1
 sidebar_label: Manage Qdrant with KubeBlocks
 ---
+
 # Manage Qdrant with KubeBlocks
 
 The popularity of generative AI (Generative AI) has aroused widespread attention and completely ignited the vector database (Vector Database) market. Qdrant (read: quadrant) is a vector similarity search engine and vector database. It provides a production-ready service with a convenient API to store, search, and manage points—vectors with an additional payload Qdrant is tailored to extended filtering support. It makes it useful for all sorts of neural-network or semantic-based matching, faceted search, and other applications.
@@ -106,7 +107,7 @@ For the testing environment, you can run the command below to open the Grafana m
 2. Check whether the monitoring function of the cluster is enabled. If the monitoring function is enabled, the output shows `disableExporter: false`.
 
    ```bash
-   kubectl get cluster mycluster -o yaml
+   kubectl get cluster qdrant -o yaml
    >
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
@@ -122,7 +123,7 @@ For the testing environment, you can run the command below to open the Grafana m
    If `disableExporter: false` is not shown in the output, it means the monitoring function of this cluster is not enabled and you need to enable it first.
 
    ```bash
-   kbcli cluster update mycluster --disableExporter=false
+   kbcli cluster update qdrant --disableExporter=false
    ```
 
 3. View the dashboard list.

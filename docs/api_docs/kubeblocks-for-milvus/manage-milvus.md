@@ -239,7 +239,6 @@ EOF
 | `spec.affinity`                       | It defines a set of node affinity scheduling rules for the cluster's Pods. This field helps control the placement of Pods on nodes within the cluster.  |
 | `spec.affinity.podAntiAffinity`       | It specifies the anti-affinity level of Pods within a component. It determines how pods should spread across nodes to improve availability and performance. |
 | `spec.affinity.topologyKeys`          | It represents the key of node labels used to define the topology domain for Pod anti-affinity and Pod spread constraints.   |
-| `spec.affinity.tenacy`                | It determines the level of resource isolation between Pods. It can have the following values: `SharedNode` and `DedicatedNode`. <p> - SharedNode: It allows that multiple Pods may share the same node, which is the default behavior of K8s. </p> - DedicatedNode: Each Pod runs on a dedicated node, ensuring that no two Pods share the same node.                                                                                                                |
 | `spec.tolerations`                    | It is an array that specifies tolerations attached to the cluster's Pods, allowing them to be scheduled onto nodes with matching taints.  |
 | `spec.componentSpecs`                 | It is the list of components that define the cluster components. This field allows customized configuration of each component within a cluster.   |
 | `spec.componentSpecs.componentDefRef` | It is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition apecloud-mysql -o json \| jq '.spec.componentDefs[].name'`.   |
@@ -272,7 +271,7 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY     STATUS    AGE
-mycluster   milvus               milvus-1.5.0   Delete                 Running   47m
+mycluster   milvus               milvus-2.3.2   Delete                 Running   47m
 ```
 
 #### Steps
@@ -379,7 +378,7 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    AGE
-mycluster   milvus               milvus-2.3.3      Delete               Running   4m29s
+mycluster   milvus               milvus-2.3.2      Delete               Running   4m29s
 ```
 
 ### Steps
@@ -444,7 +443,7 @@ There are two ways to apply volume expansion.
      namespace: demo
    spec:
      clusterDefinitionRef: milvus
-     clusterVersionRef: milvus-2.3.3
+     clusterVersionRef: milvus-2.3.2
      componentSpecs:
      - name: milvus
        componentDefRef: milvus
@@ -509,7 +508,7 @@ metadata:
     namespace: demo
 spec:
   clusterDefinitionRef: milvus
-  clusterVersionRef: milvus-1.8.1
+  clusterVersionRef: milvus-2.3.2
   terminationPolicy: Delete
   componentSpecs:
   - name: milvus
@@ -566,7 +565,7 @@ metadata:
     namespace: demo
 spec:
   clusterDefinitionRef: milvus
-  clusterVersionRef: milvus-1.8.1
+  clusterVersionRef: milvus-2.3.2
   terminationPolicy: Delete
   componentSpecs:
   - name: milvus

@@ -15,7 +15,7 @@ You can expand the storage volume size of each pod.
 
 :::note
 
-Volume expansion triggers a concurrent restart and the leader pod may change after the operation.
+Volume expansion triggers a restart and the pod role may change after the operation.
 
 :::
 

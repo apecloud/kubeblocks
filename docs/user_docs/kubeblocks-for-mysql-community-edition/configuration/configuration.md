@@ -201,7 +201,7 @@ The example below takes configuring `max_connections` and `innodb_buffer_pool_si
 
 For your convenience, KubeBlocks offers a tool `edit-config` to help you configure parameters in a visualized way.
 
-For Linux and macOS, you can edit configuration files by vim. For Windows, you can edit files on the notepad.
+For Linux and macOS, you can edit configuration files by vi. For Windows, you can edit files on the notepad.
 
 1. Edit the configuration file.
 

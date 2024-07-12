@@ -13,7 +13,7 @@ You can restart all pods of the cluster. When an exception occurs in a database,
 
 :::note
 
-Restarting a Pulsar cluster triggers a concurrent restart and the leader may change after the cluster restarts.
+The pod role may change after the cluster restarts.
 
 :::
 

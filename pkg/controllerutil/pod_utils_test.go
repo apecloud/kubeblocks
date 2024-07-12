@@ -389,33 +389,33 @@ var _ = Describe("pod utils", func() {
 				// memory unit: Gi
 				{
 					pvc: corev1.PersistentVolumeClaimSpec{
-						Resources: corev1.ResourceRequirements{
+						Resources: appsv1alpha1.VolumeResourceConvert(corev1.ResourceRequirements{
 							Requests: corev1.ResourceList{
 								corev1.ResourceStorage: resource.MustParse("100Gi"),
 							},
-						},
+						}),
 					},
 					expectStorageSize: 100 * 1024 * 1024 * 1024,
 				},
 				// memory unit: G
 				{
 					pvc: corev1.PersistentVolumeClaimSpec{
-						Resources: corev1.ResourceRequirements{
+						Resources: appsv1alpha1.VolumeResourceConvert(corev1.ResourceRequirements{
 							Requests: corev1.ResourceList{
 								corev1.ResourceStorage: resource.MustParse("100G"),
 							},
-						},
+						}),
 					},
 					expectStorageSize: 100 * 1000 * 1000 * 1000,
 				},
 				// memory unit: no
 				{
 					pvc: corev1.PersistentVolumeClaimSpec{
-						Resources: corev1.ResourceRequirements{
+						Resources: appsv1alpha1.VolumeResourceConvert(corev1.ResourceRequirements{
 							Requests: corev1.ResourceList{
 								corev1.ResourceStorage: resource.MustParse("10000"),
 							},
-						},
+						}),
 					},
 					expectStorageSize: 10000,
 				},

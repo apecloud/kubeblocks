@@ -25,6 +25,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 var _ = Describe("pvc builder", func() {
@@ -57,7 +59,7 @@ var _ = Describe("pvc builder", func() {
 
 		Expect(pvc.Name).Should(Equal(name))
 		Expect(pvc.Namespace).Should(Equal(ns))
-		Expect(pvc.Spec.Resources).Should(Equal(resources))
+		Expect(pvc.Spec.Resources).Should(Equal(appsv1alpha1.VolumeResourceConvert(resources)))
 		Expect(pvc.Spec.AccessModes).Should(Equal(accessModes))
 		Expect(pvc.Spec.StorageClassName).ShouldNot(BeNil())
 		Expect(*pvc.Spec.StorageClassName).Should(Equal(sc))
@@ -65,7 +67,7 @@ var _ = Describe("pvc builder", func() {
 		Expect(*pvc.Spec.DataSource).Should(Equal(dataSource))
 
 		spec := corev1.PersistentVolumeClaimSpec{
-			Resources:        resources,
+			Resources:        appsv1alpha1.VolumeResourceConvert(resources),
 			AccessModes:      accessModes,
 			StorageClassName: &sc,
 			DataSource:       &dataSource,
@@ -74,7 +76,7 @@ var _ = Describe("pvc builder", func() {
 		pvc = NewPVCBuilder(ns, name).SetSpec(spec).GetObject()
 		Expect(pvc.Name).Should(Equal(name))
 		Expect(pvc.Namespace).Should(Equal(ns))
-		Expect(pvc.Spec.Resources).Should(Equal(resources))
+		Expect(pvc.Spec.Resources).Should(Equal(appsv1alpha1.VolumeResourceConvert(resources)))
 		Expect(pvc.Spec.AccessModes).Should(Equal(accessModes))
 		Expect(pvc.Spec.StorageClassName).ShouldNot(BeNil())
 		Expect(*pvc.Spec.StorageClassName).Should(Equal(sc))

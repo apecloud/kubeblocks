@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -126,11 +127,11 @@ var _ = Describe("plan builder test", func() {
 		It("should update pvc object", func() {
 			pvcOrig := builder.NewPVCBuilder(namespace, name).GetObject()
 			pvc := pvcOrig.DeepCopy()
-			pvc.Spec.Resources = corev1.ResourceRequirements{
+			pvc.Spec.Resources = appsv1alpha1.VolumeResourceConvert(corev1.ResourceRequirements{
 				Requests: map[corev1.ResourceName]resource.Quantity{
 					corev1.ResourceStorage: resource.MustParse("500m"),
 				},
-			}
+			})
 			v := &model.ObjectVertex{
 				OriObj: pvcOrig,
 				Obj:    pvc,

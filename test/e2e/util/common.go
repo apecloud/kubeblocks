@@ -18,6 +18,7 @@ limitations under the License.
 package util
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os/exec"
@@ -26,9 +27,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
-	"github.com/vmware-tanzu/velero/test/e2e/util/common"
-	"golang.org/x/net/context"
-	corev1api "k8s.io/api/core/v1"
+	"github.com/vmware-tanzu/velero/test/util/common"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 
@@ -64,12 +64,12 @@ func WaitForPods(ctx context.Context, client TestClient, namespace string, pods 
 		for _, podName := range pods {
 			checkPod, err := client.ClientGo.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
 			if err != nil {
-				fmt.Println(errors.Wrap(err, fmt.Sprintf("Failed to verify pod %s/%s is %s, try again...\n", namespace, podName, corev1api.PodRunning)))
+				fmt.Println(errors.Wrap(err, fmt.Sprintf("Failed to verify pod %s/%s is %s, try again...\n", namespace, podName, corev1.PodRunning)))
 				return false, nil
 			}
 			// If any pod is still waiting, no need to check, just return and wait for next poll interval
-			if checkPod.Status.Phase != corev1api.PodRunning {
-				fmt.Printf("Pod %s is in state %s waiting for it to be %s\n", podName, checkPod.Status.Phase, corev1api.PodRunning)
+			if checkPod.Status.Phase != corev1.PodRunning {
+				fmt.Printf("Pod %s is in state %s waiting for it to be %s\n", podName, checkPod.Status.Phase, corev1.PodRunning)
 				return false, nil
 			}
 		}

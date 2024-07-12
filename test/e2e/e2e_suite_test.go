@@ -27,10 +27,15 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	. "github.com/vmware-tanzu/velero/test/e2e"
-	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
+	. "github.com/vmware-tanzu/velero/test/util/k8s"
+
+	. "github.com/apecloud/kubeblocks/test/e2e"
+	. "github.com/apecloud/kubeblocks/test/e2e/envcheck"
+	. "github.com/apecloud/kubeblocks/test/e2e/installation"
+	. "github.com/apecloud/kubeblocks/test/e2e/testdata/smoketest"
 
 	"github.com/onsi/ginkgo/v2/reporters"
+	velero "github.com/vmware-tanzu/velero/test"
 	"go.uber.org/zap/zapcore"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -38,10 +43,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
-	. "github.com/apecloud/kubeblocks/test/e2e"
-	. "github.com/apecloud/kubeblocks/test/e2e/envcheck"
-	. "github.com/apecloud/kubeblocks/test/e2e/installation"
-	. "github.com/apecloud/kubeblocks/test/e2e/testdata/smoketest"
 	e2eutil "github.com/apecloud/kubeblocks/test/e2e/util"
 )
 
@@ -84,15 +85,15 @@ func TestE2e(t *testing.T) {
 func GetKubeconfigContext() error {
 	var err error
 	var tcDefault TestClient
-	tcDefault, err = NewTestClient(VeleroCfg.DefaultCluster)
-	VeleroCfg.DefaultClient = &tcDefault
-	VeleroCfg.ClientToInstallVelero = VeleroCfg.DefaultClient
+	tcDefault, err = NewTestClient(velero.VeleroCfg.DefaultCluster)
+	velero.VeleroCfg.DefaultClient = &tcDefault
+	velero.VeleroCfg.ClientToInstallVelero = velero.VeleroCfg.DefaultClient
 	if err != nil {
 		return err
 	}
 
-	if VeleroCfg.DefaultCluster != "" {
-		err = KubectlConfigUseContext(context.Background(), VeleroCfg.DefaultCluster)
+	if velero.VeleroCfg.DefaultCluster != "" {
+		err = KubectlConfigUseContext(context.Background(), velero.VeleroCfg.DefaultCluster)
 		if err != nil {
 			return err
 		}

@@ -19,7 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package builder
 
-import corev1 "k8s.io/api/core/v1"
+import (
+	corev1 "k8s.io/api/core/v1"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+)
 
 type PVCBuilder struct {
 	BaseBuilder[corev1.PersistentVolumeClaim, *corev1.PersistentVolumeClaim, PVCBuilder]
@@ -32,7 +36,7 @@ func NewPVCBuilder(namespace, name string) *PVCBuilder {
 }
 
 func (builder *PVCBuilder) SetResources(resources corev1.ResourceRequirements) *PVCBuilder {
-	builder.get().Spec.Resources = resources
+	builder.get().Spec.Resources = appsv1alpha1.VolumeResourceConvert(resources)
 	return builder
 }
 

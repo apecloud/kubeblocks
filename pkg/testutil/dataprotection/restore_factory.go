@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -102,11 +103,11 @@ func (f *MockRestoreFactory) buildRestoreVolumeClaim(name, volumeSource, mountPa
 		},
 		VolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
 			StorageClassName: &storageClass,
-			Resources: corev1.ResourceRequirements{
+			Resources: appsv1alpha1.VolumeResourceConvert(corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
 					corev1.ResourceStorage: resource.MustParse("20Gi"),
 				},
-			},
+			}),
 			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 		},
 	}

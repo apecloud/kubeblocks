@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -133,11 +134,11 @@ var (
 				Name: "data",
 			},
 			Spec: corev1.PersistentVolumeClaimSpec{
-				Resources: corev1.ResourceRequirements{
+				Resources: appsv1alpha1.VolumeResourceConvert(corev1.ResourceRequirements{
 					Requests: map[corev1.ResourceName]resource.Quantity{
 						corev1.ResourceStorage: resource.MustParse("2G"),
 					},
-				},
+				}),
 			},
 		},
 	}

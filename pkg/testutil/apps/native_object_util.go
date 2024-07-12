@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubectl/pkg/util/storage"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/testutil"
 )
 
@@ -61,11 +62,11 @@ func SetConfigMapData(key string, value string) func(*corev1.ConfigMap) {
 func NewPVC(size string) corev1.PersistentVolumeClaimSpec {
 	return corev1.PersistentVolumeClaimSpec{
 		AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-		Resources: corev1.ResourceRequirements{
+		Resources: appsv1alpha1.VolumeResourceConvert(corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
 				corev1.ResourceStorage: resource.MustParse(size),
 			},
-		},
+		}),
 	}
 }
 

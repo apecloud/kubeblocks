@@ -159,11 +159,11 @@ single_thread_memory = 294912
 						Name: "data",
 					},
 					Spec: corev1.PersistentVolumeClaimSpec{
-						Resources: corev1.ResourceRequirements{
+						Resources: appsv1alpha1.VolumeResourceConvert(corev1.ResourceRequirements{
 							Requests: corev1.ResourceList{
 								corev1.ResourceStorage: resource.MustParse("10Gi"),
 							},
-						},
+						}),
 					},
 				},
 			},

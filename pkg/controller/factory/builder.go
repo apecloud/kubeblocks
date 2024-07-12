@@ -338,7 +338,7 @@ func BuildPVC(cluster *appsv1alpha1.Cluster,
 		AddLabelsInMap(wellKnownLabels).
 		AddLabels(constant.VolumeClaimTemplateNameLabelKey, vct.Name).
 		SetAccessModes(vct.Spec.AccessModes).
-		SetResources(vct.Spec.Resources)
+		SetResources(appsv1alpha1.RequireResourceConvert(vct.Spec.Resources))
 	if vct.Spec.StorageClassName != nil {
 		pvcBuilder.SetStorageClass(*vct.Spec.StorageClassName)
 	}

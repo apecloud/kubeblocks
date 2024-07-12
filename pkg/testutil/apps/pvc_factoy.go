@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
@@ -63,11 +64,11 @@ func (factory *MockPersistentVolumeClaimFactory) SetStorageClass(storageClassNam
 }
 
 func (factory *MockPersistentVolumeClaimFactory) SetStorage(storageSize string) *MockPersistentVolumeClaimFactory {
-	factory.Get().Spec.Resources = corev1.ResourceRequirements{
+	factory.Get().Spec.Resources = appsv1alpha1.VolumeResourceConvert(corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
 			corev1.ResourceStorage: resource.MustParse(storageSize),
 		},
-	}
+	})
 	return factory
 }
 

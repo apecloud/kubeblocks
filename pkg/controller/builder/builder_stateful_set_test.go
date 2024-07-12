@@ -28,6 +28,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 var _ = Describe("stateful_set builder", func() {
@@ -70,11 +72,11 @@ var _ = Describe("stateful_set builder", func() {
 				},
 				Spec: corev1.PersistentVolumeClaimSpec{
 					VolumeName: "foo-1",
-					Resources: corev1.ResourceRequirements{
+					Resources: appsv1alpha1.VolumeResourceConvert(corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
 							corev1.ResourceCPU: resource.MustParse("500m"),
 						},
-					},
+					}),
 				},
 			},
 		}
@@ -85,11 +87,11 @@ var _ = Describe("stateful_set builder", func() {
 			},
 			Spec: corev1.PersistentVolumeClaimSpec{
 				VolumeName: "foo-2",
-				Resources: corev1.ResourceRequirements{
+				Resources: appsv1alpha1.VolumeResourceConvert(corev1.ResourceRequirements{
 					Requests: corev1.ResourceList{
 						corev1.ResourceCPU: resource.MustParse("600m"),
 					},
-				},
+				}),
 			},
 		}
 		partition, maxUnavailable := int32(3), intstr.FromInt(2)

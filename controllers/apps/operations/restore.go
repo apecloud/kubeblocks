@@ -132,6 +132,10 @@ func (r RestoreOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, 
 }
 
 func (r RestoreOpsHandler) restoreClusterFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *appsv1alpha1.OpsRequest) (*appsv1alpha1.Cluster, error) {
+	if opsRequest.Spec.RestoreSpec == nil {
+		return nil, intctrlutil.NewFatalError("spec.restoreSpec can not be empty")
+	}
+
 	backupName := opsRequest.Spec.RestoreSpec.BackupName
 
 	// check if the backup exists

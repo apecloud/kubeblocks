@@ -13,7 +13,7 @@ import TabItem from '@theme/TabItem';
 
 The popularity of generative AI (Generative AI) has aroused widespread attention and completely ignited the vector database (Vector Database) market. KubeBlocks supports the management of vector databases, such as Qdrant, Milvus, and Weaviate.
 
-In this chapter, we take Qdrant as an example to show how to manage vector databases with KubeBlocks. This chapter illustrates how to create and manage a Qdrant cluster by `kubectl` or a YAML file. You can find the YAML examples in [the GitHub repository](https://github.com/apecloud/kubeblocks/tree/main/examples/qdrant).
+In this chapter, we take Qdrant as an example to show how to manage vector databases with KubeBlocks. This chapter illustrates how to create and manage a Qdrant cluster by `kubectl` or a YAML file. You can find the YAML examples in [the GitHub repository](https://github.com/apecloud/kubeblocks-addons/tree/release-0.9/examples/qdrant).
 
 ## Before you start
 
@@ -60,7 +60,6 @@ spec:
     podAntiAffinity: Preferred
     topologyKeys:
     - kubernetes.io/hostname
-    tenancy: SharedNode
   tolerations:
     - key: kb-data
       operator: Equal
@@ -70,7 +69,7 @@ spec:
   - name: qdrant
     componentDefRef: qdrant
     disableExporter: true
-    serviceAccountName: kb-qdrant-cluster
+    serviceAccountName: kb-mycluster
     replicas: 2
     resources:
       limits:
@@ -98,7 +97,6 @@ EOF
 | `spec.affinity`                       | It defines a set of node affinity scheduling rules for the cluster's Pods. This field helps control the placement of Pods on nodes within the cluster.  |
 | `spec.affinity.podAntiAffinity`       | It specifies the anti-affinity level of Pods within a component. It determines how pods should spread across nodes to improve availability and performance. |
 | `spec.affinity.topologyKeys`          | It represents the key of node labels used to define the topology domain for Pod anti-affinity and Pod spread constraints.   |
-| `spec.affinity.tenacy`                | It determines the level of resource isolation between Pods. It can have the following values: `SharedNode` and `DedicatedNode`. <p> - SharedNode: It allows that multiple Pods may share the same node, which is the default behavior of K8s. </p> - DedicatedNode: Each Pod runs on a dedicated node, ensuring that no two Pods share the same node.                                                                                                                |
 | `spec.tolerations`                    | It is an array that specifies tolerations attached to the cluster's Pods, allowing them to be scheduled onto nodes with matching taints.  |
 | `spec.componentSpecs`                 | It is the list of components that define the cluster components. This field allows customized configuration of each component within a cluster.   |
 | `spec.componentSpecs.componentDefRef` | It is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition apecloud-mysql -o json \| jq '.spec.componentDefs[].name'`.   |
@@ -152,8 +150,8 @@ Check whether the cluster STATUS is `Running`. Otherwise, the following operatio
 ```bash
 kubectl get cluster mycluster -n demo
 >
-NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
-mycluster   qdrant               qdrant-1.5.0   Halt                 Running   47m
+NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY     STATUS    AGE
+mycluster   qdrant               qdrant-1.5.0   Delete                 Running   47m
 ```
 
 #### Steps
@@ -227,7 +225,7 @@ There are two ways to apply horizontal scaling.
            resources:
              requests:
                storage: 1Gi
-    terminationPolicy: Halt
+    terminationPolicy: Delete
    ```
 
 2. Check whether the corresponding resources change.
@@ -295,7 +293,7 @@ You can vertically scale a cluster by changing resource requirements and limits 
 
 :::note
 
-During the vertical scaling process, all pods restart in the order of learner -> follower -> leader and the leader pod may change after the restarting.
+During the vertical scaling process, all pods restart and the pod role may change after the restarting.
 
 :::
 
@@ -306,8 +304,8 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 ```bash
 kubectl get cluster mycluster -n demo
 >
-NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
-mycluster   qdrant               qdrant-1.5.0   Halt                 Running   47m
+NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY     STATUS    AGE
+mycluster   qdrant               qdrant-1.5.0   Delete                 Running   47m
 ```
 
 #### Steps
@@ -392,7 +390,7 @@ There are two ways to apply vertical scaling.
            resources:
              requests:
                storage: 1Gi
-     terminationPolicy: Halt
+     terminationPolicy: Delete
    ```
 
 2. Check whether the corresponding resources change.
@@ -416,7 +414,6 @@ kubectl get cluster mycluster -n demo
 NAME        CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    AGE
 mycluster   qdrant               qdrant-1.5.0      Delete               Running   4m29s
 ```
-
 
 ### Steps
 
@@ -493,7 +490,7 @@ There are two ways to apply volume expansion.
            resources:
              requests:
                storage: 1Gi # Change the volume storage size.
-     terminationPolicy: Halt
+     terminationPolicy: Delete
    ```
 
 2. Check whether the corresponding cluster resources change.
@@ -506,7 +503,7 @@ There are two ways to apply volume expansion.
 
 </Tabs>
 
-## Stop/Start PostgreSQL Cluster
+## Stop/Start a cluster
 
 You can stop/start a cluster to save computing resources. When a cluster is stopped, the computing resources of this cluster are released, which means the pods of Kubernetes are released, but the storage resources are reserved. Start this cluster again if you want to restore the cluster resources from the original storage by snapshots.
 
@@ -533,7 +530,7 @@ EOF
 
 </TabItem>
 
-<TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
 Configure replicas as 0 to delete pods.
 
@@ -590,7 +587,7 @@ EOF
 
 </TabItem>
 
-<TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
 Change replicas back to the original amount to start this cluster again.
 
@@ -605,7 +602,7 @@ spec:
   clusterVersionRef: qdrant-1.8.1
   terminationPolicy: Delete
   componentSpecs:
-  - name: postgresql
+  - name: qdrant
     componentDefRef: qdrant
     disableExporter: true  
     replicas: 1

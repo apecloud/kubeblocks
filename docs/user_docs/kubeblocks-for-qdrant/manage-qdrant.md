@@ -1,10 +1,11 @@
 ---
 title: Manage Qdrant with KubeBlocks
-description: How to manage vector databases on KubeBlocks
+description: How to manage Qdrant on KubeBlocks
 keywords: [qdrant, vector database, control plane]
 sidebar_position: 1
 sidebar_label: Manage Qdrant with KubeBlocks
 ---
+
 # Manage Qdrant with KubeBlocks
 
 The popularity of generative AI (Generative AI) has aroused widespread attention and completely ignited the vector database (Vector Database) market. Qdrant (read: quadrant) is a vector similarity search engine and vector database. It provides a production-ready service with a convenient API to store, search, and manage points—vectors with an additional payload Qdrant is tailored to extended filtering support. It makes it useful for all sorts of neural-network or semantic-based matching, faceted search, and other applications.
@@ -17,7 +18,7 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
 
 ***Steps***
 
-1. Execute the following command to create a Qdrant cluster. You can change the `cluster-definition` value as any other databases supported.
+1. Execute the following command to create a Qdrant cluster. 
 
    ```bash
    kbcli cluster create qdrant --cluster-definition=qdrant
@@ -35,7 +36,7 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
    kbcli cluster list
    >
    NAME     NAMESPACE   CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    CREATED-TIME
-   qdrant   default     qdrant               qdrant-1.1.0   Delete               Running   Aug 15,2023 23:03 UTC+0800
+   qdrant   default     qdrant               qdrant-1.5.0   Delete               Running   Aug 15,2023 23:03 UTC+0800
    ```
 
 3. Check the cluster information.
@@ -45,7 +46,7 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
    >
    Name: qdrant         Created Time: Aug 15,2023 23:03 UTC+0800
    NAMESPACE   CLUSTER-DEFINITION   VERSION        STATUS    TERMINATION-POLICY
-   default     qdrant               qdrant-1.1.0   Running   Delete
+   default     qdrant               qdrant-1.5.0   Running   Delete
 
    Endpoints:
    COMPONENT   MODE        INTERNAL                                       EXTERNAL
@@ -84,8 +85,8 @@ If your cluster is on AWS, install the AWS Load Balancer Controller first.
 :::
 
 - If your client is inside a K8s cluster, run `kbcli cluster describe qdrant` to get the ClusterIP address of the cluster or the corresponding K8s cluster domain name.
-- If your client is outside the K8s cluster but in the same VPC as the server, run `kbcli cluster expose qdant --enable=true --type=vpc` to get a VPC load balancer address for the database cluster.
-- If your client is outside the VPC, run `kbcli cluster expose qdant --enable=true --type=internet` to open a public network reachable address for the database cluster.
+- If your client is outside the K8s cluster but in the same VPC as the server, run `kbcli cluster expose qdrant --enable=true --type=vpc` to get a VPC load balancer address for the database cluster.
+- If your client is outside the VPC, run `kbcli cluster expose qdrant --enable=true --type=internet` to open a public network reachable address for the database cluster.
 
 ## Monitor the database
 
@@ -106,7 +107,7 @@ For the testing environment, you can run the command below to open the Grafana m
 2. Check whether the monitoring function of the cluster is enabled. If the monitoring function is enabled, the output shows `disableExporter: false`.
 
    ```bash
-   kubectl get cluster mycluster -o yaml
+   kubectl get cluster qdrant -o yaml
    >
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
@@ -122,7 +123,7 @@ For the testing environment, you can run the command below to open the Grafana m
    If `disableExporter: false` is not shown in the output, it means the monitoring function of this cluster is not enabled and you need to enable it first.
 
    ```bash
-   kbcli cluster update mycluster --disableExporter=false
+   kbcli cluster update qdrant --disableExporter=false
    ```
 
 3. View the dashboard list.

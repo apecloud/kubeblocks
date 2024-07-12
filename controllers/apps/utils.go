@@ -38,13 +38,6 @@ import (
 // default reconcile requeue after duration
 var requeueDuration = time.Millisecond * 1000
 
-func getEnvReplacementMapForAccount(name, passwd string) map[string]string {
-	return map[string]string{
-		"$(USERNAME)": name,
-		"$(PASSWD)":   passwd,
-	}
-}
-
 // notifyClusterStatusChange notifies cluster changes occurred and triggers it to reconcile.
 func notifyClusterStatusChange(ctx context.Context, cli client.Client, recorder record.EventRecorder, obj client.Object, event *corev1.Event) error {
 	if obj == nil || !intctrlutil.WorkloadFilterPredicate(obj) {

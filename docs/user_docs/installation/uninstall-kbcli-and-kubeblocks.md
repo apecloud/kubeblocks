@@ -9,7 +9,6 @@ sidebar_label: Uninstall KubeBlocks and kbcli
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-
 # Uninstall KubeBlocks and kbcli
 
 Uninstallation order:
@@ -28,15 +27,9 @@ Uninstallation order:
 
 Uninstall KubeBlocks if you want to delete KubeBlocks after your trial.
 
-<Tabs>
-<TabItem value="kbcli" label="kbcli" default>
-
 ```bash
 kbcli kubeblocks uninstall
 ```
-</TabItem>
-</Tabs>
-
 
 ## Uninstall kbcli
 

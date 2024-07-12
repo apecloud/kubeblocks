@@ -68,13 +68,13 @@ The open-source or customized Exporter is injected after the monitoring function
 If you disable the monitoring function when creating a cluster, run the command below to enable it.
 
 ```bash
-kubectl patch cluster mycluster -n demo --type "json" -p '[{"op":"add","path":"/spec/componentSpecs/0/monitor","value":true}]'
+kubectl patch cluster mycluster -n demo --type "json" -p '[{"op":"add","path":"/spec/componentSpecs/0/disableExporter","value":false}]'
 ```
 
 If you want to disable the monitoring function, run the command below to disable it.
 
 ```bash
-kubectl patch cluster mycluster -n namespace --type "json" -p '[{"op":"add","path":"/spec/componentSpecs/0/monitor","value":false}]'
+kubectl patch cluster mycluster -n namespace --type "json" -p '[{"op":"add","path":"/spec/componentSpecs/0/disableExporter","value":true}]'
 ```
 
 You can also edit the `cluster.yaml` to enable/disable the monitoring function.
@@ -89,7 +89,7 @@ componentSpecs:
     - error
     - general
     - slow
-    monitor: false # Change this value
+    disableExporter: false # Change this value
 ```
 
 ### View the dashboard
@@ -150,13 +150,13 @@ The open-source or customized Exporter is injected after the monitoring function
 If you disable the monitoring function when creating a cluster, run the command below to enable it.
 
 ```bash
-kubectl patch cluster mycluster -n demo --type "json" -p '[{"op":"add","path":"/spec/componentSpecs/0/monitor","value":true}]'
+kubectl patch cluster mycluster -n demo --type "json" -p '[{"op":"add","path":"/spec/componentSpecs/0/disableExporter","value":false}]'
 ```
 
 If you want to disable the monitoring function, run the command below to disable it.
 
 ```bash
-kubectl patch cluster mycluster -n namespace --type "json" -p '[{"op":"add","path":"/spec/componentSpecs/0/monitor","value":false}]'
+kubectl patch cluster mycluster -n namespace --type "json" -p '[{"op":"add","path":"/spec/componentSpecs/0/disableExporter","value":true}]'
 ```
 
 You can also edit the `cluster.yaml` to enable/disable the monitoring function.
@@ -171,7 +171,7 @@ componentSpecs:
     - error
     - general
     - slow
-    monitor: false # Change this value
+    disableExporter: true # Change this value
 ```
 
 ### View the dashboard

@@ -53,4 +53,4 @@ KubeBlocks supports restoring clusters from backups with the following instructi
 
 3. Connect to the restored cluster for verification.
 
-    Once the cluster status is `Running`, [connect to the cluster](./../../../kubeblocks-for-apecloud-mysql/cluster-management/create-and-connect-a-mysql-cluster.md#connect-to-a-mysql-cluster) for verification.
+    Once the cluster status is `Running`, [connect to the cluster](./../../../kubeblocks-for-apecloud-mysql/cluster-management/create-and-connect-an-apecloud-mysql-cluster.md#connect-to-a-cluster) for verification.

@@ -33,19 +33,19 @@ You can switch over a secondary of a PostgreSQL PrimaeySecondary database to the
 * Switchover with no primary instance specified
 
     ```bash
-    kbcli cluster promote mycluster
+    kbcli cluster promote pg-cluster
     ```
 
 * Switchover with a specified new primary instance
 
     ```bash
-    kbcli cluster promote mycluster --instance='mycluster-postgresql-2'
+    kbcli cluster promote pg-cluster --instance='pg-cluster-postgresql-2'
     ```
 
 * If there are multiple components, you can use `--components` to specify a component.
 
     ```bash
-    kbcli cluster promote mycluster --instance='mycluster-postgresql-2' --components='postgresql'
+    kbcli cluster promote pg-cluster --instance='pg-cluster-postgresql-2' --components='postgresql'
     ```
 
 

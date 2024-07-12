@@ -1,45 +1,42 @@
 ---
-title: Upgrade to KubeBlocks v0.9
-description: Upgrade to KubeBlocks v0.9, operation, tips and notes
-keywords: [upgrade, 0.9]
-sidebar_position: 1
-sidebar_label: Upgrade to KubeBlocks v0.9
+title: Upgrade to KubeBlocks v0.8
+description: Upgrade to KubeBlocks v0.8, operation, tips and notes
+keywords: [upgrade, 0.8]
+sidebar_position: 2
+sidebar_label: Upgrade to KubeBlocks v0.8
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 
-# Upgrade to KubeBlocks v0.9
+# Upgrade to KubeBlocks v0.8
 
 In this tutorial, you will learn how to upgrade to KubeBlocks v0.8.
-
 
 :::note
 
 Execute `kbcli version` to check the current KubeBlocks version you are running, and then upgrade.
 
-
 :::
 
-## Upgrade from KubeBlocks v0.8
+## Upgrade from KubeBlocks v0.6
 
-If you are currently running KubeBlocks v0.8, please upgrade to v0.9 first.
+If you are currently running KubeBlocks v0.6, please upgrade to v0.7.2 first.
 
-
-1. Download kbcli v0.9.0.
-
-    ```shell
-    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s 0.9.x
-    ```
-
-2. Upgrade to KubeBlocks v0.9.x
+1. Download kbcli v0.7.2.
 
     ```shell
-    kbcli kb upgrade --version 0.9.x
+    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s 0.7.2
     ```
 
-## Upgrade from KubeBlocks v0.8
+2. Upgrade to KubeBlocks v0.7.2.
+
+    ```shell
+    kbcli kb upgrade --version 0.7.2
+    ```
+
+## Upgrade from KubeBlocks v0.7
 
 <Tabs>
 
@@ -63,7 +60,7 @@ If you are currently running KubeBlocks v0.8, please upgrade to v0.9 first.
     helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version {VERSION} --set keepAddons=true
     ```
 
-    Replace {VERSION} with your current KubeBlocks version, such as 0.7.2.
+    Replace `{VERSION}` with your current KubeBlocks version, such as 0.7.2.
 
 - Check addons.
 
@@ -84,7 +81,7 @@ If you are currently running KubeBlocks v0.8, please upgrade to v0.9 first.
 3. Upgrade KubeBlocks.
 
     ```shell
-    helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.0 --set dataProtection.image.datasafed.tag=0.1.0
+    helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.8.1 --set dataProtection.image.datasafed.tag=0.1.0
     ```
 
     :::note
@@ -92,27 +89,26 @@ If you are currently running KubeBlocks v0.8, please upgrade to v0.9 first.
     To avoid affecting existing database clusters, when upgrading to KubeBlocks v0.8, the versions of already-installed addons will not be upgraded by default. If you want to upgrade the addons to the versions built into KubeBlocks v0.8, execute the following command. Note that this may restart existing clusters and affect availability. Please proceed with caution.
 
     ```shell
-
     helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.8.1 --set upgradeAddons=true
-
     ```
+
     :::
 
 </TabItem>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
-1. Download kbcli v0.9.
+1. Download kbcli v0.8.
 
     ```shell
-    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s 0.9.0
+    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s 0.8.1
     ```
 
 2. Upgrade KubeBlocks.
 
     ```shell
 
-    kbcli kb upgrade --version 0.9.0 --set dataProtection.image.datasafed.tag=0.1.0
+    kbcli kb upgrade --version 0.8.1 --set dataProtection.image.datasafed.tag=0.1.0
 
     ```
 

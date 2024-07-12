@@ -62,6 +62,7 @@ var _ = Describe("OpsUtil functions", func() {
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.InstanceSetSignature, true, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PodSignature, true, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.ConfigMapSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
 	}
@@ -151,7 +152,6 @@ var _ = Describe("OpsUtil functions", func() {
 				opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsCreatingPhase
 				opsRes.OpsRequest.Status.StartTimestamp = metav1.Time{Time: time.Now()}
 			})).Should(Succeed())
-
 			By("create ha configmap and do horizontalScaling with disable ha")
 			haConfigName := "ha-config"
 			haConfig := &corev1.ConfigMap{

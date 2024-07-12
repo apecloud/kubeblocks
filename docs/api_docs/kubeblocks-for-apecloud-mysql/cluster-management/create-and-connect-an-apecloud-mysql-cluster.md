@@ -59,7 +59,6 @@ spec:
     podAntiAffinity: Preferred
     topologyKeys:
     - kubernetes.io/hostname
-    tenancy: SharedNode
   tolerations:
     - key: kb-data
       operator: Equal
@@ -149,7 +148,6 @@ metadata:
 spec:
   affinity:
     podAntiAffinity: Required
-    tenancy: SharedNode
   clusterDefinitionRef: apecloud-mysql
   clusterVersionRef: ac-mysql-8.0.30
   componentSpecs:

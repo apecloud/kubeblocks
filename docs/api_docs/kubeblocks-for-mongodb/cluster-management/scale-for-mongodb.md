@@ -113,7 +113,6 @@ There are two ways to apply vertical scaling.
    spec:
      affinity:
        podAntiAffinity: Preferred
-       tenancy: SharedNode
        topologyKeys:
        - kubernetes.io/hostname
      clusterDefinitionRef: mongodb

@@ -60,7 +60,6 @@ spec:
     podAntiAffinity: Preferred
     topologyKeys:
     - kubernetes.io/hostname
-    tenancy: SharedNode
   tolerations:
     - key: kb-data
       operator: Equal

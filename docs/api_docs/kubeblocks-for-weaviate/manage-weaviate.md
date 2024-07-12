@@ -55,7 +55,6 @@ metadata:
 spec:
   affinity:
     podAntiAffinity: Preferred
-    tenancy: SharedNode
     topologyKeys:
     - "null"
   clusterDefinitionRef: weaviate

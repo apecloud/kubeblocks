@@ -65,7 +65,6 @@ spec:
     podAntiAffinity: Preferred
     topologyKeys:
     - kubernetes.io/hostname
-    tenancy: SharedNode
   tolerations:
     - key: kb-data
       operator: Equal
@@ -154,7 +153,6 @@ metadata:
 spec:
   affinity:
     podAntiAffinity: Preferred
-    tenancy: SharedNode
     topologyKeys:
     - kubernetes.io/hostname
   clusterDefinitionRef: mongodb

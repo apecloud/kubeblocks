@@ -101,7 +101,6 @@ There are two ways to apply volume expansion.
     spec:
       affinity:
         podAntiAffinity: Preferred
-        tenancy: SharedNode
         topologyKeys:
         - kubernetes.io/hostname
       clusterDefinitionRef: redis

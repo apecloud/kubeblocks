@@ -61,7 +61,6 @@ spec:
     podAntiAffinity: Preferred
     topologyKeys:
     - kubernetes.io/hostname
-    tenancy: SharedNode
   tolerations:
     - key: kb-data
       operator: Equal
@@ -147,7 +146,6 @@ metadata:
 spec:
   affinity:
     podAntiAffinity: Preferred
-    tenancy: SharedNode
   clusterDefinitionRef: postgresql
   clusterVersionRef: postgresql-14.8.0
   componentSpecs:

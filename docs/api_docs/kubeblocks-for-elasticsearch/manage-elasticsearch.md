@@ -61,7 +61,6 @@ metadata:
 spec:
   affinity:
     podAntiAffinity: Required
-    tenancy: SharedNode
     topologyKeys:
     - kubernetes.io/hostname
   componentSpecs:

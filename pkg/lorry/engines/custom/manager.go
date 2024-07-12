@@ -265,8 +265,8 @@ func (mgr *Manager) Unlock(ctx context.Context) error {
 
 // CreateUser provides the following dedicated environment variables for the action:
 //
-// - USERNAME: The name of the account to create.
-// - PASSWD: The password of the account to create.
+// - KB_ACCOUNT_NAME: The name of the account to create.
+// - KB_ACCOUNT_PASSWORD: The password of the account to create.
 // - KB_ACCOUNT_STATEMENT: The statement used to create the account.
 func (mgr *Manager) CreateUser(ctx context.Context, userName, password, statement string) error {
 	accountProvisionCmd, ok := mgr.actionCommands[constant.AccountProvisionAction]
@@ -274,8 +274,8 @@ func (mgr *Manager) CreateUser(ctx context.Context, userName, password, statemen
 		return nil
 	}
 	envs := os.Environ()
-	envs = append(envs, "USERNAME"+"="+userName)
-	envs = append(envs, "PASSWD"+"="+password)
+	envs = append(envs, "KB_ACCOUNT_NAME"+"="+userName)
+	envs = append(envs, "KB_ACCOUNT_PASSWORD"+"="+password)
 	envs = append(envs, "KB_ACCOUNT_STATEMENT"+"="+statement)
 	output, err := util.ExecCommand(ctx, accountProvisionCmd, envs)
 

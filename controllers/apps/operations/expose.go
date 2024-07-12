@@ -328,7 +328,7 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 
 	defaultServicePortsFunc := func() ([]corev1.ServicePort, error) {
 		if len(compDefName) > 0 {
-			compDef, err := component.GetCompDefByName(reqCtx, cli, compDefName)
+			compDef, err := component.GetCompDefByName(reqCtx.Ctx, cli, compDefName)
 			if err != nil {
 				return nil, err
 			}
@@ -348,50 +348,33 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 		return nil, fmt.Errorf("component definition is not defined, cluster: %s, component: %s", cluster.Name, clusterCompSpecName)
 	}
 
-	defaultRoleSelectorFunc := func() (string, error) {
+	checkComponentHasRoles := func() (bool, error) {
 		if len(compDefName) > 0 {
-			compDef, err := component.GetCompDefByName(reqCtx, cli, compDefName)
+			compDef, err := component.GetCompDefByName(reqCtx.Ctx, cli, compDefName)
 			if err != nil {
-				return "", err
+				return false, err
 			}
-			if len(compDef.Spec.Roles) == 0 {
-				return "", nil
-			}
-			for _, role := range compDef.Spec.Roles {
-				if role.Writable && role.Serviceable {
-					return role.Name, nil
-				}
-			}
-			return "", nil
+			return len(compDef.Spec.Roles) > 0, nil
 		}
 		if cluster.Spec.ClusterDefRef != "" && clusterCompDefRefName != "" {
 			clusterDef, err := getClusterDefByName(reqCtx.Ctx, cli, cluster.Spec.ClusterDefRef)
 			if err != nil {
-				return "", err
+				return false, err
 			}
 			clusterCompDef := clusterDef.GetComponentDefByName(clusterCompDefRefName)
 			if clusterCompDef == nil {
-				return "", fmt.Errorf("referenced cluster component definition is not defined: %s", clusterCompDefRefName)
+				return false, fmt.Errorf("referenced cluster component definition is not defined: %s", clusterCompDefRefName)
 			}
 			switch clusterCompDef.WorkloadType {
-			case appsv1alpha1.Replication:
-				return constant.Primary, nil
-			case appsv1alpha1.Consensus:
-				if clusterCompDef.ConsensusSpec != nil {
-					return clusterCompDef.ConsensusSpec.Leader.Name, nil
-				}
-				return constant.Leader, nil
+			case appsv1alpha1.Replication, appsv1alpha1.Consensus:
+				return true, nil
 			case appsv1alpha1.Stateful:
 				if clusterCompDef.RSMSpec != nil {
-					for _, role := range clusterCompDef.RSMSpec.Roles {
-						if role.IsLeader {
-							return role.Name, nil
-						}
-					}
+					return len(clusterCompDef.RSMSpec.Roles) > 0, nil
 				}
 			}
 		}
-		return "", nil
+		return false, nil
 	}
 
 	for _, exposeService := range exposeServices {
@@ -412,11 +395,6 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 				},
 			},
 			ComponentSelector: clusterCompSpecName,
-		}
-
-		// set service selector
-		if exposeService.PodSelector != nil {
-			clusterService.Spec.Selector = exposeService.PodSelector
 		}
 
 		// set service ports
@@ -440,16 +418,21 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 			clusterService.Spec.IPFamilies = exposeService.IPFamilies
 		}
 
+		// set service selector
+		if exposeService.PodSelector != nil {
+			clusterService.Spec.Selector = exposeService.PodSelector
+		}
+
 		// set role selector
 		if len(exposeService.RoleSelector) != 0 {
 			clusterService.RoleSelector = exposeService.RoleSelector
 		} else if len(clusterCompSpecName) > 0 {
-			defaultRoleSelector, err := defaultRoleSelectorFunc()
+			hasRoles, err := checkComponentHasRoles()
 			if err != nil {
 				return err
 			}
-			if defaultRoleSelector != "" {
-				clusterService.RoleSelector = defaultRoleSelector
+			if hasRoles && exposeService.PodSelector == nil {
+				return fmt.Errorf("component has roles, at least one of 'roleSelector' or 'podSelector' must be specified, cluster: %s, component: %s", cluster.Name, clusterCompSpecName)
 			}
 		}
 		cluster.Spec.Services = append(cluster.Spec.Services, clusterService)

@@ -22,6 +22,7 @@ package backup
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"sort"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -286,12 +287,29 @@ func (s *Scheduler) generateBackupName(schedulePolicy *dpv1alpha1.SchedulePolicy
 	return backupNamePrefix + "-$(date -u +'%Y%m%d%H%M%S')"
 }
 
-func (s *Scheduler) reconcileForContinuous(schedulePolicy *dpv1alpha1.SchedulePolicy,
-	targetSelectorLabels map[string]string) error {
-	backupName := GenerateCRNameByBackupSchedule(s.BackupSchedule, schedulePolicy.BackupMethod)
+func (s *Scheduler) getGenerateContinuousBackup(schedulePolicy *dpv1alpha1.SchedulePolicy) (*dpv1alpha1.Backup, error) {
 	backup := &dpv1alpha1.Backup{}
+	backupName := GenerateCRNameByBackupSchedule(s.BackupSchedule, schedulePolicy.BackupMethod)
 	exists, err := intctrlutil.CheckResourceExists(s.Ctx, s.Client, client.ObjectKey{Name: backupName,
 		Namespace: s.BackupSchedule.Namespace}, backup)
+	if err != nil {
+		return nil, err
+	}
+	if exists {
+		return backup, nil
+	}
+	// if no backup found, check if existing legacy backup.
+	backupName = GenerateLegacyCRNameByBackupSchedule(s.BackupSchedule, schedulePolicy.BackupMethod)
+	if _, err = intctrlutil.CheckResourceExists(s.Ctx, s.Client, client.ObjectKey{Name: backupName,
+		Namespace: s.BackupSchedule.Namespace}, backup); err != nil {
+		return nil, err
+	}
+	return backup, nil
+}
+
+func (s *Scheduler) reconcileForContinuous(schedulePolicy *dpv1alpha1.SchedulePolicy,
+	targetSelectorLabels map[string]string) error {
+	backup, err := s.getGenerateContinuousBackup(schedulePolicy)
 	if err != nil {
 		return err
 	}
@@ -306,11 +324,11 @@ func (s *Scheduler) reconcileForContinuous(schedulePolicy *dpv1alpha1.SchedulePo
 	backup.Labels[dptypes.BackupScheduleLabelKey] = s.BackupSchedule.Name
 	backup.Labels[dptypes.BackupTypeLabelKey] = string(dpv1alpha1.BackupTypeContinuous)
 	backup.Labels[dptypes.AutoBackupLabelKey] = "true"
-	if !exists {
+	if backup.Name == "" {
 		if boolptr.IsSetToFalse(schedulePolicy.Enabled) {
 			return nil
 		}
-		backup.Name = backupName
+		backup.Name = GenerateCRNameByBackupSchedule(s.BackupSchedule, schedulePolicy.BackupMethod)
 		backup.Namespace = s.BackupSchedule.Namespace
 		backup.Spec.BackupMethod = schedulePolicy.BackupMethod
 		backup.Spec.BackupPolicyName = s.BackupSchedule.Spec.BackupPolicyName
@@ -380,6 +398,14 @@ func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 		return intctrlutil.NewFatalError(fmt.Sprintf(`spec.target and spec.targets can not be empty in backupPOlicy "%s"`, s.BackupPolicy.Name))
 	}
 	targetPodSelector := targets[0].PodSelector
+	clusterName := targetPodSelector.MatchLabels[constant.AppInstanceLabelKey]
+	cluster := &appsv1alpha1.Cluster{}
+	if err := s.Client.Get(s.Ctx, client.ObjectKey{Name: clusterName, Namespace: s.BackupSchedule.Namespace}, cluster); err != nil {
+		return err
+	}
+	if !slices.Contains(appsv1alpha1.GetReconfiguringRunningPhases(), cluster.Status.Phase) {
+		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting for the cluster %s to be available.", clusterName)
+	}
 	ops := appsv1alpha1.OpsRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: s.BackupSchedule.Name + "-",
@@ -390,7 +416,7 @@ func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 		},
 		Spec: appsv1alpha1.OpsRequestSpec{
 			Type:        appsv1alpha1.ReconfiguringType,
-			ClusterName: targetPodSelector.MatchLabels[constant.AppInstanceLabelKey],
+			ClusterName: clusterName,
 			SpecificOpsRequest: appsv1alpha1.SpecificOpsRequest{
 				Reconfigure: &appsv1alpha1.Reconfigure{
 					ComponentOps: appsv1alpha1.ComponentOps{

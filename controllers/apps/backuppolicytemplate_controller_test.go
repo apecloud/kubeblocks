@@ -36,7 +36,6 @@ var _ = Describe("", func() {
 		BackupMethod             = "test-bm"
 		ActionSetName            = "test-as"
 		VsBackupMethodName       = "test-vs-bm"
-		VsActionSetName          = "test-vs-as"
 		ttl                      = "7d"
 	)
 
@@ -69,7 +68,7 @@ var _ = Describe("", func() {
 				SetComponentDef(compDef1, compDef2).
 				AddBackupMethod(BackupMethod, false, ActionSetName).
 				SetBackupMethodVolumeMounts("data", "/data").
-				AddBackupMethod(VsBackupMethodName, true, VsActionSetName).
+				AddBackupMethod(VsBackupMethodName, true, "").
 				SetBackupMethodVolumeMounts("data", "/data").
 				AddSchedule(BackupMethod, "0 0 * * *", ttl, true).
 				AddSchedule(VsBackupMethodName, "0 0 * * *", ttl, true).

@@ -76,7 +76,7 @@ spec:
     componentDefRef: mongodb
     enabledLogs:
     - running
-    monitor: false
+    disableExporter: true
     serviceAccountName: kb-mongo-cluster
     replicas: 1
     resources:
@@ -110,6 +110,7 @@ EOF
 | `spec.componentSpecs`                 | It is the list of components that define the cluster components. This field allows customized configuration of each component within a cluster.   |
 | `spec.componentSpecs.componentDefRef` | It is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition apecloud-mysql -o json \| jq '.spec.componentDefs[].name'`.   |
 | `spec.componentSpecs.name`            | It specifies the name of the component.     |
+| `spec.componentSpecs.disableExporter` | It defines whether the monitoring function is enabled. |
 | `spec.componentSpecs.replicas`        | It specifies the number of replicas of the component.  |
 | `spec.componentSpecs.resources`       | It specifies the resource requirements of the component.  |
 
@@ -135,7 +136,7 @@ kind: Cluster
 metadata:
   annotations:
     kubectl.kubernetes.io/last-applied-configuration: |
-      {"apiVersion":"apps.kubeblocks.io/v1alpha1","kind":"Cluster","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"mycluster","app.kubernetes.io/version":"5.0.14","helm.sh/chart":"mycluster-0.8.0"},"name":"mycluster","namespace":"demo"},"spec":{"affinity":{"podAntiAffinity":"Preferred","tenancy":"SharedNode","topologyKeys":["kubernetes.io/hostname"]},"clusterDefinitionRef":"mongodb","clusterVersionRef":"mongodb-5.0","componentSpecs":[{"componentDefRef":"mongodb","monitor":false,"name":"mongodb","replicas":1,"resources":{"limits":{"cpu":"0.5","memory":"0.5Gi"},"requests":{"cpu":"0.5","memory":"0.5Gi"}},"serviceAccountName":null,"services":null,"volumeClaimTemplates":[{"name":"data","spec":{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"20Gi"}}}}]}],"terminationPolicy":"Delete"}}
+      {"apiVersion":"apps.kubeblocks.io/v1alpha1","kind":"Cluster","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"mycluster","app.kubernetes.io/version":"5.0.14","helm.sh/chart":"mycluster-0.8.0"},"name":"mycluster","namespace":"demo"},"spec":{"affinity":{"podAntiAffinity":"Preferred","tenancy":"SharedNode","topologyKeys":["kubernetes.io/hostname"]},"clusterDefinitionRef":"mongodb","clusterVersionRef":"mongodb-5.0","componentSpecs":[{"componentDefRef":"mongodb","disableExporter":true,"name":"mongodb","replicas":1,"resources":{"limits":{"cpu":"0.5","memory":"0.5Gi"},"requests":{"cpu":"0.5","memory":"0.5Gi"}},"serviceAccountName":null,"services":null,"volumeClaimTemplates":[{"name":"data","spec":{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"20Gi"}}}}]}],"terminationPolicy":"Delete"}}
   creationTimestamp: "2024-05-07T10:23:13Z"
   finalizers:
   - cluster.kubeblocks.io/finalizer
@@ -160,7 +161,7 @@ spec:
   clusterVersionRef: mongodb-5.0
   componentSpecs:
   - componentDefRef: mongodb
-    monitor: false
+    disableExporter: true
     name: mongodb
     replicas: 1
     resources:

@@ -69,8 +69,8 @@ var _ = Describe("object generation transformer test.", func() {
 				"KB_REPLICA_COUNT",
 				"KB_0_HOSTNAME",
 			}
-			cfg := buildEnvConfigData(*its)
-
+			cfg, err := buildEnvConfigData(*its)
+			Expect(err).Should(BeNil())
 			By("builds Env Config correctly")
 			Expect(cfg).ShouldNot(BeNil())
 			for _, k := range requiredKeys {
@@ -103,7 +103,8 @@ var _ = Describe("object generation transformer test.", func() {
 				"KB_2_HOSTNAME":    hostname(2),
 				"KB_3_HOSTNAME":    hostname(3),
 			}
-			cfg := buildEnvConfigData(*its)
+			cfg, err := buildEnvConfigData(*its)
+			Expect(err).Should(BeNil())
 
 			By("builds Env Config correctly")
 			Expect(cfg).ShouldNot(BeNil())

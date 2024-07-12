@@ -39,7 +39,7 @@ spec:
   componentSpecs:
   - name: qdrant
     componentDefRef: qdrant
-    monitorEnabled: false
+    disableExporter: true
     serviceAccountName: kb-qdrant-cluster
     replicas: 3
     resources:

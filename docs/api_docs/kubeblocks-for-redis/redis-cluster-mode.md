@@ -5,6 +5,9 @@ keywords: [redis, redis cluster, feature]
 sidebar_position: 7
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Redis Cluster Mode
 
 While Redis Sentinel clusters provide excellent failover support, they do not inherently provide data sharding. All data remains on a single Redis instance, limited by its memory and performance capacity. Therefore, it may impact horizontal scalability when dealing with large datasets and high read/write operations.
@@ -28,8 +31,8 @@ Below is a brief introduction to the basic operations of Redis Cluster Mode.
 ### Before you start
 
 * [Install KubeBlocks](./../installation/install-kubeblocks.md).
-    Make sure your KubeBlocks and add-on are version 0.9 or above.
-* Make sure the add-on is enabled.
+    Make sure your KubeBlocks and addon are version 0.9 or above.
+* Make sure the Redis addon is enabled.
 * View all the database types and versions available for creating a cluster.
 
   Make sure you can get the redis `componentdefinition`. It is used to describe and define the components in a database cluster, and usually presents basic information such as the name, type, version, status, etc.
@@ -59,7 +62,9 @@ Redis Cluster Mode requires a minimum of three shards, so the number of shards c
 
 :::
 
-#### Using Helm
+<Tabs>
+
+<TabItem value="Helm" label="Helm" default>
 
 ```bash
 # Example 1: Creating a Redis Cluster with three shards, each shard having one replica (one master, one replica)
@@ -69,7 +74,9 @@ helm install redisc xxxxx(chart remote address) --set mode=cluster --set redisCl
 helm install redisc xxxxx(chart remote address) --set mode=cluster --set nodePortEnabled=true --set redisCluster.shardCount=3 --set replicas=2 -n demo
 ```
 
-#### Using YAML
+</TabItem>
+
+<TabItem value="YAML" label="YAML">
 
 ```bash
 kubectl apply -f redis-cluster-example.yaml
@@ -166,7 +173,11 @@ spec:
   terminationPolicy: Delete
 ```
 
-Once the cluster is created, wait until the cluster status change to `running`. Then, run `kubectl get component -n demo | grep redisc-shard` to view the roles of nodes in the cluster.
+</TabItem>
+
+</Tabs>
+
+Once the cluster is created, wait until the cluster status changes to `running`. Then, run `kubectl get component -n demo | grep redisc-shard` to view the roles of nodes in the cluster.
 
 ```bash
 kubectl get component -n demo | grep redisc-shard
@@ -178,7 +189,9 @@ redisc-shard-5tw            redis-cluster          Running   79m
 
 ### Connect to clusters
 
-**Option 1: Using SDK**
+<Tabs>
+
+<TabItem value="SDK" label="SDK" default>
 
 Redis Cluster Mode requires using specific client SDKs for connection. Currently, there are Redis Cluster client SDK implementations available in different popular programming languages. You can choose the appropriate SDK based on your requirements. For example, Jedis or Lettuce for Java, go-redis for Golang, etc.
 
@@ -211,7 +224,15 @@ Configure each Pod's HostIP and the corresponding NodePort.
 172.18.0.8:31718
 ```
 
-**Option 2: Direct connect (for testings only)**
+</TabItem>
+
+<TabItem value="Direct connect" label="Direct connect">
+
+:::note
+
+Direct connection is only for testing.
+
+:::
 
 For simple connectivity verification, you can use kubectl commands to log in to a specific Pod in the cluster and check the cluster's status.
 
@@ -233,6 +254,10 @@ b695dbac46efd9ec24ea608358f92dfd749e8e71 172.18.0.3:31603@30000,redisc-shard-kr2
 568bb6ced7f186caddb2b2b7ab560e61ff95438c 172.18.0.3:32269@31457,redisc-shard-fm6-0.redisc-shard-fm6-headless.default.svc master - 0 1713927853340 4 connected 0-1364 5461-6826 10923-12287
 ```
 
+</TabItem>
+
+</Tabs>
+
 ### Scale shards
 
 :::note
@@ -243,7 +268,9 @@ b695dbac46efd9ec24ea608358f92dfd749e8e71 172.18.0.3:31603@30000,redisc-shard-kr2
 
 :::
 
-**Option 1: Using `kubectl patch`**
+<Tabs>
+
+<TabItem value="kubectl patch" label="kubectl patch" default>
 
 You can use `kubectl patch` to update the shards field and scale the shards.
 
@@ -255,7 +282,9 @@ kubectl patch cluster redisc --type='json' -p='[{"op": "replace", "path": "/spec
 kubectl patch cluster redisc --type='json' -p='[{"op": "replace", "path": "/spec/shardingSpecs/0/shards", "value":3}]' -n demo
 ```
 
-**Option 2: Using `kubectl edit`**
+</TabItem>
+
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
 You can use `kubectl edit` to directly edit the cluster YAML and modify the value of `spec.shardingSpecs[0].shards`.
 
@@ -263,11 +292,17 @@ You can use `kubectl edit` to directly edit the cluster YAML and modify the valu
 kubectl edit cluster redisc
 ```
 
+</TabItem>
+
+</Tabs>
+
 ### Scale replicas
 
-The number of replica applies to all shards.
+The number of replicas applies to all shards.
 
-**Option 1: Using `kubectl patch`**
+<Tabs>
+
+<TabItem value="kubectl patch" label="kubectl patch" default>
 
 You can use `kubectl patch` to update the replicas field and scale the shard replicas.
 
@@ -276,7 +311,9 @@ You can use `kubectl patch` to update the replicas field and scale the shard rep
 kubectl patch cluster redisc --type='json' -p='[{"op": "replace", "path": "/spec/shardingSpecs/0/template/replicas", "value": 3}]' -n default
 ```
 
-**Option 2: Using `kubectl edit`**
+</TabItem>
+
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
 You can Use `kubectl edit` to directly edit the cluster YAML and modify the value of `spec.shardingSpecs[0].template.replicas`.
 
@@ -284,7 +321,11 @@ You can Use `kubectl edit` to directly edit the cluster YAML and modify the valu
 kubectl edit cluster redisc
 ```
 
-**Option 3: Using OpsRequest**
+</TabItem>
+
+<TabItem value="OpsRequest" label="OpsRequest">
+
+You can apply an OpsRequest to scale replicas.
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -298,6 +339,10 @@ spec:
     replicas: 3
   type: HorizontalScaling
 ```
+
+</TabItem>
+
+</Tabs>
 
 ### Resource scaling/reconfiguration
 
@@ -338,17 +383,7 @@ spec:
 
 ### Restart
 
-```yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: OpsRequest
-metadata:
-  name: restart-redisc
-spec:
-  clusterName: redisc
-  restart:
-  - componentName: shard
-  type: Restart
-```
+Currently, restarting a Redis Cluster is not supported and it will be supported in the future.
 
 ### Stop/Start
 
@@ -404,4 +439,3 @@ spec:
   restore:
     backupName: backup-redisc-1
 ```
-

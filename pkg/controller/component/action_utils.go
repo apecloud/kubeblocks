@@ -142,6 +142,7 @@ func renderActionCmdJob(ctx context.Context, cli client.Reader, actionCtx *Actio
 	renderJobPodVolumes := func() ([]corev1.Volume, []corev1.VolumeMount) {
 		volumes := make([]corev1.Volume, 0)
 		volumeMounts := make([]corev1.VolumeMount, 0)
+		volumeMountSet := make(map[string]struct{})
 
 		// find current pod's volume which mapped to scriptsTemplates
 		findVolumes := func(tplSpec appsv1alpha1.ComponentTemplateSpec) {
@@ -162,7 +163,11 @@ func renderActionCmdJob(ctx context.Context, cli client.Reader, actionCtx *Actio
 			for _, container := range tplPod.Spec.Containers {
 				for _, volumeMount := range container.VolumeMounts {
 					if volumeMount.Name == volume.Name {
-						volumeMounts = append(volumeMounts, volumeMount)
+						// filter duplicate volumeMounts
+						if _, exists := volumeMountSet[volumeMount.Name]; !exists {
+							volumeMounts = append(volumeMounts, volumeMount)
+							volumeMountSet[volumeMount.Name] = struct{}{}
+						}
 						break
 					}
 				}
@@ -192,8 +197,9 @@ func renderActionCmdJob(ctx context.Context, cli client.Reader, actionCtx *Actio
 						Name:      jobName,
 					},
 					Spec: corev1.PodSpec{
-						Volumes:       volumes,
-						RestartPolicy: corev1.RestartPolicyNever,
+						Volumes:            volumes,
+						RestartPolicy:      corev1.RestartPolicyNever,
+						ServiceAccountName: tplPod.Spec.ServiceAccountName,
 						Containers: []corev1.Container{
 							{
 								Name:            kbLifecycleActionJobContainerName,
@@ -469,7 +475,7 @@ func setActionDoneAnnotation(graphCli model.GraphClient, actionCtx *ActionContex
 	timeStr := time.Now().Format(time.RFC3339Nano)
 	actionCtx.component.Annotations[actionDoneKey] = timeStr
 	graphCli.Update(dag, compObj, actionCtx.component, &model.ReplaceIfExistingOption{})
-	return nil
+	return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting for component %s annotation %s to be updated", actionCtx.component.Name, actionDoneKey)
 }
 
 // cleanActionJob cleans the action job by name.
@@ -478,34 +484,33 @@ func cleanActionJob(ctx context.Context,
 	dag *graph.DAG,
 	actionCtx *ActionContext,
 	jobName string) error {
-	if actionCtx.cluster.Annotations == nil || actionCtx.component.Annotations == nil {
-		return errors.New("cluster or component annotations not found")
-	}
 	// check action done annotation has been set
 	if !checkActionDoneAnnotationExist(actionCtx) {
-		return fmt.Errorf("cluster %s %s done annotation has not been set", actionCtx.cluster.Name, actionCtx.actionType)
+		return fmt.Errorf("component %s %s action done annotation has not been set", actionCtx.component.Name, actionCtx.actionType)
 	}
 	return job.CleanJobByNameWithDAG(ctx, cli, dag, actionCtx.cluster, jobName)
 }
 
 // checkActionDoneAnnotationExist checks if the action done annotation exists.
 func checkActionDoneAnnotationExist(actionCtx *ActionContext) bool {
-	if actionCtx.cluster.Annotations == nil || actionCtx.component.Annotations == nil {
-		return false
-	}
 	var actionDoneKey string
 	switch actionCtx.actionType {
 	case PostProvisionAction:
 		// TODO(xingran): for backward compatibility before KubeBlocks v0.8.0, check the annotation of the cluster object first, it will be deprecated in the future
-		compPostStartDoneKey := fmt.Sprintf(kbCompPostStartDoneKeyPattern, actionCtx.component.Name)
-		_, ok := actionCtx.cluster.Annotations[compPostStartDoneKey]
-		if ok {
-			return true
+		if actionCtx.cluster.Annotations != nil {
+			compPostStartDoneKey := fmt.Sprintf(kbCompPostStartDoneKeyPattern, actionCtx.component.Name)
+			_, ok := actionCtx.cluster.Annotations[compPostStartDoneKey]
+			if ok {
+				return true
+			}
 		}
 		actionDoneKey = kbCompPostProvisionDoneKey
 	case PreTerminateAction:
 		actionDoneKey = kbCompPreTerminateDoneKey
 	default:
+		return false
+	}
+	if actionCtx.component.Annotations == nil {
 		return false
 	}
 	_, ok := actionCtx.component.Annotations[actionDoneKey]

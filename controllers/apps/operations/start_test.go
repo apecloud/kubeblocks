@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
-	"encoding/json"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -29,14 +27,12 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
 var _ = Describe("Start OpsRequest", func() {
-
 	var (
 		randomStr             = testCtx.GetRandomStr()
 		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr
@@ -58,6 +54,7 @@ var _ = Describe("Start OpsRequest", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.InstanceSetSignature, true, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
 	}
 
@@ -70,24 +67,15 @@ var _ = Describe("Start OpsRequest", func() {
 			By("init operations resources ")
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
-
-			By("mock cluster annotations for start opsRequest")
-			// mock snapshot annotation for cluster
-			componentReplicasMap := map[string]int32{}
-			for _, v := range opsRes.Cluster.Spec.ComponentSpecs {
-				componentReplicasMap[v.Name] = v.Replicas
-			}
-			componentReplicasSnapshot, _ := json.Marshal(componentReplicasMap)
-			opsRes.Cluster.Annotations = map[string]string{
-				constant.SnapShotForStartAnnotationKey: string(componentReplicasSnapshot),
-			}
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusComp)
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, statelessComp)
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, statefulComp)
 			By("create Start opsRequest")
 			ops := testapps.NewOpsRequestObj("start-ops-"+randomStr, testCtx.DefaultNamespace,
 				clusterName, appsv1alpha1.StartType)
 			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
 
 			By("test start action and reconcile function")
-			oldComponentReplicasMap, _ := getComponentReplicasSnapshot(opsRes.Cluster.Annotations)
 			Expect(opsutil.UpdateClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())
 			// mock cluster phase to stopped
 			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
@@ -103,12 +91,10 @@ var _ = Describe("Start OpsRequest", func() {
 			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			for _, v := range opsRes.Cluster.Spec.ComponentSpecs {
-				oldReplicas := oldComponentReplicasMap[v.Name]
-				Expect(oldReplicas == v.Replicas).Should(BeTrue())
+				Expect(v.Stop).Should(BeNil())
 			}
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err == nil).Should(BeTrue())
 		})
-
 	})
 })

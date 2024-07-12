@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -443,6 +444,16 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	UpdateStrategy *UpdateStrategy `json:"updateStrategy,omitempty"`
 
+	// InstanceSet controls the creation of pods during initial scale up, replacement of pods on nodes, and scaling down.
+	//
+	// - `OrderedReady`: Creates pods in increasing order (pod-0, then pod-1, etc). The controller waits until each pod
+	// is ready before continuing. Pods are removed in reverse order when scaling down.
+	// - `Parallel`: Creates pods in parallel to match the desired scale without waiting. All pods are deleted at once
+	// when scaling down.
+	//
+	// +optional
+	PodManagementPolicy *appsv1.PodManagementPolicyType `json:"podManagementPolicy,omitempty"`
+
 	// Enumerate all possible roles assigned to each replica of the Component, influencing its behavior.
 	//
 	// A replica can have zero to multiple roles.
@@ -582,8 +593,7 @@ type SystemAccount struct {
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// Indicates if this account is the unique system initialization account (e.g., MySQL root).
-	// Only one system initialization account is permitted.
+	// Indicates if this account is a system initialization account (e.g., MySQL root).
 	//
 	// This field is immutable once set.
 	//

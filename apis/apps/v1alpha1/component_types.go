@@ -65,6 +65,21 @@ type ComponentSpec struct {
 	// +optional
 	ServiceRefs []ServiceRef `json:"serviceRefs,omitempty"`
 
+	// Specifies Labels to override or add for underlying Pods.
+	//
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Specifies Annotations to override or add for underlying Pods.
+	//
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// List of environment variables to add.
+	//
+	// +optional
+	Env []corev1.EnvVar `json:"env,omitempty"`
+
 	// Specifies the resources required by the Component.
 	// It allows defining the CPU, memory requirements and limits for the Component's containers.
 	//
@@ -82,11 +97,21 @@ type ComponentSpec struct {
 	// +patchStrategy=merge,retainKeys
 	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
+	// List of volumes to override.
+	//
+	// +optional
+	Volumes []corev1.Volume `json:"volumes,omitempty"`
+
 	// Overrides Services defined in referenced ComponentDefinition and exposes endpoints that can be accessed
 	// by clients.
 	//
 	// +optional
 	Services []ComponentService `json:"services,omitempty"`
+
+	// Overrides system accounts defined in referenced ComponentDefinition.
+	//
+	// +optional
+	SystemAccounts []ComponentSystemAccount `json:"systemAccounts,omitempty"`
 
 	// Specifies the desired number of replicas in the Component for enhancing availability and durability, or load balancing.
 	//
@@ -95,6 +120,8 @@ type ComponentSpec struct {
 	// +kubebuilder:default=1
 	Replicas int32 `json:"replicas"`
 
+	// Specifies the configuration content of a config template.
+	//
 	// +optional
 	Configs []ClusterComponentConfig `json:"configs,omitempty"`
 
@@ -228,6 +255,12 @@ type ComponentSpec struct {
 	//
 	// +optional
 	DisableExporter *bool `json:"disableExporter,omitempty"`
+
+	// Stop the Component.
+	// If set, all the computing resources will be released.
+	//
+	// +optional
+	Stop *bool `json:"stop,omitempty"`
 }
 
 // ComponentStatus represents the observed state of a Component within the Cluster.

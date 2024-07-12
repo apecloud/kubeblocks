@@ -26,6 +26,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/utils/pointer"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"golang.org/x/exp/slices"
@@ -304,7 +305,12 @@ var _ = Describe("OpsRequest Controller", func() {
 					testk8s.RemovePodFinalizer(ctx, testCtx, &podList.Items[i])
 				}
 			}
-			mockPods := testapps.MockInstanceSetPods(&testCtx, its, clusterObj.Name, mysqlCompName)
+			cluster := &appsv1alpha1.Cluster{}
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterObj), cluster)).Should(Succeed())
+			mockPods := testapps.MockInstanceSetPods(&testCtx, its, cluster, mysqlCompName)
+
+			// mock currentRevisions and updateRevisions
+			testapps.MockInstanceSetStatus(testCtx, clusterObj, mysqlCompName)
 			Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
 				testk8s.MockInstanceSetReady(its, mockPods...)
 			})).ShouldNot(HaveOccurred())
@@ -366,7 +372,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			ops.Spec.HorizontalScalingList = []appsv1alpha1.HorizontalScaling{
 				{
 					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: mysqlCompName},
-					Replicas:     replicas,
+					Replicas:     pointer.Int32(replicas),
 				},
 			}
 			// for reconciling the ops labels
@@ -558,7 +564,7 @@ var _ = Describe("OpsRequest Controller", func() {
 				clusterObj.Spec.ComponentSpecs[0].Replicas = 4
 			})).Should(Succeed())
 
-			By("scale down the cluster replicas to 2")
+			By("scale in the cluster replicas to 2")
 			phase := appsv1alpha1.OpsPendingPhase
 			replicas := int32(2)
 			ops := createClusterHscaleOps(replicas)
@@ -653,12 +659,25 @@ var _ = Describe("OpsRequest Controller", func() {
 			podName := fmt.Sprintf("%s-%s-%d", clusterObj.Name, mysqlCompName, 3)
 			pod := testapps.MockInstanceSetPod(&testCtx, nil, clusterObj.Name, mysqlCompName, podName, "follower", "Readonly")
 
+			By("mock a running restore")
+			workloadName := constant.GenerateWorkloadNamePattern(clusterKey.Name, mysqlCompName)
+			restore := testdp.NewRestoreFactory(testCtx.DefaultNamespace, testdp.RestoreName).
+				AddFinalizers([]string{constant.DBComponentFinalizerName}).
+				SetLabels(map[string]string{
+					constant.AppInstanceLabelKey:    clusterKey.Name,
+					constant.KBAppComponentLabelKey: mysqlCompName,
+				}).
+				SetBackup(constant.GenerateResourceNameWithScalingSuffix(workloadName), testCtx.DefaultNamespace).Create(&testCtx).GetObject()
+			Expect(testapps.ChangeObjStatus(&testCtx, restore, func() {
+				restore.Status.Phase = dpv1alpha1.RestorePhaseRunning
+			})).Should(Succeed())
+
 			By("cancel the opsRequest")
 			Eventually(testapps.ChangeObj(&testCtx, ops, func(opsRequest *appsv1alpha1.OpsRequest) {
 				opsRequest.Spec.Cancel = true
 			})).Should(Succeed())
 
-			By("check opsRequest is Cancelling")
+			By("check opsRequest is Cancelling and Running restore should be deleted")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(ops), func(g Gomega, opsRequest *appsv1alpha1.OpsRequest) {
 				g.Expect(opsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsCancellingPhase))
 				g.Expect(opsRequest.Status.CancelTimestamp.IsZero()).Should(BeFalse())
@@ -666,6 +685,7 @@ var _ = Describe("OpsRequest Controller", func() {
 				g.Expect(cancelCondition).ShouldNot(BeNil())
 				g.Expect(cancelCondition.Reason).Should(Equal(appsv1alpha1.ReasonOpsCanceling))
 			})).Should(Succeed())
+			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(restore), &dpv1alpha1.Restore{}, false)).Should(Succeed())
 
 			By("delete the created pod")
 			pod.Kind = constant.PodKind
@@ -715,6 +735,12 @@ var _ = Describe("OpsRequest Controller", func() {
 
 			By("create second restart ops")
 			ops2 := createRestartOps(clusterObj.Name, 2)
+			Eventually(testapps.ChangeObj(&testCtx, ops2, func(request *appsv1alpha1.OpsRequest) {
+				if request.Annotations == nil {
+					request.Annotations = map[string]string{}
+				}
+				request.Annotations[constant.OpsDependentOnSuccessfulOpsAnnoKey] = ops1.Name
+			})).Should(Succeed())
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops2))).Should(Equal(appsv1alpha1.OpsPendingPhase))
 
 			By("create third restart ops")
@@ -734,6 +760,9 @@ var _ = Describe("OpsRequest Controller", func() {
 			By("mock ops1 phase to Succeed")
 			mockCompRunning(replicas, true)
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).Should(Equal(appsv1alpha1.OpsSucceedPhase))
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(ops2), func(g Gomega, opsRequest *appsv1alpha1.OpsRequest) {
+				g.Expect(opsRequest.Annotations[constant.ReconcileAnnotationKey]).ShouldNot(BeEmpty())
+			})).Should(Succeed())
 
 			By("expect for next ops is Running")
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops2))).Should(Equal(appsv1alpha1.OpsRunningPhase))
@@ -804,8 +833,9 @@ var _ = Describe("OpsRequest Controller", func() {
 						Switch:        exposeSwitch,
 						Services: []appsv1alpha1.OpsService{
 							{
-								Name:        "svc1",
-								ServiceType: corev1.ServiceTypeLoadBalancer,
+								Name:         "svc1",
+								ServiceType:  corev1.ServiceTypeLoadBalancer,
+								RoleSelector: constant.Leader,
 								Ports: []corev1.ServicePort{
 									{Name: "port1", Port: 3306, TargetPort: intstr.IntOrString{Type: intstr.String, StrVal: "mysql"}},
 								},
@@ -854,6 +884,37 @@ var _ = Describe("OpsRequest Controller", func() {
 			By("expect restartOps2 to Running and exposeOps2 to Succeed")
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(restartOps2))).Should(Equal(appsv1alpha1.OpsRunningPhase))
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(exposeOps2))).Should(Equal(appsv1alpha1.OpsSucceedPhase))
+		})
+
+		It("test opsRequest timeout", func() {
+			By("create cluster and mock it to running")
+			replicas := int32(3)
+			createMysqlCluster(replicas)
+			mockCompRunning(replicas, false)
+
+			By("create a opsRequest and specified the timeoutSeconds to 1")
+			ops := testapps.NewOpsRequestObj("restart-ops-1", testCtx.DefaultNamespace,
+				clusterObj.Name, appsv1alpha1.HorizontalScalingType)
+			ops.Spec.TimeoutSeconds = pointer.Int32(1)
+			ops.Spec.HorizontalScalingList = []appsv1alpha1.HorizontalScaling{
+				{
+					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: mysqlCompName},
+					ScaleOut:     &appsv1alpha1.ScaleOut{ReplicaChanger: appsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)}},
+				},
+			}
+			testapps.CreateOpsRequest(ctx, testCtx, ops)
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops))).Should(Equal(appsv1alpha1.OpsRunningPhase))
+
+			By("create a next opsRequest")
+			ops1 := createRestartOps(clusterObj.Name, 2, true)
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).Should(Equal(appsv1alpha1.OpsPendingPhase))
+
+			By("mock timeout")
+			time.Sleep(time.Second)
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops))).Should(Equal(appsv1alpha1.OpsAbortedPhase))
+
+			By("expect for the next ops is running")
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).ShouldNot(Equal(appsv1alpha1.OpsPendingPhase))
 		})
 	})
 })

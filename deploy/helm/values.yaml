@@ -12,7 +12,7 @@ versionOverride:
 ## @param image.imagePullSecrets KubeBlocks image pull secrets
 ## @param image.tools.repository KubeBlocks tools image repository
 image:
-  registry: infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com
+  registry: apecloud-registry.cn-zhangjiakou.cr.aliyuncs.com
   repository: apecloud/kubeblocks
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
@@ -434,7 +434,7 @@ addonController:
 
 
 ## @param keepAddons - keep Addon CR objects when delete this chart.
-keepAddons: false
+keepAddons: true
 
 ## @param addonChartLocationBase - KubeBlocks official addon's chart location base, to be released in an air-gapped environment.
 ## if url has prefix "file://", KubeBlocks will use the helm charts copied from the addonChartsImage.
@@ -1629,7 +1629,6 @@ grafana:
   defaultDashboardsTimezone:
 
   adminUser: admin
-  adminPassword: kubeblocks
 
   sidecar:
     image:

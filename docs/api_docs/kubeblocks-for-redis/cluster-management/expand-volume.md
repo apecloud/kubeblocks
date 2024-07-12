@@ -110,7 +110,7 @@ There are two ways to apply volume expansion.
       - componentDefRef: redis
         enabledLogs:
         - running
-        monitor: false
+        disableExporter: true
         name: redis
         replicas: 1
         resources:

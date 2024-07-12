@@ -21,12 +21,16 @@ package apps
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -92,14 +96,18 @@ func MockInstanceSetComponent(
 	itsCompName string) *workloads.InstanceSet {
 	itsName := clusterName + "-" + itsCompName
 	return NewInstanceSetFactory(testCtx.DefaultNamespace, itsName, clusterName, itsCompName).SetReplicas(ConsensusReplicas).
-		AddContainer(corev1.Container{Name: DefaultMySQLContainerName, Image: ApeCloudMySQLImage}).Create(testCtx).GetObject()
+		AddContainer(corev1.Container{Name: DefaultMySQLContainerName, Image: ApeCloudMySQLImage}).
+		SetRoles([]workloads.ReplicaRole{
+			{Name: "leader", AccessMode: workloads.ReadWriteMode, CanVote: true, IsLeader: true},
+			{Name: "follower", AccessMode: workloads.ReadonlyMode, CanVote: true, IsLeader: false},
+		}).Create(testCtx).GetObject()
 }
 
 // MockInstanceSetPods mocks the InstanceSet pods, just using in envTest
 func MockInstanceSetPods(
 	testCtx *testutil.TestContext,
 	its *workloads.InstanceSet,
-	clusterName,
+	cluster *appsv1alpha1.Cluster,
 	consensusCompName string) []*corev1.Pod {
 	getReplicas := func() int {
 		if its == nil || its.Spec.Replicas == nil {
@@ -132,8 +140,8 @@ func MockInstanceSetPods(
 	replicas := getReplicas()
 	replicasStr := strconv.Itoa(replicas)
 	podList := make([]*corev1.Pod, replicas)
-	for i := 0; i < replicas; i++ {
-		podName := fmt.Sprintf("%s-%s-%d", clusterName, consensusCompName, i)
+	podNames := generatePodNames(cluster, consensusCompName)
+	for i, pName := range podNames {
 		var podRole, accessMode string
 		if its != nil && len(its.Spec.Roles) > 0 {
 			if i == 0 {
@@ -144,7 +152,7 @@ func MockInstanceSetPods(
 				accessMode = string(noneLeaderRole.AccessMode)
 			}
 		}
-		pod := MockInstanceSetPod(testCtx, its, clusterName, consensusCompName, podName, podRole, accessMode)
+		pod := MockInstanceSetPod(testCtx, its, cluster.Name, consensusCompName, pName, podRole, accessMode)
 		annotations := pod.Annotations
 		if annotations == nil {
 			annotations = make(map[string]string)
@@ -183,7 +191,7 @@ func MockInstanceSetPod(
 		AddAppComponentLabel(consensusCompName).
 		AddAppManagedByLabel().
 		AddRoleLabel(podRole).
-		AddConsensusSetAccessModeLabel(accessMode).
+		AddAccessModeLabel(accessMode).
 		AddControllerRevisionHashLabel(stsUpdateRevision).
 		AddLabelsInMap(ml).
 		AddVolume(corev1.Volume{
@@ -236,4 +244,120 @@ func MockInstanceSetPod(
 	}
 	gomega.Expect(testCtx.Cli.Status().Patch(context.Background(), pod, patch)).Should(gomega.Succeed())
 	return pod
+}
+
+func generateInstanceNames(parentName, templateName string,
+	replicas int32, offlineInstances []string) []string {
+	usedNames := sets.New(offlineInstances...)
+	var instanceNameList []string
+	ordinal := 0
+	for count := int32(0); count < replicas; count++ {
+		var name string
+		for {
+			if len(templateName) == 0 {
+				name = fmt.Sprintf("%s-%d", parentName, ordinal)
+			} else {
+				name = fmt.Sprintf("%s-%s-%d", parentName, templateName, ordinal)
+			}
+			ordinal++
+			if !usedNames.Has(name) {
+				instanceNameList = append(instanceNameList, name)
+				break
+			}
+		}
+	}
+	return instanceNameList
+}
+
+func generatePodNames(cluster *appsv1alpha1.Cluster, compName string) []string {
+	podNames := make([]string, 0)
+	insTPLReplicasCnt := int32(0)
+	workloadName := constant.GenerateWorkloadNamePattern(cluster.Name, compName)
+	compSpec := cluster.Spec.GetComponentByName(compName)
+	for _, insTpl := range compSpec.Instances {
+		insReplicas := *insTpl.Replicas
+		insTPLReplicasCnt += insReplicas
+		podNames = append(podNames, generateInstanceNames(workloadName, insTpl.Name, insReplicas, compSpec.OfflineInstances)...)
+	}
+	if insTPLReplicasCnt < compSpec.Replicas {
+		podNames = append(podNames, generateInstanceNames(workloadName, "",
+			compSpec.Replicas-insTPLReplicasCnt, compSpec.OfflineInstances)...)
+	}
+	return podNames
+}
+
+func podIsReady(pod *corev1.Pod) bool {
+	if !pod.DeletionTimestamp.IsZero() {
+		return false
+	}
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue {
+			return true
+		}
+	}
+	return false
+}
+
+func MockInstanceSetStatus(testCtx testutil.TestContext, cluster *appsv1alpha1.Cluster, fullCompName string) {
+	currentPodNames := generatePodNames(cluster, fullCompName)
+	updateRevisions := map[string]string{}
+	for _, podName := range currentPodNames {
+		updateRevisions[podName] = "revision"
+	}
+	podList := &corev1.PodList{}
+	gomega.Expect(testCtx.Cli.List(testCtx.Ctx, podList, client.MatchingLabels{
+		constant.AppInstanceLabelKey:    cluster.Name,
+		constant.KBAppComponentLabelKey: fullCompName,
+	})).Should(gomega.Succeed())
+	currRevisions := map[string]string{}
+	newMembersStatus := make([]workloads.MemberStatus, 0)
+	notReadyPodNames := make([]string, 0)
+	for _, pod := range podList.Items {
+		currRevisions[pod.Name] = "revision"
+		if !podIsReady(&pod) {
+			notReadyPodNames = append(notReadyPodNames, pod.Name)
+			continue
+		}
+		if _, ok := pod.Labels[constant.RoleLabelKey]; !ok {
+			continue
+		}
+		memberStatus := workloads.MemberStatus{
+			PodName: pod.Name,
+			ReplicaRole: &workloads.ReplicaRole{
+				Name:       pod.Labels[constant.RoleLabelKey],
+				AccessMode: workloads.AccessMode(pod.Labels[constant.AccessModeLabelKey]),
+				CanVote:    true,
+			},
+		}
+		if memberStatus.ReplicaRole.AccessMode == workloads.ReadWriteMode {
+			memberStatus.ReplicaRole.IsLeader = true
+		}
+		newMembersStatus = append(newMembersStatus, memberStatus)
+	}
+	itsName := constant.GenerateClusterComponentName(cluster.Name, fullCompName)
+	compSpec := cluster.Spec.GetComponentByName(fullCompName)
+	gomega.Eventually(GetAndChangeObjStatus(&testCtx, client.ObjectKey{Name: itsName, Namespace: cluster.Namespace}, func(its *workloads.InstanceSet) {
+		its.Status.CurrentRevisions = currRevisions
+		its.Status.UpdateRevisions = updateRevisions
+		its.Status.Replicas = compSpec.Replicas
+		its.Status.CurrentReplicas = int32(len(podList.Items))
+		its.Status.MembersStatus = newMembersStatus
+		if len(notReadyPodNames) > 0 {
+			msg, _ := json.Marshal(notReadyPodNames)
+			meta.SetStatusCondition(&its.Status.Conditions, metav1.Condition{
+				Type:               string(workloads.InstanceReady),
+				Status:             metav1.ConditionFalse,
+				ObservedGeneration: its.Generation,
+				Reason:             workloads.ReasonNotReady,
+				Message:            string(msg),
+			})
+		} else {
+			meta.SetStatusCondition(&its.Status.Conditions, metav1.Condition{
+				Type:               string(workloads.InstanceReady),
+				Status:             metav1.ConditionTrue,
+				ObservedGeneration: its.Generation,
+				Reason:             workloads.ReasonReady,
+			})
+		}
+	})).Should(gomega.Succeed())
 }

@@ -90,7 +90,7 @@ There are two ways to apply vertical scaling.
 
 </TabItem>
   
-<TabItem value="Edit the cluster YAML file" label="Edit the cluster YAML file">
+<TabItem value="Edit the cluster YAML file" label="Edit cluster YAML file">
 
 1. Change the configuration of `spec.componentSpecs.resources` in the YAML file. `spec.componentSpecs.resources` controls the requirement and limit of resources and changing them triggers a vertical scaling.
 

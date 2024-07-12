@@ -37,13 +37,6 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-const (
-	// componentFailedTimeout when the duration of component failure exceeds this threshold, it is determined that opsRequest has failed
-	componentFailedTimeout = 30 * time.Second
-
-	opsRequestQueueLimitSize = 20
-)
-
 var _ error = &WaitForClusterPhaseErr{}
 
 type WaitForClusterPhaseErr struct {
@@ -59,16 +52,10 @@ func (e *WaitForClusterPhaseErr) Error() string {
 type handleStatusProgressWithComponent func(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
-	pgRes progressResource,
+	pgRes *progressResource,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, succeedCount int32, err error)
 
 type handleReconfigureOpsStatus func(cmStatus *appsv1alpha1.ConfigurationItemStatus) error
-
-func isFailedOrAbnormal(phase appsv1alpha1.ClusterComponentPhase) bool {
-	return slices.Index([]appsv1alpha1.ClusterComponentPhase{
-		appsv1alpha1.FailedClusterCompPhase,
-		appsv1alpha1.AbnormalClusterCompPhase}, phase) != -1
-}
 
 // getClusterDefByName gets the ClusterDefinition object by the name.
 func getClusterDefByName(ctx context.Context, cli client.Client, clusterDefName string) (*appsv1alpha1.ClusterDefinition, error) {
@@ -241,7 +228,7 @@ func abortEarlierOpsRequestWithSameKind(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
 	sameKinds []appsv1alpha1.OpsType,
-	matchAbortCondition func(earlierOps *appsv1alpha1.OpsRequest) bool) error {
+	matchAbortCondition func(earlierOps *appsv1alpha1.OpsRequest) (bool, error)) error {
 	opsRequestSlice, err := opsutil.GetOpsRequestSliceFromCluster(opsRes.Cluster)
 	if err != nil {
 		return err
@@ -273,12 +260,16 @@ func abortEarlierOpsRequestWithSameKind(reqCtx intctrlutil.RequestCtx,
 			appsv1alpha1.OpsCancelledPhase}, earlierOps.Status.Phase) {
 			continue
 		}
-		if matchAbortCondition(earlierOps) {
+		needAborted, err := matchAbortCondition(earlierOps)
+		if err != nil {
+			return err
+		}
+		if needAborted {
 			// abort the opsRequest that matches the abort condition.
 			patch := client.MergeFrom(earlierOps.DeepCopy())
 			earlierOps.Status.Phase = appsv1alpha1.OpsAbortedPhase
-			abortedCondition := appsv1alpha1.NewAbortedCondition(earlierOps)
-			earlierOps.SetStatusCondition(abortedCondition)
+			abortedCondition := appsv1alpha1.NewAbortedCondition(fmt.Sprintf(`Aborted as a result of the latest opsRequest "%s" being overridden`, earlierOps.Name))
+			earlierOps.SetStatusCondition(*abortedCondition)
 			earlierOps.Status.CompletionTimestamp = metav1.Time{Time: time.Now()}
 			if err = cli.Status().Patch(reqCtx.Ctx, earlierOps, patch); err != nil {
 				return err
@@ -308,4 +299,18 @@ func updateHAConfigIfNecessary(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	}
 	haConfig.Annotations["enable"] = switchBoolStr
 	return cli.Update(reqCtx.Ctx, haConfig)
+}
+
+func getComponentSpecOrShardingTemplate(cluster *appsv1alpha1.Cluster, componentName string) *appsv1alpha1.ClusterComponentSpec {
+	for _, v := range cluster.Spec.ComponentSpecs {
+		if v.Name == componentName {
+			return &v
+		}
+	}
+	for _, v := range cluster.Spec.ShardingSpecs {
+		if v.Name == componentName {
+			return &v.Template
+		}
+	}
+	return nil
 }

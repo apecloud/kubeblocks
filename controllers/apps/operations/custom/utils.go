@@ -69,12 +69,8 @@ func buildComponentEnvs(reqCtx intctrlutil.RequestCtx,
 	if len(opsDef.Spec.ComponentInfos) == 0 {
 		return nil
 	}
-	compObj, err := component.GetComponentByName(reqCtx, cli, fullCompName, cluster.Namespace)
-	if err != nil {
-		return err
-	}
 	// get component definition
-	compDef, err := component.GetCompDefByName(reqCtx, cli, compObj.Spec.CompDef)
+	_, compDef, err := component.GetCompNCompDefByName(reqCtx.Ctx, cli, cluster.Namespace, fullCompName)
 	if err != nil {
 		return err
 	}
@@ -324,10 +320,26 @@ func getTargetPods(
 		pods []*corev1.Pod
 		err  error
 	)
-	if podSelector.Role != "" {
-		pods, err = component.ListOwnedPodsWithRole(ctx, cli, cluster.Namespace, cluster.Name, compName, podSelector.Role)
+	if cluster.Spec.GetShardingByName(compName) != nil {
+		// get pods of the sharding components
+		podList := &corev1.PodList{}
+		labels := constant.GetClusterWellKnownLabels(cluster.Namespace)
+		labels[constant.KBAppShardingNameLabelKey] = compName
+		if podSelector.Role != "" {
+			labels[constant.RoleLabelKey] = podSelector.Role
+		}
+		if err = cli.List(ctx, podList, client.InNamespace(cluster.Namespace), client.MatchingLabels(labels)); err != nil {
+			return nil, err
+		}
+		for i := range podList.Items {
+			pods = append(pods, &podList.Items[i])
+		}
 	} else {
-		pods, err = component.ListOwnedPods(ctx, cli, cluster.Namespace, cluster.Name, compName)
+		if podSelector.Role != "" {
+			pods, err = component.ListOwnedPodsWithRole(ctx, cli, cluster.Namespace, cluster.Name, compName, podSelector.Role)
+		} else {
+			pods, err = component.ListOwnedPods(ctx, cli, cluster.Namespace, cluster.Name, compName)
+		}
 	}
 	if err != nil {
 		return nil, err

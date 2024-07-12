@@ -33,6 +33,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 var _ = Describe("status reconciler test", func() {
@@ -104,41 +105,49 @@ var _ = Describe("status reconciler test", func() {
 			Expect(its.Status.AvailableReplicas).Should(BeEquivalentTo(0))
 			Expect(its.Status.UpdatedReplicas).Should(BeEquivalentTo(0))
 			Expect(its.Status.CurrentReplicas).Should(BeEquivalentTo(0))
-			Expect(its.Status.CurrentRevisions).Should(HaveLen(0))
 
 			By("make all pods ready with old revision")
 			condition := corev1.PodCondition{
 				Type:               corev1.PodReady,
 				Status:             corev1.ConditionTrue,
-				LastTransitionTime: metav1.NewTime(time.Now().Add(-1 * minReadySeconds * time.Second)),
+				LastTransitionTime: metav1.NewTime(time.Now()),
 			}
-			makePodAvailableWithRevision := func(pod *corev1.Pod, revision string) {
+			makePodAvailableWithRevision := func(pod *corev1.Pod, revision string, updatePodAvailable bool) {
 				pod.Labels[appsv1.ControllerRevisionHashLabelKey] = revision
 				pod.Status.Phase = corev1.PodRunning
-				pod.Status.Conditions = append(pod.Status.Conditions, condition)
+				if updatePodAvailable {
+					condition.LastTransitionTime = metav1.NewTime(time.Now().Add(-1 * minReadySeconds * time.Second))
+				}
+				pod.Status.Conditions = []corev1.PodCondition{condition}
 			}
 			pods := newTree.List(&corev1.Pod{})
+			currentRevisionMap := map[string]string{}
+			oldRevision := "old-revision"
 			for _, object := range pods {
 				pod, ok := object.(*corev1.Pod)
 				Expect(ok).Should(BeTrue())
-				makePodAvailableWithRevision(pod, "old-revision")
+				makePodAvailableWithRevision(pod, oldRevision, false)
+				currentRevisionMap[pod.Name] = oldRevision
 			}
 			_, err = reconciler.Reconcile(newTree)
-			Expect(err).Should(BeNil())
+			Expect(intctrlutil.IsDelayedRequeueError(err)).Should(BeTrue())
 			Expect(its.Status.Replicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.ReadyReplicas).Should(BeEquivalentTo(replicas))
-			Expect(its.Status.AvailableReplicas).Should(BeEquivalentTo(replicas))
+			Expect(its.Status.AvailableReplicas).Should(BeEquivalentTo(0))
 			Expect(its.Status.UpdatedReplicas).Should(BeEquivalentTo(0))
 			Expect(its.Status.CurrentReplicas).Should(BeEquivalentTo(replicas))
-			Expect(its.Status.CurrentRevisions).Should(HaveLen(0))
+			currentRevisions, _ := buildRevisions(currentRevisionMap)
+			Expect(its.Status.CurrentRevisions).Should(Equal(currentRevisions))
+			Expect(its.Status.Conditions[1].Type).Should(BeEquivalentTo(workloads.InstanceAvailable))
+			Expect(its.Status.Conditions[1].Status).Should(BeEquivalentTo(corev1.ConditionFalse))
 
 			By("make all pods available with latest revision")
-			updateRevisions, err := getUpdateRevisions(its.Status.UpdateRevisions)
+			updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
 			Expect(err).Should(BeNil())
 			for _, object := range pods {
 				pod, ok := object.(*corev1.Pod)
 				Expect(ok).Should(BeTrue())
-				makePodAvailableWithRevision(pod, updateRevisions[pod.Name])
+				makePodAvailableWithRevision(pod, updateRevisions[pod.Name], true)
 			}
 			_, err = reconciler.Reconcile(newTree)
 			Expect(err).Should(BeNil())
@@ -148,7 +157,9 @@ var _ = Describe("status reconciler test", func() {
 			Expect(its.Status.UpdatedReplicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.CurrentReplicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.CurrentRevisions).Should(Equal(its.Status.UpdateRevisions))
-			Expect(its.Status.Conditions).Should(HaveLen(1))
+			Expect(its.Status.Conditions).Should(HaveLen(2))
+			Expect(its.Status.Conditions[1].Type).Should(BeEquivalentTo(workloads.InstanceAvailable))
+			Expect(its.Status.Conditions[1].Status).Should(BeEquivalentTo(corev1.ConditionTrue))
 
 			By("make all pods failed")
 			for _, object := range pods {
@@ -164,7 +175,7 @@ var _ = Describe("status reconciler test", func() {
 			Expect(its.Status.UpdatedReplicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.CurrentReplicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.CurrentRevisions).Should(Equal(its.Status.UpdateRevisions))
-			Expect(its.Status.Conditions).Should(HaveLen(2))
+			Expect(its.Status.Conditions).Should(HaveLen(3))
 			failureNames := []string{"bar-0", "bar-1", "bar-2", "bar-3", "bar-foo-0", "bar-foo-1", "bar-hello-0"}
 			message, err := json.Marshal(failureNames)
 			Expect(err).Should(BeNil())
@@ -172,9 +183,9 @@ var _ = Describe("status reconciler test", func() {
 			Expect(its.Status.Conditions[0].Status).Should(BeEquivalentTo(metav1.ConditionFalse))
 			Expect(its.Status.Conditions[0].Reason).Should(BeEquivalentTo(workloads.ReasonNotReady))
 			Expect(its.Status.Conditions[0].Message).Should(BeEquivalentTo(message))
-			Expect(its.Status.Conditions[1].Type).Should(BeEquivalentTo(workloads.InstanceFailure))
-			Expect(its.Status.Conditions[1].Reason).Should(BeEquivalentTo(workloads.ReasonInstanceFailure))
-			Expect(its.Status.Conditions[1].Message).Should(BeEquivalentTo(message))
+			Expect(its.Status.Conditions[2].Type).Should(BeEquivalentTo(workloads.InstanceFailure))
+			Expect(its.Status.Conditions[2].Reason).Should(BeEquivalentTo(workloads.ReasonInstanceFailure))
+			Expect(its.Status.Conditions[2].Message).Should(BeEquivalentTo(message))
 		})
 	})
 

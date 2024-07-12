@@ -86,7 +86,9 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 		AddLabelsInMap(labels).
 		AddLabelsInMap(compDefLabel).
 		AddLabelsInMap(constant.GetAppVersionLabel(compDefName)).
-		AddAnnotations(constant.ComponentReplicasAnnotationKey, replicasStr)
+		AddLabelsInMap(synthesizedComp.UserDefinedLabels).
+		AddAnnotations(constant.ComponentReplicasAnnotationKey, replicasStr).
+		AddAnnotationsInMap(synthesizedComp.UserDefinedAnnotations)
 	template := corev1.PodTemplateSpec{
 		ObjectMeta: podBuilder.GetObject().ObjectMeta,
 		Spec:       *synthesizedComp.PodSpec.DeepCopy(),
@@ -122,7 +124,7 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 	// TODO(xingran): synthesizedComp.VolumeTypes has been removed, and the following code needs to be refactored.
 	if len(itsObj.Spec.VolumeClaimTemplates) > 0 && len(itsObj.GetLabels()) > 0 {
 		for index, vct := range itsObj.Spec.VolumeClaimTemplates {
-			BuildPersistentVolumeClaimLabels(synthesizedComp, &vct, vct.Name)
+			BuildPersistentVolumeClaimLabels(synthesizedComp, &vct, vct.Name, "")
 			itsObj.Spec.VolumeClaimTemplates[index] = vct
 		}
 	}
@@ -179,7 +181,7 @@ func setDefaultResourceLimits(its *workloads.InstanceSet) {
 
 // BuildPersistentVolumeClaimLabels builds a pvc name label, and synchronize the labels from component to pvc.
 func BuildPersistentVolumeClaimLabels(component *component.SynthesizedComponent, pvc *corev1.PersistentVolumeClaim,
-	pvcTplName string) {
+	pvcTplName, templateName string) {
 	// strict args checking.
 	if pvc == nil || component == nil {
 		return
@@ -194,6 +196,9 @@ func BuildPersistentVolumeClaimLabels(component *component.SynthesizedComponent,
 			pvc.Labels[constant.VolumeTypeLabelKey] = string(t.Type)
 			break
 		}
+	}
+	if templateName != "" {
+		pvc.Labels[constant.KBAppComponentInstanceTemplateLabelKey] = templateName
 	}
 }
 
@@ -326,6 +331,7 @@ func BuildPVC(cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent,
 	vct *corev1.PersistentVolumeClaimTemplate,
 	pvcKey types.NamespacedName,
+	templateName,
 	snapshotName string) *corev1.PersistentVolumeClaim {
 	wellKnownLabels := constant.GetKBWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
 	pvcBuilder := builder.NewPVCBuilder(pvcKey.Namespace, pvcKey.Name).
@@ -345,7 +351,7 @@ func BuildPVC(cluster *appsv1alpha1.Cluster,
 		})
 	}
 	pvc := pvcBuilder.GetObject()
-	BuildPersistentVolumeClaimLabels(component, pvc, vct.Name)
+	BuildPersistentVolumeClaimLabels(component, pvc, vct.Name, templateName)
 	return pvc
 }
 
@@ -383,7 +389,7 @@ func BuildConfigMapWithTemplate(cluster *appsv1alpha1.Cluster,
 		GetObject()
 }
 
-func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams, component *component.SynthesizedComponent) (*corev1.Container, error) {
+func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams) (*corev1.Container, error) {
 	var env []corev1.EnvVar
 	env = append(env, corev1.EnvVar{
 		Name: "CONFIG_MANAGER_POD_IP",
@@ -394,44 +400,17 @@ func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams,
 			},
 		},
 	})
-	if len(sidecarRenderedParam.CharacterType) > 0 {
-		env = append(env, corev1.EnvVar{
-			Name:  "DB_TYPE",
-			Value: sidecarRenderedParam.CharacterType,
-		})
-	}
-	// TODO: Remove hard coding
-	if sidecarRenderedParam.CharacterType == "mysql" {
-		env = append(env, corev1.EnvVar{
-			Name: "MYSQL_USER",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					Key:                  "username",
-					LocalObjectReference: corev1.LocalObjectReference{Name: sidecarRenderedParam.SecreteName},
-				},
-			},
-		},
-			corev1.EnvVar{
-				Name: "MYSQL_PASSWORD",
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						Key:                  "password",
-						LocalObjectReference: corev1.LocalObjectReference{Name: sidecarRenderedParam.SecreteName},
-					},
-				},
-			},
-			corev1.EnvVar{
-				Name:  "DATA_SOURCE_NAME",
-				Value: "$(MYSQL_USER):$(MYSQL_PASSWORD)@(localhost:3306)/",
-			},
-		)
-	}
 	containerBuilder := builder.NewContainerBuilder(sidecarRenderedParam.ManagerName).
 		AddCommands("env").
 		AddArgs("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$(TOOLS_PATH)").
 		AddArgs(getSidecarBinaryPath(sidecarRenderedParam)).
 		AddArgs(sidecarRenderedParam.Args...).
 		AddEnv(env...).
+		AddPorts(corev1.ContainerPort{
+			Name:          constant.ConfigManagerPortName,
+			ContainerPort: sidecarRenderedParam.ContainerPort,
+			Protocol:      "TCP",
+		}).
 		SetImage(sidecarRenderedParam.Image).
 		SetImagePullPolicy(corev1.PullIfNotPresent).
 		AddVolumeMounts(sidecarRenderedParam.Volumes...)

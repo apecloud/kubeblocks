@@ -48,10 +48,10 @@ import TabItem from '@theme/TabItem';
     kbcli cluster promote mycluster --instance='mycluster-postgresql-2'
     ```
 
-* 如果有多个组件，可以使用 `--component` 参数指定一个组件。
+* 如果有多个组件，可以使用 `--components` 参数指定一个组件。
 
     ```bash
-    kbcli cluster promote mycluster --instance='mycluster-postgresql-2' --component='postgresql'
+    kbcli cluster promote mycluster --instance='mycluster-postgresql-2' --components='postgresql'
     ```
 
 </TabItem>

@@ -44,7 +44,6 @@ type CfgManagerBuildParams struct {
 
 	Volumes       []corev1.VolumeMount `json:"volumes"`
 	ComponentName string               `json:"componentName"`
-	CharacterType string               `json:"characterType"`
 	SecreteName   string               `json:"secreteName"`
 
 	// add volume to pod

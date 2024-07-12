@@ -40,8 +40,7 @@ func init() {
 		hook.NewNoVersion(0, 8))
 }
 
-type ccConversion struct {
-}
+type ccConversion struct{}
 
 func (c *ccConversion) Convert(ctx context.Context, cli hook.CRClient) ([]client.Object, error) {
 	ccList, err := cli.KBClient.AppsV1alpha1().ConfigConstraints().List(ctx, metav1.ListOptions{})
@@ -70,14 +69,12 @@ func (c *ccConversion) Convert(ctx context.Context, cli hook.CRClient) ([]client
 	return objects, err
 }
 
-func convert(from *appsv1alpha1.ConfigConstraint) (*appsv1beta1.ConfigConstraint, error) {
-	newObj := appsv1beta1.ConfigConstraint{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       from.Kind,
-			APIVersion: configConstraintBeta1GVR.GroupVersion().String(),
-		},
+func hasConversionVersion(obj client.Object) bool {
+	annotations := obj.GetAnnotations()
+	if len(annotations) == 0 {
+		return false
 	}
-	return &newObj, from.ConvertTo(&newObj)
+	return annotations[constant.KubeblocksAPIConversionTypeAnnotationName] == constant.MigratedAPIVersion
 }
 
 func hasValidBetaVersion(ctx context.Context, obj *appsv1alpha1.ConfigConstraint, kbClient *versioned.Clientset) bool {
@@ -89,10 +86,69 @@ func hasValidBetaVersion(ctx context.Context, obj *appsv1alpha1.ConfigConstraint
 	return hasConversionVersion(newObj)
 }
 
-func hasConversionVersion(obj client.Object) bool {
-	annotations := obj.GetAnnotations()
-	if len(annotations) == 0 {
-		return false
+func convert(from *appsv1alpha1.ConfigConstraint) (*appsv1beta1.ConfigConstraint, error) {
+	newObj := &appsv1beta1.ConfigConstraint{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       from.Kind,
+			APIVersion: configConstraintBeta1GVR.GroupVersion().String(),
+		},
 	}
-	return annotations[constant.KubeblocksAPIConversionTypeAnnotationName] == constant.MigratedAPIVersion
+	if err := convertImpl(from, newObj); err != nil {
+		return nil, err
+	}
+	return newObj, nil
+}
+
+func convertImpl(source *appsv1alpha1.ConfigConstraint, target *appsv1beta1.ConfigConstraint) error {
+	target.ObjectMeta = source.ObjectMeta
+	if target.Annotations == nil {
+		target.Annotations = make(map[string]string)
+	}
+	target.Annotations[constant.KubeblocksAPIConversionTypeAnnotationName] = constant.MigratedAPIVersion
+	target.Annotations[constant.SourceAPIVersionAnnotationName] = appsv1alpha1.GroupVersion.Version
+	convertToConstraintSpec(&source.Spec, &target.Spec)
+	return nil
+}
+
+func convertToConstraintSpec(source *appsv1alpha1.ConfigConstraintSpec, target *appsv1beta1.ConfigConstraintSpec) {
+	target.MergeReloadAndRestart = source.DynamicActionCanBeMerged
+	target.ReloadStaticParamsBeforeRestart = source.ReloadStaticParamsBeforeRestart
+	target.DownwardAPIChangeTriggeredActions = source.DownwardAPIOptions
+	target.StaticParameters = source.StaticParameters
+	target.DynamicParameters = source.DynamicParameters
+	target.ImmutableParameters = source.ImmutableParameters
+	target.FileFormatConfig = source.FormatterConfig
+	convertDynamicReloadAction(source.ReloadOptions, target, source.ToolsImageSpec, source.ScriptConfigs, source.Selector)
+	convertSchema(source.ConfigurationSchema, source.CfgSchemaTopLevelName, target)
+}
+
+func convertDynamicReloadAction(options *appsv1alpha1.ReloadOptions, target *appsv1beta1.ConfigConstraintSpec,
+	toolsSetup *appsv1beta1.ToolsSetup, configs []appsv1beta1.ScriptConfig, selector *metav1.LabelSelector) {
+	if options == nil {
+		return
+	}
+	target.ReloadAction = &appsv1beta1.ReloadAction{
+		UnixSignalTrigger: options.UnixSignalTrigger,
+		ShellTrigger:      options.ShellTrigger,
+		TPLScriptTrigger:  options.TPLScriptTrigger,
+		AutoTrigger:       options.AutoTrigger,
+		TargetPodSelector: selector,
+	}
+	if target.ReloadAction.ShellTrigger != nil {
+		target.ReloadAction.ShellTrigger.ToolsSetup = toolsSetup
+		if len(configs) > 0 {
+			target.ReloadAction.ShellTrigger.ScriptConfig = configs[0].DeepCopy()
+		}
+	}
+}
+
+func convertSchema(schema *appsv1alpha1.CustomParametersValidation, topLevelKey string, target *appsv1beta1.ConfigConstraintSpec) {
+	if schema == nil {
+		return
+	}
+	target.ParametersSchema = &appsv1beta1.ParametersSchema{
+		TopLevelKey:  topLevelKey,
+		CUE:          schema.CUE,
+		SchemaInJSON: schema.Schema,
+	}
 }

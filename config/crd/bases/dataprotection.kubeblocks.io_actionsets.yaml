@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.12.1
+    controller-gen.kubebuilder.io/version: v0.14.0
   labels:
     app.kubernetes.io/name: kubeblocks
   name: actionsets.dataprotection.kubeblocks.io
@@ -35,14 +35,19 @@ spec:
         description: ActionSet is the Schema for the actionsets API
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
@@ -74,20 +79,21 @@ spec:
                         type: string
                       runOnTargetPodNode:
                         default: false
-                        description: Determines whether to run the job workload on
-                          the target pod node. If the backup container needs to mount
-                          the target pod's volumes, this field should be set to true.
-                          Otherwise, the target pod's volumes will be ignored.
+                        description: |-
+                          Determines whether to run the job workload on the target pod node.
+                          If the backup container needs to mount the target pod's volumes, this field
+                          should be set to true. Otherwise, the target pod's volumes will be ignored.
                         type: boolean
                       syncProgress:
-                        description: Determines if the backup progress should be synchronized
-                          and the interval for synchronization in seconds.
+                        description: |-
+                          Determines if the backup progress should be synchronized and the interval
+                          for synchronization in seconds.
                         properties:
                           enabled:
-                            description: Determines if the backup progress should
-                              be synchronized. If set to true, a sidecar container
-                              will be instantiated to synchronize the backup progress
-                              with the Backup Custom Resource (CR) status.
+                            description: |-
+                              Determines if the backup progress should be synchronized. If set to true,
+                              a sidecar container will be instantiated to synchronize the backup progress with the
+                              Backup Custom Resource (CR) status.
                             type: boolean
                           intervalSeconds:
                             default: 60
@@ -119,9 +125,9 @@ spec:
                               minItems: 1
                               type: array
                             container:
-                              description: Specifies the container within the pod
-                                where the command should be executed. If not specified,
-                                the first container in the pod is used by default.
+                              description: |-
+                                Specifies the container within the pod where the command should be executed.
+                                If not specified, the first container in the pod is used by default.
                               type: string
                             onError:
                               default: Fail
@@ -132,9 +138,9 @@ spec:
                               - Fail
                               type: string
                             timeout:
-                              description: Specifies the maximum duration to wait
-                                for the hook to complete before considering the execution
-                                a failure.
+                              description: |-
+                                Specifies the maximum duration to wait for the hook to complete before
+                                considering the execution a failure.
                               type: string
                           required:
                           - command
@@ -162,11 +168,10 @@ spec:
                               type: string
                             runOnTargetPodNode:
                               default: false
-                              description: Determines whether to run the job workload
-                                on the target pod node. If the backup container needs
-                                to mount the target pod's volumes, this field should
-                                be set to true. Otherwise, the target pod's volumes
-                                will be ignored.
+                              description: |-
+                                Determines whether to run the job workload on the target pod node.
+                                If the backup container needs to mount the target pod's volumes, this field
+                                should be set to true. Otherwise, the target pod's volumes will be ignored.
                               type: boolean
                           required:
                           - command
@@ -193,9 +198,9 @@ spec:
                               minItems: 1
                               type: array
                             container:
-                              description: Specifies the container within the pod
-                                where the command should be executed. If not specified,
-                                the first container in the pod is used by default.
+                              description: |-
+                                Specifies the container within the pod where the command should be executed.
+                                If not specified, the first container in the pod is used by default.
                               type: string
                             onError:
                               default: Fail
@@ -206,9 +211,9 @@ spec:
                               - Fail
                               type: string
                             timeout:
-                              description: Specifies the maximum duration to wait
-                                for the hook to complete before considering the execution
-                                a failure.
+                              description: |-
+                                Specifies the maximum duration to wait for the hook to complete before
+                                considering the execution a failure.
                               type: string
                           required:
                           - command
@@ -236,11 +241,10 @@ spec:
                               type: string
                             runOnTargetPodNode:
                               default: false
-                              description: Determines whether to run the job workload
-                                on the target pod node. If the backup container needs
-                                to mount the target pod's volumes, this field should
-                                be set to true. Otherwise, the target pod's volumes
-                                will be ignored.
+                              description: |-
+                                Determines whether to run the job workload on the target pod node.
+                                If the backup container needs to mount the target pod's volumes, this field
+                                should be set to true. Otherwise, the target pod's volumes will be ignored.
                               type: boolean
                           required:
                           - command
@@ -249,9 +253,9 @@ spec:
                       type: object
                     type: array
                   preDelete:
-                    description: 'Represents a custom deletion action that can be
-                      executed before the built-in deletion action. Note: The preDelete
-                      action job will ignore the env/envFrom.'
+                    description: |-
+                      Represents a custom deletion action that can be executed before the built-in deletion action.
+                      Note: The preDelete action job will ignore the env/envFrom.
                     properties:
                       command:
                         description: Defines the commands to back up the volume data.
@@ -279,13 +283,17 @@ spec:
                   - Differential
                   - Continuous
                 default: Full
-                description: "Specifies the backup type. Supported values include:
-                  \n - `Full` for a full backup. - `Incremental` back up data that
-                  have changed since the last backup (either full or incremental).
-                  - `Differential` back up data that has changed since the last full
-                  backup. - `Continuous` back up transaction logs continuously, such
-                  as MySQL binlog, PostgreSQL WAL, etc. \n Continuous backup is essential
-                  for implementing Point-in-Time Recovery (PITR)."
+                description: |-
+                  Specifies the backup type. Supported values include:
+
+
+                  - `Full` for a full backup.
+                  - `Incremental` back up data that have changed since the last backup (either full or incremental).
+                  - `Differential` back up data that has changed since the last full backup.
+                  - `Continuous` back up transaction logs continuously, such as MySQL binlog, PostgreSQL WAL, etc.
+
+
+                  Continuous backup is essential for implementing Point-in-Time Recovery (PITR).
                 type: string
               env:
                 description: Specifies a list of environment variables to be set in
@@ -298,15 +306,16 @@ spec:
                       description: Name of the environment variable. Must be a C_IDENTIFIER.
                       type: string
                     value:
-                      description: 'Variable references $(VAR_NAME) are expanded using
-                        the previously defined environment variables in the container
-                        and any service environment variables. If a variable cannot
-                        be resolved, the reference in the input string will be unchanged.
-                        Double $$ are reduced to a single $, which allows for escaping
-                        the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will produce the
-                        string literal "$(VAR_NAME)". Escaped references will never
-                        be expanded, regardless of whether the variable exists or
-                        not. Defaults to "".'
+                      description: |-
+                        Variable references $(VAR_NAME) are expanded
+                        using the previously defined environment variables in the container and
+                        any service environment variables. If a variable cannot be resolved,
+                        the reference in the input string will be unchanged. Double $$ are reduced
+                        to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
+                        "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
+                        Escaped references will never be expanded, regardless of whether the variable
+                        exists or not.
+                        Defaults to "".
                       type: string
                     valueFrom:
                       description: Source for the environment variable's value. Cannot
@@ -319,8 +328,10 @@ spec:
                               description: The key to select.
                               type: string
                             name:
-                              description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                TODO: Add other useful fields. apiVersion, kind, uid?'
+                              description: |-
+                                Name of the referent.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                TODO: Add other useful fields. apiVersion, kind, uid?
                               type: string
                             optional:
                               description: Specify whether the ConfigMap or its key
@@ -331,10 +342,9 @@ spec:
                           type: object
                           x-kubernetes-map-type: atomic
                         fieldRef:
-                          description: 'Selects a field of the pod: supports metadata.name,
-                            metadata.namespace, `metadata.labels[''<KEY>'']`, `metadata.annotations[''<KEY>'']`,
-                            spec.nodeName, spec.serviceAccountName, status.hostIP,
-                            status.podIP, status.podIPs.'
+                          description: |-
+                            Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`,
+                            spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
                           properties:
                             apiVersion:
                               description: Version of the schema the FieldPath is
@@ -349,10 +359,9 @@ spec:
                           type: object
                           x-kubernetes-map-type: atomic
                         resourceFieldRef:
-                          description: 'Selects a resource of the container: only
-                            resources limits and requests (limits.cpu, limits.memory,
-                            limits.ephemeral-storage, requests.cpu, requests.memory
-                            and requests.ephemeral-storage) are currently supported.'
+                          description: |-
+                            Selects a resource of the container: only resources limits and requests
+                            (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.
                           properties:
                             containerName:
                               description: 'Container name: required for volumes,
@@ -381,8 +390,10 @@ spec:
                                 be a valid secret key.
                               type: string
                             name:
-                              description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                TODO: Add other useful fields. apiVersion, kind, uid?'
+                              description: |-
+                                Name of the referent.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                TODO: Add other useful fields. apiVersion, kind, uid?
                               type: string
                             optional:
                               description: Specify whether the Secret or its key must
@@ -399,12 +410,15 @@ spec:
                 type: array
                 x-kubernetes-preserve-unknown-fields: true
               envFrom:
-                description: "Specifies a list of sources to populate environment
-                  variables in the container. The keys within a source must be a C_IDENTIFIER.
-                  Any invalid keys will be reported as an event when the container
-                  starts. If a key exists in multiple sources, the value from the
-                  last source will take precedence. Any values defined by an Env with
-                  a duplicate key will take precedence. \n This field cannot be updated."
+                description: |-
+                  Specifies a list of sources to populate environment variables in the container.
+                  The keys within a source must be a C_IDENTIFIER. Any invalid keys will be
+                  reported as an event when the container starts. If a key exists in multiple
+                  sources, the value from the last source will take precedence. Any values
+                  defined by an Env with a duplicate key will take precedence.
+
+
+                  This field cannot be updated.
                 items:
                   description: EnvFromSource represents the source of a set of ConfigMaps
                   properties:
@@ -412,8 +426,10 @@ spec:
                       description: The ConfigMap to select from
                       properties:
                         name:
-                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          description: |-
+                            Name of the referent.
+                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?
                           type: string
                         optional:
                           description: Specify whether the ConfigMap must be defined
@@ -428,8 +444,10 @@ spec:
                       description: The Secret to select from
                       properties:
                         name:
-                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          description: |-
+                            Name of the referent.
+                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?
                           type: string
                         optional:
                           description: Specify whether the Secret must be defined
@@ -461,9 +479,9 @@ spec:
                               minItems: 1
                               type: array
                             container:
-                              description: Specifies the container within the pod
-                                where the command should be executed. If not specified,
-                                the first container in the pod is used by default.
+                              description: |-
+                                Specifies the container within the pod where the command should be executed.
+                                If not specified, the first container in the pod is used by default.
                               type: string
                             onError:
                               default: Fail
@@ -474,9 +492,9 @@ spec:
                               - Fail
                               type: string
                             timeout:
-                              description: Specifies the maximum duration to wait
-                                for the hook to complete before considering the execution
-                                a failure.
+                              description: |-
+                                Specifies the maximum duration to wait for the hook to complete before
+                                considering the execution a failure.
                               type: string
                           required:
                           - command
@@ -504,11 +522,10 @@ spec:
                               type: string
                             runOnTargetPodNode:
                               default: false
-                              description: Determines whether to run the job workload
-                                on the target pod node. If the backup container needs
-                                to mount the target pod's volumes, this field should
-                                be set to true. Otherwise, the target pod's volumes
-                                will be ignored.
+                              description: |-
+                                Determines whether to run the job workload on the target pod node.
+                                If the backup container needs to mount the target pod's volumes, this field
+                                should be set to true. Otherwise, the target pod's volumes will be ignored.
                               type: boolean
                           required:
                           - command
@@ -538,10 +555,10 @@ spec:
                         type: string
                       runOnTargetPodNode:
                         default: false
-                        description: Determines whether to run the job workload on
-                          the target pod node. If the backup container needs to mount
-                          the target pod's volumes, this field should be set to true.
-                          Otherwise, the target pod's volumes will be ignored.
+                        description: |-
+                          Determines whether to run the job workload on the target pod node.
+                          If the backup container needs to mount the target pod's volumes, this field
+                          should be set to true. Otherwise, the target pod's volumes will be ignored.
                         type: boolean
                     required:
                     - command

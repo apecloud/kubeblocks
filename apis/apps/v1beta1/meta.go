@@ -16,7 +16,11 @@ limitations under the License.
 
 package v1beta1
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	"slices"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
 func (in *ConfigConstraintSpec) NeedDynamicReloadAction() bool {
 	if in.MergeReloadAndRestart != nil {
@@ -40,6 +44,16 @@ func (in *ConfigConstraintSpec) GetToolsSetup() *ToolsSetup {
 }
 
 func (in *ConfigConstraintSpec) GetScriptConfigs() []ScriptConfig {
+	uniqueSlice := func(items []ScriptConfig) []ScriptConfig {
+		var uniqItems []ScriptConfig
+		for _, item := range items {
+			if !slices.Contains(uniqItems, item) {
+				uniqItems = append(uniqItems, item)
+			}
+		}
+		return uniqItems
+	}
+
 	scriptConfigs := make([]ScriptConfig, 0)
 	for _, action := range in.DownwardAPIChangeTriggeredActions {
 		if action.ScriptConfig != nil {
@@ -47,12 +61,12 @@ func (in *ConfigConstraintSpec) GetScriptConfigs() []ScriptConfig {
 		}
 	}
 	if in.ReloadAction == nil {
-		return scriptConfigs
+		return uniqueSlice(scriptConfigs)
 	}
 	if in.ReloadAction.ShellTrigger != nil && in.ReloadAction.ShellTrigger.ScriptConfig != nil {
 		scriptConfigs = append(scriptConfigs, *in.ReloadAction.ShellTrigger.ScriptConfig)
 	}
-	return scriptConfigs
+	return uniqueSlice(scriptConfigs)
 }
 
 func (in *ConfigConstraintSpec) ShellTrigger() bool {

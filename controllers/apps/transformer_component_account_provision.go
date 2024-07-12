@@ -94,9 +94,13 @@ func (t *componentAccountProvisionTransformer) Transform(ctx graph.TransformCont
 		if t.isAccountProvisioned(cond, account) {
 			continue
 		}
-		if err = t.provisionAccount(transCtx, cond, lorryCli, account); err != nil {
-			t.markProvisionAsFailed(transCtx, &cond, err)
-			return err
+		if transCtx.SynthesizeComponent.Annotations[constant.RestoreFromBackupAnnotationKey] == "" {
+			// TODO: restore account secret from backup.
+			// provision account when the component is not recovered from backup
+			if err = t.provisionAccount(transCtx, cond, lorryCli, account); err != nil {
+				t.markProvisionAsFailed(transCtx, &cond, err)
+				return err
+			}
 		}
 		t.markAccountProvisioned(&cond, account)
 	}
@@ -205,7 +209,7 @@ func (t *componentAccountProvisionTransformer) buildLorryClient(transCtx *compon
 }
 
 func (t *componentAccountProvisionTransformer) provisionAccount(transCtx *componentTransformContext,
-	cond metav1.Condition, lorryCli lorry.Client, account appsv1alpha1.SystemAccount) error {
+	_ metav1.Condition, lorryCli lorry.Client, account appsv1alpha1.SystemAccount) error {
 
 	synthesizedComp := transCtx.SynthesizeComponent
 	secret, err := t.getAccountSecret(transCtx, synthesizedComp, account)
@@ -218,8 +222,15 @@ func (t *componentAccountProvisionTransformer) provisionAccount(transCtx *compon
 		return nil
 	}
 
+	userInfo, err := lorryCli.DescribeUser(transCtx, string(username))
+	if err == nil && len(userInfo) != 0 {
+		return nil
+	}
+
+	namedVars := getEnvReplacementMapForAccount(string(username), string(password))
+	stmt := component.ReplaceNamedVars(namedVars, account.Statement, -1, true)
 	// TODO: re-define the role
-	return lorryCli.CreateUser(transCtx.Context, string(username), string(password), string(lorryModel.SuperUserRole))
+	return lorryCli.CreateUser(transCtx.Context, string(username), string(password), string(lorryModel.SuperUserRole), stmt)
 }
 
 func (t *componentAccountProvisionTransformer) getAccountSecret(ctx graph.TransformContext,
@@ -233,4 +244,11 @@ func (t *componentAccountProvisionTransformer) getAccountSecret(ctx graph.Transf
 		return nil, err
 	}
 	return secret, nil
+}
+
+func getEnvReplacementMapForAccount(name, passwd string) map[string]string {
+	return map[string]string{
+		"$(USERNAME)": name,
+		"$(PASSWD)":   passwd,
+	}
 }

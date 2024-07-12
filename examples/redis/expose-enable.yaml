@@ -13,6 +13,7 @@ spec:
     # Specifies a list of OpsService. When an OpsService is exposed, a corresponding ClusterService will be added to `cluster.spec.services`. 
     services:
     - name: internet
+      roleSelector: primary
       serviceType: LoadBalancer
     # Indicates whether the services will be exposed. 'Enable' exposes the services. while 'Disable' removes the exposed Service.
     switch: Enable

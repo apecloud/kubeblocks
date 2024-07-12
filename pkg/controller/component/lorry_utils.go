@@ -164,7 +164,7 @@ func adaptLorryIfCustomHandlerDefined(synthesizeComp *SynthesizedComponent, lorr
 
 func buildBasicContainer(lorryHTTPPort int) *corev1.Container {
 	return builder.NewContainerBuilder("string").
-		SetImage("infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com/google_containers/pause:3.6").
+		SetImage("apecloud-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/pause:3.6").
 		SetImagePullPolicy(corev1.PullIfNotPresent).
 		AddCommands("/pause").
 		SetStartupProbe(corev1.Probe{
@@ -218,7 +218,7 @@ func buildLorryInitContainer() *corev1.Container {
 	container.Image = viper.GetString(constant.KBToolsImage)
 	container.Name = constant.LorryInitContainerName
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
-	container.Command = []string{"cp", "-r", "/bin/lorry", "/config", "/kubeblocks/"}
+	container.Command = []string{"cp", "-r", "/bin/lorry", "/config", "/bin/curl", "/kubeblocks/"}
 	container.StartupProbe = nil
 	container.ReadinessProbe = nil
 	volumeMount := corev1.VolumeMount{Name: "kubeblocks", MountPath: "/kubeblocks"}
@@ -326,6 +326,7 @@ func buildEnv4DBAccount(synthesizeComp *SynthesizedComponent, clusterCompSpec *a
 	)
 
 	for index, sysAccount := range synthesizeComp.SystemAccounts {
+		// use first init account
 		if sysAccount.InitAccount {
 			sysInitAccount = &synthesizeComp.SystemAccounts[index]
 			break
@@ -440,7 +441,7 @@ func getBuiltinActionHandler(synthesizeComp *SynthesizedComponent) appsv1alpha1.
 		synthesizeComp.LifecycleActions.DataDump,
 		synthesizeComp.LifecycleActions.DataLoad,
 		synthesizeComp.LifecycleActions.Reconfigure,
-		// synthesizeComp.LifecycleActions.AccountProvision,
+		synthesizeComp.LifecycleActions.AccountProvision,
 	}
 
 	hasAction := false
@@ -464,16 +465,16 @@ func getActionCommandsWithExecImageOrContainerName(synthesizeComp *SynthesizedCo
 	}
 
 	actions := map[string]*appsv1alpha1.LifecycleActionHandler{
-		constant.PostProvisionAction: synthesizeComp.LifecycleActions.PostProvision,
-		constant.PreTerminateAction:  synthesizeComp.LifecycleActions.PreTerminate,
-		constant.MemberJoinAction:    synthesizeComp.LifecycleActions.MemberJoin,
-		constant.MemberLeaveAction:   synthesizeComp.LifecycleActions.MemberLeave,
-		constant.ReadonlyAction:      synthesizeComp.LifecycleActions.Readonly,
-		constant.ReadWriteAction:     synthesizeComp.LifecycleActions.Readwrite,
-		constant.DataDumpAction:      synthesizeComp.LifecycleActions.DataDump,
-		constant.DataLoadAction:      synthesizeComp.LifecycleActions.DataLoad,
+		constant.PostProvisionAction:    synthesizeComp.LifecycleActions.PostProvision,
+		constant.PreTerminateAction:     synthesizeComp.LifecycleActions.PreTerminate,
+		constant.MemberJoinAction:       synthesizeComp.LifecycleActions.MemberJoin,
+		constant.MemberLeaveAction:      synthesizeComp.LifecycleActions.MemberLeave,
+		constant.ReadonlyAction:         synthesizeComp.LifecycleActions.Readonly,
+		constant.ReadWriteAction:        synthesizeComp.LifecycleActions.Readwrite,
+		constant.DataDumpAction:         synthesizeComp.LifecycleActions.DataDump,
+		constant.DataLoadAction:         synthesizeComp.LifecycleActions.DataLoad,
+		constant.AccountProvisionAction: synthesizeComp.LifecycleActions.AccountProvision,
 		// "reconfigure":                synthesizeComp.LifecycleActions.Reconfigure,
-		// "accountProvision": synthesizeComp.LifecycleActions.AccountProvision,
 	}
 
 	if synthesizeComp.LifecycleActions.RoleProbe != nil {
@@ -485,7 +486,7 @@ func getActionCommandsWithExecImageOrContainerName(synthesizeComp *SynthesizedCo
 	actionCommands := map[string][]string{}
 	for action, handler := range actions {
 		if handler != nil && handler.CustomHandler != nil && handler.CustomHandler.Exec != nil {
-			actionCommands[action] = handler.CustomHandler.Exec.Command
+			actionCommands[action] = append(handler.CustomHandler.Exec.Command, handler.CustomHandler.Exec.Args...)
 			if handler.CustomHandler.Image != "" {
 				toolImage = handler.CustomHandler.Image
 			}

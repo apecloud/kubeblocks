@@ -47,7 +47,7 @@ OPS-NAME   CLUSTER   COMPONENT   CONFIG-SPEC-NAME   FILE   STATUS   POLICY   PRO
 1. 将 `systemLog.verbosity` 设置为 1。
 
    ```bash
-   kbcli cluster configure mongodb-cluster --component mongodb --config-spec mongodb-config --config-file mongodb.conf --set systemLog.verbosity=1
+   kbcli cluster configure mongodb-cluster --components mongodb --config-spec mongodb-config --config-file mongodb.conf --set systemLog.verbosity=1
    >
    Warning: The parameter change you modified needs to be restarted, which may cause the cluster to be unavailable for a period of time. Do you need to continue...
    Please type "yes" to confirm: yes
@@ -95,7 +95,7 @@ Linux 和 macOS 系统可以使用 vi 编辑器编辑配置文件，Windows 系�
 
    :::note
 
-   如果集群中有多个组件，请使用 `--component` 参数指定一个组件。
+   如果集群中有多个组件，请使用 `--components` 参数指定一个组件。
 
    :::
 

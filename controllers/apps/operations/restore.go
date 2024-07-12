@@ -132,7 +132,11 @@ func (r RestoreOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, 
 }
 
 func (r RestoreOpsHandler) restoreClusterFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *appsv1alpha1.OpsRequest) (*appsv1alpha1.Cluster, error) {
-	backupName := opsRequest.Spec.GetRestore().BackupName
+	restoreSpec := opsRequest.Spec.GetRestore()
+	if restoreSpec == nil {
+		return nil, intctrlutil.NewFatalError("spec.restore can not be empty")
+	}
+	backupName := restoreSpec.BackupName
 
 	// check if the backup exists
 	backup := &dpv1alpha1.Backup{}
@@ -151,7 +155,7 @@ func (r RestoreOpsHandler) restoreClusterFromBackup(reqCtx intctrlutil.RequestCt
 
 	// format and validate the restore time
 	if backupType == string(dpv1alpha1.BackupTypeContinuous) {
-		restoreTimeStr, err := restore.FormatRestoreTimeAndValidate(opsRequest.Spec.GetRestore().RestorePointInTime, backup)
+		restoreTimeStr, err := restore.FormatRestoreTimeAndValidate(restoreSpec.RestorePointInTime, backup)
 		if err != nil {
 			return nil, err
 		}
@@ -211,5 +215,8 @@ func (r RestoreOpsHandler) getClusterObjFromBackup(backup *dpv1alpha1.Backup, op
 		services = append(services, svc)
 	}
 	cluster.Spec.Services = services
+	for i := range cluster.Spec.ComponentSpecs {
+		cluster.Spec.ComponentSpecs[i].OfflineInstances = nil
+	}
 	return cluster, nil
 }

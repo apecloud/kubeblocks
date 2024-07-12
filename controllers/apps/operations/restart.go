@@ -66,8 +66,8 @@ func (r restartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	}
 	// abort earlier running vertical scaling opsRequest.
 	if err := abortEarlierOpsRequestWithSameKind(reqCtx, cli, opsRes, []appsv1alpha1.OpsType{appsv1alpha1.RestartType},
-		func(earlierOps *appsv1alpha1.OpsRequest) bool {
-			return true
+		func(earlierOps *appsv1alpha1.OpsRequest) (bool, error) {
+			return true, nil
 		}); err != nil {
 		return err
 	}
@@ -91,7 +91,7 @@ func (r restartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 	handleRestartProgress := func(reqCtx intctrlutil.RequestCtx,
 		cli client.Client,
 		opsRes *OpsResource,
-		pgRes progressResource,
+		pgRes *progressResource,
 		compStatus *appsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
 		return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus, r.podApplyCompOps)
 	}
@@ -106,11 +106,11 @@ func (r restartOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, 
 }
 
 func (r restartOpsHandler) podApplyCompOps(
+	ops *appsv1alpha1.OpsRequest,
 	pod *corev1.Pod,
-	compOps ComponentOpsInteface,
-	opsStartTime metav1.Time,
+	compOps ComponentOpsInterface,
 	insTemplateName string) bool {
-	return !pod.CreationTimestamp.Before(&opsStartTime)
+	return !pod.CreationTimestamp.Before(&ops.Status.StartTimestamp)
 }
 
 // restartStatefulSet restarts statefulSet workload

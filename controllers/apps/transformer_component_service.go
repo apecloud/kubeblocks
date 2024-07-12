@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -65,6 +66,11 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 
 	synthesizeComp := transCtx.SynthesizeComponent
+	runningServices, err := t.listOwnedServices(transCtx.Context, transCtx.Client, transCtx.Component, synthesizeComp)
+	if err != nil {
+		return err
+	}
+
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for _, service := range synthesizeComp.ComponentServices {
 		// component controller does not handle the default headless service; the default headless service is managed by the InstanceSet.
@@ -79,10 +85,30 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 			if err = t.createOrUpdateService(ctx, dag, graphCli, &service, svc, transCtx.ComponentOrig); err != nil {
 				return err
 			}
+			delete(runningServices, svc.Name)
 		}
 	}
-	// TODO: delete orphaned services
+
+	for svc := range runningServices {
+		graphCli.Delete(dag, runningServices[svc], inDataContext4G())
+	}
+
 	return nil
+}
+
+func (t *componentServiceTransformer) listOwnedServices(ctx context.Context, cli client.Reader,
+	comp *appsv1alpha1.Component, synthesizedComp *component.SynthesizedComponent) (map[string]*corev1.Service, error) {
+	services, err := component.ListOwnedServices(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
+	if err != nil {
+		return nil, err
+	}
+	owned := make(map[string]*corev1.Service)
+	for i, svc := range services {
+		if model.IsOwnerOf(comp, svc) {
+			owned[svc.Name] = services[i]
+		}
+	}
+	return owned, nil
 }
 
 func (t *componentServiceTransformer) buildCompService(comp *appsv1alpha1.Component,
@@ -127,7 +153,10 @@ func (t *componentServiceTransformer) buildPodService(comp *appsv1alpha1.Compone
 }
 
 func (t *componentServiceTransformer) podsNameNOrdinal(synthesizeComp *component.SynthesizedComponent) (map[string]int, error) {
-	podNames := generatePodNames(synthesizeComp)
+	podNames, err := generatePodNames(synthesizeComp)
+	if err != nil {
+		return nil, err
+	}
 	pods := make(map[string]int)
 	for _, name := range podNames {
 		ordinal, err := func() (int, error) {
@@ -250,19 +279,15 @@ func (t *componentServiceTransformer) createOrUpdateServiceInUnique(ctx graph.Tr
 	return createOrUpdateService(ctx, dag, graphCli, service, owner)
 }
 
-func generatePodNames(synthesizeComp *component.SynthesizedComponent) []string {
-	workloadName := constant.GenerateWorkloadNamePattern(synthesizeComp.ClusterName, synthesizeComp.Name)
-	var templates []instanceset.InstanceTemplate
-	for i := range synthesizeComp.Instances {
-		templates = append(templates, &synthesizeComp.Instances[i])
-	}
-	return instanceset.GenerateAllInstanceNames(workloadName, synthesizeComp.Replicas, templates, synthesizeComp.OfflineInstances)
+func generatePodNames(synthesizeComp *component.SynthesizedComponent) ([]string, error) {
+	return component.GenerateAllPodNames(synthesizeComp.Replicas, synthesizeComp.Instances,
+		synthesizeComp.OfflineInstances, synthesizeComp.ClusterName, synthesizeComp.Name)
 }
 
-func generatePodNamesByITS(its *workloads.InstanceSet) []string {
+func generatePodNamesByITS(its *workloads.InstanceSet) ([]string, error) {
 	var templates []instanceset.InstanceTemplate
 	for i := range its.Spec.Instances {
 		templates = append(templates, &its.Spec.Instances[i])
 	}
-	return instanceset.GenerateAllInstanceNames(its.Name, *its.Spec.Replicas, templates, its.Spec.OfflineInstances)
+	return instanceset.GenerateAllInstanceNames(its.Name, *its.Spec.Replicas, templates, its.Spec.OfflineInstances, workloads.Ordinals{})
 }

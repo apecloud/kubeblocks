@@ -21,13 +21,17 @@ package user
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
@@ -49,12 +53,26 @@ func init() {
 }
 
 func (s *CreateUser) Init(ctx context.Context) error {
-	dbManager, err := register.GetDBManager(nil)
+	s.logger = ctrl.Log.WithName("CreateUser")
+
+	actionJSON := viper.GetString(constant.KBEnvActionCommands)
+	if actionJSON != "" {
+		actionCommands := map[string][]string{}
+		err := json.Unmarshal([]byte(actionJSON), &actionCommands)
+		if err != nil {
+			s.logger.Info("get action commands failed", "error", err.Error())
+			return err
+		}
+		accoutProvisionCmd, ok := actionCommands[constant.AccountProvisionAction]
+		if ok && len(accoutProvisionCmd) > 0 {
+			s.Command = accoutProvisionCmd
+		}
+	}
+	dbManager, err := register.GetDBManager(s.Command)
 	if err != nil {
 		return errors.Wrap(err, "get manager failed")
 	}
 	s.dbManager = dbManager
-	s.logger = ctrl.Log.WithName("CreateUser")
 	return nil
 }
 
@@ -75,16 +93,23 @@ func (s *CreateUser) Do(ctx context.Context, req *operations.OpsRequest) (*opera
 	userInfo, _ := UserInfoParser(req)
 	resp := operations.NewOpsResponse(util.CreateUserOp)
 
-	err := s.dbManager.CreateUser(ctx, userInfo.UserName, userInfo.Password)
+	user, err := s.dbManager.DescribeUser(ctx, userInfo.UserName)
+	if err == nil && user != nil {
+		return resp.WithSuccess("account already exists")
+	}
+
+	// for compatibility with old addons that specify accoutprovision action but not work actually.
+	err = s.dbManager.CreateUser(ctx, userInfo.UserName, userInfo.Password, userInfo.Statement)
 	if err != nil {
-		s.logger.Info("executing CreateUser error", "error", err)
+		err = errors.Cause(err)
+		s.logger.Info("executing CreateUser error", "error", err.Error())
 		return resp, err
 	}
 
 	if userInfo.RoleName != "" {
 		err := s.dbManager.GrantUserRole(ctx, userInfo.UserName, userInfo.RoleName)
-		if err != nil {
-			s.logger.Info("executing grantRole error", "error", err)
+		if err != nil && err != models.ErrNotImplemented {
+			s.logger.Info("executing grantRole error", "error", err.Error())
 			return resp, err
 		}
 	}

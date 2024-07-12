@@ -831,6 +831,44 @@ identified using Cluster, Component and Service names.</li>
 </tr>
 <tr>
 <td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies Labels to override or add for underlying Pods.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>annotations</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies Annotations to override or add for underlying Pods.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>env</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>List of environment variables to add.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>resources</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcerequirements-v1-core">
@@ -863,6 +901,20 @@ These templates are used to dynamically provision persistent volumes for the Com
 </tr>
 <tr>
 <td>
+<code>volumes</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volume-v1-core">
+[]Kubernetes core/v1.Volume
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>List of volumes to override.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>services</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ComponentService">
@@ -874,6 +926,20 @@ These templates are used to dynamically provision persistent volumes for the Com
 <em>(Optional)</em>
 <p>Overrides Services defined in referenced ComponentDefinition and exposes endpoints that can be accessed
 by clients.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>systemAccounts</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentSystemAccount">
+[]ComponentSystemAccount
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Overrides system accounts defined in referenced ComponentDefinition.</p>
 </td>
 </tr>
 <tr>
@@ -898,6 +964,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
+<p>Specifies the configuration content of a config template.</p>
 </td>
 </tr>
 <tr>
@@ -1095,6 +1162,19 @@ bool
 <li>&ldquo;monitor.kubeblocks.io/scheme&rdquo;</li>
 </ul>
 <p>These annotations allow the Prometheus installed by KubeBlocks to discover and scrape metrics from the exporter.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>stop</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Stop the Component.
+If set, all the computing resources will be released.</p>
 </td>
 </tr>
 </table>
@@ -1662,6 +1742,26 @@ number of operational replicas for maintaining quorum.
 at least 3 operational for quorum.</li>
 </ul>
 <p>This field is immutable and defaults to &lsquo;Serial&rsquo;.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podManagementPolicy</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podmanagementpolicytype-v1-apps">
+Kubernetes apps/v1.PodManagementPolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>InstanceSet controls the creation of pods during initial scale up, replacement of pods on nodes, and scaling down.</p>
+<ul>
+<li><code>OrderedReady</code>: Creates pods in increasing order (pod-0, then pod-1, etc). The controller waits until each pod
+is ready before continuing. Pods are removed in reverse order when scaling down.</li>
+<li><code>Parallel</code>: Creates pods in parallel to match the desired scale without waiting. All pods are deleted at once
+when scaling down.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -2592,6 +2692,34 @@ int32
 <em>(Optional)</em>
 <p>Specifies the duration in seconds that an OpsRequest will remain in the system after successfully completing
 (when <code>opsRequest.status.phase</code> is &ldquo;Succeed&rdquo;) before automatic deletion.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>preConditionDeadlineSeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the maximum time in seconds that the OpsRequest will wait for its pre-conditions to be met
+before it aborts the operation.
+If set to 0 (default), pre-conditions must be satisfied immediately for the OpsRequest to proceed.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>timeoutSeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the maximum duration (in seconds) that an opsRequest is allowed to run.
+If the opsRequest runs longer than this duration, its phase will be marked as Aborted.
+If this value is not set or set to 0, the timeout will be ignored and the opsRequest will run indefinitely.</p>
 </td>
 </tr>
 <tr>
@@ -4727,6 +4855,45 @@ you can enable the collection of these logs by including their names in the <cod
 </tr>
 <tr>
 <td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies Labels to override or add for underlying Pods.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>annotations</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies Annotations to override or add for underlying Pods.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>env</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>List of environment variables to add.
+These environment variables will be placed after the environment variables declared in the Pod.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>replicas</code><br/>
 <em>
 int32
@@ -4822,6 +4989,20 @@ These templates are used to dynamically provision persistent volumes for the Com
 </tr>
 <tr>
 <td>
+<code>volumes</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volume-v1-core">
+[]Kubernetes core/v1.Volume
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>List of volumes to override.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>services</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentService">
@@ -4836,6 +5017,20 @@ These templates are used to dynamically provision persistent volumes for the Com
 </tr>
 <tr>
 <td>
+<code>systemAccounts</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentSystemAccount">
+[]ComponentSystemAccount
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Overrides system accounts defined in referenced ComponentDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>configs</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentConfig">
@@ -4845,6 +5040,7 @@ These templates are used to dynamically provision persistent volumes for the Com
 </td>
 <td>
 <em>(Optional)</em>
+<p>Specifies the configuration content of a config template.</p>
 </td>
 </tr>
 <tr>
@@ -4912,8 +5108,9 @@ string
 This ServiceAccount is used to grant necessary permissions for the Component&rsquo;s Pods to interact
 with other Kubernetes resources, such as modifying Pod labels or sending events.</p>
 <p>Defaults:
-If not specified, KubeBlocks automatically assigns a default ServiceAccount named &ldquo;kb-&#123;cluster.name&#125;&rdquo;,
-bound to a default role installed together with KubeBlocks.</p>
+To perform certain operational tasks, agent sidecars running in Pods require specific RBAC permissions.
+The service account will be bound to a default role named &ldquo;kubeblocks-cluster-pod-role&rdquo; which is installed together with KubeBlocks.
+If not specified, KubeBlocks automatically assigns a default ServiceAccount named &ldquo;kb-&#123;cluster.name&#125;&rdquo;</p>
 <p>Future Changes:
 Future versions might change the default ServiceAccount creation strategy to one per Component,
 potentially revising the naming to &ldquo;kb-&#123;cluster.name&#125;-&#123;component.name&#125;&rdquo;.</p>
@@ -5046,6 +5243,19 @@ Determines whether metrics exporter information is annotated on the Component&rs
 <li>&ldquo;monitor.kubeblocks.io/scheme&rdquo;</li>
 </ul>
 <p>These annotations allow the Prometheus installed by KubeBlocks to discover and scrape metrics from the exporter.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>stop</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Stop the Component.
+If set, all the computing resources will be released.</p>
 </td>
 </tr>
 </tbody>
@@ -7668,6 +7878,26 @@ at least 3 operational for quorum.</li>
 </tr>
 <tr>
 <td>
+<code>podManagementPolicy</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podmanagementpolicytype-v1-apps">
+Kubernetes apps/v1.PodManagementPolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>InstanceSet controls the creation of pods during initial scale up, replacement of pods on nodes, and scaling down.</p>
+<ul>
+<li><code>OrderedReady</code>: Creates pods in increasing order (pod-0, then pod-1, etc). The controller waits until each pod
+is ready before continuing. Pods are removed in reverse order when scaling down.</li>
+<li><code>Parallel</code>: Creates pods in parallel to match the desired scale without waiting. All pods are deleted at once
+when scaling down.</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
 <code>roles</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ReplicaRole">
@@ -8534,6 +8764,44 @@ identified using Cluster, Component and Service names.</li>
 </tr>
 <tr>
 <td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies Labels to override or add for underlying Pods.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>annotations</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies Annotations to override or add for underlying Pods.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>env</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>List of environment variables to add.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>resources</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcerequirements-v1-core">
@@ -8566,6 +8834,20 @@ These templates are used to dynamically provision persistent volumes for the Com
 </tr>
 <tr>
 <td>
+<code>volumes</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volume-v1-core">
+[]Kubernetes core/v1.Volume
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>List of volumes to override.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>services</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ComponentService">
@@ -8577,6 +8859,20 @@ These templates are used to dynamically provision persistent volumes for the Com
 <em>(Optional)</em>
 <p>Overrides Services defined in referenced ComponentDefinition and exposes endpoints that can be accessed
 by clients.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>systemAccounts</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentSystemAccount">
+[]ComponentSystemAccount
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Overrides system accounts defined in referenced ComponentDefinition.</p>
 </td>
 </tr>
 <tr>
@@ -8601,6 +8897,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
+<p>Specifies the configuration content of a config template.</p>
 </td>
 </tr>
 <tr>
@@ -8800,6 +9097,19 @@ bool
 <p>These annotations allow the Prometheus installed by KubeBlocks to discover and scrape metrics from the exporter.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>stop</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Stop the Component.
+If set, all the computing resources will be released.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentStatus">ComponentStatus
@@ -8953,6 +9263,64 @@ If this field is set, the scripts defined under the &lsquo;scripts&rsquo; field 
 <p>This field is deprecated from v0.9.
 This field is maintained for backward compatibility and its use is discouraged.
 Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ComponentSystemAccount">ComponentSystemAccount
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The name of the system account.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>passwordConfig</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.PasswordConfig">
+PasswordConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the policy for generating the account&rsquo;s password.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>secretRef</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ProvisionSecretRef">
+ProvisionSecretRef
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Refers to the secret from which data will be copied to create the new account.</p>
+<p>This field is immutable once set.</p>
 </td>
 </tr>
 </tbody>
@@ -11956,46 +12324,41 @@ int32
 </em>
 </td>
 <td>
-<p>Specifies the number of total replicas.</p>
+<em>(Optional)</em>
+<p>Deprecated: since v0.9, use scaleOut and scaleIn instead.
+Specifies the number of replicas for the component. Cannot be used with &ldquo;scaleIn&rdquo; and &ldquo;scaleOut&rdquo;.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>instances</code><br/>
+<code>scaleOut</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.InstanceTemplate">
-[]InstanceTemplate
+<a href="#apps.kubeblocks.io/v1alpha1.ScaleOut">
+ScaleOut
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Contains a list of InstanceTemplate objects.
-Each InstanceTemplate object allows for modifying replica counts or specifying configurations for new instances during scaling.</p>
-<p>The field supports two main use cases:</p>
-<ul>
-<li>Modifying replica count:
-Specify the desired replica count for existing instances with a particular configuration using Name and Replicas fields.
-To modify the replica count, the Name and Replicas fields of the InstanceTemplate object should be provided.
-Only these fields are used for matching and adjusting replicas; other fields are ignored.
-The Replicas value overrides any existing count.</li>
-<li>Configuring new instances:
-Define the configuration for new instances added during scaling, including resource requirements, labels, annotations, etc.
-New instances are created based on the provided InstanceTemplate.</li>
-</ul>
+<p>Specifies the replica changes for scaling out components and instance templates,
+and brings offline instances back online. Can be used in conjunction with the &ldquo;scaleIn&rdquo; operation.
+Note: Any configuration that deletes instances is considered invalid.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>offlineInstances</code><br/>
+<code>scaleIn</code><br/>
 <em>
-[]string
+<a href="#apps.kubeblocks.io/v1alpha1.ScaleIn">
+ScaleIn
+</a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the names of instances to be scaled down.
-This provides control over which specific instances are targeted for termination when reducing the replica count.</p>
+<p>Specifies the replica changes for scaling in components and instance templates,
+and takes specified instances offline. Can be used in conjunction with the &ldquo;scaleOut&rdquo; operation.
+Note: Any configuration that creates instances is considered invalid.</p>
 </td>
 </tr>
 </tbody>
@@ -12192,6 +12555,46 @@ If not set, it will rebuild on a random node.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.InstanceReplicasTemplate">InstanceReplicasTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ReplicaChanger">ReplicaChanger</a>)
+</p>
+<div>
+<p>InstanceReplicasTemplate defines the template for instance replicas.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the instance template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>replicaChanges</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>Specifies the replica changes for the instance template.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.InstanceResourceTemplate">InstanceResourceTemplate
 </h3>
 <p>
@@ -12239,7 +12642,7 @@ Kubernetes core/v1.ResourceRequirements
 <h3 id="apps.kubeblocks.io/v1alpha1.InstanceTemplate">InstanceTemplate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.LastComponentConfiguration">LastComponentConfiguration</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.LastComponentConfiguration">LastComponentConfiguration</a>, <a href="#apps.kubeblocks.io/v1alpha1.ScaleOut">ScaleOut</a>)
 </p>
 <div>
 <p>InstanceTemplate allows customization of individual replica configurations in a Component.</p>
@@ -12321,47 +12724,16 @@ string
 </tr>
 <tr>
 <td>
-<code>nodeName</code><br/>
+<code>schedulingPolicy</code><br/>
 <em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the name of the node where the Pod should be scheduled.
-If set, the Pod will be directly assigned to the specified node, bypassing the Kubernetes scheduler.
-This is useful for controlling Pod placement on specific nodes.</p>
-<p>Important considerations:
-- <code>nodeName</code> bypasses default scheduling constraints (e.g., resource requirements, node selectors, affinity rules).
-- It is the user&rsquo;s responsibility to ensure the node is suitable for the Pod.
-- If the node is unavailable, the Pod will remain in &ldquo;Pending&rdquo; state until the node is available or the Pod is deleted.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>nodeSelector</code><br/>
-<em>
-map[string]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines NodeSelector to override.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>tolerations</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#toleration-v1-core">
-[]Kubernetes core/v1.Toleration
+<a href="#apps.kubeblocks.io/v1alpha1.SchedulingPolicy">
+SchedulingPolicy
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Tolerations specifies a list of tolerations to be applied to the Pod, allowing it to tolerate node taints.
-This field can be used to add new tolerations or override existing ones.</p>
+<p>Specifies the scheduling policy for the Component.</p>
 </td>
 </tr>
 <tr>
@@ -14061,6 +14433,34 @@ int32
 </tr>
 <tr>
 <td>
+<code>preConditionDeadlineSeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the maximum time in seconds that the OpsRequest will wait for its pre-conditions to be met
+before it aborts the operation.
+If set to 0 (default), pre-conditions must be satisfied immediately for the OpsRequest to proceed.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>timeoutSeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the maximum duration (in seconds) that an opsRequest is allowed to run.
+If the opsRequest runs longer than this duration, its phase will be marked as Aborted.
+If this value is not set or set to 0, the timeout will be ignored and the opsRequest will run indefinitely.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>SpecificOpsRequest</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">
@@ -14429,7 +14829,7 @@ string
 <em>(Optional)</em>
 <p>Specifies a role to target with the service.
 If specified, the service will only be exposed to pods with the matching role.</p>
-<p>Note: At least one of &lsquo;roleSelector&rsquo; or &lsquo;podSelector&rsquo; must be specified.
+<p>Note: If the component has roles, at least one of &lsquo;roleSelector&rsquo; or &lsquo;podSelector&rsquo; must be specified.
 If both are specified, a pod must match both conditions to be selected.</p>
 </td>
 </tr>
@@ -14444,7 +14844,7 @@ map[string]string
 <em>(Optional)</em>
 <p>Routes service traffic to pods with matching label keys and values.
 If specified, the service will only be exposed to pods matching the selector.</p>
-<p>Note: At least one of &lsquo;roleSelector&rsquo; or &lsquo;podSelector&rsquo; must be specified.
+<p>Note: If the component has roles, at least one of &lsquo;roleSelector&rsquo; or &lsquo;podSelector&rsquo; must be specified.
 If both are specified, a pod must match both conditions to be selected.</p>
 </td>
 </tr>
@@ -14950,7 +15350,7 @@ The supported property types include:
 <h3 id="apps.kubeblocks.io/v1alpha1.PasswordConfig">PasswordConfig
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SystemAccount">SystemAccount</a>, <a href="#apps.kubeblocks.io/v1alpha1.SystemAccountSpec">SystemAccountSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentSystemAccount">ComponentSystemAccount</a>, <a href="#apps.kubeblocks.io/v1alpha1.SystemAccount">SystemAccount</a>, <a href="#apps.kubeblocks.io/v1alpha1.SystemAccountSpec">SystemAccountSpec</a>)
 </p>
 <div>
 <p>PasswordConfig helps provide to customize complexity of password generation pattern.</p>
@@ -15921,7 +16321,7 @@ ProvisionSecretRef
 <h3 id="apps.kubeblocks.io/v1alpha1.ProvisionSecretRef">ProvisionSecretRef
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ProvisionPolicy">ProvisionPolicy</a>, <a href="#apps.kubeblocks.io/v1alpha1.SystemAccount">SystemAccount</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentSystemAccount">ComponentSystemAccount</a>, <a href="#apps.kubeblocks.io/v1alpha1.ProvisionPolicy">ProvisionPolicy</a>, <a href="#apps.kubeblocks.io/v1alpha1.SystemAccount">SystemAccount</a>)
 </p>
 <div>
 <p>ProvisionSecretRef represents the reference to a secret.</p>
@@ -16136,6 +16536,19 @@ ComponentOps
 </td>
 <td>
 <p>Specifies the instances (Pods) that need to be rebuilt, typically operating as standbys.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>inPlace</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<p>When it is set to true, the instance will be rebuilt in-place.
+By default, a new pod will be created. Once the new pod is ready to serve,
+the instance that require rebuilding will be taken offline.</p>
 </td>
 </tr>
 <tr>
@@ -16473,6 +16886,50 @@ AutoTrigger
 <td>
 <em>(Optional)</em>
 <p>Automatically perform the reload when specified conditions are met.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ReplicaChanger">ReplicaChanger
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ScaleIn">ScaleIn</a>, <a href="#apps.kubeblocks.io/v1alpha1.ScaleOut">ScaleOut</a>)
+</p>
+<div>
+<p>ReplicaChanger defines the parameters for changing the number of replicas.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>replicaChanges</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>Specifies the replica changes for the component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>instances</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.InstanceReplicasTemplate">
+[]InstanceReplicasTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Modifies the desired replicas count for existing InstanceTemplate.
+if the inst</p>
 </td>
 </tr>
 </tbody>
@@ -16944,6 +17401,113 @@ string
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ScaleIn">ScaleIn
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>)
+</p>
+<div>
+<p>ScaleIn defines the configuration for a scale-in operation.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ReplicaChanger</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ReplicaChanger">
+ReplicaChanger
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ReplicaChanger</code> are embedded into this type.)
+</p>
+<p>Modifies the replicas of the component and instance templates.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>onlineInstancesToOffline</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the instance names that need to be taken offline.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ScaleOut">ScaleOut
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>)
+</p>
+<div>
+<p>ScaleOut defines the configuration for a scale-out operation.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ReplicaChanger</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ReplicaChanger">
+ReplicaChanger
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ReplicaChanger</code> are embedded into this type.)
+</p>
+<p>Modifies the replicas of the component and instance templates.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>newInstances</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.InstanceTemplate">
+[]InstanceTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the configuration for new instances added during scaling, including resource requirements, labels, annotations, etc.
+New instances are created based on the provided instance templates.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>offlineInstancesToOnline</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the instances in the offline list to bring back online.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.SchedulePolicy">SchedulePolicy
 </h3>
 <p>
@@ -17022,7 +17586,7 @@ Sample duration format:</p>
 <h3 id="apps.kubeblocks.io/v1alpha1.SchedulingPolicy">SchedulingPolicy
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ClusterSpec">ClusterSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ClusterSpec">ClusterSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.InstanceTemplate">InstanceTemplate</a>)
 </p>
 <div>
 </div>
@@ -18942,8 +19506,8 @@ Upgrade
 <td>
 <em>(Optional)</em>
 <p>Lists HorizontalScaling objects, each specifying scaling requirements for a Component,
-including desired total replica counts, configurations for new instances, modifications for existing instances,
-and instance downscaling options.</p>
+including desired replica changes, configurations for new instances, modifications for existing instances,
+and take offline/online the specified instances.</p>
 </td>
 </tr>
 <tr>
@@ -19044,20 +19608,6 @@ Reconfigure
 <td>
 <em>(Optional)</em>
 <p>Lists Expose objects, each specifying a Component and its services to be exposed.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>preConditionDeadlineSeconds</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the maximum time in seconds that the OpsRequest will wait for its pre-conditions to be met
-before it aborts the operation.
-If set to 0 (default), pre-conditions must be satisfied immediately for the OpsRequest to proceed.</p>
 </td>
 </tr>
 <tr>
@@ -19542,8 +20092,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Indicates if this account is the unique system initialization account (e.g., MySQL root).
-Only one system initialization account is permitted.</p>
+<p>Indicates if this account is a system initialization account (e.g., MySQL root).</p>
 <p>This field is immutable once set.</p>
 </td>
 </tr>
@@ -20664,6 +21213,7 @@ Kubernetes core/v1.ResourceRequirements
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Specifies the desired compute resources of the instance template that need to vertical scale.</p>
 </td>
 </tr>
@@ -20725,6 +21275,7 @@ that are used to expand the storage and the desired storage size for each one.</
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Specifies the desired storage size of the instance template that need to volume expand.</p>
 </td>
 </tr>
@@ -22462,6 +23013,23 @@ Defaults to 1 if unspecified.</p>
 </tr>
 <tr>
 <td>
+<code>defaultTemplateOrdinals</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.Ordinals">
+Ordinals
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the desired Ordinals of the default template.
+The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the default template.</p>
+<p>For example, if Ordinals is &#123;ranges: [&#123;start: 0, end: 1&#125;], discrete: [7]&#125;,
+then the instance names generated under the default template would be
+$(cluster.name)-$(component.name)-0、$(cluster.name)-$(component.name)-1 and $(cluster.name)-$(component.name)-7</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>minReadySeconds</code><br/>
 <em>
 int32
@@ -22814,7 +23382,11 @@ string
 <th>Description</th>
 </tr>
 </thead>
-<tbody><tr><td><p>&#34;InstanceFailure&#34;</p></td>
+<tbody><tr><td><p>&#34;InstanceAvailable&#34;</p></td>
+<td><p>InstanceAvailable ConditionStatus will be True if all instances(pods) are in the ready condition
+and continue for &ldquo;MinReadySeconds&rdquo; seconds. Otherwise, it will be set to False.</p>
+</td>
+</tr><tr><td><p>&#34;InstanceFailure&#34;</p></td>
 <td><p>InstanceFailure is added in an instance set when at least one of its instances(pods) is in a <code>Failed</code> phase.</p>
 </td>
 </tr><tr><td><p>&#34;InstanceReady&#34;</p></td>
@@ -22944,6 +23516,23 @@ int32
 <p>Specifies the desired number of replicas of the given Template.
 These replicas are instantiations of the same Template, with each having a consistent identity.
 Defaults to 1 if unspecified.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>defaultTemplateOrdinals</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.Ordinals">
+Ordinals
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the desired Ordinals of the default template.
+The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the default template.</p>
+<p>For example, if Ordinals is &#123;ranges: [&#123;start: 0, end: 1&#125;], discrete: [7]&#125;,
+then the instance names generated under the default template would be
+$(cluster.name)-$(component.name)-0、$(cluster.name)-$(component.name)-1 and $(cluster.name)-$(component.name)-7</p>
 </td>
 </tr>
 <tr>
@@ -23456,6 +24045,24 @@ The default value is 1. A value of 0 disables instance creation.</p>
 </tr>
 <tr>
 <td>
+<code>ordinals</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.Ordinals">
+Ordinals
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the desired Ordinals of this InstanceTemplate.
+The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.</p>
+<p>For example, if Ordinals is &#123;ranges: [&#123;start: 0, end: 1&#125;], discrete: [7]&#125;,
+then the instance names generated under this InstanceTemplate would be
+$(cluster.name)-$(component.name)-$(template.name)-0、$(cluster.name)-$(component.name)-$(template.name)-1 and
+$(cluster.name)-$(component.name)-$(template.name)-7</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>annotations</code><br/>
 <em>
 map[string]string
@@ -23494,47 +24101,16 @@ string
 </tr>
 <tr>
 <td>
-<code>nodeName</code><br/>
+<code>schedulingPolicy</code><br/>
 <em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the name of the node where the Pod should be scheduled.
-If set, the Pod will be directly assigned to the specified node, bypassing the Kubernetes scheduler.
-This is useful for controlling Pod placement on specific nodes.</p>
-<p>Important considerations:
-- <code>nodeName</code> bypasses default scheduling constraints (e.g., resource requirements, node selectors, affinity rules).
-- It is the user&rsquo;s responsibility to ensure the node is suitable for the Pod.
-- If the node is unavailable, the Pod will remain in &ldquo;Pending&rdquo; state until the node is available or the Pod is deleted.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>nodeSelector</code><br/>
-<em>
-map[string]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines NodeSelector to override.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>tolerations</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#toleration-v1-core">
-[]Kubernetes core/v1.Toleration
+<a href="#workloads.kubeblocks.io/v1alpha1.SchedulingPolicy">
+SchedulingPolicy
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Tolerations specifies a list of tolerations to be applied to the Pod, allowing it to tolerate node taints.
-This field can be used to add new tolerations or override existing ones.</p>
+<p>Specifies the scheduling policy for the Component.</p>
 </td>
 </tr>
 <tr>
@@ -23777,6 +24353,85 @@ If the Image is not configured, the Image from the previous non-nil action will 
 </tr>
 </tbody>
 </table>
+<h3 id="workloads.kubeblocks.io/v1alpha1.Ordinals">Ordinals
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1alpha1.InstanceTemplate">InstanceTemplate</a>)
+</p>
+<div>
+<p>Ordinals represents a combination of continuous segments and individual values.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ranges</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.Range">
+[]Range
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>discrete</code><br/>
+<em>
+[]int32
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1alpha1.Range">Range
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.Ordinals">Ordinals</a>)
+</p>
+<div>
+<p>Range represents a range with a start and an end value.
+It is used to define a continuous segment.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>start</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>end</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="workloads.kubeblocks.io/v1alpha1.ReplicaRole">ReplicaRole
 </h3>
 <p>
@@ -23990,6 +24645,117 @@ RoleUpdateMechanism
 </tr><tr><td><p>&#34;ReadinessProbeEventUpdate&#34;</p></td>
 <td></td>
 </tr></tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1alpha1.SchedulingPolicy">SchedulingPolicy
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.InstanceTemplate">InstanceTemplate</a>)
+</p>
+<div>
+<p>SchedulingPolicy the scheduling policy.
+Deprecated: Unify with apps/v1alpha1.SchedulingPolicy</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>schedulerName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>If specified, the Pod will be dispatched by specified scheduler.
+If not specified, the Pod will be dispatched by default scheduler.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>nodeSelector</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>NodeSelector is a selector which must be true for the Pod to fit on a node.
+Selector which must match a node&rsquo;s labels for the Pod to be scheduled on that node.
+More info: <a href="https://kubernetes.io/docs/concepts/configuration/assign-pod-node/">https://kubernetes.io/docs/concepts/configuration/assign-pod-node/</a></p>
+</td>
+</tr>
+<tr>
+<td>
+<code>nodeName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>NodeName is a request to schedule this Pod onto a specific node. If it is non-empty,
+the scheduler simply schedules this Pod onto that node, assuming that it fits resource
+requirements.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>affinity</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#affinity-v1-core">
+Kubernetes core/v1.Affinity
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a group of affinity scheduling rules of the Cluster, including NodeAffinity, PodAffinity, and PodAntiAffinity.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>tolerations</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#toleration-v1-core">
+[]Kubernetes core/v1.Toleration
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Allows Pods to be scheduled onto nodes with matching taints.
+Each toleration in the array allows the Pod to tolerate node taints based on
+specified <code>key</code>, <code>value</code>, <code>effect</code>, and <code>operator</code>.</p>
+<ul>
+<li>The <code>key</code>, <code>value</code>, and <code>effect</code> identify the taint that the toleration matches.</li>
+<li>The <code>operator</code> determines how the toleration matches the taint.</li>
+</ul>
+<p>Pods with matching tolerations are allowed to be scheduled on tainted nodes, typically reserved for specific purposes.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>topologySpreadConstraints</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#topologyspreadconstraint-v1-core">
+[]Kubernetes core/v1.TopologySpreadConstraint
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>TopologySpreadConstraints describes how a group of Pods ought to spread across topology
+domains. Scheduler will schedule Pods in a way which abides by the constraints.
+All topologySpreadConstraints are ANDed.</p>
+</td>
+</tr>
+</tbody>
 </table>
 <hr/>
 <p><em>

@@ -197,14 +197,13 @@ func (r *LogCollectionReconciler) patchRestoreStatus(reqCtx intctrlutil.RequestC
 	}
 
 	objectKey := dprestore.BuildJobKeyForActionStatus(job.Name)
-	logPrefix := "Collection logs"
 	var hasPatchedLogs bool
 	doLogsPatch := func(actions []dpv1alpha1.RestoreStatusAction) error {
 		for i := range actions {
 			if actions[i].ObjectKey != objectKey {
 				continue
 			}
-			if strings.HasPrefix(actions[i].Message, logPrefix) {
+			if strings.HasPrefix(actions[i].Message, dptypes.LogCollectorOutput) {
 				hasPatchedLogs = true
 				return nil
 			}
@@ -215,7 +214,7 @@ func (r *LogCollectionReconciler) patchRestoreStatus(reqCtx intctrlutil.RequestC
 			if errorLogs == "" {
 				return nil
 			}
-			actions[i].Message = fmt.Sprintf("%s: %s", logPrefix, errorLogs)
+			actions[i].Message = fmt.Sprintf("%s: %s", dptypes.LogCollectorOutput, errorLogs)
 			break
 		}
 		return nil

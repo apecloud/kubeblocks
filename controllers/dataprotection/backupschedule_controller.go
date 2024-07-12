@@ -22,17 +22,18 @@ package dataprotection
 import (
 	"context"
 	"reflect"
-	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -104,6 +105,7 @@ func (r *BackupScheduleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	} else {
 		b.Owns(&batchv1beta1.CronJob{})
 	}
+	b.Watches(&dpv1alpha1.Backup{}, handler.EnqueueRequestsFromMapFunc(r.parseBackup))
 	return b.Complete(r)
 }
 
@@ -126,27 +128,6 @@ func (r *BackupScheduleReconciler) deleteExternalResources(
 		}
 		if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, &cronjob); err != nil {
 			// failed delete k8s job, return error info.
-			return err
-		}
-	}
-	// notice running backup to completed
-	// TODO(ldm): is it necessary to notice running backup to completed?
-	backup := &dpv1alpha1.Backup{}
-	for _, s := range backupSchedule.Spec.Schedules {
-		backupKey := client.ObjectKey{
-			Namespace: backupSchedule.Namespace,
-			Name:      dpbackup.GenerateCRNameByBackupSchedule(backupSchedule, s.BackupMethod),
-		}
-		if err := r.Client.Get(reqCtx.Ctx, backupKey, backup); err != nil {
-			if client.IgnoreNotFound(err) == nil {
-				continue
-			}
-			return err
-		}
-		patch := client.MergeFrom(backup.DeepCopy())
-		backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
-		backup.Status.CompletionTimestamp = &metav1.Time{Time: time.Now().UTC()}
-		if err := r.Client.Status().Patch(reqCtx.Ctx, backup, patch); err != nil {
 			return err
 		}
 	}
@@ -234,4 +215,21 @@ func (r *BackupScheduleReconciler) patchScheduleMetadata(
 	}
 	backupSchedule.Labels[dptypes.BackupPolicyLabelKey] = backupSchedule.Spec.BackupPolicyName
 	return r.Client.Patch(reqCtx.Ctx, backupSchedule, patch)
+}
+
+func (r *BackupScheduleReconciler) parseBackup(ctx context.Context, object client.Object) []reconcile.Request {
+	backup := object.(*dpv1alpha1.Backup)
+	backupScheduleName := dptypes.BackupScheduleLabelKey
+	if backup.Labels[dptypes.BackupTypeLabelKey] == string(dpv1alpha1.BackupTypeContinuous) &&
+		backupScheduleName != "" {
+		return []reconcile.Request{
+			{
+				NamespacedName: types.NamespacedName{
+					Namespace: backup.Namespace,
+					Name:      backupScheduleName,
+				},
+			},
+		}
+	}
+	return []reconcile.Request{}
 }

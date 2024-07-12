@@ -134,6 +134,13 @@ func parseDigitNumber(s string) int {
 
 type cueExpandHandle func(string) (int64, error)
 
+func isAllNumber(s string) bool {
+	isNotDigit := func(c rune) bool {
+		return !unicode.IsNumber(c)
+	}
+	return strings.IndexFunc(s, isNotDigit) == -1
+}
+
 func handleCueExpandHelper(expand string, handle cueExpandHandle) cueExpandHandle {
 	var baseUnit int64 = 0
 	if expand != "" {
@@ -141,7 +148,7 @@ func handleCueExpandHelper(expand string, handle cueExpandHandle) cueExpandHandl
 	}
 	return func(s string) (int64, error) {
 		v, err := handle(s)
-		if baseUnit > 0 {
+		if baseUnit > 0 && !isAllNumber(s) {
 			v /= baseUnit
 		}
 		return v, err

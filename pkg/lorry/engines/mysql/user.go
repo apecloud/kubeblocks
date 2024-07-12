@@ -114,12 +114,12 @@ func (mgr *Manager) DescribeUser(ctx context.Context, userName string) (*models.
 	return user, nil
 }
 
-func (mgr *Manager) CreateUser(ctx context.Context, userName, password string) error {
+func (mgr *Manager) CreateUser(ctx context.Context, userName, password, _ string) error {
 	sql := fmt.Sprintf(createUserSQL, userName, password)
 
 	_, err := mgr.Exec(ctx, sql)
 	if err != nil {
-		mgr.Logger.Error(err, "execute sql failed", "sql", sql)
+		mgr.Logger.Info("execute sql failed", "sql", sql, "error", err.Error())
 		return err
 	}
 

@@ -263,6 +263,17 @@ func (factory *MockClusterFactory) AddComponentService(serviceName string, servi
 	})
 }
 
+func (factory *MockClusterFactory) AddSystemAccount(name string, passwordConfig *appsv1alpha1.PasswordConfig, secretRef *appsv1alpha1.ProvisionSecretRef) *MockClusterFactory {
+	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
+		comp.SystemAccounts = append(comp.SystemAccounts,
+			appsv1alpha1.ComponentSystemAccount{
+				Name:           name,
+				PasswordConfig: passwordConfig,
+				SecretRef:      secretRef,
+			})
+	})
+}
+
 func (factory *MockClusterFactory) SetBackup(backup *appsv1alpha1.ClusterBackup) *MockClusterFactory {
 	factory.Get().Spec.Backup = backup
 	return factory
@@ -315,5 +326,11 @@ func (factory *MockClusterFactory) AddUserConfigmapVolume(name, mountPoint, resN
 			comp.UserResourceRefs = userResourcesRefs
 		}
 		userResourcesRefs.ConfigMapRefs = append(userResourcesRefs.ConfigMapRefs, cmResource)
+	})
+}
+
+func (factory *MockClusterFactory) SetStop(stop *bool) *MockClusterFactory {
+	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
+		comp.Stop = stop
 	})
 }

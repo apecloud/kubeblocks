@@ -38,7 +38,6 @@ import (
 
 	// +kubebuilder:scaffold:imports
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/testutil"
 )
@@ -101,8 +100,6 @@ var _ = BeforeSuite(func() {
 		Recorder: recorder,
 	}).SetupWithManager(k8sManager, nil)
 	Expect(err).ToNot(HaveOccurred())
-
-	appsv1alpha1.RegisterWebhookManager(k8sManager)
 
 	go func() {
 		defer GinkgoRecover()

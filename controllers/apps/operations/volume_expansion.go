@@ -22,18 +22,19 @@ package operations
 import (
 	"fmt"
 	"reflect"
-	"regexp"
-	"strconv"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -41,16 +42,15 @@ type volumeExpansionOpsHandler struct {
 }
 
 type volumeExpansionHelper struct {
-	compOps           ComponentOpsInteface
-	fullComponentName string
-	templateName      string
-	vctName           string
-	expectCount       int
+	compOps              ComponentOpsInterface
+	fullComponentName    string
+	templateName         string
+	vctName              string
+	expectCount          int
+	offlineInstanceNames []string
 }
 
 var _ OpsHandler = volumeExpansionOpsHandler{}
-
-var pvcNameRegex = regexp.MustCompile("(.*)-([0-9]+)$")
 
 const (
 	// VolumeExpansionTimeOut volume expansion timeout.
@@ -74,7 +74,7 @@ func (ve volumeExpansionOpsHandler) ActionStartedCondition(reqCtx intctrlutil.Re
 
 // Action modifies Cluster.spec.components[*].VolumeClaimTemplates[*].spec.resources
 func (ve volumeExpansionOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	applyVolumeExpansion := func(compSpec *appsv1alpha1.ClusterComponentSpec, obj ComponentOpsInteface) {
+	applyVolumeExpansion := func(compSpec *appsv1alpha1.ClusterComponentSpec, obj ComponentOpsInterface) error {
 		setVolumeStorage := func(volumeExpansionVCTs []appsv1alpha1.OpsRequestVolumeClaimTemplate,
 			targetVCTs []appsv1alpha1.ClusterComponentVolumeClaimTemplate) {
 			for _, v := range volumeExpansionVCTs {
@@ -97,9 +97,12 @@ func (ve volumeExpansionOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli cl
 				}
 			}
 		}
+		return nil
 	}
 	compOpsSet := newComponentOpsHelper(opsRes.OpsRequest.Spec.VolumeExpansionList)
-	compOpsSet.updateClusterComponentsAndShardings(opsRes.Cluster, applyVolumeExpansion)
+	if err := compOpsSet.updateClusterComponentsAndShardings(opsRes.Cluster, applyVolumeExpansion); err != nil {
+		return err
+	}
 	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
 }
 
@@ -119,7 +122,7 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 	getTemplateReplicas := func(templates []appsv1alpha1.InstanceTemplate) int32 {
 		var replicaCount int32
 		for _, v := range templates {
-			replicaCount += intctrlutil.TemplateReplicas(v)
+			replicaCount += v.GetReplicas()
 		}
 		return replicaCount
 	}
@@ -130,16 +133,17 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.VolumeExpansionList)
 	storageMap := ve.getRequestStorageMap(opsRequest)
 	var veHelpers []volumeExpansionHelper
-	setVeHelpers := func(compSpec appsv1alpha1.ClusterComponentSpec, compOps ComponentOpsInteface, fullComponentName string) {
+	setVeHelpers := func(compSpec appsv1alpha1.ClusterComponentSpec, compOps ComponentOpsInterface, fullComponentName string) {
 		volumeExpansion := compOps.(appsv1alpha1.VolumeExpansion)
 		if len(volumeExpansion.VolumeClaimTemplates) > 0 {
 			expectReplicas := compSpec.Replicas - getTemplateReplicas(compSpec.Instances)
 			for _, vct := range volumeExpansion.VolumeClaimTemplates {
 				veHelpers = append(veHelpers, volumeExpansionHelper{
-					compOps:           compOps,
-					fullComponentName: fullComponentName,
-					expectCount:       int(expectReplicas),
-					vctName:           vct.Name,
+					compOps:              compOps,
+					fullComponentName:    fullComponentName,
+					expectCount:          int(expectReplicas),
+					vctName:              vct.Name,
+					offlineInstanceNames: compSpec.OfflineInstances,
 				})
 			}
 		}
@@ -147,10 +151,11 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 			for _, ins := range compSpec.Instances {
 				for _, vct := range ins.VolumeClaimTemplates {
 					veHelpers = append(veHelpers, volumeExpansionHelper{
-						compOps:           compOps,
-						fullComponentName: fullComponentName,
-						expectCount:       int(intctrlutil.TemplateReplicas(ins)),
-						vctName:           vct.Name,
+						compOps:              compOps,
+						fullComponentName:    fullComponentName,
+						expectCount:          int(ins.GetReplicas()),
+						vctName:              vct.Name,
+						offlineInstanceNames: compSpec.OfflineInstances,
 					})
 				}
 			}
@@ -229,7 +234,7 @@ func (ve volumeExpansionOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.Req
 	opsRequest := opsRes.OpsRequest
 	compOpsHelper := newComponentOpsHelper(opsRequest.Spec.VolumeExpansionList)
 	storageMap := ve.getRequestStorageMap(opsRequest)
-	compOpsHelper.saveLastConfigurations(opsRes, func(compSpec appsv1alpha1.ClusterComponentSpec, comOps ComponentOpsInteface) appsv1alpha1.LastComponentConfiguration {
+	compOpsHelper.saveLastConfigurations(opsRes, func(compSpec appsv1alpha1.ClusterComponentSpec, comOps ComponentOpsInterface) appsv1alpha1.LastComponentConfiguration {
 		getLastVCTs := func(vcts []appsv1alpha1.ClusterComponentVolumeClaimTemplate, templateName string) []appsv1alpha1.ClusterComponentVolumeClaimTemplate {
 			lastVCTs := make([]appsv1alpha1.ClusterComponentVolumeClaimTemplate, 0)
 			for _, vct := range vcts {
@@ -326,23 +331,23 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 		constant.KBAppComponentLabelKey:          veHelper.fullComponentName,
 	}
 	if veHelper.templateName != "" {
-		matchingLabels[constant.KBAppComponentInstanceTemplatelabelKey] = veHelper.templateName
+		matchingLabels[constant.KBAppComponentInstanceTemplateLabelKey] = veHelper.templateName
 	}
 	pvcList := &corev1.PersistentVolumeClaimList{}
 	if err = cli.List(reqCtx.Ctx, pvcList, matchingLabels, client.InNamespace(opsRes.Cluster.Namespace)); err != nil {
 		return 0, 0, err
 	}
-	var ordinal int
+	workloadName := constant.GenerateWorkloadNamePattern(opsRes.Cluster.Name, veHelper.fullComponentName)
+	instanceNames, err := instanceset.GenerateInstanceNamesFromTemplate(workloadName, veHelper.templateName, int32(veHelper.expectCount), veHelper.offlineInstanceNames, nil)
+	if err != nil {
+		return 0, 0, err
+	}
+	instanceNameSet := sets.New(instanceNames...)
 	for _, v := range pvcList.Items {
-		// filter PVC(s) with ordinal no larger than comp.Replicas - 1, which left by scale-in
-		ordinal, err = getPVCOrdinal(v.Name)
-		if err != nil {
-			return 0, 0, err
-		}
-		if ordinal > veHelper.expectCount-1 {
+		if _, ok := instanceNameSet[strings.Replace(v.Name, veHelper.vctName+"-", "", 1)]; !ok {
 			continue
 		}
-		if v.Labels[constant.KBAppComponentInstanceTemplatelabelKey] != veHelper.templateName {
+		if v.Labels[constant.KBAppComponentInstanceTemplateLabelKey] != veHelper.templateName {
 			continue
 		}
 		objectKey := getPVCProgressObjectKey(v.Name)
@@ -390,12 +395,4 @@ func getComponentVCTKey(compoName, insTemplateName, vctName string) string {
 
 func getPVCProgressObjectKey(pvcName string) string {
 	return fmt.Sprintf("PVC/%s", pvcName)
-}
-
-func getPVCOrdinal(pvcName string) (int, error) {
-	subMatches := pvcNameRegex.FindStringSubmatch(pvcName)
-	if len(subMatches) < 3 {
-		return 0, fmt.Errorf("wrong pvc name: %s", pvcName)
-	}
-	return strconv.Atoi(subMatches[2])
 }

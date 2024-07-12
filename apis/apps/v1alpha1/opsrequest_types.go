@@ -80,6 +80,21 @@ type OpsRequestSpec struct {
 	// +optional
 	TTLSecondsAfterSucceed int32 `json:"ttlSecondsAfterSucceed,omitempty"`
 
+	// Specifies the maximum time in seconds that the OpsRequest will wait for its pre-conditions to be met
+	// before it aborts the operation.
+	// If set to 0 (default), pre-conditions must be satisfied immediately for the OpsRequest to proceed.
+	//
+	// +kubebuilder:default=0
+	// +optional
+	PreConditionDeadlineSeconds *int32 `json:"preConditionDeadlineSeconds,omitempty"`
+
+	// Specifies the maximum duration (in seconds) that an opsRequest is allowed to run.
+	// If the opsRequest runs longer than this duration, its phase will be marked as Aborted.
+	// If this value is not set or set to 0, the timeout will be ignored and the opsRequest will run indefinitely.
+	// +optional
+	// +kubebuilder:Minimum=0
+	TimeoutSeconds *int32 `json:"timeoutSeconds,omitempty"`
+
 	// Exactly one of its members must be set.
 	SpecificOpsRequest `json:",inline"`
 }
@@ -94,8 +109,8 @@ type SpecificOpsRequest struct {
 	Upgrade *Upgrade `json:"upgrade,omitempty"`
 
 	// Lists HorizontalScaling objects, each specifying scaling requirements for a Component,
-	// including desired total replica counts, configurations for new instances, modifications for existing instances,
-	// and instance downscaling options.
+	// including desired replica changes, configurations for new instances, modifications for existing instances,
+	// and take offline/online the specified instances.
 	//
 	// +optional
 	// +patchMergeKey=componentName
@@ -168,14 +183,6 @@ type SpecificOpsRequest struct {
 	// +optional
 	ExposeList []Expose `json:"expose,omitempty"`
 
-	// Specifies the maximum time in seconds that the OpsRequest will wait for its pre-conditions to be met
-	// before it aborts the operation.
-	// If set to 0 (default), pre-conditions must be satisfied immediately for the OpsRequest to proceed.
-	//
-	// +kubebuilder:default=0
-	// +optional
-	PreConditionDeadlineSeconds *int32 `json:"preConditionDeadlineSeconds,omitempty"`
-
 	// Specifies the image and scripts for executing engine-specific operations such as creating databases or users.
 	// It supports limited engines including MySQL, PostgreSQL, Redis, MongoDB.
 	//
@@ -241,8 +248,15 @@ type RebuildInstance struct {
 
 	// Specifies the instances (Pods) that need to be rebuilt, typically operating as standbys.
 	//
+	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:Required
 	Instances []Instance `json:"instances"`
+
+	// When it is set to true, the instance will be rebuilt in-place.
+	// By default, a new pod will be created. Once the new pod is ready to serve,
+	// the instance that require rebuilding will be taken offline.
+	// +kubebuilder:validation:default=false
+	InPlace bool `json:"inPlace,omitempty"`
 
 	// Indicates the name of the Backup custom resource from which to recover the instance.
 	// Defaults to an empty PersistentVolume if unspecified.
@@ -360,7 +374,12 @@ type VerticalScaling struct {
 	corev1.ResourceRequirements `json:",inline"`
 
 	// Specifies the desired compute resources of the instance template that need to vertical scale.
-	Instances []InstanceResourceTemplate `json:"instances,omitempty"`
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	Instances []InstanceResourceTemplate `json:"instances,omitempty"  patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 }
 
 type InstanceResourceTemplate struct {
@@ -403,7 +422,12 @@ type VolumeExpansion struct {
 	VolumeClaimTemplates []OpsRequestVolumeClaimTemplate `json:"volumeClaimTemplates" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// Specifies the desired storage size of the instance template that need to volume expand.
-	Instances []InstanceVolumeClaimTemplate `json:"instances,omitempty"`
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	Instances []InstanceVolumeClaimTemplate `json:"instances,omitempty"  patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 }
 
 type OpsRequestVolumeClaimTemplate struct {
@@ -425,34 +449,84 @@ type HorizontalScaling struct {
 	// Specifies the name of the Component.
 	ComponentOps `json:",inline"`
 
-	// Specifies the number of total replicas.
-	//
-	// +kubebuilder:validation:Required
+	// Deprecated: since v0.9, use scaleOut and scaleIn instead.
+	// Specifies the number of replicas for the component. Cannot be used with "scaleIn" and "scaleOut".
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +kubebuilder:validation:Minimum=0
-	Replicas int32 `json:"replicas"`
+	// +optional
+	Replicas *int32 `json:"replicas,omitempty"`
 
-	// Contains a list of InstanceTemplate objects.
-	// Each InstanceTemplate object allows for modifying replica counts or specifying configurations for new instances during scaling.
-	//
-	// The field supports two main use cases:
-	//
-	// - Modifying replica count:
-	//   Specify the desired replica count for existing instances with a particular configuration using Name and Replicas fields.
-	//   To modify the replica count, the Name and Replicas fields of the InstanceTemplate object should be provided.
-	//   Only these fields are used for matching and adjusting replicas; other fields are ignored.
-	//   The Replicas value overrides any existing count.
-	// - Configuring new instances:
-	//   Define the configuration for new instances added during scaling, including resource requirements, labels, annotations, etc.
-	//   New instances are created based on the provided InstanceTemplate.
+	// Specifies the replica changes for scaling out components and instance templates,
+	// and brings offline instances back online. Can be used in conjunction with the "scaleIn" operation.
+	// Note: Any configuration that deletes instances is considered invalid.
 	//
 	// +optional
-	Instances []InstanceTemplate `json:"instances,omitempty"`
+	ScaleOut *ScaleOut `json:"scaleOut,omitempty"`
 
-	// Specifies the names of instances to be scaled down.
-	// This provides control over which specific instances are targeted for termination when reducing the replica count.
-	//
+	// Specifies the replica changes for scaling in components and instance templates,
+	// and takes specified instances offline. Can be used in conjunction with the "scaleOut" operation.
+	// Note: Any configuration that creates instances is considered invalid.
 	// +optional
-	OfflineInstances []string `json:"offlineInstances,omitempty"`
+	ScaleIn *ScaleIn `json:"scaleIn,omitempty"`
+}
+
+// ScaleOut defines the configuration for a scale-out operation.
+type ScaleOut struct {
+
+	// Modifies the replicas of the component and instance templates.
+	ReplicaChanger `json:",inline"`
+
+	// Defines the configuration for new instances added during scaling, including resource requirements, labels, annotations, etc.
+	// New instances are created based on the provided instance templates.
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	NewInstances []InstanceTemplate `json:"newInstances,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+
+	// Specifies the instances in the offline list to bring back online.
+	// +optional
+	OfflineInstancesToOnline []string `json:"offlineInstancesToOnline,omitempty"`
+}
+
+// ScaleIn defines the configuration for a scale-in operation.
+type ScaleIn struct {
+
+	// Modifies the replicas of the component and instance templates.
+	ReplicaChanger `json:",inline"`
+
+	// Specifies the instance names that need to be taken offline.
+	// +optional
+	OnlineInstancesToOffline []string `json:"onlineInstancesToOffline,omitempty"`
+}
+
+// ReplicaChanger defines the parameters for changing the number of replicas.
+type ReplicaChanger struct {
+	// Specifies the replica changes for the component.
+	// +kubebuilder:validation:Minimum=0
+	ReplicaChanges *int32 `json:"replicaChanges,omitempty"`
+
+	// Modifies the desired replicas count for existing InstanceTemplate.
+	// if the inst
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	Instances []InstanceReplicasTemplate `json:"instances,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+}
+
+// InstanceReplicasTemplate defines the template for instance replicas.
+type InstanceReplicasTemplate struct {
+	// Specifies the name of the instance template.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Specifies the replica changes for the instance template.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Required
+	ReplicaChanges int32 `json:"replicaChanges"`
 }
 
 // Reconfigure defines the parameters for updating a Component's configuration.
@@ -677,7 +751,7 @@ type OpsService struct {
 	// Specifies a role to target with the service.
 	// If specified, the service will only be exposed to pods with the matching role.
 	//
-	// Note: At least one of 'roleSelector' or 'podSelector' must be specified.
+	// Note: If the component has roles, at least one of 'roleSelector' or 'podSelector' must be specified.
 	// If both are specified, a pod must match both conditions to be selected.
 	//
 	// +optional
@@ -686,7 +760,7 @@ type OpsService struct {
 	// Routes service traffic to pods with matching label keys and values.
 	// If specified, the service will only be exposed to pods matching the selector.
 	//
-	// Note: At least one of 'roleSelector' or 'podSelector' must be specified.
+	// Note: If the component has roles, at least one of 'roleSelector' or 'podSelector' must be specified.
 	// If both are specified, a pod must match both conditions to be selected.
 	//
 	// +optional

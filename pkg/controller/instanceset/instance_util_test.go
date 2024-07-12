@@ -21,12 +21,15 @@ package instanceset
 
 import (
 	"fmt"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -409,7 +412,71 @@ var _ = Describe("instance util test", func() {
 
 			var instanceNameList []string
 			for _, template := range templates {
-				instanceNames := GenerateInstanceNamesFromTemplate(parentName, template.Name, template.Replicas, offlineInstances)
+				instanceNames, err := GenerateInstanceNamesFromTemplate(parentName, template.Name, template.Replicas, offlineInstances, nil)
+				Expect(err).Should(BeNil())
+				instanceNameList = append(instanceNameList, instanceNames...)
+			}
+			getNameNOrdinalFunc := func(i int) (string, int) {
+				return ParseParentNameAndOrdinal(instanceNameList[i])
+			}
+			baseSort(instanceNameList, getNameNOrdinalFunc, nil, true)
+			podNamesExpected := []string{"foo-1", "foo-2", "foo-bar-0", "foo-bar-2"}
+			Expect(instanceNameList).Should(Equal(podNamesExpected))
+		})
+		It("without OfflineInstances, should work well", func() {
+			parentName := "foo"
+			templateName := "bar"
+			templates := []*instanceTemplateExt{
+				{
+					Name:     "",
+					Replicas: 2,
+				},
+				{
+					Replicas: 2,
+					Name:     templateName,
+				},
+			}
+			templateName2OrdinalListMap := map[string][]int32{
+				"":           {1, 2},
+				templateName: {0, 2},
+			}
+
+			var instanceNameList []string
+			for _, template := range templates {
+				instanceNames, err := GenerateInstanceNamesFromTemplate(parentName, template.Name, template.Replicas, nil, templateName2OrdinalListMap[template.Name])
+				Expect(err).Should(BeNil())
+				instanceNameList = append(instanceNameList, instanceNames...)
+			}
+			getNameNOrdinalFunc := func(i int) (string, int) {
+				return ParseParentNameAndOrdinal(instanceNameList[i])
+			}
+			baseSort(instanceNameList, getNameNOrdinalFunc, nil, true)
+			podNamesExpected := []string{"foo-1", "foo-2", "foo-bar-0", "foo-bar-2"}
+			Expect(instanceNameList).Should(Equal(podNamesExpected))
+		})
+		It("with OfflineInstances, should work well", func() {
+			parentName := "foo"
+			templateName := "bar"
+			templates := []*instanceTemplateExt{
+				{
+					Name:     "",
+					Replicas: 2,
+				},
+				{
+					Replicas: 2,
+					Name:     templateName,
+				},
+			}
+			templateName2OrdinalListMap := map[string][]int32{
+				"":           {0, 1, 2},
+				templateName: {0, 1, 2},
+			}
+			offlineInstances := []string{"foo-bar-1", "foo-0"}
+
+			var instanceNameList []string
+			for _, template := range templates {
+				instanceNames, err := GenerateInstanceNamesFromTemplate(parentName, template.Name, template.Replicas, offlineInstances, templateName2OrdinalListMap[template.Name])
+				Expect(err).Should(BeNil())
 				instanceNameList = append(instanceNameList, instanceNames...)
 			}
 			getNameNOrdinalFunc := func(i int) (string, int) {
@@ -435,10 +502,843 @@ var _ = Describe("instance util test", func() {
 			var templates []InstanceTemplate
 			templates = append(templates, templatesFoo, templateBar)
 			offlineInstances := []string{"foo-bar-1", "foo-0"}
-			instanceNameList := GenerateAllInstanceNames(parentName, 5, templates, offlineInstances)
+			instanceNameList, err := GenerateAllInstanceNames(parentName, 5, templates, offlineInstances, workloads.Ordinals{})
+			Expect(err).Should(BeNil())
 
 			podNamesExpected := []string{"foo-1", "foo-2", "foo-bar-0", "foo-bar-2", "foo-foo-0"}
 			Expect(instanceNameList).Should(Equal(podNamesExpected))
+		})
+		It("with Ordinals, without offlineInstances", func() {
+			parentName := "foo"
+			defaultTemplateOrdinals := workloads.Ordinals{
+				Ranges: []workloads.Range{
+					{
+						Start: 1,
+						End:   2,
+					},
+				},
+			}
+			templatesFoo := &workloads.InstanceTemplate{
+				Name:     "foo",
+				Replicas: pointer.Int32(1),
+				Ordinals: workloads.Ordinals{
+					Discrete: []int32{0},
+				},
+			}
+			templateBar := &workloads.InstanceTemplate{
+				Name:     "bar",
+				Replicas: pointer.Int32(3),
+				Ordinals: workloads.Ordinals{
+					Ranges: []workloads.Range{
+						{
+							Start: 2,
+							End:   3,
+						},
+					},
+					Discrete: []int32{0},
+				},
+			}
+			var templates []InstanceTemplate
+			templates = append(templates, templatesFoo, templateBar)
+			instanceNameList, err := GenerateAllInstanceNames(parentName, 6, templates, nil, defaultTemplateOrdinals)
+			Expect(err).Should(BeNil())
+
+			podNamesExpected := []string{"foo-1", "foo-2", "foo-bar-0", "foo-bar-2", "foo-bar-3", "foo-foo-0"}
+			Expect(instanceNameList).Should(Equal(podNamesExpected))
+		})
+		It("with templatesOrdinals, with offlineInstances", func() {
+			parentName := "foo"
+			defaultTemplateOrdinals := workloads.Ordinals{
+				Ranges: []workloads.Range{
+					{
+						Start: 1,
+						End:   2,
+					},
+				},
+			}
+			templatesFoo := &workloads.InstanceTemplate{
+				Name:     "foo",
+				Replicas: pointer.Int32(1),
+				Ordinals: workloads.Ordinals{
+					Discrete: []int32{0},
+				},
+			}
+			templateBar := &workloads.InstanceTemplate{
+				Name:     "bar",
+				Replicas: pointer.Int32(2),
+				Ordinals: workloads.Ordinals{
+					Ranges: []workloads.Range{
+						{
+							Start: 2,
+							End:   3,
+						},
+					},
+					Discrete: []int32{0},
+				},
+			}
+			var templates []InstanceTemplate
+			templates = append(templates, templatesFoo, templateBar)
+			offlineInstances := []string{"foo-bar-1", "foo-0", "foo-bar-3"}
+			instanceNameList, err := GenerateAllInstanceNames(parentName, 5, templates, offlineInstances, defaultTemplateOrdinals)
+			Expect(err).Should(BeNil())
+
+			podNamesExpected := []string{"foo-1", "foo-2", "foo-bar-0", "foo-bar-2", "foo-foo-0"}
+			Expect(instanceNameList).Should(Equal(podNamesExpected))
+		})
+		It("with templatesOrdinals, with offlineInstances, replicas error", func() {
+			parentName := "foo"
+			defaultTemplateOrdinals := workloads.Ordinals{
+				Ranges: []workloads.Range{
+					{
+						Start: 1,
+						End:   2,
+					},
+				},
+			}
+			templatesFoo := &workloads.InstanceTemplate{
+				Name:     "foo",
+				Replicas: pointer.Int32(1),
+				Ordinals: workloads.Ordinals{
+					Discrete: []int32{0},
+				},
+			}
+			templateBar := &workloads.InstanceTemplate{
+				Name:     "bar",
+				Replicas: pointer.Int32(3),
+				Ordinals: workloads.Ordinals{
+					Ranges: []workloads.Range{
+						{
+							Start: 2,
+							End:   3,
+						},
+					},
+					Discrete: []int32{0},
+				},
+			}
+			var templates []InstanceTemplate
+			templates = append(templates, templatesFoo, templateBar)
+			offlineInstances := []string{"foo-bar-1", "foo-0", "foo-bar-3"}
+			instanceNameList, err := GenerateAllInstanceNames(parentName, 5, templates, offlineInstances, defaultTemplateOrdinals)
+			errInstanceNameListExpected := []string{"foo-bar-0", "foo-bar-2"}
+			errExpected := fmt.Errorf(fmt.Sprintf("for template '%s', expected %d instance names but generated %d: [%s]",
+				templateBar.Name, *templateBar.Replicas, len(errInstanceNameListExpected), strings.Join(errInstanceNameListExpected, ", ")))
+			Expect(instanceNameList).Should(BeNil())
+			Expect(err).Should(Equal(errExpected))
+		})
+	})
+
+	Context("GetOrdinalListByTemplateName", func() {
+		It("should work well", func() {
+			its := &workloads.InstanceSet{
+				Spec: workloads.InstanceSetSpec{
+					DefaultTemplateOrdinals: workloads.Ordinals{
+						Ranges: []workloads.Range{
+							{
+								Start: 1,
+								End:   2,
+							},
+						},
+					},
+					Instances: []workloads.InstanceTemplate{
+						{
+							Name: "foo",
+							Ordinals: workloads.Ordinals{
+								Discrete: []int32{0},
+							},
+						},
+						{
+							Name: "bar",
+							Ordinals: workloads.Ordinals{
+								Ranges: []workloads.Range{
+									{
+										Start: 2,
+										End:   3,
+									},
+								},
+								Discrete: []int32{0},
+							},
+						},
+					},
+				},
+			}
+			templateNameDefault := ""
+			templateNameFoo := "foo"
+			templateNameBar := "bar"
+			templateNameNotFound := "foobar"
+
+			ordinalListDefault, err := GetOrdinalListByTemplateName(its, templateNameDefault)
+			Expect(err).Should(BeNil())
+			ordinalListDefaultExpected := []int32{1, 2}
+			Expect(ordinalListDefault).Should(Equal(ordinalListDefaultExpected))
+
+			ordinalListFoo, err := GetOrdinalListByTemplateName(its, templateNameFoo)
+			Expect(err).Should(BeNil())
+			ordinalListFooExpected := []int32{0}
+			Expect(ordinalListFoo).Should(Equal(ordinalListFooExpected))
+
+			ordinalListBar, err := GetOrdinalListByTemplateName(its, templateNameBar)
+			Expect(err).Should(BeNil())
+			ordinalListBarExpected := []int32{0, 2, 3}
+			Expect(ordinalListBar).Should(Equal(ordinalListBarExpected))
+
+			ordinalListNotFound, err := GetOrdinalListByTemplateName(its, templateNameNotFound)
+			Expect(ordinalListNotFound).Should(BeNil())
+			errExpected := fmt.Errorf("template %s not found", templateNameNotFound)
+			Expect(err).Should(Equal(errExpected))
+		})
+	})
+
+	Context("GetOrdinalsByTemplateName", func() {
+		It("should work well", func() {
+			its := &workloads.InstanceSet{
+				Spec: workloads.InstanceSetSpec{
+					DefaultTemplateOrdinals: workloads.Ordinals{
+						Ranges: []workloads.Range{
+							{
+								Start: 1,
+								End:   2,
+							},
+						},
+					},
+					Instances: []workloads.InstanceTemplate{
+						{
+							Name: "foo",
+							Ordinals: workloads.Ordinals{
+								Discrete: []int32{0},
+							},
+						},
+						{
+							Name: "bar",
+							Ordinals: workloads.Ordinals{
+								Ranges: []workloads.Range{
+									{
+										Start: 2,
+										End:   3,
+									},
+								},
+								Discrete: []int32{0},
+							},
+						},
+					},
+				},
+			}
+			templateNameDefault := ""
+			templateNameFoo := "foo"
+			templateNameBar := "bar"
+			templateNameNotFound := "foobar"
+
+			ordinalsDefault, err := GetOrdinalsByTemplateName(its, templateNameDefault)
+			Expect(err).Should(BeNil())
+			ordinalsDefaultExpected := workloads.Ordinals{
+				Ranges: []workloads.Range{
+					{
+						Start: 1,
+						End:   2,
+					},
+				},
+			}
+			Expect(ordinalsDefault).Should(Equal(ordinalsDefaultExpected))
+
+			ordinalsFoo, err := GetOrdinalsByTemplateName(its, templateNameFoo)
+			Expect(err).Should(BeNil())
+			ordinalsFooExpected := workloads.Ordinals{
+				Discrete: []int32{0},
+			}
+			Expect(ordinalsFoo).Should(Equal(ordinalsFooExpected))
+
+			ordinalsBar, err := GetOrdinalsByTemplateName(its, templateNameBar)
+			Expect(err).Should(BeNil())
+			ordinalsBarExpected := workloads.Ordinals{
+				Ranges: []workloads.Range{
+					{
+						Start: 2,
+						End:   3,
+					},
+				},
+				Discrete: []int32{0},
+			}
+			Expect(ordinalsBar).Should(Equal(ordinalsBarExpected))
+
+			ordinalsNotFound, err := GetOrdinalsByTemplateName(its, templateNameNotFound)
+			Expect(ordinalsNotFound).Should(Equal(workloads.Ordinals{}))
+			errExpected := fmt.Errorf("template %s not found", templateNameNotFound)
+			Expect(err).Should(Equal(errExpected))
+		})
+	})
+
+	Context("ConvertOrdinalsToSortedList", func() {
+		It("should work well", func() {
+			ordinals := workloads.Ordinals{
+				Ranges: []workloads.Range{
+					{
+						Start: 2,
+						End:   4,
+					},
+				},
+				Discrete: []int32{0, 6},
+			}
+			ordinalList, err := ConvertOrdinalsToSortedList(ordinals)
+			Expect(err).Should(BeNil())
+			sets.NewInt32(ordinalList...).Equal(sets.NewInt32(0, 2, 3, 4, 6))
+		})
+		It("rightNumber must >= leftNumber", func() {
+			ordinals := workloads.Ordinals{
+				Ranges: []workloads.Range{
+					{
+						Start: 4,
+						End:   2,
+					},
+				},
+				Discrete: []int32{0},
+			}
+			ordinalList, err := ConvertOrdinalsToSortedList(ordinals)
+			errExpected := fmt.Errorf("range's end(%v) must >= start(%v)", 2, 4)
+			Expect(err).Should(Equal(errExpected))
+			Expect(ordinalList).Should(BeNil())
+		})
+	})
+
+	Context("mergeAffinity", func() {
+		It("merge all configs", func() {
+			affinity1 := &corev1.Affinity{
+				NodeAffinity: &corev1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+						NodeSelectorTerms: []corev1.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{
+										Key:      "node-role.kubernetes.io/worker",
+										Operator: corev1.NodeSelectorOpExists,
+									},
+								},
+								MatchFields: nil,
+							},
+							{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{
+										Key:      "topology.kubernetes.io/zone",
+										Operator: corev1.NodeSelectorOpIn,
+										Values: []string{
+											"east1",
+										},
+									},
+								},
+							},
+						},
+					},
+					PreferredDuringSchedulingIgnoredDuringExecution: nil,
+				},
+				PodAffinity: &corev1.PodAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: nil,
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "app",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"myapp"},
+									},
+								},
+							},
+							Namespaces:  nil,
+							TopologyKey: "",
+							NamespaceSelector: &metav1.LabelSelector{
+								MatchLabels:      nil,
+								MatchExpressions: nil,
+							},
+						},
+					},
+					PreferredDuringSchedulingIgnoredDuringExecution: nil,
+				},
+				PodAntiAffinity: &corev1.PodAntiAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: nil,
+					PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+						{
+							Weight: 100,
+							PodAffinityTerm: corev1.PodAffinityTerm{
+								LabelSelector: &metav1.LabelSelector{
+									MatchLabels: nil,
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										{
+											Key:      "app",
+											Operator: metav1.LabelSelectorOpIn,
+											Values:   []string{"myapp"},
+										},
+									},
+								},
+								TopologyKey: "kubernetes.io/hostname",
+								NamespaceSelector: &metav1.LabelSelector{
+									MatchLabels:      nil,
+									MatchExpressions: nil,
+								},
+							},
+						},
+					},
+				},
+			}
+			affinity2 := &corev1.Affinity{
+				NodeAffinity: &corev1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+						NodeSelectorTerms: []corev1.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{
+										Key:      "disktype",
+										Operator: corev1.NodeSelectorOpIn,
+										Values: []string{
+											"hdd",
+										},
+									},
+								},
+								MatchFields: nil,
+							},
+							{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{
+										Key:      "topology.kubernetes.io/zone",
+										Operator: corev1.NodeSelectorOpIn,
+										Values: []string{
+											"west1",
+										},
+									},
+								},
+							},
+						},
+					},
+					PreferredDuringSchedulingIgnoredDuringExecution: nil,
+				},
+				PodAffinity: &corev1.PodAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: nil,
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "app",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"myapp"},
+									},
+								},
+							},
+							Namespaces:  nil,
+							TopologyKey: "",
+							NamespaceSelector: &metav1.LabelSelector{
+								MatchLabels:      nil,
+								MatchExpressions: nil,
+							},
+						},
+					},
+					PreferredDuringSchedulingIgnoredDuringExecution: nil,
+				},
+				PodAntiAffinity: &corev1.PodAntiAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: nil,
+					PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+						{
+							Weight: 100,
+							PodAffinityTerm: corev1.PodAffinityTerm{
+								LabelSelector: &metav1.LabelSelector{
+									MatchLabels: nil,
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										{
+											Key:      "app",
+											Operator: metav1.LabelSelectorOpIn,
+											Values:   []string{"myapp"},
+										},
+									},
+								},
+								TopologyKey: "kubernetes.io/hostname",
+								NamespaceSelector: &metav1.LabelSelector{
+									MatchLabels:      nil,
+									MatchExpressions: nil,
+								},
+							},
+						},
+					},
+				},
+			}
+
+			mergeAffinity(&affinity1, &affinity2)
+
+			expectMergedAffinity := &corev1.Affinity{
+				NodeAffinity: &corev1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+						NodeSelectorTerms: []corev1.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{
+										Key:      "disktype",
+										Operator: corev1.NodeSelectorOpIn,
+										Values: []string{
+											"hdd",
+										},
+									},
+								},
+								MatchFields: nil,
+							},
+							{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{
+										Key:      "topology.kubernetes.io/zone",
+										Operator: corev1.NodeSelectorOpIn,
+										Values: []string{
+											"west1",
+										},
+									},
+								},
+							},
+							{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{
+										Key:      "node-role.kubernetes.io/worker",
+										Operator: corev1.NodeSelectorOpExists,
+									},
+								},
+								MatchFields: nil,
+							},
+							{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{
+										Key:      "topology.kubernetes.io/zone",
+										Operator: corev1.NodeSelectorOpIn,
+										Values: []string{
+											"east1",
+										},
+									},
+								},
+							},
+						},
+					},
+					PreferredDuringSchedulingIgnoredDuringExecution: nil,
+				},
+				PodAffinity: &corev1.PodAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: nil,
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "app",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"myapp"},
+									},
+								},
+							},
+							Namespaces:  nil,
+							TopologyKey: "",
+							NamespaceSelector: &metav1.LabelSelector{
+								MatchLabels:      nil,
+								MatchExpressions: nil,
+							},
+						},
+					},
+					PreferredDuringSchedulingIgnoredDuringExecution: nil,
+				},
+				PodAntiAffinity: &corev1.PodAntiAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: nil,
+					PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+						{
+							Weight: 100,
+							PodAffinityTerm: corev1.PodAffinityTerm{
+								LabelSelector: &metav1.LabelSelector{
+									MatchLabels: nil,
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										{
+											Key:      "app",
+											Operator: metav1.LabelSelectorOpIn,
+											Values:   []string{"myapp"},
+										},
+									},
+								},
+								TopologyKey: "kubernetes.io/hostname",
+								NamespaceSelector: &metav1.LabelSelector{
+									MatchLabels:      nil,
+									MatchExpressions: nil,
+								},
+							},
+						},
+					},
+				},
+			}
+			Expect(affinity2).Should(Equal(expectMergedAffinity))
+		})
+		It("merge with nil src", func() {
+			var affinity1 *corev1.Affinity
+			affinity2 := &corev1.Affinity{
+				NodeAffinity: &corev1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+						NodeSelectorTerms: []corev1.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{
+										Key:      "node-role.kubernetes.io/worker",
+										Operator: corev1.NodeSelectorOpExists,
+									},
+								},
+								MatchFields: nil,
+							},
+						},
+					},
+					PreferredDuringSchedulingIgnoredDuringExecution: nil,
+				},
+				PodAffinity: &corev1.PodAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: nil,
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "app",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"myapp"},
+									},
+								},
+							},
+							Namespaces:  nil,
+							TopologyKey: "",
+							NamespaceSelector: &metav1.LabelSelector{
+								MatchLabels:      nil,
+								MatchExpressions: nil,
+							},
+						},
+					},
+					PreferredDuringSchedulingIgnoredDuringExecution: nil,
+				},
+				PodAntiAffinity: &corev1.PodAntiAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: nil,
+					PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+						{
+							Weight: 100,
+							PodAffinityTerm: corev1.PodAffinityTerm{
+								LabelSelector: &metav1.LabelSelector{
+									MatchLabels: nil,
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										{
+											Key:      "app",
+											Operator: metav1.LabelSelectorOpIn,
+											Values:   []string{"myapp"},
+										},
+									},
+								},
+								TopologyKey: "kubernetes.io/hostname",
+								NamespaceSelector: &metav1.LabelSelector{
+									MatchLabels:      nil,
+									MatchExpressions: nil,
+								},
+							},
+						},
+					},
+				},
+			}
+
+			mergeAffinity(&affinity1, &affinity2)
+
+			expectMergedAffinity := &corev1.Affinity{
+				NodeAffinity: &corev1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+						NodeSelectorTerms: []corev1.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{
+										Key:      "node-role.kubernetes.io/worker",
+										Operator: corev1.NodeSelectorOpExists,
+									},
+								},
+								MatchFields: nil,
+							},
+						},
+					},
+					PreferredDuringSchedulingIgnoredDuringExecution: nil,
+				},
+				PodAffinity: &corev1.PodAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: nil,
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "app",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"myapp"},
+									},
+								},
+							},
+							Namespaces:  nil,
+							TopologyKey: "",
+							NamespaceSelector: &metav1.LabelSelector{
+								MatchLabels:      nil,
+								MatchExpressions: nil,
+							},
+						},
+					},
+					PreferredDuringSchedulingIgnoredDuringExecution: nil,
+				},
+				PodAntiAffinity: &corev1.PodAntiAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: nil,
+					PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+						{
+							Weight: 100,
+							PodAffinityTerm: corev1.PodAffinityTerm{
+								LabelSelector: &metav1.LabelSelector{
+									MatchLabels: nil,
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										{
+											Key:      "app",
+											Operator: metav1.LabelSelectorOpIn,
+											Values:   []string{"myapp"},
+										},
+									},
+								},
+								TopologyKey: "kubernetes.io/hostname",
+								NamespaceSelector: &metav1.LabelSelector{
+									MatchLabels:      nil,
+									MatchExpressions: nil,
+								},
+							},
+						},
+					},
+				},
+			}
+			Expect(affinity2).Should(Equal(expectMergedAffinity))
+		})
+		It("merge with nil dst", func() {
+			affinity1 := &corev1.Affinity{
+				NodeAffinity: &corev1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+						NodeSelectorTerms: []corev1.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{
+										Key:      "node-role.kubernetes.io/worker",
+										Operator: corev1.NodeSelectorOpExists,
+									},
+								},
+								MatchFields: nil,
+							},
+						},
+					},
+					PreferredDuringSchedulingIgnoredDuringExecution: nil,
+				},
+				PodAffinity: &corev1.PodAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: nil,
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "app",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"myapp"},
+									},
+								},
+							},
+							Namespaces:  nil,
+							TopologyKey: "",
+							NamespaceSelector: &metav1.LabelSelector{
+								MatchLabels:      nil,
+								MatchExpressions: nil,
+							},
+						},
+					},
+					PreferredDuringSchedulingIgnoredDuringExecution: nil,
+				},
+				PodAntiAffinity: &corev1.PodAntiAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: nil,
+					PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+						{
+							Weight: 100,
+							PodAffinityTerm: corev1.PodAffinityTerm{
+								LabelSelector: &metav1.LabelSelector{
+									MatchLabels: nil,
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										{
+											Key:      "app",
+											Operator: metav1.LabelSelectorOpIn,
+											Values:   []string{"myapp"},
+										},
+									},
+								},
+								TopologyKey: "kubernetes.io/hostname",
+								NamespaceSelector: &metav1.LabelSelector{
+									MatchLabels:      nil,
+									MatchExpressions: nil,
+								},
+							},
+						},
+					},
+				},
+			}
+			var affinity2 *corev1.Affinity = nil
+
+			mergeAffinity(&affinity1, &affinity2)
+
+			expectMergedAffinity := &corev1.Affinity{
+				NodeAffinity: &corev1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+						NodeSelectorTerms: []corev1.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{
+										Key:      "node-role.kubernetes.io/worker",
+										Operator: corev1.NodeSelectorOpExists,
+									},
+								},
+								MatchFields: nil,
+							},
+						},
+					},
+					PreferredDuringSchedulingIgnoredDuringExecution: nil,
+				},
+				PodAffinity: &corev1.PodAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: nil,
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "app",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"myapp"},
+									},
+								},
+							},
+							Namespaces:  nil,
+							TopologyKey: "",
+							NamespaceSelector: &metav1.LabelSelector{
+								MatchLabels:      nil,
+								MatchExpressions: nil,
+							},
+						},
+					},
+					PreferredDuringSchedulingIgnoredDuringExecution: nil,
+				},
+				PodAntiAffinity: &corev1.PodAntiAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: nil,
+					PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+						{
+							Weight: 100,
+							PodAffinityTerm: corev1.PodAffinityTerm{
+								LabelSelector: &metav1.LabelSelector{
+									MatchLabels: nil,
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										{
+											Key:      "app",
+											Operator: metav1.LabelSelectorOpIn,
+											Values:   []string{"myapp"},
+										},
+									},
+								},
+								TopologyKey: "kubernetes.io/hostname",
+								NamespaceSelector: &metav1.LabelSelector{
+									MatchLabels:      nil,
+									MatchExpressions: nil,
+								},
+							},
+						},
+					},
+				},
+			}
+			Expect(affinity2).Should(Equal(expectMergedAffinity))
 		})
 	})
 })

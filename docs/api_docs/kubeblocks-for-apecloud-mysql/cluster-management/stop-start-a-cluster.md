@@ -52,7 +52,7 @@ spec:
   componentSpecs:
   - name: mysql
     componentDefRef: mysql
-    monitor: false  
+    disableExporter: true  
     replicas: 0
     volumeClaimTemplates:
     - name: data
@@ -108,7 +108,7 @@ spec:
   componentSpecs:
   - name: mysql
     componentDefRef: mysql
-    monitor: false  
+    disableExporter: true
     replicas: 3
     volumeClaimTemplates:
     - name: data

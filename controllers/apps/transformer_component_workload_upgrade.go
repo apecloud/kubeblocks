@@ -60,18 +60,61 @@ func (t *componentWorkloadUpgradeTransformer) Transform(ctx graph.TransformConte
 	var parent *model.ObjectVertex
 	legacyFound := false
 
-	// remove the RSM object if found
-	exists, err := legacyCRDExists(transCtx.Context, graphCli)
-	if err != nil {
-		return err
-	}
-	if exists {
-		rsm := &legacy.ReplicatedStateMachine{}
-		if err := graphCli.Get(transCtx.Context, client.ObjectKeyFromObject(comp), rsm); err == nil {
-			legacyFound = true
-			parent = graphCli.Do(dag, nil, rsm, model.ActionDeletePtr(), parent)
-		} else if !apierrors.IsNotFound(err) {
-			return err
+	// update pod & pvc & svc labels
+	objectList := []client.ObjectList{&corev1.PersistentVolumeClaimList{}, &corev1.PodList{}, &corev1.ServiceList{}, &corev1.ConfigMapList{}}
+	ml := constant.GetComponentWellKnownLabels(synthesizeComp.ClusterName, synthesizeComp.Name)
+	inNS := client.InNamespace(comp.Namespace)
+	defaultHeadlessSvc := constant.GenerateDefaultComponentHeadlessServiceName(synthesizeComp.ClusterName, synthesizeComp.Name)
+	envCM := instanceset.GetEnvConfigMapName(constant.GenerateClusterComponentName(synthesizeComp.ClusterName, synthesizeComp.Name))
+	var revision string
+	for _, list := range objectList {
+		if err := graphCli.List(transCtx.Context, list, client.MatchingLabels(ml), inNS); err == nil {
+			items := reflect.ValueOf(list).Elem().FieldByName("Items")
+			l := items.Len()
+			for i := 0; i < l; i++ {
+				object := items.Index(i).Addr().Interface().(client.Object)
+				if _, ok := object.GetLabels()[instanceset.WorkloadsManagedByLabelKey]; ok {
+					continue
+				}
+				_, isSvc := object.(*corev1.Service)
+				if isSvc && object.GetName() != defaultHeadlessSvc {
+					continue
+				}
+				_, isCM := object.(*corev1.ConfigMap)
+				if isCM && object.GetName() != envCM {
+					continue
+				}
+				legacyFound = true
+
+				// fix labels
+				object.GetLabels()[instanceset.WorkloadsManagedByLabelKey] = workloads.Kind
+				object.GetLabels()[instanceset.WorkloadsInstanceLabelKey] = comp.Name
+
+				// fix labels, ownerReference and finalizer of Service and ConfigMap:
+				// assume all the OwnerReferences and Finalizers were set by the KubeBlocks.
+				// set them to empty and the InstanceSet Controller will fix them.
+				if isSvc || isCM {
+					object.SetOwnerReferences([]metav1.OwnerReference{})
+					object.SetFinalizers([]string{})
+					delete(object.GetLabels(), constant.AppManagedByLabelKey)
+					delete(object.GetLabels(), constant.AppNameLabelKey)
+					delete(object.GetLabels(), constant.AppComponentLabelKey)
+					delete(object.GetLabels(), constant.AppInstanceLabelKey)
+					delete(object.GetLabels(), constant.KBAppComponentLabelKey)
+				}
+
+				// fix revision of Pods
+				if _, ok := object.(*corev1.Pod); ok {
+					if revision == "" {
+						revision, err = buildRevision(synthesizeComp, compDef)
+						if err != nil {
+							return err
+						}
+					}
+					object.GetLabels()[appsv1.ControllerRevisionHashLabelKey] = revision
+				}
+				parent = graphCli.Do(dag, nil, object, model.ActionUpdatePtr(), parent)
+			}
 		}
 	}
 
@@ -84,39 +127,18 @@ func (t *componentWorkloadUpgradeTransformer) Transform(ctx graph.TransformConte
 		return err
 	}
 
-	// update pod & pvc & svc labels
-	objectList := []client.ObjectList{&corev1.PersistentVolumeClaimList{}, &corev1.ServiceList{}, &corev1.PodList{}}
-	ml := constant.GetComponentWellKnownLabels(synthesizeComp.ClusterName, synthesizeComp.Name)
-	inNS := client.InNamespace(comp.Namespace)
-	defaultHeadlessSvc := constant.GenerateDefaultComponentHeadlessServiceName(synthesizeComp.ClusterName, synthesizeComp.Name)
-	var revision string
-	for _, list := range objectList {
-		if err := graphCli.List(transCtx.Context, list, client.MatchingLabels(ml), inNS); err == nil {
-			items := reflect.ValueOf(list).Elem().FieldByName("Items")
-			l := items.Len()
-			for i := 0; i < l; i++ {
-				object := items.Index(i).Addr().Interface().(client.Object)
-				if _, ok := object.GetLabels()[instanceset.WorkloadsManagedByLabelKey]; ok {
-					continue
-				}
-				if _, ok := object.(*corev1.Service); ok && object.GetName() != defaultHeadlessSvc {
-					continue
-				}
-				legacyFound = true
-				object.SetOwnerReferences([]metav1.OwnerReference{})
-				object.GetLabels()[instanceset.WorkloadsManagedByLabelKey] = workloads.Kind
-				object.GetLabels()[instanceset.WorkloadsInstanceLabelKey] = comp.Name
-				if _, ok := object.(*corev1.Pod); ok {
-					if revision == "" {
-						revision, err = buildRevision(synthesizeComp, compDef)
-						if err != nil {
-							return err
-						}
-					}
-					object.GetLabels()[appsv1.ControllerRevisionHashLabelKey] = revision
-				}
-				parent = graphCli.Do(dag, nil, object, model.ActionUpdatePtr(), parent)
-			}
+	// remove the RSM object if found
+	exists, err := legacyCRDExists(transCtx.Context, graphCli)
+	if err != nil {
+		return err
+	}
+	if exists {
+		rsm := &legacy.ReplicatedStateMachine{}
+		if err := graphCli.Get(transCtx.Context, client.ObjectKeyFromObject(comp), rsm); err == nil {
+			legacyFound = true
+			graphCli.Do(dag, nil, rsm, model.ActionDeletePtr(), parent, model.WithPropagationPolicy(client.PropagationPolicy(metav1.DeletePropagationOrphan)))
+		} else if !apierrors.IsNotFound(err) {
+			return err
 		}
 	}
 

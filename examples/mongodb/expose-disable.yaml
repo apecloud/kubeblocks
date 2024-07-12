@@ -9,10 +9,11 @@ spec:
   # Lists Expose objects, each specifying a Component and its services to be exposed.
   expose:
     # Specifies the name of the Component.
-  - componentName: mongo
+  - componentName: mongodb
     # Specifies a list of OpsService. When an OpsService is exposed, a corresponding ClusterService will be added to `cluster.spec.services`. 
     services:
     - name: internet
+      roleSelector: primary
       serviceType: LoadBalancer
     # Indicates whether the services will be exposed. 'Enable' exposes the services. while 'Disable' removes the exposed Service.
     switch: Disable

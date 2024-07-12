@@ -131,8 +131,6 @@ var _ = BeforeSuite(func() {
 
 	eventRecorder = k8sManager.GetEventRecorderFor("event-controller")
 
-	appsv1alpha1.RegisterWebhookManager(k8sManager)
-
 	testCtx = testutil.NewDefaultTestContext(ctx, k8sClient, testEnv)
 
 	go func() {
@@ -179,9 +177,9 @@ func initOperationsResources(clusterDefinitionName,
 	return opsRes, clusterDef, clusterObject
 }
 
-func initInstanceSetPods(ctx context.Context, cli client.Client, opsRes *OpsResource, clusterName string) []*corev1.Pod {
+func initInstanceSetPods(ctx context.Context, cli client.Client, opsRes *OpsResource) []*corev1.Pod {
 	// mock the pods of consensusSet component
-	testapps.MockInstanceSetPods(&testCtx, nil, clusterName, consensusComp)
+	testapps.MockInstanceSetPods(&testCtx, nil, opsRes.Cluster, consensusComp)
 	pods, err := intctrlcomp.ListOwnedPods(ctx, cli, opsRes.Cluster.Namespace, opsRes.Cluster.Name, consensusComp)
 	Expect(err).Should(Succeed())
 	// the opsRequest will use startTime to check some condition.

@@ -20,14 +20,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"slices"
+	"strings"
 	"sync"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -63,6 +67,14 @@ func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, o
 			return &ctrl.Result{}, patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error())
 		}
 	} else {
+		// validate entry condition for OpsRequest, check if the cluster is in the right phase
+		if err = validateOpsWaitingPhase(opsRes.Cluster, opsRequest, opsBehaviour); err != nil {
+			// check if the error is caused by WaitForClusterPhaseErr  error
+			if _, ok := err.(*WaitForClusterPhaseErr); ok {
+				return intctrlutil.ResultToP(intctrlutil.RequeueAfter(time.Second, reqCtx.Log, ""))
+			}
+			return &ctrl.Result{}, patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error())
+		}
 		// validate OpsRequest.spec
 		// if the operation will create a new cluster, don't validate the cluster
 		if err = opsRequest.Validate(reqCtx.Ctx, cli, opsRes.Cluster, !opsBehaviour.IsClusterCreation); err != nil {
@@ -73,14 +85,6 @@ func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, o
 	if opsRequest.Status.Phase == appsv1alpha1.OpsPendingPhase {
 		if opsRequest.Spec.Cancel {
 			return &ctrl.Result{}, PatchOpsStatus(reqCtx.Ctx, cli, opsRes, appsv1alpha1.OpsCancelledPhase)
-		}
-		// validate entry condition for OpsRequest, check if the cluster is in the right phase
-		if err = validateOpsWaitingPhase(opsRes.Cluster, opsRequest, opsBehaviour); err != nil {
-			// check if the error is caused by WaitForClusterPhaseErr  error
-			if _, ok := err.(*WaitForClusterPhaseErr); ok {
-				return intctrlutil.ResultToP(intctrlutil.RequeueAfter(time.Second, reqCtx.Log, ""))
-			}
-			return &ctrl.Result{}, patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error())
 		}
 		// TODO: abort last OpsRequest if using 'force' and intersecting with cluster component name or shard name.
 		if opsBehaviour.QueueByCluster || opsBehaviour.QueueBySelf {
@@ -95,6 +99,15 @@ func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, o
 				// if the opsRequest is in the queue, return
 				return intctrlutil.ResultToP(intctrlutil.Reconciled())
 			}
+		}
+
+		// validate if the dependent ops have been successful
+		if pass, err := opsMgr.validateDependOnSuccessfulOps(reqCtx, cli, opsRes); intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
+			return &ctrl.Result{}, patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error())
+		} else if err != nil {
+			return nil, err
+		} else if !pass {
+			return intctrlutil.ResultToP(intctrlutil.Reconciled())
 		}
 		opsDeepCopy := opsRequest.DeepCopy()
 		// save last configuration into status.lastConfiguration
@@ -156,7 +169,7 @@ func (opsMgr *OpsManager) Reconcile(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		return 0, opsMgr.handleOpsCompleted(reqCtx, cli, opsRes, opsRequestPhase,
 			appsv1alpha1.NewCancelFailedCondition(opsRequest, err), appsv1alpha1.NewFailedCondition(opsRequest, err))
 	default:
-		return requeueAfter, nil
+		return opsMgr.checkAndHandleOpsTimeout(reqCtx, cli, opsRes, requeueAfter)
 	}
 }
 
@@ -173,6 +186,69 @@ func (opsMgr *OpsManager) handleOpsCompleted(reqCtx intctrlutil.RequestCtx,
 		return PatchOpsStatus(reqCtx.Ctx, cli, opsRes, appsv1alpha1.OpsCancelledPhase, cancelledCondition)
 	}
 	return PatchOpsStatus(reqCtx.Ctx, cli, opsRes, opsRequestPhase, completedCondition)
+}
+
+// validateDependOnOps validates if the dependent ops have been successful
+func (opsMgr *OpsManager) validateDependOnSuccessfulOps(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	opsRes *OpsResource) (bool, error) {
+	dependentOpsStr := opsRes.OpsRequest.Annotations[constant.OpsDependentOnSuccessfulOpsAnnoKey]
+	if dependentOpsStr == "" {
+		return true, nil
+	}
+	opsNames := strings.Split(dependentOpsStr, ",")
+	for _, opsName := range opsNames {
+		ops := &appsv1alpha1.OpsRequest{}
+		if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: opsName, Namespace: opsRes.OpsRequest.Namespace}, ops); err != nil {
+			if apierrors.IsNotFound(err) {
+				return false, intctrlutil.NewFatalError(err.Error())
+			}
+			return false, err
+		}
+		var relatedOpsArr []string
+		relatedOpsStr := ops.Annotations[constant.RelatedOpsAnnotationKey]
+		if relatedOpsStr != "" {
+			relatedOpsArr = strings.Split(relatedOpsStr, ",")
+		}
+		if !slices.Contains(relatedOpsArr, opsRes.OpsRequest.Name) {
+			// annotate to the dependent opsRequest
+			relatedOpsArr = append(relatedOpsArr, opsRes.OpsRequest.Name)
+			if ops.Annotations == nil {
+				ops.Annotations = map[string]string{}
+			}
+			ops.Annotations[constant.RelatedOpsAnnotationKey] = strings.Join(relatedOpsArr, ",")
+			if err := cli.Update(reqCtx.Ctx, ops); err != nil {
+				return false, err
+			}
+		}
+		if slices.Contains([]appsv1alpha1.OpsPhase{appsv1alpha1.OpsFailedPhase, appsv1alpha1.OpsCancelledPhase, appsv1alpha1.OpsAbortedPhase}, ops.Status.Phase) {
+			return false, PatchOpsStatus(reqCtx.Ctx, cli, opsRes, appsv1alpha1.OpsCancelledPhase)
+		}
+		if ops.Status.Phase != appsv1alpha1.OpsSucceedPhase {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+// handleOpsIsRunningTimedOut handles if the opsRequest is timed out.
+func (opsMgr *OpsManager) checkAndHandleOpsTimeout(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	opsRes *OpsResource,
+	requeueAfter time.Duration) (time.Duration, error) {
+	timeoutSeconds := opsRes.OpsRequest.Spec.TimeoutSeconds
+	if timeoutSeconds == nil || *timeoutSeconds == 0 {
+		return requeueAfter, nil
+	}
+	timeoutPoint := opsRes.OpsRequest.Status.StartTimestamp.Add(time.Duration(*timeoutSeconds))
+	if !time.Now().Before(timeoutPoint) {
+		return 0, PatchOpsStatus(reqCtx.Ctx, cli, opsRes, appsv1alpha1.OpsAbortedPhase,
+			appsv1alpha1.NewAbortedCondition("Aborted due to exceeding the specified timeout period (timeoutSeconds)"))
+	}
+	if requeueAfter != 0 {
+		return requeueAfter, nil
+	}
+	return time.Until(timeoutPoint), nil
 }
 
 func GetOpsManager() *OpsManager {

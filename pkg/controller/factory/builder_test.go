@@ -172,7 +172,7 @@ var _ = Describe("builder", func() {
 				Namespace: "default",
 				Name:      "data-mysql-01-replicasets-0",
 			}
-			pvc := BuildPVC(cluster, synthesizedComponent, &synthesizedComponent.VolumeClaimTemplates[0], pvcKey, snapshotName)
+			pvc := BuildPVC(cluster, synthesizedComponent, &synthesizedComponent.VolumeClaimTemplates[0], pvcKey, "", snapshotName)
 			Expect(pvc).ShouldNot(BeNil())
 			Expect(pvc.Spec.AccessModes).Should(Equal(its.Spec.VolumeClaimTemplates[0].Spec.AccessModes))
 			Expect(pvc.Spec.Resources).Should(Equal(synthesizedComponent.VolumeClaimTemplates[0].Spec.Resources))
@@ -367,24 +367,22 @@ var _ = Describe("builder", func() {
 				ManagerName:   "cfgmgr",
 				SecreteName:   "test-secret",
 				ComponentName: synthesizedComponent.Name,
-				CharacterType: synthesizedComponent.CharacterType,
 				Image:         constant.KBToolsImage,
 				Args:          []string{},
 				Envs:          []corev1.EnvVar{},
 				Volumes:       []corev1.VolumeMount{},
 				Cluster:       cluster,
 			}
-			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam, synthesizedComponent)
+			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam)
 			Expect(err).Should(BeNil())
 			Expect(configmap).ShouldNot(BeNil())
 			Expect(configmap.SecurityContext).Should(BeNil())
 		})
 
 		It("builds config manager sidecar container correctly", func() {
-			_, cluster, synthesizedComponent := newClusterObjs(nil)
+			_, cluster, _ := newClusterObjs(nil)
 			sidecarRenderedParam := &cfgcm.CfgManagerBuildParams{
 				ManagerName:           "cfgmgr",
-				CharacterType:         mysqlCharacterType,
 				SecreteName:           "test-secret",
 				Image:                 constant.KBToolsImage,
 				ShareProcessNamespace: true,
@@ -393,7 +391,7 @@ var _ = Describe("builder", func() {
 				Volumes:               []corev1.VolumeMount{},
 				Cluster:               cluster,
 			}
-			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam, synthesizedComponent)
+			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam)
 			Expect(err).Should(BeNil())
 			Expect(configmap).ShouldNot(BeNil())
 			Expect(configmap.SecurityContext).ShouldNot(BeNil())

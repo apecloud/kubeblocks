@@ -102,13 +102,17 @@ func (cli *lorryClient) GetRole(ctx context.Context) (string, error) {
 	return role.(string), nil
 }
 
-func (cli *lorryClient) CreateUser(ctx context.Context, userName, password, roleName string) error {
+func (cli *lorryClient) CreateUser(ctx context.Context, userName, password, roleName, statement string) error {
 	parameters := map[string]any{
 		"userName": userName,
 		"password": password,
 	}
 	if roleName != "" {
 		parameters["roleName"] = roleName
+	}
+
+	if statement != "" {
+		parameters["statement"] = statement
 	}
 
 	req := map[string]any{"parameters": parameters}
@@ -135,7 +139,7 @@ func (cli *lorryClient) DescribeUser(ctx context.Context, userName string) (map[
 		return nil, err
 	}
 	user, ok := resp["user"]
-	if !ok {
+	if !ok || user == nil {
 		return nil, nil
 	}
 

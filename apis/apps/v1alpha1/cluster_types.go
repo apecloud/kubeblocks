@@ -433,27 +433,10 @@ type InstanceTemplate struct {
 	// +optional
 	Image *string `json:"image,omitempty"`
 
-	// Specifies the name of the node where the Pod should be scheduled.
-	// If set, the Pod will be directly assigned to the specified node, bypassing the Kubernetes scheduler.
-	// This is useful for controlling Pod placement on specific nodes.
-	//
-	// Important considerations:
-	// - `nodeName` bypasses default scheduling constraints (e.g., resource requirements, node selectors, affinity rules).
-	// - It is the user's responsibility to ensure the node is suitable for the Pod.
-	// - If the node is unavailable, the Pod will remain in "Pending" state until the node is available or the Pod is deleted.
+	// Specifies the scheduling policy for the Component.
 	//
 	// +optional
-	NodeName *string `json:"nodeName,omitempty"`
-
-	// Defines NodeSelector to override.
-	// +optional
-	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
-
-	// Tolerations specifies a list of tolerations to be applied to the Pod, allowing it to tolerate node taints.
-	// This field can be used to add new tolerations or override existing ones.
-	//
-	// +optional
-	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+	SchedulingPolicy *SchedulingPolicy `json:"schedulingPolicy,omitempty"`
 
 	// Specifies an override for the resource requirements of the first container in the Pod.
 	// This field allows for customizing resource allocation (CPU, memory, etc.) for the container.
@@ -669,6 +652,22 @@ type ClusterComponentSpec struct {
 	// +optional
 	EnabledLogs []string `json:"enabledLogs,omitempty"`
 
+	// Specifies Labels to override or add for underlying Pods.
+	//
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Specifies Annotations to override or add for underlying Pods.
+	//
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// List of environment variables to add.
+	// These environment variables will be placed after the environment variables declared in the Pod.
+	//
+	// +optional
+	Env []corev1.EnvVar `json:"env,omitempty"`
+
 	// Specifies the desired number of replicas in the Component for enhancing availability and durability, or load balancing.
 	//
 	// +kubebuilder:validation:Required
@@ -723,11 +722,23 @@ type ClusterComponentSpec struct {
 	// +optional
 	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
+	// List of volumes to override.
+	//
+	// +optional
+	Volumes []corev1.Volume `json:"volumes,omitempty"`
+
 	// Overrides services defined in referenced ComponentDefinition and expose endpoints that can be accessed by clients.
 	//
 	// +optional
 	Services []ClusterComponentService `json:"services,omitempty"`
 
+	// Overrides system accounts defined in referenced ComponentDefinition.
+	//
+	// +optional
+	SystemAccounts []ComponentSystemAccount `json:"systemAccounts,omitempty"`
+
+	// Specifies the configuration content of a config template.
+	//
 	// +optional
 	Configs []ClusterComponentConfig `json:"configs,omitempty"`
 
@@ -765,8 +776,9 @@ type ClusterComponentSpec struct {
 	// with other Kubernetes resources, such as modifying Pod labels or sending events.
 	//
 	// Defaults:
-	// If not specified, KubeBlocks automatically assigns a default ServiceAccount named "kb-{cluster.name}",
-	// bound to a default role installed together with KubeBlocks.
+	// To perform certain operational tasks, agent sidecars running in Pods require specific RBAC permissions.
+	// The service account will be bound to a default role named "kubeblocks-cluster-pod-role" which is installed together with KubeBlocks.
+	// If not specified, KubeBlocks automatically assigns a default ServiceAccount named "kb-{cluster.name}"
 	//
 	// Future Changes:
 	// Future versions might change the default ServiceAccount creation strategy to one per Component,
@@ -868,6 +880,12 @@ type ClusterComponentSpec struct {
 	// +optional
 	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.10.0"
 	Monitor *bool `json:"monitor,omitempty"`
+
+	// Stop the Component.
+	// If set, all the computing resources will be released.
+	//
+	// +optional
+	Stop *bool `json:"stop,omitempty"`
 }
 
 type ComponentMessageMap map[string]string
@@ -1214,6 +1232,27 @@ type ClusterComponentService struct {
 	//
 	// +optional
 	PodService *bool `json:"podService,omitempty"`
+}
+
+type ComponentSystemAccount struct {
+	// The name of the system account.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Specifies the policy for generating the account's password.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	PasswordConfig *PasswordConfig `json:"passwordConfig,omitempty"`
+
+	// Refers to the secret from which data will be copied to create the new account.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	SecretRef *ProvisionSecretRef `json:"secretRef,omitempty"`
 }
 
 // ClusterComponentConfig represents a config with its source bound.
@@ -1642,8 +1681,16 @@ func (t *InstanceTemplate) GetName() string {
 	return t.Name
 }
 
-func (t *InstanceTemplate) GetReplicas() *int32 {
-	return t.Replicas
+func (t *InstanceTemplate) GetReplicas() int32 {
+	if t.Replicas != nil {
+		return *t.Replicas
+	}
+	return defaultInstanceTemplateReplicas
+}
+
+// GetOrdinals TODO(free6om): Remove after resolving the circular dependencies between apps and workloads.
+func (t *InstanceTemplate) GetOrdinals() workloads.Ordinals {
+	return workloads.Ordinals{}
 }
 
 // GetClusterUpRunningPhases returns Cluster running or partially running phases.
@@ -1687,4 +1734,14 @@ func GetComponentUpRunningPhase() []ClusterComponentPhase {
 // ComponentPodsAreReady checks if the pods of component are ready.
 func ComponentPodsAreReady(podsAreReady *bool) bool {
 	return podsAreReady != nil && *podsAreReady
+}
+
+// GetInstanceTemplateName get the instance template name by instance name.
+func GetInstanceTemplateName(clusterName, componentName, instanceName string) string {
+	workloadPrefix := fmt.Sprintf("%s-%s", clusterName, componentName)
+	compInsKey := instanceName[:strings.LastIndex(instanceName, "-")]
+	if compInsKey == workloadPrefix {
+		return ""
+	}
+	return strings.Replace(compInsKey, workloadPrefix+"-", "", 1)
 }

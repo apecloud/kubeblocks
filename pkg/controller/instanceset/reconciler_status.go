@@ -21,6 +21,7 @@ package instanceset
 
 import (
 	"encoding/json"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -60,7 +61,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 		podList = append(podList, pod)
 	}
 	// 2. calculate status summary
-	updateRevisions, err := getUpdateRevisions(its.Status.UpdateRevisions)
+	updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +69,10 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	currentReplicas, updatedReplicas := int32(0), int32(0)
 	readyReplicas, availableReplicas := int32(0), int32(0)
 	notReadyNames := sets.New[string]()
+	notAvailableNames := sets.New[string]()
+	currentRevisions := map[string]string{}
 	for _, pod := range podList {
+		currentRevisions[pod.Name] = getPodRevision(pod)
 		if isCreated(pod) {
 			notReadyNames.Insert(pod.Name)
 			replicas++
@@ -78,6 +82,8 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 			notReadyNames.Delete(pod.Name)
 			if isRunningAndAvailable(pod, its.Spec.MinReadySeconds) {
 				availableReplicas++
+			} else {
+				notAvailableNames.Insert(pod.Name)
 			}
 		}
 		if isCreated(pod) && !isTerminating(pod) {
@@ -98,13 +104,13 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	its.Status.AvailableReplicas = availableReplicas
 	its.Status.CurrentReplicas = currentReplicas
 	its.Status.UpdatedReplicas = updatedReplicas
+	its.Status.CurrentRevisions, _ = buildRevisions(currentRevisions)
 	// all pods have been updated
 	totalReplicas := int32(1)
 	if its.Spec.Replicas != nil {
 		totalReplicas = *its.Spec.Replicas
 	}
 	if its.Status.Replicas == totalReplicas && its.Status.UpdatedReplicas == totalReplicas {
-		its.Status.CurrentRevisions = its.Status.UpdateRevisions
 		its.Status.CurrentRevision = its.Status.UpdateRevision
 		its.Status.CurrentReplicas = totalReplicas
 	}
@@ -113,6 +119,12 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 		return nil, err
 	}
 	meta.SetStatusCondition(&its.Status.Conditions, *readyCondition)
+
+	availableCondition, err := buildAvailableCondition(its, availableReplicas >= replicas, notAvailableNames)
+	if err != nil {
+		return nil, err
+	}
+	meta.SetStatusCondition(&its.Status.Conditions, *availableCondition)
 
 	// 3. set InstanceFailure condition
 	failureCondition, err := buildFailureCondition(its, podList)
@@ -132,7 +144,17 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	// TODO(free6om): should put this field to the spec
 	setReadyWithPrimary(its, podList)
 
+	if its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
+		return tree, intctrlutil.NewDelayedRequeueError(time.Second, "requeue for right status update")
+	}
 	return tree, nil
+}
+
+func buildConditionMessageWithNames(podNames []string) ([]byte, error) {
+	baseSort(podNames, func(i int) (string, int) {
+		return ParseParentNameAndOrdinal(podNames[i])
+	}, nil, true)
+	return json.Marshal(podNames)
 }
 
 func buildReadyCondition(its *workloads.InstanceSet, ready bool, notReadyNames sets.Set[string]) (*metav1.Condition, error) {
@@ -145,11 +167,26 @@ func buildReadyCondition(its *workloads.InstanceSet, ready bool, notReadyNames s
 	if !ready {
 		condition.Status = metav1.ConditionFalse
 		condition.Reason = workloads.ReasonNotReady
-		names := notReadyNames.UnsortedList()
-		baseSort(names, func(i int) (string, int) {
-			return ParseParentNameAndOrdinal(names[i])
-		}, nil, true)
-		message, err := json.Marshal(names)
+		message, err := buildConditionMessageWithNames(notReadyNames.UnsortedList())
+		if err != nil {
+			return nil, err
+		}
+		condition.Message = string(message)
+	}
+	return condition, nil
+}
+
+func buildAvailableCondition(its *workloads.InstanceSet, available bool, notAvailableNames sets.Set[string]) (*metav1.Condition, error) {
+	condition := &metav1.Condition{
+		Type:               string(workloads.InstanceAvailable),
+		Status:             metav1.ConditionTrue,
+		ObservedGeneration: its.Generation,
+		Reason:             workloads.ReasonAvailable,
+	}
+	if !available {
+		condition.Status = metav1.ConditionFalse
+		condition.Reason = workloads.ReasonNotAvailable
+		message, err := buildConditionMessageWithNames(notAvailableNames.UnsortedList())
 		if err != nil {
 			return nil, err
 		}
@@ -170,7 +207,7 @@ func buildFailureCondition(its *workloads.InstanceSet, pods []*corev1.Pod) (*met
 			continue
 		}
 		// KubeBlocks says the Pod is 'Failed'
-		isFailed, isTimedOut, _ := intctrlutil.IsPodFailedAndTimedOut(pod, false)
+		isFailed, isTimedOut, _ := intctrlutil.IsPodFailedAndTimedOut(pod)
 		if isFailed && isTimedOut {
 			failureNames = append(failureNames, pod.Name)
 		}
@@ -178,10 +215,7 @@ func buildFailureCondition(its *workloads.InstanceSet, pods []*corev1.Pod) (*met
 	if len(failureNames) == 0 {
 		return nil, nil
 	}
-	baseSort(failureNames, func(i int) (string, int) {
-		return ParseParentNameAndOrdinal(failureNames[i])
-	}, nil, true)
-	message, err := json.Marshal(failureNames)
+	message, err := buildConditionMessageWithNames(failureNames)
 	if err != nil {
 		return nil, err
 	}

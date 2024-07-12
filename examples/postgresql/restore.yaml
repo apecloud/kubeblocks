@@ -41,7 +41,7 @@ spec:
     componentDefRef: postgresql
     enabledLogs:
     - running
-    monitorEnabled: false
+    disableExporter: true
     replicas: 2
     resources:
       limits:

@@ -34,6 +34,8 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
+const opsRequestQueueLimitSize = 20
+
 // DequeueOpsRequestInClusterAnnotation when OpsRequest.status.phase is Succeeded or Failed
 // we should remove the OpsRequest Annotation of cluster, then unlock cluster
 func DequeueOpsRequestInClusterAnnotation(ctx context.Context, cli client.Client, opsRes *OpsResource) error {
@@ -127,7 +129,7 @@ func enqueueOpsRequestToClusterAnnotation(ctx context.Context, cli client.Client
 			// the opsRequest is already running.
 			return &opsRecorder, nil
 		}
-		if existOtherRunningOps(opsRequestSlice, opsRecorder.Type, opsBehaviour) {
+		if !opsRes.OpsRequest.Spec.Force && existOtherRunningOps(opsRequestSlice, opsRecorder.Type, opsBehaviour) {
 			// if exists other running opsRequest, return.
 			return &opsRecorder, nil
 		}

@@ -267,7 +267,8 @@ func (mgr *Manager) Unlock(ctx context.Context) error {
 //
 // - KB_ACCOUNT_NAME: The name of the account to create.
 // - KB_ACCOUNT_PASSWORD: The password of the account to create.
-func (mgr *Manager) CreateUser(ctx context.Context, userName, password string) error {
+// - KB_ACCOUNT_STATEMENT: The statement used to create the account.
+func (mgr *Manager) CreateUser(ctx context.Context, userName, password, statement string) error {
 	accountProvisionCmd, ok := mgr.actionCommands[constant.AccountProvisionAction]
 	if !ok || len(accountProvisionCmd) == 0 {
 		return nil
@@ -275,6 +276,7 @@ func (mgr *Manager) CreateUser(ctx context.Context, userName, password string) e
 	envs := os.Environ()
 	envs = append(envs, "KB_ACCOUNT_NAME"+"="+userName)
 	envs = append(envs, "KB_ACCOUNT_PASSWORD"+"="+password)
+	envs = append(envs, "KB_ACCOUNT_STATEMENT"+"="+statement)
 	output, err := util.ExecCommand(ctx, accountProvisionCmd, envs)
 
 	if output != "" {

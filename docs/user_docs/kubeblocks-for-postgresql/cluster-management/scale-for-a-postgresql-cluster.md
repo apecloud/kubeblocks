@@ -22,7 +22,7 @@ You can vertically scale a cluster by changing resource requirements and limits 
 
 :::note
 
-During the vertical scaling process, a concurrent restart is triggered and the leader pod may change after the restarting.
+During the vertical scaling process, all pods restart and the pod role may change after the restarting.
 
 :::
 
@@ -45,13 +45,8 @@ pg-cluster   default     postgresql              postgresql-14.8.0   Delete     
 
    ```bash
    kbcli cluster vscale pg-cluster \
-<<<<<<< HEAD
-   --components="pg-replication" \
-   --memory="4Gi" --cpu="2" \
-=======
    --components="postgresql" \
    --memory="1Gi" --cpu="1" \
->>>>>>> 0e34a119e (docs: update 0.9 docs (#7744))
    ```
 
    - `--components` describes the component name ready for vertical scaling.
@@ -71,7 +66,7 @@ pg-cluster   default     postgresql              postgresql-14.8.0   Delete     
 
    - STATUS=Updating: it means the vertical scaling is in progress.
    - STATUS=Running: it means the vertical scaling has been applied.
-   - STATUS=Abnormal: it means the vertical scaling is abnormal. The reason may be the normal instances number is less than the total instance number or the leader instance is running properly while others are abnormal.
+   - STATUS=Abnormal: it means the vertical scaling is abnormal. The reason may be the normal instances number is less than the total instance number or the primary instance is running properly while others are abnormal.
      > To solve the problem, you can check manually to see whether resources are sufficient. If AutoScaling is supported, the system recovers when there are enough resources, otherwise, you can create enough resources and check the result with kubectl describe command.
 
 3. Check whether the corresponding resources change.

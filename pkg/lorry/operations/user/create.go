@@ -21,12 +21,15 @@ package user
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
@@ -50,12 +53,26 @@ func init() {
 }
 
 func (s *CreateUser) Init(ctx context.Context) error {
-	dbManager, err := register.GetDBManager(nil)
+	s.logger = ctrl.Log.WithName("CreateUser")
+
+	actionJSON := viper.GetString(constant.KBEnvActionCommands)
+	if actionJSON != "" {
+		actionCommands := map[string][]string{}
+		err := json.Unmarshal([]byte(actionJSON), &actionCommands)
+		if err != nil {
+			s.logger.Info("get action commands failed", "error", err.Error())
+			return err
+		}
+		accoutProvisionCmd, ok := actionCommands[constant.AccountProvisionAction]
+		if ok && len(accoutProvisionCmd) > 0 {
+			s.Command = accoutProvisionCmd
+		}
+	}
+	dbManager, err := register.GetDBManager(s.Command)
 	if err != nil {
 		return errors.Wrap(err, "get manager failed")
 	}
 	s.dbManager = dbManager
-	s.logger = ctrl.Log.WithName("CreateUser")
 	return nil
 }
 
@@ -81,7 +98,8 @@ func (s *CreateUser) Do(ctx context.Context, req *operations.OpsRequest) (*opera
 		return resp.WithSuccess("account already exists")
 	}
 
-	err = s.dbManager.CreateUser(ctx, userInfo.UserName, userInfo.Password)
+	// for compatibility with old addons that specify accoutprovision action but not work actually.
+	err = s.dbManager.CreateUser(ctx, userInfo.UserName, userInfo.Password, userInfo.Statement)
 	if err != nil {
 		err = errors.Cause(err)
 		s.logger.Info("executing CreateUser error", "error", err.Error())

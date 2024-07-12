@@ -217,19 +217,18 @@ func (t *componentAccountProvisionTransformer) provisionAccount(transCtx *compon
 		return err
 	}
 
-	username, password := secret.Data[constant.AccountNameForSecret], secret.Data[constant.AccountPasswdForSecret]R
+	username, password := secret.Data[constant.AccountNameForSecret], secret.Data[constant.AccountPasswdForSecret]
 	if len(username) == 0 || len(password) == 0 {
 		return nil
 	}
-
-	namedVars := getEnvReplacementMapForAccount(userName, passwd)
-	stmt := componet.ReplaceNamedVars(namedVars, account.Statement, -1, true)
-
 
 	userInfo, err := lorryCli.DescribeUser(transCtx, string(username))
 	if err == nil && len(userInfo) != 0 {
 		return nil
 	}
+
+	namedVars := getEnvReplacementMapForAccount(string(username), string(password))
+	stmt := component.ReplaceNamedVars(namedVars, account.Statement, -1, true)
 	// TODO: re-define the role
 	return lorryCli.CreateUser(transCtx.Context, string(username), string(password), string(lorryModel.SuperUserRole), stmt)
 }

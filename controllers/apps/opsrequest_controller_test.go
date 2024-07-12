@@ -706,6 +706,13 @@ var _ = Describe("OpsRequest Controller", func() {
 				g.Expect(opsSlice).Should(HaveLen(0))
 				g.Expect(tmlCluster.Status.Phase).Should(Equal(appsv1alpha1.RunningClusterPhase))
 			})).Should(Succeed())
+
+			By("check OpsRequest reclaimed after ttl")
+			Expect(testapps.ChangeObj(&testCtx, ops, func(lopsReq *appsv1alpha1.OpsRequest) {
+				lopsReq.Spec.TTLSecondsAfterUnsuccessfulCompletion = 1
+			})).ShouldNot(HaveOccurred())
+
+			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(ops), ops, false)).Should(Succeed())
 		})
 
 		createRestartOps := func(clusterName string, index int, force ...bool) *appsv1alpha1.OpsRequest {

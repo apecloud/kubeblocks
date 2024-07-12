@@ -102,10 +102,10 @@ type ShardingDefinition struct {
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// Template is the template name or name prefix of the ComponentDefinition.
+	// CompDef is the template name or name prefix of the ComponentDefinition.
 	//
 	// +kubebuilder:validation:Required
-	Template string `json:"template"`
+	CompDef string `json:"compDef"`
 
 	// Defines the upper limit of the number of shards supported by the ShardingDefinition.
 	//

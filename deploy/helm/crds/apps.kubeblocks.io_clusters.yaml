@@ -8907,6 +8907,65 @@ spec:
                       maximum: 2048
                       minimum: 0
                       type: integer
+                    shardsLimit:
+                      description: |-
+                        Defines the upper limit of the number of shards supported by the Sharding.
+
+
+                        It defines the maximum number of sets that can be created for the Sharding.
+                        This field allows you to set a limit on the scalability of the Sharding, preventing it from exceeding a certain number of shards.
+
+
+                        This field is immutable.
+                      properties:
+                        maxShards:
+                          description: The maximum limit of shards.
+                          format: int32
+                          type: integer
+                        minShards:
+                          description: The minimum limit of shards.
+                          format: int32
+                          type: integer
+                      required:
+                      - maxShards
+                      - minShards
+                      type: object
+                      x-kubernetes-validations:
+                      - message: the minimum and maximum limit of shards should be
+                          in the range of [0, 2048]
+                        rule: self.minShards >= 0 && self.maxShards <= 2048
+                      - message: the minimum shards limit should be no greater than
+                          the maximum
+                        rule: self.minShards <= self.maxShards
+                    sharedResources:
+                      description: Defines the shared resources that can be shared
+                        across multiple components within the Sharding.
+                      items:
+                        properties:
+                          name:
+                            description: Name is the unique identifier for the shared
+                              resource.
+                            type: string
+                          resourceFrom:
+                            description: Defines the source of the shared resource.
+                            properties:
+                              systemAccountSource:
+                                description: Defines the system account that the shared
+                                  resource is derived from.
+                                properties:
+                                  accountName:
+                                    description: The name of the system account defined
+                                      in the ComponentDefinition.Spec.SystemAccounts[x].Name.
+                                    type: string
+                                required:
+                                - accountName
+                                type: object
+                            type: object
+                        required:
+                        - name
+                        - resourceFrom
+                        type: object
+                      type: array
                     template:
                       description: |-
                         The template for generating Components for shards, where each shard consists of one Component.

@@ -9672,6 +9672,10 @@ spec:
                 description: Defines sharding definitions for the cluster.
                 items:
                   properties:
+                    compDef:
+                      description: CompDef is the template name or name prefix of
+                        the ComponentDefinition.
+                      type: string
                     name:
                       description: Name is the unique identifier for the sharding
                         definition.
@@ -9735,13 +9739,9 @@ spec:
                         - resourceFrom
                         type: object
                       type: array
-                    template:
-                      description: Template is the template name or name prefix of
-                        the ComponentDefinition.
-                      type: string
                   required:
+                  - compDef
                   - name
-                  - template
                   type: object
                 type: array
               topologies:

@@ -13,7 +13,7 @@ import TabItem from '@theme/TabItem';
 
 The popularity of generative AI (Generative AI) has aroused widespread attention and completely ignited the vector database (Vector Database) market. KubeBlocks supports the management of vector databases, such as Qdrant, Milvus, and Weaviate.
 
-In this chapter, we take Qdrant as an example to show how to manage vector databases with KubeBlocks. This chapter illustrates how to create and manage a Qdrant cluster by `kubectl` or a YAML file. You can find the YAML examples in [the GitHub repository](https://github.com/apecloud/kubeblocks/tree/main/examples/qdrant).
+In this chapter, we take Qdrant as an example to show how to manage vector databases with KubeBlocks. This chapter illustrates how to create and manage a Qdrant cluster by `kubectl` or a YAML file. You can find the YAML examples in [the GitHub repository](https://github.com/apecloud/kubeblocks-addons/tree/release-0.9/examples/qdrant).
 
 ## Before you start
 

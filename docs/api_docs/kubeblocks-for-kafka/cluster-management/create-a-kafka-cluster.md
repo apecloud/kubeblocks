@@ -232,7 +232,7 @@ This document shows how to create a Kafka cluster.
 
 :::note
 
-If you only have one node for deploying a RaftGroup Cluster, set `spec.affinity.topologyKeys` as `null`.
+If you only have one node for deploying a cluster with multiple replicas, set `spec.affinity.topologyKeys` as `null`.
 
 :::
 

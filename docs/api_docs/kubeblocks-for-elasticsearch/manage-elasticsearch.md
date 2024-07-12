@@ -11,6 +11,10 @@ import TabItem from '@theme/TabItem';
 
 # Manage Elasticsearch with KubeBlocks
 
+Elasticsearch is a distributed, RESTful search and analytics engine that is capable of solving an ever-growing number of use cases. As the heart of the Elastic Stack, Elasticsearch stores your data centrally, allowing you to search it quickly, tune relevancy, perform sophisticated analytics, and easily scale.
+
+KubeBlocks supports the management of Elasticsearch. This tutorial illustrates how to create and manage an Elasticsearch cluster by `kubectl` or a YAML file. You can find the YAML examples and guides in [the GitHub repository](https://github.com/apecloud/kubeblocks-addons/tree/release-0.9/examples/elasticsearch).
+
 ## Before you start
 
 * [Install KubeBlocks](./../installation/install-kubeblocks.md).
@@ -39,7 +43,7 @@ import TabItem from '@theme/TabItem';
 
 ## Create a cluster
 
-KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a RaftGroup cluster. Pods are distributed on different nodes by default. But if you only have one node for deploying a RaftGroup Cluster, set `spec.affinity.topologyKeys` as `null`.
+KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating an Elasticsearch cluster. Pods are distributed on different nodes by default. But if you only have one node for deploying an Elasticsearch cluster, set `spec.affinity.topologyKeys` as `null`.
 
 ```yaml
 cat <<EOF | kubectl apply -f -

@@ -13,6 +13,8 @@ import TabItem from '@theme/TabItem';
 
 The popularity of generative AI (Generative AI) has aroused widespread attention and completely ignited the vector database (Vector Database) market. Weaviate is an open-source vector database that simplifies the development of AI applications. Built-in vector and hybrid search, easy-to-connect machine learning models, and a focus on data privacy enable developers of all levels to build, iterate, and scale AI capabilities faster.
 
+This tutorial illustrates how to create and manage a Weaviate cluster by `kubectl` or a YAML file. You can find the YAML examples and guides in [the GitHub repository](https://github.com/apecloud/kubeblocks-addons/tree/release-0.9/examples/weaviate).
+
 ## Before you start
 
 * [Install KubeBlocks](./../installation/install-kubeblocks.md).

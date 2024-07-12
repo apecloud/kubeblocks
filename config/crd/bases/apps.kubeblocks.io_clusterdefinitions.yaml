@@ -9668,82 +9668,6 @@ spec:
                   This field is maintained for backward compatibility and its use is discouraged.
                   Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
                 type: object
-              shardingDefs:
-                description: Defines sharding definitions for the cluster.
-                items:
-                  properties:
-                    compDef:
-                      description: CompDef is the template name or name prefix of
-                        the ComponentDefinition.
-                      type: string
-                    name:
-                      description: Name is the unique identifier for the sharding
-                        definition.
-                      type: string
-                    shardsLimit:
-                      description: |-
-                        Defines the upper limit of the number of shards supported by the ShardingDefinition.
-
-
-                        It defines the maximum number of sets that can be created for the Sharding.
-                        This field allows you to set a limit on the scalability of the Sharding, preventing it from exceeding a certain number of shards.
-
-
-                        This field is immutable.
-                      properties:
-                        maxShards:
-                          description: The maximum limit of shards.
-                          format: int32
-                          type: integer
-                        minShards:
-                          description: The minimum limit of shards.
-                          format: int32
-                          type: integer
-                      required:
-                      - maxShards
-                      - minShards
-                      type: object
-                      x-kubernetes-validations:
-                      - message: the minimum and maximum limit of shards should be
-                          in the range of [0, 2048]
-                        rule: self.minShards >= 0 && self.maxShards <= 2048
-                      - message: the minimum shards limit should be no greater than
-                          the maximum
-                        rule: self.minShards <= self.maxShards
-                    sharedResources:
-                      description: Defines the shared resources that can be shared
-                        across multiple components within the Sharding.
-                      items:
-                        properties:
-                          name:
-                            description: Name is the unique identifier for the shared
-                              resource.
-                            type: string
-                          resourceFrom:
-                            description: Defines the source of the shared resource.
-                            properties:
-                              systemAccountSource:
-                                description: Defines the system account that the shared
-                                  resource is derived from.
-                                properties:
-                                  accountName:
-                                    description: The name of the system account defined
-                                      in the ComponentDefinition.Spec.SystemAccounts[x].Name.
-                                    type: string
-                                required:
-                                - accountName
-                                type: object
-                            type: object
-                        required:
-                        - name
-                        - resourceFrom
-                        type: object
-                      type: array
-                  required:
-                  - compDef
-                  - name
-                  type: object
-                type: array
               topologies:
                 description: Topologies defines all possible topologies within the
                   cluster.
@@ -9846,10 +9770,26 @@ spec:
                           type: array
                       type: object
                     shardings:
-                      description: Sharding specifies the sharding configuration for
-                        the topology.
+                      description: Sharding specifies the shardings in the topology.
                       items:
                         properties:
+                          compDef:
+                            description: |-
+                              Specifies the name or prefix of the ComponentDefinition custom resource(CR) template that
+                              defines the Component's characteristics and behavior.
+
+
+                              When a prefix is used, the system selects the ComponentDefinition CR with the latest version that matches the prefix.
+                              This approach allows:
+
+
+                              1. Precise selection by providing the exact name of a ComponentDefinition CR.
+                              2. Flexible and automatic selection of the most up-to-date ComponentDefinition CR by specifying a prefix.
+
+
+                              Once set, this field cannot be updated.
+                            maxLength: 64
+                            type: string
                           name:
                             description: |-
                               Defines the unique identifier of the sharding within the cluster topology.
@@ -9863,17 +9803,68 @@ spec:
                             maxLength: 16
                             pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                             type: string
-                          shardingDef:
+                          shardsLimit:
                             description: |-
-                              Specifies the name the ShardingDefinition defined in the ClusterDefinition.Spec.ShardingDefs[x].Name.
+                              Defines the upper limit of the number of shards supported by the ShardingDefinition.
 
 
-                              Once set, this field cannot be updated.
-                            maxLength: 64
-                            type: string
+                              It defines the maximum number of sets that can be created for the Sharding.
+                              This field allows you to set a limit on the scalability of the Sharding, preventing it from exceeding a certain number of shards.
+
+
+                              This field is immutable.
+                            properties:
+                              maxShards:
+                                description: The maximum limit of shards.
+                                format: int32
+                                type: integer
+                              minShards:
+                                description: The minimum limit of shards.
+                                format: int32
+                                type: integer
+                            required:
+                            - maxShards
+                            - minShards
+                            type: object
+                            x-kubernetes-validations:
+                            - message: the minimum and maximum limit of shards should
+                                be in the range of [0, 2048]
+                              rule: self.minShards >= 0 && self.maxShards <= 2048
+                            - message: the minimum shards limit should be no greater
+                                than the maximum
+                              rule: self.minShards <= self.maxShards
+                          sharedResources:
+                            description: Defines the shared resources that can be
+                              shared across multiple components within the Sharding.
+                            items:
+                              properties:
+                                name:
+                                  description: Name is the unique identifier for the
+                                    shared resource.
+                                  type: string
+                                resourceFrom:
+                                  description: Defines the source of the shared resource.
+                                  properties:
+                                    systemAccountSource:
+                                      description: Defines the system account that
+                                        the shared resource is derived from.
+                                      properties:
+                                        accountName:
+                                          description: The name of the system account
+                                            defined in the ComponentDefinition.Spec.SystemAccounts[x].Name.
+                                          type: string
+                                      required:
+                                      - accountName
+                                      type: object
+                                  type: object
+                              required:
+                              - name
+                              - resourceFrom
+                              type: object
+                            type: array
                         required:
+                        - compDef
                         - name
-                        - shardingDef
                         type: object
                       maxItems: 128
                       minItems: 1

@@ -89,38 +89,6 @@ type ClusterDefinitionSpec struct {
 	// +kubebuilder:validation:MaxItems=128
 	// +optional
 	Topologies []ClusterTopology `json:"topologies,omitempty"`
-
-	// Defines sharding definitions for the cluster.
-	//
-	// +optional
-	ShardingDefs []ShardingDefinition `json:"shardingDefs,omitempty"`
-}
-
-type ShardingDefinition struct {
-	// Name is the unique identifier for the sharding definition.
-	//
-	// +kubebuilder:validation:Required
-	Name string `json:"name"`
-
-	// CompDef is the template name or name prefix of the ComponentDefinition.
-	//
-	// +kubebuilder:validation:Required
-	CompDef string `json:"compDef"`
-
-	// Defines the upper limit of the number of shards supported by the ShardingDefinition.
-	//
-	// It defines the maximum number of sets that can be created for the Sharding.
-	// This field allows you to set a limit on the scalability of the Sharding, preventing it from exceeding a certain number of shards.
-	//
-	// This field is immutable.
-	//
-	// +optional
-	ShardsLimit *ShardsLimit `json:"shardsLimit,omitempty"`
-
-	// Defines the shared resources that can be shared across multiple components within the Sharding.
-	//
-	// +optional
-	SharedResources []SharedResource `json:"sharedResources,omitempty"`
 }
 
 // ShardsLimit defines the upper limit of the number of shards supported by the Sharding.
@@ -174,7 +142,7 @@ type ClusterTopology struct {
 	// +kubebuilder:validation:MaxLength=32
 	Name string `json:"name"`
 
-	// Sharding specifies the sharding configuration for the topology.
+	// Sharding specifies the shardings in the topology.
 	//
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=128
@@ -216,13 +184,35 @@ type ClusterTopologySharding struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// Specifies the name the ShardingDefinition defined in the ClusterDefinition.Spec.ShardingDefs[x].Name.
+	// Specifies the name or prefix of the ComponentDefinition custom resource(CR) template that
+	// defines the Component's characteristics and behavior.
+	//
+	// When a prefix is used, the system selects the ComponentDefinition CR with the latest version that matches the prefix.
+	// This approach allows:
+	//
+	// 1. Precise selection by providing the exact name of a ComponentDefinition CR.
+	// 2. Flexible and automatic selection of the most up-to-date ComponentDefinition CR by specifying a prefix.
 	//
 	// Once set, this field cannot be updated.
 	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=64
-	ShardingDef string `json:"shardingDef"`
+	CompDef string `json:"compDef"`
+
+	// Defines the upper limit of the number of shards supported by the ShardingDefinition.
+	//
+	// It defines the maximum number of sets that can be created for the Sharding.
+	// This field allows you to set a limit on the scalability of the Sharding, preventing it from exceeding a certain number of shards.
+	//
+	// This field is immutable.
+	//
+	// +optional
+	ShardsLimit *ShardsLimit `json:"shardsLimit,omitempty"`
+
+	// Defines the shared resources that can be shared across multiple components within the Sharding.
+	//
+	// +optional
+	SharedResources []SharedResource `json:"sharedResources,omitempty"`
 }
 
 // ClusterTopologyComponent defines a Component within a ClusterTopology.

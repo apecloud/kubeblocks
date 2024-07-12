@@ -91,48 +91,6 @@ type ClusterDefinitionSpec struct {
 	Topologies []ClusterTopology `json:"topologies,omitempty"`
 }
 
-// ShardsLimit defines the upper limit of the number of shards supported by the Sharding.
-//
-// +kubebuilder:validation:XValidation:rule="self.minShards >= 0 && self.maxShards <= 2048",message="the minimum and maximum limit of shards should be in the range of [0, 2048]"
-// +kubebuilder:validation:XValidation:rule="self.minShards <= self.maxShards",message="the minimum shards limit should be no greater than the maximum"
-type ShardsLimit struct {
-	// The minimum limit of shards.
-	//
-	// +kubebuilder:validation:Required
-	MinShards int32 `json:"minShards"`
-
-	// The maximum limit of shards.
-	//
-	// +kubebuilder:validation:Required
-	MaxShards int32 `json:"maxShards"`
-}
-
-type SharedResource struct {
-	// Name is the unique identifier for the shared resource.
-	//
-	// +kubebuilder:validation:Required
-	Name string `json:"name"`
-
-	// Defines the source of the shared resource.
-	//
-	// +kubebuilder:validation:Required
-	ResourceFrom *ResourceFrom `json:"resourceFrom"`
-}
-
-type ResourceFrom struct {
-	// Defines the system account that the shared resource is derived from.
-	//
-	// +optional
-	SystemAccountSource *SystemAccountSource `json:"systemAccountSource,omitempty"`
-}
-
-type SystemAccountSource struct {
-	// The name of the system account defined in the ComponentDefinition.Spec.SystemAccounts[x].Name.
-	//
-	// +kubebuilder:validation:Required
-	AccountName string `json:"accountName"`
-}
-
 // ClusterTopology represents the definition for a specific cluster topology.
 type ClusterTopology struct {
 	// Name is the unique identifier for the cluster topology.
@@ -213,6 +171,48 @@ type ClusterTopologySharding struct {
 	//
 	// +optional
 	SharedResources []SharedResource `json:"sharedResources,omitempty"`
+}
+
+// ShardsLimit defines the upper limit of the number of shards supported by the Sharding.
+//
+// +kubebuilder:validation:XValidation:rule="self.minShards >= 0 && self.maxShards <= 2048",message="the minimum and maximum limit of shards should be in the range of [0, 2048]"
+// +kubebuilder:validation:XValidation:rule="self.minShards <= self.maxShards",message="the minimum shards limit should be no greater than the maximum"
+type ShardsLimit struct {
+	// The minimum limit of shards.
+	//
+	// +kubebuilder:validation:Required
+	MinShards int32 `json:"minShards"`
+
+	// The maximum limit of shards.
+	//
+	// +kubebuilder:validation:Required
+	MaxShards int32 `json:"maxShards"`
+}
+
+type SharedResource struct {
+	// Name is the unique identifier for the shared resource.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Defines the source of the shared resource.
+	//
+	// +kubebuilder:validation:Required
+	ResourceFrom *ResourceFrom `json:"resourceFrom"`
+}
+
+type ResourceFrom struct {
+	// Defines the system account that the shared resource is derived from.
+	//
+	// +optional
+	SystemAccountSource *SystemAccountSource `json:"systemAccountSource,omitempty"`
+}
+
+type SystemAccountSource struct {
+	// The name of the system account defined in the ComponentDefinition.Spec.SystemAccounts[x].Name.
+	//
+	// +kubebuilder:validation:Required
+	AccountName string `json:"accountName"`
 }
 
 // ClusterTopologyComponent defines a Component within a ClusterTopology.

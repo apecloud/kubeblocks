@@ -21,7 +21,7 @@ This tutorial shows how to create and connect to a MongoDB cluster.
 
 * View all the database types and versions available for creating a cluster.
   
-  Make sure the `mongodb` cluster definition is installed. If the cluster definition is not available, refer to [this doc](./../../overview/supported-addons.md#install-addons) to enable it first.
+  Make sure the `mongodb` cluster definition is installed. If the cluster definition is not available, refer to [this doc](./../../installation/install-addons.md) to enable it first.
 
   ```bash
   kubectl get clusterdefinition mongodb

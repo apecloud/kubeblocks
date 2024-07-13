@@ -2,7 +2,7 @@
 title: Install KubeBlocks
 description: Install KubeBlocks on the existing Kubernetes clusters with Helm
 keywords: [taints, affinity, tolerance, install, kbcli, KubeBlocks]
-sidebar_position: 3
+sidebar_position: 1
 sidebar_label: Install KubeBlocks
 ---
 

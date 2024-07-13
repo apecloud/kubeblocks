@@ -21,7 +21,7 @@ sidebar_label: Install KubeBlocks
    helm search repo kubeblocks/mariadb --devel --versions
    ```
 
-3. Install the addon.
+3. Install the addon (take mariadb as example).
 
    ```bash
    helm install mariadb kubeblocks/mariadb --namespace kb-system --create-namespace --version 0.9.0

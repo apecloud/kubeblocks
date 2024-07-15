@@ -884,7 +884,7 @@ func setEncryptedSystemAccountsAnnotation(request *dpbackup.Request, cluster *ap
 	if err != nil {
 		return err
 	}
-	if secretMapString != nil || *secretMapString != "" {
+	if secretMapString != nil && *secretMapString != "" {
 		request.Backup.Annotations[constant.EncryptedSystemAccountsAnnotationKey] = *secretMapString
 	}
 	return nil

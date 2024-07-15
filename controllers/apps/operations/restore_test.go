@@ -78,10 +78,6 @@ var _ = Describe("Restore OpsRequest", func() {
 			reqCtx intctrlutil.RequestCtx
 			backup *dpv1alpha1.Backup
 		)
-
-		account := make([]string, 2)
-		password := make([][]byte, 2)
-
 		BeforeEach(func() {
 			By("init operations resources ")
 			opsRes, _, _ = initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
@@ -92,12 +88,6 @@ var _ = Describe("Restore OpsRequest", func() {
 				SetBackupPolicyName(testdp.BackupPolicyName).
 				SetBackupMethod(testdp.VSBackupMethodName).
 				Create(&testCtx).GetObject()
-
-			By("set system account")
-			account[0] = "test0"
-			account[1] = "test1"
-			password[0], _ = json.Marshal("testPwd0")
-			password[1], _ = json.Marshal("testPwd1")
 
 			Expect(testapps.ChangeObjStatus(&testCtx, backup, func() {
 				backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted

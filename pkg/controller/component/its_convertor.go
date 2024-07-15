@@ -279,12 +279,6 @@ func (c *itsRoleProbeConvertor) convert(args ...any) (any, error) {
 		RoleUpdateMechanism: workloads.DirectAPIServerEventUpdate,
 	}
 
-	if synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler != nil {
-		builtinHandler := string(*synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler)
-		itsRoleProbe.BuiltinHandler = &builtinHandler
-		return itsRoleProbe, nil
-	}
-
 	// TODO(xingran): ITS Action does not support args[] yet
 	if synthesizeComp.LifecycleActions.RoleProbe.Exec != nil {
 		itsRoleProbeCmdAction := workloads.Action{

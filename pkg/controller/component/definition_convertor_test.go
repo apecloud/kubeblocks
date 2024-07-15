@@ -859,12 +859,11 @@ var _ = Describe("Component Definition Convertor", func() {
 
 				actions := res.(*appsv1alpha1.ComponentLifecycleActions)
 				Expect(actions.PostProvision).ShouldNot(BeNil())
-				Expect(actions.PostProvision.CustomHandler).ShouldNot(BeNil())
-				Expect(actions.PostProvision.CustomHandler.Exec.Image).Should(BeEquivalentTo(commandExecutorEnvItem.Image))
-				Expect(actions.PostProvision.CustomHandler.Exec.Env).Should(BeEquivalentTo(commandExecutorEnvItem.Env))
-				Expect(actions.PostProvision.CustomHandler.Exec.Command).Should(BeEquivalentTo(commandExecutorItem.Command))
-				Expect(actions.PostProvision.CustomHandler.Exec.Args).Should(BeEquivalentTo(commandExecutorItem.Args))
-				Expect(*actions.PostProvision.CustomHandler.PreCondition).Should(BeEquivalentTo(appsv1alpha1.ComponentReadyPreConditionType))
+				Expect(actions.PostProvision.Exec.Image).Should(BeEquivalentTo(commandExecutorEnvItem.Image))
+				Expect(actions.PostProvision.Exec.Env).Should(BeEquivalentTo(commandExecutorEnvItem.Env))
+				Expect(actions.PostProvision.Exec.Command).Should(BeEquivalentTo(commandExecutorItem.Command))
+				Expect(actions.PostProvision.Exec.Args).Should(BeEquivalentTo(commandExecutorItem.Args))
+				Expect(*actions.PostProvision.PreCondition).Should(BeEquivalentTo(appsv1alpha1.ComponentReadyPreConditionType))
 			})
 
 			It("role probe", func() {
@@ -873,13 +872,7 @@ var _ = Describe("Component Definition Convertor", func() {
 				Expect(err).Should(Succeed())
 
 				actions := res.(*appsv1alpha1.ComponentLifecycleActions)
-				// mysql + consensus -> wesql
-				wesqlBuiltinHandler := func() *appsv1alpha1.BuiltinActionHandlerType {
-					handler := appsv1alpha1.WeSQLBuiltinActionHandler
-					return &handler
-				}
 				expectedRoleProbe := &appsv1alpha1.Probe{
-					BuiltinHandler: wesqlBuiltinHandler(),
 					Action: appsv1alpha1.Action{
 						TimeoutSeconds: clusterCompDef.Probes.RoleProbe.TimeoutSeconds,
 					},
@@ -913,7 +906,6 @@ var _ = Describe("Component Definition Convertor", func() {
 
 				actions := res.(*appsv1alpha1.ComponentLifecycleActions)
 				Expect(actions.RoleProbe).ShouldNot(BeNil())
-				Expect(*actions.RoleProbe.BuiltinHandler).Should(BeEquivalentTo(appsv1alpha1.WeSQLBuiltinActionHandler))
 				Expect(actions.RoleProbe.Exec).ShouldNot(BeNil())
 				Expect(actions.RoleProbe.Exec.Image).Should(BeEquivalentTo("mock-its-role-probe-image"))
 				Expect(actions.RoleProbe.Exec.Command).Should(BeEquivalentTo(mockCommand))

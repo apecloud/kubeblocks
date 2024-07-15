@@ -137,15 +137,13 @@ var _ = Describe("Component PostProvision Test", func() {
 			By("build component with postProvision without PodList, do not need to do PostProvision action")
 			synthesizeComp.LifecycleActions = &appsv1alpha1.ComponentLifecycleActions{}
 			defaultPreCondition := appsv1alpha1.ComponentReadyPreConditionType
-			postProvision := appsv1alpha1.LifecycleActionHandler{
-				CustomHandler: &appsv1alpha1.Action{
-					Exec: &appsv1alpha1.ExecAction{
-						Image:   constant.KBToolsImage,
-						Command: []string{"echo", "mock"},
-						Args:    []string{},
-					},
-					PreCondition: &defaultPreCondition,
+			postProvision := appsv1alpha1.Action{
+				Exec: &appsv1alpha1.ExecAction{
+					Image:   constant.KBToolsImage,
+					Command: []string{"echo", "mock"},
+					Args:    []string{},
 				},
+				PreCondition: &defaultPreCondition,
 			}
 			synthesizeComp.LifecycleActions.PostProvision = &postProvision
 			actionCtx, err = NewActionContext(cluster, comp, nil, synthesizeComp.LifecycleActions, synthesizeComp.ScriptTemplates, PostProvisionAction)

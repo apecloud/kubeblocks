@@ -531,43 +531,11 @@ func (c *compDefLifecycleActionsConvertor) convert(args ...any) (any, error) {
 	return lifecycleActions, nil // TODO
 }
 
-func (c *compDefLifecycleActionsConvertor) convertBuiltinActionHandler(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) appsv1alpha1.BuiltinActionHandlerType {
-	if clusterCompDef == nil || clusterCompDef.CharacterType == "" {
-		return appsv1alpha1.UnknownBuiltinActionHandler
-	}
-	switch clusterCompDef.CharacterType {
-	case constant.MySQLCharacterType:
-		if clusterCompDef.WorkloadType == appsv1alpha1.Consensus {
-			return appsv1alpha1.WeSQLBuiltinActionHandler
-		} else {
-			return appsv1alpha1.MySQLBuiltinActionHandler
-		}
-	case constant.PostgreSQLCharacterType:
-		if clusterCompDef.WorkloadType == appsv1alpha1.Consensus {
-			return appsv1alpha1.ApeCloudPostgresqlBuiltinActionHandler
-		} else {
-			return appsv1alpha1.PostgresqlBuiltinActionHandler
-		}
-	case constant.RedisCharacterType:
-		return appsv1alpha1.RedisBuiltinActionHandler
-	case constant.MongoDBCharacterType:
-		return appsv1alpha1.MongoDBBuiltinActionHandler
-	case constant.ETCDCharacterType:
-		return appsv1alpha1.ETCDBuiltinActionHandler
-	case constant.PolarDBXCharacterType:
-		return appsv1alpha1.PolarDBXBuiltinActionHandler
-	default:
-		return appsv1alpha1.UnknownBuiltinActionHandler
-	}
-}
-
 func (c *compDefLifecycleActionsConvertor) convertRoleProbe(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) *appsv1alpha1.Probe {
-	builtinHandler := c.convertBuiltinActionHandler(clusterCompDef)
 	// if RSMSpec has role probe CustomHandler, use it first.
 	if clusterCompDef.RSMSpec != nil && clusterCompDef.RSMSpec.RoleProbe != nil && len(clusterCompDef.RSMSpec.RoleProbe.CustomHandler) > 0 {
 		// TODO(xingran): RSMSpec.RoleProbe.CustomHandler support multiple images and commands, but ComponentDefinition.LifeCycleAction.RoleProbe only support one image and command now.
 		return &appsv1alpha1.Probe{
-			BuiltinHandler: &builtinHandler,
 			Action: appsv1alpha1.Action{
 				Exec: &appsv1alpha1.ExecAction{
 					Image:   clusterCompDef.RSMSpec.RoleProbe.CustomHandler[0].Image,
@@ -589,12 +557,6 @@ func (c *compDefLifecycleActionsConvertor) convertRoleProbe(clusterCompDef *apps
 		},
 		PeriodSeconds: clusterCompDefRoleProbe.PeriodSeconds,
 	}
-
-	roleProbe.BuiltinHandler = &builtinHandler
-	if clusterCompDefRoleProbe.Commands == nil || len(clusterCompDefRoleProbe.Commands.Queries) == 0 {
-		return roleProbe
-	}
-
 	commands := clusterCompDefRoleProbe.Commands.Writes
 	if len(clusterCompDefRoleProbe.Commands.Writes) == 0 {
 		commands = clusterCompDefRoleProbe.Commands.Queries
@@ -605,22 +567,20 @@ func (c *compDefLifecycleActionsConvertor) convertRoleProbe(clusterCompDef *apps
 	return roleProbe
 }
 
-func (c *compDefLifecycleActionsConvertor) convertPostProvision(postStart *appsv1alpha1.PostStartAction) *appsv1alpha1.LifecycleActionHandler {
+func (c *compDefLifecycleActionsConvertor) convertPostProvision(postStart *appsv1alpha1.PostStartAction) *appsv1alpha1.Action {
 	if postStart == nil {
 		return nil
 	}
 
 	defaultPreCondition := appsv1alpha1.ComponentReadyPreConditionType
-	return &appsv1alpha1.LifecycleActionHandler{
-		CustomHandler: &appsv1alpha1.Action{
-			Exec: &appsv1alpha1.ExecAction{
-				Image:   postStart.CmdExecutorConfig.Image,
-				Command: postStart.CmdExecutorConfig.Command,
-				Args:    postStart.CmdExecutorConfig.Args,
-				Env:     postStart.CmdExecutorConfig.Env,
-			},
-			PreCondition: &defaultPreCondition,
+	return &appsv1alpha1.Action{
+		Exec: &appsv1alpha1.ExecAction{
+			Image:   postStart.CmdExecutorConfig.Image,
+			Command: postStart.CmdExecutorConfig.Command,
+			Args:    postStart.CmdExecutorConfig.Args,
+			Env:     postStart.CmdExecutorConfig.Env,
 		},
+		PreCondition: &defaultPreCondition,
 	}
 }
 

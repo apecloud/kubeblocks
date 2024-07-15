@@ -121,8 +121,13 @@ func (t *componentAccountTransformer) getPasswordFromSecret(ctx graph.TransformC
 }
 
 func (t *componentAccountTransformer) buildPassword(ctx *componentTransformContext, account appsv1alpha1.SystemAccount) []byte {
+	password := ""
+	if account.InitAccount {
+		password = factory.GetRestorePassword(ctx.SynthesizeComponent)
+	} else {
+		password = factory.GetRestoreSystemAccountPassword(ctx.SynthesizeComponent, account)
+	}
 	// get restore password if exists during recovery.
-	password := factory.GetRestoreSystemAccountPassword(ctx.SynthesizeComponent, account)
 	if password == "" {
 		return t.generatePassword(account)
 	}

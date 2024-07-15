@@ -751,7 +751,7 @@ func PatchBackupObjectMeta(
 	// TODO(ldm): we should remove this dependency of cluster in the future
 	cluster := getCluster(request.Ctx, request.Client, targetPod)
 	if cluster != nil {
-		if err := setSnapshotAnnotation(request, cluster); err != nil {
+		if err := setClusterSnapshotAnnotation(request, cluster); err != nil {
 			return false, err
 		}
 		if err := setEncryptedSystemAccountsAnnotation(request, cluster); err != nil {
@@ -912,13 +912,16 @@ func getClusterObjectString(cluster *appsv1alpha1.Cluster) (*string, error) {
 	return clusterString, err
 }
 
-// setSnapshotAnnotation sets the snapshot of cluster to the backup's annotations.
-func setSnapshotAnnotation(request *dpbackup.Request, cluster *appsv1alpha1.Cluster) error {
+// setClusterSnapshotAnnotation sets the snapshot of cluster to the backup's annotations.
+func setClusterSnapshotAnnotation(request *dpbackup.Request, cluster *appsv1alpha1.Cluster) error {
 	if request.Backup.Annotations == nil {
 		request.Backup.Annotations = map[string]string{}
 	}
 	clusterString, err := getClusterObjectString(cluster)
-	if err != nil || clusterString == nil {
+	if err != nil {
+		return err
+	}
+	if clusterString == nil {
 		return err
 	}
 	request.Backup.Annotations[constant.ClusterSnapshotAnnotationKey] = *clusterString

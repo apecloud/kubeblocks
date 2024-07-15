@@ -857,10 +857,8 @@ func setConnectionPasswordAnnotation(request *dpbackup.Request) error {
 }
 
 func setEncryptedSystemAccountsAnnotation(request *dpbackup.Request, cluster *appsv1alpha1.Cluster) error {
-	var (
-		usernameKey = "username"
-		passwordKey = "password"
-	)
+	usernameKey := constant.AccountNameForSecret
+	passwordKey := constant.AccountPasswdForSecret
 	// fetch secret objects
 	secretList, _ := listObjectsOfClusterWithErrorIgnored(request.Ctx, request.Client, cluster, &corev1.SecretList{}).(*corev1.SecretList)
 	// store the data of secrets in a map data structure, which contains the name of the component, the username, and the encrypted password.

@@ -352,7 +352,10 @@ func GetRestoreSystemAccountPassword(synthesizedComp *component.SynthesizedCompo
 		return ""
 	}
 	e := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
-	encryptedPwd := systemAccountsMap[synthesizedComp.Name][account.Name]
+	encryptedPwd, ok := systemAccountsMap[synthesizedComp.Name][account.Name]
+	if !ok {
+		return ""
+	}
 	password, _ := e.Decrypt([]byte(encryptedPwd))
 	return password
 }

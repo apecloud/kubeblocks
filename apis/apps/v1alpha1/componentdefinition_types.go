@@ -744,6 +744,16 @@ type HTTPAction struct {
 // Which may run as a K8s job or be executed inside the Lorry sidecar container, depending on the implementation.
 // Future implementations will standardize execution within Lorry.
 type ExecAction struct {
+	// Specifies the container image to be used for running the Action.
+	//
+	// When specified, a dedicated container will be created using this image to execute the Action.
+	// This field is mutually exclusive with the `container` field; only one of them should be provided.
+	//
+	// This field cannot be updated.
+	//
+	// +optional
+	Image string `json:"image,omitempty"`
+
 	// Specifies the command to be executed inside the container.
 	// The working directory for this command is the container's root directory('/').
 	// Commands are executed directly without a shell environment, meaning shell-specific syntax ('|', etc.) is not supported.
@@ -758,6 +768,54 @@ type ExecAction struct {
 	//
 	// +optional
 	Args []string `json:"args,omitempty"`
+
+	// Represents a list of environment variables that will be injected into the container.
+	// These variables enable the container to adapt its behavior based on the environment it's running in.
+	//
+	// This field cannot be updated.
+	//
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	Env []corev1.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
+
+	// Defines the criteria used to select the target Pod(s) for executing the Action.
+	// This is useful when there is no default target replica identified.
+	// It allows for precise control over which Pod(s) the Action should run in.
+	//
+	// This field cannot be updated.
+	//
+	// Note: This field is reserved for future use and is not currently active.
+	//
+	// +optional
+	TargetPodSelector TargetPodSelector `json:"targetPodSelector,omitempty"`
+
+	// Used in conjunction with the `targetPodSelector` field to refine the selection of target pod(s) for Action execution.
+	// The impact of this field depends on the `targetPodSelector` value:
+	//
+	// - When `targetPodSelector` is set to `Any` or `All`, this field will be ignored.
+	// - When `targetPodSelector` is set to `Role`, only those replicas whose role matches the `matchingKey`
+	//   will be selected for the Action.
+	//
+	// This field cannot be updated.
+	//
+	// Note: This field is reserved for future use and is not currently active.
+	//
+	// +optional
+	MatchingKey string `json:"matchingKey,omitempty"`
+
+	// Defines the name of the container within the target Pod where the action will be executed.
+	//
+	// This name must correspond to one of the containers defined in `componentDefinition.spec.runtime`.
+	// If this field is not specified, the default behavior is to use the first container listed in
+	// `componentDefinition.spec.runtime`.
+	//
+	// This field cannot be updated.
+	//
+	// Note: This field is reserved for future use and is not currently active.
+	//
+	// +optional
+	Container string `json:"container,omitempty"`
 }
 
 type RetryPolicy struct {
@@ -834,16 +892,6 @@ const (
 //   - If an action encounters any errors, error messages should be written to stderr,
 //     or detailed in the HTTP response with the appropriate non-200 status code.
 type Action struct {
-	// Specifies the container image to be used for running the Action.
-	//
-	// When specified, a dedicated container will be created using this image to execute the Action.
-	// This field is mutually exclusive with the `container` field; only one of them should be provided.
-	//
-	// This field cannot be updated.
-	//
-	// +optional
-	Image string `json:"image,omitempty"`
-
 	// Defines the command to run.
 	//
 	// This field cannot be updated.
@@ -859,54 +907,6 @@ type Action struct {
 	//
 	// +optional
 	HTTP *HTTPAction `json:"http,omitempty"`
-
-	// Represents a list of environment variables that will be injected into the container.
-	// These variables enable the container to adapt its behavior based on the environment it's running in.
-	//
-	// This field cannot be updated.
-	//
-	// +optional
-	// +patchMergeKey=name
-	// +patchStrategy=merge
-	Env []corev1.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
-
-	// Defines the criteria used to select the target Pod(s) for executing the Action.
-	// This is useful when there is no default target replica identified.
-	// It allows for precise control over which Pod(s) the Action should run in.
-	//
-	// This field cannot be updated.
-	//
-	// Note: This field is reserved for future use and is not currently active.
-	//
-	// +optional
-	TargetPodSelector TargetPodSelector `json:"targetPodSelector,omitempty"`
-
-	// Used in conjunction with the `targetPodSelector` field to refine the selection of target pod(s) for Action execution.
-	// The impact of this field depends on the `targetPodSelector` value:
-	//
-	// - When `targetPodSelector` is set to `Any` or `All`, this field will be ignored.
-	// - When `targetPodSelector` is set to `Role`, only those replicas whose role matches the `matchingKey`
-	//   will be selected for the Action.
-	//
-	// This field cannot be updated.
-	//
-	// Note: This field is reserved for future use and is not currently active.
-	//
-	// +optional
-	MatchingKey string `json:"matchingKey,omitempty"`
-
-	// Defines the name of the container within the target Pod where the action will be executed.
-	//
-	// This name must correspond to one of the containers defined in `componentDefinition.spec.runtime`.
-	// If this field is not specified, the default behavior is to use the first container listed in
-	// `componentDefinition.spec.runtime`.
-	//
-	// This field cannot be updated.
-	//
-	// Note: This field is reserved for future use and is not currently active.
-	//
-	// +optional
-	Container string `json:"container,omitempty"`
 
 	// Specifies the maximum duration in seconds that the Action is allowed to run.
 	//
@@ -946,6 +946,39 @@ type Action struct {
 	//
 	// +optional
 	PreCondition *PreConditionType `json:"preCondition,omitempty"`
+}
+
+type Probe struct {
+	Action `json:",inline"`
+
+	// TODO: remove this later.
+	//
+	// +optional
+	BuiltinHandler *BuiltinActionHandlerType `json:"builtinHandler,omitempty"`
+
+	// Specifies the number of seconds to wait after the container has started before the RoleProbe
+	// begins to detect the container's role.
+	//
+	// +optional
+	InitialDelaySeconds int32 `json:"initialDelaySeconds,omitempty"`
+
+	// Specifies the frequency at which the probe is conducted. This value is expressed in seconds.
+	// Default to 10 seconds. Minimum value is 1.
+	//
+	// +optional
+	PeriodSeconds int32 `json:"periodSeconds,omitempty"`
+
+	// Minimum consecutive successes for the probe to be considered successful after having failed.
+	// Defaults to 1. Minimum value is 1.
+	//
+	// +optional
+	SuccessThreshold int32 `json:"successThreshold,omitempty"`
+
+	// Minimum consecutive failures for the probe to be considered failed after having succeeded.
+	// Defaults to 3. Minimum value is 1.
+	//
+	// +optional
+	FailureThreshold int32 `json:"failureThreshold,omitempty"`
 }
 
 // BuiltinActionHandlerType defines build-in action handlers provided by Lorry, including:
@@ -1148,7 +1181,7 @@ type ComponentLifecycleActions struct {
 	// Note: This field is immutable once it has been set.
 	//
 	// +optional
-	RoleProbe *RoleProbe `json:"roleProbe,omitempty"`
+	RoleProbe *Probe `json:"roleProbe,omitempty"`
 
 	// Defines the procedure for a controlled transition of leadership from the current leader to a new replica.
 	// This approach aims to minimize downtime and maintain availability in systems with a leader-follower topology,
@@ -1378,26 +1411,4 @@ type ComponentSwitchover struct {
 	// +kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.9.0"
 	// +optional
 	ScriptSpecSelectors []ScriptSpecSelector `json:"scriptSpecSelectors,omitempty"`
-}
-
-type RoleProbe struct {
-	LifecycleActionHandler `json:",inline"`
-
-	// Specifies the number of seconds to wait after the container has started before the RoleProbe
-	// begins to detect the container's role.
-	//
-	// +optional
-	InitialDelaySeconds int32 `json:"initialDelaySeconds,omitempty" protobuf:"varint,2,opt,name=initialDelaySeconds"`
-
-	// Specifies the number of seconds after which the probe times out.
-	// Defaults to 1 second. Minimum value is 1.
-	//
-	// +optional
-	TimeoutSeconds int32 `json:"timeoutSeconds,omitempty" protobuf:"varint,3,opt,name=timeoutSeconds"`
-
-	// Specifies the frequency at which the probe is conducted. This value is expressed in seconds.
-	// Default to 10 seconds. Minimum value is 1.
-	//
-	// +optional
-	PeriodSeconds int32 `json:"periodSeconds,omitempty" protobuf:"varint,4,opt,name=periodSeconds"`
 }

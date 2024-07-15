@@ -274,7 +274,7 @@ func renderSwitchoverCmdJob(ctx context.Context,
 						Containers: []corev1.Container{
 							{
 								Name:            KBSwitchoverJobContainerName,
-								Image:           cmdExecutorConfig.Image,
+								Image:           cmdExecutorConfig.Exec.Image,
 								ImagePullPolicy: corev1.PullIfNotPresent,
 								Command:         cmdExecutorConfig.Exec.Command,
 								Args:            cmdExecutorConfig.Exec.Args,
@@ -366,11 +366,11 @@ func buildSwitchoverEnvs(ctx context.Context,
 	switch switchover.InstanceName {
 	case KBSwitchoverCandidateInstanceForAnyPod:
 		if synthesizeComp.LifecycleActions.Switchover.WithoutCandidate != nil {
-			switchoverEnvs = append(switchoverEnvs, synthesizeComp.LifecycleActions.Switchover.WithoutCandidate.Env...)
+			switchoverEnvs = append(switchoverEnvs, synthesizeComp.LifecycleActions.Switchover.WithoutCandidate.Exec.Env...)
 		}
 	default:
 		if synthesizeComp.LifecycleActions.Switchover.WithCandidate != nil {
-			switchoverEnvs = append(switchoverEnvs, synthesizeComp.LifecycleActions.Switchover.WithCandidate.Env...)
+			switchoverEnvs = append(switchoverEnvs, synthesizeComp.LifecycleActions.Switchover.WithCandidate.Exec.Env...)
 		}
 	}
 
@@ -395,7 +395,7 @@ func replaceSwitchoverConnCredentialEnv(switchoverSpec *appsv1alpha1.ComponentSw
 	connCredentialMap := component.GetEnvReplacementMapForConnCredential(clusterName)
 	replaceEnvVars := func(action *appsv1alpha1.Action) {
 		if action != nil {
-			action.Env = component.ReplaceSecretEnvVars(connCredentialMap, action.Env)
+			action.Exec.Env = component.ReplaceSecretEnvVars(connCredentialMap, action.Exec.Env)
 		}
 	}
 	replaceEnvVars(switchoverSpec.WithCandidate)

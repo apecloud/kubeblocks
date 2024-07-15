@@ -6,7 +6,7 @@ sidebar_position: 1
 ---
 
 - Node: In a distributed database, each computer is referred to as a node, and each node has its own storage and processing capabilities. By adding new nodes, the storage and processing capacity of the distributed database can be easily expanded to accommodate the growing volume of data and concurrent access demands. Distributed databases can distribute read and write requests to different nodes for processing, achieving load balancing and improving the system's concurrent processing capabilities.
-- Data Sharding：To achieve distributed storage of data, it is necessary to divide the data into multiple parts, with each part being called a data shard. Common data sharding strategies include:
+- Data Sharding: To achieve distributed storage of data, it is necessary to divide the data into multiple parts, with each part being called a data shard. Common data sharding strategies include:
   - Range Sharding: The data is divided into multiple shards based on the key value range, with each shard responsible for a continuous key value range.
   - Hash Sharding: A hash function is used to map the data's key values to different shards, with each shard being responsible for a hash value range.
   - Composite Sharding: Multiple sharding strategies are combined, such as first sharding based on range and then sharding based on hash, to optimize the distribution and access efficiency of data.
@@ -16,6 +16,7 @@ sidebar_position: 1
   - Resource limits define the maximum amount of resources that a Pod can use at runtime. They are used to prevent the Pod from consuming excessive resources and protect nodes and other Pods from being affected.
 
 - Replication
+  
   To improve the availability and fault tolerance of data, distributed databases typically replicate data across multiple nodes, with each node having a complete or partial copy of the data. Through data replication and failover mechanisms, distributed databases can continue to provide service even when nodes fail, thereby increasing the system's availability. Common replication strategies include:
   - Primary-Replica Replication:
     - Each partition has a single primary node and multiple replica nodes.

@@ -42,6 +42,7 @@ import (
 type RestoreOpsHandler struct{}
 type RestoredResources struct {
 	cluster *appsv1alpha1.Cluster
+	// packing restored resources here to support more at future.
 }
 
 var _ OpsHandler = RestoreOpsHandler{}
@@ -71,7 +72,7 @@ func (r RestoreOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	opsRequest := opsRes.OpsRequest
 
 	// restore the cluster from the backup
-	if restoredResources, err = r.restoreResourceFromBackup(reqCtx, cli, opsRequest); err != nil {
+	if restoredResources, err = r.restoreClusterFromBackup(reqCtx, cli, opsRequest); err != nil {
 		return err
 	}
 	cluster := restoredResources.cluster
@@ -80,7 +81,6 @@ func (r RestoreOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	if err = cli.Create(reqCtx.Ctx, cluster); err != nil {
 		return err
 	}
-
 	opsRes.Cluster = cluster
 
 	// add labels of clusterRef and type to OpsRequest
@@ -136,8 +136,12 @@ func (r RestoreOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, 
 	return nil
 }
 
-func (r RestoreOpsHandler) restoreResourceFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *appsv1alpha1.OpsRequest) (*RestoredResources, error) {
-	backupName := opsRequest.Spec.GetRestore().BackupName
+func (r RestoreOpsHandler) restoreClusterFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *appsv1alpha1.OpsRequest) (*RestoredResources, error) {
+	restoreSpec := opsRequest.Spec.GetRestore()
+	if restoreSpec == nil {
+		return nil, intctrlutil.NewFatalError("spec.restore can not be empty")
+	}
+	backupName := restoreSpec.BackupName
 	restoredResources := &RestoredResources{}
 	// check if the backup exists
 	backup := &dpv1alpha1.Backup{}
@@ -156,7 +160,7 @@ func (r RestoreOpsHandler) restoreResourceFromBackup(reqCtx intctrlutil.RequestC
 
 	// format and validate the restore time
 	if backupType == string(dpv1alpha1.BackupTypeContinuous) {
-		restoreTimeStr, err := restore.FormatRestoreTimeAndValidate(opsRequest.Spec.GetRestore().RestorePointInTime, backup)
+		restoreTimeStr, err := restore.FormatRestoreTimeAndValidate(restoreSpec.RestorePointInTime, backup)
 		if err != nil {
 			return nil, err
 		}

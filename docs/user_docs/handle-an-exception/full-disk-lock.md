@@ -9,7 +9,7 @@ sidebar_label: Full disk lock
 
 The full disk lock function of KubeBlocks ensures the stability and availability of a database. This function triggers a disk lock when the disk usage reaches a set threshold, thereby pausing write operations and only allowing read operations. Such a mechanism prevents a database from being affected by disk space exhaustion.
 
-## Lock/unlock mechanism
+## Mechanism of lock/unlock
 
 When the space water level of any configured volume exceeds the defined threshold, the instance is locked (read-only). Meanwhile, the system sends a related warning event, including the specific threshold and space usage information of each volume.
 

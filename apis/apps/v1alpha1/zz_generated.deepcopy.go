@@ -676,6 +676,11 @@ func (in *ClusterComponentSpec) DeepCopyInto(out *ClusterComponentSpec) {
 		*out = new(UpdateStrategy)
 		**out = **in
 	}
+	if in.PodUpdatePolicy != nil {
+		in, out := &in.PodUpdatePolicy, &out.PodUpdatePolicy
+		*out = new(workloadsv1alpha1.PodUpdatePolicyType)
+		**out = **in
+	}
 	if in.UserResourceRefs != nil {
 		in, out := &in.UserResourceRefs, &out.UserResourceRefs
 		*out = new(UserResourceRefs)
@@ -700,6 +705,11 @@ func (in *ClusterComponentSpec) DeepCopyInto(out *ClusterComponentSpec) {
 	}
 	if in.Monitor != nil {
 		in, out := &in.Monitor, &out.Monitor
+		*out = new(bool)
+		**out = **in
+	}
+	if in.Stop != nil {
+		in, out := &in.Stop, &out.Stop
 		*out = new(bool)
 		**out = **in
 	}
@@ -2042,6 +2052,11 @@ func (in *ComponentSpec) DeepCopyInto(out *ComponentSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.PodUpdatePolicy != nil {
+		in, out := &in.PodUpdatePolicy, &out.PodUpdatePolicy
+		*out = new(workloadsv1alpha1.PodUpdatePolicyType)
+		**out = **in
+	}
 	if in.Affinity != nil {
 		in, out := &in.Affinity, &out.Affinity
 		*out = new(Affinity)
@@ -2083,6 +2098,11 @@ func (in *ComponentSpec) DeepCopyInto(out *ComponentSpec) {
 	}
 	if in.DisableExporter != nil {
 		in, out := &in.DisableExporter, &out.DisableExporter
+		*out = new(bool)
+		**out = **in
+	}
+	if in.Stop != nil {
+		in, out := &in.Stop, &out.Stop
 		*out = new(bool)
 		**out = **in
 	}

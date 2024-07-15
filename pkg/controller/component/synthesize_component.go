@@ -178,7 +178,9 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		Instances:              comp.Spec.Instances,
 		OfflineInstances:       comp.Spec.OfflineInstances,
 		DisableExporter:        comp.Spec.DisableExporter,
+		Stop:                   comp.Spec.Stop,
 		PodManagementPolicy:    compDef.Spec.PodManagementPolicy,
+		PodUpdatePolicy:        comp.Spec.PodUpdatePolicy,
 	}
 
 	// build backward compatible fields, including workload, services, componentRefEnvs, clusterDefName, clusterCompDefName, and clusterCompVer, etc.

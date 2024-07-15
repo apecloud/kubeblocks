@@ -922,7 +922,7 @@ func setClusterSnapshotAnnotation(request *dpbackup.Request, cluster *appsv1alph
 		return err
 	}
 	if clusterString == nil {
-		return err
+		return nil
 	}
 	request.Backup.Annotations[constant.ClusterSnapshotAnnotationKey] = *clusterString
 	return nil

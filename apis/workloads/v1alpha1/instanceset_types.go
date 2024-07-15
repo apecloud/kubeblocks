@@ -277,6 +277,17 @@ type InstanceSetSpec struct {
 	// +optional
 	PodManagementPolicy appsv1.PodManagementPolicyType `json:"podManagementPolicy,omitempty"`
 
+	// PodUpdatePolicy indicates how pods should be updated
+	//
+	// - `StrictInPlace` indicates that only allows in-place upgrades.
+	// Any attempt to modify other fields will be rejected.
+	// - `PreferInPlace` indicates that we will first attempt an in-place upgrade of the Pod.
+	// If that fails, it will fall back to the ReCreate, where pod will be recreated.
+	// Default value is "PreferInPlace"
+	//
+	// +optional
+	PodUpdatePolicy PodUpdatePolicyType `json:"podUpdatePolicy,omitempty"`
+
 	// Indicates the StatefulSetUpdateStrategy that will be
 	// employed to update Pods in the InstanceSet when a revision is made to
 	// Template.
@@ -405,6 +416,7 @@ type InstanceSetStatus struct {
 // +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.replicas
 // +kubebuilder:resource:categories={kubeblocks,all},shortName=its
 // +kubebuilder:printcolumn:name="LEADER",type="string",JSONPath=".status.membersStatus[?(@.role.isLeader==true)].podName",description="leader instance name."
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.readyReplicas",description="ready replicas."
@@ -436,6 +448,18 @@ type InstanceSetList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []InstanceSet `json:"items"`
 }
+
+type PodUpdatePolicyType string
+
+const (
+	// StrictInPlacePodUpdatePolicyType indicates that only allows in-place upgrades.
+	// Any attempt to modify other fields will be rejected.
+	StrictInPlacePodUpdatePolicyType PodUpdatePolicyType = "StrictInPlace"
+
+	// PreferInPlacePodUpdatePolicyType indicates that we will first attempt an in-place upgrade of the Pod.
+	// If that fails, it will fall back to the ReCreate, where pod will be recreated.
+	PreferInPlacePodUpdatePolicyType PodUpdatePolicyType = "PreferInPlace"
+)
 
 type ReplicaRole struct {
 
@@ -673,6 +697,10 @@ const (
 
 	// InstanceFailure is added in an instance set when at least one of its instances(pods) is in a `Failed` phase.
 	InstanceFailure ConditionType = "InstanceFailure"
+
+	// InstanceUpdateRestricted represents a ConditionType that indicates updates to an InstanceSet are blocked(when the
+	// PodUpdatePolicy is set to StrictInPlace but the pods cannot be updated in-place).
+	InstanceUpdateRestricted ConditionType = "InstanceUpdateRestricted"
 )
 
 const (
@@ -690,6 +718,9 @@ const (
 
 	// ReasonInstanceFailure is a reason for condition InstanceFailure.
 	ReasonInstanceFailure = "InstanceFailure"
+
+	// ReasonInstanceUpdateRestricted is a reason for condition InstanceUpdateRestricted.
+	ReasonInstanceUpdateRestricted = "InstanceUpdateRestricted"
 )
 
 const defaultInstanceTemplateReplicas = 1

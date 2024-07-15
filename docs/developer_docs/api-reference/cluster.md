@@ -1164,6 +1164,19 @@ bool
 <p>These annotations allow the Prometheus installed by KubeBlocks to discover and scrape metrics from the exporter.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>stop</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Stop the Component.
+If set, all the computing resources will be released.</p>
+</td>
+</tr>
 </table>
 </td>
 </tr>
@@ -5232,6 +5245,19 @@ Determines whether metrics exporter information is annotated on the Component&rs
 <p>These annotations allow the Prometheus installed by KubeBlocks to discover and scrape metrics from the exporter.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>stop</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Stop the Component.
+If set, all the computing resources will be released.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterComponentStatus">ClusterComponentStatus
@@ -9069,6 +9095,19 @@ bool
 <li>&ldquo;monitor.kubeblocks.io/scheme&rdquo;</li>
 </ul>
 <p>These annotations allow the Prometheus installed by KubeBlocks to discover and scrape metrics from the exporter.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>stop</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Stop the Component.
+If set, all the computing resources will be released.</p>
 </td>
 </tr>
 </tbody>
@@ -16501,6 +16540,19 @@ ComponentOps
 </tr>
 <tr>
 <td>
+<code>inPlace</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<p>When it is set to true, the instance will be rebuilt in-place.
+By default, a new pod will be created. Once the new pod is ready to serve,
+the instance that require rebuilding will be taken offline.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>backupName</code><br/>
 <em>
 string
@@ -22961,6 +23013,23 @@ Defaults to 1 if unspecified.</p>
 </tr>
 <tr>
 <td>
+<code>defaultTemplateOrdinals</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.Ordinals">
+Ordinals
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the desired Ordinals of the default template.
+The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the default template.</p>
+<p>For example, if Ordinals is &#123;ranges: [&#123;start: 0, end: 1&#125;], discrete: [7]&#125;,
+then the instance names generated under the default template would be
+$(cluster.name)-$(component.name)-0、$(cluster.name)-$(component.name)-1 and $(cluster.name)-$(component.name)-7</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>minReadySeconds</code><br/>
 <em>
 int32
@@ -23447,6 +23516,23 @@ int32
 <p>Specifies the desired number of replicas of the given Template.
 These replicas are instantiations of the same Template, with each having a consistent identity.
 Defaults to 1 if unspecified.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>defaultTemplateOrdinals</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.Ordinals">
+Ordinals
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the desired Ordinals of the default template.
+The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the default template.</p>
+<p>For example, if Ordinals is &#123;ranges: [&#123;start: 0, end: 1&#125;], discrete: [7]&#125;,
+then the instance names generated under the default template would be
+$(cluster.name)-$(component.name)-0、$(cluster.name)-$(component.name)-1 and $(cluster.name)-$(component.name)-7</p>
 </td>
 </tr>
 <tr>
@@ -23959,6 +24045,24 @@ The default value is 1. A value of 0 disables instance creation.</p>
 </tr>
 <tr>
 <td>
+<code>ordinals</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.Ordinals">
+Ordinals
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the desired Ordinals of this InstanceTemplate.
+The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.</p>
+<p>For example, if Ordinals is &#123;ranges: [&#123;start: 0, end: 1&#125;], discrete: [7]&#125;,
+then the instance names generated under this InstanceTemplate would be
+$(cluster.name)-$(component.name)-$(template.name)-0、$(cluster.name)-$(component.name)-$(template.name)-1 and
+$(cluster.name)-$(component.name)-$(template.name)-7</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>annotations</code><br/>
 <em>
 map[string]string
@@ -24245,6 +24349,85 @@ Action
 <em>(Optional)</em>
 <p>Defines the action to inform the cluster that the new member can join voting now.
 If the Image is not configured, the Image from the previous non-nil action will be used.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1alpha1.Ordinals">Ordinals
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1alpha1.InstanceTemplate">InstanceTemplate</a>)
+</p>
+<div>
+<p>Ordinals represents a combination of continuous segments and individual values.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ranges</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.Range">
+[]Range
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>discrete</code><br/>
+<em>
+[]int32
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1alpha1.Range">Range
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.Ordinals">Ordinals</a>)
+</p>
+<div>
+<p>Range represents a range with a start and an end value.
+It is used to define a continuous segment.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>start</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>end</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
 </td>
 </tr>
 </tbody>

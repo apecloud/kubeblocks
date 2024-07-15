@@ -93,24 +93,17 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	}
 	transCtx.RunningWorkload = runningITS
 
-	// build synthesizeComp podSpec volumeMounts
+	// inject volume mounts and build its proto
 	buildPodSpecVolumeMounts(synthesizeComp)
-
-	// build workload
 	protoITS, err := factory.BuildInstanceSet(synthesizeComp, compDef)
 	if err != nil {
 		return err
 	}
-	if runningITS != nil {
-		*protoITS.Spec.Selector = *runningITS.Spec.Selector
-		protoITS.Spec.Template.Labels = intctrlutil.MergeMetadataMaps(runningITS.Spec.Template.Labels, synthesizeComp.UserDefinedLabels)
-	}
 	transCtx.ProtoWorkload = protoITS
 
-	buildInstanceSetPlacementAnnotation(transCtx.Component, protoITS)
-
-	// build configuration template annotations to workload
-	configuration.BuildConfigTemplateAnnotations(protoITS, synthesizeComp)
+	if err = t.reconcileWorkload(synthesizeComp, transCtx.Component, runningITS, protoITS); err != nil {
+		return err
+	}
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	if runningITS == nil {
@@ -130,25 +123,57 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 
 func (t *componentWorkloadTransformer) runningInstanceSetObject(ctx graph.TransformContext,
 	synthesizeComp *component.SynthesizedComponent) (*workloads.InstanceSet, error) {
-	itsKey := types.NamespacedName{
-		Namespace: synthesizeComp.Namespace,
-		Name:      constant.GenerateWorkloadNamePattern(synthesizeComp.ClusterName, synthesizeComp.Name),
-	}
-	its := &workloads.InstanceSet{}
-	if err := ctx.GetClient().Get(ctx.GetContext(), itsKey, its); err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil, nil
-		}
+	objs, err := component.ListOwnedWorkloads(ctx.GetContext(), ctx.GetClient(),
+		synthesizeComp.Namespace, synthesizeComp.ClusterName, synthesizeComp.Name)
+	if err != nil {
 		return nil, err
 	}
-	return its, nil
+	if len(objs) == 0 {
+		return nil, nil
+	}
+	return objs[0], nil
+}
+
+func (t *componentWorkloadTransformer) reconcileWorkload(synthesizedComp *component.SynthesizedComponent,
+	comp *appsv1alpha1.Component, runningITS, protoITS *workloads.InstanceSet) error {
+	if runningITS != nil {
+		*protoITS.Spec.Selector = *runningITS.Spec.Selector
+		protoITS.Spec.Template.Labels = intctrlutil.MergeMetadataMaps(runningITS.Spec.Template.Labels, synthesizedComp.UserDefinedLabels)
+	}
+
+	buildInstanceSetPlacementAnnotation(comp, protoITS)
+
+	// build configuration template annotations to workload
+	configuration.BuildConfigTemplateAnnotations(protoITS, synthesizedComp)
+
+	// mark proto its as stopped if the component is stopped
+	if isCompStopped(synthesizedComp) {
+		t.stopWorkload(protoITS)
+	}
+
+	return nil
+}
+
+func isCompStopped(synthesizedComp *component.SynthesizedComponent) bool {
+	return synthesizedComp.Stop != nil && *synthesizedComp.Stop
+}
+
+func (t *componentWorkloadTransformer) stopWorkload(protoITS *workloads.InstanceSet) {
+	zero := func() *int32 { r := int32(0); return &r }()
+	// since its doesn't support stop, we achieve it by setting replicas to 0.
+	protoITS.Spec.Replicas = zero
+	for i := range protoITS.Spec.Instances {
+		protoITS.Spec.Instances[i].Replicas = zero
+	}
 }
 
 func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCtx, cli model.GraphClient, dag *graph.DAG,
 	cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, runningITS, protoITS *workloads.InstanceSet) error {
-	// TODO(xingran): Some workload operations should be moved down to Lorry implementation. Subsequent operations such as horizontal scaling will be removed from the component controller
-	if err := t.handleWorkloadUpdate(reqCtx, dag, cluster, synthesizeComp, runningITS, protoITS); err != nil {
-		return err
+	if !isCompStopped(synthesizeComp) {
+		// postpone the update of the workload until the component is back to running.
+		if err := t.handleWorkloadUpdate(reqCtx, dag, cluster, synthesizeComp, runningITS, protoITS); err != nil {
+			return err
+		}
 	}
 
 	objCopy := copyAndMergeITS(runningITS, protoITS, synthesizeComp)
@@ -468,7 +493,7 @@ func (r *componentWorkloadOps) postScaleOut(itsObj *workloads.InstanceSet) error
 	if d != nil {
 		// clean backup resources.
 		// there will not be any backup resources other than scale out.
-		tmpObjs, err := d.ClearTmpResources()
+		tmpObjs, err := d.GetTmpResources()
 		if err != nil {
 			return err
 		}
@@ -809,6 +834,11 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 
 	updatePVCByRecreateFromStep := func(fromStep pvcRecreateStep) {
 		lastVertex := r.buildProtoITSWorkloadVertex()
+		// The steps here are decremented in reverse order because during the plan execution, dag.WalkReverseTopoOrder
+		// is called to execute all vertices on the graph according to the reverse topological order.
+		// Therefore, the vertices need to maintain the following edge linkages:
+		// root -> its -> step5 -> step4 -> step3 -> step2 -> step1
+		// So that, during execution, the sequence becomes step1 -> step2 -> step3 -> step4 -> step5
 		for step := pvRestorePolicyStep; step >= fromStep && step >= pvPolicyRetainStep; step-- {
 			lastVertex = addStepMap[step](lastVertex, step)
 		}

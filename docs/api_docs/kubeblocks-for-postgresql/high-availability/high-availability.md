@@ -101,7 +101,7 @@ KubeBlocks integrates [the open-source Patroni solution](https://patroni.readthe
 
    ![PostgreSQL replication info](./../../../img/api-ha-pg-replication-info.png)
 
-   From the output, `pg-cluster-postgresql-0` has been assigned as the secondary's pod.
+   From the output, `pg-cluster-postgresql-0` has been assigned as the secondary pod.
 
 5. View the status of the PostgreSQL cluster and pods again.
 

@@ -92,7 +92,7 @@ There are two ways to apply vertical scaling.
     Component Def Ref:  postgresql
     Enabled Logs:
       running
-    Monitor:   false
+    DisableExporter:   true
     Name:      postgresql
     Replicas:  2
     Resources:
@@ -119,7 +119,6 @@ There are two ways to apply vertical scaling.
    spec:
      affinity:
        podAntiAffinity: Preferred
-       tenancy: SharedNode
        topologyKeys:
        - kubernetes.io/hostname
      clusterDefinitionRef: postgresql
@@ -128,7 +127,7 @@ There are two ways to apply vertical scaling.
      - componentDefRef: postgresql
        enabledLogs:
        - running
-       monitor: false
+       disableExporter: true
        name: postgresql
        replicas: 2
        resources:
@@ -150,7 +149,7 @@ There are two ways to apply vertical scaling.
     Component Def Ref:  postgresql
     Enabled Logs:
       running
-    Monitor:   false
+    DisableExporter:   true
     Name:      postgresql
     Replicas:  2
     Resources:

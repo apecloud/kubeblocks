@@ -7,7 +7,7 @@ sidebar_position: 1
 
 # Configure cluster parameters
 
-This guide shows how to configure cluster parameters by creating an opsRequest.
+This guide shows how to configure cluster parameters.
 
 KubeBlocks supports dynamic configuration. When the specification of a database instance changes (e.g., a user vertically scales a cluster), KubeBlocks automatically matches the appropriate configuration template based on the new specification. This is because different specifications of a database instance may require different optimal configurations to optimize performance and resource utilization. When you choose a different database instance specification, KubeBlocks automatically detects and determines the best database configuration for the new specification, ensuring optimal performance and configuration of the database under the new specifications.
 

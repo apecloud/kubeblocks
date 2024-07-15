@@ -26,23 +26,17 @@ The termination policy determines how a cluster is deleted.
 
 To check the termination policy, execute the following command.
 
-
 ```bash
 kbcli cluster list pg-cluster
 >
 NAME         NAMESPACE   CLUSTER-DEFINITION   VERSION             TERMINATION-POLICY   STATUS    CREATED-TIME
-pg-cluster   default     postgresql           postgresql-14.7.0   Delete               Running   Mar 03,2023 18:49 UTC+0800
+pg-cluster   default     postgresql           postgresql-14.7.0   Delete               Running   Mar 03,2023 19:49 UTC+0800
 ```
-
-
 
 ## Step
 
 Run the command below to delete a specified cluster.
 
-
 ```bash
 kbcli cluster delete pg-cluster
 ```
-
-

@@ -68,6 +68,7 @@ func (t *componentAccountProvisionTransformer) Transform(ctx graph.TransformCont
 	if transCtx.Component.Status.Phase != appsv1alpha1.RunningClusterCompPhase {
 		return nil
 	}
+	// TODO: (good-first-issue) if the component's account is deleted by user, we should re-provision it
 	cond, provisioned := t.isProvisioned(transCtx)
 	if provisioned {
 		return nil
@@ -88,6 +89,12 @@ func (t *componentAccountProvisionTransformer) Transform(ctx graph.TransformCont
 		return nil
 	}
 	for _, account := range transCtx.SynthesizeComponent.SystemAccounts {
+		// The secret of initAccount should be rendered into the config file,
+		// or injected into the container through specific account&password environment variables name supported by the engine.
+		// When the engine starts up, it will automatically load and create this account.
+		// There's no need for lorry to create it again.
+		//
+		// InitAccount is necessary because lorry itself requires an account to connect in the first place.
 		if account.InitAccount {
 			continue
 		}
@@ -209,7 +216,7 @@ func (t *componentAccountProvisionTransformer) buildLorryClient(transCtx *compon
 }
 
 func (t *componentAccountProvisionTransformer) provisionAccount(transCtx *componentTransformContext,
-	cond metav1.Condition, lorryCli lorry.Client, account appsv1alpha1.SystemAccount) error {
+	_ metav1.Condition, lorryCli lorry.Client, account appsv1alpha1.SystemAccount) error {
 
 	synthesizedComp := transCtx.SynthesizeComponent
 	secret, err := t.getAccountSecret(transCtx, synthesizedComp, account)
@@ -226,8 +233,11 @@ func (t *componentAccountProvisionTransformer) provisionAccount(transCtx *compon
 	if err == nil && len(userInfo) != 0 {
 		return nil
 	}
+
+	namedVars := getEnvReplacementMapForAccount(string(username), string(password))
+	stmt := component.ReplaceNamedVars(namedVars, account.Statement, -1, true)
 	// TODO: re-define the role
-	return lorryCli.CreateUser(transCtx.Context, string(username), string(password), string(lorryModel.SuperUserRole))
+	return lorryCli.CreateUser(transCtx.Context, string(username), string(password), string(lorryModel.SuperUserRole), stmt)
 }
 
 func (t *componentAccountProvisionTransformer) getAccountSecret(ctx graph.TransformContext,
@@ -241,4 +251,11 @@ func (t *componentAccountProvisionTransformer) getAccountSecret(ctx graph.Transf
 		return nil, err
 	}
 	return secret, nil
+}
+
+func getEnvReplacementMapForAccount(name, passwd string) map[string]string {
+	return map[string]string{
+		"$(USERNAME)": name,
+		"$(PASSWD)":   passwd,
+	}
 }

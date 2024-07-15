@@ -25,6 +25,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
 
 type SynthesizedComponent struct {
@@ -61,6 +62,7 @@ type SynthesizedComponent struct {
 	Annotations            map[string]string                   `json:"annotations,omitempty"`
 	UpdateStrategy         *v1alpha1.UpdateStrategy            `json:"updateStrategy,omitempty"`
 	PodManagementPolicy    *appsv1.PodManagementPolicyType     `json:"podManagementPolicy,omitempty"`
+	PodUpdatePolicy        *workloads.PodUpdatePolicyType      `json:"podUpdatePolicy,omitempty"`
 	PolicyRules            []rbacv1.PolicyRule                 `json:"policyRules,omitempty"`
 	LifecycleActions       *v1alpha1.ComponentLifecycleActions `json:"lifecycleActions,omitempty"`
 	SystemAccounts         []v1alpha1.SystemAccount            `json:"systemAccounts,omitempty"`
@@ -70,6 +72,7 @@ type SynthesizedComponent struct {
 	MinReadySeconds        int32                               `json:"minReadySeconds,omitempty"`
 	Sidecars               []string                            `json:"sidecars,omitempty"`
 	DisableExporter        *bool                               `json:"disableExporter,omitempty"`
+	Stop                   *bool
 
 	// TODO(xingran): The following fields will be deprecated after KubeBlocks version 0.8.0
 	ClusterDefName        string                          `json:"clusterDefName,omitempty"`     // the name of the clusterDefinition

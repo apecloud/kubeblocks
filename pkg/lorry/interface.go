@@ -17,25 +17,25 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package user
+package lorry
 
 import (
-	"testing"
-
-	"github.com/stretchr/testify/assert"
-
-	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
+	"context"
 )
 
-func TestUserInfoParser(t *testing.T) {
-	req := &operations.OpsRequest{
-		Parameters: map[string]interface{}{
-			"userName": "john",
-			"age":      30,
-		},
-	}
+type Client interface {
+	CreateUser(ctx context.Context, userName, password, roleName, statement string) error
 
-	user, err := UserInfoParser(req)
-	assert.Nil(t, err)
-	assert.Equal(t, "john", user.UserName)
+	JoinMember(ctx context.Context) error
+
+	LeaveMember(ctx context.Context) error
+
+	Switchover(ctx context.Context, primary, candidate string, force bool) error
+	Lock(ctx context.Context) error
+	Unlock(ctx context.Context) error
+	PostProvision(ctx context.Context, componentNames, podNames, podIPs, podHostNames, podHostIPs string) error
+	PreTerminate(ctx context.Context) error
+
+	DataDump(ctx context.Context) error
+	DataLoad(ctx context.Context) error
 }

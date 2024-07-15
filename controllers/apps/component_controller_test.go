@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -30,7 +29,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/golang/mock/gomock"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/sethvargo/go-password/password"
 	"golang.org/x/exp/maps"
@@ -58,7 +56,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/generics"
-	lorry "github.com/apecloud/kubeblocks/pkg/lorry/client"
+	"github.com/apecloud/kubeblocks/pkg/lorry"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
@@ -76,55 +74,12 @@ var (
 	podAnnotationKey4Test = fmt.Sprintf("%s-test", constant.ComponentReplicasAnnotationKey)
 )
 
-var mockLorryClient = func(mock func(*lorry.MockClientMockRecorder)) {
-	mockLorryCli := lorry.GetMockClient()
-	if mockLorryCli == nil {
-		ctrl := gomock.NewController(GinkgoT())
-		mockLorryCli = lorry.NewMockClient(ctrl)
-	}
-	if mock != nil {
-		mockCli := mockLorryCli.(*lorry.MockClient)
-		mock(mockCli.EXPECT())
-	}
-	lorry.SetMockClient(mockLorryCli, nil)
-}
-
 var mockLorryClientDefault = func() {
-	mockLorryClient(func(recorder *lorry.MockClientMockRecorder) {
-		recorder.CreateUser(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-		recorder.DescribeUser(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
-		recorder.GrantUserRole(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-	})
+	// TODO: lorry client mock
 }
 
 var mockLorryClient4HScale = func(clusterKey types.NamespacedName, compName string, replicas int) {
-	mockLorryClient(func(recorder *lorry.MockClientMockRecorder) {
-		recorder.JoinMember(gomock.Any()).Return(nil).AnyTimes()
-		recorder.LeaveMember(gomock.Any()).DoAndReturn(func(ctx context.Context) error {
-			var podList corev1.PodList
-			labels := client.MatchingLabels{
-				constant.AppInstanceLabelKey:    clusterKey.Name,
-				constant.KBAppComponentLabelKey: compName,
-			}
-			if err := testCtx.Cli.List(ctx, &podList, labels, client.InNamespace(clusterKey.Namespace)); err != nil {
-				return err
-			}
-			for _, pod := range podList.Items {
-				if pod.Annotations == nil {
-					panic(fmt.Sprintf("pod annotations is nil: %s", pod.Name))
-				}
-				if pod.Annotations[podAnnotationKey4Test] == fmt.Sprintf("%d", replicas) {
-					continue
-				}
-				pod.Annotations[podAnnotationKey4Test] = fmt.Sprintf("%d", replicas)
-				if err := testCtx.Cli.Update(ctx, &pod); err != nil {
-					return err
-				}
-			}
-			return nil
-		}).AnyTimes()
-		recorder.Switchover(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-	})
+	// TODO: lorry client mock
 }
 
 var _ = Describe("Component Controller", func() {

@@ -17,38 +17,25 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package oceanbase
+package lorry
 
 import (
-	"testing"
-
-	"github.com/stretchr/testify/assert"
-
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
+	"errors"
 )
 
-var (
-	fakeProperties = engines.Properties{
-		"url":          "root:@tcp(127.0.0.1:3306)/mysql?multiStatements=true",
-		"maxOpenConns": "5",
-	}
-	fakePropertiesWithWrongPem = engines.Properties{
-		"pemPath": "fake-path",
-	}
+type OperationKind string
+
+const (
+	CheckRoleOperation OperationKind = "checkRole"
+
+	LegacyEventFieldPath = "spec.containers{kb-checkrole}"
+	LorryEventFieldPath  = "spec.containers{lorry}"
 )
 
-func TestNewConfig(t *testing.T) {
-	t.Run("new config failed", func(t *testing.T) {
-		fakeConfig, err := NewConfig(fakePropertiesWithWrongPem)
+type RoleType string
 
-		assert.Nil(t, fakeConfig)
-		assert.NotNil(t, err)
-	})
+const (
+	SuperUserRole RoleType = "superuser"
+)
 
-	t.Run("new config successfully", func(t *testing.T) {
-		fakeConfig, err := NewConfig(fakeProperties)
-
-		assert.NotNil(t, fakeConfig)
-		assert.Nil(t, err)
-	})
-}
+var ErrNotImplemented = errors.New("not implemented")

@@ -90,6 +90,7 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluste
 		SetReplicas(compSpec.Replicas).
 		SetResources(compSpec.Resources).
 		SetServiceAccountName(compSpec.ServiceAccountName).
+		SetPodUpdatePolicy(compSpec.PodUpdatePolicy).
 		SetVolumeClaimTemplates(compSpec.VolumeClaimTemplates).
 		SetVolumes(compSpec.Volumes).
 		SetConfigs(compSpec.Configs).

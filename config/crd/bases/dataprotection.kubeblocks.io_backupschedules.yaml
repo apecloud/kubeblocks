@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.12.1
+    controller-gen.kubebuilder.io/version: v0.14.0
   labels:
     app.kubernetes.io/name: kubeblocks
   name: backupschedules.dataprotection.kubeblocks.io
@@ -32,14 +32,19 @@ spec:
         description: BackupSchedule is the Schema for the backupschedules API.
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
@@ -59,8 +64,9 @@ spec:
                         in backupPolicy.
                       type: string
                     cronExpression:
-                      description: Specifies the cron expression for the schedule.
-                        The timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.
+                      description: |-
+                        Specifies the cron expression for the schedule. The timezone is in UTC.
+                        see https://en.wikipedia.org/wiki/Cron.
                       type: string
                     enabled:
                       description: Specifies whether the backup schedule is enabled
@@ -69,12 +75,12 @@ spec:
                     retentionPeriod:
                       default: 7d
                       description: "Determines the duration for which the backup should
-                        be kept. KubeBlocks will remove all backups that are older
-                        than the RetentionPeriod. For example, RetentionPeriod of
-                        `30d` will keep only the backups of last 30 days. Sample duration
-                        format: \n - years: \t2y - months: \t6mo - days: \t\t30d -
-                        hours: \t12h - minutes: \t30m \n You can also combine the
-                        above durations. For example: 30d12h30m"
+                        be kept.\nKubeBlocks will remove all backups that are older
+                        than the RetentionPeriod.\nFor example, RetentionPeriod of
+                        `30d` will keep only the backups of last 30 days.\nSample
+                        duration format:\n\n\n- years: \t2y\n- months: \t6mo\n- days:
+                        \t\t30d\n- hours: \t12h\n- minutes: \t30m\n\n\nYou can also
+                        combine the above durations. For example: 30d12h30m"
                       type: string
                   required:
                   - backupMethod
@@ -83,8 +89,9 @@ spec:
                 minItems: 1
                 type: array
               startingDeadlineMinutes:
-                description: Defines the deadline in minutes for starting the backup
-                  workload if it misses its scheduled time for any reason.
+                description: |-
+                  Defines the deadline in minutes for starting the backup workload if it
+                  misses its scheduled time for any reason.
                 format: int64
                 maximum: 1440
                 minimum: 0
@@ -100,9 +107,10 @@ spec:
                 description: Represents an error that caused the backup to fail.
                 type: string
               observedGeneration:
-                description: Represents the most recent generation observed for this
-                  BackupSchedule. It refers to the BackupSchedule's generation, which
-                  is updated on mutation by the API Server.
+                description: |-
+                  Represents the most recent generation observed for this BackupSchedule.
+                  It refers to the BackupSchedule's generation, which is updated on mutation
+                  by the API Server.
                 format: int64
                 type: integer
               phase:

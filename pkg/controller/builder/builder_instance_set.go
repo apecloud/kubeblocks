@@ -107,6 +107,11 @@ func (builder *InstanceSetBuilder) SetPodManagementPolicy(policy apps.PodManagem
 	return builder
 }
 
+func (builder *InstanceSetBuilder) SetPodUpdatePolicy(policy workloads.PodUpdatePolicyType) *InstanceSetBuilder {
+	builder.get().Spec.PodUpdatePolicy = policy
+	return builder
+}
+
 func (builder *InstanceSetBuilder) SetUpdateStrategy(strategy apps.StatefulSetUpdateStrategy) *InstanceSetBuilder {
 	builder.get().Spec.UpdateStrategy = strategy
 	return builder

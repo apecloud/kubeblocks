@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"math"
 	"time"
 
@@ -198,6 +199,11 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 		resources.componentMatchLabels())
 	if err := reconcileContext.GetRelatedObjects(); err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(configMap, r.Recorder, err, reqCtx.Log)
+	}
+
+	if model.IsReconciliationPaused(configMap) {
+		reqCtx.Log.Info(fmt.Sprintf("reconfigure is paused beacuse cluster %s is paused", resources.clusterName))
+		return intctrlutil.Reconciled()
 	}
 
 	// Assumption: It is required that the cluster must have a component.

@@ -237,6 +237,7 @@ var _ = Describe("Component Controller", func() {
 		By("Create a componentDefinition obj")
 		compDefObj = testapps.NewComponentDefinitionFactory(compDefName).
 			WithRandomName().
+			AddAnnotations(constant.SkipImmutableCheckAnnotationKey, "true").
 			SetDefaultSpec().
 			Create(&testCtx).
 			GetObject()

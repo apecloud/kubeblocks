@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -140,7 +141,7 @@ func buildTLSCert(ctx context.Context, cli client.Reader, synthesizedComp compon
 	if tls.Issuer == nil {
 		return fmt.Errorf("issuer shouldn't be nil when tls enabled")
 	}
-
+	var getSecretErr error
 	switch tls.Issuer.Name {
 	case appsv1alpha1.IssuerUserProvided:
 		if err := plan.CheckTLSSecretRef(ctx, cli, synthesizedComp.Namespace, tls.Issuer.SecretRef); err != nil {
@@ -149,15 +150,19 @@ func buildTLSCert(ctx context.Context, cli client.Reader, synthesizedComp compon
 	case appsv1alpha1.IssuerKubeBlocks:
 		secretName := plan.GenerateTLSSecretName(synthesizedComp.ClusterName, synthesizedComp.Name)
 		preSecret := &corev1.Secret{}
-		if err := cli.Get(ctx, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: secretName}, preSecret); err == nil {
+		getSecretErr = cli.Get(ctx, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: secretName}, preSecret)
+		if getSecretErr == nil {
 			return nil
 		}
-		secret, err := plan.ComposeTLSSecret(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
-		if err != nil {
-			return err
+		if errors.IsNotFound(getSecretErr) {
+			secret, err := plan.ComposeTLSSecret(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
+			if err != nil {
+				return err
+			}
+			graphCli, _ := cli.(model.GraphClient)
+			graphCli.Create(dag, secret)
 		}
-		graphCli, _ := cli.(model.GraphClient)
-		graphCli.Create(dag, secret)
+		return getSecretErr
 	}
 
 	return nil

@@ -249,7 +249,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 					return apierrors.IsNotFound(err)
 				}).Should(BeTrue())
 			})
-			It("should skip creation if secret already exists", func() {
+			It("should skip if the existence of the secret is confirmed", func() {
 				err := buildTLSCert(ctx, k8sClient, synthesizedComp, dag)
 				Expect(err).Should(BeNil())
 				createdSecret := &corev1.Secret{}

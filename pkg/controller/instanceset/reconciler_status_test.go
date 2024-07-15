@@ -105,6 +105,13 @@ var _ = Describe("status reconciler test", func() {
 			Expect(its.Status.AvailableReplicas).Should(BeEquivalentTo(0))
 			Expect(its.Status.UpdatedReplicas).Should(BeEquivalentTo(0))
 			Expect(its.Status.CurrentReplicas).Should(BeEquivalentTo(0))
+			for _, templateStatus := range its.Status.TemplatesStatus {
+				Expect(templateStatus.Replicas).Should(BeEquivalentTo(0))
+				Expect(templateStatus.ReadyReplicas).Should(BeEquivalentTo(0))
+				Expect(templateStatus.AvailableReplicas).Should(BeEquivalentTo(0))
+				Expect(templateStatus.UpdatedReplicas).Should(BeEquivalentTo(0))
+				Expect(templateStatus.CurrentReplicas).Should(BeEquivalentTo(0))
+			}
 
 			By("make all pods ready with old revision")
 			condition := corev1.PodCondition{
@@ -136,6 +143,20 @@ var _ = Describe("status reconciler test", func() {
 			Expect(its.Status.AvailableReplicas).Should(BeEquivalentTo(0))
 			Expect(its.Status.UpdatedReplicas).Should(BeEquivalentTo(0))
 			Expect(its.Status.CurrentReplicas).Should(BeEquivalentTo(replicas))
+			for _, templateStatus := range its.Status.TemplatesStatus {
+				if templateStatus.Name == nameHello {
+					Expect(templateStatus.Replicas).Should(BeEquivalentTo(1))
+					Expect(templateStatus.ReadyReplicas).Should(BeEquivalentTo(1))
+					Expect(templateStatus.CurrentReplicas).Should(BeEquivalentTo(1))
+				}
+				if templateStatus.Name == generateNameFoo {
+					Expect(templateStatus.Replicas).Should(BeEquivalentTo(replicasFoo))
+					Expect(templateStatus.ReadyReplicas).Should(BeEquivalentTo(replicasFoo))
+					Expect(templateStatus.CurrentReplicas).Should(BeEquivalentTo(replicasFoo))
+				}
+				Expect(templateStatus.AvailableReplicas).Should(BeEquivalentTo(0))
+				Expect(templateStatus.UpdatedReplicas).Should(BeEquivalentTo(0))
+			}
 			currentRevisions, _ := buildRevisions(currentRevisionMap)
 			Expect(its.Status.CurrentRevisions).Should(Equal(currentRevisions))
 			Expect(its.Status.Conditions[1].Type).Should(BeEquivalentTo(workloads.InstanceAvailable))
@@ -156,6 +177,22 @@ var _ = Describe("status reconciler test", func() {
 			Expect(its.Status.AvailableReplicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.UpdatedReplicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.CurrentReplicas).Should(BeEquivalentTo(replicas))
+			for _, templateStatus := range its.Status.TemplatesStatus {
+				if templateStatus.Name == nameHello {
+					Expect(templateStatus.Replicas).Should(BeEquivalentTo(1))
+					Expect(templateStatus.ReadyReplicas).Should(BeEquivalentTo(1))
+					Expect(templateStatus.AvailableReplicas).Should(BeEquivalentTo(1))
+					Expect(templateStatus.UpdatedReplicas).Should(BeEquivalentTo(1))
+					Expect(templateStatus.CurrentReplicas).Should(BeEquivalentTo(1))
+				}
+				if templateStatus.Name == generateNameFoo {
+					Expect(templateStatus.Replicas).Should(BeEquivalentTo(replicasFoo))
+					Expect(templateStatus.ReadyReplicas).Should(BeEquivalentTo(replicasFoo))
+					Expect(templateStatus.AvailableReplicas).Should(BeEquivalentTo(replicasFoo))
+					Expect(templateStatus.UpdatedReplicas).Should(BeEquivalentTo(replicasFoo))
+					Expect(templateStatus.CurrentReplicas).Should(BeEquivalentTo(replicasFoo))
+				}
+			}
 			Expect(its.Status.CurrentRevisions).Should(Equal(its.Status.UpdateRevisions))
 			Expect(its.Status.Conditions).Should(HaveLen(2))
 			Expect(its.Status.Conditions[1].Type).Should(BeEquivalentTo(workloads.InstanceAvailable))
@@ -174,6 +211,20 @@ var _ = Describe("status reconciler test", func() {
 			Expect(its.Status.AvailableReplicas).Should(BeEquivalentTo(0))
 			Expect(its.Status.UpdatedReplicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.CurrentReplicas).Should(BeEquivalentTo(replicas))
+			for _, templateStatus := range its.Status.TemplatesStatus {
+				if templateStatus.Name == nameHello {
+					Expect(templateStatus.Replicas).Should(BeEquivalentTo(1))
+					Expect(templateStatus.UpdatedReplicas).Should(BeEquivalentTo(1))
+					Expect(templateStatus.CurrentReplicas).Should(BeEquivalentTo(1))
+				}
+				if templateStatus.Name == generateNameFoo {
+					Expect(templateStatus.Replicas).Should(BeEquivalentTo(replicasFoo))
+					Expect(templateStatus.UpdatedReplicas).Should(BeEquivalentTo(replicasFoo))
+					Expect(templateStatus.CurrentReplicas).Should(BeEquivalentTo(replicasFoo))
+				}
+				Expect(templateStatus.ReadyReplicas).Should(BeEquivalentTo(0))
+				Expect(templateStatus.AvailableReplicas).Should(BeEquivalentTo(0))
+			}
 			Expect(its.Status.CurrentRevisions).Should(Equal(its.Status.UpdateRevisions))
 			Expect(its.Status.Conditions).Should(HaveLen(3))
 			failureNames := []string{"bar-0", "bar-1", "bar-2", "bar-3", "bar-foo-0", "bar-foo-1", "bar-hello-0"}

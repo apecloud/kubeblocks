@@ -12492,6 +12492,46 @@ spec:
                   controller.
                 format: int32
                 type: integer
+              templatesStatus:
+                description: TemplatesStatus represents status of each instance generated
+                  by InstanceTemplates
+                items:
+                  description: InstanceTemplateStatus aggregates the status of replicas
+                    for each InstanceTemplate
+                  properties:
+                    availableReplicas:
+                      description: AvailableReplicas is the number of Pods that ready
+                        for at least minReadySeconds.
+                      format: int32
+                      type: integer
+                    currentReplicas:
+                      description: |-
+                        currentReplicas is the number of instances created by the InstanceSet controller from the InstanceSet version
+                        indicated by CurrentRevisions.
+                      format: int32
+                      type: integer
+                    name:
+                      description: Name, the name of the InstanceTemplate.
+                      type: string
+                    readyReplicas:
+                      description: ReadyReplicas is the number of Pods that have a
+                        Ready Condition.
+                      format: int32
+                      type: integer
+                    replicas:
+                      description: Replicas is the number of replicas of the InstanceTemplate.
+                      format: int32
+                      type: integer
+                    updatedReplicas:
+                      description: |-
+                        UpdatedReplicas is the number of Pods created by the InstanceSet controller from the InstanceSet version
+                        indicated by UpdateRevisions.
+                      format: int32
+                      type: integer
+                  required:
+                  - name
+                  type: object
+                type: array
               updateRevision:
                 description: |-
                   updateRevision, if not empty, indicates the version of the InstanceSet used to generate instances in the sequence

@@ -4548,6 +4548,12 @@ spec:
                   (when `opsRequest.status.phase` is "Succeed") before automatic deletion.
                 format: int32
                 type: integer
+              ttlSecondsAfterUnsuccessfulCompletion:
+                description: |-
+                  Specifies the duration in seconds that an OpsRequest will remain in the system after completion
+                  for any phase other than "Succeed" (e.g., "Failed", "Cancelled", "Aborted") before automatic deletion.
+                format: int32
+                type: integer
               type:
                 description: |-
                   Specifies the type of this operation. Supported types include "Start", "Stop", "Restart", "Switchover",

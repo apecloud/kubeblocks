@@ -951,11 +951,6 @@ type Action struct {
 type Probe struct {
 	Action `json:",inline"`
 
-	// TODO: remove this later.
-	//
-	// +optional
-	BuiltinHandler *BuiltinActionHandlerType `json:"builtinHandler,omitempty"`
-
 	// Specifies the number of seconds to wait after the container has started before the RoleProbe
 	// begins to detect the container's role.
 	//
@@ -979,96 +974,6 @@ type Probe struct {
 	//
 	// +optional
 	FailureThreshold int32 `json:"failureThreshold,omitempty"`
-}
-
-// BuiltinActionHandlerType defines build-in action handlers provided by Lorry, including:
-//
-// - `mysql`
-// - `wesql`
-// - `oceanbase`
-// - `redis`
-// - `mongodb`
-// - `etcd`
-// - `postgresql`
-// - `official-postgresql`
-// - `apecloud-postgresql`
-// - `polardbx`
-// - `custom`
-// - `unknown`
-type BuiltinActionHandlerType string
-
-const (
-	MySQLBuiltinActionHandler              BuiltinActionHandlerType = "mysql"
-	WeSQLBuiltinActionHandler              BuiltinActionHandlerType = "wesql"
-	OceanbaseBuiltinActionHandler          BuiltinActionHandlerType = "oceanbase"
-	RedisBuiltinActionHandler              BuiltinActionHandlerType = "redis"
-	MongoDBBuiltinActionHandler            BuiltinActionHandlerType = "mongodb"
-	ETCDBuiltinActionHandler               BuiltinActionHandlerType = "etcd"
-	PostgresqlBuiltinActionHandler         BuiltinActionHandlerType = "postgresql"
-	OfficialPostgresqlBuiltinActionHandler BuiltinActionHandlerType = "official-postgresql"
-	ApeCloudPostgresqlBuiltinActionHandler BuiltinActionHandlerType = "apecloud-postgresql"
-	PolarDBXBuiltinActionHandler           BuiltinActionHandlerType = "polardbx"
-	CustomActionHandler                    BuiltinActionHandlerType = "custom"
-	UnknownBuiltinActionHandler            BuiltinActionHandlerType = "unknown"
-)
-
-// LifecycleActionHandler describes the implementation of a specific lifecycle action.
-//
-// Each action is deemed successful if it returns an exit code of 0 for command executions,
-// or an HTTP 200 status for HTTP(s) actions.
-// Any other exit code or HTTP status is considered an indication of failure.
-type LifecycleActionHandler struct {
-	// Specifies the name of the predefined action handler to be invoked for lifecycle actions.
-	//
-	// Lorry, as a sidecar agent co-located with the database container in the same Pod,
-	// includes a suite of built-in action implementations that are tailored to different database engines.
-	// These are known as "builtin" handlers, includes: `mysql`, `redis`, `mongodb`, `etcd`,
-	// `postgresql`, `official-postgresql`, `apecloud-postgresql`, `wesql`, `oceanbase`, `polardbx`.
-	//
-	// If the `builtinHandler` field is specified, it instructs Lorry to utilize its internal built-in action handler
-	// to execute the specified lifecycle actions.
-	//
-	// The `builtinHandler` field is of type `BuiltinActionHandlerType`,
-	// which represents the name of the built-in handler.
-	// The `builtinHandler` specified within the same `ComponentLifecycleActions` should be consistent across all
-	// actions.
-	// This means that if you specify a built-in handler for one action, you should use the same handler
-	// for all other actions throughout the entire `ComponentLifecycleActions` collection.
-	//
-	// If you need to define lifecycle actions for database engines not covered by the existing built-in support,
-	// or when the pre-existing built-in handlers do not meet your specific needs,
-	// you can use the `customHandler` field to define your own action implementation.
-	//
-	// Deprecation Notice:
-	//
-	// - In the future, the `builtinHandler` field will be deprecated in favor of using the `customHandler` field
-	//   for configuring all lifecycle actions.
-	// - Instead of using a name to indicate the built-in action implementations in Lorry,
-	//   the recommended approach will be to explicitly invoke the desired action implementation through
-	//   a gRPC interface exposed by the sidecar agent.
-	// - Developers will have the flexibility to either use the built-in action implementations provided by Lorry
-	//   or develop their own sidecar agent to implement custom actions and expose them via gRPC interfaces.
-	// - This change will allow for greater customization and extensibility of lifecycle actions,
-	//   as developers can create their own "builtin" implementations tailored to their specific requirements.
-	//
-	// +optional
-	BuiltinHandler *BuiltinActionHandlerType `json:"builtinHandler,omitempty"`
-
-	// Specifies a user-defined hook or procedure that is called to perform the specific lifecycle action.
-	// It offers a flexible and expandable approach for customizing the behavior of a Component by leveraging
-	// tailored actions.
-	//
-	// An Action can be implemented as either an ExecAction or an HTTPAction, with future versions planning
-	// to support GRPCAction,
-	// thereby accommodating unique logic for different database systems within the Action's framework.
-	//
-	// In future iterations, all built-in handlers are expected to transition to GRPCAction.
-	// This change means that Lorry or other sidecar agents will expose the implementation of actions
-	// through a GRPC interface for external invocation.
-	// Then the controller will interact with these actions via GRPCAction calls.
-	//
-	// +optional
-	CustomHandler *Action `json:"customHandler,omitempty"`
 }
 
 // ComponentLifecycleActions defines a collection of Actions for customizing the behavior of a Component.
@@ -1108,7 +1013,7 @@ type ComponentLifecycleActions struct {
 	// Note: This field is immutable once it has been set.
 	//
 	// +optional
-	PostProvision *LifecycleActionHandler `json:"postProvision,omitempty"`
+	PostProvision *Action `json:"postProvision,omitempty"`
 
 	// Specifies the hook to be executed prior to terminating a component.
 	//
@@ -1151,7 +1056,7 @@ type ComponentLifecycleActions struct {
 	// Note: This field is immutable once it has been set.
 	//
 	// +optional
-	PreTerminate *LifecycleActionHandler `json:"preTerminate,omitempty"`
+	PreTerminate *Action `json:"preTerminate,omitempty"`
 
 	// Defines the procedure which is invoked regularly to assess the role of replicas.
 	//
@@ -1245,7 +1150,7 @@ type ComponentLifecycleActions struct {
 	// Note: This field is immutable once it has been set.
 	//
 	// +optional
-	MemberJoin *LifecycleActionHandler `json:"memberJoin,omitempty"`
+	MemberJoin *Action `json:"memberJoin,omitempty"`
 
 	// Defines the procedure to remove a replica from the replication group.
 	//
@@ -1286,7 +1191,7 @@ type ComponentLifecycleActions struct {
 	// Note: This field is immutable once it has been set.
 	//
 	// +optional
-	MemberLeave *LifecycleActionHandler `json:"memberLeave,omitempty"`
+	MemberLeave *Action `json:"memberLeave,omitempty"`
 
 	// Defines the procedure to switch a replica into the read-only state.
 	//
@@ -1306,7 +1211,7 @@ type ComponentLifecycleActions struct {
 	// Note: This field is immutable once it has been set.
 	//
 	// +optional
-	Readonly *LifecycleActionHandler `json:"readonly,omitempty"`
+	Readonly *Action `json:"readonly,omitempty"`
 
 	// Defines the procedure to transition a replica from the read-only state back to the read-write state.
 	//
@@ -1328,7 +1233,7 @@ type ComponentLifecycleActions struct {
 	// Note: This field is immutable once it has been set.
 	//
 	// +optional
-	Readwrite *LifecycleActionHandler `json:"readwrite,omitempty"`
+	Readwrite *Action `json:"readwrite,omitempty"`
 
 	// Defines the procedure for exporting the data from a replica.
 	//
@@ -1347,7 +1252,7 @@ type ComponentLifecycleActions struct {
 	// Note: This field is immutable once it has been set.
 	//
 	// +optional
-	DataDump *LifecycleActionHandler `json:"dataDump,omitempty"`
+	DataDump *Action `json:"dataDump,omitempty"`
 
 	// Defines the procedure for importing data into a replica.
 	//
@@ -1365,7 +1270,7 @@ type ComponentLifecycleActions struct {
 	// Note: This field is immutable once it has been set.
 	//
 	// +optional
-	DataLoad *LifecycleActionHandler `json:"dataLoad,omitempty"`
+	DataLoad *Action `json:"dataLoad,omitempty"`
 
 	// Defines the procedure that update a replica with new configuration.
 	//
@@ -1374,7 +1279,7 @@ type ComponentLifecycleActions struct {
 	// This Action is reserved for future versions.
 	//
 	// +optional
-	Reconfigure *LifecycleActionHandler `json:"reconfigure,omitempty"`
+	Reconfigure *Action `json:"reconfigure,omitempty"`
 
 	// Defines the procedure to generate a new database account.
 	//
@@ -1385,7 +1290,7 @@ type ComponentLifecycleActions struct {
 	// Note: This field is immutable once it has been set.
 	//
 	// +optional
-	AccountProvision *LifecycleActionHandler `json:"accountProvision,omitempty"`
+	AccountProvision *Action `json:"accountProvision,omitempty"`
 }
 
 type ComponentSwitchover struct {

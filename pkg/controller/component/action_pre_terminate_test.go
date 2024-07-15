@@ -148,13 +148,11 @@ var _ = Describe("Component PreTerminate Test", func() {
 				Expect(k8sClient.Status().Update(ctx, &pod)).Should(Succeed())
 			}
 			synthesizeComp.LifecycleActions = &appsv1alpha1.ComponentLifecycleActions{}
-			PreTerminate := appsv1alpha1.LifecycleActionHandler{
-				CustomHandler: &appsv1alpha1.Action{
-					Exec: &appsv1alpha1.ExecAction{
-						Image:   constant.KBToolsImage,
-						Command: []string{"echo", "mock"},
-						Args:    []string{},
-					},
+			PreTerminate := appsv1alpha1.Action{
+				Exec: &appsv1alpha1.ExecAction{
+					Image:   constant.KBToolsImage,
+					Command: []string{"echo", "mock"},
+					Args:    []string{},
 				},
 			}
 			synthesizeComp.LifecycleActions.PreTerminate = &PreTerminate

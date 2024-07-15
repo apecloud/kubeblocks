@@ -67,9 +67,8 @@ const (
 )
 
 var (
-	defaultBuiltinHandler         = appsv1alpha1.MySQLBuiltinActionHandler
-	defaultLifecycleActionHandler = &appsv1alpha1.LifecycleActionHandler{
-		BuiltinHandler: &defaultBuiltinHandler,
+	defaultLifecycleAction = &appsv1alpha1.Action{
+		Exec: &appsv1alpha1.ExecAction{},
 	}
 
 	zeroResRequirements = corev1.ResourceRequirements{
@@ -344,24 +343,23 @@ var (
 			ScrapeScheme: appsv1alpha1.HTTPProtocol,
 		},
 		LifecycleActions: &appsv1alpha1.ComponentLifecycleActions{
-			PostProvision: defaultLifecycleActionHandler,
-			PreTerminate:  defaultLifecycleActionHandler,
 			RoleProbe: &appsv1alpha1.Probe{
-				BuiltinHandler: defaultLifecycleActionHandler.BuiltinHandler,
 				Action: appsv1alpha1.Action{
+					Exec:           &appsv1alpha1.ExecAction{},
 					TimeoutSeconds: 5,
 				},
 				PeriodSeconds: 1,
 			},
-			Switchover:       nil,
-			MemberJoin:       defaultLifecycleActionHandler,
-			MemberLeave:      defaultLifecycleActionHandler,
-			Readonly:         defaultLifecycleActionHandler,
-			Readwrite:        defaultLifecycleActionHandler,
-			DataDump:         defaultLifecycleActionHandler,
-			DataLoad:         defaultLifecycleActionHandler,
-			Reconfigure:      defaultLifecycleActionHandler,
-			AccountProvision: defaultLifecycleActionHandler,
+			PreTerminate:     defaultLifecycleAction,
+			PostProvision:    defaultLifecycleAction,
+			MemberJoin:       defaultLifecycleAction,
+			MemberLeave:      defaultLifecycleAction,
+			Readonly:         defaultLifecycleAction,
+			Readwrite:        defaultLifecycleAction,
+			DataDump:         defaultLifecycleAction,
+			DataLoad:         defaultLifecycleAction,
+			Reconfigure:      defaultLifecycleAction,
+			AccountProvision: defaultLifecycleAction,
 		},
 	}
 

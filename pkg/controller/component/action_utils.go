@@ -526,12 +526,12 @@ func checkLifeCycleAction(actionCtx *ActionContext) (bool, *appsv1alpha1.Action)
 	var action *appsv1alpha1.Action
 	switch actionCtx.actionType {
 	case PostProvisionAction:
-		if actions := actionCtx.lifecycleActions.PostProvision; actions != nil {
-			action = actions.CustomHandler
+		if actionCtx.lifecycleActions.PostProvision != nil {
+			action = actionCtx.lifecycleActions.PostProvision
 		}
 	case PreTerminateAction:
-		if actions := actionCtx.lifecycleActions.PreTerminate; actions != nil {
-			action = actions.CustomHandler
+		if actionCtx.lifecycleActions.PreTerminate != nil {
+			action = actionCtx.lifecycleActions.PreTerminate
 		}
 	default:
 		return false, nil

@@ -21,7 +21,9 @@ package apps
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"reflect"
 	"strings"
 
@@ -29,6 +31,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -38,6 +41,10 @@ import (
 	appsconfig "github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+)
+
+const (
+	immutableHashAnnotationKey = "apps.kubeblocks.io/immutable-hash"
 )
 
 // ComponentDefinitionReconciler reconciles a ComponentDefinition object
@@ -100,8 +107,11 @@ func (r *ComponentDefinitionReconciler) reconcile(rctx intctrlutil.RequestCtx,
 		return intctrlutil.CheckedRequeueWithError(err, rctx.Log, "")
 	}
 
-	err = r.available(r.Client, rctx, cmpd)
-	if err != nil {
+	if err = r.immutableHash(r.Client, rctx, cmpd); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, rctx.Log, "")
+	}
+
+	if err = r.available(r.Client, rctx, cmpd); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, rctx.Log, "")
 	}
 
@@ -144,6 +154,27 @@ func (r *ComponentDefinitionReconciler) status(cli client.Client, rctx intctrlut
 	return cli.Status().Patch(rctx.Ctx, cmpd, patch)
 }
 
+func (r *ComponentDefinitionReconciler) immutableHash(cli client.Client, rctx intctrlutil.RequestCtx,
+	cmpd *appsv1alpha1.ComponentDefinition) error {
+	if r.skipImmutableCheck(cmpd) {
+		return nil
+	}
+
+	if cmpd.Annotations != nil {
+		_, ok := cmpd.Annotations[immutableHashAnnotationKey]
+		if ok {
+			return nil
+		}
+	}
+
+	patch := client.MergeFrom(cmpd.DeepCopy())
+	if cmpd.Annotations == nil {
+		cmpd.Annotations = map[string]string{}
+	}
+	cmpd.Annotations[immutableHashAnnotationKey], _ = r.cmpdHash(cmpd)
+	return cli.Patch(rctx.Ctx, cmpd, patch)
+}
+
 func (r *ComponentDefinitionReconciler) validate(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1alpha1.ComponentDefinition) error {
 	for _, validator := range []func(client.Client, intctrlutil.RequestCtx, *appsv1alpha1.ComponentDefinition) error{
@@ -166,7 +197,7 @@ func (r *ComponentDefinitionReconciler) validate(cli client.Client, rctx intctrl
 			return err
 		}
 	}
-	return nil
+	return r.immutableCheck(cmpd)
 }
 
 func (r *ComponentDefinitionReconciler) validateServiceVersion(cli client.Client, rctx intctrlutil.RequestCtx,
@@ -370,6 +401,54 @@ func (r *ComponentDefinitionReconciler) validateLifecycleActionBuiltInHandlers(l
 func (r *ComponentDefinitionReconciler) validateComponentDefRef(cli client.Client, reqCtx intctrlutil.RequestCtx,
 	cmpd *appsv1alpha1.ComponentDefinition) error {
 	return nil
+}
+
+func (r *ComponentDefinitionReconciler) immutableCheck(cmpd *appsv1alpha1.ComponentDefinition) error {
+	if r.skipImmutableCheck(cmpd) {
+		return nil
+	}
+
+	newHashValue, err := r.cmpdHash(cmpd)
+	if err != nil {
+		return err
+	}
+
+	hashValue, ok := cmpd.Annotations[immutableHashAnnotationKey]
+	if ok && hashValue != newHashValue {
+		// TODO: fields been updated
+		return fmt.Errorf("immutable fields can't be updated")
+	}
+	return nil
+}
+
+func (r *ComponentDefinitionReconciler) skipImmutableCheck(cmpd *appsv1alpha1.ComponentDefinition) bool {
+	if cmpd.Annotations == nil {
+		return false
+	}
+	skip, ok := cmpd.Annotations[constant.SkipImmutableCheckAnnotationKey]
+	return ok && strings.ToLower(skip) == "true"
+}
+
+func (r *ComponentDefinitionReconciler) cmpdHash(cmpd *appsv1alpha1.ComponentDefinition) (string, error) {
+	objCopy := cmpd.DeepCopy()
+
+	// reset all mutable fields
+	objCopy.Spec.Provider = ""
+	objCopy.Spec.Description = ""
+	objCopy.Spec.Monitor = nil
+	objCopy.Spec.Exporter = nil
+	objCopy.Spec.HostNetwork = nil
+	objCopy.Spec.PodManagementPolicy = nil
+
+	// TODO: bpt
+
+	data, err := json.Marshal(objCopy.Spec)
+	if err != nil {
+		return "", err
+	}
+	hash := fnv.New32a()
+	hash.Write(data)
+	return rand.SafeEncodeString(fmt.Sprintf("%d", hash.Sum32())), nil
 }
 
 func getNCheckCompDefinition(ctx context.Context, cli client.Reader, name string) (*appsv1alpha1.ComponentDefinition, error) {

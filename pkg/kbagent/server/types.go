@@ -17,37 +17,23 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package handlers
+package server
 
 import (
-	"context"
-
-	"github.com/go-logr/logr"
-	"github.com/pkg/errors"
-	ctrl "sigs.k8s.io/controller-runtime"
-
-	"github.com/apecloud/kubeblocks/pkg/kbagent/util"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/service"
+	"io"
 )
 
-type GRPCHandler struct {
-	Logger logr.Logger
+// Server is an interface for the kb-agent server.
+type Server interface {
+	io.Closer
+	StartNonBlocking() error
 }
 
-var _ Handler = &GRPCHandler{}
-
-func NewGRPCHandler(properties map[string]string) (*GRPCHandler, error) {
-	logger := ctrl.Log.WithName("GRPC handler")
-	h := &GRPCHandler{
-		Logger: logger,
+// NewHttpServer returns a new HTTP server.
+func NewHttpServer(service service.Service) Server {
+	return &server{
+		config:  config,
+		service: service,
 	}
-
-	return h, nil
-}
-
-func (h *GRPCHandler) Do(ctx context.Context, setting util.HandlerSpec, args map[string]any) (*Response, error) {
-	if setting.GPRC == nil {
-		return nil, errors.New("grpc setting is nil")
-	}
-	// TODO: implement grpc handler
-	return nil, ErrNotImplemented
 }

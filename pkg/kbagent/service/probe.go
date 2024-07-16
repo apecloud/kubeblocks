@@ -17,14 +17,14 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package handlers
+package service
 
-import "fmt"
+import appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 
-const (
-	errMsgNotImplemented = "not implemented"
-)
+type probeService struct {
+	actions *appsv1alpha1.ComponentLifecycleActions
+}
 
-var (
-	ErrNotImplemented = fmt.Errorf(errMsgNotImplemented)
-)
+func (s *probeService) start() error {
+	return nil
+}

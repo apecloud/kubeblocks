@@ -17,19 +17,43 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package handlers
+package service
 
 import (
 	"context"
-
-	"github.com/apecloud/kubeblocks/pkg/kbagent/util"
+	"fmt"
 )
 
-type Response struct {
-	Message string `json:"message"`
+const (
+	version = "v1.0"
+	uri     = "action"
+)
+
+type kbagent struct {
+	action *actionService
+	probe  *probeService
 }
 
-type Handler interface {
-	// exec action
-	Do(ctx context.Context, settings util.HandlerSpec, agrs map[string]interface{}) (*Response, error)
+var _ Service = &kbagent{}
+
+func (s *kbagent) Version() string {
+	return version
+}
+
+func (s *kbagent) URI() string {
+	return uri
+}
+
+func (s *kbagent) Start() error {
+	if s.probe != nil {
+		return s.probe.start()
+	}
+	return nil
+}
+
+func (s *kbagent) Call(ctx context.Context, action string, parameters map[string]string) ([]byte, error) {
+	if s.action != nil {
+		return s.action.call(ctx, action, parameters)
+	}
+	return nil, fmt.Errorf("%s is not supported", action)
 }

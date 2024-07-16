@@ -17,60 +17,43 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package handlers
+package service
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"os/exec"
 	"time"
 
-	"github.com/go-logr/logr"
-	"github.com/pkg/errors"
-	ctrl "sigs.k8s.io/controller-runtime"
-
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/util"
 )
 
-type ExecHandler struct {
-	Logger logr.Logger
-
-	Executor util.Executor
+type actionService struct {
+	actions *appsv1alpha1.ComponentLifecycleActions
 }
 
-var _ Handler = &ExecHandler{}
-
-func NewExecHandler(properties map[string]string) (*ExecHandler, error) {
-	logger := ctrl.Log.WithName("EXEC handler")
-
-	h := &ExecHandler{
-		Logger:   logger,
-		Executor: &util.ExecutorImpl{},
-	}
-
-	return h, nil
+func (s *actionService) call(ctx context.Context, action string, parameters map[string]string) ([]byte, error) {
+	return nil, nil
 }
 
-func (h *ExecHandler) Do(ctx context.Context, setting util.HandlerSpec, args map[string]any) (*Response, error) {
-	if len(setting.Command) == 0 {
-		h.Logger.Info("action command is empty!")
-		return nil, nil
+func execute(ctx context.Context, commands []string, args map[string]any) ([]byte, error) {
+	if len(commands) == 0 {
+		return nil, fmt.Errorf("commands can not be empty")
 	}
 	envs := util.GetAllEnvs(args)
-	h.Logger.Info("execute action", "commands", setting.Command, "envs", envs)
 	if setting.TimeoutSeconds > 0 {
 		timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(setting.TimeoutSeconds)*time.Second)
 		defer cancel()
 		ctx = timeoutCtx
 	}
 
-	output, err := h.Executor.ExecCommand(ctx, setting.Command, envs)
-
-	if err != nil {
-		return nil, errors.Wrap(err, "ExecHandler executes action failed")
+	cmd := exec.CommandContext(ctx, commands[0], commands[1:]...)
+	cmd.Env = envs
+	bytes, err := cmd.Output()
+	if exitErr, ok := err.(*exec.ExitError); ok {
+		err = errors.New(string(exitErr.Stderr))
 	}
-
-	h.Logger.V(1).Info("execute action", "output", output)
-	resp := &Response{
-		Message: output,
-	}
-	return resp, err
+	return bytes, err
 }

@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package httpserver
+package server
 
 // ErrorResponse is an HTTP response message sent back to calling clients.
 type ErrorResponse struct {

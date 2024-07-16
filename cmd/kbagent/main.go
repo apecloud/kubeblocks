@@ -34,9 +34,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	kzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/apecloud/kubeblocks/pkg/kbagent/cronjobs"
-	"github.com/apecloud/kubeblocks/pkg/kbagent/handlers"
-	"github.com/apecloud/kubeblocks/pkg/kbagent/httpserver"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/server"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -68,27 +66,29 @@ func main() {
 	}
 	ctrl.SetLogger(kzap.New(kopts...))
 
-	// init action handlers
-	err = handlers.InitHandlers()
+	// initialize kbagent
+	service, err := kbagent.Initialize(envInMapping())
 	if err != nil {
 		panic(errors.Wrap(err, "init action handlers failed"))
 	}
 
-	// start cron jobs
-	jobManager, err := cronjobs.NewManager()
-	if err != nil {
-		panic(errors.Wrap(err, "Cron jobs initialize failed"))
-	}
-	jobManager.Start()
-
 	// start HTTP Server
-	httpServer := httpserver.NewServer()
-	err = httpServer.StartNonBlocking()
+	server := server.NewHttpServer(service)
+	err = server.StartNonBlocking()
 	if err != nil {
-		panic(errors.Wrap(err, "HTTP server initialize failed"))
+		panic(errors.Wrap(err, "failed to start HTTP server"))
 	}
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, os.Interrupt)
 	<-stop
+}
+
+func envInMapping() map[string]string {
+	vars := map[string]string{}
+	for _, v := range os.Environ() {
+		pairs := strings.SplitN(v, "=", 2)
+		vars[pairs[0]] = pairs[1]
+	}
+	return vars
 }

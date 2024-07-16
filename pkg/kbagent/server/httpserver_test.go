@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package httpserver
+package server
 
 import (
 	"os"
@@ -25,18 +25,14 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
-	"github.com/valyala/fasthttp"
-
-	"github.com/apecloud/kubeblocks/pkg/kbagent/util"
 )
 
 func TestNewServer(t *testing.T) {
-	s := NewServer()
+	s := NewHttpServer()
 	assert.NotNil(t, s)
 }
 
 func TestStartNonBlocking(t *testing.T) {
-
 	t.Run("StartNonBlocking unix domain socket", func(t *testing.T) {
 		config := Config{
 			Port:             KBAgentDefaultPort,
@@ -66,15 +62,6 @@ func TestStartNonBlocking(t *testing.T) {
 		}
 		s := &server{
 			config: config,
-			endpoints: []Endpoint{
-				{
-					Route:       util.Path,
-					Method:      fasthttp.MethodPost,
-					Version:     util.Version,
-					Handler:     actionHandler,
-					LegacyRoute: "test_legacy_route",
-				},
-			},
 		}
 		err := s.StartNonBlocking()
 		assert.Nil(t, err)
@@ -91,8 +78,7 @@ func TestStartNonBlocking(t *testing.T) {
 			APILogging:       false,
 		}
 		s := &server{
-			config:    config,
-			endpoints: Endpoints(),
+			config: config,
 		}
 		err := s.StartNonBlocking()
 		assert.Error(t, err, errors.New("no endpoint to listen on"))

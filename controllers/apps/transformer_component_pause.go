@@ -67,7 +67,7 @@ func (t *componentPauseTransformer) Transform(ctx graph.TransformContext, dag *g
 			graphCli.Update(dag, nil, instanceSet)
 			return nil
 		}
-		// get configuration and set paused
+		// get configuration and cancel paused
 		configuration := getConfiguration(transCtx)
 		if configuration, needUpdate := removePauseAnnotation(configuration); needUpdate {
 			graphCli.Update(dag, nil, configuration)

@@ -45,6 +45,10 @@ const (
 	DisableHAAnnotationKey                   = "kubeblocks.io/disable-ha"
 	OpsDependentOnSuccessfulOpsAnnoKey       = "ops.kubeblocks.io/dependent-on-successful-ops" // OpsDependentOnSuccessfulOpsAnnoKey wait for the dependent ops to succeed before executing the current ops. If it fails, this ops will also fail.
 	RelatedOpsAnnotationKey                  = "ops.kubeblocks.io/related-ops"
+
+	// SkipImmutableCheckAnnotationKey specifies to skip the mutation check for the object.
+	// The mutation check is only applied to the fields that are declared as immutable.
+	SkipImmutableCheckAnnotationKey = "apps.kubeblocks.io/skip-immutable-check"
 )
 
 // annotations for multi-cluster

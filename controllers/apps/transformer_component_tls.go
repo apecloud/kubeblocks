@@ -22,6 +22,7 @@ package apps
 import (
 	"context"
 	"fmt"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -34,7 +35,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -141,6 +141,7 @@ func buildTLSCert(ctx context.Context, cli client.Reader, synthesizedComp compon
 	if tls.Issuer == nil {
 		return fmt.Errorf("issuer shouldn't be nil when tls enabled")
 	}
+
 	var getSecretErr error
 	switch tls.Issuer.Name {
 	case appsv1alpha1.IssuerUserProvided:
@@ -150,19 +151,18 @@ func buildTLSCert(ctx context.Context, cli client.Reader, synthesizedComp compon
 	case appsv1alpha1.IssuerKubeBlocks:
 		secretName := plan.GenerateTLSSecretName(synthesizedComp.ClusterName, synthesizedComp.Name)
 		preSecret := &corev1.Secret{}
-		getSecretErr = cli.Get(ctx, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: secretName}, preSecret)
+		if getSecretErr = cli.Get(ctx, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: secretName}, preSecret); !errors.IsNotFound(getSecretErr) {
+			return getSecretErr
+		}
 		if getSecretErr == nil {
 			return nil
 		}
-		if errors.IsNotFound(getSecretErr) {
-			secret, err := plan.ComposeTLSSecret(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
-			if err != nil {
-				return err
-			}
-			graphCli, _ := cli.(model.GraphClient)
-			graphCli.Create(dag, secret)
+		secret, err := plan.ComposeTLSSecret(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
+		if err != nil {
+			return err
 		}
-		return getSecretErr
+		graphCli, _ := cli.(model.GraphClient)
+		graphCli.Create(dag, secret)
 	}
 
 	return nil

@@ -22,7 +22,6 @@ package apps
 import (
 	"context"
 	"fmt"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -35,6 +34,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )

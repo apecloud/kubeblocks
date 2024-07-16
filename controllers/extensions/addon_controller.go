@@ -23,6 +23,8 @@ import (
 	"context"
 	"runtime"
 
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	//apierrors "k8s.io/apimachinery/pkg/api/errors"
 	ctrlerihandler "github.com/authzed/controller-idioms/handler"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -82,7 +84,8 @@ func (r *AddonReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 	// TODO (good-first-issue) rewrite it using the new kubebuilderx framework
 
-	buildStageCtx := func(next ...ctrlerihandler.Handler) stageCtx {
+	//buildStageCtx := func(next ...ctrlerihandler.Handler) stageCtx {
+	_ = func(next ...ctrlerihandler.Handler) stageCtx {
 		return stageCtx{
 			reqCtx:     &reqCtx,
 			reconciler: r,
@@ -90,7 +93,35 @@ func (r *AddonReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		}
 	}
 
-	fetchNDeletionCheckStageBuilder := func(next ...ctrlerihandler.Handler) ctrlerihandler.Handler {
+	buildStageCtx2 := func() stageCtx {
+		return stageCtx{
+			reqCtx:     &reqCtx,
+			reconciler: r,
+		}
+	}
+	logger := log.FromContext(ctx).WithValues("addon", req.NamespacedName)
+	err := kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
+		Prepare(NewTreeLoader()).
+		Do(NewfetchNDeletionCheckReconciler(reqCtx, buildStageCtx2)).
+		Do(NewGenIDProceedCheckReconciler(reqCtx, buildStageCtx2)).
+		Do(NewMetadataCheckReconciler(reqCtx, buildStageCtx2)).
+		Do(NewInstallableCheckReconciler(reqCtx, buildStageCtx2)).
+		Do(NewAutoInstallCheckReconciler(reqCtx, buildStageCtx2)).
+		Do(NewEnabledWithDefaultValuesReconciler(reqCtx, buildStageCtx2)).
+		Do(NewProgressingReconciler(reqCtx, buildStageCtx2)).
+		Do(NewTerminalStateReconciler(reqCtx, buildStageCtx2)).
+		Commit()
+	res, ok := reqCtx.Ctx.Value(resultValueKey).(*ctrl.Result)
+	if ok && res != nil {
+		err, ok := reqCtx.Ctx.Value(errorValueKey).(error)
+		if ok {
+			return *res, err
+		}
+		return *res, nil
+	}
+
+	return ctrl.Result{}, err
+	/*fetchNDeletionCheckStageBuilder := func(next ...ctrlerihandler.Handler) ctrlerihandler.Handler {
 		return ctrlerihandler.NewTypeHandler(&fetchNDeletionCheckStage{
 			stageCtx: buildStageCtx(next...),
 			deletionStage: deletionStage{
@@ -148,7 +179,7 @@ func (r *AddonReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return *res, nil
 	}
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{}, nil*/
 }
 
 // SetupWithManager sets up the controller with the Manager.

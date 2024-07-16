@@ -19,6 +19,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package constant
 
+// annotations for kubeblocks
+const (
+	// SkipImmutableCheckAnnotationKey specifies to skip the mutation check for the object.
+	// The mutation check is only applied to the fields that are declared as immutable.
+	SkipImmutableCheckAnnotationKey = "apps.kubeblocks.io/skip-immutable-check"
+)
+
 // GetKBGenerationAnnotation returns the annotation for kubeblocks generation.
 func GetKBGenerationAnnotation(generation string) map[string]string {
 	return map[string]string{

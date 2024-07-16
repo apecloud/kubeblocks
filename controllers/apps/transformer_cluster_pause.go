@@ -37,9 +37,9 @@ func (t *clusterPauseTransformer) Transform(ctx graph.TransformContext, dag *gra
 	transCtx, _ := ctx.(*clusterTransformContext)
 	cluster := transCtx.OrigCluster
 	graphCli, _ := transCtx.Client.(model.GraphClient)
-	// set paused for all components
 	componentList, err := component.ListClusterComponents(transCtx.Context, transCtx.Client, cluster)
 	if model.IsReconciliationPaused(cluster) {
+		// set paused for all components
 		if err != nil {
 			return err
 		}

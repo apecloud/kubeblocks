@@ -21,6 +21,8 @@ package instanceset
 
 import (
 	"encoding/json"
+	"sort"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -71,17 +73,41 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	notReadyNames := sets.New[string]()
 	notAvailableNames := sets.New[string]()
 	currentRevisions := map[string]string{}
+
+	template2TemplatesStatus := map[string]*workloads.InstanceTemplateStatus{}
+	template2TotalReplicas := map[string]int32{}
+	for _, template := range its.Spec.Instances {
+		templateReplicas := int32(1)
+		if template.Replicas != nil {
+			templateReplicas = *template.Replicas
+		}
+		template2TotalReplicas[template.Name] = templateReplicas
+	}
+
 	for _, pod := range podList {
+		parentName, _ := ParseParentNameAndOrdinal(pod.Name)
+		templateName, _ := strings.CutPrefix(parentName, its.Name)
+		if len(templateName) > 0 {
+			templateName, _ = strings.CutPrefix(templateName, "-")
+		}
+		if template2TemplatesStatus[templateName] == nil {
+			template2TemplatesStatus[templateName] = &workloads.InstanceTemplateStatus{
+				Name: templateName,
+			}
+		}
 		currentRevisions[pod.Name] = getPodRevision(pod)
 		if isCreated(pod) {
 			notReadyNames.Insert(pod.Name)
 			replicas++
+			template2TemplatesStatus[templateName].Replicas++
 		}
 		if isRunningAndReady(pod) && !isTerminating(pod) {
 			readyReplicas++
+			template2TemplatesStatus[templateName].ReadyReplicas++
 			notReadyNames.Delete(pod.Name)
 			if isRunningAndAvailable(pod, its.Spec.MinReadySeconds) {
 				availableReplicas++
+				template2TemplatesStatus[templateName].AvailableReplicas++
 			} else {
 				notAvailableNames.Insert(pod.Name)
 			}
@@ -94,8 +120,10 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 			switch _, ok := updateRevisions[pod.Name]; {
 			case !ok, !isPodUpdated:
 				currentReplicas++
+				template2TemplatesStatus[templateName].CurrentReplicas++
 			default:
 				updatedReplicas++
+				template2TemplatesStatus[templateName].UpdatedReplicas++
 			}
 		}
 	}
@@ -105,6 +133,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	its.Status.CurrentReplicas = currentReplicas
 	its.Status.UpdatedReplicas = updatedReplicas
 	its.Status.CurrentRevisions, _ = buildRevisions(currentRevisions)
+	its.Status.TemplatesStatus = buildTemplatesStatus(template2TemplatesStatus)
 	// all pods have been updated
 	totalReplicas := int32(1)
 	if its.Spec.Replicas != nil {
@@ -114,6 +143,13 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 		its.Status.CurrentRevision = its.Status.UpdateRevision
 		its.Status.CurrentReplicas = totalReplicas
 	}
+	for idx, templateStatus := range its.Status.TemplatesStatus {
+		templateTotalReplicas := template2TotalReplicas[templateStatus.Name]
+		if templateStatus.Replicas == templateTotalReplicas && templateStatus.UpdatedReplicas == templateTotalReplicas {
+			its.Status.TemplatesStatus[idx].CurrentReplicas = templateTotalReplicas
+		}
+	}
+
 	readyCondition, err := buildReadyCondition(its, readyReplicas >= replicas, notReadyNames)
 	if err != nil {
 		return nil, err
@@ -155,6 +191,20 @@ func buildConditionMessageWithNames(podNames []string) ([]byte, error) {
 		return ParseParentNameAndOrdinal(podNames[i])
 	}, nil, true)
 	return json.Marshal(podNames)
+}
+
+func buildTemplatesStatus(template2TemplatesStatus map[string]*workloads.InstanceTemplateStatus) []workloads.InstanceTemplateStatus {
+	var templatesStatus []workloads.InstanceTemplateStatus
+	for templateName, templateStatus := range template2TemplatesStatus {
+		if len(templateName) == 0 {
+			continue
+		}
+		templatesStatus = append(templatesStatus, *templateStatus)
+	}
+	sort.Slice(templatesStatus, func(i, j int) bool {
+		return templatesStatus[i].Name < templatesStatus[j].Name
+	})
+	return templatesStatus
 }
 
 func buildReadyCondition(its *workloads.InstanceSet, ready bool, notReadyNames sets.Set[string]) (*metav1.Condition, error) {

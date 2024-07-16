@@ -514,9 +514,6 @@ get_trigger_mode() {
             apis/*)
                 add_trigger_mode "[apis][test]"
             ;;
-            pkg/lorry/ctl/*)
-                add_trigger_mode "[lorry][test]"
-            ;;
             *)
                 add_trigger_mode "[test]"
             ;;

@@ -17,24 +17,36 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package models
+package lorry
 
-import "strings"
+import (
+	"fmt"
 
-const (
-	PRIMARY   = "primary"
-	SECONDARY = "secondary"
-	MASTER    = "master"
-	SLAVE     = "slave"
-	LEADER    = "Leader"
-	FOLLOWER  = "Follower"
-	LEARNER   = "Learner"
-	CANDIDATE = "Candidate"
+	corev1 "k8s.io/api/core/v1"
 )
 
-// IsLikelyPrimaryRole returns true if the role is primary,
-// it is used for the case where db manager do not implemement the IsLeader method.
-// use it curefully, as it is for normal case, and may be wrong for some special cases.
-func IsLikelyPrimaryRole(role string) bool {
-	return strings.EqualFold(role, PRIMARY) || strings.EqualFold(role, MASTER) || strings.EqualFold(role, LEADER)
+// HACK: for unit test only.
+var mockClient Client
+var mockClientError error
+
+func SetMockClient(cli Client, err error) {
+	mockClient = cli
+	mockClientError = err
+}
+
+func UnsetMockClient() {
+	mockClient = nil
+	mockClientError = nil
+}
+
+func GetMockClient() Client {
+	return mockClient
+}
+
+func NewClient(pod corev1.Pod) (Client, error) {
+	if mockClient != nil || mockClientError != nil {
+		return mockClient, mockClientError
+	}
+
+	return nil, fmt.Errorf("not implemented")
 }

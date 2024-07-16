@@ -44,7 +44,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	lorry "github.com/apecloud/kubeblocks/pkg/lorry/client"
+	"github.com/apecloud/kubeblocks/pkg/lorry"
 )
 
 // componentWorkloadTransformer handles component workload generation
@@ -597,9 +597,9 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 		}
 		// if HA functionality is not enabled, no need to switchover
 		err := lorryCli.Switchover(r.reqCtx.Ctx, pod.Name, "", false)
-		if err == lorry.NotImplemented {
+		if err == lorry.ErrNotImplemented {
 			// For the purpose of upgrade compatibility, if the version of Lorry is 0.7 and
-			// the version of KB is upgraded to 0.8 or newer, lorry client will return an NotImplemented error,
+			// the version of KB is upgraded to 0.8 or newer, lorry client will return an ErrNotImplemented error,
 			// in this case, here just return success.
 			r.reqCtx.Log.Info("lorry switchover api is not implemented")
 			return nil
@@ -643,9 +643,9 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 
 		if err2 := lorryCli.LeaveMember(r.reqCtx.Ctx); err2 != nil {
 			// For the purpose of upgrade compatibility, if the version of Lorry is 0.7 and
-			// the version of KB is upgraded to 0.8 or newer, lorry client will return an NotImplemented error,
+			// the version of KB is upgraded to 0.8 or newer, lorry client will return an ErrNotImplemented error,
 			// in this case, here just ignore it.
-			if err2 == lorry.NotImplemented {
+			if err2 == lorry.ErrNotImplemented {
 				r.reqCtx.Log.Info("lorry leave member api is not implemented")
 			} else if err == nil {
 				err = err2

@@ -37,7 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	"github.com/apecloud/kubeblocks/pkg/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/lorry"
 )
 
 type PodRoleEventHandler struct{}
@@ -65,8 +65,8 @@ const (
 var roleMessageRegex = regexp.MustCompile(`Readiness probe failed: .*({.*})`)
 
 func (h *PodRoleEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
-	filePaths := []string{readinessProbeEventFieldPath, util.LegacyEventFieldPath, util.LorryEventFieldPath}
-	if !slices.Contains(filePaths, event.InvolvedObject.FieldPath) || event.Reason != string(util.CheckRoleOperation) {
+	filePaths := []string{readinessProbeEventFieldPath, lorry.LegacyEventFieldPath, lorry.LorryEventFieldPath}
+	if !slices.Contains(filePaths, event.InvolvedObject.FieldPath) || event.Reason != string(lorry.CheckRoleOperation) {
 		return nil
 	}
 	var (

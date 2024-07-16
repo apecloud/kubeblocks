@@ -23,6 +23,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/apecloud/kubeblocks/controllers/extensions"
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"k8s.io/apimachinery/pkg/types"
 	"reflect"
 	"time"
 
@@ -257,4 +260,68 @@ func isOwnedByInstanceSet(obj client.Object) bool {
 		}
 	}
 	return false
+}
+
+func setPauseAnnotation(object client.Object) (client.Object, bool) {
+	if !model.IsReconciliationPaused(object) {
+		annotations := object.GetAnnotations()
+		if annotations == nil {
+			annotations = make(map[string]string)
+		}
+		if val, ok := annotations[extensions.ControllerPaused]; !ok || val != trueVal {
+			annotations[extensions.ControllerPaused] = trueVal
+			object.SetAnnotations(annotations)
+			return object, true
+		}
+	}
+	return object, false
+}
+
+func removePauseAnnotation(object client.Object) (client.Object, bool) {
+	if model.IsReconciliationPaused(object) {
+		annotations := object.GetAnnotations()
+		if _, ok := annotations[extensions.ControllerPaused]; ok {
+			delete(object.GetAnnotations(), extensions.ControllerPaused)
+			return object, true
+		}
+	}
+	return object, false
+}
+
+func getInstanceSet(transCtx *componentTransformContext) *workloads.InstanceSet {
+	instanceName := transCtx.Component.Name
+	instanceSet := &workloads.InstanceSet{}
+	err := transCtx.Client.Get(transCtx.Context, types.NamespacedName{Name: instanceName, Namespace: transCtx.Component.Namespace}, instanceSet)
+	if err != nil {
+		return nil
+	}
+	return instanceSet
+}
+
+func getConfiguration(transCtx *componentTransformContext) *appsv1alpha1.Configuration {
+	configuration := &appsv1alpha1.Configuration{}
+	configurationName := cfgcore.GenerateComponentConfigurationName(transCtx.SynthesizeComponent.ClusterName, transCtx.SynthesizeComponent.Name)
+	configurationNamespacedName := &types.NamespacedName{
+		Name:      configurationName,
+		Namespace: transCtx.Component.Namespace,
+	}
+	if err := transCtx.Client.Get(transCtx.Context, *configurationNamespacedName, configuration); err != nil {
+		return nil
+	}
+	return configuration
+}
+
+func listConfigMaps(transCtx *componentTransformContext) *corev1.ConfigMapList {
+	cmList := &corev1.ConfigMapList{}
+	ml := constant.GetComponentWellKnownLabels(transCtx.Component.Labels[constant.AppInstanceLabelKey], transCtx.Component.Labels[constant.KBAppComponentLabelKey])
+
+	listOpts := []client.ListOption{
+		client.InNamespace(transCtx.Component.Namespace),
+		client.MatchingLabels(ml),
+	}
+	err := transCtx.Client.List(transCtx, cmList, listOpts...)
+	if err != nil {
+		return nil
+	}
+	return cmList
 }

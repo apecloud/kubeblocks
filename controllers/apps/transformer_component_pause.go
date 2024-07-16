@@ -20,17 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"fmt"
-
-	"github.com/pkg/errors"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/extensions"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -49,77 +40,45 @@ func (t *componentPauseTransformer) Transform(ctx graph.TransformContext, dag *g
 	comp := transCtx.Component
 	if model.IsReconciliationPaused(comp) {
 		// get instanceSet and set paused
-		instanceSet, err := t.getInstanceSet(transCtx, comp)
-		if err != nil {
-			return err
-		}
-		if !instanceSet.Spec.Paused {
+		instanceSet := getInstanceSet(transCtx)
+		if !model.IsReconciliationPaused(instanceSet) {
 			instanceSet.Spec.Paused = true
 			graphCli.Update(dag, nil, instanceSet)
 		}
+		// get configuration and set paused
+		configuration := getConfiguration(transCtx)
+		if configuration, needUpdate := setPauseAnnotation(configuration); needUpdate {
+			graphCli.Update(dag, nil, configuration)
+		}
 		// list configmaps and set paused
-		configMapList, err := t.listConfigMaps(transCtx, comp)
-		if err != nil {
-			return err
-		}
-		if err != nil {
-			return err
-		}
-		for _, configMap := range configMapList.Items {
-			annotations := configMap.GetAnnotations()
-			if annotations == nil {
-				annotations = make(map[string]string)
+		configMapList := listConfigMaps(transCtx)
+		for i := range configMapList.Items {
+			if configMap, needUpdate := setPauseAnnotation(&configMapList.Items[i]); needUpdate {
+				graphCli.Update(dag, nil, configMap)
 			}
-			annotations[extensions.ControllerPaused] = trueVal
-			configMap.SetAnnotations(annotations)
-			graphCli.Update(dag, nil, &configMap)
 		}
-
+		// pause reconcile now
 		return graph.ErrPrematureStop
 	} else {
 		// get instanceSet and cancel paused
-		oldInstanceSet, _ := t.getInstanceSet(transCtx, comp)
-		if model.IsReconciliationPaused(oldInstanceSet) {
-			oldInstanceSet.Spec.Paused = false
-			graphCli.Update(dag, nil, oldInstanceSet)
+		instanceSet := getInstanceSet(transCtx)
+		if model.IsReconciliationPaused(instanceSet) {
+			instanceSet.Spec.Paused = false
+			graphCli.Update(dag, nil, instanceSet)
 			return nil
 		}
-		// list configmaps and cancel paused
-		configMapList, err := t.listConfigMaps(transCtx, comp)
-		if err != nil {
-			return err
+		// get configuration and set paused
+		configuration := getConfiguration(transCtx)
+		if configuration, needUpdate := removePauseAnnotation(configuration); needUpdate {
+			graphCli.Update(dag, nil, configuration)
 		}
-		for _, configMap := range configMapList.Items {
-			if model.IsReconciliationPaused(&configMap) {
-				delete(configMap.Annotations, extensions.ControllerPaused)
-				graphCli.Update(dag, configMap.DeepCopy(), &configMap)
+		// list configmaps and cancel paused
+		configMapList := listConfigMaps(transCtx)
+		for i := range configMapList.Items {
+			if configMap, needUpdate := removePauseAnnotation(&configMapList.Items[i]); needUpdate {
+				graphCli.Update(dag, nil, configMap)
 			}
 		}
 		return nil
 	}
-}
-
-func (t *componentPauseTransformer) getInstanceSet(transCtx *componentTransformContext, comp *appsv1alpha1.Component) (*workloads.InstanceSet, error) {
-	instanceName := comp.Name
-	instanceSet := &workloads.InstanceSet{}
-	err := transCtx.Client.Get(transCtx.Context, types.NamespacedName{Name: instanceName, Namespace: comp.Namespace}, instanceSet)
-	if err != nil {
-		return nil, errors.New(fmt.Sprintf("failed to get instanceSet %s: %v", instanceName, err))
-	}
-	return instanceSet, nil
-}
-
-func (t *componentPauseTransformer) listConfigMaps(transCtx *componentTransformContext, component *appsv1alpha1.Component) (*corev1.ConfigMapList, error) {
-	cmList := &corev1.ConfigMapList{}
-	ml := constant.GetComponentWellKnownLabels(component.Labels[constant.AppInstanceLabelKey], component.Labels[constant.KBAppComponentLabelKey])
-
-	listOpts := []client.ListOption{
-		client.InNamespace(component.Namespace),
-		client.MatchingLabels(ml),
-	}
-	err := t.Client.List(transCtx, cmList, listOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return cmList, nil
 }

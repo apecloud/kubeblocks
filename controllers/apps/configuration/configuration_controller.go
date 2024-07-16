@@ -115,7 +115,7 @@ func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return intctrlutil.Reconciled()
 	}
 	if model.IsReconciliationPaused(config) {
-		reqCtx.Log.Info(fmt.Sprintf("cluster is paused, skip reconcile"))
+		reqCtx.Log.Info("cluster is paused, skip reconcile")
 		return intctrlutil.Reconciled()
 	}
 	if fetcherTask.ClusterComObj == nil || fetcherTask.ComponentObj == nil {

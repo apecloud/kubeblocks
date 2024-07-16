@@ -34,9 +34,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	kzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/cronjobs"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/httpserver"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/cronjobs"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/handlers"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/httpserver"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 

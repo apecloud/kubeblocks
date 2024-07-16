@@ -29,7 +29,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/util"
 )
 
 func TestDo(t *testing.T) {

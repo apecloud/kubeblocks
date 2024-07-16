@@ -23,9 +23,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/apecloud/kubeblocks/pkg/kbagent/util"
 )
 
 func TestNewGRPCHandler(t *testing.T) {

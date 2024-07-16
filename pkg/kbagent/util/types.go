@@ -22,7 +22,7 @@ package util
 const (
 	OperationSuccess      = "Success"
 	OperationFailed       = "Failed"
-	KBAgentEventFieldPath = "spec.containers{kb-agent}"
+	KBAgentEventFieldPath = "spec.containers{kbagent}"
 )
 
 // for http server

@@ -21,86 +21,83 @@ package util
 
 import (
 	"encoding/json"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/controller/builder"
-	"github.com/apecloud/kubeblocks/pkg/kbagent/service"
+
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
+
+	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/service"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/util"
 )
 
 const (
-	containerName = "kbagent"
-	commandName   = "/bin/kbagent"
 	actionEnvName = "KB_AGENT_ACTION"
+	probeEnvName  = "KB_AGENT_PROBE"
 )
 
-func BuildSidecarContainer(actions *appsv1alpha1.ComponentLifecycleActions, port int32) (*corev1.Container, error) {
-	actionEnv, err := buildActionEnv(actions)
+func BuildEnvVars(actions []proto.Action, probes []proto.Probe) ([]corev1.EnvVar, error) {
+	da, dp, err := serializeActionNProbe(actions, probes)
 	if err != nil {
 		return nil, err
 	}
-	return builder.NewContainerBuilder(containerName).
-		SetImage("apecloud-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/pause:3.6").
-		SetImagePullPolicy(corev1.PullIfNotPresent).
-		AddCommands(commandName).
-		AddEnv(*actionEnv).
-		AddPorts(corev1.ContainerPort{
-			Name:          "http",
-			ContainerPort: port,
-			Protocol:      "TCP",
-		}).
-		SetStartupProbe(corev1.Probe{
-			ProbeHandler: corev1.ProbeHandler{
-				TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromInt(int(port))},
-			}}).
-		GetObject(), nil
-}
-
-func Initialize(envVars map[string]string) (any, error) {
-	data := getActionEnvValue(envVars)
-	if len(data) == 0 {
-		return nil, nil
-	}
-
-	actions, err := deserializeAction(data)
-	if err != nil {
-		return nil, err
-	}
-
-	return service.NewService(actions), nil
-}
-
-func buildActionEnv(actions *appsv1alpha1.ComponentLifecycleActions) (*corev1.EnvVar, error) {
-	value, err := serializeAction(actions)
-	if err != nil {
-		return nil, err
-	}
-	return &corev1.EnvVar{
-		Name:  actionEnvName,
-		Value: value,
+	return []corev1.EnvVar{
+		{
+			Name:  actionEnvName,
+			Value: da,
+		},
+		{
+			Name:  probeEnvName,
+			Value: dp,
+		},
 	}, nil
 }
 
-func getActionEnvValue(envVars map[string]string) string {
-	value, ok := envVars[actionEnvName]
-	if !ok {
-		return ""
+func Initialize(envs []string) ([]service.Service, error) {
+	da, dp := getActionNProbeEnvValue(envs)
+	if len(da) == 0 {
+		return nil, nil
 	}
-	return value
-}
 
-func serializeAction(actions *appsv1alpha1.ComponentLifecycleActions) (string, error) {
-	data, err := json.Marshal(actions)
+	actions, probes, err := deserializeActionNProbe(da, dp)
 	if err != nil {
-		return "", nil
-	}
-	return string(data), nil
-}
-
-func deserializeAction(value string) (*appsv1alpha1.ComponentLifecycleActions, error) {
-	actions := &appsv1alpha1.ComponentLifecycleActions{}
-	if err := json.Unmarshal([]byte(value), actions); err != nil {
 		return nil, err
 	}
-	return actions, nil
+
+	return service.New(actions, probes)
+}
+
+func getActionNProbeEnvValue(envs []string) (string, string) {
+	envVars := util.EnvL2M(envs)
+	da, ok := envVars[actionEnvName]
+	if !ok {
+		return "", ""
+	}
+	dp, ok := envVars[probeEnvName]
+	if !ok {
+		return da, ""
+	}
+	return da, dp
+}
+
+func serializeActionNProbe(actions []proto.Action, probes []proto.Probe) (string, string, error) {
+	da, err := json.Marshal(actions)
+	if err != nil {
+		return "", "", nil
+	}
+	dp, err := json.Marshal(probes)
+	if err != nil {
+		return "", "", nil
+	}
+	return string(da), string(dp), nil
+}
+
+func deserializeActionNProbe(da, dp string) ([]proto.Action, []proto.Probe, error) {
+	actions := make([]proto.Action, 0)
+	if err := json.Unmarshal([]byte(da), &actions); err != nil {
+		return nil, nil, err
+	}
+	probes := make([]proto.Probe, 0)
+	if err := json.Unmarshal([]byte(dp), &probes); err != nil {
+		return nil, nil, err
+	}
+	return actions, probes, nil
 }

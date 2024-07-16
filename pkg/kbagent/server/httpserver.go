@@ -29,18 +29,24 @@ import (
 
 	fasthttprouter "github.com/fasthttp/router"
 	"github.com/valyala/fasthttp"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/kbagent/service"
 )
 
 const (
+	defaultMaxConcurrency = 8
 	jsonContentTypeHeader = "application/json"
 )
 
+var (
+	logger = ctrl.Log.WithName("HTTP")
+)
+
 type server struct {
-	config  Config
-	servers []*fasthttp.Server
-	service service.Service
+	config   Config
+	services []service.Service
+	servers  []*fasthttp.Server
 }
 
 var _ Server = &server{}
@@ -50,7 +56,7 @@ func (s *server) StartNonBlocking() error {
 	logger.Info("Starting HTTP Server")
 	handler := s.router()
 
-	APILogging := s.config.APILogging
+	APILogging := s.config.Logging
 	if APILogging {
 		handler = s.apiLogger(handler)
 	}
@@ -64,10 +70,9 @@ func (s *server) StartNonBlocking() error {
 		}
 		listeners = append(listeners, l)
 	} else {
-		apiListenAddress := s.config.Address
-		l, err := net.Listen("tcp", fmt.Sprintf("%s:%v", apiListenAddress, s.config.Port))
+		l, err := net.Listen("tcp", fmt.Sprintf("%s:%v", s.config.Address, s.config.Port))
 		if err != nil {
-			logger.Error(err, "listen address", apiListenAddress, "port", s.config.Port)
+			logger.Error(err, "listen address", s.config.Address, "port", s.config.Port)
 		} else {
 			listeners = append(listeners, l)
 		}
@@ -84,10 +89,10 @@ func (s *server) StartNonBlocking() error {
 			Handler: handler,
 		}
 
-		if s.config.ConCurrency > 0 {
-			customServer.Concurrency = s.config.ConCurrency
+		if s.config.Concurrency > 0 {
+			customServer.Concurrency = s.config.Concurrency
 		} else {
-			customServer.Concurrency = KBAgentDefaultConcurrency
+			customServer.Concurrency = defaultMaxConcurrency
 		}
 
 		s.servers = append(s.servers, customServer)
@@ -132,57 +137,42 @@ func (s *server) apiLogger(next fasthttp.RequestHandler) fasthttp.RequestHandler
 
 func (s *server) router() fasthttp.RequestHandler {
 	router := fasthttprouter.New()
-
-	path := fmt.Sprintf("/%s/%s", s.service.Version(), s.service.URI())
-	router.Handle(fasthttp.MethodPost, path, s.dispatcher())
-	logger.Info("service route", "method", fasthttp.MethodPost, "path", path)
-
+	for i := range s.services {
+		s.registerService(router, s.services[i])
+	}
 	return router.Handler
 }
 
-type request struct {
-	Action     string            `json:"action"`
-	Data       interface{}       `json:"data,omitempty"`
-	Parameters map[string]string `json:"parameters,omitempty"`
+func (s *server) registerService(router *fasthttprouter.Router, svc service.Service) {
+	path := fmt.Sprintf("/%s/%s", svc.Version(), svc.URI())
+	router.Handle(fasthttp.MethodPost, path, s.dispatcher(svc))
+	logger.Info("service route", "method", fasthttp.MethodPost, "path", path)
 }
 
-func (s *server) dispatcher() func(*fasthttp.RequestCtx) {
+func (s *server) dispatcher(svc service.Service) func(*fasthttp.RequestCtx) {
 	return func(reqCtx *fasthttp.RequestCtx) {
 		ctx := context.Background()
 		body := reqCtx.PostBody()
 
-		var req request
-		if len(body) > 0 {
-			err := json.Unmarshal(body, &req)
-			if err != nil {
-				msg := NewErrorResponse("ERR_MALFORMED_REQUEST", fmt.Sprintf("unmarshal HTTP body failed: %v", err))
-				respond(reqCtx, withError(fasthttp.StatusBadRequest, msg))
-				return
-			}
-		}
-
-		_, err := json.Marshal(req.Data)
+		req, err := svc.Decode(body)
 		if err != nil {
-			msg := NewErrorResponse("ERR_MALFORMED_REQUEST_DATA", fmt.Sprintf("marshal request data field: %v", err))
-			respond(reqCtx, withError(fasthttp.StatusInternalServerError, msg))
-			logger.Info("marshal request data field", "error", err.Error())
-			return
-		}
-
-		if req.Action == "" {
-			msg := NewErrorResponse("ERR_MALFORMED_REQUEST_DATA", "no action in request")
+			msg := newErrorResponse("ERR_MALFORMED_REQUEST", fmt.Sprintf("unmarshal HTTP body failed: %v", err))
 			respond(reqCtx, withError(fasthttp.StatusBadRequest, msg))
 			return
 		}
 
-		rsp, err := s.service.Call(ctx, req.Action, req.Parameters)
+		rsp, err := svc.Call(ctx, req)
 		statusCode := fasthttp.StatusOK
 		if err != nil {
-			// TODO: not-implemented error
-			statusCode = fasthttp.StatusInternalServerError
-			logger.Info("action exec failed", "action", req.Action, "error", err.Error())
+			if errors.Is(err, service.ErrNotImplemented) {
+				statusCode = fasthttp.StatusNotImplemented
+			} else {
+				statusCode = fasthttp.StatusInternalServerError
+			}
 
-			msg := NewErrorResponse("ERR_ACTION_FAILED", fmt.Sprintf("action exec failed: %s", err.Error()))
+			logger.Info("service call failed", "service", svc.Kind(), "error", err.Error())
+
+			msg := newErrorResponse("ERR_SERVICE_FAILED", fmt.Sprintf("service call failed: %s", err.Error()))
 			respond(reqCtx, withError(statusCode, msg))
 			return
 		}
@@ -195,9 +185,20 @@ func (s *server) dispatcher() func(*fasthttp.RequestCtx) {
 	}
 }
 
+type errorResponse struct {
+	ErrorCode string `json:"errorCode"`
+	Message   string `json:"message"`
+}
+
+func newErrorResponse(errorCode, message string) errorResponse {
+	return errorResponse{
+		ErrorCode: errorCode,
+		Message:   message,
+	}
+}
+
 type option = func(ctx *fasthttp.RequestCtx)
 
-// withJSON overrides the content-type with application/json.
 func withJSON(code int, obj []byte) option {
 	return func(ctx *fasthttp.RequestCtx) {
 		ctx.Response.SetStatusCode(code)
@@ -206,8 +207,7 @@ func withJSON(code int, obj []byte) option {
 	}
 }
 
-// withError sets error code and jsonify error message.
-func withError(code int, resp ErrorResponse) option {
+func withError(code int, resp errorResponse) option {
 	b, _ := json.Marshal(&resp)
 	return withJSON(code, b)
 }

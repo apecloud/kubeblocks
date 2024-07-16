@@ -21,56 +21,43 @@ package util
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"time"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/client-go/kubernetes"
 	ctlruntime "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
-var logger = ctlruntime.Log.WithName("event")
-var EventSendMaxAttempts = 30
-var EventSendPeriod = 10 * time.Second
+const (
+	sendEventMaxAttempts   = 30
+	sendEventRetryInterval = 10 * time.Second
+)
 
-func SentEventForProbe(ctx context.Context, msg ActionMessage) error {
-	logger.Info(fmt.Sprintf("send event: %v", msg))
-	action := msg.GetAction()
-	if action == "" {
-		return errors.New("action is unset")
-	}
-	event, err := CreateEvent(action, msg)
-	if err != nil {
-		logger.Info("create event failed", "error", err.Error())
-		return err
-	}
+var (
+	logger = ctlruntime.Log.WithName("event")
+)
 
+func SendEventWithMessage(reason string, message string) {
+	logger.Info(fmt.Sprintf("send event, reason: %s, message: %s", reason, message))
 	go func() {
-		_ = SendEvent(ctx, event)
+		_ = sendEvent(createEvent(reason, message))
 	}()
-
-	return nil
 }
 
-func CreateEvent(reason string, msg ActionMessage) (*corev1.Event, error) {
-	// get pod object
+func createEvent(reason string, message string) *corev1.Event {
 	podName := os.Getenv(constant.KBEnvPodName)
 	podUID := os.Getenv(constant.KBEnvPodUID)
 	nodeName := os.Getenv(constant.KBEnvNodeName)
 	namespace := os.Getenv(constant.KBEnvNamespace)
-	data, err := json.Marshal(msg)
-	if err != nil {
-		return nil, err
-	}
-
-	event := &corev1.Event{
+	return &corev1.Event{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s.%s", podName, rand.String(16)),
 			Namespace: namespace,
@@ -83,7 +70,7 @@ func CreateEvent(reason string, msg ActionMessage) (*corev1.Event, error) {
 			FieldPath: "spec.containers{kbagent}",
 		},
 		Reason:  reason,
-		Message: string(data),
+		Message: message,
 		Source: corev1.EventSource{
 			Component: "kbagent",
 			Host:      nodeName,
@@ -96,25 +83,37 @@ func CreateEvent(reason string, msg ActionMessage) (*corev1.Event, error) {
 		Action:              reason,
 		Type:                "Normal",
 	}
-	return event, nil
 }
 
-func SendEvent(ctx context.Context, event *corev1.Event) error {
+func sendEvent(event *corev1.Event) error {
 	ctx1 := context.Background()
-	clientset, err := GetClientSet()
+	clientset, err := getK8sClientSet()
 	if err != nil {
 		logger.Info("k8s client create failed", "error", err.Error())
 		return err
 	}
 	namespace := os.Getenv(constant.KBEnvNamespace)
-	for i := 0; i < EventSendMaxAttempts; i++ {
+	for i := 0; i < sendEventMaxAttempts; i++ {
 		_, err = clientset.CoreV1().Events(namespace).Create(ctx1, event, metav1.CreateOptions{})
 		if err == nil {
 			logger.Info("send event success", "message", event.Message)
 			break
 		}
 		logger.Info("send event failed", "error", err.Error())
-		time.Sleep(EventSendPeriod)
+		time.Sleep(sendEventRetryInterval)
 	}
 	return err
+}
+
+func getK8sClientSet() (*kubernetes.Clientset, error) {
+	restConfig, err := ctlruntime.GetConfig()
+	if err != nil {
+		return nil, errors.Wrap(err, "get kubeConfig failed")
+	}
+	clientSet, err := kubernetes.NewForConfig(restConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return clientSet, nil
 }

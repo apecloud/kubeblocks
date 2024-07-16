@@ -21,40 +21,35 @@ package service
 
 import (
 	"context"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"errors"
+
+	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
 type Service interface {
-	Start() error
-
+	Kind() string
 	Version() string
 	URI() string
 
-	// Refresh(actions *appsv1alpha1.ComponentLifecycleActions) error
+	Start() error
 
-	Call(ctx context.Context, action string, parameters map[string]string) ([]byte, error)
+	Decode([]byte) (interface{}, error)
+
+	Call(ctx context.Context, req interface{}) ([]byte, error)
+
+	// Refresh([]proto.Action, []proto.Probe) error
 }
 
-func NewService(actions *appsv1alpha1.ComponentLifecycleActions) Service {
-	return &kbagent{
-		action: &actionService{
-			actions: actions,
-		},
-		probe: &probeService{
-			actions: actions,
-		},
+func New(actions []proto.Action, probes []proto.Probe) ([]Service, error) {
+	sa, err := newActionService(actions)
+	if err != nil {
+		return nil, err
 	}
+	sp, err := newProbeService(sa, probes)
+	if err != nil {
+		return nil, err
+	}
+	return []Service{sa, sp}, nil
 }
 
-func dispatch(actions *appsv1alpha1.ComponentLifecycleActions) (map[string]*appsv1alpha1.Action, map[string]*appsv1alpha1.Action) {
-	if actions == nil {
-		return nil, nil
-	}
-
-	actions := map[string]*appsv1alpha1.Action{}
-	probes := map[string]*appsv1alpha1.Action{}
-	if actions.PostProvision != nil {
-
-	}
-	return actions, probes
-}
+var ErrNotImplemented = errors.New("NotImplemented")

@@ -21,36 +21,98 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os/exec"
+	"strings"
 	"time"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/util"
 )
 
-type actionService struct {
-	actions *appsv1alpha1.ComponentLifecycleActions
-}
+const (
+	actionVersion = "v1.0"
+	actionURI     = "action"
+)
 
-func (s *actionService) call(ctx context.Context, action string, parameters map[string]string) ([]byte, error) {
-	return nil, nil
-}
-
-func execute(ctx context.Context, commands []string, args map[string]any) ([]byte, error) {
-	if len(commands) == 0 {
-		return nil, fmt.Errorf("commands can not be empty")
+func newActionService(actions []proto.Action) (*actionService, error) {
+	sa := &actionService{}
+	for i, action := range actions {
+		sa.actions[action.Name] = &actions[i]
 	}
-	envs := util.GetAllEnvs(args)
-	if setting.TimeoutSeconds > 0 {
-		timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(setting.TimeoutSeconds)*time.Second)
+	return sa, nil
+}
+
+type actionService struct {
+	actions map[string]*proto.Action
+}
+
+var _ Service = &actionService{}
+
+func (s *actionService) Kind() string {
+	return "Action"
+}
+
+func (s *actionService) Version() string {
+	return actionVersion
+}
+
+func (s *actionService) URI() string {
+	return actionURI
+}
+
+func (s *actionService) Start() error {
+	return nil
+}
+
+func (s *actionService) Decode(payload []byte) (interface{}, error) {
+	req := &proto.ActionRequest{}
+	if err := json.Unmarshal(payload, req); err != nil {
+		return nil, err
+	}
+	return req, nil
+}
+
+func (s *actionService) Call(ctx context.Context, i interface{}) ([]byte, error) {
+	req := i.(*proto.ActionRequest)
+
+	action := strings.ToLower(req.Action)
+	if _, ok := s.actions[action]; !ok {
+		return nil, fmt.Errorf("%s is not supported", action)
+	}
+	return s.callAction(ctx, req)
+}
+
+func (s *actionService) callAction(ctx context.Context, req *proto.ActionRequest) ([]byte, error) {
+	action := s.actions[strings.ToLower(req.Action)]
+	if action.Exec != nil {
+		return s.callExecAction(ctx, req, action)
+	}
+	return nil, fmt.Errorf("only exec action is supported: %s", req.Action)
+}
+
+func (s *actionService) callExecAction(ctx context.Context, req *proto.ActionRequest, action *proto.Action) ([]byte, error) {
+	// TODO: non-blocking & timeout
+	return execute(ctx, action.Exec.Commands, action.Exec.Args, req.Parameters, req.TimeoutSeconds)
+}
+
+func execute(ctx context.Context, commands []string, args []string, parameters map[string]string, timeout *int32) ([]byte, error) {
+	if timeout != nil && *timeout > 0 {
+		timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(*timeout)*time.Second)
 		defer cancel()
 		ctx = timeoutCtx
 	}
 
-	cmd := exec.CommandContext(ctx, commands[0], commands[1:]...)
-	cmd.Env = envs
+	mergedArgs := make([]string, 0)
+	if len(commands) > 1 {
+		mergedArgs = append(mergedArgs, commands[1:]...)
+	}
+	mergedArgs = append(mergedArgs, args...)
+
+	cmd := exec.CommandContext(ctx, commands[0], mergedArgs...)
+	cmd.Env = util.EnvM2L(parameters)
 	bytes, err := cmd.Output()
 	if exitErr, ok := err.(*exec.ExitError); ok {
 		err = errors.New(string(exitErr.Stderr))

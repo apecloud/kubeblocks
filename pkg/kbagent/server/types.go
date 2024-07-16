@@ -20,8 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package server
 
 import (
-	"github.com/apecloud/kubeblocks/pkg/kbagent/service"
 	"io"
+
+	"github.com/apecloud/kubeblocks/pkg/kbagent/service"
 )
 
 // Server is an interface for the kb-agent server.
@@ -30,10 +31,18 @@ type Server interface {
 	StartNonBlocking() error
 }
 
-// NewHttpServer returns a new HTTP server.
-func NewHttpServer(service service.Service) Server {
+type Config struct {
+	Address          string
+	UnixDomainSocket string
+	Port             int
+	Concurrency      int
+	Logging          bool
+}
+
+// NewHTTPServer returns a new HTTP server.
+func NewHTTPServer(config Config, services []service.Service) Server {
 	return &server{
-		config:  config,
-		service: service,
+		config:   config,
+		services: services,
 	}
 }

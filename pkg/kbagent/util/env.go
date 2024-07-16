@@ -17,18 +17,30 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package server
+package util
 
-// ErrorResponse is an HTTP response message sent back to calling clients.
-type ErrorResponse struct {
-	ErrorCode string `json:"errorCode"`
-	Message   string `json:"message"`
+import (
+	"strings"
+)
+
+func EnvM2L(m map[string]string) []string {
+	l := make([]string, 0)
+	for k, v := range m {
+		l = append(l, strings.ToUpper(k)+"="+v)
+	}
+	return l
 }
 
-// NewErrorResponse returns a new ErrorResponse.
-func NewErrorResponse(errorCode, message string) ErrorResponse {
-	return ErrorResponse{
-		ErrorCode: errorCode,
-		Message:   message,
+func EnvL2M(l []string) map[string]string {
+	m := make(map[string]string, 0)
+	for _, p := range l {
+		kv := strings.Split(p, "=")
+		if len(kv) == 2 {
+			m[strings.ToLower(kv[0])] = kv[1]
+		}
+		if len(kv) == 1 {
+			m[strings.ToLower(kv[0])] = ""
+		}
 	}
+	return m
 }

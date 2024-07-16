@@ -239,6 +239,11 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		return nil, err
 	}
 
+	if err = buildKBAgentContainer(synthesizeComp); err != nil {
+		reqCtx.Log.Error(err, "build kb-agent container failed")
+		return nil, err
+	}
+
 	if err = buildServiceReferences(reqCtx.Ctx, cli, synthesizeComp, compDef, comp); err != nil {
 		reqCtx.Log.Error(err, "build service references failed.")
 		return nil, err

@@ -21,6 +21,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"strings"
@@ -34,12 +35,27 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	kzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	kbagent "github.com/apecloud/kubeblocks/pkg/kbagent"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/server"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
+const (
+	defaultPort           = 3501
+	defaultMaxConcurrency = 8
+)
+
+var serverConfig server.Config
+
 func init() {
 	viper.AutomaticEnv()
+
+	pflag.StringVar(&serverConfig.Address, "address", "0.0.0.0", "The HTTP Server listen address for kb-agent service.")
+	pflag.StringVar(&serverConfig.UnixDomainSocket, "unix-socket", ".", "The path of the Unix Domain Socket for kb-agent service.")
+	pflag.IntVar(&serverConfig.Port, "port", defaultPort, "The HTTP Server listen port for kb-agent service.")
+	pflag.IntVar(&serverConfig.Concurrency, "max-concurrency", defaultMaxConcurrency,
+		fmt.Sprintf("The maximum number of concurrent connections the Server may serve, use the default value %d if <=0.", defaultMaxConcurrency))
+	pflag.BoolVar(&serverConfig.Logging, "api-logging", true, "Enable api logging for kb-agent request.")
 }
 
 func main() {
@@ -66,14 +82,14 @@ func main() {
 	}
 	ctrl.SetLogger(kzap.New(kopts...))
 
-	// initialize kbagent
-	service, err := kbagent.Initialize(envInMapping())
+	// initialize kb-agent
+	services, err := kbagent.Initialize(os.Environ())
 	if err != nil {
 		panic(errors.Wrap(err, "init action handlers failed"))
 	}
 
 	// start HTTP Server
-	server := server.NewHttpServer(service)
+	server := server.NewHTTPServer(serverConfig, services)
 	err = server.StartNonBlocking()
 	if err != nil {
 		panic(errors.Wrap(err, "failed to start HTTP server"))
@@ -82,13 +98,4 @@ func main() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, os.Interrupt)
 	<-stop
-}
-
-func envInMapping() map[string]string {
-	vars := map[string]string{}
-	for _, v := range os.Environ() {
-		pairs := strings.SplitN(v, "=", 2)
-		vars[pairs[0]] = pairs[1]
-	}
-	return vars
 }

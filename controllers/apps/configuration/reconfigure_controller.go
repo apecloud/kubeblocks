@@ -202,7 +202,7 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 	}
 
 	if model.IsReconciliationPaused(configMap) {
-		reqCtx.Log.Info(fmt.Sprintf("reconfigure is paused beacuse cluster %s is paused", resources.clusterName))
+		reqCtx.Log.Info(fmt.Sprintf("reconfigure is paused because cluster %s is paused", resources.clusterName))
 		return intctrlutil.Reconciled()
 	}
 

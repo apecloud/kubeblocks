@@ -87,4 +87,5 @@ type SynthesizedComponent struct {
 	CharacterType         string                          `json:"characterType,omitempty"`
 	WorkloadType          v1alpha1.WorkloadType           `json:"workloadType,omitempty"`
 	HorizontalScalePolicy *v1alpha1.HorizontalScalePolicy `json:"horizontalScalePolicy,omitempty"`
+	EnabledLogs           []string                        `json:"enabledLogs,omitempty"`
 }

@@ -346,6 +346,9 @@ spec:
 
 
                   If set, the DNS policy will be automatically set to "ClusterFirstWithHostNet".
+
+
+                  This field is immutable.
                 properties:
                   containerPorts:
                     description: The list of container ports that are required by

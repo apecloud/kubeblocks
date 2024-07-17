@@ -142,7 +142,6 @@ func buildTLSCert(ctx context.Context, cli client.Reader, synthesizedComp compon
 		return fmt.Errorf("issuer shouldn't be nil when tls enabled")
 	}
 
-	var getSecretErr error
 	switch tls.Issuer.Name {
 	case appsv1alpha1.IssuerUserProvided:
 		if err := plan.CheckTLSSecretRef(ctx, cli, synthesizedComp.Namespace, tls.Issuer.SecretRef); err != nil {
@@ -151,11 +150,8 @@ func buildTLSCert(ctx context.Context, cli client.Reader, synthesizedComp compon
 	case appsv1alpha1.IssuerKubeBlocks:
 		secretName := plan.GenerateTLSSecretName(synthesizedComp.ClusterName, synthesizedComp.Name)
 		preSecret := &corev1.Secret{}
-		if getSecretErr = cli.Get(ctx, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: secretName}, preSecret); !errors.IsNotFound(getSecretErr) {
-			return getSecretErr
-		}
-		if getSecretErr == nil {
-			return nil
+		if err := cli.Get(ctx, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: secretName}, preSecret); !errors.IsNotFound(err) {
+			return err
 		}
 		secret, err := plan.ComposeTLSSecret(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
 		if err != nil {

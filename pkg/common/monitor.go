@@ -60,7 +60,7 @@ func getPortNumberFromContainer(portName string, container *corev1.Container) st
 func FromContainerPort(exporter Exporter, container *corev1.Container) string {
 	convertPort := func(port intstr.IntOrString) string {
 		switch {
-		case port.StrVal == "":
+		case port.StrVal != "":
 			return getPortNumberFromContainer(exporter.TargetPort.StrVal, container)
 		case port.IntVal != 0:
 			return strconv.Itoa(int(exporter.TargetPort.IntVal))
@@ -72,6 +72,7 @@ func FromContainerPort(exporter Exporter, container *corev1.Container) string {
 	if exporter.ScrapePort != "" {
 		return getPortNumberFromContainer(exporter.ScrapePort, container)
 	}
+	// handle monitor.exporter in ComponentDefinition for compatibility with previous versions.
 	if exporter.TargetPort != nil {
 		return convertPort(*exporter.TargetPort)
 	}

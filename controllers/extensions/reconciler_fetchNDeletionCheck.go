@@ -77,7 +77,6 @@ func (r *fetchNDeletionCheckReconciler) Reconcile(tree *kubebuilderx.ObjectTree)
 	return tree, nil
 }
 
-
 func NewfetchNDeletionCheckReconciler(reqCtx intctrlutil.RequestCtx, buildStageCtx func() stageCtx) kubebuilderx.Reconciler {
 
 	return &fetchNDeletionCheckReconciler{

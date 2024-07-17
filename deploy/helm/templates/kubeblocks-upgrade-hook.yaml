@@ -33,6 +33,22 @@ spec:
           args:
             - --version={{ .Chart.Version }}
             - --namespace={{ .Release.Namespace }}
+        - name: delete-ops
+          image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.tools.repository }}:{{ .Values.image.tag | default .Chart.Version }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - sh
+            - -c
+            - |
+              opsDefs=$(kubectl get opsdefinitions.apps.kubeblocks.io | awk 'NR>1 {print $1}')
+              for opsDef in ${opsDefs}; do
+                if [ $(kubectl get opsdefinitions.apps.kubeblocks.io ${opsDef} -oyaml | grep "  jobSpec:") ]; then
+                  kubectl patch opsdefinitions.apps.kubeblocks.io ${opsDef} -p '{"metadata":{"finalizers":null}}' --type=merge
+                  kubectl delete opsdefinitions.apps.kubeblocks.io ${opsDef}
+                elif [ ! $(kubectl get opsdefinitions.apps.kubeblocks.io ${opsDef} -oyaml | grep "  actions:") ]; then
+                  kubectl patch opsdefinitions.apps.kubeblocks.io ${opsDef} --type=merge -p '{"spec":{"actions":[{"name":"mock","exec":{"podInfoExtractorName":"test","command":["echo 1"]}}]}}'
+                fi
+              done
       {{- with .Values.topologySpreadConstraints }}
       topologySpreadConstraints:
         {{- toYaml . | nindent 8 }}

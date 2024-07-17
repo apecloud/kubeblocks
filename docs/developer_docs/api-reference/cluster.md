@@ -1612,6 +1612,7 @@ When using hostNetwork, the operator will set the DNSPolicy to &lsquo;ClusterFir
 With this policy, DNS queries will first go through the K8s cluster&rsquo;s DNS service.
 If the query fails, it will fall back to the host&rsquo;s DNS settings.</p>
 <p>If set, the DNS policy will be automatically set to &ldquo;ClusterFirstWithHostNet&rdquo;.</p>
+<p>This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -8212,6 +8213,7 @@ When using hostNetwork, the operator will set the DNSPolicy to &lsquo;ClusterFir
 With this policy, DNS queries will first go through the K8s cluster&rsquo;s DNS service.
 If the query fails, it will fall back to the host&rsquo;s DNS settings.</p>
 <p>If set, the DNS policy will be automatically set to &ldquo;ClusterFirstWithHostNet&rdquo;.</p>
+<p>This field is immutable.</p>
 </td>
 </tr>
 <tr>

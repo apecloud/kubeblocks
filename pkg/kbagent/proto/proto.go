@@ -48,7 +48,7 @@ type RetryPolicy struct {
 type ActionRequest struct {
 	Action         string            `json:"action"`
 	Parameters     map[string]string `json:"parameters,omitempty"`
-	Blocking       *bool             `json:"blocking,omitempty"`
+	NonBlocking    *bool             `json:"nonBlocking,omitempty"`
 	TimeoutSeconds *int32            `json:"timeoutSeconds,omitempty"`
 	RetryPolicy    *RetryPolicy      `json:"retryPolicy,omitempty"`
 }

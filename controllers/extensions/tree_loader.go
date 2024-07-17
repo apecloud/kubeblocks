@@ -22,17 +22,12 @@ package extensions
 import (
 	"context"
 
-	"github.com/go-logr/logr"
-	//corev1 "k8s.io/api/core/v1"
-	//"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	//appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	extensions "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	//workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	//"github.com/apecloud/kubeblocks/pkg/constant"
+
+	"k8s.io/client-go/tools/record"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"github.com/go-logr/logr"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
 
@@ -47,7 +42,6 @@ func (t *treeLoader) Load(ctx context.Context, reader client.Reader, req ctrl.Re
 	if root == nil {
 		return tree, nil
 	}
-
 
 	tree.EventRecorder = recorder
 	tree.Logger = logger

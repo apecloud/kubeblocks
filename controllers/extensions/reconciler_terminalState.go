@@ -20,18 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package extensions
 
 import (
-	//"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-
 	"fmt"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type terminalStateReconciler struct {
@@ -82,12 +81,11 @@ func (r *terminalStateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kub
 			return
 		}
 	})
-	//r.next.Handle(r.reqCtx.Ctx)
+
 	return tree, nil
 }
 
 func NewTerminalStateReconciler(reqCtx intctrlutil.RequestCtx, buildStageCtx func() stageCtx) kubebuilderx.Reconciler {
-
 	return &terminalStateReconciler{
 		stageCtx: buildStageCtx(),
 	}

@@ -23,10 +23,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/spf13/pflag"
-
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
+	"github.com/spf13/pflag"
 )
 
 type CheckRoleJob struct {

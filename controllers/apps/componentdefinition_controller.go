@@ -437,7 +437,6 @@ func (r *ComponentDefinitionReconciler) cmpdHash(cmpd *appsv1alpha1.ComponentDef
 	objCopy.Spec.Description = ""
 	objCopy.Spec.Monitor = nil
 	objCopy.Spec.Exporter = nil
-	objCopy.Spec.HostNetwork = nil
 	objCopy.Spec.PodManagementPolicy = nil
 
 	// TODO: bpt

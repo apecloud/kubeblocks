@@ -80,16 +80,17 @@ func main() {
 	if strings.EqualFold("debug", viper.GetString("zap-log-level")) {
 		kopts = append(kopts, kzap.RawZapOpts(zap.AddCaller()))
 	}
-	ctrl.SetLogger(kzap.New(kopts...))
+	logger := kzap.New(kopts...)
+	ctrl.SetLogger(logger)
 
 	// initialize kb-agent
-	services, err := kbagent.Initialize(os.Environ())
+	services, err := kbagent.Initialize(logger, os.Environ())
 	if err != nil {
 		panic(errors.Wrap(err, "init action handlers failed"))
 	}
 
 	// start HTTP Server
-	server := server.NewHTTPServer(serverConfig, services)
+	server := server.NewHTTPServer(logger, serverConfig, services)
 	err = server.StartNonBlocking()
 	if err != nil {
 		panic(errors.Wrap(err, "failed to start HTTP server"))

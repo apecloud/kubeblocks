@@ -22,6 +22,7 @@ package util
 import (
 	"encoding/json"
 
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
@@ -51,7 +52,7 @@ func BuildEnvVars(actions []proto.Action, probes []proto.Probe) ([]corev1.EnvVar
 	}, nil
 }
 
-func Initialize(envs []string) ([]service.Service, error) {
+func Initialize(logger logr.Logger, envs []string) ([]service.Service, error) {
 	da, dp := getActionNProbeEnvValue(envs)
 	if len(da) == 0 {
 		return nil, nil
@@ -62,7 +63,7 @@ func Initialize(envs []string) ([]service.Service, error) {
 		return nil, err
 	}
 
-	return service.New(actions, probes)
+	return service.New(logger, actions, probes)
 }
 
 func getActionNProbeEnvValue(envs []string) (string, string) {

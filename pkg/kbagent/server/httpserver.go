@@ -28,8 +28,8 @@ import (
 	"time"
 
 	fasthttprouter "github.com/fasthttp/router"
+	"github.com/go-logr/logr"
 	"github.com/valyala/fasthttp"
-	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/apecloud/kubeblocks/pkg/kbagent/service"
 )
@@ -39,11 +39,8 @@ const (
 	jsonContentTypeHeader = "application/json"
 )
 
-var (
-	logger = ctrl.Log.WithName("HTTP")
-)
-
 type server struct {
+	logger   logr.Logger
 	config   Config
 	services []service.Service
 	servers  []*fasthttp.Server
@@ -53,7 +50,7 @@ var _ Server = &server{}
 
 // StartNonBlocking starts a new server in a goroutine.
 func (s *server) StartNonBlocking() error {
-	logger.Info("Starting HTTP Server")
+	s.logger.Info("Starting HTTP Server")
 	handler := s.router()
 
 	APILogging := s.config.Logging
@@ -72,7 +69,7 @@ func (s *server) StartNonBlocking() error {
 	} else {
 		l, err := net.Listen("tcp", fmt.Sprintf("%s:%v", s.config.Address, s.config.Port))
 		if err != nil {
-			logger.Error(err, "listen address", s.config.Address, "port", s.config.Port)
+			s.logger.Error(err, "listen address", s.config.Address, "port", s.config.Port)
 		} else {
 			listeners = append(listeners, l)
 		}
@@ -112,7 +109,7 @@ func (s *server) Close() error {
 	for i, ln := range s.servers {
 		// This calls `Close()` on the underlying listener.
 		if err := ln.Shutdown(); err != nil {
-			logger.Error(err, "server close failed")
+			s.logger.Error(err, "server close failed")
 			errs[i] = err
 		}
 	}
@@ -122,9 +119,9 @@ func (s *server) Close() error {
 
 func (s *server) apiLogger(next fasthttp.RequestHandler) fasthttp.RequestHandler {
 	return func(ctx *fasthttp.RequestCtx) {
-		reqLogger := logger
+		reqLogger := s.logger
 		if userAgent := string(ctx.Request.Header.Peek("User-Agent")); userAgent != "" {
-			reqLogger = logger.WithValues("useragent", userAgent)
+			reqLogger = s.logger.WithValues("useragent", userAgent)
 		}
 		start := time.Now()
 		path := string(ctx.Path())
@@ -146,7 +143,7 @@ func (s *server) router() fasthttp.RequestHandler {
 func (s *server) registerService(router *fasthttprouter.Router, svc service.Service) {
 	path := fmt.Sprintf("/%s/%s", svc.Version(), svc.URI())
 	router.Handle(fasthttp.MethodPost, path, s.dispatcher(svc))
-	logger.Info("service route", "method", fasthttp.MethodPost, "path", path)
+	s.logger.Info("service route", "method", fasthttp.MethodPost, "path", path)
 }
 
 func (s *server) dispatcher(svc service.Service) func(*fasthttp.RequestCtx) {
@@ -170,7 +167,7 @@ func (s *server) dispatcher(svc service.Service) func(*fasthttp.RequestCtx) {
 				statusCode = fasthttp.StatusInternalServerError
 			}
 
-			logger.Info("service call failed", "service", svc.Kind(), "error", err.Error())
+			s.logger.Info("service call failed", "service", svc.Kind(), "error", err.Error())
 
 			msg := newErrorResponse("ERR_SERVICE_FAILED", fmt.Sprintf("service call failed: %s", err.Error()))
 			respond(reqCtx, withError(statusCode, msg))

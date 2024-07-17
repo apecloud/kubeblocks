@@ -23,6 +23,8 @@ import (
 	"context"
 	"errors"
 
+	"github.com/go-logr/logr"
+
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
@@ -40,12 +42,12 @@ type Service interface {
 	// Refresh([]proto.Action, []proto.Probe) error
 }
 
-func New(actions []proto.Action, probes []proto.Probe) ([]Service, error) {
-	sa, err := newActionService(actions)
+func New(logger logr.Logger, actions []proto.Action, probes []proto.Probe) ([]Service, error) {
+	sa, err := newActionService(logger, actions)
 	if err != nil {
 		return nil, err
 	}
-	sp, err := newProbeService(sa, probes)
+	sp, err := newProbeService(logger, sa, probes)
 	if err != nil {
 		return nil, err
 	}

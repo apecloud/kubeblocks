@@ -25,6 +25,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,14 +42,17 @@ const (
 	sendEventRetryInterval = 10 * time.Second
 )
 
-var (
-	logger = ctlruntime.Log.WithName("event")
-)
-
-func SendEventWithMessage(reason string, message string) {
-	logger.Info(fmt.Sprintf("send event, reason: %s, message: %s", reason, message))
+func SendEventWithMessage(logger *logr.Logger, reason string, message string) {
 	go func() {
-		_ = sendEvent(createEvent(reason, message))
+		event := createEvent(reason, message)
+		err := sendEvent(event)
+		if logger != nil {
+			if err != nil {
+				logger.Error(err, "send event failed")
+			} else {
+				logger.Info("send event success", "message", event.Message)
+			}
+		}
 	}()
 }
 
@@ -86,20 +90,16 @@ func createEvent(reason string, message string) *corev1.Event {
 }
 
 func sendEvent(event *corev1.Event) error {
-	ctx1 := context.Background()
-	clientset, err := getK8sClientSet()
+	clientSet, err := getK8sClientSet()
 	if err != nil {
-		logger.Info("k8s client create failed", "error", err.Error())
 		return err
 	}
 	namespace := os.Getenv(constant.KBEnvNamespace)
 	for i := 0; i < sendEventMaxAttempts; i++ {
-		_, err = clientset.CoreV1().Events(namespace).Create(ctx1, event, metav1.CreateOptions{})
+		_, err = clientSet.CoreV1().Events(namespace).Create(context.Background(), event, metav1.CreateOptions{})
 		if err == nil {
-			logger.Info("send event success", "message", event.Message)
-			break
+			return nil
 		}
-		logger.Info("send event failed", "error", err.Error())
 		time.Sleep(sendEventRetryInterval)
 	}
 	return err
@@ -114,6 +114,5 @@ func getK8sClientSet() (*kubernetes.Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	return clientSet, nil
 }

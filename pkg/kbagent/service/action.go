@@ -25,8 +25,9 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
-	"strings"
 	"time"
+
+	"github.com/go-logr/logr"
 
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/util"
@@ -37,8 +38,8 @@ const (
 	actionURI     = "action"
 )
 
-func newActionService(actions []proto.Action) (*actionService, error) {
-	sa := &actionService{}
+func newActionService(logger logr.Logger, actions []proto.Action) (*actionService, error) {
+	sa := &actionService{logger: logger}
 	for i, action := range actions {
 		sa.actions[action.Name] = &actions[i]
 	}
@@ -46,6 +47,7 @@ func newActionService(actions []proto.Action) (*actionService, error) {
 }
 
 type actionService struct {
+	logger  logr.Logger
 	actions map[string]*proto.Action
 }
 
@@ -77,16 +79,14 @@ func (s *actionService) Decode(payload []byte) (interface{}, error) {
 
 func (s *actionService) Call(ctx context.Context, i interface{}) ([]byte, error) {
 	req := i.(*proto.ActionRequest)
-
-	action := strings.ToLower(req.Action)
-	if _, ok := s.actions[action]; !ok {
-		return nil, fmt.Errorf("%s is not supported", action)
+	if _, ok := s.actions[req.Action]; !ok {
+		return nil, fmt.Errorf("%s is not supported", req.Action)
 	}
 	return s.callAction(ctx, req)
 }
 
 func (s *actionService) callAction(ctx context.Context, req *proto.ActionRequest) ([]byte, error) {
-	action := s.actions[strings.ToLower(req.Action)]
+	action := s.actions[req.Action]
 	if action.Exec != nil {
 		return s.callExecAction(ctx, req, action)
 	}

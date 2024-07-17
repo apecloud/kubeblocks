@@ -22,6 +22,8 @@ package server
 import (
 	"io"
 
+	"github.com/go-logr/logr"
+
 	"github.com/apecloud/kubeblocks/pkg/kbagent/service"
 )
 
@@ -40,8 +42,9 @@ type Config struct {
 }
 
 // NewHTTPServer returns a new HTTP server.
-func NewHTTPServer(config Config, services []service.Service) Server {
+func NewHTTPServer(logger logr.Logger, config Config, services []service.Service) Server {
 	return &server{
+		logger:   logger,
 		config:   config,
 		services: services,
 	}

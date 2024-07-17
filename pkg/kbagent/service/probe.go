@@ -23,7 +23,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"time"
+
+	"github.com/go-logr/logr"
 
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/util"
@@ -34,8 +37,11 @@ const (
 	probeURI     = "probe"
 )
 
-func newProbeService(actionService *actionService, probes []proto.Probe) (*probeService, error) {
-	sp := &probeService{}
+func newProbeService(logger logr.Logger, actionService *actionService, probes []proto.Probe) (*probeService, error) {
+	sp := &probeService{
+		logger:        logger,
+		actionService: actionService,
+	}
 	for i, p := range probes {
 		if _, ok := actionService.actions[p.Action]; !ok {
 			return nil, fmt.Errorf("probe %s has no action defined", p.Action)
@@ -46,8 +52,10 @@ func newProbeService(actionService *actionService, probes []proto.Probe) (*probe
 }
 
 type probeService struct {
-	probes  map[string]*proto.Probe
-	runners map[string]*probeRunner
+	logger        logr.Logger
+	actionService *actionService
+	probes        map[string]*proto.Probe
+	runners       map[string]*probeRunner
 }
 
 var _ Service = &probeService{}
@@ -66,7 +74,10 @@ func (s *probeService) URI() string {
 
 func (s *probeService) Start() error {
 	for name := range s.probes {
-		runner := &probeRunner{}
+		runner := &probeRunner{
+			logger:        s.logger.WithValues("probe", name),
+			actionService: s.actionService,
+		}
 		go runner.run(s.probes[name])
 		s.runners[name] = runner
 	}
@@ -82,13 +93,17 @@ func (s *probeService) Call(ctx context.Context, req interface{}) ([]byte, error
 }
 
 type probeRunner struct {
-	ticker       *time.Ticker
-	succeedCount int64
-	failedCount  int64
-	latestOutput []byte
+	logger        logr.Logger
+	actionService *actionService
+	ticker        *time.Ticker
+	succeedCount  int64
+	failedCount   int64
+	latestOutput  []byte
 }
 
 func (r *probeRunner) run(probe *proto.Probe) {
+	r.logger.Info(fmt.Sprintf("probe started: %v", probe))
+
 	if probe.InitialDelaySeconds > 0 {
 		time.Sleep(time.Duration(probe.InitialDelaySeconds) * time.Second)
 	}
@@ -101,50 +116,74 @@ func (r *probeRunner) run(probe *proto.Probe) {
 
 func (r *probeRunner) runLoop(probe *proto.Probe) {
 	for range r.ticker.C {
-		out, err := r.runOnce(probe)
+		output, err := r.runOnce(probe)
 		if err == nil {
 			r.succeedCount++
 			r.failedCount = 0
-			r.latestOutput = out
 		} else {
 			r.succeedCount = 0
 			r.failedCount++
 		}
-		r.report(probe, err)
+
+		r.report(probe, output, err)
+
+		if succeed, _ := r.succeed(probe); succeed && !reflect.DeepEqual(output, r.latestOutput) {
+			r.latestOutput = output
+		}
 	}
 }
 
 func (r *probeRunner) runOnce(probe *proto.Probe) ([]byte, error) {
-	// TODO: call probe action
-	return nil, nil
+	return r.actionService.Call(context.Background(), &proto.ActionRequest{Action: probe.Action})
 }
 
-func (r *probeRunner) report(probe *proto.Probe, err error) {
+func (r *probeRunner) report(probe *proto.Probe, output []byte, err error) {
+	succeed, thresholdPoint := r.succeed(probe)
+	if succeed && thresholdPoint ||
+		succeed && !thresholdPoint && !reflect.DeepEqual(output, r.latestOutput) {
+		r.sendEvent(probe.Action, 0, output, "")
+	}
+	if r.fail(probe) {
+		r.sendEvent(probe.Action, -1, r.latestOutput, err.Error())
+	}
+}
+
+func (r *probeRunner) succeed(probe *proto.Probe) (bool, bool) {
 	if r.succeedCount > 0 {
-		if probe.SuccessThreshold > 0 && r.succeedCount == int64(probe.SuccessThreshold) ||
-			probe.SuccessThreshold == 0 && r.succeedCount == 1 {
-			r.sendEvent(probe.Action, 0, r.latestOutput, "")
+		successThreshold := probe.SuccessThreshold
+		if successThreshold <= 0 {
+			successThreshold = 1
 		}
+		return r.succeedCount >= int64(successThreshold), r.succeedCount == int64(successThreshold)
 	}
-
-	if r.failedCount > 0 {
-		if probe.FailureThreshold > 0 && r.failedCount == int64(probe.FailureThreshold) ||
-			probe.FailureThreshold == 0 && r.failedCount == 1 {
-			r.sendEvent(probe.Action, -1, r.latestOutput, err.Error())
-		}
-	}
+	return false, false
 }
 
-func (r *probeRunner) sendEvent(probe string, code int32, latestOutput []byte, message string) {
+func (r *probeRunner) fail(probe *proto.Probe) bool {
+	if r.failedCount > 0 {
+		failureThreshold := probe.FailureThreshold
+		if failureThreshold <= 0 {
+			failureThreshold = 1
+		}
+		return r.failedCount >= int64(failureThreshold)
+	}
+	return false
+}
+
+func (r *probeRunner) sendEvent(probe string, code int32, output []byte, message string) {
+	prefixLen := min(len(output), 32)
+	r.logger.Info(fmt.Sprintf("send probe event, probe: %s, code: %d, output: %s, message: %s", probe, code, output[:prefixLen], message))
+
 	eventMsg := &proto.ProbeEvent{
-		Probe:        probe,
-		Code:         code,
-		Message:      message,
-		LatestOutput: latestOutput,
+		Probe:   probe,
+		Code:    code,
+		Message: message,
+		Output:  output,
 	}
 	msg, err := json.Marshal(&eventMsg)
 	if err != nil {
+		r.logger.Error(err, "failed to marshal probe event")
 		return
 	}
-	util.SendEventWithMessage(probe, string(msg))
+	util.SendEventWithMessage(&r.logger, probe, string(msg))
 }

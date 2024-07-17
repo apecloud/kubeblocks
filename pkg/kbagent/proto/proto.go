@@ -67,8 +67,8 @@ type Probe struct {
 }
 
 type ProbeEvent struct {
-	Probe        string `json:"probe,omitempty"`
-	Code         int32  `json:"code,omitempty"`
-	Message      string `json:"message,omitempty"`
-	LatestOutput []byte `json:"latestOutput,omitempty"`
+	Probe   string `json:"probe,omitempty"`
+	Code    int32  `json:"code,omitempty"`
+	Output  []byte `json:"output,omitempty"`
+	Message string `json:"message,omitempty"`
 }

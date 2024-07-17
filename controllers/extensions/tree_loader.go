@@ -22,13 +22,13 @@ package extensions
 import (
 	"context"
 
-	ctrl "sigs.k8s.io/controller-runtime"
 	extensions "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
+	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	"github.com/go-logr/logr"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"github.com/go-logr/logr"
-	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
 
 type treeLoader struct{}

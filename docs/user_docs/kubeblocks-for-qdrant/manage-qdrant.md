@@ -123,7 +123,7 @@ For the testing environment, you can run the command below to open the Grafana m
    If `disableExporter: false` is not shown in the output, it means the monitoring function of this cluster is not enabled and you need to enable it first.
 
    ```bash
-   kbcli cluster update qdrant --disableExporter=false
+   kbcli cluster update qdrant --disable-exporter=false
    ```
 
 3. View the dashboard list.

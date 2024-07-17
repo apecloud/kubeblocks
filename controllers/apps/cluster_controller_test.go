@@ -1694,7 +1694,7 @@ var _ = Describe("Cluster Controller", func() {
 			})).Should(Succeed())
 		})
 	})
-	FContext("cluster pause and resume", func() {
+	Context("cluster pause and resume", func() {
 		BeforeEach(func() {
 			createAllWorkloadTypesClusterDef()
 		})

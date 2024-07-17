@@ -346,13 +346,13 @@ func GetRestoreSystemAccountPassword(synthesizedComp *component.SynthesizedCompo
 	if !ok {
 		return ""
 	}
-	systemAccountsMap := map[string]map[string]string{}
+	systemAccountsMap := map[string]string{}
 	err = json.Unmarshal([]byte(systemAccountsString), &systemAccountsMap)
 	if err != nil {
 		return ""
 	}
 	e := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
-	encryptedPwd, ok := systemAccountsMap[synthesizedComp.Name][account.Name]
+	encryptedPwd, ok := systemAccountsMap[account.Name]
 	if !ok {
 		return ""
 	}

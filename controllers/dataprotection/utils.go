@@ -225,19 +225,19 @@ func getCluster(ctx context.Context,
 	return cluster
 }
 
-// listObjectsOfClusterWithErrorIgnored list the objects and will ignore the error.
-func listObjectsOfClusterWithErrorIgnored(ctx context.Context,
+// listObjectsOfCluster list the objects of the cluster by labels.
+func listObjectsOfCluster(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	object client.ObjectList) client.ObjectList {
+	object client.ObjectList) (client.ObjectList, error) {
 	labels := constant.GetClusterWellKnownLabels(cluster.Name)
 	if err := cli.List(ctx, object, client.InNamespace(cluster.Namespace), client.MatchingLabels(labels)); err != nil {
-		return nil
+		return nil, err
 	}
-	return object
+	return object, nil
 }
 
-// getObjectString transfer object to string
+// getObjectString convert object to string
 func getObjectString(object any) (*string, error) {
 	if object == nil {
 		return nil, nil

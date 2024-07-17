@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 	"time"
 
@@ -757,9 +758,6 @@ func PatchBackupObjectMeta(
 		if err := setEncryptedSystemAccountsAnnotation(request, cluster); err != nil {
 			return false, err
 		}
-		if err := setConnectionPasswordAnnotation(request); err != nil {
-			return false, err
-		}
 		request.Labels[dptypes.ClusterUIDLabelKey] = string(cluster.UID)
 	}
 
@@ -827,47 +825,36 @@ func updateBackupStatusByActionStatus(backupStatus *dpv1alpha1.BackupStatus) {
 	}
 }
 
-// setConnectionPasswordAnnotation sets the encrypted password of the connection credential to the backup's annotations
-func setConnectionPasswordAnnotation(request *dpbackup.Request) error {
-	encryptPassword := func() (string, error) {
-		target := request.Target
-		if target == nil || target.ConnectionCredential == nil {
-			return "", nil
-		}
-		secret := &corev1.Secret{}
-		if err := request.Client.Get(request.Ctx, client.ObjectKey{Name: target.ConnectionCredential.SecretName, Namespace: request.Namespace}, secret); err != nil {
-			return "", err
-		}
-		e := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
-		ciphertext, err := e.Encrypt(secret.Data[target.ConnectionCredential.PasswordKey])
-		if err != nil {
-			return "", err
-		}
-		return ciphertext, nil
+func isSystemAccountSecret(secret *corev1.Secret) bool {
+	clusterName := secret.Labels[constant.AppInstanceLabelKey]
+	componentName := secret.Labels[constant.KBAppComponentLabelKey]
+	if clusterName == "" || componentName == "" {
+		return false
 	}
-	// save the connection credential password for cluster.
-	ciphertext, err := encryptPassword()
-	if err != nil {
-		return err
+	accountSecretPattern := `^` + clusterName + `-` + componentName + `-account-\w+$`
+	regex, _ := regexp.Compile(accountSecretPattern)
+	if matched := regex.MatchString(secret.Name); matched {
+		return true
 	}
-	if ciphertext != "" {
-		request.Backup.Annotations[dptypes.ConnectionPasswordAnnotationKey] = ciphertext
-	}
-	return nil
+	return false
 }
 
 func setEncryptedSystemAccountsAnnotation(request *dpbackup.Request, cluster *appsv1alpha1.Cluster) error {
 	usernameKey := constant.AccountNameForSecret
 	passwordKey := constant.AccountPasswdForSecret
 	// fetch secret objects
-	secretList, _ := listObjectsOfClusterWithErrorIgnored(request.Ctx, request.Client, cluster, &corev1.SecretList{}).(*corev1.SecretList)
-	// store the data of secrets in a map data structure, which contains the name of the component, the username, and the encrypted password.
+	objectList, err := listObjectsOfCluster(request.Ctx, request.Client, cluster, &corev1.SecretList{})
+	if err != nil {
+		return err
+	}
+	secretList := objectList.(*corev1.SecretList)
+	// store the data of secrets in a map data structure, which contains the name of component, the username, and the encrypted password.
 	secretMap := map[string]map[string]string{}
 	for i := range secretList.Items {
-		componentName, ok := secretList.Items[i].Labels[constant.KBAppComponentLabelKey]
-		if !ok {
+		if !isSystemAccountSecret(&secretList.Items[i]) {
 			continue
 		}
+		componentName := secretList.Items[i].Labels[constant.KBAppComponentLabelKey]
 		userName := string(secretList.Items[i].Data[usernameKey])
 		e := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
 		encryptedPwd, err := e.Encrypt(secretList.Items[i].Data[passwordKey])

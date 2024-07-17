@@ -40,10 +40,6 @@ import (
 )
 
 type RestoreOpsHandler struct{}
-type RestoredResources struct {
-	cluster *appsv1alpha1.Cluster
-	// packing restored resources here to support more at future.
-}
 
 var _ OpsHandler = RestoreOpsHandler{}
 
@@ -66,16 +62,15 @@ func (r RestoreOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx,
 
 // Action implements the restore action.
 func (r RestoreOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	var restoredResources *RestoredResources
+	var cluster *appsv1alpha1.Cluster
 	var err error
 
 	opsRequest := opsRes.OpsRequest
 
 	// restore the cluster from the backup
-	if restoredResources, err = r.restoreClusterFromBackup(reqCtx, cli, opsRequest); err != nil {
+	if cluster, err = r.restoreClusterFromBackup(reqCtx, cli, opsRequest); err != nil {
 		return err
 	}
-	cluster := restoredResources.cluster
 
 	// create cluster
 	if err = cli.Create(reqCtx.Ctx, cluster); err != nil {
@@ -136,13 +131,13 @@ func (r RestoreOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, 
 	return nil
 }
 
-func (r RestoreOpsHandler) restoreClusterFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *appsv1alpha1.OpsRequest) (*RestoredResources, error) {
+func (r RestoreOpsHandler) restoreClusterFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *appsv1alpha1.OpsRequest) (*appsv1alpha1.Cluster, error) {
 	restoreSpec := opsRequest.Spec.GetRestore()
 	if restoreSpec == nil {
 		return nil, intctrlutil.NewFatalError("spec.restore can not be empty")
 	}
 	backupName := restoreSpec.BackupName
-	restoredResources := &RestoredResources{}
+
 	// check if the backup exists
 	backup := &dpv1alpha1.Backup{}
 	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{
@@ -178,8 +173,7 @@ func (r RestoreOpsHandler) restoreClusterFromBackup(reqCtx intctrlutil.RequestCt
 		},
 	}
 	util.SetOpsRequestToCluster(clusterObj, opsRequestSlice)
-	restoredResources.cluster = clusterObj
-	return restoredResources, nil
+	return clusterObj, nil
 }
 
 func (r RestoreOpsHandler) getClusterObjFromBackup(backup *dpv1alpha1.Backup, opsRequest *appsv1alpha1.OpsRequest) (*appsv1alpha1.Cluster, error) {

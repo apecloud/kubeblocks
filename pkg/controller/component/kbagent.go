@@ -26,9 +26,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	kbagent "github.com/apecloud/kubeblocks/pkg/kbagent"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 const (
@@ -46,7 +48,7 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 	port := 3501 // TODO: port
 
 	container := builder.NewContainerBuilder(kbAgentContainerName).
-		SetImage("TODO: image").
+		SetImage(viper.GetString(constant.KBToolsImage)).
 		SetImagePullPolicy(corev1.PullIfNotPresent).
 		AddCommands(kbAgentCommand, "--port", strconv.Itoa(port)).
 		AddEnv(envVars...).
@@ -89,8 +91,10 @@ func buildKBAgentStartupEnv(synthesizedComp *SynthesizedComponent) ([]corev1.Env
 	if a := buildAction4KBAgent(synthesizedComp.LifecycleActions.PreTerminate, "preTerminate"); a != nil {
 		actions = append(actions, *a)
 	}
-	if a := buildAction4KBAgentLow(synthesizedComp.LifecycleActions.Switchover.WithoutCandidate, "switchover"); a != nil {
-		actions = append(actions, *a)
+	if synthesizedComp.LifecycleActions.Switchover != nil {
+		if a := buildAction4KBAgentLow(synthesizedComp.LifecycleActions.Switchover.WithoutCandidate, "switchover"); a != nil {
+			actions = append(actions, *a)
+		}
 	}
 	if a := buildAction4KBAgent(synthesizedComp.LifecycleActions.MemberJoin, "memberJoin"); a != nil {
 		actions = append(actions, *a)

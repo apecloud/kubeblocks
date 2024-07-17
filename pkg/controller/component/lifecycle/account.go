@@ -17,41 +17,24 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package service
+package lifecycle
 
 import (
 	"context"
-	"errors"
 
-	"github.com/go-logr/logr"
-
-	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type Service interface {
-	Kind() string
-
-	URI() string
-
-	Start() error
-
-	Decode([]byte) (interface{}, error)
-
-	Call(ctx context.Context, req interface{}) ([]byte, error)
-
-	// Refresh([]proto.Action, []proto.Probe) error
+type accountProvision struct {
+	args any
 }
 
-func New(logger logr.Logger, actions []proto.Action, probes []proto.Probe) ([]Service, error) {
-	sa, err := newActionService(logger, actions)
-	if err != nil {
-		return nil, err
-	}
-	sp, err := newProbeService(logger, sa, probes)
-	if err != nil {
-		return nil, err
-	}
-	return []Service{sa, sp}, nil
+var _ lifecycleAction = &accountProvision{}
+
+func (a *accountProvision) name() string {
+	return "accountProvision"
 }
 
-var ErrNotImplemented = errors.New("NotImplemented")
+func (a *accountProvision) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {
+	return nil, nil
+}

@@ -46,12 +46,8 @@ func SendEventWithMessage(logger *logr.Logger, reason string, message string) {
 	go func() {
 		event := createEvent(reason, message)
 		err := sendEvent(event)
-		if logger != nil {
-			if err != nil {
-				logger.Error(err, "send event failed")
-			} else {
-				logger.Info("send event success", "message", event.Message)
-			}
+		if logger != nil && err != nil {
+			logger.Error(err, "send event failed")
 		}
 	}()
 }

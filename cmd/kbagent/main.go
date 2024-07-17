@@ -51,7 +51,7 @@ func init() {
 	viper.AutomaticEnv()
 
 	pflag.StringVar(&serverConfig.Address, "address", "0.0.0.0", "The HTTP Server listen address for kb-agent service.")
-	pflag.StringVar(&serverConfig.UnixDomainSocket, "unix-socket", ".", "The path of the Unix Domain Socket for kb-agent service.")
+	pflag.StringVar(&serverConfig.UnixDomainSocket, "unix-socket", "", "The path of the Unix Domain Socket for kb-agent service.")
 	pflag.IntVar(&serverConfig.Port, "port", defaultPort, "The HTTP Server listen port for kb-agent service.")
 	pflag.IntVar(&serverConfig.Concurrency, "max-concurrency", defaultMaxConcurrency,
 		fmt.Sprintf("The maximum number of concurrent connections the Server may serve, use the default value %d if <=0.", defaultMaxConcurrency))

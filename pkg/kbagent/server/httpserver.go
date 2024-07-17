@@ -50,17 +50,25 @@ var _ Server = &server{}
 
 // StartNonBlocking starts a new server in a goroutine.
 func (s *server) StartNonBlocking() error {
-	s.logger.Info("Starting HTTP Server")
-	handler := s.router()
+	s.logger.Info("starting HTTP server")
 
-	APILogging := s.config.Logging
-	if APILogging {
+	// start all services first
+	for i := range s.services {
+		if err := s.services[i].Start(); err != nil {
+			s.logger.Error(err, fmt.Sprintf("start service %s failed", s.services[i].Kind()))
+			return err
+		}
+		s.logger.Info(fmt.Sprintf("start service %s...", s.services[i].Kind()))
+	}
+
+	handler := s.router()
+	if s.config.Logging {
 		handler = s.apiLogger(handler)
 	}
 
 	var listeners []net.Listener
 	if s.config.UnixDomainSocket != "" {
-		socket := fmt.Sprintf("%s/kb_agent.socket", s.config.UnixDomainSocket)
+		socket := fmt.Sprintf("%s/kbagent.socket", s.config.UnixDomainSocket)
 		l, err := net.Listen("unix", socket)
 		if err != nil {
 			return err
@@ -141,9 +149,8 @@ func (s *server) router() fasthttp.RequestHandler {
 }
 
 func (s *server) registerService(router *fasthttprouter.Router, svc service.Service) {
-	path := fmt.Sprintf("/%s/%s", svc.Version(), svc.URI())
-	router.Handle(fasthttp.MethodPost, path, s.dispatcher(svc))
-	s.logger.Info("service route", "method", fasthttp.MethodPost, "path", path)
+	router.Handle(fasthttp.MethodPost, svc.URI(), s.dispatcher(svc))
+	s.logger.Info("register service to server", "service", svc.Kind(), "method", fasthttp.MethodPost, "uri", svc.URI())
 }
 
 func (s *server) dispatcher(svc service.Service) func(*fasthttp.RequestCtx) {

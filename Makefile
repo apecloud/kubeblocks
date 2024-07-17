@@ -275,7 +275,7 @@ dataprotection: generate test-go-generate build-checks ## Build dataprotection b
 
 .PHONY: kbagent
 kbagent: generate test-go-generate build-checks
-	$(GO) build -ldflags=${LD_FLAGS} -o bin/dataprotection ./cmd/kbagent/main.go
+	$(GO) build -ldflags=${LD_FLAGS} -o bin/kbagent ./cmd/kbagent/main.go
 
 CERT_ROOT_CA ?= $(WEBHOOK_CERT_DIR)/rootCA.key
 .PHONY: webhook-cert

@@ -331,6 +331,19 @@ func GetPortByPortName(containers []corev1.Container, portName string) (int32, e
 	return 0, fmt.Errorf("port %s not found", portName)
 }
 
+func GetPortByName(pod corev1.Pod, cname, pname string) (int32, error) {
+	for _, container := range pod.Spec.Containers {
+		if container.Name == cname {
+			for _, port := range container.Ports {
+				if port.Name == pname {
+					return port.ContainerPort, nil
+				}
+			}
+		}
+	}
+	return 0, fmt.Errorf("port %s not found", pname)
+}
+
 func GetLorryGRPCPort(pod *corev1.Pod) (int32, error) {
 	return GetLorryGRPCPortFromContainers(pod.Spec.Containers)
 }

@@ -79,7 +79,7 @@ RUN --mount=type=bind,target=. \
 RUN --mount=type=bind,target=. \
     --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
-    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o /out/lorryctl cmd/lorry/ctl/main.go \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o /out/lorryctl cmd/lorry/ctl/main.go
 
 RUN --mount=type=bind,target=. \
     --mount=type=cache,target=/root/.cache/go-build \

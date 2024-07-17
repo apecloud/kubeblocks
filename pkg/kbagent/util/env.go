@@ -26,7 +26,7 @@ import (
 func EnvM2L(m map[string]string) []string {
 	l := make([]string, 0)
 	for k, v := range m {
-		l = append(l, strings.ToUpper(k)+"="+v)
+		l = append(l, k+"="+v)
 	}
 	return l
 }
@@ -34,12 +34,12 @@ func EnvM2L(m map[string]string) []string {
 func EnvL2M(l []string) map[string]string {
 	m := make(map[string]string, 0)
 	for _, p := range l {
-		kv := strings.Split(p, "=")
+		kv := strings.SplitN(p, "=", 2)
 		if len(kv) == 2 {
-			m[strings.ToLower(kv[0])] = kv[1]
+			m[kv[0]] = kv[1]
 		}
 		if len(kv) == 1 {
-			m[strings.ToLower(kv[0])] = ""
+			m[kv[0]] = ""
 		}
 	}
 	return m

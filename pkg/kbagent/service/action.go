@@ -25,24 +25,29 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
+	"golang.org/x/exp/maps"
 
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/util"
 )
 
 const (
-	actionVersion = "v1.0"
-	actionURI     = "action"
+	ActionURI = "/v1.0/action"
 )
 
 func newActionService(logger logr.Logger, actions []proto.Action) (*actionService, error) {
-	sa := &actionService{logger: logger}
+	sa := &actionService{
+		logger:  logger,
+		actions: make(map[string]*proto.Action),
+	}
 	for i, action := range actions {
 		sa.actions[action.Name] = &actions[i]
 	}
+	logger.Info(fmt.Sprintf("create service %s", sa.Kind()), "actions", strings.Join(maps.Keys(sa.actions), ","))
 	return sa, nil
 }
 
@@ -57,12 +62,8 @@ func (s *actionService) Kind() string {
 	return "Action"
 }
 
-func (s *actionService) Version() string {
-	return actionVersion
-}
-
 func (s *actionService) URI() string {
-	return actionURI
+	return ActionURI
 }
 
 func (s *actionService) Start() error {

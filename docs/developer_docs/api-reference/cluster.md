@@ -1012,6 +1012,27 @@ an existed ServiceAccount in this field.</p>
 </tr>
 <tr>
 <td>
+<code>podUpdatePolicy</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.PodUpdatePolicyType">
+PodUpdatePolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PodUpdatePolicy indicates how pods should be updated</p>
+<ul>
+<li><code>StrictInPlace</code> indicates that only allows in-place upgrades.
+Any attempt to modify other fields will be rejected.</li>
+<li><code>PreferInPlace</code> indicates that we will first attempt an in-place upgrade of the Pod.
+If that fails, it will fall back to the ReCreate, where pod will be recreated.
+Default value is &ldquo;PreferInPlace&rdquo;</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
 <code>affinity</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.Affinity">
@@ -2692,6 +2713,19 @@ int32
 <em>(Optional)</em>
 <p>Specifies the duration in seconds that an OpsRequest will remain in the system after successfully completing
 (when <code>opsRequest.status.phase</code> is &ldquo;Succeed&rdquo;) before automatic deletion.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ttlSecondsAfterUnsuccessfulCompletion</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the duration in seconds that an OpsRequest will remain in the system after completion
+for any phase other than &ldquo;Succeed&rdquo; (e.g., &ldquo;Failed&rdquo;, &ldquo;Cancelled&rdquo;, &ldquo;Aborted&rdquo;) before automatic deletion.</p>
 </td>
 </tr>
 <tr>
@@ -5133,6 +5167,27 @@ UpdateStrategy
 <p>Deprecated since v0.9.
 This field is maintained for backward compatibility and its use is discouraged.
 Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podUpdatePolicy</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.PodUpdatePolicyType">
+PodUpdatePolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PodUpdatePolicy indicates how pods should be updated</p>
+<ul>
+<li><code>StrictInPlace</code> indicates that only allows in-place upgrades.
+Any attempt to modify other fields will be rejected.</li>
+<li><code>PreferInPlace</code> indicates that we will first attempt an in-place upgrade of the Pod.
+If that fails, it will fall back to the ReCreate, where pod will be recreated.
+Default value is &ldquo;PreferInPlace&rdquo;</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -8941,6 +8996,27 @@ Future versions might change the default ServiceAccount creation strategy to one
 potentially revising the naming to &ldquo;kb-&#123;cluster.name&#125;-&#123;component.name&#125;&rdquo;.</p>
 <p>Users can override the automatic ServiceAccount assignment by explicitly setting the name of
 an existed ServiceAccount in this field.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podUpdatePolicy</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.PodUpdatePolicyType">
+PodUpdatePolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PodUpdatePolicy indicates how pods should be updated</p>
+<ul>
+<li><code>StrictInPlace</code> indicates that only allows in-place upgrades.
+Any attempt to modify other fields will be rejected.</li>
+<li><code>PreferInPlace</code> indicates that we will first attempt an in-place upgrade of the Pod.
+If that fails, it will fall back to the ReCreate, where pod will be recreated.
+Default value is &ldquo;PreferInPlace&rdquo;</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -14429,6 +14505,19 @@ int32
 <em>(Optional)</em>
 <p>Specifies the duration in seconds that an OpsRequest will remain in the system after successfully completing
 (when <code>opsRequest.status.phase</code> is &ldquo;Succeed&rdquo;) before automatic deletion.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ttlSecondsAfterUnsuccessfulCompletion</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the duration in seconds that an OpsRequest will remain in the system after completion
+for any phase other than &ldquo;Succeed&rdquo; (e.g., &ldquo;Failed&rdquo;, &ldquo;Cancelled&rdquo;, &ldquo;Aborted&rdquo;) before automatic deletion.</p>
 </td>
 </tr>
 <tr>
@@ -23176,6 +23265,27 @@ all pods at once.</p>
 </tr>
 <tr>
 <td>
+<code>podUpdatePolicy</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.PodUpdatePolicyType">
+PodUpdatePolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PodUpdatePolicy indicates how pods should be updated</p>
+<ul>
+<li><code>StrictInPlace</code> indicates that only allows in-place upgrades.
+Any attempt to modify other fields will be rejected.</li>
+<li><code>PreferInPlace</code> indicates that we will first attempt an in-place upgrade of the Pod.
+If that fails, it will fall back to the ReCreate, where pod will be recreated.
+Default value is &ldquo;PreferInPlace&rdquo;</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
 <code>updateStrategy</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#statefulsetupdatestrategy-v1-apps">
@@ -23393,6 +23503,10 @@ and continue for &ldquo;MinReadySeconds&rdquo; seconds. Otherwise, it will be se
 <td><p>InstanceReady is added in an instance set when at least one of its instances(pods) is in a Ready condition.
 ConditionStatus will be True if all its instances(pods) are in a Ready condition.
 Or, a NotReady reason with not ready instances encoded in the Message filed will be set.</p>
+</td>
+</tr><tr><td><p>&#34;InstanceUpdateRestricted&#34;</p></td>
+<td><p>InstanceUpdateRestricted represents a ConditionType that indicates updates to an InstanceSet are blocked(when the
+PodUpdatePolicy is set to StrictInPlace but the pods cannot be updated in-place).</p>
 </td>
 </tr></tbody>
 </table>
@@ -23679,6 +23793,27 @@ The alternative policy is <code>Parallel</code> which will create pods in parall
 to match the desired scale without waiting, and on scale down will delete
 all pods at once.</p>
 <p>Note: This field will be removed in future version.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podUpdatePolicy</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.PodUpdatePolicyType">
+PodUpdatePolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PodUpdatePolicy indicates how pods should be updated</p>
+<ul>
+<li><code>StrictInPlace</code> indicates that only allows in-place upgrades.
+Any attempt to modify other fields will be rejected.</li>
+<li><code>PreferInPlace</code> indicates that we will first attempt an in-place upgrade of the Pod.
+If that fails, it will fall back to the ReCreate, where pod will be recreated.
+Default value is &ldquo;PreferInPlace&rdquo;</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -23993,6 +24128,20 @@ map[string]string
 key is the pod name, value is the revision.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>templatesStatus</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.InstanceTemplateStatus">
+[]InstanceTemplateStatus
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>TemplatesStatus represents status of each instance generated by InstanceTemplates</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="workloads.kubeblocks.io/v1alpha1.InstanceTemplate">InstanceTemplate
@@ -24186,6 +24335,96 @@ Add new or override existing volume mounts of the first container in the pod.</p
 <em>(Optional)</em>
 <p>Defines VolumeClaimTemplates to override.
 Add new or override existing volume claim templates.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1alpha1.InstanceTemplateStatus">InstanceTemplateStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.InstanceSetStatus">InstanceSetStatus</a>)
+</p>
+<div>
+<p>InstanceTemplateStatus aggregates the status of replicas for each InstanceTemplate</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name, the name of the InstanceTemplate.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>replicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Replicas is the number of replicas of the InstanceTemplate.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>readyReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ReadyReplicas is the number of Pods that have a Ready Condition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>availableReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>AvailableReplicas is the number of Pods that ready for at least minReadySeconds.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>currentReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>currentReplicas is the number of instances created by the InstanceSet controller from the InstanceSet version
+indicated by CurrentRevisions.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updatedReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>UpdatedReplicas is the number of Pods created by the InstanceSet controller from the InstanceSet version
+indicated by UpdateRevisions.</p>
 </td>
 </tr>
 </tbody>
@@ -24392,6 +24631,30 @@ If the Image is not configured, the Image from the previous non-nil action will 
 </td>
 </tr>
 </tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1alpha1.PodUpdatePolicyType">PodUpdatePolicyType
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>, <a href="#workloads.kubeblocks.io/v1alpha1.InstanceSetSpec">InstanceSetSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;PreferInPlace&#34;</p></td>
+<td><p>PreferInPlacePodUpdatePolicyType indicates that we will first attempt an in-place upgrade of the Pod.
+If that fails, it will fall back to the ReCreate, where pod will be recreated.</p>
+</td>
+</tr><tr><td><p>&#34;StrictInPlace&#34;</p></td>
+<td><p>StrictInPlacePodUpdatePolicyType indicates that only allows in-place upgrades.
+Any attempt to modify other fields will be rejected.</p>
+</td>
+</tr></tbody>
 </table>
 <h3 id="workloads.kubeblocks.io/v1alpha1.Range">Range
 </h3>

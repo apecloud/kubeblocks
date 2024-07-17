@@ -24,23 +24,27 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
+	"golang.org/x/exp/maps"
 
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/util"
 )
 
 const (
-	probeVersion = "v1.0"
-	probeURI     = "probe"
+	ProbeURI                  = "/v1.0/probe"
+	defaultProbePeriodSeconds = 60
 )
 
 func newProbeService(logger logr.Logger, actionService *actionService, probes []proto.Probe) (*probeService, error) {
 	sp := &probeService{
 		logger:        logger,
 		actionService: actionService,
+		probes:        make(map[string]*proto.Probe),
+		runners:       make(map[string]*probeRunner),
 	}
 	for i, p := range probes {
 		if _, ok := actionService.actions[p.Action]; !ok {
@@ -48,6 +52,7 @@ func newProbeService(logger logr.Logger, actionService *actionService, probes []
 		}
 		sp.probes[p.Action] = &probes[i]
 	}
+	logger.Info(fmt.Sprintf("create service %s", sp.Kind()), "probes", strings.Join(maps.Keys(sp.probes), ","))
 	return sp, nil
 }
 
@@ -64,12 +69,8 @@ func (s *probeService) Kind() string {
 	return "Probe"
 }
 
-func (s *probeService) Version() string {
-	return probeVersion
-}
-
 func (s *probeService) URI() string {
-	return probeURI
+	return ProbeURI
 }
 
 func (s *probeService) Start() error {
@@ -102,12 +103,15 @@ type probeRunner struct {
 }
 
 func (r *probeRunner) run(probe *proto.Probe) {
-	r.logger.Info(fmt.Sprintf("probe started: %v", probe))
+	r.logger.Info("probe started", "config", probe)
 
 	if probe.InitialDelaySeconds > 0 {
 		time.Sleep(time.Duration(probe.InitialDelaySeconds) * time.Second)
 	}
 
+	if probe.PeriodSeconds <= 0 {
+		probe.PeriodSeconds = defaultProbePeriodSeconds
+	}
 	r.ticker = time.NewTicker(time.Duration(probe.PeriodSeconds) * time.Second)
 	defer r.ticker.Stop()
 
@@ -172,7 +176,7 @@ func (r *probeRunner) fail(probe *proto.Probe) bool {
 
 func (r *probeRunner) sendEvent(probe string, code int32, output []byte, message string) {
 	prefixLen := min(len(output), 32)
-	r.logger.Info(fmt.Sprintf("send probe event, probe: %s, code: %d, output: %s, message: %s", probe, code, output[:prefixLen], message))
+	r.logger.Info("send probe event", "code", code, "output", output[:prefixLen], "message", message)
 
 	eventMsg := &proto.ProbeEvent{
 		Probe:   probe,

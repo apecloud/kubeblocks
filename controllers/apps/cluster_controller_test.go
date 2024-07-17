@@ -22,7 +22,8 @@ package apps
 import (
 	"encoding/json"
 	"fmt"
-
+	"github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -1087,6 +1088,140 @@ var _ = Describe("Cluster Controller", func() {
 		deleteClusterWithBackup(appsv1alpha1.WipeOut, backupRetainPolicy)
 	}
 
+	testDeletePausedCluster := func(compName, compDefName string) {
+		By("creating and checking a cluster with multi component")
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name, "").
+			AddComponent(compName, compDefName).SetReplicas(1).
+			AddComponent(multiConsensusCompName, compDefName).SetReplicas(1).
+			WithRandomName().
+			Create(&testCtx).
+			GetObject()
+		clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+		By("waiting for the cluster controller to create resources completely")
+		waitForCreatingResourceCompletely(clusterKey, compName, multiConsensusCompName)
+
+		By("pause the cluster")
+		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+			setPauseAnnotation(cluster)
+		})()).ShouldNot(HaveOccurred())
+
+		By("waiting for resources of cluster turn paused")
+		kindsToPause := []client.ObjectList{
+			&appsv1alpha1.ComponentList{},
+			&v1alpha1.InstanceSetList{},
+			&appsv1alpha1.ConfigurationList{},
+		}
+		Eventually(func() bool {
+			owningObjects, err := getOwningNamespacedObjects(ctx, testCtx.Cli, clusterObj.Namespace, getAppInstanceML(*clusterObj), kindsToPause)
+			if len(owningObjects) == 0 || err != nil {
+				return false
+			}
+			for _, obj := range owningObjects {
+				if !model.IsReconciliationPaused(obj) {
+					return false
+				}
+			}
+			return true
+		}).Should(Equal(true))
+
+		By("delete the cluster")
+		testapps.DeleteObject(&testCtx, clusterKey, &appsv1alpha1.Cluster{})
+
+		By("wait for the cluster to terminate")
+		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, false)).Should(Succeed())
+
+		By("check all other resources deleted")
+		transCtx := &clusterTransformContext{
+			Context: testCtx.Ctx,
+			Client:  testCtx.Cli,
+		}
+		var namespacedKinds, clusteredKinds []client.ObjectList
+		kindsToDelete := append(namespacedKinds, clusteredKinds...)
+		otherObjs, err := getOwningNamespacedObjects(transCtx.Context, transCtx.Client, clusterObj.Namespace, getAppInstanceML(*clusterObj), kindsToDelete)
+		Expect(err).Should(Succeed())
+		Expect(otherObjs).Should(HaveLen(0))
+	}
+
+	testScaleInPausedCluster := func(compName, compDefName string) {
+		By("creating and checking a cluster with multi component")
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name, "").
+			AddComponent(compName, compDefName).SetReplicas(3).
+			WithRandomName().
+			Create(&testCtx).
+			GetObject()
+		clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+		By("waiting for the cluster controller to create resources completely")
+		waitForCreatingResourceCompletely(clusterKey, compName)
+
+		By("pause the cluster")
+		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+			setPauseAnnotation(cluster)
+		})()).ShouldNot(HaveOccurred())
+
+		By("waiting for resources of cluster turn paused")
+		kindsToPause := []client.ObjectList{
+			&appsv1alpha1.ComponentList{},
+			&v1alpha1.InstanceSetList{},
+			&appsv1alpha1.ConfigurationList{},
+		}
+		instanceSetName := ""
+		Eventually(func() bool {
+			owningObjects, err := getOwningNamespacedObjects(ctx, testCtx.Cli, clusterObj.Namespace, getAppInstanceML(*clusterObj), kindsToPause)
+			if len(owningObjects) == 0 || err != nil {
+				return false
+			}
+			for _, obj := range owningObjects {
+				instanceSet, ok := obj.(*v1alpha1.InstanceSet)
+				if ok {
+					instanceSetName = instanceSet.Name
+				}
+				if !model.IsReconciliationPaused(obj) {
+					return false
+				}
+			}
+			return true
+		}).Should(Equal(true))
+
+		By("scale in")
+		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+			cluster.Spec.ComponentSpecs[0].Replicas = 1
+		})()).ShouldNot(HaveOccurred())
+
+		By("InstanceSet is not changed after paused")
+		instanceSetNamespacedName := types.NamespacedName{
+			Namespace: clusterObj.Namespace,
+			Name:      instanceSetName,
+		}
+		Eventually(testapps.CheckObj(&testCtx, instanceSetNamespacedName, func(g Gomega, instanceSet *v1alpha1.InstanceSet) {
+			g.Expect(int(*instanceSet.Spec.Replicas)).Should(Equal(1))
+		})).ShouldNot(Succeed())
+
+		By("resume the cluster")
+		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+			removePauseAnnotation(cluster)
+		})()).ShouldNot(HaveOccurred())
+
+		By("waiting for resources of cluster turn resumed")
+		Eventually(func() bool {
+			owningObjects, err := getOwningNamespacedObjects(ctx, testCtx.Cli, clusterObj.Namespace, getAppInstanceML(*clusterObj), kindsToPause)
+			if len(owningObjects) == 0 || err != nil {
+				return false
+			}
+			for _, obj := range owningObjects {
+				if model.IsReconciliationPaused(obj) {
+					return false
+				}
+			}
+			return true
+		}).Should(Equal(true))
+
+		By("InstanceSet is changed after resumed")
+		Eventually(testapps.CheckObj(&testCtx, instanceSetNamespacedName, func(g Gomega, instanceSet *v1alpha1.InstanceSet) {
+			g.Expect(int(*instanceSet.Spec.Replicas)).Should(Equal(1))
+		})).Should(Succeed())
+	}
 	Context("cluster provisioning", func() {
 		BeforeEach(func() {
 			createAllWorkloadTypesClusterDef()
@@ -1557,6 +1692,23 @@ var _ = Describe("Cluster Controller", func() {
 				g.Expect(comp.Spec.CompDef).Should(Equal(newCompDefObj.Name))
 				g.Expect(comp.Spec.ServiceVersion).Should(Equal(defaultServiceVersion))
 			})).Should(Succeed())
+		})
+	})
+	FContext("cluster pause and resume", func() {
+		BeforeEach(func() {
+			createAllWorkloadTypesClusterDef()
+		})
+
+		AfterEach(func() {
+			cleanEnv()
+		})
+
+		It("delete paused cluster", func() {
+			testDeletePausedCluster(consensusCompName, consensusCompDefName)
+		})
+
+		It("scale in component when cluster is paused and resumed", func() {
+			testScaleInPausedCluster(consensusCompName, consensusCompDefName)
 		})
 	})
 })

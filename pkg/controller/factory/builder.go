@@ -87,6 +87,7 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 		AddLabelsInMap(compDefLabel).
 		AddLabelsInMap(constant.GetAppVersionLabel(compDefName)).
 		AddLabelsInMap(synthesizedComp.UserDefinedLabels).
+		AddLabelsInMap(constant.GetClusterWellKnownLabels(clusterName)).
 		AddAnnotations(constant.ComponentReplicasAnnotationKey, replicasStr).
 		AddAnnotationsInMap(synthesizedComp.UserDefinedAnnotations)
 	template := corev1.PodTemplateSpec{

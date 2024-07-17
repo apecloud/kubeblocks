@@ -20,20 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package extensions
 
 import (
-	//"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	//corev1 "k8s.io/api/core/v1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	// "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	//ctrl "sigs.k8s.io/controller-runtime"
-	//ctrlerihandler "github.com/authzed/controller-idioms/handler"
-	//"github.com/apecloud/kubeblocks/pkg/constant"
+
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
-type genIDProceedReconciler struct{
+type genIDProceedReconciler struct {
 	stageCtx
 }
 
@@ -41,7 +35,6 @@ func (r *genIDProceedReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *ku
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
 		return kubebuilderx.ResultUnsatisfied
 	}
-
 
 	return kubebuilderx.ResultSatisfied
 }
@@ -67,12 +60,10 @@ func (r *genIDProceedReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kube
 			}
 		}
 	})
-	//r.next.Handle(r.reqCtx.Ctx)
 	return tree, nil
 }
 
 func NewGenIDProceedCheckReconciler(reqCtx intctrlutil.RequestCtx, buildStageCtx func() stageCtx) kubebuilderx.Reconciler {
-
 	return &genIDProceedReconciler{
 		stageCtx: buildStageCtx(),
 	}

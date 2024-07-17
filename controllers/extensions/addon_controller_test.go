@@ -509,7 +509,7 @@ var _ = Describe("Addon controller", func() {
 			}).Should(Succeed())
 		})
 
-		PIt("should successfully reconcile a custom resource for Addon with autoInstall=true with failed uninstall job", func() {
+		It("should successfully reconcile a custom resource for Addon with autoInstall=true with failed uninstall job", func() {
 			createAutoInstallAddon()
 
 			By("By enable addon with fake completed install job status")
@@ -531,7 +531,7 @@ var _ = Describe("Addon controller", func() {
 			}).Should(Succeed())
 		})
 
-		PIt("should successfully reconcile a custom resource for Addon deletion while enabling", func() {
+		It("should successfully reconcile a custom resource for Addon deletion while enabling", func() {
 			By("By create an addon with auto-install")
 			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
 				newOjb.Spec.Installable.AutoInstall = true
@@ -554,7 +554,7 @@ var _ = Describe("Addon controller", func() {
 			}).Should(Succeed())
 		})
 
-		PIt("should successfully reconcile a custom resource for Addon deletion while disabling", func() {
+		It("should successfully reconcile a custom resource for Addon deletion while disabling", func() {
 			createAutoInstallAddon()
 
 			By("By enable addon with fake completed install job status")
@@ -577,7 +577,7 @@ var _ = Describe("Addon controller", func() {
 			}).Should(Succeed())
 		})
 
-		PIt("should successfully reconcile a custom resource for Addon with autoInstall=true with status.phase=Failed", func() {
+		It("should successfully reconcile a custom resource for Addon with autoInstall=true with status.phase=Failed", func() {
 			createAutoInstallAddon()
 
 			By("By enabled addon with fake failed install job status")
@@ -832,7 +832,7 @@ var _ = Describe("Addon controller", func() {
 			viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
 		})
 
-		PIt("should successfully reconcile a custom resource for Addon deleting with used by clusters", func() {
+		It("should successfully reconcile a custom resource for Addon deleting with used by clusters", func() {
 			createAutoInstallAddon()
 
 			By("By enable addon with fake completed install job status")

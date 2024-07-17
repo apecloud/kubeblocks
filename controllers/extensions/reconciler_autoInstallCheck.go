@@ -20,17 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package extensions
 
 import (
-	//"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	//corev1 "k8s.io/api/core/v1"
 
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	//"k8s.io/apimachinery/pkg/api/meta"
-	//metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	//"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type autoInstallCheckReconciler struct {
@@ -58,12 +52,10 @@ func (r *autoInstallCheckReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*
 		}
 		enabledAddonWithDefaultValues(r.reqCtx.Ctx, &r.stageCtx, addon, AddonAutoInstall, "Addon enabled auto-install")
 	})
-	//r.next.Handle(r.reqCtx.Ctx)
 	return tree, nil
 }
 
 func NewAutoInstallCheckReconciler(reqCtx intctrlutil.RequestCtx, buildStageCtx func() stageCtx) kubebuilderx.Reconciler {
-
 	return &autoInstallCheckReconciler{
 		stageCtx: buildStageCtx(),
 	}

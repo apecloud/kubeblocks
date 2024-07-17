@@ -23,26 +23,25 @@ import (
 	"context"
 	"runtime"
 
-	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
-	//apierrors "k8s.io/apimachinery/pkg/api/errors"
-	ctrlerihandler "github.com/authzed/controller-idioms/handler"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
+	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
+	ctrl "sigs.k8s.io/controller-runtime"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // AddonReconciler reconciles a Addon object
@@ -82,35 +81,26 @@ func (r *AddonReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		Recorder: r.Recorder,
 	}
 
-	// TODO (good-first-issue) rewrite it using the new kubebuilderx framework
-
-	//buildStageCtx := func(next ...ctrlerihandler.Handler) stageCtx {
-	_ = func(next ...ctrlerihandler.Handler) stageCtx {
-		return stageCtx{
-			reqCtx:     &reqCtx,
-			reconciler: r,
-			next:       ctrlerihandler.Handlers(next).MustOne(),
-		}
-	}
-
-	buildStageCtx2 := func() stageCtx {
+	buildStageCtx := func() stageCtx {
 		return stageCtx{
 			reqCtx:     &reqCtx,
 			reconciler: r,
 		}
 	}
+
 	logger := log.FromContext(ctx).WithValues("addon", req.NamespacedName)
 	err := kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
 		Prepare(NewTreeLoader()).
-		Do(NewfetchNDeletionCheckReconciler(reqCtx, buildStageCtx2)).
-		Do(NewGenIDProceedCheckReconciler(reqCtx, buildStageCtx2)).
-		Do(NewMetadataCheckReconciler(reqCtx, buildStageCtx2)).
-		Do(NewInstallableCheckReconciler(reqCtx, buildStageCtx2)).
-		Do(NewAutoInstallCheckReconciler(reqCtx, buildStageCtx2)).
-		Do(NewEnabledWithDefaultValuesReconciler(reqCtx, buildStageCtx2)).
-		Do(NewProgressingReconciler(reqCtx, buildStageCtx2)).
-		Do(NewTerminalStateReconciler(reqCtx, buildStageCtx2)).
+		Do(NewfetchNDeletionCheckReconciler(reqCtx, buildStageCtx)).
+		Do(NewGenIDProceedCheckReconciler(reqCtx, buildStageCtx)).
+		Do(NewMetadataCheckReconciler(reqCtx, buildStageCtx)).
+		Do(NewInstallableCheckReconciler(reqCtx, buildStageCtx)).
+		Do(NewAutoInstallCheckReconciler(reqCtx, buildStageCtx)).
+		Do(NewEnabledWithDefaultValuesReconciler(reqCtx, buildStageCtx)).
+		Do(NewProgressingReconciler(reqCtx, buildStageCtx)).
+		Do(NewTerminalStateReconciler(reqCtx, buildStageCtx)).
 		Commit()
+
 	res, ok := reqCtx.Ctx.Value(resultValueKey).(*ctrl.Result)
 	if ok && res != nil {
 		err, ok := reqCtx.Ctx.Value(errorValueKey).(error)
@@ -121,65 +111,6 @@ func (r *AddonReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}
 
 	return ctrl.Result{}, err
-	/*fetchNDeletionCheckStageBuilder := func(next ...ctrlerihandler.Handler) ctrlerihandler.Handler {
-		return ctrlerihandler.NewTypeHandler(&fetchNDeletionCheckStage{
-			stageCtx: buildStageCtx(next...),
-			deletionStage: deletionStage{
-				stageCtx: buildStageCtx(ctrlerihandler.NoopHandler),
-			},
-		})
-	}
-
-	genIDProceedStageBuilder := func(next ...ctrlerihandler.Handler) ctrlerihandler.Handler {
-		return ctrlerihandler.NewTypeHandler(&genIDProceedCheckStage{stageCtx: buildStageCtx(next...)})
-	}
-
-	metadataCheckStageBuilder := func(next ...ctrlerihandler.Handler) ctrlerihandler.Handler {
-		return ctrlerihandler.NewTypeHandler(&metadataCheckStage{stageCtx: buildStageCtx(next...)})
-	}
-
-	installableCheckStageBuilder := func(next ...ctrlerihandler.Handler) ctrlerihandler.Handler {
-		return ctrlerihandler.NewTypeHandler(&installableCheckStage{stageCtx: buildStageCtx(next...)})
-	}
-
-	autoInstallCheckStageBuilder := func(next ...ctrlerihandler.Handler) ctrlerihandler.Handler {
-		return ctrlerihandler.NewTypeHandler(&autoInstallCheckStage{stageCtx: buildStageCtx(next...)})
-	}
-
-	enabledAutoValuesStageBuilder := func(next ...ctrlerihandler.Handler) ctrlerihandler.Handler {
-		return ctrlerihandler.NewTypeHandler(&enabledWithDefaultValuesStage{stageCtx: buildStageCtx(next...)})
-	}
-
-	progressingStageBuilder := func(next ...ctrlerihandler.Handler) ctrlerihandler.Handler {
-		return ctrlerihandler.NewTypeHandler(&progressingHandler{stageCtx: buildStageCtx(next...)})
-	}
-
-	terminalStateStageBuilder := func(next ...ctrlerihandler.Handler) ctrlerihandler.Handler {
-		return ctrlerihandler.NewTypeHandler(&terminalStateStage{stageCtx: buildStageCtx(next...)})
-	}
-
-	handlers := ctrlerihandler.Chain(
-		fetchNDeletionCheckStageBuilder,
-		genIDProceedStageBuilder,
-		metadataCheckStageBuilder,
-		installableCheckStageBuilder,
-		autoInstallCheckStageBuilder,
-		enabledAutoValuesStageBuilder,
-		progressingStageBuilder,
-		terminalStateStageBuilder,
-	).Handler("")
-
-	handlers.Handle(ctx)
-	res, ok := reqCtx.Ctx.Value(resultValueKey).(*ctrl.Result)
-	if ok && res != nil {
-		err, ok := reqCtx.Ctx.Value(errorValueKey).(error)
-		if ok {
-			return *res, err
-		}
-		return *res, nil
-	}
-
-	return ctrl.Result{}, nil*/
 }
 
 // SetupWithManager sets up the controller with the Manager.

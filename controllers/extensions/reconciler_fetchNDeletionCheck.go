@@ -20,22 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package extensions
 
 import (
-	//"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-
-	"context"
-	"fmt"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	//ctrlerihandler "github.com/authzed/controller-idioms/handler"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
 type fetchNDeletionCheckReconciler struct {
@@ -44,7 +36,7 @@ type fetchNDeletionCheckReconciler struct {
 }
 
 func (r *fetchNDeletionCheckReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
-	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
+	if tree.GetRoot() == nil {
 		return kubebuilderx.ResultUnsatisfied
 	}
 
@@ -52,7 +44,6 @@ func (r *fetchNDeletionCheckReconciler) PreCondition(tree *kubebuilderx.ObjectTr
 }
 
 func (r *fetchNDeletionCheckReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
-	//addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
 	addon := &extensionsv1alpha1.Addon{}
 	if err := r.reconciler.Client.Get(r.reqCtx.Ctx, r.reqCtx.Req.NamespacedName, addon); err != nil {
 		res, err := intctrlutil.CheckedRequeueWithError(err, r.reqCtx.Log, "")
@@ -75,7 +66,7 @@ func (r *fetchNDeletionCheckReconciler) Reconcile(tree *kubebuilderx.ObjectTree)
 		}
 	}
 	res, err := intctrlutil.HandleCRDeletion(*r.reqCtx, r.reconciler, addon, addonFinalizerName, func() (*ctrl.Result, error) {
-		r.deletionStage.Handle2(r.reqCtx.Ctx)
+		r.deletionStage.Handle(r.reqCtx.Ctx)
 		return r.deletionStage.doReturn()
 	})
 	if res != nil || err != nil {
@@ -83,62 +74,9 @@ func (r *fetchNDeletionCheckReconciler) Reconcile(tree *kubebuilderx.ObjectTree)
 		return tree, err
 	}
 	r.reqCtx.Log.V(1).Info("start normal reconcile")
-	//r.next.Handle(r.reqCtx.Ctx)
 	return tree, nil
 }
 
-func (r *deletionStage) Handle2(ctx context.Context) {
-	r.disablingStage.stageCtx = r.stageCtx
-	r.process(func(addon *extensionsv1alpha1.Addon) {
-		r.reqCtx.Log.V(1).Info("deletionStage", "phase", addon.Status.Phase)
-		patchPhase := func(phase extensionsv1alpha1.AddonPhase, reason string) {
-			r.reqCtx.Log.V(1).Info("patching status", "phase", phase)
-			patch := client.MergeFrom(addon.DeepCopy())
-			addon.Status.Phase = phase
-			addon.Status.ObservedGeneration = addon.Generation
-			if err := r.reconciler.Status().Patch(ctx, addon, patch); err != nil {
-				r.setRequeueWithErr(err, "")
-				return
-			}
-			r.reqCtx.Log.V(1).Info("progress to", "phase", phase)
-			r.reconciler.Event(addon, corev1.EventTypeNormal, reason,
-				fmt.Sprintf("Progress to %s phase", phase))
-			r.setReconciled()
-		}
-		switch addon.Status.Phase {
-		case extensionsv1alpha1.AddonEnabling:
-			// delete running jobs
-			res, err := r.reconciler.deleteExternalResources(*r.reqCtx, addon)
-			if err != nil {
-				r.updateResultNErr(res, err)
-				return
-			}
-			patchPhase(extensionsv1alpha1.AddonDisabling, DisablingAddon)
-			return
-		case extensionsv1alpha1.AddonEnabled:
-			patchPhase(extensionsv1alpha1.AddonDisabling, DisablingAddon)
-			return
-		case extensionsv1alpha1.AddonDisabling:
-			r.disablingStage.Handle(ctx)
-			res, err := r.disablingStage.doReturn()
-
-			if res != nil || err != nil {
-				return
-			}
-			patchPhase(extensionsv1alpha1.AddonDisabled, AddonDisabled)
-			return
-		default:
-			r.reqCtx.Log.V(1).Info("delete external resources", "phase", addon.Status.Phase)
-			res, err := r.reconciler.deleteExternalResources(*r.reqCtx, addon)
-			if res != nil || err != nil {
-				r.updateResultNErr(res, err)
-				return
-			}
-			return
-		}
-	})
-	//r.next.Handle(ctx)
-}
 
 func NewfetchNDeletionCheckReconciler(reqCtx intctrlutil.RequestCtx, buildStageCtx func() stageCtx) kubebuilderx.Reconciler {
 

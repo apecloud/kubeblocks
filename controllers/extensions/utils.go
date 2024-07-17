@@ -40,7 +40,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -111,39 +110,8 @@ func (r *stageCtx) process(processor func(*extensionsv1alpha1.Addon)) {
 	processor(addon)
 }
 
-type fetchNDeletionCheckStage struct {
-	stageCtx
-	deletionStage deletionStage
-}
-
 type deletionStage struct {
 	stageCtx
-	disablingStage disablingStage
-}
-
-type genIDProceedCheckStage struct {
-	stageCtx
-}
-
-type metadataCheckStage struct {
-	stageCtx
-}
-
-type installableCheckStage struct {
-	stageCtx
-}
-
-type autoInstallCheckStage struct {
-	stageCtx
-}
-
-type enabledWithDefaultValuesStage struct {
-	stageCtx
-}
-
-type progressingHandler struct {
-	stageCtx
-	enablingStage  enablingStage
 	disablingStage disablingStage
 }
 
@@ -163,80 +131,6 @@ type enablingStage struct {
 type disablingStage struct {
 	stageCtx
 	helmTypeUninstallStage helmTypeUninstallStage
-}
-
-type terminalStateStage struct {
-	stageCtx
-}
-
-func (r *fetchNDeletionCheckStage) Handle(ctx context.Context) {
-	addon := &extensionsv1alpha1.Addon{}
-	if err := r.reconciler.Client.Get(ctx, r.reqCtx.Req.NamespacedName, addon); err != nil {
-		res, err := intctrlutil.CheckedRequeueWithError(err, r.reqCtx.Log, "")
-		r.updateResultNErr(&res, err)
-		return
-	}
-	r.reqCtx.Log.V(1).Info("get addon", "generation", addon.Generation, "observedGeneration", addon.Status.ObservedGeneration)
-	r.reqCtx.UpdateCtxValue(operandValueKey, addon)
-
-	// CheckIfAddonUsedByCluster, if err, skip the deletion stage
-	if !addon.GetDeletionTimestamp().IsZero() || !addon.Spec.InstallSpec.GetEnabled() {
-		recordEvent := func() {
-			r.reconciler.Event(addon, corev1.EventTypeWarning, "Addon is used by some clusters",
-				"Addon is used by cluster, please check")
-		}
-		if res, err := intctrlutil.ValidateReferenceCR(*r.reqCtx, r.reconciler.Client, addon, constant.ClusterDefLabelKey,
-			recordEvent, &appsv1alpha1.ClusterList{}); res != nil || err != nil {
-			r.updateResultNErr(res, err)
-			return
-		}
-	}
-	res, err := intctrlutil.HandleCRDeletion(*r.reqCtx, r.reconciler, addon, addonFinalizerName, func() (*ctrl.Result, error) {
-		r.deletionStage.Handle(ctx)
-		return r.deletionStage.doReturn()
-	})
-	if res != nil || err != nil {
-		r.updateResultNErr(res, err)
-		return
-	}
-	r.reqCtx.Log.V(1).Info("start normal reconcile")
-	r.next.Handle(ctx)
-}
-
-func (r *genIDProceedCheckStage) Handle(ctx context.Context) {
-	r.process(func(addon *extensionsv1alpha1.Addon) {
-		r.reqCtx.Log.V(1).Info("genIDProceedCheckStage", "phase", addon.Status.Phase)
-		switch addon.Status.Phase {
-		case extensionsv1alpha1.AddonEnabled, extensionsv1alpha1.AddonDisabled:
-			if addon.Generation == addon.Status.ObservedGeneration {
-				res, err := r.reconciler.deleteExternalResources(*r.reqCtx, addon)
-				if res != nil || err != nil {
-					r.updateResultNErr(res, err)
-					return
-				}
-				r.setReconciled()
-				return
-			}
-		case extensionsv1alpha1.AddonFailed:
-			if addon.Generation == addon.Status.ObservedGeneration {
-				r.setReconciled()
-				return
-			}
-		}
-	})
-	r.next.Handle(ctx)
-}
-
-func (r *metadataCheckStage) Handle(ctx context.Context) {
-	r.process(func(addon *extensionsv1alpha1.Addon) {
-		r.reqCtx.Log.V(1).Info("metadataCheckStage", "phase", addon.Status.Phase)
-		setAddonProviderAndVersion(ctx, &r.stageCtx, addon)
-		if err := r.reconciler.Client.Update(ctx, addon); err != nil {
-			r.setRequeueWithErr(err, "")
-			return
-		}
-	})
-	r.next.Handle(ctx)
 }
 
 func (r *deletionStage) Handle(ctx context.Context) {
@@ -289,170 +183,6 @@ func (r *deletionStage) Handle(ctx context.Context) {
 			return
 		}
 	})
-	r.next.Handle(ctx)
-}
-
-func (r *installableCheckStage) Handle(ctx context.Context) {
-	r.process(func(addon *extensionsv1alpha1.Addon) {
-		// XValidation was introduced as an alpha feature in Kubernetes v1.23 and requires additional enablement.
-		// It became more stable after Kubernetes 1.25. Users may encounter error in Kubernetes versions prior to 1.25.
-		// additional check to the addon YAML to ensure support for Kubernetes versions prior to 1.25
-		if err := checkAddonSpec(addon); err != nil {
-			setAddonErrorConditions(ctx, &r.stageCtx, addon, true, true, AddonCheckError, err.Error())
-			r.setReconciled()
-			return
-		}
-
-		r.reqCtx.Log.V(1).Info("installableCheckStage", "phase", addon.Status.Phase)
-
-		// check the annotations constraint about Kubeblocks Version
-		check, err := checkAnnotationsConstraint(ctx, r.reconciler, addon)
-		if err != nil {
-			res, err := intctrlutil.CheckedRequeueWithError(err, r.reqCtx.Log, "")
-			r.updateResultNErr(&res, err)
-			return
-		}
-		if !check {
-			r.setReconciled()
-			return
-		}
-
-		if addon.Spec.Installable == nil {
-			return
-		}
-		// proceed if has specified addon.spec.installSpec
-		if addon.Spec.InstallSpec != nil {
-			return
-		}
-		if addon.Annotations != nil && addon.Annotations[SkipInstallableCheck] == trueVal {
-			r.reconciler.Event(addon, corev1.EventTypeWarning, InstallableCheckSkipped,
-				"Installable check skipped.")
-			return
-		}
-		switch addon.Status.Phase {
-		case extensionsv1alpha1.AddonEnabling, extensionsv1alpha1.AddonDisabling:
-			return
-		}
-		for _, s := range addon.Spec.Installable.Selectors {
-			if s.MatchesFromConfig() {
-				continue
-			}
-			patch := client.MergeFrom(addon.DeepCopy())
-			addon.Status.ObservedGeneration = addon.Generation
-			addon.Status.Phase = extensionsv1alpha1.AddonDisabled
-			meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-				Type:               extensionsv1alpha1.ConditionTypeChecked,
-				Status:             metav1.ConditionFalse,
-				ObservedGeneration: addon.Generation,
-				Reason:             InstallableRequirementUnmatched,
-				Message:            "spec.installable.selectors has no matching requirement.",
-				LastTransitionTime: metav1.Now(),
-			})
-
-			if err := r.reconciler.Status().Patch(ctx, addon, patch); err != nil {
-				r.setRequeueWithErr(err, "")
-				return
-			}
-			r.reconciler.Event(addon, corev1.EventTypeWarning, InstallableRequirementUnmatched,
-				fmt.Sprintf("Does not meet installable requirements for key %v", s))
-			r.setReconciled()
-			return
-		}
-	})
-	r.next.Handle(ctx)
-}
-
-func (r *autoInstallCheckStage) Handle(ctx context.Context) {
-	r.process(func(addon *extensionsv1alpha1.Addon) {
-		r.reqCtx.Log.V(1).Info("autoInstallCheckStage", "phase", addon.Status.Phase)
-		if addon.Spec.Installable == nil || !addon.Spec.Installable.AutoInstall {
-			return
-		}
-		// proceed if has specified addon.spec.installSpec
-		if addon.Spec.InstallSpec != nil {
-			r.reqCtx.Log.V(1).Info("has specified addon.spec.installSpec")
-			return
-		}
-		enabledAddonWithDefaultValues(ctx, &r.stageCtx, addon, AddonAutoInstall, "Addon enabled auto-install")
-	})
-	r.next.Handle(ctx)
-}
-
-func (r *enabledWithDefaultValuesStage) Handle(ctx context.Context) {
-	r.process(func(addon *extensionsv1alpha1.Addon) {
-		r.reqCtx.Log.V(1).Info("enabledWithDefaultValuesStage", "phase", addon.Status.Phase)
-		if addon.Spec.InstallSpec.HasSetValues() || addon.Spec.InstallSpec.IsDisabled() {
-			r.reqCtx.Log.V(1).Info("has specified addon.spec.installSpec")
-			return
-		}
-		if v, ok := addon.Annotations[AddonDefaultIsEmpty]; ok && v == trueVal {
-			return
-		}
-		enabledAddonWithDefaultValues(ctx, &r.stageCtx, addon, AddonSetDefaultValues, "Addon enabled with default values")
-	})
-	r.next.Handle(ctx)
-}
-
-func (r *progressingHandler) Handle(ctx context.Context) {
-	r.enablingStage.stageCtx = r.stageCtx
-	r.disablingStage.stageCtx = r.stageCtx
-	r.process(func(addon *extensionsv1alpha1.Addon) {
-		r.reqCtx.Log.V(1).Info("progressingHandler", "phase", addon.Status.Phase)
-		patchPhase := func(phase extensionsv1alpha1.AddonPhase, reason string) {
-			r.reqCtx.Log.V(1).Info("patching status", "phase", phase)
-			patch := client.MergeFrom(addon.DeepCopy())
-			addon.Status.Phase = phase
-			addon.Status.ObservedGeneration = addon.Generation
-			if err := r.reconciler.Status().Patch(ctx, addon, patch); err != nil {
-				r.setRequeueWithErr(err, "")
-				return
-			}
-			r.reconciler.Event(addon, corev1.EventTypeNormal, reason,
-				fmt.Sprintf("Progress to %s phase", phase))
-			r.setReconciled()
-		}
-
-		// decision enabling or disabling
-		if !addon.Spec.InstallSpec.GetEnabled() {
-			r.reqCtx.Log.V(1).Info("progress to disabling stage handler")
-			// if it's new simply return
-			if addon.Status.Phase == "" {
-				return
-			}
-			if addon.Status.Phase != extensionsv1alpha1.AddonDisabling {
-				patchPhase(extensionsv1alpha1.AddonDisabling, DisablingAddon)
-				return
-			}
-			r.disablingStage.Handle(ctx)
-			return
-		}
-		// handling enabling state
-		if addon.Status.Phase != extensionsv1alpha1.AddonEnabling {
-			if addon.Status.Phase == extensionsv1alpha1.AddonFailed {
-				// clean up existing failed installation job
-				mgrNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
-				key := client.ObjectKey{
-					Namespace: mgrNS,
-					Name:      getInstallJobName(addon),
-				}
-				installJob := &batchv1.Job{}
-				if err := r.reconciler.Get(ctx, key, installJob); client.IgnoreNotFound(err) != nil {
-					r.setRequeueWithErr(err, "")
-					return
-				} else if err == nil && installJob.GetDeletionTimestamp().IsZero() {
-					if err = r.reconciler.Delete(ctx, installJob); err != nil {
-						r.setRequeueWithErr(err, "")
-						return
-					}
-				}
-			}
-			patchPhase(extensionsv1alpha1.AddonEnabling, EnablingAddon)
-			return
-		}
-		r.reqCtx.Log.V(1).Info("progress to enabling stage handler")
-		r.enablingStage.Handle(ctx)
-	})
-	r.next.Handle(ctx)
 }
 
 func getInstallJobName(addon *extensionsv1alpha1.Addon) string {
@@ -695,7 +425,6 @@ func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 		}
 		r.setRequeueAfter(time.Second, "")
 	})
-	r.next.Handle(ctx)
 }
 
 func (r *helmTypeUninstallStage) Handle(ctx context.Context) {
@@ -807,7 +536,6 @@ func (r *helmTypeUninstallStage) Handle(ctx context.Context) {
 		}
 		r.setRequeueAfter(time.Second, "")
 	})
-	r.next.Handle(ctx)
 }
 
 func (r *enablingStage) Handle(ctx context.Context) {
@@ -820,7 +548,6 @@ func (r *enablingStage) Handle(ctx context.Context) {
 		default:
 		}
 	})
-	r.next.Handle(ctx)
 }
 
 func (r *disablingStage) Handle(ctx context.Context) {
@@ -833,46 +560,6 @@ func (r *disablingStage) Handle(ctx context.Context) {
 		default:
 		}
 	})
-	r.next.Handle(ctx)
-}
-
-func (r *terminalStateStage) Handle(ctx context.Context) {
-	r.process(func(addon *extensionsv1alpha1.Addon) {
-		r.reqCtx.Log.V(1).Info("terminalStateStage", "phase", addon.Status.Phase)
-		patchPhaseNCondition := func(phase extensionsv1alpha1.AddonPhase, reason string) {
-			r.reqCtx.Log.V(1).Info("patching status", "phase", phase)
-			patch := client.MergeFrom(addon.DeepCopy())
-			addon.Status.Phase = phase
-			addon.Status.ObservedGeneration = addon.Generation
-
-			meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-				Type:               extensionsv1alpha1.ConditionTypeSucceed,
-				Status:             metav1.ConditionTrue,
-				ObservedGeneration: addon.Generation,
-				Reason:             reason,
-				LastTransitionTime: metav1.Now(),
-			})
-
-			if err := r.reconciler.Status().Patch(ctx, addon, patch); err != nil {
-				r.setRequeueWithErr(err, "")
-				return
-			}
-			r.reconciler.Event(addon, corev1.EventTypeNormal, reason,
-				fmt.Sprintf("Progress to %s phase", phase))
-			r.setReconciled()
-		}
-
-		// transit to enabled or disable phase
-		switch addon.Status.Phase {
-		case "", extensionsv1alpha1.AddonDisabling:
-			patchPhaseNCondition(extensionsv1alpha1.AddonDisabled, AddonDisabled)
-			return
-		case extensionsv1alpha1.AddonEnabling:
-			patchPhaseNCondition(extensionsv1alpha1.AddonEnabled, AddonEnabled)
-			return
-		}
-	})
-	r.next.Handle(ctx)
 }
 
 // attachVolumeMount attaches a volumes to pod and added container.VolumeMounts to a ConfigMap

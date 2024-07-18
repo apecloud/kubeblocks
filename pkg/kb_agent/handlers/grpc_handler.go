@@ -22,6 +22,9 @@ package handlers
 import (
 	"context"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/plugin"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -30,17 +33,30 @@ import (
 )
 
 type GRPCHandler struct {
-	Logger logr.Logger
+	Logger     logr.Logger
+	grpcClient plugin.GrpcClient
 }
 
 var _ Handler = &GRPCHandler{}
 
 func NewGRPCHandler(properties map[string]string) (*GRPCHandler, error) {
 	logger := ctrl.Log.WithName("GRPC handler")
-	h := &GRPCHandler{
-		Logger: logger,
+	host := viper.GetString(constant.KBEnvPodIP)
+	if h, ok := properties["host"]; ok && h != "" {
+		host = h
 	}
-
+	port, ok := properties["port"]
+	if !ok || port == "" {
+		return &GRPCHandler{logger, nil}, nil
+	}
+	grpcClient, err := plugin.NewGRPCClient(host, port)
+	if err != nil {
+		return nil, errors.Wrap(err, "new client failed")
+	}
+	h := &GRPCHandler{
+		Logger:     logger,
+		grpcClient: grpcClient,
+	}
 	return h, nil
 }
 
@@ -48,6 +64,19 @@ func (h *GRPCHandler) Do(ctx context.Context, setting util.HandlerSpec, args map
 	if setting.GPRC == nil {
 		return nil, errors.New("grpc setting is nil")
 	}
-	// TODO: implement grpc handler
-	return nil, ErrNotImplemented
+	client := h.grpcClient
+	parameters, err := util.WrapperArgs(args)
+	if err != nil {
+		return nil, errors.Wrap(err, "wrapper args failed")
+	}
+	request := &plugin.Request{
+		MethodName: args["methodName"].(string),
+		Parameters: parameters,
+	}
+	result, err := client.Call(ctx, request)
+	if err != nil {
+		return nil, errors.Wrap(err, "grpc call failed")
+	}
+	resp := &Response{Message: result.Message}
+	return resp, nil
 }

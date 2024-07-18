@@ -50,6 +50,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/action"
 	dpbackup "github.com/apecloud/kubeblocks/pkg/dataprotection/backup"
@@ -751,6 +752,10 @@ func PatchBackupObjectMeta(
 	// get KubeBlocks cluster and set labels and annotations for backup
 	// TODO(ldm): we should remove this dependency of cluster in the future
 	cluster := getCluster(request.Ctx, request.Client, targetPod)
+	// can't back up a paused cluster
+	if model.IsReconciliationPaused(cluster) {
+		return true, fmt.Errorf("can't back up a paused cluster")
+	}
 	if cluster != nil {
 		if err := setClusterSnapshotAnnotation(request.Backup, cluster); err != nil {
 			return false, err

@@ -45,7 +45,7 @@ func (t *clusterPauseTransformer) Transform(ctx graph.TransformContext, dag *gra
 		}
 		needPaused := false
 		for i := range componentList {
-			if comp, needUpdate := setPauseAnnotation(&componentList[i]); needUpdate {
+			if comp, needUpdate := SetPauseAnnotation(&componentList[i]); needUpdate {
 				graphCli.Update(dag, nil, comp)
 				needPaused = true
 			}
@@ -60,7 +60,7 @@ func (t *clusterPauseTransformer) Transform(ctx graph.TransformContext, dag *gra
 		// set resumed for all components
 		needResume := false
 		for i := range componentList {
-			if comp, needUpdate := removePauseAnnotation(&componentList[i]); needUpdate {
+			if comp, needUpdate := RemovePauseAnnotation(&componentList[i]); needUpdate {
 				graphCli.Update(dag, nil, comp)
 				needResume = true
 			}

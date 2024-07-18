@@ -47,13 +47,13 @@ func (t *componentPauseTransformer) Transform(ctx graph.TransformContext, dag *g
 		}
 		// get configuration and set paused
 		configuration := getConfiguration(transCtx)
-		if configuration, needUpdate := setPauseAnnotation(configuration); needUpdate {
+		if configuration, needUpdate := SetPauseAnnotation(configuration); needUpdate {
 			graphCli.Update(dag, nil, configuration)
 		}
 		// list configmaps and set paused
 		configMapList := listConfigMaps(transCtx)
 		for i := range configMapList.Items {
-			if configMap, needUpdate := setPauseAnnotation(&configMapList.Items[i]); needUpdate {
+			if configMap, needUpdate := SetPauseAnnotation(&configMapList.Items[i]); needUpdate {
 				graphCli.Update(dag, nil, configMap)
 			}
 		}
@@ -69,13 +69,13 @@ func (t *componentPauseTransformer) Transform(ctx graph.TransformContext, dag *g
 		}
 		// get configuration and cancel paused
 		configuration := getConfiguration(transCtx)
-		if configuration, needUpdate := removePauseAnnotation(configuration); needUpdate {
+		if configuration, needUpdate := RemovePauseAnnotation(configuration); needUpdate {
 			graphCli.Update(dag, nil, configuration)
 		}
 		// list configmaps and cancel paused
 		configMapList := listConfigMaps(transCtx)
 		for i := range configMapList.Items {
-			if configMap, needUpdate := removePauseAnnotation(&configMapList.Items[i]); needUpdate {
+			if configMap, needUpdate := RemovePauseAnnotation(&configMapList.Items[i]); needUpdate {
 				graphCli.Update(dag, nil, configMap)
 			}
 		}

@@ -1103,7 +1103,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("pause the cluster")
 		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
-			setPauseAnnotation(cluster)
+			SetPauseAnnotation(cluster)
 		})()).ShouldNot(HaveOccurred())
 
 		By("waiting for resources of cluster turn paused")
@@ -1157,7 +1157,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("pause the cluster")
 		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
-			setPauseAnnotation(cluster)
+			SetPauseAnnotation(cluster)
 		})()).ShouldNot(HaveOccurred())
 
 		By("waiting for resources of cluster turn paused")
@@ -1200,7 +1200,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("resume the cluster")
 		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
-			removePauseAnnotation(cluster)
+			RemovePauseAnnotation(cluster)
 		})()).ShouldNot(HaveOccurred())
 
 		By("waiting for resources of cluster turn resumed")

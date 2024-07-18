@@ -262,7 +262,7 @@ func isOwnedByInstanceSet(obj client.Object) bool {
 	return false
 }
 
-func setPauseAnnotation(object client.Object) (client.Object, bool) {
+func SetPauseAnnotation(object client.Object) (client.Object, bool) {
 	if !model.IsReconciliationPaused(object) {
 		annotations := object.GetAnnotations()
 		if annotations == nil {
@@ -277,7 +277,7 @@ func setPauseAnnotation(object client.Object) (client.Object, bool) {
 	return object, false
 }
 
-func removePauseAnnotation(object client.Object) (client.Object, bool) {
+func RemovePauseAnnotation(object client.Object) (client.Object, bool) {
 	if model.IsReconciliationPaused(object) {
 		annotations := object.GetAnnotations()
 		if _, ok := annotations[extensions.ControllerPaused]; ok {

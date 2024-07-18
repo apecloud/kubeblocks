@@ -37,6 +37,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dpbackup "github.com/apecloud/kubeblocks/pkg/dataprotection/backup"
@@ -206,6 +207,23 @@ var _ = Describe("Backup Controller test", func() {
 				backupKey := client.ObjectKeyFromObject(backup)
 
 				By("check backup failed and its expiration when retentionPeriod is not set")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseFailed))
+					g.Expect(fetched.Status.Expiration).Should(BeNil())
+				})).Should(Succeed())
+			})
+
+			It("should fail if cluster is paused", func() {
+				clusterKey := client.ObjectKeyFromObject(cluster)
+				Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+					apps.SetPauseAnnotation(cluster)
+				})()).ShouldNot(HaveOccurred())
+
+				By("creating a backup with cluster paused")
+				backup := testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {})
+				backupKey := client.ObjectKeyFromObject(backup)
+
+				By("check backup failed and its expiration when cluster is paused")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseFailed))
 					g.Expect(fetched.Status.Expiration).Should(BeNil())

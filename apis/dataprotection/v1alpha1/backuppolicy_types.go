@@ -111,6 +111,11 @@ type PodSelector struct {
 	// labelsSelector is the label selector to filter the target pods.
 	*metav1.LabelSelector `json:",inline"`
 
+	// used to filter available pods of other roles when the labelSelector fails to filter available pods.
+	//
+	// +optional
+	AlternateSelector *metav1.LabelSelector `json:"alternateSelector,omitempty"`
+
 	// Specifies the strategy to select the target pod when multiple pods are selected.
 	// Valid values are:
 	//

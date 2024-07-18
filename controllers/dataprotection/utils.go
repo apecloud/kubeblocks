@@ -33,6 +33,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -153,57 +154,155 @@ func GetTargetPods(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
-	pods := &corev1.PodList{}
-	if err = cli.List(reqCtx.Ctx, pods,
-		client.InNamespace(reqCtx.Req.Namespace),
-		client.MatchingLabelsSelector{Selector: labelSelector}); err != nil {
+
+	listPodsByLabel := func(label *labels.Selector) (*corev1.PodList, error) {
+		pods := &corev1.PodList{}
+		err := cli.List(reqCtx.Ctx, pods,
+			client.InNamespace(reqCtx.Req.Namespace),
+			client.MatchingLabelsSelector{Selector: *label})
+		return pods, err
+	}
+
+	listPodsByAlternateSelector := func() (*corev1.PodList, error) {
+		labelSelector, err := patchSelector(selector)
+		if err != nil && !intctrlutil.IsNotFound(err) {
+			return nil, fmt.Errorf("failed to process target pod selector by backup policy %s/%s",
+				backupPolicy.Namespace, backupPolicy.Name)
+		}
+		if err == nil {
+			pods, err := listPodsByLabel(&labelSelector)
+			if err != nil {
+				return nil, err
+			}
+			return pods, nil
+		}
+		// not found
 		return nil, err
 	}
 
-	if len(pods.Items) == 0 {
-		return nil, fmt.Errorf("failed to find target pods by backup policy %s/%s",
-			backupPolicy.Namespace, backupPolicy.Name)
+	pods, err := listPodsByLabel(&labelSelector)
+	if err != nil {
+		return nil, err
 	}
-	sort.Sort(intctrlutil.ByPodName(pods.Items))
+	findPodErr := fmt.Errorf("failed to find target pods by backup policy %s/%s",
+		backupPolicy.Namespace, backupPolicy.Name)
 	var targetPods []*corev1.Pod
 	if len(selectedPodNames) == 0 || backupType == dpv1alpha1.BackupTypeContinuous {
 		switch selector.Strategy {
 		case dpv1alpha1.PodSelectionStrategyAny:
 			// always selecting the first pod
 			pod := dputils.GetFirstIndexRunningPod(pods)
+			if pod == nil {
+				pods, err := listPodsByAlternateSelector()
+				if err != nil && !intctrlutil.IsNotFound(err) {
+					return nil, err
+				}
+				if err == nil {
+					pod = dputils.GetFirstIndexRunningPod(pods)
+				}
+			}
 			if pod != nil {
 				targetPods = append(targetPods, pod)
 			}
 		case dpv1alpha1.PodSelectionStrategyAll:
+			allAvailable := true
+			for i := range pods.Items {
+				if !intctrlutil.IsAvailable(&pods.Items[i], 0) {
+					allAvailable = false
+					break
+				}
+			}
+			if len(pods.Items) == 0 || !allAvailable {
+				podList, err := listPodsByAlternateSelector()
+				if err != nil && !intctrlutil.IsNotFound(err) {
+					return nil, err
+				}
+				if err == nil {
+					pods = podList
+				}
+			}
+			if len(pods.Items) == 0 {
+				return nil, findPodErr
+			}
+			sort.Sort(intctrlutil.ByPodName(pods.Items))
 			for i := range pods.Items {
 				targetPods = append(targetPods, &pods.Items[i])
 			}
 		}
 		return targetPods, nil
 	}
+
 	// if already selected target pods and backupType is not Continuous, we should re-use them.
+	podMap := make(map[string]*corev1.Pod)
+	for i := range pods.Items {
+		podMap[pods.Items[i].Name] = &pods.Items[i]
+	}
+	pods, err = listPodsByAlternateSelector()
+	if err != nil && !intctrlutil.IsNotFound(err) {
+		return nil, err
+	}
+	if err == nil {
+		for i := range pods.Items {
+			podMap[pods.Items[i].Name] = &pods.Items[i]
+		}
+	}
+	if len(podMap) == 0 {
+		return nil, findPodErr
+	}
 	switch selector.Strategy {
 	case dpv1alpha1.PodSelectionStrategyAny:
-		for _, pod := range pods.Items {
-			if pod.Name == selectedPodNames[0] {
-				targetPods = append(targetPods, &pod)
-				break
-			}
+		if pod, ok := podMap[selectedPodNames[0]]; ok {
+			targetPods = append(targetPods, pod)
 		}
 	case dpv1alpha1.PodSelectionStrategyAll:
-		podMap := map[string]corev1.Pod{}
-		for i := range pods.Items {
-			podMap[pods.Items[i].Name] = pods.Items[i]
-		}
 		for _, podName := range selectedPodNames {
 			pod, ok := podMap[podName]
 			if !ok {
 				return nil, intctrlutil.NewFatalError(fmt.Sprintf(`can not found the target pod "%s"`, podName))
 			}
-			targetPods = append(targetPods, &pod)
+			targetPods = append(targetPods, pod)
 		}
 	}
 	return targetPods, nil
+}
+
+func patchSelector(podSelector *dpv1alpha1.PodSelector) (labels.Selector, error) {
+	if podSelector.AlternateSelector == nil {
+		return nil, intctrlutil.NewNotFound("not found the alternate selector")
+	}
+	alteranteSelector, err := metav1.LabelSelectorAsMap(podSelector.AlternateSelector)
+	if err != nil {
+		return nil, err
+	}
+	MainSelector, err := metav1.LabelSelectorAsMap(podSelector.LabelSelector)
+	if err != nil {
+		return nil, err
+	}
+
+	patchMainSelector := func(labelMap map[string]string) bool {
+		patched := false
+		for key, value := range labelMap {
+			mainValue, ok := MainSelector[key]
+			if !ok || mainValue != value {
+				continue
+			}
+			alternateValue, ok := alteranteSelector[key]
+			if !ok || mainValue == alternateValue {
+				continue
+			}
+			MainSelector[key] = alternateValue
+			patched = true
+		}
+		return patched
+	}
+
+	patched := patchMainSelector(map[string]string{
+		constant.RoleLabelKey: constant.Secondary,
+	})
+	if patched {
+		return labels.SelectorFromSet(MainSelector), nil
+	}
+	return nil, intctrlutil.NewNotFound("not found useful alternate labels")
 }
 
 // getCluster gets the cluster and will ignore the error.

@@ -23,7 +23,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/util"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/valyala/fasthttp"
@@ -48,7 +48,7 @@ func TestStartNonBlocking(t *testing.T) {
 			config:    config,
 			endpoints: Endpoints(),
 		}
-		_ = os.Remove(config.UnixDomainSocket + "/kb_agent.socket")
+		_ = os.Remove(config.UnixDomainSocket + "/kbagent.socket")
 		err := s.StartNonBlocking()
 		assert.Nil(t, err)
 		err = s.Close()

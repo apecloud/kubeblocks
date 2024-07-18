@@ -22,7 +22,7 @@ package handlers
 import (
 	"context"
 
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/util"
 )
 
 type Response struct {

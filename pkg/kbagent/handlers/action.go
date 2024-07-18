@@ -30,7 +30,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/util"
 )
 
 var actionHandlerSpecs = map[string]util.HandlerSpec{}

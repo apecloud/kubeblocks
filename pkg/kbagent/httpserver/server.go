@@ -63,7 +63,7 @@ func (s *server) StartNonBlocking() error {
 
 	var listeners []net.Listener
 	if s.config.UnixDomainSocket != "" {
-		socket := fmt.Sprintf("%s/kb_agent.socket", s.config.UnixDomainSocket)
+		socket := fmt.Sprintf("%s/kbagent.socket", s.config.UnixDomainSocket)
 		l, err := net.Listen("unix", socket)
 		if err != nil {
 			return err

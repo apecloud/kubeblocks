@@ -28,7 +28,7 @@ import (
 	"github.com/go-logr/logr"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/util"
 )
 
 type ExecHandler struct {

@@ -17,42 +17,37 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package cronjobs
+package handlers
 
 import (
+	"context"
+
+	"github.com/go-logr/logr"
+	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/util"
 )
 
-type Manager struct {
-	Jobs map[string]Job
+type GRPCHandler struct {
+	Logger logr.Logger
 }
 
-var logger = ctrl.Log.WithName("cronjobs")
+var _ Handler = &GRPCHandler{}
 
-func NewManager() (*Manager, error) {
-	actionHandlers := handlers.GetHandlerSpecs()
-	jobs := make(map[string]Job)
-	for name, handler := range actionHandlers {
-		if handler.CronJob == nil {
-			continue
-		}
-		logger.Info("cronjob found", "name", name)
-		job, err := NewJob(name, handler.CronJob)
-		if err != nil {
-			logger.Info("Failed to create job", "name", name, "error", err.Error())
-			continue
-		}
-		jobs[name] = job
+func NewGRPCHandler(properties map[string]string) (*GRPCHandler, error) {
+	logger := ctrl.Log.WithName("GRPC handler")
+	h := &GRPCHandler{
+		Logger: logger,
 	}
-	return &Manager{
-		Jobs: jobs,
-	}, nil
+
+	return h, nil
 }
 
-func (m *Manager) Start() {
-	for _, job := range m.Jobs {
-		go job.Start()
+func (h *GRPCHandler) Do(ctx context.Context, setting util.HandlerSpec, args map[string]any) (*Response, error) {
+	if setting.GPRC == nil {
+		return nil, errors.New("grpc setting is nil")
 	}
+	// TODO: implement grpc handler
+	return nil, ErrNotImplemented
 }

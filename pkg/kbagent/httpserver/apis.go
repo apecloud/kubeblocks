@@ -27,8 +27,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/valyala/fasthttp"
 
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers"
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/handlers"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/util"
 )
 
 type option = func(ctx *fasthttp.RequestCtx)

@@ -23,7 +23,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/util"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )

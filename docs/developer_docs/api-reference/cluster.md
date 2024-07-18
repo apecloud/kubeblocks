@@ -20521,6 +20521,18 @@ the <code>strategy</code> field below.</li>
 </tr>
 <tr>
 <td>
+<code>alternateRole</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the alternative role to select one or more replicas for backup.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>account</code><br/>
 <em>
 string

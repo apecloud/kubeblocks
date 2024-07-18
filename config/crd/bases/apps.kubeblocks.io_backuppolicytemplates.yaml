@@ -362,6 +362,10 @@ spec:
                                   If `backupPolicy.componentDefRef` (a legacy and deprecated API) is set, the secret defined in
                                   `clusterDefinition.spec.ConnectionCredential` is used instead.
                                 type: string
+                              alternateRole:
+                                description: Specifies the alternative role to select
+                                  one or more replicas for backup.
+                                type: string
                               connectionCredential:
                                 description: Specifies the connection credential to
                                   connect to the target database cluster.
@@ -427,10 +431,10 @@ spec:
                                 description: Used to find the target pod. The volumes
                                   of the target pod will be backed up.
                                 properties:
-                                  alternateSelector:
-                                    description: used to filter available pods of
-                                      other roles when the labelSelector fails to
-                                      filter available pods.
+                                  alternateLabelSelector:
+                                    description: alternateLabelSelector is used to
+                                      filter available pods when the labelSelector
+                                      fails.
                                     properties:
                                       matchExpressions:
                                         description: matchExpressions is a list of
@@ -736,10 +740,10 @@ spec:
                                   description: Used to find the target pod. The volumes
                                     of the target pod will be backed up.
                                   properties:
-                                    alternateSelector:
-                                      description: used to filter available pods of
-                                        other roles when the labelSelector fails to
-                                        filter available pods.
+                                    alternateLabelSelector:
+                                      description: alternateLabelSelector is used
+                                        to filter available pods when the labelSelector
+                                        fails.
                                       properties:
                                         matchExpressions:
                                           description: matchExpressions is a list
@@ -987,6 +991,10 @@ spec:
 
                             If `backupPolicy.componentDefRef` (a legacy and deprecated API) is set, the secret defined in
                             `clusterDefinition.spec.ConnectionCredential` is used instead.
+                          type: string
+                        alternateRole:
+                          description: Specifies the alternative role to select one
+                            or more replicas for backup.
                           type: string
                         connectionCredentialKey:
                           description: |-

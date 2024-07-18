@@ -360,7 +360,7 @@ func (r *clusterBackupPolicyTransformer) syncBackupPolicy(comp componentItem, ba
 	r.syncBackupPolicyTargetSpec(backupPolicy, comp)
 }
 
-func (r *clusterBackupPolicyTransformer) syncRoleLabelSelector(comp componentItem, target *dpv1alpha1.BackupTarget, role string) {
+func (r *clusterBackupPolicyTransformer) syncRoleLabelSelector(comp componentItem, target *dpv1alpha1.BackupTarget, role, alternateRole string) {
 	if len(role) == 0 || target == nil {
 		return
 	}
@@ -368,10 +368,22 @@ func (r *clusterBackupPolicyTransformer) syncRoleLabelSelector(comp componentIte
 	if podSelector.LabelSelector == nil || podSelector.LabelSelector.MatchLabels == nil {
 		podSelector.LabelSelector = &metav1.LabelSelector{MatchLabels: map[string]string{}}
 	}
-	if r.getCompReplicas(comp) == 1 {
+	replicas := r.getCompReplicas(comp)
+	if replicas == 1 {
 		delete(podSelector.LabelSelector.MatchLabels, constant.RoleLabelKey)
 	} else if podSelector.LabelSelector.MatchLabels[constant.RoleLabelKey] == "" {
 		podSelector.LabelSelector.MatchLabels[constant.RoleLabelKey] = role
+	}
+	if len(alternateRole) == 0 {
+		return
+	}
+	if podSelector.AlternateLabelSelector == nil || podSelector.AlternateLabelSelector.MatchLabels == nil {
+		podSelector.AlternateLabelSelector = &metav1.LabelSelector{MatchLabels: map[string]string{}}
+	}
+	if replicas == 1 {
+		delete(podSelector.AlternateLabelSelector.MatchLabels, constant.RoleLabelKey)
+	} else if podSelector.AlternateLabelSelector.MatchLabels[constant.RoleLabelKey] == "" {
+		podSelector.AlternateLabelSelector.MatchLabels[constant.RoleLabelKey] = alternateRole
 	}
 }
 
@@ -496,7 +508,7 @@ func (r *clusterBackupPolicyTransformer) buildBackupTarget(
 ) *dpv1alpha1.BackupTarget {
 	if oldTarget != nil {
 		// if the target already exists, only sync the role by component replicas automatically.
-		r.syncRoleLabelSelector(comp, oldTarget, targetTpl.Role)
+		r.syncRoleLabelSelector(comp, oldTarget, targetTpl.Role, targetTpl.AlternateRole)
 		return oldTarget
 	}
 	clusterName := r.OrigCluster.Name
@@ -507,11 +519,16 @@ func (r *clusterBackupPolicyTransformer) buildBackupTarget(
 		PodSelector: &dpv1alpha1.PodSelector{
 			Strategy: targetTpl.Strategy,
 			LabelSelector: &metav1.LabelSelector{
-				MatchLabels: r.buildTargetPodLabels(targetTpl, comp),
+				MatchLabels: r.buildTargetPodLabels(targetTpl.Role, comp),
 			},
 		},
 		// dataprotection will use its dedicated service account if this field is empty.
 		ServiceAccountName: "",
+	}
+	if len(targetTpl.Role) != 0 && len(targetTpl.AlternateRole) != 0 {
+		target.PodSelector.AlternateLabelSelector = &metav1.LabelSelector{
+			MatchLabels: r.buildTargetPodLabels(targetTpl.AlternateRole, comp),
+		}
 	}
 	if comp.isSharding {
 		target.Name = comp.fullComponentName
@@ -745,16 +762,16 @@ func (r *clusterBackupPolicyTransformer) compDefNameFromPolicy(policy *dpv1alpha
 
 // buildTargetPodLabels builds the target labels for the backup policy that will be
 // used to select the target pod.
-func (r *clusterBackupPolicyTransformer) buildTargetPodLabels(targetTpl appsv1alpha1.TargetInstance, comp componentItem) map[string]string {
+func (r *clusterBackupPolicyTransformer) buildTargetPodLabels(role string, comp componentItem) map[string]string {
 	labels := map[string]string{
 		constant.AppInstanceLabelKey:    r.OrigCluster.Name,
 		constant.AppManagedByLabelKey:   constant.AppName,
 		constant.KBAppComponentLabelKey: comp.fullComponentName,
 	}
 	// append label to filter specific role of the component.
-	if len(targetTpl.Role) > 0 && r.getCompReplicas(comp) > 1 {
+	if len(role) > 0 && r.getCompReplicas(comp) > 1 {
 		// the role only works when the component has multiple replicas.
-		labels[constant.RoleLabelKey] = targetTpl.Role
+		labels[constant.RoleLabelKey] = role
 	}
 	if comp.isSharding {
 		labels[constant.KBAppShardingNameLabelKey] = comp.componentName

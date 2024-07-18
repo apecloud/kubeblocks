@@ -211,6 +211,11 @@ type TargetInstance struct {
 	//   the `strategy` field below.
 	Role string `json:"role"`
 
+	// Specifies the alternative role to select one or more replicas for backup.
+	//
+	// +optional
+	AlternateRole string `json:"alternateRole"`
+
 	// If `backupPolicy.componentDefs` is set, this field is required to specify the system account name.
 	// This account must match one listed in `componentDefinition.spec.systemAccounts[*].name`.
 	// The corresponding secret created by this account is used to connect to the database.

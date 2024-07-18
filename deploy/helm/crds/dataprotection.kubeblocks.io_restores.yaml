@@ -2042,10 +2042,9 @@ spec:
                               Selects one of the pods, identified by labels, to build the job spec.
                               This includes mounting required volumes and injecting built-in environment variables of the selected pod.
                             properties:
-                              alternateSelector:
-                                description: used to filter available pods of other
-                                  roles when the labelSelector fails to filter available
-                                  pods.
+                              alternateLabelSelector:
+                                description: alternateLabelSelector is used to filter
+                                  available pods when the labelSelector fails.
                                 properties:
                                   matchExpressions:
                                     description: matchExpressions is a list of label

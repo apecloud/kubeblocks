@@ -3900,7 +3900,7 @@ Kubernetes meta/v1.LabelSelector
 </tr>
 <tr>
 <td>
-<code>alternateSelector</code><br/>
+<code>alternateLabelSelector</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#labelselector-v1-meta">
 Kubernetes meta/v1.LabelSelector
@@ -3909,7 +3909,7 @@ Kubernetes meta/v1.LabelSelector
 </td>
 <td>
 <em>(Optional)</em>
-<p>used to filter available pods of other roles when the labelSelector fails to filter available pods.</p>
+<p>alternateLabelSelector is used to filter available pods when the labelSelector fails.</p>
 </td>
 </tr>
 <tr>

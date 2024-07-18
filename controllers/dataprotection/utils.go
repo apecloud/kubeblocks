@@ -33,7 +33,6 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -150,37 +149,23 @@ func GetTargetPods(reqCtx intctrlutil.RequestCtx,
 	if !existPodSelector(selector) {
 		return nil, nil
 	}
-	labelSelector, err := metav1.LabelSelectorAsSelector(selector.LabelSelector)
-	if err != nil {
-		return nil, err
-	}
 
-	listPodsByLabel := func(label *labels.Selector) (*corev1.PodList, error) {
+	listPodsByLabel := func(labelSelector *metav1.LabelSelector) (*corev1.PodList, error) {
+		if labelSelector == nil {
+			return nil, intctrlutil.NewNotFound("not found labelSelector")
+		}
+		selector, err := metav1.LabelSelectorAsSelector(labelSelector)
+		if err != nil {
+			return nil, err
+		}
 		pods := &corev1.PodList{}
-		err := cli.List(reqCtx.Ctx, pods,
+		err = cli.List(reqCtx.Ctx, pods,
 			client.InNamespace(reqCtx.Req.Namespace),
-			client.MatchingLabelsSelector{Selector: *label})
+			client.MatchingLabelsSelector{Selector: selector})
 		return pods, err
 	}
 
-	listPodsByAlternateSelector := func() (*corev1.PodList, error) {
-		labelSelector, err := patchSelector(selector)
-		if err != nil && !intctrlutil.IsNotFound(err) {
-			return nil, fmt.Errorf("failed to process target pod selector by backup policy %s/%s",
-				backupPolicy.Namespace, backupPolicy.Name)
-		}
-		if err == nil {
-			pods, err := listPodsByLabel(&labelSelector)
-			if err != nil {
-				return nil, err
-			}
-			return pods, nil
-		}
-		// not found
-		return nil, err
-	}
-
-	pods, err := listPodsByLabel(&labelSelector)
+	pods, err := listPodsByLabel(selector.LabelSelector)
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +178,7 @@ func GetTargetPods(reqCtx intctrlutil.RequestCtx,
 			// always selecting the first pod
 			pod := dputils.GetFirstIndexRunningPod(pods)
 			if pod == nil {
-				pods, err := listPodsByAlternateSelector()
+				pods, err := listPodsByLabel(selector.AlternateLabelSelector)
 				if err != nil && !intctrlutil.IsNotFound(err) {
 					return nil, err
 				}
@@ -213,7 +198,7 @@ func GetTargetPods(reqCtx intctrlutil.RequestCtx,
 				}
 			}
 			if len(pods.Items) == 0 || !allAvailable {
-				podList, err := listPodsByAlternateSelector()
+				podList, err := listPodsByLabel(selector.AlternateLabelSelector)
 				if err != nil && !intctrlutil.IsNotFound(err) {
 					return nil, err
 				}
@@ -237,7 +222,7 @@ func GetTargetPods(reqCtx intctrlutil.RequestCtx,
 	for i := range pods.Items {
 		podMap[pods.Items[i].Name] = &pods.Items[i]
 	}
-	pods, err = listPodsByAlternateSelector()
+	pods, err = listPodsByLabel(selector.AlternateLabelSelector)
 	if err != nil && !intctrlutil.IsNotFound(err) {
 		return nil, err
 	}
@@ -264,45 +249,6 @@ func GetTargetPods(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 	return targetPods, nil
-}
-
-func patchSelector(podSelector *dpv1alpha1.PodSelector) (labels.Selector, error) {
-	if podSelector.AlternateSelector == nil {
-		return nil, intctrlutil.NewNotFound("not found the alternate selector")
-	}
-	alteranteSelector, err := metav1.LabelSelectorAsMap(podSelector.AlternateSelector)
-	if err != nil {
-		return nil, err
-	}
-	MainSelector, err := metav1.LabelSelectorAsMap(podSelector.LabelSelector)
-	if err != nil {
-		return nil, err
-	}
-
-	patchMainSelector := func(labelMap map[string]string) bool {
-		patched := false
-		for key, value := range labelMap {
-			mainValue, ok := MainSelector[key]
-			if !ok || mainValue != value {
-				continue
-			}
-			alternateValue, ok := alteranteSelector[key]
-			if !ok || mainValue == alternateValue {
-				continue
-			}
-			MainSelector[key] = alternateValue
-			patched = true
-		}
-		return patched
-	}
-
-	patched := patchMainSelector(map[string]string{
-		constant.RoleLabelKey: constant.Secondary,
-	})
-	if patched {
-		return labels.SelectorFromSet(MainSelector), nil
-	}
-	return nil, intctrlutil.NewNotFound("not found useful alternate labels")
 }
 
 // getCluster gets the cluster and will ignore the error.

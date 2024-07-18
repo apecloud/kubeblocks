@@ -78,6 +78,7 @@ func TestGRPCHandlerDo(t *testing.T) {
 			},
 		}
 		handler, err := NewGRPCHandler(setting.GPRC)
+		assert.Nil(t, err)
 		args := map[string]interface{}{
 			"methodName": "test",
 			"username":   "admin",
@@ -97,6 +98,7 @@ func TestGRPCHandlerDo(t *testing.T) {
 			},
 		}
 		handler, err := NewGRPCHandler(setting.GPRC)
+		assert.Nil(t, err)
 		args := map[string]interface{}{
 			"methodName": "notImplemented",
 			"username":   "admin",

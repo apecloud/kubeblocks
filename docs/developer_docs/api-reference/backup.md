@@ -3900,6 +3900,20 @@ Kubernetes meta/v1.LabelSelector
 </tr>
 <tr>
 <td>
+<code>alternateSelector</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#labelselector-v1-meta">
+Kubernetes meta/v1.LabelSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>used to filter available pods of other roles when the labelSelector fails to filter available pods.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>strategy</code><br/>
 <em>
 <a href="#dataprotection.kubeblocks.io/v1alpha1.PodSelectionStrategy">

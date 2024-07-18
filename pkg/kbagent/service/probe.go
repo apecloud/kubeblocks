@@ -35,7 +35,8 @@ import (
 )
 
 const (
-	ProbeURI                  = "/v1.0/probe"
+	probeServiceName          = "Probe"
+	probeServiceVersion       = "v1.0"
 	defaultProbePeriodSeconds = 60
 )
 
@@ -66,11 +67,11 @@ type probeService struct {
 var _ Service = &probeService{}
 
 func (s *probeService) Kind() string {
-	return "Probe"
+	return probeServiceName
 }
 
-func (s *probeService) URI() string {
-	return ProbeURI
+func (s *probeService) Version() string {
+	return probeServiceVersion
 }
 
 func (s *probeService) Start() error {
@@ -89,7 +90,7 @@ func (s *probeService) Decode(payload []byte) (interface{}, error) {
 	return nil, ErrNotImplemented
 }
 
-func (s *probeService) Call(ctx context.Context, req interface{}) ([]byte, error) {
+func (s *probeService) HandleRequest(ctx context.Context, req interface{}) ([]byte, error) {
 	return nil, ErrNotImplemented
 }
 
@@ -138,7 +139,7 @@ func (r *probeRunner) runLoop(probe *proto.Probe) {
 }
 
 func (r *probeRunner) runOnce(probe *proto.Probe) ([]byte, error) {
-	return r.actionService.Call(context.Background(), &proto.ActionRequest{Action: probe.Action})
+	return r.actionService.HandleRequest(context.Background(), &proto.ActionRequest{Action: probe.Action})
 }
 
 func (r *probeRunner) report(probe *proto.Probe, output []byte, err error) {
@@ -176,7 +177,7 @@ func (r *probeRunner) fail(probe *proto.Probe) bool {
 
 func (r *probeRunner) sendEvent(probe string, code int32, output []byte, message string) {
 	prefixLen := min(len(output), 32)
-	r.logger.Info("send probe event", "code", code, "output", output[:prefixLen], "message", message)
+	r.logger.Info("send probe event", "code", code, "output", string(output[:prefixLen]), "message", message)
 
 	eventMsg := &proto.ProbeEvent{
 		Probe:   probe,

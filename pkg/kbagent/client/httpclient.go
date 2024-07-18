@@ -30,11 +30,11 @@ import (
 	"github.com/valyala/fasthttp"
 
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
-	"github.com/apecloud/kubeblocks/pkg/kbagent/service"
 )
 
 const (
-	urlTemplate = "http://%s:%d/%s"
+	urlTemplate      = "http://%s:%d/%s"
+	actionServiceURI = "/v1.0/action"
 )
 
 type httpClient struct {
@@ -46,7 +46,7 @@ type httpClient struct {
 var _ Client = &httpClient{}
 
 func (c *httpClient) CallAction(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
-	url := fmt.Sprintf(urlTemplate, c.host, c.port, service.ActionURI)
+	url := fmt.Sprintf(urlTemplate, c.host, c.port, actionServiceURI)
 
 	data, err := json.Marshal(req)
 	if err != nil {

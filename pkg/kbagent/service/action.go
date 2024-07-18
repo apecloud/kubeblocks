@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -36,7 +37,8 @@ import (
 )
 
 const (
-	ActionURI = "/v1.0/action"
+	actionServiceName    = "Action"
+	actionServiceVersion = "v1.0"
 )
 
 func newActionService(logger logr.Logger, actions []proto.Action) (*actionService, error) {
@@ -59,11 +61,11 @@ type actionService struct {
 var _ Service = &actionService{}
 
 func (s *actionService) Kind() string {
-	return "Action"
+	return actionServiceName
 }
 
-func (s *actionService) URI() string {
-	return ActionURI
+func (s *actionService) Version() string {
+	return actionServiceVersion
 }
 
 func (s *actionService) Start() error {
@@ -78,42 +80,58 @@ func (s *actionService) Decode(payload []byte) (interface{}, error) {
 	return req, nil
 }
 
-func (s *actionService) Call(ctx context.Context, i interface{}) ([]byte, error) {
+func (s *actionService) HandleRequest(ctx context.Context, i interface{}) ([]byte, error) {
 	req := i.(*proto.ActionRequest)
 	if _, ok := s.actions[req.Action]; !ok {
 		return nil, fmt.Errorf("%s is not supported", req.Action)
 	}
-	return s.callAction(ctx, req)
+	return s.handleActionRequest(ctx, req)
 }
 
-func (s *actionService) callAction(ctx context.Context, req *proto.ActionRequest) ([]byte, error) {
+func (s *actionService) handleActionRequest(ctx context.Context, req *proto.ActionRequest) ([]byte, error) {
 	action := s.actions[req.Action]
 	if action.Exec != nil {
-		return s.callExecAction(ctx, req, action)
+		return s.handleExecAction(ctx, req, action)
 	}
 	return nil, fmt.Errorf("only exec action is supported: %s", req.Action)
 }
 
-func (s *actionService) callExecAction(ctx context.Context, req *proto.ActionRequest, action *proto.Action) ([]byte, error) {
+func (s *actionService) handleExecAction(ctx context.Context, req *proto.ActionRequest, action *proto.Action) ([]byte, error) {
 	// TODO: non-blocking & timeout
-	return execute(ctx, action.Exec.Commands, action.Exec.Args, req.Parameters, req.TimeoutSeconds)
+	return execute(ctx, action.Exec, req.Parameters, req.TimeoutSeconds)
 }
 
-func execute(ctx context.Context, commands []string, args []string, parameters map[string]string, timeout *int32) ([]byte, error) {
+func execute(ctx context.Context, action *proto.ExecAction, parameters map[string]string, timeout *int32) ([]byte, error) {
 	if timeout != nil && *timeout > 0 {
 		timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(*timeout)*time.Second)
 		defer cancel()
 		ctx = timeoutCtx
 	}
 
-	mergedArgs := make([]string, 0)
-	if len(commands) > 1 {
-		mergedArgs = append(mergedArgs, commands[1:]...)
-	}
-	mergedArgs = append(mergedArgs, args...)
+	mergedArgs := func() []string {
+		args := make([]string, 0)
+		if len(action.Commands) > 1 {
+			args = append(args, action.Commands[1:]...)
+		}
+		args = append(args, action.Args...)
+		return args
+	}()
 
-	cmd := exec.CommandContext(ctx, commands[0], mergedArgs...)
-	cmd.Env = util.EnvM2L(parameters)
+	mergedEnv := func() []string {
+		env := util.EnvM2L(parameters)
+		if len(action.Env) > 0 {
+			env = append(env, action.Env...)
+		}
+		if len(env) > 0 {
+			env = append(env, os.Environ()...)
+		}
+		return env
+	}()
+
+	cmd := exec.CommandContext(ctx, action.Commands[0], mergedArgs...)
+	if len(mergedEnv) > 0 {
+		cmd.Env = mergedEnv
+	}
 	bytes, err := cmd.Output()
 	if exitErr, ok := err.(*exec.ExitError); ok {
 		err = errors.New(string(exitErr.Stderr))

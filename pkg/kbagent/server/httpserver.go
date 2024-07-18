@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	fasthttprouter "github.com/fasthttp/router"
@@ -149,8 +150,12 @@ func (s *server) router() fasthttp.RequestHandler {
 }
 
 func (s *server) registerService(router *fasthttprouter.Router, svc service.Service) {
-	router.Handle(fasthttp.MethodPost, svc.URI(), s.dispatcher(svc))
-	s.logger.Info("register service to server", "service", svc.Kind(), "method", fasthttp.MethodPost, "uri", svc.URI())
+	router.Handle(fasthttp.MethodPost, s.serviceURI(svc), s.dispatcher(svc))
+	s.logger.Info("register service to server", "service", svc.Kind(), "method", fasthttp.MethodPost, "uri", s.serviceURI(svc))
+}
+
+func (s *server) serviceURI(svc service.Service) string {
+	return fmt.Sprintf("/%s/%s", svc.Version(), strings.ToLower(svc.Kind()))
 }
 
 func (s *server) dispatcher(svc service.Service) func(*fasthttp.RequestCtx) {
@@ -165,7 +170,7 @@ func (s *server) dispatcher(svc service.Service) func(*fasthttp.RequestCtx) {
 			return
 		}
 
-		rsp, err := svc.Call(ctx, req)
+		rsp, err := svc.HandleRequest(ctx, req)
 		statusCode := fasthttp.StatusOK
 		if err != nil {
 			if errors.Is(err, service.ErrNotImplemented) {

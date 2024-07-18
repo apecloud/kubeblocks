@@ -65,8 +65,6 @@ func getClusterPods(ctx context.Context, cli client.Reader, namespace, clusterNa
 		podHostNameList: strings.Join(traverse(pods, hostName), ","),
 		podHostIPList:   strings.Join(traverse(pods, hostIP), ","),
 	}, nil
-	m := make(map[string]string)
-	return m, nil
 }
 
 func getCompPods(ctx context.Context, cli client.Reader, namespace, clusterName, compName string) (map[string]string, error) {

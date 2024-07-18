@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"fmt"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
@@ -34,12 +35,24 @@ import (
 )
 
 const (
-	kbAgentContainerName = "kbagent"
-	kbAgentCommand       = "/bin/kbagent"
-	kbAgentPortName      = "http"
+	kbAgentContainerName     = "kbagent"
+	kbAgentInitContainerName = "init-kbagent"
+	kbAgentCommand           = "/bin/kbagent"
+	kbAgentPortName          = "http"
+
+	kbAgentSharedMountPath      = "/kubeblocks"
+	kbAgentCommandOnSharedMount = "/kubeblocks/kbagent"
+)
+
+var (
+	sharedVolumeMount = corev1.VolumeMount{Name: "kubeblocks", MountPath: kbAgentSharedMountPath}
 )
 
 func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
+	if synthesizedComp.LifecycleActions == nil {
+		return nil
+	}
+
 	envVars, err := buildKBAgentStartupEnv(synthesizedComp)
 	if err != nil {
 		return err
@@ -50,7 +63,8 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 	container := builder.NewContainerBuilder(kbAgentContainerName).
 		SetImage(viper.GetString(constant.KBToolsImage)).
 		SetImagePullPolicy(corev1.PullIfNotPresent).
-		AddCommands(kbAgentCommand, "--port", strconv.Itoa(port)).
+		AddCommands(kbAgentCommand).
+		AddArgs("--port", strconv.Itoa(port)).
 		AddEnv(envVars...).
 		AddPorts(corev1.ContainerPort{
 			ContainerPort: int32(port),
@@ -62,6 +76,10 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 				TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromInt(port)},
 			}}).
 		GetObject()
+
+	if err = adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp, container); err != nil {
+		return err
+	}
 
 	// set kb-agent container ports to host network
 	if synthesizedComp.HostNetwork != nil {
@@ -85,6 +103,7 @@ func buildKBAgentStartupEnv(synthesizedComp *SynthesizedComponent) ([]corev1.Env
 		actions []proto.Action
 		probes  []proto.Probe
 	)
+
 	if a := buildAction4KBAgent(synthesizedComp.LifecycleActions.PostProvision, "postProvision"); a != nil {
 		actions = append(actions, *a)
 	}
@@ -120,10 +139,12 @@ func buildKBAgentStartupEnv(synthesizedComp *SynthesizedComponent) ([]corev1.Env
 	if a := buildAction4KBAgent(synthesizedComp.LifecycleActions.AccountProvision, "accountProvision"); a != nil {
 		actions = append(actions, *a)
 	}
-	if a, p := buildRoleProbe4KBAgent(synthesizedComp.LifecycleActions.RoleProbe); a != nil && p != nil {
+
+	if a, p := buildProbe4KBAgent(synthesizedComp.LifecycleActions.RoleProbe, "roleProbe"); a != nil && p != nil {
 		actions = append(actions, *a)
 		probes = append(probes, *p)
 	}
+
 	return kbagent.BuildEnvVars(actions, probes)
 }
 
@@ -138,41 +159,133 @@ func buildAction4KBAgentLow(action *appsv1alpha1.Action, name string) *proto.Act
 	if action == nil || action.Exec == nil {
 		return nil
 	}
-	return &proto.Action{
+	a := &proto.Action{
 		Name: name,
 		Exec: &proto.ExecAction{
 			Commands: action.Exec.Command,
 			Args:     action.Exec.Args,
-			// Env:       action.Env,
-			Container: action.Container,
+			// Env:       action.Exec.Env,
+			Container: action.Exec.Container,
 		},
 		TimeoutSeconds: action.TimeoutSeconds,
-		RetryPolicy:    nil,
 	}
+	if action.RetryPolicy != nil {
+		a.RetryPolicy = &proto.RetryPolicy{
+			MaxRetries:    action.RetryPolicy.MaxRetries,
+			RetryInterval: action.RetryPolicy.RetryInterval,
+		}
+	}
+	return a
 }
 
-func buildRoleProbe4KBAgent(roleProbe *appsv1alpha1.RoleProbe) (*proto.Action, *proto.Probe) {
-	if roleProbe == nil || roleProbe.CustomHandler == nil || roleProbe.CustomHandler.Exec == nil {
+func buildProbe4KBAgent(probe *appsv1alpha1.Probe, name string) (*proto.Action, *proto.Probe) {
+	if probe == nil || probe.Exec == nil {
 		return nil, nil
 	}
-	a := &proto.Action{
-		Name: "roleProbe",
-		Exec: &proto.ExecAction{
-			Commands: roleProbe.CustomHandler.Exec.Command,
-			Args:     roleProbe.CustomHandler.Exec.Args,
-			// Env:       roleProbe.CustomHandler.Env,
-			Container: roleProbe.CustomHandler.Container,
-		},
-		TimeoutSeconds: roleProbe.CustomHandler.TimeoutSeconds,
-		RetryPolicy:    nil,
-	}
+	a := buildAction4KBAgentLow(&probe.Action, name)
 	p := &proto.Probe{
-		Action:              "roleProbe",
-		InitialDelaySeconds: roleProbe.InitialDelaySeconds,
-		PeriodSeconds:       roleProbe.PeriodSeconds,
-		SuccessThreshold:    1,
-		FailureThreshold:    1,
-		ReportPeriodSeconds: nil,
+		Action:              name,
+		InitialDelaySeconds: probe.InitialDelaySeconds,
+		PeriodSeconds:       probe.PeriodSeconds,
+		SuccessThreshold:    probe.SuccessThreshold,
+		FailureThreshold:    probe.FailureThreshold,
+		ReportPeriodSeconds: nil, // TODO
 	}
 	return a, p
+}
+
+func adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp *SynthesizedComponent, container *corev1.Container) error {
+	image, _, err := customExecActionImageNContainer(synthesizedComp)
+	if err != nil {
+		return err
+	}
+	if len(image) == 0 {
+		return nil
+	}
+
+	// init-container to copy binaries to the shared mount point /kubeblocks
+	initContainer := buildKBAgentInitContainer()
+	synthesizedComp.PodSpec.InitContainers = append(synthesizedComp.PodSpec.InitContainers, *initContainer)
+
+	container.Image = image
+	container.Command[0] = kbAgentCommandOnSharedMount
+	container.VolumeMounts = append(container.VolumeMounts, sharedVolumeMount)
+
+	// TODO: exec container resources
+	return nil
+}
+
+func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) (string, string, error) {
+	if synthesizedComp.LifecycleActions == nil {
+		return "", "", nil
+	}
+
+	handlers := []*appsv1alpha1.LifecycleActionHandler{
+		synthesizedComp.LifecycleActions.PostProvision,
+		synthesizedComp.LifecycleActions.PreTerminate,
+		synthesizedComp.LifecycleActions.MemberJoin,
+		synthesizedComp.LifecycleActions.MemberLeave,
+		synthesizedComp.LifecycleActions.Readonly,
+		synthesizedComp.LifecycleActions.Readwrite,
+		synthesizedComp.LifecycleActions.DataDump,
+		synthesizedComp.LifecycleActions.DataLoad,
+		synthesizedComp.LifecycleActions.Reconfigure,
+		synthesizedComp.LifecycleActions.AccountProvision,
+	}
+	if synthesizedComp.LifecycleActions.RoleProbe != nil && synthesizedComp.LifecycleActions.RoleProbe.Exec != nil {
+		handlers = append(handlers, &appsv1alpha1.LifecycleActionHandler{
+			CustomHandler: &synthesizedComp.LifecycleActions.RoleProbe.Action,
+		})
+	}
+
+	var image, container string
+	for _, handler := range handlers {
+		if handler == nil || handler.CustomHandler == nil || handler.CustomHandler.Exec == nil {
+			continue
+		}
+		if handler.CustomHandler.Exec.Image != "" {
+			if len(image) > 0 && image != handler.CustomHandler.Exec.Image {
+				return "", "", fmt.Errorf("only one exec image is allowed in lifecycle actions")
+			}
+			image = handler.CustomHandler.Exec.Image
+		}
+		if handler.CustomHandler.Exec.Container != "" {
+			if len(container) > 0 && container != handler.CustomHandler.Exec.Container {
+				return "", "", fmt.Errorf("only one exec container is allowed in lifecycle actions")
+			}
+			container = handler.CustomHandler.Exec.Container
+		}
+	}
+
+	var c *corev1.Container
+	if len(container) > 0 {
+		for _, cc := range synthesizedComp.PodSpec.Containers {
+			if cc.Name == container {
+				c = &cc
+				break
+			}
+		}
+		if c == nil {
+			return "", "", fmt.Errorf("exec container %s not found", container)
+		}
+	}
+	if len(image) > 0 && len(container) > 0 {
+		if c.Image == image {
+			return image, container, nil
+		}
+		return "", "", fmt.Errorf("exec image and container must be the same")
+	}
+	if len(image) == 0 && len(container) > 0 {
+		image = c.Image
+	}
+	return image, container, nil
+}
+
+func buildKBAgentInitContainer() *corev1.Container {
+	return builder.NewContainerBuilder(kbAgentInitContainerName).
+		SetImage(viper.GetString(constant.KBToolsImage)).
+		SetImagePullPolicy(corev1.PullIfNotPresent).
+		AddCommands([]string{"cp", "-r", kbAgentCommand, "/bin/curl", kbAgentSharedMountPath + "/"}...).
+		AddVolumeMounts(sharedVolumeMount).
+		GetObject()
 }

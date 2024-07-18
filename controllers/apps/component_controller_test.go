@@ -58,6 +58,8 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	kbagent "github.com/apecloud/kubeblocks/pkg/kbagent/client"
+	kbagentproto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	lorry "github.com/apecloud/kubeblocks/pkg/lorry/client"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
@@ -76,38 +78,36 @@ var (
 	podAnnotationKey4Test = fmt.Sprintf("%s-test", constant.ComponentReplicasAnnotationKey)
 )
 
-var mockLorryClient = func(mock func(*lorry.MockClientMockRecorder)) {
-	mockLorryCli := lorry.GetMockClient()
-	if mockLorryCli == nil {
-		ctrl := gomock.NewController(GinkgoT())
-		mockLorryCli = lorry.NewMockClient(ctrl)
-	}
+var mockKBAgentClient = func(mock func(*kbagent.MockClientMockRecorder)) {
+	cli := kbagent.NewMockClient(gomock.NewController(GinkgoT()))
 	if mock != nil {
-		mockCli := mockLorryCli.(*lorry.MockClient)
-		mock(mockCli.EXPECT())
+		mock(cli.EXPECT())
 	}
-	lorry.SetMockClient(mockLorryCli, nil)
+	kbagent.SetMockClient(cli, nil)
 }
 
-var mockLorryClientDefault = func() {
-	mockLorryClient(func(recorder *lorry.MockClientMockRecorder) {
-		recorder.CreateUser(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-		recorder.DescribeUser(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
-		recorder.GrantUserRole(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+var mockKBAgentClientDefault = func() {
+	mockKBAgentClient(func(recorder *kbagent.MockClientMockRecorder) {
+		recorder.CallAction(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+			return kbagentproto.ActionResponse{}, nil
+		}).AnyTimes()
 	})
 }
 
-var mockLorryClient4HScale = func(clusterKey types.NamespacedName, compName string, replicas int) {
-	mockLorryClient(func(recorder *lorry.MockClientMockRecorder) {
-		recorder.JoinMember(gomock.Any()).Return(nil).AnyTimes()
-		recorder.LeaveMember(gomock.Any()).DoAndReturn(func(ctx context.Context) error {
+var mockKBAgentClient4HScale = func(clusterKey types.NamespacedName, compName string, replicas int) {
+	mockKBAgentClient(func(recorder *kbagent.MockClientMockRecorder) {
+		recorder.CallAction(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+			rsp := kbagentproto.ActionResponse{}
+			if req.Action != "memberLeave" {
+				return rsp, nil
+			}
 			var podList corev1.PodList
 			labels := client.MatchingLabels{
 				constant.AppInstanceLabelKey:    clusterKey.Name,
 				constant.KBAppComponentLabelKey: compName,
 			}
 			if err := testCtx.Cli.List(ctx, &podList, labels, client.InNamespace(clusterKey.Namespace)); err != nil {
-				return err
+				return rsp, err
 			}
 			for _, pod := range podList.Items {
 				if pod.Annotations == nil {
@@ -118,12 +118,11 @@ var mockLorryClient4HScale = func(clusterKey types.NamespacedName, compName stri
 				}
 				pod.Annotations[podAnnotationKey4Test] = fmt.Sprintf("%d", replicas)
 				if err := testCtx.Cli.Update(ctx, &pod); err != nil {
-					return err
+					return rsp, err
 				}
 			}
-			return nil
+			return rsp, nil
 		}).AnyTimes()
-		recorder.Switchover(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	})
 }
 
@@ -242,14 +241,14 @@ var _ = Describe("Component Controller", func() {
 			Create(&testCtx).
 			GetObject()
 
-		By("Create a componentDefinition obj")
+		By("Create a componentVersion obj")
 		compVerObj = testapps.NewComponentVersionFactory(compVerName).
 			SetDefaultSpec(compDefName).
 			Create(&testCtx).
 			GetObject()
 
 		By("Mock lorry client for the default transformer of system accounts provision")
-		mockLorryClientDefault()
+		mockKBAgentClientDefault()
 	}
 
 	waitForCreatingResourceCompletely := func(clusterKey client.ObjectKey, compNames ...string) {
@@ -736,6 +735,7 @@ var _ = Describe("Component Controller", func() {
 					if ordinal >= updatedReplicas {
 						continue
 					}
+					// The annotation was updated by the mocked member leave action.
 					g.Expect(pod.Annotations[podAnnotationKey4Test]).Should(Equal(fmt.Sprintf("%d", updatedReplicas)))
 				}
 			}).Should(Succeed())
@@ -816,7 +816,7 @@ var _ = Describe("Component Controller", func() {
 		By("Get the latest cluster def")
 		Expect(k8sClient.Get(testCtx.Ctx, client.ObjectKeyFromObject(clusterDefObj), clusterDefObj)).Should(Succeed())
 		for i, comp := range cluster.Spec.ComponentSpecs {
-			mockLorryClient4HScale(clusterKey, comp.Name, updatedReplicas)
+			mockKBAgentClient4HScale(clusterKey, comp.Name, updatedReplicas)
 
 			By(fmt.Sprintf("H-scale component %s with policy %s", comp.Name, hscalePolicy(comp)))
 			horizontalScaleComp(updatedReplicas, &cluster.Spec.ComponentSpecs[i], storageClassName, hscalePolicy(comp))
@@ -831,7 +831,7 @@ var _ = Describe("Component Controller", func() {
 		dataClonePolicy appsv1alpha1.HScaleDataClonePolicyType) {
 		By("Creating a single component cluster with VolumeClaimTemplate")
 		pvcSpec := testapps.NewPVCSpec("1Gi")
-		createClusterObj(compName, compDefName, func(f *testapps.MockClusterFactory) {
+		createClusterObjV2(compName, compDefName, func(f *testapps.MockClusterFactory) {
 			f.SetReplicas(initialReplicas).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				AddVolumeClaimTemplate(testapps.LogVolumeName, pvcSpec)
@@ -2296,6 +2296,11 @@ var _ = Describe("Component Controller", func() {
 			testk8s.MockDisableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
 			testMultiCompHScale(appsv1alpha1.HScaleDataClonePolicyCloneVolume)
 		})
+
+		// TODO(component): events & conditions
+		PIt("backup error at scale-out", func() {
+			testBackupError(defaultCompName, compDefName)
+		})
 	})
 
 	Context("h-scaling and volume expansion", func() {
@@ -2333,33 +2338,6 @@ var _ = Describe("Component Controller", func() {
 				})
 			})
 
-			Context(fmt.Sprintf("[comp: %s] horizontal scale", compName), func() {
-				It("scale-out from 1 to 3 with backup(snapshot) policy normally", func() {
-					testHorizontalScale(compName, compDefName, 1, 3, appsv1alpha1.HScaleDataClonePolicyCloneVolume)
-				})
-
-				// TODO(component): events & conditions
-				PIt("backup error at scale-out", func() {
-					testBackupError(compName, compDefName)
-				})
-
-				It("scale-out without data clone policy", func() {
-					testHorizontalScale(compName, compDefName, 1, 3, "")
-				})
-
-				It("scale-in from 3 to 1", func() {
-					testHorizontalScale(compName, compDefName, 3, 1, appsv1alpha1.HScaleDataClonePolicyCloneVolume)
-				})
-
-				It("scale-in to 0 and PVCs should not been deleted", func() {
-					testHorizontalScale(compName, compDefName, 3, 0, appsv1alpha1.HScaleDataClonePolicyCloneVolume)
-				})
-
-				It("scale-out from 0 and should work well", func() {
-					testHorizontalScale(compName, compDefName, 0, 3, appsv1alpha1.HScaleDataClonePolicyCloneVolume)
-				})
-			})
-
 			Context(fmt.Sprintf("[comp: %s] scale-out after volume expansion", compName), func() {
 				It("scale-out with data clone policy", func() {
 					testVolumeExpansion(compName, compDefName, mockStorageClass)
@@ -2373,6 +2351,28 @@ var _ = Describe("Component Controller", func() {
 				})
 			})
 		}
+
+		Context("horizontal scale", func() {
+			It("scale-out from 1 to 3 with backup(snapshot) policy normally", func() {
+				testHorizontalScale(defaultCompName, compDefName, 1, 3, appsv1alpha1.HScaleDataClonePolicyCloneVolume)
+			})
+
+			It("scale-out without data clone policy", func() {
+				testHorizontalScale(defaultCompName, compDefName, 1, 3, "")
+			})
+
+			It("scale-in from 3 to 1", func() {
+				testHorizontalScale(defaultCompName, compDefName, 3, 1, appsv1alpha1.HScaleDataClonePolicyCloneVolume)
+			})
+
+			It("scale-in to 0 and PVCs should not been deleted", func() {
+				testHorizontalScale(defaultCompName, compDefName, 3, 0, appsv1alpha1.HScaleDataClonePolicyCloneVolume)
+			})
+
+			It("scale-out from 0 and should work well", func() {
+				testHorizontalScale(defaultCompName, compDefName, 0, 3, appsv1alpha1.HScaleDataClonePolicyCloneVolume)
+			})
+		})
 	})
 
 	When("creating cluster with workloadType=consensus component", func() {

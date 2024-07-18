@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -70,6 +72,15 @@ var (
 	defaultBuiltinHandler         = appsv1alpha1.MySQLBuiltinActionHandler
 	defaultLifecycleActionHandler = &appsv1alpha1.LifecycleActionHandler{
 		BuiltinHandler: &defaultBuiltinHandler,
+	}
+	newLifecycleActionHandler = func(name string) *appsv1alpha1.LifecycleActionHandler {
+		return &appsv1alpha1.LifecycleActionHandler{
+			CustomHandler: &appsv1alpha1.Action{
+				Exec: &appsv1alpha1.ExecAction{
+					Command: []string{"/bin/sh", "-c", fmt.Sprintf("echo %s", name)},
+				},
+			},
+		}
 	}
 
 	zeroResRequirements = corev1.ResourceRequirements{
@@ -355,13 +366,13 @@ var (
 			},
 			Switchover:       nil,
 			MemberJoin:       defaultLifecycleActionHandler,
-			MemberLeave:      defaultLifecycleActionHandler,
+			MemberLeave:      newLifecycleActionHandler("member-leave"),
 			Readonly:         defaultLifecycleActionHandler,
 			Readwrite:        defaultLifecycleActionHandler,
 			DataDump:         defaultLifecycleActionHandler,
 			DataLoad:         defaultLifecycleActionHandler,
 			Reconfigure:      defaultLifecycleActionHandler,
-			AccountProvision: defaultLifecycleActionHandler,
+			AccountProvision: newLifecycleActionHandler("account-provision"),
 		},
 	}
 

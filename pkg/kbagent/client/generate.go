@@ -17,41 +17,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package service
+package client
 
-import (
-	"context"
-	"errors"
-
-	"github.com/go-logr/logr"
-
-	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
-)
-
-type Service interface {
-	Kind() string
-
-	URI() string
-
-	Start() error
-
-	Decode([]byte) (interface{}, error)
-
-	Call(ctx context.Context, req interface{}) ([]byte, error)
-
-	// Refresh([]proto.Action, []proto.Probe) error
-}
-
-func New(logger logr.Logger, actions []proto.Action, probes []proto.Probe) ([]Service, error) {
-	sa, err := newActionService(logger, actions)
-	if err != nil {
-		return nil, err
-	}
-	sp, err := newProbeService(logger, sa, probes)
-	if err != nil {
-		return nil, err
-	}
-	return []Service{sa, sp}, nil
-}
-
-var ErrNotImplemented = errors.New("NotImplemented")
+//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../../hack/boilerplate.go.txt -package client -destination client_mock.go github.com/apecloud/kubeblocks/pkg/kbagent/client Client

@@ -306,7 +306,7 @@ var _ = Describe("builder", func() {
 			}
 
 			// test role probe
-			Expect(its.Spec.RoleProbe).ShouldNot(BeNil())
+			Expect(its.Spec.RoleProbe).Should(BeNil())
 
 			// test member update strategy
 			Expect(its.Spec.MemberUpdateStrategy).ShouldNot(BeNil())
@@ -328,7 +328,7 @@ var _ = Describe("builder", func() {
 			Expect(its.Spec.Roles[0].Name).Should(Equal(appsv1alpha1.DefaultLeader.Name))
 
 			// test role probe
-			Expect(its.Spec.RoleProbe).ShouldNot(BeNil())
+			Expect(its.Spec.RoleProbe).Should(BeNil())
 
 			// test member update strategy
 			Expect(its.Spec.MemberUpdateStrategy).ShouldNot(BeNil())

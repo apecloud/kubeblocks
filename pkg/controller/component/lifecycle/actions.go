@@ -119,7 +119,7 @@ func (a *actions) AccountProvision(ctx context.Context, cli client.Reader, opts 
 
 func (a *actions) callAction(ctx context.Context, cli client.Reader,
 	spec *appsv1alpha1.Action, action lifecycleAction, opts *Options) ([]byte, error) {
-	if len(spec.Image) > 0 {
+	if spec.Exec != nil && len(spec.Exec.Image) > 0 {
 		return nil, fmt.Errorf("NotImplemented") // TODO: job executor
 	}
 	return a.callActionByKBAgent(ctx, cli, spec, action, opts)

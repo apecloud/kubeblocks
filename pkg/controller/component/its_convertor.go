@@ -263,40 +263,6 @@ func (c *itsRolesConvertor) convert(args ...any) (any, error) {
 // itsRoleProbeConvertor converts the ComponentDefinition.Spec.LifecycleActions.RoleProbe into InstanceSet.Spec.RoleProbe.
 func (c *itsRoleProbeConvertor) convert(args ...any) (any, error) {
 	return nil, nil
-	// synthesizeComp, err := parseITSConvertorArgs(args...)
-	// if err != nil {
-	//	return nil, err
-	//}
-	//
-	// if synthesizeComp.LifecycleActions == nil || synthesizeComp.LifecycleActions.RoleProbe == nil {
-	//	return nil, nil
-	// }
-	//
-	// itsRoleProbe := &workloads.RoleProbe{
-	//	TimeoutSeconds:      synthesizeComp.LifecycleActions.RoleProbe.TimeoutSeconds,
-	//	PeriodSeconds:       synthesizeComp.LifecycleActions.RoleProbe.PeriodSeconds,
-	//	SuccessThreshold:    1,
-	//	FailureThreshold:    2,
-	//	RoleUpdateMechanism: workloads.DirectAPIServerEventUpdate,
-	// }
-	//
-	// if synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler != nil {
-	//	builtinHandler := string(*synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler)
-	//	itsRoleProbe.BuiltinHandler = &builtinHandler
-	//	return itsRoleProbe, nil
-	// }
-	//
-	//// TODO(xingran): ITS Action does not support args[] yet
-	// if synthesizeComp.LifecycleActions.RoleProbe.Exec != nil {
-	//	itsRoleProbeCmdAction := workloads.Action{
-	//		Image:   synthesizeComp.LifecycleActions.RoleProbe.Exec.Image,
-	//		Command: synthesizeComp.LifecycleActions.RoleProbe.Exec.Command,
-	//		Args:    synthesizeComp.LifecycleActions.RoleProbe.Exec.Args,
-	//	}
-	//	itsRoleProbe.CustomHandler = []workloads.Action{itsRoleProbeCmdAction}
-	// }
-	//
-	// return itsRoleProbe, nil
 }
 
 func (c *itsCredentialConvertor) convert(args ...any) (any, error) {

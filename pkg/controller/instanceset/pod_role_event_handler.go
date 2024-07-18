@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -37,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
@@ -65,6 +67,9 @@ const (
 var roleMessageRegex = regexp.MustCompile(`Readiness probe failed: .*({.*})`)
 
 func (h *PodRoleEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
+	// HACK: to support kb-agent probe event
+	event = h.transformKBAgentProbeEvent(reqCtx.Log, event)
+
 	filePaths := []string{readinessProbeEventFieldPath, util.LegacyEventFieldPath, util.LorryEventFieldPath}
 	if !slices.Contains(filePaths, event.InvolvedObject.FieldPath) || event.Reason != string(util.CheckRoleOperation) {
 		return nil
@@ -90,6 +95,32 @@ func (h *PodRoleEventHandler) Handle(cli client.Client, reqCtx intctrlutil.Reque
 	}
 	event.Annotations[roleChangedAnnotKey] = count
 	return cli.Patch(reqCtx.Ctx, event, patch, inDataContextUnspecified())
+}
+
+func (h *PodRoleEventHandler) transformKBAgentProbeEvent(logger logr.Logger, event *corev1.Event) *corev1.Event {
+	if event.ReportingController != "kbagent" || event.Reason != "roleProbe" {
+		return event
+	}
+
+	probeEvent := &proto.ProbeEvent{}
+	if err := json.Unmarshal([]byte(event.Message), probeEvent); err != nil {
+		logger.Error(err, "unmarshal probe event message failed")
+		return event
+	}
+
+	message := &probeMessage{
+		Message: probeEvent.Message,
+		Role:    string(probeEvent.Output),
+	}
+	if probeEvent.Code == 0 {
+		message.Event = successEvent
+	}
+	data, _ := json.Marshal(message)
+
+	event.InvolvedObject.FieldPath = util.LorryEventFieldPath
+	event.Reason = string(util.CheckRoleOperation)
+	event.Message = string(data)
+	return event
 }
 
 // handleRoleChangedEvent handles role changed event and return role.

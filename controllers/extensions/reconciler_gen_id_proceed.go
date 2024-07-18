@@ -20,11 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package extensions
 
 import (
-	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	ctrl "sigs.k8s.io/controller-runtime"
 
+	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type genIDProceedReconciler struct {
@@ -35,31 +36,36 @@ func (r *genIDProceedReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *ku
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
 		return kubebuilderx.ResultUnsatisfied
 	}
+	if res, _ := r.reqCtx.Ctx.Value(resultValueKey).(*ctrl.Result); res != nil {
+		return kubebuilderx.ResultUnsatisfied
+	}
+	if err, _ := r.reqCtx.Ctx.Value(errorValueKey).(error); err != nil {
+		return kubebuilderx.ResultUnsatisfied
+	}
 
 	return kubebuilderx.ResultSatisfied
 }
 
 func (r *genIDProceedReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
-	r.process(func(addon *extensionsv1alpha1.Addon) {
-		r.reqCtx.Log.V(1).Info("genIDProceedCheckStage", "phase", addon.Status.Phase)
-		switch addon.Status.Phase {
-		case extensionsv1alpha1.AddonEnabled, extensionsv1alpha1.AddonDisabled:
-			if addon.Generation == addon.Status.ObservedGeneration {
-				res, err := r.reconciler.deleteExternalResources(*r.reqCtx, addon)
-				if res != nil || err != nil {
-					r.updateResultNErr(res, err)
-					return
-				}
-				r.setReconciled()
-				return
+	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
+	r.reqCtx.Log.V(1).Info("genIDProceedCheckStage", "phase", addon.Status.Phase)
+	switch addon.Status.Phase {
+	case extensionsv1alpha1.AddonEnabled, extensionsv1alpha1.AddonDisabled:
+		if addon.Generation == addon.Status.ObservedGeneration {
+			res, err := r.reconciler.deleteExternalResources(*r.reqCtx, addon)
+			if res != nil || err != nil {
+				r.updateResultNErr(res, err)
+				return tree, err
 			}
-		case extensionsv1alpha1.AddonFailed:
-			if addon.Generation == addon.Status.ObservedGeneration {
-				r.setReconciled()
-				return
-			}
+			r.setReconciled()
+			return tree, nil
 		}
-	})
+	case extensionsv1alpha1.AddonFailed:
+		if addon.Generation == addon.Status.ObservedGeneration {
+			r.setReconciled()
+			return tree, nil
+		}
+	}
 	return tree, nil
 }
 

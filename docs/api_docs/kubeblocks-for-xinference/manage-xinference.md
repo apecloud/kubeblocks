@@ -196,15 +196,6 @@ There are two ways to apply vertical scaling.
          limits:
            memory: "4Gi"
            cpu: "2"
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 1Gi
-     terminationPolicy: Delete
    ```
 
 2. Check whether the corresponding resources change.
@@ -233,7 +224,7 @@ kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: ops-stop
+  name: mycluster-stop
   namespace: demo
 spec:
   clusterName: mycluster
@@ -281,7 +272,7 @@ kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: ops-start
+  name: mycluster-start
   namespace: demo
 spec:
   clusterName: mycluster
@@ -325,7 +316,7 @@ spec:
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: OpsRequest
    metadata:
-     name: ops-restart
+     name: mycluster-restart
      namespace: demo
    spec:
      clusterName: mycluster
@@ -340,7 +331,7 @@ spec:
    ```bash
    kubectl get pod -n demo
 
-   kubectl get ops ops-restart -n demo
+   kubectl get ops mycluster-restart -n demo
    ```
 
    During the restarting process, there are two status types for pods.

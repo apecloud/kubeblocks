@@ -28,12 +28,6 @@ KubeBlocks supports the management of StarRocks.
    kbcli cluster create mycluster --cluster-definition=starrocks
    ```
 
-   If you want to create a StarRocks cluster with multiple replicas. Use the following command and set the replica numbers.
-
-   ```bash
-   kbcli cluster create mycluster --cluster-definition=starrocks --set replicas=3
-   ```
-
    You can also create a cluster with specified CPU, memory and storage values.
 
    ```bash
@@ -87,7 +81,7 @@ KubeBlocks supports the management of StarRocks.
 Use the following command to perform vertical scaling.
 
 ```bash
-kbcli cluster vscale mycluster --cpu=2 --memory=20Gi --components=starrocks 
+kbcli cluster vscale mycluster --cpu=2 --memory=20Gi --components=be
 ```
 
 Please wait a few seconds until the scaling process is over.
@@ -131,7 +125,7 @@ kbcli cluster describe mycluster
 Use the following command to perform volume expansion.
 
 ```bash
-kbcli cluster volume-expand mycluster --storage=40Gi --components=starrocks
+kbcli cluster volume-expand mycluster --storage=40Gi --components=be
 ```
 
 The volume expansion may take a few minutes.

@@ -82,7 +82,7 @@ KubeBlocks supports the management of Xinference.
 Use the following command to perform vertical scaling.
 
 ```bash
-kbcli cluster vscale xinference --cpu=0.5 --memory=512Mi --components=xinference 
+kbcli cluster vscale mycluster --cpu=0.5 --memory=512Mi --components=xinference 
 ```
 
 Please wait a few seconds until the scaling process is over.
@@ -96,7 +96,7 @@ kbcli cluster describe-ops mycluster-verticalscaling-smx8b -n default
 To check whether the scaling is done, use the following command.
 
 ```bash
-kbcli cluster describe xinference
+kbcli cluster describe mycluster
 ```
 
 ## Restart
@@ -106,7 +106,7 @@ kbcli cluster describe xinference
    Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
 
    ```bash
-   kbcli cluster restart xinference --components="xinference" \
+   kbcli cluster restart mycluster --components="xinference" \
    --ttlSecondsAfterSucceed=30
    ```
 
@@ -118,10 +118,10 @@ kbcli cluster describe xinference
    Run the command below to check the cluster status to check the restarting status.
 
    ```bash
-   kbcli cluster list xinference
+   kbcli cluster list mycluster
    >
-   NAME       NAMESPACE   CLUSTER-DEFINITION     VERSION            TERMINATION-POLICY   STATUS    CREATED-TIME
-   xinference   default     xinference               xinference-0.11.0    Delete               Running   Jul 05,2024 18:42 UTC+0800
+   NAME         NAMESPACE   CLUSTER-DEFINITION     VERSION              TERMINATION-POLICY   STATUS    CREATED-TIME
+   mycluster    default     xinference             xinference-0.11.0    Delete               Running   Jul 05,2024 18:42 UTC+0800
    ```
 
    * STATUS=Updating: it means the cluster restart is in progress.

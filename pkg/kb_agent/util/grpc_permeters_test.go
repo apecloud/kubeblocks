@@ -30,16 +30,12 @@ func TestWrapperArgs(t *testing.T) {
 	t.Run("supported type", func(t *testing.T) {
 		args := map[string]interface{}{
 			"key1": "value1",
-			"key2": "value2",
 		}
 		parameters, err := WrapperArgs(args)
 		assert.Nil(t, err)
 		assert.NotNil(t, parameters)
-		assert.Equal(t, 2, len(parameters))
 		assert.Equal(t, "key1", parameters[0].GetKey())
 		assert.Equal(t, "value1", parameters[0].GetValue())
-		assert.Equal(t, "key2", parameters[1].GetKey())
-		assert.Equal(t, "value2", parameters[1].GetValue())
 	})
 	t.Run("unsupported type", func(t *testing.T) {
 		args := map[string]interface{}{

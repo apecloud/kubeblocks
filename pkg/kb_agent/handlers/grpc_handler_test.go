@@ -58,7 +58,12 @@ func TestGRPCHandlerDo(t *testing.T) {
 			log.Fatalf("failed to serve: %v", err)
 		}
 	}()
-
+	setting := util.HandlerSpec{
+		GPRC: map[string]string{
+			"host": "localhost",
+			"port": "50051",
+		},
+	}
 	t.Run("grpc handler is nil", func(t *testing.T) {
 		setting := util.HandlerSpec{
 			GPRC: nil,
@@ -70,13 +75,16 @@ func TestGRPCHandlerDo(t *testing.T) {
 		assert.Error(t, err, errors.New("grpc setting is nil"))
 	})
 
+	t.Run("grpc args is nil", func(t *testing.T) {
+		handler, err := NewGRPCHandler(setting.GPRC)
+		assert.Nil(t, err)
+		do, err := handler.Do(ctx, setting, nil)
+		assert.Nil(t, do)
+		assert.NotNil(t, err)
+		assert.Error(t, err, errors.New("args is nil"))
+	})
+
 	t.Run("grpc do success", func(t *testing.T) {
-		setting := util.HandlerSpec{
-			GPRC: map[string]string{
-				"host": "localhost",
-				"port": "50051",
-			},
-		}
 		handler, err := NewGRPCHandler(setting.GPRC)
 		assert.Nil(t, err)
 		args := map[string]interface{}{
@@ -91,12 +99,6 @@ func TestGRPCHandlerDo(t *testing.T) {
 	})
 
 	t.Run("grpc do not implemented", func(t *testing.T) {
-		setting := util.HandlerSpec{
-			GPRC: map[string]string{
-				"host": "localhost",
-				"port": "50051",
-			},
-		}
 		handler, err := NewGRPCHandler(setting.GPRC)
 		assert.Nil(t, err)
 		args := map[string]interface{}{

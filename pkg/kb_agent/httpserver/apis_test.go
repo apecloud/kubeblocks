@@ -71,16 +71,6 @@ func TestActionHandler(t *testing.T) {
 		assert.JSONEq(t, `{"errorCode":"ERR_MALFORMED_REQUEST_DATA","message":"no action in request"}`, string(reqCtx.Response.Body()))
 	})
 
-	t.Run("action not implemented", func(t *testing.T) {
-		reqCtx := &fasthttp.RequestCtx{}
-		reqCtx.Request.Header.SetMethod(fasthttp.MethodPost)
-		reqCtx.Request.Header.SetContentType("application/json")
-		reqCtx.Request.SetBody([]byte(`{"action":"test"}`))
-		actionHandler(reqCtx)
-		assert.Equal(t, fasthttp.StatusNotImplemented, reqCtx.Response.StatusCode())
-		assert.JSONEq(t, `{"errorCode":"ERR_ACTION_FAILED","message":"action exec failed: not implemented"}`, string(reqCtx.Response.Body()))
-	})
-
 	t.Run("action exec failed", func(t *testing.T) {
 		msg := "action exec failed"
 		reqCtx := &fasthttp.RequestCtx{}

@@ -64,7 +64,9 @@ func (h *GRPCHandler) Do(ctx context.Context, setting util.HandlerSpec, args map
 	if setting.GPRC == nil {
 		return nil, errors.New("grpc setting is nil")
 	}
-	client := h.grpcClient
+	if args == nil {
+		return nil, errors.New("args is nil")
+	}
 	parameters, err := util.WrapperArgs(args)
 	if err != nil {
 		return nil, errors.Wrap(err, "wrapper args failed")
@@ -73,6 +75,7 @@ func (h *GRPCHandler) Do(ctx context.Context, setting util.HandlerSpec, args map
 		MethodName: args["methodName"].(string),
 		Parameters: parameters,
 	}
+	client := h.grpcClient
 	result, err := client.Call(ctx, request)
 	if err != nil {
 		return nil, errors.Wrap(err, "grpc call failed")

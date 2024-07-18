@@ -20,11 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package extensions
 
 import (
-	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	ctrl "sigs.k8s.io/controller-runtime"
 
+	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type autoInstallCheckReconciler struct {
@@ -35,23 +36,29 @@ func (r *autoInstallCheckReconciler) PreCondition(tree *kubebuilderx.ObjectTree)
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
 		return kubebuilderx.ResultUnsatisfied
 	}
+	if res, _ := r.reqCtx.Ctx.Value(resultValueKey).(*ctrl.Result); res != nil {
+		return kubebuilderx.ResultUnsatisfied
+	}
+	if err, _ := r.reqCtx.Ctx.Value(errorValueKey).(error); err != nil {
+		return kubebuilderx.ResultUnsatisfied
+	}
 
 	return kubebuilderx.ResultSatisfied
 }
 
 func (r *autoInstallCheckReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
-	r.process(func(addon *extensionsv1alpha1.Addon) {
-		r.reqCtx.Log.V(1).Info("autoInstallCheckStage", "phase", addon.Status.Phase)
-		if addon.Spec.Installable == nil || !addon.Spec.Installable.AutoInstall {
-			return
-		}
-		// proceed if has specified addon.spec.installSpec
-		if addon.Spec.InstallSpec != nil {
-			r.reqCtx.Log.V(1).Info("has specified addon.spec.installSpec")
-			return
-		}
-		enabledAddonWithDefaultValues(r.reqCtx.Ctx, &r.stageCtx, addon, AddonAutoInstall, "Addon enabled auto-install")
-	})
+	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
+	r.reqCtx.Log.V(1).Info("autoInstallCheckStage", "phase", addon.Status.Phase)
+	if addon.Spec.Installable == nil || !addon.Spec.Installable.AutoInstall {
+		return tree, nil
+	}
+	// proceed if has specified addon.spec.installSpec
+	if addon.Spec.InstallSpec != nil {
+		r.reqCtx.Log.V(1).Info("has specified addon.spec.installSpec")
+		return tree, nil
+	}
+	enabledAddonWithDefaultValues(r.reqCtx.Ctx, &r.stageCtx, addon, AddonAutoInstall, "Addon enabled auto-install")
+
 	return tree, nil
 }
 

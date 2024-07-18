@@ -20,11 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package extensions
 
 import (
-	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	ctrl "sigs.k8s.io/controller-runtime"
 
+	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type metadataCheckReconciler struct {
@@ -35,19 +36,24 @@ func (r *metadataCheckReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *k
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
 		return kubebuilderx.ResultUnsatisfied
 	}
+	if res, _ := r.reqCtx.Ctx.Value(resultValueKey).(*ctrl.Result); res != nil {
+		return kubebuilderx.ResultUnsatisfied
+	}
+	if err, _ := r.reqCtx.Ctx.Value(errorValueKey).(error); err != nil {
+		return kubebuilderx.ResultUnsatisfied
+	}
 
 	return kubebuilderx.ResultSatisfied
 }
 
 func (r *metadataCheckReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
-	r.process(func(addon *extensionsv1alpha1.Addon) {
-		r.reqCtx.Log.V(1).Info("metadataCheckStage", "phase", addon.Status.Phase)
-		setAddonProviderAndVersion(r.reqCtx.Ctx, &r.stageCtx, addon)
-		if err := r.reconciler.Client.Update(r.reqCtx.Ctx, addon); err != nil {
-			r.setRequeueWithErr(err, "")
-			return
-		}
-	})
+	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
+	r.reqCtx.Log.V(1).Info("metadataCheckStage", "phase", addon.Status.Phase)
+	setAddonProviderAndVersion(addon)
+	if err := r.reconciler.Client.Update(r.reqCtx.Ctx, addon); err != nil {
+		r.setRequeueWithErr(err, "")
+		return tree, nil
+	}
 	return tree, nil
 }
 

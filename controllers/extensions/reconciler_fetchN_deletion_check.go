@@ -20,23 +20,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package extensions
 
 import (
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type fetchNDeletionCheckReconciler struct {
 	stageCtx
-	deletionStage deletionStage
+	deletionReconciler deletionReconciler
 }
 
 func (r *fetchNDeletionCheckReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil {
+		return kubebuilderx.ResultUnsatisfied
+	}
+	if res, _ := r.reqCtx.Ctx.Value(resultValueKey).(*ctrl.Result); res != nil {
+		return kubebuilderx.ResultUnsatisfied
+	}
+	if err, _ := r.reqCtx.Ctx.Value(errorValueKey).(error); err != nil {
 		return kubebuilderx.ResultUnsatisfied
 	}
 
@@ -44,12 +50,7 @@ func (r *fetchNDeletionCheckReconciler) PreCondition(tree *kubebuilderx.ObjectTr
 }
 
 func (r *fetchNDeletionCheckReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
-	addon := &extensionsv1alpha1.Addon{}
-	if err := r.reconciler.Client.Get(r.reqCtx.Ctx, r.reqCtx.Req.NamespacedName, addon); err != nil {
-		res, err := intctrlutil.CheckedRequeueWithError(err, r.reqCtx.Log, "")
-		r.updateResultNErr(&res, err)
-		return tree, err
-	}
+	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
 	r.reqCtx.Log.V(1).Info("get addon", "generation", addon.Generation, "observedGeneration", addon.Status.ObservedGeneration)
 	r.reqCtx.UpdateCtxValue(operandValueKey, addon)
 
@@ -66,8 +67,8 @@ func (r *fetchNDeletionCheckReconciler) Reconcile(tree *kubebuilderx.ObjectTree)
 		}
 	}
 	res, err := intctrlutil.HandleCRDeletion(*r.reqCtx, r.reconciler, addon, addonFinalizerName, func() (*ctrl.Result, error) {
-		r.deletionStage.Handle(r.reqCtx.Ctx)
-		return r.deletionStage.doReturn()
+		r.deletionReconciler.Reconcile(tree)
+		return r.deletionReconciler.doReturn()
 	})
 	if res != nil || err != nil {
 		r.updateResultNErr(res, err)
@@ -81,7 +82,7 @@ func NewfetchNDeletionCheckReconciler(reqCtx intctrlutil.RequestCtx, buildStageC
 
 	return &fetchNDeletionCheckReconciler{
 		stageCtx: buildStageCtx(),
-		deletionStage: deletionStage{
+		deletionReconciler: deletionReconciler{
 			stageCtx: buildStageCtx(),
 		},
 	}

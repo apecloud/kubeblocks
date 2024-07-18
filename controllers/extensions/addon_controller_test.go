@@ -116,9 +116,17 @@ var _ = Describe("Addon controller", func() {
 		})
 
 		doReconcile := func() (ctrl.Result, error) {
+			k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
+				Scheme:  scheme.Scheme,
+				Metrics: server.Options{BindAddress: "0"},
+			})
+			Expect(err).ToNot(HaveOccurred())
+			recorder := k8sManager.GetEventRecorderFor("addon-controller")
+
 			addonReconciler := &AddonReconciler{
-				Client: testCtx.Cli,
-				Scheme: testCtx.Cli.Scheme(),
+				Client:   testCtx.Cli,
+				Scheme:   testCtx.Cli.Scheme(),
+				Recorder: recorder,
 			}
 			req := reconcile.Request{
 				NamespacedName: key,

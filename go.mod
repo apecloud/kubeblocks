@@ -8,7 +8,6 @@ require (
 	github.com/Masterminds/semver/v3 v3.2.1
 	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/StudioSol/set v1.0.0
-	github.com/authzed/controller-idioms v0.7.0
 	github.com/aws/aws-sdk-go v1.50.8
 	github.com/bhmj/jsonslice v1.1.2
 	github.com/clbanning/mxj/v2 v2.5.7

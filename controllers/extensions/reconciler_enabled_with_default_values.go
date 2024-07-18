@@ -20,11 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package extensions
 
 import (
-	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	ctrl "sigs.k8s.io/controller-runtime"
 
+	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type enabledWithDefaultValuesReconciler struct {
@@ -35,22 +36,28 @@ func (r *enabledWithDefaultValuesReconciler) PreCondition(tree *kubebuilderx.Obj
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
 		return kubebuilderx.ResultUnsatisfied
 	}
+	if res, _ := r.reqCtx.Ctx.Value(resultValueKey).(*ctrl.Result); res != nil {
+		return kubebuilderx.ResultUnsatisfied
+	}
+	if err, _ := r.reqCtx.Ctx.Value(errorValueKey).(error); err != nil {
+		return kubebuilderx.ResultUnsatisfied
+	}
 
 	return kubebuilderx.ResultSatisfied
 }
 
 func (r *enabledWithDefaultValuesReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
-	r.process(func(addon *extensionsv1alpha1.Addon) {
-		r.reqCtx.Log.V(1).Info("enabledWithDefaultValuesStage", "phase", addon.Status.Phase)
-		if addon.Spec.InstallSpec.HasSetValues() || addon.Spec.InstallSpec.IsDisabled() {
-			r.reqCtx.Log.V(1).Info("has specified addon.spec.installSpec")
-			return
-		}
-		if v, ok := addon.Annotations[AddonDefaultIsEmpty]; ok && v == trueVal {
-			return
-		}
-		enabledAddonWithDefaultValues(r.reqCtx.Ctx, &r.stageCtx, addon, AddonSetDefaultValues, "Addon enabled with default values")
-	})
+	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
+	r.reqCtx.Log.V(1).Info("enabledWithDefaultValuesStage", "phase", addon.Status.Phase)
+	if addon.Spec.InstallSpec.HasSetValues() || addon.Spec.InstallSpec.IsDisabled() {
+		r.reqCtx.Log.V(1).Info("has specified addon.spec.installSpec")
+		return tree, nil
+	}
+	if v, ok := addon.Annotations[AddonDefaultIsEmpty]; ok && v == trueVal {
+		return tree, nil
+	}
+	enabledAddonWithDefaultValues(r.reqCtx.Ctx, &r.stageCtx, addon, AddonSetDefaultValues, "Addon enabled with default values")
+
 	return tree, nil
 }
 

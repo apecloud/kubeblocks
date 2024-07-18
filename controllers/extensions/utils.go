@@ -27,7 +27,6 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
-	ctrlerihandler "github.com/authzed/controller-idioms/handler"
 	"golang.org/x/exp/slices"
 	v1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -42,6 +41,7 @@ import (
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -49,7 +49,6 @@ import (
 type stageCtx struct {
 	reqCtx     *intctrlutil.RequestCtx
 	reconciler *AddonReconciler
-	next       ctrlerihandler.Handler
 }
 
 const (
@@ -101,88 +100,78 @@ func (r *stageCtx) doReturn() (*ctrl.Result, error) {
 	return res, err
 }
 
-func (r *stageCtx) process(processor func(*extensionsv1alpha1.Addon)) {
-	res, _ := r.doReturn()
-	if res != nil {
+type deletionReconciler struct {
+	stageCtx
+	disablingReconciler disablingReconciler
+}
+
+type helmTypeInstallReconciler struct {
+	stageCtx
+}
+
+type helmTypeUninstallReconciler struct {
+	stageCtx
+}
+
+type enablingReconciler struct {
+	stageCtx
+	helmTypeInstallReconciler helmTypeInstallReconciler
+}
+
+type disablingReconciler struct {
+	stageCtx
+	helmTypeUninstallReconciler helmTypeUninstallReconciler
+}
+
+func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) {
+	r.disablingReconciler.stageCtx = r.stageCtx
+	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
+	r.reqCtx.Log.V(1).Info("deletionStage", "phase", addon.Status.Phase)
+	patchPhase := func(phase extensionsv1alpha1.AddonPhase, reason string) {
+		r.reqCtx.Log.V(1).Info("patching status", "phase", phase)
+		patch := client.MergeFrom(addon.DeepCopy())
+		addon.Status.Phase = phase
+		addon.Status.ObservedGeneration = addon.Generation
+		if err := r.reconciler.Status().Patch(r.reqCtx.Ctx, addon, patch); err != nil {
+			r.setRequeueWithErr(err, "")
+			return
+		}
+		r.reqCtx.Log.V(1).Info("progress to", "phase", phase)
+		r.reconciler.Event(addon, corev1.EventTypeNormal, reason,
+			fmt.Sprintf("Progress to %s phase", phase))
+		r.setReconciled()
+	}
+	switch addon.Status.Phase {
+	case extensionsv1alpha1.AddonEnabling:
+		// delete running jobs
+		res, err := r.reconciler.deleteExternalResources(*r.reqCtx, addon)
+		if err != nil {
+			r.updateResultNErr(res, err)
+			return
+		}
+		patchPhase(extensionsv1alpha1.AddonDisabling, DisablingAddon)
+		return
+	case extensionsv1alpha1.AddonEnabled:
+		patchPhase(extensionsv1alpha1.AddonDisabling, DisablingAddon)
+		return
+	case extensionsv1alpha1.AddonDisabling:
+		r.disablingReconciler.Reconcile(tree)
+		res, err := r.disablingReconciler.doReturn()
+
+		if res != nil || err != nil {
+			return
+		}
+		patchPhase(extensionsv1alpha1.AddonDisabled, AddonDisabled)
+		return
+	default:
+		r.reqCtx.Log.V(1).Info("delete external resources", "phase", addon.Status.Phase)
+		res, err := r.reconciler.deleteExternalResources(*r.reqCtx, addon)
+		if res != nil || err != nil {
+			r.updateResultNErr(res, err)
+			return
+		}
 		return
 	}
-	addon := r.reqCtx.Ctx.Value(operandValueKey).(*extensionsv1alpha1.Addon)
-	processor(addon)
-}
-
-type deletionStage struct {
-	stageCtx
-	disablingStage disablingStage
-}
-
-type helmTypeInstallStage struct {
-	stageCtx
-}
-
-type helmTypeUninstallStage struct {
-	stageCtx
-}
-
-type enablingStage struct {
-	stageCtx
-	helmTypeInstallStage helmTypeInstallStage
-}
-
-type disablingStage struct {
-	stageCtx
-	helmTypeUninstallStage helmTypeUninstallStage
-}
-
-func (r *deletionStage) Handle(ctx context.Context) {
-	r.disablingStage.stageCtx = r.stageCtx
-	r.process(func(addon *extensionsv1alpha1.Addon) {
-		r.reqCtx.Log.V(1).Info("deletionStage", "phase", addon.Status.Phase)
-		patchPhase := func(phase extensionsv1alpha1.AddonPhase, reason string) {
-			r.reqCtx.Log.V(1).Info("patching status", "phase", phase)
-			patch := client.MergeFrom(addon.DeepCopy())
-			addon.Status.Phase = phase
-			addon.Status.ObservedGeneration = addon.Generation
-			if err := r.reconciler.Status().Patch(ctx, addon, patch); err != nil {
-				r.setRequeueWithErr(err, "")
-				return
-			}
-			r.reqCtx.Log.V(1).Info("progress to", "phase", phase)
-			r.reconciler.Event(addon, corev1.EventTypeNormal, reason,
-				fmt.Sprintf("Progress to %s phase", phase))
-			r.setReconciled()
-		}
-		switch addon.Status.Phase {
-		case extensionsv1alpha1.AddonEnabling:
-			// delete running jobs
-			res, err := r.reconciler.deleteExternalResources(*r.reqCtx, addon)
-			if err != nil {
-				r.updateResultNErr(res, err)
-				return
-			}
-			patchPhase(extensionsv1alpha1.AddonDisabling, DisablingAddon)
-			return
-		case extensionsv1alpha1.AddonEnabled:
-			patchPhase(extensionsv1alpha1.AddonDisabling, DisablingAddon)
-			return
-		case extensionsv1alpha1.AddonDisabling:
-			r.disablingStage.Handle(ctx)
-			res, err := r.disablingStage.doReturn()
-
-			if res != nil || err != nil {
-				return
-			}
-			patchPhase(extensionsv1alpha1.AddonDisabled, AddonDisabled)
-			return
-		default:
-			r.reqCtx.Log.V(1).Info("delete external resources", "phase", addon.Status.Phase)
-			res, err := r.reconciler.deleteExternalResources(*r.reqCtx, addon)
-			if res != nil || err != nil {
-				r.updateResultNErr(res, err)
-				return
-			}
-			return
-		}
-	})
 }
 
 func getInstallJobName(addon *extensionsv1alpha1.Addon) string {
@@ -257,309 +246,305 @@ func setInitContainer(addon *extensionsv1alpha1.Addon, helmJobPodSpec *corev1.Po
 	helmJobPodSpec.InitContainers = append(helmJobPodSpec.InitContainers, copyChartsContainer)
 }
 
-func (r *helmTypeInstallStage) Handle(ctx context.Context) {
-	r.process(func(addon *extensionsv1alpha1.Addon) {
-		r.reqCtx.Log.V(1).Info("helmTypeInstallStage", "phase", addon.Status.Phase)
-		mgrNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+func (r *helmTypeInstallReconciler) Reconcile(tree *kubebuilderx.ObjectTree) {
+	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
+	r.reqCtx.Log.V(1).Info("helmTypeInstallStage", "phase", addon.Status.Phase)
+	mgrNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
 
-		key := client.ObjectKey{
-			Namespace: mgrNS,
-			Name:      getInstallJobName(addon),
-		}
+	key := client.ObjectKey{
+		Namespace: mgrNS,
+		Name:      getInstallJobName(addon),
+	}
 
-		helmInstallJob := &batchv1.Job{}
-		if err := r.reconciler.Get(ctx, key, helmInstallJob); client.IgnoreNotFound(err) != nil {
-			r.setRequeueWithErr(err, "")
-			return
-		} else if err == nil {
-			if helmInstallJob.Status.Succeeded > 0 {
-				return
-			}
-
-			if helmInstallJob.Status.Active > 0 {
-				r.setRequeueAfter(time.Second, fmt.Sprintf("running Helm install job %s", key.Name))
-				return
-			}
-			// there are situations that job.status.[Active | Failed | Succeeded ] are all
-			// 0, and len(job.status.conditions) > 0, and need to handle failed
-			// info. from conditions.
-			if helmInstallJob.Status.Failed > 0 {
-				// job failed set terminal state phase
-				setAddonErrorConditions(ctx, &r.stageCtx, addon, true, true, InstallationFailed,
-					fmt.Sprintf("Installation failed, do inspect error from jobs.batch %s", key.String()))
-				// only allow to do pod logs if max concurrent reconciles > 1, also considered that helm
-				// cmd error only has limited contents
-				if viper.GetInt(maxConcurrentReconcilesKey) > 1 {
-					if err := logFailedJobPodToCondError(ctx, &r.stageCtx, addon, key.Name, InstallationFailedLogs); err != nil {
-						r.setRequeueWithErr(err, "")
-						return
-					}
-				}
-				return
-			}
-			r.setRequeueAfter(time.Second, "")
+	helmInstallJob := &batchv1.Job{}
+	if err := r.reconciler.Get(r.reqCtx.Ctx, key, helmInstallJob); client.IgnoreNotFound(err) != nil {
+		r.setRequeueWithErr(err, "")
+		return
+	} else if err == nil {
+		if helmInstallJob.Status.Succeeded > 0 {
 			return
 		}
 
-		var err error
-		helmInstallJob, err = createHelmJobProto(addon)
-		if err != nil {
-			r.setRequeueWithErr(err, "")
+		if helmInstallJob.Status.Active > 0 {
+			r.setRequeueAfter(time.Second, fmt.Sprintf("running Helm install job %s", key.Name))
 			return
 		}
-
-		// set addon installation job to use local charts instead of remote charts,
-		// the init container will copy the local charts to the shared volume
-		chartsPath, err := buildLocalChartsPath(addon)
-		if err != nil {
-			r.setRequeueWithErr(err, "")
-			return
-		}
-
-		helmInstallJob.ObjectMeta.Name = key.Name
-		helmInstallJob.ObjectMeta.Namespace = key.Namespace
-		helmJobPodSpec := &helmInstallJob.Spec.Template.Spec
-		helmContainer := &helmInstallJob.Spec.Template.Spec.Containers[0]
-		helmContainer.Args = append([]string{
-			"upgrade",
-			"--install",
-			"$(RELEASE_NAME)",
-			chartsPath,
-			"--namespace",
-			"$(RELEASE_NS)",
-			"--create-namespace",
-		}, viper.GetStringSlice(addonHelmInstallOptKey)...)
-
-		installValues := addon.Spec.Helm.BuildMergedValues(addon.Spec.InstallSpec)
-		if err = addon.Spec.Helm.BuildContainerArgs(helmContainer, installValues); err != nil {
-			r.setRequeueWithErr(err, "")
-			return
-		}
-
-		// set values from file
-		for _, cmRef := range installValues.ConfigMapRefs {
-			cm := &corev1.ConfigMap{}
-			key := client.ObjectKey{
-				Name:      cmRef.Name,
-				Namespace: mgrNS}
-			if err := r.reconciler.Get(ctx, key, cm); err != nil {
-				if !apierrors.IsNotFound(err) {
+		// there are situations that job.status.[Active | Failed | Succeeded ] are all
+		// 0, and len(job.status.conditions) > 0, and need to handle failed
+		// info. from conditions.
+		if helmInstallJob.Status.Failed > 0 {
+			// job failed set terminal state phase
+			setAddonErrorConditions(r.reqCtx.Ctx, &r.stageCtx, addon, true, true, InstallationFailed,
+				fmt.Sprintf("Installation failed, do inspect error from jobs.batch %s", key.String()))
+			// only allow to do pod logs if max concurrent reconciles > 1, also considered that helm
+			// cmd error only has limited contents
+			if viper.GetInt(maxConcurrentReconcilesKey) > 1 {
+				if err := logFailedJobPodToCondError(r.reqCtx.Ctx, &r.stageCtx, addon, key.Name, InstallationFailedLogs); err != nil {
 					r.setRequeueWithErr(err, "")
 					return
 				}
-				r.setRequeueAfter(time.Second, fmt.Sprintf("ConfigMap %s not found", cmRef.Name))
-				setAddonErrorConditions(ctx, &r.stageCtx, addon, false, true, AddonRefObjError,
-					fmt.Sprintf("ConfigMap object %v not found", key))
-				return
 			}
-			if !findDataKey(cm.Data, cmRef) {
-				setAddonErrorConditions(ctx, &r.stageCtx, addon, true, true, AddonRefObjError,
-					fmt.Sprintf("Attach ConfigMap %v volume source failed, key %s not found", key, cmRef.Key))
-				r.setReconciled()
-				return
-			}
-			attachVolumeMount(helmJobPodSpec, cmRef, cm.Name, "cm",
-				func() corev1.VolumeSource {
-					return corev1.VolumeSource{
-						ConfigMap: &corev1.ConfigMapVolumeSource{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: cm.Name,
-							},
-							Items: []corev1.KeyToPath{
-								{
-									Key:  cmRef.Key,
-									Path: cmRef.Key,
-								},
-							},
-						},
-					}
-				})
-		}
-
-		for _, secretRef := range installValues.SecretRefs {
-			secret := &corev1.Secret{}
-			key := client.ObjectKey{
-				Name:      secretRef.Name,
-				Namespace: mgrNS}
-			if err := r.reconciler.Get(ctx, key, secret); err != nil {
-				if !apierrors.IsNotFound(err) {
-					r.setRequeueWithErr(err, "")
-					return
-				}
-				r.setRequeueAfter(time.Second, fmt.Sprintf("Secret %s not found", secret.Name))
-				setAddonErrorConditions(ctx, &r.stageCtx, addon, false, true, AddonRefObjError,
-					fmt.Sprintf("Secret object %v not found", key))
-				return
-			}
-			if !findDataKey(secret.Data, secretRef) {
-				setAddonErrorConditions(ctx, &r.stageCtx, addon, true, true, AddonRefObjError,
-					fmt.Sprintf("Attach Secret %v volume source failed, key %s not found", key, secretRef.Key))
-				r.setReconciled()
-				return
-			}
-			attachVolumeMount(helmJobPodSpec, secretRef, secret.Name, "secret",
-				func() corev1.VolumeSource {
-					return corev1.VolumeSource{
-						Secret: &corev1.SecretVolumeSource{
-							SecretName: secret.Name,
-							Items: []corev1.KeyToPath{
-								{
-									Key:  secretRef.Key,
-									Path: secretRef.Key,
-								},
-							},
-						},
-					}
-				})
-		}
-
-		// if chartLocationURL starts with 'file://', it means the charts is from local file system
-		// we will copy the charts from charts image to shared volume. Addon container will use the
-		// charts from shared volume to install the addon.
-		setSharedVolume(addon, helmJobPodSpec)
-		setInitContainer(addon, helmJobPodSpec)
-
-		if err := r.reconciler.Create(ctx, helmInstallJob); err != nil {
-			r.setRequeueWithErr(err, "")
 			return
 		}
 		r.setRequeueAfter(time.Second, "")
-	})
+		return
+	}
+
+	var err error
+	helmInstallJob, err = createHelmJobProto(addon)
+	if err != nil {
+		r.setRequeueWithErr(err, "")
+		return
+	}
+
+	// set addon installation job to use local charts instead of remote charts,
+	// the init container will copy the local charts to the shared volume
+	chartsPath, err := buildLocalChartsPath(addon)
+	if err != nil {
+		r.setRequeueWithErr(err, "")
+		return
+	}
+
+	helmInstallJob.ObjectMeta.Name = key.Name
+	helmInstallJob.ObjectMeta.Namespace = key.Namespace
+	helmJobPodSpec := &helmInstallJob.Spec.Template.Spec
+	helmContainer := &helmInstallJob.Spec.Template.Spec.Containers[0]
+	helmContainer.Args = append([]string{
+		"upgrade",
+		"--install",
+		"$(RELEASE_NAME)",
+		chartsPath,
+		"--namespace",
+		"$(RELEASE_NS)",
+		"--create-namespace",
+	}, viper.GetStringSlice(addonHelmInstallOptKey)...)
+
+	installValues := addon.Spec.Helm.BuildMergedValues(addon.Spec.InstallSpec)
+	if err = addon.Spec.Helm.BuildContainerArgs(helmContainer, installValues); err != nil {
+		r.setRequeueWithErr(err, "")
+		return
+	}
+
+	// set values from file
+	for _, cmRef := range installValues.ConfigMapRefs {
+		cm := &corev1.ConfigMap{}
+		key := client.ObjectKey{
+			Name:      cmRef.Name,
+			Namespace: mgrNS}
+		if err := r.reconciler.Get(r.reqCtx.Ctx, key, cm); err != nil {
+			if !apierrors.IsNotFound(err) {
+				r.setRequeueWithErr(err, "")
+				return
+			}
+			r.setRequeueAfter(time.Second, fmt.Sprintf("ConfigMap %s not found", cmRef.Name))
+			setAddonErrorConditions(r.reqCtx.Ctx, &r.stageCtx, addon, false, true, AddonRefObjError,
+				fmt.Sprintf("ConfigMap object %v not found", key))
+			return
+		}
+		if !findDataKey(cm.Data, cmRef) {
+			setAddonErrorConditions(r.reqCtx.Ctx, &r.stageCtx, addon, true, true, AddonRefObjError,
+				fmt.Sprintf("Attach ConfigMap %v volume source failed, key %s not found", key, cmRef.Key))
+			r.setReconciled()
+			return
+		}
+		attachVolumeMount(helmJobPodSpec, cmRef, cm.Name, "cm",
+			func() corev1.VolumeSource {
+				return corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: cm.Name,
+						},
+						Items: []corev1.KeyToPath{
+							{
+								Key:  cmRef.Key,
+								Path: cmRef.Key,
+							},
+						},
+					},
+				}
+			})
+	}
+
+	for _, secretRef := range installValues.SecretRefs {
+		secret := &corev1.Secret{}
+		key := client.ObjectKey{
+			Name:      secretRef.Name,
+			Namespace: mgrNS}
+		if err := r.reconciler.Get(r.reqCtx.Ctx, key, secret); err != nil {
+			if !apierrors.IsNotFound(err) {
+				r.setRequeueWithErr(err, "")
+				return
+			}
+			r.setRequeueAfter(time.Second, fmt.Sprintf("Secret %s not found", secret.Name))
+			setAddonErrorConditions(r.reqCtx.Ctx, &r.stageCtx, addon, false, true, AddonRefObjError,
+				fmt.Sprintf("Secret object %v not found", key))
+			return
+		}
+		if !findDataKey(secret.Data, secretRef) {
+			setAddonErrorConditions(r.reqCtx.Ctx, &r.stageCtx, addon, true, true, AddonRefObjError,
+				fmt.Sprintf("Attach Secret %v volume source failed, key %s not found", key, secretRef.Key))
+			r.setReconciled()
+			return
+		}
+		attachVolumeMount(helmJobPodSpec, secretRef, secret.Name, "secret",
+			func() corev1.VolumeSource {
+				return corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: secret.Name,
+						Items: []corev1.KeyToPath{
+							{
+								Key:  secretRef.Key,
+								Path: secretRef.Key,
+							},
+						},
+					},
+				}
+			})
+	}
+
+	// if chartLocationURL starts with 'file://', it means the charts is from local file system
+	// we will copy the charts from charts image to shared volume. Addon container will use the
+	// charts from shared volume to install the addon.
+	setSharedVolume(addon, helmJobPodSpec)
+	setInitContainer(addon, helmJobPodSpec)
+
+	if err := r.reconciler.Create(r.reqCtx.Ctx, helmInstallJob); err != nil {
+		r.setRequeueWithErr(err, "")
+		return
+	}
+	r.setRequeueAfter(time.Second, "")
 }
 
-func (r *helmTypeUninstallStage) Handle(ctx context.Context) {
-	r.process(func(addon *extensionsv1alpha1.Addon) {
-		r.reqCtx.Log.V(1).Info("helmTypeUninstallStage", "phase", addon.Status.Phase, "next", r.next.ID())
-		key := client.ObjectKey{
-			Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
-			Name:      getUninstallJobName(addon),
-		}
-		helmUninstallJob := &batchv1.Job{}
-		if err := r.reconciler.Get(ctx, key, helmUninstallJob); client.IgnoreNotFound(err) != nil {
-			r.setRequeueWithErr(err, "")
+func (r *helmTypeUninstallReconciler) Reconcile(tree *kubebuilderx.ObjectTree) {
+	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
+	r.reqCtx.Log.V(1).Info("helmTypeUninstallReconciler", "phase", addon.Status.Phase)
+	key := client.ObjectKey{
+		Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
+		Name:      getUninstallJobName(addon),
+	}
+	helmUninstallJob := &batchv1.Job{}
+	if err := r.reconciler.Get(r.reqCtx.Ctx, key, helmUninstallJob); client.IgnoreNotFound(err) != nil {
+		r.setRequeueWithErr(err, "")
+		return
+	} else if err == nil {
+		if helmUninstallJob.Status.Succeeded > 0 {
+			r.reqCtx.Log.V(1).Info("helm uninstall job succeed", "job", key)
+			// TODO:
+			// helm uninstall should always succeed, therefore need additional label selector to check any
+			// helm managed object is not properly cleaned up
 			return
-		} else if err == nil {
-			if helmUninstallJob.Status.Succeeded > 0 {
-				r.reqCtx.Log.V(1).Info("helm uninstall job succeed", "job", key)
-				// TODO:
-				// helm uninstall should always succeed, therefore need additional label selector to check any
-				// helm managed object is not properly cleaned up
-				return
-			}
+		}
 
-			// Job controller has yet handling Job or job controller is not running, i.e., testenv
-			// only handles this situation when addon is at terminating state.
-			if helmUninstallJob.Status.StartTime.IsZero() && !addon.GetDeletionTimestamp().IsZero() {
-				return
-			}
+		// Job controller has yet handling Job or job controller is not running, i.e., testenv
+		// only handles this situation when addon is at terminating state.
+		if helmUninstallJob.Status.StartTime.IsZero() && !addon.GetDeletionTimestamp().IsZero() {
+			return
+		}
 
-			// requeue if uninstall job is active or under deleting
-			if !helmUninstallJob.GetDeletionTimestamp().IsZero() || helmUninstallJob.Status.Active > 0 {
-				r.setRequeueAfter(time.Second, "")
-				return
-			}
-			// there are situations that job.status.[Active | Failed | Succeeded ] are all
-			// 0, and len(job.status.conditions) > 0, and need to handle failed
-			// info. from conditions.
-			if helmUninstallJob.Status.Failed > 0 {
-				r.reqCtx.Log.V(1).Info("helm uninstall job failed", "job", key)
-				r.reconciler.Event(addon, corev1.EventTypeWarning, UninstallationFailed,
-					fmt.Sprintf("Uninstallation failed, do inspect error from jobs.batch %s",
-						key.String()))
-				// only allow to do pod logs if max concurrent reconciles > 1, also considered that helm
-				// cmd error only has limited contents
-				if viper.GetInt(maxConcurrentReconcilesKey) > 1 {
-					if err := logFailedJobPodToCondError(ctx, &r.stageCtx, addon, key.Name, UninstallationFailedLogs); err != nil {
-						r.setRequeueWithErr(err, "")
-						return
-					}
-				}
-
-				if err := r.reconciler.Delete(ctx, helmUninstallJob); client.IgnoreNotFound(err) != nil {
-					r.setRequeueWithErr(err, "")
-					return
-				}
-				if err := r.reconciler.cleanupJobPods(*r.reqCtx); err != nil {
-					r.setRequeueWithErr(err, "")
-					return
-				}
-			}
+		// requeue if uninstall job is active or under deleting
+		if !helmUninstallJob.GetDeletionTimestamp().IsZero() || helmUninstallJob.Status.Active > 0 {
 			r.setRequeueAfter(time.Second, "")
 			return
 		}
+		// there are situations that job.status.[Active | Failed | Succeeded ] are all
+		// 0, and len(job.status.conditions) > 0, and need to handle failed
+		// info. from conditions.
+		if helmUninstallJob.Status.Failed > 0 {
+			r.reqCtx.Log.V(1).Info("helm uninstall job failed", "job", key)
+			r.reconciler.Event(addon, corev1.EventTypeWarning, UninstallationFailed,
+				fmt.Sprintf("Uninstallation failed, do inspect error from jobs.batch %s",
+					key.String()))
+			// only allow to do pod logs if max concurrent reconciles > 1, also considered that helm
+			// cmd error only has limited contents
+			if viper.GetInt(maxConcurrentReconcilesKey) > 1 {
+				if err := logFailedJobPodToCondError(r.reqCtx.Ctx, &r.stageCtx, addon, key.Name, UninstallationFailedLogs); err != nil {
+					r.setRequeueWithErr(err, "")
+					return
+				}
+			}
 
-		// inspect helm releases secrets
-		helmSecrets := &corev1.SecretList{}
-		if err := r.reconciler.List(ctx, helmSecrets, client.MatchingLabels{
-			"name":  getHelmReleaseName(addon),
-			"owner": "helm",
-		}); err != nil {
-			r.setRequeueWithErr(err, "")
-			return
-		}
-		releaseExist := false
-		for _, s := range helmSecrets.Items {
-			if string(s.Type) == "helm.sh/release.v1" {
-				releaseExist = true
-				break
+			if err := r.reconciler.Delete(r.reqCtx.Ctx, helmUninstallJob); client.IgnoreNotFound(err) != nil {
+				r.setRequeueWithErr(err, "")
+				return
+			}
+			if err := r.reconciler.cleanupJobPods(*r.reqCtx); err != nil {
+				r.setRequeueWithErr(err, "")
+				return
 			}
 		}
-
-		// has no installed release simply return
-		if !releaseExist {
-			r.reqCtx.Log.V(1).Info("helmTypeUninstallStage release not exist", "job", key)
-			return
-		}
-
-		r.reqCtx.Log.V(1).Info("creating helm uninstall job", "job", key)
-		var err error
-		// create `helm delete <release>` job
-		helmUninstallJob, err = createHelmJobProto(addon)
-		if err != nil {
-			r.reqCtx.Log.V(1).Info("helmTypeUninstallStage", "job", key, "err", err)
-			r.setRequeueWithErr(err, "")
-			return
-		}
-		helmUninstallJob.ObjectMeta.Name = key.Name
-		helmUninstallJob.ObjectMeta.Namespace = key.Namespace
-		helmUninstallJob.Spec.Template.Spec.Containers[0].Args = append([]string{
-			"delete",
-			"$(RELEASE_NAME)",
-			"--namespace",
-			"$(RELEASE_NS)",
-		}, viper.GetStringSlice(addonHelmUninstallOptKey)...)
-		r.reqCtx.Log.V(1).Info("create helm uninstall job", "job", key)
-		if err := r.reconciler.Create(ctx, helmUninstallJob); err != nil {
-			r.reqCtx.Log.V(1).Info("helmTypeUninstallStage", "job", key, "err", err)
-			r.setRequeueWithErr(err, "")
-			return
-		}
 		r.setRequeueAfter(time.Second, "")
-	})
+		return
+	}
+
+	// inspect helm releases secrets
+	helmSecrets := &corev1.SecretList{}
+	if err := r.reconciler.List(r.reqCtx.Ctx, helmSecrets, client.MatchingLabels{
+		"name":  getHelmReleaseName(addon),
+		"owner": "helm",
+	}); err != nil {
+		r.setRequeueWithErr(err, "")
+		return
+	}
+	releaseExist := false
+	for _, s := range helmSecrets.Items {
+		if string(s.Type) == "helm.sh/release.v1" {
+			releaseExist = true
+			break
+		}
+	}
+
+	// has no installed release simply return
+	if !releaseExist {
+		r.reqCtx.Log.V(1).Info("helmTypeUninstallStage release not exist", "job", key)
+		return
+	}
+
+	r.reqCtx.Log.V(1).Info("creating helm uninstall job", "job", key)
+	var err error
+	// create `helm delete <release>` job
+	helmUninstallJob, err = createHelmJobProto(addon)
+	if err != nil {
+		r.reqCtx.Log.V(1).Info("helmTypeUninstallStage", "job", key, "err", err)
+		r.setRequeueWithErr(err, "")
+		return
+	}
+	helmUninstallJob.ObjectMeta.Name = key.Name
+	helmUninstallJob.ObjectMeta.Namespace = key.Namespace
+	helmUninstallJob.Spec.Template.Spec.Containers[0].Args = append([]string{
+		"delete",
+		"$(RELEASE_NAME)",
+		"--namespace",
+		"$(RELEASE_NS)",
+	}, viper.GetStringSlice(addonHelmUninstallOptKey)...)
+	r.reqCtx.Log.V(1).Info("create helm uninstall job", "job", key)
+	if err := r.reconciler.Create(r.reqCtx.Ctx, helmUninstallJob); err != nil {
+		r.reqCtx.Log.V(1).Info("helmTypeUninstallStage", "job", key, "err", err)
+		r.setRequeueWithErr(err, "")
+		return
+	}
+	r.setRequeueAfter(time.Second, "")
 }
 
-func (r *enablingStage) Handle(ctx context.Context) {
-	r.helmTypeInstallStage.stageCtx = r.stageCtx
-	r.process(func(addon *extensionsv1alpha1.Addon) {
-		r.reqCtx.Log.V(1).Info("enablingStage", "phase", addon.Status.Phase)
-		switch addon.Spec.Type {
-		case extensionsv1alpha1.HelmType:
-			r.helmTypeInstallStage.Handle(ctx)
-		default:
-		}
-	})
+func (r *enablingReconciler) Reconcile(tree *kubebuilderx.ObjectTree) {
+	r.helmTypeInstallReconciler.stageCtx = r.stageCtx
+	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
+	r.reqCtx.Log.V(1).Info("enablingStage", "phase", addon.Status.Phase)
+	switch addon.Spec.Type {
+	case extensionsv1alpha1.HelmType:
+		r.helmTypeInstallReconciler.Reconcile(tree)
+	default:
+	}
 }
 
-func (r *disablingStage) Handle(ctx context.Context) {
-	r.helmTypeUninstallStage.stageCtx = r.stageCtx
-	r.process(func(addon *extensionsv1alpha1.Addon) {
-		r.reqCtx.Log.V(1).Info("disablingStage", "phase", addon.Status.Phase, "type", addon.Spec.Type)
-		switch addon.Spec.Type {
-		case extensionsv1alpha1.HelmType:
-			r.helmTypeUninstallStage.Handle(ctx)
-		default:
-		}
-	})
+func (r *disablingReconciler) Reconcile(tree *kubebuilderx.ObjectTree) {
+	r.helmTypeUninstallReconciler.stageCtx = r.stageCtx
+	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
+	r.reqCtx.Log.V(1).Info("disablingStage", "phase", addon.Status.Phase, "type", addon.Spec.Type)
+	switch addon.Spec.Type {
+	case extensionsv1alpha1.HelmType:
+		r.helmTypeUninstallReconciler.Reconcile(tree)
+	default:
+	}
 }
 
 // attachVolumeMount attaches a volumes to pod and added container.VolumeMounts to a ConfigMap
@@ -946,7 +931,7 @@ func checkAddonSpec(addon *extensionsv1alpha1.Addon) error {
 	return nil
 }
 
-func setAddonProviderAndVersion(ctx context.Context, stageCtx *stageCtx, addon *extensionsv1alpha1.Addon) {
+func setAddonProviderAndVersion(addon *extensionsv1alpha1.Addon) {
 	// if not set provider and version in spec, set it from labels
 	if addon.Labels == nil {
 		addon.Labels = map[string]string{}

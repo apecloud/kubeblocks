@@ -22,26 +22,33 @@ package extensions
 import (
 	"fmt"
 
-	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type progressingReconciler struct {
 	stageCtx
-	enablingStage  enablingStage
-	disablingStage disablingStage
+	enablingReconciler enablingReconciler
+	disablingStage     disablingReconciler
 }
 
 func (r *progressingReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
+		return kubebuilderx.ResultUnsatisfied
+	}
+	if res, _ := r.reqCtx.Ctx.Value(resultValueKey).(*ctrl.Result); res != nil {
+		return kubebuilderx.ResultUnsatisfied
+	}
+	if err, _ := r.reqCtx.Ctx.Value(errorValueKey).(error); err != nil {
 		return kubebuilderx.ResultUnsatisfied
 	}
 
@@ -49,64 +56,70 @@ func (r *progressingReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kub
 }
 
 func (r *progressingReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
-	r.enablingStage.stageCtx = r.stageCtx
+	r.enablingReconciler.stageCtx = r.stageCtx
 	r.disablingStage.stageCtx = r.stageCtx
-	r.process(func(addon *extensionsv1alpha1.Addon) {
-		r.reqCtx.Log.V(1).Info("progressingHandler", "phase", addon.Status.Phase)
-		patchPhase := func(phase extensionsv1alpha1.AddonPhase, reason string) {
-			r.reqCtx.Log.V(1).Info("patching status", "phase", phase)
-			patch := client.MergeFrom(addon.DeepCopy())
-			addon.Status.Phase = phase
-			addon.Status.ObservedGeneration = addon.Generation
-			if err := r.reconciler.Status().Patch(r.reqCtx.Ctx, addon, patch); err != nil {
-				r.setRequeueWithErr(err, "")
-				return
-			}
-			r.reconciler.Event(addon, corev1.EventTypeNormal, reason,
-				fmt.Sprintf("Progress to %s phase", phase))
-			r.setReconciled()
-		}
 
-		// decision enabling or disabling
-		if !addon.Spec.InstallSpec.GetEnabled() {
-			r.reqCtx.Log.V(1).Info("progress to disabling stage handler")
-			// if it's new simply return
-			if addon.Status.Phase == "" {
-				return
-			}
-			if addon.Status.Phase != extensionsv1alpha1.AddonDisabling {
-				patchPhase(extensionsv1alpha1.AddonDisabling, DisablingAddon)
-				return
-			}
-			r.disablingStage.Handle(r.reqCtx.Ctx)
-			return
+	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
+	r.reqCtx.Log.V(1).Info("progressingHandler", "phase", addon.Status.Phase)
+	patchPhase := func(phase extensionsv1alpha1.AddonPhase, reason string) error {
+		r.reqCtx.Log.V(1).Info("patching status", "phase", phase)
+		patch := client.MergeFrom(addon.DeepCopy())
+		addon.Status.Phase = phase
+		addon.Status.ObservedGeneration = addon.Generation
+		if err := r.reconciler.Status().Patch(r.reqCtx.Ctx, addon, patch); err != nil {
+			r.setRequeueWithErr(err, "")
+			return err
 		}
-		// handling enabling state
-		if addon.Status.Phase != extensionsv1alpha1.AddonEnabling {
-			if addon.Status.Phase == extensionsv1alpha1.AddonFailed {
-				// clean up existing failed installation job
-				mgrNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
-				key := client.ObjectKey{
-					Namespace: mgrNS,
-					Name:      getInstallJobName(addon),
-				}
-				installJob := &batchv1.Job{}
-				if err := r.reconciler.Get(r.reqCtx.Ctx, key, installJob); client.IgnoreNotFound(err) != nil {
+		r.reconciler.Event(addon, corev1.EventTypeNormal, reason,
+			fmt.Sprintf("Progress to %s phase", phase))
+		r.setReconciled()
+		return nil
+	}
+
+	// decision enabling or disabling
+	if !addon.Spec.InstallSpec.GetEnabled() {
+		r.reqCtx.Log.V(1).Info("progress to disabling stage handler")
+		// if it's new simply return
+		if addon.Status.Phase == "" {
+			return tree, nil
+		}
+		if addon.Status.Phase != extensionsv1alpha1.AddonDisabling {
+			if err := patchPhase(extensionsv1alpha1.AddonDisabling, DisablingAddon); err != nil {
+				return tree, err
+			}
+			return tree, nil
+		}
+		r.disablingStage.Reconcile(tree)
+		return tree, nil
+	}
+	// handling enabling state
+	if addon.Status.Phase != extensionsv1alpha1.AddonEnabling {
+		if addon.Status.Phase == extensionsv1alpha1.AddonFailed {
+			// clean up existing failed installation job
+			mgrNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+			key := client.ObjectKey{
+				Namespace: mgrNS,
+				Name:      getInstallJobName(addon),
+			}
+			installJob := &batchv1.Job{}
+			if err := r.reconciler.Get(r.reqCtx.Ctx, key, installJob); client.IgnoreNotFound(err) != nil {
+				r.setRequeueWithErr(err, "")
+				return tree, err
+			} else if err == nil && installJob.GetDeletionTimestamp().IsZero() {
+				if err = r.reconciler.Delete(r.reqCtx.Ctx, installJob); err != nil {
 					r.setRequeueWithErr(err, "")
-					return
-				} else if err == nil && installJob.GetDeletionTimestamp().IsZero() {
-					if err = r.reconciler.Delete(r.reqCtx.Ctx, installJob); err != nil {
-						r.setRequeueWithErr(err, "")
-						return
-					}
+					return tree, err
 				}
 			}
-			patchPhase(extensionsv1alpha1.AddonEnabling, EnablingAddon)
-			return
 		}
-		r.reqCtx.Log.V(1).Info("progress to enabling stage handler")
-		r.enablingStage.Handle(r.reqCtx.Ctx)
-	})
+		if err := patchPhase(extensionsv1alpha1.AddonEnabling, EnablingAddon); err != nil {
+			return tree, err
+		}
+		return tree, nil
+	}
+	r.reqCtx.Log.V(1).Info("progress to enabling stage handler")
+	r.enablingReconciler.Reconcile(tree)
+
 	return tree, nil
 }
 

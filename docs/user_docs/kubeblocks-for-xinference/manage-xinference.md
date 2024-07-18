@@ -86,13 +86,11 @@ kbcli cluster vscale xinference --cpu=0.5 --memory=512Mi --components=xinference
 ```
 
 Please wait a few seconds until the scaling process is over.
-The `kbcli cluster vscale` command print the `opsname`, to check the progress of scaling, you can use the following command with the `opsname`.
+
+The `kbcli cluster vscale` command prints a command to help check the progress of scaling operations.
 
 ```bash
-kubectl get ops xinference-verticalscaling-rpw2l
->
-NAME                             TYPE              CLUSTER     STATUS    PROGRESS   AGE
-xinference-verticalscaling-rpw2l   VerticalScaling   xinference    Running   1/5        44s
+kbcli cluster describe-ops mycluster-verticalscaling-smx8b -n default
 ```
 
 To check whether the scaling is done, use the following command.

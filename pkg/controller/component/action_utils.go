@@ -203,7 +203,7 @@ func renderActionCmdJob(ctx context.Context, cli client.Reader, actionCtx *Actio
 						Containers: []corev1.Container{
 							{
 								Name:            kbLifecycleActionJobContainerName,
-								Image:           customAction.Image,
+								Image:           customAction.Exec.Image,
 								ImagePullPolicy: corev1.PullIfNotPresent,
 								Command:         customAction.Exec.Command,
 								Args:            customAction.Exec.Args,
@@ -253,7 +253,7 @@ func buildLifecycleActionEnvs(ctx context.Context,
 
 	// add custom environment variables of the lifecycle action
 	if action != nil {
-		workloadEnvs = append(workloadEnvs, action.Env...)
+		workloadEnvs = append(workloadEnvs, action.Exec.Env...)
 	}
 
 	if tplPod != nil && len(tplPod.Spec.Containers) > 0 {

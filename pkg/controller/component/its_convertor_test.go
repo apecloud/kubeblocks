@@ -38,13 +38,11 @@ var _ = Describe("Test InstanceSet Convertor", func() {
 		BeforeEach(func() {
 			synComp = &SynthesizedComponent{
 				LifecycleActions: &appsv1alpha1.ComponentLifecycleActions{
-					RoleProbe: &appsv1alpha1.RoleProbe{
-						LifecycleActionHandler: appsv1alpha1.LifecycleActionHandler{
-							CustomHandler: &appsv1alpha1.Action{
-								Exec: &appsv1alpha1.ExecAction{
-									Command: command,
-									Args:    args,
-								},
+					RoleProbe: &appsv1alpha1.Probe{
+						Action: appsv1alpha1.Action{
+							Exec: &appsv1alpha1.ExecAction{
+								Command: command,
+								Args:    args,
 							},
 						},
 					},

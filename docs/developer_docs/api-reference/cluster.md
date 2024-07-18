@@ -1537,6 +1537,7 @@ When using hostNetwork, the operator will set the DNSPolicy to &lsquo;ClusterFir
 With this policy, DNS queries will first go through the K8s cluster&rsquo;s DNS service.
 If the query fails, it will fall back to the host&rsquo;s DNS settings.</p>
 <p>If set, the DNS policy will be automatically set to &ldquo;ClusterFirstWithHostNet&rdquo;.</p>
+<p>This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -3012,7 +3013,7 @@ The modes can be <code>None</code>, <code>Readonly</code>, or <code>ReadWrite</c
 <h3 id="apps.kubeblocks.io/v1alpha1.Action">Action
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentSwitchover">ComponentSwitchover</a>, <a href="#apps.kubeblocks.io/v1alpha1.LifecycleActionHandler">LifecycleActionHandler</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentSwitchover">ComponentSwitchover</a>, <a href="#apps.kubeblocks.io/v1alpha1.LifecycleActionHandler">LifecycleActionHandler</a>, <a href="#apps.kubeblocks.io/v1alpha1.Probe">Probe</a>)
 </p>
 <div>
 <p>Action defines a customizable hook or procedure tailored for different database engines,
@@ -3073,21 +3074,6 @@ or detailed in the HTTP response with the appropriate non-200 status code.</li>
 <tbody>
 <tr>
 <td>
-<code>image</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the container image to be used for running the Action.</p>
-<p>When specified, a dedicated container will be created using this image to execute the Action.
-This field is mutually exclusive with the <code>container</code> field; only one of them should be provided.</p>
-<p>This field cannot be updated.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>exec</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ExecAction">
@@ -3115,77 +3101,6 @@ HTTPAction
 <p>Specifies the HTTP request to perform.</p>
 <p>This field cannot be updated.</p>
 <p>Note: HTTPAction is to be implemented in future version.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>env</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
-[]Kubernetes core/v1.EnvVar
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Represents a list of environment variables that will be injected into the container.
-These variables enable the container to adapt its behavior based on the environment it&rsquo;s running in.</p>
-<p>This field cannot be updated.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>targetPodSelector</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.TargetPodSelector">
-TargetPodSelector
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the criteria used to select the target Pod(s) for executing the Action.
-This is useful when there is no default target replica identified.
-It allows for precise control over which Pod(s) the Action should run in.</p>
-<p>This field cannot be updated.</p>
-<p>Note: This field is reserved for future use and is not currently active.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>matchingKey</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Used in conjunction with the <code>targetPodSelector</code> field to refine the selection of target pod(s) for Action execution.
-The impact of this field depends on the <code>targetPodSelector</code> value:</p>
-<ul>
-<li>When <code>targetPodSelector</code> is set to <code>Any</code> or <code>All</code>, this field will be ignored.</li>
-<li>When <code>targetPodSelector</code> is set to <code>Role</code>, only those replicas whose role matches the <code>matchingKey</code>
-will be selected for the Action.</li>
-</ul>
-<p>This field cannot be updated.</p>
-<p>Note: This field is reserved for future use and is not currently active.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>container</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the name of the container within the target Pod where the action will be executed.</p>
-<p>This name must correspond to one of the containers defined in <code>componentDefinition.spec.runtime</code>.
-If this field is not specified, the default behavior is to use the first container listed in
-<code>componentDefinition.spec.runtime</code>.</p>
-<p>This field cannot be updated.</p>
-<p>Note: This field is reserved for future use and is not currently active.</p>
 </td>
 </tr>
 <tr>
@@ -3986,7 +3901,7 @@ RefNamespaceName
 <h3 id="apps.kubeblocks.io/v1alpha1.BuiltinActionHandlerType">BuiltinActionHandlerType
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.LifecycleActionHandler">LifecycleActionHandler</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.LifecycleActionHandler">LifecycleActionHandler</a>, <a href="#apps.kubeblocks.io/v1alpha1.Probe">Probe</a>)
 </p>
 <div>
 <p>BuiltinActionHandlerType defines build-in action handlers provided by Lorry, including:</p>
@@ -7703,6 +7618,7 @@ When using hostNetwork, the operator will set the DNSPolicy to &lsquo;ClusterFir
 With this policy, DNS queries will first go through the K8s cluster&rsquo;s DNS service.
 If the query fails, it will fall back to the host&rsquo;s DNS settings.</p>
 <p>If set, the DNS policy will be automatically set to &ldquo;ClusterFirstWithHostNet&rdquo;.</p>
+<p>This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -8263,8 +8179,8 @@ is being cleaned up.</p></li>
 <td>
 <code>roleProbe</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.RoleProbe">
-RoleProbe
+<a href="#apps.kubeblocks.io/v1alpha1.Probe">
+Probe
 </a>
 </em>
 </td>
@@ -11879,6 +11795,21 @@ Future implementations will standardize execution within Lorry.</p>
 <tbody>
 <tr>
 <td>
+<code>image</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the container image to be used for running the Action.</p>
+<p>When specified, a dedicated container will be created using this image to execute the Action.
+This field is mutually exclusive with the <code>container</code> field; only one of them should be provided.</p>
+<p>This field cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>command</code><br/>
 <em>
 []string
@@ -11903,6 +11834,77 @@ If the shell is required, it must be explicitly invoked in the command.</p>
 <td>
 <em>(Optional)</em>
 <p>Args represents the arguments that are passed to the <code>command</code> for execution.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>env</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents a list of environment variables that will be injected into the container.
+These variables enable the container to adapt its behavior based on the environment it&rsquo;s running in.</p>
+<p>This field cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>targetPodSelector</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.TargetPodSelector">
+TargetPodSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the criteria used to select the target Pod(s) for executing the Action.
+This is useful when there is no default target replica identified.
+It allows for precise control over which Pod(s) the Action should run in.</p>
+<p>This field cannot be updated.</p>
+<p>Note: This field is reserved for future use and is not currently active.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>matchingKey</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Used in conjunction with the <code>targetPodSelector</code> field to refine the selection of target pod(s) for Action execution.
+The impact of this field depends on the <code>targetPodSelector</code> value:</p>
+<ul>
+<li>When <code>targetPodSelector</code> is set to <code>Any</code> or <code>All</code>, this field will be ignored.</li>
+<li>When <code>targetPodSelector</code> is set to <code>Role</code>, only those replicas whose role matches the <code>matchingKey</code>
+will be selected for the Action.</li>
+</ul>
+<p>This field cannot be updated.</p>
+<p>Note: This field is reserved for future use and is not currently active.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>container</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the name of the container within the target Pod where the action will be executed.</p>
+<p>This name must correspond to one of the containers defined in <code>componentDefinition.spec.runtime</code>.
+If this field is not specified, the default behavior is to use the first container listed in
+<code>componentDefinition.spec.runtime</code>.</p>
+<p>This field cannot be updated.</p>
+<p>Note: This field is reserved for future use and is not currently active.</p>
 </td>
 </tr>
 </tbody>
@@ -13303,7 +13305,7 @@ ConfigTemplateExtension
 <h3 id="apps.kubeblocks.io/v1alpha1.LifecycleActionHandler">LifecycleActionHandler
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1alpha1.RoleProbe">RoleProbe</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentLifecycleActions">ComponentLifecycleActions</a>)
 </p>
 <div>
 <p>LifecycleActionHandler describes the implementation of a specific lifecycle action.</p>
@@ -16077,6 +16079,103 @@ string
 <td></td>
 </tr></tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.Probe">Probe
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentLifecycleActions">ComponentLifecycleActions</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>Action</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>Action</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>builtinHandler</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.BuiltinActionHandlerType">
+BuiltinActionHandlerType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>initialDelaySeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the number of seconds to wait after the container has started before the RoleProbe
+begins to detect the container&rsquo;s role.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>periodSeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the frequency at which the probe is conducted. This value is expressed in seconds.
+Default to 10 seconds. Minimum value is 1.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>successThreshold</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Minimum consecutive successes for the probe to be considered successful after having failed.
+Defaults to 1. Minimum value is 1.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>failureThreshold</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Minimum consecutive failures for the probe to be considered failed after having succeeded.
+Defaults to 3. Minimum value is 1.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ProgressStatus">ProgressStatus
 (<code>string</code> alias)</h3>
 <p>
@@ -17369,77 +17468,6 @@ time.Duration
 <em>(Optional)</em>
 <p>Indicates the duration of time to wait between each retry attempt.
 This value is set to 0 by default, indicating that there will be no delay between retry attempts.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.RoleProbe">RoleProbe
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentLifecycleActions">ComponentLifecycleActions</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>LifecycleActionHandler</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.LifecycleActionHandler">
-LifecycleActionHandler
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>LifecycleActionHandler</code> are embedded into this type.)
-</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>initialDelaySeconds</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the number of seconds to wait after the container has started before the RoleProbe
-begins to detect the container&rsquo;s role.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>timeoutSeconds</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the number of seconds after which the probe times out.
-Defaults to 1 second. Minimum value is 1.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>periodSeconds</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the frequency at which the probe is conducted. This value is expressed in seconds.
-Default to 10 seconds. Minimum value is 1.</p>
 </td>
 </tr>
 </tbody>
@@ -20571,7 +20599,7 @@ It will be ignored when the <code>account</code> is set.</p>
 <h3 id="apps.kubeblocks.io/v1alpha1.TargetPodSelector">TargetPodSelector
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.Action">Action</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ExecAction">ExecAction</a>)
 </p>
 <div>
 <p>TargetPodSelector defines how to select pod(s) to execute an Action.</p>

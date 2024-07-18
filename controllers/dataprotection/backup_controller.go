@@ -23,7 +23,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"regexp"
 	"strings"
 	"time"
 
@@ -825,23 +824,14 @@ func updateBackupStatusByActionStatus(backupStatus *dpv1alpha1.BackupStatus) {
 	}
 }
 
-func isSystemAccountSecret(secret *corev1.Secret) bool {
-	clusterName := secret.Labels[constant.AppInstanceLabelKey]
-	componentName := secret.Labels[constant.KBAppComponentLabelKey]
-	if clusterName == "" || componentName == "" {
-		return false
-	}
-	accountSecretPattern := `^` + clusterName + `-` + componentName + `-account-\w+$`
-	regex, _ := regexp.Compile(accountSecretPattern)
-	if matched := regex.MatchString(secret.Name); matched {
-		return true
-	}
-	return false
-}
-
 func setEncryptedSystemAccountsAnnotation(request *dpbackup.Request, cluster *appsv1alpha1.Cluster) error {
 	usernameKey := constant.AccountNameForSecret
 	passwordKey := constant.AccountPasswdForSecret
+	isSystemAccountSecret := func(secret *corev1.Secret) bool {
+		username := secret.Data[usernameKey]
+		password := secret.Data[passwordKey]
+		return username != nil && password != nil
+	}
 	// fetch secret objects
 	objectList, err := listObjectsOfCluster(request.Ctx, request.Client, cluster, &corev1.SecretList{})
 	if err != nil {

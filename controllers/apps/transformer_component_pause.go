@@ -26,12 +26,12 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
-// componentDeletionTransformer handles component deletion
+// componentPauseTransformer handles component pause and resume
 type componentPauseTransformer struct {
 	client.Client
 }
 
-var _ graph.Transformer = &componentDeletionTransformer{}
+var _ graph.Transformer = &componentPauseTransformer{}
 
 func (t *componentPauseTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)

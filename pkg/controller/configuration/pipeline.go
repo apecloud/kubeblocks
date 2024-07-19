@@ -378,6 +378,10 @@ func (p *updatePipeline) Sync() *updatePipeline {
 			return p.Client.Create(p.Context, p.newCM)
 		case p.ConfigMapObj != nil:
 			patch := client.MergeFrom(p.ConfigMapObj)
+			if p.ConfigMapObj != nil {
+				p.newCM.Labels = intctrlutil.MergeMetadataMaps(p.newCM.Labels, p.ConfigMapObj.Labels)
+				p.newCM.Annotations = intctrlutil.MergeMetadataMaps(p.newCM.Annotations, p.ConfigMapObj.Annotations)
+			}
 			return p.Client.Patch(p.Context, p.newCM, patch)
 		}
 		return core.MakeError("unexpected condition")

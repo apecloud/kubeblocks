@@ -42,16 +42,16 @@ func NewReplicasAlignmentReconciler() kubebuilderx.Reconciler {
 
 func (r *instanceAlignmentReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
-		return kubebuilderx.ResultUnsatisfied
+		return kubebuilderx.ConditionUnsatisfied
 	}
 	if model.IsReconciliationPaused(tree.GetRoot()) {
-		return kubebuilderx.ResultUnsatisfied
+		return kubebuilderx.ConditionUnsatisfied
 	}
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
 	if err := validateSpec(its, tree); err != nil {
 		return kubebuilderx.CheckResultWithError(err)
 	}
-	return kubebuilderx.ResultSatisfied
+	return kubebuilderx.ConditionSatisfied
 }
 
 func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {

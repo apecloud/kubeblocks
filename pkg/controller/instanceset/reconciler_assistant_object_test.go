@@ -49,7 +49,7 @@ var _ = Describe("assistant object reconciler test", func() {
 			tree := kubebuilderx.NewObjectTree()
 			tree.SetRoot(its)
 			reconciler = NewAssistantObjectReconciler()
-			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ResultSatisfied))
+			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ConditionSatisfied))
 
 			By("do reconcile")
 			res, err := reconciler.Reconcile(tree)

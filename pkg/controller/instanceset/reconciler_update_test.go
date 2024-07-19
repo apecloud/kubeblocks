@@ -57,7 +57,7 @@ var _ = Describe("update reconciler test", func() {
 			tree := kubebuilderx.NewObjectTree()
 			tree.SetRoot(its)
 			reconciler = NewUpdateReconciler()
-			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ResultSatisfied))
+			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ConditionSatisfied))
 
 			By("prepare current tree")
 			// desired: bar-hello-0, bar-foo-1, bar-foo-0, bar-3, bar-2, bar-1, bar-0

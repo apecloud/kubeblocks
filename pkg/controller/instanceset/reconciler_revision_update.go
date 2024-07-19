@@ -42,13 +42,13 @@ func NewRevisionUpdateReconciler() kubebuilderx.Reconciler {
 
 func (r *revisionUpdateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || !model.IsObjectUpdating(tree.GetRoot()) {
-		return kubebuilderx.ResultUnsatisfied
+		return kubebuilderx.ConditionUnsatisfied
 	}
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
 	if err := validateSpec(its, tree); err != nil {
 		return kubebuilderx.CheckResultWithError(err)
 	}
-	return kubebuilderx.ResultSatisfied
+	return kubebuilderx.ConditionSatisfied
 }
 
 func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {

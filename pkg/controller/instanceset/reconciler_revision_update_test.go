@@ -48,7 +48,7 @@ var _ = Describe("revision update reconciler test", func() {
 			tree := kubebuilderx.NewObjectTree()
 			tree.SetRoot(its)
 			reconciler := NewRevisionUpdateReconciler()
-			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ResultSatisfied))
+			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ConditionSatisfied))
 
 			By("Reconcile")
 			res, err := reconciler.Reconcile(tree)

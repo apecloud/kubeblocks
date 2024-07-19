@@ -48,9 +48,9 @@ func NewStatusReconciler() kubebuilderx.Reconciler {
 
 func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || !model.IsObjectStatusUpdating(tree.GetRoot()) {
-		return kubebuilderx.ResultUnsatisfied
+		return kubebuilderx.ConditionUnsatisfied
 	}
-	return kubebuilderx.ResultSatisfied
+	return kubebuilderx.ConditionSatisfied
 }
 
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {

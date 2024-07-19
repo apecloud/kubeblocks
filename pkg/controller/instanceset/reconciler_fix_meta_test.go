@@ -35,7 +35,7 @@ var _ = Describe("fix meta reconciler test", func() {
 			tree := kubebuilderx.NewObjectTree()
 			tree.SetRoot(its)
 			reconciler := NewFixMetaReconciler()
-			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ResultSatisfied))
+			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ConditionSatisfied))
 
 			By("Reconcile without finalizer")
 			res, err := reconciler.Reconcile(tree)
@@ -45,7 +45,7 @@ var _ = Describe("fix meta reconciler test", func() {
 			Expect(res).Should(Equal(kubebuilderx.Commit))
 
 			By("Reconcile with finalizer")
-			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ResultUnsatisfied))
+			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ConditionUnsatisfied))
 		})
 	})
 })

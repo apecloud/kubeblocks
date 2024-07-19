@@ -131,9 +131,9 @@ func (d *dummyReconciler) PreCondition(tree *ObjectTree) *CheckResult {
 		return CheckResultWithError(d.preErr)
 	}
 	if d.unsatisfied {
-		return ResultUnsatisfied
+		return ConditionUnsatisfied
 	}
-	return ResultSatisfied
+	return ConditionSatisfied
 }
 
 func (d *dummyReconciler) Reconcile(tree *ObjectTree) (Result, error) {

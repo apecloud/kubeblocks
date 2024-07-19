@@ -54,8 +54,8 @@ type CheckResult struct {
 	Err       error
 }
 
-var ResultUnsatisfied = &CheckResult{}
-var ResultSatisfied = &CheckResult{Satisfied: true}
+var ConditionUnsatisfied = &CheckResult{}
+var ConditionSatisfied = &CheckResult{Satisfied: true}
 
 type controlMethod string
 

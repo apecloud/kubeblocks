@@ -37,17 +37,17 @@ type scaleTargetClusterReconciler struct{}
 
 func (r *scaleTargetClusterReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
-		return kubebuilderx.ResultUnsatisfied
+		return kubebuilderx.ConditionUnsatisfied
 	}
-	return kubebuilderx.ResultSatisfied
+	return kubebuilderx.ConditionSatisfied
 }
 
-func (r *scaleTargetClusterReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
+func (r *scaleTargetClusterReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	scaler, _ := tree.GetRoot().(*experimental.NodeCountScaler)
 	clusterKey := builder.NewClusterBuilder(scaler.Namespace, scaler.Spec.TargetClusterName).GetObject()
 	object, err := tree.Get(clusterKey)
 	if err != nil {
-		return nil, err
+		return kubebuilderx.Continue, err
 	}
 	cluster, _ := object.(*appsv1alpha1.Cluster)
 	nodes := tree.List(&corev1.Node{})
@@ -67,15 +67,15 @@ func (r *scaleTargetClusterReconciler) Reconcile(tree *kubebuilderx.ObjectTree) 
 		}
 	}
 	if !scaled {
-		return tree, nil
+		return kubebuilderx.Continue, nil
 	}
 
 	scaler.Status.LastScaleTime = metav1.Time{Time: time.Now()}
 	if err = tree.Update(cluster); err != nil {
-		return nil, err
+		return kubebuilderx.Continue, err
 	}
 
-	return tree, nil
+	return kubebuilderx.Continue, nil
 }
 
 func scaleTargetCluster() kubebuilderx.Reconciler {

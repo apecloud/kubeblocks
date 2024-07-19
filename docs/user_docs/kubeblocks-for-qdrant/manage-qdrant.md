@@ -34,6 +34,16 @@ KubeBlocks supports the management of Qdrant.
    kbcli cluster create qdrant --cluster-definition=qdrant --set replicas=3
    ```
 
+:::note
+
+View more flags for creating a MySQL cluster to create a cluster with customized specifications.
+  
+```bash
+kbcli cluster create --help
+```
+
+:::
+
 2. Check whether the cluster is created.
 
    ```bash

@@ -40,6 +40,16 @@ KubeBlocks supports the management of Xinference.
    kbcli cluster create mycluster --cluster-definition=xinference --set cpu=1,memory=2Gi,storage=10Gi
    ```
 
+:::note
+
+View more flags for creating a MySQL cluster to create a cluster with customized specifications.
+  
+```bash
+kbcli cluster create --help
+```
+
+:::
+
 2. Check whether the cluster is created.
 
    ```bash

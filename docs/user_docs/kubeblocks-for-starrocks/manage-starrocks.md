@@ -34,6 +34,16 @@ KubeBlocks supports the management of StarRocks.
    kbcli cluster create mycluster --cluster-definition=starrocks --set cpu=1,memory=2Gi,storage=10Gi
    ```
 
+:::note
+
+View more flags for creating a MySQL cluster to create a cluster with customized specifications.
+  
+```bash
+kbcli cluster create --help
+```
+
+:::
+
 2. Check whether the cluster is created.
 
    ```bash

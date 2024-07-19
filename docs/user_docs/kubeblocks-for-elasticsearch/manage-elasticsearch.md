@@ -28,6 +28,16 @@ KubeBlocks supports the management of Elasticsearch.
    kbcli cluster create elasticsearch elasticsearch
    ```
 
+:::note
+
+View more flags for creating a MySQL cluster to create a cluster with customized specifications.
+  
+```bash
+kbcli cluster create --help
+```
+
+:::
+
 2. Check whether the cluster is created.
 
    ```bash

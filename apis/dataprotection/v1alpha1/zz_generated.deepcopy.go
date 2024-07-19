@@ -1162,8 +1162,8 @@ func (in *PodSelector) DeepCopyInto(out *PodSelector) {
 		*out = new(metav1.LabelSelector)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.AlternateSelector != nil {
-		in, out := &in.AlternateSelector, &out.AlternateSelector
+	if in.AlternateLabelSelector != nil {
+		in, out := &in.AlternateLabelSelector, &out.AlternateLabelSelector
 		*out = new(metav1.LabelSelector)
 		(*in).DeepCopyInto(*out)
 	}

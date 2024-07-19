@@ -12,7 +12,11 @@ The popularity of generative AI (Generative AI) has aroused widespread attention
 
 KubeBlocks supports the management of Weaviate.
 
-Before you start, [install kbcli](./../installation/install-with-kbcli/install-kbcli.md) and [install KubeBlocks](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md).
+## Before you start
+
+- [Install kbcli](./../installation/install-with-kbcli/install-kbcli.md).
+- [Install KubeBlocks](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md).
+- [Install and enable the weaviate addon](./../overview/supported-addons.md#use-addons).
 
 ## Create a cluster
 
@@ -29,6 +33,16 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
    ```bash
    kbcli cluster create weaviate --cluster-definition=weaviate --set replicas=3
    ```
+
+:::note
+
+View more flags for creating a MySQL cluster to create a cluster with customized specifications.
+  
+```bash
+kbcli cluster create --help
+```
+
+:::
 
 2. Check whether the cluster is created.
 
@@ -111,7 +125,7 @@ For the testing environment, you can run the command below to open the Grafana m
    If `disableExporter: false` is not shown in the output, it means the monitoring function of this cluster is not enabled and you need to enable it first.
 
    ```bash
-   kbcli cluster update weaviate --disableExporter=false
+   kbcli cluster update weaviate --disable-exporter=false
    ```
 
 3. View the dashboard list.
@@ -147,13 +161,10 @@ kbcli cluster hscale weaviate --replicas=3 --components=weaviate
 
 Please wait a few seconds until the scaling process is over.
 
-The `kbcli cluster hscale` command print the `opsname`, to check the progress of horizontal scaling, you can use the following command with the `opsname`.
+The `kbcli cluster hscale` command prints a command to help check the progress of scaling operations.
 
 ```bash
-kubectl get ops weaviate-horizontalscaling-xpdwz
->
-NAME                               TYPE                CLUSTER     STATUS    PROGRESS   AGE
-weaviate-horizontalscaling-xpdwz   HorizontalScaling   weaviate    Running   0/2        16s
+kbcli cluster describe-ops weaviate-horizontalscaling-xpdwz -n default
 ```
 
 To check whether the scaling is done, use the following command.
@@ -171,13 +182,11 @@ kbcli cluster vscale weaviate --cpu=0.5 --memory=512Mi --components=weaviate
 ```
 
 Please wait a few seconds until the scaling process is over.
-The `kbcli cluster vscale` command print the `opsname`, to check the progress of scaling, you can use the following command with the `opsname`.
+
+The `kbcli cluster vscale` command prints a command to help check the progress of scaling operations.
 
 ```bash
-kubectl get ops weaviate-verticalscaling-rpw2l
->
-NAME                             TYPE              CLUSTER     STATUS    PROGRESS   AGE
-weaviate-verticalscaling-rpw2l   VerticalScaling   weaviate    Running   1/5        44s
+kbcli cluster describe-ops weaviate-verticalscaling-rpw2l -n default
 ```
 
 To check whether the scaling is done, use the following command.
@@ -196,13 +205,10 @@ kbcli cluster volume-expand weaviate --storage=40Gi --components=weaviate -t dat
 
 The volume expansion may take a few minutes.
 
-The `kbcli cluster volume-expand` command print the `opsname`, to check the progress of volume expanding, you can use the following command with the `opsname`.
+The `kbcli cluster volume-expand` command prints a command to help check the progress of scaling operations.
 
 ```bash
-kubectl get ops weaviate-volumeexpansion-5pbd2
->
-NAME                             TYPE              CLUSTER     STATUS   PROGRESS   AGE
-weaviate-volumeexpansion-5pbd2   VolumeExpansion   weaviate    Running  1/1        67s
+kbcli cluster describe-ops weaviate-volumeexpansion-5pbd2 -n default
 ```
 
 To check whether the expanding is done, use the following command.
@@ -238,3 +244,35 @@ kbcli cluster describe weaviate
 
    * STATUS=Updating: it means the cluster restart is in progress.
    * STATUS=Running: it means the cluster has been restarted.
+
+## Stop/Start a cluster
+
+You can stop/start a cluster to save computing resources. When a cluster is stopped, the computing resources of this cluster are released, which means the pods of Kubernetes are released, but the storage resources are reserved. You can start this cluster again by snapshots if you want to restore the cluster resources.
+
+### Stop a cluster
+
+1. Configure the name of your cluster and run the command below to stop this cluster.
+
+   ```bash
+   kbcli cluster stop weaviate
+   ```
+
+2. Check the status of the cluster to see whether it is stopped.
+
+    ```bash
+    kbcli cluster list
+    ```
+
+### Start a cluster
+
+1. Configure the name of your cluster and run the command below to start this cluster.
+
+   ```bash
+   kbcli cluster start weaviate
+   ```
+
+2. Check the status of the cluster to see whether it is running again.
+
+    ```bash
+    kbcli cluster list
+    ```

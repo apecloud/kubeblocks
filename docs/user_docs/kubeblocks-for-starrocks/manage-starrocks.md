@@ -1,7 +1,7 @@
 ---
 title: Manage StarRocks with KubeBlocks
 description: How to manage StarRocks on KubeBlocks
-keywords: [starrocks, control plane]
+keywords: [starrocks, analytic, data warehouse, control plane]
 sidebar_position: 1
 sidebar_label: Manage StarRocks with KubeBlocks
 ---
@@ -108,7 +108,7 @@ kbcli cluster hscale mycluster --replicas=3 --components=be
 
 Please wait a few seconds until the scaling process is over.
 
-The `kbcli cluster vscale` command prints a command to help check the progress of scaling operations.
+The `kbcli cluster hscale` command prints a command to help check the progress of scaling operations.
 
 ```bash
 kbcli cluster describe-ops mycluster-horizontalscaling-smx8b -n default
@@ -130,7 +130,7 @@ kbcli cluster volume-expand mycluster --storage=40Gi --components=be
 
 The volume expansion may take a few minutes.
 
-The `kbcli cluster vscale` command prints a command to help check the progress of scaling operations.
+The `kbcli cluster volume-expand` command prints a command to help check the progress of scaling operations.
 
 ```bash
 kbcli cluster describe-ops mycluster-volumeexpansion-smx8b -n default

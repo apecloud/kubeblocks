@@ -1,7 +1,7 @@
 ---
 title: Manage Xinference with KubeBlocks
 description: How to manage Xinference on KubeBlocks
-keywords: [xinference, control plane]
+keywords: [xinference, LLM, AI, control plane]
 sidebar_position: 1
 sidebar_label: Manage Xinference with KubeBlocks
 ---
@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 
 # Manage Xinference with KubeBlocks
 
-Xorbits Inference (Xinference) is an open-source platform to streamline the operation and integration of a wide array of AI models. With Xinference, you’re empowered to run inference using any open-source LLMs, embedding models, and multimodal models either in the cloud or on your own premises, and create robust AI-driven applications.
+Xorbits Inference (Xinference) is an open-source platform to streamline the operation and integration of a wide array of AI models. With Xinference, you’re empowered to run inference using any open-source LLMs, embedding models, and multimodal models either in the cloud or on your premises, and create robust AI-driven applications.
 
 This tutorial illustrates how to create and manage a Xinference cluster by `kubectl` or a YAML file. You can find the YAML examples and guides in [the GitHub repository](https://github.com/apecloud/kubeblocks-addons/tree/release-0.9/examples/xinference).
 
@@ -162,7 +162,7 @@ There are two ways to apply vertical scaling.
    demo        mycluster-vertical-scaling   VerticalScaling   mycluster   Succeed   3/3        6m
    ```
 
-   If an error occurs in the vertical scaling operation, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
+   If an error occurs, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
 
 3. Check whether the corresponding resources change.
 

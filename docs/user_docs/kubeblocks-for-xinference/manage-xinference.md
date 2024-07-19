@@ -1,14 +1,14 @@
 ---
 title: Manage Xinference with KubeBlocks
 description: How to manage Xinference on KubeBlocks
-keywords: [xinference, vector database, control plane]
+keywords: [xinference, LLM, AI, control plane]
 sidebar_position: 1
 sidebar_label: Manage Xinference with KubeBlocks
 ---
 
 # Manage Xinference with KubeBlocks
 
-Xorbits Inference (Xinference) is an open-source platform to streamline the operation and integration of a wide array of AI models. With Xinference, you’re empowered to run inference using any open-source LLMs, embedding models, and multimodal models either in the cloud or on your own premises, and create robust AI-driven applications.
+Xorbits Inference (Xinference) is an open-source platform to streamline the operation and integration of a wide array of AI models. With Xinference, you’re empowered to run inference using any open-source LLMs, embedding models, and multimodal models either in the cloud or on your premises, and create robust AI-driven applications.
 
 KubeBlocks supports the management of Xinference.
 

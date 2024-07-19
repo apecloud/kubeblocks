@@ -134,7 +134,7 @@ The volume expansion may take a few minutes.
 The `kbcli cluster volume-expand` command prints a command to help check the progress of scaling operations.
 
 ```bash
-kbcli cluster describe-ops milvus-volumeexpansion-5pbd2 -n defaule
+kbcli cluster describe-ops milvus-volumeexpansion-5pbd2 -n default
 ```
 
 To check whether the expanding is done, use the following command.

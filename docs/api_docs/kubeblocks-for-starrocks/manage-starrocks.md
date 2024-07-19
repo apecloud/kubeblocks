@@ -1,38 +1,38 @@
 ---
-title: Manage Weaviate with KubeBlocks
-description: How to manage Weaviate on KubeBlocks
-keywords: [weaviate, vector database, control plane]
+title: Manage StarRocks with KubeBlocks
+description: How to manage StarRocks on KubeBlocks
+keywords: [starrocks, analytic, data warehouse, control plane]
 sidebar_position: 1
-sidebar_label: Manage Weaviate with KubeBlocks
+sidebar_label: Manage StarRocks with KubeBlocks
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Manage Weaviate with KubeBlocks
+# Manage StarRocks with KubeBlocks
 
-The popularity of generative AI (Generative AI) has aroused widespread attention and completely ignited the vector database (Vector Database) market. Weaviate is an open-source vector database that simplifies the development of AI applications. Built-in vector and hybrid search, easy-to-connect machine learning models, and a focus on data privacy enable developers of all levels to build, iterate, and scale AI capabilities faster.
+StarRocks is a next-gen, high-performance analytical data warehouse that enables real-time, multi-dimensional, and highly concurrent data analysis.
 
-This tutorial illustrates how to create and manage a Weaviate cluster by `kubectl` or a YAML file. You can find the YAML examples and guides in [the GitHub repository](https://github.com/apecloud/kubeblocks-addons/tree/release-0.9/examples/weaviate).
+This tutorial illustrates how to create and manage a StarRocks cluster by `kubectl` or a YAML file. You can find the YAML examples and guides in [the GitHub repository](https://github.com/apecloud/kubeblocks-addons/tree/release-0.9/examples/starrocks).
 
 ## Before you start
 
 * [Install KubeBlocks](./../installation/install-kubeblocks.md).
 * View all the database types and versions available for creating a cluster.
   
-  Make sure the `weaviate` cluster definition is installed. If the cluster definition is not available, refer to [this doc](./../installation/install-addons.md) to enable it first.
+  Make sure the `starrocks` cluster definition is installed. If the cluster definition is not available, refer to [this doc](./../installation/install-addons.md) to enable it first.
 
   ```bash
-  kubectl get clusterdefinition weaviate
+  kubectl get clusterdefinition starrocks
   >
-  NAME         TOPOLOGIES   SERVICEREFS   STATUS      AGE
-  weaviate                                Available   30m
+  NAME         TOPOLOGIES   SERVICEREFS    STATUS      AGE
+  starrocks                                Available   30m
   ```
 
   View all available versions for creating a cluster.
 
   ```bash
-  kubectl get clusterversions -l clusterdefinition.kubeblocks.io/name=weaviate
+  kubectl get clusterversions -l clusterdefinition.kubeblocks.io/name=starrocks
   ```
 
 * To keep things isolated, create a separate namespace called `demo` throughout this tutorial.
@@ -43,7 +43,7 @@ This tutorial illustrates how to create and manage a Weaviate cluster by `kubect
 
 ## Create a cluster
 
-KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a Weaviate cluster.
+KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a StarRocks cluster.
 
 ```yaml
 cat <<EOF | kubectl apply -f -
@@ -51,42 +51,51 @@ apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   name: mycluster
-  namespace: default
+  namespace: demo
 spec:
+  clusterDefinitionRef: starrocks-ce
+  clusterVersionRef: starrocks-ce-3.1.1
+  terminationPolicy: Delete
   affinity:
     podAntiAffinity: Preferred
     topologyKeys:
-    - "kubernetes.io/hostname"
-  clusterDefinitionRef: weaviate
-  clusterVersionRef: weaviate-1.18.0
+    - kubernetes.io/hostname
+    tenancy: SharedNode
+  tolerations:
+    - key: kb-data
+      operator: Equal
+      value: 'true'
+      effect: NoSchedule
   componentSpecs:
-  - componentDefRef: weaviate
-    disableExporter: true
-    name: weaviate
+  - name: fe
+    componentDefRef: fe
+    serviceAccountName: kb-starrocks-cluster
     replicas: 1
     resources:
       limits:
-        cpu: "1"
-        memory: 1Gi
+        cpu: '0.5'
+        memory: 0.5Gi
       requests:
-        cpu: "1"
-        memory: 1Gi
-    serviceAccountName: kb-mycluster
+        cpu: '0.5'
+        memory: 0.5Gi
+  - name: be
+    componentDefRef: be
+    replicas: 2
+    resources:
+      limits:
+        cpu: '0.5'
+        memory: 0.5Gi
+      requests:
+        cpu: '0.5'
+        memory: 0.5Gi
     volumeClaimTemplates:
-    - name: data
+    - name: be-storage
       spec:
         accessModes:
         - ReadWriteOnce
         resources:
           requests:
             storage: 20Gi
-  resources:
-    cpu: "0"
-    memory: "0"
-  storage:
-    size: "0"
-  terminationPolicy: Delete
-status: {}
 EOF
 ```
 
@@ -102,7 +111,6 @@ EOF
 | `spec.componentSpecs`                 | It is the list of components that define the cluster components. This field allows customized configuration of each component within a cluster.   |
 | `spec.componentSpecs.componentDefRef` | It is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition apecloud-mysql -o json \| jq '.spec.componentDefs[].name'`.   |
 | `spec.componentSpecs.name`            | It specifies the name of the component.     |
-| `spec.componentSpecs.disableExporter` | It defines whether the monitoring function is enabled. |
 | `spec.componentSpecs.replicas`        | It specifies the number of replicas of the component.  |
 | `spec.componentSpecs.resources`       | It specifies the resource requirements of the component.  |
 
@@ -112,23 +120,13 @@ KubeBlocks operator watches for the `Cluster` CRD and creates the cluster and al
 kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=mycluster -n demo
 ```
 
-Run the following command to see the created Weaviate cluster object:
+Run the following command to see the created StarRocks cluster object:
 
 ```bash
 kubectl get cluster mycluster -n demo -o yaml
 ```
 
-## Connect to a Weaviate cluster
-
-Weaviate provides the HTTP protocol for client access on port 8080. You can visit the cluster by the local host.
-
-```bash
-curl http://localhost:8080/v1/meta | jq
-```
-
 ## Scaling
-
-Scaling function for vector databases is also supported.
 
 ### Scale horizontally
 
@@ -141,8 +139,8 @@ Check whether the cluster STATUS is `Running`. Otherwise, the following operatio
 ```bash
 kubectl get cluster mycluster -n demo
 >
-NAME        CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY     STATUS    AGE
-mycluster   weaviate             weaviate-1.18.0   Delete                 Running   47m
+NAME        CLUSTER-DEFINITION    VERSION              TERMINATION-POLICY     STATUS    AGE
+mycluster   starrocks             starrocks-ce-3.1.1   Delete                 Running   47m
 ```
 
 #### Steps
@@ -160,14 +158,14 @@ There are two ways to apply horizontal scaling.
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: OpsRequest
    metadata:
-     name: ops-horizontal-scaling
+     name: mycluster-horizontal-scaling
      namespace: demo
    spec:
      clusterName: mycluster
      type: HorizontalScaling
      horizontalScaling:
-     - componentName: weaviate
-       replicas: 1
+     - componentName: fe
+       replicas: 2
    EOF
    ```
 
@@ -176,11 +174,11 @@ There are two ways to apply horizontal scaling.
    ```bash
    kubectl get ops -n demo
    >
-   NAMESPACE   NAME                     TYPE                CLUSTER     STATUS    PROGRESS   AGE
-   demo        ops-horizontal-scaling   HorizontalScaling   mycluster   Succeed   3/3        6m
+   NAMESPACE   NAME                           TYPE                CLUSTER     STATUS    PROGRESS   AGE
+   demo        mycluster-horizontal-scaling   HorizontalScaling   mycluster   Succeed   3/3        6m
    ```
 
-   If an error occurs to the horizontal scaling operation, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
+   If an error occurs, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
 
 3. Check whether the corresponding resources change.
 
@@ -202,21 +200,12 @@ There are two ways to apply horizontal scaling.
      name: mycluster
      namespace: demo
    spec:
-     clusterDefinitionRef: weaviate
-     clusterVersionRef: weaviate-1.18.0
+     clusterDefinitionRef: starrocks-ce
+     clusterVersionRef: starrocks-ce-3.1.1
      componentSpecs:
-     - name: weaviate
-       componentDefRef: weaviate
+     - name: fe
+       componentDefRef: fe
        replicas: 2 # Change the amount
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 1Gi
-    terminationPolicy: Delete
    ```
 
 2. Check whether the corresponding resources change.
@@ -229,55 +218,6 @@ There are two ways to apply horizontal scaling.
 
 </Tabs>
 
-#### Handle the snapshot exception
-
-If `STATUS=ConditionsError` occurs during the horizontal scaling process, you can find the cause from `cluster.status.condition.message` for troubleshooting.
-In the example below, a snapshot exception occurs.
-
-```bash
-Status:
-  conditions: 
-  - lastTransitionTime: "2024-04-25T17:40:26Z"
-    message: VolumeSnapshot/mycluster-weaviate-scaling-dbqgp: Failed to set default snapshot
-      class with error cannot find default snapshot class
-    reason: ApplyResourcesFailed
-    status: "False"
-    type: ApplyResources
-```
-
-***Reason***
-
-This exception occurs because the `VolumeSnapshotClass` is not configured. This exception can be fixed after configuring `VolumeSnapshotClass`, but the horizontal scaling cannot continue to run. It is because the wrong backup (volumesnapshot is generated by backup) and volumesnapshot generated before still exist. First, delete these two wrong resources and then KubeBlocks re-generates new resources.
-
-***Steps:***
-
-1. Configure the VolumeSnapshotClass by running the command below.
-
-   ```bash
-   kubectl create -f - <<EOF
-   apiVersion: snapshot.storage.k8s.io/v1
-   kind: VolumeSnapshotClass
-   metadata:
-     name: csi-aws-vsc
-     annotations:
-       snapshot.storage.kubernetes.io/is-default-class: "true"
-   driver: ebs.csi.aws.com
-   deletionPolicy: Delete
-   EOF
-   ```
-
-2. Delete the wrong backup (volumesnapshot is generated by backup) and volumesnapshot resources.
-
-   ```bash
-   kubectl delete backup -l app.kubernetes.io/instance=mycluster
-   
-   kubectl delete volumesnapshot -l app.kubernetes.io/instance=mycluster
-   ```
-
-***Result***
-
-The horizontal scaling continues after backup and volumesnapshot are deleted and the cluster restores to running status.
-
 ### Scale vertically
 
 You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, if you need to change the resource class from 1C2G to 2C4G, vertical scaling is what you need.
@@ -289,8 +229,8 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 ```bash
 kubectl get cluster mycluster -n demo
 >
-NAME        CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY     STATUS    AGE
-mycluster   weaviate             weaviate-1.18.0   Delete                 Running   47m
+NAME        CLUSTER-DEFINITION    VERSION              TERMINATION-POLICY     STATUS    AGE
+mycluster   starrocks             starrocks-ce-3.1.1   Delete                 Running   47m
 ```
 
 #### Steps
@@ -308,13 +248,13 @@ There are two ways to apply vertical scaling.
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: OpsRequest
    metadata:
-     name: ops-vertical-scaling
+     name: mycluster-vertical-scaling
      namespace: demo
    spec:
      clusterName: mycluster
      type: VerticalScaling
      verticalScaling:
-     - componentName: weaviate
+     - componentName: fe
        requests:
          memory: "2Gi"
          cpu: "1"
@@ -329,11 +269,11 @@ There are two ways to apply vertical scaling.
    ```bash
    kubectl get ops -n demo
    >
-   NAMESPACE   NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
-   demo        ops-vertical-scaling   VerticalScaling   mycluster   Succeed   3/3        6m
+   NAMESPACE   NAME                         TYPE              CLUSTER     STATUS    PROGRESS   AGE
+   demo        mycluster-vertical-scaling   VerticalScaling   mycluster   Succeed   3/3        6m
    ```
 
-   If an error occurs to the vertical scaling operation, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
+   If an error occurs, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
 
 3. Check whether the corresponding resources change.
 
@@ -354,12 +294,12 @@ There are two ways to apply vertical scaling.
      name: mycluster
      namespace: demo
    spec:
-     clusterDefinitionRef: weaviate
-     clusterVersionRef: weaviate-1.18.0
+     clusterDefinitionRef: starrocks-ce
+     clusterVersionRef: starrocks-ce-3.1.1
      componentSpecs:
-     - name: weaviate
-       componentDefRef: weaviate
-       replicas: 1
+     - name: fe
+       componentDefRef: fe
+       replicas: 2
        resources: # Change the values of resources.
          requests:
            memory: "2Gi"
@@ -367,15 +307,6 @@ There are two ways to apply vertical scaling.
          limits:
            memory: "4Gi"
            cpu: "2"
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 1Gi
-     terminationPolicy: Delete
    ```
 
 2. Check whether the corresponding resources change.
@@ -396,8 +327,8 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 ```bash
 kubectl get cluster mycluster -n demo
 >
-NAME        CLUSTER-DEFINITION   VERSION              TERMINATION-POLICY   STATUS    AGE
-mycluster   weaviate             weaviate-1.18.0      Delete               Running   4m29s
+NAME        CLUSTER-DEFINITION    VERSION                  TERMINATION-POLICY   STATUS    AGE
+mycluster   starrocks             starrocks-ce-3.1.1      Delete               Running   4m29s
 ```
 
 ### Steps
@@ -415,15 +346,15 @@ There are two ways to apply volume expansion.
     apiVersion: apps.kubeblocks.io/v1alpha1
     kind: OpsRequest
     metadata:
-      name: ops-volume-expansion
+      name: mycluster-volume-expansion
       namespace: demo
     spec:
       clusterName: mycluster
       type: VolumeExpansion
       volumeExpansion:
-      - componentName: weaviate
+      - componentName: be
         volumeClaimTemplates:
-        - name: data
+        - name: be-storage
           storage: "40Gi"
     EOF
     ```
@@ -433,8 +364,8 @@ There are two ways to apply volume expansion.
     ```bash
     kubectl get ops -n demo
     >
-    NAMESPACE   NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
-    demo        ops-volume-expansion   VolumeExpansion   mycluster   Succeed   3/3        6m
+    NAMESPACE   NAME                         TYPE              CLUSTER     STATUS    PROGRESS   AGE
+    demo        mycluster-volume-expansion   VolumeExpansion   mycluster   Succeed   3/3        6m
     ```
 
     If an error occurs to the vertical scaling operation, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
@@ -461,20 +392,19 @@ There are two ways to apply volume expansion.
      name: mycluster
      namespace: demo
    spec:
-     clusterDefinitionRef: weaviate
-     clusterVersionRef: weaviate-1.18.0
+     clusterDefinitionRef: starrocks-ce
+     clusterVersionRef: starrocks-ce-3.1.1
      componentSpecs:
-     - name: weaviate
-       componentDefRef: weaviate
-       replicas: 2
+     - name: be
+       componentDefRef: be
        volumeClaimTemplates:
-       - name: data
+       - name: be-storage
          spec:
            accessModes:
              - ReadWriteOnce
            resources:
              requests:
-               storage: 1Gi # Change the volume storage size.
+               storage: 40Gi # Change the volume storage size.
      terminationPolicy: Delete
    ```
 
@@ -505,7 +435,7 @@ kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: ops-stop
+  name: mycluster-stop
   namespace: demo
 spec:
   clusterName: mycluster
@@ -526,23 +456,27 @@ metadata:
     name: mycluster
     namespace: demo
 spec:
-  clusterDefinitionRef: weaviate
-  clusterVersionRef: weaviate-1.18.0
+  clusterDefinitionRef: starrocks-ce
+  clusterVersionRef: starrocks-ce-3.1.1
   terminationPolicy: Delete
+  affinity:
+    podAntiAffinity: Preferred
+    topologyKeys:
+    - kubernetes.io/hostname
+    tenancy: SharedNode
+  tolerations:
+    - key: kb-data
+      operator: Equal
+      value: 'true'
+      effect: NoSchedule
   componentSpecs:
-  - name: weaviate
-    componentDefRef: weaviate
-    disableExporter: true  
+  - name: fe
+    componentDefRef: fe
+    serviceAccountName: kb-starrocks-cluster
     replicas: 0
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        storageClassName: standard
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
+  - name: be
+    componentDefRef: be
+    replicas: 0
 ```
 
 </TabItem>
@@ -562,7 +496,7 @@ kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: ops-start
+  name: mycluster-start
   namespace: demo
 spec:
   clusterName: mycluster
@@ -577,29 +511,28 @@ EOF
 Change replicas back to the original amount to start this cluster again.
 
 ```yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: Cluster
-metadata:
-    name: mycluster
-    namespace: demo
 spec:
-  clusterDefinitionRef: weaviate
-  clusterVersionRef: weaviate-1.18.0
+  clusterDefinitionRef: starrocks-ce
+  clusterVersionRef: starrocks-ce-3.1.1
   terminationPolicy: Delete
+  affinity:
+    podAntiAffinity: Preferred
+    topologyKeys:
+    - kubernetes.io/hostname
+    tenancy: SharedNode
+  tolerations:
+    - key: kb-data
+      operator: Equal
+      value: 'true'
+      effect: NoSchedule
   componentSpecs:
-  - name: weaviate
-    componentDefRef: weaviate
-    disableExporter: true  
+  - name: fe
+    componentDefRef: fe
+    serviceAccountName: kb-starrocks-cluster
     replicas: 1
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        storageClassName: standard
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
+  - name: be
+    componentDefRef: be
+    replicas: 2
 ```
 
 </TabItem>
@@ -615,13 +548,13 @@ spec:
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: OpsRequest
    metadata:
-     name: ops-restart
+     name: mycluster-restart
      namespace: demo
    spec:
      clusterName: mycluster
      type: Restart 
      restart:
-     - componentName: weaviate
+     - componentName: be
    EOF
    ```
 

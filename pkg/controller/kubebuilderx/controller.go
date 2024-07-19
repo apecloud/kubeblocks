@@ -75,7 +75,7 @@ func (c *controller) Prepare(reader TreeLoader) Controller {
 }
 
 func (c *controller) Do(reconcilers ...Reconciler) Controller {
-	if c.err != nil {
+	if c.err != nil || c.res.Next == cmmt || c.res.Next == rtry {
 		return c
 	}
 

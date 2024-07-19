@@ -57,23 +57,26 @@ type CheckResult struct {
 var ResultUnsatisfied = &CheckResult{}
 var ResultSatisfied = &CheckResult{Satisfied: true}
 
-type ControlMethod string
+type controlMethod string
 
 const (
-	// Continue tells the control flow to continue
-	Continue ControlMethod = "Continue"
+	// cntn tells the control flow to continue
+	cntn controlMethod = "Continue"
 
-	// Commit tells the control flow to stop and jump to the commit phase
-	Commit   ControlMethod = "Commit"
+	// cmmt tells the control flow to stop and jump to the commit phase
+	cmmt controlMethod = "Commit"
 
-	// Retry tells the control flow to stop and retry from the beginning with a delay specified by Result.RetryAfter
-	Retry    ControlMethod = "Retry"
+	// rtry tells the control flow to stop and retry from the beginning with a delay specified by Result.RetryAfter
+	rtry controlMethod = "Retry"
 )
 
 type Result struct {
-	Next       ControlMethod
+	Next       controlMethod
 	RetryAfter time.Duration
 }
+
+var Continue = Result{Next: cntn}
+var Commit = Result{Next: cmmt}
 
 var ErrDeepCopyFailed = errors.New("DeepCopyFailed")
 
@@ -84,6 +87,10 @@ type Reconciler interface {
 
 func CheckResultWithError(err error) *CheckResult {
 	return &CheckResult{Satisfied: false, Err: err}
+}
+
+func RetryAfter(after time.Duration) Result {
+	return Result{Next: rtry, RetryAfter: after}
 }
 
 func (t *ObjectTree) DeepCopy() (*ObjectTree, error) {

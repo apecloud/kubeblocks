@@ -54,17 +54,17 @@ func (r *instanceAlignmentReconciler) PreCondition(tree *kubebuilderx.ObjectTree
 	return kubebuilderx.ResultSatisfied
 }
 
-func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
+func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
 	itsExt, err := buildInstanceSetExt(its, tree)
 	if err != nil {
-		return nil, err
+		return kubebuilderx.Continue, err
 	}
 
 	// 1. build desired name to template map
 	nameToTemplateMap, err := buildInstanceName2TemplateMap(itsExt)
 	if err != nil {
-		return nil, err
+		return kubebuilderx.Continue, err
 	}
 
 	// 2. find the create and delete set
@@ -120,10 +120,10 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		}
 		inst, err := buildInstanceByTemplate(name, nameToTemplateMap[name], its, "")
 		if err != nil {
-			return nil, err
+			return kubebuilderx.Continue, err
 		}
 		if err := tree.Add(inst.pod); err != nil {
-			return nil, err
+			return kubebuilderx.Continue, err
 		}
 		currentAlignedNameList = append(currentAlignedNameList, name)
 		createCount--
@@ -135,16 +135,16 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		for _, pvc := range pvcs {
 			switch oldPvc, err := tree.Get(pvc); {
 			case err != nil:
-				return nil, err
+				return kubebuilderx.Continue, err
 			case oldPvc == nil:
 				if err = tree.Add(pvc); err != nil {
-					return nil, err
+					return kubebuilderx.Continue, err
 				}
 			default:
 				pvcObj := copyAndMerge(oldPvc, pvc)
 				if pvcObj != nil {
 					if err = tree.Update(pvcObj); err != nil {
-						return nil, err
+						return kubebuilderx.Continue, err
 					}
 				}
 			}
@@ -169,14 +169,14 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 				pod.Name)
 		}
 		if err := tree.Delete(pod); err != nil {
-			return nil, err
+			return kubebuilderx.Continue, err
 		}
 		// TODO(free6om): handle pvc management policy
 		// Retain by default.
 		deleteCount--
 	}
 
-	return tree, nil
+	return kubebuilderx.Continue, nil
 }
 
 var _ kubebuilderx.Reconciler = &instanceAlignmentReconciler{}

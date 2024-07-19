@@ -86,12 +86,13 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			By("do reconcile with OrderedReady(Serial) policy")
 			orderedReadyTree, err := tree.DeepCopy()
 			Expect(err).Should(BeNil())
-			newTree, err := reconciler.Reconcile(orderedReadyTree)
+			res, err := reconciler.Reconcile(orderedReadyTree)
 			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
 			// desired: bar-0, bar-1, bar-foo-0
-			pods := newTree.List(&corev1.Pod{})
+			pods := orderedReadyTree.List(&corev1.Pod{})
 			Expect(pods).Should(HaveLen(3))
-			pvcs := newTree.List(&corev1.PersistentVolumeClaim{})
+			pvcs := orderedReadyTree.List(&corev1.PersistentVolumeClaim{})
 			Expect(pvcs).Should(HaveLen(3))
 			podBar0 := builder.NewPodBuilder(namespace, "bar-0").GetObject()
 			for _, object := range []client.Object{podFoo0, podBar0, podBar1} {
@@ -110,12 +111,13 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			parallelITS, ok := parallelTree.GetRoot().(*workloads.InstanceSet)
 			Expect(ok).Should(BeTrue())
 			parallelITS.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
-			newTree, err = reconciler.Reconcile(parallelTree)
+			res, err = reconciler.Reconcile(parallelTree)
 			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
 			// desired: bar-0, bar-1, bar-2, bar-3, bar-foo-0, bar-foo-1, bar-hello-0
-			pods = newTree.List(&corev1.Pod{})
+			pods = parallelTree.List(&corev1.Pod{})
 			Expect(pods).Should(HaveLen(7))
-			pvcs = newTree.List(&corev1.PersistentVolumeClaim{})
+			pvcs = parallelTree.List(&corev1.PersistentVolumeClaim{})
 			Expect(pvcs).Should(HaveLen(7))
 			podHello := builder.NewPodBuilder(namespace, its.Name+"-hello-0").GetObject()
 			podFoo1 := builder.NewPodBuilder(namespace, its.Name+"-foo-1").GetObject()

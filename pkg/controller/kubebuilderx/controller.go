@@ -89,7 +89,7 @@ func (c *controller) Do(reconcilers ...Reconciler) Controller {
 		}
 
 		c.res, c.err = reconciler.Reconcile(c.tree)
-		if c.err != nil || c.res.Next == Commit || c.res.Next == Retry {
+		if c.err != nil || c.res.Next == cmmt || c.res.Next == rtry {
 			return c
 		}
 	}
@@ -116,9 +116,12 @@ func (c *controller) Commit() (ctrl.Result, error) {
 		return ctrl.Result{}, c.err
 	}
 	if c.err = plan.Execute(); c.err != nil {
+		if apierrors.IsConflict(c.err) {
+			return ctrl.Result{Requeue: true}, nil
+		}
 		return ctrl.Result{}, c.err
 	}
-	if c.res.Next == Retry {
+	if c.res.Next == rtry {
 		return ctrl.Result{Requeue: true, RequeueAfter: c.res.RetryAfter}, nil
 	}
 	return ctrl.Result{}, nil

@@ -38,13 +38,14 @@ var _ = Describe("fix meta reconciler test", func() {
 			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ResultSatisfied))
 
 			By("Reconcile without finalizer")
-			newTree, err := reconciler.Reconcile(tree)
+			res, err := reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
-			Expect(newTree.GetRoot().GetFinalizers()).Should(HaveLen(1))
-			Expect(newTree.GetRoot().GetFinalizers()[0]).Should(Equal(finalizer))
+			Expect(tree.GetRoot().GetFinalizers()).Should(HaveLen(1))
+			Expect(tree.GetRoot().GetFinalizers()[0]).Should(Equal(finalizer))
+			Expect(res).Should(Equal(kubebuilderx.Commit))
 
 			By("Reconcile with finalizer")
-			Expect(reconciler.PreCondition(newTree)).Should(Equal(kubebuilderx.ResultUnsatisfied))
+			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ResultUnsatisfied))
 		})
 	})
 })

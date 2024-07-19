@@ -40,12 +40,12 @@ func (r *fixMetaReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebui
 	return kubebuilderx.ResultSatisfied
 }
 
-func (r *fixMetaReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
+func (r *fixMetaReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	// The object is not being deleted, so if it does not have our finalizer,
 	// then lets add the finalizer and update the object. This is equivalent
 	// registering our finalizer.
 	controllerutil.AddFinalizer(tree.GetRoot(), finalizer)
-	return tree, nil
+	return kubebuilderx.Commit, nil
 }
 
 func NewFixMetaReconciler() kubebuilderx.Reconciler {

@@ -51,11 +51,11 @@ func (r *revisionUpdateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *
 	return kubebuilderx.ResultSatisfied
 }
 
-func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
+func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
 	itsExt, err := buildInstanceSetExt(its, tree)
 	if err != nil {
-		return nil, err
+		return kubebuilderx.Continue, err
 	}
 
 	// 1. build all templates by applying instance template overrides to default pod template
@@ -66,15 +66,15 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*ku
 	for _, template := range instanceTemplateList {
 		ordinalList, err := GetOrdinalListByTemplateName(itsExt.its, template.Name)
 		if err != nil {
-			return nil, err
+			return kubebuilderx.Continue, err
 		}
 		instanceNames, err := GenerateInstanceNamesFromTemplate(its.Name, template.Name, template.Replicas, itsExt.its.Spec.OfflineInstances, ordinalList)
 		if err != nil {
-			return nil, err
+			return kubebuilderx.Continue, err
 		}
 		revision, err := BuildInstanceTemplateRevision(&template.PodTemplateSpec, its)
 		if err != nil {
-			return nil, err
+			return kubebuilderx.Continue, err
 		}
 		for _, name := range instanceNames {
 			instanceRevisionList = append(instanceRevisionList, instanceRevision{name: name, revision: revision})
@@ -85,7 +85,7 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*ku
 		return r.name
 	}
 	if err := ValidateDupInstanceNames(instanceRevisionList, getNameFunc); err != nil {
-		return nil, err
+		return kubebuilderx.Continue, err
 	}
 
 	updatedRevisions := make(map[string]string, len(instanceRevisionList))
@@ -96,7 +96,7 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*ku
 	// 3. persistent these revisions to status
 	revisions, err := buildRevisions(updatedRevisions)
 	if err != nil {
-		return nil, err
+		return kubebuilderx.Continue, err
 	}
 	its.Status.UpdateRevisions = revisions
 	updateRevision := ""
@@ -106,7 +106,7 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*ku
 	its.Status.UpdateRevision = updateRevision
 	updatedReplicas, err := calculateUpdatedReplicas(its, tree.List(&corev1.Pod{}))
 	if err != nil {
-		return nil, err
+		return kubebuilderx.Continue, err
 	}
 	its.Status.UpdatedReplicas = updatedReplicas
 	// The 'ObservedGeneration' field is used to indicate whether the revisions have been updated.
@@ -114,7 +114,7 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*ku
 	// performing the computation only when the 'spec' is updated.
 	its.Status.ObservedGeneration = its.Generation
 
-	return tree, nil
+	return kubebuilderx.Continue, nil
 }
 
 func calculateUpdatedReplicas(its *workloads.InstanceSet, pods []client.Object) (int32, error) {

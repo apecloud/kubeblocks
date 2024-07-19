@@ -53,7 +53,7 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 	return kubebuilderx.ResultSatisfied
 }
 
-func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
+func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
 	// 1. get all pods
 	pods := tree.List(&corev1.Pod{})
@@ -65,7 +65,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	// 2. calculate status summary
 	updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
 	if err != nil {
-		return nil, err
+		return kubebuilderx.Continue, err
 	}
 	replicas := int32(0)
 	currentReplicas, updatedReplicas := int32(0), int32(0)
@@ -115,7 +115,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 		if isCreated(pod) && !isTerminating(pod) {
 			isPodUpdated, err := IsPodUpdated(its, pod)
 			if err != nil {
-				return nil, err
+				return kubebuilderx.Continue, err
 			}
 			switch _, ok := updateRevisions[pod.Name]; {
 			case !ok, !isPodUpdated:
@@ -152,20 +152,20 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 
 	readyCondition, err := buildReadyCondition(its, readyReplicas >= replicas, notReadyNames)
 	if err != nil {
-		return nil, err
+		return kubebuilderx.Continue, err
 	}
 	meta.SetStatusCondition(&its.Status.Conditions, *readyCondition)
 
 	availableCondition, err := buildAvailableCondition(its, availableReplicas >= replicas, notAvailableNames)
 	if err != nil {
-		return nil, err
+		return kubebuilderx.Continue, err
 	}
 	meta.SetStatusCondition(&its.Status.Conditions, *availableCondition)
 
 	// 3. set InstanceFailure condition
 	failureCondition, err := buildFailureCondition(its, podList)
 	if err != nil {
-		return nil, err
+		return kubebuilderx.Continue, err
 	}
 	if failureCondition != nil {
 		meta.SetStatusCondition(&its.Status.Conditions, *failureCondition)
@@ -181,9 +181,9 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	setReadyWithPrimary(its, podList)
 
 	if its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
-		return tree, intctrlutil.NewDelayedRequeueError(time.Second, "requeue for right status update")
+		return kubebuilderx.RetryAfter(time.Second), nil
 	}
-	return tree, nil
+	return kubebuilderx.Continue, nil
 }
 
 func buildConditionMessageWithNames(podNames []string) ([]byte, error) {

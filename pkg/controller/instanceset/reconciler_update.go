@@ -58,17 +58,17 @@ func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 	return kubebuilderx.ResultSatisfied
 }
 
-func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
+func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
 	itsExt, err := buildInstanceSetExt(its, tree)
 	if err != nil {
-		return nil, err
+		return kubebuilderx.Continue, err
 	}
 
 	// 1. build desired name to template map
 	nameToTemplateMap, err := buildInstanceName2TemplateMap(itsExt)
 	if err != nil {
-		return nil, err
+		return kubebuilderx.Continue, err
 	}
 
 	// 2. validate the update set
@@ -88,19 +88,19 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	updateNameSet := oldNameSet.Intersection(newNameSet)
 	if len(updateNameSet) != len(oldNameSet) || len(updateNameSet) != len(newNameSet) {
 		tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s instances are not aligned", its.Namespace, its.Name))
-		return tree, nil
+		return kubebuilderx.Continue, nil
 	}
 
 	// 3. do update
 	// do nothing if UpdateStrategyType is 'OnDelete'
 	if its.Spec.UpdateStrategy.Type == apps.OnDeleteStatefulSetStrategyType {
-		return tree, nil
+		return kubebuilderx.Continue, nil
 	}
 
 	// handle 'RollingUpdate'
 	partition, maxUnavailable, err := parsePartitionNMaxUnavailable(its.Spec.UpdateStrategy.RollingUpdate, len(oldPodList))
 	if err != nil {
-		return nil, err
+		return kubebuilderx.Continue, err
 	}
 	currentUnavailable := 0
 	for _, pod := range oldPodList {
@@ -116,7 +116,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	plan := NewUpdatePlan(*itsForPlan, oldPodList, IsPodUpdated)
 	podsToBeUpdated, err := plan.Execute()
 	if err != nil {
-		return nil, err
+		return kubebuilderx.Continue, err
 	}
 	updateCount := len(podsToBeUpdated)
 
@@ -137,13 +137,10 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on scale-in as the pod %s is not healthy", its.Namespace, its.Name, pod.Name))
 			break
 		}
-		if err != nil {
-			return nil, err
-		}
 
 		updatePolicy, err := getPodUpdatePolicy(its, pod)
 		if err != nil {
-			return nil, err
+			return kubebuilderx.Continue, err
 		}
 		if its.Spec.PodUpdatePolicy == workloads.StrictInPlacePodUpdatePolicyType && updatePolicy == RecreatePolicy {
 			message := fmt.Sprintf("InstanceSet %s/%s blocks on scale-in as the PodUpdatePolicy is %s and the pod %s can not inplace update",
@@ -158,17 +155,17 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 		if updatePolicy == InPlaceUpdatePolicy {
 			newInstance, err := buildInstanceByTemplate(pod.Name, nameToTemplateMap[pod.Name], its, getPodRevision(pod))
 			if err != nil {
-				return nil, err
+				return kubebuilderx.Continue, err
 			}
 			newPod := copyAndMerge(pod, newInstance.pod)
 			if err = tree.Update(newPod); err != nil {
-				return nil, err
+				return kubebuilderx.Continue, err
 			}
 			updatingPods++
 		} else if updatePolicy == RecreatePolicy {
 			if !isTerminating(pod) {
 				if err = tree.Delete(pod); err != nil {
-					return nil, err
+					return kubebuilderx.Continue, err
 				}
 			}
 			updatingPods++
@@ -178,7 +175,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	if !isBlocked {
 		meta.RemoveStatusCondition(&its.Status.Conditions, string(workloads.InstanceUpdateRestricted))
 	}
-	return tree, nil
+	return kubebuilderx.Continue, nil
 }
 
 func buildBlockedCondition(its *workloads.InstanceSet, message string) *metav1.Condition {

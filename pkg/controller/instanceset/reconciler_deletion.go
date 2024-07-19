@@ -40,19 +40,19 @@ func (r *deletionReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebu
 	return kubebuilderx.ResultSatisfied
 }
 
-func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
+func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	// delete secondary objects first
 	// retain all pvcs
 	// TODO(free6om): respect PVCManagementPolicy
 	allObjects := tree.GetSecondaryObjects()
 	objects := filterByType[*corev1.PersistentVolumeClaim](allObjects)
 	if len(objects) > 0 {
-		return tree, tree.Delete(objects...)
+		return kubebuilderx.Continue, tree.Delete(objects...)
 	}
 
 	// delete root object
 	tree.DeleteRoot()
-	return tree, nil
+	return kubebuilderx.Continue, nil
 }
 
 func filterByType[T client.Object](snapshot model.ObjectSnapshot) []client.Object {

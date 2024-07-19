@@ -33,7 +33,6 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 var _ = Describe("status reconciler test", func() {
@@ -77,29 +76,34 @@ var _ = Describe("status reconciler test", func() {
 			// prepare for update
 			By("fix meta")
 			reconciler = NewFixMetaReconciler()
-			newTree, err := reconciler.Reconcile(tree)
+			res, err := reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Commit))
 
 			By("update revisions")
 			reconciler = NewRevisionUpdateReconciler()
-			newTree, err = reconciler.Reconcile(newTree)
+			res, err = reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
 
 			By("assistant object")
 			reconciler = NewAssistantObjectReconciler()
-			newTree, err = reconciler.Reconcile(newTree)
+			res, err = reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
 
 			By("replicas alignment")
 			reconciler = NewReplicasAlignmentReconciler()
-			newTree, err = reconciler.Reconcile(newTree)
+			res, err = reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
 
 			By("all pods are not ready")
 			reconciler = NewStatusReconciler()
-			Expect(reconciler.PreCondition(newTree)).Should(Equal(kubebuilderx.ResultSatisfied))
-			_, err = reconciler.Reconcile(newTree)
+			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ResultSatisfied))
+			res, err = reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
 			Expect(its.Status.Replicas).Should(BeEquivalentTo(0))
 			Expect(its.Status.ReadyReplicas).Should(BeEquivalentTo(0))
 			Expect(its.Status.AvailableReplicas).Should(BeEquivalentTo(0))
@@ -127,7 +131,7 @@ var _ = Describe("status reconciler test", func() {
 				}
 				pod.Status.Conditions = []corev1.PodCondition{condition}
 			}
-			pods := newTree.List(&corev1.Pod{})
+			pods := tree.List(&corev1.Pod{})
 			currentRevisionMap := map[string]string{}
 			oldRevision := "old-revision"
 			for _, object := range pods {
@@ -136,8 +140,9 @@ var _ = Describe("status reconciler test", func() {
 				makePodAvailableWithRevision(pod, oldRevision, false)
 				currentRevisionMap[pod.Name] = oldRevision
 			}
-			_, err = reconciler.Reconcile(newTree)
-			Expect(intctrlutil.IsDelayedRequeueError(err)).Should(BeTrue())
+			res, err = reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.RetryAfter(time.Second)))
 			Expect(its.Status.Replicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.ReadyReplicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.AvailableReplicas).Should(BeEquivalentTo(0))
@@ -170,8 +175,9 @@ var _ = Describe("status reconciler test", func() {
 				Expect(ok).Should(BeTrue())
 				makePodAvailableWithRevision(pod, updateRevisions[pod.Name], true)
 			}
-			_, err = reconciler.Reconcile(newTree)
+			res, err = reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
 			Expect(its.Status.Replicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.ReadyReplicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.AvailableReplicas).Should(BeEquivalentTo(replicas))
@@ -204,8 +210,9 @@ var _ = Describe("status reconciler test", func() {
 				Expect(ok).Should(BeTrue())
 				pod.Status.Phase = corev1.PodFailed
 			}
-			_, err = reconciler.Reconcile(newTree)
+			res, err = reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
 			Expect(its.Status.Replicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.ReadyReplicas).Should(BeEquivalentTo(0))
 			Expect(its.Status.AvailableReplicas).Should(BeEquivalentTo(0))

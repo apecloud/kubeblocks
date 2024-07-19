@@ -51,9 +51,10 @@ var _ = Describe("revision update reconciler test", func() {
 			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ResultSatisfied))
 
 			By("Reconcile")
-			newTree, err := reconciler.Reconcile(tree)
+			res, err := reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
-			newITS, ok := newTree.GetRoot().(*workloads.InstanceSet)
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			newITS, ok := tree.GetRoot().(*workloads.InstanceSet)
 			Expect(ok).Should(BeTrue())
 			Expect(newITS.Status.ObservedGeneration).Should(Equal(its.Generation))
 			updateRevisions, err := GetRevisions(newITS.Status.UpdateRevisions)

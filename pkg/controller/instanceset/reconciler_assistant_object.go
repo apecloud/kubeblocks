@@ -47,7 +47,7 @@ func (a *assistantObjectReconciler) PreCondition(tree *kubebuilderx.ObjectTree) 
 	return kubebuilderx.ResultSatisfied
 }
 
-func (a *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
+func (a *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
 
 	// generate objects by current spec
@@ -59,7 +59,7 @@ func (a *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*k
 	headLessSvc := buildHeadlessSvc(*its, labels, headlessSelectors)
 	envConfig, err := buildEnvConfigMap(*its, labels)
 	if err != nil {
-		return nil, err
+		return kubebuilderx.Continue, err
 	}
 	var objects []client.Object
 	if svc != nil {
@@ -68,7 +68,7 @@ func (a *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*k
 	objects = append(objects, headLessSvc, envConfig)
 	for _, object := range objects {
 		if err := intctrlutil.SetOwnership(its, object, model.GetScheme(), finalizer); err != nil {
-			return nil, err
+			return kubebuilderx.Continue, err
 		}
 	}
 	// compute create/update/delete set
@@ -76,7 +76,7 @@ func (a *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*k
 	for _, object := range objects {
 		name, err := model.GetGVKName(object)
 		if err != nil {
-			return nil, err
+			return kubebuilderx.Continue, err
 		}
 		newSnapshot[*name] = object
 	}
@@ -85,13 +85,13 @@ func (a *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*k
 	cmList := tree.List(&corev1.ConfigMap{})
 	cmListFiltered, err := filterTemplate(cmList, its.Annotations)
 	if err != nil {
-		return nil, err
+		return kubebuilderx.Continue, err
 	}
 	for _, objectList := range [][]client.Object{svcList, cmListFiltered} {
 		for _, object := range objectList {
 			name, err := model.GetGVKName(object)
 			if err != nil {
-				return nil, err
+				return kubebuilderx.Continue, err
 			}
 			oldSnapshot[*name] = object
 		}
@@ -105,22 +105,22 @@ func (a *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*k
 	deleteSet := oldNameSet.Difference(newNameSet)
 	for name := range createSet {
 		if err := tree.Add(newSnapshot[name]); err != nil {
-			return nil, err
+			return kubebuilderx.Continue, err
 		}
 	}
 	for name := range updateSet {
 		oldObj := oldSnapshot[name]
 		newObj := copyAndMerge(oldObj, newSnapshot[name])
 		if err := tree.Update(newObj); err != nil {
-			return nil, err
+			return kubebuilderx.Continue, err
 		}
 	}
 	for name := range deleteSet {
 		if err := tree.Delete(oldSnapshot[name]); err != nil {
-			return nil, err
+			return kubebuilderx.Continue, err
 		}
 	}
-	return tree, nil
+	return kubebuilderx.Continue, nil
 }
 
 func filterTemplate(cmList []client.Object, annotations map[string]string) ([]client.Object, error) {

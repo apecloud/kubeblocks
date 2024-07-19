@@ -90,7 +90,7 @@ var _ = Describe("controller test", func() {
 			newTree = NewObjectTree()
 			Expect(cli.Get(ctx, client.ObjectKeyFromObject(root), root)).Should(Succeed())
 			newTree.SetRoot(root)
-			res, err = controller.Prepare(&dummyLoader{tree: newTree}).Do(&dummyReconciler{res: Result{Next: Commit}}).Commit()
+			res, err = controller.Prepare(&dummyLoader{tree: newTree}).Do(&dummyReconciler{res: Commit}).Commit()
 			Expect(err).Should(BeNil())
 			Expect(res.Requeue).Should(BeFalse())
 			Expect(newTree).Should(Equal(tree))
@@ -99,7 +99,7 @@ var _ = Describe("controller test", func() {
 			newTree = NewObjectTree()
 			Expect(cli.Get(ctx, client.ObjectKeyFromObject(root), root)).Should(Succeed())
 			newTree.SetRoot(root)
-			res, err = controller.Prepare(&dummyLoader{tree: newTree}).Do(&dummyReconciler{res: Result{Next: Retry, RetryAfter: time.Second}}).Commit()
+			res, err = controller.Prepare(&dummyLoader{tree: newTree}).Do(&dummyReconciler{res: RetryAfter(time.Second)}).Commit()
 			Expect(err).Should(BeNil())
 			Expect(res.Requeue).Should(BeTrue())
 			Expect(res.RequeueAfter).Should(Equal(time.Second))
@@ -137,7 +137,7 @@ func (d *dummyReconciler) PreCondition(tree *ObjectTree) *CheckResult {
 }
 
 func (d *dummyReconciler) Reconcile(tree *ObjectTree) (Result, error) {
-	if d.err != nil || d.res.Next != Continue {
+	if d.err != nil || d.res.Next != cntn {
 		return d.res, d.err
 	}
 	if tree != nil {

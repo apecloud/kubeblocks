@@ -112,3 +112,11 @@ func errPrematureStopWithSetCompOwnership(comp *appsv1alpha1.Component, dag *gra
 	}
 	return graph.ErrPrematureStop
 }
+
+// errWithSetCompOwnership is a helper function that sets component ownership before returns err
+// TODO: refactor to set ownership information when creating each object, instead of setting it uniformly.
+func errWithSetCompOwnership(comp *appsv1alpha1.Component, dag *graph.DAG, cli client.Reader, err error) error {
+	graphCli, _ := cli.(model.GraphClient)
+	_ = setCompOwnership(comp, dag, graphCli)
+	return err
+}

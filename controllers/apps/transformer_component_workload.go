@@ -641,6 +641,10 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 			return switchoverErr
 		}
 
+		if r.synthesizeComp.LifecycleActions == nil || r.synthesizeComp.LifecycleActions.MemberLeave == nil {
+			continue
+		}
+
 		if err2 := lorryCli.LeaveMember(r.reqCtx.Ctx); err2 != nil {
 			// For the purpose of upgrade compatibility, if the version of Lorry is 0.7 and
 			// the version of KB is upgraded to 0.8 or newer, lorry client will return an NotImplemented error,

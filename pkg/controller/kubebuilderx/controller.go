@@ -30,18 +30,17 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
 
 // TODO(free6om): this is a new reconciler framework in the very early stage leaving the following tasks to do:
-// 1. don't expose the client.Client to the Reconciler, to prevent write operation in Prepare and Do stages.
-// 2. expose EventRecorder
-// 3. expose Logger
+// 1. expose EventRecorder & Logger
+// 2. parallel workflow-style reconciler chain
 
 type Controller interface {
 	Prepare(TreeLoader) Controller
 	Do(...Reconciler) Controller
-	Commit() error
+	Commit() (ctrl.Result, error)
 }
 
 type controller struct {
@@ -51,6 +50,7 @@ type controller struct {
 	recorder record.EventRecorder
 	logger   logr.Logger
 
+	res Result
 	err error
 
 	oldTree *ObjectTree
@@ -88,8 +88,8 @@ func (c *controller) Do(reconcilers ...Reconciler) Controller {
 			return c
 		}
 
-		c.tree, c.err = reconciler.Reconcile(c.tree)
-		if c.err != nil {
+		c.res, c.err = reconciler.Reconcile(c.tree)
+		if c.err != nil || c.res.Next == Commit || c.res.Next == Retry {
 			return c
 		}
 	}
@@ -97,27 +97,31 @@ func (c *controller) Do(reconcilers ...Reconciler) Controller {
 	return c
 }
 
-func (c *controller) Commit() error {
+func (c *controller) Commit() (ctrl.Result, error) {
 	defer c.emitFailureEvent()
 
-	if c.err != nil && !intctrlutil.IsDelayedRequeueError(c.err) {
-		return c.err
+	if c.err != nil {
+		return ctrl.Result{}, c.err
 	}
 	if c.oldTree.GetRoot() == nil {
-		return nil
+		return ctrl.Result{}, nil
 	}
 	builder := NewPlanBuilder(c.ctx, c.cli, c.oldTree, c.tree, c.recorder, c.logger)
-	if err := builder.Init(); err != nil {
-		return err
+	if c.err = builder.Init(); c.err != nil {
+		return ctrl.Result{}, c.err
 	}
-	plan, err := builder.Build()
-	if err != nil {
-		return err
+	var plan graph.Plan
+	plan, c.err = builder.Build()
+	if c.err != nil {
+		return ctrl.Result{}, c.err
 	}
-	if err = plan.Execute(); err != nil {
-		return err
+	if c.err = plan.Execute(); c.err != nil {
+		return ctrl.Result{}, c.err
 	}
-	return c.err
+	if c.res.Next == Retry {
+		return ctrl.Result{Requeue: true, RequeueAfter: c.res.RetryAfter}, nil
+	}
+	return ctrl.Result{}, nil
 }
 
 func (c *controller) emitFailureEvent() {

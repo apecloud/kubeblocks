@@ -49,27 +49,31 @@ var _ = Describe("controller test", func() {
 			cli := fake.NewFakeClient()
 			req := ctrl.Request{}
 			logger := log.FromContext(ctx).WithValues("InstanceSet", "test")
-			controller := NewController(context.Background(), cli, req, nil, logger)
+			var controller Controller
 			tree := NewObjectTree()
 
 			By("Load tree and reconcile it with no error")
+			controller = NewController(ctx, cli, req, nil, logger)
 			res, err := controller.Prepare(&dummyLoader{tree: tree}).Do(&dummyReconciler{}).Commit()
 			Expect(err).Should(BeNil())
 			Expect(res.Requeue).Should(BeFalse())
 
 			By("Load tree with error")
+			controller = NewController(ctx, cli, req, nil, logger)
 			loadErr := fmt.Errorf("load tree failed")
 			res, err = controller.Prepare(&dummyLoader{err: loadErr}).Do(&dummyReconciler{}).Commit()
 			Expect(err).Should(Equal(loadErr))
 			Expect(res.Requeue).Should(BeFalse())
 
 			By("Reconcile with pre-condition error")
+			controller = NewController(ctx, cli, req, nil, logger)
 			reconcileCondErr := fmt.Errorf("reconcile pre-condition failed")
 			res, err = controller.Prepare(&dummyLoader{tree: tree}).Do(&dummyReconciler{preErr: reconcileCondErr}).Commit()
 			Expect(err).Should(Equal(reconcileCondErr))
 			Expect(res.Requeue).Should(BeFalse())
 
 			By("Reconcile with pre-condition unsatisfied")
+			controller = NewController(ctx, cli, req, nil, logger)
 			root := builder.NewPodBuilder(namespace, name).GetObject()
 			tree.SetRoot(root)
 			Expect(cli.Create(ctx, root)).Should(Succeed())
@@ -81,12 +85,14 @@ var _ = Describe("controller test", func() {
 			Expect(newTree).Should(Equal(tree))
 
 			By("Reconcile with error")
+			controller = NewController(ctx, cli, req, nil, logger)
 			reconcileErr := fmt.Errorf("reconcile with error")
 			res, err = controller.Prepare(&dummyLoader{tree: tree}).Do(&dummyReconciler{err: reconcileErr}).Commit()
 			Expect(err).Should(Equal(reconcileErr))
 			Expect(res.Requeue).Should(BeFalse())
 
 			By("Reconcile with Commit method")
+			controller = NewController(ctx, cli, req, nil, logger)
 			newTree = NewObjectTree()
 			Expect(cli.Get(ctx, client.ObjectKeyFromObject(root), root)).Should(Succeed())
 			newTree.SetRoot(root)
@@ -96,6 +102,7 @@ var _ = Describe("controller test", func() {
 			Expect(newTree).Should(Equal(tree))
 
 			By("Reconcile with Retry method")
+			controller = NewController(ctx, cli, req, nil, logger)
 			newTree = NewObjectTree()
 			Expect(cli.Get(ctx, client.ObjectKeyFromObject(root), root)).Should(Succeed())
 			newTree.SetRoot(root)

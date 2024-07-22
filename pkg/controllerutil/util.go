@@ -21,7 +21,9 @@ package controllerutil
 
 import (
 	"context"
+	"fmt"
 	"reflect"
+	gruntime "runtime"
 	"strings"
 
 	"golang.org/x/exp/slices"
@@ -158,10 +160,16 @@ func GeKubeRestConfig(userAgent string) *rest.Config {
 	if clientBurst != 0 {
 		cfg.Burst = clientBurst
 	}
-	if len(strings.TrimSpace(userAgent)) > 0 {
-		rest.AddUserAgent(cfg, userAgent)
+	if len(strings.TrimSpace(userAgent)) == 0 {
+		userAgent = defaultUserAgent()
 	}
+	cfg.UserAgent = userAgent
 	return cfg
+}
+
+func defaultUserAgent() string {
+	version := viper.GetString(constant.AppVersionKey)
+	return fmt.Sprintf("KubeBlocks %s (%s/%s)", version, gruntime.GOOS, gruntime.GOARCH,)
 }
 
 // DeleteOwnedResources deletes the matched resources which are owned by the owner.

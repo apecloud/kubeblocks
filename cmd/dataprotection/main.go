@@ -118,6 +118,7 @@ func init() {
 	viper.SetDefault(dptypes.CfgKeyWorkerServiceAccountAnnotations, "{}")
 	viper.SetDefault(dptypes.CfgKeyWorkerClusterRoleName, "kubeblocks-dataprotection-worker-role")
 	viper.SetDefault(dptypes.CfgDataProtectionReconcileWorkers, runtime.NumCPU())
+	viper.SetDefault(constant.AppVersionKey, "unknown")
 }
 
 func main() {
@@ -146,7 +147,7 @@ func main() {
 	flag.String(multiClusterContextsFlagKey.String(), "", "Kube contexts the manager will talk to.")
 	flag.String(multiClusterContextsDisabledFlagKey.String(), "", "Kube contexts that mark as disabled.")
 
-	flag.String(userAgentFlagKey.String(), appName, "User agent of the operator.")
+	flag.String(userAgentFlagKey.String(), "", "User agent of the operator.")
 
 	flag.String(constant.ManagedNamespacesFlag, "",
 		"The namespaces that the operator will manage, multiple namespaces are separated by commas.")

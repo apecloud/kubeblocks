@@ -145,6 +145,7 @@ func init() {
 	viper.SetDefault(intctrlutil.FeatureGateEnableRuntimeMetrics, false)
 	viper.SetDefault(constant.CfgKBReconcileWorkers, 8)
 	viper.SetDefault(constant.FeatureGateIgnoreConfigTemplateDefaultMode, false)
+	viper.SetDefault(constant.AppVersionKey, "unknown")
 }
 
 type flagName string
@@ -184,7 +185,7 @@ func setupFlags() {
 	flag.String(constant.ManagedNamespacesFlag, "",
 		"The namespaces that the operator will manage, multiple namespaces are separated by commas.")
 
-	flag.String(userAgentFlagKey.String(), appName, "User agent of the operator.")
+	flag.String(userAgentFlagKey.String(), "", "User agent of the operator.")
 
 	opts := zap.Options{
 		Development: false,

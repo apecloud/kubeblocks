@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package component
+package scheduling
 
 import (
 	"fmt"
@@ -29,39 +29,26 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("affinity utils", func() {
 	const (
-		clusterDefName     = "test-clusterdef"
-		clusterVersionName = "test-clusterversion"
-		clusterName        = "test-cluster"
-		mysqlCompDefName   = "replicasets"
-		mysqlCompName      = "mysql"
-
-		clusterTolerationKey = "testClusterTolerationKey"
-		topologyKey          = "testTopologyKey"
-		labelKey             = "testNodeLabelKey"
-		labelValue           = "testLabelValue"
-		nodeKey              = "testNodeKey"
+		clusterName          = "test-cluster"
+		compName             = "test-comp"
+		clusterTolerationKey = "test-clusterTolerationKey"
+		topologyKey          = "test-topologyKey"
+		labelKey             = "test-nodeLabelKey"
+		labelValue           = "test-labelValue"
+		nodeKey              = "test-nodeKey"
 	)
 
 	var (
 		clusterObj *appsv1alpha1.Cluster
-		component  *SynthesizedComponent
+		compSpec   *appsv1alpha1.ClusterComponentSpec
 
 		buildObjs = func(podAntiAffinity appsv1alpha1.PodAntiAffinity) {
-			clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
-				GetObject()
-
-			clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.Name).
-				AddComponentVersion(mysqlCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-				GetObject()
-
 			affinity := &appsv1alpha1.Affinity{
 				PodAntiAffinity: podAntiAffinity,
 				TopologyKeys:    []string{topologyKey},
@@ -69,44 +56,39 @@ var _ = Describe("affinity utils", func() {
 					labelKey: labelValue,
 				},
 			}
-
 			toleration := corev1.Toleration{
 				Key:      clusterTolerationKey,
 				Operator: corev1.TolerationOpExists,
 				Effect:   corev1.TaintEffectNoExecute,
 			}
 
-			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-				clusterDefObj.Name, clusterVersionObj.Name).
-				AddComponent(mysqlCompName, mysqlCompDefName).
+			clusterObj = testapps.NewClusterFactory("default", clusterName, "", "").
+				AddComponent(compName, "").
 				SetClusterAffinity(affinity).
 				AddClusterToleration(toleration).
 				GetObject()
+			compSpec = &clusterObj.Spec.ComponentSpecs[0]
 
-			reqCtx := intctrlutil.RequestCtx{
-				Ctx: ctx,
-				Log: logger,
-			}
-			component, _ = BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli,
-				clusterDefObj, clusterVersionObj, clusterObj, &clusterObj.Spec.ComponentSpecs[0])
 		}
 	)
 
 	Context("with PodAntiAffinity set to Required", func() {
 		BeforeEach(func() {
 			buildObjs(appsv1alpha1.Required)
-			Expect(component).ShouldNot(BeNil())
 		})
 
 		It("should have correct Affinity and TopologySpreadConstraints", func() {
-			affinity, err := BuildPodAffinity(clusterObj.Name, component.Name, clusterObj.Spec.Affinity)
+			schedulingPolicy, err := BuildSchedulingPolicy(clusterObj, compSpec)
 			Expect(err).Should(Succeed())
+			Expect(schedulingPolicy).ShouldNot(BeNil())
+
+			affinity := schedulingPolicy.Affinity
 			Expect(affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).Should(Equal(labelKey))
 			Expect(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).Should(Equal(topologyKey))
 			Expect(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution).Should(BeEmpty())
 			Expect(affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution).Should(BeEmpty())
 
-			topologySpreadConstraints := BuildPodTopologySpreadConstraints(clusterObj.Name, component.Name, clusterObj.Spec.Affinity)
+			topologySpreadConstraints := schedulingPolicy.TopologySpreadConstraints
 			Expect(topologySpreadConstraints[0].WhenUnsatisfiable).Should(Equal(corev1.DoNotSchedule))
 			Expect(topologySpreadConstraints[0].TopologyKey).Should(Equal(topologyKey))
 		})
@@ -116,14 +98,17 @@ var _ = Describe("affinity utils", func() {
 				fmt.Sprintf("{\"nodeAffinity\":{\"preferredDuringSchedulingIgnoredDuringExecution\":[{\"preference\":{\"matchExpressions\":[{\"key\":\"%s\",\"operator\":\"In\",\"values\":[\"true\"]}]},\"weight\":100}]}}", nodeKey))
 			defer viper.Set(constant.CfgKeyDataPlaneAffinity, "")
 
-			affinity, err := BuildPodAffinity(clusterObj.Name, component.Name, clusterObj.Spec.Affinity)
+			schedulingPolicy, err := BuildSchedulingPolicy(clusterObj, compSpec)
 			Expect(err).Should(Succeed())
+			Expect(schedulingPolicy).ShouldNot(BeNil())
+
+			affinity := schedulingPolicy.Affinity
 			Expect(affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).Should(Equal(labelKey))
 			Expect(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).Should(Equal(topologyKey))
 			Expect(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution).Should(BeEmpty())
 			Expect(affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Preference.MatchExpressions[0].Key).Should(Equal(nodeKey))
 
-			topologySpreadConstraints := BuildPodTopologySpreadConstraints(clusterObj.Name, component.Name, clusterObj.Spec.Affinity)
+			topologySpreadConstraints := schedulingPolicy.TopologySpreadConstraints
 			Expect(topologySpreadConstraints[0].WhenUnsatisfiable).Should(Equal(corev1.DoNotSchedule))
 			Expect(topologySpreadConstraints[0].TopologyKey).Should(Equal(topologyKey))
 		})
@@ -132,18 +117,21 @@ var _ = Describe("affinity utils", func() {
 	Context("with PodAntiAffinity set to Preferred", func() {
 		BeforeEach(func() {
 			buildObjs(appsv1alpha1.Preferred)
-			Expect(component).ShouldNot(BeNil())
 		})
 
 		It("should have correct Affinity and TopologySpreadConstraints", func() {
-			affinity, err := BuildPodAffinity(clusterObj.Name, component.Name, clusterObj.Spec.Affinity)
+			schedulingPolicy, err := BuildSchedulingPolicy(clusterObj, compSpec)
+			Expect(err).Should(Succeed())
+			Expect(schedulingPolicy).ShouldNot(BeNil())
+
+			affinity := schedulingPolicy.Affinity
 			Expect(err).Should(Succeed())
 			Expect(affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).Should(Equal(labelKey))
 			Expect(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution).Should(BeEmpty())
 			Expect(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Weight).ShouldNot(BeNil())
 			Expect(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].PodAffinityTerm.TopologyKey).Should(Equal(topologyKey))
 
-			topologySpreadConstraints := BuildPodTopologySpreadConstraints(clusterObj.Name, component.Name, clusterObj.Spec.Affinity)
+			topologySpreadConstraints := schedulingPolicy.TopologySpreadConstraints
 			Expect(topologySpreadConstraints[0].WhenUnsatisfiable).Should(Equal(corev1.ScheduleAnyway))
 			Expect(topologySpreadConstraints[0].TopologyKey).Should(Equal(topologyKey))
 		})
@@ -155,8 +143,11 @@ var _ = Describe("affinity utils", func() {
 		})
 
 		It("should have correct tolerations", func() {
-			tolerations, err := BuildTolerations(clusterObj, &clusterObj.Spec.ComponentSpecs[0])
+			schedulingPolicy, err := BuildSchedulingPolicy(clusterObj, compSpec)
 			Expect(err).Should(Succeed())
+			Expect(schedulingPolicy).ShouldNot(BeNil())
+
+			tolerations := schedulingPolicy.Tolerations
 			Expect(tolerations).ShouldNot(BeEmpty())
 			Expect(tolerations[0].Key).Should(Equal(clusterTolerationKey))
 		})
@@ -165,8 +156,12 @@ var _ = Describe("affinity utils", func() {
 			const dpTolerationKey = "dataPlaneTolerationKey"
 			viper.Set(constant.CfgKeyDataPlaneTolerations, fmt.Sprintf("[{\"key\":\"%s\", \"operator\": \"Exists\", \"effect\": \"NoSchedule\"}]", dpTolerationKey))
 			defer viper.Set(constant.CfgKeyDataPlaneTolerations, "")
-			tolerations, err := BuildTolerations(clusterObj, &clusterObj.Spec.ComponentSpecs[0])
+
+			schedulingPolicy, err := BuildSchedulingPolicy(clusterObj, compSpec)
 			Expect(err).Should(Succeed())
+			Expect(schedulingPolicy).ShouldNot(BeNil())
+
+			tolerations := schedulingPolicy.Tolerations
 			Expect(tolerations).Should(HaveLen(2))
 			Expect(tolerations[0].Key).Should(Equal(clusterTolerationKey))
 			Expect(tolerations[1].Key).Should(Equal(dpTolerationKey))

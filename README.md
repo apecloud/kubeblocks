@@ -17,21 +17,21 @@
 
 ## Motivation
 
-If you are a developer using multiple types of databases in your application and are considering deploying both your application and databases on K8s for cost or efficiency reasons, you will need to find suitable operators for each database. Learning the different operators and their APIs will introduce a significant learning curve and time costs, not to mention the effort required to maintain them.
+If you are a developer using multiple types of databases in your application and are considering deploying both your application and databases on K8s for cost or efficiency reasons, you need to find suitable operators for each database. Learning so many different operators and their APIs introduces a significant learning curve and time costs, not to mention the effort required to maintain them.
 
-We aim to use a unified set of APIs (CRDs) and code to manage various databases on K8s. For example, we can use the `Cluster` resource to create a PostgreSQL cluster, a Redis cluster, or a Kafka cluster. This abstraction and unified API allow us to further use a single set of operator code to manage multiple types of databases, as well as handle day-2 operations, theoretically extending to any type of database engine.
+KubeBlocks uses a unified set of APIs (CRDs) and code to manage various databases on K8s. For example, we can use the `Cluster` resource to create a PostgreSQL cluster, a Redis cluster, or a Kafka cluster. This abstraction and unified API allow us to further use a single set of operator code to manage multiple types of databases, as well as handle day-2 operations, theoretically extending to any type of database engine.
 
 ## What is KubeBlocks
 
 KubeBlocks is an open-source control plane software that runs and manages multiple popular database engines on K8s through a unified set of code and APIs. The core of KubeBlocks is a K8s operator, which defines a set of CRDs to abstract the common attributes of various database engines and uses these abstractions to manage the engine's lifecycle and day-2 operations.
 
-KubeBlocks could manage various type of stateful engines, including RDBMSs (MySQL, PostgreSQL), Caches(Redis), NoSQLs (MongoDB), MQs(Kafka, Pulsar), vector databases(Milvus, Qdrant, Weaviate), and data warehouses(ClickHouse, ElasticSearch, OpenSearch, Doris, StarRocks). Adding support for a new engine to KubeBlocks can be achieved by writing a KubeBlocks Addon. The community is actively integrating more types of engines into KubeBlocks, and it currently supports 35 types of engines.
+KubeBlocks could manages various types of stateful engines, including RDBMSs (MySQL, PostgreSQL), Caches(Redis), NoSQLs (MongoDB), MQs(Kafka, Pulsar), vector databases(Milvus, Qdrant, Weaviate), and data warehouses(ClickHouse, ElasticSearch, OpenSearch, Doris, StarRocks). Adding a new engine to KubeBlocks can be achieved by writing a KubeBlocks Addon. The community is actively integrating more types of engines into KubeBlocks, and it currently supports 35 types of engines.
 
 The name KubeBlocks is inspired by Kubernetes and LEGO blocks, signifying that through the KubeBlocks API, adding, composing and managing database engines on K8s can be easy, standard and productive, like playing with LEGO blocks.
 
 ### Why you need KubeBlocks
 
-KubeBlocks integrates the most popular database engines and provides rich management functions, along with declarative APIs, on various environments. Furthermore, KubeBlocks offers the following benefits:
+KubeBlocks integrates the most popular database engines and provides rich management functions, along with declarative APIs, in various environments. KubeBlocks offers the following benefits:
 
 * Production-level
 
@@ -43,11 +43,11 @@ KubeBlocks integrates the most popular database engines and provides rich manage
 
 * Ease of use
 
-  KubeBlocks not only provides a YAML-based API but also offers an interactive kbcli tool to further simplify usage as a complement to kubectl. For example, you can install KubeBlocks and launch a playground environment on a desktop or cloud with a single command.
+  KubeBlocks not only provides a YAML-based API but also offers an interactive `kbcli` tool to further simplify usage as a complement to `kubectl`. For example, you can install KubeBlocks and launch a playground environment on a desktop or cloud with a single command.
 
 * Observability
 
-  KubeBlocks collects monitoring metrics from richful data sources, integrates with the Prometheus stack, and provides insightful Grafana templates. In addition, troubleshooting tools such as slow logs are also provided.
+  KubeBlocks collects monitoring metrics from rich data sources, integrates with the Prometheus stack, and provides insightful Grafana templates. In addition, troubleshooting tools such as slow logs are also provided.
 
 * Extensibility
 
@@ -92,7 +92,7 @@ KubeCon 2024 in HongKong from 21-23 August 2024: [KuaiShou's 100% Resource Utili
 - KubeBlocks [Slack Channel](https://join.slack.com/t/kubeblocks/shared_invite/zt-2lyc3cwsg-m07xaaN8Rle~ao3soPWKUw)
 - KubeBlocks Github [Discussions](https://github.com/apecloud/kubeblocks/discussions)
 - KubeBlocks Wechat Account:
-![img](/docs/img/wechat-assistant.jpg)
+<img src=".\docs\img\wechat-assistant.jpg" alt="wechat" width="100" height="100">
 
 ## Contributing to KubeBlocks
 
@@ -103,7 +103,7 @@ Your contributions are welcomed and appreciated.
 
 ## Report Vulnerability
 
-We consider security is a top priority issue. If you come across a related issue, please create a [Report a security vulnerability](https://github.com/apecloud/kubeblocks/security/advisories/new) issue.
+We consider security as the top priority issue. If you find any security issues, please [Report a security vulnerability](https://github.com/apecloud/kubeblocks/security/advisories/new) issue.
 
 ## License
 

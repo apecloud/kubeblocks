@@ -90,7 +90,6 @@ require (
 	k8s.io/utils v0.0.0-20231127182322-b307cd553661
 	sigs.k8s.io/controller-runtime v0.17.2
 	sigs.k8s.io/yaml v1.4.0
-	software.sslmate.com/src/go-pkcs12 v0.4.0
 )
 
 require (

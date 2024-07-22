@@ -285,6 +285,10 @@ spec:
                               description: Specifies the map key of the port in the
                                 connection credential secret.
                               type: string
+                            portName:
+                              description: Specifies the name of the port in the target
+                                pod.
+                              type: string
                             secretName:
                               description: Refers to the Secret object that contains
                                 the connection credential.
@@ -515,6 +519,10 @@ spec:
                               portKey:
                                 description: Specifies the map key of the port in
                                   the connection credential secret.
+                                type: string
+                              portName:
+                                description: Specifies the name of the port in the
+                                  target pod.
                                 type: string
                               secretName:
                                 description: Refers to the Secret object that contains
@@ -752,6 +760,10 @@ spec:
                         description: Specifies the map key of the port in the connection
                           credential secret.
                         type: string
+                      portName:
+                        description: Specifies the name of the port in the target
+                          pod.
+                        type: string
                       secretName:
                         description: Refers to the Secret object that contains the
                           connection credential.
@@ -925,6 +937,10 @@ spec:
                         portKey:
                           description: Specifies the map key of the port in the connection
                             credential secret.
+                          type: string
+                        portName:
+                          description: Specifies the name of the port in the target
+                            pod.
                           type: string
                         secretName:
                           description: Refers to the Secret object that contains the

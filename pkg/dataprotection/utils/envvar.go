@@ -50,6 +50,8 @@ func BuildEnvByCredential(pod *corev1.Pod, credential *dpv1alpha1.ConnectionCred
 	}
 	if credential.PortKey != "" {
 		envVars = append(envVars, buildEnvBySecretKey(dptypes.DPDBPort, credential.SecretName, credential.PortKey))
+	} else if credential.PortName != "" {
+		envVars = append(envVars, corev1.EnvVar{Name: dptypes.DPDBPort, Value: strconv.Itoa(int(GetPodNamedPort(pod, credential.PortName)))})
 	} else {
 		envVars = append(envVars, corev1.EnvVar{Name: dptypes.DPDBPort, Value: strconv.Itoa(int(GetPodFirstContainerPort(pod)))})
 	}

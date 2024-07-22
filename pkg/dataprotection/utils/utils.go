@@ -309,12 +309,25 @@ func SupportsCronJobV1() bool {
 	}
 	return semver.Compare(kubeVersion, "v1.21") >= 0
 }
+
 func GetPodFirstContainerPort(pod *corev1.Pod) int32 {
 	ports := pod.Spec.Containers[0].Ports
 	if len(ports) == 0 {
 		return 0
 	}
 	return ports[0].ContainerPort
+}
+
+func GetPodNamedPort(pod *corev1.Pod, portName string) int32 {
+	// the name of port is unique in the pod.
+	for _, container := range pod.Spec.Containers {
+		for _, port := range container.Ports {
+			if port.Name == portName {
+				return port.ContainerPort
+			}
+		}
+	}
+	return 0
 }
 
 // ExistTargetVolume checks if the backup.status.backupMethod.targetVolumes exists the target volume which should be restored.

@@ -166,6 +166,11 @@ type ConnectionCredential struct {
 	//
 	// +optional
 	PortKey string `json:"portKey,omitempty"`
+
+	// Specifies the name of the port in the target pod.
+	//
+	// +optional
+	PortName string `json:"portName,omitempty"`
 }
 
 // KubeResources defines the kubernetes resources to back up.

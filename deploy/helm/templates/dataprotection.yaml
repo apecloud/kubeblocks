@@ -77,7 +77,7 @@ spec:
             - "--multi-cluster-contexts-disabled={{ .Values.multiCluster.contextsDisabled }}"
             {{- end }}
             {{- if .Values.userAgent }}
-            - "--user-agent={{ .Values.userAgent | quote }}"
+            - "--user-agent={{ .Values.userAgent }}"
             {{- end }}
           env:
             - name: CM_NAMESPACE

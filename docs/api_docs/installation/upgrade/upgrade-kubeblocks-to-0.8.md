@@ -15,7 +15,7 @@ In this tutorial, you will learn how to upgrade to KubeBlocks v0.8.
 
 :::note
 
-Execute `kbcli version` to check the current KubeBlocks version you are running, and then upgrade it.
+Execute `helm -n kb-system list | grep kubeblocks` to check the current KubeBlocks version you are running, and then upgrade it.
 
 :::
 

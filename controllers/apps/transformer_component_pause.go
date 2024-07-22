@@ -38,47 +38,46 @@ func (t *componentPauseTransformer) Transform(ctx graph.TransformContext, dag *g
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	comp := transCtx.Component
+	instanceSet := getInstanceSet(transCtx)
+	configuration := getConfiguration(transCtx)
+	configMapList := listConfigMaps(transCtx)
+
 	if model.IsReconciliationPaused(comp) {
-		// get instanceSet and set paused
-		instanceSet := getInstanceSet(transCtx)
 		if !model.IsReconciliationPaused(instanceSet) {
 			instanceSet.Spec.Paused = true
 			graphCli.Update(dag, nil, instanceSet)
 		}
-		// get configuration and set paused
-		configuration := getConfiguration(transCtx)
 		if configuration, needUpdate := SetPauseAnnotation(configuration); needUpdate {
 			graphCli.Update(dag, nil, configuration)
 		}
-		// list configmaps and set paused
-		configMapList := listConfigMaps(transCtx)
 		for i := range configMapList.Items {
 			if configMap, needUpdate := SetPauseAnnotation(&configMapList.Items[i]); needUpdate {
 				graphCli.Update(dag, nil, configMap)
 			}
 		}
-		// pause reconcile now
+		// pause reconciliation now
 		return graph.ErrPrematureStop
-	} else {
-		// get instanceSet and cancel paused
-		instanceSet := getInstanceSet(transCtx)
-		if model.IsReconciliationPaused(instanceSet) {
-			instanceSet.Spec.Paused = false
-			graphCli.Update(dag, nil, instanceSet)
-			return nil
-		}
-		// get configuration and cancel paused
-		configuration := getConfiguration(transCtx)
-		if configuration, needUpdate := RemovePauseAnnotation(configuration); needUpdate {
-			graphCli.Update(dag, nil, configuration)
-		}
-		// list configmaps and cancel paused
-		configMapList := listConfigMaps(transCtx)
-		for i := range configMapList.Items {
-			if configMap, needUpdate := RemovePauseAnnotation(&configMapList.Items[i]); needUpdate {
-				graphCli.Update(dag, nil, configMap)
-			}
-		}
-		return nil
 	}
+	allResumed := true
+	if model.IsReconciliationPaused(instanceSet) {
+		instanceSet.Spec.Paused = false
+		graphCli.Update(dag, nil, instanceSet)
+		allResumed = false
+	}
+	if configuration, needUpdate := RemovePauseAnnotation(configuration); needUpdate {
+		graphCli.Update(dag, nil, configuration)
+		allResumed = false
+	}
+	for i := range configMapList.Items {
+		if configMap, needUpdate := RemovePauseAnnotation(&configMapList.Items[i]); needUpdate {
+			graphCli.Update(dag, nil, configMap)
+			allResumed = false
+		}
+	}
+	if !allResumed {
+		// Wait for the next reconciliation to actually update the resources in k8s before reconciling the component.
+		return graph.ErrPrematureStop
+	}
+	return nil
+
 }

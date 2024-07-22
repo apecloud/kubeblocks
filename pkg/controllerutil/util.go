@@ -22,6 +22,7 @@ package controllerutil
 import (
 	"context"
 	"reflect"
+	"strings"
 
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
@@ -147,7 +148,7 @@ func SetControllerReference(owner, object metav1.Object) error {
 	return controllerutil.SetControllerReference(owner, object, innerScheme)
 }
 
-func GeKubeRestConfig() *rest.Config {
+func GeKubeRestConfig(userAgent string) *rest.Config {
 	cfg := ctrl.GetConfigOrDie()
 	clientQPS := viper.GetInt(constant.CfgClientQPS)
 	if clientQPS != 0 {
@@ -156,6 +157,9 @@ func GeKubeRestConfig() *rest.Config {
 	clientBurst := viper.GetInt(constant.CfgClientBurst)
 	if clientBurst != 0 {
 		cfg.Burst = clientBurst
+	}
+	if len(strings.TrimSpace(userAgent)) > 0 {
+		rest.AddUserAgent(cfg, userAgent)
 	}
 	return cfg
 }

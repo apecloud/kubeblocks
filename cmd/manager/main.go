@@ -91,6 +91,8 @@ const (
 	multiClusterKubeConfigFlagKey       flagName = "multi-cluster-kubeconfig"
 	multiClusterContextsFlagKey         flagName = "multi-cluster-contexts"
 	multiClusterContextsDisabledFlagKey flagName = "multi-cluster-contexts-disabled"
+
+	userAgentFlagKey flagName = "user-agent"
 )
 
 var (
@@ -182,6 +184,8 @@ func setupFlags() {
 	flag.String(constant.ManagedNamespacesFlag, "",
 		"The namespaces that the operator will manage, multiple namespaces are separated by commas.")
 
+	flag.String(userAgentFlagKey.String(), appName, "User agent of the operator.")
+
 	opts := zap.Options{
 		Development: false,
 	}
@@ -261,6 +265,7 @@ func main() {
 		multiClusterKubeConfig       string
 		multiClusterContexts         string
 		multiClusterContextsDisabled string
+		userAgent                    string
 		err                          error
 	)
 
@@ -295,8 +300,10 @@ func main() {
 	multiClusterContexts = viper.GetString(multiClusterContextsFlagKey.viperName())
 	multiClusterContextsDisabled = viper.GetString(multiClusterContextsDisabledFlagKey.viperName())
 
+	userAgent = viper.GetString(userAgentFlagKey.viperName())
+
 	setupLog.Info("golang runtime metrics.", "featureGate", intctrlutil.EnabledRuntimeMetrics())
-	mgr, err := ctrl.NewManager(intctrlutil.GeKubeRestConfig(), ctrl.Options{
+	mgr, err := ctrl.NewManager(intctrlutil.GeKubeRestConfig(userAgent), ctrl.Options{
 		Scheme: scheme,
 		Metrics: server.Options{
 			BindAddress:   metricsAddr,

@@ -181,7 +181,7 @@ spec:
             {{- end }}
             {{- if .Chart.Version }}
             - name: KUBEBLOCKS_VERSION
-              value: {{ .Chart.Version }}
+              value: {{ .Chart.Version | quote }}
             {{- end }}
           {{- with .Values.securityContext }}
           securityContext:

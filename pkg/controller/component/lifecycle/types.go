@@ -27,7 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	kbagentcli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
+	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 )
 
 var (
@@ -43,14 +43,14 @@ var (
 
 func NewActions(lifecycleActions *appsv1alpha1.ComponentLifecycleActions, pod *corev1.Pod) (Actions, error) {
 	var err error
-	var agentCli kbagentcli.Client
+	var agentCli kbacli.Client
 	if pod != nil {
-		agentCli, err = kbagentcli.NewClient(*pod)
+		agentCli, err = kbacli.NewClient(*pod)
 		if err != nil {
 			return nil, err
 		}
 	}
-	return &actions{
+	return &kbagent{
 		lifecycleActions: lifecycleActions,
 		agentCli:         agentCli,
 	}, nil
@@ -63,27 +63,27 @@ type Options struct {
 }
 
 type Actions interface {
-	PostProvision(ctx context.Context, cli client.Reader, opts *Options) ([]byte, error)
+	PostProvision(ctx context.Context, cli client.Reader, opts *Options) error
 
-	PreTerminate(ctx context.Context, cli client.Reader, opts *Options) ([]byte, error)
+	PreTerminate(ctx context.Context, cli client.Reader, opts *Options) error
 
 	// RoleProbe(ctx context.Context, cli client.Reader, opts *Options) ([]byte, error)
 
-	Switchover(ctx context.Context, cli client.Reader, opts *Options) ([]byte, error)
+	Switchover(ctx context.Context, cli client.Reader, opts *Options) error
 
-	MemberJoin(ctx context.Context, cli client.Reader, opts *Options) ([]byte, error)
+	MemberJoin(ctx context.Context, cli client.Reader, opts *Options) error
 
-	MemberLeave(ctx context.Context, cli client.Reader, opts *Options) ([]byte, error)
+	MemberLeave(ctx context.Context, cli client.Reader, opts *Options) error
 
-	// Readonly(ctx context.Context, cli client.Reader, opts *Options) ([]byte, error)
+	// Readonly(ctx context.Context, cli client.Reader, opts *Options) error
 
-	// Readwrite(ctx context.Context, cli client.Reader, opts *Options) ([]byte, error)
+	// Readwrite(ctx context.Context, cli client.Reader, opts *Options) error
 
-	DataDump(ctx context.Context, cli client.Reader, opts *Options) ([]byte, error)
+	DataDump(ctx context.Context, cli client.Reader, opts *Options) error
 
-	DataLoad(ctx context.Context, cli client.Reader, opts *Options) ([]byte, error)
+	DataLoad(ctx context.Context, cli client.Reader, opts *Options) error
 
-	// Reconfigure(ctx context.Context, cli client.Reader, opts *Options) ([]byte, error)
+	// Reconfigure(ctx context.Context, cli client.Reader, opts *Options) error
 
 	AccountProvision(ctx context.Context, cli client.Reader, opts *Options, args ...any) error
 }

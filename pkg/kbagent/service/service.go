@@ -28,7 +28,12 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
-var ErrNotImplemented = errors.New("NotImplemented")
+var (
+	ErrNotDefined     = errors.New("NotDefined")
+	ErrNotImplemented = errors.New("NotImplemented")
+	ErrInProgress     = errors.New("InProgress")
+	ErrBusy           = errors.New("busy")
+)
 
 type Service interface {
 	Kind() string

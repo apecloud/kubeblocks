@@ -22,18 +22,14 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"os"
-	"os/exec"
 	"strings"
-	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/pkg/errors"
 	"golang.org/x/exp/maps"
 
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
-	"github.com/apecloud/kubeblocks/pkg/kbagent/util"
 )
 
 const (
@@ -43,8 +39,9 @@ const (
 
 func newActionService(logger logr.Logger, actions []proto.Action) (*actionService, error) {
 	sa := &actionService{
-		logger:  logger,
-		actions: make(map[string]*proto.Action),
+		logger:         logger,
+		actions:        make(map[string]*proto.Action),
+		runningActions: map[string]*runningAction{},
 	}
 	for i, action := range actions {
 		sa.actions[action.Name] = &actions[i]
@@ -54,8 +51,15 @@ func newActionService(logger logr.Logger, actions []proto.Action) (*actionServic
 }
 
 type actionService struct {
-	logger  logr.Logger
-	actions map[string]*proto.Action
+	logger         logr.Logger
+	actions        map[string]*proto.Action
+	runningActions map[string]*runningAction
+}
+
+type runningAction struct {
+	stdoutChan chan []byte
+	stderrChan chan []byte
+	errChan    chan error
 }
 
 var _ Service = &actionService{}
@@ -83,7 +87,7 @@ func (s *actionService) Decode(payload []byte) (interface{}, error) {
 func (s *actionService) HandleRequest(ctx context.Context, i interface{}) ([]byte, error) {
 	req := i.(*proto.ActionRequest)
 	if _, ok := s.actions[req.Action]; !ok {
-		return nil, fmt.Errorf("%s is not supported", req.Action)
+		return nil, errors.Wrap(ErrNotDefined, fmt.Sprintf("%s is not defined", req.Action))
 	}
 	return s.handleActionRequest(ctx, req)
 }
@@ -93,48 +97,36 @@ func (s *actionService) handleActionRequest(ctx context.Context, req *proto.Acti
 	if action.Exec != nil {
 		return s.handleExecAction(ctx, req, action)
 	}
-	return nil, fmt.Errorf("only exec action is supported: %s", req.Action)
+	return nil, errors.Wrap(ErrNotImplemented, "only exec action is supported")
 }
 
 func (s *actionService) handleExecAction(ctx context.Context, req *proto.ActionRequest, action *proto.Action) ([]byte, error) {
-	// TODO: non-blocking & timeout
-	return execute(ctx, action.Exec, req.Parameters, req.TimeoutSeconds)
+	if req.NonBlocking != nil && *req.NonBlocking {
+		return s.handleExecActionNonBlocking(ctx, req, action)
+	}
+	return runCommand(ctx, action.Exec, req.Parameters, req.TimeoutSeconds)
 }
 
-func execute(ctx context.Context, action *proto.ExecAction, parameters map[string]string, timeout *int32) ([]byte, error) {
-	if timeout != nil && *timeout > 0 {
-		timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(*timeout)*time.Second)
-		defer cancel()
-		ctx = timeoutCtx
-	}
-
-	mergedArgs := func() []string {
-		args := make([]string, 0)
-		if len(action.Commands) > 1 {
-			args = append(args, action.Commands[1:]...)
+func (s *actionService) handleExecActionNonBlocking(ctx context.Context, req *proto.ActionRequest, action *proto.Action) ([]byte, error) {
+	running, ok := s.runningActions[req.Action]
+	if !ok {
+		stdoutChan, stderrChan, errChan, err := runCommandNonBlocking(ctx, action.Exec, req.Parameters, req.TimeoutSeconds)
+		if err != nil {
+			return nil, err
 		}
-		args = append(args, action.Args...)
-		return args
-	}()
-
-	mergedEnv := func() []string {
-		env := util.EnvM2L(parameters)
-		if len(action.Env) > 0 {
-			env = append(env, action.Env...)
+		running = &runningAction{
+			stdoutChan: stdoutChan,
+			stderrChan: stderrChan,
+			errChan:    errChan,
 		}
-		if len(env) > 0 {
-			env = append(env, os.Environ()...)
-		}
-		return env
-	}()
-
-	cmd := exec.CommandContext(ctx, action.Commands[0], mergedArgs...)
-	if len(mergedEnv) > 0 {
-		cmd.Env = mergedEnv
+		s.runningActions[req.Action] = running
 	}
-	bytes, err := cmd.Output()
-	if exitErr, ok := err.(*exec.ExitError); ok {
-		err = errors.New(string(exitErr.Stderr))
+	err := gather(running.errChan)
+	if err == nil {
+		return nil, ErrInProgress
 	}
-	return bytes, err
+	if *err != nil {
+		return nil, *err
+	}
+	return *gather(running.stdoutChan), nil
 }

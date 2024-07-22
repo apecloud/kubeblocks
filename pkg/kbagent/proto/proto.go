@@ -24,7 +24,6 @@ import "time"
 type Action struct {
 	Name           string       `json:"name"`
 	Exec           *ExecAction  `json:"exec,omitempty"`
-	Grpc           *GrpcAction  `json:"grpc,omitempty"`
 	TimeoutSeconds int32        `json:"timeoutSeconds,omitempty"`
 	RetryPolicy    *RetryPolicy `json:"retryPolicy,omitempty"`
 }
@@ -34,10 +33,6 @@ type ExecAction struct {
 	Args      []string `json:"args,omitempty"`
 	Env       []string `json:"env,omitempty"`
 	Container string   `json:"container,omitempty"`
-}
-
-type GrpcAction struct {
-	// TODO: add GRPCAction definition
 }
 
 type RetryPolicy struct {

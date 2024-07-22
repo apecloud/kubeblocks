@@ -59,7 +59,7 @@ func (s *server) StartNonBlocking() error {
 			s.logger.Error(err, fmt.Sprintf("start service %s failed", s.services[i].Kind()))
 			return err
 		}
-		s.logger.Info(fmt.Sprintf("start service %s...", s.services[i].Kind()))
+		s.logger.Info(fmt.Sprintf("service %s started...", s.services[i].Kind()))
 	}
 
 	handler := s.router()

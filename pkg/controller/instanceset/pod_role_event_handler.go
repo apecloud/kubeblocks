@@ -110,7 +110,7 @@ func (h *PodRoleEventHandler) transformKBAgentProbeEvent(logger logr.Logger, eve
 
 	message := &probeMessage{
 		Message: probeEvent.Message,
-		Role:    string(probeEvent.Output),
+		Role:    strings.TrimSpace(string(probeEvent.Output)),
 	}
 	if probeEvent.Code == 0 {
 		message.Event = successEvent

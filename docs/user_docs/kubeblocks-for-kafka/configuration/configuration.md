@@ -106,7 +106,7 @@ You can also view the details of this configuration file and parameters.
      Name: mykafka-reconfiguring-wvqns	NameSpace: default	Cluster: mykafka	Type: Reconfiguring
 
    Command:
-     kbcli cluster configure mykafka --components=broker --config-spec=kafka-configuration-tpl --config-file=server.properties --set log.cleanup.policy=compact --namespace=default
+     kbcli cluster configure mykafka --components=broker --config-specs=kafka-configuration-tpl --config-file=server.properties --set log.cleanup.policy=compact --namespace=default
 
    Status:
      Start Time:         Sep 14,2023 16:28 UTC+0800
@@ -124,7 +124,7 @@ You can also view the details of this configuration file and parameters.
      Name: mykafka-reconfiguring-wvqns	NameSpace: default	Cluster: mykafka	Type: Reconfiguring
 
    Command:
-     kbcli cluster configure mykafka --components=broker --config-spec=kafka-configuration-tpl --config-file=server.properties --set log.cleanup.policy=compact --namespace=default
+     kbcli cluster configure mykafka --components=broker --config-specs=kafka-configuration-tpl --config-file=server.properties --set log.cleanup.policy=compact --namespace=default
 
    Status:
      Start Time:         Sep 14,2023 16:28 UTC+0800

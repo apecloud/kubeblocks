@@ -13,19 +13,14 @@ import TabItem from '@theme/TabItem';
 
 This tutorial shows how to create and connect to a Redis cluster.
 
-KuebBlocks for Redis supports Standalone clusters and Replication Cluster.
-
-For your better high-availability experience, KubeBlocks creates a Redis Replication Cluster by default.
-
 ## Create a Redis cluster
 
 ### Before you start
 
 * [Install kbcli](./../../installation/install-with-kbcli/install-kbcli.md).
 * [Install KubeBlocks](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md).
-* Make sure the Redis addon is enabled.
-  
- 
+* Make sure the Redis addon is enabled. If this addon is not enabled, [enable it](./../../overview/supported-addons.md#use-addons) first.
+
   ```bash
   kbcli addon list
   >
@@ -35,10 +30,7 @@ For your better high-availability experience, KubeBlocks creates a Redis Replica
   ...
   ```
 
-
 * View all the database types and versions available for creating a cluster.
-
-  
 
   ```bash
   kbcli clusterdefinition list
@@ -56,44 +48,49 @@ For your better high-availability experience, KubeBlocks creates a Redis Replica
 
 ### Create a cluster
 
-KubeBlocks supports creating two types of Redis clusters: Standalone and Replication Cluster. Standalone only supports one replica and can be used in scenarios with lower requirements for availability. For scenarios with high availability requirements, it is recommended to create a Replication Cluster, which supports automatic failover. And to ensure high availability, Primary and Secondary are distributed on different nodes by default.
-
+KubeBlocks supports creating two types of Redis clusters: Standalone and Replication Cluster. Standalone only supports one replica and can be used in scenarios with lower requirements for availability. For scenarios with high availability requirements, it is recommended to create a Replication Cluster, which supports automatic failover. To ensure high availability, Primary and Secondary are distributed on different nodes by default.
 
 Create a Standalone.
 
 ```bash
-kbcli cluster create redis --mode standalone <clustername>
+kbcli cluster create --cluster-definition redis --set replicas=1 <clustername>
 ```
 
 Create a Replication Cluster.
 
 ```bash
-kbcli cluster create redis --mode replication <clustername>
+kbcli cluster create --cluster-definition redis --set replicas=2 <clustername>
 ```
 
 If you only have one node for deploying a Replication, set the `availability-policy` as `none` when creating a Replication Cluster.
 
 ```bash
-kbcli cluster create redis --mode replication --availability-policy none <clustername>
+kbcli cluster create --cluster-definition redis --set replicas=2 --topology-keys null <clustername>
+```
+
+If you want to specify a cluster version, you can first view the available versions and use `--version` to specify a version.
+
+```bash
+kbcli clusterversion list
+
+kbcli cluster create --cluster-definition redis --version redis-7.2.4 <clustername>
 ```
 
 :::note
 
-* In the production environment, it is not recommended to deploy all replicas on one node, which may decrease cluster availability.
-* Run the command below to view the flags for creating a Redis cluster and the default values.
-  
+* In the production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
+* View more flags for creating a Redis cluster to create a cluster with customized specifications.
+
   ```bash
-  kbcli cluster create redis -h
+  kbcli cluster create --help
   ```
 
 :::
 
 ## Connect to a Redis Cluster
 
-
 ```bash
 kbcli cluster connect <clustername>  --namespace <name>
 ```
-
 
 For the detailed database connection guide, refer to [Connect database](./../../connect_database/overview-of-database-connection.md).

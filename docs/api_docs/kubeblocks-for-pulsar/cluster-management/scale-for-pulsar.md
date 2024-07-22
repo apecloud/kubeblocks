@@ -101,7 +101,6 @@ There are two ways to apply vertical scaling.
    spec:
      affinity:
        podAntiAffinity: Preferred
-       tenancy: SharedNode
        topologyKeys:
        - kubernetes.io/hostname
      clusterDefinitionRef: pulsar
@@ -110,7 +109,7 @@ There are two ways to apply vertical scaling.
      - componentDefRef: pulsar
        enabledLogs:
        - running
-       monitor: false
+       disableExporter: true
        name: pulsar
        replicas: 1
        resources:
@@ -132,7 +131,7 @@ There are two ways to apply vertical scaling.
     Component Def Ref:  pulsar
     Enabled Logs:
       running
-    Monitor:   false
+    DisableExporter:   true
     Name:      pulsar
     Replicas:  1
     Resources:

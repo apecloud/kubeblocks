@@ -15,7 +15,7 @@ You can expand the storage volume size of each pod.
 
 :::note
 
-Volume expansion triggers a concurrent restart and the leader pod may change after the operation.
+Volume expansion triggers a restart and the pod role may change after the operation.
 
 :::
 
@@ -101,7 +101,6 @@ There are two ways to apply volume expansion.
     spec:
       affinity:
         podAntiAffinity: Preferred
-        tenancy: SharedNode
         topologyKeys:
         - kubernetes.io/hostname
       clusterDefinitionRef: redis
@@ -110,7 +109,7 @@ There are two ways to apply volume expansion.
       - componentDefRef: redis
         enabledLogs:
         - running
-        monitor: false
+        disableExporter: true
         name: redis
         replicas: 1
         resources:

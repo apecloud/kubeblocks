@@ -160,7 +160,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		UserDefinedLabels:      comp.Spec.Labels,
 		UserDefinedAnnotations: comp.Spec.Annotations,
 		PodSpec:                &compDef.Spec.Runtime,
-		HostNetwork:            buildHostNetwork(compDefObj),
+		HostNetwork:            compDefObj.Spec.HostNetwork,
 		ComponentServices:      compDefObj.Spec.Services,
 		LogConfigs:             compDefObj.Spec.LogConfigs,
 		ConfigTemplates:        compDefObj.Spec.Configs,
@@ -178,7 +178,10 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		Instances:              comp.Spec.Instances,
 		OfflineInstances:       comp.Spec.OfflineInstances,
 		DisableExporter:        comp.Spec.DisableExporter,
+		Stop:                   comp.Spec.Stop,
 		PodManagementPolicy:    compDef.Spec.PodManagementPolicy,
+		PodUpdatePolicy:        comp.Spec.PodUpdatePolicy,
+		EnabledLogs:            comp.Spec.EnabledLogs,
 	}
 
 	// build backward compatible fields, including workload, services, componentRefEnvs, clusterDefName, clusterCompDefName, and clusterCompVer, etc.
@@ -352,23 +355,6 @@ func mergeUserDefinedEnv(synthesizedComp *SynthesizedComponent, comp *appsv1alph
 	}
 	for i := range synthesizedComp.PodSpec.Containers {
 		synthesizedComp.PodSpec.Containers[i].Env = append(synthesizedComp.PodSpec.Containers[i].Env, comp.Spec.Env...)
-	}
-	return nil
-}
-
-func buildHostNetwork(compDef *appsv1alpha1.ComponentDefinition) *appsv1alpha1.HostNetwork {
-	if compDef.Spec.HostNetwork != nil {
-		return compDef.Spec.HostNetwork
-	}
-	// be compatible with a kind of usage to cmpd:
-	// spec:
-	//   runtime:
-	//     hostNetwork: true
-	//     containers:
-	//       - ports:
-	//         - containerPort: 80
-	if compDef.Spec.Runtime.HostNetwork {
-		return convertHostNetworkFromPodSpec(&compDef.Spec.Runtime)
 	}
 	return nil
 }

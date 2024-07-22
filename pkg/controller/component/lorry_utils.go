@@ -44,10 +44,8 @@ const (
 
 var (
 	// default probe setting for volume protection.
-	defaultVolumeProtectionProbe = appsv1alpha1.RoleProbe{
-		PeriodSeconds:  60,
-		TimeoutSeconds: 5,
-	}
+	defaultVolumeProtectionProbeTimeout int32 = 5
+	defaultVolumeProtectionProbePeriod  int32 = 60
 )
 
 // buildLorryContainers builds lorry containers for component.
@@ -82,7 +80,7 @@ func buildLorryContainers(reqCtx intctrlutil.RequestCtx, synthesizeComp *Synthes
 
 	container := buildBasicContainer(int(lorryHTTPPort))
 	// inject role probe container
-	var compRoleProbe *appsv1alpha1.RoleProbe
+	var compRoleProbe *appsv1alpha1.Probe
 	if synthesizeComp.LifecycleActions != nil {
 		compRoleProbe = synthesizeComp.LifecycleActions.RoleProbe
 	}
@@ -218,7 +216,7 @@ func buildLorryInitContainer() *corev1.Container {
 	container.Image = viper.GetString(constant.KBToolsImage)
 	container.Name = constant.LorryInitContainerName
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
-	container.Command = []string{"cp", "-r", "/bin/lorry", "/config", "/kubeblocks/"}
+	container.Command = []string{"cp", "-r", "/bin/lorry", "/config", "/bin/curl", "/kubeblocks/"}
 	container.StartupProbe = nil
 	container.ReadinessProbe = nil
 	volumeMount := corev1.VolumeMount{Name: "kubeblocks", MountPath: "/kubeblocks"}
@@ -279,7 +277,7 @@ func buildLorryEnvs(container *corev1.Container, synthesizeComp *SynthesizedComp
 	container.Env = append(container.Env, envs...)
 }
 
-func buildRoleProbeContainer(roleChangedContainer *corev1.Container, roleProbe *appsv1alpha1.RoleProbe, probeSvcHTTPPort int) {
+func buildRoleProbeContainer(roleChangedContainer *corev1.Container, roleProbe *appsv1alpha1.Probe, probeSvcHTTPPort int) {
 	roleChangedContainer.Name = constant.RoleProbeContainerName
 	httpGet := &corev1.HTTPGetAction{}
 	httpGet.Path = constant.LorryRoleProbePath
@@ -313,8 +311,8 @@ func buildVolumeProtectionProbeContainer(c *corev1.Container, probeSvcHTTPPort i
 	httpGet.Path = constant.LorryVolumeProtectPath
 	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
 	probe.HTTPGet = httpGet
-	probe.PeriodSeconds = defaultVolumeProtectionProbe.PeriodSeconds
-	probe.TimeoutSeconds = defaultVolumeProtectionProbe.TimeoutSeconds
+	probe.PeriodSeconds = defaultVolumeProtectionProbePeriod
+	probe.TimeoutSeconds = defaultVolumeProtectionProbeTimeout
 	probe.FailureThreshold = 3
 	c.ReadinessProbe = probe
 }
@@ -441,7 +439,7 @@ func getBuiltinActionHandler(synthesizeComp *SynthesizedComponent) appsv1alpha1.
 		synthesizeComp.LifecycleActions.DataDump,
 		synthesizeComp.LifecycleActions.DataLoad,
 		synthesizeComp.LifecycleActions.Reconfigure,
-		// synthesizeComp.LifecycleActions.AccountProvision,
+		synthesizeComp.LifecycleActions.AccountProvision,
 	}
 
 	hasAction := false
@@ -465,20 +463,22 @@ func getActionCommandsWithExecImageOrContainerName(synthesizeComp *SynthesizedCo
 	}
 
 	actions := map[string]*appsv1alpha1.LifecycleActionHandler{
-		constant.PostProvisionAction: synthesizeComp.LifecycleActions.PostProvision,
-		constant.PreTerminateAction:  synthesizeComp.LifecycleActions.PreTerminate,
-		constant.MemberJoinAction:    synthesizeComp.LifecycleActions.MemberJoin,
-		constant.MemberLeaveAction:   synthesizeComp.LifecycleActions.MemberLeave,
-		constant.ReadonlyAction:      synthesizeComp.LifecycleActions.Readonly,
-		constant.ReadWriteAction:     synthesizeComp.LifecycleActions.Readwrite,
-		constant.DataDumpAction:      synthesizeComp.LifecycleActions.DataDump,
-		constant.DataLoadAction:      synthesizeComp.LifecycleActions.DataLoad,
+		constant.PostProvisionAction:    synthesizeComp.LifecycleActions.PostProvision,
+		constant.PreTerminateAction:     synthesizeComp.LifecycleActions.PreTerminate,
+		constant.MemberJoinAction:       synthesizeComp.LifecycleActions.MemberJoin,
+		constant.MemberLeaveAction:      synthesizeComp.LifecycleActions.MemberLeave,
+		constant.ReadonlyAction:         synthesizeComp.LifecycleActions.Readonly,
+		constant.ReadWriteAction:        synthesizeComp.LifecycleActions.Readwrite,
+		constant.DataDumpAction:         synthesizeComp.LifecycleActions.DataDump,
+		constant.DataLoadAction:         synthesizeComp.LifecycleActions.DataLoad,
+		constant.AccountProvisionAction: synthesizeComp.LifecycleActions.AccountProvision,
 		// "reconfigure":                synthesizeComp.LifecycleActions.Reconfigure,
-		// "accountProvision": synthesizeComp.LifecycleActions.AccountProvision,
 	}
 
-	if synthesizeComp.LifecycleActions.RoleProbe != nil {
-		actions[constant.RoleProbeAction] = &synthesizeComp.LifecycleActions.RoleProbe.LifecycleActionHandler
+	if synthesizeComp.LifecycleActions.RoleProbe != nil && synthesizeComp.LifecycleActions.RoleProbe.Exec != nil {
+		actions[constant.RoleProbeAction] = &appsv1alpha1.LifecycleActionHandler{
+			CustomHandler: &synthesizeComp.LifecycleActions.RoleProbe.Action,
+		}
 	}
 
 	var toolImage string
@@ -486,12 +486,12 @@ func getActionCommandsWithExecImageOrContainerName(synthesizeComp *SynthesizedCo
 	actionCommands := map[string][]string{}
 	for action, handler := range actions {
 		if handler != nil && handler.CustomHandler != nil && handler.CustomHandler.Exec != nil {
-			actionCommands[action] = handler.CustomHandler.Exec.Command
-			if handler.CustomHandler.Image != "" {
-				toolImage = handler.CustomHandler.Image
+			actionCommands[action] = append(handler.CustomHandler.Exec.Command, handler.CustomHandler.Exec.Args...)
+			if handler.CustomHandler.Exec.Image != "" {
+				toolImage = handler.CustomHandler.Exec.Image
 			}
-			if handler.CustomHandler.Container != "" {
-				containerName = handler.CustomHandler.Container
+			if handler.CustomHandler.Exec.Container != "" {
+				containerName = handler.CustomHandler.Exec.Container
 			}
 		}
 	}

@@ -78,6 +78,8 @@ func (r *AddonReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		Recorder: r.Recorder,
 	}
 
+	// TODO (good-first-issue) rewrite it using the new kubebuilderx framework
+
 	buildStageCtx := func(next ...ctrlerihandler.Handler) stageCtx {
 		return stageCtx{
 			reqCtx:     &reqCtx,

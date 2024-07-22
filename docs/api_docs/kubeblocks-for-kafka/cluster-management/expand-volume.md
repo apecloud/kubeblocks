@@ -6,6 +6,9 @@ sidebar_position: 4
 sidebar_label: Expand volume
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Expand volume
 
 You can expand the storage volume size of each pod.
@@ -20,7 +23,7 @@ kubectl get cluster mycluster -n demo
 
 ## Steps
 
-There are two ways to expan volume.
+There are two ways to expand volume.
 
 <Tabs>
 

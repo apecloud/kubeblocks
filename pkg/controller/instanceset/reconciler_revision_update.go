@@ -64,7 +64,14 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*ku
 	// build instance revision list from instance templates
 	var instanceRevisionList []instanceRevision
 	for _, template := range instanceTemplateList {
-		instanceNames := GenerateInstanceNamesFromTemplate(its.Name, template.Name, template.Replicas, itsExt.its.Spec.OfflineInstances)
+		ordinalList, err := GetOrdinalListByTemplateName(itsExt.its, template.Name)
+		if err != nil {
+			return nil, err
+		}
+		instanceNames, err := GenerateInstanceNamesFromTemplate(its.Name, template.Name, template.Replicas, itsExt.its.Spec.OfflineInstances, ordinalList)
+		if err != nil {
+			return nil, err
+		}
 		revision, err := BuildInstanceTemplateRevision(&template.PodTemplateSpec, its)
 		if err != nil {
 			return nil, err

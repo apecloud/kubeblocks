@@ -70,6 +70,7 @@ func (t *componentAccountTransformer) Transform(ctx graph.TransformContext, dag 
 		}
 		graphCli.Create(dag, secret, inUniversalContext4G())
 	}
+	// TODO: (good-first-issue) if an account is deleted from the Spec, the secret and account should be deleted
 	return nil
 }
 

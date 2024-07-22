@@ -61,14 +61,14 @@ func (c *configOperator) Reconcile() error {
 
 	return NewCreatePipeline(c.ReconcileCtx).
 		Prepare().
-		RenderScriptTemplate().
-		UpdateConfiguration(). // reconcile Configuration
-		Configuration().       // sync Configuration
-		CreateConfigTemplate().
-		UpdatePodVolumes().
-		BuildConfigManagerSidecar().
-		UpdateConfigRelatedObject().
-		UpdateConfigurationStatus().
+		RenderScriptTemplate().      // render scriptTemplate into ConfigMap
+		UpdateConfiguration().       // create or update Configuration
+		Configuration().             // fetch the latest Configuration
+		CreateConfigTemplate().      // render configTemplate into ConfigMap (only for the first time)
+		UpdatePodVolumes().          // update podSpec.Volumes
+		BuildConfigManagerSidecar(). // build configManager sidecar and update podSpec.Containers and podSpec.InitContainers
+		UpdateConfigRelatedObject(). // handle InjectEnvTo, and create or update ConfigMaps
+		UpdateConfigurationStatus(). // update ConfigurationItemStatus revision and phase etc.
 		Complete()
 }
 

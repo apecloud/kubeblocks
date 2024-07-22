@@ -8,7 +8,7 @@ sidebar_label: Configuration
 
 # Configure cluster parameters
 
-This guide shows how to configure cluster parameters by creating an opsRequest.
+This guide shows how to configure cluster parameters.
 
 KubeBlocks supports dynamic configuration. When the specification of a database instance changes (e.g., a user vertically scales a cluster), KubeBlocks automatically matches the appropriate configuration template based on the new specification. This is because different specifications of a database instance may require different optimal configurations to optimize performance and resource utilization. When you choose a different database instance specification, KubeBlocks automatically detects and determines the best database configuration for the new specification, ensuring optimal performance and configuration of the database under the new specifications.
 
@@ -185,10 +185,10 @@ You can also view the details of this configuration file and parameters.
 * View the user guide of a specified parameter.
   
   ```bash
-  kbcli cluster explain-config mycluster --param=innodb_buffer_pool_size --config-spec=mysql-consensusset-config -n demo
+  kbcli cluster explain-config mycluster --param=innodb_buffer_pool_size --config-specs=mysql-replication-config -n demo
   ```
 
-  `--config-spec` is required to specify a configuration template since ApeCloud MySQL currently supports multiple templates. You can run `kbcli cluster describe-config mycluster` to view the all template names.
+  `--config-specs` is required to specify a configuration template since ApeCloud MySQL currently supports multiple templates. You can run `kbcli cluster describe-config mycluster` to view the all template names.
 
   <details>
 
@@ -196,7 +196,7 @@ You can also view the details of this configuration file and parameters.
 
   ```bash
   template meta:
-    ConfigSpec: mysql-consensusset-config        ComponentName: mysql        ClusterName: mycluster
+    ConfigSpec: mysql-replication-config        ComponentName: mysql        ClusterName: mycluster
 
   Configure Constraint:
     Parameter Name:     innodb_buffer_pool_size

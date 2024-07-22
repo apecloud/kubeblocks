@@ -21,6 +21,7 @@ package util
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -37,4 +38,13 @@ func TestExecCommand(t *testing.T) {
 
 	// Check the results
 	assert.Error(t, err)
+}
+
+func TestGetAllEnvs(t *testing.T) {
+	args := map[string]any{
+		"test": "test",
+	}
+	envs := GetAllEnvs(args)
+	assert.NotNil(t, envs)
+	assert.Equal(t, len(os.Environ())+1, len(envs))
 }

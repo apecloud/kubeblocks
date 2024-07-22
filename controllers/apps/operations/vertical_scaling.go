@@ -59,7 +59,7 @@ func (vs verticalScalingHandler) ActionStartedCondition(reqCtx intctrlutil.Reque
 // Action modifies cluster component resources according to
 // the definition of opsRequest with spec.componentNames and spec.componentOps.verticalScaling
 func (vs verticalScalingHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	applyVerticalScaling := func(compSpec *appsv1alpha1.ClusterComponentSpec, obj ComponentOpsInteface) error {
+	applyVerticalScaling := func(compSpec *appsv1alpha1.ClusterComponentSpec, obj ComponentOpsInterface) error {
 		verticalScaling := obj.(appsv1alpha1.VerticalScaling)
 		if vs.verticalScalingComp(verticalScaling) {
 			compSpec.Resources = verticalScaling.ResourceRequirements
@@ -121,14 +121,20 @@ func (vs verticalScalingHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, 
 				if !ok {
 					continue
 				}
-				templatePodNames := instanceset.GenerateInstanceNamesFromTemplate(workloadName, ins.Name, replicas, pgRes.clusterComponent.OfflineInstances)
+				templatePodNames, err := instanceset.GenerateInstanceNamesFromTemplate(workloadName, ins.Name, replicas, pgRes.clusterComponent.OfflineInstances, nil)
+				if err != nil {
+					return 0, 0, err
+				}
 				for _, podName := range templatePodNames {
 					updatedPodSet[podName] = ins.Name
 				}
 				break
 			}
 			if vs.verticalScalingComp(verticalScaling) && templateReplicasCnt < pgRes.clusterComponent.Replicas {
-				podNames := instanceset.GenerateInstanceNamesFromTemplate(workloadName, "", pgRes.clusterComponent.Replicas-templateReplicasCnt, pgRes.clusterComponent.OfflineInstances)
+				podNames, err := instanceset.GenerateInstanceNamesFromTemplate(workloadName, "", pgRes.clusterComponent.Replicas-templateReplicasCnt, pgRes.clusterComponent.OfflineInstances, nil)
+				if err != nil {
+					return 0, 0, err
+				}
 				for _, podName := range podNames {
 					updatedPodSet[podName] = ""
 				}
@@ -147,11 +153,16 @@ func (vs verticalScalingHandler) verticalScalingComp(verticalScaling appsv1alpha
 }
 
 func (vs verticalScalingHandler) podApplyCompOps(
+	ops *appsv1alpha1.OpsRequest,
 	pod *corev1.Pod,
-	compOps ComponentOpsInteface,
-	opsStartTime metav1.Time,
+	compOps ComponentOpsInterface,
 	insTemplateName string) bool {
 	verticalScaling := compOps.(appsv1alpha1.VerticalScaling)
+	if ops.Spec.Cancel {
+		lastCompConfiguration := ops.Status.LastConfiguration.Components[verticalScaling.ComponentName]
+		verticalScaling.Requests = lastCompConfiguration.Requests
+		verticalScaling.Limits = lastCompConfiguration.Limits
+	}
 	matchResources := func(podResources, vsResources corev1.ResourceRequirements) bool {
 		if vsResources.Requests == nil {
 			vsResources.Requests = corev1.ResourceList{}
@@ -172,7 +183,7 @@ func (vs verticalScalingHandler) podApplyCompOps(
 		}
 		return true
 	}
-	if insTemplateName == "" {
+	if insTemplateName == constant.EmptyInsTemplateName {
 		return matchResources(pod.Spec.Containers[0].Resources, verticalScaling.ResourceRequirements)
 	}
 	for _, insTpl := range verticalScaling.Instances {
@@ -186,7 +197,7 @@ func (vs verticalScalingHandler) podApplyCompOps(
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
 func (vs verticalScalingHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.VerticalScalingList)
-	compOpsHelper.saveLastConfigurations(opsRes, func(compSpec appsv1alpha1.ClusterComponentSpec, comOps ComponentOpsInteface) appsv1alpha1.LastComponentConfiguration {
+	compOpsHelper.saveLastConfigurations(opsRes, func(compSpec appsv1alpha1.ClusterComponentSpec, comOps ComponentOpsInterface) appsv1alpha1.LastComponentConfiguration {
 		verticalScaling := comOps.(appsv1alpha1.VerticalScaling)
 		var instanceTemplates []appsv1alpha1.InstanceTemplate
 		for _, vIns := range verticalScaling.Instances {

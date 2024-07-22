@@ -6,6 +6,9 @@ sidebar_position: 5
 sidebar_label: Stop/Start
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Stop/Start a MongoDB Cluster
 
 You can stop/start a cluster to save computing resources. When a cluster is stopped, the computing resources of this cluster are released, which means the pods of Kubernetes are released, but the storage resources are reserved. Start this cluster again if you want to restore the cluster resources from the original storage by snapshots.
@@ -52,7 +55,7 @@ spec:
   componentSpecs:
   - name: mongodb
     componentDefRef: mongodb
-    monitor: false  
+    disableExporter: true  
     replicas: 0
     volumeClaimTemplates:
     - name: data
@@ -111,7 +114,7 @@ spec:
   componentSpecs:
   - name: mongodb
     componentDefRef: mongodb
-    monitor: false  
+    disableExporter: true  
     replicas: 1
     volumeClaimTemplates:
     - name: data

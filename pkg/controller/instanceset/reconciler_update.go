@@ -24,6 +24,8 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 
@@ -121,6 +123,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 	updatingPods := 0
 	updatedPods := 0
 	priorities := ComposeRolePriorityMap(its.Spec.Roles)
+	isBlocked := false
 	sortObjects(oldPodList, priorities, false)
 	for _, pod := range oldPodList {
 		if updatingPods >= updateCount || updatingPods >= unavailable {
@@ -142,6 +145,16 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 		if err != nil {
 			return nil, err
 		}
+		if its.Spec.PodUpdatePolicy == workloads.StrictInPlacePodUpdatePolicyType && updatePolicy == RecreatePolicy {
+			message := fmt.Sprintf("InstanceSet %s/%s blocks on scale-in as the PodUpdatePolicy is %s and the pod %s can not inplace update",
+				its.Namespace, its.Name, workloads.StrictInPlacePodUpdatePolicyType, pod.Name)
+			if tree != nil && tree.EventRecorder != nil {
+				tree.EventRecorder.Eventf(its, corev1.EventTypeWarning, EventReasonStrictInPlace, message)
+			}
+			meta.SetStatusCondition(&its.Status.Conditions, *buildBlockedCondition(its, message))
+			isBlocked = true
+			break
+		}
 		if updatePolicy == InPlaceUpdatePolicy {
 			newInstance, err := buildInstanceByTemplate(pod.Name, nameToTemplateMap[pod.Name], its, getPodRevision(pod))
 			if err != nil {
@@ -162,7 +175,20 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilde
 		}
 		updatedPods++
 	}
+	if !isBlocked {
+		meta.RemoveStatusCondition(&its.Status.Conditions, string(workloads.InstanceUpdateRestricted))
+	}
 	return tree, nil
+}
+
+func buildBlockedCondition(its *workloads.InstanceSet, message string) *metav1.Condition {
+	return &metav1.Condition{
+		Type:               string(workloads.InstanceUpdateRestricted),
+		Status:             metav1.ConditionTrue,
+		ObservedGeneration: its.Generation,
+		Reason:             workloads.ReasonInstanceUpdateRestricted,
+		Message:            message,
+	}
 }
 
 func getInstanceSetForUpdatePlan(its *workloads.InstanceSet) *workloads.InstanceSet {

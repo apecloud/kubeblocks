@@ -93,24 +93,17 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	}
 	transCtx.RunningWorkload = runningITS
 
-	// build synthesizeComp podSpec volumeMounts
+	// inject volume mounts and build its proto
 	buildPodSpecVolumeMounts(synthesizeComp)
-
-	// build workload
 	protoITS, err := factory.BuildInstanceSet(synthesizeComp, compDef)
 	if err != nil {
 		return err
 	}
-	if runningITS != nil {
-		*protoITS.Spec.Selector = *runningITS.Spec.Selector
-		protoITS.Spec.Template.Labels = runningITS.Spec.Template.Labels
-	}
 	transCtx.ProtoWorkload = protoITS
 
-	buildInstanceSetPlacementAnnotation(transCtx.Component, protoITS)
-
-	// build configuration template annotations to workload
-	configuration.BuildConfigTemplateAnnotations(protoITS, synthesizeComp)
+	if err = t.reconcileWorkload(synthesizeComp, transCtx.Component, runningITS, protoITS); err != nil {
+		return err
+	}
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	if runningITS == nil {
@@ -130,25 +123,57 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 
 func (t *componentWorkloadTransformer) runningInstanceSetObject(ctx graph.TransformContext,
 	synthesizeComp *component.SynthesizedComponent) (*workloads.InstanceSet, error) {
-	itsKey := types.NamespacedName{
-		Namespace: synthesizeComp.Namespace,
-		Name:      constant.GenerateWorkloadNamePattern(synthesizeComp.ClusterName, synthesizeComp.Name),
-	}
-	its := &workloads.InstanceSet{}
-	if err := ctx.GetClient().Get(ctx.GetContext(), itsKey, its); err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil, nil
-		}
+	objs, err := component.ListOwnedWorkloads(ctx.GetContext(), ctx.GetClient(),
+		synthesizeComp.Namespace, synthesizeComp.ClusterName, synthesizeComp.Name)
+	if err != nil {
 		return nil, err
 	}
-	return its, nil
+	if len(objs) == 0 {
+		return nil, nil
+	}
+	return objs[0], nil
+}
+
+func (t *componentWorkloadTransformer) reconcileWorkload(synthesizedComp *component.SynthesizedComponent,
+	comp *appsv1alpha1.Component, runningITS, protoITS *workloads.InstanceSet) error {
+	if runningITS != nil {
+		*protoITS.Spec.Selector = *runningITS.Spec.Selector
+		protoITS.Spec.Template.Labels = intctrlutil.MergeMetadataMaps(runningITS.Spec.Template.Labels, synthesizedComp.UserDefinedLabels)
+	}
+
+	buildInstanceSetPlacementAnnotation(comp, protoITS)
+
+	// build configuration template annotations to workload
+	configuration.BuildConfigTemplateAnnotations(protoITS, synthesizedComp)
+
+	// mark proto its as stopped if the component is stopped
+	if isCompStopped(synthesizedComp) {
+		t.stopWorkload(protoITS)
+	}
+
+	return nil
+}
+
+func isCompStopped(synthesizedComp *component.SynthesizedComponent) bool {
+	return synthesizedComp.Stop != nil && *synthesizedComp.Stop
+}
+
+func (t *componentWorkloadTransformer) stopWorkload(protoITS *workloads.InstanceSet) {
+	zero := func() *int32 { r := int32(0); return &r }()
+	// since its doesn't support stop, we achieve it by setting replicas to 0.
+	protoITS.Spec.Replicas = zero
+	for i := range protoITS.Spec.Instances {
+		protoITS.Spec.Instances[i].Replicas = zero
+	}
 }
 
 func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCtx, cli model.GraphClient, dag *graph.DAG,
 	cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, runningITS, protoITS *workloads.InstanceSet) error {
-	// TODO(xingran): Some workload operations should be moved down to Lorry implementation. Subsequent operations such as horizontal scaling will be removed from the component controller
-	if err := t.handleWorkloadUpdate(reqCtx, dag, cluster, synthesizeComp, runningITS, protoITS); err != nil {
-		return err
+	if !isCompStopped(synthesizeComp) {
+		// postpone the update of the workload until the component is back to running.
+		if err := t.handleWorkloadUpdate(reqCtx, dag, cluster, synthesizeComp, runningITS, protoITS); err != nil {
+			return err
+		}
 	}
 
 	objCopy := copyAndMergeITS(runningITS, protoITS, synthesizeComp)
@@ -156,16 +181,15 @@ func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCt
 		cli.Update(dag, nil, objCopy, &model.ReplaceIfExistingOption{})
 	}
 
-	// to work around that the scaled PVC will be deleted at object action.
-	if err := updateVolumes(reqCtx, t.Client, synthesizeComp, runningITS, dag); err != nil {
-		return err
-	}
 	return nil
 }
 
 func (t *componentWorkloadTransformer) handleWorkloadUpdate(reqCtx intctrlutil.RequestCtx, dag *graph.DAG,
 	cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, obj, its *workloads.InstanceSet) error {
-	cwo := newComponentWorkloadOps(reqCtx, t.Client, cluster, synthesizeComp, obj, its, dag)
+	cwo, err := newComponentWorkloadOps(reqCtx, t.Client, cluster, synthesizeComp, obj, its, dag)
+	if err != nil {
+		return err
+	}
 
 	// handle expand volume
 	if err := cwo.expandVolume(); err != nil {
@@ -176,8 +200,6 @@ func (t *componentWorkloadTransformer) handleWorkloadUpdate(reqCtx intctrlutil.R
 	if err := cwo.horizontalScale(); err != nil {
 		return err
 	}
-
-	// dag = cwo.dag
 
 	return nil
 }
@@ -471,7 +493,7 @@ func (r *componentWorkloadOps) postScaleOut(itsObj *workloads.InstanceSet) error
 	if d != nil {
 		// clean backup resources.
 		// there will not be any backup resources other than scale out.
-		tmpObjs, err := d.ClearTmpResources()
+		tmpObjs, err := d.GetTmpResources()
 		if err != nil {
 			return err
 		}
@@ -812,6 +834,11 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 
 	updatePVCByRecreateFromStep := func(fromStep pvcRecreateStep) {
 		lastVertex := r.buildProtoITSWorkloadVertex()
+		// The steps here are decremented in reverse order because during the plan execution, dag.WalkReverseTopoOrder
+		// is called to execute all vertices on the graph according to the reverse topological order.
+		// Therefore, the vertices need to maintain the following edge linkages:
+		// root -> its -> step5 -> step4 -> step3 -> step2 -> step1
+		// So that, during execution, the sequence becomes step1 -> step2 -> step3 -> step4 -> step5
 		for step := pvRestorePolicyStep; step >= fromStep && step >= pvPolicyRetainStep; step-- {
 			lastVertex = addStepMap[step](lastVertex, step)
 		}
@@ -860,31 +887,6 @@ func (r *componentWorkloadOps) buildProtoITSWorkloadVertex() *model.ObjectVertex
 	return nil
 }
 
-func updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, synthesizeComp *component.SynthesizedComponent,
-	itsObj *workloads.InstanceSet, dag *graph.DAG) error {
-	graphCli := model.NewGraphClient(cli)
-
-	// PVCs which have been added to the dag because of volume expansion.
-	pvcNameSet := sets.New[string]()
-	for _, obj := range graphCli.FindAll(dag, &corev1.PersistentVolumeClaim{}) {
-		pvcNameSet.Insert(obj.GetName())
-	}
-
-	for _, vct := range synthesizeComp.VolumeClaimTemplates {
-		pvcs, err := getRunningVolumes(reqCtx.Ctx, cli, synthesizeComp, itsObj, vct.Name)
-		if err != nil {
-			return err
-		}
-		for _, pvc := range pvcs {
-			if pvcNameSet.Has(pvc.Name) {
-				continue
-			}
-			graphCli.Noop(dag, pvc)
-		}
-	}
-	return nil
-}
-
 func getRunningVolumes(ctx context.Context, cli client.Client, synthesizedComp *component.SynthesizedComponent,
 	itsObj *workloads.InstanceSet, vctName string) ([]*corev1.PersistentVolumeClaim, error) {
 	pvcs, err := component.ListOwnedPVCs(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
@@ -905,10 +907,13 @@ func getRunningVolumes(ctx context.Context, cli client.Client, synthesizedComp *
 }
 
 func buildInstanceSetPlacementAnnotation(comp *appsv1alpha1.Component, its *workloads.InstanceSet) {
-	if its.Annotations == nil {
-		its.Annotations = make(map[string]string)
+	p := placement(comp)
+	if len(p) > 0 {
+		if its.Annotations == nil {
+			its.Annotations = make(map[string]string)
+		}
+		its.Annotations[constant.KBAppMultiClusterPlacementKey] = p
 	}
-	its.Annotations[constant.KBAppMultiClusterPlacementKey] = placement(comp)
 }
 
 func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,
@@ -917,9 +922,15 @@ func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,
 	synthesizeComp *component.SynthesizedComponent,
 	runningITS *workloads.InstanceSet,
 	protoITS *workloads.InstanceSet,
-	dag *graph.DAG) *componentWorkloadOps {
-	compPodNames := generatePodNames(synthesizeComp)
-	itsPodNames := generatePodNamesByITS(runningITS)
+	dag *graph.DAG) (*componentWorkloadOps, error) {
+	compPodNames, err := generatePodNames(synthesizeComp)
+	if err != nil {
+		return nil, err
+	}
+	itsPodNames, err := generatePodNamesByITS(runningITS)
+	if err != nil {
+		return nil, err
+	}
 	return &componentWorkloadOps{
 		cli:                   cli,
 		reqCtx:                reqCtx,
@@ -932,5 +943,5 @@ func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,
 		runningItsPodNames:    itsPodNames,
 		desiredCompPodNameSet: sets.New(compPodNames...),
 		runningItsPodNameSet:  sets.New(itsPodNames...),
-	}
+	}, nil
 }

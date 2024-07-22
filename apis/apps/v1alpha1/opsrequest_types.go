@@ -80,6 +80,12 @@ type OpsRequestSpec struct {
 	// +optional
 	TTLSecondsAfterSucceed int32 `json:"ttlSecondsAfterSucceed,omitempty"`
 
+	// Specifies the duration in seconds that an OpsRequest will remain in the system after completion
+	// for any phase other than "Succeed" (e.g., "Failed", "Cancelled", "Aborted") before automatic deletion.
+	//
+	// +optional
+	TTLSecondsAfterUnsuccessfulCompletion int32 `json:"ttlSecondsAfterUnsuccessfulCompletion,omitempty"`
+
 	// Specifies the maximum time in seconds that the OpsRequest will wait for its pre-conditions to be met
 	// before it aborts the operation.
 	// If set to 0 (default), pre-conditions must be satisfied immediately for the OpsRequest to proceed.
@@ -87,6 +93,13 @@ type OpsRequestSpec struct {
 	// +kubebuilder:default=0
 	// +optional
 	PreConditionDeadlineSeconds *int32 `json:"preConditionDeadlineSeconds,omitempty"`
+
+	// Specifies the maximum duration (in seconds) that an opsRequest is allowed to run.
+	// If the opsRequest runs longer than this duration, its phase will be marked as Aborted.
+	// If this value is not set or set to 0, the timeout will be ignored and the opsRequest will run indefinitely.
+	// +optional
+	// +kubebuilder:Minimum=0
+	TimeoutSeconds *int32 `json:"timeoutSeconds,omitempty"`
 
 	// Exactly one of its members must be set.
 	SpecificOpsRequest `json:",inline"`
@@ -241,8 +254,15 @@ type RebuildInstance struct {
 
 	// Specifies the instances (Pods) that need to be rebuilt, typically operating as standbys.
 	//
+	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:Required
 	Instances []Instance `json:"instances"`
+
+	// When it is set to true, the instance will be rebuilt in-place.
+	// By default, a new pod will be created. Once the new pod is ready to serve,
+	// the instance that require rebuilding will be taken offline.
+	// +kubebuilder:validation:default=false
+	InPlace bool `json:"inPlace,omitempty"`
 
 	// Indicates the name of the Backup custom resource from which to recover the instance.
 	// Defaults to an empty PersistentVolume if unspecified.
@@ -737,7 +757,7 @@ type OpsService struct {
 	// Specifies a role to target with the service.
 	// If specified, the service will only be exposed to pods with the matching role.
 	//
-	// Note: At least one of 'roleSelector' or 'podSelector' must be specified.
+	// Note: If the component has roles, at least one of 'roleSelector' or 'podSelector' must be specified.
 	// If both are specified, a pod must match both conditions to be selected.
 	//
 	// +optional
@@ -746,7 +766,7 @@ type OpsService struct {
 	// Routes service traffic to pods with matching label keys and values.
 	// If specified, the service will only be exposed to pods matching the selector.
 	//
-	// Note: At least one of 'roleSelector' or 'podSelector' must be specified.
+	// Note: If the component has roles, at least one of 'roleSelector' or 'podSelector' must be specified.
 	// If both are specified, a pod must match both conditions to be selected.
 	//
 	// +optional

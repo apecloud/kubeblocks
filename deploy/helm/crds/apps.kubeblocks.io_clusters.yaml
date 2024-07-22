@@ -3869,6 +3869,17 @@ spec:
                       items:
                         type: string
                       type: array
+                    podUpdatePolicy:
+                      description: |-
+                        PodUpdatePolicy indicates how pods should be updated
+
+
+                        - `StrictInPlace` indicates that only allows in-place upgrades.
+                        Any attempt to modify other fields will be rejected.
+                        - `PreferInPlace` indicates that we will first attempt an in-place upgrade of the Pod.
+                        If that fails, it will fall back to the ReCreate, where pod will be recreated.
+                        Default value is "PreferInPlace"
+                      type: string
                     replicas:
                       default: 1
                       description: Specifies the desired number of replicas in the
@@ -4977,8 +4988,9 @@ spec:
 
 
                         Defaults:
-                        If not specified, KubeBlocks automatically assigns a default ServiceAccount named "kb-{cluster.name}",
-                        bound to a default role installed together with KubeBlocks.
+                        To perform certain operational tasks, agent sidecars running in Pods require specific RBAC permissions.
+                        The service account will be bound to a default role named "kubeblocks-cluster-pod-role" which is installed together with KubeBlocks.
+                        If not specified, KubeBlocks automatically assigns a default ServiceAccount named "kb-{cluster.name}"
 
 
                         Future Changes:
@@ -5202,6 +5214,11 @@ spec:
                         - name
                         type: object
                       type: array
+                    stop:
+                      description: |-
+                        Stop the Component.
+                        If set, all the computing resources will be released.
+                      type: boolean
                     switchPolicy:
                       description: |-
                         Defines the strategy for switchover and failover when workloadType is Replication.
@@ -12532,6 +12549,17 @@ spec:
                           items:
                             type: string
                           type: array
+                        podUpdatePolicy:
+                          description: |-
+                            PodUpdatePolicy indicates how pods should be updated
+
+
+                            - `StrictInPlace` indicates that only allows in-place upgrades.
+                            Any attempt to modify other fields will be rejected.
+                            - `PreferInPlace` indicates that we will first attempt an in-place upgrade of the Pod.
+                            If that fails, it will fall back to the ReCreate, where pod will be recreated.
+                            Default value is "PreferInPlace"
+                          type: string
                         replicas:
                           default: 1
                           description: Specifies the desired number of replicas in
@@ -13651,8 +13679,9 @@ spec:
 
 
                             Defaults:
-                            If not specified, KubeBlocks automatically assigns a default ServiceAccount named "kb-{cluster.name}",
-                            bound to a default role installed together with KubeBlocks.
+                            To perform certain operational tasks, agent sidecars running in Pods require specific RBAC permissions.
+                            The service account will be bound to a default role named "kubeblocks-cluster-pod-role" which is installed together with KubeBlocks.
+                            If not specified, KubeBlocks automatically assigns a default ServiceAccount named "kb-{cluster.name}"
 
 
                             Future Changes:
@@ -13876,6 +13905,11 @@ spec:
                             - name
                             type: object
                           type: array
+                        stop:
+                          description: |-
+                            Stop the Component.
+                            If set, all the computing resources will be released.
+                          type: boolean
                         switchPolicy:
                           description: |-
                             Defines the strategy for switchover and failover when workloadType is Replication.

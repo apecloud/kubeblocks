@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 
 # Switch over a MySQL cluster
 
-You can initiate a switchover for an MySQL Replication cluster. Then KubeBlocks switches the instance roles.
+You can initiate a switchover for a MySQL Replication cluster. Then KubeBlocks switches the instance roles.
 
 ## Before you start
 
@@ -30,11 +30,11 @@ You can initiate a switchover for an MySQL Replication cluster. Then KubeBlocks 
 
 ## Initiate the switchover
 
-You can switch over a follower of a MySQL Replication to the leader role, and the former leader instance to a follower.
+You can switch over a secondary of a MySQL Replication to the primary role, and the former primary instance to a secondary.
 
-The value of `instanceName` decides whether a new leader instance is specified for the switchover.
+The value of `instanceName` decides whether a new primary instance is specified for the switchover.
 
-* Initiate a switchover with no specified leader instance.
+* Initiate a switchover with no specified primary instance.
 
   ```yaml
   kubectl apply -f -<<EOF
@@ -52,7 +52,7 @@ The value of `instanceName` decides whether a new leader instance is specified f
   >>
   ```
 
-* Initiate a switchover with a specified new leader instance.
+* Initiate a switchover with a specified new primary instance.
 
   ```yaml
   kubectl apply -f -<<EOF

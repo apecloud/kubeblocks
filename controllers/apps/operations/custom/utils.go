@@ -360,11 +360,9 @@ func getTargetPods(
 	return targetPods, nil
 }
 
-func buildLabels(clusterName, opsName, compName, actionName string) map[string]string {
+func buildLabels(opsName, actionName string) map[string]string {
 	return map[string]string{
-		constant.AppInstanceLabelKey:    clusterName,
 		constant.OpsRequestNameLabelKey: opsName,
-		constant.KBAppComponentLabelKey: compName,
 		KBOpsActionNameLabelKey:         actionName,
 		constant.AppManagedByLabelKey:   constant.AppName,
 	}

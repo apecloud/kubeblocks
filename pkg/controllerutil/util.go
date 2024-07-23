@@ -22,6 +22,7 @@ package controllerutil
 import (
 	"context"
 	"fmt"
+	"github.com/apecloud/kubeblocks/version"
 	"reflect"
 	gruntime "runtime"
 	"strings"
@@ -168,8 +169,7 @@ func GeKubeRestConfig(userAgent string) *rest.Config {
 }
 
 func defaultUserAgent() string {
-	version := viper.GetString(constant.AppVersionKey)
-	return fmt.Sprintf("KubeBlocks %s (%s/%s)", version, gruntime.GOOS, gruntime.GOARCH)
+	return fmt.Sprintf("KubeBlocks %s (%s/%s)", version.GitVersion, gruntime.GOOS, gruntime.GOARCH)
 }
 
 // DeleteOwnedResources deletes the matched resources which are owned by the owner.

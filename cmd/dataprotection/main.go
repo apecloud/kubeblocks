@@ -118,7 +118,6 @@ func init() {
 	viper.SetDefault(dptypes.CfgKeyWorkerServiceAccountAnnotations, "{}")
 	viper.SetDefault(dptypes.CfgKeyWorkerClusterRoleName, "kubeblocks-dataprotection-worker-role")
 	viper.SetDefault(dptypes.CfgDataProtectionReconcileWorkers, runtime.NumCPU())
-	viper.SetDefault(constant.AppVersionKey, "unknown")
 }
 
 func main() {

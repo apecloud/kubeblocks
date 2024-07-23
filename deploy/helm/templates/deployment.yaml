@@ -179,10 +179,6 @@ spec:
             - name: IGNORE_POD_VERTICAL_SCALING
               value: "true"
             {{- end }}
-            {{- if .Chart.Version }}
-            - name: KUBEBLOCKS_VERSION
-              value: {{ .Chart.Version | quote }}
-            {{- end }}
           {{- with .Values.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}

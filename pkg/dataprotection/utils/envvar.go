@@ -29,8 +29,9 @@ import (
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
-func BuildEnvByCredential(pod *corev1.Pod, credential *dpv1alpha1.ConnectionCredential) []corev1.EnvVar {
+func BuildEnvByTarget(pod *corev1.Pod, target *dpv1alpha1.BackupTarget) []corev1.EnvVar {
 	var envVars []corev1.EnvVar
+	credential := target.ConnectionCredential
 	if credential == nil {
 		envVars = append(envVars, corev1.EnvVar{Name: dptypes.DPDBHost, Value: intctrlutil.BuildPodHostDNS(pod)})
 		return envVars
@@ -51,8 +52,8 @@ func BuildEnvByCredential(pod *corev1.Pod, credential *dpv1alpha1.ConnectionCred
 	switch {
 	case credential.PortKey != "":
 		envVars = append(envVars, buildEnvBySecretKey(dptypes.DPDBPort, credential.SecretName, credential.PortKey))
-	case credential.PortName != "":
-		envVars = append(envVars, corev1.EnvVar{Name: dptypes.DPDBPort, Value: strconv.Itoa(int(GetPodNamedPort(pod, credential.PortName)))})
+	case target.ContainerPort != nil:
+		envVars = append(envVars, corev1.EnvVar{Name: dptypes.DPDBPort, Value: strconv.Itoa(int(GetPodNamedPort(pod, target.ContainerPort.ContainerName, target.ContainerPort.PortName)))})
 	default:
 		envVars = append(envVars, corev1.EnvVar{Name: dptypes.DPDBPort, Value: strconv.Itoa(int(GetPodFirstContainerPort(pod)))})
 	}

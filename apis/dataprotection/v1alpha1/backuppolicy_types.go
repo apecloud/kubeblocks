@@ -105,6 +105,22 @@ type BackupTarget struct {
 	//
 	// +kubebuilder:validation:Required
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
+
+	// Specifies the container port in the target pod.
+	//
+	// +optional
+	ContainerPort *ContainerPort `json:"containerPort,omitempty"`
+}
+
+type ContainerPort struct {
+	// Specifies the name of container with the port.
+	//
+	// +kubebuilder:validation:Required
+	ContainerName string `json:"containerName,omitempty"`
+	// Specifies the port name.
+	//
+	// +kubebuilder:validation:Required
+	PortName string `json:"portName,omitempty"`
 }
 
 type PodSelector struct {
@@ -166,11 +182,6 @@ type ConnectionCredential struct {
 	//
 	// +optional
 	PortKey string `json:"portKey,omitempty"`
-
-	// Specifies the name of the port in the target pod.
-	//
-	// +optional
-	PortName string `json:"portName,omitempty"`
 }
 
 // KubeResources defines the kubernetes resources to back up.

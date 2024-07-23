@@ -238,7 +238,8 @@ func (r *restoreJobBuilder) addCommonEnv(sourceTargetPodName string) *restoreJob
 }
 
 func (r *restoreJobBuilder) addTargetPodAndCredentialEnv(pod *corev1.Pod,
-	connectionCredential *dpv1alpha1.ConnectionCredential) *restoreJobBuilder {
+	connectionCredential *dpv1alpha1.ConnectionCredential,
+	target *dpv1alpha1.BackupTarget) *restoreJobBuilder {
 	if pod == nil {
 		return r
 	}
@@ -249,7 +250,11 @@ func (r *restoreJobBuilder) addTargetPodAndCredentialEnv(pod *corev1.Pod,
 		r.envFrom = pod.Spec.Containers[0].EnvFrom
 	}
 	env = append(env, corev1.EnvVar{Name: dptypes.DPDBHost, Value: intctrlutil.BuildPodHostDNS(pod)})
-	env = append(env, corev1.EnvVar{Name: dptypes.DPDBPort, Value: strconv.Itoa(int(utils.GetPodFirstContainerPort(pod)))})
+	if target.ContainerPort != nil {
+		env = append(env, corev1.EnvVar{Name: dptypes.DPDBPort, Value: strconv.Itoa(int(utils.GetPodNamedPort(pod, target.ContainerPort.ContainerName, target.ContainerPort.PortName)))})
+	} else {
+		env = append(env, corev1.EnvVar{Name: dptypes.DPDBPort, Value: strconv.Itoa(int(utils.GetPodFirstContainerPort(pod)))})
+	}
 	if connectionCredential != nil {
 		appendEnvFromSecret := func(envName, keyName string) {
 			if keyName == "" {
@@ -268,8 +273,6 @@ func (r *restoreJobBuilder) addTargetPodAndCredentialEnv(pod *corev1.Pod,
 		appendEnvFromSecret(dptypes.DPDBPassword, connectionCredential.PasswordKey)
 		if connectionCredential.PortKey != "" {
 			appendEnvFromSecret(dptypes.DPDBPort, connectionCredential.PortKey)
-		} else if connectionCredential.PortName != "" {
-			env = append(env, corev1.EnvVar{Name: dptypes.DPDBPort, Value: strconv.Itoa(int(utils.GetPodNamedPort(pod, connectionCredential.PortName)))})
 		}
 		if connectionCredential.HostKey != "" {
 			appendEnvFromSecret(dptypes.DPDBHost, connectionCredential.HostKey)

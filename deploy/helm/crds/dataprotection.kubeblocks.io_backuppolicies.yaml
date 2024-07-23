@@ -285,10 +285,6 @@ spec:
                               description: Specifies the map key of the port in the
                                 connection credential secret.
                               type: string
-                            portName:
-                              description: Specifies the name of the port in the target
-                                pod.
-                              type: string
                             secretName:
                               description: Refers to the Secret object that contains
                                 the connection credential.
@@ -301,6 +297,18 @@ spec:
                               type: string
                           required:
                           - secretName
+                          type: object
+                        containerPort:
+                          description: Specifies the container port in the target
+                            pod.
+                          properties:
+                            containerName:
+                              description: Specifies the name of container with the
+                                port.
+                              type: string
+                            portName:
+                              description: Specifies the port name.
+                              type: string
                           type: object
                         name:
                           description: |-
@@ -520,10 +528,6 @@ spec:
                                 description: Specifies the map key of the port in
                                   the connection credential secret.
                                 type: string
-                              portName:
-                                description: Specifies the name of the port in the
-                                  target pod.
-                                type: string
                               secretName:
                                 description: Refers to the Secret object that contains
                                   the connection credential.
@@ -536,6 +540,18 @@ spec:
                                 type: string
                             required:
                             - secretName
+                            type: object
+                          containerPort:
+                            description: Specifies the container port in the target
+                              pod.
+                            properties:
+                              containerName:
+                                description: Specifies the name of container with
+                                  the port.
+                                type: string
+                              portName:
+                                description: Specifies the port name.
+                                type: string
                             type: object
                           name:
                             description: |-
@@ -760,10 +776,6 @@ spec:
                         description: Specifies the map key of the port in the connection
                           credential secret.
                         type: string
-                      portName:
-                        description: Specifies the name of the port in the target
-                          pod.
-                        type: string
                       secretName:
                         description: Refers to the Secret object that contains the
                           connection credential.
@@ -776,6 +788,16 @@ spec:
                         type: string
                     required:
                     - secretName
+                    type: object
+                  containerPort:
+                    description: Specifies the container port in the target pod.
+                    properties:
+                      containerName:
+                        description: Specifies the name of container with the port.
+                        type: string
+                      portName:
+                        description: Specifies the port name.
+                        type: string
                     type: object
                   name:
                     description: |-
@@ -938,10 +960,6 @@ spec:
                           description: Specifies the map key of the port in the connection
                             credential secret.
                           type: string
-                        portName:
-                          description: Specifies the name of the port in the target
-                            pod.
-                          type: string
                         secretName:
                           description: Refers to the Secret object that contains the
                             connection credential.
@@ -954,6 +972,16 @@ spec:
                           type: string
                       required:
                       - secretName
+                      type: object
+                    containerPort:
+                      description: Specifies the container port in the target pod.
+                      properties:
+                        containerName:
+                          description: Specifies the name of container with the port.
+                          type: string
+                        portName:
+                          description: Specifies the port name.
+                          type: string
                       type: object
                     name:
                       description: |-

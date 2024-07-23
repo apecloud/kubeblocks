@@ -220,7 +220,9 @@ spec:
                           description: Specifies the name of the Component.
                           type: string
                         opsDefinitionName:
-                          description: Specifies the name of the OpsDefinition.
+                          description: |-
+                            Specifies the name of the OpsDefinition.
+                            If not set, the global opsDefinitionName will be used.
                           type: string
                         parameters:
                           description: Specifies the parameters that match the schema

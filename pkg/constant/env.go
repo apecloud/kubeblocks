@@ -57,6 +57,7 @@ const (
 	KBEnvPodOrdinal       = "KB_POD_ORDINAL"
 	KBEnvPodIPDeprecated  = "KB_PODIP"
 	KBEnvPodIPsDeprecated = "KB_PODIPS"
+	KBEnvPodList          = "KB_POD_LIST"
 )
 
 // Host

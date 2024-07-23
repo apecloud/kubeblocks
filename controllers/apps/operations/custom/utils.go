@@ -59,11 +59,13 @@ func buildComponentEnvs(reqCtx intctrlutil.RequestCtx,
 	comp *appsv1alpha1.ClusterComponentSpec) error {
 	// inject built-in component env
 	fullCompName := constant.GenerateClusterComponentName(cluster.Name, comp.Name)
+
 	*env = append(*env, []corev1.EnvVar{
 		{Name: constant.KBEnvClusterName, Value: cluster.Name},
 		{Name: constant.KBEnvCompName, Value: comp.Name},
 		{Name: constant.KBEnvClusterCompName, Value: fullCompName},
 		{Name: constant.KBEnvCompReplicas, Value: strconv.Itoa(int(comp.Replicas))},
+		{Name: constant.KBEnvPodList, Value: strconv.Itoa(int(comp.Replicas))},
 		{Name: kbEnvCompHeadlessSVCName, Value: constant.GenerateDefaultComponentHeadlessServiceName(cluster.Name, comp.Name)},
 	}...)
 	if len(opsDef.Spec.ComponentInfos) == 0 {

@@ -22,7 +22,6 @@ package controllerutil
 import (
 	"context"
 	"fmt"
-	"github.com/apecloud/kubeblocks/version"
 	"reflect"
 	gruntime "runtime"
 	"strings"
@@ -40,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+	"github.com/apecloud/kubeblocks/version"
 )
 
 // GetUncachedObjects returns a list of K8s objects, for these object types,

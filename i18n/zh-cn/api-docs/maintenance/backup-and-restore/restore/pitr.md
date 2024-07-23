@@ -1,23 +1,23 @@
 ---
 title: PITR
-description: How to perform PITR
-keywords: [backup and restore, restore, PITR]
+description: 如何对集群进行时间点恢复
+keywords: [备份恢复, 恢复, PITR, 时间点恢复]
 sidebar_position: 2
 sidebar_label: PITR
 ---
 
 # PITR
 
-## What is PITR?
+## 什么是 PITR?
 
-PITR is a database backup and restore technique commonly used in relational database management systems (RDBMS). It allows to restore data changes starting from a specific point in time, rolling back the database to a state prior to that specific point. In PITR, the database system regularly creates full backups and maintains a record of all transaction logs occurring after each backup point, including insertions, updates, deletions, and other operations. During recovery, the system first restores the most recent full backup and then applies the transaction logs recorded after the backup to bring the database to the desired state.
+PITR（Point-in-Time Recovery，时间点恢复）是一种数据库备份恢复技术，通常用于关系型数据库管理系统（RDBMS）。它可以恢复特定时间点开始的数据更改，将数据库回退到特定时间点之前的状态。在 PITR 中，数据库系统会定期创建全量备份，并记录备份点之后所有的事务日志，包括插入、更新和删除操作等。当恢复时，系统会首先还原最近的全量备份，然后应用备份之后的事务日志，将数据库恢复到所需的状态。
 
-KubeBlocks supports PITR for databases such as MySQL and PostgreSQL. This documentation takes PostgreSQL PITR as an example.
+KubeBlocks 已支持对 MySQL 和 PostgreSQL 等数据库的 PITR 功能。本章节以 PostgreSQL PITR 为例。
 
-## How to perform PITR?
+## 如何进行 PITR？
 
-1. View the timestamps to which the cluster can be restored.
-   
+1. 查看可以将集群恢复到的时间戳。
+
     ```powershell
     # 1. Get all backup objects for the current cluster
     kubectl get backup -l app.kubernetes.io/instance=pg-cluster
@@ -31,10 +31,9 @@ KubeBlocks supports PITR for databases such as MySQL and PostgreSQL. This docume
         start: "2024-05-07T10:07:45Z"
     ```
 
-    It can be seen that the current backup time range is `2024-05-07T10:07:45Z ~2024-05-07T10:47:14Z`. Still, a full backup is required for data restoration, and this full backup must be completed within the time range of the log backups.
+    可以看到当前持续日志备份的时间范围是 `2024-05-07T10:07:45Z ~2024-05-07T10:47:14Z`。但是还得需要一个基础全量备份才能恢复数据，并且这个全部备份完成时间需要落在日志备份的时间范围内才是有效的基础备份。
 
-
-2. Restore the cluster to a specific point in time.
+2. 将集群恢复到指定的时间点。
 
     ```powershell
     apiVersion: apps.kubeblocks.io/v1alpha1
@@ -50,10 +49,10 @@ KubeBlocks supports PITR for databases such as MySQL and PostgreSQL. This docume
     type: Restore
     ```
 
-3. Check the status of the new cluster.
+3. 查看新集群的状态。
 
     ```powershell
     kubectl get cluster pg-cluster-pitr
     ```
 
-    Once the status turns to `Running`, it indicates a successful operation.
+    集群状态为 Running 时，表示恢复成功。

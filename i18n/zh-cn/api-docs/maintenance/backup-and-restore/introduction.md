@@ -1,6 +1,6 @@
 ---
 title: 简介
-description: 本文介绍了 KubeBlocks 备份恢复功能。
+description: 本文介绍了 KubeBlocks 备份恢复功能
 keywords: [简介, 备份, 恢复]
 sidebar_position: 1
 sidebar_label: 简介

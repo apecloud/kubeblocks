@@ -1,21 +1,21 @@
 ---
-title: Configure pod affinity for database clusters
-description: How to configure pod affinity for database clusters
-keywords: [pod affinity]
+title: 为集群配置 Pod 亲和性
+description: 如何为集群配置 Pod 亲和性
+keywords: [pod 亲和性]
 sidebar_position: 1
 ---
 
-# Configure pod affinity for database clusters
+# 为集群配置 Pod 亲和性
 
-Affinity controls the selection logic of pod allocation on nodes. By a reasonable allocation of Kubernetes pods on different nodes, the business availability, resource usage rate, and stability are improved.
+亲和性控制了 Pod 在节点上的分配逻辑。合理地将 Kubernetes 的 Pod 分配到不同的节点上，可以提高业务的可用性、资源使用率和稳定性。
 
-Affinity and toleration can be set by the CR YAML file of the cluster, which supports both the cluster-level and component-level configurations.
+可以通过集群的 CR YAML 文件来设置亲和性和容忍度。CR YAML 文件可以支持集群级别和组件级别的配置。
 
-## Use a YAML file
+## 使用 YAML 文件配置亲和性
 
-You can configure pod affinity and toleration in either the spec of a cluster or the spec of a component.
+你可以在集群配置文件或组件配置文件中配置 Pod 亲和性和容忍度。
 
-The cluster-level configuration is used as the default configuration of all components; if the pod affinity configuration exists in a component, the component-level configuration will take effect and cover the default cluster-level configuration.
+集群级配置是所有组件的默认配置；如果组件中存在 Pod 亲和性配置，组件级配置将生效，并覆盖默认的集群级配置。
 
 ```yaml
 spec:
@@ -40,38 +40,40 @@ spec:
     ......
 ```
 
-**Description of parameters in the YAML file**
+**YAML 文件中的参数**
 
-* Affinity
+* 亲和性
   
-  Parameters related to pod affinity are under the object of `spec.affinity` in the Cluster CR YAML file.
-  The pod affinity configuration can be applied to the cluster or component and the component-level configuration covers the cluster-level configuration.
+   与 Pod 亲和性相关的参数位于集群的 CR YAML 文件的 `spec.affinity` 对象下。
 
-* Toleration
+   Pod 亲和性配置可以应用于集群或组件，组件级配置将覆盖集群级配置。
+
+* 容忍度
   
-  Parameters related to toleration are under the object of `spec.tolerations` in the Cluster CR YAML file and Kubernetes native semantics are used. For the toleration parameter configuration, refer to the Kubernetes official document [Taints and Tolerations](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/).
-  Like affinity configuration, toleration also supports component-level and cluster-level configurations. The cluster-level configuration is set as default and the component-level configuration covers the cluster-level configuration.
+   与容忍度相关的参数位于集群 CR YAML 文件的 `spec.tolerations` 对象下，使用 Kubernetes 的原生语义。有关容忍度参数配置，请参考 Kubernetes 官方文档[污点和容忍度](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/)。
 
-| **Parameter**   | **Value**                                    | **Description**  |
+   与亲和性配置类似，容忍度也支持组件级和集群级配置。默认使用集群级配置，组件级别的配置会覆盖集群级别的配置。
+
+| **参数**         | **值**                                       | **描述**  |
 | :--             | :--                                          | :--              |
-| podAntiAffinity | - Required <br/> - Preferred (default)      | It stands for the anti-affinity level of the pod under the current component.<br/> - Required means pods must be spread evenly in the fault domain specified by `topologyKeys`. <br/> - Preferred means pods can be spread as evenly as possible in the fault domain specified by `topologyKeys`. |
-| topologyKeys    |                                              | TopologyKey is the key of the node label. The node with the same value as this key is considered to be in the same topology, i.e. the same fault domain.<br/>For example, if the TopologyKey is `kubernetes.io/hostname`, every node is a domain of this topology. If the TopologyKey is `topology.kubernetes.io/zone`, every available zone is a domain of this topology. |
-| nodeLabels      |                                              | NodeLabels specifies a pod can only be scheduled to the node with the specified node label. |
-| tenancy         | - SharedNode (default) <br/> - DedicatedNode | It refers to the pod tenancy type:<br/> - SharedNode means that multiple pods share a node.<br/> - DedicatedNode means that a node is dedicated to a pod. |
+| podAntiAffinity | - Required <br/> - Preferred (default)      | <p>表示当前组件下 Pod 的反亲和性级别。</p><p> - Required 表示 Pod 必须均匀分布在由 `topologyKeys` 指定的故障域中。</p><p>- Preferred 表示 Pod 最好能够均匀分布在由 `topologyKeys` 指定的故障域中。</p> |
+| topologyKeys    |                                              | <p>TopologyKey 是节点标签的 key。具有相同 key 值的节点属于相同的拓扑，即相同的故障域。</p><p>例如，如果 TopologyKey 是 `kubernetes.io/hostname`，每个节点都是该拓扑的一个域。如果 TopologyKey 是 `topology.kubernetes.io/zone`，每个可用的区域都是该拓扑的一个域。</p> |
+| nodeLabels      |                                              | NodeLabels 指定 Pod 只能被调度到具有指定节点标签的节点上。 |
+| tenancy         | <p>- SharedNode (default)</p><p>- DedicatedNode</p> | <p>表示 Pod 的租户类型：</p><p> - SharedNode 表示多个 Pod 共享一个节点。</p><p>- DedicatedNode 表示一个节点专用于一个 Pod。</p> |
 
-## Examples
+## 示例
 
-The following examples show the common situations of how to use pod affinity and toleration configuration.
+以下示例展示了如何进行 Pod 亲和性和容忍度配置。
 
-### Default configuration
+### 默认配置
 
-No affinity parameters are required.
+无需使用亲和性参数。
 
-### Spread evenly as much as possible
+### 尽量打散
 
-You can configure the pod affinity as "Preferred" if you want the pods of the cluster to be deployed in different topological domains, but do not want deployment failure due to failing to meet distribution requirements.
+如果你希望集群的 Pod 部署在不同的拓扑域，但是不希望在节点资源充足的时候，因为不满足分布条件而部署失败，那么可以配置尽量打散，可以将 Pod 亲和性配置为“Preferred”。
 
-The example below creates and sets a cluster to be deployed evenly across nodes as much as possible.
+下面的示例创建了一个尽可能跨节点的集群。
 
 ```yaml
 spec:
@@ -79,10 +81,11 @@ spec:
     podAntiAffinity: Preferred
 ```
 
-### Forced spread evenly
+### 强制打散
 
-You can configure the pod affinity as "Required" if the pods of the cluster must be deployed in different topological domains to ensure that the cluster can be disaster-tolerant across topological domains.
-The example below creates and sets a cluster that must be deployed across nodes.
+如果集群的 Pod 必须部署在不同的拓扑域，以确保集群能够跨拓扑域具备容灾能力，你可以将 Pod 亲和性配置为“Required”。
+
+下面的示例创建了一个必须跨节点部署的集群。
 
 ```yaml
 spec:
@@ -90,10 +93,11 @@ spec:
     podAntiAffinity: Required
 ```
 
-### Deploy pods in specified nodes
+### 在指定节点上部署
 
-You can specify a node label to deploy a cluster on the specified node.
-The example below creates and sets a cluster to be deployed on the node with an available zone label of `topology.kubernetes.io/zone=us-east-1a`.
+可以通过节点标签在指定的节点上部署集群。
+
+下面的示例创建了一个在带有拓扑标签 `topology.kubernetes.io/zone=us-east-1a` 的节点上部署的集群。
 
 ```yaml
 spec:
@@ -102,11 +106,11 @@ spec:
       topology.kubernetes.io/zone: us-east-1a
 ```
 
-### Deploy pods in dedicated nodes
+### 独享主机组
 
-If you want to manage node groups by the taint and node labels and need the clusters to be deployed on a dedicated host group, you can set tolerations and specify a node label.
+如果想通过污点和节点标签来管理节点分组，并且需要将集群部署在独享的主机分组中，可以设置容忍度并指定一个节点标签。
 
-For example, you have a host group for deploying database clusters and this host is added with a taint named `database=true:NoSchedule` and a label `database=true`, then you can follow the command below to create a cluster.
+例如，如果有一个用于部署数据库集群的主机分组，并且该主机添加了一个名为 `database=true:NoSchedule` 的污点和一个名为 `database=true` 的标签，那么可以按照以下命令创建一个集群。
 
 ```yaml
 spec:
@@ -123,9 +127,9 @@ spec:
     effect: NoSchedule
 ```
 
-### One node only for one pod
+### 集群 Pod 独占一个节点
 
-If you need one cluster only for the online core business and need to ensure every pod of this cluster has its own node to avoid being affected by the cluster of the cluster, you can specify `tenancy` as "DedicatedNode".
+如果需要一个仅用于线上核心业务的集群，并且需要确保该集群的每个 Pod 都有自己的节点以避免受到集群中其他 Pod 的影响，你可以将 `tenancy` 设置为“DedicatedNode”。
 
 ```yaml
 spec:
@@ -135,6 +139,6 @@ spec:
 
 :::note
 
-This command will be performed successfully based on the prerequisite that you have added taints for these nodes. Otherwise, the business that is not managed by KubeBlocks can still be deployed on these nodes.
+只有为这些节点添加污点之后，命令才能成功执行。否则，未由 KubeBlocks 托管的业务仍然可以部署在这些节点上。
 
 :::

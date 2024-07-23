@@ -1,19 +1,20 @@
 ---
-title: Overview on in-place update
-description: Overview on in-place update
-keywords: [in-place update, overview]
+title: 概述
+description: 原地更新概述
+keywords: [原地更新, 概述]
 sidebar_position: 1
-sidebar_label: Overview on in-place update
+sidebar_label: 概述
 ---
 
-# Overview on in-place update
+# 概述
 
-In its earlier versions, KubeBlocks ultimately generated Workloads as StatefulSets. For StatefulSets, any change in the segment of PodTemplate may result in the update of all pods, and the method of update is called `Recreate`, that is deleting all current pods and create a new one. This is obviously not the best practice for database management, which has a high requirement on system availability.
-To address this issue, KubeBlocks introduced the instance in-place update feature starting from version 0.9, reducing the impact on system availability during instance updates.
+早期的版本中，KubeBlocks 最终生成的 Workload 是 StatefulSet。StatefulSet 通过 PodTemplate 渲染最终的 Pod，当 PodTemplate 中有任何字段发生了改变，都会导致所有 Pod 被更新，而 StatefulSet 采用的更新方式是 `Recreate`，即首先删除现有的 Pod，然后再新建一个 Pod。对于数据库等对可用性要求很高的系统，这样的方式显然不是最佳选择。
 
-## Which fields of an instance support in-place updates?
+为了解决这个问题，KubeBlocks 从 v0.9 开始，新增实例原地更新特性，降低实例更新时对系统可用性的影响。
 
-In principle, KubeBlocks instance in-place updates leverage the Kubernetes Pod API's in-place update capability. Therefore, the specific supported fields are as follows:
+## 实例（Instance）哪些字段支持原地更新
+
+从原理上来讲，KubeBlocks 实例原地更新复用了 [Kubernetes Pod API 原地更新能力](https://kubernetes.io/docs/concepts/workloads/pods/#pod-update-and-replacement)。所以具体支持的字段如下：
 
 * `annotations`
 * `labels`
@@ -23,31 +24,35 @@ In principle, KubeBlocks instance in-place updates leverage the Kubernetes Pod A
 * `spec.tolerations (only supports adding Toleration)`
 
 Starting from Kubernetes version 1.27, support for in-place updates of CPU and Memory can be further enabled through the PodInPlaceVerticalScaling feature switch, which is enabled by default from version 1.29 onwards. KubeBlocks automatically detects the Kubernetes version and feature switches, and further supports the following capabilities:
-For Kubernetes versions equal to or greater than 1.29, or greater than or equal to 1.27 and less than 1.29 with PodInPlaceVerticalScaling enabled, the following fields' in-place updates are supported:
+Kubernetes 从 v1.27 开始，通过 `PodInPlaceVerticalScaling` 特性开关可进一步开启对 CPU 和 Memory 的原地更新支持，并从 v1.29 开始，该特性默认打开。KubeBlocks 会自动探测 Kubernetes 版本和特性开关，并进一步支持如下能力：
+
+对于大于或等于 v1.29 的 Kubernetes，或大于等于 v1.27 且小于 v1.29 并且 `PodInPlaceVerticalScaling` 已开启的 Kubernetes，支持如下字段的原地更新：
 
 * `spec.containers[*].resources.requests["cpu"]`
 * `spec.containers[*].resources.requests["memory"]`
 * `spec.containers[*].resources.limits["cpu"]`
 * `spec.containers[*].resources.limits["memory"]`
 
-It is important to note that after successful resource resizing, some applications may need to be restarted to recognize the new resource configuration. In such cases, further configuration of container restartPolicy is required in ClusterDefinition or ComponentDefinition.
+需要注意的是，当 resource resize 成功后，有的应用可能需要重启才能感知到新的资源配置，此时需要在 ClusterDefinition 或 ComponentDefinition 中进一步配置 container `restartPolicy`。
 
-For PVC, KubeBlocks similarly leverages the capabilities of the PVC API, supporting only volume expansion.
+对于 PVC，KubeBlocks 同样复用 PVC API 的能力，仅支持 Volume 的扩容。
 
-## From the upper-level API perspective, which fields utilize in-place updates after being updated?
+## 从上层 API 视角，哪些字段更新后使用的是原地更新
 
-KubeBlocks upper-level APIs related to instances include Cluster, ClusterDefinition, ClusterVersion, ComponentDefinition, and ComponentVersion. Within these APIs, several fields will ultimately be directly or indirectly used to render instance objects, potentially triggering in-place updates for instances.
+KubeBlocks 跟实例相关的上层 API 包括 Cluster、ClusterDefinition、ClusterVersion、ComponentDefinition 和 ComponentVersion。这些 API 中有若干字段最终会直接或间接用来渲染实例对象，从而可能会触发实例原地更新。
 
-There are numerous fields across these APIs. See below table for brief descriptions.
+There are numerous fields across these APIs. See the below table for brief descriptions.
+
+这些字段非常多，这里对这些字段进行罗列和简单描述。
 
 :::note
 
-Fields marked as deprecated or immutable in the API are not included in the list.
+API 中标记为 deprecated 的字段不在列表内，immutable 的字段不在列表内
 
 :::
 
-| API |   Fields    |   Description  |
+| API |   字段名称    |   描述  |
 |:-----|:-------|:-----------|
-|Cluster| `annotations`, <p>`labels`, </p><p>`spec.tolerations`, </p><p>`spec.componentSpecs[*].serviceVersion`, </p><p>`spec.componentSpecs[*].tolerations`, </p><p>`spec.componentSpecs[*].resources`, </p><p>`spec.componentSpecs[*].volumeClaimTemplates`, </p><p>`spec.componentSpecs[*].instances[*].annotations`, </p><p>`spec.componentSpecs[*].instances[*].labels`, </p><p>`spec.componentSpecs[*].instances[*].image`, </p><p>`spec.componentSpecs[*].instances[*].tolerations`, </p><p>`spec.componentSpecs[*].instances[*].resources`, </p><p>`spec.componentSpecs[*].instances[*].volumeClaimTemplates`, </p><p>`spec.shardingSpecs[*].template.serviceVersion`, </p><p>`spec.shardingSpecs[*].template.tolerations`, </p><p>`spec.shardingSpecs[*].template.resources`, </p><p>`spec.shardingSpecs[*].template.volumeClaimTemplates`</p> | Resources related fields means: <p>`requests["cpu"]`,</p><p>`requests["memory"]`,</p><p>`limits["cpu"]`,</p>`limits["memory"]` |
-|   ComponentVersion  | `spec.releases[*].images`   | Whether in-place update is triggered depends on whether the corresponding image is changed.            |
+|Cluster| `annotations`, <p>`labels`, </p><p>`spec.tolerations`, </p><p>`spec.componentSpecs[*].serviceVersion`, </p><p>`spec.componentSpecs[*].tolerations`, </p><p>`spec.componentSpecs[*].resources`, </p><p>`spec.componentSpecs[*].volumeClaimTemplates`, </p><p>`spec.componentSpecs[*].instances[*].annotations`, </p><p>`spec.componentSpecs[*].instances[*].labels`, </p><p>`spec.componentSpecs[*].instances[*].image`, </p><p>`spec.componentSpecs[*].instances[*].tolerations`, </p><p>`spec.componentSpecs[*].instances[*].resources`, </p><p>`spec.componentSpecs[*].instances[*].volumeClaimTemplates`, </p><p>`spec.shardingSpecs[*].template.serviceVersion`, </p><p>`spec.shardingSpecs[*].template.tolerations`, </p><p>`spec.shardingSpecs[*].template.resources`, </p><p>`spec.shardingSpecs[*].template.volumeClaimTemplates`</p> | Resources 相关字段都指的是：<p>`requests["cpu"]`,</p><p>`requests["memory"]`,</p><p>`limits["cpu"]`,</p>`limits["memory"]` |
+|   ComponentVersion  | `spec.releases[*].images`   | 是否会触发实例原地更新取决于最终匹配的 Image 是否有变化。           |
 | KubeBlocks Built-in |  `annotations`, `labels` |    |

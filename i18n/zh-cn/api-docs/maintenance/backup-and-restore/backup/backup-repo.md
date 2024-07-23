@@ -1,9 +1,9 @@
 ---
 title: 配置 BackupRepo
-description: How to configure BackupRepo
-keywords: [introduction, backup, restore]
+description: 如何配置 BackupRepo
+keywords: [简介, 备份, 恢复, backuprepo]
 sidebar_position: 1
-sidebar_label: Configure BackupRepo
+sidebar_label: 配置 BackupRepo
 ---
 
 import Tabs from '@theme/Tabs';

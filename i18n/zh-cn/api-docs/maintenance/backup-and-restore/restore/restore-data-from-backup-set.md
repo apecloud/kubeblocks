@@ -1,27 +1,27 @@
 ---
-title: Restore data from backup set
-description: How to restore data from backup set
-keywords: [backup and restore, restore, backup set]
+title: 从备份集中恢复数据
+description: 如何从备份集中恢复数据
+keywords: [备份恢复, 恢复, 备份集]
 sidebar_position: 1
-sidebar_label: Restore from backup set
+sidebar_label: 从备份集中恢复数据
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Restore data from backup set
+# 从备份集中恢复数据
 
-KubeBlocks supports restoring clusters from backups with the following instructions.
+KubeBlocks 支持从备份集中恢复数据。
 
-1. View backups.
+1. 查看备份。
 
     ```shell
     kubectl get backups
     ```
 
-2. Restore clusters from a specific backup.
+2. 从特定的备份中恢复集群。
 
-    You can set the `connectionPassword.annotations` of the restored cluster as that of the original cluster. The password of the original cluster can be accessed by viewing the annotation of `dataprotection.kubeblocks.io/connection-password` in the backup YAML file.
+    可使用原集群的 connection password 作为恢复的集群的 `connectionPassword.annotations` 值。可从备份 YAML 文件中的 `dataprotection.kubeblocks.io/connection-password` annotation 中获取原集群的 connection password。
 
     ```bash
     kubectl apply -f - <<-'EOF'
@@ -51,6 +51,6 @@ KubeBlocks supports restoring clusters from backups with the following instructi
     EOF
     ```
 
-3. Connect to the restored cluster for verification.
+3. 连接被恢复集群，进行验证。
 
-    Once the cluster status is `Running`, [connect to the cluster](./../../../kubeblocks-for-apecloud-mysql/cluster-management/create-and-connect-an-apecloud-mysql-cluster.md#connect-to-a-cluster) for verification.
+    集群状态为 `Running` 后，[连接集群](./../../../kubeblocks-for-apecloud-mysql/cluster-management/create-and-connect-an-apecloud-mysql-cluster.md#connect-to-a-cluster)进行验证。

@@ -246,6 +246,47 @@ func setInitContainer(addon *extensionsv1alpha1.Addon, helmJobPodSpec *corev1.Po
 	helmJobPodSpec.InitContainers = append(helmJobPodSpec.InitContainers, copyChartsContainer)
 }
 
+func GetInstallJobStatus(jobType string, tree *kubebuilderx.ObjectTree) (key client.ObjectKey) {
+	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
+	mgrNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+	if jobType == "install" {
+		key = client.ObjectKey{
+			Namespace: mgrNS,
+			Name:      getInstallJobName(addon),
+		}
+	} else if jobType == "uninstall" {
+		key = client.ObjectKey{
+			Namespace: mgrNS,
+			Name:      getUninstallJobName(addon),
+		}
+	}
+	return key
+}
+
+func (r *AddonReconciler) PatchPhase(addon *extensionsv1alpha1.Addon, stageCtx stageCtx, phase extensionsv1alpha1.AddonPhase, reason string) error {
+	stageCtx.reqCtx.Log.V(1).Info("patching status", "phase", phase)
+	patch := client.MergeFrom(addon.DeepCopy())
+	addon.Status.Phase = phase
+	addon.Status.ObservedGeneration = addon.Generation
+
+	meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
+		Type:               extensionsv1alpha1.ConditionTypeSucceed,
+		Status:             metav1.ConditionTrue,
+		ObservedGeneration: addon.Generation,
+		Reason:             reason,
+		LastTransitionTime: metav1.Now(),
+	})
+
+	if err := r.Status().Patch(stageCtx.reqCtx.Ctx, addon, patch); err != nil {
+		stageCtx.setRequeueWithErr(err, "")
+		return err
+	}
+	r.Event(addon, corev1.EventTypeNormal, reason,
+		fmt.Sprintf("Progress to %s phase", phase))
+	stageCtx.setReconciled()
+	return nil
+}
+
 func (r *helmTypeInstallReconciler) Reconcile(tree *kubebuilderx.ObjectTree) {
 	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
 	r.reqCtx.Log.V(1).Info("helmTypeInstallStage", "phase", addon.Status.Phase)

@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package extensions
 
 import (
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -52,6 +54,7 @@ func (r *fetchNDeletionCheckReconciler) PreCondition(tree *kubebuilderx.ObjectTr
 func (r *fetchNDeletionCheckReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
 	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
 	r.reqCtx.Log.V(1).Info("get addon", "generation", addon.Generation, "observedGeneration", addon.Status.ObservedGeneration)
+	fmt.Println("fetchNDeletionCheckReconciler, phase: ", addon.Status.Phase)
 	r.reqCtx.UpdateCtxValue(operandValueKey, addon)
 
 	// CheckIfAddonUsedByCluster, if err, skip the deletion stage
@@ -75,6 +78,7 @@ func (r *fetchNDeletionCheckReconciler) Reconcile(tree *kubebuilderx.ObjectTree)
 		return tree, err
 	}
 	r.reqCtx.Log.V(1).Info("start normal reconcile")
+	//fmt.Println("fetchNDeletionCheckReconciler, start normal reconcile")
 	return tree, nil
 }
 

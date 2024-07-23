@@ -1770,44 +1770,6 @@ snapshot-controller:
 kubeblocks-csi-driver:
   enabled: false
 
-
-## csi-s3 settings
-## ref: https://artifacthub.io/packages/helm/cloudve/csi-s3#configuration
-##
-csi-s3:
-  ## @param csi-s3.enabled -- Enable csi-s3 chart.
-  ##
-  enabled: false
-
-alertmanager-webhook-adaptor:
-  ## Linkage with prometheus.enabled
-  ##
-  # enabled: false
-  ## Webhook-Adaptor container image
-  ##
-  image:
-    # if the value of alertmanager-webhook-adaptor.image.registry is not specified using `--set`, it will be set to the value of 'image.registry' by default
-    registry: ""
-
-  affinity:
-    nodeAffinity:
-      preferredDuringSchedulingIgnoredDuringExecution:
-      - weight: 100
-        preference:
-          matchExpressions:
-          - key: kb-controller
-            operator: In
-            values:
-            - "true"
-
-  ## ConfigMap override where fullname is {{.Release.Name}}-{{.Values.configMapOverrideName}}
-  ##
-  configMapOverrideName: "config"
-
-  ## Webhook-Adaptor ConfigMap Entries
-  configFiles:
-    config.yaml: {}
-
 csi-hostpath-driver:
   ## @param csi-hostpath-driver.enabled -- Enable csi-hostpath-driver chart.
   ##
@@ -1866,6 +1828,7 @@ validProviders:
  - "huaweiCloud"
  - "azure"
  - ""
+
 ## @section KubeBlocks default storageClass Parameters for cloud provider.
 storageClass:
   ## @param storageClass.name -- Specifies the name of the default storage class.
@@ -1897,15 +1860,6 @@ storageClass:
     huaweiCloud: # Huawei Cloud
       volumeType: SSD
       fsType: ext4
-
-external-dns:
-  enabled: false
-  domain: kubeblocks.io
-  tolerations:
-  - key: kb-controller
-    operator: Equal
-    value: "true"
-    effect: NoSchedule
 
 developMode: false
 

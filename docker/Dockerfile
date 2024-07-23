@@ -25,14 +25,15 @@ ENV GOPROXY=${GOPROXY}
 ARG VERSION
 ARG GIT_COMMIT
 ARG GIT_VERSION
+ARG BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
 
 ENV VERSION=${VERSION}
 ENV GIT_COMMIT=${GIT_COMMIT}
 ENV GIT_VERSION=${GIT_VERSION}
 
 ARG LD_FLAGS="-s -w \
-    -X github.com/apecloud/kubeblocks/version.Version=v${VERSION} \
-	-X github.com/apecloud/kubeblocks/version.BuildDate=`date -u +'%Y-%m-%dT%H:%M:%SZ'` \
+    -X github.com/apecloud/kubeblocks/version.Version=${VERSION} \
+	-X github.com/apecloud/kubeblocks/version.BuildDate=${BUILD_DATE} \
 	-X github.com/apecloud/kubeblocks/version.GitCommit=${GIT_COMMIT} \
 	-X github.com/apecloud/kubeblocks/version.GitVersion=${GIT_VERSION}"
 

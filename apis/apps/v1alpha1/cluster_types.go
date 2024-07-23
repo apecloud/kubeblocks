@@ -932,7 +932,7 @@ type ClusterComponentSpec struct {
 	// This allows users to customize the configuration template according to their specific requirements.
 	//
 	// +optional
-	UserConfigTemplates map[string]ConfigTemplateExtension `json:"userConfigTemplates,omitempty"`
+	CustomTemplates map[string]ConfigTemplateExtension `json:"customTemplates,omitempty"`
 
 	// Specifies the user-defined configuration template or parameters.
 	//

@@ -596,6 +596,7 @@ type CustomOps struct {
 	// Specifies the name of the OpsDefinition.
 	//
 	// +kubebuilder:validation:Required
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	OpsDefinitionName string `json:"opsDefinitionName"`
 
 	// Specifies the name of the ServiceAccount to be used for executing the custom operation.
@@ -631,6 +632,10 @@ type CustomOps struct {
 type CustomOpsComponent struct {
 	// Specifies the name of the Component.
 	ComponentOps `json:",inline"`
+
+	// Specifies the name of the OpsDefinition.
+	// +optional
+	OpsDefinitionName string `json:"opsDefinitionName,omitempty"`
 
 	// Specifies the parameters that match the schema specified in the `opsDefinition.spec.parametersSchema`.
 	//

@@ -219,6 +219,9 @@ spec:
                         componentName:
                           description: Specifies the name of the Component.
                           type: string
+                        opsDefinitionName:
+                          description: Specifies the name of the OpsDefinition.
+                          type: string
                         parameters:
                           description: Specifies the parameters that match the schema
                             specified in the `opsDefinition.spec.parametersSchema`.

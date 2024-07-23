@@ -37,6 +37,8 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
+const customOpsStartingReason = "CustomOpsStarting"
+
 type CustomOpsHandler struct{}
 
 var _ OpsHandler = CustomOpsHandler{}
@@ -52,13 +54,12 @@ func init() {
 
 // ActionStartedCondition the started condition when handling the stop request.
 func (c CustomOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (*metav1.Condition, error) {
-	opsDefName := common.ToCamelCase(opsRes.OpsRequest.Spec.CustomOps.OpsDefinitionName)
 	return &metav1.Condition{
 		Type:               appsv1alpha1.ConditionTypeCustomOperation,
 		Status:             metav1.ConditionTrue,
-		Reason:             opsDefName + "Starting",
+		Reason:             "customOpsStartingReason",
 		LastTransitionTime: metav1.Now(),
-		Message:            fmt.Sprintf("Start to handle %s on the Cluster: %s", opsDefName, opsRes.OpsRequest.Spec.GetClusterName()),
+		Message:            fmt.Sprintf("Start to handle the custom opsrequest on the Cluster: %s", opsRes.OpsRequest.Spec.GetClusterName()),
 	}, nil
 }
 
@@ -73,21 +74,27 @@ func (c CustomOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cli
 		oldOpsRequest        = opsRes.OpsRequest.DeepCopy()
 		opsRequestPhase      = opsRes.OpsRequest.Status.Phase
 		customSpec           = opsRes.OpsRequest.Spec.CustomOps
-		workflowContext      = NewWorkflowContext(reqCtx, cli, opsRes)
 		compCount            = len(customSpec.CustomOpsComponents)
 		completedActionCount int
 		compFailedCount      int
 		compCompleteCount    int
+		actionCount          int
 	)
 	// TODO: support Parallelism
 	for _, v := range customSpec.CustomOpsComponents {
+		opsDef, err := getOpsDefinition(reqCtx, cli, customSpec, v)
+		if err != nil {
+			return opsRequestPhase, 0, err
+		}
+		actionCount += len(opsDef.Spec.Actions)
 		// 1. init component action progress and preCheck if the conditions for executing ops are met.
-		passed := c.initCompActionStatusAndPreCheck(reqCtx, cli, opsRes, v)
+		passed := c.initCompActionStatusAndPreCheck(reqCtx, cli, opsRes, opsDef, v)
 		if !passed {
 			compCompleteCount += 1
 			compFailedCount += 1
 			continue
 		}
+		workflowContext := NewWorkflowContext(reqCtx, cli, opsRes, opsDef)
 		// 2. do workflow
 		workflowStatus, err := workflowContext.Run(&v)
 		if err != nil {
@@ -102,7 +109,7 @@ func (c CustomOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cli
 		completedActionCount += workflowStatus.CompletedCount
 	}
 	// sync progress
-	if err := syncProgressToOpsRequest(reqCtx, cli, opsRes, oldOpsRequest, completedActionCount, compCount*len(opsRes.OpsDef.Spec.Actions)); err != nil {
+	if err := syncProgressToOpsRequest(reqCtx, cli, opsRes, oldOpsRequest, completedActionCount, actionCount); err != nil {
 		return opsRequestPhase, 0, err
 	}
 	// check if the ops has been finished.
@@ -190,6 +197,7 @@ func (c CustomOpsHandler) checkExpression(reqCtx intctrlutil.RequestCtx,
 func (c CustomOpsHandler) initCompActionStatusAndPreCheck(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
+	opsDef *appsv1alpha1.OpsDefinition,
 	compCustomItem appsv1alpha1.CustomOpsComponent) bool {
 	if opsRes.OpsRequest.Status.Components == nil {
 		opsRes.OpsRequest.Status.Components = map[string]appsv1alpha1.OpsRequestComponentStatus{}
@@ -198,7 +206,7 @@ func (c CustomOpsHandler) initCompActionStatusAndPreCheck(reqCtx intctrlutil.Req
 	compStatus.Phase = opsRes.Cluster.Status.Components[compCustomItem.ComponentName].Phase
 	if len(compStatus.ProgressDetails) == 0 {
 		// 1. do preChecks
-		for _, v := range opsRes.OpsDef.Spec.PreConditions {
+		for _, v := range opsDef.Spec.PreConditions {
 			if v.Rule != nil {
 				if err := c.checkExpression(reqCtx, cli, opsRes, v.Rule, compCustomItem); err != nil {
 					compStatus.PreCheckResult = &appsv1alpha1.PreCheckResult{Pass: false, Message: err.Error()}
@@ -210,10 +218,10 @@ func (c CustomOpsHandler) initCompActionStatusAndPreCheck(reqCtx intctrlutil.Req
 			}
 		}
 		// 2. init action progress details
-		for i := range opsRes.OpsDef.Spec.Actions {
+		for i := range opsDef.Spec.Actions {
 			compStatus.ProgressDetails = append(compStatus.ProgressDetails, appsv1alpha1.ProgressStatusDetail{
 				Status:     appsv1alpha1.PendingProgressStatus,
-				ActionName: opsRes.OpsDef.Spec.Actions[i].Name,
+				ActionName: opsDef.Spec.Actions[i].Name,
 			})
 		}
 		opsRes.OpsRequest.Status.Components[compCustomItem.ComponentName] = compStatus
@@ -237,17 +245,16 @@ func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx,
 	if customSpec == nil {
 		return intctrlutil.NewFatalError("spec.custom can not be empty if opsType is Custom.")
 	}
-	opsDef := &appsv1alpha1.OpsDefinition{}
-	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: customSpec.OpsDefinitionName}, opsDef); err != nil {
-		return err
-	}
-	opsRes.OpsDef = opsDef
-	// 1. validate OpenApV3Schema
-	parametersSchema := opsDef.Spec.ParametersSchema
-	if parametersSchema == nil {
-		return nil
-	}
 	for _, v := range customSpec.CustomOpsComponents {
+		opsDef, err := getOpsDefinition(reqCtx, cli, customSpec, v)
+		if err != nil {
+			return err
+		}
+		// 1. validate OpenApV3Schema
+		parametersSchema := opsDef.Spec.ParametersSchema
+		if parametersSchema == nil {
+			continue
+		}
 		// covert to type map[string]interface{}
 		params, err := common.CoverStringToInterfaceBySchemaType(parametersSchema.OpenAPIV3Schema, covertParametersToMap(v.Parameters))
 		if err != nil {
@@ -260,7 +267,7 @@ func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx,
 		}
 
 		// 2. validate component and componentDef
-		if len(opsRes.OpsDef.Spec.ComponentInfos) > 0 {
+		if len(opsDef.Spec.ComponentInfos) > 0 {
 			// get component definition
 			compSpec := getComponentSpecOrShardingTemplate(opsRes.Cluster, v.ComponentName)
 			compDef, err := component.GetCompDefByName(reqCtx.Ctx, cli, compSpec.ComponentDef)
@@ -282,4 +289,17 @@ func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 	return nil
+}
+
+func getOpsDefinition(reqCtx intctrlutil.RequestCtx,
+	cli client.Client, customSpec *appsv1alpha1.CustomOps, compOps appsv1alpha1.CustomOpsComponent) (*appsv1alpha1.OpsDefinition, error) {
+	opsDefName := customSpec.OpsDefinitionName
+	if compOps.OpsDefinitionName != "" {
+		opsDefName = compOps.OpsDefinitionName
+	}
+	opsDef := &appsv1alpha1.OpsDefinition{}
+	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: opsDefName}, opsDef); err != nil {
+		return nil, err
+	}
+	return opsDef, nil
 }

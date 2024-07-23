@@ -39,16 +39,19 @@ type WorkflowContext struct {
 	reqCtx intctrlutil.RequestCtx
 	Cli    client.Client
 	OpsRes *OpsResource
+	OpsDef *appsv1alpha1.OpsDefinition
 }
 
 func NewWorkflowContext(
 	ctx intctrlutil.RequestCtx,
 	cli client.Client,
-	opsRes *OpsResource) *WorkflowContext {
+	opsRes *OpsResource,
+	opsDef *appsv1alpha1.OpsDefinition) *WorkflowContext {
 	return &WorkflowContext{
 		reqCtx: ctx,
 		Cli:    cli,
 		OpsRes: opsRes,
+		OpsDef: opsDef,
 	}
 }
 
@@ -59,7 +62,7 @@ func (w *WorkflowContext) Run(compCustomSpec *appsv1alpha1.CustomOpsComponent) (
 		actionStatus   *custom.ActionStatus
 		compStatus     = w.OpsRes.OpsRequest.Status.Components[compCustomSpec.ComponentName]
 		workflowStatus = &WorkflowStatus{}
-		actions        = w.OpsRes.OpsDef.Spec.Actions
+		actions        = w.OpsDef.Spec.Actions
 		compSpec       = getComponentSpecOrShardingTemplate(w.OpsRes.Cluster, compCustomSpec.ComponentName)
 	)
 	defer func() {
@@ -151,10 +154,10 @@ func (w *WorkflowContext) getAction(action appsv1alpha1.OpsAction,
 	switch {
 	case action.Workload != nil:
 		return custom.NewWorkloadAction(w.OpsRes.OpsRequest, w.OpsRes.Cluster,
-			w.OpsRes.OpsDef, compCustomItem, compSpec, progressDetail)
+			w.OpsDef, compCustomItem, compSpec, progressDetail)
 	case action.Exec != nil:
 		return custom.NewExecAction(w.OpsRes.OpsRequest, w.OpsRes.Cluster,
-			w.OpsRes.OpsDef, compCustomItem, compSpec, progressDetail)
+			w.OpsDef, compCustomItem, compSpec, progressDetail)
 	case action.ResourceModifier != nil:
 		// TODO: implement it.
 		return nil

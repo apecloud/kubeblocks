@@ -63,8 +63,8 @@ func (r *installableCheckReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*
 		return tree, nil
 	}
 
-	r.reqCtx.Log.V(1).Info("installableCheckStage", "phase", addon.Status.Phase)
-
+	r.reqCtx.Log.V(1).Info("installableCheckReconciler", "phase", addon.Status.Phase)
+	fmt.Println("installableCheckReconciler, phase: ", addon.Status.Phase)
 	// check the annotations constraint about Kubeblocks Version
 	check, err := checkAnnotationsConstraint(r.reqCtx.Ctx, r.reconciler, addon)
 	if err != nil {

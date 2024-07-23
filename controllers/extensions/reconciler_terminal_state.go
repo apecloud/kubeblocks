@@ -54,9 +54,11 @@ func (r *terminalStateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *k
 
 func (r *terminalStateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
 	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
-	r.reqCtx.Log.V(1).Info("terminalStateStage", "phase", addon.Status.Phase)
+	r.reqCtx.Log.V(1).Info("terminalStateReconciler", "phase", addon.Status.Phase)
+	fmt.Println("terminalStateReconciler, phase: ", addon.Status.Phase)
 	patchPhaseNCondition := func(phase extensionsv1alpha1.AddonPhase, reason string) error {
 		r.reqCtx.Log.V(1).Info("patching status", "phase", phase)
+		//fmt.Println("terminalStateReconciler, patching status, phase: ", phase)
 		patch := client.MergeFrom(addon.DeepCopy())
 		addon.Status.Phase = phase
 		addon.Status.ObservedGeneration = addon.Generation

@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package extensions
 
 import (
+	"fmt"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
@@ -48,13 +50,15 @@ func (r *autoInstallCheckReconciler) PreCondition(tree *kubebuilderx.ObjectTree)
 
 func (r *autoInstallCheckReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
 	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
-	r.reqCtx.Log.V(1).Info("autoInstallCheckStage", "phase", addon.Status.Phase)
+	r.reqCtx.Log.V(1).Info("autoInstallCheckReconciler", "phase", addon.Status.Phase)
+	fmt.Println("autoInstallCheckReconciler, phase: ", addon.Status.Phase)
 	if addon.Spec.Installable == nil || !addon.Spec.Installable.AutoInstall {
 		return tree, nil
 	}
 	// proceed if has specified addon.spec.installSpec
 	if addon.Spec.InstallSpec != nil {
 		r.reqCtx.Log.V(1).Info("has specified addon.spec.installSpec")
+		//fmt.Println("has specified addon.spec.installSpec")
 		return tree, nil
 	}
 	enabledAddonWithDefaultValues(r.reqCtx.Ctx, &r.stageCtx, addon, AddonAutoInstall, "Addon enabled auto-install")

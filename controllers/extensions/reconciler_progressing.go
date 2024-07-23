@@ -22,6 +22,8 @@ package extensions
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -60,12 +62,22 @@ func (r *progressingReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubeb
 	r.disablingStage.stageCtx = r.stageCtx
 
 	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
-	r.reqCtx.Log.V(1).Info("progressingHandler", "phase", addon.Status.Phase)
+	r.reqCtx.Log.V(1).Info("progressingReconciler", "phase", addon.Status.Phase)
+	fmt.Println("progressingReconciler, phase: ", addon.Status.Phase)
 	patchPhase := func(phase extensionsv1alpha1.AddonPhase, reason string) error {
 		r.reqCtx.Log.V(1).Info("patching status", "phase", phase)
 		patch := client.MergeFrom(addon.DeepCopy())
 		addon.Status.Phase = phase
 		addon.Status.ObservedGeneration = addon.Generation
+
+		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
+			Type:               extensionsv1alpha1.ConditionTypeSucceed,
+			Status:             metav1.ConditionTrue,
+			ObservedGeneration: addon.Generation,
+			Reason:             reason,
+			LastTransitionTime: metav1.Now(),
+		})
+
 		if err := r.reconciler.Status().Patch(r.reqCtx.Ctx, addon, patch); err != nil {
 			r.setRequeueWithErr(err, "")
 			return err
@@ -79,6 +91,7 @@ func (r *progressingReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubeb
 	// decision enabling or disabling
 	if !addon.Spec.InstallSpec.GetEnabled() {
 		r.reqCtx.Log.V(1).Info("progress to disabling stage handler")
+		//fmt.Println("progressingReconciler: progress to disabling stage handler")
 		// if it's new simply return
 		if addon.Status.Phase == "" {
 			return tree, nil
@@ -118,6 +131,7 @@ func (r *progressingReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubeb
 		return tree, nil
 	}
 	r.reqCtx.Log.V(1).Info("progress to enabling stage handler")
+	//fmt.Println("progressingReconciler: progress to enabling stage handler")
 	r.enablingReconciler.Reconcile(tree)
 
 	return tree, nil

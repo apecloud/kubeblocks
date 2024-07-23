@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package extensions
 
 import (
+	"fmt"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
@@ -48,9 +50,11 @@ func (r *enabledWithDefaultValuesReconciler) PreCondition(tree *kubebuilderx.Obj
 
 func (r *enabledWithDefaultValuesReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
 	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
-	r.reqCtx.Log.V(1).Info("enabledWithDefaultValuesStage", "phase", addon.Status.Phase)
+	r.reqCtx.Log.V(1).Info("enabledWithDefaultValuesReconciler", "phase", addon.Status.Phase)
+	fmt.Println("enabledWithDefaultValuesReconciler, phase: ", addon.Status.Phase)
 	if addon.Spec.InstallSpec.HasSetValues() || addon.Spec.InstallSpec.IsDisabled() {
 		r.reqCtx.Log.V(1).Info("has specified addon.spec.installSpec")
+		//fmt.Println("enabledWithDefaultValuesReconciler, has specified addon.spec.installSpec")
 		return tree, nil
 	}
 	if v, ok := addon.Annotations[AddonDefaultIsEmpty]; ok && v == trueVal {

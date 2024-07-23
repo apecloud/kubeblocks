@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package extensions
 
 import (
+	"fmt"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
@@ -48,7 +50,8 @@ func (r *metadataCheckReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *k
 
 func (r *metadataCheckReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
 	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
-	r.reqCtx.Log.V(1).Info("metadataCheckStage", "phase", addon.Status.Phase)
+	r.reqCtx.Log.V(1).Info("metadataCheckReconciler", "phase", addon.Status.Phase)
+	fmt.Println("metadataCheckReconciler, phase: ", addon.Status.Phase)
 	setAddonProviderAndVersion(addon)
 	if err := r.reconciler.Client.Update(r.reqCtx.Ctx, addon); err != nil {
 		r.setRequeueWithErr(err, "")

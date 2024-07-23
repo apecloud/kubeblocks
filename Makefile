@@ -66,8 +66,8 @@ export GOPROXY
 LD_FLAGS="-s -w \
 	-X github.com/apecloud/kubeblocks/version.Version=v${VERSION} \
 	-X github.com/apecloud/kubeblocks/version.BuildDate=`date -u +'%Y-%m-%dT%H:%M:%SZ'` \
-	-X github.com/apecloud/kubeblocks/version.GitCommit=$(GIT_COMMIT) \
-	-X github.com/apecloud/kubeblocks/version.GitVersion=$(GIT_VERSION)"
+	-X github.com/apecloud/kubeblocks/version.GitCommit=${GIT_COMMIT} \
+	-X github.com/apecloud/kubeblocks/version.GitVersion=${GIT_VERSION}"
 # Which architecture to build - see $(ALL_ARCH) for options.
 # if the 'local' rule is being run, detect the ARCH from 'go env'
 # if it wasn't specified by the caller.

@@ -12,7 +12,11 @@ The popularity of generative AI (Generative AI) has aroused widespread attention
 
 KubeBlocks supports the management of Qdrant.
 
-Before you start, [install kbcli](./../installation/install-with-kbcli/install-kbcli.md) and [install KubeBlocks](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md).
+## Before you start
+
+- [Install kbcli](./../installation/install-with-kbcli/install-kbcli.md).
+- [Install KubeBlocks](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md).
+- [Install and enable the qdrant addon](./../overview/supported-addons.md#use-addons).
 
 ## Create a cluster
 
@@ -29,6 +33,16 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
    ```bash
    kbcli cluster create qdrant --cluster-definition=qdrant --set replicas=3
    ```
+
+:::note
+
+View more flags for creating a MySQL cluster to create a cluster with customized specifications.
+  
+```bash
+kbcli cluster create --help
+```
+
+:::
 
 2. Check whether the cluster is created.
 
@@ -123,7 +137,7 @@ For the testing environment, you can run the command below to open the Grafana m
    If `disableExporter: false` is not shown in the output, it means the monitoring function of this cluster is not enabled and you need to enable it first.
 
    ```bash
-   kbcli cluster update qdrant --disableExporter=false
+   kbcli cluster update qdrant --disable-exporter=false
    ```
 
 3. View the dashboard list.
@@ -222,6 +236,66 @@ To check whether the expanding is done, use the following command.
 ```bash
 kbcli cluster describe qdrant
 ```
+
+## Restart
+
+1. Restart a cluster.
+
+   Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
+
+   ```bash
+   kbcli cluster restart qdrant --components="qdrant" \
+   --ttlSecondsAfterSucceed=30
+   ```
+
+   - `components` describes the component name that needs to be restarted.
+   - `ttlSecondsAfterSucceed` describes the time to live of an OpsRequest job after the restarting succeeds.
+
+2. Validate the restarting.
+
+   Run the command below to check the cluster status to check the restarting status.
+
+   ```bash
+   kbcli cluster list qdrant
+   >
+   NAME     NAMESPACE   CLUSTER-DEFINITION     VERSION         TERMINATION-POLICY   STATUS    CREATED-TIME
+   qdrant   default     qdrant                 qdrant-1.5.0    Delete               Running   Aug 15,2023 23:03 UTC+0800
+   ```
+
+   * STATUS=Updating: it means the cluster restart is in progress.
+   * STATUS=Running: it means the cluster has been restarted.
+
+## Stop/Start a cluster
+
+You can stop/start a cluster to save computing resources. When a cluster is stopped, the computing resources of this cluster are released, which means the pods of Kubernetes are released, but the storage resources are reserved. You can start this cluster again by snapshots if you want to restore the cluster resources.
+
+### Stop a cluster
+
+1. Configure the name of your cluster and run the command below to stop this cluster.
+
+   ```bash
+   kbcli cluster stop qdrant
+   ```
+
+2. Check the status of the cluster to see whether it is stopped.
+
+    ```bash
+    kbcli cluster list
+    ```
+
+### Start a cluster
+
+1. Configure the name of your cluster and run the command below to start this cluster.
+
+   ```bash
+   kbcli cluster start qdrant
+   ```
+
+2. Check the status of the cluster to see whether it is running again.
+
+    ```bash
+    kbcli cluster list
+    ```
 
 ## Backup and restore
 

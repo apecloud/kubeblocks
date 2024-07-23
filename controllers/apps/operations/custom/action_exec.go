@@ -127,7 +127,7 @@ func (e *ExecAction) createExecPod(actionCtx ActionContext,
 		namespace = e.OpsRequest.Namespace
 	}
 	pod := builder.NewPodBuilder(namespace, podName).
-		AddLabelsInMap(buildLabels(e.Cluster.Name, e.OpsRequest.Name, e.Comp.Name, actionCtx.Action.Name)).
+		AddLabelsInMap(buildLabels(e.OpsRequest.Name, actionCtx.Action.Name)).
 		AddLabels(constant.OpsRequestNamespaceLabelKey, e.OpsRequest.Namespace).
 		SetPodSpec(*podSpec).
 		AddServiceAccount(serviceAccountName).

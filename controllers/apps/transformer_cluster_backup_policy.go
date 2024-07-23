@@ -168,6 +168,8 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 					graphCli.Patch(dag, oldBackupSchedule, newBackupSchedule)
 				}
 				graphCli.DependOn(dag, backupPolicy, newBackupSchedule)
+				comps := graphCli.FindAll(dag, &appsv1alpha1.Component{})
+				graphCli.DependOn(dag, backupPolicy, comps...)
 				backupScheduleNames[newBackupSchedule.Name] = struct{}{}
 			}
 

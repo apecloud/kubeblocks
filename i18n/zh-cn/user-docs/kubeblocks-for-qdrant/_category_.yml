@@ -1,4 +1,4 @@
 position: 14
-label: 用 KubeBlocks 管理向量数据库
+label: 用 KubeBlocks 管理 Qdrant
 collapsible: true 
 collapsed: true

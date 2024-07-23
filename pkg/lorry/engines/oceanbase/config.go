@@ -56,15 +56,21 @@ func NewConfig(properties map[string]string) (*Config, error) {
 func getRootPassword(compName string) string {
 	rootPasswordEnv := "OB_ROOT_PASSWD"
 
+	// to support different root password for different components
+	rootPasswordEnvPerCmp := ""
 	if compName == "" {
 		compName = viper.GetString("KB_COMP_NAME")
 	}
-
 	if compName != "" {
 		compName = strings.ToUpper(compName)
 		compName = strings.ReplaceAll(compName, "-", "_")
-		rootPasswordEnv = rootPasswordEnv + "_" + compName
+		rootPasswordEnvPerCmp = rootPasswordEnv + "_" + compName
 	}
+
+	if viper.IsSet(rootPasswordEnvPerCmp) {
+		rootPasswordEnv = rootPasswordEnvPerCmp
+	}
+
 	return viper.GetString(rootPasswordEnv)
 }
 

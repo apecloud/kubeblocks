@@ -80,6 +80,12 @@ type OpsRequestSpec struct {
 	// +optional
 	TTLSecondsAfterSucceed int32 `json:"ttlSecondsAfterSucceed,omitempty"`
 
+	// Specifies the duration in seconds that an OpsRequest will remain in the system after completion
+	// for any phase other than "Succeed" (e.g., "Failed", "Cancelled", "Aborted") before automatic deletion.
+	//
+	// +optional
+	TTLSecondsAfterUnsuccessfulCompletion int32 `json:"ttlSecondsAfterUnsuccessfulCompletion,omitempty"`
+
 	// Specifies the maximum time in seconds that the OpsRequest will wait for its pre-conditions to be met
 	// before it aborts the operation.
 	// If set to 0 (default), pre-conditions must be satisfied immediately for the OpsRequest to proceed.

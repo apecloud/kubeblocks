@@ -1,7 +1,7 @@
 ---
 title: Manage Weaviate with KubeBlocks
 description: How to manage Weaviate on KubeBlocks
-keywords: [weaviate, control plane]
+keywords: [weaviate, vector database, control plane]
 sidebar_position: 1
 sidebar_label: Manage Weaviate with KubeBlocks
 ---

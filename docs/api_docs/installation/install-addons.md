@@ -3,7 +3,7 @@ title: Install Addons
 description: Install KubeBlocks addons with Helm
 keywords: [addon, helm, KubeBlocks]
 sidebar_position: 3
-sidebar_label: Install KubeBlocks
+sidebar_label: Install Addons
 ---
 
 # Install addons

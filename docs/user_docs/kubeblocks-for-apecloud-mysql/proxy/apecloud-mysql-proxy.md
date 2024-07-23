@@ -274,7 +274,7 @@ In the production environment, all monitoring addons are disabled by default whe
 1. Enable the monitoring function.
 
    ```bash
-   kbcli cluster update myproxy --monitor=true
+   kbcli cluster update myproxy --disable-exporter=false
    ```
 
 2. View the addon list and enable the Grafana addon.

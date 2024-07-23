@@ -286,11 +286,11 @@ func (c *itsRoleProbeConvertor) convert(args ...any) (any, error) {
 	}
 
 	// TODO(xingran): ITS Action does not support args[] yet
-	if synthesizeComp.LifecycleActions.RoleProbe.CustomHandler != nil {
+	if synthesizeComp.LifecycleActions.RoleProbe.Exec != nil {
 		itsRoleProbeCmdAction := workloads.Action{
-			Image:   synthesizeComp.LifecycleActions.RoleProbe.CustomHandler.Image,
-			Command: synthesizeComp.LifecycleActions.RoleProbe.CustomHandler.Exec.Command,
-			Args:    synthesizeComp.LifecycleActions.RoleProbe.CustomHandler.Exec.Args,
+			Image:   synthesizeComp.LifecycleActions.RoleProbe.Exec.Image,
+			Command: synthesizeComp.LifecycleActions.RoleProbe.Exec.Command,
+			Args:    synthesizeComp.LifecycleActions.RoleProbe.Exec.Args,
 		}
 		itsRoleProbe.CustomHandler = []workloads.Action{itsRoleProbeCmdAction}
 	}

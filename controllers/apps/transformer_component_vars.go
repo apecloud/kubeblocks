@@ -62,7 +62,7 @@ func (t *componentVarsTransformer) Transform(ctx graph.TransformContext, dag *gr
 
 	legacy, err := generatedComponent4LegacyCluster(transCtx)
 	if err != nil {
-		return err
+		return errWithSetCompOwnership(transCtx.Component, dag, graphCli, err)
 	}
 
 	var templateVars map[string]any
@@ -75,14 +75,17 @@ func (t *componentVarsTransformer) Transform(ctx graph.TransformContext, dag *gr
 			synthesizedComp, transCtx.CompDef.Spec.Vars)
 	}
 	if err != nil {
-		return err
+		return errWithSetCompOwnership(transCtx.Component, dag, graphCli, err)
 	}
 
 	// pass all direct value env vars through CM
 	envVars2, envData := buildEnvVarsNData(synthesizedComp, envVars, legacy)
 	setTemplateNEnvVars(synthesizedComp, templateVars, envVars2, legacy)
 
-	return createOrUpdateEnvConfigMap(ctx, dag, envData)
+	if err := createOrUpdateEnvConfigMap(ctx, dag, envData); err != nil {
+		return errWithSetCompOwnership(transCtx.Component, dag, graphCli, err)
+	}
+	return nil
 }
 
 // generatedComponent4LegacyCluster checks whether the cluster to which this component belongs was created before 0.8.

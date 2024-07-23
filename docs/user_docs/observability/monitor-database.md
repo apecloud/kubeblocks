@@ -51,7 +51,7 @@ KubeBlock Playground supports the following built-in monitoring addons:
    If `disableExporter: false` is not shown in the output, it means the monitoring function of this cluster is not enabled and you need to enable it first.
 
    ```bash
-   kbcli cluster update mycluster --disableExporter=false
+   kbcli cluster update mycluster --disable-exporter=false
    ```
 
 3. View the dashboard list.
@@ -96,13 +96,13 @@ spec:
    ......
    componentSpecs:
    ......
-      monitor: true
+      disableExporter: false
 ```
 
-If `monitor: true` is not shown in the output, it means the monitoring function of this cluster is not enabled and you need to enable it first.
+If `disableExporter: false` is not shown in the output, it means the monitoring function of this cluster is not enabled and you need to enable it first.
 
 ```bash
-kbcli cluster update mycluster --monitor=true
+kbcli cluster update mycluster --disable-exporter=false
 ```
 
 ### View the dashboard

@@ -12,7 +12,11 @@ Elasticsearch is a distributed, RESTful search and analytics engine that is capa
 
 KubeBlocks supports the management of Elasticsearch.
 
-Before you start, [install kbcli](./../installation/install-with-kbcli/install-kbcli.md) and [install KubeBlocks](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md).
+## Before you start
+
+- [Install kbcli](./../installation/install-with-kbcli/install-kbcli.md).
+- [Install KubeBlocks](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md).
+- [Install and enable the elasticsearch addon](./../overview/supported-addons.md#use-addons).
 
 ## Create a cluster
 
@@ -23,6 +27,16 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
    ```bash
    kbcli cluster create elasticsearch elasticsearch
    ```
+
+:::note
+
+View more flags for creating a MySQL cluster to create a cluster with customized specifications.
+  
+```bash
+kbcli cluster create --help
+```
+
+:::
 
 2. Check whether the cluster is created.
 
@@ -86,7 +100,7 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
     Show cluster events: kbcli cluster list-events -n default elasticsearch
    ```
 
-## Connect to a Elasticsearch cluster
+## Connect to an Elasticsearch cluster
 
 Elasticsearch provides the HTTP protocol for client access on port 9200. You can visit the cluster by the local host.
 
@@ -129,7 +143,7 @@ For the testing environment, you can run the command below to open the Grafana m
    If `disableExporter: false` is not shown in the output, it means the monitoring function of this cluster is not enabled and you need to enable it first.
 
    ```bash
-   kbcli cluster update elasticssearch --disableExporter=false
+   kbcli cluster update elasticssearch --disable-exporter=false
    ```
 
 3. View the dashboard list.
@@ -160,18 +174,15 @@ The scaling function for vector databases is also supported.
 Use the following command to perform horizontal scaling.
 
 ```bash
-kbcli cluster hscale elasticsearch --replicas=5 --components=elasticsearch
+kbcli cluster hscale elasticsearch --replicas=2 --components=elasticsearch
 ```
 
 Please wait a few seconds until the scaling process is over.
 
-The `kbcli cluster hscale` command print the `opsname`, to check the progress of horizontal scaling, you can use the following command with the `opsname`.
+The `kbcli cluster hscale` command prints a command to help check the progress of scaling operations.
 
 ```bash
-kubectl get ops elasticsearch-horizontalscaling-xpdwz
->
-NAME                                    TYPE                CLUSTER          STATUS    PROGRESS   AGE
-elasticsearch-horizontalscaling-xpdwz   HorizontalScaling   elasticsearch    Running   0/2        16s
+kbcli cluster describe-ops elasticsearch-horizontalscaling-xpdwz -n demo
 ```
 
 To check whether the scaling is done, use the following command.
@@ -185,17 +196,15 @@ kbcli cluster describe elasticsearch
 Use the following command to perform vertical scaling.
 
 ```bash
-kbcli cluster vscale elasticsearch --cpu=0.5 --memory=512Mi --components=elasticsearch 
+kbcli cluster vscale elasticsearch --cpu=2 --memory=3Gi --components=elasticsearch 
 ```
 
 Please wait a few seconds until the scaling process is over.
-The `kbcli cluster vscale` command print the `opsname`, to check the progress of scaling, you can use the following command with the `opsname`.
+
+The `kbcli cluster vscale` command prints a command to help check the progress of scaling operations.
 
 ```bash
-kubectl get ops elasticsearch-verticalscaling-rpw2l
->
-NAME                                  TYPE              CLUSTER          STATUS    PROGRESS   AGE
-elasticsearch-verticalscaling-rpw2l   VerticalScaling   elasticsearch    Running   1/5        44s
+kbcli cluster describe-ops elasticsearch-verticalscaling-rpw2l
 ```
 
 To check whether the scaling is done, use the following command.
@@ -214,13 +223,10 @@ kbcli cluster volume-expand elasticsearch --storage=40Gi --components=elasticsea
 
 The volume expansion may take a few minutes.
 
-The `kbcli cluster volume-expand` command print the `opsname`, to check the progress of volume expanding, you can use the following command with the `opsname`.
+The `kbcli cluster volume-expand` command prints a command to help check the progress of scaling operations.
 
 ```bash
-kubectl get ops elasticsearch-volumeexpansion-5pbd2
->
-NAME                                  TYPE              CLUSTER          STATUS   PROGRESS   AGE
-elasticsearch-volumeexpansion-5pbd2   VolumeExpansion   elasticsearch    Running  1/1        67s
+kbcli cluster describe-ops elasticsearch-volumeexpansion-5pbd2 -n default
 ```
 
 To check whether the expanding is done, use the following command.

@@ -178,13 +178,7 @@ func (r *OpsRequestReconciler) handleOpsRequestByPhase(reqCtx intctrlutil.Reques
 	case appsv1alpha1.OpsSucceedPhase:
 		return r.handleSucceedOpsRequest(reqCtx, opsRes.OpsRequest)
 	default:
-		if err := r.annotateRelatedOps(reqCtx, opsRes.OpsRequest); err != nil {
-			return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
-		}
-		if err := r.cleanupOpsAnnotationForCluster(reqCtx, opsRes.Cluster); err != nil {
-			return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
-		}
-		return intctrlutil.ResultToP(intctrlutil.Reconciled())
+		return r.handleUnsuccessfulCompletionOpsRequest(reqCtx, opsRes)
 	}
 }
 
@@ -239,6 +233,28 @@ func (r *OpsRequestReconciler) handleSucceedOpsRequest(reqCtx intctrlutil.Reques
 		return intctrlutil.ResultToP(intctrlutil.RequeueAfter(time.Until(deadline), reqCtx.Log, ""))
 	}
 	// the opsRequest will be deleted after spec.ttlSecondsAfterSucceed seconds when status.phase is Succeed
+	if err := r.Client.Delete(reqCtx.Ctx, opsRequest); err != nil {
+		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
+	}
+	return intctrlutil.ResultToP(intctrlutil.Reconciled())
+}
+
+func (r *OpsRequestReconciler) handleUnsuccessfulCompletionOpsRequest(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error) {
+	opsRequest := opsRes.OpsRequest
+	if err := r.annotateRelatedOps(reqCtx, opsRes.OpsRequest); err != nil {
+		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
+	}
+	if err := r.cleanupOpsAnnotationForCluster(reqCtx, opsRes.Cluster); err != nil {
+		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
+	}
+	if opsRequest.Status.CompletionTimestamp.IsZero() || opsRequest.Spec.TTLSecondsAfterUnsuccessfulCompletion == 0 {
+		return intctrlutil.ResultToP(intctrlutil.Reconciled())
+	}
+	deadline := opsRequest.Status.CompletionTimestamp.Add(time.Duration(opsRequest.Spec.TTLSecondsAfterUnsuccessfulCompletion) * time.Second)
+	if time.Now().Before(deadline) {
+		return intctrlutil.ResultToP(intctrlutil.RequeueAfter(time.Until(deadline), reqCtx.Log, ""))
+	}
+	// the opsRequest will be deleted after spec.ttlSecondsAfterUnsuccessfulCompletion seconds when status.phase is Failed, Cancelled or Aborted
 	if err := r.Client.Delete(reqCtx.Ctx, opsRequest); err != nil {
 		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 	}

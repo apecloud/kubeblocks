@@ -25,7 +25,7 @@ KubeBlocks uses a unified set of APIs (CRDs) and code to manage various database
 
 KubeBlocks is an open-source control plane software that runs and manages multiple popular database engines on K8s through a unified set of code and APIs. The core of KubeBlocks is a K8s operator, which defines a set of CRDs to abstract the common attributes of various database engines and uses these abstractions to manage the engine's lifecycle and day-2 operations.
 
-KubeBlocks could manages various types of stateful engines, including RDBMSs (MySQL, PostgreSQL), Caches(Redis), NoSQLs (MongoDB), MQs(Kafka, Pulsar), vector databases(Milvus, Qdrant, Weaviate), and data warehouses(ClickHouse, ElasticSearch, OpenSearch, Doris, StarRocks). Adding a new engine to KubeBlocks can be achieved by writing a KubeBlocks Addon. The community is actively integrating more types of engines into KubeBlocks, and it currently supports 35 types of engines.
+KubeBlocks manages various types of stateful engines, including RDBMSs (MySQL, PostgreSQL), Caches(Redis), NoSQLs (MongoDB), MQs(Kafka, Pulsar), vector databases(Milvus, Qdrant, Weaviate), and data warehouses(ClickHouse, ElasticSearch, OpenSearch, Doris, StarRocks). Adding a new engine to KubeBlocks can be achieved by writing a KubeBlocks Addon. The community is actively integrating more types of engines into KubeBlocks, and it currently supports 35 types of engines.
 
 The name KubeBlocks is inspired by Kubernetes and LEGO blocks, signifying that through the KubeBlocks API, adding, composing and managing database engines on K8s can be easy, standard and productive, like playing with LEGO blocks.
 

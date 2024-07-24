@@ -15,7 +15,7 @@ Another issue arises in the same scenario: if the node hosting `foo-bar-1` exper
 
 ## Scale for specified instances
 
-To specify the instance to be offloaded, use `OfflineInstances`.
+To specify the instance to be offloaded, use `onlineInstancesToOffline`.
 
 ***Steps：***
 
@@ -27,21 +27,22 @@ kind: OpsRequest
 metadata:
   generateName: foo-horizontalscaling-
 spec:
-  clusterRef: foo
+  clusterName: foo
   force: false
   horizontalScaling:
   - componentName: bar
-    replicas: 2
-    offlineInstances: ["instancename"]
+    scaleIn:
+      onlineInstancesToOffline: ["foo-bar-1"]
   ttlSecondsAfterSucceed: 0
   type: HorizontalScaling
+
 ```
 
-The OpsRequest Controller directly overrides the values of `replicas` and `offlineInstances` in the request, mapping them to the corresponding fields in the Cluster object. Eventually, the Cluster Controller completes the task of offlining the instance named `foo-bar-1`.
+The OpsRequest Controller maps the request to the corresponding fields in the Cluster object. Eventually, the Cluster Controller completes the task of offlining the instance named `foo-bar-1`.
 
 ***Example：***
 
-In the scenario of the above section, the PostgreSQL instance status is as follows:
+In the scenario of the above section, the PostgreSQL instance status is as follows before scaling:
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1

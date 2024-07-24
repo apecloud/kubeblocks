@@ -2028,3 +2028,5 @@ vmagent:
 
 crd:
   enabled: true
+
+userAgent: kubeblocks

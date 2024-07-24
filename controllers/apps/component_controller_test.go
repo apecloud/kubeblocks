@@ -242,7 +242,7 @@ var _ = Describe("Component Controller", func() {
 			Create(&testCtx).
 			GetObject()
 
-		By("Create a componentDefinition obj")
+		By("Create a componentVersion obj")
 		compVerObj = testapps.NewComponentVersionFactory(compVerName).
 			SetDefaultSpec(compDefName).
 			Create(&testCtx).
@@ -831,7 +831,7 @@ var _ = Describe("Component Controller", func() {
 		dataClonePolicy appsv1alpha1.HScaleDataClonePolicyType) {
 		By("Creating a single component cluster with VolumeClaimTemplate")
 		pvcSpec := testapps.NewPVCSpec("1Gi")
-		createClusterObj(compName, compDefName, func(f *testapps.MockClusterFactory) {
+		createClusterObjV2(compName, compDefName, func(f *testapps.MockClusterFactory) {
 			f.SetReplicas(initialReplicas).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				AddVolumeClaimTemplate(testapps.LogVolumeName, pvcSpec)
@@ -2335,28 +2335,28 @@ var _ = Describe("Component Controller", func() {
 
 			Context(fmt.Sprintf("[comp: %s] horizontal scale", compName), func() {
 				It("scale-out from 1 to 3 with backup(snapshot) policy normally", func() {
-					testHorizontalScale(compName, compDefName, 1, 3, appsv1alpha1.HScaleDataClonePolicyCloneVolume)
+					testHorizontalScale(compName, compDefObj.Name, 1, 3, appsv1alpha1.HScaleDataClonePolicyCloneVolume)
 				})
 
 				// TODO(component): events & conditions
 				PIt("backup error at scale-out", func() {
-					testBackupError(compName, compDefName)
+					testBackupError(compName, compDefObj.Name)
 				})
 
 				It("scale-out without data clone policy", func() {
-					testHorizontalScale(compName, compDefName, 1, 3, "")
+					testHorizontalScale(compName, compDefObj.Name, 1, 3, "")
 				})
 
 				It("scale-in from 3 to 1", func() {
-					testHorizontalScale(compName, compDefName, 3, 1, appsv1alpha1.HScaleDataClonePolicyCloneVolume)
+					testHorizontalScale(compName, compDefObj.Name, 3, 1, appsv1alpha1.HScaleDataClonePolicyCloneVolume)
 				})
 
 				It("scale-in to 0 and PVCs should not been deleted", func() {
-					testHorizontalScale(compName, compDefName, 3, 0, appsv1alpha1.HScaleDataClonePolicyCloneVolume)
+					testHorizontalScale(compName, compDefObj.Name, 3, 0, appsv1alpha1.HScaleDataClonePolicyCloneVolume)
 				})
 
 				It("scale-out from 0 and should work well", func() {
-					testHorizontalScale(compName, compDefName, 0, 3, appsv1alpha1.HScaleDataClonePolicyCloneVolume)
+					testHorizontalScale(compName, compDefObj.Name, 0, 3, appsv1alpha1.HScaleDataClonePolicyCloneVolume)
 				})
 			})
 

@@ -213,7 +213,7 @@ func (t *componentServiceTransformer) buildService(comp *appsv1alpha1.Component,
 	}
 
 	svcObj := builder.GetObject()
-	if err := setCompOwnership(comp, svcObj); err != nil {
+	if err := setCompOwnershipNFinalizer(comp, svcObj); err != nil {
 		return nil, err
 	}
 	return svcObj, nil

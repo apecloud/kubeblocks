@@ -33,8 +33,8 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-func setCompOwnership(comp *appsv1alpha1.Component, object client.Object) error {
-	if skipSetCompOwnership(object) {
+func setCompOwnershipNFinalizer(comp *appsv1alpha1.Component, object client.Object) error {
+	if skipSetCompOwnershipNFinalizer(object) {
 		return nil
 	}
 	// add finalizer to the object
@@ -48,8 +48,8 @@ func setCompOwnership(comp *appsv1alpha1.Component, object client.Object) error 
 	return nil
 }
 
-// skipSetCompOwnership returns true if the object should not be set ownership to the component
-func skipSetCompOwnership(obj client.Object) bool {
+// skipSetCompOwnershipNFinalizer returns true if the object should not be set ownership to the component
+func skipSetCompOwnershipNFinalizer(obj client.Object) bool {
 	switch obj.(type) {
 	case *rbacv1.ClusterRoleBinding, *corev1.PersistentVolume, *corev1.PersistentVolumeClaim, *corev1.Pod:
 		return true

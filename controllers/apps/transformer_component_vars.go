@@ -181,7 +181,7 @@ func createOrUpdateEnvConfigMap(ctx graph.TransformContext, dag *graph.DAG, data
 			AddLabelsInMap(constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
 			SetData(data).
 			GetObject()
-		if err := setCompOwnership(transCtx.Component, obj); err != nil {
+		if err := setCompOwnershipNFinalizer(transCtx.Component, obj); err != nil {
 			return err
 		}
 		graphCli.Create(dag, obj, inDataContext4G())

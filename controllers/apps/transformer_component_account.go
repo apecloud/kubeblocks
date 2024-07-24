@@ -156,7 +156,7 @@ func (t *componentAccountTransformer) buildAccountSecretWithPassword(ctx *compon
 		PutData(constant.AccountPasswdForSecret, password).
 		SetImmutable(true).
 		GetObject()
-	if err := setCompOwnership(ctx.Component, secret); err != nil {
+	if err := setCompOwnershipNFinalizer(ctx.Component, secret); err != nil {
 		return nil, err
 	}
 	return secret, nil

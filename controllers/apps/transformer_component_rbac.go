@@ -284,7 +284,7 @@ func buildServiceAccount(transCtx *componentTransformContext) (*corev1.ServiceAc
 	}
 
 	saObj := factory.BuildServiceAccount(cluster, serviceAccountName)
-	if err := setCompOwnership(comp, saObj); err != nil {
+	if err := setCompOwnershipNFinalizer(comp, saObj); err != nil {
 		return nil, false, err
 	}
 	// if volume protection is enabled, the service account needs to be bound to the clusterRoleBinding.
@@ -293,7 +293,7 @@ func buildServiceAccount(transCtx *componentTransformContext) (*corev1.ServiceAc
 
 func buildRoleBinding(cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component, serviceAccountName string) (*rbacv1.RoleBinding, error) {
 	roleBinding := factory.BuildRoleBinding(cluster, serviceAccountName)
-	if err := setCompOwnership(comp, roleBinding); err != nil {
+	if err := setCompOwnershipNFinalizer(comp, roleBinding); err != nil {
 		return nil, err
 	}
 	return roleBinding, nil

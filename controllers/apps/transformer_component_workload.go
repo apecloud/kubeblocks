@@ -108,7 +108,7 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	if runningITS == nil {
 		if protoITS != nil {
-			if err := setCompOwnership(transCtx.Component, protoITS); err != nil {
+			if err := setCompOwnershipNFinalizer(transCtx.Component, protoITS); err != nil {
 				return err
 			}
 			graphCli.Create(dag, protoITS)

@@ -259,7 +259,10 @@ func equalBasicInPlaceFields(old, new *corev1.Pod) bool {
 
 func equalResourcesInPlaceFields(old, new *corev1.Pod) bool {
 	if len(old.Spec.Containers) != len(new.Spec.Containers) {
-		return false
+		if len(old.Spec.Containers) < len(new.Spec.Containers) {
+			return false
+		}
+		return isContainerInjected(old.Spec.Containers, new.Spec.Containers)
 	}
 	for _, nc := range new.Spec.Containers {
 		index := slices.IndexFunc(old.Spec.Containers, func(oc corev1.Container) bool {
@@ -334,6 +337,21 @@ func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (PodUpdateP
 		return InPlaceUpdatePolicy, nil
 	}
 	return NoOpsPolicy, nil
+}
+
+func isContainerInjected(ocs, ncs []corev1.Container) bool {
+	for _, nc := range ncs {
+		index := slices.IndexFunc(ocs, func(oc corev1.Container) bool {
+			return nc.Name == oc.Name
+		})
+		if index < 0 {
+			return false
+		}
+		if nc.Image != ocs[index].Image {
+			return false
+		}
+	}
+	return true
 }
 
 // IsPodUpdated tells whether the pod's spec is as expected in the InstanceSet.

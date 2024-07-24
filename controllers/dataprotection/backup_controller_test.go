@@ -149,7 +149,7 @@ var _ = Describe("Backup Controller test", func() {
 					g.Expect(fetched.Status.PersistentVolumeClaimName).Should(Equal(repoPVCName))
 					g.Expect(fetched.Status.Path).Should(Equal(dpbackup.BuildBaseBackupPath(fetched, "", backupPolicy.Spec.PathPrefix)))
 					g.Expect(fetched.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
-					g.Expect(fetched.Annotations[dptypes.ConnectionPasswordAnnotationKey]).ShouldNot(BeEmpty())
+					g.Expect(fetched.Annotations[constant.EncryptedSystemAccountsAnnotationKey]).ShouldNot(BeEmpty())
 				})).Should(Succeed())
 
 				By("check backup job's nodeName equals pod's nodeName")
@@ -1058,7 +1058,7 @@ var _ = Describe("Backup Controller test", func() {
 					g.Expect(fetched.Status.Path).Should(Equal(dpbackup.BuildBaseBackupPath(fetched, "", backupPolicy.Spec.PathPrefix)))
 					g.Expect(fetched.Status.KopiaRepoPath).Should(Equal(dpbackup.BuildKopiaRepoPath(fetched, "", backupPolicy.Spec.PathPrefix)))
 					g.Expect(fetched.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
-					g.Expect(fetched.Annotations[dptypes.ConnectionPasswordAnnotationKey]).ShouldNot(BeEmpty())
+					g.Expect(fetched.Annotations[constant.EncryptedSystemAccountsAnnotationKey]).ShouldNot(BeEmpty())
 				})).Should(Succeed())
 
 				testdp.PatchK8sJobStatus(&testCtx, getJobKey(), batchv1.JobComplete)

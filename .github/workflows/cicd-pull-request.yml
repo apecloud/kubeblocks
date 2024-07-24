@@ -20,6 +20,8 @@ jobs:
     outputs:
       trigger-mode: ${{ steps.get_trigger_mode.outputs.trigger_mode }}
       matrix: ${{ steps.get_trigger_mode.outputs.matrix }}
+      git-commit: ${{ steps.get_git_info.outputs.git_commit }}
+      git-version: ${{ steps.get_git_info.outputs.git_version }}
     steps:
       - name: Cancel Previous Runs
         uses: styfle/cancel-workflow-action@0.11.0
@@ -54,6 +56,14 @@ jobs:
               --ignore-pkgs "${{ vars.SKIP_CHECK_PKG }}"`
           echo "$TEST_PACKAGES"
           echo "matrix={\"include\":[$TEST_PACKAGES]}" >> $GITHUB_OUTPUT
+
+      - name: get git info
+        id: get_git_info
+        run: |
+          GIT_COMMIT=$(git rev-list -1 HEAD)
+          GIT_VERSION=$(git describe --always --abbrev=0 --tag)
+          echo git_commit=$GIT_COMMIT >> $GITHUB_OUTPUT
+          echo git_version=$GIT_VERSION >> $GITHUB_OUTPUT
 
   test-parallel:
     name: test
@@ -157,13 +167,17 @@ jobs:
   check-image:
     needs: trigger-mode
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[docker]')
-    uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.24
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.64
     with:
       MAKE_OPS_PRE: "generate"
       IMG: "apecloud/kubeblocks"
       GO_VERSION: "1.21"
       BUILDX_PLATFORMS: "linux/amd64"
       DOCKERFILE_PATH: "./docker/Dockerfile"
+      BUILDX_ARGS: |
+        VERSION=${{ needs.trigger-mode.outputs.git-version }}
+        GIT_COMMIT=${{ needs.trigger-mode.outputs.git-commit }}
+        GIT_VERSION=${{ needs.trigger-mode.outputs.git-version }}
     secrets: inherit
 
   check-tools-image:

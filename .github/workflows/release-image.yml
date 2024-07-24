@@ -36,7 +36,10 @@ jobs:
     outputs:
       release-version: ${{ steps.get_release_version.outputs.release_version }}
       release-version-bump: ${{ steps.get_release_version.outputs.release_version_bump }}
+      git-commit: ${{ steps.get_git_info.outputs.git_commit }}
+      git-version: ${{ steps.get_git_info.outputs.git_version }}
     steps:
+      - uses: actions/checkout@v4
       - name: Get Release Version
         id: get_release_version
         run: |
@@ -52,10 +55,18 @@ jobs:
           RELEASE_VERSION_BUMP="${RELEASE_VERSION/v/}"
           echo release_version_bump=$RELEASE_VERSION_BUMP >> $GITHUB_OUTPUT
 
+      - name: get git info
+        id: get_git_info
+        run: |
+          GIT_COMMIT=$(git rev-list -1 HEAD)
+          GIT_VERSION=$(git describe --always --abbrev=0 --tag)
+          echo git_commit=$GIT_COMMIT >> $GITHUB_OUTPUT
+          echo git_version=$GIT_VERSION >> $GITHUB_OUTPUT
+
   release-image:
     if: ${{ inputs.dockerfile == '' || inputs.dockerfile == 'Dockerfile' }}
     needs: release-version
-    uses: apecloud/apecloud-cd/.github/workflows/release-image-cache.yml@v0.1.24
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-cache.yml@v0.1.64
     with:
       MAKE_OPS_PRE: "generate"
       IMG: "apecloud/kubeblocks"
@@ -63,6 +74,10 @@ jobs:
       GO_VERSION: "1.21"
       APECD_REF: "v0.1.24"
       DOCKERFILE_PATH: "./docker/Dockerfile"
+      BUILDX_ARGS: |
+        VERSION=${{ needs.release-version.outputs.release-version }}
+        GIT_COMMIT=${{ needs.release-version.outputs.git-commit }}
+        GIT_VERSION=${{ needs.release-version.outputs.git-version }}
     secrets: inherit
 
   release-tools-image:

@@ -21,7 +21,10 @@ package controllerutil
 
 import (
 	"context"
+	"fmt"
 	"reflect"
+	gruntime "runtime"
+	"strings"
 
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
@@ -36,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+	"github.com/apecloud/kubeblocks/version"
 )
 
 // GetUncachedObjects returns a list of K8s objects, for these object types,
@@ -147,7 +151,7 @@ func SetControllerReference(owner, object metav1.Object) error {
 	return controllerutil.SetControllerReference(owner, object, innerScheme)
 }
 
-func GeKubeRestConfig() *rest.Config {
+func GeKubeRestConfig(userAgent string) *rest.Config {
 	cfg := ctrl.GetConfigOrDie()
 	clientQPS := viper.GetInt(constant.CfgClientQPS)
 	if clientQPS != 0 {
@@ -157,7 +161,15 @@ func GeKubeRestConfig() *rest.Config {
 	if clientBurst != 0 {
 		cfg.Burst = clientBurst
 	}
+	if len(strings.TrimSpace(userAgent)) == 0 {
+		userAgent = defaultUserAgent()
+	}
+	cfg.UserAgent = userAgent
 	return cfg
+}
+
+func defaultUserAgent() string {
+	return fmt.Sprintf("KubeBlocks %s (%s/%s)", version.GitVersion, gruntime.GOOS, gruntime.GOARCH)
 }
 
 // DeleteOwnedResources deletes the matched resources which are owned by the owner.

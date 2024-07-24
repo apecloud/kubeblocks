@@ -54,7 +54,7 @@ func (r *enabledWithDefaultValuesReconciler) Reconcile(tree *kubebuilderx.Object
 	fmt.Println("enabledWithDefaultValuesReconciler, phase: ", addon.Status.Phase)
 	if addon.Spec.InstallSpec.HasSetValues() || addon.Spec.InstallSpec.IsDisabled() {
 		r.reqCtx.Log.V(1).Info("has specified addon.spec.installSpec")
-		//fmt.Println("enabledWithDefaultValuesReconciler, has specified addon.spec.installSpec")
+		// fmt.Println("enabledWithDefaultValuesReconciler, has specified addon.spec.installSpec")
 		return tree, nil
 	}
 	if v, ok := addon.Annotations[AddonDefaultIsEmpty]; ok && v == trueVal {

@@ -22,19 +22,13 @@ package extensions
 import (
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 type progressingReconciler struct {
@@ -64,40 +58,18 @@ func (r *progressingReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubeb
 	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
 	r.reqCtx.Log.V(1).Info("progressingReconciler", "phase", addon.Status.Phase)
 	fmt.Println("progressingReconciler, phase: ", addon.Status.Phase)
-	patchPhase := func(phase extensionsv1alpha1.AddonPhase, reason string) error {
-		r.reqCtx.Log.V(1).Info("patching status", "phase", phase)
-		patch := client.MergeFrom(addon.DeepCopy())
-		addon.Status.Phase = phase
-		addon.Status.ObservedGeneration = addon.Generation
 
-		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-			Type:               extensionsv1alpha1.ConditionTypeSucceed,
-			Status:             metav1.ConditionTrue,
-			ObservedGeneration: addon.Generation,
-			Reason:             reason,
-			LastTransitionTime: metav1.Now(),
-		})
-
-		if err := r.reconciler.Status().Patch(r.reqCtx.Ctx, addon, patch); err != nil {
-			r.setRequeueWithErr(err, "")
-			return err
-		}
-		r.reconciler.Event(addon, corev1.EventTypeNormal, reason,
-			fmt.Sprintf("Progress to %s phase", phase))
-		r.setReconciled()
-		return nil
-	}
+	helmInstallJob, err1 := r.reconciler.GetInstallJob(r.reqCtx.Ctx, "install", tree)
+	helmUninstallJob, err2 := r.reconciler.GetInstallJob(r.reqCtx.Ctx, "uninstall", tree)
 
 	// decision enabling or disabling
 	if !addon.Spec.InstallSpec.GetEnabled() {
 		r.reqCtx.Log.V(1).Info("progress to disabling stage handler")
-		//fmt.Println("progressingReconciler: progress to disabling stage handler")
-		// if it's new simply return
-		if addon.Status.Phase == "" {
+		if apierrors.IsNotFound(err1) && apierrors.IsNotFound(err2) {
 			return tree, nil
 		}
-		if addon.Status.Phase != extensionsv1alpha1.AddonDisabling {
-			if err := patchPhase(extensionsv1alpha1.AddonDisabling, DisablingAddon); err != nil {
+		if err2 != nil && helmUninstallJob.Status.Active == 0 && addon.Status.Phase != extensionsv1alpha1.AddonDisabling {
+			if err := r.reconciler.PatchPhase(addon, r.stageCtx, extensionsv1alpha1.AddonDisabling, DisablingAddon); err != nil {
 				return tree, err
 			}
 			return tree, nil
@@ -106,32 +78,22 @@ func (r *progressingReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubeb
 		return tree, nil
 	}
 	// handling enabling state
-	if addon.Status.Phase != extensionsv1alpha1.AddonEnabling {
-		if addon.Status.Phase == extensionsv1alpha1.AddonFailed {
+	if err1 != nil && helmInstallJob.Status.Active == 0 && addon.Status.Phase != extensionsv1alpha1.AddonEnabling {
+		if helmInstallJob.Status.Failed > 0 {
 			// clean up existing failed installation job
-			mgrNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
-			key := client.ObjectKey{
-				Namespace: mgrNS,
-				Name:      getInstallJobName(addon),
-			}
-			installJob := &batchv1.Job{}
-			if err := r.reconciler.Get(r.reqCtx.Ctx, key, installJob); client.IgnoreNotFound(err) != nil {
-				r.setRequeueWithErr(err, "")
-				return tree, err
-			} else if err == nil && installJob.GetDeletionTimestamp().IsZero() {
-				if err = r.reconciler.Delete(r.reqCtx.Ctx, installJob); err != nil {
+			if helmInstallJob.GetDeletionTimestamp().IsZero() {
+				if err := r.reconciler.Delete(r.reqCtx.Ctx, helmInstallJob); err != nil {
 					r.setRequeueWithErr(err, "")
 					return tree, err
 				}
 			}
 		}
-		if err := patchPhase(extensionsv1alpha1.AddonEnabling, EnablingAddon); err != nil {
+		if err := r.reconciler.PatchPhase(addon, r.stageCtx, extensionsv1alpha1.AddonEnabling, EnablingAddon); err != nil {
 			return tree, err
 		}
 		return tree, nil
 	}
 	r.reqCtx.Log.V(1).Info("progress to enabling stage handler")
-	//fmt.Println("progressingReconciler: progress to enabling stage handler")
 	r.enablingReconciler.Reconcile(tree)
 
 	return tree, nil

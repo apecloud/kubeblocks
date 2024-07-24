@@ -78,7 +78,7 @@ func (r *fetchNDeletionCheckReconciler) Reconcile(tree *kubebuilderx.ObjectTree)
 		return tree, err
 	}
 	r.reqCtx.Log.V(1).Info("start normal reconcile")
-	//fmt.Println("fetchNDeletionCheckReconciler, start normal reconcile")
+	// fmt.Println("fetchNDeletionCheckReconciler, start normal reconcile")
 	return tree, nil
 }
 

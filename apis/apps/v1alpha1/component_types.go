@@ -112,6 +112,11 @@ type ComponentSpec struct {
 	// +optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 
+	// Specifies the scheduling policy for the component.
+	//
+	// +optional
+	SchedulingPolicy *SchedulingPolicy `json:"schedulingPolicy,omitempty"`
+
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`
 

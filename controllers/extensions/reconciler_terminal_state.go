@@ -22,16 +22,12 @@ package extensions
 import (
 	"fmt"
 
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 type terminalStateReconciler struct {
@@ -56,40 +52,29 @@ func (r *terminalStateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kub
 	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
 	r.reqCtx.Log.V(1).Info("terminalStateReconciler", "phase", addon.Status.Phase)
 	fmt.Println("terminalStateReconciler, phase: ", addon.Status.Phase)
-	patchPhaseNCondition := func(phase extensionsv1alpha1.AddonPhase, reason string) error {
-		r.reqCtx.Log.V(1).Info("patching status", "phase", phase)
-		//fmt.Println("terminalStateReconciler, patching status, phase: ", phase)
-		patch := client.MergeFrom(addon.DeepCopy())
-		addon.Status.Phase = phase
-		addon.Status.ObservedGeneration = addon.Generation
 
-		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-			Type:               extensionsv1alpha1.ConditionTypeSucceed,
-			Status:             metav1.ConditionTrue,
-			ObservedGeneration: addon.Generation,
-			Reason:             reason,
-			LastTransitionTime: metav1.Now(),
-		})
+	helmInstallJob, err1 := r.reconciler.GetInstallJob(r.reqCtx.Ctx, "install", tree)
+	helmUninstallJob, err2 := r.reconciler.GetInstallJob(r.reqCtx.Ctx, "uninstall", tree)
 
-		if err := r.reconciler.Status().Patch(r.reqCtx.Ctx, addon, patch); err != nil {
-			r.setRequeueWithErr(err, "")
-			return err
+	if apierrors.IsNotFound(err1) && apierrors.IsNotFound(err2) {
+		if err := r.reconciler.PatchPhase(addon, r.stageCtx, extensionsv1alpha1.AddonDisabled, AddonDisabled); err != nil {
+			return tree, err
 		}
-		r.reconciler.Event(addon, corev1.EventTypeNormal, reason,
-			fmt.Sprintf("Progress to %s phase", phase))
-		r.setReconciled()
-		return nil
+		return tree, nil
 	}
 
-	// transit to enabled or disable phase
-	switch addon.Status.Phase {
-	case "", extensionsv1alpha1.AddonDisabling:
-		if err := patchPhaseNCondition(extensionsv1alpha1.AddonDisabled, AddonDisabled); err != nil {
-			return tree, err
+	if err1 == nil && helmInstallJob.Status.Active > 0 {
+		if addon.Status.Phase == extensionsv1alpha1.AddonEnabling {
+			if err := r.reconciler.PatchPhase(addon, r.stageCtx, extensionsv1alpha1.AddonEnabled, AddonEnabled); err != nil {
+				return tree, err
+			}
 		}
-	case extensionsv1alpha1.AddonEnabling:
-		if err := patchPhaseNCondition(extensionsv1alpha1.AddonEnabled, AddonEnabled); err != nil {
-			return tree, err
+	}
+	if err2 == nil && helmUninstallJob.Status.Active > 0 {
+		if addon.Status.Phase == extensionsv1alpha1.AddonDisabling {
+			if err := r.reconciler.PatchPhase(addon, r.stageCtx, extensionsv1alpha1.AddonDisabled, AddonDisabled); err != nil {
+				return tree, err
+			}
 		}
 	}
 

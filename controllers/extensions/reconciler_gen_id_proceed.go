@@ -22,15 +22,9 @@ package extensions
 import (
 	"fmt"
 
-	batchv1 "k8s.io/api/batch/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	//"sigs.k8s.io/controller-runtime/pkg/client"
-	//corev1 "k8s.io/api/core/v1"
-	//metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	//"k8s.io/apimachinery/pkg/api/meta"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
@@ -61,18 +55,14 @@ func (r *genIDProceedReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kube
 	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
 	r.reqCtx.Log.V(1).Info("genIDProceedCheckReconciler", "phase", addon.Status.Phase)
 	fmt.Println("genIDProceedCheckReconciler, phase: ", addon.Status.Phase)
-	
-	installJobKey := GetInstallJobStatus("install", tree)
-	uninstallJobKey := GetInstallJobStatus("uninstall", tree)
-	helmInstallJob := &batchv1.Job{}
-	helmUninstallJob := &batchv1.Job{}
-	err1 := r.reconciler.Get(r.reqCtx.Ctx, installJobKey, helmInstallJob);
-	err2 := r.reconciler.Get(r.reqCtx.Ctx, uninstallJobKey, helmUninstallJob);
 
-	if (apierrors.IsNotFound(err1) && apierrors.IsNotFound(err2)) {
+	helmInstallJob, err1 := r.reconciler.GetInstallJob(r.reqCtx.Ctx, "install", tree)
+	helmUninstallJob, err2 := r.reconciler.GetInstallJob(r.reqCtx.Ctx, "uninstall", tree)
+
+	if apierrors.IsNotFound(err1) && apierrors.IsNotFound(err2) {
 		return tree, nil
 	}
-	if (helmInstallJob.Status.Succeeded > 0 || helmUninstallJob.Status.Succeeded > 0) {
+	if (err1 == nil && helmInstallJob.Status.Succeeded > 0) || (err2 == nil && helmUninstallJob.Status.Succeeded > 0) {
 		if addon.Status.Phase == "Enabling" && helmInstallJob.Status.Succeeded > 0 {
 			err := r.reconciler.PatchPhase(addon, r.stageCtx, "Enabled", AddonEnabled)
 			return tree, err
@@ -80,9 +70,18 @@ func (r *genIDProceedReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kube
 			err := r.reconciler.PatchPhase(addon, r.stageCtx, "Disabled", AddonDisabled)
 			return tree, err
 		}
-		
-		//fmt.Println("Enabled or Disabled: ", addon.Status.Phase)
-		
+		if helmInstallJob.Status.Succeeded > 0 {
+			fmt.Println("helmInstallJob.Status.Succeeded")
+		}
+		if helmUninstallJob.Status.Succeeded > 0 {
+			fmt.Println("helmUninstallJob.Status.Succeeded")
+		}
+		if (!helmInstallJob.DeletionTimestamp.IsZero() && helmInstallJob.Status.Succeeded > 0) ||
+			(!helmUninstallJob.DeletionTimestamp.IsZero() && helmUninstallJob.Status.Succeeded > 0) {
+			fmt.Println("!Job.DeletionTimestamp.IsZero(), DeletionTimestamp: ", helmInstallJob.DeletionTimestamp)
+			return tree, nil
+		}
+
 		if addon.Generation == addon.Status.ObservedGeneration {
 			res, err := r.reconciler.deleteExternalResources(*r.reqCtx, addon)
 			if res != nil || err != nil {
@@ -90,10 +89,11 @@ func (r *genIDProceedReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kube
 				return tree, err
 			}
 			r.setReconciled()
+			fmt.Println("setReconciled")
 			return tree, nil
 		}
-	} else if (helmInstallJob.Status.Failed > 0 || helmUninstallJob.Status.Failed > 0) {
-		if (helmInstallJob.Status.Failed > 0 && addon.Status.Phase == "Enabling") {
+	} else if helmInstallJob.Status.Failed > 0 || helmUninstallJob.Status.Failed > 0 {
+		if helmInstallJob.Status.Failed > 0 && addon.Status.Phase == "Enabling" {
 			setAddonErrorConditions(r.reqCtx.Ctx, &r.stageCtx, addon, true, true, InstallationFailed,
 				fmt.Sprintf("Installation failed, do inspect error from jobs.batch %s", helmInstallJob.Name))
 			if viper.GetInt(maxConcurrentReconcilesKey) > 1 {
@@ -103,7 +103,7 @@ func (r *genIDProceedReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kube
 				}
 			}
 		}
-		if (helmUninstallJob.Status.Failed > 0 && addon.Status.Phase == "Disabling") {
+		if helmUninstallJob.Status.Failed > 0 && addon.Status.Phase == "Disabling" {
 			if viper.GetInt(maxConcurrentReconcilesKey) > 1 {
 				if err := logFailedJobPodToCondError(r.reqCtx.Ctx, &r.stageCtx, addon, helmUninstallJob.Name, UninstallationFailedLogs); err != nil {
 					r.setRequeueWithErr(err, "")
@@ -128,23 +128,7 @@ func (r *genIDProceedReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kube
 			return tree, nil
 		}
 	}
-	/*switch addon.Status.Phase {
-	case extensionsv1alpha1.AddonEnabled, extensionsv1alpha1.AddonDisabled:
-		if addon.Generation == addon.Status.ObservedGeneration {
-			res, err := r.reconciler.deleteExternalResources(*r.reqCtx, addon)
-			if res != nil || err != nil {
-				r.updateResultNErr(res, err)
-				return tree, err
-			}
-			r.setReconciled()
-			return tree, nil
-		}
-	case extensionsv1alpha1.AddonFailed:
-		if addon.Generation == addon.Status.ObservedGeneration {
-			r.setReconciled()
-			return tree, nil
-		}
-	}*/
+
 	return tree, nil
 }
 

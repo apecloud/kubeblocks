@@ -22,6 +22,8 @@ package extensions
 import (
 	"fmt"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -89,10 +91,16 @@ func (r *installableCheckReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*
 			"Installable check skipped.")
 		return tree, nil
 	}
-	switch addon.Status.Phase {
-	case extensionsv1alpha1.AddonEnabling, extensionsv1alpha1.AddonDisabling:
+
+	helmInstallJob, err1 := r.reconciler.GetInstallJob(r.reqCtx.Ctx, "install", tree)
+	_, err2 := r.reconciler.GetInstallJob(r.reqCtx.Ctx, "uninstall", tree)
+	if apierrors.IsNotFound(err1) && apierrors.IsNotFound(err2) {
 		return tree, nil
 	}
+	if err1 == nil && helmInstallJob.Status.Active > 0 {
+		return tree, nil
+	}
+
 	for _, s := range addon.Spec.Installable.Selectors {
 		if s.MatchesFromConfig() {
 			continue

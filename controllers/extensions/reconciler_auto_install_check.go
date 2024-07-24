@@ -58,7 +58,7 @@ func (r *autoInstallCheckReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*
 	// proceed if has specified addon.spec.installSpec
 	if addon.Spec.InstallSpec != nil {
 		r.reqCtx.Log.V(1).Info("has specified addon.spec.installSpec")
-		//fmt.Println("has specified addon.spec.installSpec")
+		// fmt.Println("has specified addon.spec.installSpec")
 		return tree, nil
 	}
 	enabledAddonWithDefaultValues(r.reqCtx.Ctx, &r.stageCtx, addon, AddonAutoInstall, "Addon enabled auto-install")

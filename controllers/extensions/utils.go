@@ -127,49 +127,10 @@ func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) {
 	r.disablingReconciler.stageCtx = r.stageCtx
 	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
 	r.reqCtx.Log.V(1).Info("deletionStage", "phase", addon.Status.Phase)
-	patchPhase := func(phase extensionsv1alpha1.AddonPhase, reason string) {
-		r.reqCtx.Log.V(1).Info("patching status", "phase", phase)
-		patch := client.MergeFrom(addon.DeepCopy())
-		addon.Status.Phase = phase
-		addon.Status.ObservedGeneration = addon.Generation
-		if err := r.reconciler.Status().Patch(r.reqCtx.Ctx, addon, patch); err != nil {
-			r.setRequeueWithErr(err, "")
-			return
-		}
-		r.reqCtx.Log.V(1).Info("progress to", "phase", phase)
-		r.reconciler.Event(addon, corev1.EventTypeNormal, reason,
-			fmt.Sprintf("Progress to %s phase", phase))
-		r.setReconciled()
-	}
-	switch addon.Status.Phase {
-	case extensionsv1alpha1.AddonEnabling:
-		// delete running jobs
-		res, err := r.reconciler.deleteExternalResources(*r.reqCtx, addon)
-		if err != nil {
-			r.updateResultNErr(res, err)
-			return
-		}
-		patchPhase(extensionsv1alpha1.AddonDisabling, DisablingAddon)
-		return
-	case extensionsv1alpha1.AddonEnabled:
-		patchPhase(extensionsv1alpha1.AddonDisabling, DisablingAddon)
-		return
-	case extensionsv1alpha1.AddonDisabling:
-		r.disablingReconciler.Reconcile(tree)
-		res, err := r.disablingReconciler.doReturn()
 
-		if res != nil || err != nil {
-			return
-		}
-		patchPhase(extensionsv1alpha1.AddonDisabled, AddonDisabled)
-		return
-	default:
-		r.reqCtx.Log.V(1).Info("delete external resources", "phase", addon.Status.Phase)
-		res, err := r.reconciler.deleteExternalResources(*r.reqCtx, addon)
-		if res != nil || err != nil {
-			r.updateResultNErr(res, err)
-			return
-		}
+	res, err := r.reconciler.deleteExternalResources(*r.reqCtx, addon)
+	if res != nil || err != nil {
+		r.updateResultNErr(res, err)
 		return
 	}
 }
@@ -246,21 +207,23 @@ func setInitContainer(addon *extensionsv1alpha1.Addon, helmJobPodSpec *corev1.Po
 	helmJobPodSpec.InitContainers = append(helmJobPodSpec.InitContainers, copyChartsContainer)
 }
 
-func GetInstallJobStatus(jobType string, tree *kubebuilderx.ObjectTree) (key client.ObjectKey) {
+func (r *AddonReconciler) GetInstallJob(ctx context.Context, jobType string, tree *kubebuilderx.ObjectTree) (job *batchv1.Job, err error) {
 	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
-	mgrNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+	key := client.ObjectKey{}
 	if jobType == "install" {
 		key = client.ObjectKey{
-			Namespace: mgrNS,
+			Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
 			Name:      getInstallJobName(addon),
 		}
 	} else if jobType == "uninstall" {
 		key = client.ObjectKey{
-			Namespace: mgrNS,
+			Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
 			Name:      getUninstallJobName(addon),
 		}
 	}
-	return key
+	job = &batchv1.Job{}
+	err = r.Get(ctx, key, job)
+	return job, err
 }
 
 func (r *AddonReconciler) PatchPhase(addon *extensionsv1alpha1.Addon, stageCtx stageCtx, phase extensionsv1alpha1.AddonPhase, reason string) error {
@@ -290,6 +253,7 @@ func (r *AddonReconciler) PatchPhase(addon *extensionsv1alpha1.Addon, stageCtx s
 func (r *helmTypeInstallReconciler) Reconcile(tree *kubebuilderx.ObjectTree) {
 	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
 	r.reqCtx.Log.V(1).Info("helmTypeInstallStage", "phase", addon.Status.Phase)
+	fmt.Println("helmTypeInstallReconciler, phase: ", addon.Status.Phase)
 	mgrNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
 
 	key := client.ObjectKey{
@@ -459,6 +423,7 @@ func (r *helmTypeInstallReconciler) Reconcile(tree *kubebuilderx.ObjectTree) {
 func (r *helmTypeUninstallReconciler) Reconcile(tree *kubebuilderx.ObjectTree) {
 	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
 	r.reqCtx.Log.V(1).Info("helmTypeUninstallReconciler", "phase", addon.Status.Phase)
+	fmt.Println("helmTypeUninstallReconciler, phase: ", addon.Status.Phase)
 	key := client.ObjectKey{
 		Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
 		Name:      getUninstallJobName(addon),
@@ -468,6 +433,7 @@ func (r *helmTypeUninstallReconciler) Reconcile(tree *kubebuilderx.ObjectTree) {
 		r.setRequeueWithErr(err, "")
 		return
 	} else if err == nil {
+		fmt.Println("get helmTypeUninstallJob!!!!!!!!!!!!!!!")
 		if helmUninstallJob.Status.Succeeded > 0 {
 			r.reqCtx.Log.V(1).Info("helm uninstall job succeed", "job", key)
 			// TODO:

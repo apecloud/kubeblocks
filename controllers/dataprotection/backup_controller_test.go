@@ -384,12 +384,14 @@ var _ = Describe("Backup Controller test", func() {
 					{Name: testdp.ComponentName + "-1", PodSelector: podSelector, ContainerPort: containerPort},
 				}
 			})).Should(Succeed())
+
 			By("check targets pod")
 			targets := backupPolicy.Spec.BackupMethods[0].Targets
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			targetPods, err := GetTargetPods(reqCtx, k8sClient, nil, backupPolicy, &targets[0], dpv1alpha1.BackupTypeFull)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(targetPods).Should(HaveLen(1))
+
 			By("create a backup")
 			backup := testdp.NewFakeBackup(&testCtx, nil)
 			getJobKey := func(targetName string) client.ObjectKey {

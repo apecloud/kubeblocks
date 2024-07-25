@@ -476,6 +476,60 @@ var _ = Describe("Restore Controller test", func() {
 				Expect(k8sClient.Delete(ctx, restore)).Should(Succeed())
 				Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(restore), restore, false)).Should(Succeed())
 			})
+
+			FIt("test jobAction env", func() {
+				By("remove the prepareData stage for testing post ready actions")
+				Expect(testapps.ChangeObj(&testCtx, actionSet, func(set *dpv1alpha1.ActionSet) {
+					set.Spec.Restore.PrepareData = nil
+				})).Should(Succeed())
+
+				matchLabels := map[string]string{
+					constant.AppInstanceLabelKey: testdp.ClusterName,
+				}
+
+				restore := initResourcesAndWaitRestore(true, false, false, dpv1alpha1.RestorePhaseRunning,
+					func(f *testdp.MockRestoreFactory) {
+						f.SetConnectCredential(testdp.ClusterName).SetJobActionConfig(matchLabels).SetExecActionConfig(matchLabels)
+					}, nil)
+
+				getJobKey := func(jobIndex int) client.ObjectKey {
+					return client.ObjectKey{
+						Name:      fmt.Sprintf("restore-post-ready-%s-%s-%d-%d", restore.UID[:8], restore.Spec.Backup.Name, 1, jobIndex),
+						Namespace: restore.Namespace,
+					}
+				}
+
+				getDPDBPortEnv := func(container *corev1.Container) corev1.EnvVar {
+					for _, env := range container.Env {
+						if env.Name == dptypes.DPDBPort {
+							return env
+						}
+					}
+					return corev1.EnvVar{}
+				}
+
+				By("wait for creating two exec jobs with the matchLabels")
+				a := testapps.List(&testCtx, generics.JobSignature,
+					client.MatchingLabels{dprestore.DataProtectionRestoreLabelKey: restore.Name},
+					client.InNamespace(testCtx.DefaultNamespace))
+				Eventually(a).Should(HaveLen(2))
+
+				checkJobSA(restore, viper.GetString(dptypes.CfgKeyExecWorkerServiceAccountName))
+
+				By("mock exec jobs are completed")
+				mockRestoreJobsCompleted(restore)
+
+				By("wait for creating a job of jobAction with the matchLabels, expect jobs count is 3(2+1)")
+				Eventually(testapps.List(&testCtx, generics.JobSignature,
+					client.MatchingLabels{dprestore.DataProtectionRestoreLabelKey: restore.Name},
+					client.InNamespace(testCtx.DefaultNamespace))).Should(HaveLen(3))
+
+				By("check backup job's port env")
+				Eventually(testapps.CheckObj(&testCtx, getJobKey(0), func(g Gomega, fetched *batchv1.Job) {
+					g.Expect(getDPDBPortEnv(&fetched.Spec.Template.Spec.Containers[0]).Value).Should(Equal(strconv.Itoa(testdp.PortNum)))
+				})).Should(Succeed())
+
+			})
 		})
 
 		Context("test cross namespace", func() {
@@ -511,6 +565,10 @@ func mockBackupForRestore(actionSetName, repoName, backupPVCName string, mockBac
 			backup.Status.BackupRepoName = repoName
 			backup.Status.PersistentVolumeClaimName = backupPVCName
 			testdp.MockBackupStatusTarget(backup, dpv1alpha1.PodSelectionStrategyAny)
+			backup.Status.Target.ContainerPort = &dpv1alpha1.ContainerPort{
+				ContainerName: testdp.ContainerName + "-1",
+				PortName:      testdp.PortName,
+			}
 			testdp.MockBackupStatusMethod(backup, backupMethodName, testdp.DataVolumeName, actionSetName)
 		})).Should(Succeed())
 	}

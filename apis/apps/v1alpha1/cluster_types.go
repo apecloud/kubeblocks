@@ -555,6 +555,21 @@ type ShardingSpec struct {
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=2048
 	Shards int32 `json:"shards,omitempty"`
+
+	// Defines the upper limit of the number of shards supported by the Sharding.
+	//
+	// It defines the maximum number of sets that can be created for the Sharding.
+	// This field allows you to set a limit on the scalability of the Sharding, preventing it from exceeding a certain number of shards.
+	//
+	// This field is immutable.
+	//
+	// +optional
+	ShardsLimit *ShardsLimit `json:"shardsLimit,omitempty"`
+
+	// Defines the shared resources that can be shared across multiple components within the Sharding.
+	//
+	// +optional
+	SharedResources []SharedResource `json:"sharedResources,omitempty"`
 }
 
 // ClusterComponentSpec defines the specification of a Component within a Cluster.

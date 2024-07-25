@@ -6682,6 +6682,20 @@ Cannot be updated.</p>
 </tr>
 <tr>
 <td>
+<code>shardings</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterTopologySharding">
+[]ClusterTopologySharding
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Sharding specifies the shardings in the topology.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>components</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterTopologyComponent">
@@ -6690,6 +6704,7 @@ Cannot be updated.</p>
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Components specifies the components in the topology.</p>
 </td>
 </tr>
@@ -6751,7 +6766,8 @@ string
 <p>Defines the unique identifier of the component within the cluster topology.
 It follows IANA Service naming rules and is used as part of the Service&rsquo;s DNS name.
 The name must start with a lowercase letter, can contain lowercase letters, numbers,
-and hyphens, and must end with a lowercase letter or number.</p>
+and hyphens, and must end with a lowercase letter or number.
+The name must be unique within the Components and Shardings of the ClusterTopology.</p>
 <p>Cannot be updated once set.</p>
 </td>
 </tr>
@@ -6839,6 +6855,89 @@ separated by commas.</p>
 This sequence is designed for components that have dependencies or require specific update procedures.</p>
 <p>Components that can be updated independently or have no dependencies can be listed together in the same stage,
 separated by commas.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ClusterTopologySharding">ClusterTopologySharding
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterTopology">ClusterTopology</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Defines the unique identifier of the sharding within the cluster topology.
+It follows IANA Service naming rules and is used as part of the Service&rsquo;s DNS name.
+The name must start with a lowercase letter, can contain lowercase letters, numbers,
+and hyphens, and must end with a lowercase letter or number.
+The name must be unique within the Components and Shardings of the ClusterTopology.</p>
+<p>Cannot be updated once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>compDef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name or prefix of the ComponentDefinition custom resource(CR) template that
+defines the Component&rsquo;s characteristics and behavior.</p>
+<p>When a prefix is used, the system selects the ComponentDefinition CR with the latest version that matches the prefix.
+This approach allows:</p>
+<ol>
+<li>Precise selection by providing the exact name of a ComponentDefinition CR.</li>
+<li>Flexible and automatic selection of the most up-to-date ComponentDefinition CR by specifying a prefix.</li>
+</ol>
+<p>Once set, this field cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>shardsLimit</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ShardsLimit">
+ShardsLimit
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the upper limit of the number of shards supported by the ShardingDefinition.</p>
+<p>It defines the maximum number of sets that can be created for the Sharding.
+This field allows you to set a limit on the scalability of the Sharding, preventing it from exceeding a certain number of shards.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>sharedResources</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.SharedResource">
+[]SharedResource
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the shared resources that can be shared across multiple components within the Sharding.</p>
 </td>
 </tr>
 </tbody>
@@ -17289,6 +17388,37 @@ StatefulSetSpec
 <td></td>
 </tr></tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ResourceFrom">ResourceFrom
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SharedResource">SharedResource</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>systemAccountSource</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.SystemAccountSource">
+SystemAccountSource
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the system account that the shared resource is derived from.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ResourceMeta">ResourceMeta
 </h3>
 <p>
@@ -19579,6 +19709,118 @@ Resources and data associated with the corresponding Component will also be dele
 </ul>
 </td>
 </tr>
+<tr>
+<td>
+<code>shardsLimit</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ShardsLimit">
+ShardsLimit
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the upper limit of the number of shards supported by the Sharding.</p>
+<p>It defines the maximum number of sets that can be created for the Sharding.
+This field allows you to set a limit on the scalability of the Sharding, preventing it from exceeding a certain number of shards.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>sharedResources</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.SharedResource">
+[]SharedResource
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the shared resources that can be shared across multiple components within the Sharding.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ShardsLimit">ShardsLimit
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterTopologySharding">ClusterTopologySharding</a>, <a href="#apps.kubeblocks.io/v1alpha1.ShardingSpec">ShardingSpec</a>)
+</p>
+<div>
+<p>ShardsLimit defines the upper limit of the number of shards supported by the Sharding.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>minShards</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>The minimum limit of shards.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>maxShards</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>The maximum limit of shards.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.SharedResource">SharedResource
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterTopologySharding">ClusterTopologySharding</a>, <a href="#apps.kubeblocks.io/v1alpha1.ShardingSpec">ShardingSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name is the unique identifier for the shared resource.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>resourceFrom</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ResourceFrom">
+ResourceFrom
+</a>
+</em>
+</td>
+<td>
+<p>Defines the source of the shared resource.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">SpecificOpsRequest
@@ -20332,6 +20574,34 @@ CommandExecutorEnvItem
 </td>
 <td>
 <p>Configures the method for obtaining the client SDK and executing statements.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.SystemAccountSource">SystemAccountSource
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ResourceFrom">ResourceFrom</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>accountName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The name of the system account defined in the ComponentDefinition.Spec.SystemAccounts[x].Name.</p>
 </td>
 </tr>
 </tbody>

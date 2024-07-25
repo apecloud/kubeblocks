@@ -477,7 +477,7 @@ var _ = Describe("Restore Controller test", func() {
 				Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(restore), restore, false)).Should(Succeed())
 			})
 
-			FIt("test jobAction env", func() {
+			It("test jobAction env", func() {
 				By("remove the prepareData stage for testing post ready actions")
 				Expect(testapps.ChangeObj(&testCtx, actionSet, func(set *dpv1alpha1.ActionSet) {
 					set.Spec.Restore.PrepareData = nil

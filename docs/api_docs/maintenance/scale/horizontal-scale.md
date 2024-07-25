@@ -15,7 +15,7 @@ From v0.9.0, the horizontal scale can be divided into two types to better suppor
 
 - Final-state-oriented (operator: overwrite)
 
-    Final-state-oriented horizontal scale refers to the operation in which components and instances specifies replicas. This type of horizontal scale is performed by simply specifying the replica amount and overwriting the replicas. However, this method does not support specifying an instance to scale in or out.
+    Final-state-oriented horizontal scale refers to the operation in which components and instances specify replicas. This type of horizontal scale is performed by simply specifying the replica amount and overwriting the replicas. However, this method does not support specifying an instance to scale in or out.
 
     It is also recommended to edit the cluster YAML file to perform a horizontal scale since its corresponding OpsRequest option might be deprecated later.
 
@@ -23,7 +23,7 @@ From v0.9.0, the horizontal scale can be divided into two types to better suppor
 
     The procedure-oriented horizontal scale is designed to add or delete specified instances to meet the frequent scaling in and out demands.
 
-    For the procedure-oriented horizontal scale, an operation will calculate the horizontal scale state based on the status of the pods involved in the opsRequest operation. In extreme cases, due to the non-atomic nature of the operation, the recorded lastCompReplicas may be inaccurate, leading to incorrect pod count calculations (you can ensure the order on the client side or set `KUBEBLOCKS_RECONCILE_WORKERS=1`).
+    For the procedure-oriented horizontal scale, an operation will calculate the horizontal scale state based on the status of the pods involved in the OpsRequest operation. In extreme cases, due to the non-atomic nature of the operation, the recorded lastCompReplicas may be inaccurate, leading to incorrect pod count calculations (you can ensure the order on the client side or set `KUBEBLOCKS_RECONCILE_WORKERS=1`).
 
      1. If the issued OpsRequest attempts to delete an instance created by a running OpsRequest, it will not be allowed and will fail directly.
      2. If there is a final-state-oriented operation in execution, this operation will be terminated.
@@ -269,7 +269,7 @@ For example, managing a PostgreSQL database with one primary and two secondary r
 
 Another issue arises in the same scenario: if the node hosting `foo-bar-1` experiences a hardware failure, causing disk damage and rendering data read-write inaccessible, according to operational best practices, we need to offload `foo-bar-1` and rebuild replicas on healthy nodes. However, performing such operational tasks based on *StatefulSets* isn't easy.
 
-Similar discussions can be observed in the Kubernetes community. Starting from version 0.9, KubeBlocks introduces the *specified instance scaling* feature to address these issues.
+[Similar discussions](https://github.com/kubernetes/kubernetes/issues/83224) can be observed in the Kubernetes community. Starting from version 0.9, KubeBlocks introduces the *specified instance scaling* feature to address these issues.
 
 #### Example 1
 

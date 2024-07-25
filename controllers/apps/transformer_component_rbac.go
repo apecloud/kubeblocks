@@ -80,7 +80,10 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 	}
 
 	var parent client.Object
-	rb := buildRoleBinding(transCtx.Cluster, serviceAccount.Name)
+	rb, err := buildRoleBinding(transCtx.Cluster, transCtx.Component, serviceAccount.Name)
+	if err != nil {
+		return err
+	}
 	graphCli.Create(dag, rb, inDataContext4G())
 	parent = rb
 	if needCRB {
@@ -280,14 +283,20 @@ func buildServiceAccount(transCtx *componentTransformContext) (*corev1.ServiceAc
 		}
 	}
 
-	buildSa := factory.BuildServiceAccount(cluster, serviceAccountName)
+	saObj := factory.BuildServiceAccount(cluster, serviceAccountName)
+	if err := setCompOwnershipNFinalizer(comp, saObj); err != nil {
+		return nil, false, err
+	}
 	// if volume protection is enabled, the service account needs to be bound to the clusterRoleBinding.
-	return buildSa, volumeProtectionEnable, nil
+	return saObj, volumeProtectionEnable, nil
 }
 
-func buildRoleBinding(cluster *appsv1alpha1.Cluster, serviceAccountName string) *rbacv1.RoleBinding {
+func buildRoleBinding(cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component, serviceAccountName string) (*rbacv1.RoleBinding, error) {
 	roleBinding := factory.BuildRoleBinding(cluster, serviceAccountName)
-	return roleBinding
+	if err := setCompOwnershipNFinalizer(comp, roleBinding); err != nil {
+		return nil, err
+	}
+	return roleBinding, nil
 }
 
 func createServiceAccount(serviceAccount *corev1.ServiceAccount, graphCli model.GraphClient, dag *graph.DAG, parent client.Object) {

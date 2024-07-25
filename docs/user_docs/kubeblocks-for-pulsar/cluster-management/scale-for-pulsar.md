@@ -64,7 +64,9 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
 - It is recommended to keep 3 nodes without scaling for Zookeeper, and other components can scale horizontally for multiple or single components
 - The scaling of the Bookies node needs to be cautious. The data copy is related to the EnsembleSize, Write Quorum, and Ack Quorum configurations, scaling may cause data loss. Check [Pulsar official document](https://pulsar.apahe.org/docs/3.0.x/administration-zk-bk/#decommission-bookies-cleanly) for detailed information.
 
-### Steps
+### Scale replicas
+
+#### Steps
 
 1. Change configuration.
 
@@ -94,6 +96,10 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
    ```bash
    kbcli cluster describe pulsar-cluster
    ```
+
+### Scale instances
+
+From v0.9.0, KubeBlocks supports scale in or out of specified instances. For details, refer to [Horizontal Scale](./../../maintaince/scale/horizontal-scale.md#scale-instances).
 
 ### Handle the snapshot exception
 

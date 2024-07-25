@@ -153,6 +153,8 @@ The scaling function for vector databases is also supported.
 
 ### Scale horizontally
 
+#### Scale replicas
+
 Use the following command to perform horizontal scaling.
 
 ```bash
@@ -172,6 +174,10 @@ To check whether the scaling is done, use the following command.
 ```bash
 kbcli cluster describe weaviate
 ```
+
+#### Scale instances
+
+From v0.9.0, KubeBlocks supports scale in or out of specified instances. For details, refer to [Horizontal Scale](./../maintaince/scale/horizontal-scale.md#scale-instances).
 
 ### Scale vertically
 

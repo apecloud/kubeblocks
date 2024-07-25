@@ -84,7 +84,9 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
   kafka-cluster   default     kafka                kafka-3.3.2   Delete               Running   Jul 19,2023 18:01 UTC+0800   
   ```
 
-### Steps
+### Scale replicas
+
+#### Steps
 
 1. Change configuration.
 
@@ -117,6 +119,10 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
     ```bash
     kbcli cluster describe kafka-cluster
     ```
+
+#### Scale instances
+
+From v0.9.0, KubeBlocks supports scale in or out of specified instances. For details, refer to [Horizontal Scale](./../../maintaince/scale/horizontal-scale.md#scale-instances).
 
 ### Handle the snapshot exception
 

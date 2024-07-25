@@ -90,7 +90,9 @@ NAME              NAMESPACE        CLUSTER-DEFINITION        VERSION            
 pg-cluster        default          postgreql                 postgresql-14.8.0      Delete                    Running        Mar 03,2023 19:29 UTC+0800
 ```
 
-### Steps
+### Scale replicas
+
+#### Steps
 
 1. Change configuration.
 
@@ -120,6 +122,10 @@ pg-cluster        default          postgreql                 postgresql-14.8.0  
     ```bash
     kbcli cluster describe pg-cluster
     ```
+
+### Scale instances
+
+From v0.9.0, KubeBlocks supports scale in or out of specified instances. For details, refer to [Horizontal Scale](./../../maintaince/scale/horizontal-scale.md#scale-instances).
 
 ### Handle the snapshot exception
 

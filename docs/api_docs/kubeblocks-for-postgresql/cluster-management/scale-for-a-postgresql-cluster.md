@@ -180,7 +180,9 @@ NAME        CLUSTER-DEFINITION   VERSION              TERMINATION-POLICY     STA
 mycluster   postgresql           postgresql-12.14.0   Delete                 Running   47m
 ```
 
-### Steps
+### Scale replicas
+
+#### Steps
 
 There are two ways to apply horizontal scaling.
 
@@ -266,6 +268,10 @@ There are two ways to apply horizontal scaling.
 </TabItem>
 
 </Tabs>
+
+### Scale instances
+
+From v0.9.0, KubeBlocks supports scale in or out of specified instances. For details, refer to [Horizontal Scale](./../../maintenance/scale/horizontal-scale.md#scale-instances).
 
 ### Handle the snapshot exception
 

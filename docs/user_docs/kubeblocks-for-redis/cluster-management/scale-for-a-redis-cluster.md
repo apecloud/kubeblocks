@@ -90,6 +90,8 @@ NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION         
 redis-cluster        default          redis                     redis-7.0.6              Delete                    Running        Apr 10,2023 16:50 UTC+0800
 ```
 
+### Scale replicas
+
 ### Steps
 
 1. Change configuration.
@@ -117,6 +119,10 @@ redis-cluster        default          redis                     redis-7.0.6     
 
    - STATUS=Updating: it means horizontal scaling is in progress.
    - STATUS=Running: it means horizontal scaling has been applied.
+
+### Scale instances
+
+From v0.9.0, KubeBlocks supports scale in or out of specified instances. For details, refer to [Horizontal Scale](./../../maintaince/scale/horizontal-scale.md#scale-instances).
 
 ### Handle the snapshot exception
 

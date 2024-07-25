@@ -83,7 +83,9 @@ NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY  
 mycluster   default     mysql                mysql-8.0.33   Delete               Running   Jul 05,2024 18:46 UTC+0800
 ```
 
-### Steps
+### Scale replicas
+
+#### Steps
 
 1. Change configuration.
 
@@ -113,6 +115,10 @@ mycluster   default     mysql                mysql-8.0.33   Delete              
     ```bash
     kbcli cluster describe mycluster
     ```
+
+### Scale instances
+
+From v0.9.0, KubeBlocks supports scale in or out of specified instances. For details, refer to [Horizontal Scale](./../../maintaince/scale/horizontal-scale.md#scale-instances).
 
 ### Handle the snapshot exception
 

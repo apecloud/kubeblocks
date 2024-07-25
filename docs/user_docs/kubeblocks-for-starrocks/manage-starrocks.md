@@ -110,6 +110,8 @@ kbcli cluster describe mycluster
 
 ### Scale horizontally
 
+#### Scale replicas
+
 Use the following command to perform horizontal scaling.
 
 ```bash
@@ -129,6 +131,10 @@ Validate the horizontal scale operation. When the cluster is running again, the 
 ```bash
 kbcli cluster describe mycluster
 ```
+
+#### Scale instances
+
+From v0.9.0, KubeBlocks supports scale in or out of specified instances. For details, refer to [Horizontal Scale](./../maintaince/scale/horizontal-scale.md#scale-instances).
 
 ## Volume expansion
 

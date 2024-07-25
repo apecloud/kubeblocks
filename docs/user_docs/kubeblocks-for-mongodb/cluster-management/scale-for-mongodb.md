@@ -83,7 +83,9 @@ NAME                NAMESPACE        CLUSTER-DEFINITION    VERSION          TERM
 mongodb-cluster     default          mongodb               mongodb-5.0      Delete                    Running        April 26,2023 12:00 UTC+0800
 ```
 
-### Steps
+### Scale replicas
+
+#### Steps
 
 1. Change configuration.
 
@@ -113,6 +115,10 @@ mongodb-cluster     default          mongodb               mongodb-5.0      Dele
     ```bash
     kbcli cluster describe mongodb-cluster
     ```
+
+### Scale instances
+
+From v0.9.0, KubeBlocks supports scale in or out of specified instances. For details, refer to [Horizontal Scale](./../../maintaince/scale/horizontal-scale.md#scale-instances).
 
 ### Handle the snapshot exception
 

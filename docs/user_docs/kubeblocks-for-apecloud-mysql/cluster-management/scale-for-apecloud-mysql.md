@@ -88,7 +88,9 @@ NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION         
 mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30        Delete                    Running        Jan 29,2023 14:29 UTC+0800
 ```
 
-### Steps
+### Scale replicas
+
+#### Steps
 
 1. Change configuration.
 
@@ -118,6 +120,10 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
     ```bash
     kbcli cluster describe mysql-cluster
     ```
+
+### Scale instances
+
+From v0.9.0, KubeBlocks supports scale in or out of specified instances. For details, refer to [Horizontal Scale](./../../maintaince/scale/horizontal-scale.md#scale-instances).
 
 ### Handle the snapshot exception
 

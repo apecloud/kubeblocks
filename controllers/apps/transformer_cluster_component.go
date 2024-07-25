@@ -219,6 +219,7 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component) *apps
 	// compObjCopy.Spec.Monitor = compProto.Spec.Monitor
 	compObjCopy.Spec.EnabledLogs = compProto.Spec.EnabledLogs
 	compObjCopy.Spec.ServiceAccountName = compProto.Spec.ServiceAccountName
+	compObjCopy.Spec.PodUpdatePolicy = compProto.Spec.PodUpdatePolicy
 	compObjCopy.Spec.Affinity = compProto.Spec.Affinity
 	compObjCopy.Spec.Tolerations = compProto.Spec.Tolerations
 	compObjCopy.Spec.TLSConfig = compProto.Spec.TLSConfig

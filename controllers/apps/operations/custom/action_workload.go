@@ -95,7 +95,9 @@ func (w *WorkloadAction) Execute(actionCtx ActionContext) (*ActionStatus, error)
 		}
 		return actionStatus, err
 	}
+	actionPodSpecCopy := actionCtx.Action.Workload.PodSpec.DeepCopy()
 	for i := range targetPods {
+		actionCtx.Action.Workload.PodSpec = *actionPodSpecCopy
 		actionTask, err := executeAction(podInfoExtractor, targetPods[i], i)
 		if err != nil {
 			return nil, err

@@ -624,8 +624,8 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 		podsToMemberLeave = append(podsToMemberLeave, pod)
 	}
 	for _, pod := range podsToMemberLeave {
-		if !isLeader(pod) &&
-			(r.synthesizeComp.LifecycleActions == nil || r.synthesizeComp.LifecycleActions.MemberLeave == nil) {
+		if !(isLeader(pod) || // if the pod is leader, it needs to call switchover
+			(r.synthesizeComp.LifecycleActions != nil && r.synthesizeComp.LifecycleActions.MemberLeave != nil)) { // if the memberLeave action is defined, it needs to call it
 			continue
 		}
 

@@ -29,11 +29,15 @@ import (
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
-func BuildEnvByTarget(pod *corev1.Pod, target *dpv1alpha1.BackupTarget) []corev1.EnvVar {
+func BuildEnvByTarget(pod *corev1.Pod, credential *dpv1alpha1.ConnectionCredential, containerPort *dpv1alpha1.ContainerPort) []corev1.EnvVar {
 	var envVars []corev1.EnvVar
-	credential := target.ConnectionCredential
+	envVars = append(envVars, corev1.EnvVar{Name: dptypes.DPDBHost, Value: intctrlutil.BuildPodHostDNS(pod)})
+	if containerPort != nil {
+		envVars = append(envVars, corev1.EnvVar{Name: dptypes.DPDBPort, Value: strconv.Itoa(int(GetContainerPortByName(pod, containerPort.ContainerName, containerPort.PortName)))})
+	} else {
+		envVars = append(envVars, corev1.EnvVar{Name: dptypes.DPDBPort, Value: strconv.Itoa(int(GetPodFirstContainerPort(pod)))})
+	}
 	if credential == nil {
-		envVars = append(envVars, corev1.EnvVar{Name: dptypes.DPDBHost, Value: intctrlutil.BuildPodHostDNS(pod)})
 		return envVars
 	}
 	var hostEnv corev1.EnvVar
@@ -42,20 +46,15 @@ func BuildEnvByTarget(pod *corev1.Pod, target *dpv1alpha1.BackupTarget) []corev1
 	} else {
 		hostEnv = buildEnvBySecretKey(dptypes.DPDBHost, credential.SecretName, credential.HostKey)
 	}
+	if credential.PortKey != "" {
+		envVars = append(envVars, buildEnvBySecretKey(dptypes.DPDBPort, credential.SecretName, credential.PortKey))
+	}
 	envVars = append(envVars, hostEnv)
 	if credential.PasswordKey != "" {
 		envVars = append(envVars, buildEnvBySecretKey(dptypes.DPDBPassword, credential.SecretName, credential.PasswordKey))
 	}
 	if credential.UsernameKey != "" {
 		envVars = append(envVars, buildEnvBySecretKey(dptypes.DPDBUser, credential.SecretName, credential.UsernameKey))
-	}
-	switch {
-	case credential.PortKey != "":
-		envVars = append(envVars, buildEnvBySecretKey(dptypes.DPDBPort, credential.SecretName, credential.PortKey))
-	case target.ContainerPort != nil:
-		envVars = append(envVars, corev1.EnvVar{Name: dptypes.DPDBPort, Value: strconv.Itoa(int(GetPodNamedPort(pod, target.ContainerPort.ContainerName, target.ContainerPort.PortName)))})
-	default:
-		envVars = append(envVars, corev1.EnvVar{Name: dptypes.DPDBPort, Value: strconv.Itoa(int(GetPodFirstContainerPort(pod)))})
 	}
 	return envVars
 }

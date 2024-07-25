@@ -345,7 +345,7 @@ func (r *Request) BuildJobActionPodSpec(targetPod *corev1.Pod,
 				Value: r.Spec.RetentionPeriod.String(),
 			},
 		}...)
-		envVars = append(envVars, utils.BuildEnvByTarget(targetPod, r.Target)...)
+		envVars = append(envVars, utils.BuildEnvByTarget(targetPod, r.Target.ConnectionCredential, r.Target.ContainerPort)...)
 		if r.ActionSet != nil {
 			envVars = append(envVars, r.ActionSet.Spec.Env...)
 		}

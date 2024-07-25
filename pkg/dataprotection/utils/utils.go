@@ -318,13 +318,14 @@ func GetPodFirstContainerPort(pod *corev1.Pod) int32 {
 	return ports[0].ContainerPort
 }
 
-func GetPodNamedPort(pod *corev1.Pod, containerName string, portName string) int32 {
+func GetContainerPortByName(pod *corev1.Pod, containerName string, portName string) int32 {
 	for _, container := range pod.Spec.Containers {
-		if container.Name == containerName {
-			for _, port := range container.Ports {
-				if port.Name == portName {
-					return port.ContainerPort
-				}
+		if container.Name != containerName {
+			continue
+		}
+		for _, port := range container.Ports {
+			if port.Name == portName {
+				return port.ContainerPort
 			}
 		}
 	}

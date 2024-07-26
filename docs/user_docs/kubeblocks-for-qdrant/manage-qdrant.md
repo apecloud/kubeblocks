@@ -203,7 +203,8 @@ kbcli cluster vscale qdrant --cpu=0.5 --memory=512Mi --components=qdrant
 ```
 
 Please wait a few seconds until the scaling process is over.
-The `kbcli cluster vscale` command print the `opsname`, to check the progress of scaling, you can use the following command with the `opsname`.
+
+The `kbcli cluster vscale` command prints a command to help check the progress of scaling.
 
 ```bash
 kubectl get ops qdrant-verticalscaling-rpw2l

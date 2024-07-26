@@ -17,13 +17,7 @@ After vertical scaling or horizontal scaling is performed, KubeBlocks automatica
 
 ## Vertical scaling
 
-You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, if you need to change the resource class from 1C2G to 2C4G, vertical scaling is what you need.
-
-:::note
-
-During the vertical scaling process, all pods restart in the order of learner -> follower -> leader and the leader pod may change after the restarting.
-
-:::
+You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, you can change the resource class from 1C2G to 2C4G by performing vertical scaling.
 
 ### Before you start
 

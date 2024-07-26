@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 
 # Horizontal Scale
 
-From v0.9.0, the horizontal scale can be divided into two types to better support various scenarios. Both final-state-oriented and procedure-oriented scale support scale in and out, but what distinguishes them is that the final-state-oriented scale only scales replicas and the procedure-oriented one supports scaling both the replicas and instances.
+From v0.9.0, the horizontal scale can be divided into two types to better support various scenarios. Both final-state-oriented and procedure-oriented scales support scale in and out, but what distinguishes them is that the final-state-oriented scale only scales replicas and the procedure-oriented one supports scaling both the replicas and instances.
 
 - Final-state-oriented
 

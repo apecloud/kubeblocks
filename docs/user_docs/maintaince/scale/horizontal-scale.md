@@ -8,7 +8,30 @@ sidebar_label: Horizontal Scale
 
 # Horizontal scaling
 
-Horizontal scaling changes the amount of pods. For example, you can apply horizontal scaling to scale pods up from three to five. The scaling process includes the backup and restore of data.
+From v0.9.0, the horizontal scale can be divided into two types to better support various scenarios. Both final-state-oriented and procedure-oriented scales support scale in and out, but what distinguishes them is that the final-state-oriented scale only scales replicas and the procedure-oriented one supports scaling both the replicas and instances.
+
+- Final-state-oriented
+
+    Final-state-oriented horizontal scale refers to the operation in which components and instances specify replicas. This type of horizontal scale is performed by simply specifying the replica amount and overwriting the replicas. However, this method does not support specifying an instance to scale in or out.
+
+    It is also recommended to edit the cluster YAML file to perform a horizontal scale since its corresponding OpsRequest option might be deprecated later.
+
+- Procedure-oriented
+
+    The procedure-oriented horizontal scale is designed to add or delete specified instances to meet the frequent scaling in and out demands.
+
+    For the procedure-oriented horizontal scale, an operation will calculate the horizontal scale state based on the status of the pods involved in the OpsRequest operation. In extreme cases, due to the non-atomic nature of the operation, the recorded lastCompReplicas may be inaccurate, leading to incorrect pod count calculations (you can ensure the order on the client side or set `KUBEBLOCKS_RECONCILE_WORKERS=1`).
+
+     1. If the issued OpsRequest attempts to delete an instance created by a running OpsRequest, it will not be allowed and will fail directly.
+     2. If there is a final-state-oriented operation in execution, this operation will be terminated.
+
+This tutorial takes a MySQL cluster as an example.
+
+:::note
+
+From v0.9.0, for MySQL and PostgreSQL, after horizontal scaling is performed, KubeBlocks automatically matches the appropriate configuration template based on the new specification. This is the KubeBlocks dynamic configuration feature, which simplifies the process of configuring parameters, saves time and effort and reduces performance issues caused by incorrect configuration. For detailed instructions, refer to [Configuration](./../../kubeblocks-for-apecloud-mysql/configuration/configuration.md).
+
+:::
 
 ## Before you start
 
@@ -58,19 +81,17 @@ mycluster   default     mysql                mysql-8.0.33   Delete              
 
 ### Why do you need to scale for specified instances
 
-KubeBlocks generated workloads as *StatefulSets*, which was a double-edged sword. While KubeBlocks could leverage the advantages of a *StatefulSets* to manage stateful applications like databases, it inherited its limitations.
+Before v0.9.0, KubeBlocks generated workloads as *StatefulSets*, which was a double-edged sword. While KubeBlocks could leverage the advantages of a *StatefulSets* to manage stateful applications like databases, it inherited its limitations.
 
 One of these limitations is evident in horizontal scaling scenarios, where *StatefulSets* offload Pods sequentially based on *Ordinal* order, potentially impacting the availability of databases running within.
 
-For example, managing a PostgreSQL database with one primary and two secondary replicas using a *StatefulSet* named `foo-bar`. Over time, Pod `foo-bar-2` becomes the primary node. Now, if we decide to scale down the database due to low read load, according to *StatefulSet* rules, we can only offload Pod `foo-bar-2`, which is currently the primary node. Therefore we can either directly offload `foo-bar-2`, triggering a failover mechanism to elect a new primary pod from `foo-bar-0` and `foo-bar-1`, or use a switchover mechanism to convert `foo-bar-2` into a secondary pod before offloading it. Either way, there will be a period where write is not applicable.
+Another issue arises in the same scenario: if the node hosting Pods experiences a hardware failure, causing disk damage and rendering data read-write inaccessible, according to operational best practices, we need to offload the damaged Pod and rebuild replicas on healthy nodes. However, performing such operational tasks based on *StatefulSets* isn't easy. [Similar discussions](https://github.com/kubernetes/kubernetes/issues/83224) can be observed in the Kubernetes community.
 
-Another issue arises in the same scenario: if the node hosting `foo-bar-1` experiences a hardware failure, causing disk damage and rendering data read-write inaccessible, according to operational best practices, we need to offload `foo-bar-1` and rebuild replicas on healthy nodes. However, performing such operational tasks based on *StatefulSets* isn't easy.
-
-Similar discussions can be observed in the Kubernetes community. Starting from version 0.9, KubeBlocks introduces the *specified instance scaling* feature to address these issues.
+To solve the limitations mentioned above, starting from version 0.9, KubeBlocks KubeBlocks replaces *StatefulStes* with *InstanceSet* which is a general workload API and is in charge of a set of instances. With *InstanceSet*, KubeBlocks also introduces the *specified instance scaling* feature to improve the availability.
 
 ### Steps
 
-From v0.9.0, KubeBlocks supports the scale-in subcommand by adding the `offline-instances` option to specify an instance to scale in. But note that `--offlineInstances` should be edited with `replicas` at the same time to realize offload a specified instance.
+From v0.9.0, `kbcli` supports the scale-in subcommand by adding the `offline-instances` option to specify an instance to scale in. But note that `--offlineInstances` should be edited with `replicas` at the same time to realize offload a specified instance.
 
 The example below offloads the instance `mycluster-mysql-1`.
 

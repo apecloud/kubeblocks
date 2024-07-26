@@ -17,12 +17,6 @@ You can scale Redis DB instances in two ways, vertical scaling and horizontal sc
 
 You can vertically scale a cluster by changing resource requirements and limits (e.g. CPU and storage). For example, you can change the resource class from 1C2G to 2C4G by performing vertical scaling.
 
-:::note
-
-During the vertical scaling process, a concurrent restart is triggered and the primary pod may change after the restarting.
-
-:::
-
 ### Before you start
 
 Run the command below to check whether the cluster status is `Running`. Otherwise, the following operations may fail.

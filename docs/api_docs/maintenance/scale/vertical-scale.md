@@ -17,8 +17,7 @@ This tutorial takes MySQL as an example to illustrate how to vertically scale a 
 
 :::note
 
-- During the vertical scaling process, all pods restart and the pod role may change after the restarting.
-- From v0.9.0, for MySQL and PostgreSQL, after vertical scaling is performed, KubeBlocks automatically matches the appropriate configuration template based on the new specification. This is the KubeBlocks dynamic configuration feature. This feature simplifies the process of configuring parameters, saves time and effort and reduces performance issues caused by incorrect configuration. For detailed instructions, refer to [Configuration](./../../kubeblocks-for-apecloud-mysql/configuration/configuration.md).
+From v0.9.0, for MySQL and PostgreSQL, after vertical scaling is performed, KubeBlocks automatically matches the appropriate configuration template based on the new specification. This is the KubeBlocks dynamic configuration feature. This feature simplifies the process of configuring parameters, saves time and effort and reduces performance issues caused by incorrect configuration. For detailed instructions, refer to [Configuration](./../../kubeblocks-for-apecloud-mysql/configuration/configuration.md).
 
 :::
 

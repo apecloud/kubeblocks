@@ -297,12 +297,6 @@ The horizontal scaling continues after backup and volumesnapshot are deleted and
 
 You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, if you need to change the resource class from 1C2G to 2C4G, vertical scaling is what you need.
 
-:::note
-
-During the vertical scaling process, all pods restart and the pod role may change after the restarting.
-
-:::
-
 #### Before you start
 
 Check whether the cluster status is `Running`. Otherwise, the following operations may fail.

@@ -17,12 +17,6 @@ You can scale a Pulsar cluster in two ways, vertical scaling and horizontal scal
 
 You can vertically scale a cluster by changing resource requirements and limits (e.g. CPU and storage). For example, you can change the resource class from 1C2G to 2C4G by performing vertical scaling.
 
-:::note
-
-During the vertical scaling process, all pods restart and the primary pod may change after restarting.
-
-:::
-
 ### Before you start
 
 Check whether the cluster status is `Running`. Otherwise, the following operations may fail.

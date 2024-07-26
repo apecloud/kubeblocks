@@ -66,7 +66,8 @@ const (
 	// cmmt tells the control flow to stop and jump to the commit phase
 	cmmt controlMethod = "Commit"
 
-	// rtry tells the control flow to stop and retry from the beginning with a delay specified by Result.RetryAfter
+	// rtry tells the control flow to stop, jump to the commit phase
+	// and retry from the beginning with a delay specified by Result.RetryAfter
 	rtry controlMethod = "Retry"
 )
 

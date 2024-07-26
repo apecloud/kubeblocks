@@ -61,7 +61,6 @@ func buildComponentDefinitionByConversion(clusterCompDef *appsv1alpha1.ClusterCo
 		"roles":                  &compDefRolesConvertor{},
 		"lifecycleactions":       &compDefLifecycleActionsConvertor{},
 		"servicerefdeclarations": &compDefServiceRefDeclarationsConvertor{},
-		"monitor":                &compDefMonitorConvertor{},
 		"exporter":               &compDefExporterConvertor{},
 	}
 	compDef := &appsv1alpha1.ComponentDefinition{}
@@ -683,16 +682,8 @@ func (c *compDefLifecycleActionsConvertor) convertSwitchover(switchover *appsv1a
 	}
 }
 
-type compDefMonitorConvertor struct{}
-
-func (c *compDefMonitorConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	return clusterCompDef.Monitor, nil
-}
-
 type compDefExporterConvertor struct{}
 
 func (c *compDefExporterConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	return clusterCompDef.Exporter, nil
+	return nil, nil
 }

@@ -1415,21 +1415,6 @@ These instance-specific overrides can be specified in <code>cluster.spec.compone
 </tr>
 <tr>
 <td>
-<code>monitor</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.MonitorConfig">
-MonitorConfig
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Deprecated since v0.9
-monitor is monitoring config which provided by provider.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>exporter</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.Exporter">
@@ -4498,35 +4483,6 @@ configmap and mounted to the current component.</p>
 <p>Used to declare the service reference of the current component.</p>
 </td>
 </tr>
-<tr>
-<td>
-<code>exporter</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.Exporter">
-Exporter
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the metrics exporter.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>monitor</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.MonitorConfig">
-MonitorConfig
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Deprecated since v0.9
-monitor is monitoring config which provided by provider.</p>
-</td>
-</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterComponentPhase">ClusterComponentPhase
@@ -7477,21 +7433,6 @@ They should be specified in the <code>cluster.spec.componentSpecs</code> (Cluste
 or modifying environment variable values.
 These instance-specific overrides can be specified in <code>cluster.spec.componentSpecs[*].instances</code>.</p>
 <p>This field is immutable and cannot be updated once set.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>monitor</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.MonitorConfig">
-MonitorConfig
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Deprecated since v0.9
-monitor is monitoring config which provided by provider.</p>
 </td>
 </tr>
 <tr>
@@ -11882,7 +11823,7 @@ If this field is not specified, the default behavior is to use the first contain
 <h3 id="apps.kubeblocks.io/v1alpha1.Exporter">Exporter
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
 </p>
 <div>
 </div>
@@ -11945,48 +11886,6 @@ PrometheusScheme
 <p>Specifies the schema to use for scraping.
 <code>http</code> and <code>https</code> are the expected values unless you rewrite the <code>__scheme__</code> label via relabeling.
 If empty, Prometheus uses the default value <code>http</code>.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ExporterConfig">ExporterConfig
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.MonitorConfig">MonitorConfig</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>scrapePort</code><br/>
-<em>
-<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
-Kubernetes api utils intstr.IntOrString
-</a>
-</em>
-</td>
-<td>
-<p>scrapePort is exporter port for Time Series Database to scrape metrics.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>scrapePath</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>scrapePath is exporter url path for Time Series Database to scrape metrics.</p>
 </td>
 </tr>
 </tbody>
@@ -13473,52 +13372,6 @@ for example, using &lsquo;&#123;&#123; eq .spec.replicas 1 &#125;&#125;&rsquo;</
 </tr><tr><td><p>&#34;replace&#34;</p></td>
 <td></td>
 </tr></tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.MonitorConfig">MonitorConfig
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>builtIn</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>builtIn is a switch to enable KubeBlocks builtIn monitoring.
-If BuiltIn is set to true, monitor metrics will be scraped automatically.
-If BuiltIn is set to false, the provider should set ExporterConfig and Sidecar container own.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>exporterConfig</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ExporterConfig">
-ExporterConfig
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>exporterConfig provided by provider, which specify necessary information to Time Series Database.
-exporterConfig is valid when builtIn is false.</p>
-</td>
-</tr>
-</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.MultipleClusterObjectCombinedOption">MultipleClusterObjectCombinedOption
 </h3>

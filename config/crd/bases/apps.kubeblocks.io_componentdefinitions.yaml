@@ -5732,40 +5732,6 @@ spec:
                 format: int32
                 minimum: 0
                 type: integer
-              monitor:
-                description: |-
-                  Deprecated since v0.9
-                  monitor is monitoring config which provided by provider.
-                properties:
-                  builtIn:
-                    default: false
-                    description: |-
-                      builtIn is a switch to enable KubeBlocks builtIn monitoring.
-                      If BuiltIn is set to true, monitor metrics will be scraped automatically.
-                      If BuiltIn is set to false, the provider should set ExporterConfig and Sidecar container own.
-                    type: boolean
-                  exporterConfig:
-                    description: |-
-                      exporterConfig provided by provider, which specify necessary information to Time Series Database.
-                      exporterConfig is valid when builtIn is false.
-                    properties:
-                      scrapePath:
-                        default: /metrics
-                        description: scrapePath is exporter url path for Time Series
-                          Database to scrape metrics.
-                        maxLength: 128
-                        type: string
-                      scrapePort:
-                        anyOf:
-                        - type: integer
-                        - type: string
-                        description: scrapePort is exporter port for Time Series Database
-                          to scrape metrics.
-                        x-kubernetes-int-or-string: true
-                    required:
-                    - scrapePort
-                    type: object
-                type: object
               podManagementPolicy:
                 description: |-
                   InstanceSet controls the creation of pods during initial scale up, replacement of pods on nodes, and scaling down.

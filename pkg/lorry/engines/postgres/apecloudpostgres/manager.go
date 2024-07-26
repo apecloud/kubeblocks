@@ -22,6 +22,7 @@ package apecloudpostgres
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -317,9 +318,20 @@ func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Clu
 		return nil
 	}
 
-	sql := fmt.Sprintf(`alter system consensus drop follower '%s:%d';`, addr, mgr.Config.GetDBPort())
+	var port int
+	var err error
+	if memberName != mgr.CurrentMemberName {
+		port, err = strconv.Atoi(cluster.GetMemberWithName(memberName).DBPort)
+		if err != nil {
+			mgr.Logger.Error(err, fmt.Sprintf("get member %v port failed", memberName))
+		}
+	} else {
+		port = mgr.Config.GetDBPort()
+	}
 
-	_, err := mgr.ExecLeader(ctx, sql, cluster)
+	sql := fmt.Sprintf(`alter system consensus drop follower '%s:%d';`, addr, port)
+
+	_, err = mgr.ExecLeader(ctx, sql, cluster)
 	if err != nil {
 		mgr.Logger.Error(err, fmt.Sprintf("exec sql:%s failed", sql))
 		return err

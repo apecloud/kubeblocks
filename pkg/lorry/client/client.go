@@ -210,8 +210,15 @@ func (cli *lorryClient) JoinMember(ctx context.Context) error {
 }
 
 // LeaveMember sends a Leave member operation request to Lorry, located on the target pod that is about to leave.
-func (cli *lorryClient) LeaveMember(ctx context.Context) error {
-	_, err := cli.Request(ctx, string(LeaveMemberOperation), http.MethodPost, nil)
+// Or if the parameters is not nil, the pod which Lorry accepts the request (assigned by lorryClient) is different
+// from the pod to leave (assigned by podName key in request parameters).
+func (cli *lorryClient) LeaveMember(ctx context.Context, parameters map[string]any) error {
+	req := make(map[string]any)
+	if parameters != nil {
+		req["parameters"] = parameters
+	}
+
+	_, err := cli.Request(ctx, string(LeaveMemberOperation), http.MethodPost, req)
 	return err
 }
 

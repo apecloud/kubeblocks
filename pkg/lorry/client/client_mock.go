@@ -170,7 +170,7 @@ func (mr *MockClientMockRecorder) JoinMember(arg0 interface{}) *gomock.Call {
 }
 
 // LeaveMember mocks base method.
-func (m *MockClient) LeaveMember(arg0 context.Context) error {
+func (m *MockClient) LeaveMember(arg0 context.Context,parameters map[string]any) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "LeaveMember", arg0)
 	ret0, _ := ret[0].(error)

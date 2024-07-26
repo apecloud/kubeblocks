@@ -435,7 +435,6 @@ func (r *ComponentDefinitionReconciler) cmpdHash(cmpd *appsv1alpha1.ComponentDef
 	// reset all mutable fields
 	objCopy.Spec.Provider = ""
 	objCopy.Spec.Description = ""
-	objCopy.Spec.Monitor = nil
 	objCopy.Spec.Exporter = nil
 	objCopy.Spec.PodManagementPolicy = nil
 

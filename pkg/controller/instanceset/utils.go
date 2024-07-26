@@ -27,7 +27,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/integer"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -248,4 +250,30 @@ func GetPodNameSetFromInstanceSetCondition(its *workloads.InstanceSet, condition
 		podSet = sets.New(podNames...)
 	}
 	return podSet
+}
+
+// CalculateConcurrencyReplicas returns absolute value of concurrency for workload. This func can solve some
+// corner cases about percentage-type concurrency, such as:
+// - if concurrency > "0%" and replicas > 0, it will ensure at least 1 pod is reserved.
+// - if concurrency < "100%" and replicas > 1, it will ensure at least 1 pod is reserved.
+//
+// if concurrency is nil, concurrency will be treated as 100%.
+func CalculateConcurrencyReplicas(concurrency *intstr.IntOrString, replicas int) (int, error) {
+	if concurrency == nil {
+		return replicas, nil
+	}
+
+	// 'roundUp=true' will ensure at least 1 pod is reserved if concurrency > "0%" and replicas > 0.
+	pValue, err := intstr.GetScaledValueFromIntOrPercent(concurrency, replicas, true)
+	if err != nil {
+		return pValue, err
+	}
+
+	// if concurrency < "100%" and replicas > 1, it will ensure at least 1 pod is reserved.
+	if replicas > 1 && pValue == replicas && concurrency.Type == intstr.String && concurrency.StrVal != "100%" {
+		pValue = replicas - 1
+	}
+
+	pValue = integer.IntMax(integer.IntMin(pValue, replicas), 0)
+	return pValue, nil
 }

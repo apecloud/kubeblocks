@@ -11,7 +11,7 @@ KubeBlocks integrates [the official Redis Sentinel solution](https://redis.io/do
 
 Redis Sentinel is the high availability solution for a Redis Replication Cluster, which is recommended by Redis and is also the main-stream solution in the community.
 
-In the RedisReplication Cluster provided by KubeBlocks, Sentinel is deployed as an independent component.
+In the Redis Replication Cluster provided by KubeBlocks, Sentinel is deployed as an independent component.
 
 ## Before you start
 

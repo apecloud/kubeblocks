@@ -90,6 +90,7 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluste
 		SetReplicas(compSpec.Replicas).
 		SetResources(compSpec.Resources).
 		SetServiceAccountName(compSpec.ServiceAccountName).
+		SetPodUpdatePolicy(compSpec.PodUpdatePolicy).
 		SetVolumeClaimTemplates(compSpec.VolumeClaimTemplates).
 		SetVolumes(compSpec.Volumes).
 		SetConfigs(compSpec.Configs).
@@ -99,7 +100,8 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluste
 		SetInstances(compSpec.Instances).
 		SetOfflineInstances(compSpec.OfflineInstances).
 		SetRuntimeClassName(cluster.Spec.RuntimeClassName).
-		SetSystemAccounts(compSpec.SystemAccounts)
+		SetSystemAccounts(compSpec.SystemAccounts).
+		SetStop(compSpec.Stop)
 	if labels != nil {
 		compBuilder.AddLabelsInMap(labels)
 	}
@@ -282,16 +284,5 @@ func GetExporter(componentDef appsv1alpha1.ComponentDefinitionSpec) *common.Expo
 	if componentDef.Exporter != nil {
 		return &common.Exporter{Exporter: *componentDef.Exporter}
 	}
-
-	// Compatible with previous versions of kb
-	if componentDef.Monitor == nil || componentDef.Monitor.Exporter == nil {
-		return nil
-	}
-
-	return &common.Exporter{
-		TargetPort: &componentDef.Monitor.Exporter.ScrapePort,
-		Exporter: appsv1alpha1.Exporter{
-			ScrapePath: componentDef.Monitor.Exporter.ScrapePath,
-		},
-	}
+	return nil
 }

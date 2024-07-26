@@ -473,7 +473,7 @@ prometheus:
   alertmanager:
     ## If false, alertmanager will not be installed
     ##
-    enabled: true
+    enabled: false
 
     ## alertmanager container image
     ##
@@ -1770,15 +1770,6 @@ snapshot-controller:
 kubeblocks-csi-driver:
   enabled: false
 
-
-## csi-s3 settings
-## ref: https://artifacthub.io/packages/helm/cloudve/csi-s3#configuration
-##
-csi-s3:
-  ## @param csi-s3.enabled -- Enable csi-s3 chart.
-  ##
-  enabled: false
-
 alertmanager-webhook-adaptor:
   ## Linkage with prometheus.enabled
   ##
@@ -1866,6 +1857,7 @@ validProviders:
  - "huaweiCloud"
  - "azure"
  - ""
+
 ## @section KubeBlocks default storageClass Parameters for cloud provider.
 storageClass:
   ## @param storageClass.name -- Specifies the name of the default storage class.
@@ -1897,15 +1889,6 @@ storageClass:
     huaweiCloud: # Huawei Cloud
       volumeType: SSD
       fsType: ext4
-
-external-dns:
-  enabled: false
-  domain: kubeblocks.io
-  tolerations:
-  - key: kb-controller
-    operator: Equal
-    value: "true"
-    effect: NoSchedule
 
 developMode: false
 
@@ -2045,3 +2028,5 @@ vmagent:
 
 crd:
   enabled: true
+
+userAgent: kubeblocks

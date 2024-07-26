@@ -29,18 +29,6 @@ import (
 
 // ClusterDefinitionSpec defines the desired state of ClusterDefinition.
 type ClusterDefinitionSpec struct {
-	// Specifies the well-known database type, such as mysql, redis, or mongodb.
-	//
-	// Deprecated since v0.9.
-	// This field is maintained for backward compatibility and its use is discouraged.
-	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
-	//
-	// +kubebuilder:validation:MaxLength=24
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
-	// +optional
-	Type string `json:"type,omitempty"`
-
 	// Provides the definitions for the cluster components.
 	//
 	// Deprecated since v0.9.
@@ -492,33 +480,6 @@ type ServiceRefDeclarationSpec struct {
 	ServiceVersion string `json:"serviceVersion"`
 }
 
-type ExporterConfig struct {
-	// scrapePort is exporter port for Time Series Database to scrape metrics.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:XIntOrString
-	ScrapePort intstr.IntOrString `json:"scrapePort"`
-
-	// scrapePath is exporter url path for Time Series Database to scrape metrics.
-	// +kubebuilder:validation:MaxLength=128
-	// +kubebuilder:default="/metrics"
-	// +optional
-	ScrapePath string `json:"scrapePath,omitempty"`
-}
-
-type MonitorConfig struct {
-	// builtIn is a switch to enable KubeBlocks builtIn monitoring.
-	// If BuiltIn is set to true, monitor metrics will be scraped automatically.
-	// If BuiltIn is set to false, the provider should set ExporterConfig and Sidecar container own.
-	// +kubebuilder:default=false
-	// +optional
-	BuiltIn bool `json:"builtIn,omitempty"`
-
-	// exporterConfig provided by provider, which specify necessary information to Time Series Database.
-	// exporterConfig is valid when builtIn is false.
-	// +optional
-	Exporter *ExporterConfig `json:"exporterConfig,omitempty"`
-}
-
 // ClusterComponentDefinition defines a Component within a ClusterDefinition but is deprecated and
 // has been replaced by ComponentDefinition.
 //
@@ -683,18 +644,6 @@ type ClusterComponentDefinition struct {
 	//
 	// +optional
 	ServiceRefDeclarations []ServiceRefDeclaration `json:"serviceRefDeclarations,omitempty"`
-
-	// Defines the metrics exporter.
-	//
-	// +optional
-	Exporter *Exporter `json:"exporter,omitempty"`
-
-	// Deprecated since v0.9
-	// monitor is monitoring config which provided by provider.
-	//
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.10.0"
-	// +optional
-	Monitor *MonitorConfig `json:"monitor,omitempty"`
 }
 
 func (r *ClusterComponentDefinition) GetStatefulSetWorkload() StatefulSetWorkload {

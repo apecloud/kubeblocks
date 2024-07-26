@@ -225,6 +225,31 @@ func getCluster(ctx context.Context,
 	return cluster
 }
 
+// listObjectsOfCluster list the objects of the cluster by labels.
+func listObjectsOfCluster(ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	object client.ObjectList) (client.ObjectList, error) {
+	labels := constant.GetClusterWellKnownLabels(cluster.Name)
+	if err := cli.List(ctx, object, client.InNamespace(cluster.Namespace), client.MatchingLabels(labels)); err != nil {
+		return nil, err
+	}
+	return object, nil
+}
+
+// getObjectString convert object to string
+func getObjectString(object any) (*string, error) {
+	if object == nil {
+		return nil, nil
+	}
+	objectBytes, err := json.Marshal(object)
+	if err != nil {
+		return nil, err
+	}
+	objectString := string(objectBytes)
+	return &objectString, nil
+}
+
 func getClusterLabelKeys() []string {
 	return []string{constant.AppInstanceLabelKey, constant.KBAppComponentLabelKey, constant.KBAppShardingNameLabelKey}
 }

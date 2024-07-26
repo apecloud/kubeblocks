@@ -61,7 +61,6 @@ func buildComponentDefinitionByConversion(clusterCompDef *appsv1alpha1.ClusterCo
 		"roles":                  &compDefRolesConvertor{},
 		"lifecycleactions":       &compDefLifecycleActionsConvertor{},
 		"servicerefdeclarations": &compDefServiceRefDeclarationsConvertor{},
-		"monitor":                &compDefMonitorConvertor{},
 		"exporter":               &compDefExporterConvertor{},
 	}
 	compDef := &appsv1alpha1.ComponentDefinition{}
@@ -551,20 +550,18 @@ func (c *compDefLifecycleActionsConvertor) convertBuiltinActionHandler(clusterCo
 	}
 }
 
-func (c *compDefLifecycleActionsConvertor) convertRoleProbe(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) *appsv1alpha1.RoleProbe {
+func (c *compDefLifecycleActionsConvertor) convertRoleProbe(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) *appsv1alpha1.Probe {
 	builtinHandler := c.convertBuiltinActionHandler(clusterCompDef)
 	// if RSMSpec has role probe CustomHandler, use it first.
 	if clusterCompDef.RSMSpec != nil && clusterCompDef.RSMSpec.RoleProbe != nil && len(clusterCompDef.RSMSpec.RoleProbe.CustomHandler) > 0 {
 		// TODO(xingran): RSMSpec.RoleProbe.CustomHandler support multiple images and commands, but ComponentDefinition.LifeCycleAction.RoleProbe only support one image and command now.
-		return &appsv1alpha1.RoleProbe{
-			LifecycleActionHandler: appsv1alpha1.LifecycleActionHandler{
-				BuiltinHandler: &builtinHandler,
-				CustomHandler: &appsv1alpha1.Action{
-					Image: clusterCompDef.RSMSpec.RoleProbe.CustomHandler[0].Image,
-					Exec: &appsv1alpha1.ExecAction{
-						Command: clusterCompDef.RSMSpec.RoleProbe.CustomHandler[0].Command,
-						Args:    clusterCompDef.RSMSpec.RoleProbe.CustomHandler[0].Args,
-					},
+		return &appsv1alpha1.Probe{
+			BuiltinHandler: &builtinHandler,
+			Action: appsv1alpha1.Action{
+				Exec: &appsv1alpha1.ExecAction{
+					Image:   clusterCompDef.RSMSpec.RoleProbe.CustomHandler[0].Image,
+					Command: clusterCompDef.RSMSpec.RoleProbe.CustomHandler[0].Command,
+					Args:    clusterCompDef.RSMSpec.RoleProbe.CustomHandler[0].Args,
 				},
 			},
 		}
@@ -575,14 +572,15 @@ func (c *compDefLifecycleActionsConvertor) convertRoleProbe(clusterCompDef *apps
 	}
 
 	clusterCompDefRoleProbe := clusterCompDef.Probes.RoleProbe
-	roleProbe := &appsv1alpha1.RoleProbe{
-		TimeoutSeconds: clusterCompDefRoleProbe.TimeoutSeconds,
-		PeriodSeconds:  clusterCompDefRoleProbe.PeriodSeconds,
+	roleProbe := &appsv1alpha1.Probe{
+		Action: appsv1alpha1.Action{
+			TimeoutSeconds: clusterCompDefRoleProbe.TimeoutSeconds,
+		},
+		PeriodSeconds: clusterCompDefRoleProbe.PeriodSeconds,
 	}
 
 	roleProbe.BuiltinHandler = &builtinHandler
 	if clusterCompDefRoleProbe.Commands == nil || len(clusterCompDefRoleProbe.Commands.Queries) == 0 {
-		roleProbe.CustomHandler = nil
 		return roleProbe
 	}
 
@@ -590,10 +588,8 @@ func (c *compDefLifecycleActionsConvertor) convertRoleProbe(clusterCompDef *apps
 	if len(clusterCompDefRoleProbe.Commands.Writes) == 0 {
 		commands = clusterCompDefRoleProbe.Commands.Queries
 	}
-	roleProbe.CustomHandler = &appsv1alpha1.Action{
-		Exec: &appsv1alpha1.ExecAction{
-			Command: commands,
-		},
+	roleProbe.Action.Exec = &appsv1alpha1.ExecAction{
+		Command: commands,
 	}
 	return roleProbe
 }
@@ -606,12 +602,12 @@ func (c *compDefLifecycleActionsConvertor) convertPostProvision(postStart *appsv
 	defaultPreCondition := appsv1alpha1.ComponentReadyPreConditionType
 	return &appsv1alpha1.LifecycleActionHandler{
 		CustomHandler: &appsv1alpha1.Action{
-			Image: postStart.CmdExecutorConfig.Image,
 			Exec: &appsv1alpha1.ExecAction{
+				Image:   postStart.CmdExecutorConfig.Image,
 				Command: postStart.CmdExecutorConfig.Command,
 				Args:    postStart.CmdExecutorConfig.Args,
+				Env:     postStart.CmdExecutorConfig.Env,
 			},
-			Env:          postStart.CmdExecutorConfig.Env,
 			PreCondition: &defaultPreCondition,
 		},
 	}
@@ -633,22 +629,22 @@ func (c *compDefLifecycleActionsConvertor) convertSwitchover(switchover *appsv1a
 	)
 	if spec.WithCandidate != nil && spec.WithCandidate.CmdExecutorConfig != nil {
 		withCandidateAction = &appsv1alpha1.Action{
-			Image: spec.WithCandidate.CmdExecutorConfig.Image,
 			Exec: &appsv1alpha1.ExecAction{
+				Image:   spec.WithCandidate.CmdExecutorConfig.Image,
 				Command: spec.WithCandidate.CmdExecutorConfig.Command,
 				Args:    spec.WithCandidate.CmdExecutorConfig.Args,
+				Env:     spec.WithCandidate.CmdExecutorConfig.Env,
 			},
-			Env: spec.WithCandidate.CmdExecutorConfig.Env,
 		}
 	}
 	if spec.WithoutCandidate != nil && spec.WithoutCandidate.CmdExecutorConfig != nil {
 		withoutCandidateAction = &appsv1alpha1.Action{
-			Image: spec.WithoutCandidate.CmdExecutorConfig.Image,
 			Exec: &appsv1alpha1.ExecAction{
+				Image:   spec.WithoutCandidate.CmdExecutorConfig.Image,
 				Command: spec.WithoutCandidate.CmdExecutorConfig.Command,
 				Args:    spec.WithoutCandidate.CmdExecutorConfig.Args,
+				Env:     spec.WithoutCandidate.CmdExecutorConfig.Env,
 			},
-			Env: spec.WithoutCandidate.CmdExecutorConfig.Env,
 		}
 	}
 
@@ -676,16 +672,8 @@ func (c *compDefLifecycleActionsConvertor) convertSwitchover(switchover *appsv1a
 	}
 }
 
-type compDefMonitorConvertor struct{}
-
-func (c *compDefMonitorConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	return clusterCompDef.Monitor, nil
-}
-
 type compDefExporterConvertor struct{}
 
 func (c *compDefExporterConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	return clusterCompDef.Exporter, nil
+	return nil, nil
 }

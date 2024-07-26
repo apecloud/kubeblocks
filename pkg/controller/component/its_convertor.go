@@ -48,6 +48,7 @@ func BuildWorkloadFrom(synthesizeComp *SynthesizedComponent, protoITS *workloads
 		"membershipreconfiguration": &itsMembershipReconfigurationConvertor{},
 		"memberupdatestrategy":      &itsMemberUpdateStrategyConvertor{},
 		"podmanagementpolicy":       &itsPodManagementPolicyConvertor{},
+		"podupdatepolicy":           &itsPodUpdatePolicyConvertor{},
 		"updatestrategy":            &itsUpdateStrategyConvertor{},
 		"instances":                 &itsInstancesConvertor{},
 		"offlineinstances":          &itsOfflineInstancesConvertor{},
@@ -103,6 +104,20 @@ func (c *itsPodManagementPolicyConvertor) convert(args ...any) (any, error) {
 		return appsv1.OrderedReadyPodManagement, nil
 	}
 	return appsv1.ParallelPodManagement, nil
+}
+
+// itsPodUpdatePolicyConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.PodUpdatePolicy.
+type itsPodUpdatePolicyConvertor struct{}
+
+func (c *itsPodUpdatePolicyConvertor) convert(args ...any) (any, error) {
+	synthesizedComp, err := parseITSConvertorArgs(args...)
+	if err != nil {
+		return nil, err
+	}
+	if synthesizedComp.PodUpdatePolicy != nil {
+		return *synthesizedComp.PodUpdatePolicy, nil
+	}
+	return workloads.PreferInPlacePodUpdatePolicyType, nil
 }
 
 // itsUpdateStrategyConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.Instances.
@@ -271,11 +286,11 @@ func (c *itsRoleProbeConvertor) convert(args ...any) (any, error) {
 	}
 
 	// TODO(xingran): ITS Action does not support args[] yet
-	if synthesizeComp.LifecycleActions.RoleProbe.CustomHandler != nil {
+	if synthesizeComp.LifecycleActions.RoleProbe.Exec != nil {
 		itsRoleProbeCmdAction := workloads.Action{
-			Image:   synthesizeComp.LifecycleActions.RoleProbe.CustomHandler.Image,
-			Command: synthesizeComp.LifecycleActions.RoleProbe.CustomHandler.Exec.Command,
-			Args:    synthesizeComp.LifecycleActions.RoleProbe.CustomHandler.Exec.Args,
+			Image:   synthesizeComp.LifecycleActions.RoleProbe.Exec.Image,
+			Command: synthesizeComp.LifecycleActions.RoleProbe.Exec.Command,
+			Args:    synthesizeComp.LifecycleActions.RoleProbe.Exec.Args,
 		}
 		itsRoleProbe.CustomHandler = []workloads.Action{itsRoleProbeCmdAction}
 	}

@@ -255,7 +255,7 @@ VTGate, VTConsensus, and VTTablet support parameter configuration. You can confi
 
 Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
 
-* An example for configuring VTTablet
+* An example of configuring VTTablet
 
     ```yaml
     apiVersion: apps.kubeblocks.io/v1alpha1
@@ -279,7 +279,7 @@ Apply an OpsRequest to the specified cluster. Configure the parameters according
       type: Reconfiguring
     ```
 
-* An example for configuring VTGate
+* An example of configuring VTGate
 
     ```yaml
     apiVersion: apps.kubeblocks.io/v1alpha1
@@ -451,7 +451,7 @@ spec:
 
 ## Transparent failover
 
-Run the command below to perform transparent failover.
+Run the command below to perform a transparent failover.
 
 1. Get the configuration file of this cluster.
 

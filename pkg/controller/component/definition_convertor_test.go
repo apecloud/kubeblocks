@@ -67,7 +67,6 @@ var _ = Describe("Component Definition Convertor", func() {
 		BeforeEach(func() {
 			clusterCompDef = &appsv1alpha1.ClusterComponentDefinition{
 				Name:         "mysql",
-				Description:  "component definition convertor",
 				WorkloadType: appsv1alpha1.Consensus,
 				ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{
 					{
@@ -254,20 +253,6 @@ var _ = Describe("Component Definition Convertor", func() {
 						Type: appsv1alpha1.VolumeTypeLog,
 					},
 				},
-				CustomLabelSpecs: []appsv1alpha1.CustomLabelSpec{
-					{
-						Key:   "scope",
-						Value: "scope",
-						Resources: []appsv1alpha1.GVKResource{
-							{
-								GVK: "v1/pod",
-								Selector: map[string]string{
-									"managed-by": "kubeblocks",
-								},
-							},
-						},
-					},
-				},
 				SwitchoverSpec: &appsv1alpha1.SwitchoverSpec{},
 				VolumeProtectionSpec: &appsv1alpha1.VolumeProtectionSpec{
 					HighWatermark: defaultHighWatermark,
@@ -294,7 +279,7 @@ var _ = Describe("Component Definition Convertor", func() {
 			convertor := &compDefDescriptionConvertor{}
 			res, err := convertor.convert(clusterCompDef)
 			Expect(err).Should(Succeed())
-			Expect(res).Should(Equal(clusterCompDef.Description))
+			Expect(res).Should(BeEmpty())
 		})
 
 		It("service kind", func() {
@@ -623,13 +608,7 @@ var _ = Describe("Component Definition Convertor", func() {
 			convertor := &compDefLabelsConvertor{}
 			res, err := convertor.convert(clusterCompDef)
 			Expect(err).Should(Succeed())
-
-			labels := res.(map[string]string)
-			expectedLabels := map[string]string{}
-			for _, item := range clusterCompDef.CustomLabelSpecs {
-				expectedLabels[item.Key] = item.Value
-			}
-			Expect(labels).Should(BeEquivalentTo(expectedLabels))
+			Expect(res).Should(BeNil())
 		})
 
 		Context("system accounts", func() {
@@ -831,8 +810,8 @@ var _ = Describe("Component Definition Convertor", func() {
 				Expect(actions.Switchover).ShouldNot(BeNil())
 				Expect(len(actions.Switchover.ScriptSpecSelectors)).Should(BeEquivalentTo(2))
 				Expect(actions.Switchover.WithCandidate).ShouldNot(BeNil())
-				Expect(actions.Switchover.WithCandidate.Image).Should(BeEquivalentTo(commandExecutorEnvItem.Image))
-				Expect(actions.Switchover.WithCandidate.Env).Should(BeEquivalentTo(commandExecutorEnvItem.Env))
+				Expect(actions.Switchover.WithCandidate.Exec.Image).Should(BeEquivalentTo(commandExecutorEnvItem.Image))
+				Expect(actions.Switchover.WithCandidate.Exec.Env).Should(BeEquivalentTo(commandExecutorEnvItem.Env))
 				Expect(actions.Switchover.WithCandidate.Exec.Command).Should(BeEquivalentTo(commandExecutorItem.Command))
 				Expect(actions.Switchover.WithCandidate.Exec.Args).Should(BeEquivalentTo(commandExecutorItem.Args))
 				Expect(actions.Switchover.WithoutCandidate).ShouldNot(BeNil())
@@ -859,8 +838,8 @@ var _ = Describe("Component Definition Convertor", func() {
 				actions := res.(*appsv1alpha1.ComponentLifecycleActions)
 				Expect(actions.PostProvision).ShouldNot(BeNil())
 				Expect(actions.PostProvision.CustomHandler).ShouldNot(BeNil())
-				Expect(actions.PostProvision.CustomHandler.Image).Should(BeEquivalentTo(commandExecutorEnvItem.Image))
-				Expect(actions.PostProvision.CustomHandler.Env).Should(BeEquivalentTo(commandExecutorEnvItem.Env))
+				Expect(actions.PostProvision.CustomHandler.Exec.Image).Should(BeEquivalentTo(commandExecutorEnvItem.Image))
+				Expect(actions.PostProvision.CustomHandler.Exec.Env).Should(BeEquivalentTo(commandExecutorEnvItem.Env))
 				Expect(actions.PostProvision.CustomHandler.Exec.Command).Should(BeEquivalentTo(commandExecutorItem.Command))
 				Expect(actions.PostProvision.CustomHandler.Exec.Args).Should(BeEquivalentTo(commandExecutorItem.Args))
 				Expect(*actions.PostProvision.CustomHandler.PreCondition).Should(BeEquivalentTo(appsv1alpha1.ComponentReadyPreConditionType))
@@ -877,12 +856,12 @@ var _ = Describe("Component Definition Convertor", func() {
 					handler := appsv1alpha1.WeSQLBuiltinActionHandler
 					return &handler
 				}
-				expectedRoleProbe := &appsv1alpha1.RoleProbe{
-					LifecycleActionHandler: appsv1alpha1.LifecycleActionHandler{
-						BuiltinHandler: wesqlBuiltinHandler(),
+				expectedRoleProbe := &appsv1alpha1.Probe{
+					BuiltinHandler: wesqlBuiltinHandler(),
+					Action: appsv1alpha1.Action{
+						TimeoutSeconds: clusterCompDef.Probes.RoleProbe.TimeoutSeconds,
 					},
-					TimeoutSeconds: clusterCompDef.Probes.RoleProbe.TimeoutSeconds,
-					PeriodSeconds:  clusterCompDef.Probes.RoleProbe.PeriodSeconds,
+					PeriodSeconds: clusterCompDef.Probes.RoleProbe.PeriodSeconds,
 				}
 				Expect(actions.RoleProbe).ShouldNot(BeNil())
 				Expect(*actions.RoleProbe).Should(BeEquivalentTo(*expectedRoleProbe))
@@ -913,10 +892,10 @@ var _ = Describe("Component Definition Convertor", func() {
 				actions := res.(*appsv1alpha1.ComponentLifecycleActions)
 				Expect(actions.RoleProbe).ShouldNot(BeNil())
 				Expect(*actions.RoleProbe.BuiltinHandler).Should(BeEquivalentTo(appsv1alpha1.WeSQLBuiltinActionHandler))
-				Expect(actions.RoleProbe.CustomHandler).ShouldNot(BeNil())
-				Expect(actions.RoleProbe.CustomHandler.Image).Should(BeEquivalentTo("mock-its-role-probe-image"))
-				Expect(actions.RoleProbe.CustomHandler.Exec.Command).Should(BeEquivalentTo(mockCommand))
-				Expect(actions.RoleProbe.CustomHandler.Exec.Args).Should(BeEquivalentTo(mockArgs))
+				Expect(actions.RoleProbe.Exec).ShouldNot(BeNil())
+				Expect(actions.RoleProbe.Exec.Image).Should(BeEquivalentTo("mock-its-role-probe-image"))
+				Expect(actions.RoleProbe.Exec.Command).Should(BeEquivalentTo(mockCommand))
+				Expect(actions.RoleProbe.Exec.Args).Should(BeEquivalentTo(mockArgs))
 			})
 		})
 

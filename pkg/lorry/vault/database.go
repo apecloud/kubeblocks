@@ -112,7 +112,7 @@ func (db *LorryDB) NewUser(ctx context.Context, req dbplugin.NewUserRequest) (db
 		accessMode = statements[0]
 	}
 
-	err = db.lorryClient.CreateUser(ctx, username, password, accessMode)
+	err = db.lorryClient.CreateUser(ctx, username, password, accessMode, "")
 	if err != nil {
 		db.logger.Info("create user failed", "error", err)
 		return dbplugin.NewUserResponse{}, err

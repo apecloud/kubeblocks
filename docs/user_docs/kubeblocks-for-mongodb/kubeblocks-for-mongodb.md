@@ -9,4 +9,3 @@ sidebar_position: 1
 
 * [Cluster Management](./cluster-management/create-and-connect-to-a-mongodb-cluster.md)
 * [Configuration](./configuration/configuration.md)
-* [Migration](./migration/feature-and-limit-list-mongodb.md)

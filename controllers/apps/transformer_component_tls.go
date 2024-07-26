@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -73,6 +74,7 @@ func checkAndTriggerReRender(ctx context.Context, synthesizedComp component.Synt
 		return nil
 	}
 
+	// TODO: (good-first-issue) don't hard code the tls keyword
 	tlsKeyword := plan.GetTLSKeyWord(synthesizedComp.ServiceKind)
 	if tlsKeyword == "unsupported-character-type" {
 		return nil
@@ -146,6 +148,11 @@ func buildTLSCert(ctx context.Context, cli client.Reader, synthesizedComp compon
 			return err
 		}
 	case appsv1alpha1.IssuerKubeBlocks:
+		secretName := plan.GenerateTLSSecretName(synthesizedComp.ClusterName, synthesizedComp.Name)
+		preSecret := &corev1.Secret{}
+		if err := cli.Get(ctx, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: secretName}, preSecret); !errors.IsNotFound(err) {
+			return err
+		}
 		secret, err := plan.ComposeTLSSecret(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
 		if err != nil {
 			return err

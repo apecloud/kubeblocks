@@ -13,7 +13,7 @@ Alerts are mainly used for daily error response to improve system availability. 
 
 :::note
 
-The alert function is the same for all.
+The alert function is the same for all engines.
 
 :::
 

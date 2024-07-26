@@ -29,18 +29,6 @@ import (
 
 // ClusterDefinitionSpec defines the desired state of ClusterDefinition.
 type ClusterDefinitionSpec struct {
-	// Specifies the well-known database type, such as mysql, redis, or mongodb.
-	//
-	// Deprecated since v0.9.
-	// This field is maintained for backward compatibility and its use is discouraged.
-	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
-	//
-	// +kubebuilder:validation:MaxLength=24
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
-	// +optional
-	Type string `json:"type,omitempty"`
-
 	// Provides the definitions for the cluster components.
 	//
 	// Deprecated since v0.9.
@@ -492,33 +480,6 @@ type ServiceRefDeclarationSpec struct {
 	ServiceVersion string `json:"serviceVersion"`
 }
 
-type ExporterConfig struct {
-	// scrapePort is exporter port for Time Series Database to scrape metrics.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:XIntOrString
-	ScrapePort intstr.IntOrString `json:"scrapePort"`
-
-	// scrapePath is exporter url path for Time Series Database to scrape metrics.
-	// +kubebuilder:validation:MaxLength=128
-	// +kubebuilder:default="/metrics"
-	// +optional
-	ScrapePath string `json:"scrapePath,omitempty"`
-}
-
-type MonitorConfig struct {
-	// builtIn is a switch to enable KubeBlocks builtIn monitoring.
-	// If BuiltIn is set to true, monitor metrics will be scraped automatically.
-	// If BuiltIn is set to false, the provider should set ExporterConfig and Sidecar container own.
-	// +kubebuilder:default=false
-	// +optional
-	BuiltIn bool `json:"builtIn,omitempty"`
-
-	// exporterConfig provided by provider, which specify necessary information to Time Series Database.
-	// exporterConfig is valid when builtIn is false.
-	// +optional
-	Exporter *ExporterConfig `json:"exporterConfig,omitempty"`
-}
-
 // ClusterComponentDefinition defines a Component within a ClusterDefinition but is deprecated and
 // has been replaced by ComponentDefinition.
 //
@@ -534,11 +495,6 @@ type ClusterComponentDefinition struct {
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	Name string `json:"name"`
-
-	// Description of the component definition.
-	//
-	// +optional
-	Description string `json:"description,omitempty"`
 
 	// Defines the type of the workload.
 	//
@@ -651,13 +607,6 @@ type ClusterComponentDefinition struct {
 	// +optional
 	VolumeTypes []VolumeTypeSpec `json:"volumeTypes,omitempty"`
 
-	// Used for custom label tags which you want to add to the component resources.
-	//
-	// +listType=map
-	// +listMapKey=key
-	// +optional
-	CustomLabelSpecs []CustomLabelSpec `json:"customLabelSpecs,omitempty"`
-
 	// Defines command to do switchover.
 	// In particular, when workloadType=Replication, the command defined in switchoverSpec will only be executed under
 	// the condition of cluster.componentSpecs[x].SwitchPolicy.type=Noop.
@@ -690,18 +639,6 @@ type ClusterComponentDefinition struct {
 	//
 	// +optional
 	ServiceRefDeclarations []ServiceRefDeclaration `json:"serviceRefDeclarations,omitempty"`
-
-	// Defines the metrics exporter.
-	//
-	// +optional
-	Exporter *Exporter `json:"exporter,omitempty"`
-
-	// Deprecated since v0.9
-	// monitor is monitoring config which provided by provider.
-	//
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.10.0"
-	// +optional
-	Monitor *MonitorConfig `json:"monitor,omitempty"`
 }
 
 func (r *ClusterComponentDefinition) GetStatefulSetWorkload() StatefulSetWorkload {
@@ -1235,39 +1172,6 @@ type CommandExecutorItem struct {
 	//
 	// +optional
 	Args []string `json:"args,omitempty"`
-}
-
-// CustomLabelSpec is deprecated since v0.8.
-type CustomLabelSpec struct {
-	// The key of the label.
-	//
-	// +kubebuilder:validation:Required
-	Key string `json:"key"`
-
-	// The value of the label.
-	//
-	// +kubebuilder:validation:Required
-	Value string `json:"value"`
-
-	// The resources that will be patched with the label.
-	//
-	// +kubebuilder:validation:Required
-	Resources []GVKResource `json:"resources,omitempty"`
-}
-
-// GVKResource is deprecated since v0.8.
-type GVKResource struct {
-	// Represents the GVK of a resource, such as "v1/Pod", "apps/v1/StatefulSet", etc.
-	// When a resource matching this is found by the selector, a custom label will be added if it doesn't already exist,
-	// or updated if it does.
-	//
-	// +kubebuilder:validation:Required
-	GVK string `json:"gvk"`
-
-	// A label query used to filter a set of resources.
-	//
-	// +optional
-	Selector map[string]string `json:"selector,omitempty"`
 }
 
 // TODO(API):

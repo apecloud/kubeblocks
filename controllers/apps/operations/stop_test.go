@@ -26,14 +26,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
 var _ = Describe("Stop OpsRequest", func() {
-
 	var (
 		randomStr             = testCtx.GetRandomStr()
 		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr
@@ -85,13 +83,12 @@ var _ = Describe("Stop OpsRequest", func() {
 			// do stop cluster
 			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(len(opsRes.Cluster.Annotations[constant.SnapShotForStartAnnotationKey]) != 0).Should(BeTrue())
 			for _, v := range opsRes.Cluster.Spec.ComponentSpecs {
-				Expect(v.Replicas).Should(BeEquivalentTo(0))
+				Expect(v.Stop).ShouldNot(BeNil())
+				Expect(*v.Stop).Should(BeTrue())
 			}
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err == nil).Should(BeTrue())
 		})
-
 	})
 })

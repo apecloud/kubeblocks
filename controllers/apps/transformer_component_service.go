@@ -211,7 +211,12 @@ func (t *componentServiceTransformer) buildService(comp *appsv1alpha1.Component,
 		}
 		builder.AddSelector(constant.RoleLabelKey, service.RoleSelector)
 	}
-	return builder.GetObject(), nil
+
+	svcObj := builder.GetObject()
+	if err := setCompOwnershipNFinalizer(comp, svcObj); err != nil {
+		return nil, err
+	}
+	return svcObj, nil
 }
 
 func (t *componentServiceTransformer) builtinSelector(comp *appsv1alpha1.Component) map[string]string {

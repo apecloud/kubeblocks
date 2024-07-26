@@ -99,7 +99,6 @@ If you use AWS EKS, you may want to access to the Kafka cluster from EC2 instanc
     spec:
       affinity:
         podAntiAffinity: Preferred
-        tenancy: SharedNode
         topologyKeys:
         - kubernetes.io/hostname
       clusterDefinitionRef: kafka
@@ -168,7 +167,6 @@ The current version only supports Kafka broker with a single replica (combined: 
     spec:
       affinity:
         podAntiAffinity: Preferred
-        tenancy: SharedNode
         topologyKeys:
         - kubernetes.io/hostname
       clusterDefinitionRef: kafka

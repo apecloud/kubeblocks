@@ -942,6 +942,18 @@ spec:
                                 If not specified, the default key "username" is used.
                               type: string
                           type: object
+                        containerPort:
+                          description: Specifies the container port in the target
+                            pod.
+                          properties:
+                            containerName:
+                              description: Specifies the name of container with the
+                                port.
+                              type: string
+                            portName:
+                              description: Specifies the port name.
+                              type: string
+                          type: object
                         role:
                           description: |-
                             Specifies the role to select one or more replicas for backup.

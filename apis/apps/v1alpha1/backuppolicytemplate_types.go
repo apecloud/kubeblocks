@@ -236,6 +236,11 @@ type TargetInstance struct {
 	//
 	// +optional
 	ConnectionCredentialKey ConnectionCredentialKey `json:"connectionCredentialKey,omitempty"`
+
+	// Specifies the container port in the target pod.
+	//
+	// +optional
+	ContainerPort *ContainerPort `json:"containerPort,omitempty"`
 }
 
 type ConnectionCredentialKey struct {
@@ -256,6 +261,17 @@ type ConnectionCredentialKey struct {
 
 	// Indicates map key of the port in the connection credential secret.
 	PortKey *string `json:"portKey,omitempty"`
+}
+
+type ContainerPort struct {
+	// Specifies the name of container with the port.
+	//
+	// +kubebuilder:validation:Required
+	ContainerName string `json:"containerName,omitempty"`
+	// Specifies the port name.
+	//
+	// +kubebuilder:validation:Required
+	PortName string `json:"portName,omitempty"`
 }
 
 // BackupPolicyTemplateStatus defines the observed state of BackupPolicyTemplate.

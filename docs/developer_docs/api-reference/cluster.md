@@ -4147,18 +4147,6 @@ This name will apply to cluster objects as the value of label &ldquo;apps.kubebl
 </tr>
 <tr>
 <td>
-<code>description</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Description of the component definition.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>workloadType</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.WorkloadType">
@@ -4393,20 +4381,6 @@ to the volumeType.</p>
 </ul>
 <p>NOTE: When volumeTypes is not defined, the backup function will not be supported, even if a persistent volume has
 been specified.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>customLabelSpecs</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.CustomLabelSpec">
-[]CustomLabelSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Used for custom label tags which you want to add to the component resources.</p>
 </td>
 </tr>
 <tr>
@@ -11295,59 +11269,6 @@ VarOption
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.CustomLabelSpec">CustomLabelSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>)
-</p>
-<div>
-<p>CustomLabelSpec is deprecated since v0.8.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>key</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>The key of the label.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>value</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>The value of the label.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>resources</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.GVKResource">
-[]GVKResource
-</a>
-</em>
-</td>
-<td>
-<p>The resources that will be patched with the label.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.CustomOps">CustomOps
 </h3>
 <p>
@@ -11993,49 +11914,6 @@ in each OpsService definition.</p>
 <td><p>FailurePolicyIgnore means that an error will be ignored but logged.</p>
 </td>
 </tr></tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.GVKResource">GVKResource
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CustomLabelSpec">CustomLabelSpec</a>)
-</p>
-<div>
-<p>GVKResource is deprecated since v0.8.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>gvk</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Represents the GVK of a resource, such as &ldquo;v1/Pod&rdquo;, &ldquo;apps/v1/StatefulSet&rdquo;, etc.
-When a resource matching this is found by the selector, a custom label will be added if it doesn&rsquo;t already exist,
-or updated if it does.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>selector</code><br/>
-<em>
-map[string]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>A label query used to filter a set of resources.</p>
-</td>
-</tr>
-</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.HScaleDataClonePolicyType">HScaleDataClonePolicyType
 (<code>string</code> alias)</h3>

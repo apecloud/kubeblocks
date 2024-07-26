@@ -540,51 +540,6 @@ spec:
                       required:
                       - leader
                       type: object
-                    customLabelSpecs:
-                      description: Used for custom label tags which you want to add
-                        to the component resources.
-                      items:
-                        description: CustomLabelSpec is deprecated since v0.8.
-                        properties:
-                          key:
-                            description: The key of the label.
-                            type: string
-                          resources:
-                            description: The resources that will be patched with the
-                              label.
-                            items:
-                              description: GVKResource is deprecated since v0.8.
-                              properties:
-                                gvk:
-                                  description: |-
-                                    Represents the GVK of a resource, such as "v1/Pod", "apps/v1/StatefulSet", etc.
-                                    When a resource matching this is found by the selector, a custom label will be added if it doesn't already exist,
-                                    or updated if it does.
-                                  type: string
-                                selector:
-                                  additionalProperties:
-                                    type: string
-                                  description: A label query used to filter a set
-                                    of resources.
-                                  type: object
-                              required:
-                              - gvk
-                              type: object
-                            type: array
-                          value:
-                            description: The value of the label.
-                            type: string
-                        required:
-                        - key
-                        - value
-                        type: object
-                      type: array
-                      x-kubernetes-list-map-keys:
-                      - key
-                      x-kubernetes-list-type: map
-                    description:
-                      description: Description of the component definition.
-                      type: string
                     horizontalScalePolicy:
                       description: Defines the behavior of horizontal scale.
                       properties:

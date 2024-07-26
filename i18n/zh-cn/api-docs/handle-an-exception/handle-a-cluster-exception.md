@@ -1,38 +1,38 @@
 ---
-title: Handle a cluster exception
-description: How to handle an exception in a cluster
-keywords: [cluster exception]
+title: 异常处理
+description: 如何处理异常
+keywords: [异常处理]
 sidebar_position: 1
-sidebar_label: Handle an exception
+sidebar_label: 异常处理
 ---
 
-# Handle an exception
+# 异常处理
 
-When an exception occurs during your operation, you can perform the following steps to solve it.
+发生异常时，你可以按照以下步骤解决问题。
 
-## Steps
+## 步骤
 
-1. Check the cluster status.
+1. 检查集群状态。
 
-   Take the cluster named mycluster as an example.
+   此处以 `mycluster` 为例。
 
     ```bash
     kubectl describe cluster mycluster
     ```
 
-2. Handle the exception according to the status information.
+2. 根据状态信息进行处理。
 
-    | **Status**       | **Information** |
+    | **状态**       | **信息** |
     | :---             | :---            |
-    | Abnormal         | The cluster can be accessed but exceptions occur in some pods. This might be a mediate status of the operation process and the system recovers automatically without executing any extra operation. Wait until the cluster status changes to `Running`. |
-    | ConditionsError  | The cluster is normal but an exception occurs to the condition. It might be caused by configuration loss or exception, which further leads to operation failure. Manual recovery is required. |
-    | Failed | The cluster cannot be accessed. Check the `status.message` string and get the exception reason. Then manually recover it according to the hints. |
+    | Abnormal         | 可以访问集群，但某些 Pod 发生异常。这可能是操作过程中的中间状态，系统会自动恢复，无需执行其他额外操作。等待集群状态变为 `Running` 即可。 |
+    | ConditionsError  | 集群正常，但 Condition 发生异常。这可能是由于配置丢失或异常而导致的操作失败。需要手动恢复。 |
+    | Failed | 无法访问集群。检查 `status.message `字符串并获取异常原因，然后根据提示进行手动恢复。 |
 
-    You can check the cluster's status for more information.
+    你可以查看集群的状态以获取更多信息。
 
-## Fallback strategies
+## 兜底策略
 
-If the above operations can not solve the problem, try the following steps:
+如果上述操作无法解决问题，请尝试：
 
-- Restart this cluster. If the restart fails, you can delete the pod manually.
-- Roll the cluster status back to the status before changes.
+- 重新启动该集群。如果重新启动失败，可以手动删除 Pod。
+- 将集群状态回滚到更改前的状态。

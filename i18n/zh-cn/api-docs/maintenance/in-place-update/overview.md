@@ -23,7 +23,6 @@ sidebar_label: 概述
 * `spec.containers[*].image`
 * `spec.tolerations (only supports adding Toleration)`
 
-Starting from Kubernetes version 1.27, support for in-place updates of CPU and Memory can be further enabled through the PodInPlaceVerticalScaling feature switch, which is enabled by default from version 1.29 onwards. KubeBlocks automatically detects the Kubernetes version and feature switches, and further supports the following capabilities:
 Kubernetes 从 v1.27 开始，通过 `PodInPlaceVerticalScaling` 特性开关可进一步开启对 CPU 和 Memory 的原地更新支持，并从 v1.29 开始，该特性默认打开。KubeBlocks 会自动探测 Kubernetes 版本和特性开关，并进一步支持如下能力：
 
 对于大于或等于 v1.29 的 Kubernetes，或大于等于 v1.27 且小于 v1.29 并且 `PodInPlaceVerticalScaling` 已开启的 Kubernetes，支持如下字段的原地更新：
@@ -41,13 +40,11 @@ Kubernetes 从 v1.27 开始，通过 `PodInPlaceVerticalScaling` 特性开关可
 
 KubeBlocks 跟实例相关的上层 API 包括 Cluster、ClusterDefinition、ClusterVersion、ComponentDefinition 和 ComponentVersion。这些 API 中有若干字段最终会直接或间接用来渲染实例对象，从而可能会触发实例原地更新。
 
-There are numerous fields across these APIs. See the below table for brief descriptions.
-
 这些字段非常多，这里对这些字段进行罗列和简单描述。
 
 :::note
 
-API 中标记为 deprecated 的字段不在列表内，immutable 的字段不在列表内
+API 中标记为 deprecated 的字段不在列表内，immutable 的字段不在列表内。
 
 :::
 

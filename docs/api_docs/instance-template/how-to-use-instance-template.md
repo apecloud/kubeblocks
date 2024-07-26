@@ -16,7 +16,7 @@ In the official image of RisingWave, this information can be injected via enviro
 
 ## An example
 
-In the default template of RisingWave addon, the environment variables are configured as follows:
+In the default template of RisingWave addon, [the environment variables](https://github.com/apecloud/kubeblocks-addons/blob/main/addons/risingwave/templates/clusterdefinition.yaml#L334) are configured as follows:
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1

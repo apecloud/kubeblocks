@@ -1,54 +1,54 @@
 ---
-title: MySQL introduction
-description: MySQL introduction
-keywords: [apecloud mysql, mysql, introduction]
+title: 简介
+description: ApeCloud MySQL 简介
+keywords: [apecloud mysql, 简介]
 sidebar_position: 1
 ---
 
-# MySQL introduction
+# 简介
 
-MySQL is the world’s most popular open-source database and the second-most-popular database overall. It is used by many of the most accessed applications, such as Facebook, Twitter, Netflix, Uber, Airbnb, Shopify, and Booking.com.
+MySQL 是全球最流行的开源数据库，受到许多公司的欢迎，例如 Facebook、Twitter、Netflix、Uber、Airbnb、Shopify 和 Booking 等。
 
-KubeBlocks adopts the MySQL distribution provided by ApeCloud, which includes data compression and high availability improvements.
+KubeBlocks 采用了 ApeCloud 公司提供的 MySQL 高可用版本，做了数据压缩和高可用性方面的改进。
 
-- When there are 3 or more replicas,  a strong consistent high-availability cluster is created with the consensus algorithm protocol to ensure that RPO=0 in the case of a single availability zone failure. Among them, the primary instance provides read/write capacity, and the remaining instances provide read-only services.
-- When there are 2 replicas, a Primary-Secondary replication cluster is created, in which the primary instance provides read/write capacity, and the secondary instance keeps in sync with the primary instance with asynchronous replication, providing read-only and fault tolerance capabilities.
-- When there is only 1 replica, a standalone cluster is created to provide read/write capacity. Automatic fault recovery capability is still provided, and RPO=0 remains ensured if the cloud disk is not damaged.
+- 当节点数大于等于 3 个时，通过一致性算法协议构成强一致高可用性集群，确保在单可用区故障的情况下 RPO=0。其中，主节点提供读写能力，其余节点提供只读服务。
+- 当节点数等于 2 时，构成主备复制集群，其中主节点提供读写能力，备节点通过异步复制与主节点保持同步，提供只读服务和故障容灾能力。
+- 当节点数等于 1 时，构成单节点集群，提供读写服务。KubeBlocks 仍然提供自动恢复能力，在云盘不损坏的情况下保证 RPO=0。
 
-## Instance Roles
+## 实例角色
 
-ApeCloud MySQL supports four roles, **Leader**, **Follower**, **Candidate**, and **Learner**. The Leader and a Follower form a high-availability cluster and ensure RPO=0.
+ApeCloud MySQL 支持四种角色类型，即 **Leader**（领导者）、**Follower**（跟随者）、**Candidate**（候选者）和 **Learner**（学习者）。Leader 和 Follower 组成高可用性集群，提供 RPO=0 能力。
 
-- Leader: This role is the primary instance of the cluster, and supports R/W with forced consistency. It is voted by all the Candidates participating in the election. The Candidates with the majority of votes become the Leader, and the other Candidates become the Follower.
-- Follower: Follower supports data consistency with read-only capacity, and forms a high-availability cluster with Leader and other Followers.
-- Learner: This role is usually used for cross-regional consistent read-only data. Data synchronization is performed through the Paxos protocol, and the data source can be a Leader or a Follower. The learner is a special role in the consensus algorithm protocol, and does not participate in voting or being elected as a Candidate role.
-- Candidate: The Candidate is an intermediate role that exists only during the election process or when a majority number is not enough to select the Leader role.  Normally, all Candidates in a high availability cluster will eventually become a Leader or a Follower after the election is completed.
+- Leader：Leader 是集群的主实例，支持读写操作，是集群强一致节点。由所有参与选举的 Candidate 投票产生。得票数最多的 Candidate 成为 Leader，其他的成为 Follower。
+- Follower：Follower 支持数据一致性只读服务，并与 Leader 和其他 Follower 组成高可用性集群。
+- Learner：Learner 通常用于跨地域的一致性只读数据节点实例，通过 Paxos 协议实现数据同步，数据同步源可以是 Leader 或 Follower。Learner 是一致性算法协议中的特殊角色，不参与投票，也不成为 Candidate，类似旁听角色。
+- Candidate：Candidate 是一个中间角色，只在选举过程或无法形成多数派选出 Leader 时存在。一般来说，高可用集群中的所有 Candidate 在选举完成后，最终都会成为 Leader 或 Follower 角色。
 
-| Role |  Leader |Follower | Learner | Candidate |
-| ---- |----| ----|----|----|
-| **Capability**|RW/HA|RO/HA|RO|-|
+| 角色类型 | Leader | Follower | Learner | Candidate |
+| --- | --- | --- | --- | --- |
+| 功能能力 | RW/HA | RO/HA | RO | - |
 
-![Role_changing](../../../img/apecloud-mysql-intro-role-changing.jpg)
+![ApeCloud MySQL 角色切换](./../../../img/apecloud-mysql-intro-role-changing.jpg)
 
-### Failover
+### 故障切换
 
-A failover is the redirection of traffic and switches the running tasks from a primary instance to a secondary instance.
+故障切换将重定向流量，把正在执行的任务从主节点切换到从节点。
 
-### Read-only
+### 只读功能
 
-Replicas provide read-only capabilities. In addition to the Follower that can provide read-only capabilities, you can also expand the read-only capabilities of the cluster by adding Learner roles. It should be noted that when performing read-only operations through Follower or Learner, there may be a data delay with the Leader. This delay may be caused by a log synchronization delay or a log playback delay.
+节点提供只读能力。除了 Follower 角色之外，还可以通过添加 Learner 角色来扩展集群的只读能力。需要注意的是，通过 Follower 或 Learner 执行只读操作时，可能会与 Leader 存在数据延迟。这种延迟可能是由于日志同步延迟或日志回放延迟导致的。
 
-### Fault tolerance
+### 容错性
 
-The cluster supports node fault tolerance. Suppose the number of replicas is n, then the number of faulty replicas that can be tolerated is `floor (n/2) + 1, n=[1,99]`, which meets the requirements of the Paxos algorithm protocol. Based on this, it can be obtained that under the specified tolerable number f of ApeCloud MySQL cluster nodes, the number of replicas that need to be created is n=2*f+1, f>=0. For example, if the tolerable number of faulty replicas is 1, then according to the formula, the minimum number of replicas in the cluster is 3, that is, in a Paxos group, the continuous service capability of the cluster with 1 faulty replica is guaranteed. According to the table below, it can be seen that it is more cost-effective to create an odd number of replicas.
+集群具备节点故障容错能力。在 n 个节点集群下，可以容忍的故障节点数为 `floor(n/2) + 1，其中 n=[1,99]`，满足 Paxos 算法协议的要求。基于此，可以得出在指定可容忍节点故障数为 f 的情况下，需要创建的节点数为 n=2*f+1，其中 f>=0。例如，如果可容忍的故障节点数为 1，则根据公式可知，集群中的最小节点数为 3。即，在一个 Paxos 组中，能够保证具有 1 个故障节点下集群的持续服务能力。根据下表可以看出，创建奇数个节点集群更具性价比。
 
- Replicas in Cluster | Node Majority | Nodes Tolerable |
-  ---- |----| ----|
-  3 | 2 | 1 |
-  4 | 3 | 1 |
-  5 | 3 | 2 |
-  6 | 4 | 2 |
-  7 | 4 | 3 |
-  8 | 5 | 3 |
-  9 | 5 | 4 |
-  10 | 6 | 4 |
+| 集群节点数 | 节点大多数 | 可容忍故障节点数 |
+| --- | --- | --- |
+| 3 | 2 | 1 |
+| 4 | 3 | 1 |
+| 5 | 3 | 2 |
+| 6 | 4 | 2 |
+| 7 | 4 | 3 |
+| 8 | 5 | 3 |
+| 9 | 5 | 4 |
+| 10 | 6 | 4 |

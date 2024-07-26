@@ -1,37 +1,35 @@
 ---
-title: Full disk lock
-description: How to configure disk lock when it is about to be full
+title: 磁盘满锁
+description: 磁盘空间将满时，如何设置磁盘锁定
 sidebar_position: 2
-sidebar_label: Full disk lock
+sidebar_label: 磁盘满锁
 ---
 
-# Full disk lock
+# 磁盘满锁
 
-The full disk lock function of KubeBlocks ensures the stability and availability of a database. This function triggers a disk lock when the disk usage reaches a set threshold, thereby pausing write operations and only allowing read operations. Such a mechanism prevents a database from being affected by disk space exhaustion.
+KubeBlocks 的磁盘满锁功能确保了数据库的稳定性和可用性。该功能在磁盘使用量达到设定的阈值时触发磁盘锁定，从而暂停写操作，只允许读操作。这样的机制可以防止数据库受到磁盘空间耗尽的影响。
 
-## Mechanism of lock/unlock
+## 锁定/解锁机制
 
-When the space water level of any configured volume exceeds the defined threshold, the instance is locked (read-only). Meanwhile, the system sends a related warning event, including the specific threshold and space usage information of each volume.
+只要有某些卷的空间水位超过定义的阈值，实例就会被锁定（只读）。同时，系统会发送相关警报，包括每个卷的具体阈值和空间使用信息。
 
-When the space water level of all configured volumes falls below the defined threshold, the instance is unlocked (read and write). Meanwhile, the system sends a related warning event, including the specific threshold and space usage information of each volume.
+当所有卷的空间水位都低于定义的阈值时，实例将被解锁（读写）。同时，系统也会发送相关警报，包括每个卷的具体阈值和空间使用信息。
 
 :::note
 
-1. The full disk lock function currently supports global (ClusterDefinition) enabling or disabling and does not support Cluster dimension control. Dynamically enabling or disabling this function may affect the existing Cluster instances that use this ClusterDefinition and cause them to restart. Please operate with caution.
-
-2. The full disk lock function relies on the read permission (get & list) of the two system resource nodes and nodes/stats. If you create an instance via kbcli, make sure to grant the controller administrative rights to the ClusterRoleBinding.
-
-3. Currently, full disk lock is available for ApeCloud MySQL, PostgreSQL and MongoDB.
+1. 磁盘满锁功能目前支持全局（ClusterDefinition）启用或禁用，暂不支持集群维度的控制。动态启用或禁用此功能可能会影响使用此 ClusterDefinition 的现有集群实例，并导致它们重新启动。请谨慎操作。
+2. 磁盘满锁功能依赖于两个系统资源节点和 nodes/stats 的读取权限（get 和 list）。如果你通过 kbcli 创建实例，请确保为控制器授予 ClusterRoleBinding 的管理权限。
+3. 支持的引擎：ApeCloud MySQL、PostgreSQL、MongoDB。
 
 :::
 
-## Enable full disk lock
+## 启用磁盘满锁
 
-- For MySQL database, the read/write user cannot write to the disk when the disk usage reaches the `highwatermark` value, while the superuser can still write.
-- For PostgreSQL and MongoDB, both the read/write user and the superuser cannot write when the disk usage reaches `highwatermark`.
-- `90` is the default value setting for the high watermark at the component level which means the disk is locked when the disk usage reaches 90%, while `85` is used for the volumes which overwrites the component's threshold value.
+- 对于 MySQL 数据库，当磁盘使用量达到 `highwatermark` 值时，读写用户无法写入磁盘，而超级用户仍然可以写入。
+- 对于 PostgreSQL 和 MongoDB 数据库，当磁盘使用量达到 `highwatermark` 时，无论是读写用户还是超级用户都无法写入。
+- 组件级别的高水位的默认阈值为 `90`，当磁盘使用量达到 90% 时将锁定磁盘。而卷级别的设置为 `85`，会覆盖组件级别的阈值。
 
-In the cluster definition, add the following content to enable the full disk lock function. You can set the value according to your need.
+在集群定义中，添加以下内容以启用磁盘满锁功能。你可以根据需要进行设置。
 
 ```bash
 volumeProtectionSpec:
@@ -43,10 +41,10 @@ volumeProtectionSpec:
 
 :::note
 
-The recommended value of `highWatermark` is 90.
+推荐将 `highWatermark` 设置为 90。
 
 :::
 
-## Disable full disk lock
+## 禁用磁盘满锁
 
-Delete `volumeProtectionSpec` from the cluster definition file.
+从 ClusterDefinition 文件中删除 `volumeProtectionSpec`。

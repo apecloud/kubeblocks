@@ -1,27 +1,27 @@
 ---
-title: Introduction of Instance Template
-description: Introduction of Instance Template
-keywords: [instance template]
+title: 简介
+description: 实例模板简介
+keywords: [实例模板]
 sidebar_position: 1
-sidebar_label: Introduction of instance template
+sidebar_label: 简介
 ---
 
-# Introduction of instance template
+# 简介
 
-## What is an instance template
+## 什么是实例模板
 
-An *instance* serves as the fundamental unit in KubeBlocks, comprising a Pod along with several auxiliary objects. To simplify, you can initially think of it as a Pod, and henceforth, we'll consistently refer to it as an "Instance."
+***实例（Instance）***是 KubeBlocks 中的基本单元，它由一个 Pod 和若干其它辅助对象组成。为了容易理解，你可以先把它简化为一个 Pod，下文中将统一使用“实例”这个名字。
 
-Starting from version 0.9, we're able to establish multiple instance templates for a particular component within a cluster. These instance templates include several fields such as Name, Replicas, Annotations, Labels, Env, Tolerations, NodeSelector, etc. These fields will ultimately override the corresponding ones in the default template (originating from ClusterDefinition and ComponentDefinition) to generate the final template for rendering the instance.
+从 0.9 开始，我们可以为一个 Cluster 中的某个 Component 设置若干实例模板（Instance Template），实例模板中包含 Name、Replicas、Annotations、Labels、Env、Tolerations、NodeSelector 等多个字段（Field），这些字段最终会覆盖（Override）默认模板（也就是在 ClusterDefinition 和 ComponentDefinition 中定义的 PodTemplate）中相应的字段，并生成最终的模板以便用来渲染实例。
 
-## Why do we the instance template
+## 为什么采用实例模板
 
-In KubeBlocks, a *Cluster* is composed of several *Components*, where each *Component* ultimately oversees multiple *Pods* and auxiliary objects.
+在 KubeBlocks 中，一个 *Cluster* 由若干个 *Component* 组成，一个 *Component* 最终管理若干 *Pod* 和其它对象。
 
-Prior to version 0.9, these pods were rendered from a shared PodTemplate, as defined in either ClusterDefinition or ComponentDefinition. However, this design can’t meet the following demands:
+在 0.9 版本之前，这些 Pod 是从同一个 PodTemplate 渲染出来的（该 PodTemplate 在 ClusterDefinition 或 ComponentDefinition 中定义）。这样的设计不能满足如下需求：
 
- - For Clusters rendered from the same addon, setting separate scheduling configurations such as *NodeName*, *NodeSelector*, or *Tolerations*.
- - For Components rendered from the same addon, adding custom *Annotations*, *Labels*, or ENV to the Pods they manage.
- - For Pods managed by the same Component, configuring different *CPU*, *Memory*, and other *Resource Requests* and *Limits*.
+ - 对于从同一个引擎中渲染出来的 Cluster，为其设置单独的 *NodeName*、*NodeSelector* 或 *Tolerations* 等调度相关配置。
+ - 对于从同一个引擎中渲染出来的 Component，为它所管理的 Pod 添加自定义 *Annotation*、*Label* 或 *ENV*
+ - 对于被同一个 Component 管理的 Pod，为它们配置不同的 *CPU*、*Memory* 等 *Resources Requests* 和 *Limits*
 
-With various similar requirements emerging, the Cluster API introduced the Instance Template feature from version 0.9 onwards to cater to these needs.
+类似的需求还有很多，所以从 0.9 版本开始，Cluster API 中增加了实例模板特性，以满足上述需求。

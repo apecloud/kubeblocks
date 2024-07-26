@@ -143,25 +143,25 @@ helm install  vm kubeblocks/victoria-metrics-agent --set remoteWriteUrls={http:/
 
 ### 集成监控工具
 
-For the production environment, it is highly recommended to build your monitoring system or purchase a third-party monitoring service. You can follow the docs of monitoring tools to integrate the tools with KubeBlocks.
+对于生产环境，强烈建议您搭建您专属的监控系统或者购买第三方监控服务。您可参考监控工具的相关文档，将该工具集成到 KubeBlocks。
 
-### Enable the monitoring function for a database
+### 开启数据库监控功能
 
-The open-source or customized Exporter is injected after the monitoring function is enabled. This Exporter can be found by the Prometheus server automatically and scrape monitoring indicators at regular intervals.
+开源或自定义的 Exporter 会在启用监控功能后注入。Prometheus 服务器可以自动发现这个 Exporter 并定期抓取监控指标。
 
-If you disable the monitoring function when creating a cluster, run the command below to enable it.
+如果在创建集群时禁用了监控功能，请运行以下命令来启用它。
 
 ```bash
 kubectl patch cluster mycluster -n demo --type "json" -p '[{"op":"add","path":"/spec/componentSpecs/0/disableExporter","value":false}]'
 ```
 
-If you want to disable the monitoring function, run the command below to disable it.
+如果您需要关闭监控功能，可执行以下命令。
 
 ```bash
 kubectl patch cluster mycluster -n namespace --type "json" -p '[{"op":"add","path":"/spec/componentSpecs/0/disableExporter","value":true}]'
 ```
 
-You can also edit the `cluster.yaml` to enable/disable the monitoring function.
+您也可以通过编辑 `cluster.yaml` 文件开启/关闭监控功能。
 
 ```bash
 kubectl edit cluster mycluster -n demo
@@ -176,18 +176,18 @@ componentSpecs:
     disableExporter: true # Change this value
 ```
 
-### View the dashboard
+### 查看大盘
 
-You can view the dashboard of the corresponding cluster via Grafana Web Console. For more detailed information, see the [Grafana dashboard documentation](https://grafana.com/docs/grafana/latest/dashboards/).
+您可以通过 Grafana Web 控制台查看相应集群的仪表板。有关详细信息， [Grafana 大盘文档](https://grafana.com/docs/grafana/latest/dashboards/)。
 
-### (Optional) Enable remote write
+### （可选）开启 remote write
 
-KubeBlocks supports the `victoria-metrics-agent` addon to enable you to remotely write the data to your VM. Compared with the native Prometheus, [vmgent](https://docs.victoriametrics.com/vmagent.html) is lighter and supports the horizontal extension.
+KubeBlocks 支持 `victoria-metrics-agent` 引擎，使您可以将数据远程写入您的 VM。与原生 Prometheus 相比，[vmgent](https://docs.victoriametrics.com/vmagent.html) 更轻量并且支持水平扩展。
 
-Install the `victoria-metrics-agent` addon.
+执行以下命令，安装 `victoria-metrics-agent` 引擎。
 
 ```bash
 helm install vm kubeblocks/victoria-metrics-agent --set remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}
 ```
 
-For detailed settings, you can refer to [Victoria Metrics docs](https://artifacthub.io/packages/helm/victoriametrics/victoria-metrics-agent).
+有关详细设置，您可以参考 [Victoria Metrics 文档](https://artifacthub.io/packages/helm/victoriametrics/victoria-metrics-agent)。

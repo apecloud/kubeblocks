@@ -1,22 +1,22 @@
 ---
-title: Apply instance template
-description: Apply instance template
-keywords: [apply instance template, instance template]
+title: 应用实例模板
+description: 应用实例模板
+keywords: [应用实例模板, 实例模板]
 sidebar_position: 2
-sidebar_label: Apply instance template
+sidebar_label: 应用实例模板
 ---
 
-# Apply instance template
+# 应用实例模板
 
-Instance templates can be applied to many scenarios. In this section, we take a RisingWave cluster as an example.
+实例模板可用于多种场景。本章节以 RisingWave 为实例。
 
-KubeBlocks supports the management of RisingWave clusters. The RisingWave addon is contributed by the RisingWave official team. For RisingWave to function optimally, it relies on an external storage solution, such as AWS S3 or Alibaba Cloud OSS, to serve as its state backend. When creating a RisingWave cluster, it is necessary to configure credentials and other information for the external storage to ensure normal operation, and this information may vary for each cluster.
+KubeBlocks 中支持管理 RisingWave 集群，RisingWave 引擎由 RisingWave 官方贡献。RisingWave 需要一个外部存储来作为自己的存储后端（state backend），这个外部存储可以是 AWS S3、阿里云 OSS 等。RisingWave 集群在创建时需要配置外部存储的 Credential 等信息，以便能够正常工作，而这些信息对每个集群来说可能都不同。
 
-In the official image of RisingWave, this information can be injected via environment variables. Therefore, in KubeBlocks 0.9, we can configure corresponding environment variables in the instance template and set the values of these environment variables each time a cluster is created, so as to inject credential information into the container of RisingWave.
+在 RisingWave 的官方镜像中，这些信息可以通过环境变量（Env）方式注入，所以在 KubeBlocks v0.9 中，我们可以通过在实例模板中配置相应的环境变量，在每次创建集群时设置这些环境变量的值，以便将 Credential 等信息注入到 RisingWave 的容器中。
 
-## An example
+## 示例
 
-In the default template of RisingWave addon, the environment variables are configured as follows:
+在 RisingWave 引擎的默认模板中，[环境变量相关配置](https://github.com/apecloud/kubeblocks-addons/blob/main/addons/risingwave/templates/clusterdefinition.yaml#L334)如下：
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -60,7 +60,7 @@ spec:
 # ...
 ```
 
-After adding an instance template to the cluster resources:
+在 Cluster 资源中添加实例模板后如下：
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -107,26 +107,26 @@ spec:
 # ...
 ```
 
-In the example above, we added an instance template through the `instances` field, named `instance`. This template defines several environment variables such as `RW_STATE_STORE` and `AWS_REGION`. These environment variables will be appended by KubeBlocks to the list of environment variables defined in the default template. Consequently, the rendered instance will contain both the default template and all the environment variables defined in this instance template.
+在上面的例子中，我们通过 `instances` 字段新增了一个实例模板，该实例模板的名字为 `instance`。模板中定义了 `RW_STATE_STORE`、`AWS_REGION` 等若干环境变量，这些环境变量会被 KubeBlocks append 到默认模板中定义的环境变量列表后面，最终渲染的实例中将包含默认模板和在该实例模板中定义的所有环境变量。
 
-Additionally, the `replicas` field in the instance template is identical to that in the `componentSpec` (both are `{{ .Values.risingwave.compute.replicas }}`), indicating that after overriding the default template, this instance template will be used to render all instances within this component.
+另外，实例模板中 `replicas` 与 `componentSpec` 中相同（都为 `{{ .Values.risingwave.compute.replicas }}`），意味着在覆盖默认模板后，该实例模板将用来渲染该 Component 中的所有实例。
 
-## Detailed information on instance template
+## 实例模板详细说明
 
-- `Name` field: For each component, multiple instance templates can be defined. The template name is configured with the `Name` field and must remain unique within the same component.
-- `Replica` field: Each template can set the number of instances rendered based on that template via the `Replicas` field, of which the default value is 1. The sum of `Replicas` for all instance templates within the same component must be less than or equal to the `Replicas` value of the component. If the number of instances rendered based on the instance templates is less than the total number required by the component, the remaining instances will be rendered using the default template.
+- `Name` 字段：每个 Component 中可以定义多个实例模板。每个模板都需要通过 `Name` 字段设置模板名称，同一个 Component 中的实例模板名字必须保持唯一。
+- `Replica` 字段：每个模板可以通过 `Replicas` 字段设置基于该模板渲染的实例数量，Replicas 默认为 1。同一个 Component 中的所有实例模板的 `Replicas` 相加后必须小于或等于 Component 的 `Replicas` 值。若基于实例模板渲染的实例数量小于 Component 需要的总的实例数量，剩余的实例将使用默认模板进行渲染。
 
-The pattern for the names of instances rendered based on instance templates is `$(cluster name)-$(component name)-$(instance template name)-ordinal`. For example, in the above RisingWave cluster, the cluster name is `risingwave`, the component name is `compute`, the instance template name is `instance`, and the number of `Replicas` is 3. Therefore, the rendered instance names are risingwave-compute-instance-0, risingwave-compute-instance-1, and risingwave-compute-instance-2.
+基于实例模板渲染的实例名称的模式（Pattern）为 `$(cluster name)-$(component name)-$(instance template name)-ordinal`。比如在上文 RisingWave 示例中， Cluster 名字为 `risingwave`，Component 名字为 `compute`，实例模板名称为 `instance`，实例数量 `Replicas` 为 3。那么最终渲染出的实例名称为：`risingwave-compute-instance-0`,`risingwave-compute-instance-1`,`risingwave-compute-instance-2`。
 
-Instance templates can be used during cluster creation and can be updated during the operations period. Specifically, this includes adding, deleting, or updating instance templates. Updating instance templates may update, delete, or reconstruct instances. You are recommended to carefully evaluate whether the final changes meet expectations before performing updates.
+实例模板在集群创建阶段可以使用，并可以在后续运维中对实例模板进行更新，具体包括添加实例模板、删除实例模板或更新实例模板。实例模板更新可能会引起实例的更新、删除或重建，在更新前建议仔细分析最终的变化是否符合预期。
 
 ### Annotations
 
-The `Annotations` in the instance template are used to override the `Annotations` field in the default template. If a Key in the `Annotations` of the instance template already exists in the default template, the `value` corresponding to the Key will use the value in the instance template; if the Key does not exist in the default template, the Key and Value will be added to the final `Annotations`.
+实例模板中的 `annotations` 用于覆盖默认模板中的 `annotations` 字段，若实例模板 `annotations` 中的某个 Key 在默认模板中已存在，该 Key 对应的值（Value）将使用实例模板中的值；若该 Key 在默认模板中不存在，该 Key 和 Value 将被添加到最终的 `annotations` 中。
 
-***Example:***
+***示例***
 
-The `annotations` in the default template are:
+默认模板中 `annotations` 为：
 
 ```yaml
 annotations:
@@ -134,7 +134,7 @@ annotations:
   "foo1": "bar"
 ```
 
-And `annotations` in the instance templates are:
+实例模板中 `annotations` 为：
 
 ```yaml
 annotations:
@@ -142,7 +142,7 @@ annotations:
   "foo2": "bar2"
 ```
 
-Then, after rendering, the actual annotations are:
+则最终被渲染出的实例的 `annotations` 为：
 
 ```yaml
 annotations:
@@ -153,68 +153,68 @@ annotations:
 
 :::note
 
-KubeBlocks adds system `Annotations`, and do not overwrite them.
+KubeBlocks 会添加一些系统 `annotations`，需要避免对这些 `annotations` 造成覆盖。
 
 :::
 
 ### Labels
 
-You can also set `Labels` with the instance template.
+您也可以通过实例模板设置 `Labels`。
 
-Similar to `Annotations`, `Labels` in instance templates follow the same overriding logic applied to existing labels.
+与 `Annotations` 类似，实例模板中的 `Labels` 采用相同的覆盖逻辑应用到已有的 `Labels` 上，并形成最终的 `Labels`。
 
 :::note
 
-KubeBlocks adds system `Labels`, and do not overwrite them.
+KubeBlocks 添加了系统 `Labels`，请勿覆盖这些 `Labels`。
 
 :::
 
 ### Image
 
-The `Image` field in the instance template is used to override the `Image` field of the first container in the default template.
+实例模板中的 `Image` 用于覆盖默认模板中第一个 Container 的 `Image` 字段。
 
-:::note
+:::warning
 
-`Image` field should be used with caution: for the StatefulSet like databases, changing the `Image` often involves compatibility issues with data formats. When changing this field, please ensure that the image version in the instance template is fully compatible with that in the default template.
+该字段需慎用：在数据库等有状态应用中，`Image` 改变通常涉及数据格式等的兼容性，使用该字段时请确认实例模板的镜像版本与默认模板中的完全兼容。
 
 :::
 
-With KubeBlocks version 0.9 and above, detailed design for image versions is provided through `ComponentVersion`. It is recommended to manage versions using `ComponentVersion`.
+同时 KubeBlocks 从 v0.9 开始，通过 `ComponentVersion` 对镜像版本进行了详细设计，建议通过 `ComponentVersion` 进行版本管理。
 
 ### NodeName
 
-`NodeName` in the instance template overrides the same field in the default template.
+该字段用于覆盖默认模板中的 `NodeName` 字段。
 
 ### NodeSelector
 
-`NodeSelector` in the instance template overrides the same field in the default template.
+该字段用于覆盖默认模板中的 `NodeSelector` 字段，覆盖逻辑与 `Annotations` 和 `Labels` 相同。
 
 ### Tolerations
 
-`Tolerations` in the instance template overrides the same field in the default template.
+该字段用于覆盖默认模板中的 `Tolerations` 字段。
 
-If the `Toleration` in the instance template is identical to a `Toleration` in the default template (with the same `Key`, `Operator`, `Value`, `Effect`, and `TolerationSeconds`), then that `Toleration` will be ignored. Otherwise, it will be added to the list of `Tolerations` in the default template.
+若实例模板中的 `Toleration` 与默认模板中的某个 `Toleration` 完全相同（`Key`、`Operator`、`Value`、`Effect` 和 `TolerationSeconds` 都相同），则该 `Toleration` 会被忽略；否则，追加到默认模板中的 `Tolerations` 列表中。
 
 ### RuntimeClassName
 
-`RuntimeClassName` in the instance template overrides the same field in the default template.
+该字段用于覆盖默认模板中的 `RuntimeClassName` 字段。
 
 ### Resources
 
-`Resources` in the instance template overrides the same field in the default template and gets the highest priority.
+在实例模板中可以进一步覆盖 `Resources` 的值，其优先级高于 `Component`。
 
 ### Env
 
-The environment variables (`Env`) defined in the instance template will override any other environment variables except for the default `Env` set by KubeBlocks. The overriding logic is similar to `Annotations` and `Labels`. If an environment variable name is the same, the value or value source from the instance template will be used; if it's different, it will be added as a new environment variable.
+实例模板中定义的 `Env` 将覆盖除 KubeBlocks 系统默认 `Env` 外的其他 `Env`。覆盖逻辑与 `Annotaions` 和 `Labels` 类似，即若 `Env Name` 相同，则用实例模板中的 `Value` 或 `ValueFrom`；不同，则添加为新的 `Env`。
 
 ### Volumes
 
-Used to override the `Volumes` field of the first container in the default template. The overriding logic is similar to `Env`, if the `Volume Name` is the same, the `VolumeSource` from the instance template will be used; otherwise, it will be added as a new `Volume`.
+用于覆盖默认模板第一个 Container 的 `Volumes` 字段。覆盖逻辑与 `Env` 类似，即若 `Volume Name` 相同，则用实例模板中的 `VolumeSource`；否则，添加为新的 `Volume`。
 
 ### VolumeMounts
 
-Used to override the `VolumeMounts` field of the first container in the default template. The overriding logic is similar to `Volumes`, meaning if the `VolumeMount` `Name` is the same, the `MountPath` and other values from the instance template will be used; otherwise, it will be added as a new `VolumeMount`.
+用于覆盖默认模板第一个 Container 的 `VolumeMounts` 字段。覆盖逻辑与 `Volumes` 类似，即若 VolumeMount `Name` 相同，则用实例模板中的 `MountPath` 等值；否则，添加为新的 `VolumeMount`。
 
 ### VolumeClaimTemplates
 
-Used to override the `VolumeClaimTemplates` generated by `ClusterComponentVolumeClaimTemplate` within the Component. The overriding logic is similar to `Volumes`, meaning if the `PersistentVolumeClaim` `Name` is the same, the `PersistentVolumeClaimSpec` values from the instance template will be used; otherwise, it will be added as a new `PersistentVolumeClaim`.
+用于覆盖 Component 中通过 `ClusterComponentVolumeClaimTemplate` 生成的 `VolumeClaimTemplates`。覆盖逻辑与 Volumes 类似，即若 `PersistentVolumeClaim Name` 相同，则用实例模板中的 `PersistentVolumeClaimSpec` 值；否则，添加为新的 `PersistentVolumeClaim`。

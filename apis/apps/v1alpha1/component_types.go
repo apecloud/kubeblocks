@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
@@ -171,6 +172,13 @@ type ComponentSpec struct {
 	//
 	// +optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
+
+	// Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
+	// or when scaling down. It only used when `PodManagementPolicy` is set to `Parallel`.
+	// The default Concurrency is 100%.
+	//
+	// +optional
+	ParallelPodManagementConcurrency *intstr.IntOrString `json:"parallelPodManagementConcurrency,omitempty"`
 
 	// PodUpdatePolicy indicates how pods should be updated
 	//

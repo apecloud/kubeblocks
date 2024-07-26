@@ -219,9 +219,6 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 	credentialBuilder := builder.NewSecretBuilder(cluster.Namespace, constant.GenerateDefaultConnCredential(cluster.Name)).
 		AddLabelsInMap(wellKnownLabels).
 		SetStringData(clusterDefinition.Spec.ConnectionCredential)
-	if len(clusterDefinition.Spec.Type) > 0 {
-		credentialBuilder.AddLabelsInMap(constant.GetClusterDefTypeLabel(clusterDefinition.Spec.Type))
-	}
 	connCredential := credentialBuilder.GetObject()
 
 	if len(connCredential.StringData) == 0 {

@@ -9775,17 +9775,6 @@ spec:
                 maxItems: 128
                 minItems: 1
                 type: array
-              type:
-                description: |-
-                  Specifies the well-known database type, such as mysql, redis, or mongodb.
-
-
-                  Deprecated since v0.9.
-                  This field is maintained for backward compatibility and its use is discouraged.
-                  Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
-                maxLength: 24
-                pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
-                type: string
             type: object
           status:
             description: ClusterDefinitionStatus defines the observed state of ClusterDefinition

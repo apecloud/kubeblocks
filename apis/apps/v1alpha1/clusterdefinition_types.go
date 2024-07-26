@@ -29,18 +29,6 @@ import (
 
 // ClusterDefinitionSpec defines the desired state of ClusterDefinition.
 type ClusterDefinitionSpec struct {
-	// Specifies the well-known database type, such as mysql, redis, or mongodb.
-	//
-	// Deprecated since v0.9.
-	// This field is maintained for backward compatibility and its use is discouraged.
-	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
-	//
-	// +kubebuilder:validation:MaxLength=24
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
-	// +optional
-	Type string `json:"type,omitempty"`
-
 	// Provides the definitions for the cluster components.
 	//
 	// Deprecated since v0.9.

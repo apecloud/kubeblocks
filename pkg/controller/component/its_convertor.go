@@ -25,6 +25,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -40,18 +41,19 @@ func BuildWorkloadFrom(synthesizeComp *SynthesizedComponent, protoITS *workloads
 		protoITS = &workloads.InstanceSet{}
 	}
 	convertors := map[string]convertor{
-		"service":                   &itsServiceConvertor{},
-		"alternativeservices":       &itsAlternativeServicesConvertor{},
-		"roles":                     &itsRolesConvertor{},
-		"roleprobe":                 &itsRoleProbeConvertor{},
-		"credential":                &itsCredentialConvertor{},
-		"membershipreconfiguration": &itsMembershipReconfigurationConvertor{},
-		"memberupdatestrategy":      &itsMemberUpdateStrategyConvertor{},
-		"podmanagementpolicy":       &itsPodManagementPolicyConvertor{},
-		"podupdatepolicy":           &itsPodUpdatePolicyConvertor{},
-		"updatestrategy":            &itsUpdateStrategyConvertor{},
-		"instances":                 &itsInstancesConvertor{},
-		"offlineinstances":          &itsOfflineInstancesConvertor{},
+		"service":                          &itsServiceConvertor{},
+		"alternativeservices":              &itsAlternativeServicesConvertor{},
+		"roles":                            &itsRolesConvertor{},
+		"roleprobe":                        &itsRoleProbeConvertor{},
+		"credential":                       &itsCredentialConvertor{},
+		"membershipreconfiguration":        &itsMembershipReconfigurationConvertor{},
+		"memberupdatestrategy":             &itsMemberUpdateStrategyConvertor{},
+		"podmanagementpolicy":              &itsPodManagementPolicyConvertor{},
+		"parallelpodmanagementconcurrency": &itsParallelPodManagementConcurrencyConvertor{},
+		"podupdatepolicy":                  &itsPodUpdatePolicyConvertor{},
+		"updatestrategy":                   &itsUpdateStrategyConvertor{},
+		"instances":                        &itsInstancesConvertor{},
+		"offlineinstances":                 &itsOfflineInstancesConvertor{},
 	}
 	if err := covertObject(convertors, &protoITS.Spec, synthesizeComp); err != nil {
 		return nil, err
@@ -104,6 +106,20 @@ func (c *itsPodManagementPolicyConvertor) convert(args ...any) (any, error) {
 		return appsv1.OrderedReadyPodManagement, nil
 	}
 	return appsv1.ParallelPodManagement, nil
+}
+
+// itsParallelPodManagementConcurrencyConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.ParallelPodManagementConcurrency.
+type itsParallelPodManagementConcurrencyConvertor struct{}
+
+func (c *itsParallelPodManagementConcurrencyConvertor) convert(args ...any) (any, error) {
+	synthesizedComp, err := parseITSConvertorArgs(args...)
+	if err != nil {
+		return nil, err
+	}
+	if synthesizedComp.ParallelPodManagementConcurrency != nil {
+		return synthesizedComp.ParallelPodManagementConcurrency, nil
+	}
+	return &intstr.IntOrString{Type: intstr.String, StrVal: "100%"}, nil
 }
 
 // itsPodUpdatePolicyConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.PodUpdatePolicy.

@@ -109,6 +109,9 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	if runningITS == nil {
 		if protoITS != nil {
+			if err := setCompOwnershipNFinalizer(transCtx.Component, protoITS); err != nil {
+				return err
+			}
 			graphCli.Create(dag, protoITS)
 			return nil
 		}
@@ -328,6 +331,8 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, synthesizeComp *comp
 	itsObjCopy.Spec.OfflineInstances = itsProto.Spec.OfflineInstances
 	itsObjCopy.Spec.MinReadySeconds = itsProto.Spec.MinReadySeconds
 	itsObjCopy.Spec.VolumeClaimTemplates = itsProto.Spec.VolumeClaimTemplates
+	itsObjCopy.Spec.ParallelPodManagementConcurrency = itsProto.Spec.ParallelPodManagementConcurrency
+	itsObjCopy.Spec.PodUpdatePolicy = itsProto.Spec.PodUpdatePolicy
 
 	if itsProto.Spec.UpdateStrategy.Type != "" || itsProto.Spec.UpdateStrategy.RollingUpdate != nil {
 		updateUpdateStrategy(itsObjCopy, itsProto)
@@ -575,26 +580,26 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 	if err != nil {
 		return err
 	}
-
-	tryToSwitchover := func(lifecycleActions lifecycle.Actions, pod *corev1.Pod) error {
+	isLeader := func(pod *corev1.Pod) bool {
 		if pod == nil || len(pod.Labels) == 0 {
-			return nil
-		}
-		// if pod is not leader/primary, no need to switchover
-		isLeader := func() bool {
-			roleName, ok := pod.Labels[constant.RoleLabelKey]
-			if !ok {
-				return false
-			}
-
-			for _, replicaRole := range r.runningITS.Spec.Roles {
-				if roleName == replicaRole.Name && replicaRole.IsLeader {
-					return true
-				}
-			}
 			return false
 		}
-		if !isLeader() {
+		roleName, ok := pod.Labels[constant.RoleLabelKey]
+		if !ok {
+			return false
+		}
+
+		for _, replicaRole := range r.runningITS.Spec.Roles {
+			if roleName == replicaRole.Name && replicaRole.IsLeader {
+				return true
+			}
+		}
+		return false
+	}
+
+	tryToSwitchover := func(lifecycleActions lifecycle.Actions, pod *corev1.Pod) error {
+		// if pod is not leader/primary, no need to switchover
+		if !isLeader(pod) {
 			return nil
 		}
 		// if HA functionality is not enabled, no need to switchover
@@ -618,6 +623,11 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 		podsToMemberLeave = append(podsToMemberLeave, pod)
 	}
 	for _, pod := range podsToMemberLeave {
+		if !(isLeader(pod) || // if the pod is leader, it needs to call switchover
+			(r.synthesizeComp.LifecycleActions != nil && r.synthesizeComp.LifecycleActions.MemberLeave != nil)) { // if the memberLeave action is defined, it needs to call it
+			continue
+		}
+
 		lifecycleActions, err1 := lifecycle.NewActions(r.synthesizeComp.LifecycleActions, pod)
 		if err1 != nil || lifecycleActions == nil {
 			if err == nil {

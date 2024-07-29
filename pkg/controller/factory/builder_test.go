@@ -187,13 +187,6 @@ var _ = Describe("builder", func() {
 			)
 			credential := BuildConnCredential(clusterDef, cluster, synthesizedComponent)
 			Expect(credential).ShouldNot(BeNil())
-			Expect(credential.Labels[constant.KBAppClusterDefTypeLabelKey]).Should(BeEmpty())
-			By("setting type")
-			characterType := "test-character-type"
-			clusterDef.Spec.Type = characterType
-			credential = BuildConnCredential(clusterDef, cluster, synthesizedComponent)
-			Expect(credential).ShouldNot(BeNil())
-			Expect(credential.Labels[constant.KBAppClusterDefTypeLabelKey]).Should(Equal(characterType))
 			// "username":      "root",
 			// "SVC_FQDN":      "$(SVC_FQDN)",
 			// "RANDOM_PASSWD": "$(RANDOM_PASSWD)",

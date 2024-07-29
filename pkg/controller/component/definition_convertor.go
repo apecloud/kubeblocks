@@ -61,7 +61,6 @@ func buildComponentDefinitionByConversion(clusterCompDef *appsv1alpha1.ClusterCo
 		"roles":                  &compDefRolesConvertor{},
 		"lifecycleactions":       &compDefLifecycleActionsConvertor{},
 		"servicerefdeclarations": &compDefServiceRefDeclarationsConvertor{},
-		"monitor":                &compDefMonitorConvertor{},
 		"exporter":               &compDefExporterConvertor{},
 	}
 	compDef := &appsv1alpha1.ComponentDefinition{}
@@ -82,8 +81,7 @@ func (c *compDefProviderConvertor) convert(args ...any) (any, error) {
 type compDefDescriptionConvertor struct{}
 
 func (c *compDefDescriptionConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	return clusterCompDef.Description, nil
+	return "", nil
 }
 
 // compDefServiceKindConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.ServiceKind.
@@ -329,16 +327,7 @@ func (c *compDefPolicyRulesConvertor) convert(args ...any) (any, error) {
 type compDefLabelsConvertor struct{}
 
 func (c *compDefLabelsConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	if clusterCompDef.CustomLabelSpecs == nil {
-		return nil, nil
-	}
-
-	labels := make(map[string]string, 0)
-	for _, customLabel := range clusterCompDef.CustomLabelSpecs {
-		labels[customLabel.Key] = customLabel.Value
-	}
-	return labels, nil
+	return nil, nil
 }
 
 type compDefReplicasLimitConvertor struct{}
@@ -683,16 +672,8 @@ func (c *compDefLifecycleActionsConvertor) convertSwitchover(switchover *appsv1a
 	}
 }
 
-type compDefMonitorConvertor struct{}
-
-func (c *compDefMonitorConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	return clusterCompDef.Monitor, nil
-}
-
 type compDefExporterConvertor struct{}
 
 func (c *compDefExporterConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	return clusterCompDef.Exporter, nil
+	return nil, nil
 }

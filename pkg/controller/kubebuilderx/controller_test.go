@@ -54,21 +54,21 @@ var _ = Describe("controller test", func() {
 
 			By("Load tree and reconcile it with no error")
 			controller = NewController(ctx, cli, req, nil, logger)
-			res, err := controller.Prepare(&dummyLoader{tree: tree}).Do(&dummyReconciler{}).Commit()
+			res, err := controller.Prepare(&dummyLoader{tree: tree}).Do(&dummyReconciler{res: Commit}).Commit()
 			Expect(err).Should(BeNil())
 			Expect(res.Requeue).Should(BeFalse())
 
 			By("Load tree with error")
 			controller = NewController(ctx, cli, req, nil, logger)
 			loadErr := fmt.Errorf("load tree failed")
-			res, err = controller.Prepare(&dummyLoader{err: loadErr}).Do(&dummyReconciler{}).Commit()
+			res, err = controller.Prepare(&dummyLoader{err: loadErr}).Do(&dummyReconciler{res: Commit}).Commit()
 			Expect(err).Should(Equal(loadErr))
 			Expect(res.Requeue).Should(BeFalse())
 
 			By("Reconcile with pre-condition error")
 			controller = NewController(ctx, cli, req, nil, logger)
 			reconcileCondErr := fmt.Errorf("reconcile pre-condition failed")
-			res, err = controller.Prepare(&dummyLoader{tree: tree}).Do(&dummyReconciler{preErr: reconcileCondErr}).Commit()
+			res, err = controller.Prepare(&dummyLoader{tree: tree}).Do(&dummyReconciler{preErr: reconcileCondErr, res: Commit}).Commit()
 			Expect(err).Should(Equal(reconcileCondErr))
 			Expect(res.Requeue).Should(BeFalse())
 
@@ -79,7 +79,7 @@ var _ = Describe("controller test", func() {
 			Expect(cli.Create(ctx, root)).Should(Succeed())
 			newTree := NewObjectTree()
 			newTree.SetRoot(root)
-			res, err = controller.Prepare(&dummyLoader{tree: newTree}).Do(&dummyReconciler{unsatisfied: true}).Commit()
+			res, err = controller.Prepare(&dummyLoader{tree: newTree}).Do(&dummyReconciler{unsatisfied: true, res: Commit}).Commit()
 			Expect(err).Should(BeNil())
 			Expect(res.Requeue).Should(BeFalse())
 			Expect(newTree).Should(Equal(tree))
@@ -87,7 +87,7 @@ var _ = Describe("controller test", func() {
 			By("Reconcile with error")
 			controller = NewController(ctx, cli, req, nil, logger)
 			reconcileErr := fmt.Errorf("reconcile with error")
-			res, err = controller.Prepare(&dummyLoader{tree: tree}).Do(&dummyReconciler{err: reconcileErr}).Commit()
+			res, err = controller.Prepare(&dummyLoader{tree: tree}).Do(&dummyReconciler{err: reconcileErr, res: Commit}).Commit()
 			Expect(err).Should(Equal(reconcileErr))
 			Expect(res.Requeue).Should(BeFalse())
 

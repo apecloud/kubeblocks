@@ -368,22 +368,19 @@ func (r *clusterBackupPolicyTransformer) syncRoleLabelSelector(comp componentIte
 	if podSelector.LabelSelector == nil || podSelector.LabelSelector.MatchLabels == nil {
 		podSelector.LabelSelector = &metav1.LabelSelector{MatchLabels: map[string]string{}}
 	}
-	replicas := r.getCompReplicas(comp)
-	if replicas == 1 {
+	if r.getCompReplicas(comp) == 1 {
 		delete(podSelector.LabelSelector.MatchLabels, constant.RoleLabelKey)
-	} else if podSelector.LabelSelector.MatchLabels[constant.RoleLabelKey] == "" {
+		if podSelector.AlternateLabelSelector != nil && podSelector.AlternateLabelSelector.MatchLabels != nil {
+			delete(podSelector.AlternateLabelSelector.MatchLabels, constant.RoleLabelKey)
+		}
+	} else {
 		podSelector.LabelSelector.MatchLabels[constant.RoleLabelKey] = role
-	}
-	if len(alternateRole) == 0 {
-		return
-	}
-	if podSelector.AlternateLabelSelector == nil || podSelector.AlternateLabelSelector.MatchLabels == nil {
-		podSelector.AlternateLabelSelector = &metav1.LabelSelector{MatchLabels: map[string]string{}}
-	}
-	if replicas == 1 {
-		delete(podSelector.AlternateLabelSelector.MatchLabels, constant.RoleLabelKey)
-	} else if podSelector.AlternateLabelSelector.MatchLabels[constant.RoleLabelKey] == "" {
-		podSelector.AlternateLabelSelector.MatchLabels[constant.RoleLabelKey] = alternateRole
+		if len(alternateRole) > 0 {
+			if podSelector.AlternateLabelSelector == nil || podSelector.AlternateLabelSelector.MatchLabels == nil {
+				podSelector.AlternateLabelSelector = &metav1.LabelSelector{MatchLabels: map[string]string{}}
+			}
+			podSelector.AlternateLabelSelector.MatchLabels[constant.RoleLabelKey] = alternateRole
+		}
 	}
 }
 

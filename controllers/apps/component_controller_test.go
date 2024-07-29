@@ -2180,7 +2180,7 @@ var _ = Describe("Component Controller", func() {
 				replicationCompName: replicationCompDefName,
 			}
 			initialReplicas := int32(1)
-			updatedReplicas := int32(3)
+			updatedReplicas := int32(2)
 
 			By("Creating a multi components cluster with VolumeClaimTemplate")
 			pvcSpec := testapps.NewPVCSpec("1Gi")

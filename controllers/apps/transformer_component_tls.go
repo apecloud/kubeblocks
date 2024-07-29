@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -147,7 +148,11 @@ func buildTLSCert(ctx context.Context, cli client.Reader, synthesizedComp compon
 			return err
 		}
 	case appsv1alpha1.IssuerKubeBlocks:
-		// TODO: (good-first-issue) should check if the secret exists, skip if already exists
+		secretName := plan.GenerateTLSSecretName(synthesizedComp.ClusterName, synthesizedComp.Name)
+		preSecret := &corev1.Secret{}
+		if err := cli.Get(ctx, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: secretName}, preSecret); !errors.IsNotFound(err) {
+			return err
+		}
 		secret, err := plan.ComposeTLSSecret(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
 		if err != nil {
 			return err

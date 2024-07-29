@@ -514,21 +514,6 @@ ClusterDefinitionSpec
 <table>
 <tr>
 <td>
-<code>type</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the well-known database type, such as mysql, redis, or mongodb.</p>
-<p>Deprecated since v0.9.
-This field is maintained for backward compatibility and its use is discouraged.
-Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>componentDefs</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">
@@ -1426,21 +1411,6 @@ They should be specified in the <code>cluster.spec.componentSpecs</code> (Cluste
 or modifying environment variable values.
 These instance-specific overrides can be specified in <code>cluster.spec.componentSpecs[*].instances</code>.</p>
 <p>This field is immutable and cannot be updated once set.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>monitor</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.MonitorConfig">
-MonitorConfig
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Deprecated since v0.9
-monitor is monitoring config which provided by provider.</p>
 </td>
 </tr>
 <tr>
@@ -4177,18 +4147,6 @@ This name will apply to cluster objects as the value of label &ldquo;apps.kubebl
 </tr>
 <tr>
 <td>
-<code>description</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Description of the component definition.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>workloadType</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.WorkloadType">
@@ -4427,20 +4385,6 @@ been specified.</p>
 </tr>
 <tr>
 <td>
-<code>customLabelSpecs</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.CustomLabelSpec">
-[]CustomLabelSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Used for custom label tags which you want to add to the component resources.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>switchoverSpec</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.SwitchoverSpec">
@@ -4511,35 +4455,6 @@ configmap and mounted to the current component.</p>
 <td>
 <em>(Optional)</em>
 <p>Used to declare the service reference of the current component.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>exporter</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.Exporter">
-Exporter
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the metrics exporter.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>monitor</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.MonitorConfig">
-MonitorConfig
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Deprecated since v0.9
-monitor is monitoring config which provided by provider.</p>
 </td>
 </tr>
 </tbody>
@@ -5722,21 +5637,6 @@ and will not affect the life cycle of the pod. default values are 60 seconds.</p
 </tr>
 </thead>
 <tbody>
-<tr>
-<td>
-<code>type</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the well-known database type, such as mysql, redis, or mongodb.</p>
-<p>Deprecated since v0.9.
-This field is maintained for backward compatibility and its use is discouraged.
-Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
-</td>
-</tr>
 <tr>
 <td>
 <code>componentDefs</code><br/>
@@ -7507,21 +7407,6 @@ They should be specified in the <code>cluster.spec.componentSpecs</code> (Cluste
 or modifying environment variable values.
 These instance-specific overrides can be specified in <code>cluster.spec.componentSpecs[*].instances</code>.</p>
 <p>This field is immutable and cannot be updated once set.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>monitor</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.MonitorConfig">
-MonitorConfig
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Deprecated since v0.9
-monitor is monitoring config which provided by provider.</p>
 </td>
 </tr>
 <tr>
@@ -11384,59 +11269,6 @@ VarOption
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.CustomLabelSpec">CustomLabelSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>)
-</p>
-<div>
-<p>CustomLabelSpec is deprecated since v0.8.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>key</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>The key of the label.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>value</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>The value of the label.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>resources</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.GVKResource">
-[]GVKResource
-</a>
-</em>
-</td>
-<td>
-<p>The resources that will be patched with the label.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.CustomOps">CustomOps
 </h3>
 <p>
@@ -11912,7 +11744,7 @@ If this field is not specified, the default behavior is to use the first contain
 <h3 id="apps.kubeblocks.io/v1alpha1.Exporter">Exporter
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
 </p>
 <div>
 </div>
@@ -11975,48 +11807,6 @@ PrometheusScheme
 <p>Specifies the schema to use for scraping.
 <code>http</code> and <code>https</code> are the expected values unless you rewrite the <code>__scheme__</code> label via relabeling.
 If empty, Prometheus uses the default value <code>http</code>.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ExporterConfig">ExporterConfig
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.MonitorConfig">MonitorConfig</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>scrapePort</code><br/>
-<em>
-<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
-Kubernetes api utils intstr.IntOrString
-</a>
-</em>
-</td>
-<td>
-<p>scrapePort is exporter port for Time Series Database to scrape metrics.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>scrapePath</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>scrapePath is exporter url path for Time Series Database to scrape metrics.</p>
 </td>
 </tr>
 </tbody>
@@ -12124,49 +11914,6 @@ in each OpsService definition.</p>
 <td><p>FailurePolicyIgnore means that an error will be ignored but logged.</p>
 </td>
 </tr></tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.GVKResource">GVKResource
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CustomLabelSpec">CustomLabelSpec</a>)
-</p>
-<div>
-<p>GVKResource is deprecated since v0.8.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>gvk</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Represents the GVK of a resource, such as &ldquo;v1/Pod&rdquo;, &ldquo;apps/v1/StatefulSet&rdquo;, etc.
-When a resource matching this is found by the selector, a custom label will be added if it doesn&rsquo;t already exist,
-or updated if it does.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>selector</code><br/>
-<em>
-map[string]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>A label query used to filter a set of resources.</p>
-</td>
-</tr>
-</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.HScaleDataClonePolicyType">HScaleDataClonePolicyType
 (<code>string</code> alias)</h3>
@@ -13503,52 +13250,6 @@ for example, using &lsquo;&#123;&#123; eq .spec.replicas 1 &#125;&#125;&rsquo;</
 </tr><tr><td><p>&#34;replace&#34;</p></td>
 <td></td>
 </tr></tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.MonitorConfig">MonitorConfig
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>builtIn</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>builtIn is a switch to enable KubeBlocks builtIn monitoring.
-If BuiltIn is set to true, monitor metrics will be scraped automatically.
-If BuiltIn is set to false, the provider should set ExporterConfig and Sidecar container own.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>exporterConfig</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ExporterConfig">
-ExporterConfig
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>exporterConfig provided by provider, which specify necessary information to Time Series Database.
-exporterConfig is valid when builtIn is false.</p>
-</td>
-</tr>
-</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.MultipleClusterObjectCombinedOption">MultipleClusterObjectCombinedOption
 </h3>

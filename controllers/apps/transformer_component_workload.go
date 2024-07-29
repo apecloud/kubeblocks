@@ -108,6 +108,9 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	if runningITS == nil {
 		if protoITS != nil {
+			if err := setCompOwnershipNFinalizer(transCtx.Component, protoITS); err != nil {
+				return err
+			}
 			graphCli.Create(dag, protoITS)
 			return nil
 		}
@@ -327,6 +330,8 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, synthesizeComp *comp
 	itsObjCopy.Spec.OfflineInstances = itsProto.Spec.OfflineInstances
 	itsObjCopy.Spec.MinReadySeconds = itsProto.Spec.MinReadySeconds
 	itsObjCopy.Spec.VolumeClaimTemplates = itsProto.Spec.VolumeClaimTemplates
+	itsObjCopy.Spec.ParallelPodManagementConcurrency = itsProto.Spec.ParallelPodManagementConcurrency
+	itsObjCopy.Spec.PodUpdatePolicy = itsProto.Spec.PodUpdatePolicy
 
 	if itsProto.Spec.UpdateStrategy.Type != "" || itsProto.Spec.UpdateStrategy.RollingUpdate != nil {
 		updateUpdateStrategy(itsObjCopy, itsProto)

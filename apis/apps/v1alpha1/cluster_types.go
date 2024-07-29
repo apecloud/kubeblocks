@@ -1389,6 +1389,9 @@ type ServiceRefClusterSelector struct {
 	//
 	// +optional
 	Credential *ServiceRefCredentialSelector `json:"credential,omitempty"`
+
+	// +optional
+	PodFQDNs *ServiceRefPodFQDNsSelector `json:"podFQDNs,omitempty"`
 }
 
 type ServiceRefServiceSelector struct {
@@ -1430,6 +1433,19 @@ type ServiceRefCredentialSelector struct {
 	//
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
+}
+
+type ServiceRefPodFQDNsSelector struct {
+	// The name of the Component where the pods reside in.
+	//
+	// +kubebuilder:validation:Required
+	Component string `json:"component"`
+
+	// TODO: container port
+	//// The port name of the container port to be referenced.
+	////
+	//// +optional
+	// Port string `json:"port,omitempty"`
 }
 
 // +genclient

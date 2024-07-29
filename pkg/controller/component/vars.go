@@ -887,6 +887,8 @@ func resolveServiceRefVarRef(ctx context.Context, cli client.Reader, synthesized
 		resolveFunc = resolveServiceRefUsernameRef
 	case selector.Password != nil:
 		resolveFunc = resolveServiceRefPasswordRef
+	case selector.PodFQDNs != nil:
+		resolveFunc = resolveServiceRefPodFQDNsRef
 	default:
 		return nil, nil, nil
 	}
@@ -970,6 +972,21 @@ func resolveServiceRefPasswordRef(ctx context.Context, cli client.Reader, synthe
 		return nil, &corev1.EnvVar{Name: defineKey, Value: sd.Spec.Auth.Password.Value}, nil
 	}
 	return resolveServiceRefVarRefLow(ctx, cli, synthesizedComp, selector, selector.Password, resolvePassword)
+}
+
+func resolveServiceRefPodFQDNsRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+	defineKey string, selector appsv1alpha1.ServiceRefVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
+	resolvePodFQDNs := func(obj any) (*corev1.EnvVar, *corev1.EnvVar, error) {
+		sd := obj.(*appsv1alpha1.ServiceDescriptor)
+		if sd.Spec.PodFQDNs == nil {
+			return nil, nil, nil
+		}
+		return &corev1.EnvVar{
+			Name:  defineKey,
+			Value: sd.Spec.PodFQDNs.Value,
+		}, nil, nil
+	}
+	return resolveServiceRefVarRefLow(ctx, cli, synthesizedComp, selector, selector.Host, resolvePodFQDNs)
 }
 
 func resolveHostNetworkVarRefLow(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
@@ -1174,26 +1191,46 @@ func resolveComponentPodFQDNsRef(ctx context.Context, cli client.Reader, synthes
 	defineKey string, selector appsv1alpha1.ComponentVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
 	resolveFQDNList := func(obj any) (*corev1.EnvVar, *corev1.EnvVar, error) {
 		comp := obj.(*appsv1alpha1.Component)
-		var templates []instanceset.InstanceTemplate
-		for i := range comp.Spec.Instances {
-			templates = append(templates, &comp.Spec.Instances[i])
-		}
-		clusterDomainFn := func(name string) string {
-			return fmt.Sprintf("%s.%s", name, viper.GetString(constant.KubernetesClusterDomainEnv))
-		}
-		names, err := instanceset.GenerateAllInstanceNames(comp.Name, comp.Spec.Replicas, templates, comp.Spec.OfflineInstances, workloads.Ordinals{})
+		fqdn, err := podFQDNsGetter(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, comp)
 		if err != nil {
 			return nil, nil, err
 		}
-		fqdn := func(name string) string {
-			return clusterDomainFn(fmt.Sprintf("%s.%s-headless.%s.svc", name, comp.Name, synthesizedComp.Namespace))
-		}
-		for i := range names {
-			names[i] = fqdn(names[i])
-		}
-		return &corev1.EnvVar{Name: defineKey, Value: strings.Join(names, ",")}, nil, nil
+		return &corev1.EnvVar{Name: defineKey, Value: fqdn}, nil, nil
 	}
 	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector, selector.PodFQDNs, resolveFQDNList)
+}
+
+func podFQDNsGetter(ctx context.Context, cli client.Reader, namespace, clusterName, compName string, comp *appsv1alpha1.Component) (string, error) {
+	if comp == nil {
+		key := types.NamespacedName{
+			Namespace: namespace,
+			Name:      constant.GenerateClusterComponentName(clusterName, compName),
+		}
+		comp = &appsv1alpha1.Component{}
+		err := cli.Get(ctx, key, comp, inDataContext())
+		if err != nil {
+			return "", err
+		}
+	}
+
+	var templates []instanceset.InstanceTemplate
+	for i := range comp.Spec.Instances {
+		templates = append(templates, &comp.Spec.Instances[i])
+	}
+	clusterDomainFn := func(name string) string {
+		return fmt.Sprintf("%s.%s", name, viper.GetString(constant.KubernetesClusterDomainEnv))
+	}
+	names, err := instanceset.GenerateAllInstanceNames(comp.Name, comp.Spec.Replicas, templates, comp.Spec.OfflineInstances, workloads.Ordinals{})
+	if err != nil {
+		return "", err
+	}
+	fqdn := func(name string) string {
+		return clusterDomainFn(fmt.Sprintf("%s.%s-headless.%s.svc", name, comp.Name, namespace))
+	}
+	for i := range names {
+		names[i] = fqdn(names[i])
+	}
+	return strings.Join(names, ","), nil
 }
 
 func resolveComponentVarRefLow(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,

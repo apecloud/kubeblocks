@@ -75,26 +75,31 @@ func (c *controller) Prepare(reader TreeLoader) Controller {
 }
 
 func (c *controller) Do(reconcilers ...Reconciler) Controller {
-	if c.err != nil || c.res.Next == cmmt || c.res.Next == rtry {
+	if c.err != nil {
+		return c
+	}
+	if c.res.Next != cntn && c.res.Next != cmmt && c.res.Next != rtry {
+		c.err = fmt.Errorf("unexpected next action: %s. should be one of Continue, Commit or Retry", c.res.Next)
+		return c
+	}
+	if c.res.Next != cntn {
+		return c
+	}
+	if len(reconcilers) == 0 {
 		return c
 	}
 
-	for _, reconciler := range reconcilers {
-		switch result := reconciler.PreCondition(c.tree); {
-		case result.Err != nil:
-			c.err = result.Err
-			return c
-		case !result.Satisfied:
-			return c
-		}
-
-		c.res, c.err = reconciler.Reconcile(c.tree)
-		if c.err != nil || c.res.Next == cmmt || c.res.Next == rtry {
-			return c
-		}
+	reconciler := reconcilers[0]
+	switch result := reconciler.PreCondition(c.tree); {
+	case result.Err != nil:
+		c.err = result.Err
+		return c
+	case !result.Satisfied:
+		return c
 	}
+	c.res, c.err = reconciler.Reconcile(c.tree)
 
-	return c
+	return c.Do(reconcilers[1:]...)
 }
 
 func (c *controller) Commit() (ctrl.Result, error) {
@@ -155,6 +160,7 @@ func NewController(ctx context.Context, cli client.Client, req ctrl.Request, rec
 		req:      req,
 		recorder: recorder,
 		logger:   logger,
+		res:      Continue,
 	}
 }
 

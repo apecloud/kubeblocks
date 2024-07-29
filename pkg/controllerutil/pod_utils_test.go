@@ -628,11 +628,11 @@ func TestBuildImagePullSecretsByEnv(t *testing.T) {
 		},
 	}
 
-	Context("test BuildImagePullSecretsByEnv", func() {
+	Context("test BuildImagePullSecrets", func() {
 		It("Should succeed with no error", func() {
 			for _, t := range tests {
 				viper.Set(constant.KBImagePullSecrets, t.value)
-				secrets := BuildImagePullSecretsByEnv()
+				secrets := BuildImagePullSecrets()
 				if t.value == "" {
 					Expect(len(secrets)).To(Equal(0))
 				} else {

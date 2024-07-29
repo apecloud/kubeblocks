@@ -172,6 +172,6 @@ func (e *ExecAction) buildExecPodSpec(actionCtx ActionContext,
 		Containers: []corev1.Container{*container},
 		// tolerate all taints
 		Tolerations:      e.Comp.Tolerations,
-		ImagePullSecrets: intctrlutil.BuildImagePullSecretsByEnv(),
+		ImagePullSecrets: intctrlutil.BuildImagePullSecrets(),
 	}, nil
 }

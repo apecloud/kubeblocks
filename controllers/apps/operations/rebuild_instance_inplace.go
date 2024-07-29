@@ -311,7 +311,7 @@ func (inPlaceHelper *inplaceRebuildHelper) createTmpPVCsAndPod(reqCtx intctrluti
 		AddLabels(constant.OpsRequestNamespaceLabelKey, opsRequest.Namespace).
 		SetTopologySpreadConstraints(inPlaceHelper.targetPod.Spec.TopologySpreadConstraints).
 		SetAffinity(inPlaceHelper.targetPod.Spec.Affinity).
-		SetImagePullSecrets(intctrlutil.BuildImagePullSecretsByEnv())
+		SetImagePullSecrets(intctrlutil.BuildImagePullSecrets())
 	if inPlaceHelper.instance.TargetNodeName != "" {
 		rebuildPodBuilder.SetNodeSelector(map[string]string{
 			corev1.LabelHostname: inPlaceHelper.instance.TargetNodeName,

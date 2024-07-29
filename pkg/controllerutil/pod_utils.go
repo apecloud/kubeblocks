@@ -585,7 +585,7 @@ func isContainerFailedAndTimedOut(pod *corev1.Pod, podConditionType corev1.PodCo
 	return time.Now().After(containerReadyCondition.LastTransitionTime.Add(PodContainerFailedTimeout))
 }
 
-func BuildImagePullSecretsByEnv() []corev1.LocalObjectReference {
+func BuildImagePullSecrets() []corev1.LocalObjectReference {
 	secrets := make([]corev1.LocalObjectReference, 0)
 	secretsVal := viper.GetString(constant.KBImagePullSecrets)
 	if secretsVal == "" {

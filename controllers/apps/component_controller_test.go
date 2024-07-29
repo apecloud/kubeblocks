@@ -106,7 +106,7 @@ var mockLorryClient4HScale = func(clusterKey types.NamespacedName, compName stri
 				constant.AppInstanceLabelKey:    clusterKey.Name,
 				constant.KBAppComponentLabelKey: compName,
 			}
-			if err := testCtx.Cli.List(ctx, &podList, labels, client.InNamespace(clusterKey.Namespace)); err != nil {
+			if err := k8sClient.List(ctx, &podList, labels, client.InNamespace(clusterKey.Namespace)); err != nil {
 				return err
 			}
 			for _, pod := range podList.Items {
@@ -117,7 +117,7 @@ var mockLorryClient4HScale = func(clusterKey types.NamespacedName, compName stri
 					continue
 				}
 				pod.Annotations[podAnnotationKey4Test] = fmt.Sprintf("%d", replicas)
-				if err := testCtx.Cli.Update(ctx, &pod); err != nil {
+				if err := k8sClient.Update(ctx, &pod); err != nil {
 					return err
 				}
 			}
@@ -609,7 +609,7 @@ var _ = Describe("Component Controller", func() {
 			if updatedReplicas == 0 {
 				Consistently(func(g Gomega) {
 					pvcList := corev1.PersistentVolumeClaimList{}
-					g.Expect(testCtx.Cli.List(testCtx.Ctx, &pvcList, client.MatchingLabels{
+					g.Expect(k8sClient.List(testCtx.Ctx, &pvcList, client.MatchingLabels{
 						constant.AppInstanceLabelKey:    clusterKey.Name,
 						constant.KBAppComponentLabelKey: comp.Name,
 					})).Should(Succeed())
@@ -629,7 +629,7 @@ var _ = Describe("Component Controller", func() {
 			By("Checking pvcs deleting")
 			Eventually(func(g Gomega) {
 				pvcList := corev1.PersistentVolumeClaimList{}
-				g.Expect(testCtx.Cli.List(testCtx.Ctx, &pvcList, client.MatchingLabels{
+				g.Expect(k8sClient.List(testCtx.Ctx, &pvcList, client.MatchingLabels{
 					constant.AppInstanceLabelKey:    clusterKey.Name,
 					constant.KBAppComponentLabelKey: comp.Name,
 				})).Should(Succeed())
@@ -645,7 +645,7 @@ var _ = Describe("Component Controller", func() {
 			By("Checking pod's annotation should be updated consistently")
 			Eventually(func(g Gomega) {
 				podList := corev1.PodList{}
-				g.Expect(testCtx.Cli.List(testCtx.Ctx, &podList, client.MatchingLabels{
+				g.Expect(k8sClient.List(testCtx.Ctx, &podList, client.MatchingLabels{
 					constant.AppInstanceLabelKey:    clusterKey.Name,
 					constant.KBAppComponentLabelKey: comp.Name,
 				})).Should(Succeed())
@@ -713,7 +713,7 @@ var _ = Describe("Component Controller", func() {
 		defer lorry.UnsetMockClient()
 
 		cluster := &appsv1alpha1.Cluster{}
-		Expect(testCtx.Cli.Get(testCtx.Ctx, clusterKey, cluster)).Should(Succeed())
+		Expect(k8sClient.Get(testCtx.Ctx, clusterKey, cluster)).Should(Succeed())
 		initialGeneration := int(cluster.Status.ObservedGeneration)
 
 		setHorizontalScalePolicy(policyType, componentDefsWithHScalePolicy...)
@@ -1909,7 +1909,7 @@ var _ = Describe("Component Controller", func() {
 
 		By("Mocking backup status to failed")
 		backupList := dpv1alpha1.BackupList{}
-		Expect(testCtx.Cli.List(testCtx.Ctx, &backupList, ml)).Should(Succeed())
+		Expect(k8sClient.List(testCtx.Ctx, &backupList, ml)).Should(Succeed())
 		backupKey := types.NamespacedName{
 			Namespace: backupList.Items[0].Namespace,
 			Name:      backupList.Items[0].Name,
@@ -2521,12 +2521,12 @@ var _ = Describe("Component Controller", func() {
 
 func mockRestoreCompleted(ml client.MatchingLabels) {
 	restoreList := dpv1alpha1.RestoreList{}
-	Expect(testCtx.Cli.List(testCtx.Ctx, &restoreList, ml)).Should(Succeed())
+	Expect(k8sClient.List(testCtx.Ctx, &restoreList, ml)).Should(Succeed())
 	for _, rs := range restoreList.Items {
 		err := testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(&rs), func(res *dpv1alpha1.Restore) {
 			res.Status.Phase = dpv1alpha1.RestorePhaseCompleted
 		})()
-		Expect(client.IgnoreNotFound(err)).ShouldNot(HaveOccurred())
+		Expect(err).ShouldNot(HaveOccurred())
 	}
 }
 

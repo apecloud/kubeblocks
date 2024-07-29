@@ -130,7 +130,9 @@ kubectl get cluster mycluster -n demo -o yaml
 
 ### Scale horizontally
 
-Horizontal scaling changes the amount of pods. For example, you can apply horizontal scaling to scale pods up from three to five. The scaling process includes the backup and restore of data.
+Horizontal scaling changes the amount of pods. For example, you can scale out replicas from three to five. The scaling process includes the backup and restore of data.
+
+From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out instances, refer to [Horizontal Scale](./../maintenance/scale/horizontal-scale.md) for more details and examples.
 
 #### Before you start
 
@@ -143,9 +145,7 @@ NAME        CLUSTER-DEFINITION    VERSION              TERMINATION-POLICY     ST
 mycluster   starrocks             starrocks-ce-3.1.1   Delete                 Running   47m
 ```
 
-#### Scale replicas
-
-***Steps:***
+#### Steps
 
 There are two ways to apply horizontal scaling.
 
@@ -154,6 +154,8 @@ There are two ways to apply horizontal scaling.
 <TabItem value="OpsRequest" label="OpsRequest" default>
 
 1. Apply an OpsRequest to a specified cluster. Configure the parameters according to your needs.
+
+   The example below means adding two replicas for the component `fe`.
 
    ```bash
    kubectl apply -f - <<EOF
@@ -167,7 +169,29 @@ There are two ways to apply horizontal scaling.
      type: HorizontalScaling
      horizontalScaling:
      - componentName: fe
-       replicas: 2
+       scaleOut:
+         replicaChanges: 2
+   EOF
+   ```
+
+   If you want to scale in replicas, replace `scaleOut` with `scaleIn`.
+
+   The example below means deleting two replicas for the component `fe`.
+
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: mycluster-horizontal-scaling
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     type: HorizontalScaling
+     horizontalScaling:
+     - componentName: fe
+       scaleIn:
+         replicaChanges: 2
    EOF
    ```
 
@@ -219,10 +243,6 @@ There are two ways to apply horizontal scaling.
 </TabItem>
 
 </Tabs>
-
-#### Scale instances
-
-From v0.9.0, KubeBlocks supports scale in or out of specified instances. For details, refer to [Horizontal Scale](./../../maintenance/scale/horizontal-scale.md#scale-instances).
 
 ### Scale vertically
 

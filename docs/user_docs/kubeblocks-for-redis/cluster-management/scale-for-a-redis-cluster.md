@@ -71,7 +71,9 @@ redis-cluster        default          redis                     redis-7.0.6     
 
 ## Horizontal scaling
 
-Horizontal scaling changes the amount of pods. For example, you can apply horizontal scaling to scale up from three pods to five pods. The scaling process includes the backup and restoration of data.
+Horizontal scaling changes the amount of pods. For example, you can scale out replicas from three to five. The scaling process includes the backup and restore of data.
+
+From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out instances, refer to [Horizontal Scale](./../../maintaince/scale/horizontal-scale.md) for more details and examples.
 
 ### Before you start
 
@@ -84,8 +86,6 @@ NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION         
 redis-cluster        default          redis                     redis-7.0.6              Delete                    Running        Apr 10,2023 16:50 UTC+0800
 ```
 
-### Scale replicas
-
 ### Steps
 
 1. Change configuration.
@@ -97,8 +97,8 @@ redis-cluster        default          redis                     redis-7.0.6     
    --components="redis" --replicas=2
    ```
 
-   - `--components` describes the component name ready for vertical scaling.
-   - `--replicas` describes the replica amount of a specified component.
+   - `--components` describes the component name ready for horizontal scaling.
+   - `--replicas` describes the replica amount of the specified components. Edit the amount based on your demands to scale in or out replicas.
 
 2. Validate the horizontal scaling operation.
 
@@ -113,10 +113,6 @@ redis-cluster        default          redis                     redis-7.0.6     
 
    - STATUS=Updating: it means horizontal scaling is in progress.
    - STATUS=Running: it means horizontal scaling has been applied.
-
-### Scale instances
-
-From v0.9.0, KubeBlocks supports scale in or out of specified instances. For details, refer to [Horizontal Scale](./../../maintaince/scale/horizontal-scale.md#scale-instances).
 
 ### Handle the snapshot exception
 

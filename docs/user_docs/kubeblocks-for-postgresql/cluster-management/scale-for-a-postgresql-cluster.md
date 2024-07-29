@@ -71,7 +71,9 @@ pg-cluster   default     postgresql              postgresql-14.8.0   Delete     
 
 ## Horizontal scaling
 
-Horizontal scaling changes the amount of pods. For example, you can apply horizontal scaling to scale pods up from three to five. The scaling process includes the backup and restore of data.
+Horizontal scaling changes the amount of pods. For example, you can scale out replicas from three to five. The scaling process includes the backup and restore of data.
+
+From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out instances, refer to [Horizontal Scale](./../../maintenance/scale/horizontal-scale.md) for more details and examples.
 
 ### Before you start
 
@@ -84,9 +86,7 @@ NAME              NAMESPACE        CLUSTER-DEFINITION        VERSION            
 pg-cluster        default          postgreql                 postgresql-14.8.0      Delete                    Running        Mar 03,2023 19:29 UTC+0800
 ```
 
-### Scale replicas
-
-#### Steps
+### Steps
 
 1. Change configuration.
 
@@ -98,7 +98,7 @@ pg-cluster        default          postgreql                 postgresql-14.8.0  
     ```
 
     - `--components` describes the component name ready for horizontal scaling.
-    - `--replicas` describes the replica amount of the specified components.
+    - `--replicas` describes the replica amount of the specified components. Edit the amount based on your demands to scale in or out replicas.
 
 2. Validate the horizontal scaling operation.
 
@@ -116,10 +116,6 @@ pg-cluster        default          postgreql                 postgresql-14.8.0  
     ```bash
     kbcli cluster describe pg-cluster
     ```
-
-### Scale instances
-
-From v0.9.0, KubeBlocks supports scale in or out of specified instances. For details, refer to [Horizontal Scale](./../../maintaince/scale/horizontal-scale.md#scale-instances).
 
 ### Handle the snapshot exception
 

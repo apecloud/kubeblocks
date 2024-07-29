@@ -69,7 +69,9 @@ kafka-cluster   default     kafka                kafka-3.3.2   Delete           
 
 ## Horizontal scaling
 
-Horizontal scaling changes the amount of pods. For example, you can apply horizontal scaling to scale pods up from three to five. The scaling process includes the backup and restoration of data.
+Horizontal scaling changes the amount of pods. For example, you can scale out replicas from three to five. The scaling process includes the backup and restore of data.
+
+From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out instances, refer to [Horizontal Scale](./../../maintaince/scale/horizontal-scale.md) for more details and examples.
 
 ### Before you start
 
@@ -84,9 +86,7 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
   kafka-cluster   default     kafka                kafka-3.3.2   Delete               Running   Jul 19,2023 18:01 UTC+0800   
   ```
 
-### Scale replicas
-
-#### Steps
+### Steps
 
 1. Change configuration.
 
@@ -97,11 +97,8 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
    --components="broker" --replicas=3
    ```
 
-   - `--components` value can be `broker` or `controller`.
-     - broker: all nodes in the combined mode, or all the broker node in the separated node.
-     - controller: all the corresponding nodes in the separated mode.
-   - `--memory` describes the requested and limited size of the component memory.
-   - `--cpu` describes the requested and limited size of the component CPU.
+   - `--components` describes the component name ready for horizontal scaling.
+   - `--replicas` describes the replica amount of the specified components. Edit the amount based on your demands to scale in or out replicas.
 
 2. Validate the horizontal scaling operation.
 
@@ -119,10 +116,6 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
     ```bash
     kbcli cluster describe kafka-cluster
     ```
-
-#### Scale instances
-
-From v0.9.0, KubeBlocks supports scale in or out of specified instances. For details, refer to [Horizontal Scale](./../../maintaince/scale/horizontal-scale.md#scale-instances).
 
 ### Handle the snapshot exception
 

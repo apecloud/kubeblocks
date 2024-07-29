@@ -149,17 +149,20 @@ For the production environment, it is highly recommended to build your monitorin
 
 ## Scale
 
-The scaling function for vector databases is also supported.
-
 ### Scale horizontally
 
-#### Scale replicas
+Horizontal scaling changes the amount of pods. For example, you can scale out replicas from three to five. The scaling process includes the backup and restore of data.
+
+From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out instances, refer to [Horizontal Scale](./../maintaince/scale/horizontal-scale.md) for more details and examples.
 
 Use the following command to perform horizontal scaling.
 
 ```bash
 kbcli cluster hscale weaviate --replicas=3 --components=weaviate
 ```
+
+- `--components` describes the component name ready for horizontal scaling.
+- `--replicas` describes the replica amount of the specified components. Edit the amount based on your demands to scale in or out replicas.
 
 Please wait a few seconds until the scaling process is over.
 
@@ -174,10 +177,6 @@ To check whether the scaling is done, use the following command.
 ```bash
 kbcli cluster describe weaviate
 ```
-
-#### Scale instances
-
-From v0.9.0, KubeBlocks supports scale in or out of specified instances. For details, refer to [Horizontal Scale](./../maintaince/scale/horizontal-scale.md#scale-instances).
 
 ### Scale vertically
 

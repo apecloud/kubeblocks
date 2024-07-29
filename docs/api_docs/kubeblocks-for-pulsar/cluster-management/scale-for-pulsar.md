@@ -72,7 +72,7 @@ There are two ways to apply vertical scaling.
    demo        ops-vertical-scaling   VerticalScaling   mycluster   Succeed   3/3        6m
    ```
 
-   If an error occurs to the vertical scaling operation, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
+   If an error occurs, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
 
 3. Check whether the corresponding resources change.
 
@@ -143,16 +143,16 @@ There are two ways to apply vertical scaling.
 
 ## Horizontal scaling
 
-Horizontal scaling changes the amount of pods. For example, you can apply horizontal scaling to scale pods up from three to five. The scaling process includes the backup and restoration of data.
+Horizontal scaling changes the amount of pods. For example, you can scale out replicas from three to five. The scaling process includes the backup and restore of data.
+
+From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out instances, refer to [Horizontal Scale](./../../maintenance/scale/horizontal-scale.md) for more details and examples.
 
 ### Before you start
 
 - It is recommended to keep 3 nodes without scaling for Zookeeper, and other components can scale horizontally for multiple or single components
 - The scaling of the Bookies node needs to be cautious. The data copy is related to the EnsembleSize, Write Quorum, and Ack Quorum configurations, scaling may cause data loss. Check [Pulsar official document](https://pulsar.apahe.org/docs/3.0.x/administration-zk-bk/#decommission-bookies-cleanly) for detailed information.
 
-### Scale replicas
-
-#### Steps
+### Steps
 
 There are two ways to apply horizontal scaling.
 
@@ -161,6 +161,8 @@ There are two ways to apply horizontal scaling.
 <TabItem value="OpsRequest" label="OpsRequest" default>
 
 1. Apply an OpsRequest to a specified cluster. Configure the parameters according to your needs.
+
+   The example below means adding two replicas.
 
     ```bash
     kubectl create -f -<< EOF
@@ -174,7 +176,29 @@ There are two ways to apply horizontal scaling.
       type: HorizontalScaling  
       horizontalScaling:
       - componentName: pulsar-proxy
-        replicas: 2
+        scaleOut:
+          replicaChanges: 2
+    EOF
+    ```
+
+    If you want to scale in replicas, replace `scaleOut` with `scaleIn`.
+
+   The example below means deleting two replicas.
+
+    ```bash
+    kubectl create -f -<< EOF
+    apiVersion: apps.kubeblocks.io/v1alpha1
+    kind: OpsRequest
+    metadata:
+      name: ops-horizontalscaling
+      namespace: demo
+    spec:
+      clusterRef: mycluster
+      type: HorizontalScaling  
+      horizontalScaling:
+      - componentName: pulsar-proxy
+        scaleIn:
+          replicaChanges: 2
     EOF
     ```
 
@@ -187,7 +211,7 @@ There are two ways to apply horizontal scaling.
    demo        ops-horizontal-scaling   HorizontalScaling   mycluster   Succeed   3/3        6m
    ```
 
-   If an error occurs to the horizontal scaling operation, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
+   If an error occurs, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
 
 3. Check whether the corresponding resources change.
 
@@ -229,10 +253,6 @@ There are two ways to apply horizontal scaling.
 </TabItem>
 
 </Tabs>
-
-### Scale instances
-
-From v0.9.0, KubeBlocks supports scale in or out of specified instances. For details, refer to [Horizontal Scale](./../../maintenance/scale/horizontal-scale.md#scale-instances).
 
 ### Handle the snapshot exception
 

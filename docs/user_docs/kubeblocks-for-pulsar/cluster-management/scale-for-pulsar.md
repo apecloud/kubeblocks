@@ -57,16 +57,16 @@ kbcli cluster list pulsar-cluster
 
 ## Horizontal scaling
 
-Horizontal scaling changes the amount of pods. For example, you can apply horizontal scaling to scale pods up from three to five. The scaling process includes the backup and restoration of data.
+Horizontal scaling changes the amount of pods. For example, you can scale out replicas from three to five. The scaling process includes the backup and restore of data.
+
+From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out instances, refer to [Horizontal Scale](./../../maintaince/scale/horizontal-scale.md) for more details and examples.
 
 ### Before you start
 
 - It is recommended to keep 3 nodes without scaling for Zookeeper, and other components can scale horizontally for multiple or single components
 - The scaling of the Bookies node needs to be cautious. The data copy is related to the EnsembleSize, Write Quorum, and Ack Quorum configurations, scaling may cause data loss. Check [Pulsar official document](https://pulsar.apahe.org/docs/3.0.x/administration-zk-bk/#decommission-bookies-cleanly) for detailed information.
 
-### Scale replicas
-
-#### Steps
+### Steps
 
 1. Change configuration.
 
@@ -77,9 +77,8 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
    ```
 
    - `--components` describes the component name ready for horizontal scaling.
-   - `--replicas` describes the replicas with the specified components.
+   - `--replicas` describes the replica amount of the specified components. Edit the amount based on your demands to scale in or out replicas.
 
-   
 2. Validate the horizontal scaling operation.
 
    Check the cluster STATUS to identify the horizontal scaling status.
@@ -96,10 +95,6 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
    ```bash
    kbcli cluster describe pulsar-cluster
    ```
-
-### Scale instances
-
-From v0.9.0, KubeBlocks supports scale in or out of specified instances. For details, refer to [Horizontal Scale](./../../maintaince/scale/horizontal-scale.md#scale-instances).
 
 ### Handle the snapshot exception
 

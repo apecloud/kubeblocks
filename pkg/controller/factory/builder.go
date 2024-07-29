@@ -502,6 +502,7 @@ func BuildServiceAccount(cluster *appsv1alpha1.Cluster, saName string) *corev1.S
 	wellKnownLabels := constant.GetKBWellKnownLabels(cluster.Spec.ClusterDefRef, cluster.Name, "")
 	return builder.NewServiceAccountBuilder(cluster.Namespace, saName).
 		AddLabelsInMap(wellKnownLabels).
+		SetImagePullSecrets(intctrlutil.BuildImagePullSecretsByEnv()).
 		GetObject()
 }
 

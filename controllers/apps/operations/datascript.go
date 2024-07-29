@@ -328,6 +328,7 @@ func buildDataScriptJobs(reqCtx intctrlutil.RequestCtx, cli client.Client, clust
 		job.Spec.BackoffLimit = pointer.Int32(0)
 		job.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyNever
 		job.Spec.Template.Spec.Containers = []corev1.Container{container}
+		job.Spec.Template.Spec.ImagePullSecrets = intctrlutil.BuildImagePullSecretsByEnv()
 
 		// add labels
 		job.Labels = getDataScriptJobLabels(cluster.Name, component.Name, ops.Name)

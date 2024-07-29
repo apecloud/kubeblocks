@@ -38,6 +38,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type TestResourceUnit struct {
@@ -607,3 +608,37 @@ var _ = Describe("pod utils", func() {
 		})
 	})
 })
+
+func TestBuildImagePullSecretsByEnv(t *testing.T) {
+	tests := []struct {
+		value    string
+		expected []corev1.LocalObjectReference
+	}{
+		{
+			value:    "",
+			expected: nil,
+		},
+		{
+			value: "[{\"name\":\"test\"}]",
+			expected: []corev1.LocalObjectReference{
+				{
+					Name: "test",
+				},
+			},
+		},
+	}
+
+	Context("test BuildImagePullSecretsByEnv", func() {
+		It("Should succeed with no error", func() {
+			for _, t := range tests {
+				viper.Set(constant.KBImagePullSecrets, t.value)
+				secrets := BuildImagePullSecretsByEnv()
+				if t.value == "" {
+					Expect(len(secrets)).To(Equal(0))
+				} else {
+					Expect(secrets).To(Equal(t.expected))
+				}
+			}
+		})
+	})
+}

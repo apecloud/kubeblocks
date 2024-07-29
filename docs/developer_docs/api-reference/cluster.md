@@ -1017,6 +1017,22 @@ an existed ServiceAccount in this field.</p>
 </tr>
 <tr>
 <td>
+<code>parallelPodManagementConcurrency</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
+or when scaling down. It only used when <code>PodManagementPolicy</code> is set to <code>Parallel</code>.
+The default Concurrency is 100%.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>podUpdatePolicy</code><br/>
 <em>
 <a href="#workloads.kubeblocks.io/v1alpha1.PodUpdatePolicyType">
@@ -5399,6 +5415,22 @@ Existing usage should be updated to the current preferred approach to avoid comp
 </tr>
 <tr>
 <td>
+<code>parallelPodManagementConcurrency</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
+or when scaling down. It only used when <code>PodManagementPolicy</code> is set to <code>Parallel</code>.
+The default Concurrency is 100%.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>podUpdatePolicy</code><br/>
 <em>
 <a href="#workloads.kubeblocks.io/v1alpha1.PodUpdatePolicyType">
@@ -9640,6 +9672,22 @@ Future versions might change the default ServiceAccount creation strategy to one
 potentially revising the naming to &ldquo;kb-&#123;cluster.name&#125;-&#123;component.name&#125;&rdquo;.</p>
 <p>Users can override the automatic ServiceAccount assignment by explicitly setting the name of
 an existed ServiceAccount in this field.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>parallelPodManagementConcurrency</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
+or when scaling down. It only used when <code>PodManagementPolicy</code> is set to <code>Parallel</code>.
+The default Concurrency is 100%.</p>
 </td>
 </tr>
 <tr>
@@ -24126,6 +24174,22 @@ all pods at once.</p>
 </tr>
 <tr>
 <td>
+<code>parallelPodManagementConcurrency</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
+or when scaling down. It only used when <code>PodManagementPolicy</code> is set to <code>Parallel</code>.
+The default Concurrency is 100%.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>podUpdatePolicy</code><br/>
 <em>
 <a href="#workloads.kubeblocks.io/v1alpha1.PodUpdatePolicyType">
@@ -24654,6 +24718,22 @@ The alternative policy is <code>Parallel</code> which will create pods in parall
 to match the desired scale without waiting, and on scale down will delete
 all pods at once.</p>
 <p>Note: This field will be removed in future version.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>parallelPodManagementConcurrency</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
+or when scaling down. It only used when <code>PodManagementPolicy</code> is set to <code>Parallel</code>.
+The default Concurrency is 100%.</p>
 </td>
 </tr>
 <tr>

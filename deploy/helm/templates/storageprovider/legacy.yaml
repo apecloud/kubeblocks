@@ -258,8 +258,12 @@ spec:
     provisioner: ru.yandex.s3.csi
     parameters:
       mounter: geesefs
+      {{ `{{ $regionOption := "" }}` }}
+      {{ `{{ if .Parameters.region }}` }}
+        {{ `{{ $regionOption = (printf "--region %s" .Parameters.region) }}` }}
+      {{ `{{ end }}` }}
       # you can set mount options here, for example limit memory cache size (recommended)
-      options: {{ `{{ printf "--memory-limit %s --read-ahead-large %s --dir-mode 0777 --file-mode 0666 %s" .Parameters.geesefsMemoryLimit .Parameters.geesefsReadAheadLarge .Parameters.mountOptions }}` }}
+      options: {{ `{{ printf "--memory-limit %s --read-ahead-large %s --dir-mode 0777 --file-mode 0666 %s %s" .Parameters.geesefsMemoryLimit .Parameters.geesefsReadAheadLarge .Parameters.mountOptions $regionOption }}` }}
       bucket: {{ `{{ index .Parameters "bucket" }}` }}
       csi.storage.k8s.io/provisioner-secret-name: {{ `{{ .CSIDriverSecretRef.Name }}` }}
       csi.storage.k8s.io/provisioner-secret-namespace: {{ `{{ .CSIDriverSecretRef.Namespace }}` }}
@@ -277,6 +281,7 @@ spec:
     env_auth = false
     access_key_id = {{ `{{ index .Parameters "accessKeyId" }}` }}
     secret_access_key = {{ `{{ index .Parameters "secretAccessKey" }}` }}
+    region = {{ `{{ index .Parameters "region" }}` }}
     endpoint = {{ `{{ index .Parameters "endpoint" }}` }}
     root = {{ `{{ index .Parameters "bucket" }}` }}
     no_check_certificate = {{ `{{ index .Parameters "insecure" }}` }}
@@ -286,6 +291,9 @@ spec:
     openAPIV3Schema:
       type: "object"
       properties:
+        region:
+          type: string
+          description: "MinIO region (optional), e.g. us-west-1"
         bucket:
           type: string
           description: "MinIO bucket"

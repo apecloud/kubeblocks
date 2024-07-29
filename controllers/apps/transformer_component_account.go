@@ -70,6 +70,7 @@ func (t *componentAccountTransformer) Transform(ctx graph.TransformContext, dag 
 		}
 		graphCli.Create(dag, secret, inUniversalContext4G())
 	}
+	// TODO: (good-first-issue) if an account is deleted from the Spec, the secret and account should be deleted
 	return nil
 }
 
@@ -102,7 +103,7 @@ func (t *componentAccountTransformer) buildAccountSecret(ctx *componentTransform
 	default:
 		password = t.buildPassword(ctx, account)
 	}
-	return t.buildAccountSecretWithPassword(synthesizeComp, account, password), nil
+	return t.buildAccountSecretWithPassword(ctx, synthesizeComp, account, password)
 }
 
 func (t *componentAccountTransformer) getPasswordFromSecret(ctx graph.TransformContext, account appsv1alpha1.SystemAccount) ([]byte, error) {
@@ -121,11 +122,13 @@ func (t *componentAccountTransformer) getPasswordFromSecret(ctx graph.TransformC
 }
 
 func (t *componentAccountTransformer) buildPassword(ctx *componentTransformContext, account appsv1alpha1.SystemAccount) []byte {
-	if !account.InitAccount {
-		return t.generatePassword(account)
-	}
 	// get restore password if exists during recovery.
-	password := factory.GetRestorePassword(ctx.SynthesizeComponent)
+	password := factory.GetRestoreSystemAccountPassword(ctx.SynthesizeComponent, account)
+	if account.InitAccount && password == "" {
+		// initAccount can also restore from factory.GetRestoreSystemAccountPassword(ctx.SynthesizeComponent, account).
+		// This is compatibility processing.
+		password = factory.GetRestorePassword(ctx.SynthesizeComponent)
+	}
 	if password == "" {
 		return t.generatePassword(account)
 	}
@@ -144,15 +147,19 @@ func (t *componentAccountTransformer) generatePassword(account appsv1alpha1.Syst
 	return []byte(passwd)
 }
 
-func (t *componentAccountTransformer) buildAccountSecretWithPassword(synthesizeComp *component.SynthesizedComponent,
-	account appsv1alpha1.SystemAccount, password []byte) *corev1.Secret {
+func (t *componentAccountTransformer) buildAccountSecretWithPassword(ctx *componentTransformContext,
+	synthesizeComp *component.SynthesizedComponent, account appsv1alpha1.SystemAccount, password []byte) (*corev1.Secret, error) {
 	secretName := constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, account.Name)
 	labels := constant.GetComponentWellKnownLabels(synthesizeComp.ClusterName, synthesizeComp.Name)
-	return builder.NewSecretBuilder(synthesizeComp.Namespace, secretName).
+	secret := builder.NewSecretBuilder(synthesizeComp.Namespace, secretName).
 		AddLabelsInMap(labels).
 		AddLabels(constant.ClusterAccountLabelKey, account.Name).
 		PutData(constant.AccountNameForSecret, []byte(account.Name)).
 		PutData(constant.AccountPasswdForSecret, password).
 		SetImmutable(true).
 		GetObject()
+	if err := setCompOwnershipNFinalizer(ctx.Component, secret); err != nil {
+		return nil, err
+	}
+	return secret, nil
 }

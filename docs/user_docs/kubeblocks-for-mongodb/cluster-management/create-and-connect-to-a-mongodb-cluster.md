@@ -56,13 +56,13 @@ kbcli cluster create <clustername> --cluster-definition mongodb
 Create a ReplicatSet.
 
 ```bash
-kbcli cluster create <clustername> --cluster-definition mongodb --mode replicaset 
+kbcli cluster create <clustername> --cluster-definition mongodb --set replicas=2 
 ```
 
 If you only have one node for deploying a ReplicaSet, set the `availability-policy` as `none` when creating a ReplicaSet.
 
 ```bash
-kbcli cluster create <clustername> --cluster-definition mongodb --mode replicaset --availability-policy none
+kbcli cluster create <clustername> --cluster-definition mongodb --set replicas=2 --topology-keys null
 ```
 
 If you want to specify a cluster version, you can first view the available versions and use `--version` to specify a version.

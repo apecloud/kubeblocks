@@ -89,7 +89,7 @@ func MockInstanceSetComponent(
 	return NewInstanceSetFactory(testCtx.DefaultNamespace, itsName, clusterName, itsCompName).SetReplicas(ConsensusReplicas).
 		AddContainer(corev1.Container{Name: DefaultMySQLContainerName, Image: ApeCloudMySQLImage}).
 		SetRoles([]workloads.ReplicaRole{
-			{Name: "Leader", AccessMode: workloads.ReadWriteMode, CanVote: true, IsLeader: true},
+			{Name: "leader", AccessMode: workloads.ReadWriteMode, CanVote: true, IsLeader: true},
 			{Name: "follower", AccessMode: workloads.ReadonlyMode, CanVote: true, IsLeader: false},
 		}).Create(testCtx).GetObject()
 }

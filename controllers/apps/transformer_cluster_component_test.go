@@ -77,12 +77,14 @@ var _ = Describe("cluster component transformer test", func() {
 		clusterTopologyDefault             = "test-topology-default"
 		clusterTopologyNoOrders            = "test-topology-no-orders"
 		clusterTopologyProvisionNUpdateOOD = "test-topology-ood"
+		clusterTopology4Stop               = "test-topology-stop"
 		compDefName                        = "test-compdef"
 		clusterName                        = "test-cluster"
 		comp1aName                         = "comp-1a"
 		comp1bName                         = "comp-1b"
 		comp2aName                         = "comp-2a"
 		comp2bName                         = "comp-2b"
+		comp3aName                         = "comp-3a"
 	)
 
 	var (
@@ -178,6 +180,26 @@ var _ = Describe("cluster component transformer test", func() {
 					},
 				},
 			}).
+			AddClusterTopology(appsv1alpha1.ClusterTopology{
+				Name: clusterTopology4Stop,
+				Components: []appsv1alpha1.ClusterTopologyComponent{
+					{
+						Name:    comp1aName,
+						CompDef: compDefName,
+					},
+					{
+						Name:    comp2aName,
+						CompDef: compDefName,
+					},
+					{
+						Name:    comp3aName,
+						CompDef: compDefName,
+					},
+				},
+				Orders: &appsv1alpha1.ClusterTopologyOrders{
+					Update: []string{comp1aName, comp2aName, comp3aName},
+				},
+			}).
 			GetObject()
 	})
 
@@ -258,7 +280,7 @@ var _ = Describe("cluster component transformer test", func() {
 			transformer, transCtx, dag := newTransformerNCtx(clusterTopologyDefault)
 			err := transformer.Transform(transCtx, dag)
 			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(And(ContainSubstring("retry later"), ContainSubstring(comp2aName), ContainSubstring(comp2bName)))
+			Expect(err.Error()).Should(And(ContainSubstring("retry later"), ContainSubstring(comp2aName)))
 
 			// check the first two components
 			graphCli := transCtx.Client.(model.GraphClient)
@@ -289,7 +311,7 @@ var _ = Describe("cluster component transformer test", func() {
 
 			err := transformer.Transform(transCtx, dag)
 			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(And(ContainSubstring("retry later"), ContainSubstring(comp2aName), ContainSubstring(comp2bName)))
+			Expect(err.Error()).Should(And(ContainSubstring("retry later"), ContainSubstring(comp2aName)))
 
 			// should have no components to update
 			graphCli := transCtx.Client.(model.GraphClient)
@@ -312,7 +334,7 @@ var _ = Describe("cluster component transformer test", func() {
 
 			err := transformer.Transform(transCtx, dag)
 			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(And(ContainSubstring("retry later"), ContainSubstring(comp2aName), ContainSubstring(comp2bName)))
+			Expect(err.Error()).Should(And(ContainSubstring("retry later"), ContainSubstring(comp2aName)))
 
 			// should have one component to create
 			graphCli := transCtx.Client.(model.GraphClient)
@@ -372,7 +394,7 @@ var _ = Describe("cluster component transformer test", func() {
 
 			err := transformer.Transform(transCtx, dag)
 			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(And(ContainSubstring("retry later"), ContainSubstring(comp2aName), ContainSubstring(comp2bName)))
+			Expect(err.Error()).Should(And(ContainSubstring("retry later"), ContainSubstring(comp2aName)))
 
 			// check the first component
 			graphCli := transCtx.Client.(model.GraphClient)
@@ -409,8 +431,7 @@ var _ = Describe("cluster component transformer test", func() {
 
 			err := transformer.Transform(transCtx, dag)
 			Expect(err).ShouldNot(BeNil())
-			// TODO: should not contain comp2bName
-			Expect(err.Error()).Should(And(ContainSubstring("retry later"), ContainSubstring(comp2aName), ContainSubstring(comp2bName)))
+			Expect(err.Error()).Should(And(ContainSubstring("retry later"), ContainSubstring(comp2aName)))
 
 			// should have no components to update
 			graphCli := transCtx.Client.(model.GraphClient)
@@ -445,8 +466,7 @@ var _ = Describe("cluster component transformer test", func() {
 
 			err := transformer.Transform(transCtx, dag)
 			Expect(err).ShouldNot(BeNil())
-			// TODO: should not contain comp2bName
-			Expect(err.Error()).Should(And(ContainSubstring("retry later"), ContainSubstring(comp2aName), ContainSubstring(comp2bName)))
+			Expect(err.Error()).Should(And(ContainSubstring("retry later"), ContainSubstring(comp2aName)))
 
 			// should have one component to update
 			graphCli := transCtx.Client.(model.GraphClient)
@@ -490,6 +510,83 @@ var _ = Describe("cluster component transformer test", func() {
 			comp := objs[0].(*appsv1alpha1.Component)
 			Expect(component.ShortName(transCtx.Cluster.Name, comp.Name)).Should(Equal(comp2aName))
 			Expect(graphCli.IsAction(dag, comp, model.ActionUpdatePtr())).Should(BeTrue())
+		})
+
+		It("w/ orders update - stop", func() {
+			transformer, transCtx, dag := newTransformerNCtx(clusterTopology4Stop)
+
+			// mock to stop all components
+			reader := &mockReader{
+				objs: []client.Object{
+					mockCompObj(transCtx, comp1aName, func(comp *appsv1alpha1.Component) {
+						comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+					}),
+					mockCompObj(transCtx, comp2aName, func(comp *appsv1alpha1.Component) {
+						comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+					}),
+					mockCompObj(transCtx, comp3aName, func(comp *appsv1alpha1.Component) {
+						comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+					}),
+				},
+			}
+			transCtx.Client = model.NewGraphClient(reader)
+			for i := range transCtx.ComponentSpecs {
+				transCtx.ComponentSpecs[i].Stop = &[]bool{true}[0]
+			}
+			transCtx.OrigCluster.Generation += 1 // mock cluster spec update
+
+			err := transformer.Transform(transCtx, dag)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(And(ContainSubstring("retry later"), ContainSubstring(comp2aName)))
+
+			// should have the first component to update only
+			graphCli := transCtx.Client.(model.GraphClient)
+			objs := graphCli.FindAll(dag, &appsv1alpha1.Component{})
+			Expect(len(objs)).Should(Equal(1))
+			comp := objs[0].(*appsv1alpha1.Component)
+			Expect(component.ShortName(transCtx.Cluster.Name, comp.Name)).Should(Equal(comp1aName))
+			Expect(graphCli.IsAction(dag, comp, model.ActionUpdatePtr())).Should(BeTrue())
+			Expect(comp.Spec.Stop).ShouldNot(BeNil())
+			Expect(*comp.Spec.Stop).Should(BeTrue())
+		})
+
+		It("w/ orders update - stop the second component", func() {
+			transformer, transCtx, dag := newTransformerNCtx(clusterTopology4Stop)
+
+			// mock to stop all components and the first component has been stopped
+			reader := &mockReader{
+				objs: []client.Object{
+					mockCompObj(transCtx, comp1aName, func(comp *appsv1alpha1.Component) {
+						comp.Spec.Stop = &[]bool{true}[0]
+						comp.Status.Phase = appsv1alpha1.StoppedClusterCompPhase
+					}),
+					mockCompObj(transCtx, comp2aName, func(comp *appsv1alpha1.Component) {
+						comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+					}),
+					mockCompObj(transCtx, comp3aName, func(comp *appsv1alpha1.Component) {
+						comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+					}),
+				},
+			}
+			transCtx.Client = model.NewGraphClient(reader)
+			for i := range transCtx.ComponentSpecs {
+				transCtx.ComponentSpecs[i].Stop = &[]bool{true}[0]
+			}
+			transCtx.OrigCluster.Generation += 1 // mock cluster spec update
+
+			err := transformer.Transform(transCtx, dag)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(And(ContainSubstring("retry later"), ContainSubstring(comp3aName)))
+
+			// should have the second component to update only
+			graphCli := transCtx.Client.(model.GraphClient)
+			objs := graphCli.FindAll(dag, &appsv1alpha1.Component{})
+			Expect(len(objs)).Should(Equal(1))
+			comp := objs[0].(*appsv1alpha1.Component)
+			Expect(component.ShortName(transCtx.Cluster.Name, comp.Name)).Should(Equal(comp2aName))
+			Expect(graphCli.IsAction(dag, comp, model.ActionUpdatePtr())).Should(BeTrue())
+			Expect(comp.Spec.Stop).ShouldNot(BeNil())
+			Expect(*comp.Spec.Stop).Should(BeTrue())
 		})
 
 		It("w/ orders provision & update - OOD", func() {

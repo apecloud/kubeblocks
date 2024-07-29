@@ -142,8 +142,8 @@ var _ = Describe("Component PreTerminate Test", func() {
 			synthesizeComp.LifecycleActions = &appsv1alpha1.ComponentLifecycleActions{}
 			PreTerminate := appsv1alpha1.LifecycleActionHandler{
 				CustomHandler: &appsv1alpha1.Action{
-					Image: constant.KBToolsImage,
 					Exec: &appsv1alpha1.ExecAction{
+						Image:   constant.KBToolsImage,
 						Command: []string{"echo", "mock"},
 						Args:    []string{},
 					},

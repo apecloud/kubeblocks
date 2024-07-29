@@ -179,6 +179,7 @@ func NewFakeCluster(testCtx *testutil.TestContext) *BackupClusterInfo {
 	By("mocking a cluster")
 	cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, ClusterName, "test-cd").
 		AddLabels(constant.AppInstanceLabelKey, ClusterName).
+		AddComponent("test-cmp", "test-cmpd").AddSystemAccount("test-account", nil, nil).
 		Create(testCtx).GetObject()
 	podName := ClusterName + "-" + ComponentName
 

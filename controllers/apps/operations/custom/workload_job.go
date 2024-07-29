@@ -45,7 +45,7 @@ func (w *WorkloadAction) createJob(actionCtx ActionContext,
 	}
 	job := builder.NewJobBuilder(w.OpsRequest.Namespace, buildJobName()).
 		SetBackoffLimit(actionCtx.Action.Workload.BackoffLimit).
-		AddLabelsInMap(buildLabels(w.Cluster.Name, w.OpsRequest.Name, w.Comp.Name, actionCtx.Action.Name)).
+		AddLabelsInMap(buildLabels(w.OpsRequest.Name, actionCtx.Action.Name)).
 		SetPodTemplateSpec(corev1.PodTemplateSpec{Spec: *podSpec}).
 		GetObject()
 	job.Kind = constant.JobKind

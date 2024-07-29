@@ -156,12 +156,13 @@ var _ = BeforeSuite(func() {
 	Expect(k8sClient).NotTo(BeNil())
 
 	// run reconcile
+	unCachedObjs := intctrlutil.GetUncachedObjects()
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme:  scheme.Scheme,
 		Metrics: server.Options{BindAddress: "0"},
 		Client: client.Options{
 			Cache: &client.CacheOptions{
-				DisableFor: intctrlutil.GetUncachedObjects(),
+				DisableFor: append(unCachedObjs, &dpv1alpha1.Restore{}),
 			},
 		},
 	})

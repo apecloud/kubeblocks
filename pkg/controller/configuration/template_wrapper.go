@@ -109,6 +109,10 @@ func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1alpha1.Cluster
 		if err != nil {
 			return err
 		}
+		// If ConfigMap already exists, skip the rendering process.
+		// In this way, the Component controller only creates ConfigMap objects for the first time,
+		// and does not update the ConfigMap objects in the subsequent reconfiguration process.
+		// The subsequent reconfiguration process is handled by the Configuration controller.
 		if origCMObj != nil {
 			wrapper.addVolumeMountMeta(configSpec.ComponentTemplateSpec, origCMObj, false)
 			continue

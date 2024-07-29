@@ -35,6 +35,8 @@ import (
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -204,6 +206,49 @@ var _ = Describe("TLS self-signed cert function", func() {
 
 				testapps.DeleteObject(&testCtx, clusterKey, &appsv1alpha1.Cluster{})
 				Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, false)).Should(Succeed())
+			})
+		})
+		Context("when issuer is KubeBlocks check secret exists or not", func() {
+			var (
+				kbTLSSecretObj  *corev1.Secret
+				synthesizedComp component.SynthesizedComponent
+				dag             *graph.DAG
+				err             error
+			)
+			BeforeEach(func() {
+				synthesizedComp = component.SynthesizedComponent{
+					Namespace:   testCtx.DefaultNamespace,
+					ClusterName: "test-kb",
+					Name:        "test-kb-tls",
+					TLSConfig: &appsv1alpha1.TLSConfig{
+						Enable: true,
+						Issuer: &appsv1alpha1.Issuer{
+							Name: appsv1alpha1.IssuerKubeBlocks,
+						},
+					},
+				}
+				dag = &graph.DAG{}
+				kbTLSSecretObj, err = plan.ComposeTLSSecret(testCtx.DefaultNamespace, synthesizedComp.ClusterName, synthesizedComp.Name)
+				Expect(err).Should(BeNil())
+				Expect(k8sClient.Create(ctx, kbTLSSecretObj)).Should(Succeed())
+			})
+			AfterEach(func() {
+				// delete self provided tls certs secret
+				Expect(k8sClient.Delete(ctx, kbTLSSecretObj)).Should(Succeed())
+				Eventually(func() bool {
+					err := k8sClient.Get(ctx,
+						client.ObjectKeyFromObject(kbTLSSecretObj),
+						kbTLSSecretObj)
+					return apierrors.IsNotFound(err)
+				}).Should(BeTrue())
+			})
+			It("should skip if the existence of the secret is confirmed", func() {
+				err := buildTLSCert(ctx, k8sClient, synthesizedComp, dag)
+				Expect(err).Should(BeNil())
+				createdSecret := &corev1.Secret{}
+				err = k8sClient.Get(ctx, types.NamespacedName{Namespace: testCtx.DefaultNamespace, Name: kbTLSSecretObj.Name}, createdSecret)
+				Expect(err).Should(BeNil())
+				Expect(createdSecret.Data).To(Equal(kbTLSSecretObj.Data))
 			})
 		})
 	})

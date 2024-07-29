@@ -19,9 +19,7 @@ kbcli cluster list pulsar-cluster
 
 ## Steps
 
-1. Change configuration. There are 3 ways to apply volume expansion.
-
-    Configure the values of `--components`, `--volume-claim-templates`, and `--storage`, and run the command below to expand the volume.
+1. Configure the values of `--components`, `--volume-claim-templates`, and `--storage`, and run the command below to expand the volume.
 
     :::note
 

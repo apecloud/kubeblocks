@@ -110,7 +110,7 @@ type BackupTarget struct {
 	// If not specified, the first container and its first port will be used.
 	//
 	// +optional
-	ContainerPort *ContainerPort `json:",inline"`
+	ContainerPort *ContainerPort `json:"containerPort,omitempty"`
 }
 
 type ContainerPort struct {

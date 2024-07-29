@@ -20,9 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package utils
 
 import (
-	"strconv"
-
 	corev1 "k8s.io/api/core/v1"
+	"strconv"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -31,30 +30,30 @@ import (
 
 func BuildEnvByTarget(pod *corev1.Pod, credential *dpv1alpha1.ConnectionCredential, containerPort *dpv1alpha1.ContainerPort) []corev1.EnvVar {
 	var envVars []corev1.EnvVar
-	envVars = append(envVars, corev1.EnvVar{Name: dptypes.DPDBHost, Value: intctrlutil.BuildPodHostDNS(pod)})
-	if containerPort != nil {
-		envVars = append(envVars, corev1.EnvVar{Name: dptypes.DPDBPort, Value: strconv.Itoa(int(GetContainerPortByName(pod, containerPort.ContainerName, containerPort.PortName)))})
-	} else {
-		envVars = append(envVars, corev1.EnvVar{Name: dptypes.DPDBPort, Value: strconv.Itoa(int(GetPodFirstContainerPort(pod)))})
-	}
 	if credential == nil {
-		return envVars
-	}
-	var hostEnv corev1.EnvVar
-	if credential.HostKey == "" {
-		hostEnv = corev1.EnvVar{Name: dptypes.DPDBHost, Value: intctrlutil.BuildPodHostDNS(pod)}
+		envVars = append(envVars, corev1.EnvVar{Name: dptypes.DPDBHost, Value: intctrlutil.BuildPodHostDNS(pod)})
+		if containerPort != nil {
+			envVars = append(envVars, corev1.EnvVar{Name: dptypes.DPDBPort, Value: strconv.Itoa(int(GetContainerPortByName(pod, containerPort.ContainerName, containerPort.PortName)))})
+		} else {
+			envVars = append(envVars, corev1.EnvVar{Name: dptypes.DPDBPort, Value: strconv.Itoa(int(GetPodFirstContainerPort(pod)))})
+		}
 	} else {
-		hostEnv = buildEnvBySecretKey(dptypes.DPDBHost, credential.SecretName, credential.HostKey)
-	}
-	if credential.PortKey != "" {
-		envVars = append(envVars, buildEnvBySecretKey(dptypes.DPDBPort, credential.SecretName, credential.PortKey))
-	}
-	envVars = append(envVars, hostEnv)
-	if credential.PasswordKey != "" {
-		envVars = append(envVars, buildEnvBySecretKey(dptypes.DPDBPassword, credential.SecretName, credential.PasswordKey))
-	}
-	if credential.UsernameKey != "" {
-		envVars = append(envVars, buildEnvBySecretKey(dptypes.DPDBUser, credential.SecretName, credential.UsernameKey))
+		var hostEnv corev1.EnvVar
+		if credential.HostKey == "" {
+			hostEnv = corev1.EnvVar{Name: dptypes.DPDBHost, Value: intctrlutil.BuildPodHostDNS(pod)}
+		} else {
+			hostEnv = buildEnvBySecretKey(dptypes.DPDBHost, credential.SecretName, credential.HostKey)
+		}
+		if credential.PortKey != "" {
+			envVars = append(envVars, buildEnvBySecretKey(dptypes.DPDBPort, credential.SecretName, credential.PortKey))
+		}
+		envVars = append(envVars, hostEnv)
+		if credential.PasswordKey != "" {
+			envVars = append(envVars, buildEnvBySecretKey(dptypes.DPDBPassword, credential.SecretName, credential.PasswordKey))
+		}
+		if credential.UsernameKey != "" {
+			envVars = append(envVars, buildEnvBySecretKey(dptypes.DPDBUser, credential.SecretName, credential.UsernameKey))
+		}
 	}
 	return envVars
 }

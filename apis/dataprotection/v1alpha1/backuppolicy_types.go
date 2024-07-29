@@ -107,9 +107,10 @@ type BackupTarget struct {
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 
 	// Specifies the container port in the target pod.
+	// If not specified, the first container and its first port will be used.
 	//
 	// +optional
-	ContainerPort *ContainerPort `json:"containerPort,omitempty"`
+	ContainerPort *ContainerPort `json:",inline"`
 }
 
 type ContainerPort struct {

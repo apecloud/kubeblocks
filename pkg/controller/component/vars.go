@@ -332,11 +332,14 @@ func buildDefaultEnvVars(synthesizedComp *SynthesizedComponent, legacy bool) []c
 			{Name: constant.KBEnvCompName, Value: synthesizedComp.Name},
 			{Name: constant.KBEnvClusterCompName, Value: clusterCompName},
 			{Name: constant.KBEnvClusterUIDPostfix8Deprecated, Value: clusterUIDPostfix(synthesizedComp)},
-			{Name: constant.KBEnvPodFQDN, Value: fmt.Sprintf("%s.%s-headless.%s.svc", constant.EnvPlaceHolder(constant.KBEnvPodName), constant.EnvPlaceHolder(constant.KBEnvClusterCompName), constant.EnvPlaceHolder(constant.KBEnvNamespace))}}...)
+			{Name: constant.KBEnvPodFQDN, Value: fmt.Sprintf("%s.%s-headless.%s.svc.%s", constant.EnvPlaceHolder(constant.KBEnvPodName),
+				constant.EnvPlaceHolder(constant.KBEnvClusterCompName), constant.EnvPlaceHolder(constant.KBEnvNamespace), viper.Get(constant.KubernetesClusterDomainEnv))},
+		}...)
 	} else {
 		vars = append(vars, corev1.EnvVar{
-			Name:  constant.KBEnvPodFQDN,
-			Value: fmt.Sprintf("%s.%s-headless.%s.svc", constant.EnvPlaceHolder(constant.KBEnvPodName), clusterCompName, constant.EnvPlaceHolder(constant.KBEnvNamespace)),
+			Name: constant.KBEnvPodFQDN,
+			Value: fmt.Sprintf("%s.%s-headless.%s.svc.%s", constant.EnvPlaceHolder(constant.KBEnvPodName),
+				clusterCompName, constant.EnvPlaceHolder(constant.KBEnvNamespace), viper.Get(constant.KubernetesClusterDomainEnv)),
 		})
 	}
 	return vars

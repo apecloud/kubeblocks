@@ -38,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/job"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // switchover constants
@@ -340,7 +341,7 @@ func buildSwitchoverCandidateEnv(
 		},
 		{
 			Name:  KBSwitchoverCandidateFqdn,
-			Value: fmt.Sprintf("%s.%s", switchover.InstanceName, svcName),
+			Value: fmt.Sprintf("%s.%s.svc.%s", switchover.InstanceName, svcName, viper.Get(constant.KubernetesClusterDomainEnv)),
 		},
 	}
 }
@@ -427,7 +428,7 @@ func buildSwitchoverWorkloadEnvs(ctx context.Context,
 		},
 		{
 			Name:  KBSwitchoverLeaderPodFqdn,
-			Value: fmt.Sprintf("%s.%s", pod.Name, svcName),
+			Value: fmt.Sprintf("%s.%s.svc.%s", pod.Name, svcName, viper.Get(constant.KubernetesClusterDomainEnv)),
 		},
 	}...)
 
@@ -443,7 +444,7 @@ func buildSwitchoverWorkloadEnvs(ctx context.Context,
 		},
 		{
 			Name:  KBSwitchoverReplicationPrimaryPodFqdn,
-			Value: fmt.Sprintf("%s.%s", pod.Name, svcName),
+			Value: fmt.Sprintf("%s.%s.svc.%s", pod.Name, svcName, viper.Get(constant.KubernetesClusterDomainEnv)),
 		},
 		{
 			Name:  KBSwitchoverConsensusLeaderPodIP,
@@ -455,7 +456,7 @@ func buildSwitchoverWorkloadEnvs(ctx context.Context,
 		},
 		{
 			Name:  KBSwitchoverConsensusLeaderPodFqdn,
-			Value: fmt.Sprintf("%s.%s", pod.Name, svcName),
+			Value: fmt.Sprintf("%s.%s.svc.%s", pod.Name, svcName, viper.Get(constant.KubernetesClusterDomainEnv)),
 		},
 	}...)
 

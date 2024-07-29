@@ -54,7 +54,6 @@ const (
 	KBEnvPodIP            = "KB_POD_IP"
 	KBEnvPodIPs           = "KB_POD_IPS"
 	KBEnvPodFQDN          = "KB_POD_FQDN"
-	KBEnvPodOrdinal       = "KB_POD_ORDINAL"
 	KBEnvPodIPDeprecated  = "KB_PODIP"
 	KBEnvPodIPsDeprecated = "KB_PODIPS"
 )

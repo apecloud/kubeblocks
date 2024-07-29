@@ -140,7 +140,7 @@ func (w *WorkloadAction) buildPodSpec(actionCtx ActionContext,
 
 	var (
 		workloadAction = actionCtx.Action.Workload
-		podSpec        = workloadAction.PodSpec
+		podSpec        = workloadAction.PodSpec.DeepCopy()
 		volumeMounts   []corev1.VolumeMount
 		env            []corev1.EnvVar
 	)
@@ -174,7 +174,7 @@ func (w *WorkloadAction) buildPodSpec(actionCtx ActionContext,
 		intctrlutil.InjectZeroResourcesLimitsIfEmpty(&podSpec.Containers[i])
 	}
 	// inject extras script.
-	w.injectOpsUtils(&podSpec)
+	w.injectOpsUtils(podSpec)
 	for i := range podSpec.InitContainers {
 		intctrlutil.InjectZeroResourcesLimitsIfEmpty(&podSpec.InitContainers[i])
 	}
@@ -198,7 +198,7 @@ func (w *WorkloadAction) buildPodSpec(actionCtx ActionContext,
 			podSpec.ServiceAccountName = saKey.Name
 		}
 	}
-	return &podSpec, nil
+	return podSpec, nil
 }
 
 func (w *WorkloadAction) injectOpsUtils(podSpec *corev1.PodSpec) {

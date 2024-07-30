@@ -1,7 +1,7 @@
 ---
 title: Manage Milvus with KubeBlocks
 description: How to manage Milvus on KubeBlocks
-keywords: [milvus, control plane]
+keywords: [milvus, vector database, control plane]
 sidebar_position: 1
 sidebar_label: Manage Milvus with KubeBlocks
 ---
@@ -14,31 +14,39 @@ Milvus is a highly flexible, reliable, and blazing-fast cloud-native, open-sourc
 
 KubeBlocks supports the management of Milvus.
 
-Before you start, [install kbcli](./../installation/install-with-kbcli/install-kbcli.md) and [install KubeBlocks](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md).
+## Before you start
+
+- [Install kbcli](./../installation/install-with-kbcli/install-kbcli.md).
+- [Install KubeBlocks](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md).
+- [Install and enable the milvus addon](./../overview/supported-addons.md#use-addons).
 
 ## Create a cluster
 
 ***Steps***
 
-1. Execute the following command to create a Milvus cluster. You can change the `cluster-definition` value as any other databases supported.
+1. Execute the following command to create a Milvus cluster. You can change the `cluster-definition` value as any other database supported.
 
    ```bash
    kbcli cluster create milvus --cluster-definition=milvus-2.3.2
    ```
 
-   If you want to create a Milvus cluster with multiple replicas. Use the following command and set the replica numbers.
+:::note
 
-   ```bash
-   kbcli cluster create milvus --cluster-definition=milvus-2.3.2 --set replicas=3
-   ```
+View more flags for creating a MySQL cluster to create a cluster with customized specifications.
+  
+```bash
+kbcli cluster create --help
+```
+
+:::
 
 2. Check whether the cluster is created.
 
    ```bash
    kbcli cluster list
    >
-   NAME     NAMESPACE   CLUSTER-DEFINITION        VERSION               TERMINATION-POLICY   STATUS            CREATED-TIME
-   milvus   default     milvus-2.3.2              milvus-2.3.2          Delete               Creating          Jul 05,2024 17:35 UTC+0800   
+   NAME     NAMESPACE   CLUSTER-DEFINITION        VERSION               TERMINATION-POLICY   STATUS           CREATED-TIME
+   milvus   default     milvus-2.3.2              milvus-2.3.2          Delete               Running          Jul 05,2024 17:35 UTC+0800   
    ```
 
 3. Check the cluster information.
@@ -93,108 +101,22 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
    Show cluster events: kbcli cluster list-events -n default milvus
    ```
 
-## Monitor the database
-
-For the testing environment, you can run the command below to open the Grafana monitor web page.
-
-1. View all built-in addons and make sure the monitoring addons are enabled. If the monitoring addons are not enabled, [enable these addons](./../overview/supported-addons.md#use-addons) first.
-
-   ```bash
-   # View all addons supported
-   kbcli addon list
-   ...
-   grafana                        Helm   Enabled                   true                                                                                    
-   alertmanager-webhook-adaptor   Helm   Enabled                   true                                                                                    
-   prometheus                     Helm   Enabled    alertmanager   true 
-   ...
-   ```
-
-2. Check whether the monitoring function of the cluster is enabled. If the monitoring function is enabled, the output shows `disableExporter: false`.
-
-   ```bash
-   kubectl get cluster milvus -o yaml
-   >
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-   ......
-   spec:
-     ......
-     componentSpecs:
-     ......
-       disableExporter: false
-   ```
-
-   If `disableExporter: false` is not shown in the output, it means the monitoring function of this cluster is not enabled and you need to enable it first.
-
-   ```bash
-   kbcli cluster update milvus --disableExporter=false
-   ```
-
-3. View the dashboard list.
-
-   ```bash
-   kbcli dashboard list
-   >
-   NAME                                 NAMESPACE   PORT    CREATED-TIME
-   kubeblocks-grafana                   kb-system   13000   Jul 24,2023 11:38 UTC+0800
-   kubeblocks-prometheus-alertmanager   kb-system   19093   Jul 24,2023 11:38 UTC+0800
-   kubeblocks-prometheus-server         kb-system   19090   Jul 24,2023 11:38 UTC+0800
-   ```
-
-4. Open and view the web console of a monitoring dashboard. For example,
-
-   ```bash
-   kbcli dashboard open kubeblocks-grafana
-   ```
-
-For the production environment, it is highly recommended to build your monitoring system or purchase a third-party monitoring service and you can refer to [the monitoring document](./../observability/monitor-database.md#for-production-environment) for details.
-
 ## Scale
 
-The scaling function for vector databases is also supported.
-
-### Scale horizontally
-
-Use the following command to perform horizontal scaling.
-
-```bash
-kbcli cluster hscale milvus --replicas=5 --components=milvus
-```
-
-Please wait a few seconds until the scaling process is over.
-
-The `kbcli cluster hscale` command print the `opsname`, to check the progress of horizontal scaling, you can use the following command with the `opsname`.
-
-```bash
-kubectl get ops milvus-horizontalscaling-xpdwz
->
-NAME                             TYPE                CLUSTER   STATUS    PROGRESS   AGE
-milvus-horizontalscaling-xpdwz   HorizontalScaling   milvus    Running   0/2        16s
-```
-
-To check whether the scaling is done, use the following command.
-
-```bash
-kbcli cluster describe milvus
-```
-
-### Scale vertically
+Currently, KubeBlocks supports vertically scaling a Milvus cluster.
 
 Use the following command to perform vertical scaling.
 
 ```bash
-kbcli cluster vscale milvus --cpu=0.5 --memory=512Mi --components=milvus 
+kbcli cluster vscale milvus --cpu=1 --memory=1Gi --components=milvus 
 ```
 
 Please wait a few seconds until the scaling process is over.
-The `kbcli cluster vscale` command print the `opsname`, to check the progress of scaling, you can use the following command with the `opsname`.
+
+The `kbcli cluster vscale` command prints a command to help check the progress of scaling operations.
 
 ```bash
-kubectl get ops milvus-verticalscaling-rpw2l
->
-NAME                           TYPE              CLUSTER   STATUS    PROGRESS   AGE
-milvus-verticalscaling-rpw2l   VerticalScaling   milvus    Running   1/5        44s
+kbcli cluster describe-ops milvus-verticalscaling-rpw2l -n default
 ```
 
 To check whether the scaling is done, use the following command.
@@ -213,13 +135,10 @@ kbcli cluster volume-expand milvus --storage=40Gi --components=milvus -t data
 
 The volume expansion may take a few minutes.
 
-The `kbcli cluster volume-expand` command print the `opsname`, to check the progress of volume expanding, you can use the following command with the `opsname`.
+The `kbcli cluster volume-expand` command prints a command to help check the progress of scaling operations.
 
 ```bash
-kubectl get ops milvus-volumeexpansion-5pbd2
->
-NAME                           TYPE              CLUSTER   STATUS   PROGRESS   AGE
-milvus-volumeexpansion-5pbd2   VolumeExpansion   milvus    Running  1/1        67s
+kbcli cluster describe-ops milvus-volumeexpansion-5pbd2 -n default
 ```
 
 To check whether the expanding is done, use the following command.
@@ -255,3 +174,35 @@ kbcli cluster describe milvus
 
    * STATUS=Updating: it means the cluster restart is in progress.
    * STATUS=Running: it means the cluster has been restarted.
+
+## Stop/Start a cluster
+
+You can stop/start a cluster to save computing resources. When a cluster is stopped, the computing resources of this cluster are released, which means the pods of Kubernetes are released, but the storage resources are reserved. You can start this cluster again by snapshots if you want to restore the cluster resources.
+
+### Stop a cluster
+
+1. Configure the name of your cluster and run the command below to stop this cluster.
+
+   ```bash
+   kbcli cluster stop milvus
+   ```
+
+2. Check the status of the cluster to see whether it is stopped.
+
+    ```bash
+    kbcli cluster list
+    ```
+
+### Start a cluster
+
+1. Configure the name of your cluster and run the command below to start this cluster.
+
+   ```bash
+   kbcli cluster start milvus
+   ```
+
+2. Check the status of the cluster to see whether it is running again.
+
+    ```bash
+    kbcli cluster list
+    ```

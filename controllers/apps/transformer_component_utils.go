@@ -30,44 +30,26 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/graph"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-// componentOwnershipTransformer adds finalizer to all none component objects
-type componentOwnershipTransformer struct{}
-
-var _ graph.Transformer = &componentOwnershipTransformer{}
-
-func (f *componentOwnershipTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*componentTransformContext)
-	graphCli, _ := transCtx.Client.(model.GraphClient)
-	comp := transCtx.Component
-	return setCompOwnership(comp, dag, graphCli)
-}
-
-func setCompOwnership(comp *appsv1alpha1.Component, dag *graph.DAG, graphCli model.GraphClient) error {
-	// find all objects that are not component and set ownership to the component
-	objects := graphCli.FindAll(dag, &appsv1alpha1.Component{}, &model.HaveDifferentTypeWithOption{})
-	for _, object := range objects {
-		if skipSetCompOwnership(object) {
-			continue
+func setCompOwnershipNFinalizer(comp *appsv1alpha1.Component, object client.Object) error {
+	if skipSetCompOwnershipNFinalizer(object) {
+		return nil
+	}
+	// add finalizer to the object
+	addFinalizer(object, comp)
+	if err := intctrlutil.SetOwnership(comp, object, rscheme, ""); err != nil {
+		if _, ok := err.(*controllerutil.AlreadyOwnedError); ok {
+			return nil
 		}
-		// add finalizer to the object
-		addFinalizer(object, comp)
-		if err := intctrlutil.SetOwnership(comp, object, rscheme, ""); err != nil {
-			if _, ok := err.(*controllerutil.AlreadyOwnedError); ok {
-				continue
-			}
-			return err
-		}
+		return err
 	}
 	return nil
 }
 
-// skipSetCompOwnership returns true if the object should not be set ownership to the component
-func skipSetCompOwnership(obj client.Object) bool {
+// skipSetCompOwnershipNFinalizer returns true if the object should not be set ownership to the component
+func skipSetCompOwnershipNFinalizer(obj client.Object) bool {
 	switch obj.(type) {
 	case *rbacv1.ClusterRoleBinding, *corev1.PersistentVolume, *corev1.PersistentVolumeClaim, *corev1.Pod:
 		return true
@@ -101,14 +83,4 @@ func skipAddCompFinalizer(obj client.Object, comp *appsv1alpha1.Component) bool 
 		}
 	}
 	return false
-}
-
-// errPrematureStopWithSetCompOwnership is a helper function that sets component ownership and returns graph.ErrPrematureStop
-// TODO: remove this function to independent component transformer utils
-func errPrematureStopWithSetCompOwnership(comp *appsv1alpha1.Component, dag *graph.DAG, graphCli model.GraphClient) error {
-	err := setCompOwnership(comp, dag, graphCli)
-	if err != nil {
-		return err
-	}
-	return graph.ErrPrematureStop
 }

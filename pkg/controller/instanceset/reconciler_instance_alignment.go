@@ -84,12 +84,14 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	deleteNameSet := oldNameSet.Difference(newNameSet)
 
 	// default OrderedReady policy
-	createCount, deleteCount := 1, 1
-	shouldReady := true
+	isOrderedReady := true
+	concurrency := 0
 	if its.Spec.PodManagementPolicy == appsv1.ParallelPodManagement {
-		createCount = len(createNameSet)
-		deleteCount = len(deleteNameSet)
-		shouldReady = false
+		concurrency, err = CalculateConcurrencyReplicas(its.Spec.ParallelPodManagementConcurrency, int(*its.Spec.Replicas))
+		if err != nil {
+			return nil, err
+		}
+		isOrderedReady = false
 	}
 	// TODO(free6om): handle BestEffortParallel: always keep the majority available.
 
@@ -105,17 +107,26 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		}
 		return oldInstanceMap[newNameList[i-1]]
 	}
+	if !isOrderedReady {
+		for _, name := range newNameList {
+			if _, ok := createNameSet[name]; !ok {
+				if !isHealthy(oldInstanceMap[name]) {
+					concurrency--
+				}
+			}
+		}
+	}
 	var currentAlignedNameList []string
 	for i, name := range newNameList {
 		if _, ok := createNameSet[name]; !ok {
 			currentAlignedNameList = append(currentAlignedNameList, name)
 			continue
 		}
-		if createCount <= 0 {
+		if !isOrderedReady && concurrency <= 0 {
 			break
 		}
 		predecessor := getPredecessor(i)
-		if shouldReady && predecessor != nil && !isHealthy(predecessor) {
+		if isOrderedReady && predecessor != nil && !isHealthy(predecessor) {
 			break
 		}
 		inst, err := buildInstanceByTemplate(name, nameToTemplateMap[name], its, "")
@@ -126,7 +137,11 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 			return kubebuilderx.Continue, err
 		}
 		currentAlignedNameList = append(currentAlignedNameList, name)
-		createCount--
+
+		if isOrderedReady {
+			break
+		}
+		concurrency--
 	}
 
 	// create PVCs
@@ -159,10 +174,10 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		if _, ok := deleteNameSet[pod.Name]; !ok {
 			continue
 		}
-		if deleteCount <= 0 {
+		if !isOrderedReady && concurrency <= 0 {
 			break
 		}
-		if shouldReady && !isRunningAndReady(pod) {
+		if isOrderedReady && !isRunningAndReady(pod) {
 			tree.EventRecorder.Eventf(its, corev1.EventTypeWarning, "InstanceSet %s/%s is waiting for Pod %s to be Running and Ready",
 				its.Namespace,
 				its.Name,
@@ -173,7 +188,11 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		}
 		// TODO(free6om): handle pvc management policy
 		// Retain by default.
-		deleteCount--
+
+		if isOrderedReady {
+			break
+		}
+		concurrency--
 	}
 
 	return kubebuilderx.Continue, nil

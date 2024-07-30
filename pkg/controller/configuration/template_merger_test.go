@@ -56,6 +56,9 @@ xengine_block_cache_size=307
 xengine_row_cache_size=102
 max_connections=666
 `
+
+	testString := "// this is a test string"
+
 	const (
 		baseCMName    = "base-cm"
 		updatedCMName = "updated-cm"
@@ -63,6 +66,7 @@ max_connections=666
 		testConfigSpecName = "test-config"
 		testClusterName    = "test-cluster"
 		testConfigName     = "my.cnf"
+		testConfig2Name    = "test.txt"
 	)
 
 	var (
@@ -82,12 +86,14 @@ max_connections=666
 			&appsv1beta1.ConfigConstraint{})
 		baseCMObject = &corev1.ConfigMap{
 			Data: map[string]string{
-				testConfigName: baseConfig,
+				testConfigName:  baseConfig,
+				testConfig2Name: testString,
 			},
 		}
 		updatedCMObject = &corev1.ConfigMap{
 			Data: map[string]string{
-				testConfigName: extendConfig,
+				testConfigName:  extendConfig,
+				testConfig2Name: testString,
 			},
 		}
 		baseCMObject.SetName(baseCMName)
@@ -101,6 +107,7 @@ max_connections=666
 				TemplateRef: baseCMObject.GetName(),
 				Namespace:   "default",
 			},
+			Keys:                []string{"my.cnf"},
 			ConfigConstraintRef: configConstraintObj.GetName(),
 		}
 
@@ -141,6 +148,7 @@ max_connections=666
 			tmpCM := baseCMObject.DeepCopy()
 			mergedData, err := mergerConfigTemplate(importedTemplate, templateBuilder, configSpec, tmpCM.Data, ctx, mockClient.Client())
 			Expect(err).To(Succeed())
+			Expect(mergedData).Should(HaveLen(2))
 
 			configReaders, err := cfgcore.LoadRawConfigObject(mergedData, configConstraintObj.Spec.FileFormatConfig, configSpec.Keys)
 			Expect(err).Should(Succeed())
@@ -169,6 +177,7 @@ max_connections=666
 			tmpCM := baseCMObject.DeepCopy()
 			mergedData, err := mergerConfigTemplate(importedTemplate, templateBuilder, configSpec, tmpCM.Data, ctx, mockClient.Client())
 			Expect(err).Should(Succeed())
+			Expect(mergedData).Should(HaveLen(2))
 			Expect(reflect.DeepEqual(mergedData, updatedCMObject.Data)).Should(BeTrue())
 
 			configReaders, err := cfgcore.LoadRawConfigObject(mergedData, configConstraintObj.Spec.FileFormatConfig, configSpec.Keys)

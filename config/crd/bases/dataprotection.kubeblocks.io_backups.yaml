@@ -501,9 +501,9 @@ spec:
                         description: Used to find the target pod. The volumes of the
                           target pod will be backed up.
                         properties:
-                          alternateLabelSelector:
-                            description: alternateLabelSelector is used to filter
-                              available pods when the labelSelector fails.
+                          fallbackLabelSelector:
+                            description: fallbackLabelSelector is used to filter available
+                              pods when the labelSelector fails.
                             properties:
                               matchExpressions:
                                 description: matchExpressions is a list of label selector
@@ -776,8 +776,8 @@ spec:
                           description: Used to find the target pod. The volumes of
                             the target pod will be backed up.
                           properties:
-                            alternateLabelSelector:
-                              description: alternateLabelSelector is used to filter
+                            fallbackLabelSelector:
+                              description: fallbackLabelSelector is used to filter
                                 available pods when the labelSelector fails.
                               properties:
                                 matchExpressions:
@@ -1103,8 +1103,8 @@ spec:
                     description: Used to find the target pod. The volumes of the target
                       pod will be backed up.
                     properties:
-                      alternateLabelSelector:
-                        description: alternateLabelSelector is used to filter available
+                      fallbackLabelSelector:
+                        description: fallbackLabelSelector is used to filter available
                           pods when the labelSelector fails.
                         properties:
                           matchExpressions:
@@ -1324,8 +1324,8 @@ spec:
                       description: Used to find the target pod. The volumes of the
                         target pod will be backed up.
                       properties:
-                        alternateLabelSelector:
-                          description: alternateLabelSelector is used to filter available
+                        fallbackLabelSelector:
+                          description: fallbackLabelSelector is used to filter available
                             pods when the labelSelector fails.
                           properties:
                             matchExpressions:

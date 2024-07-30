@@ -363,14 +363,14 @@ var _ = Describe("Backup Controller test", func() {
 			})).Should(Succeed())
 		})
 
-		It("create an backup using alternateLabelSelector", func() {
+		It("create an backup using fallbackLabelSelector", func() {
 			podFactory := func(name string) *testapps.MockPodFactory {
 				return testapps.NewPodFactory(testCtx.DefaultNamespace, name).
 					AddAppInstanceLabel(testdp.ClusterName).
 					AddAppComponentLabel(testdp.ComponentName).
 					AddContainer(corev1.Container{Name: testdp.ContainerName, Image: testapps.ApeCloudMySQLImage})
 			}
-			podName := "alternate" + testdp.ClusterName + "-" + testdp.ComponentName
+			podName := "fallback" + testdp.ClusterName + "-" + testdp.ComponentName
 			By("mock a primary pod that is available ")
 			pod0 := podFactory(podName + "-0").
 				AddRoleLabel("primary").
@@ -388,7 +388,7 @@ var _ = Describe("Backup Controller test", func() {
 				testk8s.MockPodIsFailed(context.Background(), testCtx, pod1)
 			})).Should(Succeed())
 
-			By("Set backupPolicy's target with alternateLabelSelector")
+			By("Set backupPolicy's target with fallbackLabelSelector")
 			Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(bp *dpv1alpha1.BackupPolicy) {
 				podSelector := &dpv1alpha1.PodSelector{
 					LabelSelector: &metav1.LabelSelector{
@@ -398,7 +398,7 @@ var _ = Describe("Backup Controller test", func() {
 							constant.RoleLabelKey:           "secondary",
 						},
 					},
-					AlternateLabelSelector: &metav1.LabelSelector{
+					FallbackLabelSelector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
 							constant.AppInstanceLabelKey:    testdp.ClusterName,
 							constant.KBAppComponentLabelKey: testdp.ComponentName,

@@ -175,10 +175,10 @@ func GetTargetPods(reqCtx intctrlutil.RequestCtx,
 	if len(selectedPodNames) == 0 || backupType == dpv1alpha1.BackupTypeContinuous {
 		switch selector.Strategy {
 		case dpv1alpha1.PodSelectionStrategyAny:
-			// always selecting the first pod
+			// always selecting the first available pod
 			pod := dputils.GetFirstIndexRunningPod(pods)
 			if pod == nil {
-				pods, err := listPodsByLabel(selector.AlternateLabelSelector)
+				pods, err := listPodsByLabel(selector.FallbackLabelSelector)
 				if err != nil && !intctrlutil.IsNotFound(err) {
 					return nil, err
 				}
@@ -198,7 +198,7 @@ func GetTargetPods(reqCtx intctrlutil.RequestCtx,
 				}
 			}
 			if len(pods.Items) == 0 || !allAvailable {
-				podList, err := listPodsByLabel(selector.AlternateLabelSelector)
+				podList, err := listPodsByLabel(selector.FallbackLabelSelector)
 				if err != nil && !intctrlutil.IsNotFound(err) {
 					return nil, err
 				}
@@ -217,12 +217,38 @@ func GetTargetPods(reqCtx intctrlutil.RequestCtx,
 		return targetPods, nil
 	}
 
+	filterTargetPods := func(podMap map[string]*corev1.Pod) ([]*corev1.Pod, error) {
+		var targets []*corev1.Pod
+		switch selector.Strategy {
+		case dpv1alpha1.PodSelectionStrategyAny:
+			if pod, ok := podMap[selectedPodNames[0]]; ok {
+				targets = append(targets, pod)
+			}
+		case dpv1alpha1.PodSelectionStrategyAll:
+			for _, podName := range selectedPodNames {
+				pod, ok := podMap[podName]
+				if !ok {
+					return nil, intctrlutil.NewFatalError(fmt.Sprintf(`can not found the target pod "%s"`, podName))
+				}
+				targets = append(targets, pod)
+			}
+		}
+		return targets, nil
+	}
+
 	// if already selected target pods and backupType is not Continuous, we should re-use them.
 	podMap := make(map[string]*corev1.Pod)
 	for i := range pods.Items {
 		podMap[pods.Items[i].Name] = &pods.Items[i]
 	}
-	pods, err = listPodsByLabel(selector.AlternateLabelSelector)
+	if len(podMap) > 0 {
+		targetPods, _ = filterTargetPods(podMap)
+		podMap = make(map[string]*corev1.Pod)
+	}
+	if targetPods != nil {
+		return targetPods, nil
+	}
+	pods, err = listPodsByLabel(selector.FallbackLabelSelector)
 	if err != nil && !intctrlutil.IsNotFound(err) {
 		return nil, err
 	}
@@ -234,21 +260,8 @@ func GetTargetPods(reqCtx intctrlutil.RequestCtx,
 	if len(podMap) == 0 {
 		return nil, findPodErr
 	}
-	switch selector.Strategy {
-	case dpv1alpha1.PodSelectionStrategyAny:
-		if pod, ok := podMap[selectedPodNames[0]]; ok {
-			targetPods = append(targetPods, pod)
-		}
-	case dpv1alpha1.PodSelectionStrategyAll:
-		for _, podName := range selectedPodNames {
-			pod, ok := podMap[podName]
-			if !ok {
-				return nil, intctrlutil.NewFatalError(fmt.Sprintf(`can not found the target pod "%s"`, podName))
-			}
-			targetPods = append(targetPods, pod)
-		}
-	}
-	return targetPods, nil
+	targetPods, err = filterTargetPods(podMap)
+	return targetPods, err
 }
 
 // getCluster gets the cluster and will ignore the error.

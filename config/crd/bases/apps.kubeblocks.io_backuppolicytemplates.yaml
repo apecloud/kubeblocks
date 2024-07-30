@@ -431,8 +431,8 @@ spec:
                                 description: Used to find the target pod. The volumes
                                   of the target pod will be backed up.
                                 properties:
-                                  alternateLabelSelector:
-                                    description: alternateLabelSelector is used to
+                                  fallbackLabelSelector:
+                                    description: fallbackLabelSelector is used to
                                       filter available pods when the labelSelector
                                       fails.
                                     properties:
@@ -740,9 +740,9 @@ spec:
                                   description: Used to find the target pod. The volumes
                                     of the target pod will be backed up.
                                   properties:
-                                    alternateLabelSelector:
-                                      description: alternateLabelSelector is used
-                                        to filter available pods when the labelSelector
+                                    fallbackLabelSelector:
+                                      description: fallbackLabelSelector is used to
+                                        filter available pods when the labelSelector
                                         fails.
                                       properties:
                                         matchExpressions:

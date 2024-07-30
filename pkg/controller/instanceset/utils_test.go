@@ -248,14 +248,14 @@ var _ = Describe("utils test", func() {
 			replicas = 0
 			concurrencyReplicas, err = CalculateConcurrencyReplicas(concurrent, replicas)
 			Expect(err).Should(BeNil())
-			Expect(concurrencyReplicas).Should(Equal(0))
+			Expect(concurrencyReplicas).Should(Equal(1))
 
 			By("concurrency = 0%, replicas = 10")
 			concurrent = &intstr.IntOrString{Type: intstr.String, StrVal: "0%"}
 			replicas = 10
 			concurrencyReplicas, err = CalculateConcurrencyReplicas(concurrent, replicas)
 			Expect(err).Should(BeNil())
-			Expect(concurrencyReplicas).Should(Equal(0))
+			Expect(concurrencyReplicas).Should(Equal(1))
 
 			By("concurrency = 5, replicas = 10")
 			concurrent = &intstr.IntOrString{Type: intstr.Int, IntVal: 5}
@@ -269,14 +269,14 @@ var _ = Describe("utils test", func() {
 			replicas = 0
 			concurrencyReplicas, err = CalculateConcurrencyReplicas(concurrent, replicas)
 			Expect(err).Should(BeNil())
-			Expect(concurrencyReplicas).Should(Equal(0))
+			Expect(concurrencyReplicas).Should(Equal(1))
 
 			By("concurrency = 0, replicas = 10")
 			concurrent = &intstr.IntOrString{Type: intstr.Int, IntVal: 0}
 			replicas = 10
 			concurrencyReplicas, err = CalculateConcurrencyReplicas(concurrent, replicas)
 			Expect(err).Should(BeNil())
-			Expect(concurrencyReplicas).Should(Equal(0))
+			Expect(concurrencyReplicas).Should(Equal(1))
 
 			By("concurrency = 10%, replicas = 1")
 			concurrent = &intstr.IntOrString{Type: intstr.String, StrVal: "10%"}
@@ -311,7 +311,7 @@ var _ = Describe("utils test", func() {
 			concurrent = &intstr.IntOrString{Type: intstr.String, StrVal: "-50%"}
 			concurrencyReplicas, err = CalculateConcurrencyReplicas(concurrent, replicas)
 			Expect(err).Should(BeNil())
-			Expect(concurrencyReplicas).Should(Equal(0))
+			Expect(concurrencyReplicas).Should(Equal(1))
 
 			By("concurrency percentage > 100%")
 			replicas = 10

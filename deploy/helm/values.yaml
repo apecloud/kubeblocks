@@ -1923,6 +1923,8 @@ featureGates:
     enabled: false
   ignorePodVerticalScaling:
     enabled: false
+  downwardAPIServiceDiscoveryMechanism:
+    enabled: true
 
 vmagent:
 

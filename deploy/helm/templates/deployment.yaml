@@ -179,6 +179,8 @@ spec:
             - name: IGNORE_POD_VERTICAL_SCALING
               value: "true"
             {{- end }}
+            - name: DOWNWARD_API_SERVICE_DISCOVERY_MECHANISM
+              value: {{ .Values.featureGates.downwardAPIServiceDiscoveryMechanism.enabled | quote }}
           {{- with .Values.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}

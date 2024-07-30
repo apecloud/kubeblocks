@@ -141,14 +141,15 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			Expect(ok).Should(BeTrue())
 			parallelITS.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
 			parallelITS.Spec.ParallelPodManagementConcurrency = &intstr.IntOrString{Type: intstr.String, StrVal: "50%"}
-			newTree, err = reconciler.Reconcile(parallelTree)
+			res, err = reconciler.Reconcile(parallelTree)
 			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
 			// replicas is 7, ParallelPodManagementConcurrency is 50%, so concurrency is 4.
 			// since the original bar-1 and bar-foo-0 are not ready, only the new instances bar-0 and bar-2 will be added.
 			// desired: bar-0, bar-1, bar-2, bar-foo-0
-			pods = newTree.List(&corev1.Pod{})
+			pods = parallelTree.List(&corev1.Pod{})
 			Expect(pods).Should(HaveLen(4))
-			pvcs = newTree.List(&corev1.PersistentVolumeClaim{})
+			pvcs = parallelTree.List(&corev1.PersistentVolumeClaim{})
 			Expect(pvcs).Should(HaveLen(4))
 			for _, object := range []client.Object{podFoo0, podBar0, podBar1, podBar2} {
 				Expect(slices.IndexFunc(pods, func(item client.Object) bool {

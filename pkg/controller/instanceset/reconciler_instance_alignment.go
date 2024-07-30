@@ -89,7 +89,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	if its.Spec.PodManagementPolicy == appsv1.ParallelPodManagement {
 		concurrency, err = CalculateConcurrencyReplicas(its.Spec.ParallelPodManagementConcurrency, int(*its.Spec.Replicas))
 		if err != nil {
-			return nil, err
+			return kubebuilderx.Continue, err
 		}
 		isOrderedReady = false
 	}

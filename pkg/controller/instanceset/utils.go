@@ -274,6 +274,7 @@ func CalculateConcurrencyReplicas(concurrency *intstr.IntOrString, replicas int)
 		pValue = replicas - 1
 	}
 
-	pValue = integer.IntMax(integer.IntMin(pValue, replicas), 0)
+	// if the calculated concurrency is 0, it will ensure the concurrency at least 1.
+	pValue = integer.IntMax(integer.IntMin(pValue, replicas), 1)
 	return pValue, nil
 }

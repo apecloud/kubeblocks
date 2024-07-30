@@ -77,5 +77,5 @@ const (
 
 const (
 	FeatureGateIgnoreConfigTemplateDefaultMode = "IGNORE_CONFIG_TEMPLATE_DEFAULT_MODE"
-	FeatureGateDownwardAPIServiceDiscoveryMechanism = "DOWNWARD_API_SERVICE_DISCOVERY_MECHANISM"
+	FeatureGateComponentReplicasAnnotation = "COMPONENT_REPLICAS_ANNOTATION"
 )

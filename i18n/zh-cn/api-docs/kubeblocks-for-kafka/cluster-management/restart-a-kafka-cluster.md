@@ -1,25 +1,25 @@
 ---
-title: Restart Kafka cluster
-description: How to restart a Kafka cluster
-keywords: [kafka, restart]
+title: 重启集群
+description: 如何重启集群
+keywords: [kafka, 重启]
 sidebar_position: 4
-sidebar_label: Restart
+sidebar_label: 重启
 ---
 
 
-# Restart a Kafka cluster
+# 重启集群
 
-You can restart all pods of the cluster. When an exception occurs in a database, you can try to restart it.
+KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，也可以尝试重启集群。
 
 :::note
 
-The pod role may change after the cluster restarts.
+重启后，节点角色可能会发生变化。
 
 :::
 
-## Steps
+## 步骤
 
-1. Create an OpsRequest to restart a cluster.
+1. 创建 OpsRequest，重启集群。
 
   ```bash
   kubectl apply -f - <<EOF
@@ -36,7 +36,7 @@ The pod role may change after the cluster restarts.
   EOF
   ```
 
-2. Check the pod and operation status to validate the restarting.
+1. 查看 pod 和运维操作状态，验证重启操作。
 
    ```bash
    kubectl get pod -n demo
@@ -47,7 +47,7 @@ The pod role may change after the cluster restarts.
    ops-restart   Restart   mycluster   Succeed   1/1        3m26s
    ```
 
-   During the restarting process, there are two status types for pods.
+   重启过程中，Pod 有如下两种状态：
 
-   - STATUS=Terminating: it means the cluster restart is in progress.
-   - STATUS=Running: it means the cluster has been restarted.
+   - STATUS=Terminating：表示集群正在重启。
+   - STATUS=Running：表示集群已重启。

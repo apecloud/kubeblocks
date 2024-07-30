@@ -1,28 +1,29 @@
 ---
-title: Configure cluster parameters
-description: Configure cluster parameters
-keywords: [kafka, parameter, configuration, reconfiguration]
+title: 配置集群参数
+description: 如何配置集群参数
+keywords: [kafka, 参数, 配置, 再配置]
 sidebar_position: 1
+sidebar_label: 配置
 ---
 
-# Configure cluster parameters
+# 配置集群参数
 
-This guide shows how to configure cluster parameters by creating an opsRequest.
+本教程演示了如何配置集群参数。
 
-## Before you start
+## 开始之前
 
-1. [Install KubeBlocks](./../../installation/install-kubeblocks.md).
-2. [Create a Kafka cluster](./../cluster-management/create-a-kafka-cluster.md).
+1. [安装 KubeBlocks](./.././../installation/install-kubeblocks.md).
+2. [创建 Kafka 集群](./../cluster-management/create-a-kafka-cluster.md).
 
-## Configure cluster parameters by editing configuration file
+## 通过编辑配置文件配置参数
 
-1. Get the configuration file of this cluster.
+1. 获取集群的配置文件。
 
    ```bash
-   kubectl edit configurations.apps.kubeblocks.io mycluster-kafka -n demo
+   kubectl edit configurations.apps.kubeblocks.io mycluster-kafka-combine -n demo
    ```
 
-2. Configure parameters according to your needs. The example below adds the `spec.configFileParams` part to configure `log.cleanup.policy`.
+2. 按需配置参数。以下实例中添加了 `spec.configFileParams`，用于配置 `log.cleanup.policy` 参数。
 
    ```yaml
    spec:
@@ -30,21 +31,21 @@ This guide shows how to configure cluster parameters by creating an opsRequest.
      componentName: kafka
      configItemDetails:
      - configFileParams:
-         mongodb.cnf:
+         server.properties:
            parameters:
-             log.flush.interval.ms: "2000"
+             log.cleanup.policy: "compact"
        configSpec:
-         constraintRef: kafka-config-constraints
-         name: kafka-configuration
+         constraintRef: kafka-cc
+         name: kafka-configuration-tpl
          namespace: kb-system
-         templateRef: kafka3.3.2-config-template
+         templateRef: kafka-configuration-tpl
          volumeName: kafka-config
-       name: kafka-config
+       name: kafka-configuration-tpl
      - configSpec:
          defaultMode: 292
    ```
 
-3. Connect to this cluster to verify whether the configuration takes effect as expected.
+3. 确认配置是否生效。
 
    ```bash
    kbcli cluster describe-config mycluster --show-detail | grep log.cleanup.policy
@@ -71,8 +72,8 @@ This guide shows how to configure cluster parameters by creating an opsRequest.
        - keys:
          - key: server.properties
            parameters:
-           - key: log.flush.interval.ms
-             value: "2000"
+           - key: log.cleanup.policy
+             value: "compact"
          name: kafka-configuration-tpl
      preConditionDeadlineSeconds: 0
      type: Reconfiguring

@@ -1,49 +1,49 @@
 ---
-title: Introduction
-description: Introduction to ApeCloud MySQL Proxy
-keywords: [introduction, proxy]
+title: 简介
+description: ApeCloud MySQL 代理简介
+keywords: [简介, 代理]
 sidebar_position: 1
-sidebar_label: Introduction
+sidebar_label: 简介
 ---
 
-# Introduction
+## 简介
 
-A database proxy is an essential tool for developers and database administrators to improve the scalability, performance, security, and resilience of their applications.
+数据库代理是数据库开发和管理人员改善应用程序的可伸缩性、性能、安全性和弹性的重要工具。
 
-ApeCloud MySQL Proxy is a database proxy designed to be highly compatible with MySQL. It supports the MySQL wire protocol, read-write splitting without stale reads, connection pooling, and transparent failover. This section introduces ApeCloud MySQL Proxy, explaining its architecture, key features, and benefits.
+ApeCloud MySQL 代理是一个专为与 MySQL 高度兼容而设计的数据库代理。它支持 MySQL 传输协议、读写分离、连接池和透明的故障切换。本节介绍 ApeCloud MySQL 代理的架构、功能和主要优势。
 
-## Architecture
+## 架构
 
-ApeCloud MySQL Proxy is a fork of the Vitess project and the support for sharding is removed in exchange for better SQL compatibility, for example, better support for subqueries, Common Table Expressions (CTE) and expression evaluation. The below graph displays the architecture of a proxy cluster.
+ApeCloud MySQL 代理是 Vitess 项目的一个分支。为了提供更好的 SQL 兼容性，例如更好的子查询、公共表表达式（CTE）和表达式评估，它移除了对分片的支持。下图展示了代理集群的架构。
 
-**VTGate**: Client application usually connects to VTGate via standard MySQL wire protocol. VTGate is stateless, which means it can be easily and effectively scaled in terms of size and performance. It acts like a MySQL and is responsible for parsing SQL queries, as well as planning and routing queries to VTTables.
+**VTGate**：客户端应用一般通过标准的 MySQL 传输协议连接到 VTGate。VTGate 是无状态的，可以轻松高效地扩展其大小和性能。它类似于 MySQL，负责解析 SQL 查询，还有规划和路由查询请求到 VTTablet 上进行处理。
 
-**VTTablet**: Typically, VTTablet is implemented as a sidecar for MySQL. If ApeCloud MySQL Proxy is deployed in Kubernetes, VTTablet should be in the same pod as MySQL. VTTablet accepts gRPC requests from VTGate and then sends those queries to be executed on MySQL. The VTTablet takes care of a few tasks such as permission checking and logging, but its most critical role is to ensure proper connection pooling.
+**VTTablet**：VTTablet 通常作为 MySQL 的附加组件实现。如果 ApeCloud MySQL 代理部署在 Kubernetes 中，那么 VTTablet 与 MySQL 就放置在同一个 pod 中。VTTablet 接受来自 VTGate 的 gRPC 请求，然后将这些查询发送到 MySQL 上执行。VTTablet 还处理一些权限检查和日志记录的任务，但其最关键的角色是确保适当的连接池管理。
 
-**VTController**: The VTController component facilitates service discovery between VTGate and VTTablet, while also enabling them to store metadata of the cluster. If the role of MySQL changes, for example, from leaders to followers, the corresponding role of VTTablet should change accordingly. VTController checks the status of the MySQL cluster and sends commands to VTTablet to request that it changes roles.
+**VTController**：VTController 组件帮助在 VTGate 和 VTTablet 之间实现服务发现，并使它们能够存储集群的元数据。如果 MySQL 的角色发生变化，例如从 Leader 变为 Follower，VTTablet 的角色也会相应变化。VTController 会检查 MySQL 集群的状态，并向 VTTablet 发送命令，请求其更改角色。
 
 ![ApeCloud MySQL Proxy architecture](./../../../img/proxy-architecture.png)
 
-## Connection pooling
+## 连接池
 
-Database connections consume memory, and to ensure that the buffer pool has enough memory, databases restrict the value of 'max_connections'. As applications are generally stateless and may need to rapidly scale out, a large number of connections may be created, which can easily overload your database. So, these kinds of applications are not suitable for directly connecting to the MySQL server and creating a connection pool.
+数据库连接会占用内存。为了确保缓冲池中有足够的内存，数据库通常会限制 'max_connections' 的值。然而，由于应用程序通常是无状态的，并且可能需要快速扩展和创建大量连接，数据库很有可能会超负荷运行。因此，这类应用程序不适合直接连接到 MySQL 服务器并创建连接池。
 
-Applications can create as many connections as they require with ApeCloud MySQL Proxy, without any concern about 'max_connection' errors. Because ApeCloud MySQL Proxy takes over the establishment of a connection pool to the database, allowing applications to share and reuse connections at the MySQL server side. This reduces the memory and CPU overheads associated with opening and closing connections on the MySQL server side, improving scalability and performance.
+使用 ApeCloud MySQL 代理，应用程序可以根据需要创建任意数量的连接，无需担心 'max_connections' 错误。因为 ApeCloud MySQL 代理接管了数据库连接池的建立，允许应用程序在 MySQL 服务器端共享和重用连接。这降低了 MySQL 服务器端打开和关闭连接所带来的内存和 CPU 开销，提高了可伸缩性和性能。
 
-## Read-Write splitting
+## 读写分离
 
-Using read-only nodes can significantly reduce the workload on the primary database node and improve resource utilization. However, managing multiple read-only nodes and deciding when to use each can be challenging for applications. ApeCloud MySQL Proxy addresses this issue by offering three essential features: read-write splitting, read-after-write consistency, and load-balancing. These features make it easier for applications to take advantage of read-only nodes effectively.
+使用只读节点可以显著减轻主数据库节点的工作负载，提高资源利用率。然而，管理多个只读节点并决定何时使用各个节点却并不容易。ApeCloud MySQL 代理通过提供三个重要功能来解决这个问题：读写分离、写后读一致性和负载均衡。这些功能可以使应用程序更有效地利用只读节点。
 
-**Read-Write Split**: ApeCloud MySQL Proxy simplifies application logic by automatically routing read queries to read-only nodes and write queries to the primary node. This is achieved by parsing and analyzing SQL statements, which improves load balancing and ensures efficient use of available resources.
+**读写分离**：ApeCloud MySQL 代理通过自动将读查询路由到只读节点，将写查询路由到主节点，简化了应用程序逻辑。这是通过解析 SQL 语句实现的，它因此改善了负载均衡，确保有效利用可用资源。
 
-**Read-After-Write Consistency**: This feature works in conjunction with read-write splitting to maintain data consistency while still benefiting from performance improvements. When an application writes data to the primary node and subsequently reads it on a read-only node, ApeCloud MySQL Proxy makes sure that the data that was just written to the primary node can be accessed and read from the read-only node.
+**写后读一致性**：此功能与读写分离配合使用，以在获得性能改进的同时保持数据一致性。当应用程序将数据写入主节点，并在只读节点上读取时，ApeCloud MySQL 代理确保刚刚写入主节点的数据可以从只读节点中访问和读取。
 
-**Load-Balancing**: ApeCloud MySQL Proxy helps manage read-only nodes by routing queries to the appropriate node using various load balancing policies. This ensures that the workload is evenly distributed across all available nodes, optimizing performance and resource utilization.
+**负载均衡**：ApeCloud MySQL 代理通过使用各种负载均衡策略将查询路由到适当的只读节点，从而帮助管理只读节点。这确保工作负载在所有可用节点上均匀分布，因此实现了性能优化和资源利用率的提高。
 
-## Transparent failover
+## 透明的故障切换
 
-Failover is a feature designed to ensure that if the original database instance becomes unavailable, it is replaced with another instance and remains highly available. Various factors can trigger a failover event, including issues with the database instance or scheduled maintenance procedures like database upgrades.
+故障切换旨在确保当系统中原始数据库实例不可用时，能切换到另一个实例上并保持其高可用性。触发故障切换的因素有很多，包括数据库实例问题和计划维护过程（如数据库升级）等。
 
-Without ApeCloud MySQL Proxy, a failover requires a short period of downtime. Existing connections to the database are disconnected and need to be reopened by your application. ApeCloud MySQL Proxy is capable of automatically detecting failovers and buffering application SQL in its memory while keeping application connections intact, thus enhancing application resilience in the event of database failures.
+在没有 ApeCloud MySQL 代理的情况下，故障切换需要短暂的停机时间与数据库的现有连接断开，还需要应用程序重新打开这些连接。ApeCloud MySQL 代理能够自动检测故障切换，并在保持应用程序连接完整的同时，将应用程序的 SQL 缓冲在其内存中，在数据库出现问题的情况下增强应用程序的弹性。
 
-There is no way to completely solve the application-side connection error problem. However, the proxy is stateless and can be deployed with multiple nodes for high availability. Moreover, restart/recovery is usually way faster than the database, as it does not need to recover from the undo-redo log.
+应用程序端的连接错误问题通常无法完全解决。然而，代理是无状态的，开发者可以部署多个节点以实现高可用性。此外，代理的重启/恢复速度也比数据库更快，因为它不需要从撤销-重做日志中恢复。

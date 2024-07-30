@@ -1,14 +1,14 @@
 ---
-title: KubeBlocks for Kafka
-description: Feature list of KubeBlocks for Kafka
-keywords: [kafka, introduction, feature]
+title: 用 KubeBlocks 管理 Kafka
+description: Kafka 功能列表
+keywords: [kafka, 简介, 功能]
 sidebar_position: 1
 ---
 
-# KubeBlocks for Kafka
+# 用 KubeBlocks 管理 Kafka
 
-This tutorial illustrates how to create and manage a Kafka cluster by `kubectl` or a YAML file. You can find the YAML examples in [the GitHub repository](https://github.com/apecloud/kubeblocks-addons/tree/release-0.9/examples/kafka).
+本章节展示了如何通过 `kubectl` 或 YAML 文件创建和运维 Kafka 集群。您可以在 [GitHub 仓库](https://github.com/apecloud/kubeblocks-addons/tree/release-0.9/examples/kafka)中查看这些 YAML 示例。
 
-* [Cluster Management](./cluster-management/create-a-kafka-cluster.md)
-* [Configuration](./configuration/configuration.md)
-* [Resource Description](./configuration-recommendations-for-production-environments.md)
+* [集群管理](./cluster-management/create-a-kafka-cluster.md)
+* [配置](./configuration/configuration.md)
+* [资源描述](./configuration-recommendations-for-production-environments.md)

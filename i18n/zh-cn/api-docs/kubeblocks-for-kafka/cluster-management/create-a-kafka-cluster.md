@@ -1,24 +1,24 @@
 ---
-title: Create a cluster for Kafka
-description: Guide for cluster creation for kafka
-keywords: [kafka, cluster, management]
+title: 创建 Kafka 集群
+description: 如何创建 Kafka 集群
+keywords: [kafka, 集群, 管理, 创建]
 sidebar_position: 1
-sidebar_label: Create
+sidebar_label: 创建
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Create a Kafka cluster
+# 创建集群
 
-This document shows how to create a Kafka cluster.
+本文档展示如何创建一个 Kafka 集群。
 
-## Before you start
+## 开始之前
 
-* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
-* View all the database types and versions available for creating a cluster.
+* [安装 KubeBlocks](./../../installation/install-kubeblocks.md)。
+* 查看可用于创建集群的数据库类型和版本。
   
-  Make sure the `kafka` cluster definition is installed. If the cluster definition is not available, refer to [this doc](./../../installation/install-addons.md) to enable it first.
+  确保 `kafka` cluster definition 已安装。如果该 cluster definition 不可用，可[参考相关文档](./../../installation/install-addons.md)启用。
 
   ```bash
   kubectl get clusterdefinition kafka
@@ -27,13 +27,13 @@ This document shows how to create a Kafka cluster.
   kafka                              Available   27m
   ```
 
-  View all available versions for creating a cluster.
+  查看可用于创建集群的引擎版本。
 
   ```bash
   kubectl get clusterversions -l clusterdefinition.kubeblocks.io/name=kafka
   ```
 
-* To keep things isolated, create a separate namespace called `demo` throughout this tutorial.
+* 为保证资源隔离，本教程将创建一个名为 `demo` 的独立命名空间。
 
   ```bash
   kubectl create namespace demo
@@ -41,15 +41,15 @@ This document shows how to create a Kafka cluster.
 
 :::note
 
-* KubeBlocks integrates Kafka v3.3.2, running it in KRaft mode.
-* You are not recommended to use kraft cluster in combined mode in production environment.
-* The controller number suggested ranges from 3 to 5, out of complexity and availability.
+- KubeBlocks 集成了 Kafka v3.3.2，以 KRaft 模式运行。
+- 在生产环境中，不建议以组合模式使用 KRaft 集群。
+- 建议将控制器数量设置在 3 到 5 个之间，实现复杂性和可用性的平衡。
 
 :::
 
-## Create a Kafka cluster
+## 创建 Kafka 集群
 
-* Create a Kafka cluster in combined mode.
+* 创建组合模式的 Kafka 集群。
 
     ```yaml
     # create kafka in combined mode 
@@ -127,7 +127,7 @@ This document shows how to create a Kafka cluster.
     EOF
     ```
 
-* Create a Kafka cluster in separated mode.
+* 创建分离模式的 Kafka 集群。
 
     ```yaml
     # Create kafka cluster in separated mode
@@ -230,24 +230,24 @@ This document shows how to create a Kafka cluster.
 
 :::note
 
-If you only have one node for deploying a cluster with multiple replicas, set `spec.affinity.topologyKeys` as `null`.
+如果您只有一个节点可用于部署集群，可将 `spec.affinity.topologyKeys` 设置为 `null`。
 
 :::
 
-| Field                                 | Definition  |
+| 字段                                   | 定义  |
 |---------------------------------------|--------------------------------------|
-| `metadata.annotations."kubeblocks.io/extra-env"` | It defines Kafka broker's jvm heap setting. |
-| `metadata.annotations.kubeblocks.io/enabled-pod-ordinal-svc` | It defines kafka cluster annotation keys for nodeport feature gate. You can also set`kubeblocks.io/enabled-node-port-svc: broker` and `kubeblocks.io/disabled-cluster-ip-svc: broker`. |
-| `spec.clusterDefinitionRef`           | It specifies the name of the ClusterDefinition for creating a specific type of cluster.  |
-| `spec.clusterVersionRef`              | It is the name of the cluster version CRD that defines the cluster version.  |
-| `spec.terminationPolicy`              | It is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Halt`, `Delete`, `WipeOut`.  <p> - `DoNotTerminate` blocks deletion operation. </p><p> - `Halt` deletes workload resources such as statefulset and deployment workloads but keep PVCs. </p><p> - `Delete` is based on Halt and deletes PVCs. </p><p> - `WipeOut` is based on Delete and wipe out all volume snapshots and snapshot data from a backup storage location. </p> |
-| `spec.affinity`                       | It defines a set of node affinity scheduling rules for the cluster's Pods. This field helps control the placement of Pods on nodes within the cluster.  |
-| `spec.affinity.podAntiAffinity`       | It specifies the anti-affinity level of Pods within a component. It determines how pods should spread across nodes to improve availability and performance. |
-| `spec.affinity.topologyKeys`          | It represents the key of node labels used to define the topology domain for Pod anti-affinity and Pod spread constraints.   |
-| `spec.tolerations`                    | It is an array that specifies tolerations attached to the cluster's Pods, allowing them to be scheduled onto nodes with matching taints.  |
-| `spec.services` | It defines the services to access a cluster. |
-| `spec.componentSpecs`                 | It is the list of components that define the cluster components. This field allows customized configuration of each component within a cluster.   |
-| `spec.componentSpecs.componentDefRef` | It is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition kafka -o json \| jq '.spec.componentDefs[].name'`.   |
-| `spec.componentSpecs.name`            | It specifies the name of the component.     |
-| `spec.componentSpecs.replicas`        | It specifies the number of replicas of the component.  |
-| `spec.componentSpecs.resources`       | It specifies the resource requirements of the component.  |
+| `metadata.annotations."kubeblocks.io/extra-env"` | 定义了 Kafka broker 的 jvm heap 配置。 |
+| `metadata.annotations.kubeblocks.io/enabled-pod-ordinal-svc` | 为 nodeport 特性门控定义了 Kafka 集群注释键。您还可以设置 `kubeblocks.io/enabled-node-port-svc: broker` 和 `kubeblocks.io/disabled-cluster-ip-svc: broker`。 |
+| `spec.clusterDefinitionRef`           | 集群定义 CRD 的名称，用来定义集群组件。  |
+| `spec.clusterVersionRef`              | 集群版本 CRD 的名称，用来定义集群版本。 |
+| `spec.terminationPolicy`              | 集群的终止策略，默认值为 `Delete`，有效值为 `DoNotTerminate`、`Halt`、`Delete` 和 `WipeOut`。 <p> - `DoNotTerminate` 会阻止删除操作。 </p><p> - `Halt` 会删除工作负载资源，如 statefulset 和 deployment 等，但是保留了 PVC 。  </p><p> - `Delete` 在 `Halt` 的基础上进一步删除了 PVC。 </p><p> - `WipeOut` 在 `Delete` 的基础上从备份存储的位置完全删除所有卷快照和快照数据。 </p>|
+| `spec.affinity`                       | 为集群的 Pods 定义了一组节点亲和性调度规则。该字段可控制 Pods 在集群中节点上的分布。 |
+| `spec.affinity.podAntiAffinity`       | 定义了不在同一 component 中的 Pods 的反亲和性水平。该字段决定了 Pods 以何种方式跨节点分布，以提升可用性和性能。 |
+| `spec.affinity.topologyKeys`          | 用于定义 Pod 反亲和性和 Pod 分布约束的拓扑域的节点标签值。 |
+| `spec.tolerations`                    | 该字段为数组，用于定义集群中 Pods 的容忍，确保 Pod 可被调度到具有匹配污点的节点上。 |
+| `spec.services`                       | 定义了访问集群的服务。 |
+| `spec.componentSpecs`                 | 集群 components 列表，定义了集群 components。该字段允许对集群中的每个 component 进行自定义配置。 |
+| `spec.componentSpecs.componentDefRef` | 表示 cluster definition 中定义的 component definition 的名称，可通过执行 `kubectl get clusterdefinition apecloud-mysql -o json \| jq '.spec.componentDefs[].name'` 命令获取 component definition 名称。 |
+| `spec.componentSpecs.name`            | 定义了 component 的名称。  |
+| `spec.componentSpecs.replicas`        | 定义了 component 中 replicas 的数量。 |
+| `spec.componentSpecs.resources`       | 定义了 component 的资源要求。  |

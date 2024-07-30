@@ -45,7 +45,7 @@ KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，�
    ops-restart   Restart   mycluster   Succeed   1/1        3m26s
    ```
 
-   During the restarting process, there are two status types for pods.重启过程中，Pod 有如下两种状态：
+   重启过程中，Pod 有如下两种状态：
 
    - STATUS=Terminating：表示集群正在重启。
    - STATUS=Running：表示集群已重启。

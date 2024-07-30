@@ -1,33 +1,34 @@
 ---
-title: Connect to a Kafka cluster 
-description: Guide for cluster creation for kafka
-keywords: [kafka, cluster, connect, network]
+title: 连接到 Kafka 集群  
+description: 如何连接到 Kafka 集群
+keywords: [kafka, 集群, 连接, 网络]
 sidebar_position: 2
-sidebar_label: Connect
+sidebar_label: 连接
 ---
 
-## Overview
+# 连接到 Kafka 集群
 
-Before connecting to the Kafka cluster, you must check your network environment, and from which network you would like to connect to the cluster.
-There are three scenarios of connecting.
+## 概述
 
-* Connect to the cluster within the same Kubernetes cluster.
-* Connect to a Kafka cluster from outside of the Kubernetes cluster but in the same VPC.
-* Connect to a Kafka cluster from public internet.
+在连接 Kafka 集群之前，请检查网络环境，并确认连接场景。一般来说，有三种连接场景：
 
-## Connect to a kafka cluster within the Kubernetes cluster
+- 在 Kubernetes 集群内连接到 Kafka 集群。
+- 在 Kubernetes 集群外同一 VPC 下连接到 Kafka 集群
+- 在公共互联网连接到 Kafka 集群。
 
-Within the same Kubernetes cluster, you can directly access the Kafka cluster with ClusterIP service:9092.
+## 在 Kubernetes 集群内连接到 Kafka 集群
 
-***Steps:***
+通过直连 Kafka 集群的 ClusterIP service:9092 访问。
 
-1. Get the address of the Kafka ClusterIP service port No..
+***步骤：***
+
+1. 获取 Kafka ClusterIP 服务的地址和端口号。
 
    ```bash
    kubectl get svc 
    ```
 
-   *Example:*
+   *示例:*
 
    ```bash
    NAME                        TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)                               AGE
@@ -36,58 +37,58 @@ Within the same Kubernetes cluster, you can directly access the Kafka cluster wi
    mycluster-broker            ClusterIP   10.43.8.124   <none>        9093/TCP,9092/TCP,5556/TCP            7d16h
    ```
 
-2. Connect to the Kafka cluster with the port No..
+2. 使用端口号连接到 Kafka 集群。
 
-   Below is an example of connecting with the official client script.
+   下面展示如何使用官方客户端脚本连接 Kafka 集群。
 
-   1. Start client pod.
+   1. 启动客户端 Pod。
 
        ```bash
        kubectl run kafka-producer --restart='Never' --image docker.io/bitnami/kafka:3.3.2-debian-11-r54 --command -- sleep infinity
        kubectl run kafka-consumer --restart='Never' --image docker.io/bitnami/kafka:3.3.2-debian-11-r54 --command -- sleep infinity
        ```
 
-   2. Log in to kafka-producer.
+   2. 登录 kafka-producer。
 
        ```bash
        kubectl exec -ti kafka-producer -- bash
        ```
 
-   3. Create a topic.
+   3. 创建 topic。
 
        ```bash
        kafka-topics.sh --create --topic quickstart-events --bootstrap-server xxx-broker:9092
        ```
 
-   4. Create a producer.
+   4. 创建 producer。
 
        ```bash
        kafka-console-producer.sh --topic quickstart-events --bootstrap-server xxx-broker:9092 
        ```
 
-   5. Enter："Hello, KubeBlocks" and press Enter.
+   5. 输入：Hello, KubeBlocks，然后按 Enter 键。
 
-   6. Start a new terminal session and login to kafka-consumer.
+   6. 打开新的终端窗口并登录到 kafka-consumer。
 
        ```bash
        kubectl exec -ti kafka-consumer -- bash
        ```
 
-   7. Create consumer and specify consuming topic, and consuming message from the beginning.
+   7. 创建 consumer，指定消费 topic 和从开头开始消费消息。
 
        ```bash
        kafka-console-consumer.sh --topic quickstart-events --from-beginning --bootstrap-server xxx-broker:9092
        ```
 
-   And you get the output 'Hello, KubeBlocks'.
+   然后将得到输出 'Hello, KubeBlocks'。
 
-## Connect to a Kafka cluster from outside of the Kubernetes cluster but in the same VPC
+## 在 Kubernetes 集群外同一 VPC 下连接到 Kafka 集群
 
-If you use AWS EKS, you may want to access to the Kafka cluster from EC2 instance. This section shows how to perform the connection.
+许多使用 AWS EKS 的用户希望能从 EC2 实例访问 Kafka 集群，本节将展示具体操作步骤。
 
-***Steps:***
+***步骤：***
 
-1. Set the value of `host-network-accessible` as true.
+1. 将 `host-network-accessible` 的值设置为 true。
 
     ```bash
     kubectl apply -f - <<EOF
@@ -127,7 +128,7 @@ If you use AWS EKS, you may want to access to the Kafka cluster from EC2 instanc
     EOF
     ```
 
-2. Get the corresponding ELB address.
+2. 获取相应的 ELB 地址。
 
    ```bash
    kubectl get svc 
@@ -141,21 +142,21 @@ If you use AWS EKS, you may want to access to the Kafka cluster from EC2 instanc
 
   :::
 
-3. Use the ELB address to connect.
+3. 使用 ELB 地址进行连接。
 
-    In the above example, the ELB address is a0e01377fa33xxx-xxx.cn-northwest-1.elb.amazonaws.com.cn:9092.
+    在上例中，ELB 地址为 `a0e01377fa33xxx-xxx.cn-northwest-1.elb.amazonaws.com.cn:9092`。
 
-## Connect to a Kafka cluster from public internet
+## 在公共互联网连接到 Kafka 集群
 
 :::caution
 
-The current version only supports Kafka broker with a single replica (combined: --replicas=1 or separated: --broker-replicas=1) to adpot the following approach.
+限制条件：目前版本只支持 Kafka broker 单 replica（combined: --replicas=1 或 separated: --broker-replicas=1）使用以下方案。
 
 :::
 
-***Steps:***
+***步骤：***
 
-1. Set the `--publicly-accessible` value as true when creating cluster.
+1. 将 `--publicly-accessible` 的值设置为 true。
 
     ```bash
     kubectl apply -f - <<EOF
@@ -195,7 +196,7 @@ The current version only supports Kafka broker with a single replica (combined: 
     EOF
     ```
 
-2. Get the corresponding ELB address.
+2. 获取实例对应的 ELB 地址。
 
    ```bash
    kubectl get svc
@@ -205,28 +206,28 @@ The current version only supports Kafka broker with a single replica (combined: 
 
   :::note
 
-  xxxx-xxxx.cn-northwest-1.elb.amazonaws.com.cn is the ELB address accessible over the public network.
+  `xxxx-xxxx.cn-northwest-1.elb.amazonaws.com.cn` 是公网下能访问的 ELB 地址。
 
   :::
 
-3. Configure hostname mapping.
+3. 配置 hostname 映射。
 
-   1. Login to the remote machine.
-   2. Check ELB address IP address.
+   1. 登录远程机器。
+   2. 查看 ELB 地址 IP。
 
       ```bash
       nslookup a96caad7bab59xxxx-xxxx.cn-northwest-1.elb.amazonaws.com.cn
       ```
 
-   3. Gain the Broker address.
+   3. 获取 Broker 地址。
 
-      The Broker address follows a fixed format. Just replace `{clusterName}` in the string below with the Kafka Cluster Name.
+      Broker 地址为固定格式，将下面字符串中 `{clusterName}` 替换成 Kafka Cluster Name 即可。
 
       ```bash
       {clusterName}-broker-0.{clusterName}-broker-headless.default.svc
       ```
 
-   4. Configure /etc/hosts mapping.
+   4. 配置 /etc/hosts 映射。
 
        ```bash
        vi /etc/hosts
@@ -234,6 +235,6 @@ The current version only supports Kafka broker with a single replica (combined: 
        52.83.xx.xx {clusterName}-broker-0.{clusterName}-broker-headless.default.svc
        ```
 
-4. Use ELB address to connect.
+4. 使用 ELB 地址进行连接。
 
-    In the above example, the ELB address is xxxx-xxxx.cn-northwest-1.elb.amazonaws.com.cn:9092.
+    在上例中，ELB 地址为 `xxxx-xxxx.cn-northwest-1.elb.amazonaws.com.cn:9092`。

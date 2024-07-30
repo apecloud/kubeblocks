@@ -1,29 +1,29 @@
 ---
-title: Failure simulation and automatic recovery
-description: Automatic recovery of cluster
-keywords: [mysql, high availability, failure simulation, automatic recovery]
+title: 故障模拟与自动恢复
+description: 集群自动恢复
+keywords: [mysql, 高可用, 故障模拟, 自动恢复]
 sidebar_position: 1
 ---
 
-# Failure simulation and automatic recovery
+# 故障模拟与自动恢复
 
-As an open-source data management platform, Kubeblocks currently supports over thirty database engines and is continuously expanding. Due to the varying high availability capabilities of databases, KubeBlocks has designed and implemented a high availability (HA) system for database instances. The KubeBlocks HA system uses a unified HA framework to provide high availability for databases, allowing different databases on KubeBlocks to achieve similar high availability capabilities and experiences.
+作为一个开源数据管理平台，Kubeblocks目前支持三十多种数据库引擎，并且持续扩展中。由于这些数据库本身的高可用能力是参差不齐的，因此 KubeBlocks 设计实现了一套高可用系统用于保障数据库实例的高可用能力。KubeBlocks 高可用系统采用了统一的 HA 框架设计，实现对数据库的高可用支持，使得不同的数据库在 KubeBlocks 上可以获得类似的高可用能力和体验。
 
-This tutorial uses Apecloud MySQL as an example to demonstrate its fault simulation and recovery capabilities.
+下面以 ApeCloud MySQL为例，演示它的故障模拟和恢复能力。
 
-## Recovery simulation
+## 故障恢复
 
 :::note
 
-The faults here are all simulated by deleting pods. When there are sufficient resources, the fault can also be simulated by machine downtime or container deletion, and its automatic recovery is the same as described here.
+下面通过删除 Pod 来模拟故障。在资源充足的情况下，也可以通过机器宕机或删除容器来模拟故障，其自动恢复过程与本文描述的相同。
 
 :::
 
-### Before you start
+### 开始之前
 
-* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
-* [Create an ApeCloud MySQL RaftGroup Cluster](./../cluster-management/create-and-connect-an-apecloud-mysql-cluster.md).
-* Run `kubectl get cd apecloud-mysql -o yaml` to check whether _rolechangedprobe_ is enabled in the ApeCloud MySQL RaftGroup Cluster (it is enabled by default). If the following configuration exists, it indicates that it is enabled:
+* [安装 KubeBlocks](./../../installation/install-kubeblocks.md)。
+* [创建 ApeCloud MySQL 集群版](./../cluster-management/create-and-connect-an-apecloud-mysql-cluster.md)。
+* 执行 `kubectl get cd apecloud-mysql -o yaml` 检查 ApeCloud MySQL 集群版是否已启用 _rolechangedprobe_（默认情况下是启用的）。如果出现以下配置信息，则表明已启用：
 
   ```bash
   probes:
@@ -33,27 +33,27 @@ The faults here are all simulated by deleting pods. When there are sufficient re
       timeoutSeconds: 1
   ```
 
-### Leader pod fault
+### Leader 节点异常
 
-***Steps:***
+***步骤：***
 
-1. View the pod role of the ApeCloud MySQL RaftGroup Cluster. In this example, the leader pod's name is `mysql-cluster-1`.
+1. 查看 ApeCloud MySQL 集群版 pod 角色。在本示例种，Leader 节点为 `mycluster-1`。
 
     ```bash
     kubectl get pods --show-labels -n demo | grep role
     ```
 
     ![describe_pod](./../../../img/api-ha-grep-role.png)
-2. Delete the leader pod `mysql-cluster-mysql-1` to simulate a pod fault.
+2. 删除 Leader 节点 `mycluster-mysql-1`，模拟节点故障。
 
     ```bash
-    kubectl delete pod mysql-cluster-mysql-1 -n demo
+    kubectl delete pod mycluster-mysql-1 -n demo
     ```
 
     ![delete_pod](./../../../img/api-ha-delete-leader-pod.png)
-3. Check the status of the pods and RaftGroup Cluster connection.
+3. 检查 pod 状态和集群连接。
 
-    The following example shows that the roles of pods have changed after the old leader pod was deleted and `mysql-cluster-mysql-0` is elected as the new leader pod.
+    此处示例显示 pod 角色发生变化。原 Leader 节点删除后，系统选出新的 Leader 为 `mycluster-mysql-0`。
 
     ```bash
     kubectl get pods --show-labels -n demo | grep role
@@ -61,7 +61,7 @@ The faults here are all simulated by deleting pods. When there are sufficient re
 
     ![describe_cluster_after](./../../../img/api-ha-delete-leader-pod-after.png)
 
-    Connect to this cluster to check the pod roles and status. This cluster can be connected within seconds.
+    连接到该集群，检查 pod 角色和状态。该集群可在几秒内连接成功。
 
     ```bash
     kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
@@ -79,29 +79,29 @@ The faults here are all simulated by deleting pods. When there are sufficient re
 
     ![connect_cluster_after](./../../../img/api-ha-leader-pod-connect-check.png)
 
-   ***How the automatic recovery works***
+   ***自动恢复机制***
 
-   After the leader pod is deleted, the ApeCloud MySQL RaftGroup Cluster elects a new leader. In this example, `mysql-cluster-mysql-0` is elected as the new leader. KubeBlocks detects that the leader has changed, and sends a notification to update the access link. The original exception node automatically rebuilds and recovers to the normal RaftGroup Cluster state. It normally takes 30 seconds from exception to recovery.
+   Leader 节点删除后，ApeCloud MySQL 集群版会自行选主。上述示例中，选出新的 Leader 为 `mycluster-mysql-0`，KubeBlocks 探测到 Leader 角色发生变化，会发出通知，更新访问链路。原先异常节点会自动重建，恢复正常集群版状态。从异常开始到恢复完成，整体耗时正常在 30s 之内。
 
-### Single follower pod exception
+### 单个 follower 节点异常
 
-***Steps:***
+***步骤：***
 
-1. View the pod role again and in this example, the follower pods are `mysql-cluster-mysql-1` and `mysql-cluster-mysql-2`.
+1. 查看 pod 角色，如下示例中 follower 节点为 `mycluster-mysql-1` and `mycluster-mysql-2`。
 
     ```bash
     kubectl get pods --show-labels -n demo | grep role
     ```
 
     ![describe_cluster](./../../../img/api-ha-grep-role-single-follower-pod.png)
-2. Delete the follower pod `mysql-cluster-mysql-1`.
+2. 删除 follower 节点 `mycluster-mysql-1`。
 
     ```bash
     kubectl delete pod mycluster-mysql-1 -n demo
     ```
 
     ![delete_follower_pod](./../../../img/api-ha-single-follower-pod-delete.png)
-3. Open another terminal page and view the pod status. You can find the follower pod `mysql-cluster-mysql-1` is `Terminating`.
+3. 新开一个终端窗口，查看 pod 状态。可以发现 follower 节点 `mycluster-mysql-1` 处于 `Terminating` 状态。
 
     ```bash
     kubectl get pod -n demo
@@ -109,11 +109,11 @@ The faults here are all simulated by deleting pods. When there are sufficient re
 
     ![view_cluster_follower_status](./../../../img/api-delete-single-follower-pod-status.png)
 
-    View the pod roles again.
+    再次查看 pod 角色。
 
     ![describe_cluster_follower](./../../../img/api-ha-single-follower-pod-grep-role-after.png)
 
-4. Connect to this cluster and you can find this single follower exception doesn't affect the R/W of the cluster.
+4. 连接集群，发现单个 Follower 节点异常不影响集群的读写操作。
 
     ```bash
     kubectl exec -ti -n demo mycluster-mysql-0 -- bash
@@ -123,33 +123,31 @@ The faults here are all simulated by deleting pods. When there are sufficient re
 
     ![connect_cluster_follower](./../../../img/api-ha-connect-single-follower-pod.png)
 
-   ***How the automatic recovery works***
+   ***自动恢复机制***
 
-   One follower exception doesn't trigger re-electing of the leader or access link switch, so the R/W of the cluster is not affected. Follower exception triggers recreation and recovery. The process takes no more than 30 seconds.
+   单个 Follower 节点异常不会触发角色重新选主，也不会切换访问链路，所以集群读写不受影响，Follower 节点异常后会自动触发重建，恢复正常，整体耗时正常 30s 之内。
 
-### Two pods exception
+### 两个节点异常
 
-The availability of the cluster generally requires the majority of pods to be in a normal state. When exceptions occur to the majority of pods, the original leader will be automatically downgraded to a follower. Therefore, the exceptions of any two pods result in only one follower pod remaining.
+集群可用一般要求满足多数节点状态正常，当多数节点异常时，原 Leader 节点会自动降级为 Follower 节点，因此任意两个节点异常都会导致仅存一个 Follower 节点。所以一个 Leader 节点一个 Follower 节点异常和两个 Follower 节点异常，故障表现和自动恢复情况是一样的。
 
-In this way, whether exceptions occur to one leader and one follower or two followers, failure performance and automatic recovery are the same.
+***步骤：***
 
-***Steps:***
-
-1. View the pod role again. In this example, the follower pods are `mysql-cluster-mysql-1` and `mysql-cluster-mysql-2`.
+1. 查看 Pod 状态。如下示例中，follower 节点为 `mycluster-mysql-1` 和 `mycluster-mysql-2`。
 
     ```bash
     kubectl get pods --show-labels -n demo | grep role
     ```
 
     ![describe_cluster](./../../../img/api-ha-two-pods-grep-role.png)
-2. Delete these two follower pods.
+2. 删除两个 follower 节点。
 
     ```bash
     kubectl delete pod mycluster-mysql-1 mycluster-mysql-2 -n demo
     ```
 
     ![delete_two_pods](./../../../img/api-ha-two-pod-get-status.png)
-3. Open another terminal page and view the pod status. You can find the follower pods `mysql-cluster-mysql-1` and `mysql-cluster-mysql-2` is `Terminating`.
+3. 新开一个终端窗口，查看 pod 状态，发现两个 follower 节点 `mycluster-mysql-1` 和 `mycluster-mysql-2` 都处于 `Terminating` 状态。
 
     ```bash
     kubectl get pod -n demo
@@ -157,7 +155,7 @@ In this way, whether exceptions occur to one leader and one follower or two foll
 
     ![view_cluster_follower_status](./../../../img/api-ha-two-pod-get-status.png)
 
-    View the pod roles and you can find a new leader pod is selected.
+    查看节点角色，发现已选举产生新的 leader。
 
     ```bash
     kubectl get pods --show-labels -n demo | grep role
@@ -165,7 +163,7 @@ In this way, whether exceptions occur to one leader and one follower or two foll
 
     ![describe_cluster_follower](./../../../img/api-ha-two-pods-grep-role-after.png)
 
-4. Connect to this cluster after a few seconds and you can find the pods in the RaftGroup Cluster work normally again.
+4. 稍等几秒后，连接集群，发现集群中的 pod 在此正常运行。
 
     ```bash
     kubectl exec -ti -n demo mycluster-mysql-0 -- bash
@@ -175,22 +173,22 @@ In this way, whether exceptions occur to one leader and one follower or two foll
 
     ![connect_two_pods](./../../../img/api-ha-two-pods-connect-after.png)
 
-   ***How the automatic recovery works***
+   ***自动恢复机制***
 
-   When exceptions occur to two pods of the ApeCloud MySQL RaftGroup Cluster, all pods are unavailable and the cluster R/W is unavailable. After the recreation of pods, a new leader is elected to recover to R/W status. The process takes less than 30 seconds.
+   当 ApeCloud MySQL 集群版中两个节点异常时，会满足数节点不可用，导致 Leader 会自动降级为 Follower，此时集群不可读写。待 Pod 自动重建完成后，集群重新选出 Leader 并恢复到可 Read Write 状态。整体耗时正常 30s 之内。
 
-### All pods exception
+### 所有节点异常
 
-***Steps:***
+***步骤：***
 
-1. View the role of pods.
+1. 查看节点角色。
 
     ```bash
     kubectl get pods --show-labels -n demo | grep role
     ```
 
     ![describe_cluster](./../../../img/api-ha-all-pods-grep-role.png)
-2. Delete all pods.
+2. 删除所有节点。
 
     ```bash
     kubectl delete pod mycluster-mysql-1 mycluster-mysql-0 mycluster-mysql-2 -n demo
@@ -204,14 +202,14 @@ In this way, whether exceptions occur to one leader and one follower or two foll
     ```
 
     ![describe_three_clusters](./../../../img/api-ha-all-pods-get-status.png)
-4. View the pod roles and you can find a new leader pod is elected.
+4. 再次查看节点角色，发现已选举产生新的 leader。
 
     ```bash
     kubectl get pods --show-labels -n demo | grep role
     ```
 
     ![describe_cluster_follower](./../../../img/api-ha-all-pods-grep-role-after.png)
-5. Connect to this cluster after a few seconds and you can find the pods in this cluster work normally again.
+5. 稍等几秒后，连接集群，发现集群中的 pod 已恢复正常运行。
 
     ```bash
     kubectl exec -ti -n demo mycluster-mysql-0 -- bash
@@ -221,6 +219,6 @@ In this way, whether exceptions occur to one leader and one follower or two foll
 
     ![connect_three_clusters](./../../../img/api-ha-all-pods-connect-after.png)
 
-   ***How the automatic recovery works***
+   ***自动恢复机制***
 
-   Every time all pods are deleted, recreation is triggered. And then ApeCloud MySQL automatically completes the cluster recovery and the election of a new leader. Once a new leader is elected, KubeBlocks detects this new leader and updates the access link. This process takes less than 30 seconds.
+   节点删除后，都会自动触发重建。随后，ApeCloud MySQL 会自动完成集群恢复及选主。选主完成后，KubeBlocks 会探测新 Leader，并更新访问链路，恢复可用。整体耗时正常 30s 之内。

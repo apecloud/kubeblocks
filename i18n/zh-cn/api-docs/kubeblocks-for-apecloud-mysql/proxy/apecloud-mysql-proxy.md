@@ -1,62 +1,62 @@
 ---
-title: How to use ApeCloud MySQL Proxy Cluster
-description: ApeCloud MySQL Proxy Cluster tutorial
-keywords: [apecloud mysql proxy, proxy]
+title: ApeCloud MySQL 代理
+description: 如何使用 ApeCloud MySQL 代理
+keywords: [apecloud mysql 代理, 代理]
 sidebar_position: 2
-sidebar_label: ApeCloud MySQL Proxy Cluster
+sidebar_label: ApeCloud MySQL 代理
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# ApeCloud MySQL Proxy
+# ApeCloud MySQL 代理
 
-## Before you start
+## 开始之前
 
-1. [Install KubeBlocks](./../../installation/install-kubeblocks.md).
-2. Prepare an ApeCloud MySQL RaftGroup named `mycluster` for demonstrating how to enable the proxy function for an existing cluster. Refer to [Create a MySQL cluster](./../cluster-management/create-and-connect-an-apecloud-mysql-cluster.md) for details.
+1. [安装 KubeBlocks](./../../installation/install-kubeblocks.md)。
+2. 准备一个名为 mycluster 的 ApeCloud MySQL 三节点集群，用于演示如何为现有集群启用代理功能。详情请参考 [创建并连接到 MySQL 集群](./../cluster-management/create-and-connect-an-apecloud-mysql-cluster.md)。
 
-## Create a Proxy Cluster
+## 创建代理集群
 
-1. Add the KubeBlocks repository.
+1. 添加 KubeBlocks 仓库。
 
    ```bash
    helm repo add kubeblocks https://apecloud.github.io/helm-charts
    ```
 
-2. View the repository list to verify whether the KubeBlocks repository is added successfully.
+2. 查看仓库列表，确认 KubeBlocks 仓库是否已添加。
 
    ```bash
    helm repo list
    ```
 
-3. Run the update command to make sure you have added the latest version.
+3. 执行更新命令，确保您已安装最新版本。
 
    ```bash
    helm repo update
    ```
 
-4. Install etcd to create the external service reference.
+4. 安装 etcd，用于创建外部服务引用。
 
-   1. View all versions of etcd.
+   1. 查看 etcd 的所有版本。
 
        ```bash
        helm search repo kubeblocks/etcd --devel --versions
        ```
 
-   2. Install the etcd addon.
+   2. 安装 etcd 引擎。
 
        ```bash
        helm install etcd kubeblocks/etcd --version=v0.6.5
        ```
 
-   3. Install the etcd cluster.
+   3. 安装 etcd 集群。
 
        ```bash
        helm install etcd-cluster kubeblocks/etcd-cluster 
        ```
 
-   4. view the status of the etcd cluster and make sure it is running.
+   4. 查看 etcd 集群状态，确保其处于 `Running` 状态。
 
        ```bash
        kubectl get cluster
@@ -65,7 +65,7 @@ import TabItem from '@theme/TabItem';
        etcd-cluster   etcd                 etcd-v3.5.6   Halt                 Running     10s
        ```
 
-   5. View the service address of this etcd clsuter.
+   5. 查看 etcd 集群的服务地址。
 
        ```bash
        kubectl get service
@@ -76,28 +76,28 @@ import TabItem from '@theme/TabItem';
        kubernetes                       ClusterIP   10.96.0.1      <none>        443/TCP                                                  13m
        ```
 
-       You can combine the service address to get the endpoint or you can use the IP of the service address as the access address. 
+       您可以将服务地址组合起来，获取 endpoint。或者您可使用服务地址的 IP 作为连接地址。
 
-       Here is an example of combining the service address.
+       以下为服务地址组合的示例。
 
        ```bash
        etcd-cluster-etcd.default.svc.cluster.local:2379
        ```
 
-5. Create an ApeCloud MySQL Proxy Cluster.
-   1. View all versions of ApeCloud MySQL Proxy.
+5. 创建 ApeCloud MySQL 代理集群。
+   1. 查看 ApeCloud MySQL 代理集群可用版本。
 
        ```bash
        helm search repo kubeblocks/apecloud-mysql --devel --versions
        ```
 
-   2. (Optional) If you disable the `apecloud-mysql` addon when installing KuebBlocks, run the command below to specify a version and install the cluster definition of ApeCloud MySQL. Skip this step if you install KubeBlocks with the default settings.
+   2. （可选）如果您在安装 KubeBlocks 时停用了 `apecloud-mysql` 引擎，可执行以下命令并指定版本，安装 ApeCloud MySQL 的集群定义（cluster definition）。如果您安装 KubeBlocks 时选用了默认设置，可跳过本步骤。
 
        ```bash
        helm install myproxy kubeblocks/apecloud-mysql --version=v0.9.0
        ```
 
-   3. Create an ApeCloud MySQL Proxy Cluster.
+   3. 创建 ApeCloud MySQL 代理集群。
 
        ```bash
        helm install myproxy kubeblocks/apecloud-mysql-cluster --version=v0.9.0 --set mode=raftGroup,proxyEnabled=true,etcd.serviceReference.endpoint="etcd-cluster-etcd.default.svc.cluster.local:2379"
@@ -105,7 +105,7 @@ import TabItem from '@theme/TabItem';
 
 :::note
 
-If you only have one node for deploying a RaftGroup Cluster, set the `extra.availability-policy` as `none` when creating a RaftGroup Cluster.
+如果您只有一个节点可用于部署集群版，可在创建集群时将 `extra.availability-policy` 设置为 `none`。
 
 ```bash
 helm install myproxy kubeblocks/apecloud-mysql-cluster --version=v0.9.0 --set mode=raftGroup,proxyEnabled=true,etcd.serviceReference.endpoint="etcd-cluster-etcd.default.svc.cluster.local:2379" --set extra.availabilityPolicy=none
@@ -113,7 +113,7 @@ helm install myproxy kubeblocks/apecloud-mysql-cluster --version=v0.9.0 --set mo
 
 :::
 
-6. Check the status of the clusters.
+6. 查看集群状态。
 
    ```bash
    kubectl get cluster
@@ -121,53 +121,53 @@ helm install myproxy kubeblocks/apecloud-mysql-cluster --version=v0.9.0 --set mo
    kubectl get pods
    ```
 
-   You can also enter the etcd container or wesql-scale container to view the configuration of wesql-scale or to check the availability of the etcd service.
+   您也可以进入 etcd 容器或 wesql-scale 容器内部，查看 wesql-scale 的配置或检查 etcd 服务的可用性。
 
    ```bash
    etcdctl --endpoints=http://etcd-cluster-etcd.default.svc.cluster.local:2379 get /vitess --prefix --keys-only
    ```
 
-## Enable/Disable Proxy dynamically
+## 动态启用/关闭代理
 
-As its name suggests, ApeCloud MySQL Proxy in nature is a database proxy. An ApeCloud MySQL RaftGroup Cluster that already exists can be switched to an ApeCloud MySQL Proxy Cluster by setting `proxyEnabled=true`.
+ApeCloud MySQL 代理本质上是数据库代理。已创建的 ApeClud MySQL 集群版可通过设置 `proxyEnabled=true`，切换为 ApeCloud MySQL 代理集群。
 
 ```bash
 helm upgrade mycluster kubeblocks/apecloud-mysql-cluster --set mode=raftGroup,proxyEnabled=true,etcd.serviceReference.endpoint="etcd-cluster-etcd.default.svc.cluster.local:2379"
 ```
 
-If you want to disable proxy, run the command below.
+如果您想要关闭代理，可执行以下命令。
 
 ```bash
 helm upgrade mycluster kubeblocks/apecloud-mysql-cluster --set mode=raftGroup
 ```
 
-## Connect Proxy Cluster
+## 连接代理集群
 
-ApeCloud MySQL Proxy is routed through the `vtgate` component, and the way the MySQL Server accesses `vtgate` is similar to the way of accessing `mysqld`. The external SQL access address provided by ApeCloud MySQL Proxy is the `vtgate` address and port. The `vtgate` address created by KubeBlocks by default is `myproxy-cluster-vtgate-headless`, and the port number is `15306`. You can visit ApeCloud MySQL Proxy through the MySQL Server in any pod under the same namespace as ApeCloud MySQL Proxy.
+ApeCloud MySQL 代理集群是通过 `vtgate` 组件进行路由，MySQL 客户端访问 `vtgate` 方式与访问 `mysqld` 方式类似。ApeCloud MySQL 代理提供的对外 SQL 访问地址即是 `vtgate` 地址和端口号。KubeBlocks 默认创建的 `vtgate` 地址为 `myproxy-cluster-vtgate-headless`，端口号为 `15306`。可以在 ApeCloud MySQL 同一个 namespace 下的任意 pod 中通过 MySQL 客户端访客 ApeCloud MySQL 集群。
 
-### Connect Proxy Cluster by VTGate
+### 通过 VTGate 连接代理集群
 
-1. Expose the port of VTGate to the localhost so that the localhost can access the Proxy.
+1. 将 VTGate 的端口映射到本地主机，使本地主机可以访问代理。
 
    ```bash
    kubectl port-forward svc/vt-vtgate-headless 15306:15306
    ```
 
-2. Connect to the cluster.
+2. 连接到集群。
 
    ```bash
    mysql -h 127.0.0.1 -P 15306
    ```
 
-### Connect Proxy Cluster by MySQL Server
+### 通过 MySQL 服务器连接代理集群
 
-1. Expose the port of the MySQL Server to the localhost so that the localhost can access the MySQL Server.
+1. 将 MySQL 服务器的端口暴露到本地主机，使本地主机可以访问 MySQL 服务器。
 
    ```bash
    kubectl port-forward svc/vt-mysql 3306:3306
    ```
 
-2. Connect to the cluster.
+2. 连接到集群。
 
    ```bash
    mysql -h 127.0.0.1 -P 3306
@@ -175,15 +175,15 @@ ApeCloud MySQL Proxy is routed through the `vtgate` component, and the way the M
 
 :::note
 
-If you need to test the failover of MySQL, you need to delete the Pod first and continue to port-forward the port, and you can also write a shell script. Here are examples.
+如果要测试 MySQL 的故障切换功能，请先删除 Pod，然后进行端口转发。或者你可以编写一个 shell 脚本进行测试。比如，
 
-For VTGate,
+如果使用 VTGate：
 
 ```bash
 while true; do date; kubectl port-forward svc/vt-vtgate-headless 15306:15306; sleep 0.5; done
 ```
 
-For the MySQL Server,
+如果使用 MySQL：
 
 ```bash
 while true; do date; kubectl port-forward svc/vt-mysql 3306:3306; sleep 0.5; done
@@ -191,21 +191,21 @@ while true; do date; kubectl port-forward svc/vt-mysql 3306:3306; sleep 0.5; don
 
 :::
 
-## Configure Proxy Cluster parameters
+## 配置代理集群参数
 
-VTGate, VTConsensus, and VTTablet support parameter configuration. You can configure the proxy cluster by editing the configuration file or by performing an OpsRequest.
+VTGate、VTConsensus 和 VTTablet 都支持参数配置。你可以使用 `--components` 参数指定组件来配置 VTGate 和 VTConsensus，使用 `--components=mysql --config-specs=vttablet-config` 同时指定组件和配置文件模板来配置 VTTablet，因为 VTTablet 是 MySQL 组件的附属组件。
 
 <Tabs>
 
-<TabItem value="Edit config file" label="Edit config file" default>
+<TabItem value="编辑配置文件" label="编辑配置文件" default>
 
-1. Get the configuration file of this cluster.
+1. 查看当前配置文件的详细信息。
 
    ```bash
    kubectl edit configurations.apps.kubeblocks.io myproxy-vtgate
    ```
 
-2. Configure parameters according to your needs. The example below adds the `spec.configFileParams` part to configure `max_connections`.
+2. 按需配置参数。如下示例添加 `spec.configFileParams` 部分，用以配置 `max_connections`。
 
    ```yaml
    spec:
@@ -226,15 +226,15 @@ VTGate, VTConsensus, and VTTablet support parameter configuration. You can confi
        payload: {}
    ```
 
-3. Connect to this cluster to verify whether the configuration takes effect.
+3. 连接至该集群，确认配置是否生效。
 
-   1. Expose the port of the MySQL Server to the localhost so that the localhost can access the MySQL Server.
+   1. 将 MySQL 服务器的端口暴露到本地主机，使本地主机可以访问 MySQL 服务器。
 
       ```bash
       kubectl port-forward svc/vt-vtgate-headless 15306:15306
       ```
 
-   2. Connect to this cluster and verify whether the parameters are configured as expected.
+   2. 连接集群，确认参数是否已修改。
 
       ```bash
       mysql -h 127.0.0.1 -P 3306
@@ -253,9 +253,9 @@ VTGate, VTConsensus, and VTTablet support parameter configuration. You can confi
 
 <TabItem value="OpsRequest" label="OpsRequest">
 
-Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
+将 OpsRequest 应用于指定集群，根据您的需要配置参数。
 
-* An example of configuring VTTablet
+* 配置 VTTablet 示例
 
     ```yaml
     apiVersion: apps.kubeblocks.io/v1alpha1
@@ -279,7 +279,7 @@ Apply an OpsRequest to the specified cluster. Configure the parameters according
       type: Reconfiguring
     ```
 
-* An example of configuring VTGate
+* 配置 VTGate 示例
 
     ```yaml
     apiVersion: apps.kubeblocks.io/v1alpha1
@@ -307,43 +307,43 @@ Apply an OpsRequest to the specified cluster. Configure the parameters according
 
 </Tabs>
 
-## Log
+## 日志
 
-You can view the log files of components, Pods, and containers.
+您可查看组件、Pod 和容器的日志文件。
 
-View the log of VTGate.
+查看 VTGate 日志。
 
 ```bash
 kubectl logs myproxy-cluster-vtgate-8659d5db95-4dzt5
 ```
 
-View the log of VTTablet and `-c` is required.
+查看 VTTablet 日志，`-c` 为必选项。
 
 ```bash
 kubectl logs myproxy-cluster-mysql-0 -c vttablet
 ```
 
-Enter the container and view more logs of VTGate.
+进入容器，查看更多 VTGate 日志。
 
 ```bash
 kubectl exec -it myproxy-cluster-vtgate-8659d5db95-4dzt5 -- bash
 ls /vtdataroot
 ```
 
-Enter the container and view more logs of VTTable.
+进入容器，查看更多 VTTablet 日志。
 
 ```bash
 kubectl exec -it myproxy-cluster-mysql-0  -c vttablet -- bash
 ls /vtdataroot
 ```
 
-## Monitoring
+## 监控
 
-You can monitor the performance of the proxy cluster.
+您可监控代理集群的性能。
 
-1. Enable the monitoring addons.
+1. 启用监控引擎。
 
-   For the testing/demo environment, run the commands below to enable the monitoring addons provided by KubeBlocks.
+   对于测试或演示环境，可执行以下命令，启用 KubeBlocks 提供的监控引擎。
 
    ```bash
    helm install prometheus kubeblocks/prometheus --namespace kb-system --create-namespace
@@ -351,25 +351,25 @@ You can monitor the performance of the proxy cluster.
    helm install prometheus kubeblocks/prometheus --namespace kb-system --create-namespace
    ```
 
-   For the production environment, you can integrate the monitoring components. For details, you can refer to the relevant docs provided by the monitoring tools.
+   对于生产环境，您可以集成监控组件。可参考监控工具提供的相关文档查看集成细节。
 
-2. Check whether the monitoring function of this proxy cluster is enabled.
+2. 检查当前代理集群的监控功能是否启用。
 
    ```bash
    kubectl get cluster myproxy -o yaml
    ```
 
-   If the output YAML file shows `disableExporter: false`, the monitoring function of this proxy cluster is enabled.
+   如果输出的 YAML 文件中显示 `disableExporter: false`，则表示该集群的监控功能已开启。
 
-   If the monitoring function is not enabled, run the command below to enable it first.
+   如果监控功能未开启，可执行以下命令启用监控功能。
 
    ```bash
    kubectl patch cluster mycluster -n demo --type "json" -p '[{"op":"add","path":"/spec/componentSpecs/0/disableExporter","value":false}]'
    ```
 
-3. View the dashboard.
+3. 查看监控大盘。
 
-   For the testing/demo environment, run the commands below to view the Grafana dashboard.
+   对于测试或演示环境，可执行以下命令查看 Grafana 大盘。
 
    ```bash
    # 1. Get the username and password 
@@ -385,29 +385,29 @@ You can monitor the performance of the proxy cluster.
    # 4. Enter the username and password obtained from step 1.
    ```
 
-   For the production environment, you can view the dashboard of the corresponding cluster via Grafana Web Console. For more detailed information, see [the Grafana dashboard documentation](https://grafana.com/docs/grafana/latest/dashboards/).
+   对于生产环境，您可以通过 Grafana Web 控制台查看对应集群的大盘。可查看 [Grafana 大盘文档](https://grafana.com/docs/grafana/latest/dashboards/) 查看配置细节。
 
 :::note
 
-1. If there is no data in the dashboard, you can check whether the job is `kubeblocks-service`. Enter `kubeblocks-service` in the job field and press the enter button.
+1. 如果大盘中无数据，您可检查 job 是否为 `kubeblocks-service`。如果不是，可在 job 字段中输入 `kubeblocks-service` 并按回车键跳转。
 
    ![Monitoring dashboard](./../../../img/api-monitoring.png)
 
-2. For more details on the monitoring function, you can refer to [Monitoring](./../../observability/monitor-database.md).
+2. 更多关于监控功能的细节，可查看 [监控](./../../observability/monitor-database.md) 文档。
 
 :::
 
-## Read-write splitting
+## 读写分离
 
-You can enable the read-write splitting function.
+您可启用读写分离功能。
 
-1. Get the configuration file of this cluster.
+1. 获取当前集群的配置文件。
 
    ```bash
    kubectl edit configurations.apps.kubeblocks.io myproxy-vtgate
    ```
 
-2. Configure `read_write_splitting_policy` as `random`. 
+2. 将 `read_write_splitting_policy` 配置为 `random`。
 
    ```yaml
    spec:
@@ -428,7 +428,7 @@ You can enable the read-write splitting function.
        payload: {}
    ```
 
-You can also set the ratio for read-write splitting and here is an example of directing 70% flow to the read-only node.
+您也可以设置读写分离的比例，以下示例将 70% 的流量导向只读节点。
 
 ```yaml
 spec:
@@ -449,17 +449,17 @@ spec:
       payload: {}
 ```
 
-## Transparent failover
+## 透明故障切换
 
-Run the command below to perform a transparent failover.
+执行以下命令，实现透明的故障切换。
 
-1. Get the configuration file of this cluster.
+1. 获取集群的配置文件。
 
    ```bash
    kubectl edit configurations.apps.kubeblocks.io myproxy-vtgate
    ```
 
-2. Configure `enable_buffer` as `true`.
+2. 将 `enable_buffer` 设置为 `true`。
 
    ```yaml
    spec:

@@ -671,6 +671,11 @@ func (r *clusterBackupPolicyTransformer) getClusterComponentItems() []componentI
 		}
 	}
 	for i, v := range r.clusterTransformContext.Cluster.Spec.ShardingSpecs {
+		shardComponents, _ := intctrlutil.ListShardingComponents(r.Context, r.Client, r.Cluster, v.Name)
+		if len(shardComponents) == 0 {
+			// waiting for sharding component to be created
+			continue
+		}
 		if matchedCompDef(v.Template) {
 			compSpecItems = append(compSpecItems, componentItem{
 				compSpec:      &r.clusterTransformContext.Cluster.Spec.ShardingSpecs[i].Template,

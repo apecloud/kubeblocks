@@ -130,7 +130,7 @@ Scaling function for vector databases is also supported.
 
 ### Scale horizontally
 
-Horizontal scaling changes the amount of pods. For example, you can scale out replicas from three to five. The scaling process includes the backup and restore of data.
+Horizontal scaling changes the amount of pods. For example, you can scale out replicas from three to five.
 
 From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out instances, refer to [Horizontal Scale](./../maintenance/scale/horizontal-scale.md) for more details and examples.
 

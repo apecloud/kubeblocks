@@ -274,6 +274,8 @@ func (r *restoreJobBuilder) addTargetPodAndCredentialEnv(pod *corev1.Pod,
 		appendEnvFromSecret(dptypes.DPDBPassword, connectionCredential.PasswordKey)
 		if connectionCredential.PortKey != "" {
 			appendEnvFromSecret(dptypes.DPDBPort, connectionCredential.PortKey)
+		} else {
+			env = append(env, corev1.EnvVar{Name: dptypes.DPDBPort, Value: strconv.Itoa(int(utils.GetPodFirstContainerPort(pod)))})
 		}
 		if connectionCredential.HostKey != "" {
 			appendEnvFromSecret(dptypes.DPDBHost, connectionCredential.HostKey)

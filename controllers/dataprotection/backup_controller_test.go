@@ -379,18 +379,10 @@ var _ = Describe("Backup Controller test", func() {
 					ContainerName: testdp.ContainerName + "-1",
 					PortName:      testdp.PortName,
 				}
-				backupPolicy.Spec.BackupMethods[0].Targets = []dpv1alpha1.BackupTarget{
-					{Name: testdp.ComponentName + "-0", PodSelector: podSelector, ContainerPort: containerPort},
-					{Name: testdp.ComponentName + "-1", PodSelector: podSelector, ContainerPort: containerPort},
+				backupPolicy.Spec.BackupMethods[0].Target = &dpv1alpha1.BackupTarget{
+					Name: testdp.ComponentName, PodSelector: podSelector, ContainerPort: containerPort,
 				}
 			})).Should(Succeed())
-
-			By("check targets pod")
-			targets := backupPolicy.Spec.BackupMethods[0].Targets
-			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
-			targetPods, err := GetTargetPods(reqCtx, k8sClient, nil, backupPolicy, &targets[0], dpv1alpha1.BackupTypeFull)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(targetPods).Should(HaveLen(1))
 
 			By("create a backup")
 			backup := testdp.NewFakeBackup(&testCtx, nil)
@@ -411,7 +403,7 @@ var _ = Describe("Backup Controller test", func() {
 			}
 
 			By("check backup job's port env")
-			Eventually(testapps.CheckObj(&testCtx, getJobKey(targets[0].Name), func(g Gomega, fetched *batchv1.Job) {
+			Eventually(testapps.CheckObj(&testCtx, getJobKey(backup.Status.Target.Name), func(g Gomega, fetched *batchv1.Job) {
 				g.Expect(fetched.Spec.Template.Spec.NodeSelector[corev1.LabelHostname]).To(Equal(targetPod.Spec.NodeName))
 				// image should be expanded by env
 				g.Expect(getDPDBPortEnv(&fetched.Spec.Template.Spec.Containers[0]).Value).Should(Equal(strconv.Itoa(testdp.PortNum)))

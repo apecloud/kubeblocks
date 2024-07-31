@@ -44,10 +44,12 @@ func BuildEnvByTarget(pod *corev1.Pod, credential *dpv1alpha1.ConnectionCredenti
 		} else {
 			hostEnv = buildEnvBySecretKey(dptypes.DPDBHost, credential.SecretName, credential.HostKey)
 		}
+		envVars = append(envVars, hostEnv)
 		if credential.PortKey != "" {
 			envVars = append(envVars, buildEnvBySecretKey(dptypes.DPDBPort, credential.SecretName, credential.PortKey))
+		} else {
+			envVars = append(envVars, corev1.EnvVar{Name: dptypes.DPDBPort, Value: strconv.Itoa(int(GetPodFirstContainerPort(pod)))})
 		}
-		envVars = append(envVars, hostEnv)
 		if credential.PasswordKey != "" {
 			envVars = append(envVars, buildEnvBySecretKey(dptypes.DPDBPassword, credential.SecretName, credential.PasswordKey))
 		}

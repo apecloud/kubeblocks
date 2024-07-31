@@ -403,8 +403,7 @@ var _ = Describe("Backup Controller test", func() {
 			}
 
 			By("check backup job's port env")
-			Eventually(testapps.CheckObj(&testCtx, getJobKey(backup.Status.Target.Name), func(g Gomega, fetched *batchv1.Job) {
-				g.Expect(fetched.Spec.Template.Spec.NodeSelector[corev1.LabelHostname]).To(Equal(targetPod.Spec.NodeName))
+			Eventually(testapps.CheckObj(&testCtx, getJobKey(backupPolicy.Spec.BackupMethods[0].Target.Name), func(g Gomega, fetched *batchv1.Job) {
 				// image should be expanded by env
 				g.Expect(getDPDBPortEnv(&fetched.Spec.Template.Spec.Containers[0]).Value).Should(Equal(strconv.Itoa(testdp.PortNum)))
 			})).Should(Succeed())

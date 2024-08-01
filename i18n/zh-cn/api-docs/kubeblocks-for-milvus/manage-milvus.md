@@ -45,7 +45,7 @@ Milvus 是高度灵活、可靠且速度极快的云原生开源矢量数据库�
 
 ## 创建集群
 
-KubeBlocks 通过 `Cluster` 定义集群。以下是创建 Milvus 集群版的示例。
+KubeBlocks 通过 `Cluster` 定义集群。以下是创建 Milvus 集群的示例。
 
 ```yaml
 cat <<EOF | kubectl apply -f -

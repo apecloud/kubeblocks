@@ -81,7 +81,7 @@ mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running 
 
 1. 更改集群 YAML 文件中 `spec.componentSpecs.volumeClaimTemplates.spec.resources` 的值。
 
-   `spec.componentSpecs.volumeClaimTemplates.spec.resources` 是 Pod 的存储资源信息，更改此值会触发磁盘扩容。
+   `spec.componentSpecs.volumeClaimTemplates.spec.resources` 定义了 Pod 的存储资源信息，更改此值会触发磁盘扩容。
 
    ```yaml
    apiVersion: apps.kubeblocks.io/v1alpha1

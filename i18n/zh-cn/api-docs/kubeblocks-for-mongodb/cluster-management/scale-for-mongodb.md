@@ -1,31 +1,25 @@
 ---
-title: Scale for MongoDB cluster
-description: How to vertically scale a MongoDB cluster
-keywords: [mongodb, vertical scaling, vertically scale a mongodb cluster]
+title: 集群扩缩容
+description: 如何对集群进行扩缩容操作
+keywords: [mongodb, 垂直扩容, 垂直扩容 MongoDB 集群]
 sidebar_position: 2
-sidebar_label: Scale
+sidebar_label: 扩缩容
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Scale for a MongoDB cluster
+# MongoDB 集群扩缩容
 
-You can scale a MongoDB cluster in two ways, vertical scaling and horizontal scaling.
+KubeBlocks 支持对 MongoDB 集群进行垂直和水平扩缩容。
 
-## Vertical scaling
+## 垂直扩缩容
 
-You can vertically scale a cluster by changing resource requirements and limits (e.g. CPU and storage). For example, you can change the resource class from 1C2G to 2C4G by performing vertical scaling.
+您可以通过更改资源需求和限制（例如 CPU 和存储）来实现集群垂直扩缩容。例如，您可以通过垂直扩缩容将资源类别从 1C2G 更改为 2C4G。
 
-:::note
+### 开始之前
 
-During the vertical scaling process, a restart is triggered and the primary pod may change after the restarting.
-
-:::
-
-### Before you start
-
-Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
+检查集群状态是否为 `Running`。否则，后续操作可能会失败。
 
 ```bash
 kubectl get cluster mycluster -n demo
@@ -34,15 +28,15 @@ NAME        CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    AG
 mycluster   mongodb              mongodb-5.0   Delete               Running   27m
 ```
 
-### Steps
+### 步骤
 
-There are two ways to apply vertical scaling.
+可通过以下两种方式实现垂直扩缩容。
 
 <Tabs>
 
 <TabItem value="OpsRequest" label="OpsRequest" default>
 
-1. Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
+1. 对指定的集群应用 OpsRequest，可根据您的需求配置参数。
 
    ```bash
    kubectl apply -f - <<EOF
@@ -65,7 +59,7 @@ There are two ways to apply vertical scaling.
    EOF
    ```
 
-2. Check the operation status to validate the vertical scaling.
+2. 查看运维任务状态，验证垂直扩缩容操作是否成功。
 
    ```bash
    kubectl get ops -n demo
@@ -74,9 +68,9 @@ There are two ways to apply vertical scaling.
    demo        ops-vertical-scaling   VerticalScaling   mycluster   Succeed   3/3        6m
    ```
 
-   If an error occurs to the vertical scaling operation, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
+   如果有报错，可执行 `kubectl describe ops -n demo` 命令查看该运维操作的相关事件，协助排障。
 
-3. Check whether the corresponding resources change.
+3. 查看相应资源是否变更。
 
    ```bash
    kubectl describe cluster mycluster -n demo
@@ -102,9 +96,7 @@ There are two ways to apply vertical scaling.
 
 <TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
-1. Change the configuration of `spec.components.resources` in the YAML file. 
-
-   `spec.components.resources` controls the requirement and limit of resources and changing them triggers a vertical scaling.
+1. 修改 YAML 文件中 `spec.componentSpecs.resources` 的配置。`spec.componentSpecs.resources` 控制资源的请求值和限制值，修改参数值将出发垂直扩缩容。
 
    ```yaml
    kubectl edit cluster mycluster -n demo
@@ -133,7 +125,7 @@ There are two ways to apply vertical scaling.
            memory: 2Gi
    ```
 
-2. Check whether the corresponding resources change.
+2. 查看相应资源是否变更。
 
    ```bash
    kubectl describe cluster mycluster -n demo
@@ -159,9 +151,11 @@ There are two ways to apply vertical scaling.
 
 </Tabs>
 
-## Horizontal scaling
+## 水平扩缩容
 
-Horizontal scaling changes the amount of pods. For example, you can apply horizontal scaling to scale pods up from three to five. The scaling process includes the backup and restore of data.
+水平扩展改变 Pod 的数量。例如，您可以将副本从三个扩展到五个。
+
+从 v0.9.0 开始，除了支持 replica 的扩缩容外，KubeBlocks 还支持了实例（instance）的扩缩容。可通过 [水平扩缩容](./../../maintenance/scale/scale-for-specified-instance.md) 文档了解更多细节和示例。
 
 ### Before you start
 

@@ -1,18 +1,18 @@
 ---
-title: Restart a MongoDB cluster
-description: How to restart a MongoDB cluster
-keywords: [mongodb, restart a cluster]
+title: 重启集群
+description: 如何重启集群
+keywords: [mongodb, 重启, 重启集群]
 sidebar_position: 4
-sidebar_label: Restart
+sidebar_label: 重启
 ---
 
-# Restart MongoDB cluster
+# 重启集群
 
-You can restart all pods of the cluster. When an exception occurs in a database, you can try to restart it.
+KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，也可以尝试重启集群。重启后，主节点可能会发生变化。
 
 ## Steps
 
-1. Create an OpsRequest to restart a cluster.
+1. 创建 OpsRequest 重启集群。
 
    ```bash
    kubectl apply -f - <<EOF
@@ -29,7 +29,7 @@ You can restart all pods of the cluster. When an exception occurs in a database,
    EOF
    ```
 
-2. Check the pod and operation status to validate the restarting.
+2. 查看 Pod 和重启操作的状态，验证该操作是否成功。
 
    ```bash
    kubectl get pod -n demo
@@ -43,7 +43,9 @@ You can restart all pods of the cluster. When an exception occurs in a database,
    ops-restart   Restart   mycluster   Succeed   1/1        3m26s
    ```
 
-   During the restarting process, there are two status types for pods.
+   重启过程中，Pod 有如下两种状态：
 
-   - STATUS=Terminating: it means the cluster restart is in progress.
-   - STATUS=Running: it means the cluster has been restarted.
+   - STATUS=Terminating：表示集群正在重启。
+   - STATUS=Running：表示集群已重启。
+
+   如果操作过程中出现报错，可通过 `kubectl describe ops -n demo` 查看该操作的事件，协助排障。

@@ -1,21 +1,21 @@
 ---
-title: Expand volume
-description: How to expand the volume of a MongoDB cluster
-keywords: [mongodb, expand volume, volume expansion]
+title: 磁盘扩容
+description: 如何调整集群所使用的磁盘大小
+keywords: [mongodb, 磁盘扩容]
 sidebar_position: 3
-sidebar_label: Expand volume
+sidebar_label: 磁盘扩容
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Expand volume
+# 磁盘扩容
 
-You can expand the storage volume size of each pod.
+您可以调整 Pod 磁盘容量。
 
-## Before you start
+## 开始之前
 
-Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
+确保集群处于 `Running` 状态，否则以下操作可能会失败。
 
 ```bash
 kubectl get cluster mycluster -n demo
@@ -24,15 +24,15 @@ NAME        CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    AG
 mycluster   mongodb              mongodb-5.0   Delete               Running   27m
 ```
 
-## Steps
+## 步骤
 
-There are two ways to apply volume expansion.
+当前支持通过以下两种方式扩容磁盘。
 
 <Tabs>
 
 <TabItem value="OpsRequest" label="OpsRequest" default>
 
-1. Apply an OpsRequest. Change the value of storage according to your need and run the command below to expand the volume of a cluster.
+1. 应用 OpsRequest。根据需求更改 storage 的值，并执行以下命令来更改集群的存储容量。
 
    ```bash
    kubectl apply -f - <<EOF
@@ -52,7 +52,7 @@ There are two ways to apply volume expansion.
    EOF
    ```
 
-2. Validate the volume expansion operation.
+2. 验证磁盘扩容操作是否成功。
 
    ```bash
    kubectl get ops -n demo
@@ -61,7 +61,9 @@ There are two ways to apply volume expansion.
    demo        ops-volume-expansion   VolumeExpansion   mycluster   Succeed   3/3        6m
    ```
 
-3. Check whether the corresponding cluster resources change.
+   如果操作过程中出现报错，可通过 `kubectl describe ops -n demo` 查看该操作的事件，协助排障。
+
+3. 查看对应的集群资源是否变更。
 
    ```bash
    kubectl describe cluster mycluster -n demo
@@ -81,7 +83,7 @@ There are two ways to apply volume expansion.
 
 <TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
-1. Change the value of `spec.components.volumeClaimTemplates.spec.resources` in the cluster YAML file. `spec.components.volumeClaimTemplates.spec.resources` is the storage resource information of the pod and changing this value triggers the volume expansion of a cluster.
+1. 更改集群 YAML 文件中 `spec.componentSpecs.volumeClaimTemplates.spec.resources` 的值。`spec.componentSpecs.volumeClaimTemplates.spec.resources` 定义了 Pod 的存储资源信息，更改此值会触发磁盘扩容。
 
    ```yaml
    apiVersion: apps.kubeblocks.io/v1alpha1
@@ -107,7 +109,7 @@ There are two ways to apply volume expansion.
      terminationPolicy: Delete
    ```
 
-2. Check whether the corresponding cluster resources change.
+2. 查看对应的集群资源是否变更。
 
    ```bash
    kubectl describe cluster mycluster -n demo

@@ -221,7 +221,7 @@ status:
 
 使用 `kubectl exec` 命令进入 Pod 并连接到数据库。
 
-KubeBlocks operator 会创建一个名为 `mysql-cluster-conn-credential` 的新的 Secret 来存储 MySQL 集群的连接凭证。该 Secret 包含以下 key：
+KubeBlocks operator 会创建一个名为 `mycluster-conn-credential` 的新的 Secret 来存储 MySQL 集群的连接凭证。该 Secret 包含以下 key：
 
 * `username`：MySQL 集群的根用户名。
 * `password`：根用户的密码。
@@ -241,7 +241,7 @@ KubeBlocks operator 会创建一个名为 `mysql-cluster-conn-credential` 的新
    2gvztbvz
    ```
 
-2. 使用用户名和密码，进入 Pod `mysql-cluster-mysql-0` 并连接到数据库。
+2. 使用用户名和密码，进入 Pod `mycluster-mysql-0` 并连接到数据库。
 
    ```bash
    kubectl exec -ti -n demo mycluster-mysql-0 -- bash

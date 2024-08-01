@@ -1137,21 +1137,16 @@ type ComponentLifecycleActions struct {
 	//
 	// The container executing this action has access to following environment variables:
 	//
-	// - KB_SWITCHOVER_CANDIDATE_NAME: The name of the pod for the new leader candidate, which may not be specified (empty).
-	// - KB_SWITCHOVER_CANDIDATE_FQDN: The FQDN of the new leader candidate's pod, which may not be specified (empty).
 	// - KB_LEADER_POD_IP: The IP address of the current leader's pod prior to the switchover.
 	// - KB_LEADER_POD_NAME: The name of the current leader's pod prior to the switchover.
 	// - KB_LEADER_POD_FQDN: The FQDN of the current leader's pod prior to the switchover.
-	//
-	// The environment variables with the following prefixes are deprecated and will be removed in future releases:
-	//
-	// - KB_REPLICATION_PRIMARY_POD_
-	// - KB_CONSENSUS_LEADER_POD_
+	// - KB_SWITCHOVER_CANDIDATE_NAME: The name of the pod for the new leader candidate, which may not be specified (empty).
+	// - KB_SWITCHOVER_CANDIDATE_FQDN: The FQDN of the new leader candidate's pod, which may not be specified (empty).
 	//
 	// Note: This field is immutable once it has been set.
 	//
 	// +optional
-	Switchover *ComponentSwitchover `json:"switchover,omitempty"`
+	Switchover *Action `json:"switchover,omitempty"`
 
 	// Defines the procedure to add a new replica to the replication group.
 	//

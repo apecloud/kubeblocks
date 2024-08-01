@@ -1783,7 +1783,7 @@ func (in *ComponentLifecycleActions) DeepCopyInto(out *ComponentLifecycleActions
 	}
 	if in.Switchover != nil {
 		in, out := &in.Switchover, &out.Switchover
-		*out = new(ComponentSwitchover)
+		*out = new(Action)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.MemberJoin != nil {

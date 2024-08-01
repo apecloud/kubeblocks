@@ -2999,7 +2999,7 @@ The modes can be <code>None</code>, <code>Readonly</code>, or <code>ReadWrite</c
 <h3 id="apps.kubeblocks.io/v1alpha1.Action">Action
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentSwitchover">ComponentSwitchover</a>, <a href="#apps.kubeblocks.io/v1alpha1.LifecycleActionHandler">LifecycleActionHandler</a>, <a href="#apps.kubeblocks.io/v1alpha1.Probe">Probe</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSwitchover">ComponentSwitchover</a>, <a href="#apps.kubeblocks.io/v1alpha1.LifecycleActionHandler">LifecycleActionHandler</a>, <a href="#apps.kubeblocks.io/v1alpha1.Probe">Probe</a>)
 </p>
 <div>
 <p>Action defines a customizable hook or procedure tailored for different database engines,
@@ -8115,8 +8115,8 @@ Without this, services that rely on roleSelectors might improperly direct traffi
 <td>
 <code>switchover</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.ComponentSwitchover">
-ComponentSwitchover
+<a href="#apps.kubeblocks.io/v1alpha1.Action">
+Action
 </a>
 </em>
 </td>
@@ -8128,16 +8128,11 @@ during events such as planned maintenance or when performing stop, shutdown, res
 involving the current leader node.</p>
 <p>The container executing this action has access to following environment variables:</p>
 <ul>
-<li>KB_SWITCHOVER_CANDIDATE_NAME: The name of the pod for the new leader candidate, which may not be specified (empty).</li>
-<li>KB_SWITCHOVER_CANDIDATE_FQDN: The FQDN of the new leader candidate&rsquo;s pod, which may not be specified (empty).</li>
 <li>KB_LEADER_POD_IP: The IP address of the current leader&rsquo;s pod prior to the switchover.</li>
 <li>KB_LEADER_POD_NAME: The name of the current leader&rsquo;s pod prior to the switchover.</li>
 <li>KB_LEADER_POD_FQDN: The FQDN of the current leader&rsquo;s pod prior to the switchover.</li>
-</ul>
-<p>The environment variables with the following prefixes are deprecated and will be removed in future releases:</p>
-<ul>
-<li>KB_REPLICATION_PRIMARY<em>POD</em></li>
-<li>KB_CONSENSUS_LEADER<em>POD</em></li>
+<li>KB_SWITCHOVER_CANDIDATE_NAME: The name of the pod for the new leader candidate, which may not be specified (empty).</li>
+<li>KB_SWITCHOVER_CANDIDATE_FQDN: The FQDN of the new leader candidate&rsquo;s pod, which may not be specified (empty).</li>
 </ul>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
@@ -9113,9 +9108,6 @@ and <code>Name</code> is the specific name of the object.</p>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentSwitchover">ComponentSwitchover
 </h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentLifecycleActions">ComponentLifecycleActions</a>)
-</p>
 <div>
 </div>
 <table>

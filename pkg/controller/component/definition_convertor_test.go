@@ -809,13 +809,10 @@ var _ = Describe("Component Definition Convertor", func() {
 				Expect(err).Should(Succeed())
 				actions := res.(*appsv1alpha1.ComponentLifecycleActions)
 				Expect(actions.Switchover).ShouldNot(BeNil())
-				Expect(len(actions.Switchover.ScriptSpecSelectors)).Should(BeEquivalentTo(2))
-				Expect(actions.Switchover.WithCandidate).ShouldNot(BeNil())
-				Expect(actions.Switchover.WithCandidate.Exec.Image).Should(BeEquivalentTo(commandExecutorEnvItem.Image))
-				Expect(actions.Switchover.WithCandidate.Exec.Env).Should(BeEquivalentTo(commandExecutorEnvItem.Env))
-				Expect(actions.Switchover.WithCandidate.Exec.Command).Should(BeEquivalentTo(commandExecutorItem.Command))
-				Expect(actions.Switchover.WithCandidate.Exec.Args).Should(BeEquivalentTo(commandExecutorItem.Args))
-				Expect(actions.Switchover.WithoutCandidate).ShouldNot(BeNil())
+				Expect(actions.Switchover.Exec.Image).Should(BeEquivalentTo(commandExecutorEnvItem.Image))
+				Expect(actions.Switchover.Exec.Env).Should(BeEquivalentTo(commandExecutorEnvItem.Env))
+				Expect(actions.Switchover.Exec.Command).Should(BeEquivalentTo(commandExecutorItem.Command))
+				Expect(actions.Switchover.Exec.Args).Should(BeEquivalentTo(commandExecutorItem.Args))
 			})
 
 			It("post provision", func() {

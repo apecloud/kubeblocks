@@ -614,7 +614,7 @@ func (c *compDefLifecycleActionsConvertor) convertPostProvision(postStart *appsv
 }
 
 func (c *compDefLifecycleActionsConvertor) convertSwitchover(switchover *appsv1alpha1.SwitchoverSpec,
-	clusterCompVer *appsv1alpha1.ClusterComponentVersion) *appsv1alpha1.ComponentSwitchover {
+	clusterCompVer *appsv1alpha1.ClusterComponentVersion) *appsv1alpha1.Action {
 	spec := *switchover
 	if clusterCompVer != nil {
 		overrideSwitchoverSpecAttr(&spec, clusterCompVer.SwitchoverSpec)
@@ -623,22 +623,8 @@ func (c *compDefLifecycleActionsConvertor) convertSwitchover(switchover *appsv1a
 		return nil
 	}
 
-	var (
-		withCandidateAction    *appsv1alpha1.Action
-		withoutCandidateAction *appsv1alpha1.Action
-	)
-	if spec.WithCandidate != nil && spec.WithCandidate.CmdExecutorConfig != nil {
-		withCandidateAction = &appsv1alpha1.Action{
-			Exec: &appsv1alpha1.ExecAction{
-				Image:   spec.WithCandidate.CmdExecutorConfig.Image,
-				Command: spec.WithCandidate.CmdExecutorConfig.Command,
-				Args:    spec.WithCandidate.CmdExecutorConfig.Args,
-				Env:     spec.WithCandidate.CmdExecutorConfig.Env,
-			},
-		}
-	}
 	if spec.WithoutCandidate != nil && spec.WithoutCandidate.CmdExecutorConfig != nil {
-		withoutCandidateAction = &appsv1alpha1.Action{
+		return &appsv1alpha1.Action{
 			Exec: &appsv1alpha1.ExecAction{
 				Image:   spec.WithoutCandidate.CmdExecutorConfig.Image,
 				Command: spec.WithoutCandidate.CmdExecutorConfig.Command,
@@ -647,29 +633,17 @@ func (c *compDefLifecycleActionsConvertor) convertSwitchover(switchover *appsv1a
 			},
 		}
 	}
-
-	mergeScriptSpec := func() []appsv1alpha1.ScriptSpecSelector {
-		if len(spec.WithCandidate.ScriptSpecSelectors) == 0 && len(spec.WithoutCandidate.ScriptSpecSelectors) == 0 {
-			return nil
+	if spec.WithCandidate != nil && spec.WithCandidate.CmdExecutorConfig != nil {
+		return &appsv1alpha1.Action{
+			Exec: &appsv1alpha1.ExecAction{
+				Image:   spec.WithCandidate.CmdExecutorConfig.Image,
+				Command: spec.WithCandidate.CmdExecutorConfig.Command,
+				Args:    spec.WithCandidate.CmdExecutorConfig.Args,
+				Env:     spec.WithCandidate.CmdExecutorConfig.Env,
+			},
 		}
-
-		mergeScriptSpecMap := map[appsv1alpha1.ScriptSpecSelector]bool{}
-		for _, val := range append(spec.WithCandidate.ScriptSpecSelectors, spec.WithoutCandidate.ScriptSpecSelectors...) {
-			mergeScriptSpecMap[val] = true
-		}
-
-		scriptSpecList := make([]appsv1alpha1.ScriptSpecSelector, 0, len(mergeScriptSpecMap))
-		for key := range mergeScriptSpecMap {
-			scriptSpecList = append(scriptSpecList, key)
-		}
-		return scriptSpecList
 	}
-
-	return &appsv1alpha1.ComponentSwitchover{
-		WithCandidate:       withCandidateAction,
-		WithoutCandidate:    withoutCandidateAction,
-		ScriptSpecSelectors: mergeScriptSpec(),
-	}
+	return nil
 }
 
 type compDefExporterConvertor struct{}

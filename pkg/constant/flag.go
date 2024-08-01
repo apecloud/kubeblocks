@@ -33,4 +33,7 @@ const (
 
 	// HostNetworkAnnotationKey defines the feature gate to enable the host-network for specified components or shardings.
 	HostNetworkAnnotationKey = "kubeblocks.io/host-network"
+
+	// FeatureGateComponentReplicasAnnotation tells whether to add and update the annotation "component-replicas" to all pods of a Component
+	FeatureGateComponentReplicasAnnotation = "COMPONENT_REPLICAS_ANNOTATION"
 )

@@ -130,7 +130,9 @@ Scaling function for vector databases is also supported.
 
 ### Scale horizontally
 
-Horizontal scaling changes the amount of pods. For example, you can apply horizontal scaling to scale pods up from three to five. The scaling process includes the backup and restore of data.
+Horizontal scaling changes the amount of pods. For example, you can scale out replicas from three to five.
+
+From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out instances, refer to [Horizontal Scale](./../maintenance/scale/horizontal-scale.md) for more details and examples.
 
 #### Before you start
 
@@ -143,7 +145,9 @@ NAME        CLUSTER-DEFINITION          VERSION               TERMINATION-POLICY
 mycluster   elasticsearch               elasticsearch-8.8.2   Delete                Running   47m
 ```
 
-#### Steps
+#### Scale replicas
+
+***Steps:***
 
 There are two ways to apply horizontal scaling.
 
@@ -152,6 +156,8 @@ There are two ways to apply horizontal scaling.
 <TabItem value="OpsRequest" label="OpsRequest" default>
 
 1. Apply an OpsRequest to a specified cluster. Configure the parameters according to your needs.
+
+   The example below means adding two replicas.
 
    ```bash
    kubectl apply -f - <<EOF
@@ -165,7 +171,29 @@ There are two ways to apply horizontal scaling.
      type: HorizontalScaling
      horizontalScaling:
      - componentName: elasticsearch
-       replicas: 1
+       scaleOut:
+         replicaChanges: 2
+   EOF
+   ```
+
+   If you want to scale in replicas, replace `scaleOut` with `scaleIn`.
+
+   The example below means deleting two replicas.
+
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: ops-horizontal-scaling
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     type: HorizontalScaling
+     horizontalScaling:
+     - componentName: elasticsearch
+       scaleIn:
+         replicaChanges: 2
    EOF
    ```
 
@@ -178,7 +206,7 @@ There are two ways to apply horizontal scaling.
    demo        ops-horizontal-scaling   HorizontalScaling   mycluster   Succeed   3/3        6m
    ```
 
-   If an error occurs to the horizontal scaling operation, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
+   If an error occurs, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
 
 3. Check whether the corresponding resources change.
 
@@ -278,13 +306,7 @@ The horizontal scaling continues after backup and volumesnapshot are deleted and
 
 ### Scale vertically
 
-You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, if you need to change the resource class from 1C2G to 2C4G, vertical scaling is what you need.
-
-:::note
-
-During the vertical scaling process, all pods restart and the pod role may change after the restarting.
-
-:::
+You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, you can change the resource class from 1C2G to 2C4G by performing vertical scaling.
 
 #### Before you start
 

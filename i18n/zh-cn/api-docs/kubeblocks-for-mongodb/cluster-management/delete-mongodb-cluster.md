@@ -1,29 +1,29 @@
 ---
-title: Delete a MongoDB Cluster
-description: How to delete a MongoDB Cluster
-keywords: [mongodb, delete a cluster, delete protection]
+title: 删除集群
+description: 如何删除集群
+keywords: [mongodb, 删除集群, 删除保护]
 sidebar_position: 7
-sidebar_label: Delete protection
+sidebar_label: 删除保护
 ---
 
-# Delete a MongoDB cluster
+# 删除集群
 
-## Termination policy
+## 终止策略
 
 :::note
 
-The termination policy determines how a cluster is deleted. Set the policy when creating a cluster.
+终止策略决定了删除集群的方式，可在创建集群时进行设置。
 
 :::
 
-| **terminationPolicy**  | **Deleting Operation**                    |
+| **terminationPolicy**  | **删除操作**                    |
 |:--                     | :--                                       |
-| `DoNotTerminate`       | `DoNotTerminate` blocks delete operation. |
-| `Halt`                 | `Halt` deletes workload resources such as statefulset, deployment workloads but keep PVCs. |
-| `Delete`               | `Delete` deletes workload resources and PVCs but keep backups. |
-| `WipeOut`              | `WipeOut` deletes workload resources, PVCs and all relevant resources included backups. |
+| `DoNotTerminate`       | `DoNotTerminate` 禁止删除操作。 |
+| `Halt`                 | `Halt` 删除工作负载资源（如 statefulset、deployment 等），但保留 PVC。 |
+| `Delete`               | `Delete`  删除工作负载资源和 PVC，但保留备份。 |
+| `WipeOut`              | `WipeOut` 删除工作负载资源、PVC 和所有相关资源（包括备份）。 |
 
-To check the termination policy, execute the following command.
+执行以下命令查看终止策略。
 
 ```bash
 kubectl -n demo get cluster mycluster 
@@ -32,15 +32,15 @@ NAME        CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    AG
 mycluster   mongodb              mongodb-5.0   Delete               Running   17m
 ```
 
-## Steps
+## 步骤
 
-Run the command below to delete the cluster.
+执行以下命令，删除集群。
 
 ```bash
 kubectl delete -n demo cluster mycluster
 ```
 
-If you want to delete a cluster and its all related resources, you can set the termination policy to `WipeOut`, and then delete the cluster.
+如果想删除集群和所有相关资源，可以将终止策略修改为 `WipeOut`，然后再删除该集群。
 
 ```bash
 kubectl patch -n demo cluster mycluster -p '{"spec":{"terminationPolicy":"WipeOut"}}' --type="merge"

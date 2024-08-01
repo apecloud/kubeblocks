@@ -126,8 +126,6 @@ curl http://127.0.0.1:9200/_cat/nodes?v
 
 ## Scaling
 
-Scaling function for vector databases is also supported.
-
 ### Scale horizontally
 
 Horizontal scaling changes the amount of pods. For example, you can scale out replicas from three to five.
@@ -197,7 +195,7 @@ There are two ways to apply horizontal scaling.
    EOF
    ```
 
-2. Check the operation status to validate the horizontal scaling status.
+2. Check the operation status to validate the horizontal scaling.
 
    ```bash
    kubectl get ops -n demo
@@ -473,7 +471,7 @@ There are two ways to apply volume expansion.
 
 </TabItem>
 
-<TabItem value="Edit cluster YAML file" label="Edit cluster YAML fil">
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
 1. Change the value of `spec.componentSpecs.volumeClaimTemplates.spec.resources` in the cluster YAML file.
 
@@ -598,7 +596,7 @@ EOF
 
 </TabItem>
 
-<TabItem value="Edit cluster YAML filee" label="Edit cluster YAML file">
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
 Change replicas back to the original amount to start this cluster again.
 

@@ -11191,45 +11191,6 @@ ConsensusMember
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ContainerPort">ContainerPort
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.TargetInstance">TargetInstance</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>containerName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies the name of container with the port.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>portName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies the port name.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ContainerVars">ContainerVars
 </h3>
 <p>
@@ -20637,9 +20598,7 @@ It will be ignored when the <code>account</code> is set.</p>
 <td>
 <code>containerPort</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.ContainerPort">
-ContainerPort
-</a>
+github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1.ContainerPort
 </em>
 </td>
 <td>

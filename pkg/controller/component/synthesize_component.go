@@ -814,12 +814,8 @@ func ReplaceNamedVars(namedValuesMap map[string]string, targetVar string, limits
 func ReplaceSecretEnvVars(namedValuesMap map[string]string, envs []corev1.EnvVar) []corev1.EnvVar {
 	newEnvs := make([]corev1.EnvVar, 0, len(envs))
 	for _, e := range envs {
-		if e.ValueFrom == nil || e.ValueFrom.SecretKeyRef == nil {
-			continue
-		}
-		name := ReplaceNamedVars(namedValuesMap, e.ValueFrom.SecretKeyRef.Name, 1, false)
-		if name != e.ValueFrom.SecretKeyRef.Name {
-			e.ValueFrom.SecretKeyRef.Name = name
+		if e.ValueFrom != nil && e.ValueFrom.SecretKeyRef != nil {
+			e.ValueFrom.SecretKeyRef.Name = ReplaceNamedVars(namedValuesMap, e.ValueFrom.SecretKeyRef.Name, 1, false)
 		}
 		newEnvs = append(newEnvs, e)
 	}

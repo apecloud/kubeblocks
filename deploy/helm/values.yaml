@@ -1923,6 +1923,8 @@ featureGates:
     enabled: false
   ignorePodVerticalScaling:
     enabled: false
+  componentReplicasAnnotation:
+    enabled: true
 
 vmagent:
 

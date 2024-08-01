@@ -997,6 +997,22 @@ an existed ServiceAccount in this field.</p>
 </tr>
 <tr>
 <td>
+<code>parallelPodManagementConcurrency</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
+or when scaling down. It only used when <code>PodManagementPolicy</code> is set to <code>Parallel</code>.
+The default Concurrency is 100%.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>podUpdatePolicy</code><br/>
 <em>
 <a href="#workloads.kubeblocks.io/v1alpha1.PodUpdatePolicyType">
@@ -3059,22 +3075,6 @@ ExecAction
 </tr>
 <tr>
 <td>
-<code>http</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.HTTPAction">
-HTTPAction
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the HTTP request to perform.</p>
-<p>This field cannot be updated.</p>
-<p>Note: HTTPAction is to be implemented in future version.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>timeoutSeconds</code><br/>
 <em>
 int32
@@ -4997,6 +4997,22 @@ UpdateStrategy
 <p>Deprecated since v0.9.
 This field is maintained for backward compatibility and its use is discouraged.
 Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>parallelPodManagementConcurrency</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
+or when scaling down. It only used when <code>PodManagementPolicy</code> is set to <code>Parallel</code>.
+The default Concurrency is 100%.</p>
 </td>
 </tr>
 <tr>
@@ -8801,6 +8817,22 @@ an existed ServiceAccount in this field.</p>
 </tr>
 <tr>
 <td>
+<code>parallelPodManagementConcurrency</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
+or when scaling down. It only used when <code>PodManagementPolicy</code> is set to <code>Parallel</code>.
+The default Concurrency is 100%.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>podUpdatePolicy</code><br/>
 <em>
 <a href="#workloads.kubeblocks.io/v1alpha1.PodUpdatePolicyType">
@@ -11942,108 +11974,6 @@ The policy can be set to <code>None</code>, <code>CloneVolume</code>, or <code>S
 <td><p>HScaleDataClonePolicyNone indicates that no data cloning will occur during horizontal scaling.</p>
 </td>
 </tr></tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.HTTPAction">HTTPAction
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.Action">Action</a>)
-</p>
-<div>
-<p>HTTPAction describes an Action that triggers HTTP requests.
-HTTPAction is to be implemented in future version.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>path</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the endpoint to be requested on the HTTP server.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>port</code><br/>
-<em>
-<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
-Kubernetes api utils intstr.IntOrString
-</a>
-</em>
-</td>
-<td>
-<p>Specifies the target port for the HTTP request.
-It can be specified either as a numeric value in the range of 1 to 65535,
-or as a named port that meets the IANA_SVC_NAME specification.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>host</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Indicates the server&rsquo;s domain name or IP address. Defaults to the Pod&rsquo;s IP.
-Prefer setting the &ldquo;Host&rdquo; header in httpHeaders when needed.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>scheme</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#urischeme-v1-core">
-Kubernetes core/v1.URIScheme
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Designates the protocol used to make the request, such as HTTP or HTTPS.
-If not specified, HTTP is used by default.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>method</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Represents the type of HTTP request to be made, such as &ldquo;GET,&rdquo; &ldquo;POST,&rdquo; &ldquo;PUT,&rdquo; etc.
-If not specified, &ldquo;GET&rdquo; is the default method.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>httpHeaders</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#httpheader-v1-core">
-[]Kubernetes core/v1.HTTPHeader
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Allows for the inclusion of custom headers in the request.
-HTTP permits the use of repeated headers.</p>
-</td>
-</tr>
-</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.HorizontalScalePolicy">HorizontalScalePolicy
 </h3>
@@ -22994,6 +22924,22 @@ all pods at once.</p>
 </tr>
 <tr>
 <td>
+<code>parallelPodManagementConcurrency</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
+or when scaling down. It only used when <code>PodManagementPolicy</code> is set to <code>Parallel</code>.
+The default Concurrency is 100%.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>podUpdatePolicy</code><br/>
 <em>
 <a href="#workloads.kubeblocks.io/v1alpha1.PodUpdatePolicyType">
@@ -23522,6 +23468,22 @@ The alternative policy is <code>Parallel</code> which will create pods in parall
 to match the desired scale without waiting, and on scale down will delete
 all pods at once.</p>
 <p>Note: This field will be removed in future version.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>parallelPodManagementConcurrency</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
+or when scaling down. It only used when <code>PodManagementPolicy</code> is set to <code>Parallel</code>.
+The default Concurrency is 100%.</p>
 </td>
 </tr>
 <tr>

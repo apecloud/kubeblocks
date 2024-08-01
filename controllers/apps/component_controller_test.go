@@ -106,7 +106,7 @@ var mockLorryClient4HScale = func(clusterKey types.NamespacedName, compName stri
 				constant.AppInstanceLabelKey:    clusterKey.Name,
 				constant.KBAppComponentLabelKey: compName,
 			}
-			if err := testCtx.Cli.List(ctx, &podList, labels, client.InNamespace(clusterKey.Namespace)); err != nil {
+			if err := k8sClient.List(ctx, &podList, labels, client.InNamespace(clusterKey.Namespace)); err != nil {
 				return err
 			}
 			for _, pod := range podList.Items {
@@ -117,7 +117,7 @@ var mockLorryClient4HScale = func(clusterKey types.NamespacedName, compName stri
 					continue
 				}
 				pod.Annotations[podAnnotationKey4Test] = fmt.Sprintf("%d", replicas)
-				if err := testCtx.Cli.Update(ctx, &pod); err != nil {
+				if err := k8sClient.Update(ctx, &pod); err != nil {
 					return err
 				}
 			}
@@ -242,7 +242,7 @@ var _ = Describe("Component Controller", func() {
 			Create(&testCtx).
 			GetObject()
 
-		By("Create a componentDefinition obj")
+		By("Create a componentVersion obj")
 		compVerObj = testapps.NewComponentVersionFactory(compVerName).
 			SetDefaultSpec(compDefName).
 			Create(&testCtx).
@@ -690,7 +690,7 @@ var _ = Describe("Component Controller", func() {
 			if updatedReplicas == 0 {
 				Consistently(func(g Gomega) {
 					pvcList := corev1.PersistentVolumeClaimList{}
-					g.Expect(testCtx.Cli.List(testCtx.Ctx, &pvcList, client.MatchingLabels{
+					g.Expect(k8sClient.List(testCtx.Ctx, &pvcList, client.MatchingLabels{
 						constant.AppInstanceLabelKey:    clusterKey.Name,
 						constant.KBAppComponentLabelKey: comp.Name,
 					})).Should(Succeed())
@@ -710,7 +710,7 @@ var _ = Describe("Component Controller", func() {
 			By("Checking pvcs deleting")
 			Eventually(func(g Gomega) {
 				pvcList := corev1.PersistentVolumeClaimList{}
-				g.Expect(testCtx.Cli.List(testCtx.Ctx, &pvcList, client.MatchingLabels{
+				g.Expect(k8sClient.List(testCtx.Ctx, &pvcList, client.MatchingLabels{
 					constant.AppInstanceLabelKey:    clusterKey.Name,
 					constant.KBAppComponentLabelKey: comp.Name,
 				})).Should(Succeed())
@@ -726,7 +726,7 @@ var _ = Describe("Component Controller", func() {
 			By("Checking pod's annotation should be updated consistently")
 			Eventually(func(g Gomega) {
 				podList := corev1.PodList{}
-				g.Expect(testCtx.Cli.List(testCtx.Ctx, &podList, client.MatchingLabels{
+				g.Expect(k8sClient.List(testCtx.Ctx, &podList, client.MatchingLabels{
 					constant.AppInstanceLabelKey:    clusterKey.Name,
 					constant.KBAppComponentLabelKey: comp.Name,
 				})).Should(Succeed())
@@ -794,7 +794,7 @@ var _ = Describe("Component Controller", func() {
 		defer lorry.UnsetMockClient()
 
 		cluster := &appsv1alpha1.Cluster{}
-		Expect(testCtx.Cli.Get(testCtx.Ctx, clusterKey, cluster)).Should(Succeed())
+		Expect(k8sClient.Get(testCtx.Ctx, clusterKey, cluster)).Should(Succeed())
 		initialGeneration := int(cluster.Status.ObservedGeneration)
 
 		setHorizontalScalePolicy(policyType, componentDefsWithHScalePolicy...)
@@ -831,7 +831,7 @@ var _ = Describe("Component Controller", func() {
 		dataClonePolicy appsv1alpha1.HScaleDataClonePolicyType) {
 		By("Creating a single component cluster with VolumeClaimTemplate")
 		pvcSpec := testapps.NewPVCSpec("1Gi")
-		createClusterObj(compName, compDefName, func(f *testapps.MockClusterFactory) {
+		createClusterObjV2(compName, compDefName, func(f *testapps.MockClusterFactory) {
 			f.SetReplicas(initialReplicas).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				AddVolumeClaimTemplate(testapps.LogVolumeName, pvcSpec)
@@ -1990,7 +1990,7 @@ var _ = Describe("Component Controller", func() {
 
 		By("Mocking backup status to failed")
 		backupList := dpv1alpha1.BackupList{}
-		Expect(testCtx.Cli.List(testCtx.Ctx, &backupList, ml)).Should(Succeed())
+		Expect(k8sClient.List(testCtx.Ctx, &backupList, ml)).Should(Succeed())
 		backupKey := types.NamespacedName{
 			Namespace: backupList.Items[0].Namespace,
 			Name:      backupList.Items[0].Name,
@@ -2269,7 +2269,7 @@ var _ = Describe("Component Controller", func() {
 				replicationCompName: replicationCompDefName,
 			}
 			initialReplicas := int32(1)
-			updatedReplicas := int32(3)
+			updatedReplicas := int32(2)
 
 			By("Creating a multi components cluster with VolumeClaimTemplate")
 			pvcSpec := testapps.NewPVCSpec("1Gi")
@@ -2335,28 +2335,28 @@ var _ = Describe("Component Controller", func() {
 
 			Context(fmt.Sprintf("[comp: %s] horizontal scale", compName), func() {
 				It("scale-out from 1 to 3 with backup(snapshot) policy normally", func() {
-					testHorizontalScale(compName, compDefName, 1, 3, appsv1alpha1.HScaleDataClonePolicyCloneVolume)
+					testHorizontalScale(compName, compDefObj.Name, 1, 3, appsv1alpha1.HScaleDataClonePolicyCloneVolume)
 				})
 
 				// TODO(component): events & conditions
 				PIt("backup error at scale-out", func() {
-					testBackupError(compName, compDefName)
+					testBackupError(compName, compDefObj.Name)
 				})
 
 				It("scale-out without data clone policy", func() {
-					testHorizontalScale(compName, compDefName, 1, 3, "")
+					testHorizontalScale(compName, compDefObj.Name, 1, 3, "")
 				})
 
 				It("scale-in from 3 to 1", func() {
-					testHorizontalScale(compName, compDefName, 3, 1, appsv1alpha1.HScaleDataClonePolicyCloneVolume)
+					testHorizontalScale(compName, compDefObj.Name, 3, 1, appsv1alpha1.HScaleDataClonePolicyCloneVolume)
 				})
 
 				It("scale-in to 0 and PVCs should not been deleted", func() {
-					testHorizontalScale(compName, compDefName, 3, 0, appsv1alpha1.HScaleDataClonePolicyCloneVolume)
+					testHorizontalScale(compName, compDefObj.Name, 3, 0, appsv1alpha1.HScaleDataClonePolicyCloneVolume)
 				})
 
 				It("scale-out from 0 and should work well", func() {
-					testHorizontalScale(compName, compDefName, 0, 3, appsv1alpha1.HScaleDataClonePolicyCloneVolume)
+					testHorizontalScale(compName, compDefObj.Name, 0, 3, appsv1alpha1.HScaleDataClonePolicyCloneVolume)
 				})
 			})
 
@@ -2610,12 +2610,12 @@ var _ = Describe("Component Controller", func() {
 
 func mockRestoreCompleted(ml client.MatchingLabels) {
 	restoreList := dpv1alpha1.RestoreList{}
-	Expect(testCtx.Cli.List(testCtx.Ctx, &restoreList, ml)).Should(Succeed())
+	Expect(k8sClient.List(testCtx.Ctx, &restoreList, ml)).Should(Succeed())
 	for _, rs := range restoreList.Items {
 		err := testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(&rs), func(res *dpv1alpha1.Restore) {
 			res.Status.Phase = dpv1alpha1.RestorePhaseCompleted
 		})()
-		Expect(client.IgnoreNotFound(err)).ShouldNot(HaveOccurred())
+		Expect(err).ShouldNot(HaveOccurred())
 	}
 }
 

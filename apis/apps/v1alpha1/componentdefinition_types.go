@@ -23,7 +23,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // +genclient
@@ -697,44 +696,6 @@ const (
 	OrdinalSelector TargetPodSelector = "Ordinal"
 )
 
-// HTTPAction describes an Action that triggers HTTP requests.
-// HTTPAction is to be implemented in future version.
-type HTTPAction struct {
-	// Specifies the endpoint to be requested on the HTTP server.
-	//
-	// +optional
-	Path string `json:"path,omitempty"`
-
-	// Specifies the target port for the HTTP request.
-	// It can be specified either as a numeric value in the range of 1 to 65535,
-	// or as a named port that meets the IANA_SVC_NAME specification.
-	Port intstr.IntOrString `json:"port"`
-
-	// Indicates the server's domain name or IP address. Defaults to the Pod's IP.
-	// Prefer setting the "Host" header in httpHeaders when needed.
-	//
-	// +optional
-	Host string `json:"host,omitempty"`
-
-	// Designates the protocol used to make the request, such as HTTP or HTTPS.
-	// If not specified, HTTP is used by default.
-	//
-	// +optional
-	Scheme corev1.URIScheme `json:"scheme,omitempty"`
-
-	// Represents the type of HTTP request to be made, such as "GET," "POST," "PUT," etc.
-	// If not specified, "GET" is the default method.
-	//
-	// +optional
-	Method string `json:"method,omitempty"`
-
-	// Allows for the inclusion of custom headers in the request.
-	// HTTP permits the use of repeated headers.
-	//
-	// +optional
-	HTTPHeaders []corev1.HTTPHeader `json:"httpHeaders,omitempty"`
-}
-
 // ExecAction describes an Action that executes a command inside a container.
 // Which may run as a K8s job or be executed inside the Lorry sidecar container, depending on the implementation.
 // Future implementations will standardize execution within Lorry.
@@ -893,15 +854,6 @@ type Action struct {
 	//
 	// +optional
 	Exec *ExecAction `json:"exec,omitempty"`
-
-	// Specifies the HTTP request to perform.
-	//
-	// This field cannot be updated.
-	//
-	// Note: HTTPAction is to be implemented in future version.
-	//
-	// +optional
-	HTTP *HTTPAction `json:"http,omitempty"`
 
 	// Specifies the maximum duration in seconds that the Action is allowed to run.
 	//

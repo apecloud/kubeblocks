@@ -35,7 +35,7 @@ Required
 '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule","key=diskType,value=ssd,operator=Equal,effect=NoSchedule"'
   
   # Create a cluster, with each pod runs on their own dedicated node
-  kbcli cluster create --schedulingPolicy=DedicatedNode
+  kbcli cluster create --tenancy=DedicatedNode
 
 Options:
     ......
@@ -45,8 +45,8 @@ Options:
     --pod-anti-affinity='Preferred':
         Pod anti-affinity type, one of: (Preferred, Required)
         
-    --schedulingPolicy='SharedNode':
-        Scheduling policy options, one of: (SharedNode, DedicatedNode)
+    --tenancy='SharedNode':
+        Tenancy options, one of: (SharedNode, DedicatedNode)
 
     --tolerations=[]:
         Tolerations for cluster, such as '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"'
@@ -104,10 +104,10 @@ kbcli cluster create --node-labels '"databa=true"' --tolerations '"key=database,
 
 ### One node only for one pod
 
-If you need one cluster only for the online core business and need to ensure every pod of this cluster has its own node to avoid being affected by the cluster of the cluster, you can specify `schedulingPolicy` as "DedicatedNode".
+If you need one cluster only for the online core business and need to ensure every pod of this cluster has its own node to avoid being affected by the cluster of the cluster, you can specify `tenancy` as "DedicatedNode".
 
 ```bash
-kbcli cluster create --schedulingPolicy=DedicatedNode
+kbcli cluster create --tenancy=DedicatedNode
 ```
 
 :::note

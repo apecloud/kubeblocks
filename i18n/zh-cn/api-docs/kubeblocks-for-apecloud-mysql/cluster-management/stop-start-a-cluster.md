@@ -21,6 +21,8 @@ import TabItem from '@theme/TabItem';
 
 <TabItem value="OpsRequest" label="OpsRequest" default>
 
+执行以下命令，停止集群。
+
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -36,9 +38,9 @@ EOF
 
 </TabItem>
   
-<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
+<TabItem value="编辑集群 YAML 文件" label="编辑集群 YAML 文件">
 
-将副本数设置为 0，删除 Pod。 
+将副本数设置为 0，删除 Pod。
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -77,6 +79,8 @@ spec:
 
 <TabItem value="OpsRequest" label="OpsRequest" default>
 
+执行以下命令，启动集群。
+
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -92,7 +96,7 @@ EOF
 
 </TabItem>
   
-<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
+<TabItem value="编辑集群 YAML 文件" label="编辑集群 YAML 文件">
 
 将副本数改为原始数量，重新启动该集群。
 

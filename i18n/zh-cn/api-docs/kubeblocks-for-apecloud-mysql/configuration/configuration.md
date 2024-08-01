@@ -3,7 +3,7 @@ title: 配置集群参数
 description: 配置集群参数
 keywords: [mysql, 参数, 配置]
 sidebar_position: 1
-sidebar_label: Configuration
+sidebar_label: 配置
 ---
 
 # 配置集群参数
@@ -18,14 +18,16 @@ KubeBlocks 支持动态配置。当数据库实例的规格发生变化时（例
 
 ## 开始之前
 
-1. [安装 KubeBlocks](./../../installation/install-kubeblocks.md).
-2. [创建 ApeCloud MySQL 集群](./../cluster-management/create-and-connect-an-apecloud-mysql-cluster.md).
+1. [安装 KubeBlocks](./../../installation/install-kubeblocks.md)。
+2. [创建 ApeCloud MySQL 集群](./../cluster-management/create-and-connect-an-apecloud-mysql-cluster.md)。
 
 ## 通过编辑配置文件配置参数
 
 1. 获取集群的配置文件。
 
    ```bash
+   kubectl get configurations.apps.kubeblocks.io
+
    kubectl edit configurations.apps.kubeblocks.io mycluster-mysql -n demo
    ```
 
@@ -165,7 +167,7 @@ KubeBlocks 支持动态配置。当数据库实例的规格发生变化时（例
 kbcli cluster describe-config mycluster -n demo
 ```
 
-从元信息中可以看到，集群 `mycluster` 有一个名为 `my.cnf` 的配置文件。
+从元信息中可以看到，集群 `mycluster` 的配置文件。
 
 你也可以查看此配置文件和参数的详细信息。
 
@@ -187,7 +189,7 @@ kbcli cluster describe-config mycluster -n demo
    kbcli cluster explain-config mycluster --param=innodb_buffer_pool_size --config-specs=mysql-consensusset-config -n demo
    ```
 
-   ApeCloud MySQL 目前支持多个模板，你可以通过 `--config-specs` 来指定一个配置模板。执行 `kbcli cluster describe-config mysql-cluster` 查看所有模板的名称。
+   ApeCloud MySQL 目前支持多个模板，你可以通过 `--config-specs` 来指定一个配置模板。执行 `kbcli cluster describe-config mycluster` 查看所有模板的名称。
 
   <details>
 

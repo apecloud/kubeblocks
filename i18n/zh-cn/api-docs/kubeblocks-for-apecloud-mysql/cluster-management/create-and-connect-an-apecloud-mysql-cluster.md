@@ -13,7 +13,9 @@ sidebar_label: 创建并连接
 ## 开始之前
 
 * [安装 KubeBlocks](./../../installation/install-kubeblocks.md).
-* 请确保 `apecloud-mysql` 集群定义已安装。如果未安装，可参考[该文档](./../../installation/install-addons.md)安装并启用。
+* 查看可用于创建集群的数据库类型和版本。
+  
+  请确保 `apecloud-mysql` 集群定义已安装。如果未安装，可参考[该文档](./../../installation/install-addons.md)安装并启用。
 
   ```bash
   kubectl get clusterdefinition apecloud-mysql
@@ -22,7 +24,7 @@ sidebar_label: 创建并连接
   apecloud-mysql                              Available   27m
   ```
 
-  查看集群版本。
+  查看可用的集群版本。
 
   ```bash
   kubectl get clusterversions -l clusterdefinition.kubeblocks.io/name=apecloud-mysql
@@ -36,7 +38,7 @@ sidebar_label: 创建并连接
 
 ## 创建集群
 
-KubeBlocks 支持创建两种类型的 MySQL 集群：单机版（Standalone）和集群版（RaftGroup）。单机版仅支持一个副本，适用于对可用性要求较低的场景。 集群版包含三个副本，适用于对高可用性要求较高的场景。
+KubeBlocks 支持创建两种类型的 MySQL 集群：单机版（Standalone）和集群版（RaftGroup）。单机版仅支持一个副本，适用于对可用性要求较低的场景。集群版包含三个副本，适用于对高可用性要求较高的场景。
 
 为了确保高可用性，所有的副本都默认分布在不同的节点上。如果您只有一个节点可用于部署集群版，可将 `spec.affinity.topologyKeys` 设置为 `null`。
 

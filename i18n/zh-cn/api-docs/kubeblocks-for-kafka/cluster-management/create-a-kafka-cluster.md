@@ -232,6 +232,8 @@ import TabItem from '@theme/TabItem';
 
 如果您只有一个节点可用于部署集群，可将 `spec.affinity.topologyKeys` 设置为 `null`。
 
+但对于生产环境，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
+
 :::
 
 | 字段                                   | 定义  |

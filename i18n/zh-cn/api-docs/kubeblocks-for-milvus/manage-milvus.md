@@ -326,7 +326,7 @@ mycluster   milvus               milvus-2.3.2   Delete                 Running  
 
 <TabItem value="修改集群 YAML 文件" label="修改集群 YAML 文件">
 
-1. 修改 YAML 文件中 `spec.componentSpecs.resources` 的配置。`spec.componentSpecs.resources` 控制资源的请求值和限制值，修改参数值将出发垂直扩缩容。
+1. 修改 YAML 文件中 `spec.componentSpecs.resources` 的配置。`spec.componentSpecs.resources` 控制资源的请求值和限制值，修改参数值将触发垂直扩缩容。
 
    ```yaml
    apiVersion: apps.kubeblocks.io/v1alpha1
@@ -430,7 +430,7 @@ mycluster   milvus               milvus-2.3.2      Delete               Running 
 
 <TabItem value="修改集群 YAML 文件" label="修改集群 YAML 文件">
 
-1. 修改 YAML 文件中 `spec.componentSpecs.volumeClaimTemplates.spec.resources` 的配置。`spec.componentSpecs.volumeClaimTemplates.spec.resources` 控制资源的请求值和限制值，修改参数值将出发垂直扩缩容。
+1. 修改 YAML 文件中 `spec.componentSpecs.volumeClaimTemplates.spec.resources` 的配置。`spec.componentSpecs.volumeClaimTemplates.spec.resources` 控制资源的请求值和限制值，修改参数值将触发垂直扩缩容。
 
    ```yaml
    kubectl edit cluster mycluster -n demo

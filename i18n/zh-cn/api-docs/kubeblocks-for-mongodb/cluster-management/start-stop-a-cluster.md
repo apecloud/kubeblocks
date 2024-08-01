@@ -1,27 +1,27 @@
 ---
-title: Stop/Start a MongoDB cluster
-description: How to start/stop a MongoDB cluster
-keywords: [mongodb, stop a momgodb cluster, start a mongodb cluster]
+title: 停止/启动集群
+description: 如何停止/启动集群
+keywords: [mongodb, 停止集群, 启动集群]
 sidebar_position: 5
-sidebar_label: Stop/Start
+sidebar_label: 停止/启动
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Stop/Start a MongoDB Cluster
+# 停止/启动集群
 
-You can stop/start a cluster to save computing resources. When a cluster is stopped, the computing resources of this cluster are released, which means the pods of Kubernetes are released, but the storage resources are reserved. Start this cluster again if you want to restore the cluster resources from the original storage by snapshots.
+你可以停止/启动集群以释放计算资源。当集群被停止时，其计算资源将被释放，也就是说 Kubernetes 的 Pod 将被释放，但其存储资源仍将被保留。如果你希望通过快照从原始存储中恢复集群资源，请重新启动该集群。
 
-## Stop a cluster
+## 停止集群
 
-You can stop a cluster by OpsRequest or changing the YAML file of the cluster.
+您可通过创建 OpsRequest 或修改集群 YAML 文件来停止集群。
 
 <Tabs>
 
 <TabItem value="OpsRequest" label="OpsRequest" default>
 
-Run the command below to stop a cluster.
+执行以下命令，停止集群。
 
 ```bash
 kubectl apply -f - <<EOF
@@ -40,7 +40,7 @@ EOF
 
 <TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
-Configure replicas as 0 to delete pods.
+将副本数设置为 0，删除 Pod。
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -72,15 +72,15 @@ spec:
 
 </Tabs>
 
-## Start a cluster
+## 启动集群
   
-You can stop a cluster by OpsRequest or changing the YAML file of the cluster.
+您可通过创建 OpsRequest 或修改集群 YAML 文件来启动集群。
 
 <Tabs>
 
 <TabItem value="OpsRequest" label="OpsRequest" default>
 
-Run the command below to start a cluster.
+执行以下命令，启动集群。
 
 ```bash
 kubectl apply -f - <<EOF
@@ -97,9 +97,9 @@ EOF
 
 </TabItem>
 
-<TabItem value="Edit cluster YAML file" label="Edit cluster YAML File">
+<TabItem value="编辑集群 YAML 文件" label="编辑集群 YAML 文件">
 
-Change replicas back to the original amount to start this cluster again.
+将副本数改为原始数量，重新启动该集群。
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1

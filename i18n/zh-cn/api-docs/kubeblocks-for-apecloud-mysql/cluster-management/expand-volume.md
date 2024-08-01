@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 
 # 磁盘扩容
 
-KubeBlocks 支持 Pod 扩缩容。
+KubeBlocks 支持调整 Pod 磁盘容量。
 
 :::note
 
@@ -77,7 +77,7 @@ mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running 
 
 </TabItem>
 
-<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
+<TabItem value="编辑集群 YAML 文件" label="编辑集群 YAML 文件">
 
 1. 更改集群 YAML 文件中 `spec.componentSpecs.volumeClaimTemplates.spec.resources` 的值。
 

@@ -93,7 +93,7 @@ kubectl get cluster mycluster -n demo
 
 <TabItem value="编辑集群 YAML 文件" label="编辑集群 YAML 文件">
 
-1. 修改 YAML 文件中 `spec.componentSpecs.resources` 的配置。`spec.componentSpecs.resources` 控制资源的请求值和限制值，修改参数值将出发垂直扩缩容。
+1. 修改 YAML 文件中 `spec.componentSpecs.resources` 的配置。`spec.componentSpecs.resources` 控制资源的请求值和限制值，修改参数值将触发垂直扩缩容。
 
    ```yaml
    apiVersion: apps.kubeblocks.io/v1alpha1
@@ -156,6 +156,8 @@ kubectl get cluster mycluster -n demo
 
 水平扩展改变 Pod 的数量。例如，您可以将副本从三个扩展到五个。
 
+从 v0.9.0 开始，除了支持副本（replica）的扩缩容外，KubeBlocks 还支持了实例（instance）的扩缩容。可通过 [水平扩缩容](./../../maintenance/scale/horizontal-scale.md) 文档了解更多细节和示例。
+
 ### 开始之前
 
 - 确保集群处于 `Running` 状态，否则以下操作可能会失败。
@@ -176,6 +178,8 @@ kubectl get cluster mycluster -n demo
 
 1. 对指定的集群应用 OpsRequest，可根据您的需求配置参数。
 
+   以下示例演示了增加 2 个副本。
+
    ```yaml
    kubectl apply -f - <<EOF
    apiVersion: apps.kubeblocks.io/v1alpha1
@@ -188,9 +192,30 @@ kubectl get cluster mycluster -n demo
      type: HorizontalScaling
      horizontalScaling:
      - componentName: broker
-       replicas: 3
+       scaleOut:
+         replicaChanges: 2
    EOF
    ```
+
+   如果您想要缩容，可将 `scaleOut` 替换为 `scaleIn`。
+
+   以下示例演示了删除 2 个副本。
+
+   ```yaml
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: ops-horizontal-scaling
+     namespace: demo
+   spec:
+     clusterRef: mycluster
+     type: HorizontalScaling
+     horizontalScaling:
+     - componentName: broker
+       scaleIn:
+         replicaChanges: 2
+   EOF
 
 2. 查看运维操作状态，验证水平扩缩容是否成功。
 

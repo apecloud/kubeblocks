@@ -45,6 +45,12 @@ KubeBlocks 支持管理 Elasticsearch。本教程将演示如何通过 `kubectl`
 
 KubeBlocks 通过 `Cluster` 定义集群。以下是创建 Elasticsearch 集群版的示例。Pod 默认分布在不同节点。但如果您只有一个节点可用于部署集群，可将 `spec.affinity.topologyKeys` 设置为 `null`。
 
+:::note
+
+生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
+
+:::
+
 ```yaml
 cat <<EOF | kubectl apply -f -
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -128,7 +134,9 @@ curl http://127.0.0.1:9200/_cat/nodes?v
 
 ### 水平扩缩容
 
-水平扩展改变 Pod 的数量。例如，您可以将副本从三个扩展到五个。扩展过程包括数据的备份和恢复。
+水平扩展改变 Pod 的数量。例如，您可以将副本从三个扩展到五个。
+
+从 v0.9.0 开始，除了支持副本（replica）的扩缩容外，KubeBlocks 还支持了实例（instance）的扩缩容。可通过 [水平扩缩容](./../../maintenance/scale/horizontal-scale.md) 文档了解更多细节和示例。
 
 #### 开始之前
 
@@ -151,6 +159,8 @@ mycluster   elasticsearch               elasticsearch-8.8.2   Delete            
 
 1. 对指定的集群应用 OpsRequest，可根据您的需求配置参数。
 
+   以下示例演示了增加 2 个副本。
+
    ```bash
    kubectl apply -f - <<EOF
    apiVersion: apps.kubeblocks.io/v1alpha1
@@ -163,7 +173,29 @@ mycluster   elasticsearch               elasticsearch-8.8.2   Delete            
      type: HorizontalScaling
      horizontalScaling:
      - componentName: elasticsearch
-       replicas: 1
+       scaleOut:
+         replicaChanges: 2
+   EOF
+   ```
+
+   如果您想要缩容，可将 `scaleOut` 替换为 `scaleIn`。
+
+   以下示例演示了删除 2 个副本。
+
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: ops-horizontal-scaling
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     type: HorizontalScaling
+     horizontalScaling:
+     - componentName: elasticsearch
+       scaleIn:
+         replicaChanges: 2
    EOF
    ```
 
@@ -342,7 +374,7 @@ mycluster   elasticsearch        elasticsearch-8.8.2   Delete                 Ru
 
 <TabItem value="修改集群 YAML 文件" label="修改集群 YAML 文件">
 
-1. 修改 YAML 文件中 `spec.componentSpecs.resources` 的配置。`spec.componentSpecs.resources` 控制资源的请求值和限制值，修改参数值将出发垂直扩缩容。
+1. 修改 YAML 文件中 `spec.componentSpecs.resources` 的配置。`spec.componentSpecs.resources` 控制资源的请求值和限制值，修改参数值将触发垂直扩缩容。
 
    ```yaml
    apiVersion: apps.kubeblocks.io/v1alpha1
@@ -448,7 +480,7 @@ mycluster   elasticsearch        elasticsearch-8.8.2      Delete               R
 
 1. 修改集群 YAML 文件中 `spec.componentSpecs.volumeClaimTemplates.spec.resources` 的值。
 
-   `spec.componentSpecs.volumeClaimTemplates.spec.resources` 定义了 Pod 存储资源信息，修改该数值将出发集群磁盘扩容。
+   `spec.componentSpecs.volumeClaimTemplates.spec.resources` 定义了 Pod 存储资源信息，修改该数值将触发集群磁盘扩容。
 
    ```yaml
    kubectl edit cluster mycluster -n demo

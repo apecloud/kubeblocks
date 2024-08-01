@@ -37,7 +37,7 @@ sidebar_position: 1
 
 ***步骤：***
 
-1. 查看 ApeCloud MySQL 集群版 pod 角色。在本示例种，Leader 节点为 `mycluster-1`。
+1. 查看 ApeCloud MySQL 集群版 pod 角色。在本示例中，Leader 节点为 `mycluster-1`。
 
     ```bash
     kubectl get pods --show-labels -n demo | grep role
@@ -101,7 +101,7 @@ sidebar_position: 1
     ```
 
     ![delete_follower_pod](./../../../img/api-ha-single-follower-pod-delete.png)
-3. 新开一个终端窗口，查看 pod 状态。可以发现 follower 节点 `mycluster-mysql-1` 处于 `Terminating` 状态。
+3. 打开一个新的终端窗口，查看 pod 状态。可以发现 follower 节点 `mycluster-mysql-1` 处于 `Terminating` 状态。
 
     ```bash
     kubectl get pod -n demo
@@ -147,7 +147,7 @@ sidebar_position: 1
     ```
 
     ![delete_two_pods](./../../../img/api-ha-two-pod-get-status.png)
-3. 新开一个终端窗口，查看 pod 状态，发现两个 follower 节点 `mycluster-mysql-1` 和 `mycluster-mysql-2` 都处于 `Terminating` 状态。
+3. 打开一个新的终端窗口，查看 pod 状态，发现两个 follower 节点 `mycluster-mysql-1` 和 `mycluster-mysql-2` 都处于 `Terminating` 状态。
 
     ```bash
     kubectl get pod -n demo
@@ -195,7 +195,7 @@ sidebar_position: 1
     ```
 
     ![delete_three_pods](./../../../img/api-ha-all-pods-delete.png)
-3. Open another terminal page and view the pod status. You can find the pods are terminating.
+3. 打开一个新的终端窗口，查看 pod 状态，发现所有 pod 均处于 `Terminating` 状态。
 
     ```bash
     kubectl get pod -n demo

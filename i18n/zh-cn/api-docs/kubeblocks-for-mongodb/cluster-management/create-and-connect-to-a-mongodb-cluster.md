@@ -46,6 +46,12 @@ import TabItem from '@theme/TabItem';
 
 KubeBlocks 支持创建两种 MongoDB 集群：单机版（Standalone）和主备版（ReplicaSet）。MongoDB 单机版仅支持一个副本，适用于对可用性要求较低的场景。 对于高可用性要求较高的场景，建议创建主备版集群，以支持自动故障切换。为了确保高可用性，所有的副本都默认分布在不同的节点上。但如果您只有一个节点可用于创建主备版集群，可将 `spec.affinity.topologyKeys` 设置为 `null`。
 
+:::note
+
+生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
+
+:::
+
 KubeBlocks 通过 `Cluster` 定义集群。以下是创建 MongoDB 单机版的示例。
 
 ```yaml

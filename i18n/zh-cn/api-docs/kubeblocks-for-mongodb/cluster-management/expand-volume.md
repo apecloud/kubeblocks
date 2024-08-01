@@ -81,7 +81,7 @@ mycluster   mongodb              mongodb-5.0   Delete               Running   27
 
 </TabItem>
 
-<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
+<TabItem value="编辑集群 YAML 文件" label="编辑集群 YAML 文件">
 
 1. 更改集群 YAML 文件中 `spec.componentSpecs.volumeClaimTemplates.spec.resources` 的值。`spec.componentSpecs.volumeClaimTemplates.spec.resources` 定义了 Pod 的存储资源信息，更改此值会触发磁盘扩容。
 

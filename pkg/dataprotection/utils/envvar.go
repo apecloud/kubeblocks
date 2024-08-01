@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package utils
 
 import (
-	"strconv"
-
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
@@ -48,7 +46,8 @@ func BuildEnvByTarget(pod *corev1.Pod, credential *dpv1alpha1.ConnectionCredenti
 		if credential.PortKey != "" {
 			envVars = append(envVars, buildEnvBySecretKey(dptypes.DPDBPort, credential.SecretName, credential.PortKey))
 		} else {
-			envVars = append(envVars, corev1.EnvVar{Name: dptypes.DPDBPort, Value: strconv.Itoa(int(GetPodFirstContainerPort(pod)))})
+			portEnv, _ := GetDPDBPortEnv(pod, nil)
+			envVars = append(envVars, *portEnv)
 		}
 		if credential.PasswordKey != "" {
 			envVars = append(envVars, buildEnvBySecretKey(dptypes.DPDBPassword, credential.SecretName, credential.PasswordKey))

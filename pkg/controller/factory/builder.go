@@ -80,7 +80,6 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 		synthesizedComp.Annotations,
 	)
 
-	replicasStr := strconv.Itoa(int(synthesizedComp.Replicas))
 	podBuilder := builder.NewPodBuilder("", "").
 		AddLabelsInMap(synthesizedComp.Labels).
 		AddLabelsInMap(labels).
@@ -88,8 +87,12 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 		AddLabelsInMap(constant.GetAppVersionLabel(compDefName)).
 		AddLabelsInMap(synthesizedComp.UserDefinedLabels).
 		AddLabelsInMap(constant.GetClusterWellKnownLabels(clusterName)).
-		AddAnnotations(constant.ComponentReplicasAnnotationKey, replicasStr).
 		AddAnnotationsInMap(synthesizedComp.UserDefinedAnnotations)
+	if viper.GetBool(constant.FeatureGateComponentReplicasAnnotation) {
+		replicasStr := strconv.Itoa(int(synthesizedComp.Replicas))
+		podBuilder.AddAnnotations(constant.ComponentReplicasAnnotationKey, replicasStr)
+
+	}
 	template := corev1.PodTemplateSpec{
 		ObjectMeta: podBuilder.GetObject().ObjectMeta,
 		Spec:       *synthesizedComp.PodSpec.DeepCopy(),
@@ -219,9 +222,6 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 	credentialBuilder := builder.NewSecretBuilder(cluster.Namespace, constant.GenerateDefaultConnCredential(cluster.Name)).
 		AddLabelsInMap(wellKnownLabels).
 		SetStringData(clusterDefinition.Spec.ConnectionCredential)
-	if len(clusterDefinition.Spec.Type) > 0 {
-		credentialBuilder.AddLabelsInMap(constant.GetClusterDefTypeLabel(clusterDefinition.Spec.Type))
-	}
 	connCredential := credentialBuilder.GetObject()
 
 	if len(connCredential.StringData) == 0 {

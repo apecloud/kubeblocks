@@ -514,21 +514,6 @@ ClusterDefinitionSpec
 <table>
 <tr>
 <td>
-<code>type</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the well-known database type, such as mysql, redis, or mongodb.</p>
-<p>Deprecated since v0.9.
-This field is maintained for backward compatibility and its use is discouraged.
-Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>componentDefs</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">
@@ -1012,6 +997,22 @@ an existed ServiceAccount in this field.</p>
 </tr>
 <tr>
 <td>
+<code>parallelPodManagementConcurrency</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
+or when scaling down. It only used when <code>PodManagementPolicy</code> is set to <code>Parallel</code>.
+The default Concurrency is 100%.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>podUpdatePolicy</code><br/>
 <em>
 <a href="#workloads.kubeblocks.io/v1alpha1.PodUpdatePolicyType">
@@ -1426,21 +1427,6 @@ They should be specified in the <code>cluster.spec.componentSpecs</code> (Cluste
 or modifying environment variable values.
 These instance-specific overrides can be specified in <code>cluster.spec.componentSpecs[*].instances</code>.</p>
 <p>This field is immutable and cannot be updated once set.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>monitor</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.MonitorConfig">
-MonitorConfig
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Deprecated since v0.9
-monitor is monitoring config which provided by provider.</p>
 </td>
 </tr>
 <tr>
@@ -3089,22 +3075,6 @@ ExecAction
 </tr>
 <tr>
 <td>
-<code>http</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.HTTPAction">
-HTTPAction
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the HTTP request to perform.</p>
-<p>This field cannot be updated.</p>
-<p>Note: HTTPAction is to be implemented in future version.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>timeoutSeconds</code><br/>
 <em>
 int32
@@ -4177,18 +4147,6 @@ This name will apply to cluster objects as the value of label &ldquo;apps.kubebl
 </tr>
 <tr>
 <td>
-<code>description</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Description of the component definition.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>workloadType</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.WorkloadType">
@@ -4427,20 +4385,6 @@ been specified.</p>
 </tr>
 <tr>
 <td>
-<code>customLabelSpecs</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.CustomLabelSpec">
-[]CustomLabelSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Used for custom label tags which you want to add to the component resources.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>switchoverSpec</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.SwitchoverSpec">
@@ -4511,35 +4455,6 @@ configmap and mounted to the current component.</p>
 <td>
 <em>(Optional)</em>
 <p>Used to declare the service reference of the current component.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>exporter</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.Exporter">
-Exporter
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the metrics exporter.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>monitor</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.MonitorConfig">
-MonitorConfig
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Deprecated since v0.9
-monitor is monitoring config which provided by provider.</p>
 </td>
 </tr>
 </tbody>
@@ -5082,6 +4997,22 @@ UpdateStrategy
 <p>Deprecated since v0.9.
 This field is maintained for backward compatibility and its use is discouraged.
 Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>parallelPodManagementConcurrency</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
+or when scaling down. It only used when <code>PodManagementPolicy</code> is set to <code>Parallel</code>.
+The default Concurrency is 100%.</p>
 </td>
 </tr>
 <tr>
@@ -5722,21 +5653,6 @@ and will not affect the life cycle of the pod. default values are 60 seconds.</p
 </tr>
 </thead>
 <tbody>
-<tr>
-<td>
-<code>type</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the well-known database type, such as mysql, redis, or mongodb.</p>
-<p>Deprecated since v0.9.
-This field is maintained for backward compatibility and its use is discouraged.
-Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
-</td>
-</tr>
 <tr>
 <td>
 <code>componentDefs</code><br/>
@@ -7511,21 +7427,6 @@ These instance-specific overrides can be specified in <code>cluster.spec.compone
 </tr>
 <tr>
 <td>
-<code>monitor</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.MonitorConfig">
-MonitorConfig
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Deprecated since v0.9
-monitor is monitoring config which provided by provider.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>exporter</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.Exporter">
@@ -8912,6 +8813,22 @@ Future versions might change the default ServiceAccount creation strategy to one
 potentially revising the naming to &ldquo;kb-&#123;cluster.name&#125;-&#123;component.name&#125;&rdquo;.</p>
 <p>Users can override the automatic ServiceAccount assignment by explicitly setting the name of
 an existed ServiceAccount in this field.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>parallelPodManagementConcurrency</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
+or when scaling down. It only used when <code>PodManagementPolicy</code> is set to <code>Parallel</code>.
+The default Concurrency is 100%.</p>
 </td>
 </tr>
 <tr>
@@ -11384,59 +11301,6 @@ VarOption
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.CustomLabelSpec">CustomLabelSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>)
-</p>
-<div>
-<p>CustomLabelSpec is deprecated since v0.8.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>key</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>The key of the label.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>value</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>The value of the label.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>resources</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.GVKResource">
-[]GVKResource
-</a>
-</em>
-</td>
-<td>
-<p>The resources that will be patched with the label.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.CustomOps">CustomOps
 </h3>
 <p>
@@ -11912,7 +11776,7 @@ If this field is not specified, the default behavior is to use the first contain
 <h3 id="apps.kubeblocks.io/v1alpha1.Exporter">Exporter
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
 </p>
 <div>
 </div>
@@ -11975,48 +11839,6 @@ PrometheusScheme
 <p>Specifies the schema to use for scraping.
 <code>http</code> and <code>https</code> are the expected values unless you rewrite the <code>__scheme__</code> label via relabeling.
 If empty, Prometheus uses the default value <code>http</code>.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ExporterConfig">ExporterConfig
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.MonitorConfig">MonitorConfig</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>scrapePort</code><br/>
-<em>
-<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
-Kubernetes api utils intstr.IntOrString
-</a>
-</em>
-</td>
-<td>
-<p>scrapePort is exporter port for Time Series Database to scrape metrics.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>scrapePath</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>scrapePath is exporter url path for Time Series Database to scrape metrics.</p>
 </td>
 </tr>
 </tbody>
@@ -12125,49 +11947,6 @@ in each OpsService definition.</p>
 </td>
 </tr></tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.GVKResource">GVKResource
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CustomLabelSpec">CustomLabelSpec</a>)
-</p>
-<div>
-<p>GVKResource is deprecated since v0.8.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>gvk</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Represents the GVK of a resource, such as &ldquo;v1/Pod&rdquo;, &ldquo;apps/v1/StatefulSet&rdquo;, etc.
-When a resource matching this is found by the selector, a custom label will be added if it doesn&rsquo;t already exist,
-or updated if it does.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>selector</code><br/>
-<em>
-map[string]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>A label query used to filter a set of resources.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.HScaleDataClonePolicyType">HScaleDataClonePolicyType
 (<code>string</code> alias)</h3>
 <p>
@@ -12195,108 +11974,6 @@ The policy can be set to <code>None</code>, <code>CloneVolume</code>, or <code>S
 <td><p>HScaleDataClonePolicyNone indicates that no data cloning will occur during horizontal scaling.</p>
 </td>
 </tr></tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.HTTPAction">HTTPAction
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.Action">Action</a>)
-</p>
-<div>
-<p>HTTPAction describes an Action that triggers HTTP requests.
-HTTPAction is to be implemented in future version.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>path</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the endpoint to be requested on the HTTP server.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>port</code><br/>
-<em>
-<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
-Kubernetes api utils intstr.IntOrString
-</a>
-</em>
-</td>
-<td>
-<p>Specifies the target port for the HTTP request.
-It can be specified either as a numeric value in the range of 1 to 65535,
-or as a named port that meets the IANA_SVC_NAME specification.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>host</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Indicates the server&rsquo;s domain name or IP address. Defaults to the Pod&rsquo;s IP.
-Prefer setting the &ldquo;Host&rdquo; header in httpHeaders when needed.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>scheme</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#urischeme-v1-core">
-Kubernetes core/v1.URIScheme
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Designates the protocol used to make the request, such as HTTP or HTTPS.
-If not specified, HTTP is used by default.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>method</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Represents the type of HTTP request to be made, such as &ldquo;GET,&rdquo; &ldquo;POST,&rdquo; &ldquo;PUT,&rdquo; etc.
-If not specified, &ldquo;GET&rdquo; is the default method.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>httpHeaders</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#httpheader-v1-core">
-[]Kubernetes core/v1.HTTPHeader
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Allows for the inclusion of custom headers in the request.
-HTTP permits the use of repeated headers.</p>
-</td>
-</tr>
-</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.HorizontalScalePolicy">HorizontalScalePolicy
 </h3>
@@ -13503,52 +13180,6 @@ for example, using &lsquo;&#123;&#123; eq .spec.replicas 1 &#125;&#125;&rsquo;</
 </tr><tr><td><p>&#34;replace&#34;</p></td>
 <td></td>
 </tr></tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.MonitorConfig">MonitorConfig
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>builtIn</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>builtIn is a switch to enable KubeBlocks builtIn monitoring.
-If BuiltIn is set to true, monitor metrics will be scraped automatically.
-If BuiltIn is set to false, the provider should set ExporterConfig and Sidecar container own.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>exporterConfig</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ExporterConfig">
-ExporterConfig
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>exporterConfig provided by provider, which specify necessary information to Time Series Database.
-exporterConfig is valid when builtIn is false.</p>
-</td>
-</tr>
-</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.MultipleClusterObjectCombinedOption">MultipleClusterObjectCombinedOption
 </h3>
@@ -23293,6 +22924,22 @@ all pods at once.</p>
 </tr>
 <tr>
 <td>
+<code>parallelPodManagementConcurrency</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
+or when scaling down. It only used when <code>PodManagementPolicy</code> is set to <code>Parallel</code>.
+The default Concurrency is 100%.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>podUpdatePolicy</code><br/>
 <em>
 <a href="#workloads.kubeblocks.io/v1alpha1.PodUpdatePolicyType">
@@ -23821,6 +23468,22 @@ The alternative policy is <code>Parallel</code> which will create pods in parall
 to match the desired scale without waiting, and on scale down will delete
 all pods at once.</p>
 <p>Note: This field will be removed in future version.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>parallelPodManagementConcurrency</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
+or when scaling down. It only used when <code>PodManagementPolicy</code> is set to <code>Parallel</code>.
+The default Concurrency is 100%.</p>
 </td>
 </tr>
 <tr>

@@ -148,40 +148,41 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	}
 	compDefObj := compDef.DeepCopy()
 	synthesizeComp := &SynthesizedComponent{
-		Namespace:              comp.Namespace,
-		ClusterName:            clusterName,
-		ClusterUID:             clusterUID,
-		Comp2CompDefs:          comp2CompDef,
-		Name:                   compName,
-		FullCompName:           comp.Name,
-		CompDefName:            compDef.Name,
-		ServiceVersion:         comp.Spec.ServiceVersion,
-		ClusterGeneration:      clusterGeneration(cluster, comp),
-		UserDefinedLabels:      comp.Spec.Labels,
-		UserDefinedAnnotations: comp.Spec.Annotations,
-		PodSpec:                &compDef.Spec.Runtime,
-		HostNetwork:            compDefObj.Spec.HostNetwork,
-		ComponentServices:      compDefObj.Spec.Services,
-		LogConfigs:             compDefObj.Spec.LogConfigs,
-		ConfigTemplates:        compDefObj.Spec.Configs,
-		ScriptTemplates:        compDefObj.Spec.Scripts,
-		Roles:                  compDefObj.Spec.Roles,
-		UpdateStrategy:         compDefObj.Spec.UpdateStrategy,
-		MinReadySeconds:        compDefObj.Spec.MinReadySeconds,
-		PolicyRules:            compDefObj.Spec.PolicyRules,
-		LifecycleActions:       compDefObj.Spec.LifecycleActions,
-		SystemAccounts:         mergeSystemAccounts(compDefObj.Spec.SystemAccounts, comp.Spec.SystemAccounts),
-		Replicas:               comp.Spec.Replicas,
-		Resources:              comp.Spec.Resources,
-		TLSConfig:              comp.Spec.TLSConfig,
-		ServiceAccountName:     comp.Spec.ServiceAccountName,
-		Instances:              comp.Spec.Instances,
-		OfflineInstances:       comp.Spec.OfflineInstances,
-		DisableExporter:        comp.Spec.DisableExporter,
-		Stop:                   comp.Spec.Stop,
-		PodManagementPolicy:    compDef.Spec.PodManagementPolicy,
-		PodUpdatePolicy:        comp.Spec.PodUpdatePolicy,
-		EnabledLogs:            comp.Spec.EnabledLogs,
+		Namespace:                        comp.Namespace,
+		ClusterName:                      clusterName,
+		ClusterUID:                       clusterUID,
+		Comp2CompDefs:                    comp2CompDef,
+		Name:                             compName,
+		FullCompName:                     comp.Name,
+		CompDefName:                      compDef.Name,
+		ServiceVersion:                   comp.Spec.ServiceVersion,
+		ClusterGeneration:                clusterGeneration(cluster, comp),
+		UserDefinedLabels:                comp.Spec.Labels,
+		UserDefinedAnnotations:           comp.Spec.Annotations,
+		PodSpec:                          &compDef.Spec.Runtime,
+		HostNetwork:                      compDefObj.Spec.HostNetwork,
+		ComponentServices:                compDefObj.Spec.Services,
+		LogConfigs:                       compDefObj.Spec.LogConfigs,
+		ConfigTemplates:                  compDefObj.Spec.Configs,
+		ScriptTemplates:                  compDefObj.Spec.Scripts,
+		Roles:                            compDefObj.Spec.Roles,
+		UpdateStrategy:                   compDefObj.Spec.UpdateStrategy,
+		MinReadySeconds:                  compDefObj.Spec.MinReadySeconds,
+		PolicyRules:                      compDefObj.Spec.PolicyRules,
+		LifecycleActions:                 compDefObj.Spec.LifecycleActions,
+		SystemAccounts:                   mergeSystemAccounts(compDefObj.Spec.SystemAccounts, comp.Spec.SystemAccounts),
+		Replicas:                         comp.Spec.Replicas,
+		Resources:                        comp.Spec.Resources,
+		TLSConfig:                        comp.Spec.TLSConfig,
+		ServiceAccountName:               comp.Spec.ServiceAccountName,
+		Instances:                        comp.Spec.Instances,
+		OfflineInstances:                 comp.Spec.OfflineInstances,
+		DisableExporter:                  comp.Spec.DisableExporter,
+		Stop:                             comp.Spec.Stop,
+		PodManagementPolicy:              compDef.Spec.PodManagementPolicy,
+		ParallelPodManagementConcurrency: comp.Spec.ParallelPodManagementConcurrency,
+		PodUpdatePolicy:                  comp.Spec.PodUpdatePolicy,
+		EnabledLogs:                      comp.Spec.EnabledLogs,
 	}
 
 	// build backward compatible fields, including workload, services, componentRefEnvs, clusterDefName, clusterCompDefName, and clusterCompVer, etc.
@@ -813,12 +814,8 @@ func ReplaceNamedVars(namedValuesMap map[string]string, targetVar string, limits
 func ReplaceSecretEnvVars(namedValuesMap map[string]string, envs []corev1.EnvVar) []corev1.EnvVar {
 	newEnvs := make([]corev1.EnvVar, 0, len(envs))
 	for _, e := range envs {
-		if e.ValueFrom == nil || e.ValueFrom.SecretKeyRef == nil {
-			continue
-		}
-		name := ReplaceNamedVars(namedValuesMap, e.ValueFrom.SecretKeyRef.Name, 1, false)
-		if name != e.ValueFrom.SecretKeyRef.Name {
-			e.ValueFrom.SecretKeyRef.Name = name
+		if e.ValueFrom != nil && e.ValueFrom.SecretKeyRef != nil {
+			e.ValueFrom.SecretKeyRef.Name = ReplaceNamedVars(namedValuesMap, e.ValueFrom.SecretKeyRef.Name, 1, false)
 		}
 		newEnvs = append(newEnvs, e)
 	}

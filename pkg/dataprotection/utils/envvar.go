@@ -32,11 +32,11 @@ func BuildEnvByTarget(pod *corev1.Pod, credential *dpv1alpha1.ConnectionCredenti
 	var envVars []corev1.EnvVar
 	if credential == nil {
 		envVars = append(envVars, corev1.EnvVar{Name: dptypes.DPDBHost, Value: intctrlutil.BuildPodHostDNS(pod)})
-		port, err := GetContainerPort(pod, containerPort)
+		portEnv, err := GetDPDBPortEnv(pod, containerPort)
 		if err != nil {
 			return nil, err
 		}
-		envVars = append(envVars, corev1.EnvVar{Name: dptypes.DPDBPort, Value: strconv.Itoa(int(port))})
+		envVars = append(envVars, *portEnv)
 	} else {
 		var hostEnv corev1.EnvVar
 		if credential.HostKey == "" {

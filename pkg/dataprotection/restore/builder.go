@@ -251,8 +251,8 @@ func (r *restoreJobBuilder) addTargetPodAndCredentialEnv(pod *corev1.Pod,
 	}
 	if connectionCredential == nil {
 		env = append(env, corev1.EnvVar{Name: dptypes.DPDBHost, Value: intctrlutil.BuildPodHostDNS(pod)})
-		if port, err := utils.GetContainerPort(pod, target.ContainerPort); err == nil {
-			env = append(env, corev1.EnvVar{Name: dptypes.DPDBPort, Value: strconv.Itoa(int(port))})
+		if portEnv, err := utils.GetDPDBPortEnv(pod, target.ContainerPort); err == nil {
+			env = append(env, *portEnv)
 		}
 	} else {
 		appendEnvFromSecret := func(envName, keyName string) {

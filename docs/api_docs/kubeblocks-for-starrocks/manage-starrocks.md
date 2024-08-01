@@ -60,7 +60,6 @@ spec:
     podAntiAffinity: Preferred
     topologyKeys:
     - kubernetes.io/hostname
-    schedulingPolicy: SharedNode
   tolerations:
     - key: kb-data
       operator: Equal
@@ -489,7 +488,6 @@ spec:
     podAntiAffinity: Preferred
     topologyKeys:
     - kubernetes.io/hostname
-    schedulingPolicy: SharedNode
   tolerations:
     - key: kb-data
       operator: Equal
@@ -545,7 +543,6 @@ spec:
     podAntiAffinity: Preferred
     topologyKeys:
     - kubernetes.io/hostname
-    schedulingPolicy: SharedNode
   tolerations:
     - key: kb-data
       operator: Equal

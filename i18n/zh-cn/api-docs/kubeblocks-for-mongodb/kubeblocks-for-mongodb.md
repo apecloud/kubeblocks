@@ -1,13 +1,13 @@
 ---
-title: KubeBlocks for MongoDB
-description: Feature list of KubeBlocks for MongoDB
-keywords: [mongodb, introduction, feature]
+title: 用 KubeBlocks 管理 MongoDB
+description: KubeBlocks 中的 MongoDB 功能列表
+keywords: [mongodb, 概述, 功能]
 sidebar_position: 1
 ---
 
-# KubeBlocks for MongoDB
+# 用 KubeBlocks 管理 MongoDB
 
-This tutorial illustrates how to create and manage a MongoDB cluster by `kubectl` or a YAML file. You can find the YAML examples in [the GitHub repository](https://github.com/apecloud/kubeblocks-addons/tree/release-0.9/examples/mongodb).
+本教程演示了如何通过 `kubectl` 或 YAML 文件创建并管理 Milvus 集群。您可在 [GitHub 仓库](https://github.com/apecloud/kubeblocks-addons/tree/release-0.9/examples/mongodb)查看相应的 YAML 示例和指南。
 
-* [Cluster Management](./cluster-management/create-and-connect-to-a-mongodb-cluster.md)
-* [Configuration](./configuration/configuration.md)
+* [集群管理](./cluster-management/create-and-connect-to-a-mongodb-cluster.md)
+* [配置](./configuration/configuration.md)

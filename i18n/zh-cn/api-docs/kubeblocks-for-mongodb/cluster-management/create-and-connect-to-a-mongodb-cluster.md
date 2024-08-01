@@ -1,27 +1,27 @@
 ---
-title: Create and connect to a MongoDB Cluster
-description: How to create and connect to a MongoDB cluster
-keywords: [mogodb, create a mongodb cluster]
+title: 创建并连接到 MongoDB 集群
+description: 如何创建并连接到 MongoDB 集群
+keywords: [mongodb, 创建 MongoDB 集群, 连接 MongoDB 集群]
 sidebar_position: 1
-sidebar_label: Create and connect
+sidebar_label: 创建并连接
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Create and connect to a MongoDB cluster
+# 创建并连接到 MongoDB 集群
 
-This tutorial shows how to create and connect to a MongoDB cluster.
+本文档展示如何创建并连接到一个 MongoDB 集群。
 
-## Create a MongoDB cluster
+## 创建 MongoDB 集群
 
-### Before you start
+### 开始之前
 
-* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
+* [Install KubeBlocks](./../../installation/install-kubeblocks.md)。
 
-* View all the database types and versions available for creating a cluster.
+* 查看可用于创建集群的数据库类型和版本。
   
-  Make sure the `mongodb` cluster definition is installed. If the cluster definition is not available, refer to [this doc](./../../installation/install-addons.md) to enable it first.
+  确保 `mongodb` cluster definition 已安装。如果该 cluster definition 不可用，可[参考相关文档](./../../installation/install-addons.md)启用。
 
   ```bash
   kubectl get clusterdefinition mongodb

@@ -340,7 +340,7 @@ mycluster   elasticsearch        elasticsearch-8.8.2   Delete                 Ru
 
 </TabItem>
 
-<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
+<TabItem value="修改集群 YAML 文件" label="修改集群 YAML 文件">
 
 1. 修改 YAML 文件中 `spec.componentSpecs.resources` 的配置。`spec.componentSpecs.resources` 控制资源的请求值和限制值，修改参数值将出发垂直扩缩容。
 
@@ -444,7 +444,7 @@ mycluster   elasticsearch        elasticsearch-8.8.2      Delete               R
 
 </TabItem>
 
-<TabItem value="Edit cluster YAML file" label="Edit cluster YAML fil">
+<TabItem value="修改集群 YAML 文件" label="修改集群 YAML 文件">
 
 1. 修改集群 YAML 文件中 `spec.componentSpecs.volumeClaimTemplates.spec.resources` 的值。
 
@@ -630,7 +630,7 @@ spec:
    kubectl get ops ops-restart -n demo
    ```
 
-   During the restarting process, there are two status types for pods.
+   重启过程中，Pod 有如下两种状态：
 
    - STATUS=Terminating：表示集群正在重启。
    - STATUS=Running：表示集群已重启。

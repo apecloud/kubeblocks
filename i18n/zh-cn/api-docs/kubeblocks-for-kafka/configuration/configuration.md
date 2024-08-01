@@ -28,7 +28,7 @@ sidebar_label: 配置
    ```yaml
    spec:
      clusterRef: mycluster
-     componentName: kafka
+     componentName: kafka-combine
      configItemDetails:
      - configFileParams:
          server.properties:
@@ -54,9 +54,9 @@ sidebar_label: 配置
    mycluster-reconfiguring-wvqns   mycluster   broker      kafka-configuration-tpl   server.properties   Succeed   restart   1/1        May 10,2024 16:28 UTC+0800   {"server.properties":"{\"log.cleanup.policy\":\"compact\"}"}
    ```
 
-## Configure cluster parameters with OpsRequest
+## 通过 OpsRerquest 配置参数
 
-1. Define an OpsRequest file and configure the parameters in the OpsRequest in a yaml file named `mycluster-configuring-demo.yaml`. In this example, `max_connections` is configured as `600`.
+1. 在名为 `mycluster-configuring-demo.yaml` 的 YAML 文件中定义 OpsRequest，并修改参数。如下示例中，`log.cleanup.policy` 参数修改为 `compact`。
 
    ```bash
    apiVersion: apps.kubeblocks.io/v1alpha1
@@ -80,75 +80,75 @@ sidebar_label: 配置
    EOF
    ```
 
-   | Field                                                  | Definition     |
+   | 字段                                                    | 定义     |
    |--------------------------------------------------------|--------------------------------|
-   | `metadata.name`                                        | It specifies the name of this OpsRequest. |
-   | `metadata.namespace`                                   | It specifies the namespace where this cluster is created. |
-   | `spec.clusterName`                                     | It specifies the cluster name that this operation is targeted at. |
-   | `spec.reconfigure`                                     | It specifies a component and its configuration updates. |
-   | `spec.reconfigure.componentName`                       | It specifies the component name of this cluster.  |
-   | `spec.configurations`                                  | It contains a list of ConfigurationItem objects, specifying the component's configuration template name, upgrade policy, and parameter key-value pairs to be updated. |
-   | `spec.reconfigure.configurations.keys.key`             | It specifies the configuration map. |
-   | `spec.reconfigure.configurations.keys.parameters`      | It defines a list of key-value pairs for a single configuration file. |
-   | `spec.reconfigure.configurations.keys.parameter.key`   | It represents the name of the parameter you want to edit. |
-   | `spec.reconfigure.configurations.keys.parameter.value` | It represents the parameter values that are to be updated. If set to nil, the parameter defined by the Key field will be removed from the configuration file.  |
-   | `spec.reconfigure.configurations.name`                 | It specifies the configuration template name.  |
-   | `preConditionDeadlineSeconds`                          | It specifies the maximum number of seconds this OpsRequest will wait for its start conditions to be met before aborting. If set to 0 (default), the start conditions must be met immediately for the OpsRequest to proceed. |
+   | `metadata.name`                                        | 定义了 Opsrequest 的名称。 |
+   | `metadata.namespace`                                   | 定义了集群所在的 namespace。 |
+   | `spec.clusterName`                                     | 定义了本次运维操作指向的集群名称。 |
+   | `spec.reconfigure`                                     | 定义了需配置的 component 及相关配置更新内容。 |
+   | `spec.reconfigure.componentName`                       | 定义了改集群的 component 名称。  |
+   | `spec.configurations`                                  | 包含一系列 ConfigurationItem 对象，定义了 component 的配置模板名称、更新策略、参数键值对。 |
+   | `spec.reconfigure.configurations.keys.key`             | 定义了 configuration map。 |
+   | `spec.reconfigure.configurations.keys.parameters`      | 定义了单个参数文件的键值对列表。 |
+   | `spec.reconfigure.configurations.keys.parameter.key`   | 代表您需要编辑的参数名称。|
+   | `spec.reconfigure.configurations.keys.parameter.value` | 代表了将要更新的参数值。如果设置为 nil，Key 字段定义的参数将会被移出配置文件。  |
+   | `spec.reconfigure.configurations.name`                 | 定义了配置模板名称。  |
+   | `preConditionDeadlineSeconds`                          | 定义了本次 OpsRequest 中止之前，满足其启动条件的最长等待时间（单位为秒）。如果设置为 0（默认），则必须立即满足启动条件，OpsRequest 才能继续。|
 
-2. Apply the configuration opsRequest.
+2. 应用配置 OpsRequest。
 
    ```bash
    kubectl apply -f mycluster-configuring-demo.yaml
    ```
 
-3. Connect to this cluster to verify whether the configuration takes effect as expected.
+3. 确认配置是否生效。
 
    ```bash
-   kbcli cluster describe-config mykafka --show-detail | grep log.cleanup.policy
+   kbcli cluster describe-config mycluster --show-detail | grep log.cleanup.policy
    >
    log.cleanup.policy = compact
-   mykafka-reconfiguring-wvqns   mykafka   broker      kafka-configuration-tpl   server.properties   Succeed   restart   1/1        May 10,2024 16:28 UTC+0800   {"server.properties":"{\"log.cleanup.policy\":\"compact\"}"}
    ```
 
 :::note
 
-Just in case you cannot find the configuration file of your cluster, you can use `kbcli` to view the current configuration file of a cluster.
+如果您无法找到集群的配置文件，您可以使用 `kbcli` 查看集群当前的配置文件。
 
 ```bash
 kbcli cluster describe-config mycluster -n demo
 ```
 
-From the meta information, the cluster `mycluster` has a configuration file named `kafka.conf`.
+从元信息中可以看到，集群 `mycluster` 有一个名为 `server.properties` 的配置文件。
 
-You can also view the details of this configuration file and parameters.
+你也可以查看此配置文件和参数的详细信息。
 
-* View the details of the current configuration file.
+* 查看当前配置文件的详细信息。
 
    ```bash
    kbcli cluster describe-config mycluster --show-detail -n demo
    ```
 
-* View the parameter description.
+* 查看参数描述。
 
-  ```bash
-  kbcli cluster explain-config mycluster -n demo | head -n 20
-  ```
+   ```bash
+   kbcli cluster explain-config mycluster -n demo | head -n 20
+   ```
 
-* View the user guide of a specified parameter.
-  
-  ```bash
-  kbcli cluster explain-config mykafka --param=log.cleanup.policy
-  ```
+* 查看指定参数的使用文档。
 
-  `--config-specs` is required to specify a configuration template since ApeCloud MySQL currently supports multiple templates. You can run `kbcli cluster describe-config mycluster` to view the all template names.
+   ```bash
+   kbcli cluster explain-config mycluster --param=log.cleanup.policy -n demo
+   ```
+
+   Kafka 目前支持多个模板，你可以通过 `--config-specs` 来指定一个配置模板。执行 `kbcli cluster describe-config mycluster` 查看所有模板的名称。
 
   <details>
 
-  <summary>Output</summary>
+  <summary>输出</summary>
 
   ```bash
+  component: kafka-combine
   template meta:
-    ConfigSpec: kafka-configuration-tpl   ComponentName: broker   ClusterName: mykafka
+    ConfigSpec: kafka-configuration-tpl	ComponentName: kafka-combine	ClusterName: mycluster
 
   Configure Constraint:
     Parameter Name:     log.cleanup.policy
@@ -156,15 +156,18 @@ You can also view the details of this configuration file and parameters.
     Scope:              Global
     Dynamic:            false
     Type:               string
-    Description:        The default cleanup policy for segments beyond the retention window. A comma separated list of valid policies.   
+    Description:        The default cleanup policy for segments beyond the retention window. A comma separated list of valid policies.
+  component: kafka-exporter
+  template meta:
+    ConfigSpec: kafka-configuration-tpl	ComponentName: kafka-exporter	ClusterName: mycluster
   ```
   
   </details>
 
-  * Allowed Values: It defines the valid value range of this parameter.
-  * Dynamic: The value of `Dynamic` in `Configure Constraint` defines how the parameter configuration takes effect. There are two different configuration strategies based on the effectiveness type of modified parameters, i.e. **dynamic** and **static**.
-    * When `Dynamic` is `true`, it means the effectiveness type of parameters is **dynamic** and can be configured online.
-    * When `Dynamic` is `false`, it means the effectiveness type of parameters is **static** and a pod restarting is required to make the configuration effective.
-  * Description: It describes the parameter definition.
+  * Allowed Values：定义了参数的有效值范围。
+  * Dynamic: 决定了参数配置的生效方式。根据被修改参数的生效类型，有**动态**和**静态**两种不同的配置策略。
+    * `Dynamic` 为 `true` 时，参数**动态**生效，可在线配置。
+    * `Dynamic` 为 `false` 时，参数**静态**生效，需要重新启动 Pod 才能生效。
+  * Description：描述了参数的定义。
 
 :::

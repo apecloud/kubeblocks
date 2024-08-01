@@ -159,7 +159,6 @@ KubeBlocks 支持动态配置。当数据库实例的规格发生变化时（例
 
 :::note
 
-Just in case you cannot find the configuration file of your cluster, you can use `kbcli` to view the current configuration file of a cluster.
 如果您无法找到集群的配置文件，您可以使用 `kbcli` 查看集群当前的配置文件。
 
 ```bash

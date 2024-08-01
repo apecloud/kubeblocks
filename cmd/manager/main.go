@@ -254,6 +254,14 @@ func validateRequiredToParseConfigs() error {
 	if err := validateAffinity(viper.GetString(constant.CfgKeyDataPlaneAffinity)); err != nil {
 		return err
 	}
+
+	if imagePullSecrets := viper.GetString(constant.KBImagePullSecrets); imagePullSecrets != "" {
+		secrets := make([]corev1.LocalObjectReference, 0)
+		if err := json.Unmarshal([]byte(imagePullSecrets), &secrets); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

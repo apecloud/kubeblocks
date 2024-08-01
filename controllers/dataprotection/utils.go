@@ -383,6 +383,7 @@ func EnsureWorkerServiceAccount(reqCtx intctrlutil.RequestCtx, cli client.Client
 				sa.Annotations[k] = v
 			}
 		}
+		sa.ImagePullSecrets = intctrlutil.BuildImagePullSecrets()
 		if !reflect.DeepEqual(sa, saCopy) {
 			err := cli.Patch(ctx, sa, client.MergeFrom(saCopy), multicluster.InUniversalContext())
 			if err != nil {
@@ -418,6 +419,7 @@ func EnsureWorkerServiceAccount(reqCtx intctrlutil.RequestCtx, cli client.Client
 		sa.Name = saName
 		sa.Namespace = namespace
 		sa.Annotations = extraAnnotations
+		sa.ImagePullSecrets = intctrlutil.BuildImagePullSecrets()
 		if err := cli.Create(ctx, sa, multicluster.InUniversalContext()); err != nil {
 			return client.IgnoreAlreadyExists(err)
 		}

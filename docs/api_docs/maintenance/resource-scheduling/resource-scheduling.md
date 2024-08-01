@@ -57,7 +57,7 @@ spec:
 | podAntiAffinity | - Required <br/> - Preferred (default)      | It stands for the anti-affinity level of the pod under the current component.<br/> - Required means pods must be spread evenly in the fault domain specified by `topologyKeys`. <br/> - Preferred means pods can be spread as evenly as possible in the fault domain specified by `topologyKeys`. |
 | topologyKeys    |                                              | TopologyKey is the key of the node label. The node with the same value as this key is considered to be in the same topology, i.e. the same fault domain.<br/>For example, if the TopologyKey is `kubernetes.io/hostname`, every node is a domain of this topology. If the TopologyKey is `topology.kubernetes.io/zone`, every available zone is a domain of this topology. |
 | nodeLabels      |                                              | NodeLabels specifies a pod can only be scheduled to the node with the specified node label. |
-| tenancy         | - SharedNode (default) <br/> - DedicatedNode | It refers to the pod tenancy type:<br/> - SharedNode means that multiple pods share a node.<br/> - DedicatedNode means that a node is dedicated to a pod. |
+| schedulingPolicy         | - SharedNode (default) <br/> - DedicatedNode | It refers to the scheduling policy type of the pod:<br/> - SharedNode means that multiple pods share a node.<br/> - DedicatedNode means that a node is dedicated to a pod. |
 
 ## Examples
 
@@ -125,12 +125,12 @@ spec:
 
 ### One node only for one pod
 
-If you need one cluster only for the online core business and need to ensure every pod of this cluster has its own node to avoid being affected by the cluster of the cluster, you can specify `tenancy` as "DedicatedNode".
+If you need one cluster only for the online core business and need to ensure every pod of this cluster has its own node to avoid being affected by the cluster of the cluster, you can specify `schedulingPolicy` as "DedicatedNode".
 
 ```yaml
 spec:
   affinity:
-    tenancy: DedicatedNode
+    schedulingPolicy: DedicatedNode
 ```
 
 :::note

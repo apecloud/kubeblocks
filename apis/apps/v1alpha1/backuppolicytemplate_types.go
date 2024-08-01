@@ -211,10 +211,11 @@ type TargetInstance struct {
 	//   the `strategy` field below.
 	Role string `json:"role"`
 
-	// Specifies the alternative role to select one or more replicas for backup.
+	// Specifies the fallback role to select one replica for backup, this only takes effect when the
+	// `strategy` field below is set to `Any`.
 	//
 	// +optional
-	AlternateRole string `json:"alternateRole"`
+	FallbackRole string `json:"fallbackRole"`
 
 	// If `backupPolicy.componentDefs` is set, this field is required to specify the system account name.
 	// This account must match one listed in `componentDefinition.spec.systemAccounts[*].name`.

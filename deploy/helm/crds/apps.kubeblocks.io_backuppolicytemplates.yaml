@@ -362,10 +362,6 @@ spec:
                                   If `backupPolicy.componentDefRef` (a legacy and deprecated API) is set, the secret defined in
                                   `clusterDefinition.spec.ConnectionCredential` is used instead.
                                 type: string
-                              alternateRole:
-                                description: Specifies the alternative role to select
-                                  one or more replicas for backup.
-                                type: string
                               connectionCredential:
                                 description: Specifies the connection credential to
                                   connect to the target database cluster.
@@ -422,6 +418,11 @@ spec:
                                       If not specified, the default key "username" is used.
                                     type: string
                                 type: object
+                              fallbackRole:
+                                description: |-
+                                  Specifies the fallback role to select one replica for backup, this only takes effect when the
+                                  `strategy` field below is set to `Any`.
+                                type: string
                               name:
                                 description: |-
                                   Specifies a mandatory and unique identifier for each target when using the "targets" field.
@@ -432,9 +433,9 @@ spec:
                                   of the target pod will be backed up.
                                 properties:
                                   fallbackLabelSelector:
-                                    description: fallbackLabelSelector is used to
-                                      filter available pods when the labelSelector
-                                      fails.
+                                    description: |-
+                                      fallbackLabelSelector is used to filter available pods when the labelSelector fails.
+                                      This only takes effect when the `strategy` field below is set to `Any`.
                                     properties:
                                       matchExpressions:
                                         description: matchExpressions is a list of
@@ -741,9 +742,9 @@ spec:
                                     of the target pod will be backed up.
                                   properties:
                                     fallbackLabelSelector:
-                                      description: fallbackLabelSelector is used to
-                                        filter available pods when the labelSelector
-                                        fails.
+                                      description: |-
+                                        fallbackLabelSelector is used to filter available pods when the labelSelector fails.
+                                        This only takes effect when the `strategy` field below is set to `Any`.
                                       properties:
                                         matchExpressions:
                                           description: matchExpressions is a list
@@ -992,10 +993,6 @@ spec:
                             If `backupPolicy.componentDefRef` (a legacy and deprecated API) is set, the secret defined in
                             `clusterDefinition.spec.ConnectionCredential` is used instead.
                           type: string
-                        alternateRole:
-                          description: Specifies the alternative role to select one
-                            or more replicas for backup.
-                          type: string
                         connectionCredentialKey:
                           description: |-
                             Specifies the keys of the connection credential secret defined in `clusterDefinition.spec.ConnectionCredential`.
@@ -1020,6 +1017,11 @@ spec:
                                 If not specified, the default key "username" is used.
                               type: string
                           type: object
+                        fallbackRole:
+                          description: |-
+                            Specifies the fallback role to select one replica for backup, this only takes effect when the
+                            `strategy` field below is set to `Any`.
+                          type: string
                         role:
                           description: |-
                             Specifies the role to select one or more replicas for backup.

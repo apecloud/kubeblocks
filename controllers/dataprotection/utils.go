@@ -151,9 +151,6 @@ func GetTargetPods(reqCtx intctrlutil.RequestCtx,
 	}
 
 	listPodsByLabel := func(labelSelector *metav1.LabelSelector) (*corev1.PodList, error) {
-		if labelSelector == nil {
-			return nil, intctrlutil.NewNotFound("not found labelSelector")
-		}
 		selector, err := metav1.LabelSelectorAsSelector(labelSelector)
 		if err != nil {
 			return nil, err
@@ -177,35 +174,17 @@ func GetTargetPods(reqCtx intctrlutil.RequestCtx,
 		case dpv1alpha1.PodSelectionStrategyAny:
 			// always selecting the first available pod
 			pod := dputils.GetFirstIndexRunningPod(pods)
-			if pod == nil {
+			if pod == nil && selector.FallbackLabelSelector != nil {
 				pods, err := listPodsByLabel(selector.FallbackLabelSelector)
-				if err != nil && !intctrlutil.IsNotFound(err) {
+				if err != nil {
 					return nil, err
 				}
-				if err == nil {
-					pod = dputils.GetFirstIndexRunningPod(pods)
-				}
+				pod = dputils.GetFirstIndexRunningPod(pods)
 			}
 			if pod != nil {
 				targetPods = append(targetPods, pod)
 			}
 		case dpv1alpha1.PodSelectionStrategyAll:
-			allAvailable := true
-			for i := range pods.Items {
-				if !intctrlutil.IsAvailable(&pods.Items[i], 0) {
-					allAvailable = false
-					break
-				}
-			}
-			if len(pods.Items) == 0 || !allAvailable {
-				podList, err := listPodsByLabel(selector.FallbackLabelSelector)
-				if err != nil && !intctrlutil.IsNotFound(err) {
-					return nil, err
-				}
-				if err == nil {
-					pods = podList
-				}
-			}
 			if len(pods.Items) == 0 {
 				return nil, findPodErr
 			}
@@ -217,51 +196,46 @@ func GetTargetPods(reqCtx intctrlutil.RequestCtx,
 		return targetPods, nil
 	}
 
-	filterTargetPods := func(podMap map[string]*corev1.Pod) ([]*corev1.Pod, error) {
-		var targets []*corev1.Pod
-		switch selector.Strategy {
-		case dpv1alpha1.PodSelectionStrategyAny:
-			if pod, ok := podMap[selectedPodNames[0]]; ok {
-				targets = append(targets, pod)
-			}
-		case dpv1alpha1.PodSelectionStrategyAll:
-			for _, podName := range selectedPodNames {
-				pod, ok := podMap[podName]
-				if !ok {
-					return nil, intctrlutil.NewFatalError(fmt.Sprintf(`can not found the target pod "%s"`, podName))
-				}
-				targets = append(targets, pod)
-			}
-		}
-		return targets, nil
-	}
-
 	// if already selected target pods and backupType is not Continuous, we should re-use them.
-	podMap := make(map[string]*corev1.Pod)
-	for i := range pods.Items {
-		podMap[pods.Items[i].Name] = &pods.Items[i]
-	}
-	if len(podMap) > 0 {
-		targetPods, _ = filterTargetPods(podMap)
-		podMap = make(map[string]*corev1.Pod)
-	}
-	if targetPods != nil {
-		return targetPods, nil
-	}
-	pods, err = listPodsByLabel(selector.FallbackLabelSelector)
-	if err != nil && !intctrlutil.IsNotFound(err) {
-		return nil, err
-	}
-	if err == nil {
+	switch selector.Strategy {
+	case dpv1alpha1.PodSelectionStrategyAny:
+		for _, pod := range pods.Items {
+			if pod.Name == selectedPodNames[0] {
+				targetPods = append(targetPods, &pod)
+				break
+			}
+		}
+		if len(targetPods) == 0 && selector.FallbackLabelSelector != nil {
+			if pods, err = listPodsByLabel(selector.FallbackLabelSelector); err != nil {
+				return nil, err
+			}
+			if len(pods.Items) == 0 {
+				return nil, findPodErr
+			}
+			for _, pod := range pods.Items {
+				if pod.Name == selectedPodNames[0] {
+					targetPods = append(targetPods, &pod)
+					break
+				}
+			}
+		}
+	case dpv1alpha1.PodSelectionStrategyAll:
+		if len(pods.Items) == 0 {
+			return nil, findPodErr
+		}
+		podMap := map[string]corev1.Pod{}
 		for i := range pods.Items {
-			podMap[pods.Items[i].Name] = &pods.Items[i]
+			podMap[pods.Items[i].Name] = pods.Items[i]
+		}
+		for _, podName := range selectedPodNames {
+			pod, ok := podMap[podName]
+			if !ok {
+				return nil, intctrlutil.NewFatalError(fmt.Sprintf(`can not found the target pod "%s"`, podName))
+			}
+			targetPods = append(targetPods, &pod)
 		}
 	}
-	if len(podMap) == 0 {
-		return nil, findPodErr
-	}
-	targetPods, err = filterTargetPods(podMap)
-	return targetPods, err
+	return targetPods, nil
 }
 
 // getCluster gets the cluster and will ignore the error.

@@ -3909,7 +3909,8 @@ Kubernetes meta/v1.LabelSelector
 </td>
 <td>
 <em>(Optional)</em>
-<p>fallbackLabelSelector is used to filter available pods when the labelSelector fails.</p>
+<p>fallbackLabelSelector is used to filter available pods when the labelSelector fails.
+This only takes effect when the <code>strategy</code> field below is set to <code>Any</code>.</p>
 </td>
 </tr>
 <tr>

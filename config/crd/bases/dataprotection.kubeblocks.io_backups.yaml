@@ -502,8 +502,9 @@ spec:
                           target pod will be backed up.
                         properties:
                           fallbackLabelSelector:
-                            description: fallbackLabelSelector is used to filter available
-                              pods when the labelSelector fails.
+                            description: |-
+                              fallbackLabelSelector is used to filter available pods when the labelSelector fails.
+                              This only takes effect when the `strategy` field below is set to `Any`.
                             properties:
                               matchExpressions:
                                 description: matchExpressions is a list of label selector
@@ -777,8 +778,9 @@ spec:
                             the target pod will be backed up.
                           properties:
                             fallbackLabelSelector:
-                              description: fallbackLabelSelector is used to filter
-                                available pods when the labelSelector fails.
+                              description: |-
+                                fallbackLabelSelector is used to filter available pods when the labelSelector fails.
+                                This only takes effect when the `strategy` field below is set to `Any`.
                               properties:
                                 matchExpressions:
                                   description: matchExpressions is a list of label
@@ -1104,8 +1106,9 @@ spec:
                       pod will be backed up.
                     properties:
                       fallbackLabelSelector:
-                        description: fallbackLabelSelector is used to filter available
-                          pods when the labelSelector fails.
+                        description: |-
+                          fallbackLabelSelector is used to filter available pods when the labelSelector fails.
+                          This only takes effect when the `strategy` field below is set to `Any`.
                         properties:
                           matchExpressions:
                             description: matchExpressions is a list of label selector
@@ -1325,8 +1328,9 @@ spec:
                         target pod will be backed up.
                       properties:
                         fallbackLabelSelector:
-                          description: fallbackLabelSelector is used to filter available
-                            pods when the labelSelector fails.
+                          description: |-
+                            fallbackLabelSelector is used to filter available pods when the labelSelector fails.
+                            This only takes effect when the `strategy` field below is set to `Any`.
                           properties:
                             matchExpressions:
                               description: matchExpressions is a list of label selector

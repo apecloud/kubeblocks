@@ -112,6 +112,7 @@ type PodSelector struct {
 	*metav1.LabelSelector `json:",inline"`
 
 	// fallbackLabelSelector is used to filter available pods when the labelSelector fails.
+	// This only takes effect when the `strategy` field below is set to `Any`.
 	//
 	// +optional
 	FallbackLabelSelector *metav1.LabelSelector `json:"fallbackLabelSelector,omitempty"`

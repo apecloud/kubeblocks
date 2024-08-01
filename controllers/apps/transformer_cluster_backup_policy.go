@@ -505,7 +505,7 @@ func (r *clusterBackupPolicyTransformer) buildBackupTarget(
 ) *dpv1alpha1.BackupTarget {
 	if oldTarget != nil {
 		// if the target already exists, only sync the role by component replicas automatically.
-		r.syncRoleLabelSelector(comp, oldTarget, targetTpl.Role, targetTpl.AlternateRole)
+		r.syncRoleLabelSelector(comp, oldTarget, targetTpl.Role, targetTpl.FallbackRole)
 		return oldTarget
 	}
 	clusterName := r.OrigCluster.Name
@@ -522,9 +522,9 @@ func (r *clusterBackupPolicyTransformer) buildBackupTarget(
 		// dataprotection will use its dedicated service account if this field is empty.
 		ServiceAccountName: "",
 	}
-	if len(targetTpl.Role) != 0 && len(targetTpl.AlternateRole) != 0 {
+	if len(targetTpl.Role) != 0 && len(targetTpl.FallbackRole) != 0 {
 		target.PodSelector.FallbackLabelSelector = &metav1.LabelSelector{
-			MatchLabels: r.buildTargetPodLabels(targetTpl.AlternateRole, comp),
+			MatchLabels: r.buildTargetPodLabels(targetTpl.FallbackRole, comp),
 		}
 	}
 	if comp.isSharding {

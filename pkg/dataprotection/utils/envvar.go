@@ -28,15 +28,15 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-func BuildEnvByTarget(pod *corev1.Pod, credential *dpv1alpha1.ConnectionCredential, containerPort *dpv1alpha1.ContainerPort) []corev1.EnvVar {
+func BuildEnvByTarget(pod *corev1.Pod, credential *dpv1alpha1.ConnectionCredential, containerPort *dpv1alpha1.ContainerPort) ([]corev1.EnvVar, error) {
 	var envVars []corev1.EnvVar
 	if credential == nil {
 		envVars = append(envVars, corev1.EnvVar{Name: dptypes.DPDBHost, Value: intctrlutil.BuildPodHostDNS(pod)})
-		if containerPort != nil {
-			envVars = append(envVars, corev1.EnvVar{Name: dptypes.DPDBPort, Value: strconv.Itoa(int(GetContainerPortByName(pod, containerPort.ContainerName, containerPort.PortName)))})
-		} else {
-			envVars = append(envVars, corev1.EnvVar{Name: dptypes.DPDBPort, Value: strconv.Itoa(int(GetPodFirstContainerPort(pod)))})
+		port, err := GetContainerPort(pod, containerPort)
+		if err != nil {
+			return nil, err
 		}
+		envVars = append(envVars, corev1.EnvVar{Name: dptypes.DPDBPort, Value: strconv.Itoa(int(port))})
 	} else {
 		var hostEnv corev1.EnvVar
 		if credential.HostKey == "" {
@@ -57,7 +57,7 @@ func BuildEnvByTarget(pod *corev1.Pod, credential *dpv1alpha1.ConnectionCredenti
 			envVars = append(envVars, buildEnvBySecretKey(dptypes.DPDBUser, credential.SecretName, credential.UsernameKey))
 		}
 	}
-	return envVars
+	return envVars, nil
 }
 
 func buildEnvBySecretKey(name, secretName, key string) corev1.EnvVar {

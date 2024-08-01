@@ -514,6 +514,7 @@ func (r *clusterBackupPolicyTransformer) buildBackupTarget(
 		},
 		// dataprotection will use its dedicated service account if this field is empty.
 		ServiceAccountName: "",
+		ContainerPort:      targetTpl.ContainerPort,
 	}
 	if comp.isSharding {
 		target.Name = comp.fullComponentName

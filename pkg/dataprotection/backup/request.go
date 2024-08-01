@@ -312,7 +312,7 @@ func (r *Request) BuildJobActionPodSpec(targetPod *corev1.Pod,
 	// build environment variables, include built-in envs, envs from backupMethod
 	// and envs from actionSet. Latter will override former for the same name.
 	// env from backupMethod has the highest priority.
-	buildEnv := func() []corev1.EnvVar {
+	buildEnv := func() ([]corev1.EnvVar, error) {
 		envVars := targetPod.Spec.Containers[0].Env
 		envVars = append(envVars, []corev1.EnvVar{
 			{
@@ -345,7 +345,11 @@ func (r *Request) BuildJobActionPodSpec(targetPod *corev1.Pod,
 				Value: r.Spec.RetentionPeriod.String(),
 			},
 		}...)
-		envVars = append(envVars, utils.BuildEnvByTarget(targetPod, r.Target.ConnectionCredential, r.Target.ContainerPort)...)
+		envFromTarget, err := utils.BuildEnvByTarget(targetPod, r.Target.ConnectionCredential, r.Target.ContainerPort)
+		if err != nil {
+			return nil, err
+		}
+		envVars = append(envVars, envFromTarget...)
 		if r.ActionSet != nil {
 			envVars = append(envVars, r.ActionSet.Spec.Env...)
 		}
@@ -359,7 +363,7 @@ func (r *Request) BuildJobActionPodSpec(targetPod *corev1.Pod,
 		setKBClusterEnv(constant.AppInstanceLabelKey, constant.KBEnvClusterName)
 		setKBClusterEnv(constant.KBAppComponentLabelKey, constant.KBEnvCompName)
 		envVars = append(envVars, corev1.EnvVar{Name: constant.KBEnvNamespace, Value: r.Namespace})
-		return utils.MergeEnv(envVars, r.BackupMethod.Env)
+		return utils.MergeEnv(envVars, r.BackupMethod.Env), nil
 	}
 
 	runOnTargetPodNode := func() bool {
@@ -397,7 +401,10 @@ func (r *Request) BuildJobActionPodSpec(targetPod *corev1.Pod,
 	}
 
 	runAsUser := int64(0)
-	env := buildEnv()
+	env, err := buildEnv()
+	if err != nil {
+		return nil, err
+	}
 	container := corev1.Container{
 		Name: name,
 		// expand the image value with the env variables.

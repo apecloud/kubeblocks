@@ -318,18 +318,23 @@ func GetPodFirstContainerPort(pod *corev1.Pod) int32 {
 	return ports[0].ContainerPort
 }
 
-func GetContainerPortByName(pod *corev1.Pod, containerName string, portName string) int32 {
+func GetContainerPort(pod *corev1.Pod, containerPort *dpv1alpha1.ContainerPort) (int32, error) {
+	if containerPort == nil {
+		return GetPodFirstContainerPort(pod), nil
+	}
+	containerName := containerPort.ContainerName
+	portName := containerPort.PortName
 	for _, container := range pod.Spec.Containers {
 		if container.Name != containerName {
 			continue
 		}
 		for _, port := range container.Ports {
 			if port.Name == portName {
-				return port.ContainerPort
+				return port.ContainerPort, nil
 			}
 		}
 	}
-	return 0
+	return 0, fmt.Errorf("the specified containerPort of targetPod is not found")
 }
 
 // ExistTargetVolume checks if the backup.status.backupMethod.targetVolumes exists the target volume which should be restored.

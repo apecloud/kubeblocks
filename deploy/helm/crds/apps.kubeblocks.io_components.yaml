@@ -3490,6 +3490,15 @@ spec:
                 items:
                   type: string
                 type: array
+              parallelPodManagementConcurrency:
+                anyOf:
+                - type: integer
+                - type: string
+                description: |-
+                  Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
+                  or when scaling down. It only used when `PodManagementPolicy` is set to `Parallel`.
+                  The default Concurrency is 100%.
+                x-kubernetes-int-or-string: true
               podUpdatePolicy:
                 description: |-
                   PodUpdatePolicy indicates how pods should be updated

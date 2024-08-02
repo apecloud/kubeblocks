@@ -306,43 +306,6 @@ var _ = Describe("Component Definition Convertor", func() {
 				Expect(err).Should(HaveOccurred())
 				Expect(res).Should(BeNil())
 			})
-
-			It("w/o comp version", func() {
-				convertor := &compDefRuntimeConvertor{}
-				res, err := convertor.convert(clusterCompDef)
-				Expect(err).Should(Succeed())
-				Expect(res).Should(BeEquivalentTo(*clusterCompDef.PodSpec))
-			})
-
-			It("w/ comp version", func() {
-				clusterCompVer := &appsv1alpha1.ClusterComponentVersion{
-					VersionsCtx: appsv1alpha1.VersionsContext{
-						InitContainers: []corev1.Container{
-							{
-								Name:  "init",
-								Image: "init",
-							},
-						},
-						Containers: []corev1.Container{
-							{
-								Name:  "mysql",
-								Image: "image",
-							},
-						},
-					},
-				}
-
-				convertor := &compDefRuntimeConvertor{}
-				res, err := convertor.convert(clusterCompDef, clusterCompVer)
-				Expect(err).Should(Succeed())
-
-				expectedPodSpec := clusterCompDef.PodSpec
-				Expect(expectedPodSpec.Containers[0].Image).Should(BeEmpty())
-				Expect(expectedPodSpec.InitContainers).Should(HaveLen(0))
-				expectedPodSpec.Containers[0].Image = clusterCompVer.VersionsCtx.Containers[0].Image
-				expectedPodSpec.InitContainers = clusterCompVer.VersionsCtx.InitContainers
-				Expect(res).Should(BeEquivalentTo(*expectedPodSpec))
-			})
 		})
 
 		Context("vars", func() {
@@ -546,37 +509,11 @@ var _ = Describe("Component Definition Convertor", func() {
 			})
 		})
 
-		Context("configs", func() {
-			It("w/o comp version", func() {
-				convertor := &compDefConfigsConvertor{}
-				res, err := convertor.convert(clusterCompDef)
-				Expect(err).Should(Succeed())
-				Expect(res).Should(BeEquivalentTo(clusterCompDef.ConfigSpecs))
-			})
-
-			It("w/ comp version", func() {
-				clusterCompVer := &appsv1alpha1.ClusterComponentVersion{
-					ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{
-						{
-							ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-								Name:        "agamotto-config",
-								TemplateRef: "agamotto-config-template",
-								VolumeName:  "agamotto-config",
-								DefaultMode: &defaultVolumeMode,
-							},
-						},
-					},
-				}
-
-				convertor := &compDefConfigsConvertor{}
-				res, err := convertor.convert(clusterCompDef, clusterCompVer)
-				Expect(err).Should(Succeed())
-
-				expectedConfigs := make([]appsv1alpha1.ComponentConfigSpec, 0)
-				expectedConfigs = append(expectedConfigs, clusterCompVer.ConfigSpecs...)
-				expectedConfigs = append(expectedConfigs, clusterCompDef.ConfigSpecs...)
-				Expect(res).Should(BeEquivalentTo(expectedConfigs))
-			})
+		It("configs", func() {
+			convertor := &compDefConfigsConvertor{}
+			res, err := convertor.convert(clusterCompDef)
+			Expect(err).Should(Succeed())
+			Expect(res).Should(BeEquivalentTo(clusterCompDef.ConfigSpecs))
 		})
 
 		It("log configs", func() {
@@ -751,24 +688,11 @@ var _ = Describe("Component Definition Convertor", func() {
 		})
 
 		Context("lifecycle actions", func() {
-			It("w/o comp version", func() {
+			It("ok", func() {
 				clusterCompDef.Probes.RoleProbe = nil
 
 				convertor := &compDefLifecycleActionsConvertor{}
 				res, err := convertor.convert(clusterCompDef)
-				Expect(err).Should(Succeed())
-
-				actions := res.(*appsv1alpha1.ComponentLifecycleActions)
-				expectedActions := &appsv1alpha1.ComponentLifecycleActions{}
-				Expect(*actions).Should(BeEquivalentTo(*expectedActions))
-			})
-
-			It("w/ comp version", func() {
-				clusterCompDef.Probes.RoleProbe = nil
-				clusterCompVer := &appsv1alpha1.ClusterComponentVersion{}
-
-				convertor := &compDefLifecycleActionsConvertor{}
-				res, err := convertor.convert(clusterCompDef, clusterCompVer)
 				Expect(err).Should(Succeed())
 
 				actions := res.(*appsv1alpha1.ComponentLifecycleActions)

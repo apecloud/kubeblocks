@@ -41,30 +41,23 @@ import (
 var _ = Describe("Component PostProvision Test", func() {
 	Context("has the BuildComponent function", func() {
 		const (
-			clusterDefName     = "test-clusterdef"
-			clusterVersionName = "test-clusterversion"
-			clusterName        = "test-cluster"
-			mysqlCompDefName   = "replicasets"
-			mysqlCompName      = "mysql"
+			clusterDefName   = "test-clusterdef"
+			clusterName      = "test-cluster"
+			mysqlCompDefName = "replicasets"
+			mysqlCompName    = "mysql"
 		)
 
 		var (
-			clusterDef     *appsv1alpha1.ClusterDefinition
-			clusterVersion *appsv1alpha1.ClusterVersion
-			cluster        *appsv1alpha1.Cluster
+			clusterDef *appsv1alpha1.ClusterDefinition
+			cluster    *appsv1alpha1.Cluster
 		)
 
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
 				AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
 				GetObject()
-			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponentVersion(mysqlCompDefName).
-				AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-				GetObject()
 			pvcSpec := testapps.NewPVCSpec("1Gi")
-			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-				clusterDef.Name, clusterVersion.Name).
+			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDef.Name).
 				SetUID(clusterName).
 				AddComponent(mysqlCompName, mysqlCompDefName).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
@@ -112,7 +105,6 @@ var _ = Describe("Component PostProvision Test", func() {
 				reqCtx,
 				testCtx.Cli,
 				clusterDef,
-				clusterVersion,
 				cluster,
 				&cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())

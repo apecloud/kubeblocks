@@ -54,7 +54,6 @@ const (
 	WorkloadTypeLabelKey                   = "apps.kubeblocks.io/workload-type"
 	KBAppPodNameLabelKey                   = "apps.kubeblocks.io/pod-name"
 	ClusterDefLabelKey                     = "clusterdefinition.kubeblocks.io/name"
-	ClusterVerLabelKey                     = "clusterversion.kubeblocks.io/name"
 	ComponentDefinitionLabelKey            = "componentdefinition.kubeblocks.io/name"
 	ComponentVersionLabelKey               = "componentversion.kubeblocks.io/name"
 	ConsensusSetAccessModeLabelKey         = "cs.apps.kubeblocks.io/access-mode"

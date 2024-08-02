@@ -54,9 +54,6 @@ const (
 	DefaultRedisContainerName     = "redis"
 	DefaultRedisInitContainerName = "redis-init-container"
 
-	EnvKeyImageTag  = "IMAGE_TAG"
-	DefaultImageTag = "test"
-
 	DefaultConfigSpecName          = "config-cm"
 	DefaultConfigSpecTplRef        = "env-from-config-tpl"
 	DefaultConfigSpecVolumeName    = "volume"

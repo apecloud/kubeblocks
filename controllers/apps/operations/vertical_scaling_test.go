@@ -44,7 +44,6 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 	var (
 		randomStr             = testCtx.GetRandomStr()
 		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr
-		clusterVersionName    = "clusterversion-for-ops-" + randomStr
 		clusterName           = "cluster-for-ops-" + randomStr
 		reqCtx                intctrlutil.RequestCtx
 	)
@@ -55,7 +54,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
 		By("clean resources")
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResources(&testCtx)
 
 		// delete rest resources
@@ -73,7 +72,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 
 		testVerticalScaling := func(verticalScaling []appsv1alpha1.VerticalScaling) *OpsResource {
 			By("init operations resources ")
-			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterName)
 
 			By("create VerticalScaling ops")
 			ops := testapps.NewOpsRequestObj("vertical-scaling-ops-"+randomStr, testCtx.DefaultNamespace,
@@ -117,9 +116,9 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 		})
 
 		It("cancel vertical scaling opsRequest", func() {
-			By("init operations resources with CLusterDefinition/ClusterVersion/Hybrid components Cluster/consensus Pods")
+			By("init operations resources with CLusterDefinition/Hybrid components Cluster/consensus Pods")
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
-			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterName)
 			podList := initInstanceSetPods(ctx, k8sClient, opsRes)
 
 			By("create VerticalScaling ops")

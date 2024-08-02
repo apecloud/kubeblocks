@@ -80,7 +80,6 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 		synthesizedComp.Annotations,
 	)
 
-	replicasStr := strconv.Itoa(int(synthesizedComp.Replicas))
 	podBuilder := builder.NewPodBuilder("", "").
 		AddLabelsInMap(synthesizedComp.Labels).
 		AddLabelsInMap(labels).
@@ -88,8 +87,12 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 		AddLabelsInMap(constant.GetAppVersionLabel(compDefName)).
 		AddLabelsInMap(synthesizedComp.UserDefinedLabels).
 		AddLabelsInMap(constant.GetClusterWellKnownLabels(clusterName)).
-		AddAnnotations(constant.ComponentReplicasAnnotationKey, replicasStr).
 		AddAnnotationsInMap(synthesizedComp.UserDefinedAnnotations)
+	if viper.GetBool(constant.FeatureGateComponentReplicasAnnotation) {
+		replicasStr := strconv.Itoa(int(synthesizedComp.Replicas))
+		podBuilder.AddAnnotations(constant.ComponentReplicasAnnotationKey, replicasStr)
+
+	}
 	template := corev1.PodTemplateSpec{
 		ObjectMeta: podBuilder.GetObject().ObjectMeta,
 		Spec:       *synthesizedComp.PodSpec.DeepCopy(),
@@ -502,6 +505,7 @@ func BuildServiceAccount(cluster *appsv1alpha1.Cluster, saName string) *corev1.S
 	wellKnownLabels := constant.GetKBWellKnownLabels(cluster.Spec.ClusterDefRef, cluster.Name, "")
 	return builder.NewServiceAccountBuilder(cluster.Namespace, saName).
 		AddLabelsInMap(wellKnownLabels).
+		SetImagePullSecrets(intctrlutil.BuildImagePullSecrets()).
 		GetObject()
 }
 

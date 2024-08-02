@@ -24,6 +24,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,7 +47,6 @@ var _ = Describe("OpsUtil functions", func() {
 	var (
 		randomStr             = testCtx.GetRandomStr()
 		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr
-		clusterVersionName    = "clusterversion-for-ops-" + randomStr
 		clusterName           = "cluster-for-ops-" + randomStr
 		rebuildInstanceCount  = 2
 	)
@@ -58,7 +58,7 @@ var _ = Describe("OpsUtil functions", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResources(&testCtx)
 
 		// delete rest resources
@@ -104,7 +104,7 @@ var _ = Describe("OpsUtil functions", func() {
 		}
 
 		prepareOpsRes := func(backupName string, inPlace bool) *OpsResource {
-			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterName)
 			podList := initInstanceSetPods(ctx, k8sClient, opsRes)
 
 			// fake to create the source pvc.
@@ -377,7 +377,7 @@ var _ = Describe("OpsUtil functions", func() {
 
 		It("rebuild instance with horizontal scaling", func() {
 			By("init operations resources ")
-			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterName)
 			its := testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusComp)
 			podList := testapps.MockInstanceSetPods(&testCtx, its, opsRes.Cluster, consensusComp)
 			opsRes.OpsRequest = createRebuildInstanceOps("", false, podList[1].Name, podList[2].Name)

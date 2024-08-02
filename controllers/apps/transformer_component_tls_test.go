@@ -46,7 +46,6 @@ import (
 var _ = Describe("TLS self-signed cert function", func() {
 	const (
 		clusterDefName      = "test-clusterdef-tls"
-		clusterVersionName  = "test-clusterversion-tls"
 		clusterNamePrefix   = "test-cluster"
 		statefulCompDefName = "mysql"
 		statefulCompName    = "mysql"
@@ -65,7 +64,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 
 		// delete rest configurations
@@ -98,12 +97,6 @@ var _ = Describe("TLS self-signed cert function", func() {
 				AddConfigTemplate(configSpecName, configMapObj.Name, configConstraintObj.Name, testCtx.DefaultNamespace, testapps.ConfVolumeName).
 				AddContainerEnv(mysqlContainerName, corev1.EnvVar{Name: "MYSQL_ALLOW_EMPTY_PASSWORD", Value: "yes"}).
 				CheckedCreate(&testCtx).GetObject()
-
-			By("Create a clusterVersion obj")
-			testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponentVersion(statefulCompDefName).AddContainerShort(mysqlContainerName, testapps.ApeCloudMySQLImage).
-				CheckedCreate(&testCtx).GetObject()
-
 		})
 
 		Context("when issuer is UserProvided", func() {
@@ -137,7 +130,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 					},
 				}
 				By("create cluster obj")
-				clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefName, clusterVersionName).
+				clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefName).
 					WithRandomName().
 					AddComponent(statefulCompName, statefulCompDefName).
 					SetReplicas(3).
@@ -155,7 +148,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 		Context("when switch between disabled and enabled", func() {
 			It("should handle tls settings properly", func() {
 				By("create cluster with tls disabled")
-				clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefName, clusterVersionName).
+				clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefName).
 					WithRandomName().
 					AddComponent(statefulCompName, statefulCompDefName).
 					SetReplicas(3).

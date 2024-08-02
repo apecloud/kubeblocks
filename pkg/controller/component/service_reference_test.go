@@ -51,7 +51,6 @@ var _ = Describe("service reference", func() {
 		// resources should be released in following order
 		// non-namespaced
 		testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ClusterVersionSignature, true, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ClusterDefinitionSignature, true, ml)
 
 		// namespaced
@@ -62,7 +61,6 @@ var _ = Describe("service reference", func() {
 	var (
 		mockClient                    *testutil.K8sClientMockHelper
 		clusterDef                    *appsv1alpha1.ClusterDefinition
-		clusterVersion                *appsv1alpha1.ClusterVersion
 		cluster                       *appsv1alpha1.Cluster
 		beReferencedCluster           *appsv1alpha1.Cluster
 		beReferencedServiceDescriptor *appsv1alpha1.ServiceDescriptor
@@ -73,7 +71,6 @@ var _ = Describe("service reference", func() {
 		clusterName                      = "mycluster"
 		beReferencedClusterName          = "mycluster-be-referenced"
 		clusterDefName                   = "test-clusterdef"
-		clusterVersionName               = "test-clusterversion"
 		nginxCompName                    = "nginx"
 		nginxCompDefName                 = "nginx"
 		mysqlCompName                    = "mysql"
@@ -119,11 +116,6 @@ var _ = Describe("service reference", func() {
 		clusterDef = testapps.NewClusterDefFactory(clusterDefName).
 			AddComponentDef(testapps.StatelessNginxComponent, nginxCompDefName).
 			AddServiceRefDeclarations(serviceRefDeclarations).
-			Create(&testCtx).GetObject()
-		clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-			AddComponentVersion(nginxCompDefName).
-			AddInitContainerShort("nginx-init", testapps.NginxImage).
-			AddContainerShort("nginx", testapps.NginxImage).
 			Create(&testCtx).GetObject()
 
 		By("mock a service descriptor and the configmap referenced")
@@ -218,7 +210,7 @@ var _ = Describe("service reference", func() {
 			},
 		}
 		Expect(testCtx.CheckedCreateObj(ctx, secret)).Should(Succeed())
-		beReferencedCluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, beReferencedClusterName, clusterDef.Name, clusterVersion.Name).
+		beReferencedCluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, beReferencedClusterName, clusterDef.Name).
 			AddComponent(mysqlCompName, mysqlCompDefName).
 			Create(&testCtx).
 			GetObject()
@@ -233,8 +225,7 @@ var _ = Describe("service reference", func() {
 				Cluster: beReferencedCluster.Name,
 			},
 		}
-		cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-			clusterDef.Name, clusterVersion.Name).
+		cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDef.Name).
 			AddComponent(nginxCompName, nginxCompDefName).
 			SetServiceRefs(serviceRefs).
 			Create(&testCtx).GetObject()

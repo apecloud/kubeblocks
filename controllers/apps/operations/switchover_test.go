@@ -38,16 +38,14 @@ import (
 )
 
 var (
-	clusterDefObj     *appsv1alpha1.ClusterDefinition
-	clusterVersionObj *appsv1alpha1.ClusterVersion
-	clusterObj        *appsv1alpha1.Cluster
+	clusterDefObj *appsv1alpha1.ClusterDefinition
+	clusterObj    *appsv1alpha1.Cluster
 )
 
 var _ = Describe("", func() {
 	var (
-		randomStr          = testCtx.GetRandomStr()
-		clusterVersionName = "cluster-version-for-ops-" + randomStr
-		clusterName        = "cluster-for-ops-" + randomStr
+		randomStr   = testCtx.GetRandomStr()
+		clusterName = "cluster-for-ops-" + randomStr
 	)
 
 	defaultRole := func(index int32) string {
@@ -80,7 +78,7 @@ var _ = Describe("", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResources(&testCtx)
 
 		// delete rest resources
@@ -122,11 +120,6 @@ var _ = Describe("", func() {
 				AddComponentDef(testapps.ConsensusMySQLComponent, consensusComp).
 				AddSwitchoverSpec(switchoverSpec).
 				Create(&testCtx).GetObject()
-
-			By("Create a clusterVersion obj with replication workloadType.")
-			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponentVersion(consensusComp).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
-				Create(&testCtx).GetObject()
 		})
 
 		It("Test switchover OpsRequest", func() {
@@ -135,8 +128,8 @@ var _ = Describe("", func() {
 				Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
 			}
 			By("Creating a cluster with consensus .")
-			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name).
+				WithRandomName().
 				AddComponent(consensusComp, consensusComp).
 				SetReplicas(2).
 				Create(&testCtx).GetObject()

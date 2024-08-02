@@ -27,7 +27,6 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/apiutil"
-	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 )
@@ -35,8 +34,7 @@ import (
 // TODO(component): type check
 
 // buildComponentDefinitionByConversion builds a ComponentDefinition from a ClusterComponentDefinition and a ClusterComponentVersion.
-func buildComponentDefinitionByConversion(clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
-	clusterCompVer *appsv1alpha1.ClusterComponentVersion) (*appsv1alpha1.ComponentDefinition, error) {
+func buildComponentDefinitionByConversion(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) (*appsv1alpha1.ComponentDefinition, error) {
 	if clusterCompDef == nil {
 		return nil, nil
 	}
@@ -64,7 +62,7 @@ func buildComponentDefinitionByConversion(clusterCompDef *appsv1alpha1.ClusterCo
 		"exporter":               &compDefExporterConvertor{},
 	}
 	compDef := &appsv1alpha1.ComponentDefinition{}
-	if err := covertObject(convertors, &compDef.Spec, clusterCompDef, clusterCompVer); err != nil {
+	if err := covertObject(convertors, &compDef.Spec, clusterCompDef); err != nil {
 		return nil, err
 	}
 	return compDef, nil
@@ -104,23 +102,10 @@ type compDefRuntimeConvertor struct{}
 
 func (c *compDefRuntimeConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	var clusterCompVer *appsv1alpha1.ClusterComponentVersion
-	if len(args) > 1 {
-		clusterCompVer = args[1].(*appsv1alpha1.ClusterComponentVersion)
-	}
 	if clusterCompDef.PodSpec == nil {
 		return nil, fmt.Errorf("no pod spec")
 	}
-
 	podSpec := clusterCompDef.PodSpec.DeepCopy()
-	if clusterCompVer != nil {
-		for _, container := range clusterCompVer.VersionsCtx.InitContainers {
-			podSpec.InitContainers = appendOrOverrideContainerAttr(podSpec.InitContainers, container)
-		}
-		for _, container := range clusterCompVer.VersionsCtx.Containers {
-			podSpec.Containers = appendOrOverrideContainerAttr(podSpec.Containers, container)
-		}
-	}
 	return *podSpec, nil
 }
 
@@ -290,14 +275,7 @@ type compDefConfigsConvertor struct{}
 
 func (c *compDefConfigsConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	var clusterCompVer *appsv1alpha1.ClusterComponentVersion
-	if len(args) > 1 {
-		clusterCompVer = args[1].(*appsv1alpha1.ClusterComponentVersion)
-	}
-	if clusterCompVer == nil {
-		return clusterCompDef.ConfigSpecs, nil
-	}
-	return cfgcore.MergeConfigTemplates(clusterCompVer.ConfigSpecs, clusterCompDef.ConfigSpecs), nil
+	return clusterCompDef.ConfigSpecs, nil
 }
 
 // compDefLogConfigsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.LogConfigs.
@@ -487,10 +465,6 @@ type compDefLifecycleActionsConvertor struct{}
 
 func (c *compDefLifecycleActionsConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	var clusterCompVer *appsv1alpha1.ClusterComponentVersion
-	if len(args) > 1 {
-		clusterCompVer = args[1].(*appsv1alpha1.ClusterComponentVersion)
-	}
 
 	lifecycleActions := &appsv1alpha1.ComponentLifecycleActions{}
 
@@ -500,7 +474,7 @@ func (c *compDefLifecycleActionsConvertor) convert(args ...any) (any, error) {
 	}
 
 	if clusterCompDef.SwitchoverSpec != nil {
-		lifecycleActions.Switchover = c.convertSwitchover(clusterCompDef.SwitchoverSpec, clusterCompVer)
+		lifecycleActions.Switchover = c.convertSwitchover(clusterCompDef.SwitchoverSpec)
 	}
 
 	if clusterCompDef.PostStartSpec != nil {
@@ -613,12 +587,8 @@ func (c *compDefLifecycleActionsConvertor) convertPostProvision(postStart *appsv
 	}
 }
 
-func (c *compDefLifecycleActionsConvertor) convertSwitchover(switchover *appsv1alpha1.SwitchoverSpec,
-	clusterCompVer *appsv1alpha1.ClusterComponentVersion) *appsv1alpha1.ComponentSwitchover {
+func (c *compDefLifecycleActionsConvertor) convertSwitchover(switchover *appsv1alpha1.SwitchoverSpec) *appsv1alpha1.ComponentSwitchover {
 	spec := *switchover
-	if clusterCompVer != nil {
-		overrideSwitchoverSpecAttr(&spec, clusterCompVer.SwitchoverSpec)
-	}
 	if spec.WithCandidate == nil && spec.WithoutCandidate == nil {
 		return nil
 	}

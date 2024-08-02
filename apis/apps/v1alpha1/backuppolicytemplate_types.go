@@ -149,8 +149,7 @@ type ValueFrom struct {
 }
 
 type ValueMapping struct {
-	// Represents an array of names of ClusterVersion or ComponentDefinition that can be mapped to
-	// the appropriate version of the backup tool image.
+	// Represents an array of names of ComponentDefinition that can be mapped to the appropriate version of the backup tool image.
 	//
 	// This mapping allows different versions of component images to correspond to specific versions of backup tool images.
 	//

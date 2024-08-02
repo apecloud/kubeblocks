@@ -149,11 +149,9 @@ var _ = AfterSuite(func() {
 })
 
 // initOperationsResources inits the operations resources.
-func initOperationsResources(clusterDefinitionName,
-	clusterVersionName,
-	clusterName string) (*OpsResource, *appsv1alpha1.ClusterDefinition, *appsv1alpha1.Cluster) {
-	clusterDef, _, clusterObject := testapps.InitClusterWithHybridComps(&testCtx, clusterDefinitionName,
-		clusterVersionName, clusterName, statelessComp, statefulComp, consensusComp)
+func initOperationsResources(clusterDefinitionName, clusterName string) (*OpsResource, *appsv1alpha1.ClusterDefinition, *appsv1alpha1.Cluster) {
+	clusterDef, clusterObject := testapps.InitClusterWithHybridComps(&testCtx, clusterDefinitionName,
+		clusterName, statelessComp, statefulComp, consensusComp)
 	opsRes := &OpsResource{
 		Cluster:  clusterObject,
 		Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),

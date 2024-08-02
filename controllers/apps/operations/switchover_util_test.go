@@ -39,15 +39,13 @@ import (
 var _ = Describe("Switchover Util", func() {
 
 	var (
-		clusterName        = "test-cluster-repl"
-		clusterDefName     = "test-cluster-def-repl"
-		clusterVersionName = "test-cluster-version-repl"
+		clusterName    = "test-cluster-repl"
+		clusterDefName = "test-cluster-def-repl"
 	)
 
 	var (
-		clusterDefObj     *appsv1alpha1.ClusterDefinition
-		clusterVersionObj *appsv1alpha1.ClusterVersion
-		clusterObj        *appsv1alpha1.Cluster
+		clusterDefObj *appsv1alpha1.ClusterDefinition
+		clusterObj    *appsv1alpha1.Cluster
 	)
 
 	defaultRole := func(index int32) string {
@@ -64,7 +62,7 @@ var _ = Describe("Switchover Util", func() {
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
 		By("clean resources")
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResources(&testCtx)
 
 		// clear rest resources
@@ -81,8 +79,8 @@ var _ = Describe("Switchover Util", func() {
 
 	testNeedDoSwitchover := func() {
 		By("Creating a cluster with replication workloadType.")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name).
+			WithRandomName().
 			AddComponent(testapps.DefaultRedisCompSpecName, testapps.DefaultRedisCompDefName).
 			SetReplicas(testapps.DefaultReplicationReplicas).
 			Create(&testCtx).GetObject()
@@ -145,8 +143,8 @@ var _ = Describe("Switchover Util", func() {
 
 	testDoSwitchover := func() {
 		By("Creating a cluster with replication workloadType.")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name).
+			WithRandomName().
 			AddComponent(testapps.DefaultRedisCompSpecName, testapps.DefaultRedisCompDefName).
 			SetReplicas(testapps.DefaultReplicationReplicas).
 			Create(&testCtx).GetObject()
@@ -231,12 +229,6 @@ var _ = Describe("Switchover Util", func() {
 				AddComponentDef(testapps.ReplicationRedisComponent, testapps.DefaultRedisCompDefName).
 				AddSwitchoverSpec(switchoverSpec).
 				Create(&testCtx).GetObject()
-
-			By("Create a clusterVersion obj with replication workloadType.")
-			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponentVersion(testapps.DefaultRedisCompDefName).AddContainerShort(testapps.DefaultRedisContainerName, testapps.DefaultRedisImageName).
-				Create(&testCtx).GetObject()
-
 		})
 
 		It("Test needDoSwitchover with different conditions", func() {

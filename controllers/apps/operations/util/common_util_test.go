@@ -36,7 +36,6 @@ var _ = Describe("OpsRequest Controller", func() {
 	var (
 		randomStr             = testCtx.GetRandomStr()
 		clusterDefinitionName = "cluster-definition-" + randomStr
-		clusterVersionName    = "clusterversion-" + randomStr
 		clusterName           = "cluster-" + randomStr
 		consensusCompName     = "consensus"
 	)
@@ -61,7 +60,7 @@ var _ = Describe("OpsRequest Controller", func() {
 	Context("Test OpsRequest", func() {
 		It("Should Test all OpsRequest", func() {
 			cluster := testapps.CreateConsensusMysqlCluster(&testCtx, clusterDefinitionName,
-				clusterVersionName, clusterName, "consensus", consensusCompName)
+				clusterName, "consensus", consensusCompName)
 			By("init restart OpsRequest")
 			testOpsName := "restart-" + randomStr
 			ops := testapps.NewOpsRequestObj(testOpsName, testCtx.DefaultNamespace,

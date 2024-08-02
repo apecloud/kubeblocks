@@ -443,15 +443,6 @@ func (r *clusterBackupPolicyTransformer) syncBackupMethods(backupPolicy *dpv1alp
 func (r *clusterBackupPolicyTransformer) doEnvMapping(comp *appsv1alpha1.ClusterComponentSpec, envMapping []appsv1alpha1.EnvMappingVar) []corev1.EnvVar {
 	var env []corev1.EnvVar
 	for _, v := range envMapping {
-		for _, cv := range v.ValueFrom.ClusterVersionRef {
-			if !slices.Contains(cv.Names, r.Cluster.Spec.ClusterVersionRef) {
-				continue
-			}
-			env = append(env, corev1.EnvVar{
-				Name:  v.Key,
-				Value: cv.MappingValue,
-			})
-		}
 		for _, cm := range v.ValueFrom.ComponentDef {
 			if !slices.Contains(cm.Names, comp.ComponentDef) {
 				continue

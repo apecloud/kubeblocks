@@ -54,13 +54,13 @@ kbcli cluster create postgresql <clustername>
 Create a Replication Cluster.
 
 ```bash
-kbcli cluster create --cluster-definition postgresql --mode replication <clustername>
+kbcli cluster create --cluster-definition postgresql --set replicas=2 <clustername>
 ```
 
 If you only have one node for deploying a Replication, set the `availability-policy` as `none` when creating a Replication Cluster.
 
 ```bash
-kbcli cluster create --cluster-definition postgresql --mode replication --availability-policy none <clustername>
+kbcli cluster create --cluster-definition postgresql --set replicas=2 --topology-keys null <clustername>
 ```
 
 If you want to specify a cluster version, you can first view the available versions and use `--version` to specify a version.

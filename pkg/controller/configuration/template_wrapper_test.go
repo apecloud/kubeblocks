@@ -36,11 +36,9 @@ import (
 )
 
 var _ = Describe("TemplateWrapperTest", func() {
-
 	var mockK8sCli *testutil.K8sClientMockHelper
 	var clusterObj *appsv1alpha1.Cluster
 	var componentObj *appsv1alpha1.Component
-	var clusterVersionObj *appsv1alpha1.ClusterVersion
 	var clusterDefObj *appsv1alpha1.ClusterDefinition
 	var clusterComponent *component.SynthesizedComponent
 
@@ -54,8 +52,8 @@ var _ = Describe("TemplateWrapperTest", func() {
 		// Add any setup steps that needs to be executed before each test
 		mockK8sCli = testutil.NewK8sMockClient()
 
-		clusterObj, clusterDefObj, clusterVersionObj, _ = newAllFieldsClusterObj(nil, nil, false)
-		clusterComponent = newAllFieldsSynthesizedComponent(clusterDefObj, clusterVersionObj, clusterObj)
+		clusterObj, clusterDefObj, _ = newAllFieldsClusterObj(nil, false)
+		clusterComponent = newAllFieldsSynthesizedComponent(clusterDefObj, clusterObj)
 		componentObj = newAllFieldsComponent(clusterObj)
 	})
 

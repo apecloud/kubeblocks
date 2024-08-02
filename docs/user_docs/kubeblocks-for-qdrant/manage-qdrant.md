@@ -1,23 +1,28 @@
 ---
 title: Manage Qdrant with KubeBlocks
-description: How to manage vector databases on KubeBlocks
+description: How to manage Qdrant on KubeBlocks
 keywords: [qdrant, vector database, control plane]
 sidebar_position: 1
 sidebar_label: Manage Qdrant with KubeBlocks
 ---
+
 # Manage Qdrant with KubeBlocks
 
 The popularity of generative AI (Generative AI) has aroused widespread attention and completely ignited the vector database (Vector Database) market. Qdrant (read: quadrant) is a vector similarity search engine and vector database. It provides a production-ready service with a convenient API to store, search, and manage points—vectors with an additional payload Qdrant is tailored to extended filtering support. It makes it useful for all sorts of neural-network or semantic-based matching, faceted search, and other applications.
 
 KubeBlocks supports the management of Qdrant.
 
-Before you start, [install kbcli](./../installation/install-with-kbcli/install-kbcli.md) and [install KubeBlocks](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md).
+## Before you start
+
+- [Install kbcli](./../installation/install-with-kbcli/install-kbcli.md).
+- [Install KubeBlocks](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md).
+- [Install and enable the qdrant addon](./../overview/supported-addons.md#use-addons).
 
 ## Create a cluster
 
 ***Steps***
 
-1. Execute the following command to create a Qdrant cluster. You can change the `cluster-definition` value as any other databases supported.
+1. Execute the following command to create a Qdrant cluster. 
 
    ```bash
    kbcli cluster create qdrant --cluster-definition=qdrant
@@ -29,13 +34,23 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
    kbcli cluster create qdrant --cluster-definition=qdrant --set replicas=3
    ```
 
+:::note
+
+View more flags for creating a MySQL cluster to create a cluster with customized specifications.
+  
+```bash
+kbcli cluster create --help
+```
+
+:::
+
 2. Check whether the cluster is created.
 
    ```bash
    kbcli cluster list
    >
    NAME     NAMESPACE   CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    CREATED-TIME
-   qdrant   default     qdrant               qdrant-1.1.0   Delete               Running   Aug 15,2023 23:03 UTC+0800
+   qdrant   default     qdrant               qdrant-1.5.0   Delete               Running   Aug 15,2023 23:03 UTC+0800
    ```
 
 3. Check the cluster information.
@@ -45,7 +60,7 @@ Before you start, [install kbcli](./../installation/install-with-kbcli/install-k
    >
    Name: qdrant         Created Time: Aug 15,2023 23:03 UTC+0800
    NAMESPACE   CLUSTER-DEFINITION   VERSION        STATUS    TERMINATION-POLICY
-   default     qdrant               qdrant-1.1.0   Running   Delete
+   default     qdrant               qdrant-1.5.0   Running   Delete
 
    Endpoints:
    COMPONENT   MODE        INTERNAL                                       EXTERNAL
@@ -84,8 +99,8 @@ If your cluster is on AWS, install the AWS Load Balancer Controller first.
 :::
 
 - If your client is inside a K8s cluster, run `kbcli cluster describe qdrant` to get the ClusterIP address of the cluster or the corresponding K8s cluster domain name.
-- If your client is outside the K8s cluster but in the same VPC as the server, run `kbcli cluster expose qdant --enable=true --type=vpc` to get a VPC load balancer address for the database cluster.
-- If your client is outside the VPC, run `kbcli cluster expose qdant --enable=true --type=internet` to open a public network reachable address for the database cluster.
+- If your client is outside the K8s cluster but in the same VPC as the server, run `kbcli cluster expose qdrant --enable=true --type=vpc` to get a VPC load balancer address for the database cluster.
+- If your client is outside the VPC, run `kbcli cluster expose qdrant --enable=true --type=internet` to open a public network reachable address for the database cluster.
 
 ## Monitor the database
 
@@ -106,7 +121,7 @@ For the testing environment, you can run the command below to open the Grafana m
 2. Check whether the monitoring function of the cluster is enabled. If the monitoring function is enabled, the output shows `disableExporter: false`.
 
    ```bash
-   kubectl get cluster mycluster -o yaml
+   kubectl get cluster qdrant -o yaml
    >
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
@@ -122,7 +137,7 @@ For the testing environment, you can run the command below to open the Grafana m
    If `disableExporter: false` is not shown in the output, it means the monitoring function of this cluster is not enabled and you need to enable it first.
 
    ```bash
-   kbcli cluster update mycluster --disableExporter=false
+   kbcli cluster update qdrant --disable-exporter=false
    ```
 
 3. View the dashboard list.
@@ -150,12 +165,19 @@ The scaling function for vector databases is also supported.
 
 ### Scale horizontally
 
+Horizontal scaling changes the amount of pods. For example, you can scale out replicas from three to five.
+
+From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out instances, refer to [Horizontal Scale](./../../api_docs/maintenance/scale/horizontal-scale.md) in API docs for more details and examples.
+
 Use the following command to perform horizontal scaling.
 
 ```bash
 kbcli cluster hscale qdrant --replicas=5 --components=qdrant
 ```
 
+- `--components` describes the component name ready for horizontal scaling.
+- `--replicas` describes the replica amount of the specified components. Edit the amount based on your demands to scale in or out replicas.
+  
 Please wait a few seconds until the scaling process is over.
 
 The `kbcli cluster hscale` command print the `opsname`, to check the progress of horizontal scaling, you can use the following command with the `opsname`.
@@ -182,7 +204,8 @@ kbcli cluster vscale qdrant --cpu=0.5 --memory=512Mi --components=qdrant
 ```
 
 Please wait a few seconds until the scaling process is over.
-The `kbcli cluster vscale` command print the `opsname`, to check the progress of scaling, you can use the following command with the `opsname`.
+
+The `kbcli cluster vscale` command prints a command to help check the progress of scaling.
 
 ```bash
 kubectl get ops qdrant-verticalscaling-rpw2l
@@ -221,6 +244,66 @@ To check whether the expanding is done, use the following command.
 ```bash
 kbcli cluster describe qdrant
 ```
+
+## Restart
+
+1. Restart a cluster.
+
+   Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
+
+   ```bash
+   kbcli cluster restart qdrant --components="qdrant" \
+   --ttlSecondsAfterSucceed=30
+   ```
+
+   - `components` describes the component name that needs to be restarted.
+   - `ttlSecondsAfterSucceed` describes the time to live of an OpsRequest job after the restarting succeeds.
+
+2. Validate the restarting.
+
+   Run the command below to check the cluster status to check the restarting status.
+
+   ```bash
+   kbcli cluster list qdrant
+   >
+   NAME     NAMESPACE   CLUSTER-DEFINITION     VERSION         TERMINATION-POLICY   STATUS    CREATED-TIME
+   qdrant   default     qdrant                 qdrant-1.5.0    Delete               Running   Aug 15,2023 23:03 UTC+0800
+   ```
+
+   * STATUS=Updating: it means the cluster restart is in progress.
+   * STATUS=Running: it means the cluster has been restarted.
+
+## Stop/Start a cluster
+
+You can stop/start a cluster to save computing resources. When a cluster is stopped, the computing resources of this cluster are released, which means the pods of Kubernetes are released, but the storage resources are reserved. You can start this cluster again by snapshots if you want to restore the cluster resources.
+
+### Stop a cluster
+
+1. Configure the name of your cluster and run the command below to stop this cluster.
+
+   ```bash
+   kbcli cluster stop qdrant
+   ```
+
+2. Check the status of the cluster to see whether it is stopped.
+
+    ```bash
+    kbcli cluster list
+    ```
+
+### Start a cluster
+
+1. Configure the name of your cluster and run the command below to start this cluster.
+
+   ```bash
+   kbcli cluster start qdrant
+   ```
+
+2. Check the status of the cluster to see whether it is running again.
+
+    ```bash
+    kbcli cluster list
+    ```
 
 ## Backup and restore
 

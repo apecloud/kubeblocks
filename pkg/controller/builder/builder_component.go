@@ -21,8 +21,10 @@ package builder
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
 
 type ComponentBuilder struct {
@@ -77,6 +79,16 @@ func (builder *ComponentBuilder) SetConfigs(configs []appsv1alpha1.ClusterCompon
 
 func (builder *ComponentBuilder) SetServiceAccountName(serviceAccountName string) *ComponentBuilder {
 	builder.get().Spec.ServiceAccountName = serviceAccountName
+	return builder
+}
+
+func (builder *ComponentBuilder) SetParallelPodManagementConcurrency(parallelPodManagementConcurrency *intstr.IntOrString) *ComponentBuilder {
+	builder.get().Spec.ParallelPodManagementConcurrency = parallelPodManagementConcurrency
+	return builder
+}
+
+func (builder *ComponentBuilder) SetPodUpdatePolicy(policy *workloads.PodUpdatePolicyType) *ComponentBuilder {
+	builder.get().Spec.PodUpdatePolicy = policy
 	return builder
 }
 

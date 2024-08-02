@@ -57,7 +57,7 @@ var _ = Describe("update reconciler test", func() {
 			tree := kubebuilderx.NewObjectTree()
 			tree.SetRoot(its)
 			reconciler = NewUpdateReconciler()
-			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ResultSatisfied))
+			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ConditionSatisfied))
 
 			By("prepare current tree")
 			// desired: bar-hello-0, bar-foo-1, bar-foo-0, bar-3, bar-2, bar-1, bar-0
@@ -80,26 +80,30 @@ var _ = Describe("update reconciler test", func() {
 			// prepare for update
 			By("fix meta")
 			reconciler = NewFixMetaReconciler()
-			newTree, err := reconciler.Reconcile(tree)
+			res, err := reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Commit))
 
 			By("update revisions")
 			reconciler = NewRevisionUpdateReconciler()
-			newTree, err = reconciler.Reconcile(newTree)
+			res, err = reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
 
 			By("assistant object")
 			reconciler = NewAssistantObjectReconciler()
-			newTree, err = reconciler.Reconcile(newTree)
+			res, err = reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
 
 			By("replicas alignment")
 			reconciler = NewReplicasAlignmentReconciler()
-			newTree, err = reconciler.Reconcile(newTree)
+			res, err = reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
 
 			By("update all pods to ready with outdated revision")
-			pods := newTree.List(&corev1.Pod{})
+			pods := tree.List(&corev1.Pod{})
 			condition := corev1.PodCondition{
 				Type:               corev1.PodReady,
 				Status:             corev1.ConditionTrue,
@@ -139,14 +143,15 @@ var _ = Describe("update reconciler test", func() {
 			By("reconcile with default UpdateStrategy(RollingUpdate, no partition, MaxUnavailable=1)")
 			// order: bar-hello-0, bar-foo-1, bar-foo-0, bar-3, bar-2, bar-1, bar-0
 			// expected: bar-hello-0 being deleted
-			defaultTree, err := newTree.DeepCopy()
+			defaultTree, err := tree.DeepCopy()
 			Expect(err).Should(BeNil())
-			_, err = reconciler.Reconcile(defaultTree)
+			res, err = reconciler.Reconcile(defaultTree)
 			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
 			expectUpdatedPods(defaultTree, []string{"bar-hello-0"})
 
 			By("reconcile with Partition=50% and MaxUnavailable=2")
-			partitionTree, err := newTree.DeepCopy()
+			partitionTree, err := tree.DeepCopy()
 			Expect(err).Should(BeNil())
 			root, ok := partitionTree.GetRoot().(*workloads.InstanceSet)
 			Expect(ok).Should(BeTrue())
@@ -160,12 +165,13 @@ var _ = Describe("update reconciler test", func() {
 			}
 			// order: bar-hello-0, bar-foo-1, bar-foo-0, bar-3, bar-2, bar-1, bar-0
 			// expected: bar-hello-0, bar-foo-1 being deleted
-			_, err = reconciler.Reconcile(partitionTree)
+			res, err = reconciler.Reconcile(partitionTree)
 			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
 			expectUpdatedPods(partitionTree, []string{"bar-hello-0", "bar-foo-1"})
 
 			By("update revisions to the updated value")
-			partitionTree, err = newTree.DeepCopy()
+			partitionTree, err = tree.DeepCopy()
 			Expect(err).Should(BeNil())
 			root, ok = partitionTree.GetRoot().(*workloads.InstanceSet)
 			Expect(ok).Should(BeTrue())
@@ -183,19 +189,59 @@ var _ = Describe("update reconciler test", func() {
 				Expect(ok).Should(BeTrue())
 				makePodLatestRevision(pod)
 			}
-			_, err = reconciler.Reconcile(partitionTree)
+			res, err = reconciler.Reconcile(partitionTree)
 			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
 			expectUpdatedPods(partitionTree, []string{"bar-foo-0"})
 
 			By("reconcile with UpdateStrategy='OnDelete'")
-			onDeleteTree, err := newTree.DeepCopy()
+			onDeleteTree, err := tree.DeepCopy()
 			Expect(err).Should(BeNil())
 			root, ok = onDeleteTree.GetRoot().(*workloads.InstanceSet)
 			Expect(ok).Should(BeTrue())
 			root.Spec.UpdateStrategy.Type = appsv1.OnDeleteStatefulSetStrategyType
-			_, err = reconciler.Reconcile(onDeleteTree)
+			res, err = reconciler.Reconcile(onDeleteTree)
 			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
 			expectUpdatedPods(onDeleteTree, []string{})
+
+			// order: bar-hello-0, bar-foo-1, bar-foo-0, bar-3, bar-2, bar-1, bar-0
+			// expected: bar-hello-0 being deleted
+			By("reconcile with PodUpdatePolicy='PreferInPlace'")
+			preferInPlaceTree, err := tree.DeepCopy()
+			Expect(err).Should(BeNil())
+			root, ok = preferInPlaceTree.GetRoot().(*workloads.InstanceSet)
+			Expect(ok).Should(BeTrue())
+			root.Spec.PodUpdatePolicy = workloads.PreferInPlacePodUpdatePolicyType
+			// try to add env to instanceHello to trigger the recreation
+			root.Spec.Instances[0].Env = []corev1.EnvVar{
+				{
+					Name:  "foo",
+					Value: "bar",
+				},
+			}
+			res, err = reconciler.Reconcile(preferInPlaceTree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			expectUpdatedPods(preferInPlaceTree, []string{"bar-hello-0"})
+
+			By("reconcile with PodUpdatePolicy='StrictInPlace'")
+			strictInPlaceTree, err := tree.DeepCopy()
+			Expect(err).Should(BeNil())
+			root, ok = strictInPlaceTree.GetRoot().(*workloads.InstanceSet)
+			Expect(ok).Should(BeTrue())
+			root.Spec.PodUpdatePolicy = workloads.StrictInPlacePodUpdatePolicyType
+			// try to add env to instanceHello to trigger the recreation
+			root.Spec.Instances[0].Env = []corev1.EnvVar{
+				{
+					Name:  "foo",
+					Value: "bar",
+				},
+			}
+			res, err = reconciler.Reconcile(strictInPlaceTree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			expectUpdatedPods(strictInPlaceTree, []string{})
 		})
 	})
 })

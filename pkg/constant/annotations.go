@@ -25,10 +25,11 @@ const (
 
 // annotations for kubeblocks
 const (
-	ClusterSnapshotAnnotationKey             = "kubeblocks.io/cluster-snapshot" // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
-	OpsRequestAnnotationKey                  = "kubeblocks.io/ops-request"      // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
-	ReconcileAnnotationKey                   = "kubeblocks.io/reconcile"        // ReconcileAnnotationKey Notify k8s object to reconcile
-	RestartAnnotationKey                     = "kubeblocks.io/restart"          // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
+	ClusterSnapshotAnnotationKey             = "kubeblocks.io/cluster-snapshot"          // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
+	EncryptedSystemAccountsAnnotationKey     = "kubeblocks.io/encrypted-system-accounts" // EncryptedSystemAccountsAnnotationKey saves the encrypted system accounts.
+	OpsRequestAnnotationKey                  = "kubeblocks.io/ops-request"               // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
+	ReconcileAnnotationKey                   = "kubeblocks.io/reconcile"                 // ReconcileAnnotationKey Notify k8s object to reconcile
+	RestartAnnotationKey                     = "kubeblocks.io/restart"                   // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
 	RestoreFromBackupAnnotationKey           = "kubeblocks.io/restore-from-backup"
 	RestoreDoneAnnotationKey                 = "kubeblocks.io/restore-done"
 	BackupSourceTargetAnnotationKey          = "kubeblocks.io/backup-source-target"    // RestoreFromBackupAnnotationKey specifies the component to recover from the backup.
@@ -36,7 +37,6 @@ const (
 	BackupPolicyTemplateAnnotationKey        = "apps.kubeblocks.io/backup-policy-template"
 	LastAppliedClusterAnnotationKey          = "apps.kubeblocks.io/last-applied-cluster"
 	PVLastClaimPolicyAnnotationKey           = "apps.kubeblocks.io/pv-last-claim-policy"
-	HaltRecoveryAllowInconsistentCVAnnotKey  = "clusters.apps.kubeblocks.io/allow-inconsistent-cv"
 	HaltRecoveryAllowInconsistentResAnnotKey = "clusters.apps.kubeblocks.io/allow-inconsistent-resource"
 	KubeBlocksGenerationKey                  = "kubeblocks.io/generation"
 	ExtraEnvAnnotationKey                    = "kubeblocks.io/extra-env"
@@ -45,6 +45,10 @@ const (
 	DisableHAAnnotationKey                   = "kubeblocks.io/disable-ha"
 	OpsDependentOnSuccessfulOpsAnnoKey       = "ops.kubeblocks.io/dependent-on-successful-ops" // OpsDependentOnSuccessfulOpsAnnoKey wait for the dependent ops to succeed before executing the current ops. If it fails, this ops will also fail.
 	RelatedOpsAnnotationKey                  = "ops.kubeblocks.io/related-ops"
+
+	// SkipImmutableCheckAnnotationKey specifies to skip the mutation check for the object.
+	// The mutation check is only applied to the fields that are declared as immutable.
+	SkipImmutableCheckAnnotationKey = "apps.kubeblocks.io/skip-immutable-check"
 )
 
 // annotations for multi-cluster

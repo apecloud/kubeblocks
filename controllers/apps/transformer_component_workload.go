@@ -108,6 +108,9 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	if runningITS == nil {
 		if protoITS != nil {
+			if err := setCompOwnershipNFinalizer(transCtx.Component, protoITS); err != nil {
+				return err
+			}
 			graphCli.Create(dag, protoITS)
 			return nil
 		}
@@ -327,6 +330,8 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, synthesizeComp *comp
 	itsObjCopy.Spec.OfflineInstances = itsProto.Spec.OfflineInstances
 	itsObjCopy.Spec.MinReadySeconds = itsProto.Spec.MinReadySeconds
 	itsObjCopy.Spec.VolumeClaimTemplates = itsProto.Spec.VolumeClaimTemplates
+	itsObjCopy.Spec.ParallelPodManagementConcurrency = itsProto.Spec.ParallelPodManagementConcurrency
+	itsObjCopy.Spec.PodUpdatePolicy = itsProto.Spec.PodUpdatePolicy
 
 	if itsProto.Spec.UpdateStrategy.Type != "" || itsProto.Spec.UpdateStrategy.RollingUpdate != nil {
 		updateUpdateStrategy(itsObjCopy, itsProto)
@@ -493,7 +498,7 @@ func (r *componentWorkloadOps) postScaleOut(itsObj *workloads.InstanceSet) error
 	if d != nil {
 		// clean backup resources.
 		// there will not be any backup resources other than scale out.
-		tmpObjs, err := d.ClearTmpResources()
+		tmpObjs, err := d.GetTmpResources()
 		if err != nil {
 			return err
 		}
@@ -574,25 +579,26 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 	if err != nil {
 		return err
 	}
-	tryToSwitchover := func(lorryCli lorry.Client, pod *corev1.Pod) error {
+	isLeader := func(pod *corev1.Pod) bool {
 		if pod == nil || len(pod.Labels) == 0 {
-			return nil
-		}
-		// if pod is not leader/primary, no need to switchover
-		isLeader := func() bool {
-			roleName, ok := pod.Labels[constant.RoleLabelKey]
-			if !ok {
-				return false
-			}
-
-			for _, replicaRole := range r.runningITS.Spec.Roles {
-				if roleName == replicaRole.Name && replicaRole.IsLeader {
-					return true
-				}
-			}
 			return false
 		}
-		if !isLeader() {
+		roleName, ok := pod.Labels[constant.RoleLabelKey]
+		if !ok {
+			return false
+		}
+
+		for _, replicaRole := range r.runningITS.Spec.Roles {
+			if roleName == replicaRole.Name && replicaRole.IsLeader {
+				return true
+			}
+		}
+		return false
+	}
+
+	tryToSwitchover := func(lorryCli lorry.Client, pod *corev1.Pod) error {
+		// if pod is not leader/primary, no need to switchover
+		if !isLeader(pod) {
 			return nil
 		}
 		// if HA functionality is not enabled, no need to switchover
@@ -623,6 +629,11 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 		podsToMemberLeave = append(podsToMemberLeave, pod)
 	}
 	for _, pod := range podsToMemberLeave {
+		if !(isLeader(pod) || // if the pod is leader, it needs to call switchover
+			(r.synthesizeComp.LifecycleActions != nil && r.synthesizeComp.LifecycleActions.MemberLeave != nil)) { // if the memberLeave action is defined, it needs to call it
+			continue
+		}
+
 		lorryCli, err1 := lorry.NewClient(*pod)
 		if err1 != nil {
 			if err == nil {
@@ -834,6 +845,11 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 
 	updatePVCByRecreateFromStep := func(fromStep pvcRecreateStep) {
 		lastVertex := r.buildProtoITSWorkloadVertex()
+		// The steps here are decremented in reverse order because during the plan execution, dag.WalkReverseTopoOrder
+		// is called to execute all vertices on the graph according to the reverse topological order.
+		// Therefore, the vertices need to maintain the following edge linkages:
+		// root -> its -> step5 -> step4 -> step3 -> step2 -> step1
+		// So that, during execution, the sequence becomes step1 -> step2 -> step3 -> step4 -> step5
 		for step := pvRestorePolicyStep; step >= fromStep && step >= pvPolicyRetainStep; step-- {
 			lastVertex = addStepMap[step](lastVertex, step)
 		}

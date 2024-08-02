@@ -25,7 +25,6 @@ spec:
     - kubernetes.io/hostname
     nodeLabels:
       topology.kubernetes.io/zone: us-east-1a
-    tenancy: SharedNode
   tolerations:
   - key: EngineType
     operator: Equal
@@ -117,7 +116,6 @@ spec:
     - kubernetes.io/hostname
     nodeLabels:
       database: true
-    tenancy: SharedNode
   tolerations:
   - key: database
     operator: Equal

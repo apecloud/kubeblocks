@@ -158,6 +158,7 @@ func CreateValidConfigMapFilter() NotifyEventFilter {
 func GetSupportReloadConfigSpecs(configSpecs []appsv1alpha1.ComponentConfigSpec, cli client.Client, ctx context.Context) ([]ConfigSpecMeta, error) {
 	var reloadConfigSpecMeta []ConfigSpecMeta
 	for _, configSpec := range configSpecs {
+		// pass if support change and reload ConfigMap when parameters change
 		if !core.NeedReloadVolume(configSpec) {
 			continue
 		}

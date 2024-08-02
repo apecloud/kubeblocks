@@ -168,6 +168,8 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 					graphCli.Patch(dag, oldBackupSchedule, newBackupSchedule)
 				}
 				graphCli.DependOn(dag, backupPolicy, newBackupSchedule)
+				comps := graphCli.FindAll(dag, &appsv1alpha1.Component{})
+				graphCli.DependOn(dag, backupPolicy, comps...)
 				backupScheduleNames[newBackupSchedule.Name] = struct{}{}
 			}
 
@@ -441,15 +443,6 @@ func (r *clusterBackupPolicyTransformer) syncBackupMethods(backupPolicy *dpv1alp
 func (r *clusterBackupPolicyTransformer) doEnvMapping(comp *appsv1alpha1.ClusterComponentSpec, envMapping []appsv1alpha1.EnvMappingVar) []corev1.EnvVar {
 	var env []corev1.EnvVar
 	for _, v := range envMapping {
-		for _, cv := range v.ValueFrom.ClusterVersionRef {
-			if !slices.Contains(cv.Names, r.Cluster.Spec.ClusterVersionRef) {
-				continue
-			}
-			env = append(env, corev1.EnvVar{
-				Name:  v.Key,
-				Value: cv.MappingValue,
-			})
-		}
 		for _, cm := range v.ValueFrom.ComponentDef {
 			if !slices.Contains(cm.Names, comp.ComponentDef) {
 				continue
@@ -652,6 +645,11 @@ func (r *clusterBackupPolicyTransformer) getClusterComponentItems() []componentI
 		}
 	}
 	for i, v := range r.clusterTransformContext.Cluster.Spec.ShardingSpecs {
+		shardComponents, _ := intctrlutil.ListShardingComponents(r.Context, r.Client, r.Cluster, v.Name)
+		if len(shardComponents) == 0 {
+			// waiting for sharding component to be created
+			continue
+		}
 		if matchedCompDef(v.Template) {
 			compSpecItems = append(compSpecItems, componentItem{
 				compSpec:      &r.clusterTransformContext.Cluster.Spec.ShardingSpecs[i].Template,

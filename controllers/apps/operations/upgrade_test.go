@@ -20,10 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
-	"fmt"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -37,20 +36,17 @@ import (
 var _ = Describe("Upgrade OpsRequest", func() {
 
 	var (
-		randomStr             = testCtx.GetRandomStr()
-		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr
-		clusterVersionName    = "clusterversion-for-ops-" + randomStr
-		clusterName           = "cluster-for-ops-" + randomStr
-		serviceVer0           = testapps.ServiceVersion("v0")
-		serviceVer1           = testapps.ServiceVersion("v1")
-		serviceVer2           = testapps.ServiceVersion("v2")
-		release0              = testapps.ReleaseID("r0")
-		release1              = testapps.ReleaseID("r1")
-		release2              = testapps.ReleaseID("r2")
-		release3              = testapps.ReleaseID("r3")
-		release4              = testapps.ReleaseID("r4")
+		randomStr   = testCtx.GetRandomStr()
+		clusterName = "cluster-for-ops-" + randomStr
+		serviceVer0 = testapps.ServiceVersion("v0")
+		serviceVer1 = testapps.ServiceVersion("v1")
+		serviceVer2 = testapps.ServiceVersion("v2")
+		release0    = testapps.ReleaseID("r0")
+		release1    = testapps.ReleaseID("r1")
+		release2    = testapps.ReleaseID("r2")
+		release3    = testapps.ReleaseID("r3")
+		release4    = testapps.ReleaseID("r4")
 	)
-	const mysqlImageForUpdate = "docker.io/apecloud/apecloud-mysql-server:8.0.30"
 	cleanEnv := func() {
 		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
@@ -58,7 +54,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResources(&testCtx)
 
 		// delete rest resources
@@ -187,7 +183,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			})).Should(Succeed())
 		}
 		// create the cluster with no clusterDefinition
-		clusterObject := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "", "").
+		clusterObject := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 			AddComponentV2(consensusComp, compDef1.Name).
 			SetServiceVersion(testapps.ServiceVersion("v0")).
 			SetReplicas(int32(3)).Create(&testCtx).GetObject()
@@ -239,43 +235,6 @@ var _ = Describe("Upgrade OpsRequest", func() {
 	}
 
 	Context("Test OpsRequest", func() {
-		It("Test upgrade OpsRequest with ClusterVersion", func() {
-			By("init operations resources ")
-			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
-			opsRes, _, clusterObject := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
-
-			By("create Upgrade Ops")
-			newClusterVersionName := "clusterversion-upgrade-" + randomStr
-			_ = testapps.NewClusterVersionFactory(newClusterVersionName, clusterDefinitionName).
-				AddComponentVersion(consensusComp).AddContainerShort(testapps.DefaultMySQLContainerName, mysqlImageForUpdate).
-				Create(&testCtx).GetObject()
-			opsRes.OpsRequest = createUpgradeOpsRequest(clusterObject, appsv1alpha1.Upgrade{ClusterVersionRef: &newClusterVersionName})
-
-			By("mock upgrade OpsRequest phase is Running")
-			makeUpgradeOpsIsRunning(reqCtx, opsRes)
-
-			By("expect upgrade successfully")
-			_ = testapps.MockInstanceSetPod(&testCtx, nil, clusterName, statelessComp, fmt.Sprintf(clusterName+"-"+statelessComp+"-0"), "", "")
-			_ = testapps.MockInstanceSetPods(&testCtx, nil, clusterObject, statefulComp)
-			pods := testapps.MockInstanceSetPods(&testCtx, nil, clusterObject, consensusComp)
-			for i := range pods {
-				pod := pods[i]
-				Expect(testapps.ChangeObj(&testCtx, pod, func(pod *corev1.Pod) {
-					pod.Spec.Containers[0].Image = mysqlImageForUpdate
-				})).Should(Succeed())
-				Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
-					pod.Status.ContainerStatuses = []corev1.ContainerStatus{
-						{
-							Name:  testapps.DefaultMySQLContainerName,
-							Image: mysqlImageForUpdate,
-						},
-					}
-				})).Should(Succeed())
-			}
-			// mock component to running
-			expectOpsSucceed(reqCtx, opsRes, consensusComp, statelessComp, statefulComp)
-		})
-
 		It("Test upgrade OpsRequest with ComponentDef and no ComponentVersion", func() {
 			By("init operations resources ")
 			compDef1, compDef2, opsRes := initOpsResWithComponentDef(false)

@@ -52,7 +52,6 @@ var _ = Describe("build service references", func() {
 
 		// resources should be released in following order
 		// non-namespaced
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ClusterVersionSignature, true, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ClusterDefinitionSignature, true, ml)
 		testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
 
@@ -61,17 +60,15 @@ var _ = Describe("build service references", func() {
 	}
 
 	var (
-		mockClient     *testutil.K8sClientMockHelper
-		clusterDef     *appsv1alpha1.ClusterDefinition
-		clusterVersion *appsv1alpha1.ClusterVersion
-		cluster        *appsv1alpha1.Cluster
+		mockClient *testutil.K8sClientMockHelper
+		clusterDef *appsv1alpha1.ClusterDefinition
+		cluster    *appsv1alpha1.Cluster
 	)
 
 	var (
 		namespace                        = "default"
 		clusterName                      = "cluster"
 		clusterDefName                   = "test-cd"
-		clusterVersionName               = "test-cv"
 		nginxCompName                    = "nginx"
 		nginxCompDefName                 = "nginx"
 		externalServiceDescriptorName    = "mock-external-service-descriptor-name"
@@ -96,7 +93,6 @@ var _ = Describe("build service references", func() {
 	buildServiceReferences4Test := func(ctx context.Context,
 		cli client.Reader,
 		clusterDef *appsv1alpha1.ClusterDefinition,
-		clusterVer *appsv1alpha1.ClusterVersion,
 		cluster *appsv1alpha1.Cluster,
 		clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (map[string]*appsv1alpha1.ServiceDescriptor, error) {
 		var (
@@ -104,7 +100,7 @@ var _ = Describe("build service references", func() {
 			comp    *appsv1alpha1.Component
 			err     error
 		)
-		if compDef, err = BuildComponentDefinition(clusterDef, clusterVer, clusterCompSpec); err != nil {
+		if compDef, err = BuildComponentDefinition(clusterDef, clusterCompSpec); err != nil {
 			return nil, err
 		}
 		if comp, err = BuildComponent(cluster, clusterCompSpec, nil, nil); err != nil {
@@ -146,11 +142,6 @@ var _ = Describe("build service references", func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
 				AddComponentDef(testapps.StatelessNginxComponent, nginxCompDefName).
 				AddServiceRefDeclarations(serviceRefDeclarations).
-				Create(&testCtx).GetObject()
-			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponentVersion(nginxCompDefName).
-				AddInitContainerShort("nginx-init", testapps.NginxImage).
-				AddContainerShort("nginx", testapps.NginxImage).
 				Create(&testCtx).GetObject()
 		})
 
@@ -220,21 +211,20 @@ var _ = Describe("build service references", func() {
 		})
 
 		It("generate service descriptor test", func() {
-			By("Create cluster")
+			By("Create a cluster")
 			serviceRefs := []appsv1alpha1.ServiceRef{
 				{
 					Name:              redisServiceRefDeclarationName,
 					ServiceDescriptor: externalServiceDescriptorName,
 				},
 			}
-			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-				clusterDef.Name, clusterVersion.Name).
+			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDef.Name).
 				AddComponent(nginxCompName, nginxCompDefName).
 				SetServiceRefs(serviceRefs).
 				Create(&testCtx).GetObject()
 
 			By("GenServiceReferences failed because external service descriptor not found")
-			serviceReferences, err := buildServiceReferences4Test(testCtx.Ctx, testCtx.Cli, clusterDef, nil, cluster, &cluster.Spec.ComponentSpecs[0])
+			serviceReferences, err := buildServiceReferences4Test(testCtx.Ctx, testCtx.Cli, clusterDef, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).ShouldNot(Succeed())
 			Expect(apierrors.IsNotFound(err)).Should(BeTrue())
 			Expect(serviceReferences).Should(BeNil())
@@ -265,7 +255,7 @@ var _ = Describe("build service references", func() {
 				Create(&testCtx).GetObject()
 
 			By("GenServiceReferences failed because external service descriptor status is not available")
-			serviceReferences, err = buildServiceReferences4Test(testCtx.Ctx, testCtx.Cli, clusterDef, nil, cluster, &cluster.Spec.ComponentSpecs[0])
+			serviceReferences, err = buildServiceReferences4Test(testCtx.Ctx, testCtx.Cli, clusterDef, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("status is not available"))
 			Expect(serviceReferences).Should(BeNil())
@@ -276,7 +266,7 @@ var _ = Describe("build service references", func() {
 			})).Should(Succeed())
 
 			By("GenServiceReferences failed because external service descriptor kind and version not match")
-			serviceReferences, err = buildServiceReferences4Test(testCtx.Ctx, testCtx.Cli, clusterDef, nil, cluster, &cluster.Spec.ComponentSpecs[0])
+			serviceReferences, err = buildServiceReferences4Test(testCtx.Ctx, testCtx.Cli, clusterDef, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("kind or version is not match with"))
 			Expect(serviceReferences).Should(BeNil())
@@ -288,7 +278,7 @@ var _ = Describe("build service references", func() {
 			})).Should(Succeed())
 
 			By("GenServiceReferences succeed because external service descriptor found")
-			serviceReferences, err = buildServiceReferences4Test(testCtx.Ctx, testCtx.Cli, clusterDef, nil, cluster, &cluster.Spec.ComponentSpecs[0])
+			serviceReferences, err = buildServiceReferences4Test(testCtx.Ctx, testCtx.Cli, clusterDef, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
 			Expect(serviceReferences).ShouldNot(BeNil())
 			Expect(len(serviceReferences)).Should(Equal(1))

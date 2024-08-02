@@ -29,13 +29,12 @@ type MockClusterFactory struct {
 	BaseFactory[appsv1alpha1.Cluster, *appsv1alpha1.Cluster, MockClusterFactory]
 }
 
-func NewClusterFactory(namespace, name, cdRef, cvRef string) *MockClusterFactory {
+func NewClusterFactory(namespace, name, cdRef string) *MockClusterFactory {
 	f := &MockClusterFactory{}
 	f.Init(namespace, name,
 		&appsv1alpha1.Cluster{
 			Spec: appsv1alpha1.ClusterSpec{
 				ClusterDefRef:     cdRef,
-				ClusterVersionRef: cvRef,
 				ComponentSpecs:    []appsv1alpha1.ClusterComponentSpec{},
 				TerminationPolicy: appsv1alpha1.WipeOut,
 			},
@@ -326,5 +325,11 @@ func (factory *MockClusterFactory) AddUserConfigmapVolume(name, mountPoint, resN
 			comp.UserResourceRefs = userResourcesRefs
 		}
 		userResourcesRefs.ConfigMapRefs = append(userResourcesRefs.ConfigMapRefs, cmResource)
+	})
+}
+
+func (factory *MockClusterFactory) SetStop(stop *bool) *MockClusterFactory {
+	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
+		comp.Stop = stop
 	})
 }

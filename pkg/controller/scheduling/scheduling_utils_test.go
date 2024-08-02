@@ -62,13 +62,12 @@ var _ = Describe("affinity utils", func() {
 				Effect:   corev1.TaintEffectNoExecute,
 			}
 
-			clusterObj = testapps.NewClusterFactory("default", clusterName, "", "").
+			clusterObj = testapps.NewClusterFactory("default", clusterName, "").
 				AddComponent(compName, "").
 				SetClusterAffinity(affinity).
 				AddClusterToleration(toleration).
 				GetObject()
 			compSpec = &clusterObj.Spec.ComponentSpecs[0]
-
 		}
 	)
 

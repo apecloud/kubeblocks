@@ -38,17 +38,15 @@ import (
 var _ = Describe("ConfigEnvFrom test", func() {
 
 	const (
-		clusterDefName     = "test-clusterdef"
-		clusterVersionName = "test-clusterversion"
-		clusterName        = "test-cluster"
+		clusterDefName = "test-clusterdef"
+		clusterName    = "test-cluster"
 
 		mysqlCompDefName = "replicasets"
 		mysqlCompName    = "mysql"
 	)
 	var (
-		clusterDef     *appsv1alpha1.ClusterDefinition
-		clusterVersion *appsv1alpha1.ClusterVersion
-		cluster        *appsv1alpha1.Cluster
+		clusterDef *appsv1alpha1.ClusterDefinition
+		cluster    *appsv1alpha1.Cluster
 
 		k8sMockClient    *testutil.K8sClientMockHelper
 		origCMObject     *corev1.ConfigMap
@@ -67,13 +65,8 @@ var _ = Describe("ConfigEnvFrom test", func() {
 		clusterDef = testapps.NewClusterDefFactory(clusterDefName).
 			AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
 			GetObject()
-		clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-			AddComponentVersion(mysqlCompDefName).
-			AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-			GetObject()
 		pvcSpec := testapps.NewPVCSpec("1Gi")
-		cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-			clusterDef.Name, clusterVersion.Name).
+		cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDef.Name).
 			AddComponent(mysqlCompName, mysqlCompDefName).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			GetObject()
@@ -92,7 +85,7 @@ var _ = Describe("ConfigEnvFrom test", func() {
 				Ctx: ctx,
 				Log: logger,
 			}
-			synthesizeComp, err := component.BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, clusterVersion, cluster, &cluster.Spec.ComponentSpecs[0])
+			synthesizeComp, err := component.BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
 
 			podSpec := &corev1.PodSpec{

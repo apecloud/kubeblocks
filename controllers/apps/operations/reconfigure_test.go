@@ -24,6 +24,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -42,7 +43,6 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 	var (
 		randomStr             = testCtx.GetRandomStr()
 		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr
-		clusterVersionName    = "clusterversion-for-ops-" + randomStr
 		clusterName           = "cluster-for-ops-" + randomStr
 	)
 
@@ -53,7 +53,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResources(&testCtx)
 
 		// delete rest resources
@@ -77,7 +77,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 
 	assureMockReconfigureData := func(policyName string) (*OpsResource, *appsv1alpha1.Configuration, *corev1.ConfigMap) {
 		By("init operations resources ")
-		opsRes, _, clusterObject := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+		opsRes, _, clusterObject := initOperationsResources(clusterDefinitionName, clusterName)
 
 		By("Test Reconfigure")
 		{

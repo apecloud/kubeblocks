@@ -39,10 +39,9 @@ import (
 
 var _ = Describe("Component Utils", func() {
 	var (
-		randomStr          = testCtx.GetRandomStr()
-		clusterDefName     = "mysql-clusterdef-" + randomStr
-		clusterVersionName = "mysql-clusterversion-" + randomStr
-		clusterName        = "mysql-" + randomStr
+		randomStr      = testCtx.GetRandomStr()
+		clusterDefName = "mysql-clusterdef-" + randomStr
+		clusterName    = "mysql-" + randomStr
 	)
 
 	const (
@@ -56,7 +55,7 @@ var _ = Describe("Component Utils", func() {
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
 		By("clean resources")
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 
 		// clear rest resources
@@ -74,8 +73,8 @@ var _ = Describe("Component Utils", func() {
 	Context("Component test", func() {
 		It("Component test", func() {
 			By(" init cluster, instanceSet, pods")
-			_, _, cluster := testapps.InitClusterWithHybridComps(&testCtx, clusterDefName,
-				clusterVersionName, clusterName, statelessCompName, "stateful", consensusCompName)
+			_, cluster := testapps.InitClusterWithHybridComps(&testCtx, clusterDefName,
+				clusterName, statelessCompName, "stateful", consensusCompName)
 			its := testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusCompName)
 			_ = testapps.MockInstanceSetPods(&testCtx, its, cluster, consensusCompName)
 

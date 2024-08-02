@@ -21,9 +21,17 @@ package apps
 
 import (
 	"fmt"
+	"math"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+)
+
+var (
+	defaultReplicasLimit = appsv1alpha1.ReplicasLimit{
+		MinReplicas: 1,
+		MaxReplicas: math.MaxInt32,
+	}
 )
 
 // componentValidationTransformer validates the consistency between spec & definition.
@@ -81,11 +89,13 @@ func validateEnabledLogConfigs(compDef *appsv1alpha1.ComponentDefinition, enable
 }
 
 func validateCompReplicas(comp *appsv1alpha1.Component, compDef *appsv1alpha1.ComponentDefinition) error {
-	if compDef.Spec.ReplicasLimit == nil {
-		return nil
+	replicasLimit := &defaultReplicasLimit
+	// always respect the replicas limit if set.
+	if compDef.Spec.ReplicasLimit != nil {
+		replicasLimit = compDef.Spec.ReplicasLimit
 	}
+
 	replicas := comp.Spec.Replicas
-	replicasLimit := compDef.Spec.ReplicasLimit
 	if replicas >= replicasLimit.MinReplicas && replicas <= replicasLimit.MaxReplicas {
 		return nil
 	}

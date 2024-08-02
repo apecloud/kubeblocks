@@ -38,7 +38,6 @@ import (
 
 var _ = Describe("ConfigConstraint Controller", func() {
 	const clusterDefName = "test-clusterdef"
-	const clusterVersionName = "test-clusterversion"
 	const statefulCompDefName = "replicasets"
 
 	cleanEnv := func() {
@@ -48,7 +47,7 @@ var _ = Describe("ConfigConstraint Controller", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResources(&testCtx)
 
 		// delete rest mocked objects
@@ -78,11 +77,6 @@ var _ = Describe("ConfigConstraint Controller", func() {
 				AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
 				Create(&testCtx).GetObject()
 
-			By("Create a clusterVersion obj")
-			clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponentVersion(statefulCompDefName).
-				Create(&testCtx).GetObject()
-
 			By("check ConfigConstraint(template) status and finalizer")
 			Eventually(testapps.CheckObj(&testCtx, constraintKey,
 				func(g Gomega, tpl *appsv1beta1.ConfigConstraint) {
@@ -103,8 +97,7 @@ var _ = Describe("ConfigConstraint Controller", func() {
 					g.Expect(tpl.Status.Phase).To(BeEquivalentTo(appsv1beta1.CCDeletingPhase))
 				})).Should(Succeed())
 
-			By("By delete referencing clusterdefinition and clusterversion")
-			Expect(k8sClient.Delete(testCtx.Ctx, clusterVersionObj)).Should(Succeed())
+			By("By delete referencing clusterdefinition")
 			Expect(k8sClient.Delete(testCtx.Ctx, clusterDefObj)).Should(Succeed())
 
 			By("check ConfigConstraint should be deleted")

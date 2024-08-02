@@ -93,7 +93,6 @@ metadata:
 spec:
   affinity:
     podAntiAffinity: Preferred
-    tenancy: SharedNode
     topologyKeys:
     - kubernetes.io/hostname
   clusterVersionRef: redis-7.0.6
@@ -136,7 +135,6 @@ metadata:
 spec:
   affinity:
     podAntiAffinity: Preferred
-    tenancy: SharedNode
     topologyKeys:
     - kubernetes.io/hostname
   clusterVersionRef: redis-7.0.6

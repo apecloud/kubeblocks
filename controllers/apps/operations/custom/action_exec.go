@@ -127,7 +127,7 @@ func (e *ExecAction) createExecPod(actionCtx ActionContext,
 		namespace = e.OpsRequest.Namespace
 	}
 	pod := builder.NewPodBuilder(namespace, podName).
-		AddLabelsInMap(buildLabels(e.Cluster.Name, e.OpsRequest.Name, e.Comp.Name, actionCtx.Action.Name)).
+		AddLabelsInMap(buildLabels(e.OpsRequest.Name, actionCtx.Action.Name)).
 		AddLabels(constant.OpsRequestNamespaceLabelKey, e.OpsRequest.Namespace).
 		SetPodSpec(*podSpec).
 		AddServiceAccount(serviceAccountName).
@@ -171,6 +171,7 @@ func (e *ExecAction) buildExecPodSpec(actionCtx ActionContext,
 	return &corev1.PodSpec{
 		Containers: []corev1.Container{*container},
 		// tolerate all taints
-		Tolerations: e.Comp.Tolerations,
+		Tolerations:      e.Comp.Tolerations,
+		ImagePullSecrets: intctrlutil.BuildImagePullSecrets(),
 	}, nil
 }

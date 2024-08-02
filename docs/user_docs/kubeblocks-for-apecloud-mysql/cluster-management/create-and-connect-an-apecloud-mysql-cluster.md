@@ -57,13 +57,13 @@ kbcli cluster create <clustername> --cluster-definition apecloud-mysql
 Create a RaftGroup Cluster.
 
 ```bash
-kbcli cluster create <clustername> --cluster-definition apecloud-mysql --mode raftGroup <clustername>
+kbcli cluster create <clustername> --cluster-definition apecloud-mysql --set replicas=3 <clustername>
 ```
 
 If you only have one node for deploying a RaftGroup Cluster, set the `availability-policy` as `none` when creating a RaftGroup Cluster.
 
 ```bash
-kbcli cluster create <clustername> --cluster-definition apecloud-mysql --mode raftGroup --availability-policy none 
+kbcli cluster create <clustername> --cluster-definition apecloud-mysql --set replicas=3 --topology-keys null
 ```
 
 If you want to specify a cluster version, you can first view the available versions and use `--clusterversion` to specify a version.

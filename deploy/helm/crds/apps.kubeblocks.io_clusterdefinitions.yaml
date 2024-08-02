@@ -357,76 +357,6 @@ spec:
                       required:
                       - leader
                       type: object
-                    customLabelSpecs:
-                      description: Used for custom label tags which you want to add
-                        to the component resources.
-                      items:
-                        description: CustomLabelSpec is deprecated since v0.8.
-                        properties:
-                          key:
-                            description: The key of the label.
-                            type: string
-                          resources:
-                            description: The resources that will be patched with the
-                              label.
-                            items:
-                              description: GVKResource is deprecated since v0.8.
-                              properties:
-                                gvk:
-                                  description: |-
-                                    Represents the GVK of a resource, such as "v1/Pod", "apps/v1/StatefulSet", etc.
-                                    When a resource matching this is found by the selector, a custom label will be added if it doesn't already exist,
-                                    or updated if it does.
-                                  type: string
-                                selector:
-                                  additionalProperties:
-                                    type: string
-                                  description: A label query used to filter a set
-                                    of resources.
-                                  type: object
-                              required:
-                              - gvk
-                              type: object
-                            type: array
-                          value:
-                            description: The value of the label.
-                            type: string
-                        required:
-                        - key
-                        - value
-                        type: object
-                      type: array
-                      x-kubernetes-list-map-keys:
-                      - key
-                      x-kubernetes-list-type: map
-                    description:
-                      description: Description of the component definition.
-                      type: string
-                    exporter:
-                      description: Defines the metrics exporter.
-                      properties:
-                        containerName:
-                          description: Specifies the name of the built-in metrics
-                            exporter container.
-                          type: string
-                        scrapePath:
-                          description: |-
-                            Specifies the http/https url path to scrape for metrics.
-                            If empty, Prometheus uses the default value (e.g. `/metrics`).
-                          type: string
-                        scrapePort:
-                          description: Specifies the port name to scrape for metrics.
-                          type: string
-                        scrapeScheme:
-                          description: |-
-                            Specifies the schema to use for scraping.
-                            `http` and `https` are the expected values unless you rewrite the `__scheme__` label via relabeling.
-                            If empty, Prometheus uses the default value `http`.
-                          enum:
-                          - http
-                          - https
-                          type: string
-                      type: object
                     horizontalScalePolicy:
                       description: Defines the behavior of horizontal scale.
                       properties:
@@ -454,40 +384,6 @@ spec:
                             Specifies the volumeMount of the container to backup.
                             This only works if Type is not None. If not specified, the first volumeMount will be selected.
                           type: string
-                      type: object
-                    monitor:
-                      description: |-
-                        Deprecated since v0.9
-                        monitor is monitoring config which provided by provider.
-                      properties:
-                        builtIn:
-                          default: false
-                          description: |-
-                            builtIn is a switch to enable KubeBlocks builtIn monitoring.
-                            If BuiltIn is set to true, monitor metrics will be scraped automatically.
-                            If BuiltIn is set to false, the provider should set ExporterConfig and Sidecar container own.
-                          type: boolean
-                        exporterConfig:
-                          description: |-
-                            exporterConfig provided by provider, which specify necessary information to Time Series Database.
-                            exporterConfig is valid when builtIn is false.
-                          properties:
-                            scrapePath:
-                              default: /metrics
-                              description: scrapePath is exporter url path for Time
-                                Series Database to scrape metrics.
-                              maxLength: 128
-                              type: string
-                            scrapePort:
-                              anyOf:
-                              - type: integer
-                              - type: string
-                              description: scrapePort is exporter port for Time Series
-                                Database to scrape metrics.
-                              x-kubernetes-int-or-string: true
-                          required:
-                          - scrapePort
-                          type: object
                       type: object
                     name:
                       description: |-
@@ -9501,17 +9397,6 @@ spec:
                 maxItems: 128
                 minItems: 1
                 type: array
-              type:
-                description: |-
-                  Specifies the well-known database type, such as mysql, redis, or mongodb.
-
-
-                  Deprecated since v0.9.
-                  This field is maintained for backward compatibility and its use is discouraged.
-                  Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
-                maxLength: 24
-                pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
-                type: string
             type: object
           status:
             description: ClusterDefinitionStatus defines the observed state of ClusterDefinition

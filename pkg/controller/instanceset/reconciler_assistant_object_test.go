@@ -49,11 +49,12 @@ var _ = Describe("assistant object reconciler test", func() {
 			tree := kubebuilderx.NewObjectTree()
 			tree.SetRoot(its)
 			reconciler = NewAssistantObjectReconciler()
-			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ResultSatisfied))
+			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ConditionSatisfied))
 
 			By("do reconcile")
-			_, err := reconciler.Reconcile(tree)
+			res, err := reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
 			// desired: svc: "bar-headless", cm: "bar"
 			objects := tree.GetSecondaryObjects()
 			Expect(objects).Should(HaveLen(2))

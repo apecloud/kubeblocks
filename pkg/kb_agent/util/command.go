@@ -58,6 +58,5 @@ func GetAllEnvs(args map[string]any) []string {
 		env := fmt.Sprintf("%s=%v", strings.ToUpper(k), v)
 		envs = append(envs, env)
 	}
-
 	return envs
 }

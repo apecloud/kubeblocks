@@ -43,7 +43,6 @@ import (
 )
 
 const clusterDefName = "test-clusterdef"
-const clusterVersionName = "test-clusterversion"
 const clusterName = "test-cluster"
 const statefulCompDefName = "replicasets"
 const statefulCompName = "mysql"
@@ -109,14 +108,8 @@ func mockReconcileResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint, 
 		AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
 		Create(&testCtx).GetObject()
 
-	By("Create a clusterVersion obj")
-	clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-		AddComponentVersion(statefulCompDefName).
-		Create(&testCtx).GetObject()
-
 	By("Creating a cluster")
-	clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-		clusterDefObj.Name, clusterVersionObj.Name).
+	clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name).
 		AddComponent(statefulCompName, statefulCompDefName).Create(&testCtx).GetObject()
 
 	By("Create a component definition obj and mock to available")
@@ -186,7 +179,7 @@ func cleanEnv() {
 	// create the new objects.
 	By("clean resources")
 
-	// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+	// delete cluster(and all dependent sub-resources), cluster definition
 	testapps.ClearClusterResources(&testCtx)
 
 	// delete rest mocked objects

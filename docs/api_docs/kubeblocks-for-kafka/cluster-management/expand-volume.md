@@ -23,7 +23,7 @@ kubectl get cluster mycluster -n demo
 
 ## Steps
 
-There are two ways to expan volume.
+There are two ways to expand volume.
 
 <Tabs>
 

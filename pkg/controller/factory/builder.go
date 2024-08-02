@@ -80,15 +80,19 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 		synthesizedComp.Annotations,
 	)
 
-	replicasStr := strconv.Itoa(int(synthesizedComp.Replicas))
 	podBuilder := builder.NewPodBuilder("", "").
 		AddLabelsInMap(synthesizedComp.Labels).
 		AddLabelsInMap(labels).
 		AddLabelsInMap(compDefLabel).
 		AddLabelsInMap(constant.GetAppVersionLabel(compDefName)).
 		AddLabelsInMap(synthesizedComp.UserDefinedLabels).
-		AddAnnotations(constant.ComponentReplicasAnnotationKey, replicasStr).
+		AddLabelsInMap(constant.GetClusterWellKnownLabels(clusterName)).
 		AddAnnotationsInMap(synthesizedComp.UserDefinedAnnotations)
+	if viper.GetBool(constant.FeatureGateComponentReplicasAnnotation) {
+		replicasStr := strconv.Itoa(int(synthesizedComp.Replicas))
+		podBuilder.AddAnnotations(constant.ComponentReplicasAnnotationKey, replicasStr)
+
+	}
 	template := corev1.PodTemplateSpec{
 		ObjectMeta: podBuilder.GetObject().ObjectMeta,
 		Spec:       *synthesizedComp.PodSpec.DeepCopy(),
@@ -218,9 +222,6 @@ func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, clus
 	credentialBuilder := builder.NewSecretBuilder(cluster.Namespace, constant.GenerateDefaultConnCredential(cluster.Name)).
 		AddLabelsInMap(wellKnownLabels).
 		SetStringData(clusterDefinition.Spec.ConnectionCredential)
-	if len(clusterDefinition.Spec.Type) > 0 {
-		credentialBuilder.AddLabelsInMap(constant.GetClusterDefTypeLabel(clusterDefinition.Spec.Type))
-	}
 	connCredential := credentialBuilder.GetObject()
 
 	if len(connCredential.StringData) == 0 {
@@ -324,6 +325,39 @@ func GetRestorePassword(synthesizedComp *component.SynthesizedComponent) string 
 	}
 	e := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
 	password, _ = e.Decrypt([]byte(password))
+	return password
+}
+
+// GetRestoreSystemAccountPassword gets restore password if exists during recovery.
+func GetRestoreSystemAccountPassword(synthesizedComp *component.SynthesizedComponent, account appsv1alpha1.SystemAccount) string {
+	valueString := synthesizedComp.Annotations[constant.RestoreFromBackupAnnotationKey]
+	if len(valueString) == 0 {
+		return ""
+	}
+	backupMap := map[string]map[string]string{}
+	err := json.Unmarshal([]byte(valueString), &backupMap)
+	if err != nil {
+		return ""
+	}
+	backupSource, ok := backupMap[synthesizedComp.Name]
+	if !ok {
+		return ""
+	}
+	systemAccountsString, ok := backupSource[constant.EncryptedSystemAccounts]
+	if !ok {
+		return ""
+	}
+	systemAccountsMap := map[string]string{}
+	err = json.Unmarshal([]byte(systemAccountsString), &systemAccountsMap)
+	if err != nil {
+		return ""
+	}
+	e := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
+	encryptedPwd, ok := systemAccountsMap[account.Name]
+	if !ok {
+		return ""
+	}
+	password, _ := e.Decrypt([]byte(encryptedPwd))
 	return password
 }
 
@@ -471,6 +505,7 @@ func BuildServiceAccount(cluster *appsv1alpha1.Cluster, saName string) *corev1.S
 	wellKnownLabels := constant.GetKBWellKnownLabels(cluster.Spec.ClusterDefRef, cluster.Name, "")
 	return builder.NewServiceAccountBuilder(cluster.Namespace, saName).
 		AddLabelsInMap(wellKnownLabels).
+		SetImagePullSecrets(intctrlutil.BuildImagePullSecrets()).
 		GetObject()
 }
 

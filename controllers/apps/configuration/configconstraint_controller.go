@@ -73,7 +73,7 @@ func (r *ConfigConstraintReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, configConstraint, constant.ConfigFinalizerName, func() (*ctrl.Result, error) {
 		recordEvent := func() {
 			r.Recorder.Event(configConstraint, corev1.EventTypeWarning, "ExistsReferencedResources",
-				"cannot be deleted because of existing referencing of ClusterDefinition or ClusterVersion.")
+				"cannot be deleted because of existing referencing of ClusterDefinition.")
 		}
 		if configConstraint.Status.Phase != appsv1beta1.CCDeletingPhase {
 			err := updateConfigConstraintStatus(r.Client, reqCtx, configConstraint, appsv1beta1.CCDeletingPhase)
@@ -85,8 +85,7 @@ func (r *ConfigConstraintReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		}
 		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, configConstraint,
 			cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(configConstraint.GetName()),
-			recordEvent, &appsv1alpha1.ClusterDefinitionList{},
-			&appsv1alpha1.ClusterVersionList{}); res != nil || err != nil {
+			recordEvent, &appsv1alpha1.ClusterDefinitionList{}); res != nil || err != nil {
 			return res, err
 		}
 		return nil, nil

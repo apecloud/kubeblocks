@@ -30,22 +30,22 @@ type fixMetaReconciler struct{}
 
 func (r *fixMetaReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
-		return kubebuilderx.ResultUnsatisfied
+		return kubebuilderx.ConditionUnsatisfied
 	}
 
 	if controllerutil.ContainsFinalizer(tree.GetRoot(), finalizer) {
-		return kubebuilderx.ResultUnsatisfied
+		return kubebuilderx.ConditionUnsatisfied
 	}
 
-	return kubebuilderx.ResultSatisfied
+	return kubebuilderx.ConditionSatisfied
 }
 
-func (r *fixMetaReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
+func (r *fixMetaReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	// The object is not being deleted, so if it does not have our finalizer,
 	// then lets add the finalizer and update the object. This is equivalent
 	// registering our finalizer.
 	controllerutil.AddFinalizer(tree.GetRoot(), finalizer)
-	return tree, nil
+	return kubebuilderx.Commit, nil
 }
 
 func NewFixMetaReconciler() kubebuilderx.Reconciler {

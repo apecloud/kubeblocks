@@ -54,9 +54,6 @@ const (
 	DefaultRedisContainerName     = "redis"
 	DefaultRedisInitContainerName = "redis-init-container"
 
-	EnvKeyImageTag  = "IMAGE_TAG"
-	DefaultImageTag = "test"
-
 	DefaultConfigSpecName          = "config-cm"
 	DefaultConfigSpecTplRef        = "env-from-config-tpl"
 	DefaultConfigSpecVolumeName    = "volume"
@@ -346,10 +343,12 @@ var (
 		LifecycleActions: &appsv1alpha1.ComponentLifecycleActions{
 			PostProvision: defaultLifecycleActionHandler,
 			PreTerminate:  defaultLifecycleActionHandler,
-			RoleProbe: &appsv1alpha1.RoleProbe{
-				LifecycleActionHandler: *defaultLifecycleActionHandler,
-				PeriodSeconds:          1,
-				TimeoutSeconds:         5,
+			RoleProbe: &appsv1alpha1.Probe{
+				BuiltinHandler: defaultLifecycleActionHandler.BuiltinHandler,
+				Action: appsv1alpha1.Action{
+					TimeoutSeconds: 5,
+				},
+				PeriodSeconds: 1,
 			},
 			Switchover:       nil,
 			MemberJoin:       defaultLifecycleActionHandler,

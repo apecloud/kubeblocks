@@ -57,7 +57,7 @@ func BuildSynthesizedComponent4Generated(reqCtx intctrlutil.RequestCtx,
 	cli client.Reader,
 	cluster *appsv1alpha1.Cluster,
 	comp *appsv1alpha1.Component) (*appsv1alpha1.ComponentDefinition, *SynthesizedComponent, error) {
-	clusterDef, clusterVer, err := getClusterReferencedResources(reqCtx.Ctx, cli, cluster)
+	clusterDef, err := getClusterReferencedResources(reqCtx.Ctx, cli, cluster)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -68,7 +68,7 @@ func BuildSynthesizedComponent4Generated(reqCtx intctrlutil.RequestCtx,
 	if clusterCompSpec == nil {
 		return nil, nil, fmt.Errorf("cluster component spec is not found: %s", comp.Name)
 	}
-	compDef, err := getOrBuildComponentDefinition(reqCtx.Ctx, cli, clusterDef, clusterVer, cluster, clusterCompSpec)
+	compDef, err := getOrBuildComponentDefinition(reqCtx.Ctx, cli, clusterDef, cluster, clusterCompSpec)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -85,18 +85,17 @@ func BuildSynthesizedComponentWrapper(reqCtx intctrlutil.RequestCtx,
 	cli client.Reader,
 	cluster *appsv1alpha1.Cluster,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*SynthesizedComponent, error) {
-	clusterDef, clusterVer, err := getClusterReferencedResources(reqCtx.Ctx, cli, cluster)
+	clusterDef, err := getClusterReferencedResources(reqCtx.Ctx, cli, cluster)
 	if err != nil {
 		return nil, err
 	}
-	return BuildSynthesizedComponentWrapper4Test(reqCtx, cli, clusterDef, clusterVer, cluster, clusterCompSpec)
+	return BuildSynthesizedComponentWrapper4Test(reqCtx, cli, clusterDef, cluster, clusterCompSpec)
 }
 
 // BuildSynthesizedComponentWrapper4Test builds a new SynthesizedComponent object with a given ClusterComponentSpec.
 func BuildSynthesizedComponentWrapper4Test(reqCtx intctrlutil.RequestCtx,
 	cli client.Reader,
 	clusterDef *appsv1alpha1.ClusterDefinition,
-	clusterVer *appsv1alpha1.ClusterVersion,
 	cluster *appsv1alpha1.Cluster,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*SynthesizedComponent, error) {
 	if clusterCompSpec == nil {
@@ -105,7 +104,7 @@ func BuildSynthesizedComponentWrapper4Test(reqCtx intctrlutil.RequestCtx,
 	if clusterCompSpec == nil {
 		return nil, nil
 	}
-	compDef, err := getOrBuildComponentDefinition(reqCtx.Ctx, cli, clusterDef, clusterVer, cluster, clusterCompSpec)
+	compDef, err := getOrBuildComponentDefinition(reqCtx.Ctx, cli, clusterDef, cluster, clusterCompSpec)
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +116,7 @@ func BuildSynthesizedComponentWrapper4Test(reqCtx intctrlutil.RequestCtx,
 }
 
 // buildSynthesizedComponent builds a new SynthesizedComponent object, which is a mixture of component-related configs from ComponentDefinition and Component.
-// !!! Do not use @clusterDef, @clusterVer, @cluster and @clusterCompSpec since they are used for the backward compatibility only.
+// !!! Do not use @clusterDef, @cluster and @clusterCompSpec since they are used for the backward compatibility only.
 // TODO: remove @reqCtx & @cli
 func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	cli client.Reader,
@@ -148,41 +147,45 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	}
 	compDefObj := compDef.DeepCopy()
 	synthesizeComp := &SynthesizedComponent{
-		Namespace:              comp.Namespace,
-		ClusterName:            clusterName,
-		ClusterUID:             clusterUID,
-		Comp2CompDefs:          comp2CompDef,
-		Name:                   compName,
-		FullCompName:           comp.Name,
-		CompDefName:            compDef.Name,
-		ServiceVersion:         comp.Spec.ServiceVersion,
-		ClusterGeneration:      clusterGeneration(cluster, comp),
-		UserDefinedLabels:      comp.Spec.Labels,
-		UserDefinedAnnotations: comp.Spec.Annotations,
-		PodSpec:                &compDef.Spec.Runtime,
-		HostNetwork:            compDefObj.Spec.HostNetwork,
-		ComponentServices:      compDefObj.Spec.Services,
-		LogConfigs:             compDefObj.Spec.LogConfigs,
-		ConfigTemplates:        compDefObj.Spec.Configs,
-		ScriptTemplates:        compDefObj.Spec.Scripts,
-		Roles:                  compDefObj.Spec.Roles,
-		UpdateStrategy:         compDefObj.Spec.UpdateStrategy,
-		MinReadySeconds:        compDefObj.Spec.MinReadySeconds,
-		PolicyRules:            compDefObj.Spec.PolicyRules,
-		LifecycleActions:       compDefObj.Spec.LifecycleActions,
-		SystemAccounts:         mergeSystemAccounts(compDefObj.Spec.SystemAccounts, comp.Spec.SystemAccounts),
-		Replicas:               comp.Spec.Replicas,
-		Resources:              comp.Spec.Resources,
-		TLSConfig:              comp.Spec.TLSConfig,
-		ServiceAccountName:     comp.Spec.ServiceAccountName,
-		Instances:              comp.Spec.Instances,
-		OfflineInstances:       comp.Spec.OfflineInstances,
-		DisableExporter:        comp.Spec.DisableExporter,
-		PodManagementPolicy:    compDef.Spec.PodManagementPolicy,
+		Namespace:                        comp.Namespace,
+		ClusterName:                      clusterName,
+		ClusterUID:                       clusterUID,
+		Comp2CompDefs:                    comp2CompDef,
+		Name:                             compName,
+		FullCompName:                     comp.Name,
+		CompDefName:                      compDef.Name,
+		ServiceVersion:                   comp.Spec.ServiceVersion,
+		ClusterGeneration:                clusterGeneration(cluster, comp),
+		UserDefinedLabels:                comp.Spec.Labels,
+		UserDefinedAnnotations:           comp.Spec.Annotations,
+		PodSpec:                          &compDef.Spec.Runtime,
+		HostNetwork:                      compDefObj.Spec.HostNetwork,
+		ComponentServices:                compDefObj.Spec.Services,
+		LogConfigs:                       compDefObj.Spec.LogConfigs,
+		ConfigTemplates:                  compDefObj.Spec.Configs,
+		ScriptTemplates:                  compDefObj.Spec.Scripts,
+		Roles:                            compDefObj.Spec.Roles,
+		UpdateStrategy:                   compDefObj.Spec.UpdateStrategy,
+		MinReadySeconds:                  compDefObj.Spec.MinReadySeconds,
+		PolicyRules:                      compDefObj.Spec.PolicyRules,
+		LifecycleActions:                 compDefObj.Spec.LifecycleActions,
+		SystemAccounts:                   mergeSystemAccounts(compDefObj.Spec.SystemAccounts, comp.Spec.SystemAccounts),
+		Replicas:                         comp.Spec.Replicas,
+		Resources:                        comp.Spec.Resources,
+		TLSConfig:                        comp.Spec.TLSConfig,
+		ServiceAccountName:               comp.Spec.ServiceAccountName,
+		Instances:                        comp.Spec.Instances,
+		OfflineInstances:                 comp.Spec.OfflineInstances,
+		DisableExporter:                  comp.Spec.DisableExporter,
+		Stop:                             comp.Spec.Stop,
+		PodManagementPolicy:              compDef.Spec.PodManagementPolicy,
+		ParallelPodManagementConcurrency: comp.Spec.ParallelPodManagementConcurrency,
+		PodUpdatePolicy:                  comp.Spec.PodUpdatePolicy,
+		EnabledLogs:                      comp.Spec.EnabledLogs,
 	}
 
-	// build backward compatible fields, including workload, services, componentRefEnvs, clusterDefName, clusterCompDefName, and clusterCompVer, etc.
-	// if cluster referenced a clusterDefinition and clusterVersion, for backward compatibility, we need to merge the clusterDefinition and clusterVersion into the component
+	// build backward compatible fields, including workload, services, componentRefEnvs, clusterDefName, clusterCompDefName, etc.
+	// if cluster referenced a clusterDefinition, for backward compatibility, we need to merge the clusterDefinition into the component
 	// TODO(xingran): it will be removed in the future
 	if clusterDef != nil && cluster != nil && clusterCompSpec != nil {
 		if err = buildBackwardCompatibleFields(reqCtx, clusterDef, cluster, clusterCompSpec, synthesizeComp); err != nil {
@@ -686,79 +689,6 @@ func buildCompatibleHorizontalScalePolicy(compDef *appsv1alpha1.ComponentDefinit
 	}
 }
 
-// appendOrOverrideContainerAttr appends targetContainer to compContainers or overrides the attributes of compContainers with a given targetContainer,
-// if targetContainer does not exist in compContainers, it will be appended. otherwise it will be updated with the attributes of the target container.
-func appendOrOverrideContainerAttr(compContainers []corev1.Container, targetContainer corev1.Container) []corev1.Container {
-	index, compContainer := intctrlutil.GetContainerByName(compContainers, targetContainer.Name)
-	if compContainer == nil {
-		compContainers = append(compContainers, targetContainer)
-	} else {
-		doContainerAttrOverride(&compContainers[index], targetContainer)
-	}
-	return compContainers
-}
-
-// doContainerAttrOverride overrides the attributes in compContainer with the attributes in container.
-func doContainerAttrOverride(compContainer *corev1.Container, container corev1.Container) {
-	if compContainer == nil {
-		return
-	}
-	if container.Image != "" {
-		compContainer.Image = container.Image
-	}
-	if len(container.Command) != 0 {
-		compContainer.Command = container.Command
-	}
-	if len(container.Args) != 0 {
-		compContainer.Args = container.Args
-	}
-	if container.WorkingDir != "" {
-		compContainer.WorkingDir = container.WorkingDir
-	}
-	if len(container.Ports) != 0 {
-		compContainer.Ports = container.Ports
-	}
-	if len(container.EnvFrom) != 0 {
-		compContainer.EnvFrom = container.EnvFrom
-	}
-	if len(container.Env) != 0 {
-		compContainer.Env = container.Env
-	}
-	if container.Resources.Limits != nil || container.Resources.Requests != nil {
-		compContainer.Resources = container.Resources
-	}
-	if len(container.VolumeMounts) != 0 {
-		compContainer.VolumeMounts = container.VolumeMounts
-	}
-	if len(container.VolumeDevices) != 0 {
-		compContainer.VolumeDevices = container.VolumeDevices
-	}
-	if container.LivenessProbe != nil {
-		compContainer.LivenessProbe = container.LivenessProbe
-	}
-	if container.ReadinessProbe != nil {
-		compContainer.ReadinessProbe = container.ReadinessProbe
-	}
-	if container.StartupProbe != nil {
-		compContainer.StartupProbe = container.StartupProbe
-	}
-	if container.Lifecycle != nil {
-		compContainer.Lifecycle = container.Lifecycle
-	}
-	if container.TerminationMessagePath != "" {
-		compContainer.TerminationMessagePath = container.TerminationMessagePath
-	}
-	if container.TerminationMessagePolicy != "" {
-		compContainer.TerminationMessagePolicy = container.TerminationMessagePolicy
-	}
-	if container.ImagePullPolicy != "" {
-		compContainer.ImagePullPolicy = container.ImagePullPolicy
-	}
-	if container.SecurityContext != nil {
-		compContainer.SecurityContext = container.SecurityContext
-	}
-}
-
 // GetEnvReplacementMapForConnCredential gets the replacement map for connect credential
 // TODO: deprecated, will be removed later.
 func GetEnvReplacementMapForConnCredential(clusterName string) map[string]string {
@@ -810,40 +740,12 @@ func ReplaceNamedVars(namedValuesMap map[string]string, targetVar string, limits
 func ReplaceSecretEnvVars(namedValuesMap map[string]string, envs []corev1.EnvVar) []corev1.EnvVar {
 	newEnvs := make([]corev1.EnvVar, 0, len(envs))
 	for _, e := range envs {
-		if e.ValueFrom == nil || e.ValueFrom.SecretKeyRef == nil {
-			continue
-		}
-		name := ReplaceNamedVars(namedValuesMap, e.ValueFrom.SecretKeyRef.Name, 1, false)
-		if name != e.ValueFrom.SecretKeyRef.Name {
-			e.ValueFrom.SecretKeyRef.Name = name
+		if e.ValueFrom != nil && e.ValueFrom.SecretKeyRef != nil {
+			e.ValueFrom.SecretKeyRef.Name = ReplaceNamedVars(namedValuesMap, e.ValueFrom.SecretKeyRef.Name, 1, false)
 		}
 		newEnvs = append(newEnvs, e)
 	}
 	return newEnvs
-}
-
-// overrideSwitchoverSpecAttr overrides the attributes in switchoverSpec with the attributes of SwitchoverShortSpec in clusterVersion.
-func overrideSwitchoverSpecAttr(switchoverSpec *appsv1alpha1.SwitchoverSpec, cvSwitchoverSpec *appsv1alpha1.SwitchoverShortSpec) {
-	if switchoverSpec == nil || cvSwitchoverSpec == nil || cvSwitchoverSpec.CmdExecutorConfig == nil {
-		return
-	}
-	applyCmdExecutorConfig := func(cmdExecutorConfig *appsv1alpha1.CmdExecutorConfig) {
-		if cmdExecutorConfig == nil {
-			return
-		}
-		if len(cvSwitchoverSpec.CmdExecutorConfig.Image) > 0 {
-			cmdExecutorConfig.Image = cvSwitchoverSpec.CmdExecutorConfig.Image
-		}
-		if len(cvSwitchoverSpec.CmdExecutorConfig.Env) > 0 {
-			cmdExecutorConfig.Env = cvSwitchoverSpec.CmdExecutorConfig.Env
-		}
-	}
-	if switchoverSpec.WithCandidate != nil {
-		applyCmdExecutorConfig(switchoverSpec.WithCandidate.CmdExecutorConfig)
-	}
-	if switchoverSpec.WithoutCandidate != nil {
-		applyCmdExecutorConfig(switchoverSpec.WithoutCandidate.CmdExecutorConfig)
-	}
 }
 
 func GetConfigSpecByName(synthesizedComp *SynthesizedComponent, configSpec string) *appsv1alpha1.ComponentConfigSpec {

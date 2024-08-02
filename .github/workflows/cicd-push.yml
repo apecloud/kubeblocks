@@ -19,6 +19,8 @@ jobs:
     outputs:
       trigger-mode: ${{ steps.get_trigger_mode.outputs.trigger_mode }}
       base-commitid: ${{ steps.get_trigger_mode.outputs.base_commitid }}
+      git-commit: ${{ steps.get_git_info.outputs.git_commit }}
+      git-version: ${{ steps.get_git_info.outputs.git_version }}
     steps:
       - name: Cancel Previous Runs
         if: github.ref_name != 'main'
@@ -45,6 +47,14 @@ jobs:
           echo "BASE_COMMITID:$BASE_COMMITID"
           echo trigger_mode=$TRIGGER_MODE >> $GITHUB_OUTPUT
           echo base_commitid=$BASE_COMMITID >> $GITHUB_OUTPUT
+
+      - name: get git info
+        id: get_git_info
+        run: |
+          GIT_COMMIT=$(git rev-list -1 HEAD)
+          GIT_VERSION=$(git describe --always --abbrev=0 --tag)
+          echo git_commit=$GIT_COMMIT >> $GITHUB_OUTPUT
+          echo git_version=$GIT_VERSION >> $GITHUB_OUTPUT
 
       - name: merge releasing to release
         if: ${{ startsWith(github.ref_name, 'releasing-') }}
@@ -171,13 +181,17 @@ jobs:
   check-image:
     needs: trigger-mode
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[docker]') }}
-    uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.24
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.64
     with:
       MAKE_OPS_PRE: "generate"
       IMG: "apecloud/kubeblocks"
       GO_VERSION: "1.21"
       BUILDX_PLATFORMS: "linux/amd64"
       DOCKERFILE_PATH: "./docker/Dockerfile"
+      BUILDX_ARGS: |
+        VERSION=${{ needs.trigger-mode.outputs.git-version }}
+        GIT_COMMIT=${{ needs.trigger-mode.outputs.git-commit }}
+        GIT_VERSION=${{ needs.trigger-mode.outputs.git-version }}
     secrets: inherit
 
   check-tools-image:

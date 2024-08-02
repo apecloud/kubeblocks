@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"time"
 
 	"github.com/go-logr/logr"
 	"k8s.io/client-go/tools/record"
@@ -53,18 +54,44 @@ type CheckResult struct {
 	Err       error
 }
 
-var ResultUnsatisfied = &CheckResult{}
-var ResultSatisfied = &CheckResult{Satisfied: true}
+var ConditionUnsatisfied = &CheckResult{}
+var ConditionSatisfied = &CheckResult{Satisfied: true}
+
+type controlMethod string
+
+const (
+	// cntn tells the control flow to continue
+	cntn controlMethod = "Continue"
+
+	// cmmt tells the control flow to stop and jump to the commit phase
+	cmmt controlMethod = "Commit"
+
+	// rtry tells the control flow to stop, jump to the commit phase
+	// and retry from the beginning with a delay specified by Result.RetryAfter
+	rtry controlMethod = "Retry"
+)
+
+type Result struct {
+	Next       controlMethod
+	RetryAfter time.Duration
+}
+
+var Continue = Result{Next: cntn}
+var Commit = Result{Next: cmmt}
 
 var ErrDeepCopyFailed = errors.New("DeepCopyFailed")
 
 type Reconciler interface {
 	PreCondition(*ObjectTree) *CheckResult
-	Reconcile(tree *ObjectTree) (*ObjectTree, error)
+	Reconcile(tree *ObjectTree) (Result, error)
 }
 
 func CheckResultWithError(err error) *CheckResult {
 	return &CheckResult{Satisfied: false, Err: err}
+}
+
+func RetryAfter(after time.Duration) Result {
+	return Result{Next: rtry, RetryAfter: after}
 }
 
 func (t *ObjectTree) DeepCopy() (*ObjectTree, error) {

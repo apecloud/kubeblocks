@@ -33,15 +33,12 @@ import (
 
 var _ = Describe("ClusterDefinition Controller", func() {
 	const (
-		clusterDefName      = "test-clusterdef"
-		clusterVersionName  = "test-clusterversion"
-		compDefinitionName  = "test-component-definition"
-		statefulCompDefName = "replicasets"
+		clusterDefName     = "test-clusterdef"
+		compDefinitionName = "test-component-definition"
 	)
 
 	var (
-		clusterDefObj     *appsv1alpha1.ClusterDefinition
-		clusterVersionObj *appsv1alpha1.ClusterVersion
+		clusterDefObj *appsv1alpha1.ClusterDefinition
 	)
 
 	cleanEnv := func() {
@@ -56,7 +53,6 @@ var _ = Describe("ClusterDefinition Controller", func() {
 
 		// resources should be released in following order
 		// non-namespaced
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.ClusterVersionSignature, true, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.ClusterDefinitionSignature, true, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.ComponentDefinitionSignature, true, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.ConfigConstraintSignature, ml)
@@ -67,60 +63,10 @@ var _ = Describe("ClusterDefinition Controller", func() {
 
 	BeforeEach(func() {
 		cleanEnv()
-
 	})
 
 	AfterEach(func() {
 		cleanEnv()
-	})
-
-	Context("with no ConfigSpec", func() {
-		BeforeEach(func() {
-			By("Create a clusterDefinition obj")
-			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
-				Create(&testCtx).GetObject()
-
-			By("Create a clusterVersion obj")
-			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponentVersion(statefulCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-				Create(&testCtx).GetObject()
-		})
-
-		It("should update status of clusterVersion at the same time when updating clusterDefinition", func() {
-			By("Check reconciled finalizer and status of ClusterDefinition")
-			var cdGen int64
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
-				func(g Gomega, cd *appsv1alpha1.ClusterDefinition) {
-					g.Expect(cd.Finalizers).NotTo(BeEmpty())
-					g.Expect(cd.Status.ObservedGeneration).To(BeEquivalentTo(1))
-					cdGen = cd.Status.ObservedGeneration
-				})).Should(Succeed())
-
-			By("Check reconciled finalizer and status of ClusterVersion")
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterVersionObj),
-				func(g Gomega, cv *appsv1alpha1.ClusterVersion) {
-					g.Expect(cv.Finalizers).NotTo(BeEmpty())
-					g.Expect(cv.Status.ObservedGeneration).To(BeEquivalentTo(1))
-					g.Expect(cv.Status.ClusterDefGeneration).To(Equal(cdGen))
-				})).Should(Succeed())
-
-			By("updating clusterDefinition's spec which then update clusterVersion's status")
-			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
-				func(cd *appsv1alpha1.ClusterDefinition) {
-					cd.Spec.ConnectionCredential["root"] = "password"
-				})).Should(Succeed())
-
-			By("Check ClusterVersion.Status as updated")
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterVersionObj),
-				func(g Gomega, cv *appsv1alpha1.ClusterVersion) {
-					g.Expect(cv.Status.Phase).To(Equal(appsv1alpha1.AvailablePhase))
-					g.Expect(cv.Status.Message).To(Equal(""))
-					g.Expect(cv.Status.ClusterDefGeneration > cdGen).To(BeTrue())
-				})).Should(Succeed())
-
-			// TODO: update components to break @validateClusterVersion, and transit ClusterVersion.Status.Phase to UnavailablePhase
-		})
 	})
 
 	Context("cluster topology", func() {

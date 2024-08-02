@@ -25,10 +25,11 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var _ = Describe("ClusterDefinition Controller", func() {

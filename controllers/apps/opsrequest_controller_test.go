@@ -53,7 +53,6 @@ import (
 
 var _ = Describe("OpsRequest Controller", func() {
 	const clusterDefName = "test-clusterdef"
-	const clusterVersionName = "test-clusterversion"
 	const clusterNamePrefix = "test-cluster"
 	const mysqlCompDefName = "mysql"
 	const mysqlCompName = "mysql"
@@ -84,7 +83,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.OpsRequestSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.VolumeSnapshotSignature, true, inNS)
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		// delete cluster(and all dependent sub-resources), cluster definition
 		// TODO(review): why finalizers not removed
 		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 		testapps.ClearResources(&testCtx, intctrlutil.StorageClassSignature, ml)
@@ -102,10 +101,9 @@ var _ = Describe("OpsRequest Controller", func() {
 	})
 
 	var (
-		clusterDefObj     *appsv1alpha1.ClusterDefinition
-		clusterVersionObj *appsv1alpha1.ClusterVersion
-		clusterObj        *appsv1alpha1.Cluster
-		clusterKey        types.NamespacedName
+		clusterDefObj *appsv1alpha1.ClusterDefinition
+		clusterObj    *appsv1alpha1.Cluster
+		clusterKey    types.NamespacedName
 	)
 
 	mockSetClusterStatusPhaseToRunning := func(namespacedName types.NamespacedName) {
@@ -139,8 +137,8 @@ var _ = Describe("OpsRequest Controller", func() {
 		const opsName = "mysql-verticalscaling"
 
 		By("Create a cluster obj")
-		clusterFactory := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+		clusterFactory := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefObj.Name).
+			WithRandomName().
 			AddComponent(mysqlCompName, mysqlCompDefName).
 			SetReplicas(1).
 			SetResources(scalingCtx.source)
@@ -241,11 +239,6 @@ var _ = Describe("OpsRequest Controller", func() {
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 				AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
 				Create(&testCtx).GetObject()
-
-			By("Create a clusterVersion obj")
-			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponentVersion(mysqlCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-				Create(&testCtx).GetObject()
 		})
 
 		It("create cluster by resource, vertical scaling by resource", func() {
@@ -267,11 +260,6 @@ var _ = Describe("OpsRequest Controller", func() {
 					Type:                     appsv1alpha1.HScaleDataClonePolicyCloneVolume,
 					BackupPolicyTemplateName: backupPolicyTPLName,
 				}).Create(&testCtx).GetObject()
-
-			By("Create a clusterVersion obj")
-			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponentVersion(mysqlCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-				Create(&testCtx).GetObject()
 
 			By("Mock lorry client for the default transformer of system accounts provision")
 			mockLorryClientDefault()
@@ -331,8 +319,8 @@ var _ = Describe("OpsRequest Controller", func() {
 					})()).ShouldNot(HaveOccurred())
 			}
 			pvcSpec := testapps.NewPVCSpec("1Gi")
-			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
-				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefObj.Name).
+				WithRandomName().
 				AddComponent(mysqlCompName, mysqlCompDefName).
 				SetReplicas(replicas).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).

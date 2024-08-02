@@ -27,8 +27,6 @@ Resource Types:
 </li><li>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterDefinition">ClusterDefinition</a>
 </li><li>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterVersion">ClusterVersion</a>
-</li><li>
 <a href="#apps.kubeblocks.io/v1alpha1.Component">Component</a>
 </li><li>
 <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinition">ComponentDefinition</a>
@@ -585,104 +583,6 @@ Existing usage should be updated to the current preferred approach to avoid comp
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterDefinitionStatus">
 ClusterDefinitionStatus
-</a>
-</em>
-</td>
-<td>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ClusterVersion">ClusterVersion
-</h3>
-<div>
-<p>ClusterVersion is the Schema for the ClusterVersions API.</p>
-<p>Deprecated: ClusterVersion has been replaced by ComponentVersion since v0.9.
-This struct is maintained for backward compatibility and its use is discouraged.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>apiVersion</code><br/>
-string</td>
-<td>
-<code>apps.kubeblocks.io/v1alpha1</code>
-</td>
-</tr>
-<tr>
-<td>
-<code>kind</code><br/>
-string
-</td>
-<td><code>ClusterVersion</code></td>
-</tr>
-<tr>
-<td>
-<code>metadata</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
-Kubernetes meta/v1.ObjectMeta
-</a>
-</em>
-</td>
-<td>
-Refer to the Kubernetes API documentation for the fields of the
-<code>metadata</code> field.
-</td>
-</tr>
-<tr>
-<td>
-<code>spec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterVersionSpec">
-ClusterVersionSpec
-</a>
-</em>
-</td>
-<td>
-<br/>
-<br/>
-<table>
-<tr>
-<td>
-<code>clusterDefinitionRef</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies a reference to the ClusterDefinition.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>componentVersions</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentVersion">
-[]ClusterComponentVersion
-</a>
-</em>
-</td>
-<td>
-<p>Contains a list of versioning contexts for the components&rsquo; containers.</p>
-</td>
-</tr>
-</table>
-</td>
-</tr>
-<tr>
-<td>
-<code>status</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterVersionStatus">
-ClusterVersionStatus
 </a>
 </em>
 </td>
@@ -5248,98 +5148,6 @@ This is the readiness time of the last Component Pod.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ClusterComponentVersion">ClusterComponentVersion
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterVersionSpec">ClusterVersionSpec</a>)
-</p>
-<div>
-<p>ClusterComponentVersion is an application version component spec.</p>
-<p>Deprecated since v0.9.
-This struct is maintained for backward compatibility and its use is discouraged.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>componentDefRef</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies a reference to one of the cluster component definition names in the ClusterDefinition API (spec.componentDefs.name).</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>configSpecs</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ComponentConfigSpec">
-[]ComponentConfigSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines a configuration extension mechanism to handle configuration differences between versions.
-The configTemplateRefs field, in conjunction with the configTemplateRefs in the ClusterDefinition, determines
-the final configuration file.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>systemAccountSpec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.SystemAccountShortSpec">
-SystemAccountShortSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the image for the component to connect to databases or engines.
-This overrides the <code>image</code> and <code>env</code> attributes defined in clusterDefinition.spec.componentDefs.systemAccountSpec.cmdExecutorConfig.
-To clear default environment settings, set systemAccountSpec.cmdExecutorConfig.env to an empty list.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>versionsContext</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.VersionsContext">
-VersionsContext
-</a>
-</em>
-</td>
-<td>
-<p>Defines the context for container images for component versions.
-This value replaces the values in clusterDefinition.spec.componentDefs.podSpec.[initContainers | containers].</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>switchoverSpec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.SwitchoverShortSpec">
-SwitchoverShortSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the images for the component to perform a switchover.
-This overrides the image and env attributes defined in clusterDefinition.spec.componentDefs.SwitchoverSpec.CommandExecutorEnvItem.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterComponentVolumeClaimTemplate">ClusterComponentVolumeClaimTemplate
 </h3>
 <p>
@@ -6759,120 +6567,6 @@ separated by commas.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ClusterVersionSpec">ClusterVersionSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterVersion">ClusterVersion</a>)
-</p>
-<div>
-<p>ClusterVersionSpec defines the desired state of ClusterVersion.</p>
-<p>Deprecated since v0.9.
-This struct is maintained for backward compatibility and its use is discouraged.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>clusterDefinitionRef</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies a reference to the ClusterDefinition.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>componentVersions</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentVersion">
-[]ClusterComponentVersion
-</a>
-</em>
-</td>
-<td>
-<p>Contains a list of versioning contexts for the components&rsquo; containers.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ClusterVersionStatus">ClusterVersionStatus
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterVersion">ClusterVersion</a>)
-</p>
-<div>
-<p>ClusterVersionStatus defines the observed state of ClusterVersion.</p>
-<p>Deprecated since v0.9.
-This struct is maintained for backward compatibility and its use is discouraged.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>phase</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.Phase">
-Phase
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The current phase of the ClusterVersion.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>message</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Provides additional information about the current phase.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>observedGeneration</code><br/>
-<em>
-int64
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The generation number that has been observed by the controller.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>clusterDefGeneration</code><br/>
-<em>
-int64
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The generation number of the ClusterDefinition that is currently being referenced.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.CmdExecutorConfig">CmdExecutorConfig
 </h3>
 <p>
@@ -6925,7 +6619,7 @@ CommandExecutorItem
 <h3 id="apps.kubeblocks.io/v1alpha1.CommandExecutorEnvItem">CommandExecutorEnvItem
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CmdExecutorConfig">CmdExecutorConfig</a>, <a href="#apps.kubeblocks.io/v1alpha1.SwitchoverShortSpec">SwitchoverShortSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.SystemAccountShortSpec">SystemAccountShortSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CmdExecutorConfig">CmdExecutorConfig</a>)
 </p>
 <div>
 <p>CommandExecutorEnvItem is deprecated since v0.8.</p>
@@ -7078,7 +6772,7 @@ MatchExpressions
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentConfigSpec">ComponentConfigSpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>, <a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentVersion">ClusterComponentVersion</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ConfigurationItemDetail">ConfigurationItemDetail</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ConfigurationItemDetail">ConfigurationItemDetail</a>)
 </p>
 <div>
 </div>
@@ -10114,7 +9808,7 @@ ConfigConstraintPhase
 <td>
 <em>(Optional)</em>
 <p>Specifies the status of the configuration template.
-When set to CCAvailablePhase, the ConfigConstraint can be referenced by ClusterDefinition or ClusterVersion.</p>
+When set to CCAvailablePhase, the ConfigConstraint can be referenced by ClusterDefinition.</p>
 </td>
 </tr>
 <tr>
@@ -15251,10 +14945,10 @@ Kubernetes core/v1.PersistentVolumeMode
 <h3 id="apps.kubeblocks.io/v1alpha1.Phase">Phase
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterDefinitionStatus">ClusterDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.ClusterVersionStatus">ClusterVersionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionStatus">ComponentDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentVersionStatus">ComponentVersionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.OpsDefinitionStatus">OpsDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceDescriptorStatus">ServiceDescriptorStatus</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterDefinitionStatus">ClusterDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionStatus">ComponentDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentVersionStatus">ComponentVersionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.OpsDefinitionStatus">OpsDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceDescriptorStatus">ServiceDescriptorStatus</a>)
 </p>
 <div>
-<p>Phase represents the current status of the ClusterDefinition and ClusterVersion CR.</p>
+<p>Phase represents the current status of the ClusterDefinition CR.</p>
 </div>
 <table>
 <thead>
@@ -19717,39 +19411,6 @@ When defined, the scripts defined in scriptSpecs can be referenced within the Sw
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.SwitchoverShortSpec">SwitchoverShortSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentVersion">ClusterComponentVersion</a>)
-</p>
-<div>
-<p>SwitchoverShortSpec represents a condensed version of the SwitchoverSpec.</p>
-<p>Deprecated since v0.9.
-This struct is maintained for backward compatibility and its use is discouraged.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>cmdExecutorConfig</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.CommandExecutorEnvItem">
-CommandExecutorEnvItem
-</a>
-</em>
-</td>
-<td>
-<p>Represents the configuration for the command executor.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.SwitchoverSpec">SwitchoverSpec
 </h3>
 <p>
@@ -19922,39 +19583,6 @@ ProvisionPolicy
 </td>
 <td>
 <p>Outlines the strategy for creating the account.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.SystemAccountShortSpec">SystemAccountShortSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentVersion">ClusterComponentVersion</a>)
-</p>
-<div>
-<p>SystemAccountShortSpec represents a condensed version of the SystemAccountSpec.</p>
-<p>Deprecated since v0.9.
-This struct is maintained for backward compatibility and its use is discouraged.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>cmdExecutorConfig</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.CommandExecutorEnvItem">
-CommandExecutorEnvItem
-</a>
-</em>
-</td>
-<td>
-<p>Configures the method for obtaining the client SDK and executing statements.</p>
 </td>
 </tr>
 </tbody>
@@ -20703,8 +20331,7 @@ use the latest available version in ComponentVersion.</p>
 </em>
 </td>
 <td>
-<p>Represents an array of names of ClusterVersion or ComponentDefinition that can be mapped to
-the appropriate version of the backup tool image.</p>
+<p>Represents an array of names of ComponentDefinition that can be mapped to the appropriate version of the backup tool image.</p>
 <p>This mapping allows different versions of component images to correspond to specific versions of backup tool images.</p>
 </td>
 </tr>
@@ -20841,55 +20468,6 @@ ComponentVarSelector
 <td>
 <em>(Optional)</em>
 <p>Selects a defined var of a Component.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.VersionsContext">VersionsContext
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentVersion">ClusterComponentVersion</a>)
-</p>
-<div>
-<p>VersionsContext is deprecated since v0.9.
-This struct is maintained for backward compatibility and its use is discouraged.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>initContainers</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#container-v1-core">
-[]Kubernetes core/v1.Container
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Provides override values for ClusterDefinition.spec.componentDefs.podSpec.initContainers.
-Typically used in scenarios such as updating application container images.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>containers</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#container-v1-core">
-[]Kubernetes core/v1.Container
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Provides override values for ClusterDefinition.spec.componentDefs.podSpec.containers.
-Typically used in scenarios such as updating application container images.</p>
 </td>
 </tr>
 </tbody>
@@ -21730,7 +21308,7 @@ ConfigConstraintPhase
 <td>
 <em>(Optional)</em>
 <p>Specifies the status of the configuration template.
-When set to CCAvailablePhase, the ConfigConstraint can be referenced by ClusterDefinition or ClusterVersion.</p>
+When set to CCAvailablePhase, the ConfigConstraint can be referenced by ClusterDefinition.</p>
 </td>
 </tr>
 <tr>

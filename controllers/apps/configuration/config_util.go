@@ -160,7 +160,7 @@ func batchDeleteConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx
 		labels := client.MatchingLabels{
 			core.GenerateTPLUniqLabelKeyWithConfig(configSpec.Name): configSpec.TemplateRef,
 		}
-		if ok, err := validateConfigMapOwners(cli, ctx, labels, validator, &appsv1alpha1.ClusterVersionList{}, &appsv1alpha1.ClusterDefinitionList{}, &appsv1alpha1.ComponentDefinitionList{}); err != nil {
+		if ok, err := validateConfigMapOwners(cli, ctx, labels, validator, &appsv1alpha1.ClusterDefinitionList{}, &appsv1alpha1.ComponentDefinitionList{}); err != nil {
 			return err
 		} else if !ok {
 			continue
@@ -244,8 +244,6 @@ func handleConfigTemplate(object client.Object, handler ConfigTemplateHandler, h
 	switch cr := object.(type) {
 	case *appsv1alpha1.ClusterDefinition:
 		configTemplates, err = getConfigTemplateFromCD(cr, handler2...)
-	case *appsv1alpha1.ClusterVersion:
-		configTemplates = getConfigTemplateFromCV(cr)
 	case *appsv1alpha1.ComponentDefinition:
 		configTemplates = getConfigTemplateFromComponentDef(cr)
 	default:
@@ -260,16 +258,6 @@ func handleConfigTemplate(object client.Object, handler ConfigTemplateHandler, h
 	default:
 		return true, nil
 	}
-}
-
-func getConfigTemplateFromCV(appVer *appsv1alpha1.ClusterVersion) []appsv1alpha1.ComponentConfigSpec {
-	configTemplates := make([]appsv1alpha1.ComponentConfigSpec, 0)
-	for _, component := range appVer.Spec.ComponentVersions {
-		if len(component.ConfigSpecs) > 0 {
-			configTemplates = append(configTemplates, component.ConfigSpecs...)
-		}
-	}
-	return configTemplates
 }
 
 func getConfigTemplateFromCD(clusterDef *appsv1alpha1.ClusterDefinition, validators ...ComponentValidateHandler) ([]appsv1alpha1.ComponentConfigSpec, error) {

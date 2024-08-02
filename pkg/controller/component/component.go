@@ -122,13 +122,12 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluste
 }
 
 func BuildComponentDefinition(clusterDef *appsv1alpha1.ClusterDefinition,
-	clusterVer *appsv1alpha1.ClusterVersion,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.ComponentDefinition, error) {
-	clusterCompDef, clusterCompVer, err := getClusterCompDefAndVersion(clusterDef, clusterVer, clusterCompSpec)
+	clusterCompDef, err := getClusterCompDef(clusterDef, clusterCompSpec)
 	if err != nil {
 		return nil, err
 	}
-	compDef, err := buildComponentDefinitionByConversion(clusterCompDef, clusterCompVer)
+	compDef, err := buildComponentDefinitionByConversion(clusterCompDef)
 	if err != nil {
 		return nil, err
 	}
@@ -137,11 +136,10 @@ func BuildComponentDefinition(clusterDef *appsv1alpha1.ClusterDefinition,
 
 func getOrBuildComponentDefinition(ctx context.Context, cli client.Reader,
 	clusterDef *appsv1alpha1.ClusterDefinition,
-	clusterVer *appsv1alpha1.ClusterVersion,
 	cluster *appsv1alpha1.Cluster,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.ComponentDefinition, error) {
 	if len(cluster.Spec.ClusterDefRef) > 0 && len(clusterCompSpec.ComponentDefRef) > 0 {
-		return BuildComponentDefinition(clusterDef, clusterVer, clusterCompSpec)
+		return BuildComponentDefinition(clusterDef, clusterCompSpec)
 	}
 	if len(clusterCompSpec.ComponentDef) > 0 {
 		compDef := &appsv1alpha1.ComponentDefinition{}
@@ -154,48 +152,36 @@ func getOrBuildComponentDefinition(ctx context.Context, cli client.Reader,
 }
 
 func getClusterReferencedResources(ctx context.Context, cli client.Reader,
-	cluster *appsv1alpha1.Cluster) (*appsv1alpha1.ClusterDefinition, *appsv1alpha1.ClusterVersion, error) {
+	cluster *appsv1alpha1.Cluster) (*appsv1alpha1.ClusterDefinition, error) {
 	var (
 		clusterDef *appsv1alpha1.ClusterDefinition
-		clusterVer *appsv1alpha1.ClusterVersion
 	)
 	if len(cluster.Spec.ClusterDefRef) > 0 {
 		clusterDef = &appsv1alpha1.ClusterDefinition{}
 		if err := cli.Get(ctx, types.NamespacedName{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
-			return nil, nil, err
-		}
-	}
-	if len(cluster.Spec.ClusterVersionRef) > 0 {
-		clusterVer = &appsv1alpha1.ClusterVersion{}
-		if err := cli.Get(ctx, types.NamespacedName{Name: cluster.Spec.ClusterVersionRef}, clusterVer); err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 	}
 	if clusterDef == nil {
 		if len(cluster.Spec.ClusterDefRef) == 0 {
-			return nil, nil, fmt.Errorf("cluster definition is needed for generated component")
+			return nil, fmt.Errorf("cluster definition is needed for generated component")
 		} else {
-			return nil, nil, fmt.Errorf("referenced cluster definition is not found: %s", cluster.Spec.ClusterDefRef)
+			return nil, fmt.Errorf("referenced cluster definition is not found: %s", cluster.Spec.ClusterDefRef)
 		}
 	}
-	return clusterDef, clusterVer, nil
+	return clusterDef, nil
 }
 
-func getClusterCompDefAndVersion(clusterDef *appsv1alpha1.ClusterDefinition,
-	clusterVer *appsv1alpha1.ClusterVersion,
-	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.ClusterComponentDefinition, *appsv1alpha1.ClusterComponentVersion, error) {
+func getClusterCompDef(clusterDef *appsv1alpha1.ClusterDefinition,
+	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.ClusterComponentDefinition, error) {
 	if len(clusterCompSpec.ComponentDefRef) == 0 {
-		return nil, nil, fmt.Errorf("cluster component definition ref is empty: %s", clusterCompSpec.Name)
+		return nil, fmt.Errorf("cluster component definition ref is empty: %s", clusterCompSpec.Name)
 	}
 	clusterCompDef := clusterDef.GetComponentDefByName(clusterCompSpec.ComponentDefRef)
 	if clusterCompDef == nil {
-		return nil, nil, fmt.Errorf("referenced cluster component definition is not defined: %s", clusterCompSpec.ComponentDefRef)
+		return nil, fmt.Errorf("referenced cluster component definition is not defined: %s", clusterCompSpec.ComponentDefRef)
 	}
-	var clusterCompVer *appsv1alpha1.ClusterComponentVersion
-	if clusterVer != nil {
-		clusterCompVer = clusterVer.Spec.GetDefNameMappingComponents()[clusterCompSpec.ComponentDefRef]
-	}
-	return clusterCompDef, clusterCompVer, nil
+	return clusterCompDef, nil
 }
 
 func getClusterCompSpec4Component(ctx context.Context, cli client.Reader,

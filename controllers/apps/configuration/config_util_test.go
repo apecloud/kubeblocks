@@ -38,7 +38,6 @@ import (
 
 var _ = Describe("ConfigWrapper util test", func() {
 	const clusterDefName = "test-clusterdef"
-	const clusterVersionName = "test-clusterversion"
 	const statefulCompDefName = "replicasets"
 	const configSpecName = "mysql-config-tpl"
 	const configVolumeName = "mysql-config"
@@ -58,7 +57,6 @@ var _ = Describe("ConfigWrapper util test", func() {
 		configMapObj        *corev1.ConfigMap
 		configConstraintObj *appsv1beta1.ConfigConstraint
 		clusterDefObj       *appsv1alpha1.ClusterDefinition
-		clusterVersionObj   *appsv1alpha1.ClusterVersion
 	)
 
 	cleanEnv := func() {
@@ -74,7 +72,6 @@ var _ = Describe("ConfigWrapper util test", func() {
 		// namespaced
 		testapps.ClearResources(&testCtx, generics.ConfigMapSignature, inNS, ml)
 		// non-namespaced
-		testapps.ClearResources(&testCtx, generics.ClusterVersionSignature, ml)
 		testapps.ClearResources(&testCtx, generics.ClusterDefinitionSignature, ml)
 		testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
 	}
@@ -98,11 +95,6 @@ var _ = Describe("ConfigWrapper util test", func() {
 		clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 			AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
 			AddConfigTemplate(configSpecName, configMapObj.Name, configConstraintObj.Name, testCtx.DefaultNamespace, configVolumeName).
-			Create(&testCtx).GetObject()
-
-		By("Create a clusterVersion obj")
-		clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-			AddComponentVersion(statefulCompDefName).
 			Create(&testCtx).GetObject()
 	})
 
@@ -210,79 +202,4 @@ var _ = Describe("ConfigWrapper util test", func() {
 			Expect(ok).Should(BeTrue())
 		})
 	})
-
-	updateAVTemplates := func() {
-		var tpls []appsv1alpha1.ComponentConfigSpec
-		_, err := handleConfigTemplate(clusterDefObj, func(templates []appsv1alpha1.ComponentConfigSpec) (bool, error) {
-			tpls = templates
-			return true, nil
-		})
-		Expect(err).Should(Succeed())
-
-		if len(clusterVersionObj.Spec.ComponentVersions) == 0 {
-			return
-		}
-
-		// mock clusterVersionObj config templates
-		clusterVersionObj.Spec.ComponentVersions[0].ConfigSpecs = tpls
-	}
-
-	Context("clusterversion CR test", func() {
-		It("Should success without error", func() {
-			updateAVTemplates()
-			availableTPL := configConstraintObj.DeepCopy()
-			availableTPL.Status.Phase = appsv1beta1.CCAvailablePhase
-
-			k8sMockClient.MockPatchMethod(testutil.WithSucceed())
-			k8sMockClient.MockListMethod(testutil.WithSucceed())
-			k8sMockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSequenceResult(
-				map[client.ObjectKey][]testutil.MockGetReturned{
-					client.ObjectKeyFromObject(configMapObj): {{
-						Object: nil,
-						Err:    cfgcore.MakeError("failed to get cc object"),
-					}, {
-						Object: configMapObj,
-						Err:    nil,
-					}},
-					client.ObjectKeyFromObject(configConstraintObj): {{
-						Object: nil,
-						Err:    cfgcore.MakeError("failed to get cc object"),
-					}, {
-						Object: configConstraintObj,
-						Err:    nil,
-					}, {
-						Object: availableTPL,
-						Err:    nil,
-					}},
-				},
-			), testutil.WithAnyTimes()))
-
-			_, err := checkConfigTemplate(k8sMockClient.Client(), reqCtx, clusterVersionObj)
-			Expect(err).ShouldNot(Succeed())
-			Expect(err.Error()).Should(ContainSubstring("failed to get cc object"))
-
-			_, err = checkConfigTemplate(k8sMockClient.Client(), reqCtx, clusterVersionObj)
-			Expect(err).ShouldNot(Succeed())
-			Expect(err.Error()).Should(ContainSubstring("failed to get cc object"))
-
-			_, err = checkConfigTemplate(k8sMockClient.Client(), reqCtx, clusterVersionObj)
-			Expect(err).ShouldNot(Succeed())
-			Expect(err.Error()).Should(ContainSubstring("status not ready"))
-
-			ok, err := checkConfigTemplate(k8sMockClient.Client(), reqCtx, clusterVersionObj)
-			Expect(err).Should(Succeed())
-			Expect(ok).Should(BeTrue())
-
-			ok, err = updateLabelsByConfigSpec(k8sMockClient.Client(), reqCtx, clusterVersionObj)
-			Expect(err).Should(Succeed())
-			Expect(ok).Should(BeTrue())
-
-			_, err = updateLabelsByConfigSpec(k8sMockClient.Client(), reqCtx, clusterVersionObj)
-			Expect(err).Should(Succeed())
-
-			err = DeleteConfigMapFinalizer(k8sMockClient.Client(), reqCtx, clusterVersionObj)
-			Expect(err).Should(Succeed())
-		})
-	})
-
 })

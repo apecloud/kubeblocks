@@ -45,7 +45,9 @@ var _ = Describe("instance_set builder", func() {
 			minReadySeconds              = int32(11)
 			port                         = int32(12345)
 			policy                       = apps.OrderedReadyPodManagement
+			podUpdatePolicy              = workloads.PreferInPlacePodUpdatePolicyType
 		)
+		parallelPodManagementConcurrency := &intstr.IntOrString{Type: intstr.String, StrVal: "100%"}
 		selectors := map[string]string{selectorKey4: selectorValue4}
 		role := workloads.ReplicaRole{
 			Name:       "foo",
@@ -165,6 +167,8 @@ var _ = Describe("instance_set builder", func() {
 			SetVolumeClaimTemplates(vcs...).
 			AddVolumeClaimTemplates(vc).
 			SetPodManagementPolicy(policy).
+			SetParallelPodManagementConcurrency(parallelPodManagementConcurrency).
+			SetPodUpdatePolicy(podUpdatePolicy).
 			SetUpdateStrategy(strategy).
 			SetUpdateStrategyType(strategyType).
 			SetRoleProbe(&roleProbe).
@@ -196,6 +200,8 @@ var _ = Describe("instance_set builder", func() {
 		Expect(its.Spec.VolumeClaimTemplates[0]).Should(Equal(vcs[0]))
 		Expect(its.Spec.VolumeClaimTemplates[1]).Should(Equal(vc))
 		Expect(its.Spec.PodManagementPolicy).Should(Equal(policy))
+		Expect(its.Spec.ParallelPodManagementConcurrency).Should(Equal(parallelPodManagementConcurrency))
+		Expect(its.Spec.PodUpdatePolicy).Should(Equal(podUpdatePolicy))
 		Expect(its.Spec.UpdateStrategy.Type).Should(Equal(strategyType))
 		Expect(its.Spec.UpdateStrategy.RollingUpdate).ShouldNot(BeNil())
 		Expect(its.Spec.UpdateStrategy.RollingUpdate.Partition).ShouldNot(BeNil())

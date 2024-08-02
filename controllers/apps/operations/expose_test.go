@@ -38,7 +38,6 @@ var _ = Describe("", func() {
 	var (
 		randomStr             = testCtx.GetRandomStr()
 		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr
-		clusterVersionName    = "clusterversion-for-ops-" + randomStr
 		clusterName           = "cluster-for-ops-" + randomStr
 	)
 
@@ -53,7 +52,7 @@ var _ = Describe("", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResources(&testCtx)
 
 		// delete rest resources
@@ -70,7 +69,7 @@ var _ = Describe("", func() {
 	Context("Test OpsRequest", func() {
 		It("Test expose OpsRequest", func() {
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
-			opsRes, _, clusterObject := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			opsRes, _, clusterObject := initOperationsResources(clusterDefinitionName, clusterName)
 
 			By("create Expose opsRequest")
 			ops := testapps.NewOpsRequestObj("expose-expose-"+randomStr, testCtx.DefaultNamespace,
@@ -108,7 +107,7 @@ var _ = Describe("", func() {
 
 		It("Test expose OpsRequest with empty ComponentName", func() {
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
-			opsRes, _, clusterObject := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			opsRes, _, clusterObject := initOperationsResources(clusterDefinitionName, clusterName)
 
 			By("create Expose opsRequest")
 			ops := testapps.NewOpsRequestObj("expose-expose-"+randomStr, testCtx.DefaultNamespace,

@@ -45,7 +45,6 @@ const (
 	KBAppComponentLabelKey                 = "apps.kubeblocks.io/component-name"
 	KBAppShardingNameLabelKey              = "apps.kubeblocks.io/sharding-name"
 	KBAppComponentDefRefLabelKey           = "apps.kubeblocks.io/component-def-ref" // refer clusterDefinition.Spec.ComponentDefs[*].Name before KubeBlocks Version 0.8.0 or refer ComponentDefinition.Name after KubeBlocks Version 0.8.0
-	KBAppClusterDefTypeLabelKey            = "apps.kubeblocks.io/cluster-type"      // refer clusterDefinition.Spec.Type (deprecated)
 	KBManagedByKey                         = "apps.kubeblocks.io/managed-by"        // KBManagedByKey marks resources that auto created
 	PVCNameLabelKey                        = "apps.kubeblocks.io/pvc-name"
 	VolumeClaimTemplateNameLabelKey        = "apps.kubeblocks.io/vct-name"
@@ -54,7 +53,6 @@ const (
 	WorkloadTypeLabelKey                   = "apps.kubeblocks.io/workload-type"
 	KBAppPodNameLabelKey                   = "apps.kubeblocks.io/pod-name"
 	ClusterDefLabelKey                     = "clusterdefinition.kubeblocks.io/name"
-	ClusterVerLabelKey                     = "clusterversion.kubeblocks.io/name"
 	ComponentDefinitionLabelKey            = "componentdefinition.kubeblocks.io/name"
 	ComponentVersionLabelKey               = "componentversion.kubeblocks.io/name"
 	ConsensusSetAccessModeLabelKey         = "cs.apps.kubeblocks.io/access-mode"
@@ -138,14 +136,6 @@ func GetShardingNameLabel(shardingName string) map[string]string {
 func GetClusterCompDefLabel(clusterCompDefName string) map[string]string {
 	return map[string]string{
 		AppComponentLabelKey: clusterCompDefName,
-	}
-}
-
-// GetClusterDefTypeLabel returns the label for ClusterDefinition type (refer clusterDefinition.Spec.Type)
-// TODO:clusterDefType will be deprecated in the future
-func GetClusterDefTypeLabel(clusterDefType string) map[string]string {
-	return map[string]string{
-		KBAppClusterDefTypeLabelKey: clusterDefType,
 	}
 }
 

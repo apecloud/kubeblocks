@@ -19,6 +19,9 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
 
 // ComponentSpec defines the desired state of Component.
@@ -160,6 +163,24 @@ type ComponentSpec struct {
 	// +optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 
+	// Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
+	// or when scaling down. It only used when `PodManagementPolicy` is set to `Parallel`.
+	// The default Concurrency is 100%.
+	//
+	// +optional
+	ParallelPodManagementConcurrency *intstr.IntOrString `json:"parallelPodManagementConcurrency,omitempty"`
+
+	// PodUpdatePolicy indicates how pods should be updated
+	//
+	// - `StrictInPlace` indicates that only allows in-place upgrades.
+	// Any attempt to modify other fields will be rejected.
+	// - `PreferInPlace` indicates that we will first attempt an in-place upgrade of the Pod.
+	// If that fails, it will fall back to the ReCreate, where pod will be recreated.
+	// Default value is "PreferInPlace"
+	//
+	// +optional
+	PodUpdatePolicy *workloads.PodUpdatePolicyType `json:"podUpdatePolicy,omitempty"`
+
 	// Specifies a group of affinity scheduling rules for the Component.
 	// It allows users to control how the Component's Pods are scheduled onto nodes in the Cluster.
 	//
@@ -255,6 +276,12 @@ type ComponentSpec struct {
 	//
 	// +optional
 	DisableExporter *bool `json:"disableExporter,omitempty"`
+
+	// Stop the Component.
+	// If set, all the computing resources will be released.
+	//
+	// +optional
+	Stop *bool `json:"stop,omitempty"`
 }
 
 // ComponentStatus represents the observed state of a Component within the Cluster.

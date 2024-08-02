@@ -48,7 +48,7 @@ KubeBlocks integrates [the open-source Patroni solution](https://patroni.readthe
    root@postgres-postgresql-0:/home/postgres# rm -fr /home/postgres/pgdata/pgroot/data
    ```
 
-3. View logs to observe how the roles of pods switch  when an exception occurs.
+3. View logs to observe how the roles of pods switch when an exception occurs.
 
    ```bash
    # View the primary pod logs
@@ -89,7 +89,7 @@ KubeBlocks integrates [the open-source Patroni solution](https://patroni.readthe
 
    ![PostgreSQL replication info](../../../img/pgsql-ha-pg_stat_replication.png)
 
-   From the output, `pg-cluster-postgresql-0` has been assigned as the secondary's pod.
+   From the output, `pg-cluster-postgresql-0` has been assigned as the secondary pod.
 
 5. Describe the cluster and check the instance role.
 

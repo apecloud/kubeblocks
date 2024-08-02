@@ -236,7 +236,7 @@ func (t *ClusterAPINormalizationTransformer) resolveCompDefinitionNServiceVersio
 
 func (t *ClusterAPINormalizationTransformer) buildCompDefinition4Legacy(transCtx *clusterTransformContext,
 	compSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.ComponentDefinition, error) {
-	compDef, err := component.BuildComponentDefinition(transCtx.ClusterDef, transCtx.ClusterVer, compSpec)
+	compDef, err := component.BuildComponentDefinition(transCtx.ClusterDef, compSpec)
 	if err != nil {
 		return nil, err
 	}

@@ -37,4 +37,7 @@ const (
 	// FeatureReconciliationInCompactModeAnnotationKey indicates that the controller should run in compact mode,
 	// means to try the best to cutoff useless objects.
 	FeatureReconciliationInCompactModeAnnotationKey = "kubeblocks.io/compact-mode"
+
+	// FeatureGateComponentReplicasAnnotation tells whether to add and update the annotation "component-replicas" to all pods of a Component
+	FeatureGateComponentReplicasAnnotation = "COMPONENT_REPLICAS_ANNOTATION"
 )

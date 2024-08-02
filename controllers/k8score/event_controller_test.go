@@ -125,8 +125,8 @@ var _ = Describe("Event Controller", func() {
 			clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
 				AddComponentDef(testapps.ConsensusMySQLComponent, consensusCompDefName).
 				Create(&testCtx).GetObject()
-			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, "",
-				clusterDefObj.Name, "").WithRandomName().
+			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, "", clusterDefObj.Name).
+				WithRandomName().
 				AddComponent(consensusCompName, consensusCompDefName).
 				Create(&testCtx).GetObject()
 			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(clusterObj), &appsv1alpha1.Cluster{}, true)).Should(Succeed())

@@ -46,7 +46,7 @@ This tutorial shows how to create and connect to a MySQL cluster.
 
 ### Create a cluster
 
-KubeBlocks supports creating two types of MySQL clusters: Standalone and RaftGroup Cluster. Standalone only supports one replica and can be used in scenarios with lower requirements for availability. For scenarios with high availability requirements, it is recommended to create a RaftGroup Cluster, which creates a cluster with three replicas. To ensure high availability, all replicas are distributed on different nodes by default.
+KubeBlocks supports creating two types of MySQL clusters: Standalone and Replication Cluster. Standalone only supports one replica and can be used in scenarios with lower requirements for availability. For scenarios with high availability requirements, it is recommended to create a Replication Cluster, which creates a cluster with two replicas. To ensure high availability, all replicas are distributed on different nodes by default.
 
 Create a Standalone.
 
@@ -54,7 +54,7 @@ Create a Standalone.
 kbcli cluster create mycluster --cluster-definition mysql
 ```
 
-Create a RaftGroup Cluster.
+Create a Replication Cluster.
 
 ```bash
 kbcli cluster create mycluster --cluster-definition mysql --set replicas=2
@@ -63,7 +63,7 @@ kbcli cluster create mycluster --cluster-definition mysql --set replicas=2
 If you only have one node for deploying a Replication Cluster, set the `availability-policy` as `none` when creating a Replication Cluster.
 
 ```bash
-kbcli cluster create mycluster --cluster-definition mysql --set replicas=2 --availability-policy none 
+kbcli cluster create mycluster --cluster-definition mysql --set replicas=2 --topology-keys null
 ```
 
 If you want to specify a cluster version, you can first view the available versions and use `--clusterversion` to specify a version.

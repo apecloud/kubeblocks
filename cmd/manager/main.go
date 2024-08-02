@@ -91,6 +91,8 @@ const (
 	multiClusterKubeConfigFlagKey       flagName = "multi-cluster-kubeconfig"
 	multiClusterContextsFlagKey         flagName = "multi-cluster-contexts"
 	multiClusterContextsDisabledFlagKey flagName = "multi-cluster-contexts-disabled"
+
+	userAgentFlagKey flagName = "user-agent"
 )
 
 var (
@@ -143,6 +145,7 @@ func init() {
 	viper.SetDefault(intctrlutil.FeatureGateEnableRuntimeMetrics, false)
 	viper.SetDefault(constant.CfgKBReconcileWorkers, 8)
 	viper.SetDefault(constant.FeatureGateIgnoreConfigTemplateDefaultMode, false)
+	viper.SetDefault(constant.FeatureGateComponentReplicasAnnotation, true)
 }
 
 type flagName string
@@ -181,6 +184,8 @@ func setupFlags() {
 
 	flag.String(constant.ManagedNamespacesFlag, "",
 		"The namespaces that the operator will manage, multiple namespaces are separated by commas.")
+
+	flag.String(userAgentFlagKey.String(), "", "User agent of the operator.")
 
 	opts := zap.Options{
 		Development: false,
@@ -249,6 +254,14 @@ func validateRequiredToParseConfigs() error {
 	if err := validateAffinity(viper.GetString(constant.CfgKeyDataPlaneAffinity)); err != nil {
 		return err
 	}
+
+	if imagePullSecrets := viper.GetString(constant.KBImagePullSecrets); imagePullSecrets != "" {
+		secrets := make([]corev1.LocalObjectReference, 0)
+		if err := json.Unmarshal([]byte(imagePullSecrets), &secrets); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -261,6 +274,7 @@ func main() {
 		multiClusterKubeConfig       string
 		multiClusterContexts         string
 		multiClusterContextsDisabled string
+		userAgent                    string
 		err                          error
 	)
 
@@ -295,8 +309,10 @@ func main() {
 	multiClusterContexts = viper.GetString(multiClusterContextsFlagKey.viperName())
 	multiClusterContextsDisabled = viper.GetString(multiClusterContextsDisabledFlagKey.viperName())
 
+	userAgent = viper.GetString(userAgentFlagKey.viperName())
+
 	setupLog.Info("golang runtime metrics.", "featureGate", intctrlutil.EnabledRuntimeMetrics())
-	mgr, err := ctrl.NewManager(intctrlutil.GeKubeRestConfig(), ctrl.Options{
+	mgr, err := ctrl.NewManager(intctrlutil.GeKubeRestConfig(userAgent), ctrl.Options{
 		Scheme: scheme,
 		Metrics: server.Options{
 			BindAddress:   metricsAddr,
@@ -373,15 +389,6 @@ func main() {
 			Recorder: mgr.GetEventRecorderFor("cluster-definition-controller"),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "ClusterDefinition")
-			os.Exit(1)
-		}
-
-		if err = (&appscontrollers.ClusterVersionReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("cluster-version-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "ClusterVersion")
 			os.Exit(1)
 		}
 

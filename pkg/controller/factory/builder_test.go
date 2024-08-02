@@ -45,7 +45,6 @@ import (
 
 var _ = Describe("builder", func() {
 	const clusterDefName = "test-clusterdef"
-	const clusterVersionName = "test-clusterversion"
 	const clusterName = "test-cluster"
 	const mysqlCompDefName = "replicasets"
 	const proxyCompDefName = "proxy"
@@ -64,21 +63,6 @@ var _ = Describe("builder", func() {
 		return clusterDefObj
 	}
 
-	allFieldsClusterVersionObj := func(needCreate bool) *appsv1alpha1.ClusterVersion {
-		By("By assure an clusterVersion obj")
-		clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-			AddComponentVersion(mysqlCompDefName).
-			AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-			AddComponentVersion(proxyCompDefName).
-			AddInitContainerShort("nginx-init", testapps.NginxImage).
-			AddContainerShort("nginx", testapps.NginxImage).
-			GetObject()
-		if needCreate {
-			Expect(testCtx.CreateObj(testCtx.Ctx, clusterVersionObj)).Should(Succeed())
-		}
-		return clusterVersionObj
-	}
-
 	newExtraEnvs := func() map[string]string {
 		jsonStr, _ := json.Marshal(map[string]string{
 			"mock-key": "mock-value",
@@ -88,21 +72,13 @@ var _ = Describe("builder", func() {
 		}
 	}
 
-	newAllFieldsClusterObj := func(
-		clusterDefObj *appsv1alpha1.ClusterDefinition,
-		clusterVersionObj *appsv1alpha1.ClusterVersion,
-		needCreate bool,
-	) (*appsv1alpha1.Cluster, *appsv1alpha1.ClusterDefinition, *appsv1alpha1.ClusterVersion, types.NamespacedName) {
-		// setup Cluster obj requires default ClusterDefinition and ClusterVersion objects
+	newAllFieldsClusterObj := func(clusterDefObj *appsv1alpha1.ClusterDefinition, needCreate bool) (*appsv1alpha1.Cluster, *appsv1alpha1.ClusterDefinition, types.NamespacedName) {
+		// setup Cluster obj requires default ClusterDefinition object
 		if clusterDefObj == nil {
 			clusterDefObj = allFieldsClusterDefObj(needCreate)
 		}
-		if clusterVersionObj == nil {
-			clusterVersionObj = allFieldsClusterVersionObj(needCreate)
-		}
 		pvcSpec := testapps.NewPVCSpec("1Gi")
-		clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-			clusterDefObj.Name, clusterVersionObj.Name).
+		clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name).
 			AddAnnotationsInMap(newExtraEnvs()).
 			AddComponent(mysqlCompName, mysqlCompDefName).SetReplicas(1).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
@@ -113,7 +89,7 @@ var _ = Describe("builder", func() {
 		if needCreate {
 			Expect(testCtx.CreateObj(testCtx.Ctx, clusterObj)).Should(Succeed())
 		}
-		return clusterObj, clusterDefObj, clusterVersionObj, key
+		return clusterObj, clusterDefObj, key
 	}
 
 	newItsObj := func() *workloads.InstanceSet {
@@ -142,12 +118,11 @@ var _ = Describe("builder", func() {
 		}
 		return reqCtx
 	}
-	newAllFieldsSynthesizedComponent := func(clusterDef *appsv1alpha1.ClusterDefinition,
-		clusterVer *appsv1alpha1.ClusterVersion, cluster *appsv1alpha1.Cluster) *component.SynthesizedComponent {
+	newAllFieldsSynthesizedComponent := func(clusterDef *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster) *component.SynthesizedComponent {
 		reqCtx := newReqCtx()
 		By("assign every available fields")
 		synthesizeComp, err := component.BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli,
-			clusterDef, clusterVer, cluster, &cluster.Spec.ComponentSpecs[0])
+			clusterDef, cluster, &cluster.Spec.ComponentSpecs[0])
 		Expect(err).Should(Succeed())
 		Expect(synthesizeComp).ShouldNot(BeNil())
 		// to resolve and inject env vars
@@ -158,8 +133,8 @@ var _ = Describe("builder", func() {
 		return synthesizeComp
 	}
 	newClusterObjs := func(clusterDefObj *appsv1alpha1.ClusterDefinition) (*appsv1alpha1.ClusterDefinition, *appsv1alpha1.Cluster, *component.SynthesizedComponent) {
-		cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(clusterDefObj, nil, false)
-		synthesizedComponent := newAllFieldsSynthesizedComponent(clusterDef, clusterVersion, cluster)
+		cluster, clusterDef, _ := newAllFieldsClusterObj(clusterDefObj, false)
+		synthesizedComponent := newAllFieldsSynthesizedComponent(clusterDef, cluster)
 		return clusterDef, cluster, synthesizedComponent
 	}
 
@@ -186,13 +161,6 @@ var _ = Describe("builder", func() {
 			)
 			credential := BuildConnCredential(clusterDef, cluster, synthesizedComponent)
 			Expect(credential).ShouldNot(BeNil())
-			Expect(credential.Labels[constant.KBAppClusterDefTypeLabelKey]).Should(BeEmpty())
-			By("setting type")
-			characterType := "test-character-type"
-			clusterDef.Spec.Type = characterType
-			credential = BuildConnCredential(clusterDef, cluster, synthesizedComponent)
-			Expect(credential).ShouldNot(BeNil())
-			Expect(credential.Labels[constant.KBAppClusterDefTypeLabelKey]).Should(Equal(characterType))
 			// "username":      "root",
 			// "SVC_FQDN":      "$(SVC_FQDN)",
 			// "RANDOM_PASSWD": "$(RANDOM_PASSWD)",
@@ -276,7 +244,7 @@ var _ = Describe("builder", func() {
 				},
 			}
 			cluster.Spec.ComponentSpecs[0].Replicas = 2
-			replComponent := newAllFieldsSynthesizedComponent(clusterDef, nil, cluster)
+			replComponent := newAllFieldsSynthesizedComponent(clusterDef, cluster)
 			its, err = BuildInstanceSet(replComponent, nil)
 			Expect(err).Should(BeNil())
 			Expect(its).ShouldNot(BeNil())
@@ -315,7 +283,7 @@ var _ = Describe("builder", func() {
 			clusterDef.Spec.ComponentDefs[0].ConsensusSpec = appsv1alpha1.NewConsensusSetSpec()
 			clusterDef.Spec.ComponentDefs[0].ConsensusSpec.UpdateStrategy = appsv1alpha1.BestEffortParallelStrategy
 			cluster.Spec.ComponentSpecs[0].Replicas = 3
-			csComponent := newAllFieldsSynthesizedComponent(clusterDef, nil, cluster)
+			csComponent := newAllFieldsSynthesizedComponent(clusterDef, cluster)
 			its, err = BuildInstanceSet(csComponent, nil)
 			Expect(err).Should(BeNil())
 			Expect(its).ShouldNot(BeNil())

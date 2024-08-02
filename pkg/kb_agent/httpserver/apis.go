@@ -42,7 +42,6 @@ func Endpoints() []Endpoint {
 			Handler: actionHandler,
 		},
 	}
-
 }
 
 func actionHandler(reqCtx *fasthttp.RequestCtx) {

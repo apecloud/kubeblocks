@@ -17,7 +17,10 @@ limitations under the License.
 package common
 
 import (
+	"strconv"
+
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
@@ -41,15 +44,40 @@ func FromScrapePath(exporter appsv1alpha1.Exporter) string {
 	return defaultScrapePath
 }
 
+func getPortNumberFromContainer(portName string, container *corev1.Container) string {
+	if container == nil || portName == "" {
+		return portName
+	}
+	for _, port := range container.Ports {
+		if port.Name == portName {
+			return strconv.Itoa(int(port.ContainerPort))
+		}
+	}
+	// Compatible with number ports.
+	return portName
+}
+
 func FromContainerPort(exporter Exporter, container *corev1.Container) string {
+	convertPort := func(port intstr.IntOrString) string {
+		switch {
+		case port.StrVal != "":
+			return getPortNumberFromContainer(exporter.TargetPort.StrVal, container)
+		case port.IntVal != 0:
+			return strconv.Itoa(int(exporter.TargetPort.IntVal))
+		default:
+			return ""
+		}
+	}
+
 	if exporter.ScrapePort != "" {
-		return exporter.ScrapePort
+		return getPortNumberFromContainer(exporter.ScrapePort, container)
+	}
+	// handle monitor.exporter in ComponentDefinition for compatibility with previous versions.
+	if exporter.TargetPort != nil {
+		return convertPort(*exporter.TargetPort)
 	}
 	if container != nil && len(container.Ports) > 0 {
-		return container.Ports[0].Name
-	}
-	if exporter.TargetPort != nil {
-		return exporter.TargetPort.String()
+		return strconv.Itoa(int(container.Ports[0].ContainerPort))
 	}
 	return ""
 }

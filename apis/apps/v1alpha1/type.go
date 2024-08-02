@@ -26,7 +26,6 @@ import (
 
 const (
 	APIVersion            = "apps.kubeblocks.io/v1alpha1"
-	ClusterVersionKind    = "ClusterVersion"
 	ClusterDefinitionKind = "ClusterDefinition"
 	ClusterKind           = "Cluster"
 	ComponentKind         = "Component"
@@ -91,7 +90,6 @@ type ConfigTemplateExtension struct {
 	// Specifies the name of the referenced configuration template ConfigMap object.
 	//
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	TemplateRef string `json:"templateRef"`
 
@@ -99,7 +97,6 @@ type ConfigTemplateExtension struct {
 	// An empty namespace is equivalent to the "default" namespace.
 	//
 	// +kubebuilder:default="default"
-	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
@@ -307,7 +304,7 @@ const (
 	ConditionTypeSwitchoverPrefix    = "Switchover-"         // ConditionTypeSwitchoverPrefix component status condition of switchover
 )
 
-// Phase represents the current status of the ClusterDefinition and ClusterVersion CR.
+// Phase represents the current status of the ClusterDefinition CR.
 //
 // +enum
 // +kubebuilder:validation:Enum={Available,Unavailable}

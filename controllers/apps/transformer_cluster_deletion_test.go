@@ -66,7 +66,7 @@ var _ = Describe("clusterDeletionTransformer", func() {
 			GetObject()
 		clusterDef.Status.Phase = appsv1alpha1.AvailablePhase
 
-		cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, "test-cluster", clusterDef.Name, "").
+		cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, "test-cluster", clusterDef.Name).
 			SetTopology(clusterDef.Spec.Topologies[0].Name).
 			AddComponentV2("comp1", "compdef1").
 			AddComponentV2("comp2", "compdef2").

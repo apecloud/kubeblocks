@@ -80,6 +80,8 @@ const (
 	multiClusterKubeConfigFlagKey       flagName = "multi-cluster-kubeconfig"
 	multiClusterContextsFlagKey         flagName = "multi-cluster-contexts"
 	multiClusterContextsDisabledFlagKey flagName = "multi-cluster-contexts-disabled"
+
+	userAgentFlagKey flagName = "user-agent"
 )
 
 var (
@@ -127,6 +129,7 @@ func main() {
 		multiClusterKubeConfig       string
 		multiClusterContexts         string
 		multiClusterContextsDisabled string
+		userAgent                    string
 	)
 
 	flag.String(metricsAddrFlagKey.String(), ":8080", "The address the metric endpoint binds to.")
@@ -142,6 +145,8 @@ func main() {
 	flag.String(multiClusterKubeConfigFlagKey.String(), "", "Paths to the kubeconfig for multi-cluster accessing.")
 	flag.String(multiClusterContextsFlagKey.String(), "", "Kube contexts the manager will talk to.")
 	flag.String(multiClusterContextsDisabledFlagKey.String(), "", "Kube contexts that mark as disabled.")
+
+	flag.String(userAgentFlagKey.String(), "", "User agent of the operator.")
 
 	flag.String(constant.ManagedNamespacesFlag, "",
 		"The namespaces that the operator will manage, multiple namespaces are separated by commas.")
@@ -188,6 +193,7 @@ func main() {
 	multiClusterKubeConfig = viper.GetString(multiClusterKubeConfigFlagKey.viperName())
 	multiClusterContexts = viper.GetString(multiClusterContextsFlagKey.viperName())
 	multiClusterContextsDisabled = viper.GetString(multiClusterContextsDisabledFlagKey.viperName())
+	userAgent = viper.GetString(userAgentFlagKey.viperName())
 
 	setupLog.Info(fmt.Sprintf("config settings: %v", viper.AllSettings()))
 	if err := validateRequiredToParseConfigs(); err != nil {
@@ -199,7 +205,7 @@ func main() {
 	if len(managedNamespaces) > 0 {
 		setupLog.Info(fmt.Sprintf("managed namespaces: %s", managedNamespaces))
 	}
-	mgr, err := ctrl.NewManager(intctrlutil.GeKubeRestConfig(), ctrl.Options{
+	mgr, err := ctrl.NewManager(intctrlutil.GeKubeRestConfig(userAgent), ctrl.Options{
 		Scheme: scheme,
 		Metrics: server.Options{
 			BindAddress:   metricsAddr,
@@ -440,5 +446,13 @@ func validateRequiredToParseConfigs() error {
 	if err := validateWorkerServiceAccountAnnotations(viper.GetString(dptypes.CfgKeyWorkerServiceAccountAnnotations)); err != nil {
 		return err
 	}
+
+	if imagePullSecrets := viper.GetString(constant.KBImagePullSecrets); imagePullSecrets != "" {
+		secrets := make([]corev1.LocalObjectReference, 0)
+		if err := json.Unmarshal([]byte(imagePullSecrets), &secrets); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }

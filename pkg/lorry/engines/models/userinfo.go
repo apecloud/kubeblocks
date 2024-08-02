@@ -25,11 +25,12 @@ import (
 
 // UserInfo is the user information for account management
 type UserInfo struct {
-	UserName string        `json:"userName"`
-	Password string        `json:"password,omitempty"`
-	Expired  string        `json:"expired,omitempty"`
-	ExpireAt time.Duration `json:"expireAt,omitempty"`
-	RoleName string        `json:"roleName,omitempty"`
+	UserName  string        `json:"userName"`
+	Password  string        `json:"password,omitempty"`
+	Statement string        `json:"statement,omitempty"`
+	Expired   string        `json:"expired,omitempty"`
+	ExpireAt  time.Duration `json:"expireAt,omitempty"`
+	RoleName  string        `json:"roleName,omitempty"`
 }
 
 func (user *UserInfo) UserNameValidator() error {

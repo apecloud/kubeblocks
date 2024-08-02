@@ -33,7 +33,6 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 var _ = Describe("status reconciler test", func() {
@@ -77,34 +76,46 @@ var _ = Describe("status reconciler test", func() {
 			// prepare for update
 			By("fix meta")
 			reconciler = NewFixMetaReconciler()
-			newTree, err := reconciler.Reconcile(tree)
+			res, err := reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Commit))
 
 			By("update revisions")
 			reconciler = NewRevisionUpdateReconciler()
-			newTree, err = reconciler.Reconcile(newTree)
+			res, err = reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
 
 			By("assistant object")
 			reconciler = NewAssistantObjectReconciler()
-			newTree, err = reconciler.Reconcile(newTree)
+			res, err = reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
 
 			By("replicas alignment")
 			reconciler = NewReplicasAlignmentReconciler()
-			newTree, err = reconciler.Reconcile(newTree)
+			res, err = reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
 
 			By("all pods are not ready")
 			reconciler = NewStatusReconciler()
-			Expect(reconciler.PreCondition(newTree)).Should(Equal(kubebuilderx.ResultSatisfied))
-			_, err = reconciler.Reconcile(newTree)
+			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ConditionSatisfied))
+			res, err = reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
 			Expect(its.Status.Replicas).Should(BeEquivalentTo(0))
 			Expect(its.Status.ReadyReplicas).Should(BeEquivalentTo(0))
 			Expect(its.Status.AvailableReplicas).Should(BeEquivalentTo(0))
 			Expect(its.Status.UpdatedReplicas).Should(BeEquivalentTo(0))
 			Expect(its.Status.CurrentReplicas).Should(BeEquivalentTo(0))
+			for _, templateStatus := range its.Status.TemplatesStatus {
+				Expect(templateStatus.Replicas).Should(BeEquivalentTo(0))
+				Expect(templateStatus.ReadyReplicas).Should(BeEquivalentTo(0))
+				Expect(templateStatus.AvailableReplicas).Should(BeEquivalentTo(0))
+				Expect(templateStatus.UpdatedReplicas).Should(BeEquivalentTo(0))
+				Expect(templateStatus.CurrentReplicas).Should(BeEquivalentTo(0))
+			}
 
 			By("make all pods ready with old revision")
 			condition := corev1.PodCondition{
@@ -120,7 +131,7 @@ var _ = Describe("status reconciler test", func() {
 				}
 				pod.Status.Conditions = []corev1.PodCondition{condition}
 			}
-			pods := newTree.List(&corev1.Pod{})
+			pods := tree.List(&corev1.Pod{})
 			currentRevisionMap := map[string]string{}
 			oldRevision := "old-revision"
 			for _, object := range pods {
@@ -129,13 +140,28 @@ var _ = Describe("status reconciler test", func() {
 				makePodAvailableWithRevision(pod, oldRevision, false)
 				currentRevisionMap[pod.Name] = oldRevision
 			}
-			_, err = reconciler.Reconcile(newTree)
-			Expect(intctrlutil.IsDelayedRequeueError(err)).Should(BeTrue())
+			res, err = reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.RetryAfter(time.Second)))
 			Expect(its.Status.Replicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.ReadyReplicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.AvailableReplicas).Should(BeEquivalentTo(0))
 			Expect(its.Status.UpdatedReplicas).Should(BeEquivalentTo(0))
 			Expect(its.Status.CurrentReplicas).Should(BeEquivalentTo(replicas))
+			for _, templateStatus := range its.Status.TemplatesStatus {
+				if templateStatus.Name == nameHello {
+					Expect(templateStatus.Replicas).Should(BeEquivalentTo(1))
+					Expect(templateStatus.ReadyReplicas).Should(BeEquivalentTo(1))
+					Expect(templateStatus.CurrentReplicas).Should(BeEquivalentTo(1))
+				}
+				if templateStatus.Name == generateNameFoo {
+					Expect(templateStatus.Replicas).Should(BeEquivalentTo(replicasFoo))
+					Expect(templateStatus.ReadyReplicas).Should(BeEquivalentTo(replicasFoo))
+					Expect(templateStatus.CurrentReplicas).Should(BeEquivalentTo(replicasFoo))
+				}
+				Expect(templateStatus.AvailableReplicas).Should(BeEquivalentTo(0))
+				Expect(templateStatus.UpdatedReplicas).Should(BeEquivalentTo(0))
+			}
 			currentRevisions, _ := buildRevisions(currentRevisionMap)
 			Expect(its.Status.CurrentRevisions).Should(Equal(currentRevisions))
 			Expect(its.Status.Conditions[1].Type).Should(BeEquivalentTo(workloads.InstanceAvailable))
@@ -149,13 +175,30 @@ var _ = Describe("status reconciler test", func() {
 				Expect(ok).Should(BeTrue())
 				makePodAvailableWithRevision(pod, updateRevisions[pod.Name], true)
 			}
-			_, err = reconciler.Reconcile(newTree)
+			res, err = reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
 			Expect(its.Status.Replicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.ReadyReplicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.AvailableReplicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.UpdatedReplicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.CurrentReplicas).Should(BeEquivalentTo(replicas))
+			for _, templateStatus := range its.Status.TemplatesStatus {
+				if templateStatus.Name == nameHello {
+					Expect(templateStatus.Replicas).Should(BeEquivalentTo(1))
+					Expect(templateStatus.ReadyReplicas).Should(BeEquivalentTo(1))
+					Expect(templateStatus.AvailableReplicas).Should(BeEquivalentTo(1))
+					Expect(templateStatus.UpdatedReplicas).Should(BeEquivalentTo(1))
+					Expect(templateStatus.CurrentReplicas).Should(BeEquivalentTo(1))
+				}
+				if templateStatus.Name == generateNameFoo {
+					Expect(templateStatus.Replicas).Should(BeEquivalentTo(replicasFoo))
+					Expect(templateStatus.ReadyReplicas).Should(BeEquivalentTo(replicasFoo))
+					Expect(templateStatus.AvailableReplicas).Should(BeEquivalentTo(replicasFoo))
+					Expect(templateStatus.UpdatedReplicas).Should(BeEquivalentTo(replicasFoo))
+					Expect(templateStatus.CurrentReplicas).Should(BeEquivalentTo(replicasFoo))
+				}
+			}
 			Expect(its.Status.CurrentRevisions).Should(Equal(its.Status.UpdateRevisions))
 			Expect(its.Status.Conditions).Should(HaveLen(2))
 			Expect(its.Status.Conditions[1].Type).Should(BeEquivalentTo(workloads.InstanceAvailable))
@@ -167,13 +210,28 @@ var _ = Describe("status reconciler test", func() {
 				Expect(ok).Should(BeTrue())
 				pod.Status.Phase = corev1.PodFailed
 			}
-			_, err = reconciler.Reconcile(newTree)
+			res, err = reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
 			Expect(its.Status.Replicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.ReadyReplicas).Should(BeEquivalentTo(0))
 			Expect(its.Status.AvailableReplicas).Should(BeEquivalentTo(0))
 			Expect(its.Status.UpdatedReplicas).Should(BeEquivalentTo(replicas))
 			Expect(its.Status.CurrentReplicas).Should(BeEquivalentTo(replicas))
+			for _, templateStatus := range its.Status.TemplatesStatus {
+				if templateStatus.Name == nameHello {
+					Expect(templateStatus.Replicas).Should(BeEquivalentTo(1))
+					Expect(templateStatus.UpdatedReplicas).Should(BeEquivalentTo(1))
+					Expect(templateStatus.CurrentReplicas).Should(BeEquivalentTo(1))
+				}
+				if templateStatus.Name == generateNameFoo {
+					Expect(templateStatus.Replicas).Should(BeEquivalentTo(replicasFoo))
+					Expect(templateStatus.UpdatedReplicas).Should(BeEquivalentTo(replicasFoo))
+					Expect(templateStatus.CurrentReplicas).Should(BeEquivalentTo(replicasFoo))
+				}
+				Expect(templateStatus.ReadyReplicas).Should(BeEquivalentTo(0))
+				Expect(templateStatus.AvailableReplicas).Should(BeEquivalentTo(0))
+			}
 			Expect(its.Status.CurrentRevisions).Should(Equal(its.Status.UpdateRevisions))
 			Expect(its.Status.Conditions).Should(HaveLen(3))
 			failureNames := []string{"bar-0", "bar-1", "bar-2", "bar-3", "bar-foo-0", "bar-foo-1", "bar-hello-0"}

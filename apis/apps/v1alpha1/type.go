@@ -90,7 +90,6 @@ type ConfigTemplateExtension struct {
 	// Specifies the name of the referenced configuration template ConfigMap object.
 	//
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	TemplateRef string `json:"templateRef"`
 
@@ -98,7 +97,6 @@ type ConfigTemplateExtension struct {
 	// An empty namespace is equivalent to the "default" namespace.
 	//
 	// +kubebuilder:default="default"
-	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
 	// +optional
 	Namespace string `json:"namespace,omitempty"`

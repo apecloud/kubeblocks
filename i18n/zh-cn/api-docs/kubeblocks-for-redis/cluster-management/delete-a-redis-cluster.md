@@ -1,29 +1,29 @@
 ---
-title: Delete a Redis Cluster
-description: How to delete a Redis Cluster
-keywords: [redis, delete a cluster, delete protection]
+title: 删除集群
+description: 如何删除集群
+keywords: [redis, 删除集群, 删除保护]
 sidebar_position: 6
-sidebar_label: Delete protection
+sidebar_label: 删除保护
 ---
 
-# Delete a Redis Cluster
+# 删除集群
 
-## Termination policy
+## 终止策略
 
 :::note
 
-The termination policy determines how a cluster is deleted.
+终止策略决定了删除集群的方式。
 
 :::
 
-| **terminationPolicy**  | **Deleting Operation**                    |
-|:--                     | :--                                       |
-| `DoNotTerminate`       | `DoNotTerminate` blocks delete operation. |
-| `Halt`                 | `Halt` deletes workload resources such as statefulset, deployment workloads but keep PVCs. |
-| `Delete`               | `Delete` deletes workload resources and PVCs but keep backups. |
-| `WipeOut`              | `WipeOut` deletes workload resources, PVCs and all relevant resources included backups. |
+| **terminationPolicy** | **删除操作**                           |
+|:----------------------|:-------------------------------------------------|
+| `DoNotTerminate`      | `DoNotTerminate` 禁止删除操作。       |
+| `Halt`                | `Halt` 删除工作负载资源，但保留 PVC。 |
+| `Delete`              | `Delete` 删除工作负载资源和 PVC，但保留备份。   |
+| `WipeOut`             | `WipeOut` 删除工作负载资源、PVC 和所有相关资源（包括备份）。    |
 
-To check the termination policy, execute the following command.
+执行以下命令查看终止策略。
 
 ```bash
 kubectl -n demo get cluster mycluster
@@ -32,15 +32,15 @@ NAME        CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    AG
 mycluster   redis                redis-7.0.6   Delete               Running   10m
 ```
 
-## Step
+## 步骤
 
-Run the command below to delete a specified cluster.
+删除指定集群。
 
 ```bash
 kubectl delete cluster mycluster -n demo
 ```
 
-If you want to delete a cluster and its all related resources, you can modify the termination policy to `WipeOut`, then delete the cluster.
+如果想删除集群和所有相关资源，可以将终止策略修改为 `WipeOut`，然后再删除该集群。
 
 ```bash
 kubectl patch -n demo cluster mycluster -p '{"spec":{"terminationPolicy":"WipeOut"}}' --type="merge"

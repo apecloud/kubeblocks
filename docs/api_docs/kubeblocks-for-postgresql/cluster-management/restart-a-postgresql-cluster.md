@@ -11,12 +11,6 @@ sidebar_label: Restart
 
 You can restart all pods of the cluster. When an exception occurs in a database, you can try to restart it.
 
-:::note
-
-Restarting a PostgreSQL cluster triggers a concurrent restart and the primary may change after the cluster restarts.
-
-:::
-
 ## Steps
 
 1. Restart a cluster.

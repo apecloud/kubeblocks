@@ -1,16 +1,16 @@
 ---
-title: KubeBlocks for PostgreSQL
-description: Feature list of KubeBlocks for PostgreSQL
-keywords: [postgresql, introduction, feature]
+title: 用 KubeBlocks 管理 PostgreSQL
+description: PostgreSQL 功能列表
+keywords: [postgresql, 简介, 功能]
 sidebar_position: 1
 ---
 
-# KubeBlocks for PostgreSQL
+# 用 KubeBlocks 管理 PostgreSQL
 
-This tutorial illustrates how to create and manage a PostgreSQL cluster by `kubectl` or a YAML file. You can find the YAML examples in [the GitHub repository](https://github.com/apecloud/kubeblocks-addons/tree/release-0.9/examples/postgresql).
+本章节展示了如何通过 `kubectl` 或 YAML 文件创建和运维 PostgreSQL 集群。您可以在 [GitHub 仓库](https://github.com/apecloud/kubeblocks-addons/tree/release-0.9/examples/postgresql)中查看这些 YAML 示例。
 
-* [Introduction](./introduction/introduction.md)
-* [Cluster Management](./cluster-management/create-and-connect-a-postgresql-cluster.md)
-* [Configuration](./configuration/configuration.md)
-* [High Availability](./high-availability/high-availability.md)
-* [PostgreSQL Connection Pool](./postgresql-connection-pool/postgresql-connection-pool.md)
+* [简介](./introduction/introduction.md)
+* [集群管理](./cluster-management/create-and-connect-a-postgresql-cluster.md)
+* [配置](./configuration/configuration.md)
+* [高可用](./high-availability/high-availability.md)
+* [PostgreSQL 连接池](./postgresql-connection-pool/postgresql-connection-pool.md)

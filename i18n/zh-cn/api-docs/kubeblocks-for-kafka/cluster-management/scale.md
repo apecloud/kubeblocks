@@ -160,7 +160,7 @@ kubectl get cluster mycluster -n demo
 
 ### 开始之前
 
-- 确保集群处于 `Running` 状态，否则以下操作可能会失败。
+- 确保集群处于 `Running` 状态，否则后续操作可能会失败。
 - 不建议在 controller 节点上进行水平扩缩容（包括组合模式和分离模式的 controller 节点）。
 - 在进行水平扩缩容时，必须了解主题分区的存储情况。如果主题只有一个副本，在 broker 扩缩容时可能会导致数据丢失。
 

@@ -1,24 +1,23 @@
 ---
-title: High Availability for Redis
-description: High availability for a Redis cluster
-keywords: [redis, high availability]
+title: Redis 集群的高可用性
+description: Redis 集群的高可用性
+keywords: [redis, 高可用]
 sidebar_position: 1
 ---
 
-# High availability
+# 高可用
 
-KubeBlocks integrates [the official Redis Sentinel solution](https://redis.io/docs/management/sentinel/) to realize high availability and adopts Noop as the switch policy.
+KubeBlocks 集成 [Redis Sentinel 官方解决方案](https://redis.io/docs/management/sentinel/)以实现高可用性，并采用 Noop 作为切换策略。
 
-Redis Sentinel is the high availability solution for a Redis Replication Cluster, which is recommended by Redis and is also the main-stream solution in the community.
+Redis Sentinel 是 Redis 官方推荐的主备集群高可用性解决方案，在社区中备受欢迎。
 
-In the RedisReplication Cluster provided by KubeBlocks, Sentinel is deployed as an independent component.
+在 KubeBlocks 提供的 Redis 主备集群中，Sentinel 是一个独立的组件。
 
-## Before you start
+## 开始之前
 
-* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
-* [Create a Redis Replication Cluster](./../cluster-management/create-and-connect-a-redis-cluster.md#create-a-redis-cluster).
-* Check the role probe.
-  * Check whether the following role probe parameters exist to verify the role probe is enabled.
+* [安装 KubeBlocks](./../../installation/install-kubeblocks.md)。
+* [创建 Redis 主备版](./../cluster-management/create-and-connect-a-redis-cluster.md#create-a-redis-cluster)。
+* 检查角色探测参数，验证角色探测是否已启用。
 
     ```bash
     kubectl get cd redis -n demo -o yaml
@@ -30,9 +29,9 @@ In the RedisReplication Cluster provided by KubeBlocks, Sentinel is deployed as 
         timeoutSeconds: 1
     ```
 
-## Steps
+## 步骤
 
-1. View the initial status of the Redis cluster.
+1. 查看 Redis 集群的初始状态。
 
     ```bash
     kubectl get pods -l kubeblocks.io/role=primary -n demo
@@ -46,11 +45,11 @@ In the RedisReplication Cluster provided by KubeBlocks, Sentinel is deployed as 
     mycluster-redis-1   3/3     Running   1 (24m ago)   24m
     ```
 
-   Currently, `mycluster-redis-0` is the primary pod and `mycluster-redis-1` is the secondary pod.
+   当前 `mycluster-redis-0` 是主节点，`mycluster-redis-1` 是从节点。
 
    :::note
 
-   To fetch a more complete output, you can modify the `-o` parameter.
+   如需更完整的输出，您可使用 `-o` 参数。
 
    ```bash
    kubectl get pods  -o custom-columns=NAME:.metadata.name,ROLE_LABEL:.metadata.labels."kubeblocks\.io/role"
@@ -58,23 +57,23 @@ In the RedisReplication Cluster provided by KubeBlocks, Sentinel is deployed as 
 
    :::
 
-2. Simulate a primary pod exception.
+2. 模拟主节点异常。
 
    ```bash
-   # Enter the primary pod
+   # 进入主节点
    kubectl exec -ti -n demo mycluster-redis-0 -- bash
 
-   # Execute the debug sleep command to simulate a primary pod exception
+   # 执行 debug sleep 命令，模拟主节点异常
    root@mycluster-redis-0:/# redis-cli debug sleep 30
    ```
 
-3. Open the Redis Sentinel log to view the failover.
+3. 打开 Redis Sentinel 日志，查看故障切换情况。
 
    ```bash
    kubectl logs mycluster-redis-sentinel-0 -n demo
    ```
 
-   In the logs, we can view when a high-availability switch occurs.
+   在日志中可以看到高可用切换发生的时间。
 
    ```bash
    1:X 18 Apr 2023 06:13:17.072 # +switch-master mycluster-redis-sentinel mycluster-redis-0.mycluster-redis-headless.default.svc 6379 mycluster-redis-1.mycluster-redis-headless.default.svc 6379
@@ -82,19 +81,19 @@ In the RedisReplication Cluster provided by KubeBlocks, Sentinel is deployed as 
    1:X 18 Apr 2023 06:13:17.077 * Sentinel new configuration saved on disk
    ```
 
-4. Connect to the Redis cluster to view the primary pod information after the exception simulation.
+4. 连接到 Redis 集群，查看异常发生后的主节点信息。
 
     ```bash
     127.0.0.1:6379> info replication
     ```
 
-   Now `mycluster-redis-1` has been assigned as the primary's pod.
+   从输出可以看到，`mycluster-redis-1` 是主节点。
 
-5. Describe the cluster and check the instance role.
+5. 查看集群，检查实例角色。
 
    ```bash
    kubectl get pods -l kubeblocks.io/role=primary -n demo
    kubectl get pods -l kubeblocks.io/role=secondary -n demo
    ```
 
-   After the failover, `mycluster-redis-0` becomes the secondary pod and `mycluster-redis-1` becomes the primary pod.
+   故障切换后，`mycluster-redis-0` 变成了从节点，`mycluster-redis-1` 变成了主节点。

@@ -1,41 +1,43 @@
 ---
-title: Redis Cluster Mode
-description: A brief overview of Redis Cluster Mode and its basic operations
-keywords: [redis, redis cluster, feature]
+title: Redis Cluster 模式
+description: Redis Cluster 模式概览及基本操作
+keywords: [redis, redis cluster, 功能]
 sidebar_position: 7
+sidebar_label: Redis Cluster 模式
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Redis Cluster Mode
+# Redis Cluster 模式
 
-While Redis Sentinel clusters provide excellent failover support, they do not inherently provide data sharding. All data remains on a single Redis instance, limited by its memory and performance capacity. Therefore, it may impact horizontal scalability when dealing with large datasets and high read/write operations.
+虽然 Redis Sentinel 集群提供了出色的故障转移支持，但其本身不提供数据分片，所有数据仍然驻留在单个 Redis 实例上，并受到该实例的内存和性能限制，因此可能会影响系统在处理大型数据集和高读/写操作时的水平扩展能力。
 
-KubeBlocks now supports Redis Cluster Mode, which not only allows for greater memory distribution but also parallel processing, significantly improving performance for data-intensive operations. A brief overview of Redis Cluster Mode and its basic operations will be elaborated in this documentation.
+KubeBlocks 现已支持 Redis Cluster 模式。该模式不仅允许更大的内存分布，还支持并行处理，从而显著地提高了数据密集型操作的性能。本文档将简要介绍 Redis Cluster 模式及其基本操作。
 
-## What is Redis Cluster Mode
+## 什么是 Redis Cluster 模式
 
-Redis Cluster Mode is a distributed deployment mode of the Redis database used to horizontally scale data storage and improve system availability across multiple nodes.
+Redis Cluster 是 Redis 数据库的一种分布式部署模式，用于在多个节点上水平扩展数据存储和提高系统的可用性。
 
-In Redis Cluster Mode, the cluster manages data through a sharding mechanism and provides capabilities for data replication, failover, and traffic routing among shards. This sharding mechanism enables distributing a large amount of data across different nodes, achieving horizontal scalability and load balancing.
+在 Redis Cluster 中，集群通过分片（sharding）模式来对数据进行管理，并具备分片间数据复制、故障转移和流量调度的能力。这种分片机制允许将大量数据分散存储在不同的节点上，从而实现数据的横向扩展和负载均衡。
 
-Redis Cluster Mode ensures high availability through master-slave replication. Each master node can have one or more slave nodes that replicate the data from the master and provide read services. In case of a master node failure, a slave node can automatically take over the master's role and continue serving, ensuring failover and fault tolerance.
+Redis Cluster 采用主从复制的方式保证数据的高可用性。每个主节点可以有一个或多个从节点，从节点复制主节点的数据并提供读取服务。当主节点发生故障时，从节点可以自动接管主节点的功能，并继续提供服务，从而实现故障转移和容错性。
 
-Redis Cluster Mode also provides communication and data migration mechanisms among cluster nodes. When there are changes in the cluster, such as adding nodes, node failures, or node removal, Redis Cluster automatically performs data migration and resharding to maintain data balance and availability.
+Redis Cluster 还提供集群的节点间通信和数据迁移机制。当集群中的节点发生变更（如新增节点、节点故障、节点移除）时，Redis Cluster 会自动进行数据迁移和重新分片，以保持数据的平衡和可用性。
 
-## Basic Ops
+## 基本运维操作
 
-Below is a brief introduction to the basic operations of Redis Cluster Mode.
+下面简单介绍 Redis Cluster 的基本运维操作。
 
-### Before you start
+### 开始之前
 
-* [Install KubeBlocks](./../installation/install-kubeblocks.md).
-    Make sure your KubeBlocks and addon are version 0.9 or above.
-* Make sure the Redis addon is enabled.
-* View all the database types and versions available for creating a cluster.
+* [安装 KubeBlocks](./../installation/install-kubeblocks.md)。
+   - KubeBlocks 及 Addon 的版本都需要 0.9 版本以上。
+* 确保 Redis 引擎已启用。
+* 查看可用于创建集群的数据库类型和版本。
 
   Make sure you can get the redis `componentdefinition`. It is used to describe and define the components in a database cluster, and usually presents basic information such as the name, type, version, status, etc.
+  查看 redis 组件定义是否可用。组件定义用于描述和定义数据库集群的组件，通常呈现诸如名称、类型、版本、状态等基本信息。
 
   ```bash
   kubectl get componentdefinition redis-cluster-7.0
@@ -44,7 +46,7 @@ Below is a brief introduction to the basic operations of Redis Cluster Mode.
   redis-cluster-7.0   redis-cluster   7.0.6             Available   33m
   ```
 
-* To keep things isolated, create a separate namespace called `demo` throughout this tutorial.
+* 为了保持隔离，本文档中创建一个名为 demo 的独立命名空间。
 
   ```bash
   kubectl create namespace demo
@@ -52,13 +54,13 @@ Below is a brief introduction to the basic operations of Redis Cluster Mode.
   namespace/demo created
   ```
 
-### Create clusters
+### 创建集群
 
-Since Redis Cluster Mode is based on the latest ShardingSpec API, currently it can only be created by Helm or YAML files using kubectl.
+因为 Redis Cluster 是基于最新的 ShardingSpec API 创建的，目前只支持通过 helm 或者 kubectl apply yaml 创建。
 
 :::note
 
-Redis Cluster Mode requires a minimum of three shards, so the number of shards cannot be less than 3.
+Redis Cluster 至少需要三个分片，所以分片数量不能小于 3。
 
 :::
 
@@ -67,10 +69,10 @@ Redis Cluster Mode requires a minimum of three shards, so the number of shards c
 <TabItem value="Helm" label="Helm" default>
 
 ```bash
-# Example 1: Creating a Redis Cluster with three shards, each shard having one replica (one master, one replica)
+# 示例一：生产一个具有三个分片，每个分片一个副本（一主一备）的 Redis Cluster 集群
 helm install redisc xxxxx(chart remote address) --set mode=cluster --set redisCluster.shardCount=3 --set replicas=2 -n demo
 
-# Example 2: Creating a Redis Cluster with three shards, each shard having one replica (one master, one replica), and enabling NodePort access
+# 示例二：生产一个具有三个分片，每个分片一个副本（一主一备）， 并开启 NodePort 访问的 Redis cluster 集群
 helm install redisc xxxxx(chart remote address) --set mode=cluster --set nodePortEnabled=true --set redisCluster.shardCount=3 --set replicas=2 -n demo
 ```
 
@@ -82,7 +84,7 @@ helm install redisc xxxxx(chart remote address) --set mode=cluster --set nodePor
 kubectl apply -f redis-cluster-example.yaml
 ```
 
-**Example 1: Redis Cluster without NodePort enabled**
+**示例 1: 未开启 NodePort 的 Redis Cluster**
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -98,13 +100,13 @@ spec:
   clusterVersionRef: redis-7.0.6
   shardingSpecs:
   - name: shard
-    # Specify the number of shards, which cannot be less than 3
+    # 指定分片数量，不能小于3
     shards: 3
     template:
       componentDef: redis-cluster-7
       name: redis
       replicas: 2
-      # Specify resources for a single shard
+      # 指定单个分片的资源
       resources:
         limits:
           cpu: 500m
@@ -124,7 +126,7 @@ spec:
   terminationPolicy: Delete
 ```
 
-**Example 2: Redis Cluster with NodePort enabled**
+**示例 2: 开启 NodePort 的 Redis Cluster**
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -140,13 +142,13 @@ spec:
   clusterVersionRef: redis-7.0.6
   shardingSpecs:
   - name: shard
-    # Specify the number of shards, which cannot be less than 3
+    # 指定分片数量，不能小于 3
     shards: 3
     template:
       componentDef: redis-cluster-7.0
       name: redis
       replicas: 2
-      # Specify resources for a single shard
+      # 指定单个分片的资源
       resources:
         limits:
           cpu: 500m
@@ -155,7 +157,7 @@ spec:
           cpu: 500m
           memory: 512Mi
       serviceVersion: 7.0.6
-      # Enable NodePort
+      # 指定开启 NodePort
       services:
       - name: redis-advertised
         podService: true
@@ -175,7 +177,7 @@ spec:
 
 </Tabs>
 
-Once the cluster is created, wait until the cluster status changes to `running`. Then, run `kubectl get component -n demo | grep redisc-shard` to view the roles of nodes in the cluster.
+创建后，观察集群状态变成 `running` 后，并通过 `kubectl get component -n demo | grep redisc-shard` 命令看到对应的角色。
 
 ```bash
 kubectl get component -n demo | grep redisc-shard
@@ -185,19 +187,19 @@ redisc-shard-7zk            redis-cluster          Running   79m
 redisc-shard-5tw            redis-cluster          Running   79m
 ```
 
-### Connect to clusters
+### 连接集群
 
 <Tabs>
 
 <TabItem value="SDK" label="SDK" default>
 
-Redis Cluster Mode requires using specific client SDKs for connection. Currently, there are Redis Cluster client SDK implementations available in different popular programming languages. You can choose the appropriate SDK based on your requirements. For example, Jedis or Lettuce for Java, go-redis for Golang, etc.
+Redis Cluster 需要使用特定的客户端 SDK 进行连接，目前不同的主流编程语言都有对应的 Redis Cluster 客户端 SDK 实现，可以根据实际需求选择。例如 Java 的 Jedis 或者 Lettuce，Golang 的 go-redis 等，这部分可以参考对应 SDK 的文档。
 
-Note that when using an SDK, you need to configure the addresses of each node in the Redis Cluster. According to whether NodePort is enabled or not, there are two different configurations:
+需要注意的是，在使用 SDK 时需要在 SDK 中配置 Redis Cluster 各个节点的地址，根据上述创建集群时是否开启 NodePort 的不同，分为两种情况：
 
-**Example 1: Redis Cluster without NodePort enabled**
+**示例 1: 未开启 Nodeport**
 
-Configure each Pod's headless address.
+配置每个 Shard 对应 Pod 对应的 headless 地址。
 
 ```bash
 redisc-shard-qst-0.redisc-shard-qst-headless:6379
@@ -208,12 +210,12 @@ redisc-shard-mv6-0.redisc-shard-mv6-headless:6379
 redisc-shard-mv6-1.redisc-shard-mv6-headless:6379
 ```
 
-**Example 2: Redis Cluster with NodePort enabled**
+**示例 2: 开启 NodePort**
 
 Configure each Pod's HostIP and the corresponding NodePort.
 
 ```bash
-# 172.18.0.3 is the host IP of redisc-shard-qst-0 node, and 32269 is the NodePort mapped to the Redis 6379 server port.
+# 例如 172.18.0.3 是 redisc-shard-qst-0 所在节点的主机 ip，32269 是 redis 6379 服务端口映射的 NodePort
 172.18.0.3:32269 
 172.18.0.4:32051
 172.18.0.5:32650
@@ -224,22 +226,22 @@ Configure each Pod's HostIP and the corresponding NodePort.
 
 </TabItem>
 
-<TabItem value="Direct connect" label="Direct connect">
+<TabItem value="直连特定节点" label="直连特定节点">
 
 :::note
 
-Direct connection is only for testing.
+直连特定节点仅用于测试。
 
 :::
 
-For simple connectivity verification, you can use kubectl commands to log in to a specific Pod in the cluster and check the cluster's status.
+简单验证连通性时，可以通过 `kubectl` 命令，登录到集群中的某个 Pod，查看集群状态。
 
 ```bash
-# Log in to a pod
+# 登录到 Pod 中
 ➜  ~ kubectl exec -it redisc-shard-qst-0 -c redis-cluster -- bash
 root@redisc-shard-qst-0:/#
 
-# Check cluster topology
+# 查看集群拓扑信息
 root@redisc-shard-qst-0:/# redis-cli -a $REDIS_DEFAULT_PASSWORD cluster nodes
 Warning: Using a password with '-a' or '-u' option on the command line interface may not be safe.
 f2f729eb9074d42dc58ba544f35be0b6652134c2 172.18.0.3:32650@31171,redisc-shard-mv6-1.redisc-shard-mv6-headless.default.svc slave 04e309001ce12857558ab721b47ce802e15b84f4 0 1713927855356 3 connected
@@ -256,13 +258,13 @@ b695dbac46efd9ec24ea608358f92dfd749e8e71 172.18.0.3:31603@30000,redisc-shard-kr2
 
 </Tabs>
 
-### Scale shards
+### 分片扩缩容
 
 :::note
 
-1. Currently, only scaling up or down one shard node at a time is supported. If you need to scale multiple shards, you need to perform the operations sequentially. This will be optimized in future versions.
+1. 目前仅支持一次性扩容或者缩容一个分片节点，如需要扩缩多个分片，需要串行操作，后续版本会进行优化。
 
-2. Scaling shards using kbcli or ops will be supported in future versions.
+2. 暂不支持通过 OpsRequest 操作对分片进行扩缩容，后续版本会支持。
 
 :::
 
@@ -270,21 +272,21 @@ b695dbac46efd9ec24ea608358f92dfd749e8e71 172.18.0.3:31603@30000,redisc-shard-kr2
 
 <TabItem value="kubectl patch" label="kubectl patch" default>
 
-You can use `kubectl patch` to update the shards field and scale the shards.
+使用 kubectl patch 更新 shards 字段，对分片进行扩缩容。
 
 ```bash
-# Scale up to 4 shards
+# 扩容成4分片
 kubectl patch cluster redisc --type='json' -p='[{"op": "replace", "path": "/spec/shardingSpecs/0/shards", "value":4}]' -n demo
 
-# Scale down to 3 shards
+# 重新缩容成3分片
 kubectl patch cluster redisc --type='json' -p='[{"op": "replace", "path": "/spec/shardingSpecs/0/shards", "value":3}]' -n demo
 ```
 
 </TabItem>
 
-<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
+<TabItem value="修改集群 YAML 文件" label="修改集群 YAML 文件">
 
-You can use `kubectl edit` to directly edit the cluster YAML and modify the value of `spec.shardingSpecs[0].shards`.
+使用 `kubectl edit` 直接编辑集群 YAML 文件，修改 `spec.ShardingSpecs[0].shards` 字段的值。
 
 ```bash
 kubectl edit cluster redisc
@@ -294,15 +296,15 @@ kubectl edit cluster redisc
 
 </Tabs>
 
-### Scale replicas
+### 分片副本扩缩容
 
-The number of replicas applies to all shards.
+分片副本数量对所有分片生效。
 
 <Tabs>
 
 <TabItem value="kubectl patch" label="kubectl patch" default>
 
-You can use `kubectl patch` to update the replicas field and scale the shard replicas.
+使用 `kubectl patch` 更新 `replicas` 字段，对分片副本进行扩缩容。
 
 ```bash
 # Scale to 3 replicas (1 master and 2 replicas per shard)
@@ -311,9 +313,10 @@ kubectl patch cluster redisc --type='json' -p='[{"op": "replace", "path": "/spec
 
 </TabItem>
 
-<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
+<TabItem value="修改集群 YAML 文件" label="修改集群 YAML 文件">
 
 You can Use `kubectl edit` to directly edit the cluster YAML and modify the value of `spec.shardingSpecs[0].template.replicas`.
+使用 `kubectl edit` 直接编辑集群 YAML 文件，修改 `spec.ShardingSpecs[0].template.replicas` 字段的值。
 
 ```bash
 kubectl edit cluster redisc
@@ -323,7 +326,7 @@ kubectl edit cluster redisc
 
 <TabItem value="OpsRequest" label="OpsRequest">
 
-You can apply an OpsRequest to scale replicas.
+应用 OpsRequest 进行分片副本扩缩容。
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -342,7 +345,7 @@ spec:
 
 </Tabs>
 
-### Resource scaling/reconfiguration
+### 资源变配
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -362,7 +365,7 @@ spec:
   type: VerticalScaling
 ```
 
-### Expand volume
+### 磁盘扩容
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -379,11 +382,11 @@ spec:
   type: VolumeExpansion
 ```
 
-### Restart
+### 重启
 
-Currently, restarting a Redis Cluster is not supported and it will be supported in the future.
+当前暂不支持重启 Redis Cluster。
 
-### Stop/Start
+### 停止/启动
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -405,9 +408,9 @@ spec:
   type: Start
 ```
 
-### Back up & Restore
+### 备份恢复
 
-To back up a cluster:
+备份集群：
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -424,7 +427,7 @@ spec:
     deletionPolicy: Delete
 ```
 
-To restore a cluster:
+恢复集群：
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1

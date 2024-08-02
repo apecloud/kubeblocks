@@ -6,6 +6,8 @@ sidebar_position: 1
 sidebar_label: Create
 ---
 
+# Create a Pulsar Cluster
+
 ## Introduction
 
 KubeBlocks can quickly integrate new engines through good abstraction. KubeBlocks supports Pulsar operations, including basic lifecycle operations such as cluster creation, deletion, and restart, as well as advanced operations such as horizontal and vertical scaling, volume expansion, configuration changes, and monitoring.

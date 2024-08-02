@@ -1,31 +1,25 @@
 ---
-title: Create and connect to a Redis Cluster
-description: How to create and connect to a Redis cluster
-keywords: [redis, create a redis cluster, connect to a redis cluster, cluster, redis sentinel]
+title: 创建并连接到 Redis 集群
+description: 如何创建并连接到 Redis 集群
+keywords: [redis, 创建集群, 连接集群, 集群, redis sentinel]
 sidebar_position: 1
-sidebar_label: Create and connect
+sidebar_label: 创建并连接
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Create and Connect to a Redis cluster
+# 创建并连接到 Redis 集群
 
-This tutorial shows how to create and connect to a Redis cluster.
+本文档展示如何创建并连接到一个 Redis 集群。
 
-KuebBlocks for Redis supports Standalone clusters and Replication Cluster.
+### 开始之前
 
-For your better high-availability experience, KubeBlocks creates a Redis Replication Cluster by default.
+* [安装 KubeBlocks](./../../installation/install-kubeblocks.md)。
 
-## Create a Redis cluster
+* 查看可用于创建集群的数据库类型和版本。
 
-### Before you start
-
-* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
-
-* View all the database types and versions available for creating a cluster.
-
-  Make sure the `redis` cluster definition is installed. If the cluster definition is not available, refer to [this doc](./../../installation/install-addons.md) to enable it first.
+  请确保 `redis` 集群定义已安装。如果未安装，可参考[该文档](./../../installation/install-addons.md)安装并启用。
 
   ```bash
   kubectl get clusterdefinition redis
@@ -34,7 +28,7 @@ For your better high-availability experience, KubeBlocks creates a Redis Replica
   redis                              Available   16m
   ```
 
-  View all available versions for creating a cluster.
+  查看可用的集群版本。
 
   ```bash
   kubectl get clusterversions -l clusterdefinition.kubeblocks.io/name=redis
@@ -43,7 +37,7 @@ For your better high-availability experience, KubeBlocks creates a Redis Replica
   redis-7.0.6   redis                Available   16m
   ```
 
-* To keep things isolated, create a separate namespace called `demo` throughout this tutorial.
+* 为保持隔离，本教程中创建一个名为 `demo` 的独立命名空间。
 
   ```bash
   kubectl create namespace demo
@@ -51,13 +45,20 @@ For your better high-availability experience, KubeBlocks creates a Redis Replica
   namespace/demo created
   ```
 
-### Create a cluster
+### 创建集群
 
-KubeBlocks supports creating two types of Redis clusters: Standalone and Replication Cluster. Standalone only supports one replica and can be used in scenarios with lower requirements for availability. For scenarios with high availability requirements, it is recommended to create a Replication Cluster, which supports automatic failover.
+KubeBlocks 支持创建三种类型的 Reids 集群：单机版（Standalone）、主备版（Replication）和 Redis Cluster 模式。单机版仅支持一个副本，适用于对可用性要求较低的场景。集群版包含两个副本，适用于对高可用性要求较高的场景。从 v0.9.0 开始，KubeBlocks 也支持 Redis Cluster 模式，可参考[该文档](./../redis-cluster-mode.md)了解详情。
 
-To ensure high availability, Primary and Secondary are distributed on different nodes by default. If you only have one node for deploying a Replication Cluster, set `spec.affinity.topologyKeys` as `null`.
+为了确保高可用性，所有的副本都默认分布在不同的节点上。如果您只有一个节点可用于部署集群版，可将 `spec.affinity.topologyKeys` 设置为 `null`。
 
-KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a Standalone.
+:::note
+
+生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
+
+:::
+
+KubeBlocks 通过 `Cluster` 定义集群。以下是创建 Redis 集群的示例。
+
 
 ```yaml
 cat <<EOF | kubectl apply -f -
@@ -105,25 +106,29 @@ spec:
 EOF
 ```
 
-| Field                                 | Definition  |
+| 字段                                   | 定义  |
 |---------------------------------------|--------------------------------------|
-| `spec.clusterDefinitionRef`           | It specifies the name of the ClusterDefinition for creating a specific type of cluster.  |
-| `spec.clusterVersionRef`              | It is the name of the cluster version CRD that defines the cluster version.  |
-| `spec.terminationPolicy`              | It is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Halt`, `Delete`, `WipeOut`.  <p> - `DoNotTerminate` blocks deletion operation. </p><p> - `Halt` deletes workload resources such as statefulset and deployment workloads but keep PVCs. </p><p> - `Delete` is based on Halt and deletes PVCs. </p> - `WipeOut` is based on Delete and wipe out all volume snapshots and snapshot data from a backup storage location. |
-| `spec.affinity`                       | It defines a set of node affinity scheduling rules for the cluster's Pods. This field helps control the placement of Pods on nodes within the cluster.  |
-| `spec.affinity.podAntiAffinity`       | It specifies the anti-affinity level of Pods within a component. It determines how pods should spread across nodes to improve availability and performance. |
-| `spec.affinity.topologyKeys`          | It represents the key of node labels used to define the topology domain for Pod anti-affinity and Pod spread constraints.   |
-| `spec.tolerations`                    | It is an array that specifies tolerations attached to the cluster's Pods, allowing them to be scheduled onto nodes with matching taints.  |
-| `spec.componentSpecs`                 | It is the list of components that define the cluster components. This field allows customized configuration of each component within a cluster.   |
-| `spec.componentSpecs.componentDefRef` | It is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition apecloud-mysql -o json \| jq '.spec.componentDefs[].name'`.   |
-| `spec.componentSpecs.name`            | It specifies the name of the component.     |
-| `spec.componentSpecs.disableExporter` | It defines whether the monitoring function is enabled. |
-| `spec.componentSpecs.replicas`        | It specifies the number of replicas of the component.  |
-| `spec.componentSpecs.resources`       | It specifies the resource requirements of the component.  |
+| `spec.clusterDefinitionRef`           | 集群定义 CRD 的名称，用来定义集群组件。  |
+| `spec.clusterVersionRef`              | 集群版本 CRD 的名称，用来定义集群版本。 |
+| `spec.terminationPolicy`              | 集群的终止策略，默认值为 `Delete`，有效值为 `DoNotTerminate`、`Halt`、`Delete` 和 `WipeOut`。 <p> - `DoNotTerminate` 会阻止删除操作。 </p><p> - `Halt` 会删除工作负载资源，如 statefulset 和 deployment 等，但是保留了 PVC 。  </p><p> - `Delete` 在 `Halt` 的基础上进一步删除了 PVC。 </p><p> - `WipeOut` 在 `Delete` 的基础上从备份存储的位置完全删除所有卷快照和快照数据。 </p>|
+| `spec.affinity`                       | 为集群的 Pods 定义了一组节点亲和性调度规则。该字段可控制 Pods 在集群中节点上的分布。 |
+| `spec.affinity.podAntiAffinity`       | 定义了不在同一 component 中的 Pods 的反亲和性水平。该字段决定了 Pods 以何种方式跨节点分布，以提升可用性和性能。 |
+| `spec.affinity.topologyKeys`          | 用于定义 Pod 反亲和性和 Pod 分布约束的拓扑域的节点标签值。 |
+| `spec.tolerations`                    | 该字段为数组，用于定义集群中 Pods 的容忍，确保 Pod 可被调度到具有匹配污点的节点上。 |
+| `spec.componentSpecs`                 | 集群 components 列表，定义了集群 components。该字段允许对集群中的每个 component 进行自定义配置。 |
+| `spec.componentSpecs.componentDefRef` | 表示 cluster definition 中定义的 component definition 的名称，可通过执行 `kubectl get clusterdefinition apecloud-mysql -o json \| jq '.spec.componentDefs[].name'` 命令获取 component definition 名称。 |
+| `spec.componentSpecs.name`            | 定义了 component 的名称。  |
+| `spec.componentSpecs.disableExporter` | 定义了是否开启监控功能。 |
+| `spec.componentSpecs.replicas`        | 定义了 component 中 replicas 的数量。 |
+| `spec.componentSpecs.resources`       | 定义了 component 的资源要求。  |
 
-For the details of different parameters, you can refer to API docs for developers.
+Run KubeBlocks operator 监控 `Cluster` CRD 并创建集群和全部依赖资源。您可执行以下命令获取集群创建的所有资源信息。
 
-Run the following command to see the created Redis cluster object:
+```bash
+kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=mycluster -n demo
+```
+
+执行以下命令，查看已创建的 Redis 集群：
 
 ```bash
 kubectl get cluster mycluster -n demo -o yaml
@@ -131,7 +136,7 @@ kubectl get cluster mycluster -n demo -o yaml
 
 <details>
 
-<summary>Output</summary>
+<summary>输出</summary>
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -221,23 +226,23 @@ status:
 
 </details>
 
-## Connect to a Redis Cluster
+## 连接集群
 
 <Tabs>
 
 <TabItem value="kubectl" label="kubectl" default>
 
-You can use `kubectl exec` to exec into a Pod and connect to a database.
+使用 `kubectl exec` 命令进入 Pod 并连接到数据库。
 
-KubeBlocks operator has created a new Secret called `mycluster-conn-credential` to store the connection credential of the Redis cluster. This secret contains the following keys:
+KubeBlocks operator 会创建一个名为 `mycluster-conn-credential` 的新的 Secret 来存储 MySQL 集群的连接凭证。该 Secret 包含以下 key：
 
-* `username`: the root username of the Redis cluster.
-* `password`: the password of the root user.
-* `port`: the port of the Redis cluster.
-* `host`: the host of the Redis cluster.
-* `endpoint`: the endpoint of the Redis cluster and it is the same as `host:port`.
+* `username`：Redis 集群的根用户名。
+* `password`：根用户的密码。
+* `port`：Redis 集群的端口。
+* `host`：Redis 集群的主机。
+* `endpoint`：Redis 集群的终端节点，与 `host:port` 相同。
 
-1. Get the `username` and `password` for the `kubectl exec` command.
+1. 获取用于 `kubectl exec` 命令的 `username` 和 `password`。
 
    ```bash
    kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
@@ -249,7 +254,7 @@ KubeBlocks operator has created a new Secret called `mycluster-conn-credential` 
    5bv7czc4
    ```
 
-2. Exec into the pod `mycluster-redis-0` and connect to the database using username and password.
+2. 使用用户名和密码，进入 Pod `mycluster-redis-0` 并连接到数据库。
 
    ```bash
    kubectl exec -ti -n demo mycluster-redis-0 -- bash
@@ -261,15 +266,15 @@ KubeBlocks operator has created a new Secret called `mycluster-conn-credential` 
 
 <TabItem value="port-forward" label="port-forward">
 
-You can also port forward the service to connect to the database from your local machine.
+还可以使用端口转发在本地计算机上连接数据库。
 
-1. Run the following command to port forward the service.
+1. 通过端口转发服务。
   
    ```bash
    kubectl port-forward -n demo svc/mycluster-redis 6379:6379
    ```
 
-2. Open a new terminal and run the following command to connect to the database.
+2. 在新的终端窗口中执行以下命令，连接到数据库。
 
    ```bash
    root@mycluster-redis-0:/# redis-cli -a 5bv7czc4  --user default
@@ -279,4 +284,4 @@ You can also port forward the service to connect to the database from your local
 
 </Tabs>
 
-For the detailed database connection guide, refer to [Connect database](./../../connect_database/overview-of-database-connection.md).
+有关详细的数据库连接指南，请参考[连接数据库](./../../connect_database/overview-of-database-connection.md)。

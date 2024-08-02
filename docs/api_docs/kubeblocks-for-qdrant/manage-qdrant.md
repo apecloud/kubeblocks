@@ -117,7 +117,7 @@ Run the following command to see the created Qdrant cluster object:
 kubectl get cluster mycluster -n demo -o yaml
 ```
 
-## Connect to a vector database cluster
+## Connect to a Qdrant cluster
 
 Qdrant provides both HTTP and gRPC protocols for client access on ports 6333 and 6334 respectively. You can also port forward the service to connect to a database from your local machine.
 
@@ -135,7 +135,7 @@ Qdrant provides both HTTP and gRPC protocols for client access on ports 6333 and
 
    Refer to [the official Qdrant documents](https://qdrant.tech/documentation/) for the cluster operations.
 
-## Scaling
+## Scale
 
 ### Scale horizontally
 
@@ -420,7 +420,7 @@ There are two ways to apply vertical scaling.
 </TabItem>
 </Tabs>
 
-## Volume Expanding
+## Volume Expansion
 
 ### Before you start
 
@@ -480,7 +480,7 @@ There are two ways to apply volume expansion.
 
 </TabItem>
 
-<TabItem value="Edit cluster YAML file" label="Edit cluster YAML fil">
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
 1. Change the value of `spec.componentSpecs.volumeClaimTemplates.spec.resources` in the cluster YAML file.
 

@@ -1,34 +1,34 @@
 ---
-title: Configure cluster parameters
-description: Configure cluster parameters
-keywords: [postgresql, parameter, configuration, reconfiguration]
+title: 配置集群参数
+description: 如何配置集群参数
+keywords: [postgresql, 参数, 配置]
 sidebar_position: 1
 ---
 
-# Configure cluster parameters
+# 配置集群参数
 
-This guide shows how to configure cluster parameters.
+本文档演示了如何配置集群参数。
 
-KubeBlocks supports dynamic configuration. When the specification of a database instance changes (e.g., a user vertically scales a cluster), KubeBlocks automatically matches the appropriate configuration template based on the new specification. This is because different specifications of a database instance may require different optimal configurations to optimize performance and resource utilization. When you choose a different database instance specification, KubeBlocks automatically detects and determines the best database configuration for the new specification, ensuring optimal performance and configuration of the database under the new specifications.
+KubeBlocks 支持动态配置。当数据库实例的规格发生变化时（例如对实例进行升降配操作），KubeBlocks 会根据新的规格自动匹配适用的参数模板，因为不同规格的数据库实例可能需要不同的最佳参数配置以优化性能和资源利用率。当您选择不同的数据库实例规格时，KubeBlocks 会自动检测并确定适用于新规格的最佳数据库参数配置，以确保数据库在新规格下具有最优的性能和配置。
 
-This feature simplifies the process of configuring parameters, which saves you from manually configuring database parameters as KubeBlocks handles the updates and configurations automatically to adapt to the new specifications. This saves time and effort and reduces performance issues caused by incorrect configuration.
+动态配置功能简化了配置的过程。您无需手动修改数据库参数，KubeBlocks 会自动处理参数的更新和配置，以适应新的规格。这样可以节省时间和精力，并减少由于参数设置不正确而导致的性能问题。
 
-But it's also important to note that the dynamic parameter configuration doesn't apply to all parameters. Some parameters may require manual configuration. Additionally, if you have manually modified database parameters before, KubeBlocks may overwrite your customized configurations when refreshing the database configuration template. Therefore, when using the dynamic configuration feature, it is recommended to back up and record your custom configuration so that you can restore them if needed.
+但需要注意的是，数据库参数自动刷新功能并不适用于所有参数。有些参数可能需要手动进行调整和配置。此外，如果您之前曾手动修改了数据库参数，KubeBlocks 在刷新数据库参数模板时可能会覆盖您的修改。因此，在使用动态配置功能时，建议先备份和记录自定义的参数设置，以便在需要时进行恢复。
 
-## Before you start
+## 开始之前
 
-1. [Install KubeBlocks](./../../installation/install-kubeblocks.md).
-2. [Create a PostgreSQL cluster](./../cluster-management/create-and-connect-a-postgresql-cluster.md).
+1. [安装 KubeBlocks](./../../installation/install-kubeblocks.md)。
+2. [创建 PostgreSQL 集群](./../cluster-management/create-and-connect-a-postgresql-cluster.md)。
 
-## Configure cluster parameters by editing configuration file
+## 通过编辑配置文件配置参数
 
-1. Get the configuration file of this cluster.
+1. 获取集群的配置文件。
 
    ```bash
    kubectl edit configurations.apps.kubeblocks.io mycluster-postgresql -n demo
    ```
 
-2. Configure parameters according to your needs. The example below adds the `spec.configFileParams` part to configure `max_connections`.
+2. 按需配置参数。以下实例中添加了 `spec.configFileParams`，用于配置 `max_connections` 参数。
 
    ```yaml
    spec:
@@ -53,9 +53,9 @@ But it's also important to note that the dynamic parameter configuration doesn't
          defaultMode: 292
    ```
 
-3. Connect to this cluster to verify whether the configuration takes effect.
+3. 连接集群，确认配置是否生效。
 
-   1. Get the username and password.
+   1. 获取用户名和密码。
 
       ```bash
       kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
@@ -67,7 +67,7 @@ But it's also important to note that the dynamic parameter configuration doesn't
       2gvztbvz
       ```
 
-   2. Connect to this cluster and verify whether the parameters are configured as expected.
+   2. 连接集群，验证参数是否按预期配置。
 
       ```bash
       kubectl exec -ti -n demo mycluster-postgresql-0 -- bash
@@ -82,9 +82,9 @@ But it's also important to note that the dynamic parameter configuration doesn't
       (1 row)
       ```
 
-## Configure cluster parameters with OpsRequest
+## 通过 OpsRerquest 配置参数
 
-1. Define an OpsRequest file and configure the parameters in the OpsRequest in a YAML file named `mycluster-configuring-demo.yaml`. In this example, `max_connections` is configured as `600`.
+1. 在名为 `mycluster-configuring-demo.yaml` 的 YAML 文件中定义 OpsRequest，并修改参数。如下示例中，`max_connections` 参数修改为 `600`。
 
    ```yaml
    apiVersion: apps.kubeblocks.io/v1alpha1
@@ -107,30 +107,30 @@ But it's also important to note that the dynamic parameter configuration doesn't
      type: Reconfiguring
    ```
 
-   | Field                                                  | Definition     |
+   | 字段                                                    | 定义     |
    |--------------------------------------------------------|--------------------------------|
-   | `metadata.name`                                        | It specifies the name of this OpsRequest. |
-   | `metadata.namespace`                                   | It specifies the namespace where this cluster is created. |
-   | `spec.clusterName`                                     | It specifies the cluster name that this operation is targeted at. |
-   | `spec.reconfigure`                                     | It specifies a component and its configuration updates. |
-   | `spec.reconfigure.componentName`                       | It specifies the component name of this cluster.  |
-   | `spec.configurations`                                  | It contains a list of ConfigurationItem objects, specifying the component's configuration template name, upgrade policy, and parameter key-value pairs to be updated. |
-   | `spec.reconfigure.configurations.keys.key`             | It specifies the configuration map. |
-   | `spec.reconfigure.configurations.keys.parameters`      | It defines a list of key-value pairs for a single configuration file. |
-   | `spec.reconfigure.configurations.keys.parameter.key`   | It represents the name of the parameter you want to edit. |
-   | `spec.reconfigure.configurations.keys.parameter.value` | It represents the parameter values that are to be updated. If set to nil, the parameter defined by the Key field will be removed from the configuration file.  |
-   | `spec.reconfigure.configurations.name`                 | It specifies the configuration template name.  |
-   | `preConditionDeadlineSeconds`                          | It specifies the maximum number of seconds this OpsRequest will wait for its start conditions to be met before aborting. If set to 0 (default), the start conditions must be met immediately for the OpsRequest to proceed. |
+   | `metadata.name`                                        | 定义了 Opsrequest 的名称。 |
+   | `metadata.namespace`                                   | 定义了集群所在的 namespace。 |
+   | `spec.clusterName`                                     | 定义了本次运维操作指向的集群名称。 |
+   | `spec.reconfigure`                                     | 定义了需配置的 component 及相关配置更新内容。 |
+   | `spec.reconfigure.componentName`                       | 定义了该集群的 component 名称。  |
+   | `spec.configurations`                                  | 包含一系列 ConfigurationItem 对象，定义了 component 的配置模板名称、更新策略、参数键值对。 |
+   | `spec.reconfigure.configurations.keys.key`             | 定义了 configuration map。 |
+   | `spec.reconfigure.configurations.keys.parameters`      | 定义了单个参数文件的键值对列表。 |
+   | `spec.reconfigure.configurations.keys.parameter.key`   | 代表您需要编辑的参数名称。|
+   | `spec.reconfigure.configurations.keys.parameter.value` | 代表了将要更新的参数值。如果设置为 nil，Key 字段定义的参数将会被移出配置文件。  |
+   | `spec.reconfigure.configurations.name`                 | 定义了配置模板名称。  |
+   | `preConditionDeadlineSeconds`                          | 定义了本次 OpsRequest 中止之前，满足其启动条件的最长等待时间（单位为秒）。如果设置为 0（默认），则必须立即满足启动条件，OpsRequest 才能继续。|
 
-2. Apply this OpsRequest.
+2. 应用配置 OpsRequest。
 
    ```bash
    kubectl apply -f mycluster-configuring-demo.yaml
    ```
 
-3. Connect to this cluster to verify whether the configuration takes effect.
+3. 连接集群，确认配置是否生效。
 
-   1. Get the username and password.
+   1. 获取用户名和密码。
 
       ```bash
       kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
@@ -142,7 +142,7 @@ But it's also important to note that the dynamic parameter configuration doesn't
       tf8fhsv2
       ```
 
-   2. Connect to this cluster and verify whether the parameters are configured as expected.
+   2. 连接集群，验证参数是否按预期配置。
 
       ```bash
       kubectl exec -ti -n demo mycluster-postgresql-0 -- bash
@@ -159,29 +159,29 @@ But it's also important to note that the dynamic parameter configuration doesn't
 
 :::note
 
-Just in case you cannot find the configuration file of your cluster, you can use `kbcli` to view the current configuration file of a cluster.
+如果您无法找到集群的配置文件，您可以使用 `kbcli` 查看集群当前的配置文件。
 
 ```bash
 kbcli cluster describe-config mycluster -n demo
 ```
 
-From the meta information, the cluster `mycluster` has a configuration file named `postgresql.conf`.
+从元信息中可以看到，集群 `mycluster` 的配置文件。
 
-You can also view the details of this configuration file and parameters.
+你也可以查看此配置文件和参数的详细信息。
 
-* View the details of the current configuration file.
+* 查看当前配置文件的详细信息。
 
    ```bash
    kbcli cluster describe-config mycluster --show-detail -n demo
    ```
 
-* View the parameter description.
+* 查看参数描述。
 
   ```bash
   kbcli cluster explain-config mycluster -n demo | head -n 20
   ```
 
-* View the user guide of a specified parameter.
+* 查看指定参数的使用文档。
   
   ```bash
   kbcli cluster explain-config mycluster --param=max_connections
@@ -189,7 +189,7 @@ You can also view the details of this configuration file and parameters.
   
   <details>
 
-  <summary>Output</summary>
+  <summary>输出</summary>
   
   ```bash
   template meta:
@@ -206,10 +206,10 @@ You can also view the details of this configuration file and parameters.
 
   </details>
 
-  * Allowed Values: It defines the valid value range of this parameter.
-  * Dynamic: The value of `Dynamic` in `Configure Constraint` defines how the parameter configuration takes effect. There are two different configuration strategies based on the effectiveness type of modified parameters, i.e. **dynamic** and **static**.
-    * When `Dynamic` is `true`, it means the effectiveness type of parameters is **dynamic** and can be configured online.
-    * When `Dynamic` is `false`, it means the effectiveness type of parameters is **static** and a pod restarting is required to make the configuration effective.
-  * Description: It describes the parameter definition.
+  * Allowed Values：定义了参数的有效值范围。
+  * Dynamic: 决定了参数配置的生效方式。根据被修改参数的生效类型，有**动态**和**静态**两种不同的配置策略。
+    * `Dynamic` 为 `true` 时，参数**动态**生效，可在线配置。
+    * `Dynamic` 为 `false` 时，参数**静态**生效，需要重新启动 Pod 才能生效。
+  * Description：描述了参数的定义。
 
 :::

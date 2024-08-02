@@ -159,7 +159,7 @@ mycluster   mongodb              mongodb-5.0   Delete               Running   27
 
 ### 开始之前
 
-确保集群处于 `Running` 状态，否则以下操作可能会失败。
+确保集群处于 `Running` 状态，否则后续操作可能会失败。
 
 ```bash
 kubectl get cluster mycluster -n demo

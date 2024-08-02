@@ -1,6 +1,6 @@
 ---
-title: Manage StarRocks with KubeBlocks
-description: How to manage StarRocks on KubeBlocks
+title: 用 KubeBlocks 管理 StarRocks
+description: 如何用 KubeBlocks 管理 StarRocks
 keywords: [starrocks, analytic, data warehouse, control plane]
 sidebar_position: 1
 sidebar_label: Manage StarRocks with KubeBlocks

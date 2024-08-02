@@ -1,37 +1,31 @@
 ---
-title: Scale for a PostgreSQL cluster
-description: How to vertically scale a PostgreSQL cluster
-keywords: [postgresql, vertical scale]
+title: 集群扩缩容
+description: 如何对集群进行扩缩容操作
+keywords: [postgresql, 水平扩缩容, 垂直扩缩容]
 sidebar_position: 2
-sidebar_label: Scale
+sidebar_label: 扩缩容
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Scale for a PostgreSQL cluster
+# 集群扩缩容
 
-You can scale a PostgreSQL cluster in two ways, vertical scaling and horizontal scaling.
-
-:::note
-
-After vertical scaling or horizontal scaling is performed, KubeBlocks automatically matches the appropriate configuration template based on the new specification. This is the KubeBlocks dynamic configuration feature. This feature simplifies the process of configuring parameters, saves time and effort, and reduces performance issues caused by incorrect configuration. For detailed instructions, refer to [Configuration](./../configuration/configuration.md).
-
-:::
-
-## Vertical scaling
-
-You can vertically scale a cluster by changing resource requirements and limits (e.g. CPU and storage). For example, you can change the resource class from 1C2G to 2C4G by performing vertical scaling.
+KubeBlocks 支持对 PostgreSQL 集群进行垂直扩缩容和水平扩缩容。
 
 :::note
 
-During the vertical scaling process, a concurrent restart is triggered and the primary pod may change after the restarting.
+集群垂直或水平扩缩容后，KubeBlocks 会根据新的规格自动匹配合适的配置模板。这因为 KubeBlocks 在 v0.9.0 中引入了动态配置功能。该功能简化了配置参数的过程，节省了时间和精力，并减少了由于配置错误引起的性能问题。有关详细说明，请参阅[配置](./../configuration/configuration.md)。
 
 :::
 
-### Before you start
+## 垂直扩缩容
 
-Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
+您可以通过更改资源需求和限制（例如 CPU 和存储）来实现集群垂直扩缩容。例如，您可以通过垂直扩缩容将资源类别从 1C2G 更改为 2C4G。
+
+### 开始之前
+
+检查集群状态是否为 `Running`。否则，后续操作可能会失败。
 
 ```bash
 kubectl get cluster mycluster -n demo
@@ -40,15 +34,15 @@ NAME        CLUSTER-DEFINITION   VERSION             TERMINATION-POLICY   STATUS
 mycluster   postgresql           postgresql-14.8.0   Delete               Running   36m
 ```
 
-### Steps
+### 步骤
 
-There are two ways to apply vertical scaling.
+可通过以下两种方式实现垂直扩缩容。
 
 <Tabs>
 
 <TabItem value="OpsRequest" label="OpsRequest" default>
 
-1. Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
+1. 对指定的集群应用 OpsRequest，可根据您的需求配置参数。
 
    ```yaml
    kubectl apply -f - <<EOF
@@ -71,7 +65,7 @@ There are two ways to apply vertical scaling.
    EOF
    ```
 
-2. Check the operation status to validate the vertical scaling.
+2. 查看运维任务状态，验证垂直扩缩容操作是否成功。
 
    ```bash
    kubectl get ops -n demo
@@ -80,9 +74,9 @@ There are two ways to apply vertical scaling.
    demo        ops-vertical-scaling   VerticalScaling   mycluster   Succeed   3/3        6m
    ```
 
-   If an error occurs to the vertical scaling operation, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
+   如果有报错，可执行 `kubectl describe ops -n demo` 命令查看该运维操作的相关事件，协助排障。
 
-3. Check whether the corresponding resources change.
+3. 查看相应资源是否变更。
 
    ```bash
    kubectl describe cluster mycluster -n demo
@@ -106,11 +100,9 @@ There are two ways to apply vertical scaling.
 
 </TabItem>
 
-<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
+<TabItem value="编辑集群 YAML 文件" label="编辑集群 YAML 文件">
 
-1. Change the configuration of `spec.components.resources` in the YAML file. 
-
-   `spec.components.resources` controls the requirement and limit of resources and changing them triggers a vertical scaling.
+1. 修改 YAML 文件中 `spec.componentSpecs.resources` 的配置。`spec.componentSpecs.resources` 控制资源的请求值和限制值，修改参数值将触发垂直扩缩容。
 
    ```yaml
    kubectl edit cluster mycluster -n demo
@@ -139,7 +131,7 @@ There are two ways to apply vertical scaling.
            memory: 2Gi
    ```
 
-2. Check whether the corresponding resources change.
+2. 查看相应资源是否变更。
 
    ```bash
    kubectl describe cluster mycluster -n demo
@@ -165,13 +157,15 @@ There are two ways to apply vertical scaling.
 
 </Tabs>
 
-## Horizontal scaling
+## 水平扩缩容
 
-Horizontal scaling changes the amount of pods. For example, you can apply horizontal scaling to scale pods up from three to five. The scaling process includes the backup and restore of data.
+水平扩展改变 Pod 的数量。例如，您可以将副本从三个扩展到五个。水平扩缩容过程包括数据的备份和恢复。
 
-### Before you start
+从 v0.9.0 开始，除了支持副本（replica）的扩缩容外，KubeBlocks 还支持了实例（instance）的扩缩容。可通过 [水平扩缩容](./../../maintenance/scale/horizontal-scale.md) 文档了解更多细节和示例。
 
-Check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
+### 开始之前
+
+确保集群处于 `Running` 状态，否则后续操作可能会失败。
 
 ```bash
 kubectl get cluster mycluster -n demo
@@ -180,15 +174,17 @@ NAME        CLUSTER-DEFINITION   VERSION              TERMINATION-POLICY     STA
 mycluster   postgresql           postgresql-12.14.0   Delete                 Running   47m
 ```
 
-### Steps
+### 步骤
 
-There are two ways to apply horizontal scaling.
+可通过以下两种方式实现水平扩缩容。
 
 <Tabs>
 
 <TabItem value="OpsRequest" label="OpsRequest" default>
 
-1. Apply an OpsRequest to a specified cluster. Configure the parameters according to your needs.
+1. 对指定的集群应用 OpsRequest，可根据您的需求配置参数。
+
+   以下示例演示了增加 2 个副本。
 
    ```bash
    kubectl apply -f - <<EOF
@@ -202,11 +198,33 @@ There are two ways to apply horizontal scaling.
      type: HorizontalScaling
      horizontalScaling:
      - componentName: postgresql
-       replicas: 1
+       scaleOut:
+         replicaChanges: 2
    EOF
    ```
 
-2. Check the operation status to identify the horizontal scaling status.
+   如果您想要缩容，可将 `scaleOut` 替换为 `scaleIn`。
+
+   以下示例演示了删除 2 个副本。
+
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: ops-horizontal-scaling
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     type: HorizontalScaling
+     horizontalScaling:
+     - componentName: postgresql
+       scaleIn:
+         replicaChanges: 2
+   EOF
+   ```
+
+2. 查看运维操作状态，验证水平扩缩容是否成功。
 
    ```bash
    kubectl get ops -n demo
@@ -215,9 +233,9 @@ There are two ways to apply horizontal scaling.
    demo        ops-horizontal-scaling   HorizontalScaling   mycluster   Succeed   3/3        6m
    ```
 
-   If an error occurs to the horizontal scaling operation, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
+   如果有报错，可执行 `kubectl describe ops -n demo` 命令查看该运维操作的相关事件，协助排障。
 
-3. Check whether the corresponding resources change.
+3. 查看相应资源是否变更。
 
     ```bash
     kubectl describe cluster mycluster -n demo
@@ -225,11 +243,9 @@ There are two ways to apply horizontal scaling.
 
 </TabItem>
   
-<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
+<TabItem value="编辑集群 YAML 文件" label="编辑集群 YAML 文件">
 
-1. Change the configuration of `spec.componentSpecs.replicas` in the YAML file.
-
-   `spec.componentSpecs.replicas` stands for the pod amount and changing this value triggers a horizontal scaling of a cluster.
+1. 修改 YAML 文件中 `spec.componentSpecs.replicas` 的配置。`spec.componentSpecs.replicas` 定义了 pod 数量，修改该参数将触发集群水平扩缩容。
 
    ```yaml
    kubectl edit cluster mycluster -n demo
@@ -257,7 +273,7 @@ There are two ways to apply horizontal scaling.
     terminationPolicy: Halt
    ```
 
-2. Check whether the corresponding resources change.
+2. 查看相关资源是否变更。
 
     ```bash
     kubectl describe cluster mycluster -n demo
@@ -267,10 +283,9 @@ There are two ways to apply horizontal scaling.
 
 </Tabs>
 
-### Handle the snapshot exception
+### 处理快照异常
 
-If `STATUS=ConditionsError` occurs during the horizontal scaling process, you can find the cause from `cluster.status.condition.message` for troubleshooting.
-In the example below, a snapshot exception occurs.
+如果在水平扩容过程中出现 `STATUS=ConditionsError`，你可以从 `cluster.status.condition.message` 中找到原因并进行故障排除。如下所示，该例子中发生了快照异常。
 
 ```bash
 Status:
@@ -283,13 +298,15 @@ Status:
     type: ApplyResources
 ```
 
-***Reason***
+***原因***
 
-This exception occurs because the `VolumeSnapshotClass` is not configured. This exception can be fixed after configuring `VolumeSnapshotClass`, but the horizontal scaling cannot continue to run. It is because the wrong backup (volumesnapshot is generated by backup) and volumesnapshot generated before still exist. First delete these two wrong resources and then KubeBlocks re-generates new resources.
+此异常发生的原因是未配置 `VolumeSnapshotClass`。可以通过配置 `VolumeSnapshotClass` 解决问题。
 
-***Steps:***
+但此时，水平扩容仍然无法继续运行。这是因为错误的备份（volumesnapshot 由备份生成）和之前生成的 volumesnapshot 仍然存在。需删除这两个错误的资源，KubeBlocks 才能重新生成新的资源。
 
-1. Configure the VolumeSnapshotClass by running the command below.
+***步骤：***
+
+1. 配置 VolumeSnapshotClass。
 
    ```bash
    kubectl create -f - <<EOF
@@ -304,7 +321,7 @@ This exception occurs because the `VolumeSnapshotClass` is not configured. This 
    EOF
    ```
 
-2. Delete the wrong backup (volumesnapshot is generated by backup) and volumesnapshot resources.
+2. 删除错误的备份和 volumesnapshot 资源。
 
    ```bash
    kubectl delete backup -l app.kubernetes.io/instance=mycluster
@@ -312,6 +329,6 @@ This exception occurs because the `VolumeSnapshotClass` is not configured. This 
    kubectl delete volumesnapshot -l app.kubernetes.io/instance=mycluster
    ```
 
-***Result***
+***结果***
 
-The horizontal scaling continues after backup and volumesnapshot are deleted and the cluster restores to running status.
+删除备份和 volumesnapshot 后，水平扩容继续进行，集群恢复到 `Running` 状态。

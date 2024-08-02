@@ -10,7 +10,7 @@ sidebar_label: 重启
 
 KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，也可以尝试重启集群。重启后，主节点可能会发生变化。
 
-## Steps
+## 步骤
 
 1. 创建 OpsRequest 重启集群。
 

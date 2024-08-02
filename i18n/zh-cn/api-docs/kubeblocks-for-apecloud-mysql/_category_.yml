@@ -1,4 +1,4 @@
 position: 8
-label: MySQL
+label: 用 KubeBlocks 管理 ApeCloud MySQL
 collapsible: true 
 collapsed: true

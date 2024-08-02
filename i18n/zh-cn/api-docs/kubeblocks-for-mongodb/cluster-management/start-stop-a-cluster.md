@@ -38,7 +38,7 @@ EOF
 
 </TabItem>
 
-<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
+<TabItem value="编辑集群 YAML 文件" label="编辑集群 YAML 文件">
 
 将副本数设置为 0，删除 Pod。
 

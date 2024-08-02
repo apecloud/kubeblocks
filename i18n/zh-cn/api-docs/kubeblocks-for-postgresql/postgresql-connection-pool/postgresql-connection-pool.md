@@ -1,28 +1,28 @@
 ---
-title: PostgreSQL connection pool
-description: Connect to PgBouncer to reduce too many PostgreSQL connections and to improve the throughput and stability of the database.
-keywords: [postgresql, connection pool, pgbouncer]
+title: PostgreSQL 连接池
+description: 通过连接 PgBouncer，减少过多的 PostgreSQL 连接，提高数据库的吞吐量和稳定性。
+keywords: [postgresql, 连接池, pgbouncer]
 sidebar_position: 1
-sidebar_label: Connection pool
+sidebar_label: 连接池
 ---
 
-# PostgreSQL connection pool
+# PostgreSQL 连接池
 
-PostgreSQL adopts a multi-process architecture, which creates a separate backend process for each user connection. When there are too many user connections, it occupies a large amount of memory, which reduces the throughput and stability of the database. To solve these problems, KubeBlocks introduces a connection pool, PgBouncer, for PostgreSQL database clusters.
+PostgreSQL 是多进程架构，它会为每个用户连接创建一个单独的后端进程，当用户连接数较多时，会占用大量内存，降低数据库的吞吐量和稳定性。为解决 PostgreSQL 连接过多而导致的问题，KubeBlocks 为 PostgreSQL 集群引入了连接池，PgBouncer。
 
-When creating a PostgreSQL cluster with KubeBlocks, PgBouncer is installed by default.
+使用 KubeBlocks 创建 PostgreSQL 集群时，会默认安装 PgBouncer。
 
-## Steps
+## 步骤
 
-1. View the status of the created PostgreSQL cluster and ensure this cluster is `Running`.
+1. 查看 PostgreSQL 集群的状态，确保为 `Running`。
 
    ```bash
    kubectl get cluster mycluster -n demo
    ```
 
-2. Describe the services and there are two connection links in Endpoints.
+2. 查看 PostgreSQL 集群详细信息，其中会包含两条连接信息。
 
-    Port `5432` is used to connect to the primary pod of this database and port `6432` is used to connect to PgBouncer.
+    其中 `5432` 端口用于直接连接数据库主节点，`6432` 端口用于连接 PgBouncer。
 
     ```bash
     kubectl get services mycluster-postgresql -n demo
@@ -31,7 +31,7 @@ When creating a PostgreSQL cluster with KubeBlocks, PgBouncer is installed by de
     mycluster-postgresql   ClusterIP   10.97.123.178   <none>        5432/TCP,6432/TCP   39m       
     ```
 
-3. Run the command below to get the `username` and `password` for the `kubectl exec` command.
+3. 获取 `kubectl exec` 命令所需的 `username` 和 `password`。
 
     ```bash
     kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
@@ -43,13 +43,15 @@ When creating a PostgreSQL cluster with KubeBlocks, PgBouncer is installed by de
     shgkz4z9
    ```
 
-4. Connect the cluster with PgBouncer. The default example uses port `6432` and you can replace it with port `5432`.
+4. 通过 PgBouncer 连接集群。
+
+   该命令会展示访问集群的方式，默认使用 `5432` 端口访问集群，可以将端口替换为 `6432` 通过 PgBouncer 访问集群。
 
     ```bash
     kubectl -n demo port-forward service/mycluster-postgresql 6432:6432
     ```
 
-5. Open a new terminal window and run the `psql` command to connect to PgBouncer.
+5. 打开一个新的终端窗口，执行 `psql` 命令进行连接。
 
     Fill the password obtained from step 3 into the `PGPASSWORD`.
 
@@ -57,9 +59,9 @@ When creating a PostgreSQL cluster with KubeBlocks, PgBouncer is installed by de
     PGPASSWORD=shgkz4z9 psql -h127.0.0.1 -p 6432 -U postgres postgres
     ```
 
-6. Run the following command in `psgl` to verify the connection.
+6. 在 `psql` 中执行如下命令进行验证。
 
-   If you can connect to `pgbouncer` and execute `show help` with the expected results below, this cluster connects to PgBouncer successfully.
+   如果可以连接至 `pgbouncer` 库并正确执行 `show help` 命令，说明已经成功连接 PgBouncer。
 
    ```bash
    postgres=# \c pgbouncer

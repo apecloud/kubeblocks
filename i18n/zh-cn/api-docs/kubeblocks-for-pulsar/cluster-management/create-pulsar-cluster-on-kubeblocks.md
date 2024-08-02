@@ -1,34 +1,38 @@
 ---
-title: Create a Pulsar Cluster
-description: How to Create Pulsar Cluster on KubeBlocks
-keywords: [pulsar, create cluster]
+title: 创建 Pulsar 集群
+description: 如何创建 Pulsar 集群
+keywords: [pulsar, 创建集群]
 sidebar_position: 1
-sidebar_label: Create
+sidebar_label: 创建
 ---
 
-## Introduction
+# 创建 Pulsar 集群
 
-KubeBlocks can quickly integrate new engines through good abstraction. KubeBlocks supports Pulsar operations, including basic lifecycle operations such as cluster creation, deletion, and restart, as well as advanced operations such as horizontal and vertical scaling, volume expansion, configuration changes, and monitoring.
+## 概述
 
-## Environment Recommendation
+KubeBlocks 可以通过良好的抽象快速集成新引擎，并支持 Pulsar 集群的创建和删除、集群组件的垂直扩缩容和水平扩缩容、存储扩容、重启和配置更改等。
 
-Refer to the [Pulsar official document](https://pulsar.apache.org/docs/3.1.x/) for the configuration, such as memory, cpu, and storage, of each component.
+本系列文档重点展示 KubeBlocks 对 Pulsar 日常运维能力的支持，包括集群创建、删除、重启等基本生命周期操作，以及水平扩容、垂直扩容、存储扩容、配置变更、监控等高阶操作。
 
-|      Components        |                                 Replicas                                  |
+## 环境推荐
+
+关于各组件的规格（如内存、CPU 和存储容量等），请参考 [Pulsar 官方文档](https://pulsar.apache.org/docs/3.1.x/)。
+
+|      组件               |                                 所需副本数                                  |
 | :--------------------  | :------------------------------------------------------------------------ |
-|       zookeeper        |          1 for test environment or 3 for production environment           |
-|        bookies         |  at least 3 for test environment, at lease 4 for production environment   |
-|        broker          |      at least 1, for production environment, 3 replicas recommended       |
-| recovery (Optional)    | 1; if autoRecovery is not enabled for bookie, at least 3 replicas needed  |
-|   proxy (Optional)     |           1; and for production environment, 3 replicas needed            |
+|       zookeeper        |   测试环境 1 个，生产环境 3 个           |
+|        bookies         |  测试环境至少 3 个，生产环境至少 4 个   |
+|        broker          |      至少 1 个，生产环境建议 3 个       |
+| recovery (可选)         | 至少 1 个；如果 bookie 未启用 autoRecovery 功能，则至少需要 3 个 |
+|   proxy (可选)          |         至少 1 个；生产环境需要 3 个           |
 
-## Before you start
+## 开始之前
 
-* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
+* [安装 KubeBlocks](./../../installation/install-kubeblocks.md)。
 
-* View all the database types and versions available for creating a cluster.
+* 查看可用于创建集群的数据库类型和版本。
 
-  Make sure the `pulsar` cluster definition is installed. If the cluster definition is not available, refer to [this doc](./../../installation/install-addons.md) to enable it first.
+  确保 `pulsar` cluster definition 已安装。如果该 cluster definition 不可用，可参考[相关文档](./../../installation/install-addons.md)启用。
 
   ```bash
   kubectl get clusterdefinition redis
@@ -37,7 +41,7 @@ Refer to the [Pulsar official document](https://pulsar.apache.org/docs/3.1.x/) f
   pulsar                              Available   16m
   ```
 
-  View all available versions for creating a cluster.
+  查看可用于创建集群的引擎版本。
 
   ```bash
   kubectl get clusterversions -l clusterdefinition.kubeblocks.io/name=redis
@@ -46,7 +50,7 @@ Refer to the [Pulsar official document](https://pulsar.apache.org/docs/3.1.x/) f
   pulsar-3.0.2   pulsar               Available   16m
   ```
 
-* To keep things isolated, create a separate namespace called `demo` throughout this tutorial.
+* 为保证资源隔离，本教程将创建一个名为 `demo` 的独立命名空间。
 
   ```bash
   kubectl create namespace demo
@@ -54,11 +58,11 @@ Refer to the [Pulsar official document](https://pulsar.apache.org/docs/3.1.x/) f
   namespace/demo created
   ```
 
-## Create Pulsar cluster
+## 创建集群
 
-1. Create the Pulsar cluster template file `values-production.yaml` for `helm` locally.
+1. 在本地创建 `helm` 使用的 Pulsar 集群模板文件 `values-production.yaml`。
   
-   Copy the following information to the local file `values-production.yaml`.
+   将以下信息复制到本地文件 `values-production.yaml` 中。
 
    ```bash
    ## Bookies configuration
@@ -105,10 +109,10 @@ Refer to the [Pulsar official document](https://pulsar.apache.org/docs/3.1.x/) f
          memory: 8Gi
    ```
 
-2. Create cluster.
+2. 创建集群。
 
-   - **Option 1**: (**Recommended**) Create pulsar cluster by `values-production.yaml` and enable monitor.
-    Configuration:
+   - **选项 1.**（**推荐**）使用 `values-production.yaml` 创建 Pulsar 集群并启用监控。
+   配置:
      - broker: 3 replicas
      - bookies: 4 replicas
      - zookeeper: 3 replicas
@@ -117,8 +121,8 @@ Refer to the [Pulsar official document](https://pulsar.apache.org/docs/3.1.x/) f
      helm install mycluster kubeblocks/pulsar-cluster --version "x.x.x" -f values-production.yaml --set disable.exporter=false --namespace=demo
      ```
 
-   - **Option 2**: Create pulsar cluster with proxy.
-   Configuration:
+   - **选项 2.** 创建带 proxy 的 Pulsar 集群。
+   配置:
      - proxy: 3 replicas
      - broker: 3 replicas
      - bookies: 4 replicas
@@ -128,8 +132,8 @@ Refer to the [Pulsar official document](https://pulsar.apache.org/docs/3.1.x/) f
      helm install mycluster kubeblocks/pulsar-cluster --version "x.x.x" -f values-production.yaml --set proxy.enable=true  --set disable.exporter=false --namespace=demo
      ```
 
-   - **Option 3**:  Create pulsar cluster with proxy and deploy `bookies-recovery` component.  
-   Configuration:
+   - **选项 3.** 创建带 proxy 的 Pulsar 集群，并部署独立的 `bookies-recovery` 组件。
+   配置:
      - proxy: 3 replicas
      - broker: 3 replicas
      - bookies: 4 replicas
@@ -140,8 +144,8 @@ Refer to the [Pulsar official document](https://pulsar.apache.org/docs/3.1.x/) f
      helm install mycluster kubeblocks/pulsar-cluster --version "x.x.x" -f values-production.yaml --set proxy.enable=true --set bookiesRecovery.enable=true --set disable.exporter=false --namespace=demo
      ```
 
-   - **Option 4**: Create pulsar cluster and specify bookies and zookeeper storage parameters.
-   Configuration:
+   - **选项 4.** 创建 Pulsar 集群并指定 bookies 和 zookeeper 的存储参数。
+   配置:
      - broker: 3 replicas
      - bookies: 4 replicas
      - zookeeper: 3 replicas
@@ -150,12 +154,12 @@ Refer to the [Pulsar official document](https://pulsar.apache.org/docs/3.1.x/) f
      helm install mycluster kubeblocks/pulsar-cluster --namespace=demo --version "x.x.x" -f values-production.yaml --set bookies.persistence.data.storageClassName=<sc name>,bookies.persistence.log.storageClassName=<sc name>,zookeeper.persistence.data.storageClassName=<sc name>,zookeeper.persistence.log.storageClassName=<sc name> --set disable.exporter=false
      ```
 
-   You can specify the storage name by defining `<sc name>`.
+   您可以指定存储名称 `<sc name>`。
 
-3. Verify the cluster created.
+3. 验证已创建的集群。
 
     ```bash
     kubectl get cluster mycluster --namespace=demo
     ```
 
-    When the status is Running, the cluster is created successfully.
+    当状态显示为 `Running` 时，表示集群已成功创建。

@@ -43,7 +43,7 @@ KubeBlocks 支持管理 Elasticsearch。本教程将演示如何通过 `kubectl`
 
 ## 创建集群
 
-KubeBlocks 通过 `Cluster` 定义集群。以下是创建 Elasticsearch 集群版的示例。Pod 默认分布在不同节点。但如果您只有一个节点可用于部署集群，可将 `spec.affinity.topologyKeys` 设置为 `null`。
+KubeBlocks 通过 `Cluster` 定义集群。以下是创建 Elasticsearch 集群的示例。Pod 默认分布在不同节点。但如果您只有一个节点可用于部署集群，可将 `spec.affinity.topologyKeys` 设置为 `null`。
 
 :::note
 
@@ -104,7 +104,7 @@ EOF
 | `spec.affinity.topologyKeys`          | 用于定义 Pod 反亲和性和 Pod 分布约束的拓扑域的节点标签值。 |
 | `spec.tolerations`                    | 该字段为数组，用于定义集群中 Pods 的容忍，确保 Pod 可被调度到具有匹配污点的节点上。 |
 | `spec.componentSpecs`                 | 集群 components 列表，定义了集群 components。该字段允许对集群中的每个 component 进行自定义配置。 |
-| `spec.componentSpecs.componentDefRef` | 表示 cluster definition 中定义的 component definition 的名称，可通过执行 `kubectl get clusterdefinition apecloud-mysql -o json \| jq '.spec.componentDefs[].name'` 命令获取 component definition 名称。 |
+| `spec.componentSpecs.componentDefRef` | 表示 cluster definition 中定义的 component definition 的名称，可通过执行 `kubectl get clusterdefinition elasticsearch -o json \| jq '.spec.componentDefs[].name'` 命令获取 component definition 名称。 |
 | `spec.componentSpecs.name`            | 定义了 component 的名称。  |
 | `spec.componentSpecs.disableExporter` | 定义了是否开启监控功能。 |
 | `spec.componentSpecs.replicas`        | 定义了 component 中 replicas 的数量。 |

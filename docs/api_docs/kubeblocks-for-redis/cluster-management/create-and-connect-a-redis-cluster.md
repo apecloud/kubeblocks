@@ -13,10 +13,6 @@ import TabItem from '@theme/TabItem';
 
 This tutorial shows how to create and connect to a Redis cluster.
 
-KuebBlocks for Redis supports Standalone clusters and Replication Cluster.
-
-For your better high-availability experience, KubeBlocks creates a Redis Replication Cluster by default.
-
 ## Create a Redis cluster
 
 ### Before you start
@@ -120,8 +116,6 @@ EOF
 | `spec.componentSpecs.disableExporter` | It defines whether the monitoring function is enabled. |
 | `spec.componentSpecs.replicas`        | It specifies the number of replicas of the component.  |
 | `spec.componentSpecs.resources`       | It specifies the resource requirements of the component.  |
-
-For the details of different parameters, you can refer to API docs for developers.
 
 Run the following command to see the created Redis cluster object:
 

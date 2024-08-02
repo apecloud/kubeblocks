@@ -110,7 +110,7 @@ EOF
 | `spec.affinity.topologyKeys`          | 用于定义 Pod 反亲和性和 Pod 分布约束的拓扑域的节点标签值。 |
 | `spec.tolerations`                    | 该字段为数组，用于定义集群中 Pods 的容忍，确保 Pod 可被调度到具有匹配污点的节点上。 |
 | `spec.componentSpecs`                 | 集群 components 列表，定义了集群 components。该字段允许对集群中的每个 component 进行自定义配置。 |
-| `spec.componentSpecs.componentDefRef` | 表示 cluster definition 中定义的 component definition 的名称，可通过执行 `kubectl get clusterdefinition apecloud-mysql -o json \| jq '.spec.componentDefs[].name'` 命令获取 component definition 名称。 |
+| `spec.componentSpecs.componentDefRef` | 表示 cluster definition 中定义的 component definition 的名称，可通过执行 `kubectl get clusterdefinition mongodb -o json \| jq '.spec.componentDefs[].name'` 命令获取 component definition 名称。 |
 | `spec.componentSpecs.name`            | 定义了 component 的名称。  |
 | `spec.componentSpecs.disableExporter` | 定义了是否开启监控功能。 |
 | `spec.componentSpecs.replicas`        | 定义了 component 中 replicas 的数量。 |
@@ -225,13 +225,13 @@ status:
 
 使用 `kubectl exec` 命令进入 Pod 并连接到数据库。
 
-KubeBlocks operator 会创建一个名为 `mycluster-conn-credential` 的新的 Secret 来存储 MySQL 集群的连接凭证。该 Secret 包含以下 key：
+KubeBlocks operator 会创建一个名为 `mycluster-conn-credential` 的新的 Secret 来存储 MongoDB 集群的连接凭证。该 Secret 包含以下 key：
 
-* `username`：MySQL 集群的根用户名。
+* `username`：MongoDB 集群的根用户名。
 * `password`：根用户的密码。
-* `port`：MySQL 集群的端口。
-* `host`：MySQL 集群的主机。
-* `endpoint`：MySQL 集群的终端节点，与 `host:port` 相同。
+* `port`：MongoDB 集群的端口。
+* `host`：MongoDB 集群的主机。
+* `endpoint`：MongoDB 集群的终端节点，与 `host:port` 相同。
 
 1. 获取用于 `kubectl exec` 命令的 `username` 和 `password`。
 

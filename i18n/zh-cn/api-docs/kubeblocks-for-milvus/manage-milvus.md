@@ -45,7 +45,13 @@ Milvus 是高度灵活、可靠且速度极快的云原生开源矢量数据库�
 
 ## 创建集群
 
-KubeBlocks 通过 `Cluster` 定义集群。以下是创建 Milvus 集群的示例。
+KubeBlocks 通过 `Cluster` 定义集群。以下是创建 Milvus 集群的示例。Pod 默认分布在不同节点。但如果您只有一个节点可用于部署集群，可将 `spec.affinity.topologyKeys` 设置为 `null`。
+
+:::note
+
+生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
+
+:::
 
 ```yaml
 cat <<EOF | kubectl apply -f -
@@ -241,7 +247,7 @@ EOF
 | `spec.affinity.topologyKeys`          | 用于定义 Pod 反亲和性和 Pod 分布约束的拓扑域的节点标签值。 |
 | `spec.tolerations`                    | 该字段为数组，用于定义集群中 Pods 的容忍，确保 Pod 可被调度到具有匹配污点的节点上。 |
 | `spec.componentSpecs`                 | 集群 components 列表，定义了集群 components。该字段允许对集群中的每个 component 进行自定义配置。 |
-| `spec.componentSpecs.componentDefRef` | 表示 cluster definition 中定义的 component definition 的名称，可通过执行 `kubectl get clusterdefinition apecloud-mysql -o json \| jq '.spec.componentDefs[].name'` 命令获取 component definition 名称。 |
+| `spec.componentSpecs.componentDefRef` | 表示 cluster definition 中定义的 component definition 的名称，可通过执行 `kubectl get clusterdefinition milvus -o json \| jq '.spec.componentDefs[].name'` 命令获取 component definition 名称。 |
 | `spec.componentSpecs.name`            | 定义了 component 的名称。  |
 | `spec.componentSpecs.disableExporter` | 定义了是否开启监控功能。 |
 | `spec.componentSpecs.replicas`        | 定义了 component 中 replicas 的数量。 |

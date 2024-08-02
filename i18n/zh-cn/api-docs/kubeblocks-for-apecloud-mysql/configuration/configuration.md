@@ -114,7 +114,7 @@ KubeBlocks 支持动态配置。当数据库实例的规格发生变化时（例
    | `metadata.namespace`                                   | 定义了集群所在的 namespace。 |
    | `spec.clusterName`                                     | 定义了本次运维操作指向的集群名称。 |
    | `spec.reconfigure`                                     | 定义了需配置的 component 及相关配置更新内容。 |
-   | `spec.reconfigure.componentName`                       | 定义了改集群的 component 名称。  |
+   | `spec.reconfigure.componentName`                       | 定义了该集群的 component 名称。  |
    | `spec.configurations`                                  | 包含一系列 ConfigurationItem 对象，定义了 component 的配置模板名称、更新策略、参数键值对。 |
    | `spec.reconfigure.configurations.keys.key`             | 定义了 configuration map。 |
    | `spec.reconfigure.configurations.keys.parameters`      | 定义了单个参数文件的键值对列表。 |

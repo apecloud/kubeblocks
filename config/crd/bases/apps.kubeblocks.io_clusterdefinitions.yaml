@@ -301,7 +301,6 @@ spec:
                                 description: |-
                                   Specifies the namespace of the referenced configuration template ConfigMap object.
                                   An empty namespace is equivalent to the "default" namespace.
-                                maxLength: 63
                                 pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                                 type: string
                               policy:
@@ -316,7 +315,6 @@ spec:
                               templateRef:
                                 description: Specifies the name of the referenced
                                   configuration template ConfigMap object.
-                                maxLength: 63
                                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                                 type: string
                             required:

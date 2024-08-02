@@ -57,6 +57,11 @@ func (f *MockComponentDefinitionFactory) SetDescription(description string) *Moc
 	return f
 }
 
+func (f *MockComponentDefinitionFactory) SetServiceKind(serviceKind string) *MockComponentDefinitionFactory {
+	f.Get().Spec.ServiceKind = serviceKind
+	return f
+}
+
 func (f *MockComponentDefinitionFactory) SetServiceVersion(serviceVersion string) *MockComponentDefinitionFactory {
 	f.Get().Spec.ServiceVersion = serviceVersion
 	return f

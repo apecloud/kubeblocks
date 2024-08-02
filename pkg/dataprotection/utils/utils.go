@@ -289,6 +289,18 @@ func GetFirstIndexRunningPod(podList *corev1.PodList) *corev1.Pod {
 	return nil
 }
 
+func GetPodByName(podList *corev1.PodList, name string) *corev1.Pod {
+	if podList == nil {
+		return nil
+	}
+	for i, v := range podList.Items {
+		if v.Name == name {
+			return &podList.Items[i]
+		}
+	}
+	return nil
+}
+
 // GetKubeVersion get the version of Kubernetes and return the gitVersion
 func GetKubeVersion() (string, error) {
 	verInfo := viper.Get(constant.CfgKeyServerInfo)

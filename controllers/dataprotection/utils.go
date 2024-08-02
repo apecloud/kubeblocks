@@ -24,7 +24,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
-	"sort"
 	"strings"
 	"sync"
 
@@ -188,7 +187,6 @@ func GetTargetPods(reqCtx intctrlutil.RequestCtx,
 			if len(pods.Items) == 0 {
 				return nil, findPodErr
 			}
-			sort.Sort(intctrlutil.ByPodName(pods.Items))
 			for i := range pods.Items {
 				targetPods = append(targetPods, &pods.Items[i])
 			}
@@ -199,25 +197,15 @@ func GetTargetPods(reqCtx intctrlutil.RequestCtx,
 	// if already selected target pods and backupType is not Continuous, we should re-use them.
 	switch selector.Strategy {
 	case dpv1alpha1.PodSelectionStrategyAny:
-		for _, pod := range pods.Items {
-			if pod.Name == selectedPodNames[0] {
-				targetPods = append(targetPods, &pod)
-				break
-			}
-		}
-		if len(targetPods) == 0 && selector.FallbackLabelSelector != nil {
+		pod := dputils.GetPodByName(pods, selectedPodNames[0])
+		if pod == nil && selector.FallbackLabelSelector != nil {
 			if pods, err = listPodsByLabel(selector.FallbackLabelSelector); err != nil {
 				return nil, err
 			}
-			if len(pods.Items) == 0 {
-				return nil, findPodErr
-			}
-			for _, pod := range pods.Items {
-				if pod.Name == selectedPodNames[0] {
-					targetPods = append(targetPods, &pod)
-					break
-				}
-			}
+			pod = dputils.GetPodByName(pods, selectedPodNames[0])
+		}
+		if pod != nil {
+			targetPods = append(targetPods, pod)
 		}
 	case dpv1alpha1.PodSelectionStrategyAll:
 		if len(pods.Items) == 0 {

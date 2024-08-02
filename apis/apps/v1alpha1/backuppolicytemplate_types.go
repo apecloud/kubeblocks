@@ -215,7 +215,7 @@ type TargetInstance struct {
 	// `strategy` field below is set to `Any`.
 	//
 	// +optional
-	FallbackRole string `json:"fallbackRole"`
+	FallbackRole string `json:"fallbackRole,omitempty"`
 
 	// If `backupPolicy.componentDefs` is set, this field is required to specify the system account name.
 	// This account must match one listed in `componentDefinition.spec.systemAccounts[*].name`.

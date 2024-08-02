@@ -144,8 +144,8 @@ func GetBackupMethodByName(name string, backupPolicy *dpv1alpha1.BackupPolicy) *
 
 func GetPodListByLabelSelector(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
-	labelSelector metav1.LabelSelector) (*corev1.PodList, error) {
-	selector, err := metav1.LabelSelectorAsSelector(&labelSelector)
+	labelSelector *metav1.LabelSelector) (*corev1.PodList, error) {
+	selector, err := metav1.LabelSelectorAsSelector(labelSelector)
 	if err != nil {
 		return nil, err
 	}

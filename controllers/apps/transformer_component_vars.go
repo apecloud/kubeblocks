@@ -82,7 +82,10 @@ func (t *componentVarsTransformer) Transform(ctx graph.TransformContext, dag *gr
 	envVars2, envData := buildEnvVarsNData(synthesizedComp, envVars, legacy)
 	setTemplateNEnvVars(synthesizedComp, templateVars, envVars2, legacy)
 
-	return createOrUpdateEnvConfigMap(ctx, dag, envData)
+	if err := createOrUpdateEnvConfigMap(ctx, dag, envData); err != nil {
+		return err
+	}
+	return nil
 }
 
 // generatedComponent4LegacyCluster checks whether the cluster to which this component belongs was created before 0.8.
@@ -173,6 +176,9 @@ func createOrUpdateEnvConfigMap(ctx graph.TransformContext, dag *graph.DAG, data
 			AddLabelsInMap(constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
 			SetData(data).
 			GetObject()
+		if err := setCompOwnershipNFinalizer(transCtx.Component, obj); err != nil {
+			return err
+		}
 		graphCli.Create(dag, obj, inDataContext4G())
 	} else if !reflect.DeepEqual(envObj.Data, data) {
 		envObjCopy := envObj.DeepCopy()

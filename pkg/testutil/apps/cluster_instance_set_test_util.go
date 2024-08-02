@@ -45,24 +45,21 @@ const (
 )
 
 // InitConsensusMysql initializes a cluster environment which only contains a component of ConsensusSet type for testing,
-// includes ClusterDefinition/ClusterVersion/Cluster resources.
+// includes ClusterDefinition/Cluster resources.
 func InitConsensusMysql(testCtx *testutil.TestContext,
 	clusterDefName,
-	clusterVersionName,
 	clusterName,
 	consensusCompType,
-	consensusCompName string) (*appsv1alpha1.ClusterDefinition, *appsv1alpha1.ClusterVersion, *appsv1alpha1.Cluster) {
+	consensusCompName string) (*appsv1alpha1.ClusterDefinition, *appsv1alpha1.Cluster) {
 	clusterDef := CreateConsensusMysqlClusterDef(testCtx, clusterDefName, consensusCompType)
-	clusterVersion := CreateConsensusMysqlClusterVersion(testCtx, clusterDefName, clusterVersionName, consensusCompType)
-	cluster := CreateConsensusMysqlCluster(testCtx, clusterDefName, clusterVersionName, clusterName, consensusCompType, consensusCompName)
-	return clusterDef, clusterVersion, cluster
+	cluster := CreateConsensusMysqlCluster(testCtx, clusterDefName, clusterName, consensusCompType, consensusCompName)
+	return clusterDef, cluster
 }
 
 // CreateConsensusMysqlCluster creates a mysql cluster with a component of ConsensusSet type.
 func CreateConsensusMysqlCluster(
 	testCtx *testutil.TestContext,
 	clusterDefName,
-	clusterVersionName,
 	clusterName,
 	workloadType,
 	consensusCompName string, pvcSize ...string) *appsv1alpha1.Cluster {
@@ -71,7 +68,7 @@ func CreateConsensusMysqlCluster(
 		size = pvcSize[0]
 	}
 	pvcSpec := NewPVCSpec(size)
-	return NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
+	return NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName).
 		AddComponent(consensusCompName, workloadType).SetReplicas(ConsensusReplicas).SetEnabledLogs(errorLogName).
 		AddVolumeClaimTemplate("data", pvcSpec).Create(testCtx).GetObject()
 }
@@ -83,12 +80,6 @@ func CreateConsensusMysqlClusterDef(testCtx *testutil.TestContext, clusterDefNam
 		AddLogConfig(errorLogName, filePathPattern).Create(testCtx).GetObject()
 }
 
-// CreateConsensusMysqlClusterVersion creates a mysql clusterVersion with a component of ConsensusSet type.
-func CreateConsensusMysqlClusterVersion(testCtx *testutil.TestContext, clusterDefName, clusterVersionName, workloadType string) *appsv1alpha1.ClusterVersion {
-	return NewClusterVersionFactory(clusterVersionName, clusterDefName).AddComponentVersion(workloadType).AddContainerShort("mysql", ApeCloudMySQLImage).
-		Create(testCtx).GetObject()
-}
-
 // MockInstanceSetComponent mocks the ITS component, just using in envTest
 func MockInstanceSetComponent(
 	testCtx *testutil.TestContext,
@@ -98,7 +89,7 @@ func MockInstanceSetComponent(
 	return NewInstanceSetFactory(testCtx.DefaultNamespace, itsName, clusterName, itsCompName).SetReplicas(ConsensusReplicas).
 		AddContainer(corev1.Container{Name: DefaultMySQLContainerName, Image: ApeCloudMySQLImage}).
 		SetRoles([]workloads.ReplicaRole{
-			{Name: "Leader", AccessMode: workloads.ReadWriteMode, CanVote: true, IsLeader: true},
+			{Name: "leader", AccessMode: workloads.ReadWriteMode, CanVote: true, IsLeader: true},
 			{Name: "follower", AccessMode: workloads.ReadonlyMode, CanVote: true, IsLeader: false},
 		}).Create(testCtx).GetObject()
 }

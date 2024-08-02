@@ -28,6 +28,7 @@ import (
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -53,7 +54,7 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			tree := kubebuilderx.NewObjectTree()
 			tree.SetRoot(its)
 			reconciler = NewReplicasAlignmentReconciler()
-			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ResultSatisfied))
+			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ConditionSatisfied))
 
 			By("prepare current tree")
 			// desired: bar-0, bar-1, bar-2, bar-3, bar-foo-0, bar-foo-1, bar-hello-0
@@ -86,12 +87,13 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			By("do reconcile with OrderedReady(Serial) policy")
 			orderedReadyTree, err := tree.DeepCopy()
 			Expect(err).Should(BeNil())
-			newTree, err := reconciler.Reconcile(orderedReadyTree)
+			res, err := reconciler.Reconcile(orderedReadyTree)
 			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
 			// desired: bar-0, bar-1, bar-foo-0
-			pods := newTree.List(&corev1.Pod{})
+			pods := orderedReadyTree.List(&corev1.Pod{})
 			Expect(pods).Should(HaveLen(3))
-			pvcs := newTree.List(&corev1.PersistentVolumeClaim{})
+			pvcs := orderedReadyTree.List(&corev1.PersistentVolumeClaim{})
 			Expect(pvcs).Should(HaveLen(3))
 			podBar0 := builder.NewPodBuilder(namespace, "bar-0").GetObject()
 			for _, object := range []client.Object{podFoo0, podBar0, podBar1} {
@@ -110,18 +112,46 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			parallelITS, ok := parallelTree.GetRoot().(*workloads.InstanceSet)
 			Expect(ok).Should(BeTrue())
 			parallelITS.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
-			newTree, err = reconciler.Reconcile(parallelTree)
+			res, err = reconciler.Reconcile(parallelTree)
 			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
 			// desired: bar-0, bar-1, bar-2, bar-3, bar-foo-0, bar-foo-1, bar-hello-0
-			pods = newTree.List(&corev1.Pod{})
+			pods = parallelTree.List(&corev1.Pod{})
 			Expect(pods).Should(HaveLen(7))
-			pvcs = newTree.List(&corev1.PersistentVolumeClaim{})
+			pvcs = parallelTree.List(&corev1.PersistentVolumeClaim{})
 			Expect(pvcs).Should(HaveLen(7))
 			podHello := builder.NewPodBuilder(namespace, its.Name+"-hello-0").GetObject()
 			podFoo1 := builder.NewPodBuilder(namespace, its.Name+"-foo-1").GetObject()
 			podBar2 := builder.NewPodBuilder(namespace, "bar-2").GetObject()
 			podBar3 := builder.NewPodBuilder(namespace, "bar-3").GetObject()
 			for _, object := range []client.Object{podHello, podFoo0, podFoo1, podBar0, podBar1, podBar2, podBar3} {
+				Expect(slices.IndexFunc(pods, func(item client.Object) bool {
+					return item.GetName() == object.GetName()
+				})).Should(BeNumerically(">=", 0))
+				Expect(slices.IndexFunc(pvcs, func(item client.Object) bool {
+					expectedPVCName := fmt.Sprintf("%s-%s", volumeClaimTemplates[0].Name, object.GetName())
+					return expectedPVCName == item.GetName()
+				})).Should(BeNumerically(">=", 0))
+			}
+
+			By("do reconcile with Parallel policy, ParallelPodManagementConcurrency is 50%")
+			parallelTree, err = tree.DeepCopy()
+			Expect(err).Should(BeNil())
+			parallelITS, ok = parallelTree.GetRoot().(*workloads.InstanceSet)
+			Expect(ok).Should(BeTrue())
+			parallelITS.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+			parallelITS.Spec.ParallelPodManagementConcurrency = &intstr.IntOrString{Type: intstr.String, StrVal: "50%"}
+			res, err = reconciler.Reconcile(parallelTree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			// replicas is 7, ParallelPodManagementConcurrency is 50%, so concurrency is 4.
+			// since the original bar-1 and bar-foo-0 are not ready, only the new instances bar-0 and bar-2 will be added.
+			// desired: bar-0, bar-1, bar-2, bar-foo-0
+			pods = parallelTree.List(&corev1.Pod{})
+			Expect(pods).Should(HaveLen(4))
+			pvcs = parallelTree.List(&corev1.PersistentVolumeClaim{})
+			Expect(pvcs).Should(HaveLen(4))
+			for _, object := range []client.Object{podFoo0, podBar0, podBar1, podBar2} {
 				Expect(slices.IndexFunc(pods, func(item client.Object) bool {
 					return item.GetName() == object.GetName()
 				})).Should(BeNumerically(">=", 0))

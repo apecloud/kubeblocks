@@ -18,13 +18,7 @@ After vertical scaling or horizontal scaling is performed, KubeBlocks automatica
 
 ## Vertical scaling
 
-You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, if you need to change the resource demand from 1C2G to 2C4G, vertical scaling is what you need.
-
-:::note
-
-During the vertical scaling process, a concurrent restart is triggered and the leader pod may change after the restarting.
-
-:::
+You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, you can change the resource class from 1C2G to 2C4G by performing vertical scaling.
 
 ### Before you start
 
@@ -66,7 +60,7 @@ pg-cluster   default     postgresql              postgresql-14.8.0   Delete     
 
    - STATUS=Updating: it means the vertical scaling is in progress.
    - STATUS=Running: it means the vertical scaling has been applied.
-   - STATUS=Abnormal: it means the vertical scaling is abnormal. The reason may be the normal instances number is less than the total instance number or the leader instance is running properly while others are abnormal.
+   - STATUS=Abnormal: it means the vertical scaling is abnormal. The reason may be the normal instances number is less than the total instance number or the primary instance is running properly while others are abnormal.
      > To solve the problem, you can check manually to see whether resources are sufficient. If AutoScaling is supported, the system recovers when there are enough resources, otherwise, you can create enough resources and check the result with kubectl describe command.
 
 3. Check whether the corresponding resources change.
@@ -77,7 +71,9 @@ pg-cluster   default     postgresql              postgresql-14.8.0   Delete     
 
 ## Horizontal scaling
 
-Horizontal scaling changes the amount of pods. For example, you can apply horizontal scaling to scale pods up from three to five. The scaling process includes the backup and restore of data.
+Horizontal scaling changes the amount of pods. For example, you can scale out replicas from three to five.
+
+From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out instances, refer to [Horizontal Scale](./../../../api_docs/maintenance/scale/horizontal-scale.md) in API docs for more details and examples.
 
 ### Before you start
 
@@ -102,7 +98,7 @@ pg-cluster        default          postgreql                 postgresql-14.8.0  
     ```
 
     - `--components` describes the component name ready for horizontal scaling.
-    - `--replicas` describes the replica amount of the specified components.
+    - `--replicas` describes the replica amount of the specified components. Edit the amount based on your demands to scale in or out replicas.
 
 2. Validate the horizontal scaling operation.
 

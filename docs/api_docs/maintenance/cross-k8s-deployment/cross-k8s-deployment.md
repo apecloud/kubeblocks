@@ -13,7 +13,7 @@ KubeBlocks supports managing multiple Kubernetes clusters to provide new options
 * Control plane: An independent K8s cluster in which the KubeBlocks operator runs. And most of the objects defined by KubeBlocks, such as definition, cluster, backup, ops, are stored in this cluster. Users interact with the API of this cluster to manage multiple cluster instances.
 * Data plane: A K8s cluster used to run the actual workloads. There can be one or more clusters in the data plane. These clusters host resources such as pods, persistent volume claims (PVC), services, service accounts (SA), config maps (CM), secrets, jobs, etc., related to the instances. But in KubeBlocks v0.9.0, the KubeBlocks operator does not run in the data plane.
 
-In terms of actual physical deployment, control plane can be deployed in a single availability zone (AZ) for simplicity and flexibility. It can also be deployed in multiple different AZs to provide higher availability guarantees. Alternatively, it can be deployed by reusing a data plane, which offers a lower-cost approach to running the control plane.
+In terms of actual physical deployment, the control plane can be deployed in a single availability zone (AZ) for simplicity and flexibility. It can also be deployed in multiple different AZs to provide higher availability guarantees. Alternatively, it can be deployed by reusing a data plane, which offers a lower-cost approach to running the control plane.
 
 ## Prepare an environment
 
@@ -211,11 +211,11 @@ This tutorial takes the community edition of etcd as an example. You can refer t
 
 ### Create an instance
 
-Since different network configurations have different requirements, the following sections provide examples of creating a RaftGroup cross-cluster etcd instance using both cloud-based and self-hosted approaches.
+Since different network configurations have different requirements, the following sections provide examples of creating a cross-cluster etcd instance using both cloud-based and self-hosted approaches.
 
 #### Cloud
 
-This example illustrates create an RaftGroup etcd cluster on Alibaba Cloud. For the configurations of other cloud providers, you can refer to the official docs.
+This example illustrates create an etcd cluster on Alibaba Cloud. For the configurations of other cloud providers, you can refer to the official docs.
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1

@@ -208,7 +208,6 @@ kind: Cluster
 metadata:
   name: wesql
 spec:
-  clusterVersionRef: cluster-version-consensus
   clusterDefinitionRef: cluster-definition-consensus
   componentSpecs:
     - name: wesql-test

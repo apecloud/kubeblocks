@@ -20,7 +20,7 @@ const (
 	TPLRenderToolPath     = "/bin/config_render"
 	ConfigManagerToolPath = "/bin/reloader"
 
-	// ConfigurationTplLabelPrefixKey clusterVersion or clusterdefinition using tpl
+	// ConfigurationTplLabelPrefixKey clusterdefinition using tpl
 	ConfigurationTplLabelPrefixKey         = "config.kubeblocks.io/tpl"
 	ConfigurationConstraintsLabelPrefixKey = "config.kubeblocks.io/constraints"
 

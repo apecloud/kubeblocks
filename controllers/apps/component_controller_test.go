@@ -1256,7 +1256,7 @@ var _ = Describe("Component Controller", func() {
 		targetEnvVars := []corev1.EnvVar{
 			{
 				Name:  "SERVICE_HOST",
-				Value: constant.GenerateComponentServiceName(clusterObj.Name, compName, compDefObj.Spec.Services[0].Name),
+				Value: constant.GenerateComponentServiceName(clusterObj.Name, compName, compDefObj.Spec.Services[0].ServiceName),
 			},
 			{
 				Name:  "SERVICE_PORT",

@@ -171,32 +171,6 @@ type ClusterTopologyOrders struct {
 	Update []string `json:"update,omitempty"`
 }
 
-// SystemAccountSpec specifies information to create system accounts.
-//
-// Deprecated since v0.8, be replaced by `componentDefinition.spec.systemAccounts` and
-// `componentDefinition.spec.lifecycleActions.accountProvision`.
-type SystemAccountSpec struct {
-	// Configures how to obtain the client SDK and execute statements.
-	//
-	// +kubebuilder:validation:Required
-	CmdExecutorConfig *CmdExecutorConfig `json:"cmdExecutorConfig"`
-
-	// Defines the pattern used to generate passwords for system accounts.
-	//
-	// +kubebuilder:validation:Required
-	PasswordConfig PasswordConfig `json:"passwordConfig"`
-
-	// Defines the configuration settings for system accounts.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
-	Accounts []SystemAccountConfig `json:"accounts" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
-}
-
 // CmdExecutorConfig specifies how to perform creation and deletion statements.
 //
 // Deprecated since v0.8.
@@ -244,46 +218,6 @@ type PasswordConfig struct {
 	Seed string `json:"seed,omitempty"`
 }
 
-// SystemAccountConfig specifies how to create and delete system accounts.
-//
-// Deprecated since v0.9.
-type SystemAccountConfig struct {
-	// The unique identifier of a system account.
-	//
-	// +kubebuilder:validation:Required
-	Name AccountName `json:"name"`
-
-	// Outlines the strategy for creating the account.
-	//
-	// +kubebuilder:validation:Required
-	ProvisionPolicy ProvisionPolicy `json:"provisionPolicy"`
-}
-
-// ProvisionPolicy defines the policy details for creating accounts.
-//
-// Deprecated since v0.9.
-type ProvisionPolicy struct {
-	// Specifies the method to provision an account.
-	//
-	// +kubebuilder:validation:Required
-	Type ProvisionPolicyType `json:"type"`
-
-	// Defines the scope within which the account is provisioned.
-	//
-	// +kubebuilder:default=AnyPods
-	Scope ProvisionScope `json:"scope"`
-
-	// The statement to provision an account.
-	//
-	// +optional
-	Statements *ProvisionStatements `json:"statements,omitempty"`
-
-	// The external secret to refer.
-	//
-	// +optional
-	SecretRef *ProvisionSecretRef `json:"secretRef,omitempty"`
-}
-
 // ProvisionSecretRef represents the reference to a secret.
 type ProvisionSecretRef struct {
 	// The unique identifier of the secret.
@@ -295,30 +229,6 @@ type ProvisionSecretRef struct {
 	//
 	// +kubebuilder:validation:Required
 	Namespace string `json:"namespace"`
-}
-
-// ProvisionStatements defines the statements used to create accounts.
-//
-// Deprecated since v0.9.
-type ProvisionStatements struct {
-	// Specifies the statement required to create a new account with the necessary privileges.
-	//
-	// +kubebuilder:validation:Required
-	CreationStatement string `json:"creation"`
-
-	// Defines the statement required to update the password of an existing account.
-	//
-	// +optional
-	UpdateStatement string `json:"update,omitempty"`
-
-	// Defines the statement required to delete an existing account.
-	// Typically used in conjunction with the creation statement to delete an account before recreating it.
-	// For example, one might use a `drop user if exists` statement followed by a `create user` statement to ensure a fresh account.
-	//
-	// Deprecated: This field is deprecated and the update statement should be used instead.
-	//
-	// +optional
-	DeletionStatement string `json:"deletion,omitempty"`
 }
 
 // ClusterDefinitionStatus defines the observed state of ClusterDefinition
@@ -501,11 +411,6 @@ type ClusterComponentDefinition struct {
 	// +optional
 	PodSpec *corev1.PodSpec `json:"podSpec,omitempty"`
 
-	// Defines the service spec.
-	//
-	// +optional
-	Service *ServiceSpec `json:"service,omitempty"`
-
 	// Defines spec for `Stateless` workloads.
 	//
 	// +kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.7.0, use RSMSpec instead."
@@ -542,23 +447,12 @@ type ClusterComponentDefinition struct {
 	// +optional
 	HorizontalScalePolicy *HorizontalScalePolicy `json:"horizontalScalePolicy,omitempty"`
 
-	// Defines system accounts needed to manage the component, and the statement to create them.
-	//
-	// +optional
-	SystemAccounts *SystemAccountSpec `json:"systemAccounts,omitempty"`
-
 	// Defines command to do switchover.
 	// In particular, when workloadType=Replication, the command defined in switchoverSpec will only be executed under
 	// the condition of cluster.componentSpecs[x].SwitchPolicy.type=Noop.
 	//
 	// +optional
 	SwitchoverSpec *SwitchoverSpec `json:"switchoverSpec,omitempty"`
-
-	// Defines the command to be executed when the component is ready, and the command will only be executed once after
-	// the component becomes ready.
-	//
-	// +optional
-	PostStartSpec *PostStartAction `json:"postStartSpec,omitempty"`
 }
 
 func (r *ClusterComponentDefinition) GetStatefulSetWorkload() StatefulSetWorkload {
@@ -599,91 +493,6 @@ func (r *ClusterComponentDefinition) GetCommonStatefulSpec() (*StatefulSetSpec, 
 		// return nil, ErrWorkloadTypeIsUnknown
 	}
 	return nil, nil
-}
-
-// ServiceSpec is deprecated since v0.8.
-type ServiceSpec struct {
-	// The list of ports that are exposed by this service.
-	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
-	//
-	// +patchMergeKey=port
-	// +patchStrategy=merge
-	// +listType=map
-	// +listMapKey=port
-	// +listMapKey=protocol
-	// +optional
-	Ports []ServicePort `json:"ports,omitempty" patchStrategy:"merge" patchMergeKey:"port" protobuf:"bytes,1,rep,name=ports"`
-
-	// NOTES: name also need to be key
-}
-
-func (r *ServiceSpec) ToSVCPorts() []corev1.ServicePort {
-	ports := make([]corev1.ServicePort, 0, len(r.Ports))
-	for _, p := range r.Ports {
-		ports = append(ports, p.toSVCPort())
-	}
-	return ports
-}
-
-func (r ServiceSpec) ToSVCSpec() corev1.ServiceSpec {
-	return corev1.ServiceSpec{
-		Ports: r.ToSVCPorts(),
-	}
-}
-
-// ServicePort is deprecated since v0.8.
-type ServicePort struct {
-	// The name of this port within the service. This must be a DNS_LABEL.
-	// All ports within a ServiceSpec must have unique names. When considering
-	// the endpoints for a Service, this must match the 'name' field in the
-	// EndpointPort.
-	// +kubebuilder:validation:Required
-	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
-
-	// The IP protocol for this port. Supports "TCP", "UDP", and "SCTP".
-	// Default is TCP.
-	// +kubebuilder:validation:Enum={TCP,UDP,SCTP}
-	// +default="TCP"
-	// +optional
-	Protocol corev1.Protocol `json:"protocol,omitempty" protobuf:"bytes,2,opt,name=protocol,casttype=Protocol"`
-
-	// The application protocol for this port.
-	// This field follows standard Kubernetes label syntax.
-	// Un-prefixed names are reserved for IANA standard service names (as per
-	// RFC-6335 and https://www.iana.org/assignments/service-names).
-	// Non-standard protocols should use prefixed names such as
-	// mycompany.com/my-custom-protocol.
-	// +optional
-	AppProtocol *string `json:"appProtocol,omitempty" protobuf:"bytes,6,opt,name=appProtocol"`
-
-	// The port that will be exposed by this service.
-	Port int32 `json:"port" protobuf:"varint,3,opt,name=port"`
-
-	// Number or name of the port to access on the pods targeted by the service.
-	//
-	// Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.
-	//
-	// - If this is a string, it will be looked up as a named port in the target Pod's container ports.
-	// - If this is not specified, the value of the `port` field is used (an identity map).
-	//
-	// This field is ignored for services with clusterIP=None, and should be
-	// omitted or set equal to the `port` field.
-	//
-	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service
-	//
-	// +kubebuilder:validation:XIntOrString
-	// +optional
-	TargetPort intstr.IntOrString `json:"targetPort,omitempty" protobuf:"bytes,4,opt,name=targetPort"`
-}
-
-func (r *ServicePort) toSVCPort() corev1.ServicePort {
-	return corev1.ServicePort{
-		Name:        r.Name,
-		Protocol:    r.Protocol,
-		AppProtocol: r.AppProtocol,
-		Port:        r.Port,
-		TargetPort:  r.TargetPort,
-	}
 }
 
 // HorizontalScalePolicy is deprecated since v0.8.
@@ -1011,20 +820,6 @@ func (r *ReplicationSetSpec) FinalStsUpdateStrategy() (appsv1.PodManagementPolic
 	s.Type = appsv1.OnDeleteStatefulSetStrategyType
 	s.RollingUpdate = nil
 	return appsv1.ParallelPodManagement, s
-}
-
-// PostStartAction is deprecated since v0.8.
-type PostStartAction struct {
-	// Specifies the  post-start command to be executed.
-	//
-	// +kubebuilder:validation:Required
-	CmdExecutorConfig CmdExecutorConfig `json:"cmdExecutorConfig"`
-
-	// Used to select the script that need to be referenced.
-	// When defined, the scripts defined in scriptSpecs can be referenced within the CmdExecutorConfig.
-	//
-	// +optional
-	ScriptSpecSelectors []ScriptSpecSelector `json:"scriptSpecSelectors,omitempty"`
 }
 
 // SwitchoverSpec is deprecated since v0.8.

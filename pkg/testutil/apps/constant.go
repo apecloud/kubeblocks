@@ -92,35 +92,6 @@ var (
 				Resources: zeroResRequirements,
 			}},
 		},
-		Service: &appsv1alpha1.ServiceSpec{
-			Ports: []appsv1alpha1.ServicePort{{
-				Protocol: corev1.ProtocolTCP,
-				Port:     80,
-			}},
-		},
-	}
-
-	// defaultSvc value are corresponding to defaultMySQLContainer.Ports name mapping and
-	// corresponding to defaultConnectionCredential variable placeholder
-	defaultSvcSpec = appsv1alpha1.ServiceSpec{
-		Ports: []appsv1alpha1.ServicePort{
-			{
-				Name: "mysql",
-				TargetPort: intstr.IntOrString{
-					Type:   intstr.String,
-					StrVal: "mysql",
-				},
-				Port: 3306,
-			},
-			{
-				Name: "paxos",
-				TargetPort: intstr.IntOrString{
-					Type:   intstr.String,
-					StrVal: "paxos",
-				},
-				Port: 13306,
-			},
-		},
 	}
 
 	defaultMySQLContainer = corev1.Container{
@@ -167,7 +138,6 @@ var (
 				TimeoutSeconds:   5,
 			},
 		},
-		Service: &defaultMySQLService,
 		PodSpec: &corev1.PodSpec{
 			Containers: []corev1.Container{
 				defaultMySQLContainer,
@@ -189,14 +159,6 @@ var (
 		},
 	}
 
-	defaultMySQLService = appsv1alpha1.ServiceSpec{
-		Ports: []appsv1alpha1.ServicePort{{
-			Name:     "mysql",
-			Protocol: corev1.ProtocolTCP,
-			Port:     3306,
-		}},
-	}
-
 	consensusMySQLComponent = appsv1alpha1.ClusterComponentDefinition{
 		WorkloadType:  appsv1alpha1.Consensus,
 		ConsensusSpec: &defaultConsensusSpec,
@@ -207,7 +169,6 @@ var (
 				TimeoutSeconds:   5,
 			},
 		},
-		Service: &defaultMySQLService,
 		PodSpec: &corev1.PodSpec{
 			Containers: []corev1.Container{
 				defaultMySQLContainer,
@@ -236,6 +197,24 @@ var (
 			},
 		},
 		Services: []appsv1alpha1.ComponentService{
+			{
+				Service: appsv1alpha1.Service{
+					Name: "default",
+					Spec: corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{
+							{
+								Protocol: corev1.ProtocolTCP,
+								Port:     3306,
+								TargetPort: intstr.IntOrString{
+									Type:   intstr.String,
+									StrVal: "mysql",
+								},
+							},
+						},
+					},
+					RoleSelector: "leader",
+				},
+			},
 			{
 				Service: appsv1alpha1.Service{
 					Name:        "rw",
@@ -363,13 +342,6 @@ var (
 		},
 	}
 
-	defaultRedisService = appsv1alpha1.ServiceSpec{
-		Ports: []appsv1alpha1.ServicePort{{
-			Protocol: corev1.ProtocolTCP,
-			Port:     6379,
-		}},
-	}
-
 	defaultReplicationRedisVolumeMounts = []corev1.VolumeMount{
 		{
 			Name:      DataVolumeName,
@@ -430,7 +402,6 @@ var (
 				TimeoutSeconds:   5,
 			},
 		},
-		Service: &defaultRedisService,
 		PodSpec: &corev1.PodSpec{
 			Volumes: []corev1.Volume{
 				{

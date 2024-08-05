@@ -22,9 +22,9 @@ package operations
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -36,13 +36,9 @@ import (
 
 var _ = Describe("", func() {
 	var (
-		randomStr             = testCtx.GetRandomStr()
-		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr
-		clusterName           = "cluster-for-ops-" + randomStr
-	)
-
-	const (
-		consensusCompName = "consensus"
+		randomStr   = testCtx.GetRandomStr()
+		compDefName = "test-compdef-" + randomStr
+		clusterName = "test-cluster-" + randomStr
 	)
 
 	cleanEnv := func() {
@@ -53,7 +49,7 @@ var _ = Describe("", func() {
 		By("clean resources")
 
 		// delete cluster(and all dependent sub-resources), cluster definition
-		testapps.ClearClusterResources(&testCtx)
+		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 
 		// delete rest resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
@@ -69,14 +65,14 @@ var _ = Describe("", func() {
 	Context("Test OpsRequest", func() {
 		It("Test expose OpsRequest", func() {
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
-			opsRes, _, clusterObject := initOperationsResources(clusterDefinitionName, clusterName)
+			opsRes, _, clusterObject := initOperationsResources2(compDefName, clusterName)
 
 			By("create Expose opsRequest")
 			ops := testapps.NewOpsRequestObj("expose-expose-"+randomStr, testCtx.DefaultNamespace,
 				clusterObject.Name, appsv1alpha1.ExposeType)
 			ops.Spec.ExposeList = []appsv1alpha1.Expose{
 				{
-					ComponentName: consensusCompName,
+					ComponentName: clusterObject.Spec.ComponentSpecs[0].Name,
 					Switch:        appsv1alpha1.EnableExposeSwitch,
 					Services: []appsv1alpha1.OpsService{
 						{
@@ -107,7 +103,7 @@ var _ = Describe("", func() {
 
 		It("Test expose OpsRequest with empty ComponentName", func() {
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
-			opsRes, _, clusterObject := initOperationsResources(clusterDefinitionName, clusterName)
+			opsRes, _, clusterObject := initOperationsResources2(compDefName, clusterName)
 
 			By("create Expose opsRequest")
 			ops := testapps.NewOpsRequestObj("expose-expose-"+randomStr, testCtx.DefaultNamespace,

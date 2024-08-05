@@ -153,56 +153,6 @@ var _ = Describe("builder", func() {
 			Expect(pvc.Spec.StorageClassName).Should(Equal(synthesizedComponent.VolumeClaimTemplates[0].Spec.StorageClassName))
 		})
 
-		It("builds Conn. Credential correctly", func() {
-			var (
-				clusterDefObj                             = testapps.NewClusterDefFactoryWithConnCredential("conn-cred", mysqlCompDefName).GetObject()
-				clusterDef, cluster, synthesizedComponent = newClusterObjs(clusterDefObj)
-			)
-			credential := BuildConnCredential(clusterDef, cluster, synthesizedComponent)
-			Expect(credential).ShouldNot(BeNil())
-			// "username":      "root",
-			// "SVC_FQDN":      "$(SVC_FQDN)",
-			// "RANDOM_PASSWD": "$(RANDOM_PASSWD)",
-			// "tcpEndpoint":   "tcp:$(SVC_FQDN):$(SVC_PORT_mysql)",
-			// "paxosEndpoint": "paxos:$(SVC_FQDN):$(SVC_PORT_paxos)",
-			// "UUID":          "$(UUID)",
-			// "UUID_B64":      "$(UUID_B64)",
-			// "UUID_STR_B64":  "$(UUID_STR_B64)",
-			// "UUID_HEX":      "$(UUID_HEX)",
-			Expect(credential.StringData).ShouldNot(BeEmpty())
-			Expect(credential.StringData["username"]).Should(Equal("root"))
-
-			for _, v := range []string{
-				"SVC_FQDN",
-				"RANDOM_PASSWD",
-				"UUID",
-				"UUID_B64",
-				"UUID_STR_B64",
-				"UUID_HEX",
-				"HEADLESS_SVC_FQDN",
-			} {
-				Expect(credential.StringData[v]).ShouldNot(BeEquivalentTo(fmt.Sprintf("$(%s)", v)))
-			}
-			Expect(credential.StringData["RANDOM_PASSWD"]).Should(HaveLen(8))
-			svcFQDN := fmt.Sprintf("%s-%s", cluster.Name, synthesizedComponent.Name)
-			headlessSvcFQDN := fmt.Sprintf("%s-%s-headless", cluster.Name, synthesizedComponent.Name)
-			var mysqlPort corev1.ServicePort
-			var paxosPort corev1.ServicePort
-			for _, s := range synthesizedComponent.ComponentServices[0].Spec.Ports {
-				switch s.Name {
-				case "mysql":
-					mysqlPort = s
-				case "paxos":
-					paxosPort = s
-				}
-			}
-			Expect(credential.StringData["SVC_FQDN"]).Should(Equal(svcFQDN))
-			Expect(credential.StringData["HEADLESS_SVC_FQDN"]).Should(Equal(headlessSvcFQDN))
-			Expect(credential.StringData["tcpEndpoint"]).Should(Equal(fmt.Sprintf("tcp:%s:%d", svcFQDN, mysqlPort.Port)))
-			Expect(credential.StringData["paxosEndpoint"]).Should(Equal(fmt.Sprintf("paxos:%s:%d", svcFQDN, paxosPort.Port)))
-
-		})
-
 		It("builds Conn. Credential during restoring from backup", func() {
 			originalPassword := "test-passw0rd"
 			encryptionKey := "encryptionKey"

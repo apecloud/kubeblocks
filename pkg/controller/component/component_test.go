@@ -34,106 +34,40 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("Component", func() {
 
 	Context("has the BuildComponent function", func() {
 		const (
-			clusterDefName           = "test-clusterdef"
+			compDefName              = "test-compdef"
 			clusterName              = "test-cluster"
-			mysqlCompDefName         = "replicasets"
 			mysqlCompName            = "mysql"
-			proxyCompDefName         = "proxy"
-			proxyCompName            = "proxy"
 			mysqlSecretUserEnvName   = "MYSQL_ROOT_USER"
 			mysqlSecretPasswdEnvName = "MYSQL_ROOT_PASSWORD"
 		)
 
 		var (
-			clusterDef *appsv1alpha1.ClusterDefinition
-			cluster    *appsv1alpha1.Cluster
+			compDef *appsv1alpha1.ComponentDefinition
+			cluster *appsv1alpha1.Cluster
 		)
 
 		BeforeEach(func() {
-			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
-				AddComponentDef(testapps.StatelessNginxComponent, proxyCompDefName).
+			compDef = testapps.NewComponentDefinitionFactory(compDefName).
+				SetDefaultSpec().
 				GetObject()
-			pvcSpec := testapps.NewPVCSpec("1Gi")
-			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDef.Name).
-				AddComponent(mysqlCompName, mysqlCompDefName).
-				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
-				AddComponent(proxyCompName, proxyCompDefName).
+			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
+				AddComponentV2(mysqlCompName, compDef.GetName()).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, testapps.NewPVCSpec("1Gi")).
 				GetObject()
+
 		})
 
-		It("should auto fill first component if it's empty", func() {
-			reqCtx := intctrlutil.RequestCtx{
-				Ctx: ctx,
-				Log: logger,
-			}
-
-			By("fill simplified fields")
-			r := int32(3)
-			cluster.Spec.Replicas = &r
-			cluster.Spec.Resources.CPU = resource.MustParse("1000m")
-			cluster.Spec.Resources.Memory = resource.MustParse("2Gi")
-			cluster.Spec.Storage.Size = resource.MustParse("20Gi")
-
-			By("clear cluster's component spec")
-			cluster.Spec.ComponentSpecs = nil
-
-			By("build first component from simplified fields")
-			synthesizeComp, err := BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, cluster, nil)
+		compObj := func() *appsv1alpha1.Component {
+			comp, err := BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
 			Expect(err).Should(Succeed())
-			Expect(synthesizeComp).ShouldNot(BeNil())
-			Expect(synthesizeComp.Replicas).Should(Equal(*cluster.Spec.Replicas))
-			Expect(synthesizeComp.VolumeClaimTemplates[0].Spec.Resources.Requests["storage"]).Should(Equal(cluster.Spec.Storage.Size))
-		})
-
-		It("build affinity correctly", func() {
-			reqCtx := intctrlutil.RequestCtx{
-				Ctx: ctx,
-				Log: logger,
-			}
-			By("fill affinity")
-			cluster.Spec.AvailabilityPolicy = appsv1alpha1.AvailabilityPolicyZone
-			cluster.Spec.Tenancy = appsv1alpha1.DedicatedNode
-			By("clear cluster's component spec")
-			cluster.Spec.ComponentSpecs = nil
-			By("call build")
-			synthesizeComp, err := BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, cluster, nil)
-			Expect(err).Should(Succeed())
-			Expect(synthesizeComp).ShouldNot(BeNil())
-			Expect(synthesizeComp.PodSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].PodAffinityTerm.TopologyKey).Should(Equal("topology.kubernetes.io/zone"))
-			Expect(synthesizeComp.PodSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).Should(Equal("kubernetes.io/hostname"))
-		})
-
-		It("build network correctly", func() {
-			reqCtx := intctrlutil.RequestCtx{
-				Ctx: ctx,
-				Log: logger,
-			}
-			By("setup cloud provider")
-			viper.Set(constant.CfgKeyServerInfo, "v1.26.5-gke.1200")
-			By("fill network")
-			cluster.Spec.Network = &appsv1alpha1.ClusterNetwork{
-				HostNetworkAccessible: true,
-				PubliclyAccessible:    false,
-			}
-			By("clear cluster's component spec")
-			cluster.Spec.ComponentSpecs = nil
-			By("call build")
-			synthesizeComp, err := BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, cluster, nil)
-			Expect(err).Should(Succeed())
-			Expect(synthesizeComp).ShouldNot(BeNil())
-			Expect(synthesizeComp.ComponentServices).Should(HaveLen(2))
-			Expect(synthesizeComp.ComponentServices[1].Name).Should(Equal("vpc"))
-			Expect(synthesizeComp.ComponentServices[1].Annotations["networking.gke.io/load-balancer-type"]).Should(Equal("Internal"))
-			Expect(synthesizeComp.ComponentServices[1].Spec.Type).Should(BeEquivalentTo("LoadBalancer"))
-		})
+			return comp
+		}
 
 		It("Test replace secretRef env placeholder token", func() {
 			By("mock connect credential and do replace placeholder token")
@@ -171,19 +105,6 @@ var _ = Describe("Component", func() {
 			}
 		})
 
-		It("should not fill component if none of simplified api is present", func() {
-			reqCtx := intctrlutil.RequestCtx{
-				Ctx: ctx,
-				Log: logger,
-			}
-			By("clear cluster's component spec")
-			cluster.Spec.ComponentSpecs = nil
-			By("call build")
-			synthesizeComp, err := BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, cluster, nil)
-			Expect(err).Should(Succeed())
-			Expect(synthesizeComp).Should(BeNil())
-		})
-
 		PIt("build serviceReference correctly", func() {
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx: ctx,
@@ -210,7 +131,7 @@ var _ = Describe("Component", func() {
 				testapps.NginxImage: serviceDescriptor,
 			}
 			By("call build")
-			synthesizeComp, err := BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, cluster, &cluster.Spec.ComponentSpecs[0])
+			synthesizeComp, err := BuildSynthesizedComponent(reqCtx, testCtx.Cli, cluster, compDef, compObj())
 			Expect(err).Should(Succeed())
 			Expect(synthesizeComp).ShouldNot(BeNil())
 			Expect(synthesizeComp.ServiceReferences).ShouldNot(BeNil())
@@ -228,45 +149,42 @@ var _ = Describe("Component", func() {
 				_2048m = resource.MustParse("2Gi")
 				reqCtx = intctrlutil.RequestCtx{Ctx: ctx, Log: logger}
 			)
-			for i := range clusterDef.Spec.ComponentDefs {
-				compDef := &clusterDef.Spec.ComponentDefs[i]
-				compDef.PodSpec.Volumes = append(compDef.PodSpec.Volumes, []corev1.Volume{
-					{
-						Name: "shmd-ok",
-						VolumeSource: corev1.VolumeSource{
-							EmptyDir: &corev1.EmptyDirVolumeSource{
-								Medium: corev1.StorageMediumMemory,
-							},
+			compDef.Spec.Runtime.Volumes = append(compDef.Spec.Runtime.Volumes, []corev1.Volume{
+				{
+					Name: "shmd-ok",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{
+							Medium: corev1.StorageMediumMemory,
 						},
 					},
-					{
-						Name: "shmd-medium",
-						VolumeSource: corev1.VolumeSource{
-							EmptyDir: &corev1.EmptyDirVolumeSource{
-								Medium: corev1.StorageMediumDefault,
-							},
+				},
+				{
+					Name: "shmd-medium",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{
+							Medium: corev1.StorageMediumDefault,
 						},
 					},
-					{
-						Name: "shmd-size-small",
-						VolumeSource: corev1.VolumeSource{
-							EmptyDir: &corev1.EmptyDirVolumeSource{
-								Medium:    corev1.StorageMediumMemory,
-								SizeLimit: &_128m,
-							},
+				},
+				{
+					Name: "shmd-size-small",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{
+							Medium:    corev1.StorageMediumMemory,
+							SizeLimit: &_128m,
 						},
 					},
-					{
-						Name: "shmd-size-large",
-						VolumeSource: corev1.VolumeSource{
-							EmptyDir: &corev1.EmptyDirVolumeSource{
-								Medium:    corev1.StorageMediumMemory,
-								SizeLimit: &_2048m,
-							},
+				},
+				{
+					Name: "shmd-size-large",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{
+							Medium:    corev1.StorageMediumMemory,
+							SizeLimit: &_2048m,
 						},
 					},
-				}...)
-			}
+				},
+			}...)
 
 			By("with memory resource set")
 			if cluster.Spec.ComponentSpecs[0].Resources.Requests == nil {
@@ -277,7 +195,7 @@ var _ = Describe("Component", func() {
 			}
 			cluster.Spec.ComponentSpecs[0].Resources.Requests[corev1.ResourceMemory] = _512m
 			cluster.Spec.ComponentSpecs[0].Resources.Limits[corev1.ResourceMemory] = _1024m
-			comp, err := BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, cluster, &cluster.Spec.ComponentSpecs[0])
+			comp, err := BuildSynthesizedComponent(reqCtx, testCtx.Cli, cluster, compDef.DeepCopy(), compObj())
 			Expect(err).Should(Succeed())
 			Expect(comp).ShouldNot(BeNil())
 			for _, vol := range comp.PodSpec.Volumes {
@@ -298,7 +216,7 @@ var _ = Describe("Component", func() {
 			By("without memory resource set")
 			delete(cluster.Spec.ComponentSpecs[0].Resources.Requests, corev1.ResourceMemory)
 			delete(cluster.Spec.ComponentSpecs[0].Resources.Limits, corev1.ResourceMemory)
-			comp, err = BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, cluster, &cluster.Spec.ComponentSpecs[0])
+			comp, err = BuildSynthesizedComponent(reqCtx, testCtx.Cli, cluster, compDef.DeepCopy(), compObj())
 			Expect(err).Should(Succeed())
 			Expect(comp).ShouldNot(BeNil())
 			for _, vol := range comp.PodSpec.Volumes {

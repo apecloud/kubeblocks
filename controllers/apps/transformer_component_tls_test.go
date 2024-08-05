@@ -93,21 +93,6 @@ var _ = Describe("TLS self-signed cert function", func() {
 				"resources/mysql-config-constraint.yaml",
 				&appsv1beta1.ConfigConstraint{})
 
-<<<<<<< HEAD
-			By("Create a clusterDef obj")
-			testapps.NewClusterDefFactory(clusterDefName).
-				SetConnectionCredential(map[string]string{"username": "root", "password": ""}).
-				AddComponentDef(testapps.ConsensusMySQLComponent, statefulCompDefName).
-				AddConfigTemplate(configSpecName, configMapObj.Name, configConstraintObj.Name, testCtx.DefaultNamespace, testapps.ConfVolumeName).
-				AddContainerEnv(mysqlContainerName, corev1.EnvVar{Name: "MYSQL_ALLOW_EMPTY_PASSWORD", Value: "yes"}).
-				CheckedCreate(&testCtx).GetObject()
-
-			By("Create a clusterVersion obj")
-			testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponentVersion(statefulCompDefName).AddContainerShort(mysqlContainerName, testapps.ApeCloudMySQLImage).
-				CheckedCreate(&testCtx).GetObject()
-
-=======
 			By("Create a componentDefinition obj")
 			compDefObj = testapps.NewComponentDefinitionFactory(compDefName).
 				WithRandomName().
@@ -118,7 +103,6 @@ var _ = Describe("TLS self-signed cert function", func() {
 				AddEnv(testapps.DefaultMySQLContainerName, corev1.EnvVar{Name: "MYSQL_ALLOW_EMPTY_PASSWORD", Value: "yes"}).
 				Create(&testCtx).
 				GetObject()
->>>>>>> main
 		})
 
 		Context("when issuer is UserProvided", func() {

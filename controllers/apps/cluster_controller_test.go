@@ -566,7 +566,7 @@ var _ = Describe("Cluster Controller", func() {
 			g.Expect(svc.Spec.ExternalTrafficPolicy).Should(BeEquivalentTo(corev1.ServiceExternalTrafficPolicyTypeLocal))
 		})).Should(Succeed())
 
-		By("check component service created")
+		By("check default component service created")
 		compSvcKey := types.NamespacedName{
 			Namespace: clusterKey.Namespace,
 			Name:      constant.GenerateComponentServiceName(clusterObj.Name, compName, ""),
@@ -1360,15 +1360,15 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		It("with cluster service set", func() {
-			testClusterService(defaultCompName, defaultClusterCompDefName, createLegacyClusterObj)
+			testClusterService(defaultCompName, compDefObj.Name, createClusterObj)
 		})
 
 		It("should create and delete cluster service correctly", func() {
-			testClusterServiceCreateAndDelete(defaultCompName, defaultClusterCompDefName, createLegacyClusterObj)
+			testClusterServiceCreateAndDelete(defaultCompName, compDefObj.Name, createClusterObj)
 		})
 
 		It("should create and delete shard topology cluster service correctly", func() {
-			testShardingClusterServiceCreateAndDelete(defaultCompName, defaultClusterCompDefName, createLegacyClusterObjWithSharding)
+			testShardingClusterServiceCreateAndDelete(defaultCompName, compDefObj.Name, createClusterObjWithSharding)
 		})
 	})
 

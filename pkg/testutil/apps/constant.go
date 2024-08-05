@@ -199,6 +199,24 @@ var (
 		Services: []appsv1alpha1.ComponentService{
 			{
 				Service: appsv1alpha1.Service{
+					Name: "default",
+					Spec: corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{
+							{
+								Protocol: corev1.ProtocolTCP,
+								Port:     3306,
+								TargetPort: intstr.IntOrString{
+									Type:   intstr.String,
+									StrVal: "mysql",
+								},
+							},
+						},
+					},
+					RoleSelector: "leader",
+				},
+			},
+			{
+				Service: appsv1alpha1.Service{
 					Name:        "rw",
 					ServiceName: "rw",
 					Spec: corev1.ServiceSpec{

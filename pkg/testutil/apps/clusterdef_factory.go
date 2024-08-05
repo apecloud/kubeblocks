@@ -38,22 +38,6 @@ type MockClusterDefFactory struct {
 	BaseFactory[appsv1alpha1.ClusterDefinition, *appsv1alpha1.ClusterDefinition, MockClusterDefFactory]
 }
 
-func getDefaultConnectionCredential() map[string]string {
-	return map[string]string{
-		"username":             "root",
-		"SVC_FQDN":             "$(SVC_FQDN)",
-		"HEADLESS_SVC_FQDN":    "$(HEADLESS_SVC_FQDN)",
-		"RANDOM_PASSWD":        "$(RANDOM_PASSWD)",
-		"STRONG_RANDOM_PASSWD": "$(STRONG_RANDOM_PASSWD)",
-		"tcpEndpoint":          "tcp:$(SVC_FQDN):$(SVC_PORT_mysql)",
-		"paxosEndpoint":        "paxos:$(SVC_FQDN):$(SVC_PORT_paxos)",
-		"UUID":                 "$(UUID)",
-		"UUID_B64":             "$(UUID_B64)",
-		"UUID_STR_B64":         "$(UUID_STR_B64)",
-		"UUID_HEX":             "$(UUID_HEX)",
-	}
-}
-
 func NewClusterDefFactory(name string) *MockClusterDefFactory {
 	f := &MockClusterDefFactory{}
 	f.Init("", name,
@@ -62,14 +46,6 @@ func NewClusterDefFactory(name string) *MockClusterDefFactory {
 				ComponentDefs: []appsv1alpha1.ClusterComponentDefinition{},
 			},
 		}, f)
-	f.SetConnectionCredential(getDefaultConnectionCredential(), nil)
-	return f
-}
-
-func NewClusterDefFactoryWithConnCredential(name, compDefName string) *MockClusterDefFactory {
-	f := NewClusterDefFactory(name)
-	f.AddComponentDef(StatefulMySQLComponent, compDefName)
-	f.SetConnectionCredential(getDefaultConnectionCredential(), &defaultSvcSpec)
 	return f
 }
 
@@ -91,85 +67,6 @@ func (factory *MockClusterDefFactory) AddComponentDef(tplType ComponentDefTplTyp
 	return factory
 }
 
-func (factory *MockClusterDefFactory) AddServicePort(port int32) *MockClusterDefFactory {
-	comp := factory.getLastCompDef()
-	if comp == nil {
-		return nil
-	}
-	comp.Service = &appsv1alpha1.ServiceSpec{
-		Ports: []appsv1alpha1.ServicePort{{
-			Protocol: corev1.ProtocolTCP,
-			Port:     port,
-		}},
-	}
-	return factory
-}
-
-func (factory *MockClusterDefFactory) AddScriptTemplate(name,
-	configTemplateRef, namespace, volumeName string, mode *int32) *MockClusterDefFactory {
-	comp := factory.getLastCompDef()
-	if comp == nil {
-		return nil
-	}
-	comp.ScriptSpecs = append(comp.ScriptSpecs,
-		appsv1alpha1.ComponentTemplateSpec{
-			Name:        name,
-			TemplateRef: configTemplateRef,
-			Namespace:   namespace,
-			VolumeName:  volumeName,
-			DefaultMode: mode,
-		})
-	return factory
-}
-
-func (factory *MockClusterDefFactory) AddConfigTemplate(name,
-	configTemplateRef, configConstraintRef, namespace, volumeName string, injectEnvTo ...string) *MockClusterDefFactory {
-	comp := factory.getLastCompDef()
-	if comp == nil {
-		return nil
-	}
-	comp.ConfigSpecs = append(comp.ConfigSpecs,
-		appsv1alpha1.ComponentConfigSpec{
-			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-				Name:        name,
-				TemplateRef: configTemplateRef,
-				Namespace:   namespace,
-				VolumeName:  volumeName,
-			},
-			ConfigConstraintRef: configConstraintRef,
-			InjectEnvTo:         injectEnvTo,
-		})
-	return factory
-}
-
-func (factory *MockClusterDefFactory) AddLogConfig(name, filePathPattern string) *MockClusterDefFactory {
-	comp := factory.getLastCompDef()
-	if comp == nil {
-		return nil
-	}
-	comp.LogConfigs = append(comp.LogConfigs, appsv1alpha1.LogConfig{
-		FilePathPattern: filePathPattern,
-		Name:            name,
-	})
-	return factory
-}
-
-func (factory *MockClusterDefFactory) AddContainerEnv(containerName string, envVar corev1.EnvVar) *MockClusterDefFactory {
-	comp := factory.getLastCompDef()
-	if comp == nil {
-		return nil
-	}
-	for i, container := range comp.PodSpec.Containers {
-		if container.Name == containerName {
-			c := comp.PodSpec.Containers[i]
-			c.Env = append(c.Env, envVar)
-			comp.PodSpec.Containers[i] = c
-			break
-		}
-	}
-	return factory
-}
-
 func (factory *MockClusterDefFactory) AddHorizontalScalePolicy(policy appsv1alpha1.HorizontalScalePolicy) *MockClusterDefFactory {
 	comp := factory.getLastCompDef()
 	if comp == nil {
@@ -177,20 +74,6 @@ func (factory *MockClusterDefFactory) AddHorizontalScalePolicy(policy appsv1alph
 	}
 	comp.HorizontalScalePolicy = &policy
 	return factory
-}
-
-func (factory *MockClusterDefFactory) SetConnectionCredential(
-	connectionCredential map[string]string, svc *appsv1alpha1.ServiceSpec) *MockClusterDefFactory {
-	factory.Get().Spec.ConnectionCredential = connectionCredential
-	factory.SetServiceSpec(svc)
-	return factory
-}
-
-func (factory *MockClusterDefFactory) get1stCompDef() *appsv1alpha1.ClusterComponentDefinition {
-	if len(factory.Get().Spec.ComponentDefs) == 0 {
-		return nil
-	}
-	return &factory.Get().Spec.ComponentDefs[0]
 }
 
 func (factory *MockClusterDefFactory) getLastCompDef() *appsv1alpha1.ClusterComponentDefinition {
@@ -202,104 +85,9 @@ func (factory *MockClusterDefFactory) getLastCompDef() *appsv1alpha1.ClusterComp
 	return &comps[l-1]
 }
 
-func (factory *MockClusterDefFactory) SetServiceSpec(svc *appsv1alpha1.ServiceSpec) *MockClusterDefFactory {
-	comp := factory.get1stCompDef()
-	if comp == nil {
-		return factory
-	}
-	comp.Service = svc
-	return factory
-}
-
-func (factory *MockClusterDefFactory) AddSystemAccountSpec(sysAccounts *appsv1alpha1.SystemAccountSpec) *MockClusterDefFactory {
-	comp := factory.getLastCompDef()
-	if comp == nil {
-		return factory
-	}
-	comp.SystemAccounts = sysAccounts
-	return factory
-}
-
-func (factory *MockClusterDefFactory) AddServiceRefDeclarations(serviceRefDeclarations []appsv1alpha1.ServiceRefDeclaration) *MockClusterDefFactory {
-	comp := factory.getLastCompDef()
-	if comp == nil {
-		return factory
-	}
-	comp.ServiceRefDeclarations = serviceRefDeclarations
-	return factory
-}
-
-func (factory *MockClusterDefFactory) AddInitContainerVolumeMounts(containerName string, volumeMounts []corev1.VolumeMount) *MockClusterDefFactory {
-	comp := factory.getLastCompDef()
-	if comp == nil {
-		return factory
-	}
-	comp.PodSpec.InitContainers = appendContainerVolumeMounts(comp.PodSpec.InitContainers, containerName, volumeMounts)
-	return factory
-}
-
-func (factory *MockClusterDefFactory) AddContainerVolumeMounts(containerName string, volumeMounts []corev1.VolumeMount) *MockClusterDefFactory {
-	comp := factory.getLastCompDef()
-	if comp == nil {
-		return factory
-	}
-	comp.PodSpec.Containers = appendContainerVolumeMounts(comp.PodSpec.Containers, containerName, volumeMounts)
-	return factory
-}
-
-func (factory *MockClusterDefFactory) AddComponentRef(ref *appsv1alpha1.ComponentDefRef) *MockClusterDefFactory {
-	comp := factory.getLastCompDef()
-	if comp == nil {
-		return factory
-	}
-	if len(comp.ComponentDefRef) == 0 {
-		comp.ComponentDefRef = make([]appsv1alpha1.ComponentDefRef, 0)
-	}
-	comp.ComponentDefRef = append(comp.ComponentDefRef, *ref)
-	return factory
-}
-
-func (factory *MockClusterDefFactory) AddNamedServicePort(name string, port int32) *MockClusterDefFactory {
-	comp := factory.getLastCompDef()
-	if comp == nil {
-		return nil
-	}
-	if comp.Service != nil {
-		comp.Service.Ports = append(comp.Service.Ports, appsv1alpha1.ServicePort{
-			Name:     name,
-			Protocol: corev1.ProtocolTCP,
-			Port:     port,
-		})
-		return factory
-	}
-	comp.Service = &appsv1alpha1.ServiceSpec{
-		Ports: []appsv1alpha1.ServicePort{{
-			Name:     name,
-			Protocol: corev1.ProtocolTCP,
-			Port:     port,
-		}},
-	}
-	return factory
-}
-
 func (factory *MockClusterDefFactory) AddClusterTopology(topology appsv1alpha1.ClusterTopology) *MockClusterDefFactory {
 	factory.Get().Spec.Topologies = append(factory.Get().Spec.Topologies, topology)
 	return factory
-}
-
-// There are default volumeMounts for containers in clusterdefinition in pusrpose of a simple & fast creation,
-// but when mounts specified volumes in certain mountPaths, they may conflict with the default volumeMounts,
-// so here provides a way to overwrite the default volumeMounts.
-func appendContainerVolumeMounts(containers []corev1.Container, targetContainerName string, volumeMounts []corev1.VolumeMount) []corev1.Container {
-	for index := range containers {
-		c := &containers[index]
-		// remove the duplicated volumeMounts and overwrite the default mount path
-		if c.Name == targetContainerName {
-			mergedAddVolumeMounts(c, volumeMounts)
-			break
-		}
-	}
-	return containers
 }
 
 func mergedAddVolumeMounts(c *corev1.Container, volumeMounts []corev1.VolumeMount) {

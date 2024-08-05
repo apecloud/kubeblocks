@@ -37,18 +37,16 @@ var _ = Describe("Job Utils Test", func() {
 
 	Context("Job Utils Test function", func() {
 		const (
-			clusterDefName     = "test-clusterdef"
-			clusterVersionName = "test-clusterversion"
-			clusterName        = "test-cluster"
-			mysqlCompDefName   = "replicasets"
-			mysqlCompName      = "mysql"
-			labelKey           = "test-label"
+			clusterDefName   = "test-clusterdef"
+			clusterName      = "test-cluster"
+			mysqlCompDefName = "replicasets"
+			mysqlCompName    = "mysql"
+			labelKey         = "test-label"
 		)
 
 		var (
-			clusterDef     *appsv1alpha1.ClusterDefinition
-			clusterVersion *appsv1alpha1.ClusterVersion
-			cluster        *appsv1alpha1.Cluster
+			clusterDef *appsv1alpha1.ClusterDefinition
+			cluster    *appsv1alpha1.Cluster
 		)
 
 		createJob := func(name string, keys ...string) *batchv1.Job {
@@ -82,12 +80,7 @@ var _ = Describe("Job Utils Test", func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
 				AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
 				GetObject()
-			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponentVersion(mysqlCompDefName).
-				AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-				GetObject()
-			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-				clusterDef.Name, clusterVersion.Name).
+			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDef.Name).
 				AddComponent(mysqlCompName, mysqlCompDefName).
 				GetObject()
 		})

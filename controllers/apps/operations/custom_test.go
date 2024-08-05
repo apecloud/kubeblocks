@@ -38,7 +38,6 @@ var _ = Describe("CustomOps", func() {
 	var (
 		randomStr             = testCtx.GetRandomStr()
 		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr
-		clusterVersionName    = "clusterversion-for-ops-" + randomStr
 		clusterName           = "cluster-for-ops-" + randomStr
 		compDefName           = "apecloud-mysql"
 		opsResource           *OpsResource
@@ -55,7 +54,7 @@ var _ = Describe("CustomOps", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResources(&testCtx)
 
 		// delete rest resources
@@ -104,7 +103,7 @@ var _ = Describe("CustomOps", func() {
 				Create(&testCtx).
 				GetObject()
 
-			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefinitionName, clusterVersionName).
+			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefinitionName).
 				WithRandomName().AddComponentV2(consensusComp, componentDefObj.Name).SetReplicas(1).Create(&testCtx).GetObject()
 
 			fullCompName := constant.GenerateClusterComponentName(cluster.Name, consensusComp)

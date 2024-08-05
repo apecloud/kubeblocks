@@ -379,16 +379,11 @@ func handleComponentProgressForScalingReplicas(reqCtx intctrlutil.RequestCtx,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
 	var (
 		clusterComponent = pgRes.clusterComponent
-		opsRequest       = opsRes.OpsRequest
 		err              error
 		updatedPodCount  = int32(len(pgRes.createdPodSet) + len(pgRes.deletedPodSet))
 		completedCount   int32
 	)
 	if clusterComponent == nil {
-		return 0, 0, nil
-	}
-	lastComponentReplicas := opsRequest.Status.LastConfiguration.Components[pgRes.compOps.GetComponentName()].Replicas
-	if lastComponentReplicas == nil {
 		return 0, 0, nil
 	}
 	// if no any pod needs to create or delete, return

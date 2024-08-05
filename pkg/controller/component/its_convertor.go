@@ -25,6 +25,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -40,17 +41,19 @@ func BuildWorkloadFrom(synthesizeComp *SynthesizedComponent, protoITS *workloads
 		protoITS = &workloads.InstanceSet{}
 	}
 	convertors := map[string]convertor{
-		"service":                   &itsServiceConvertor{},
-		"alternativeservices":       &itsAlternativeServicesConvertor{},
-		"roles":                     &itsRolesConvertor{},
-		"roleprobe":                 &itsRoleProbeConvertor{},
-		"credential":                &itsCredentialConvertor{},
-		"membershipreconfiguration": &itsMembershipReconfigurationConvertor{},
-		"memberupdatestrategy":      &itsMemberUpdateStrategyConvertor{},
-		"podmanagementpolicy":       &itsPodManagementPolicyConvertor{},
-		"updatestrategy":            &itsUpdateStrategyConvertor{},
-		"instances":                 &itsInstancesConvertor{},
-		"offlineinstances":          &itsOfflineInstancesConvertor{},
+		"service":                          &itsServiceConvertor{},
+		"alternativeservices":              &itsAlternativeServicesConvertor{},
+		"roles":                            &itsRolesConvertor{},
+		"roleprobe":                        &itsRoleProbeConvertor{},
+		"credential":                       &itsCredentialConvertor{},
+		"membershipreconfiguration":        &itsMembershipReconfigurationConvertor{},
+		"memberupdatestrategy":             &itsMemberUpdateStrategyConvertor{},
+		"podmanagementpolicy":              &itsPodManagementPolicyConvertor{},
+		"parallelpodmanagementconcurrency": &itsParallelPodManagementConcurrencyConvertor{},
+		"podupdatepolicy":                  &itsPodUpdatePolicyConvertor{},
+		"updatestrategy":                   &itsUpdateStrategyConvertor{},
+		"instances":                        &itsInstancesConvertor{},
+		"offlineinstances":                 &itsOfflineInstancesConvertor{},
 	}
 	if err := covertObject(convertors, &protoITS.Spec, synthesizeComp); err != nil {
 		return nil, err
@@ -103,6 +106,34 @@ func (c *itsPodManagementPolicyConvertor) convert(args ...any) (any, error) {
 		return appsv1.OrderedReadyPodManagement, nil
 	}
 	return appsv1.ParallelPodManagement, nil
+}
+
+// itsParallelPodManagementConcurrencyConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.ParallelPodManagementConcurrency.
+type itsParallelPodManagementConcurrencyConvertor struct{}
+
+func (c *itsParallelPodManagementConcurrencyConvertor) convert(args ...any) (any, error) {
+	synthesizedComp, err := parseITSConvertorArgs(args...)
+	if err != nil {
+		return nil, err
+	}
+	if synthesizedComp.ParallelPodManagementConcurrency != nil {
+		return synthesizedComp.ParallelPodManagementConcurrency, nil
+	}
+	return &intstr.IntOrString{Type: intstr.String, StrVal: "100%"}, nil
+}
+
+// itsPodUpdatePolicyConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.PodUpdatePolicy.
+type itsPodUpdatePolicyConvertor struct{}
+
+func (c *itsPodUpdatePolicyConvertor) convert(args ...any) (any, error) {
+	synthesizedComp, err := parseITSConvertorArgs(args...)
+	if err != nil {
+		return nil, err
+	}
+	if synthesizedComp.PodUpdatePolicy != nil {
+		return *synthesizedComp.PodUpdatePolicy, nil
+	}
+	return workloads.PreferInPlacePodUpdatePolicyType, nil
 }
 
 // itsUpdateStrategyConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.Instances.
@@ -271,11 +302,11 @@ func (c *itsRoleProbeConvertor) convert(args ...any) (any, error) {
 	}
 
 	// TODO(xingran): ITS Action does not support args[] yet
-	if synthesizeComp.LifecycleActions.RoleProbe.CustomHandler != nil {
+	if synthesizeComp.LifecycleActions.RoleProbe.Exec != nil {
 		itsRoleProbeCmdAction := workloads.Action{
-			Image:   synthesizeComp.LifecycleActions.RoleProbe.CustomHandler.Image,
-			Command: synthesizeComp.LifecycleActions.RoleProbe.CustomHandler.Exec.Command,
-			Args:    synthesizeComp.LifecycleActions.RoleProbe.CustomHandler.Exec.Args,
+			Image:   synthesizeComp.LifecycleActions.RoleProbe.Exec.Image,
+			Command: synthesizeComp.LifecycleActions.RoleProbe.Exec.Command,
+			Args:    synthesizeComp.LifecycleActions.RoleProbe.Exec.Args,
 		}
 		itsRoleProbe.CustomHandler = []workloads.Action{itsRoleProbeCmdAction}
 	}
@@ -289,47 +320,39 @@ func (c *itsCredentialConvertor) convert(args ...any) (any, error) {
 		return nil, err
 	}
 
-	// use first init account as the default credential
-	var sysInitAccount *appsv1alpha1.SystemAccount
-	for index, sysAccount := range synthesizeComp.SystemAccounts {
-		if sysAccount.InitAccount {
-			sysInitAccount = &synthesizeComp.SystemAccounts[index]
-			break
+	credential := func(sysAccount appsv1alpha1.SystemAccount) *workloads.Credential {
+		secretName := constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, sysAccount.Name)
+		return &workloads.Credential{
+			Username: workloads.CredentialVar{
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: secretName,
+						},
+						Key: constant.AccountNameForSecret,
+					},
+				},
+			},
+			Password: workloads.CredentialVar{
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: secretName,
+						},
+						Key: constant.AccountPasswdForSecret,
+					},
+				},
+			},
 		}
 	}
-	if sysInitAccount == nil && len(synthesizeComp.CompDefName) != 0 {
-		return nil, nil
-	}
 
-	var secretName string
-	if sysInitAccount != nil {
-		secretName = constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, sysInitAccount.Name)
-	} else {
-		secretName = constant.GenerateDefaultConnCredential(synthesizeComp.ClusterName)
+	// use first init account as the default credential
+	for index, sysAccount := range synthesizeComp.SystemAccounts {
+		if sysAccount.InitAccount {
+			return credential(synthesizeComp.SystemAccounts[index]), nil
+		}
 	}
-	credential := &workloads.Credential{
-		Username: workloads.CredentialVar{
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: secretName,
-					},
-					Key: constant.AccountNameForSecret,
-				},
-			},
-		},
-		Password: workloads.CredentialVar{
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: secretName,
-					},
-					Key: constant.AccountPasswdForSecret,
-				},
-			},
-		},
-	}
-	return credential, nil
+	return nil, nil
 }
 
 func (c *itsMembershipReconfigurationConvertor) convert(args ...any) (any, error) {

@@ -35,7 +35,7 @@ func (w *WorkloadAction) createPod(actionCtx ActionContext,
 	retries int) (*appsv1alpha1.ActionTask, error) {
 	podName := buildActionPodName(w.OpsRequest, w.Comp.Name, actionCtx.Action.Name, targetPodIndex, retries)
 	pod := builder.NewPodBuilder(w.OpsRequest.Namespace, podName).
-		AddLabelsInMap(buildLabels(w.Cluster.Name, w.OpsRequest.Name, w.Comp.Name, actionCtx.Action.Name)).
+		AddLabelsInMap(buildLabels(w.OpsRequest.Name, actionCtx.Action.Name)).
 		AddLabels(constant.OpsRequestNamespaceLabelKey, w.OpsRequest.Namespace).
 		SetPodSpec(*podSpec).
 		SetRestartPolicy(corev1.RestartPolicyNever).

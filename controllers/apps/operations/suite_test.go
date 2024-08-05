@@ -65,9 +65,10 @@ var testCtx testutil.TestContext
 var eventRecorder record.EventRecorder
 
 const (
-	statelessComp = "stateless"
-	statefulComp  = "stateful"
-	consensusComp = "consensus"
+	statelessComp   = "stateless"
+	statefulComp    = "stateful"
+	consensusComp   = "consensus"
+	defaultCompName = "default"
 )
 
 func init() {
@@ -149,15 +150,14 @@ var _ = AfterSuite(func() {
 })
 
 // initOperationsResources inits the operations resources.
-func initOperationsResources(clusterDefinitionName,
-	clusterVersionName,
-	clusterName string) (*OpsResource, *appsv1alpha1.ClusterDefinition, *appsv1alpha1.Cluster) {
-	clusterDef, _, clusterObject := testapps.InitClusterWithHybridComps(&testCtx, clusterDefinitionName,
-		clusterVersionName, clusterName, statelessComp, statefulComp, consensusComp)
+func initOperationsResources(clusterDefinitionName, clusterName string) (*OpsResource, *appsv1alpha1.ClusterDefinition, *appsv1alpha1.Cluster) {
+	clusterDef, clusterObject := testapps.InitClusterWithHybridComps(&testCtx, clusterDefinitionName,
+		clusterName, statelessComp, statefulComp, consensusComp)
 	opsRes := &OpsResource{
 		Cluster:  clusterObject,
 		Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
 	}
+
 	By("mock cluster is Running and the status operations")
 	Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
 		clusterObject.Status.Phase = appsv1alpha1.RunningClusterPhase
@@ -175,6 +175,38 @@ func initOperationsResources(clusterDefinitionName,
 	})).Should(Succeed())
 	opsRes.Cluster = clusterObject
 	return opsRes, clusterDef, clusterObject
+}
+
+func initOperationsResources2(compDefName, clusterName string) (*OpsResource, *appsv1alpha1.ComponentDefinition, *appsv1alpha1.Cluster) {
+	compDef := testapps.NewComponentDefinitionFactory(compDefName).
+		SetDefaultSpec().
+		Create(&testCtx).
+		GetObject()
+
+	pvcSpec := testapps.NewPVCSpec("1Gi")
+	clusterObject := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
+		AddComponentV2(defaultCompName, compDef.GetName()).
+		SetReplicas(1).
+		AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
+		Create(&testCtx).
+		GetObject()
+
+	opsRes := &OpsResource{
+		Cluster:  clusterObject,
+		Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
+	}
+
+	By("mock cluster is Running and the status operations")
+	Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
+		clusterObject.Status.Phase = appsv1alpha1.RunningClusterPhase
+		clusterObject.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
+			defaultCompName: {
+				Phase: appsv1alpha1.RunningClusterCompPhase,
+			},
+		}
+	})).Should(Succeed())
+	opsRes.Cluster = clusterObject
+	return opsRes, compDef, clusterObject
 }
 
 func initInstanceSetPods(ctx context.Context, cli client.Client, opsRes *OpsResource) []*corev1.Pod {

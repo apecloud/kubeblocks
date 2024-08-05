@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"strings"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 
@@ -48,6 +49,16 @@ func NewComponentDefinitionFactoryExt(name, provider, description, serviceKind, 
 				ServiceVersion: serviceVersion,
 			},
 		}, f)
+	return f
+}
+
+func (f *MockComponentDefinitionFactory) SetDescription(description string) *MockComponentDefinitionFactory {
+	f.Get().Spec.Description = description
+	return f
+}
+
+func (f *MockComponentDefinitionFactory) SetServiceKind(serviceKind string) *MockComponentDefinitionFactory {
+	f.Get().Spec.ServiceKind = serviceKind
 	return f
 }
 
@@ -265,6 +276,11 @@ func (f *MockComponentDefinitionFactory) AddSystemAccount(accountName string, in
 
 func (f *MockComponentDefinitionFactory) SetUpdateStrategy(strategy *appsv1alpha1.UpdateStrategy) *MockComponentDefinitionFactory {
 	f.Get().Spec.UpdateStrategy = strategy
+	return f
+}
+
+func (f *MockComponentDefinitionFactory) SetPodManagementPolicy(policy *appsv1.PodManagementPolicyType) *MockComponentDefinitionFactory {
+	f.Get().Spec.PodManagementPolicy = policy
 	return f
 }
 

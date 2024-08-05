@@ -197,16 +197,13 @@ func (r *OpsRequest) validateRestart(cluster *Cluster) error {
 }
 
 // validateUpgrade validates spec.clusterOps.upgrade
-func (r *OpsRequest) validateUpgrade(ctx context.Context,
-	k8sClient client.Client,
-	cluster *Cluster) error {
+func (r *OpsRequest) validateUpgrade(ctx context.Context, k8sClient client.Client, cluster *Cluster) error {
 	upgrade := r.Spec.Upgrade
 	if upgrade == nil {
 		return notEmptyError("spec.upgrade")
 	}
 	if upgrade.ClusterVersionRef != nil && *upgrade.ClusterVersionRef != "" {
-		// TODO: remove this deprecated api after v0.9
-		return k8sClient.Get(ctx, types.NamespacedName{Name: *upgrade.ClusterVersionRef}, &ClusterVersion{})
+		return fmt.Errorf("not supported")
 	}
 	if len(r.Spec.Upgrade.Components) == 0 {
 		return notEmptyError("spec.upgrade.components")

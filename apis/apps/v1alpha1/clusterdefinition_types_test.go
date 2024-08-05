@@ -18,49 +18,7 @@ package v1alpha1
 
 import (
 	"testing"
-
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-
-	"k8s.io/apimachinery/pkg/util/yaml"
 )
-
-func TestValidateEnabledLogConfigs(t *testing.T) {
-	clusterDef := &ClusterDefinition{}
-	clusterDefByte := `
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: ClusterDefinition
-metadata:
-  name: cluster-definition-consensus
-spec:
-  componentDefs:
-    - name: replicasets
-      logConfigs:
-        - name: error
-          filePathPattern: /log/mysql/mysqld.err
-        - name: slow
-          filePathPattern: /log/mysql/*slow.log
-      podSpec:
-        containers:
-          - name: mysql
-            imagePullPolicy: IfNotPresent`
-	_ = yaml.Unmarshal([]byte(clusterDefByte), clusterDef)
-	// normal case
-	invalidLogNames := clusterDef.ValidateEnabledLogConfigs("replicasets", []string{"error", "slow"})
-	if len(invalidLogNames) != 0 {
-		t.Error("Expected empty [] invalidLogNames")
-	}
-	// corner case
-	invalidLogNames1 := clusterDef.ValidateEnabledLogConfigs("replicasets", []string{"error", "slow-test", "audit-test"})
-	if len(invalidLogNames1) != 2 {
-		t.Error("Expected invalidLogNames are [slow-test, audit-test]")
-	}
-	// corner case
-	invalidLogNames2 := clusterDef.ValidateEnabledLogConfigs("non-exist-type", []string{"error", "slow", "audit"})
-	if len(invalidLogNames2) != 3 {
-		t.Error("Expected invalidLogNames are [error, slow, audit]")
-	}
-}
 
 func TestGetComponentDefByName(t *testing.T) {
 	componentDefName := "mysqlType"
@@ -81,21 +39,3 @@ func TestGetComponentDefByName(t *testing.T) {
 		t.Error("function GetComponentDefByName should return nil")
 	}
 }
-
-var _ = Describe("", func() {
-	It("test GetTerminalPhases", func() {
-		r := ClusterDefinitionStatus{}
-		Expect(r.GetTerminalPhases()).Should(ContainElement(AvailablePhase))
-	})
-
-	It("test ToSVCSpec", func() {
-		r := ServiceSpec{
-			Ports: []ServicePort{
-				{
-					Name: "test-name",
-				},
-			},
-		}
-		Expect(r.ToSVCSpec().Ports[0].Name).Should(Equal(r.Ports[0].Name))
-	})
-})

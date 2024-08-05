@@ -44,7 +44,6 @@ var _ = Describe("DataScriptOps", func() {
 	var (
 		randomStr             = testCtx.GetRandomStr()
 		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr
-		clusterVersionName    = "clusterversion-for-ops-" + randomStr
 		clusterName           = "cluster-for-ops-" + randomStr
 
 		clusterObj  *appsv1alpha1.Cluster
@@ -63,7 +62,7 @@ var _ = Describe("DataScriptOps", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResources(&testCtx)
 
 		// delete rest resources
@@ -140,8 +139,8 @@ var _ = Describe("DataScriptOps", func() {
 	Context("with Cluster which has MySQL ConsensusSet", func() {
 		BeforeEach(func() {
 			By("mock cluster")
-			_, _, clusterObj = testapps.InitClusterWithHybridComps(&testCtx, clusterDefinitionName,
-				clusterVersionName, clusterName, statelessComp, statefulComp, consensusComp)
+			_, clusterObj = testapps.InitClusterWithHybridComps(&testCtx, clusterDefinitionName,
+				clusterName, statelessComp, statefulComp, consensusComp)
 
 			By("init opsResource")
 			opsResource = &OpsResource{
@@ -253,7 +252,7 @@ var _ = Describe("DataScriptOps", func() {
 			By("mock a job one more time, fail with missing secret")
 			_, err = buildDataScriptJobs(reqCtx, k8sClient, clusterObj, comp, ops, "mysql")
 			Expect(err).Should(HaveOccurred())
-			Expect(err.Error()).Should(ContainSubstring("conn-credential"))
+			Expect(err.Error()).Should(ContainSubstring("missing secret"))
 
 			By("patch a secret name to ops, fail with missing secret")
 			secretName := fmt.Sprintf("%s-%s", clusterObj.Name, comp.Name)

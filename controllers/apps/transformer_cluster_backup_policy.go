@@ -168,6 +168,8 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 					graphCli.Patch(dag, oldBackupSchedule, newBackupSchedule)
 				}
 				graphCli.DependOn(dag, backupPolicy, newBackupSchedule)
+				comps := graphCli.FindAll(dag, &appsv1alpha1.Component{})
+				graphCli.DependOn(dag, backupPolicy, comps...)
 				backupScheduleNames[newBackupSchedule.Name] = struct{}{}
 			}
 
@@ -441,15 +443,6 @@ func (r *clusterBackupPolicyTransformer) syncBackupMethods(backupPolicy *dpv1alp
 func (r *clusterBackupPolicyTransformer) doEnvMapping(comp *appsv1alpha1.ClusterComponentSpec, envMapping []appsv1alpha1.EnvMappingVar) []corev1.EnvVar {
 	var env []corev1.EnvVar
 	for _, v := range envMapping {
-		for _, cv := range v.ValueFrom.ClusterVersionRef {
-			if !slices.Contains(cv.Names, r.Cluster.Spec.ClusterVersionRef) {
-				continue
-			}
-			env = append(env, corev1.EnvVar{
-				Name:  v.Key,
-				Value: cv.MappingValue,
-			})
-		}
 		for _, cm := range v.ValueFrom.ComponentDef {
 			if !slices.Contains(cm.Names, comp.ComponentDef) {
 				continue
@@ -517,31 +510,12 @@ func (r *clusterBackupPolicyTransformer) buildBackupTarget(
 		target.Name = comp.fullComponentName
 	}
 	// build the target connection credential
-	cc := dpv1alpha1.ConnectionCredential{}
-	switch {
-	case len(comp.compSpec.ComponentDef) > 0 && len(targetTpl.Account) > 0:
-		cc.SecretName = constant.GenerateAccountSecretName(clusterName, comp.fullComponentName, targetTpl.Account)
-		cc.PasswordKey = constant.AccountPasswdForSecret
-		cc.UsernameKey = constant.AccountNameForSecret
-	case len(comp.compSpec.ComponentDef) == 0 && len(comp.compSpec.ComponentDefRef) > 0:
-		// TODO: remove HACK code in version 0.9, only no componentDef can using connect credential
-		cc.SecretName = constant.GenerateDefaultConnCredential(clusterName)
-		ccKey := targetTpl.ConnectionCredentialKey
-		if ccKey.PasswordKey != nil {
-			cc.PasswordKey = *ccKey.PasswordKey
+	if targetTpl.Account != "" {
+		target.ConnectionCredential = &dpv1alpha1.ConnectionCredential{
+			SecretName:  constant.GenerateAccountSecretName(clusterName, comp.fullComponentName, targetTpl.Account),
+			PasswordKey: constant.AccountPasswdForSecret,
+			UsernameKey: constant.AccountNameForSecret,
 		}
-		if ccKey.UsernameKey != nil {
-			cc.UsernameKey = *ccKey.UsernameKey
-		}
-		if ccKey.PortKey != nil {
-			cc.PortKey = *ccKey.PortKey
-		}
-		if ccKey.HostKey != nil {
-			cc.HostKey = *ccKey.HostKey
-		}
-	}
-	if cc.SecretName != "" {
-		target.ConnectionCredential = &cc
 	}
 	return target
 }
@@ -671,6 +645,11 @@ func (r *clusterBackupPolicyTransformer) getClusterComponentItems() []componentI
 		}
 	}
 	for i, v := range r.clusterTransformContext.Cluster.Spec.ShardingSpecs {
+		shardComponents, _ := intctrlutil.ListShardingComponents(r.Context, r.Client, r.Cluster, v.Name)
+		if len(shardComponents) == 0 {
+			// waiting for sharding component to be created
+			continue
+		}
 		if matchedCompDef(v.Template) {
 			compSpecItems = append(compSpecItems, componentItem{
 				compSpec:      &r.clusterTransformContext.Cluster.Spec.ShardingSpecs[i].Template,

@@ -210,7 +210,7 @@ func (mgr *DBManagerBase) ListSystemAccounts(context.Context) ([]models.UserInfo
 	return nil, models.ErrNotImplemented
 }
 
-func (mgr *DBManagerBase) CreateUser(context.Context, string, string) error {
+func (mgr *DBManagerBase) CreateUser(context.Context, string, string, string) error {
 	return models.ErrNotImplemented
 }
 

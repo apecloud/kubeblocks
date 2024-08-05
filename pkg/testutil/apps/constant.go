@@ -38,8 +38,8 @@ const (
 	ServiceVPCName      = "vpc-lb"
 	ServiceInternetName = "internet-lb"
 
-	ReplicationPodRoleVolume      = "pod-role"
 	ReplicationRoleLabelFieldPath = "metadata.labels['kubeblocks.io/role']"
+	ReplicationPodRoleVolume      = "pod-role"
 	DefaultReplicationReplicas    = 2
 
 	ApeCloudMySQLImage        = "docker.io/apecloud/apecloud-mysql-server:latest"
@@ -48,14 +48,9 @@ const (
 	NginxImage                = "nginx"
 	DefaultNginxContainerName = "nginx"
 
-	DefaultRedisCompDefName       = "redis"
-	DefaultRedisCompSpecName      = "redis-rsts"
 	DefaultRedisImageName         = "redis:7.0.5"
 	DefaultRedisContainerName     = "redis"
 	DefaultRedisInitContainerName = "redis-init-container"
-
-	EnvKeyImageTag  = "IMAGE_TAG"
-	DefaultImageTag = "test"
 
 	DefaultConfigSpecName          = "config-cm"
 	DefaultConfigSpecTplRef        = "env-from-config-tpl"
@@ -80,43 +75,12 @@ var (
 	}
 
 	statelessNginxComponent = appsv1alpha1.ClusterComponentDefinition{
-		CharacterType:        "stateless",
-		VolumeProtectionSpec: &appsv1alpha1.VolumeProtectionSpec{},
 		PodSpec: &corev1.PodSpec{
 			Containers: []corev1.Container{{
 				Name:      DefaultNginxContainerName,
 				Image:     NginxImage,
 				Resources: zeroResRequirements,
 			}},
-		},
-		Service: &appsv1alpha1.ServiceSpec{
-			Ports: []appsv1alpha1.ServicePort{{
-				Protocol: corev1.ProtocolTCP,
-				Port:     80,
-			}},
-		},
-	}
-
-	// defaultSvc value are corresponding to defaultMySQLContainer.Ports name mapping and
-	// corresponding to defaultConnectionCredential variable placeholder
-	defaultSvcSpec = appsv1alpha1.ServiceSpec{
-		Ports: []appsv1alpha1.ServicePort{
-			{
-				Name: "mysql",
-				TargetPort: intstr.IntOrString{
-					Type:   intstr.String,
-					StrVal: "mysql",
-				},
-				Port: 3306,
-			},
-			{
-				Name: "paxos",
-				TargetPort: intstr.IntOrString{
-					Type:   intstr.String,
-					StrVal: "paxos",
-				},
-				Port: 13306,
-			},
 		},
 	}
 
@@ -156,43 +120,17 @@ var (
 	}
 
 	statefulMySQLComponent = appsv1alpha1.ClusterComponentDefinition{
-		CharacterType:        "mysql",
-		VolumeProtectionSpec: &appsv1alpha1.VolumeProtectionSpec{},
-		Service:              &defaultMySQLService,
 		PodSpec: &corev1.PodSpec{
 			Containers: []corev1.Container{
 				defaultMySQLContainer,
 			},
 		},
-		VolumeTypes: []appsv1alpha1.VolumeTypeSpec{
-			{
-				Name: DataVolumeName,
-				Type: appsv1alpha1.VolumeTypeData,
-			},
-		},
-	}
-
-	defaultMySQLService = appsv1alpha1.ServiceSpec{
-		Ports: []appsv1alpha1.ServicePort{{
-			Name:     "mysql",
-			Protocol: corev1.ProtocolTCP,
-			Port:     3306,
-		}},
 	}
 
 	consensusMySQLComponent = appsv1alpha1.ClusterComponentDefinition{
-		CharacterType:        "mysql",
-		VolumeProtectionSpec: &appsv1alpha1.VolumeProtectionSpec{},
-		Service:              &defaultMySQLService,
 		PodSpec: &corev1.PodSpec{
 			Containers: []corev1.Container{
 				defaultMySQLContainer,
-			},
-		},
-		VolumeTypes: []appsv1alpha1.VolumeTypeSpec{
-			{
-				Name: DataVolumeName,
-				Type: appsv1alpha1.VolumeTypeData,
 			},
 		},
 	}
@@ -218,6 +156,24 @@ var (
 			},
 		},
 		Services: []appsv1alpha1.ComponentService{
+			{
+				Service: appsv1alpha1.Service{
+					Name: "default",
+					Spec: corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{
+							{
+								Protocol: corev1.ProtocolTCP,
+								Port:     3306,
+								TargetPort: intstr.IntOrString{
+									Type:   intstr.String,
+									StrVal: "mysql",
+								},
+							},
+						},
+					},
+					RoleSelector: "leader",
+				},
+			},
 			{
 				Service: appsv1alpha1.Service{
 					Name:        "rw",
@@ -307,10 +263,12 @@ var (
 		LifecycleActions: &appsv1alpha1.ComponentLifecycleActions{
 			PostProvision: defaultLifecycleActionHandler,
 			PreTerminate:  defaultLifecycleActionHandler,
-			RoleProbe: &appsv1alpha1.RoleProbe{
-				LifecycleActionHandler: *defaultLifecycleActionHandler,
-				PeriodSeconds:          1,
-				TimeoutSeconds:         5,
+			RoleProbe: &appsv1alpha1.Probe{
+				BuiltinHandler: defaultLifecycleActionHandler.BuiltinHandler,
+				Action: appsv1alpha1.Action{
+					TimeoutSeconds: 5,
+				},
+				PeriodSeconds: 1,
 			},
 			Switchover:       nil,
 			MemberJoin:       defaultLifecycleActionHandler,
@@ -341,13 +299,6 @@ var (
 			TemplateRef: DefaultScriptSpecTplRef,
 			VolumeName:  DefaultScriptSpecVolumeName,
 		},
-	}
-
-	defaultRedisService = appsv1alpha1.ServiceSpec{
-		Ports: []appsv1alpha1.ServicePort{{
-			Protocol: corev1.ProtocolTCP,
-			Port:     6379,
-		}},
 	}
 
 	defaultReplicationRedisVolumeMounts = []corev1.VolumeMount{
@@ -402,13 +353,6 @@ var (
 	}
 
 	replicationRedisComponent = appsv1alpha1.ClusterComponentDefinition{
-		CharacterType:        "redis",
-		VolumeProtectionSpec: &appsv1alpha1.VolumeProtectionSpec{},
-		Service:              &defaultRedisService,
-		VolumeTypes: []appsv1alpha1.VolumeTypeSpec{{
-			Name: DataVolumeName,
-			Type: appsv1alpha1.VolumeTypeData,
-		}},
 		PodSpec: &corev1.PodSpec{
 			Volumes: []corev1.Volume{
 				{

@@ -228,7 +228,8 @@ func referencedVars4Legacy(ctx context.Context, cli client.Reader, namespace str
 			}
 			return namespace
 		}(),
-		Name: constant.GenerateDefaultConnCredential(serviceRef.Cluster),
+		// keep this to reference a legacy cluster
+		Name: fmt.Sprintf("%s-conn-credential", serviceRef.Cluster),
 	}
 	if err := cli.Get(ctx, secretKey, secret); err != nil {
 		return nil, err

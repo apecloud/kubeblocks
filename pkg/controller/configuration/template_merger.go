@@ -94,21 +94,21 @@ func (c *configPatcher) Merge(baseData map[string]string, updatedData map[string
 		return baseData, nil
 	}
 
-	r := make(map[string]string)
+	mergedData := copyMap(baseData)
 	params := core.GenerateVisualizedParamsList(configPatch, formatter, nil)
 	for key, patch := range splitParameters(params) {
 		v, ok := baseData[key]
 		if !ok {
-			r[key] = updatedData[key]
+			mergedData[key] = updatedData[key]
 			continue
 		}
 		newConfig, err := core.ApplyConfigPatch([]byte(v), patch, formatter)
 		if err != nil {
 			return nil, err
 		}
-		r[key] = newConfig
+		mergedData[key] = newConfig
 	}
-	return r, err
+	return mergedData, err
 }
 
 func (c *configReplaceMerger) Merge(baseData map[string]string, updatedData map[string]string) (map[string]string, error) {

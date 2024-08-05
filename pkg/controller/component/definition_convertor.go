@@ -22,19 +22,14 @@ package component
 import (
 	"fmt"
 
-	corev1 "k8s.io/api/core/v1"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/apiutil"
-	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
-	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 )
 
 // TODO(component): type check
 
 // buildComponentDefinitionByConversion builds a ComponentDefinition from a ClusterComponentDefinition and a ClusterComponentVersion.
-func buildComponentDefinitionByConversion(clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
-	clusterCompVer *appsv1alpha1.ClusterComponentVersion) (*appsv1alpha1.ComponentDefinition, error) {
+func buildComponentDefinitionByConversion(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) (*appsv1alpha1.ComponentDefinition, error) {
 	if clusterCompDef == nil {
 		return nil, nil
 	}
@@ -59,11 +54,10 @@ func buildComponentDefinitionByConversion(clusterCompDef *appsv1alpha1.ClusterCo
 		"roles":                  &compDefRolesConvertor{},
 		"lifecycleactions":       &compDefLifecycleActionsConvertor{},
 		"servicerefdeclarations": &compDefServiceRefDeclarationsConvertor{},
-		"monitor":                &compDefMonitorConvertor{},
 		"exporter":               &compDefExporterConvertor{},
 	}
 	compDef := &appsv1alpha1.ComponentDefinition{}
-	if err := covertObject(convertors, &compDef.Spec, clusterCompDef, clusterCompVer); err != nil {
+	if err := covertObject(convertors, &compDef.Spec, clusterCompDef); err != nil {
 		return nil, err
 	}
 	return compDef, nil
@@ -80,16 +74,14 @@ func (c *compDefProviderConvertor) convert(args ...any) (any, error) {
 type compDefDescriptionConvertor struct{}
 
 func (c *compDefDescriptionConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	return clusterCompDef.Description, nil
+	return "", nil
 }
 
 // compDefServiceKindConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.ServiceKind.
 type compDefServiceKindConvertor struct{}
 
 func (c *compDefServiceKindConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	return clusterCompDef.CharacterType, nil
+	return "", nil
 }
 
 // compDefServiceVersionConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.ServiceVersion.
@@ -104,23 +96,10 @@ type compDefRuntimeConvertor struct{}
 
 func (c *compDefRuntimeConvertor) convert(args ...any) (any, error) {
 	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	var clusterCompVer *appsv1alpha1.ClusterComponentVersion
-	if len(args) > 1 {
-		clusterCompVer = args[1].(*appsv1alpha1.ClusterComponentVersion)
-	}
 	if clusterCompDef.PodSpec == nil {
 		return nil, fmt.Errorf("no pod spec")
 	}
-
 	podSpec := clusterCompDef.PodSpec.DeepCopy()
-	if clusterCompVer != nil {
-		for _, container := range clusterCompVer.VersionsCtx.InitContainers {
-			podSpec.InitContainers = appendOrOverrideContainerAttr(podSpec.InitContainers, container)
-		}
-		for _, container := range clusterCompVer.VersionsCtx.Containers {
-			podSpec.Containers = appendOrOverrideContainerAttr(podSpec.Containers, container)
-		}
-	}
 	return *podSpec, nil
 }
 
@@ -167,39 +146,7 @@ func (c *compDefVarsConvertor) convertHostNetworkVars(clusterCompDef *appsv1alph
 type compDefVolumesConvertor struct{}
 
 func (c *compDefVolumesConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	if clusterCompDef.VolumeTypes == nil {
-		return nil, nil
-	}
-
-	volumes := make([]appsv1alpha1.ComponentVolume, 0)
-	for _, vol := range clusterCompDef.VolumeTypes {
-		volumes = append(volumes, appsv1alpha1.ComponentVolume{
-			Name: vol.Name,
-		})
-	}
-
-	if clusterCompDef.VolumeProtectionSpec != nil {
-		defaultHighWatermark := clusterCompDef.VolumeProtectionSpec.HighWatermark
-		highWatermark := func(v appsv1alpha1.ProtectedVolume) int {
-			if v.HighWatermark != nil {
-				return *v.HighWatermark
-			}
-			return defaultHighWatermark
-		}
-		setHighWatermark := func(protectedVol appsv1alpha1.ProtectedVolume) {
-			for i, v := range volumes {
-				if v.Name == protectedVol.Name {
-					volumes[i].HighWatermark = highWatermark(protectedVol)
-					break
-				}
-			}
-		}
-		for _, v := range clusterCompDef.VolumeProtectionSpec.Volumes {
-			setHighWatermark(v)
-		}
-	}
-	return volumes, nil
+	return nil, nil
 }
 
 // compDefHostNetworkConvertor converts the given object into ComponentDefinition.Spec.HostNetwork.
@@ -239,56 +186,28 @@ func convertHostNetwork(clusterCompDef *appsv1alpha1.ClusterComponentDefinition)
 type compDefServicesConvertor struct{}
 
 func (c *compDefServicesConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	if clusterCompDef.Service == nil {
-		return nil, nil
-	}
-
-	svc := builder.NewServiceBuilder("", "").
-		SetType(corev1.ServiceTypeClusterIP).
-		AddPorts(clusterCompDef.Service.ToSVCSpec().Ports...).
-		GetObject()
-	services := []appsv1alpha1.ComponentService{
-		{
-			Service: appsv1alpha1.Service{
-				Name:        "default",
-				ServiceName: "",
-				Spec:        svc.Spec,
-			},
-		},
-	}
-	return services, nil
+	return nil, nil
 }
 
 // compDefConfigsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Configs.
 type compDefConfigsConvertor struct{}
 
 func (c *compDefConfigsConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	var clusterCompVer *appsv1alpha1.ClusterComponentVersion
-	if len(args) > 1 {
-		clusterCompVer = args[1].(*appsv1alpha1.ClusterComponentVersion)
-	}
-	if clusterCompVer == nil {
-		return clusterCompDef.ConfigSpecs, nil
-	}
-	return cfgcore.MergeConfigTemplates(clusterCompVer.ConfigSpecs, clusterCompDef.ConfigSpecs), nil
+	return nil, nil
 }
 
 // compDefLogConfigsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.LogConfigs.
 type compDefLogConfigsConvertor struct{}
 
 func (c *compDefLogConfigsConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	return clusterCompDef.LogConfigs, nil
+	return nil, nil
 }
 
 // compDefScriptsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Scripts.
 type compDefScriptsConvertor struct{}
 
 func (c *compDefScriptsConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	return clusterCompDef.ScriptSpecs, nil
+	return nil, nil
 }
 
 // compDefPolicyRulesConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.PolicyRules.
@@ -302,16 +221,7 @@ func (c *compDefPolicyRulesConvertor) convert(args ...any) (any, error) {
 type compDefLabelsConvertor struct{}
 
 func (c *compDefLabelsConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	if clusterCompDef.CustomLabelSpecs == nil {
-		return nil, nil
-	}
-
-	labels := make(map[string]string, 0)
-	for _, customLabel := range clusterCompDef.CustomLabelSpecs {
-		labels[customLabel.Key] = customLabel.Value
-	}
-	return labels, nil
+	return nil, nil
 }
 
 type compDefReplicasLimitConvertor struct{}
@@ -324,23 +234,7 @@ func (c *compDefReplicasLimitConvertor) convert(args ...any) (any, error) {
 type compDefSystemAccountsConvertor struct{}
 
 func (c *compDefSystemAccountsConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	if clusterCompDef.SystemAccounts == nil {
-		return nil, nil
-	}
-
-	accounts := make([]appsv1alpha1.SystemAccount, 0)
-	for _, account := range clusterCompDef.SystemAccounts.Accounts {
-		accounts = append(accounts, appsv1alpha1.SystemAccount{
-			Name:                     string(account.Name),
-			PasswordGenerationPolicy: clusterCompDef.SystemAccounts.PasswordConfig,
-			SecretRef:                account.ProvisionPolicy.SecretRef,
-		})
-		if account.ProvisionPolicy.Statements != nil {
-			accounts[len(accounts)-1].Statement = account.ProvisionPolicy.Statements.CreationStatement
-		}
-	}
-	return accounts, nil
+	return nil, nil
 }
 
 // compDefUpdateStrategyConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.UpdateStrategy.
@@ -361,22 +255,14 @@ func (c *compDefRolesConvertor) convert(args ...any) (any, error) {
 type compDefServiceRefDeclarationsConvertor struct{}
 
 func (c *compDefServiceRefDeclarationsConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	return clusterCompDef.ServiceRefDeclarations, nil
+	return nil, nil
 }
 
 // compDefLifecycleActionsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.LifecycleActions.
 type compDefLifecycleActionsConvertor struct{}
 
 func (c *compDefLifecycleActionsConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-
 	lifecycleActions := &appsv1alpha1.ComponentLifecycleActions{}
-
-	if clusterCompDef.PostStartSpec != nil {
-		lifecycleActions.PostProvision = c.convertPostProvision(clusterCompDef.PostStartSpec)
-	}
-
 	lifecycleActions.PreTerminate = nil
 	lifecycleActions.MemberJoin = nil
 	lifecycleActions.MemberLeave = nil
@@ -386,39 +272,11 @@ func (c *compDefLifecycleActionsConvertor) convert(args ...any) (any, error) {
 	lifecycleActions.DataLoad = nil
 	lifecycleActions.Reconfigure = nil
 	lifecycleActions.AccountProvision = nil
-
 	return lifecycleActions, nil // TODO
-}
-
-func (c *compDefLifecycleActionsConvertor) convertPostProvision(postStart *appsv1alpha1.PostStartAction) *appsv1alpha1.LifecycleActionHandler {
-	if postStart == nil {
-		return nil
-	}
-
-	defaultPreCondition := appsv1alpha1.ComponentReadyPreConditionType
-	return &appsv1alpha1.LifecycleActionHandler{
-		CustomHandler: &appsv1alpha1.Action{
-			Image: postStart.CmdExecutorConfig.Image,
-			Exec: &appsv1alpha1.ExecAction{
-				Command: postStart.CmdExecutorConfig.Command,
-				Args:    postStart.CmdExecutorConfig.Args,
-			},
-			Env:          postStart.CmdExecutorConfig.Env,
-			PreCondition: &defaultPreCondition,
-		},
-	}
-}
-
-type compDefMonitorConvertor struct{}
-
-func (c *compDefMonitorConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	return clusterCompDef.Monitor, nil
 }
 
 type compDefExporterConvertor struct{}
 
 func (c *compDefExporterConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	return clusterCompDef.Exporter, nil
+	return nil, nil
 }

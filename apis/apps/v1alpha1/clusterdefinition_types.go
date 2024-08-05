@@ -17,27 +17,12 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"strings"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // ClusterDefinitionSpec defines the desired state of ClusterDefinition.
 type ClusterDefinitionSpec struct {
-	// Specifies the well-known database type, such as mysql, redis, or mongodb.
-	//
-	// Deprecated since v0.9.
-	// This field is maintained for backward compatibility and its use is discouraged.
-	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
-	//
-	// +kubebuilder:validation:MaxLength=24
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
-	// +optional
-	Type string `json:"type,omitempty"`
-
 	// Provides the definitions for the cluster components.
 	//
 	// Deprecated since v0.9.
@@ -53,32 +38,6 @@ type ClusterDefinitionSpec struct {
 	// +listMapKey=name
 	// +optional
 	ComponentDefs []ClusterComponentDefinition `json:"componentDefs" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
-
-	// Connection credential template used for creating a connection credential secret for cluster objects.
-	//
-	// Built-in objects are:
-	//
-	// - `$(RANDOM_PASSWD)` random 8 characters.
-	// - `$(STRONG_RANDOM_PASSWD)` random 16 characters, with mixed cases, digits and symbols.
-	// - `$(UUID)` generate a random UUID v4 string.
-	// - `$(UUID_B64)` generate a random UUID v4 BASE64 encoded string.
-	// - `$(UUID_STR_B64)` generate a random UUID v4 string then BASE64 encoded.
-	// - `$(UUID_HEX)` generate a random UUID v4 HEX representation.
-	// - `$(HEADLESS_SVC_FQDN)` headless service FQDN placeholder, value pattern is `$(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc`,
-	//    where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute;
-	// - `$(SVC_FQDN)` service FQDN placeholder, value pattern is `$(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc`,
-	//    where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute;
-	// - `$(SVC_PORT_{PORT-NAME})` is ServicePort's port value with specified port name, i.e, a servicePort JSON struct:
-	//    `{"name": "mysql", "targetPort": "mysqlContainerPort", "port": 3306}`, and `$(SVC_PORT_mysql)` in the
-	//    connection credential value is 3306.
-	//
-	// Deprecated since v0.9.
-	// This field is maintained for backward compatibility and its use is discouraged.
-	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
-	//
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
-	// +optional
-	ConnectionCredential map[string]string `json:"connectionCredential,omitempty"`
 
 	// Topologies defines all possible topologies within the cluster.
 	//
@@ -182,32 +141,6 @@ type ClusterTopologyOrders struct {
 	Update []string `json:"update,omitempty"`
 }
 
-// SystemAccountSpec specifies information to create system accounts.
-//
-// Deprecated since v0.8, be replaced by `componentDefinition.spec.systemAccounts` and
-// `componentDefinition.spec.lifecycleActions.accountProvision`.
-type SystemAccountSpec struct {
-	// Configures how to obtain the client SDK and execute statements.
-	//
-	// +kubebuilder:validation:Required
-	CmdExecutorConfig *CmdExecutorConfig `json:"cmdExecutorConfig"`
-
-	// Defines the pattern used to generate passwords for system accounts.
-	//
-	// +kubebuilder:validation:Required
-	PasswordConfig PasswordConfig `json:"passwordConfig"`
-
-	// Defines the configuration settings for system accounts.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
-	Accounts []SystemAccountConfig `json:"accounts" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
-}
-
 // CmdExecutorConfig specifies how to perform creation and deletion statements.
 //
 // Deprecated since v0.8.
@@ -255,46 +188,6 @@ type PasswordConfig struct {
 	Seed string `json:"seed,omitempty"`
 }
 
-// SystemAccountConfig specifies how to create and delete system accounts.
-//
-// Deprecated since v0.9.
-type SystemAccountConfig struct {
-	// The unique identifier of a system account.
-	//
-	// +kubebuilder:validation:Required
-	Name AccountName `json:"name"`
-
-	// Outlines the strategy for creating the account.
-	//
-	// +kubebuilder:validation:Required
-	ProvisionPolicy ProvisionPolicy `json:"provisionPolicy"`
-}
-
-// ProvisionPolicy defines the policy details for creating accounts.
-//
-// Deprecated since v0.9.
-type ProvisionPolicy struct {
-	// Specifies the method to provision an account.
-	//
-	// +kubebuilder:validation:Required
-	Type ProvisionPolicyType `json:"type"`
-
-	// Defines the scope within which the account is provisioned.
-	//
-	// +kubebuilder:default=AnyPods
-	Scope ProvisionScope `json:"scope"`
-
-	// The statement to provision an account.
-	//
-	// +optional
-	Statements *ProvisionStatements `json:"statements,omitempty"`
-
-	// The external secret to refer.
-	//
-	// +optional
-	SecretRef *ProvisionSecretRef `json:"secretRef,omitempty"`
-}
-
 // ProvisionSecretRef represents the reference to a secret.
 type ProvisionSecretRef struct {
 	// The unique identifier of the secret.
@@ -306,30 +199,6 @@ type ProvisionSecretRef struct {
 	//
 	// +kubebuilder:validation:Required
 	Namespace string `json:"namespace"`
-}
-
-// ProvisionStatements defines the statements used to create accounts.
-//
-// Deprecated since v0.9.
-type ProvisionStatements struct {
-	// Specifies the statement required to create a new account with the necessary privileges.
-	//
-	// +kubebuilder:validation:Required
-	CreationStatement string `json:"creation"`
-
-	// Defines the statement required to update the password of an existing account.
-	//
-	// +optional
-	UpdateStatement string `json:"update,omitempty"`
-
-	// Defines the statement required to delete an existing account.
-	// Typically used in conjunction with the creation statement to delete an account before recreating it.
-	// For example, one might use a `drop user if exists` statement followed by a `create user` statement to ensure a fresh account.
-	//
-	// Deprecated: This field is deprecated and the update statement should be used instead.
-	//
-	// +optional
-	DeletionStatement string `json:"deletion,omitempty"`
 }
 
 // ClusterDefinitionStatus defines the observed state of ClusterDefinition
@@ -382,20 +251,6 @@ type LogConfig struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=4096
 	FilePathPattern string `json:"filePathPattern"`
-}
-
-// VolumeTypeSpec is deprecated since v0.9, replaced with ComponentVolume.
-type VolumeTypeSpec struct {
-	// Corresponds to the name of the VolumeMounts field in PodSpec.Container.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	Name string `json:"name"`
-
-	// Type of data the volume will persistent.
-	//
-	// +optional
-	Type VolumeType `json:"type,omitempty"`
 }
 
 // VolumeProtectionSpec is deprecated since v0.9, replaced with ComponentVolume.HighWatermark.
@@ -489,33 +344,6 @@ type ServiceRefDeclarationSpec struct {
 	ServiceVersion string `json:"serviceVersion"`
 }
 
-type ExporterConfig struct {
-	// scrapePort is exporter port for Time Series Database to scrape metrics.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:XIntOrString
-	ScrapePort intstr.IntOrString `json:"scrapePort"`
-
-	// scrapePath is exporter url path for Time Series Database to scrape metrics.
-	// +kubebuilder:validation:MaxLength=128
-	// +kubebuilder:default="/metrics"
-	// +optional
-	ScrapePath string `json:"scrapePath,omitempty"`
-}
-
-type MonitorConfig struct {
-	// builtIn is a switch to enable KubeBlocks builtIn monitoring.
-	// If BuiltIn is set to true, monitor metrics will be scraped automatically.
-	// If BuiltIn is set to false, the provider should set ExporterConfig and Sidecar container own.
-	// +kubebuilder:default=false
-	// +optional
-	BuiltIn bool `json:"builtIn,omitempty"`
-
-	// exporterConfig provided by provider, which specify necessary information to Time Series Database.
-	// exporterConfig is valid when builtIn is false.
-	// +optional
-	Exporter *ExporterConfig `json:"exporterConfig,omitempty"`
-}
-
 // ClusterComponentDefinition defines a Component within a ClusterDefinition but is deprecated and
 // has been replaced by ComponentDefinition.
 //
@@ -530,210 +358,16 @@ type ClusterComponentDefinition struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// Description of the component definition.
-	//
-	// +optional
-	Description string `json:"description,omitempty"`
-
-	// Defines well-known database component name, such as mongos(mongodb), proxy(redis), mariadb(mysql).
-	//
-	// +optional
-	CharacterType string `json:"characterType,omitempty"`
-
-	// Defines the template of configurations.
-	//
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
-	// +optional
-	ConfigSpecs []ComponentConfigSpec `json:"configSpecs,omitempty"`
-
-	// Defines the template of scripts.
-	//
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
-	// +optional
-	ScriptSpecs []ComponentTemplateSpec `json:"scriptSpecs,omitempty"`
-
-	// Specify the logging files which can be observed and configured by cluster users.
-	//
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
-	// +optional
-	LogConfigs []LogConfig `json:"logConfigs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
-
 	// Defines the pod spec template of component.
 	//
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	PodSpec *corev1.PodSpec `json:"podSpec,omitempty"`
 
-	// Defines the service spec.
-	//
-	// +optional
-	Service *ServiceSpec `json:"service,omitempty"`
-
 	// Defines the behavior of horizontal scale.
 	//
 	// +optional
 	HorizontalScalePolicy *HorizontalScalePolicy `json:"horizontalScalePolicy,omitempty"`
-
-	// Defines system accounts needed to manage the component, and the statement to create them.
-	//
-	// +optional
-	SystemAccounts *SystemAccountSpec `json:"systemAccounts,omitempty"`
-
-	// Used to describe the purpose of the volumes mapping the name of the VolumeMounts in the PodSpec.Container field,
-	// such as data volume, log volume, etc. When backing up the volume, the volume can be correctly backed up according
-	// to the volumeType.
-	//
-	// For example:
-	//
-	// - `name: data, type: data` means that the volume named `data` is used to store `data`.
-	// - `name: binlog, type: log` means that the volume named `binlog` is used to store `log`.
-	//
-	// NOTE: When volumeTypes is not defined, the backup function will not be supported, even if a persistent volume has
-	// been specified.
-	//
-	// +listType=map
-	// +listMapKey=name
-	// +optional
-	VolumeTypes []VolumeTypeSpec `json:"volumeTypes,omitempty"`
-
-	// Used for custom label tags which you want to add to the component resources.
-	//
-	// +listType=map
-	// +listMapKey=key
-	// +optional
-	CustomLabelSpecs []CustomLabelSpec `json:"customLabelSpecs,omitempty"`
-
-	// Defines the command to be executed when the component is ready, and the command will only be executed once after
-	// the component becomes ready.
-	//
-	// +optional
-	PostStartSpec *PostStartAction `json:"postStartSpec,omitempty"`
-
-	// Defines settings to do volume protect.
-	//
-	// +optional
-	VolumeProtectionSpec *VolumeProtectionSpec `json:"volumeProtectionSpec,omitempty"`
-
-	// Used to inject values from other components into the current component. Values will be saved and updated in a
-	// configmap and mounted to the current component.
-	//
-	// +patchMergeKey=componentDefName
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=componentDefName
-	// +optional
-	ComponentDefRef []ComponentDefRef `json:"componentDefRef,omitempty" patchStrategy:"merge" patchMergeKey:"componentDefName"`
-
-	// Used to declare the service reference of the current component.
-	//
-	// +optional
-	ServiceRefDeclarations []ServiceRefDeclaration `json:"serviceRefDeclarations,omitempty"`
-
-	// Defines the metrics exporter.
-	//
-	// +optional
-	Exporter *Exporter `json:"exporter,omitempty"`
-
-	// Deprecated since v0.9
-	// monitor is monitoring config which provided by provider.
-	//
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.10.0"
-	// +optional
-	Monitor *MonitorConfig `json:"monitor,omitempty"`
-}
-
-// ServiceSpec is deprecated since v0.8.
-type ServiceSpec struct {
-	// The list of ports that are exposed by this service.
-	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
-	//
-	// +patchMergeKey=port
-	// +patchStrategy=merge
-	// +listType=map
-	// +listMapKey=port
-	// +listMapKey=protocol
-	// +optional
-	Ports []ServicePort `json:"ports,omitempty" patchStrategy:"merge" patchMergeKey:"port" protobuf:"bytes,1,rep,name=ports"`
-
-	// NOTES: name also need to be key
-}
-
-func (r *ServiceSpec) ToSVCPorts() []corev1.ServicePort {
-	ports := make([]corev1.ServicePort, 0, len(r.Ports))
-	for _, p := range r.Ports {
-		ports = append(ports, p.toSVCPort())
-	}
-	return ports
-}
-
-func (r ServiceSpec) ToSVCSpec() corev1.ServiceSpec {
-	return corev1.ServiceSpec{
-		Ports: r.ToSVCPorts(),
-	}
-}
-
-// ServicePort is deprecated since v0.8.
-type ServicePort struct {
-	// The name of this port within the service. This must be a DNS_LABEL.
-	// All ports within a ServiceSpec must have unique names. When considering
-	// the endpoints for a Service, this must match the 'name' field in the
-	// EndpointPort.
-	// +kubebuilder:validation:Required
-	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
-
-	// The IP protocol for this port. Supports "TCP", "UDP", and "SCTP".
-	// Default is TCP.
-	// +kubebuilder:validation:Enum={TCP,UDP,SCTP}
-	// +default="TCP"
-	// +optional
-	Protocol corev1.Protocol `json:"protocol,omitempty" protobuf:"bytes,2,opt,name=protocol,casttype=Protocol"`
-
-	// The application protocol for this port.
-	// This field follows standard Kubernetes label syntax.
-	// Un-prefixed names are reserved for IANA standard service names (as per
-	// RFC-6335 and https://www.iana.org/assignments/service-names).
-	// Non-standard protocols should use prefixed names such as
-	// mycompany.com/my-custom-protocol.
-	// +optional
-	AppProtocol *string `json:"appProtocol,omitempty" protobuf:"bytes,6,opt,name=appProtocol"`
-
-	// The port that will be exposed by this service.
-	Port int32 `json:"port" protobuf:"varint,3,opt,name=port"`
-
-	// Number or name of the port to access on the pods targeted by the service.
-	//
-	// Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.
-	//
-	// - If this is a string, it will be looked up as a named port in the target Pod's container ports.
-	// - If this is not specified, the value of the `port` field is used (an identity map).
-	//
-	// This field is ignored for services with clusterIP=None, and should be
-	// omitted or set equal to the `port` field.
-	//
-	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service
-	//
-	// +kubebuilder:validation:XIntOrString
-	// +optional
-	TargetPort intstr.IntOrString `json:"targetPort,omitempty" protobuf:"bytes,4,opt,name=targetPort"`
-}
-
-func (r *ServicePort) toSVCPort() corev1.ServicePort {
-	return corev1.ServicePort{
-		Name:        r.Name,
-		Protocol:    r.Protocol,
-		AppProtocol: r.AppProtocol,
-		Port:        r.Port,
-		TargetPort:  r.TargetPort,
-	}
 }
 
 // HorizontalScalePolicy is deprecated since v0.8.
@@ -760,20 +394,6 @@ type HorizontalScalePolicy struct {
 	//
 	// +optional
 	VolumeMountsName string `json:"volumeMountsName,omitempty"`
-}
-
-// PostStartAction is deprecated since v0.8.
-type PostStartAction struct {
-	// Specifies the  post-start command to be executed.
-	//
-	// +kubebuilder:validation:Required
-	CmdExecutorConfig CmdExecutorConfig `json:"cmdExecutorConfig"`
-
-	// Used to select the script that need to be referenced.
-	// When defined, the scripts defined in scriptSpecs can be referenced within the CmdExecutorConfig.
-	//
-	// +optional
-	ScriptSpecSelectors []ScriptSpecSelector `json:"scriptSpecSelectors,omitempty"`
 }
 
 type ScriptSpecSelector struct {
@@ -813,39 +433,6 @@ type CommandExecutorItem struct {
 	//
 	// +optional
 	Args []string `json:"args,omitempty"`
-}
-
-// CustomLabelSpec is deprecated since v0.8.
-type CustomLabelSpec struct {
-	// The key of the label.
-	//
-	// +kubebuilder:validation:Required
-	Key string `json:"key"`
-
-	// The value of the label.
-	//
-	// +kubebuilder:validation:Required
-	Value string `json:"value"`
-
-	// The resources that will be patched with the label.
-	//
-	// +kubebuilder:validation:Required
-	Resources []GVKResource `json:"resources,omitempty"`
-}
-
-// GVKResource is deprecated since v0.8.
-type GVKResource struct {
-	// Represents the GVK of a resource, such as "v1/Pod", "apps/v1/StatefulSet", etc.
-	// When a resource matching this is found by the selector, a custom label will be added if it doesn't already exist,
-	// or updated if it does.
-	//
-	// +kubebuilder:validation:Required
-	GVK string `json:"gvk"`
-
-	// A label query used to filter a set of resources.
-	//
-	// +optional
-	Selector map[string]string `json:"selector,omitempty"`
 }
 
 // TODO(API):
@@ -893,30 +480,6 @@ func init() {
 	SchemeBuilder.Register(&ClusterDefinition{}, &ClusterDefinitionList{})
 }
 
-// ValidateEnabledLogConfigs validates enabledLogs against component compDefName, and returns the invalid logNames undefined in ClusterDefinition.
-func (r *ClusterDefinition) ValidateEnabledLogConfigs(compDefName string, enabledLogs []string) []string {
-	invalidLogNames := make([]string, 0, len(enabledLogs))
-	logTypes := make(map[string]struct{})
-	for _, comp := range r.Spec.ComponentDefs {
-		if !strings.EqualFold(compDefName, comp.Name) {
-			continue
-		}
-		for _, logConfig := range comp.LogConfigs {
-			logTypes[logConfig.Name] = struct{}{}
-		}
-	}
-	// imply that all values in enabledLogs config are invalid.
-	if len(logTypes) == 0 {
-		return enabledLogs
-	}
-	for _, name := range enabledLogs {
-		if _, ok := logTypes[name]; !ok {
-			invalidLogNames = append(invalidLogNames, name)
-		}
-	}
-	return invalidLogNames
-}
-
 // GetComponentDefByName gets component definition from ClusterDefinition with compDefName
 func (r *ClusterDefinition) GetComponentDefByName(compDefName string) *ClusterComponentDefinition {
 	for _, component := range r.Spec.ComponentDefs {
@@ -939,103 +502,3 @@ const (
 	// FailurePolicyFail means that an error will be reported.
 	FailurePolicyFail FailurePolicyType = "Fail"
 )
-
-// ComponentValueFromType specifies the type of component value from which the data is derived.
-//
-// Deprecated since v0.8.
-//
-// +enum
-// +kubebuilder:validation:Enum={FieldRef,ServiceRef,HeadlessServiceRef}
-type ComponentValueFromType string
-
-const (
-	// FromFieldRef refers to the value of a specific field in the object.
-	FromFieldRef ComponentValueFromType = "FieldRef"
-	// FromServiceRef refers to a service within the same namespace as the object.
-	FromServiceRef ComponentValueFromType = "ServiceRef"
-	// FromHeadlessServiceRef refers to a headless service within the same namespace as the object.
-	FromHeadlessServiceRef ComponentValueFromType = "HeadlessServiceRef"
-)
-
-// ComponentDefRef is used to select the component and its fields to be referenced.
-//
-// Deprecated since v0.8.
-type ComponentDefRef struct {
-	// The name of the componentDef to be selected.
-	//
-	// +kubebuilder:validation:Required
-	ComponentDefName string `json:"componentDefName"`
-
-	// Defines the policy to be followed in case of a failure in finding the component.
-	//
-	// +kubebuilder:validation:Enum={Ignore,Fail}
-	// +default="Ignore"
-	// +optional
-	FailurePolicy FailurePolicyType `json:"failurePolicy,omitempty"`
-
-	// The values that are to be injected as environment variables into each component.
-	//
-	// +kbubebuilder:validation:Required
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
-	// +optional
-	ComponentRefEnvs []ComponentRefEnv `json:"componentRefEnv" patchStrategy:"merge" patchMergeKey:"name"`
-}
-
-// ComponentRefEnv specifies name and value of an env.
-//
-// Deprecated since v0.8.
-type ComponentRefEnv struct {
-	// The name of the env, it must be a C identifier.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern=`^[A-Za-z_][A-Za-z0-9_]*$`
-	Name string `json:"name"`
-
-	// The value of the env.
-	//
-	// +optional
-	Value string `json:"value,omitempty"`
-
-	// The source from which the value of the env.
-	//
-	// +optional
-	ValueFrom *ComponentValueFrom `json:"valueFrom,omitempty"`
-}
-
-// ComponentValueFrom is deprecated since v0.8.
-type ComponentValueFrom struct {
-	// Specifies the source to select. It can be one of three types: `FieldRef`, `ServiceRef`, `HeadlessServiceRef`.
-	//
-	// +kubebuilder:validation:Enum={FieldRef,ServiceRef,HeadlessServiceRef}
-	// +kubebuilder:validation:Required
-	Type ComponentValueFromType `json:"type"`
-
-	// The jsonpath of the source to select when the Type is `FieldRef`.
-	// Two objects are registered in the jsonpath: `componentDef` and `components`:
-	//
-	// - `componentDef` is the component definition object specified in `componentRef.componentDefName`.
-	// - `components` are the component list objects referring to the component definition object.
-	//
-	// +optional
-	FieldPath string `json:"fieldPath,omitempty"`
-
-	// Defines the format of each headless service address.
-	// Three builtin variables can be used as placeholders: `$POD_ORDINAL`, `$POD_FQDN`, `$POD_NAME`
-	//
-	// - `$POD_ORDINAL` represents the ordinal of the pod.
-	// - `$POD_FQDN` represents the fully qualified domain name of the pod.
-	// - `$POD_NAME` represents the name of the pod.
-	//
-	// +kubebuilder:default=="$POD_FQDN"
-	// +optional
-	Format string `json:"format,omitempty"`
-
-	// The string used to join the values of headless service addresses.
-	//
-	// +kubebuilder:default=","
-	// +optional
-	JoinWith string `json:"joinWith,omitempty"`
-}

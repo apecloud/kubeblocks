@@ -9,7 +9,7 @@ sidebar_label: Switchover
 
 # Switch over a MongoDB cluster
 
-You can initiate a switchover for a MongoDB ReplicaSet by executing the kbcli or kubectl command. Then KubeBlocks modifies the instance roles.
+You can initiate a switchover for a MongoDB ReplicaSet. Then KubeBlocks modifies the instance roles.
 
 ## Before you start
 

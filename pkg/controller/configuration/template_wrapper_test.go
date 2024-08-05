@@ -36,12 +36,10 @@ import (
 )
 
 var _ = Describe("TemplateWrapperTest", func() {
-
 	var mockK8sCli *testutil.K8sClientMockHelper
 	var clusterObj *appsv1alpha1.Cluster
 	var componentObj *appsv1alpha1.Component
-	var clusterVersionObj *appsv1alpha1.ClusterVersion
-	var clusterDefObj *appsv1alpha1.ClusterDefinition
+	var compDefObj *appsv1alpha1.ComponentDefinition
 	var clusterComponent *component.SynthesizedComponent
 
 	mockTemplateWrapper := func() renderWrapper {
@@ -54,8 +52,8 @@ var _ = Describe("TemplateWrapperTest", func() {
 		// Add any setup steps that needs to be executed before each test
 		mockK8sCli = testutil.NewK8sMockClient()
 
-		clusterObj, clusterDefObj, clusterVersionObj, _ = newAllFieldsClusterObj(nil, nil, false)
-		clusterComponent = newAllFieldsSynthesizedComponent(clusterDefObj, clusterVersionObj, clusterObj)
+		clusterObj, compDefObj, _ = newAllFieldsClusterObj(nil, false)
+		clusterComponent = newAllFieldsSynthesizedComponent(compDefObj, clusterObj)
 		componentObj = newAllFieldsComponent(clusterObj)
 	})
 
@@ -68,11 +66,11 @@ var _ = Describe("TemplateWrapperTest", func() {
 			mockK8sCli.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult([]client.Object{
 				&corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      configSpecName,
+						Name:      configTemplateName,
 						Namespace: testCtx.DefaultNamespace,
 					},
 					Data: map[string]string{
-						configSpecName: testConfigContent,
+						configTemplateName: testConfigContent,
 					},
 				},
 			}), testutil.WithAnyTimes()))
@@ -89,7 +87,7 @@ var _ = Describe("TemplateWrapperTest", func() {
 						Namespace: testCtx.DefaultNamespace,
 					},
 					Data: map[string]string{
-						configSpecName: testConfigContent,
+						configTemplateName: testConfigContent,
 					},
 				},
 			}), testutil.WithAnyTimes()))
@@ -111,12 +109,12 @@ var _ = Describe("TemplateWrapperTest", func() {
 						},
 					},
 					Data: map[string]string{
-						configSpecName: testConfigContent,
+						configTemplateName: testConfigContent,
 					},
 				},
 				&corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:        configSpecName,
+						Name:        configTemplateName,
 						Namespace:   testCtx.DefaultNamespace,
 						Labels:      make(map[string]string),
 						Annotations: make(map[string]string),
@@ -127,7 +125,7 @@ var _ = Describe("TemplateWrapperTest", func() {
 				},
 				&appsv1beta1.ConfigConstraint{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: configSpecName,
+						Name: configTemplateName,
 					},
 					Spec: appsv1beta1.ConfigConstraintSpec{
 						FileFormatConfig: &appsv1beta1.FileFormatConfig{
@@ -143,7 +141,6 @@ var _ = Describe("TemplateWrapperTest", func() {
 			tplWrapper := mockTemplateWrapper()
 			Expect(tplWrapper.renderConfigTemplate(clusterObj, clusterComponent, nil, nil)).Should(Succeed())
 		})
-
 	})
 
 	Context("TestScriptsSpec", func() {
@@ -152,11 +149,11 @@ var _ = Describe("TemplateWrapperTest", func() {
 			mockK8sCli.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult([]client.Object{
 				&corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      mysqlScriptsConfigName,
+						Name:      mysqlScriptsTemplateName,
 						Namespace: testCtx.DefaultNamespace,
 					},
 					Data: map[string]string{
-						configSpecName: testConfigContent,
+						configTemplateName: testConfigContent,
 					},
 				},
 			}), testutil.WithAnyTimes()))
@@ -172,7 +169,7 @@ var _ = Describe("TemplateWrapperTest", func() {
 					Namespace: testCtx.DefaultNamespace,
 				},
 				Data: map[string]string{
-					configSpecName: testConfigContent,
+					configTemplateName: testConfigContent,
 				},
 			}
 			tplWrapper := mockTemplateWrapper()

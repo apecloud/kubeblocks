@@ -203,8 +203,6 @@ For your convenience, KubeBlocks offers a tool `edit-config` to help you configu
 
 For Linux and macOS, you can edit configuration files by vi. For Windows, you can edit files on the notepad.
 
-The following steps take configuring MySQL Standalone as an example.
-
 1. Edit the configuration file.
 
    ```bash
@@ -260,7 +258,7 @@ mycluster-reconfiguring-pxs46   mycluster   mysql       mysql-replication-config
 mycluster-reconfiguring-x52fb   mycluster   mysql       mysql-replication-config   my.cnf   Succeed   syncDynamicReload   2/2        Jul 05,2024 19:04 UTC+0800   {"my.cnf":"{\"mysqld\":{\"max_connections\":\"1000\"}}"}                    
 ```
 
-From the above results, there are three parameter modifications.
+From the above results, there are two parameter modifications.
 
 Compare these modifications to view the configured parameters and their different values for different versions.
 

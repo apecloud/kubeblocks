@@ -4066,18 +4066,6 @@ WorkloadType
 </tr>
 <tr>
 <td>
-<code>characterType</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines well-known database component name, such as mongos(mongodb), proxy(redis), mariadb(mysql).</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>probes</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterDefinitionProbes">
@@ -4220,29 +4208,6 @@ SystemAccountSpec
 </tr>
 <tr>
 <td>
-<code>volumeTypes</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.VolumeTypeSpec">
-[]VolumeTypeSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Used to describe the purpose of the volumes mapping the name of the VolumeMounts in the PodSpec.Container field,
-such as data volume, log volume, etc. When backing up the volume, the volume can be correctly backed up according
-to the volumeType.</p>
-<p>For example:</p>
-<ul>
-<li><code>name: data, type: data</code> means that the volume named <code>data</code> is used to store <code>data</code>.</li>
-<li><code>name: binlog, type: log</code> means that the volume named <code>binlog</code> is used to store <code>log</code>.</li>
-</ul>
-<p>NOTE: When volumeTypes is not defined, the backup function will not be supported, even if a persistent volume has
-been specified.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>switchoverSpec</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.SwitchoverSpec">
@@ -4270,20 +4235,6 @@ PostStartAction
 <em>(Optional)</em>
 <p>Defines the command to be executed when the component is ready, and the command will only be executed once after
 the component becomes ready.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>volumeProtectionSpec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.VolumeProtectionSpec">
-VolumeProtectionSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines settings to do volume protect.</p>
 </td>
 </tr>
 <tr>
@@ -20567,9 +20518,6 @@ that are used to expand the storage and the desired storage size for each one.</
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.VolumeProtectionSpec">VolumeProtectionSpec
 </h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>)
-</p>
 <div>
 <p>VolumeProtectionSpec is deprecated since v0.9, replaced with ComponentVolume.HighWatermark.</p>
 </div>
@@ -20609,74 +20557,6 @@ as read-only. And after that, if all volumes&rsquo; space usage drops under the 
 <td>
 <em>(Optional)</em>
 <p>The Volumes to be protected.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.VolumeType">VolumeType
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.VolumeTypeSpec">VolumeTypeSpec</a>)
-</p>
-<div>
-<p>VolumeType defines the type of volume, specifically distinguishing between volumes used for backup data and those used for logs.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;data&#34;</p></td>
-<td><p>VolumeTypeData indicates a volume designated for storing backup data. This type of volume is optimized for the
-storage and retrieval of data backups, ensuring data persistence and reliability.</p>
-</td>
-</tr><tr><td><p>&#34;log&#34;</p></td>
-<td><p>VolumeTypeLog indicates a volume designated for storing logs. This type of volume is optimized for log data,
-facilitating efficient log storage, retrieval, and management.</p>
-</td>
-</tr></tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.VolumeTypeSpec">VolumeTypeSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>)
-</p>
-<div>
-<p>VolumeTypeSpec is deprecated since v0.9, replaced with ComponentVolume.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Corresponds to the name of the VolumeMounts field in PodSpec.Container.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>type</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.VolumeType">
-VolumeType
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Type of data the volume will persistent.</p>
 </td>
 </tr>
 </tbody>

@@ -89,10 +89,6 @@ spec:
 
                     Deprecated: Use ComponentDefinition instead. This type is deprecated as of version 0.8.
                   properties:
-                    characterType:
-                      description: Defines well-known database component name, such
-                        as mongos(mongodb), proxy(redis), mariadb(mysql).
-                      type: string
                     componentDefRef:
                       description: |-
                         Used to inject values from other components into the current component. Values will be saved and updated in a
@@ -9161,77 +9157,6 @@ spec:
                       - cmdExecutorConfig
                       - passwordConfig
                       type: object
-                    volumeProtectionSpec:
-                      description: Defines settings to do volume protect.
-                      properties:
-                        highWatermark:
-                          default: 90
-                          description: |-
-                            The high watermark threshold for volume space usage.
-                            If there is any specified volumes who's space usage is over the threshold, the pre-defined "LOCK" action
-                            will be triggered to degrade the service to protect volume from space exhaustion, such as to set the instance
-                            as read-only. And after that, if all volumes' space usage drops under the threshold later, the pre-defined
-                            "UNLOCK" action will be performed to recover the service normally.
-                          maximum: 100
-                          minimum: 0
-                          type: integer
-                        volumes:
-                          description: The Volumes to be protected.
-                          items:
-                            description: ProtectedVolume is deprecated since v0.9,
-                              replaced with ComponentVolume.HighWatermark.
-                            properties:
-                              highWatermark:
-                                description: |-
-                                  Defines the high watermark threshold for the volume, it will override the component level threshold.
-                                  If the value is invalid, it will be ignored and the component level threshold will be used.
-                                maximum: 100
-                                minimum: 0
-                                type: integer
-                              name:
-                                description: The Name of the volume to protect.
-                                type: string
-                            type: object
-                          type: array
-                      type: object
-                    volumeTypes:
-                      description: |-
-                        Used to describe the purpose of the volumes mapping the name of the VolumeMounts in the PodSpec.Container field,
-                        such as data volume, log volume, etc. When backing up the volume, the volume can be correctly backed up according
-                        to the volumeType.
-
-
-                        For example:
-
-
-                        - `name: data, type: data` means that the volume named `data` is used to store `data`.
-                        - `name: binlog, type: log` means that the volume named `binlog` is used to store `log`.
-
-
-                        NOTE: When volumeTypes is not defined, the backup function will not be supported, even if a persistent volume has
-                        been specified.
-                      items:
-                        description: VolumeTypeSpec is deprecated since v0.9, replaced
-                          with ComponentVolume.
-                        properties:
-                          name:
-                            description: Corresponds to the name of the VolumeMounts
-                              field in PodSpec.Container.
-                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                            type: string
-                          type:
-                            description: Type of data the volume will persistent.
-                            enum:
-                            - data
-                            - log
-                            type: string
-                        required:
-                        - name
-                        type: object
-                      type: array
-                      x-kubernetes-list-map-keys:
-                      - name
-                      x-kubernetes-list-type: map
                     workloadType:
                       description: |-
                         Defines the type of the workload.

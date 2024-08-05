@@ -86,8 +86,7 @@ func (c *compDefDescriptionConvertor) convert(args ...any) (any, error) {
 type compDefServiceKindConvertor struct{}
 
 func (c *compDefServiceKindConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	return clusterCompDef.CharacterType, nil
+	return "", nil
 }
 
 // compDefServiceVersionConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.ServiceVersion.
@@ -152,39 +151,7 @@ func (c *compDefVarsConvertor) convertHostNetworkVars(clusterCompDef *appsv1alph
 type compDefVolumesConvertor struct{}
 
 func (c *compDefVolumesConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	if clusterCompDef.VolumeTypes == nil {
-		return nil, nil
-	}
-
-	volumes := make([]appsv1alpha1.ComponentVolume, 0)
-	for _, vol := range clusterCompDef.VolumeTypes {
-		volumes = append(volumes, appsv1alpha1.ComponentVolume{
-			Name: vol.Name,
-		})
-	}
-
-	if clusterCompDef.VolumeProtectionSpec != nil {
-		defaultHighWatermark := clusterCompDef.VolumeProtectionSpec.HighWatermark
-		highWatermark := func(v appsv1alpha1.ProtectedVolume) int {
-			if v.HighWatermark != nil {
-				return *v.HighWatermark
-			}
-			return defaultHighWatermark
-		}
-		setHighWatermark := func(protectedVol appsv1alpha1.ProtectedVolume) {
-			for i, v := range volumes {
-				if v.Name == protectedVol.Name {
-					volumes[i].HighWatermark = highWatermark(protectedVol)
-					break
-				}
-			}
-		}
-		for _, v := range clusterCompDef.VolumeProtectionSpec.Volumes {
-			setHighWatermark(v)
-		}
-	}
-	return volumes, nil
+	return nil, nil
 }
 
 // compDefHostNetworkConvertor converts the given object into ComponentDefinition.Spec.HostNetwork.
@@ -491,38 +458,8 @@ func (c *compDefLifecycleActionsConvertor) convert(args ...any) (any, error) {
 	return lifecycleActions, nil // TODO
 }
 
-func (c *compDefLifecycleActionsConvertor) convertBuiltinActionHandler(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) appsv1alpha1.BuiltinActionHandlerType {
-	if clusterCompDef == nil || clusterCompDef.CharacterType == "" {
-		return appsv1alpha1.UnknownBuiltinActionHandler
-	}
-	switch clusterCompDef.CharacterType {
-	case constant.MySQLCharacterType:
-		if clusterCompDef.WorkloadType == appsv1alpha1.Consensus {
-			return appsv1alpha1.WeSQLBuiltinActionHandler
-		} else {
-			return appsv1alpha1.MySQLBuiltinActionHandler
-		}
-	case constant.PostgreSQLCharacterType:
-		if clusterCompDef.WorkloadType == appsv1alpha1.Consensus {
-			return appsv1alpha1.ApeCloudPostgresqlBuiltinActionHandler
-		} else {
-			return appsv1alpha1.PostgresqlBuiltinActionHandler
-		}
-	case constant.RedisCharacterType:
-		return appsv1alpha1.RedisBuiltinActionHandler
-	case constant.MongoDBCharacterType:
-		return appsv1alpha1.MongoDBBuiltinActionHandler
-	case constant.ETCDCharacterType:
-		return appsv1alpha1.ETCDBuiltinActionHandler
-	case constant.PolarDBXCharacterType:
-		return appsv1alpha1.PolarDBXBuiltinActionHandler
-	default:
-		return appsv1alpha1.UnknownBuiltinActionHandler
-	}
-}
-
 func (c *compDefLifecycleActionsConvertor) convertRoleProbe(clusterCompDef *appsv1alpha1.ClusterComponentDefinition) *appsv1alpha1.Probe {
-	builtinHandler := c.convertBuiltinActionHandler(clusterCompDef)
+	builtinHandler := appsv1alpha1.UnknownBuiltinActionHandler
 	// if RSMSpec has role probe CustomHandler, use it first.
 	if clusterCompDef.RSMSpec != nil && clusterCompDef.RSMSpec.RoleProbe != nil && len(clusterCompDef.RSMSpec.RoleProbe.CustomHandler) > 0 {
 		// TODO(xingran): RSMSpec.RoleProbe.CustomHandler support multiple images and commands, but ComponentDefinition.LifeCycleAction.RoleProbe only support one image and command now.

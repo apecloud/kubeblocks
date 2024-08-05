@@ -375,20 +375,6 @@ type LogConfig struct {
 	FilePathPattern string `json:"filePathPattern"`
 }
 
-// VolumeTypeSpec is deprecated since v0.9, replaced with ComponentVolume.
-type VolumeTypeSpec struct {
-	// Corresponds to the name of the VolumeMounts field in PodSpec.Container.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	Name string `json:"name"`
-
-	// Type of data the volume will persistent.
-	//
-	// +optional
-	Type VolumeType `json:"type,omitempty"`
-}
-
 // VolumeProtectionSpec is deprecated since v0.9, replaced with ComponentVolume.HighWatermark.
 type VolumeProtectionSpec struct {
 	// The high watermark threshold for volume space usage.
@@ -595,23 +581,6 @@ type ClusterComponentDefinition struct {
 	// +optional
 	SystemAccounts *SystemAccountSpec `json:"systemAccounts,omitempty"`
 
-	// Used to describe the purpose of the volumes mapping the name of the VolumeMounts in the PodSpec.Container field,
-	// such as data volume, log volume, etc. When backing up the volume, the volume can be correctly backed up according
-	// to the volumeType.
-	//
-	// For example:
-	//
-	// - `name: data, type: data` means that the volume named `data` is used to store `data`.
-	// - `name: binlog, type: log` means that the volume named `binlog` is used to store `log`.
-	//
-	// NOTE: When volumeTypes is not defined, the backup function will not be supported, even if a persistent volume has
-	// been specified.
-	//
-	// +listType=map
-	// +listMapKey=name
-	// +optional
-	VolumeTypes []VolumeTypeSpec `json:"volumeTypes,omitempty"`
-
 	// Defines command to do switchover.
 	// In particular, when workloadType=Replication, the command defined in switchoverSpec will only be executed under
 	// the condition of cluster.componentSpecs[x].SwitchPolicy.type=Noop.
@@ -624,11 +593,6 @@ type ClusterComponentDefinition struct {
 	//
 	// +optional
 	PostStartSpec *PostStartAction `json:"postStartSpec,omitempty"`
-
-	// Defines settings to do volume protect.
-	//
-	// +optional
-	VolumeProtectionSpec *VolumeProtectionSpec `json:"volumeProtectionSpec,omitempty"`
 
 	// Used to inject values from other components into the current component. Values will be saved and updated in a
 	// configmap and mounted to the current component.

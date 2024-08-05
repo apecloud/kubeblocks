@@ -81,6 +81,5 @@ type SynthesizedComponent struct {
 	ClusterCompDefName    string                          `json:"clusterCompDefName,omitempty"` // the name of the clusterDefinition.Spec.ComponentDefs[*].Name
 	CharacterType         string                          `json:"characterType,omitempty"`
 	HorizontalScalePolicy *v1alpha1.HorizontalScalePolicy `json:"horizontalScalePolicy,omitempty"`
-	VolumeTypes           []v1alpha1.VolumeTypeSpec       `json:"volumeTypes,omitempty"` // The VolumeTypes will be replaced with Volumes in the future.
 	EnabledLogs           []string                        `json:"enabledLogs,omitempty"`
 }

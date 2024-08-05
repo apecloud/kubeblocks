@@ -171,7 +171,6 @@ var _ = Describe("Restore", func() {
 				HorizontalScalePolicy: clusterCompDefObj.HorizontalScalePolicy,
 				VolumeClaimTemplates:  cluster.Spec.ComponentSpecs[0].ToVolumeClaimTemplates(),
 				Name:                  mysqlCompName,
-				VolumeTypes:           []appsv1alpha1.VolumeTypeSpec{{Name: testapps.DataVolumeName, Type: appsv1alpha1.VolumeTypeData}},
 				Replicas:              1,
 				Roles: []appsv1alpha1.ReplicaRole{
 					{

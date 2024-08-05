@@ -157,17 +157,15 @@ var _ = Describe("Component Controller", func() {
 		allSettings   map[string]interface{}
 	)
 
-	resetViperCfg := func() {
+	resetTestContext := func() {
+		clusterDefObj = nil
+		compDefObj = nil
+		compVerObj = nil
+		clusterObj = nil
 		if allSettings != nil {
 			Expect(viper.MergeConfigMap(allSettings)).ShouldNot(HaveOccurred())
 			allSettings = nil
 		}
-	}
-
-	resetTestContext := func() {
-		clusterDefObj = nil
-		clusterObj = nil
-		resetViperCfg()
 	}
 
 	// Cleanups
@@ -2334,7 +2332,7 @@ var _ = Describe("Component Controller", func() {
 		}
 	})
 
-	When("creating cluster with workloadType=consensus component", func() {
+	Context("creating cluster with workloadType=consensus component", func() {
 		BeforeEach(func() {
 			createAllWorkloadTypesClusterDef()
 			createBackupPolicyTpl(clusterDefObj, compDefName)

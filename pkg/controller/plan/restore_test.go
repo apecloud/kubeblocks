@@ -167,7 +167,6 @@ var _ = Describe("Restore", func() {
 			clusterCompDefObj := clusterDef.Spec.ComponentDefs[0]
 			synthesizedComponent = &component.SynthesizedComponent{
 				PodSpec:               clusterCompDefObj.PodSpec,
-				LogConfigs:            clusterCompDefObj.LogConfigs,
 				HorizontalScalePolicy: clusterCompDefObj.HorizontalScalePolicy,
 				VolumeClaimTemplates:  cluster.Spec.ComponentSpecs[0].ToVolumeClaimTemplates(),
 				Name:                  mysqlCompName,

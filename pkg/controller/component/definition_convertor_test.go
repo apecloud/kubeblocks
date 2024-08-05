@@ -43,8 +43,6 @@ var _ = Describe("Component Definition Convertor", func() {
 			dataVolumeName = "data"
 			logVolumeName  = "log"
 
-			defaultVolumeMode = int32(0555)
-
 			runAsUser    = int64(0)
 			runAsNonRoot = false
 		)
@@ -66,44 +64,11 @@ var _ = Describe("Component Definition Convertor", func() {
 			clusterCompDef = &appsv1alpha1.ClusterComponentDefinition{
 				Name:         "mysql",
 				WorkloadType: appsv1alpha1.Consensus,
-				ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{
-					{
-						ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-							Name:        "mysql-config",
-							TemplateRef: "mysql-config-template",
-							VolumeName:  "mysql-config",
-							DefaultMode: &defaultVolumeMode,
-						},
-						ConfigConstraintRef: "mysql-config-constraints",
-					},
-				},
-				ScriptSpecs: []appsv1alpha1.ComponentTemplateSpec{
-					{
-						Name:        "mysql-scripts",
-						TemplateRef: "mysql-scripts",
-						VolumeName:  "scripts",
-						DefaultMode: &defaultVolumeMode,
-					},
-				},
 				Probes: &appsv1alpha1.ClusterDefinitionProbes{
 					RoleProbe: &appsv1alpha1.ClusterDefinitionProbe{
 						FailureThreshold: 3,
 						PeriodSeconds:    1,
 						TimeoutSeconds:   5,
-					},
-				},
-				LogConfigs: []appsv1alpha1.LogConfig{
-					{
-						Name:            "error",
-						FilePathPattern: "/data/mysql/log/mysqld-error.log",
-					},
-					{
-						Name:            "slow",
-						FilePathPattern: "/data/mysql/log/mysqld-slowquery.log",
-					},
-					{
-						Name:            "general",
-						FilePathPattern: "/data/mysql/log/mysqld.log",
 					},
 				},
 				PodSpec: &corev1.PodSpec{
@@ -452,25 +417,21 @@ var _ = Describe("Component Definition Convertor", func() {
 			convertor := &compDefConfigsConvertor{}
 			res, err := convertor.convert(clusterCompDef)
 			Expect(err).Should(Succeed())
-			Expect(res).Should(BeEquivalentTo(clusterCompDef.ConfigSpecs))
-		})
-
-		It("log configs", func() {
-			convertor := &compDefLogConfigsConvertor{}
-			res, err := convertor.convert(clusterCompDef)
-			Expect(err).Should(Succeed())
-
-			logConfigs := res.([]appsv1alpha1.LogConfig)
-			Expect(logConfigs).Should(BeEquivalentTo(clusterCompDef.LogConfigs))
+			Expect(res).Should(BeNil())
 		})
 
 		It("scripts", func() {
 			convertor := &compDefScriptsConvertor{}
 			res, err := convertor.convert(clusterCompDef)
 			Expect(err).Should(Succeed())
+			Expect(res).Should(BeNil())
+		})
 
-			scripts := res.([]appsv1alpha1.ComponentTemplateSpec)
-			Expect(scripts).Should(BeEquivalentTo(clusterCompDef.ScriptSpecs))
+		It("log configs", func() {
+			convertor := &compDefLogConfigsConvertor{}
+			res, err := convertor.convert(clusterCompDef)
+			Expect(err).Should(Succeed())
+			Expect(res).Should(BeNil())
 		})
 
 		It("policy rules", func() {

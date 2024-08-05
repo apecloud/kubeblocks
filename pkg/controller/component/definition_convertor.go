@@ -241,24 +241,21 @@ func (c *compDefServicesConvertor) roleSelector(clusterCompDef *appsv1alpha1.Clu
 type compDefConfigsConvertor struct{}
 
 func (c *compDefConfigsConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	return clusterCompDef.ConfigSpecs, nil
+	return nil, nil
 }
 
 // compDefLogConfigsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.LogConfigs.
 type compDefLogConfigsConvertor struct{}
 
 func (c *compDefLogConfigsConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	return clusterCompDef.LogConfigs, nil
+	return nil, nil
 }
 
 // compDefScriptsConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.Scripts.
 type compDefScriptsConvertor struct{}
 
 func (c *compDefScriptsConvertor) convert(args ...any) (any, error) {
-	clusterCompDef := args[0].(*appsv1alpha1.ClusterComponentDefinition)
-	return clusterCompDef.ScriptSpecs, nil
+	return nil, nil
 }
 
 // compDefPolicyRulesConvertor is an implementation of the convertor interface, used to convert the given object into ComponentDefinition.Spec.PolicyRules.

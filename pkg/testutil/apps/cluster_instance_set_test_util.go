@@ -75,9 +75,8 @@ func CreateConsensusMysqlCluster(
 
 // CreateConsensusMysqlClusterDef creates a mysql clusterDefinition with a component of ConsensusSet type.
 func CreateConsensusMysqlClusterDef(testCtx *testutil.TestContext, clusterDefName, componentDefName string) *appsv1alpha1.ClusterDefinition {
-	filePathPattern := "/data/mysql/log/mysqld.err"
 	return NewClusterDefFactory(clusterDefName).AddComponentDef(ConsensusMySQLComponent, componentDefName).
-		AddLogConfig(errorLogName, filePathPattern).Create(testCtx).GetObject()
+		Create(testCtx).GetObject()
 }
 
 // MockInstanceSetComponent mocks the ITS component, just using in envTest

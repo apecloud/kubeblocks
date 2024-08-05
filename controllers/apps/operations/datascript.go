@@ -244,6 +244,9 @@ func buildDataScriptJobs(reqCtx intctrlutil.RequestCtx, cli client.Client, clust
 
 		// parse username and password
 		secretFrom := ops.Spec.ScriptSpec.Secret
+		if secretFrom == nil {
+			return nil, intctrlutil.NewFatalError("missing secret for user & password")
+		}
 
 		// verify secrets exist
 		if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: secretFrom.Name}, &corev1.Secret{}); err != nil {

@@ -510,12 +510,12 @@ func (r *clusterBackupPolicyTransformer) buildBackupTarget(
 		target.Name = comp.fullComponentName
 	}
 	// build the target connection credential
-	cc := dpv1alpha1.ConnectionCredential{}
-	cc.SecretName = constant.GenerateAccountSecretName(clusterName, comp.fullComponentName, targetTpl.Account)
-	cc.PasswordKey = constant.AccountPasswdForSecret
-	cc.UsernameKey = constant.AccountNameForSecret
-	if cc.SecretName != "" {
-		target.ConnectionCredential = &cc
+	if targetTpl.Account != "" {
+		target.ConnectionCredential = &dpv1alpha1.ConnectionCredential{
+			SecretName:  constant.GenerateAccountSecretName(clusterName, comp.fullComponentName, targetTpl.Account),
+			PasswordKey: constant.AccountPasswdForSecret,
+			UsernameKey: constant.AccountNameForSecret,
+		}
 	}
 	return target
 }

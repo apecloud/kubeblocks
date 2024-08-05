@@ -234,16 +234,16 @@ func deleteConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, con
 }
 
 type ConfigTemplateHandler func([]appsv1alpha1.ComponentConfigSpec) (bool, error)
-type ComponentValidateHandler func(component *appsv1alpha1.ClusterComponentDefinition) error
+type componentValidateHandler func(*appsv1alpha1.ComponentDefinition) error
 
-func handleConfigTemplate(object client.Object, handler ConfigTemplateHandler, handler2 ...ComponentValidateHandler) (bool, error) {
+func handleConfigTemplate(object client.Object, handler ConfigTemplateHandler, handler2 ...componentValidateHandler) (bool, error) {
 	var (
 		err             error
 		configTemplates []appsv1alpha1.ComponentConfigSpec
 	)
 	switch cr := object.(type) {
 	case *appsv1alpha1.ComponentDefinition:
-		configTemplates = getConfigTemplateFromComponentDef(cr)
+		configTemplates, err = getConfigTemplateFromComponentDef(cr, handler2...)
 	default:
 		return false, core.MakeError("not support CR type: %v", cr)
 	}
@@ -258,7 +258,8 @@ func handleConfigTemplate(object client.Object, handler ConfigTemplateHandler, h
 	}
 }
 
-func getConfigTemplateFromComponentDef(componentDef *appsv1alpha1.ComponentDefinition) []appsv1alpha1.ComponentConfigSpec {
+func getConfigTemplateFromComponentDef(componentDef *appsv1alpha1.ComponentDefinition,
+	validators ...componentValidateHandler) ([]appsv1alpha1.ComponentConfigSpec, error) {
 	configTemplates := make([]appsv1alpha1.ComponentConfigSpec, 0)
 	// For compatibility with the previous lifecycle management of configurationSpec.TemplateRef,
 	// it is necessary to convert ScriptSpecs to ConfigSpecs,
@@ -268,7 +269,15 @@ func getConfigTemplateFromComponentDef(componentDef *appsv1alpha1.ComponentDefin
 			ComponentTemplateSpec: scriptSpec,
 		})
 	}
-	return append(configTemplates, componentDef.Spec.Configs...)
+	if len(componentDef.Spec.Configs) > 0 {
+		// Check reload configure config template
+		for _, validator := range validators {
+			if err := validator(componentDef); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return append(configTemplates, componentDef.Spec.Configs...), nil
 }
 
 func checkConfigTemplate(client client.Client, ctx intctrlutil.RequestCtx, obj client.Object) (bool, error) {

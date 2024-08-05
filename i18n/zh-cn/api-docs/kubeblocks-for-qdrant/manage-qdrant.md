@@ -13,7 +13,7 @@ import TabItem from '@theme/TabItem';
 
 生成式人工智能的爆火引发了人们对向量数据库的关注。目前，KubeBlocks 支持 Qdrant 的管理和运维。本文档展示如何使用 KubeBlocks 管理 Qdrant。
 
-本教程演示了如何通过 `kubectl` 或 YAML 文件创建并管理 MongoDB 集群。您可在 [GitHub 仓库](https://github.com/apecloud/kubeblocks-addons/tree/release-0.9/examples/qdrant)查看相应的 YAML 示例和指南。
+本教程演示了如何通过 `kubectl` 或 YAML 文件创建并管理 Qdrant 集群。您可在 [GitHub 仓库](https://github.com/apecloud/kubeblocks-addons/tree/release-0.9/examples/qdrant)查看相应的 YAML 示例和指南。
 
 ## 开始之前
 
@@ -105,7 +105,7 @@ EOF
 | `spec.affinity.topologyKeys`          | 用于定义 Pod 反亲和性和 Pod 分布约束的拓扑域的节点标签值。 |
 | `spec.tolerations`                    | 该字段为数组，用于定义集群中 Pods 的容忍，确保 Pod 可被调度到具有匹配污点的节点上。 |
 | `spec.componentSpecs`                 | 集群 components 列表，定义了集群 components。该字段允许对集群中的每个 component 进行自定义配置。 |
-| `spec.componentSpecs.componentDefRef` | 表示 cluster definition 中定义的 component definition 的名称，可通过执行 `kubectl get clusterdefinition apecloud-mysql -o json \| jq '.spec.componentDefs[].name'` 命令获取 component definition 名称。 |
+| `spec.componentSpecs.componentDefRef` | 表示 cluster definition 中定义的 component definition 的名称，可通过执行 `kubectl get clusterdefinition qdrant -o json \| jq '.spec.componentDefs[].name'` 命令获取 component definition 名称。 |
 | `spec.componentSpecs.name`            | 定义了 component 的名称。  |
 | `spec.componentSpecs.disableExporter` | 定义了是否开启监控功能。 |
 | `spec.componentSpecs.replicas`        | 定义了 component 中 replicas 的数量。 |
@@ -514,7 +514,7 @@ mycluster   qdrant               qdrant-1.5.0      Delete               Running 
              - ReadWriteOnce
            resources:
              requests:
-               storage: 1Gi # Change the volume storage size.
+               storage: 40Gi # 修改该参数值
      terminationPolicy: Delete
    ```
 

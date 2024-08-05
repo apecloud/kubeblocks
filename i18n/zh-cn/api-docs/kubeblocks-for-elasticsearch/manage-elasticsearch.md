@@ -666,3 +666,5 @@ spec:
 
    - STATUS=Terminating：表示集群正在重启。
    - STATUS=Running：表示集群已重启。
+
+   如果操作过程中出现报错，可通过 `kubectl describe ops -n demo` 查看该操作的事件，协助排障。

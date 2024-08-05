@@ -99,7 +99,7 @@ EOF
 | `spec.affinity.topologyKeys`          | It represents the key of node labels used to define the topology domain for Pod anti-affinity and Pod spread constraints.   |
 | `spec.tolerations`                    | It is an array that specifies tolerations attached to the cluster's Pods, allowing them to be scheduled onto nodes with matching taints.  |
 | `spec.componentSpecs`                 | It is the list of components that define the cluster components. This field allows customized configuration of each component within a cluster.   |
-| `spec.componentSpecs.componentDefRef` | It is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition apecloud-mysql -o json \| jq '.spec.componentDefs[].name'`.   |
+| `spec.componentSpecs.componentDefRef` | It is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition qdrant -o json \| jq '.spec.componentDefs[].name'`.   |
 | `spec.componentSpecs.name`            | It specifies the name of the component.     |
 | `spec.componentSpecs.disableExporter` | It defines whether the monitoring function is enabled. |
 | `spec.componentSpecs.replicas`        | It specifies the number of replicas of the component.  |

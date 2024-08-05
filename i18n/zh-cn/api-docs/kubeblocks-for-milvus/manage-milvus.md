@@ -13,7 +13,7 @@ import TabItem from '@theme/TabItem';
 
 生成式人工智能的爆火引发了人们对向量数据库的关注。目前，KubeBlocks 支持 Milvus 的管理和运维。本文档展示如何使用 KubeBlocks 管理 Milvus。
 
-Milvus 是高度灵活、可靠且速度极快的云原生开源矢量数据库。它为 embedding 相似性搜索和 AI 应用程序提供支持，并努力使每个组织都可以访问矢量数据库。 Milvus 可以存储、索引和管理由深度神经网络和其他机器学习 (ML) 模型生成的十亿级别以上的 embedding 向量。
+Milvus 是高度灵活、可靠且速度极快的云原生开源向量数据库。它为 embedding 相似性搜索和 AI 应用程序提供支持，并努力使每个组织都可以访问向量数据库。 Milvus 可以存储、索引和管理由深度神经网络和其他机器学习 (ML) 模型生成的十亿级别以上的 embedding 向量。
 
 本教程演示了如何通过 `kubectl` 或 YAML 文件创建并管理 Milvus 集群。您可在 [GitHub 仓库](https://github.com/apecloud/kubeblocks-addons/tree/release-0.9/examples/milvus)查看相应的 YAML 示例和指南。
 
@@ -22,7 +22,7 @@ Milvus 是高度灵活、可靠且速度极快的云原生开源矢量数据库�
 * [安装 KubeBlocks](./../installation/install-kubeblocks.md)。
 * 查看可用于创建集群的数据库类型和版本。
   
-  确保 `elasticsearch` cluster definition 已安装。如果该 cluster definition 不可用，可[参考相关文档](./../installation/install-addons.md)启用。
+  确保 `milvus` cluster definition 已安装。如果该 cluster definition 不可用，可[参考相关文档](./../installation/install-addons.md)启用。
 
   ```bash
   kubectl get clusterdefinition milvus
@@ -395,7 +395,7 @@ mycluster   milvus               milvus-2.3.2      Delete               Running 
 
 <TabItem value="OpsRequest" label="OpsRequest" default>
 
-1. Change the value of storage according to your need and run the command below to expand the volume of a cluster.
+1. 应用 OpsRequest。根据需求更改 storage 的值，并执行以下命令来更改集群的存储容量。
 
     ```yaml
     kubectl apply -f - <<EOF
@@ -622,3 +622,6 @@ spec:
 
    - STATUS=Terminating：表示集群正在重启。
    - STATUS=Running：表示集群已重启。
+
+   如果操作过程中出现报错，可通过 `kubectl describe ops -n demo` 查看该操作的事件，协助排障。
+

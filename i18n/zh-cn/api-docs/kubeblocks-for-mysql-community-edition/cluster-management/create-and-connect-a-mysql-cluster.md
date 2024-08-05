@@ -109,7 +109,7 @@ EOF
 | `spec.affinity.topologyKeys`          | 用于定义 Pod 反亲和性和 Pod 分布约束的拓扑域的节点标签值。 |
 | `spec.tolerations`                    | 该字段为数组，用于定义集群中 Pods 的容忍，确保 Pod 可被调度到具有匹配污点的节点上。 |
 | `spec.componentSpecs`                 | 集群 components 列表，定义了集群 components。该字段允许对集群中的每个 component 进行自定义配置。 |
-| `spec.componentSpecs.componentDefRef` | 表示 cluster definition 中定义的 component definition 的名称，可通过执行 `kubectl get clusterdefinition apecloud-mysql -o json \| jq '.spec.componentDefs[].name'` 命令获取 component definition 名称。 |
+| `spec.componentSpecs.componentDefRef` | 表示 cluster definition 中定义的 component definition 的名称，可通过执行 `kubectl get clusterdefinition mysql -o json \| jq '.spec.componentDefs[].name'` 命令获取 component definition 名称。 |
 | `spec.componentSpecs.name`            | 定义了 component 的名称。  |
 | `spec.componentSpecs.disableExporter` | 定义了是否开启监控功能。 |
 | `spec.componentSpecs.replicas`        | 定义了 component 中 replicas 的数量。 |

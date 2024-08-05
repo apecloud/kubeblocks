@@ -241,9 +241,6 @@ var _ = Describe("Component Definition Convertor", func() {
 						},
 					},
 				},
-				SwitchoverSpec:         &appsv1alpha1.SwitchoverSpec{},
-				ComponentDefRef:        []appsv1alpha1.ComponentDefRef{},
-				ServiceRefDeclarations: []appsv1alpha1.ServiceRefDeclaration{},
 			}
 		})
 
@@ -768,7 +765,7 @@ var _ = Describe("Component Definition Convertor", func() {
 			convertor := &compDefServiceRefDeclarationsConvertor{}
 			res, err := convertor.convert(clusterCompDef)
 			Expect(err).Should(Succeed())
-			Expect(res).Should(BeEquivalentTo(clusterCompDef.ServiceRefDeclarations))
+			Expect(res).Should(BeNil())
 		})
 	})
 })

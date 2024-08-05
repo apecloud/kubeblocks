@@ -136,15 +136,6 @@ var _ = Describe("", func() {
 		Expect(r.GetVolumeClaimNames(compName)).Should(ContainElement(fmt.Sprintf("%s-%s-%s-%d", compName, r.Name, compName, 0)))
 	})
 
-	It("test GetDefNameMappingComponents", func() {
-		r := ClusterSpec{}
-		key := "comp-def-ref"
-		comp := ClusterComponentSpec{}
-		comp.ComponentDefRef = key
-		r.ComponentSpecs = []ClusterComponentSpec{comp}
-		Expect(r.GetDefNameMappingComponents()[key]).Should(ContainElement(comp))
-	})
-
 	It("test SetComponentStatus", func() {
 		r := ClusterStatus{}
 		status := ClusterComponentStatus{}

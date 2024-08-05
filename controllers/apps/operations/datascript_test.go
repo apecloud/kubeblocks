@@ -252,7 +252,7 @@ var _ = Describe("DataScriptOps", func() {
 			By("mock a job one more time, fail with missing secret")
 			_, err = buildDataScriptJobs(reqCtx, k8sClient, clusterObj, comp, ops, "mysql")
 			Expect(err).Should(HaveOccurred())
-			Expect(err.Error()).Should(ContainSubstring("conn-credential"))
+			Expect(err.Error()).Should(ContainSubstring("missing secret"))
 
 			By("patch a secret name to ops, fail with missing secret")
 			secretName := fmt.Sprintf("%s-%s", clusterObj.Name, comp.Name)

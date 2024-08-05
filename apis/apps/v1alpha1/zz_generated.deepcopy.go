@@ -842,13 +842,6 @@ func (in *ClusterDefinitionSpec) DeepCopyInto(out *ClusterDefinitionSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.ConnectionCredential != nil {
-		in, out := &in.ConnectionCredential, &out.ConnectionCredential
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
-	}
 	if in.Topologies != nil {
 		in, out := &in.Topologies, &out.Topologies
 		*out = make([]ClusterTopology, len(*in))

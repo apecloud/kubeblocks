@@ -153,23 +153,6 @@ var _ = Describe("builder", func() {
 			Expect(pvc.Spec.StorageClassName).Should(Equal(synthesizedComponent.VolumeClaimTemplates[0].Spec.StorageClassName))
 		})
 
-		It("builds Conn. Credential during restoring from backup", func() {
-			originalPassword := "test-passw0rd"
-			encryptionKey := "encryptionKey"
-			viper.Set(constant.CfgKeyDPEncryptionKey, encryptionKey)
-			var (
-				clusterDefObj                             = testapps.NewClusterDefFactoryWithConnCredential("conn-cred", mysqlCompDefName).GetObject()
-				clusterDef, cluster, synthesizedComponent = newClusterObjs(clusterDefObj)
-			)
-			e := intctrlutil.NewEncryptor(encryptionKey)
-			ciphertext, _ := e.Encrypt([]byte(originalPassword))
-			cluster.Annotations[constant.RestoreFromBackupAnnotationKey] = fmt.Sprintf(`{"%s":{"%s":"%s"}}`,
-				synthesizedComponent.Name, constant.ConnectionPassword, ciphertext)
-			credential := BuildConnCredential(clusterDef, cluster, synthesizedComponent)
-			Expect(credential).ShouldNot(BeNil())
-			Expect(credential.StringData["RANDOM_PASSWD"]).Should(Equal(originalPassword))
-		})
-
 		It("builds InstanceSet correctly", func() {
 			clusterDef, cluster, synthesizedComponent := newClusterObjs(nil)
 
@@ -278,7 +261,6 @@ var _ = Describe("builder", func() {
 			_, cluster, synthesizedComponent := newClusterObjs(nil)
 			sidecarRenderedParam := &cfgcm.CfgManagerBuildParams{
 				ManagerName:   "cfgmgr",
-				SecreteName:   "test-secret",
 				ComponentName: synthesizedComponent.Name,
 				Image:         constant.KBToolsImage,
 				Args:          []string{},
@@ -296,7 +278,6 @@ var _ = Describe("builder", func() {
 			_, cluster, _ := newClusterObjs(nil)
 			sidecarRenderedParam := &cfgcm.CfgManagerBuildParams{
 				ManagerName:           "cfgmgr",
-				SecreteName:           "test-secret",
 				Image:                 constant.KBToolsImage,
 				ShareProcessNamespace: true,
 				Args:                  []string{},
@@ -325,7 +306,6 @@ var _ = Describe("builder", func() {
 			_, cluster, _ := newClusterObjs(nil)
 			cfgManagerParams := &cfgcm.CfgManagerBuildParams{
 				ManagerName:               constant.ConfigSidecarName,
-				SecreteName:               constant.GenerateDefaultConnCredential(cluster.Name),
 				Image:                     viper.GetString(constant.KBToolsImage),
 				Cluster:                   cluster,
 				ConfigLazyRenderedVolumes: make(map[string]corev1.VolumeMount),

@@ -205,10 +205,8 @@ func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1a
 
 func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *appsv1alpha1.Cluster, comp *component.SynthesizedComponent, configSpecBuildParams []cfgcm.ConfigSpecMeta, volumeDirs []corev1.VolumeMount, podSpec *corev1.PodSpec) (*cfgcm.CfgManagerBuildParams, error) {
 	cfgManagerParams := &cfgcm.CfgManagerBuildParams{
-		ManagerName:   constant.ConfigSidecarName,
-		ComponentName: comp.Name,
-		// TODO: (good-first-issue) the default cluster connection credential is deprecated
-		SecreteName:               constant.GenerateDefaultConnCredential(cluster.Name),
+		ManagerName:               constant.ConfigSidecarName,
+		ComponentName:             comp.Name,
 		Image:                     viper.GetString(constant.KBToolsImage),
 		Volumes:                   volumeDirs,
 		Cluster:                   cluster,

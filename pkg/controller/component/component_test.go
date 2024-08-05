@@ -31,7 +31,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
@@ -40,11 +39,9 @@ var _ = Describe("Component", func() {
 
 	Context("has the BuildComponent function", func() {
 		const (
-			compDefName              = "test-compdef"
-			clusterName              = "test-cluster"
-			mysqlCompName            = "mysql"
-			mysqlSecretUserEnvName   = "MYSQL_ROOT_USER"
-			mysqlSecretPasswdEnvName = "MYSQL_ROOT_PASSWORD"
+			compDefName   = "test-compdef"
+			clusterName   = "test-cluster"
+			mysqlCompName = "mysql"
 		)
 
 		var (
@@ -68,42 +65,6 @@ var _ = Describe("Component", func() {
 			Expect(err).Should(Succeed())
 			return comp
 		}
-
-		It("Test replace secretRef env placeholder token", func() {
-			By("mock connect credential and do replace placeholder token")
-			credentialMap := GetEnvReplacementMapForConnCredential(cluster.Name)
-			mockEnvs := []corev1.EnvVar{
-				{
-					Name: mysqlSecretUserEnvName,
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							Key: "username",
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: constant.KBConnCredentialPlaceHolder,
-							},
-						},
-					},
-				},
-				{
-					Name: mysqlSecretPasswdEnvName,
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							Key: "password",
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: constant.KBConnCredentialPlaceHolder,
-							},
-						},
-					},
-				},
-			}
-			mockEnvs = ReplaceSecretEnvVars(credentialMap, mockEnvs)
-			Expect(len(mockEnvs)).Should(Equal(2))
-			for _, env := range mockEnvs {
-				Expect(env.ValueFrom).ShouldNot(BeNil())
-				Expect(env.ValueFrom.SecretKeyRef).ShouldNot(BeNil())
-				Expect(env.ValueFrom.SecretKeyRef.Name).Should(Equal(constant.GenerateDefaultConnCredential(cluster.Name)))
-			}
-		})
 
 		PIt("build serviceReference correctly", func() {
 			reqCtx := intctrlutil.RequestCtx{

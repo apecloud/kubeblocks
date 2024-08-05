@@ -531,37 +531,6 @@ Existing usage should be updated to the current preferred approach to avoid comp
 </tr>
 <tr>
 <td>
-<code>connectionCredential</code><br/>
-<em>
-map[string]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Connection credential template used for creating a connection credential secret for cluster objects.</p>
-<p>Built-in objects are:</p>
-<ul>
-<li><code>$(RANDOM_PASSWD)</code> random 8 characters.</li>
-<li><code>$(STRONG_RANDOM_PASSWD)</code> random 16 characters, with mixed cases, digits and symbols.</li>
-<li><code>$(UUID)</code> generate a random UUID v4 string.</li>
-<li><code>$(UUID_B64)</code> generate a random UUID v4 BASE64 encoded string.</li>
-<li><code>$(UUID_STR_B64)</code> generate a random UUID v4 string then BASE64 encoded.</li>
-<li><code>$(UUID_HEX)</code> generate a random UUID v4 HEX representation.</li>
-<li><code>$(HEADLESS_SVC_FQDN)</code> headless service FQDN placeholder, value pattern is <code>$(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc</code>,
-where 1ST_COMP_NAME is the 1st component that provide <code>ClusterDefinition.spec.componentDefs[].service</code> attribute;</li>
-<li><code>$(SVC_FQDN)</code> service FQDN placeholder, value pattern is <code>$(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc</code>,
-where 1ST_COMP_NAME is the 1st component that provide <code>ClusterDefinition.spec.componentDefs[].service</code> attribute;</li>
-<li><code>$(SVC_PORT_&#123;PORT-NAME&#125;)</code> is ServicePort&rsquo;s port value with specified port name, i.e, a servicePort JSON struct:
-<code>&#123;&quot;name&quot;: &quot;mysql&quot;, &quot;targetPort&quot;: &quot;mysqlContainerPort&quot;, &quot;port&quot;: 3306&#125;</code>, and <code>$(SVC_PORT_mysql)</code> in the
-connection credential value is 3306.</li>
-</ul>
-<p>Deprecated since v0.9.
-This field is maintained for backward compatibility and its use is discouraged.
-Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>topologies</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterTopology">
@@ -5286,37 +5255,6 @@ and will not affect the life cycle of the pod. default values are 60 seconds.</p
 <p>Deprecated since v0.9.
 Components should now be individually defined using ComponentDefinition and
 collectively referenced via <code>topology.components</code>.
-This field is maintained for backward compatibility and its use is discouraged.
-Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>connectionCredential</code><br/>
-<em>
-map[string]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Connection credential template used for creating a connection credential secret for cluster objects.</p>
-<p>Built-in objects are:</p>
-<ul>
-<li><code>$(RANDOM_PASSWD)</code> random 8 characters.</li>
-<li><code>$(STRONG_RANDOM_PASSWD)</code> random 16 characters, with mixed cases, digits and symbols.</li>
-<li><code>$(UUID)</code> generate a random UUID v4 string.</li>
-<li><code>$(UUID_B64)</code> generate a random UUID v4 BASE64 encoded string.</li>
-<li><code>$(UUID_STR_B64)</code> generate a random UUID v4 string then BASE64 encoded.</li>
-<li><code>$(UUID_HEX)</code> generate a random UUID v4 HEX representation.</li>
-<li><code>$(HEADLESS_SVC_FQDN)</code> headless service FQDN placeholder, value pattern is <code>$(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc</code>,
-where 1ST_COMP_NAME is the 1st component that provide <code>ClusterDefinition.spec.componentDefs[].service</code> attribute;</li>
-<li><code>$(SVC_FQDN)</code> service FQDN placeholder, value pattern is <code>$(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc</code>,
-where 1ST_COMP_NAME is the 1st component that provide <code>ClusterDefinition.spec.componentDefs[].service</code> attribute;</li>
-<li><code>$(SVC_PORT_&#123;PORT-NAME&#125;)</code> is ServicePort&rsquo;s port value with specified port name, i.e, a servicePort JSON struct:
-<code>&#123;&quot;name&quot;: &quot;mysql&quot;, &quot;targetPort&quot;: &quot;mysqlContainerPort&quot;, &quot;port&quot;: 3306&#125;</code>, and <code>$(SVC_PORT_mysql)</code> in the
-connection credential value is 3306.</li>
-</ul>
-<p>Deprecated since v0.9.
 This field is maintained for backward compatibility and its use is discouraged.
 Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
 </td>

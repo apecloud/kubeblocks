@@ -8502,35 +8502,6 @@ spec:
                 x-kubernetes-list-map-keys:
                 - name
                 x-kubernetes-list-type: map
-              connectionCredential:
-                additionalProperties:
-                  type: string
-                description: |-
-                  Connection credential template used for creating a connection credential secret for cluster objects.
-
-
-                  Built-in objects are:
-
-
-                  - `$(RANDOM_PASSWD)` random 8 characters.
-                  - `$(STRONG_RANDOM_PASSWD)` random 16 characters, with mixed cases, digits and symbols.
-                  - `$(UUID)` generate a random UUID v4 string.
-                  - `$(UUID_B64)` generate a random UUID v4 BASE64 encoded string.
-                  - `$(UUID_STR_B64)` generate a random UUID v4 string then BASE64 encoded.
-                  - `$(UUID_HEX)` generate a random UUID v4 HEX representation.
-                  - `$(HEADLESS_SVC_FQDN)` headless service FQDN placeholder, value pattern is `$(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc`,
-                     where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute;
-                  - `$(SVC_FQDN)` service FQDN placeholder, value pattern is `$(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc`,
-                     where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute;
-                  - `$(SVC_PORT_{PORT-NAME})` is ServicePort's port value with specified port name, i.e, a servicePort JSON struct:
-                     `{"name": "mysql", "targetPort": "mysqlContainerPort", "port": 3306}`, and `$(SVC_PORT_mysql)` in the
-                     connection credential value is 3306.
-
-
-                  Deprecated since v0.9.
-                  This field is maintained for backward compatibility and its use is discouraged.
-                  Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
-                type: object
               topologies:
                 description: Topologies defines all possible topologies within the
                   cluster.

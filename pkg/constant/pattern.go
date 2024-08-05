@@ -69,12 +69,6 @@ func GenerateDefaultComponentHeadlessServiceName(clusterName, compName string) s
 	return GenerateComponentHeadlessServiceName(clusterName, compName, "")
 }
 
-// GenerateDefaultConnCredential generates the default connection credential name for cluster.
-// TODO: deprecated, will be removed later.
-func GenerateDefaultConnCredential(clusterName string) string {
-	return fmt.Sprintf("%s-conn-credential", clusterName)
-}
-
 // GenerateClusterComponentEnvPattern generates cluster and component pattern
 func GenerateClusterComponentEnvPattern(clusterName, compName string) string {
 	return fmt.Sprintf("%s-%s-env", clusterName, compName)

@@ -24,7 +24,6 @@ import (
 	"strings"
 
 	"github.com/StudioSol/set"
-	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubectl/pkg/util/resource"
@@ -231,8 +230,6 @@ func (w *envWrapper) doEnvReplace(replacedVars *set.LinkedHashSetString, oldValu
 		componentName = w.componentName
 		builtInEnvMap = component.GetReplacementMapForBuiltInEnv(clusterName, clusterUID, componentName)
 	)
-
-	maps.Copy(builtInEnvMap, component.GetEnvReplacementMapForConnCredential(clusterName))
 
 	kbInnerEnvReplaceFn := func(envName string, strToReplace string) string {
 		return strings.ReplaceAll(strToReplace, envName, builtInEnvMap[envName])

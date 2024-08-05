@@ -90,7 +90,6 @@ type ConfigTemplateExtension struct {
 	// Specifies the name of the referenced configuration template ConfigMap object.
 	//
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	TemplateRef string `json:"templateRef"`
 
@@ -98,7 +97,6 @@ type ConfigTemplateExtension struct {
 	// An empty namespace is equivalent to the "default" namespace.
 	//
 	// +kubebuilder:default="default"
-	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
@@ -614,46 +612,6 @@ type OpsRecorder struct {
 	QueueBySelf bool `json:"queueBySelf,omitempty"`
 }
 
-// ProvisionPolicyType defines the policy for creating accounts.
-//
-// +enum
-// +kubebuilder:validation:Enum={CreateByStmt,ReferToExisting}
-type ProvisionPolicyType string
-
-const (
-	// CreateByStmt will create account w.r.t. deletion and creation statement given by provider.
-	CreateByStmt ProvisionPolicyType = "CreateByStmt"
-
-	// ReferToExisting will not create account, but create a secret by copying data from referred secret file.
-	ReferToExisting ProvisionPolicyType = "ReferToExisting"
-)
-
-// ProvisionScope defines the scope of provision within a component.
-//
-// +enum
-type ProvisionScope string
-
-const (
-	// AllPods indicates that accounts will be created for all pods within the component.
-	AllPods ProvisionScope = "AllPods"
-
-	// AnyPods indicates that accounts will be created only on a single pod within the component.
-	AnyPods ProvisionScope = "AnyPods"
-)
-
-// AccountName defines system account names.
-// +enum
-// +kubebuilder:validation:Enum={kbadmin,kbdataprotection,kbprobe,kbmonitoring,kbreplicator}
-type AccountName string
-
-const (
-	AdminAccount          AccountName = "kbadmin"
-	DataprotectionAccount AccountName = "kbdataprotection"
-	ProbeAccount          AccountName = "kbprobe"
-	MonitorAccount        AccountName = "kbmonitoring"
-	ReplicatorAccount     AccountName = "kbreplicator"
-)
-
 // LetterCase defines the available cases to be used in password generation.
 //
 // +enum
@@ -725,22 +683,6 @@ const (
 	// Noop indicates that KubeBlocks will not perform any high-availability switching for the components. Users are
 	// required to implement their own HA solution or integrate an existing open-source HA solution.
 	Noop SwitchPolicyType = "Noop"
-)
-
-// VolumeType defines the type of volume, specifically distinguishing between volumes used for backup data and those used for logs.
-//
-// +enum
-// +kubebuilder:validation:Enum={data,log}
-type VolumeType string
-
-const (
-	// VolumeTypeData indicates a volume designated for storing backup data. This type of volume is optimized for the
-	// storage and retrieval of data backups, ensuring data persistence and reliability.
-	VolumeTypeData VolumeType = "data"
-
-	// VolumeTypeLog indicates a volume designated for storing logs. This type of volume is optimized for log data,
-	// facilitating efficient log storage, retrieval, and management.
-	VolumeTypeLog VolumeType = "log"
 )
 
 // BaseBackupType the base backup type, keep synchronized with the BaseBackupType of the data protection API.

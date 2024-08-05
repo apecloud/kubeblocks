@@ -24,7 +24,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -40,12 +39,8 @@ var _ = Describe("Component Definition Convertor", func() {
 
 			clusterName = "mysql-test"
 
-			defaultHighWatermark = 90
-			lowerHighWatermark   = 85
-			dataVolumeName       = "data"
-			logVolumeName        = "log"
-
-			defaultVolumeMode = int32(0555)
+			dataVolumeName = "data"
+			logVolumeName  = "log"
 
 			runAsUser    = int64(0)
 			runAsNonRoot = false
@@ -66,47 +61,13 @@ var _ = Describe("Component Definition Convertor", func() {
 
 		BeforeEach(func() {
 			clusterCompDef = &appsv1alpha1.ClusterComponentDefinition{
-				Name:          "mysql",
-				WorkloadType:  appsv1alpha1.Consensus,
-				CharacterType: "mysql",
-				ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{
-					{
-						ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-							Name:        "mysql-config",
-							TemplateRef: "mysql-config-template",
-							VolumeName:  "mysql-config",
-							DefaultMode: &defaultVolumeMode,
-						},
-						ConfigConstraintRef: "mysql-config-constraints",
-					},
-				},
-				ScriptSpecs: []appsv1alpha1.ComponentTemplateSpec{
-					{
-						Name:        "mysql-scripts",
-						TemplateRef: "mysql-scripts",
-						VolumeName:  "scripts",
-						DefaultMode: &defaultVolumeMode,
-					},
-				},
+				Name:         "mysql",
+				WorkloadType: appsv1alpha1.Consensus,
 				Probes: &appsv1alpha1.ClusterDefinitionProbes{
 					RoleProbe: &appsv1alpha1.ClusterDefinitionProbe{
 						FailureThreshold: 3,
 						PeriodSeconds:    1,
 						TimeoutSeconds:   5,
-					},
-				},
-				LogConfigs: []appsv1alpha1.LogConfig{
-					{
-						Name:            "error",
-						FilePathPattern: "/data/mysql/log/mysqld-error.log",
-					},
-					{
-						Name:            "slow",
-						FilePathPattern: "/data/mysql/log/mysqld-slowquery.log",
-					},
-					{
-						Name:            "general",
-						FilePathPattern: "/data/mysql/log/mysqld.log",
 					},
 				},
 				PodSpec: &corev1.PodSpec{
@@ -155,26 +116,6 @@ var _ = Describe("Component Definition Convertor", func() {
 						},
 					},
 				},
-				Service: &appsv1alpha1.ServiceSpec{
-					Ports: []appsv1alpha1.ServicePort{
-						{
-							Name: "mysql",
-							Port: 3306,
-							TargetPort: intstr.IntOrString{
-								Type:   intstr.String,
-								StrVal: "mysql",
-							},
-						},
-						{
-							Name: "paxos",
-							Port: 13306,
-							TargetPort: intstr.IntOrString{
-								Type:   intstr.String,
-								StrVal: "paxos",
-							},
-						},
-					},
-				},
 				StatelessSpec: nil,
 				StatefulSpec:  nil,
 				ConsensusSpec: &appsv1alpha1.ConsensusSetSpec{
@@ -195,77 +136,6 @@ var _ = Describe("Component Definition Convertor", func() {
 				},
 				ReplicationSpec:       nil,
 				HorizontalScalePolicy: &appsv1alpha1.HorizontalScalePolicy{},
-				SystemAccounts: &appsv1alpha1.SystemAccountSpec{
-					CmdExecutorConfig: &appsv1alpha1.CmdExecutorConfig{
-						CommandExecutorEnvItem: appsv1alpha1.CommandExecutorEnvItem{
-							Image: "image",
-							Env: []corev1.EnvVar{
-								{
-									Name:  "user",
-									Value: "user",
-								},
-								{
-									Name:  "password",
-									Value: "password",
-								},
-							},
-						},
-						CommandExecutorItem: appsv1alpha1.CommandExecutorItem{
-							Command: []string{"mysql"},
-							Args:    []string{"create user"},
-						},
-					},
-					PasswordConfig: appsv1alpha1.PasswordConfig{
-						Length:     16,
-						NumDigits:  8,
-						NumSymbols: 8,
-						LetterCase: appsv1alpha1.MixedCases,
-					},
-					Accounts: []appsv1alpha1.SystemAccountConfig{
-						{
-							Name: appsv1alpha1.AdminAccount,
-							ProvisionPolicy: appsv1alpha1.ProvisionPolicy{
-								Type:  appsv1alpha1.CreateByStmt,
-								Scope: appsv1alpha1.AnyPods,
-								Statements: &appsv1alpha1.ProvisionStatements{
-									CreationStatement: "creation-statement",
-								},
-							},
-						},
-						{
-							Name: appsv1alpha1.ReplicatorAccount,
-							ProvisionPolicy: appsv1alpha1.ProvisionPolicy{
-								Type: appsv1alpha1.ReferToExisting,
-								SecretRef: &appsv1alpha1.ProvisionSecretRef{
-									Name:      "refer-to-existing",
-									Namespace: "default",
-								},
-							},
-						},
-					},
-				},
-				VolumeTypes: []appsv1alpha1.VolumeTypeSpec{
-					{
-						Name: dataVolumeName,
-						Type: appsv1alpha1.VolumeTypeData,
-					},
-					{
-						Name: logVolumeName,
-						Type: appsv1alpha1.VolumeTypeLog,
-					},
-				},
-				SwitchoverSpec: &appsv1alpha1.SwitchoverSpec{},
-				VolumeProtectionSpec: &appsv1alpha1.VolumeProtectionSpec{
-					HighWatermark: defaultHighWatermark,
-					Volumes: []appsv1alpha1.ProtectedVolume{
-						{
-							Name:          logVolumeName,
-							HighWatermark: &lowerHighWatermark,
-						},
-					},
-				},
-				ComponentDefRef:        []appsv1alpha1.ComponentDefRef{},
-				ServiceRefDeclarations: []appsv1alpha1.ServiceRefDeclaration{},
 			}
 		})
 
@@ -287,7 +157,7 @@ var _ = Describe("Component Definition Convertor", func() {
 			convertor := &compDefServiceKindConvertor{}
 			res, err := convertor.convert(clusterCompDef)
 			Expect(err).Should(Succeed())
-			Expect(res).Should(Equal(clusterCompDef.CharacterType))
+			Expect(res).Should(BeEmpty())
 		})
 
 		It("service version", func() {
@@ -349,48 +219,11 @@ var _ = Describe("Component Definition Convertor", func() {
 		})
 
 		Context("volumes", func() {
-			It("w/o volume types", func() {
-				clusterCompDefCopy := clusterCompDef.DeepCopy()
-				clusterCompDefCopy.VolumeTypes = nil
-
-				convertor := &compDefVolumesConvertor{}
-				res, err := convertor.convert(clusterCompDefCopy)
-				Expect(err).Should(Succeed())
-				Expect(res).Should(BeNil())
-			})
-
-			It("w/o volume protection", func() {
-				clusterCompDefCopy := clusterCompDef.DeepCopy()
-				clusterCompDefCopy.VolumeProtectionSpec = nil
-
-				convertor := &compDefVolumesConvertor{}
-				res, err := convertor.convert(clusterCompDefCopy)
-				Expect(err).Should(Succeed())
-
-				expectedVolumes := make([]appsv1alpha1.ComponentVolume, 0)
-				for _, vol := range clusterCompDef.VolumeTypes {
-					expectedVolumes = append(expectedVolumes, appsv1alpha1.ComponentVolume{Name: vol.Name})
-				}
-				Expect(res).Should(BeEquivalentTo(expectedVolumes))
-			})
-
 			It("ok", func() {
 				convertor := &compDefVolumesConvertor{}
 				res, err := convertor.convert(clusterCompDef)
 				Expect(err).Should(Succeed())
-
-				expectedVolumes := make([]appsv1alpha1.ComponentVolume, 0)
-				for _, vol := range clusterCompDef.VolumeTypes {
-					highWatermark := 0
-					if vol.Name == logVolumeName {
-						highWatermark = lowerHighWatermark
-					}
-					expectedVolumes = append(expectedVolumes, appsv1alpha1.ComponentVolume{
-						Name:          vol.Name,
-						HighWatermark: highWatermark,
-					})
-				}
-				Expect(res).Should(BeEquivalentTo(expectedVolumes))
+				Expect(res).Should(BeNil())
 			})
 		})
 
@@ -464,49 +297,11 @@ var _ = Describe("Component Definition Convertor", func() {
 		})
 
 		Context("services", func() {
-			It("w/o service defined", func() {
-				clusterCompDef.Service = nil
-
-				convertor := &compDefServicesConvertor{}
-				res, err := convertor.convert(clusterCompDef, clusterName)
-				Expect(err).Should(Succeed())
-				Expect(res).Should(BeNil())
-			})
-
 			It("ok", func() {
 				convertor := &compDefServicesConvertor{}
 				res, err := convertor.convert(clusterCompDef, clusterName)
 				Expect(err).Should(Succeed())
-
-				services, ok := res.([]appsv1alpha1.ComponentService)
-				Expect(ok).Should(BeTrue())
-				Expect(services).Should(HaveLen(1))
-
-				// service
-				Expect(services[0].ServiceName).Should(BeEmpty())
-				Expect(services[0].Spec.Ports).Should(HaveLen(len(clusterCompDef.Service.Ports)))
-				for i := range services[0].Spec.Ports {
-					Expect(services[0].Spec.Ports[i].Name).Should(Equal(clusterCompDef.Service.Ports[i].Name))
-					Expect(services[0].Spec.Ports[i].Port).Should(Equal(clusterCompDef.Service.Ports[i].Port))
-					Expect(services[0].Spec.Ports[i].TargetPort).Should(Equal(clusterCompDef.Service.Ports[i].TargetPort))
-				}
-				Expect(services[0].Spec.Type).Should(Equal(corev1.ServiceTypeClusterIP))
-				Expect(services[0].Spec.ClusterIP).Should(BeEmpty())
-				Expect(services[0].RoleSelector).Should(BeEquivalentTo(constant.Leader))
-
-				// consensus role selector
-				clusterCompDef.WorkloadType = appsv1alpha1.Consensus
-				clusterCompDef.ConsensusSpec = &appsv1alpha1.ConsensusSetSpec{
-					Leader: appsv1alpha1.ConsensusMember{
-						Name:       constant.Primary,
-						AccessMode: appsv1alpha1.ReadWrite,
-					},
-				}
-				res2, _ := convertor.convert(clusterCompDef, clusterName)
-				services2, ok2 := res2.([]appsv1alpha1.ComponentService)
-				Expect(ok2).Should(BeTrue())
-				Expect(services2).Should(HaveLen(1))
-				Expect(services2[0].RoleSelector).Should(BeEquivalentTo(constant.Primary))
+				Expect(res).Should(BeNil())
 			})
 		})
 
@@ -514,25 +309,21 @@ var _ = Describe("Component Definition Convertor", func() {
 			convertor := &compDefConfigsConvertor{}
 			res, err := convertor.convert(clusterCompDef)
 			Expect(err).Should(Succeed())
-			Expect(res).Should(BeEquivalentTo(clusterCompDef.ConfigSpecs))
-		})
-
-		It("log configs", func() {
-			convertor := &compDefLogConfigsConvertor{}
-			res, err := convertor.convert(clusterCompDef)
-			Expect(err).Should(Succeed())
-
-			logConfigs := res.([]appsv1alpha1.LogConfig)
-			Expect(logConfigs).Should(BeEquivalentTo(clusterCompDef.LogConfigs))
+			Expect(res).Should(BeNil())
 		})
 
 		It("scripts", func() {
 			convertor := &compDefScriptsConvertor{}
 			res, err := convertor.convert(clusterCompDef)
 			Expect(err).Should(Succeed())
+			Expect(res).Should(BeNil())
+		})
 
-			scripts := res.([]appsv1alpha1.ComponentTemplateSpec)
-			Expect(scripts).Should(BeEquivalentTo(clusterCompDef.ScriptSpecs))
+		It("log configs", func() {
+			convertor := &compDefLogConfigsConvertor{}
+			res, err := convertor.convert(clusterCompDef)
+			Expect(err).Should(Succeed())
+			Expect(res).Should(BeNil())
 		})
 
 		It("policy rules", func() {
@@ -550,33 +341,11 @@ var _ = Describe("Component Definition Convertor", func() {
 		})
 
 		Context("system accounts", func() {
-			It("w/o accounts", func() {
-				clusterCompDef.SystemAccounts = nil
-
+			It("ok", func() {
 				convertor := &compDefSystemAccountsConvertor{}
 				res, err := convertor.convert(clusterCompDef)
 				Expect(err).Should(Succeed())
 				Expect(res).Should(BeNil())
-			})
-
-			It("w/ accounts", func() {
-				convertor := &compDefSystemAccountsConvertor{}
-				res, err := convertor.convert(clusterCompDef)
-				Expect(err).Should(Succeed())
-
-				expectedAccounts := []appsv1alpha1.SystemAccount{
-					{
-						Name:                     string(clusterCompDef.SystemAccounts.Accounts[0].Name),
-						PasswordGenerationPolicy: clusterCompDef.SystemAccounts.PasswordConfig,
-						Statement:                clusterCompDef.SystemAccounts.Accounts[0].ProvisionPolicy.Statements.CreationStatement,
-					},
-					{
-						Name:                     string(clusterCompDef.SystemAccounts.Accounts[1].Name),
-						PasswordGenerationPolicy: clusterCompDef.SystemAccounts.PasswordConfig,
-						SecretRef:                clusterCompDef.SystemAccounts.Accounts[1].ProvisionPolicy.SecretRef,
-					},
-				}
-				Expect(res).Should(BeEquivalentTo(expectedAccounts))
 			})
 		})
 
@@ -742,47 +511,18 @@ var _ = Describe("Component Definition Convertor", func() {
 				Expect(actions.Switchover.WithoutCandidate).ShouldNot(BeNil())
 			})
 
-			It("post provision", func() {
-				clusterCompDef.Probes.RoleProbe = nil
-				clusterCompDef.SwitchoverSpec = nil
-				convertor := &compDefLifecycleActionsConvertor{}
-				clusterCompDef.PostStartSpec = &appsv1alpha1.PostStartAction{
-					CmdExecutorConfig: appsv1alpha1.CmdExecutorConfig{
-						CommandExecutorEnvItem: *commandExecutorEnvItem,
-						CommandExecutorItem:    *commandExecutorItem,
-					},
-					ScriptSpecSelectors: []appsv1alpha1.ScriptSpecSelector{
-						{
-							Name: "post-start",
-						},
-					},
-				}
-				res, err := convertor.convert(clusterCompDef)
-				Expect(err).Should(Succeed())
-
-				actions := res.(*appsv1alpha1.ComponentLifecycleActions)
-				Expect(actions.PostProvision).ShouldNot(BeNil())
-				Expect(actions.PostProvision.CustomHandler).ShouldNot(BeNil())
-				Expect(actions.PostProvision.CustomHandler.Exec.Image).Should(BeEquivalentTo(commandExecutorEnvItem.Image))
-				Expect(actions.PostProvision.CustomHandler.Exec.Env).Should(BeEquivalentTo(commandExecutorEnvItem.Env))
-				Expect(actions.PostProvision.CustomHandler.Exec.Command).Should(BeEquivalentTo(commandExecutorItem.Command))
-				Expect(actions.PostProvision.CustomHandler.Exec.Args).Should(BeEquivalentTo(commandExecutorItem.Args))
-				Expect(*actions.PostProvision.CustomHandler.PreCondition).Should(BeEquivalentTo(appsv1alpha1.ComponentReadyPreConditionType))
-			})
-
 			It("role probe", func() {
 				convertor := &compDefLifecycleActionsConvertor{}
 				res, err := convertor.convert(clusterCompDef)
 				Expect(err).Should(Succeed())
 
 				actions := res.(*appsv1alpha1.ComponentLifecycleActions)
-				// mysql + consensus -> wesql
-				wesqlBuiltinHandler := func() *appsv1alpha1.BuiltinActionHandlerType {
-					handler := appsv1alpha1.WeSQLBuiltinActionHandler
+				builtinHandler := func() *appsv1alpha1.BuiltinActionHandlerType {
+					handler := appsv1alpha1.UnknownBuiltinActionHandler
 					return &handler
 				}
 				expectedRoleProbe := &appsv1alpha1.Probe{
-					BuiltinHandler: wesqlBuiltinHandler(),
+					BuiltinHandler: builtinHandler(),
 					Action: appsv1alpha1.Action{
 						TimeoutSeconds: clusterCompDef.Probes.RoleProbe.TimeoutSeconds,
 					},
@@ -816,7 +556,7 @@ var _ = Describe("Component Definition Convertor", func() {
 
 				actions := res.(*appsv1alpha1.ComponentLifecycleActions)
 				Expect(actions.RoleProbe).ShouldNot(BeNil())
-				Expect(*actions.RoleProbe.BuiltinHandler).Should(BeEquivalentTo(appsv1alpha1.WeSQLBuiltinActionHandler))
+				Expect(*actions.RoleProbe.BuiltinHandler).Should(BeEquivalentTo(appsv1alpha1.UnknownBuiltinActionHandler))
 				Expect(actions.RoleProbe.Exec).ShouldNot(BeNil())
 				Expect(actions.RoleProbe.Exec.Image).Should(BeEquivalentTo("mock-its-role-probe-image"))
 				Expect(actions.RoleProbe.Exec.Command).Should(BeEquivalentTo(mockCommand))
@@ -828,7 +568,7 @@ var _ = Describe("Component Definition Convertor", func() {
 			convertor := &compDefServiceRefDeclarationsConvertor{}
 			res, err := convertor.convert(clusterCompDef)
 			Expect(err).Should(Succeed())
-			Expect(res).Should(BeEquivalentTo(clusterCompDef.ServiceRefDeclarations))
+			Expect(res).Should(BeNil())
 		})
 	})
 })

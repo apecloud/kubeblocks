@@ -23,11 +23,12 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/spf13/viper"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
-	"github.com/spf13/viper"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestNewManager(t *testing.T) {

@@ -89,7 +89,8 @@ func (o DataScriptOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.C
 
 	// create jobs
 	var jobs []*batchv1.Job
-	if jobs, err = buildDataScriptJobs(reqCtx, cli, opsResource.Cluster, component, opsRequest, componentDef.CharacterType); err != nil {
+	// TODO(v1.0): character-type
+	if jobs, err = buildDataScriptJobs(reqCtx, cli, opsResource.Cluster, component, opsRequest, ""); err != nil {
 		return err
 	}
 	for _, job := range jobs {

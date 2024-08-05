@@ -154,6 +154,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		Name:                             compName,
 		FullCompName:                     comp.Name,
 		CompDefName:                      compDef.Name,
+		ServiceKind:                      compDefObj.Spec.ServiceKind,
 		ServiceVersion:                   comp.Spec.ServiceVersion,
 		ClusterGeneration:                clusterGeneration(cluster, comp),
 		UserDefinedLabels:                comp.Spec.Labels,
@@ -620,9 +621,7 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 	buildWorkload := func() {
 		synthesizeComp.ClusterDefName = clusterDef.Name
 		synthesizeComp.ClusterCompDefName = clusterCompDef.Name
-		synthesizeComp.CharacterType = clusterCompDef.CharacterType
 		synthesizeComp.HorizontalScalePolicy = clusterCompDef.HorizontalScalePolicy
-		synthesizeComp.VolumeTypes = clusterCompDef.VolumeTypes
 	}
 
 	buildClusterCompServices := func() {
@@ -665,12 +664,6 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 
 	// build pod management policy
 	buildPodManagementPolicy()
-
-	// build componentRefEnvs
-	if err := buildComponentRef(clusterDef, cluster, clusterCompDef, synthesizeComp); err != nil {
-		reqCtx.Log.Error(err, "failed to merge componentRef")
-		return err
-	}
 
 	return nil
 }

@@ -67,69 +67,6 @@ func (factory *MockClusterDefFactory) AddComponentDef(tplType ComponentDefTplTyp
 	return factory
 }
 
-func (factory *MockClusterDefFactory) AddServicePort(port int32) *MockClusterDefFactory {
-	comp := factory.getLastCompDef()
-	if comp == nil {
-		return nil
-	}
-	comp.Service = &appsv1alpha1.ServiceSpec{
-		Ports: []appsv1alpha1.ServicePort{{
-			Protocol: corev1.ProtocolTCP,
-			Port:     port,
-		}},
-	}
-	return factory
-}
-
-func (factory *MockClusterDefFactory) AddScriptTemplate(name,
-	configTemplateRef, namespace, volumeName string, mode *int32) *MockClusterDefFactory {
-	comp := factory.getLastCompDef()
-	if comp == nil {
-		return nil
-	}
-	comp.ScriptSpecs = append(comp.ScriptSpecs,
-		appsv1alpha1.ComponentTemplateSpec{
-			Name:        name,
-			TemplateRef: configTemplateRef,
-			Namespace:   namespace,
-			VolumeName:  volumeName,
-			DefaultMode: mode,
-		})
-	return factory
-}
-
-func (factory *MockClusterDefFactory) AddConfigTemplate(name,
-	configTemplateRef, configConstraintRef, namespace, volumeName string, injectEnvTo ...string) *MockClusterDefFactory {
-	comp := factory.getLastCompDef()
-	if comp == nil {
-		return nil
-	}
-	comp.ConfigSpecs = append(comp.ConfigSpecs,
-		appsv1alpha1.ComponentConfigSpec{
-			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-				Name:        name,
-				TemplateRef: configTemplateRef,
-				Namespace:   namespace,
-				VolumeName:  volumeName,
-			},
-			ConfigConstraintRef: configConstraintRef,
-			InjectEnvTo:         injectEnvTo,
-		})
-	return factory
-}
-
-func (factory *MockClusterDefFactory) AddLogConfig(name, filePathPattern string) *MockClusterDefFactory {
-	comp := factory.getLastCompDef()
-	if comp == nil {
-		return nil
-	}
-	comp.LogConfigs = append(comp.LogConfigs, appsv1alpha1.LogConfig{
-		FilePathPattern: filePathPattern,
-		Name:            name,
-	})
-	return factory
-}
-
 func (factory *MockClusterDefFactory) AddContainerEnv(containerName string, envVar corev1.EnvVar) *MockClusterDefFactory {
 	comp := factory.getLastCompDef()
 	if comp == nil {
@@ -155,13 +92,6 @@ func (factory *MockClusterDefFactory) AddHorizontalScalePolicy(policy appsv1alph
 	return factory
 }
 
-func (factory *MockClusterDefFactory) get1stCompDef() *appsv1alpha1.ClusterComponentDefinition {
-	if len(factory.Get().Spec.ComponentDefs) == 0 {
-		return nil
-	}
-	return &factory.Get().Spec.ComponentDefs[0]
-}
-
 func (factory *MockClusterDefFactory) getLastCompDef() *appsv1alpha1.ClusterComponentDefinition {
 	l := len(factory.Get().Spec.ComponentDefs)
 	if l == 0 {
@@ -171,39 +101,12 @@ func (factory *MockClusterDefFactory) getLastCompDef() *appsv1alpha1.ClusterComp
 	return &comps[l-1]
 }
 
-func (factory *MockClusterDefFactory) SetServiceSpec(svc *appsv1alpha1.ServiceSpec) *MockClusterDefFactory {
-	comp := factory.get1stCompDef()
-	if comp == nil {
-		return factory
-	}
-	comp.Service = svc
-	return factory
-}
-
-func (factory *MockClusterDefFactory) AddSystemAccountSpec(sysAccounts *appsv1alpha1.SystemAccountSpec) *MockClusterDefFactory {
-	comp := factory.getLastCompDef()
-	if comp == nil {
-		return factory
-	}
-	comp.SystemAccounts = sysAccounts
-	return factory
-}
-
 func (factory *MockClusterDefFactory) AddSwitchoverSpec(switchoverSpec *appsv1alpha1.SwitchoverSpec) *MockClusterDefFactory {
 	comp := factory.getLastCompDef()
 	if comp == nil {
 		return factory
 	}
 	comp.SwitchoverSpec = switchoverSpec
-	return factory
-}
-
-func (factory *MockClusterDefFactory) AddServiceRefDeclarations(serviceRefDeclarations []appsv1alpha1.ServiceRefDeclaration) *MockClusterDefFactory {
-	comp := factory.getLastCompDef()
-	if comp == nil {
-		return factory
-	}
-	comp.ServiceRefDeclarations = serviceRefDeclarations
 	return factory
 }
 
@@ -231,41 +134,6 @@ func (factory *MockClusterDefFactory) AddReplicationSpec(replicationSpec *appsv1
 		return factory
 	}
 	comp.ReplicationSpec = replicationSpec
-	return factory
-}
-
-func (factory *MockClusterDefFactory) AddComponentRef(ref *appsv1alpha1.ComponentDefRef) *MockClusterDefFactory {
-	comp := factory.getLastCompDef()
-	if comp == nil {
-		return factory
-	}
-	if len(comp.ComponentDefRef) == 0 {
-		comp.ComponentDefRef = make([]appsv1alpha1.ComponentDefRef, 0)
-	}
-	comp.ComponentDefRef = append(comp.ComponentDefRef, *ref)
-	return factory
-}
-
-func (factory *MockClusterDefFactory) AddNamedServicePort(name string, port int32) *MockClusterDefFactory {
-	comp := factory.getLastCompDef()
-	if comp == nil {
-		return nil
-	}
-	if comp.Service != nil {
-		comp.Service.Ports = append(comp.Service.Ports, appsv1alpha1.ServicePort{
-			Name:     name,
-			Protocol: corev1.ProtocolTCP,
-			Port:     port,
-		})
-		return factory
-	}
-	comp.Service = &appsv1alpha1.ServiceSpec{
-		Ports: []appsv1alpha1.ServicePort{{
-			Name:     name,
-			Protocol: corev1.ProtocolTCP,
-			Port:     port,
-		}},
-	}
 	return factory
 }
 

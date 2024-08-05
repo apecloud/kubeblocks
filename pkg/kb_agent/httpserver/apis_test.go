@@ -26,12 +26,13 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/valyala/fasthttp"
+
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/handlers"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
-	"github.com/stretchr/testify/assert"
-	"github.com/valyala/fasthttp"
 )
 
 func TestEndpoints(t *testing.T) {

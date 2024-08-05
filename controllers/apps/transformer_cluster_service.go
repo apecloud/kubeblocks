@@ -131,7 +131,6 @@ func (t *clusterServiceTransformer) convertLegacyClusterCompSpecServices(transCt
 		if clusterCompDef == nil {
 			continue
 		}
-		defaultLegacyServicePorts := clusterCompDef.Service.ToSVCPorts()
 
 		for _, item := range compSpec.Services {
 			legacyService := &appsv1alpha1.ClusterService{
@@ -140,7 +139,7 @@ func (t *clusterServiceTransformer) convertLegacyClusterCompSpecServices(transCt
 					ServiceName: constant.GenerateClusterServiceName(cluster.Name, item.Name),
 					Annotations: item.Annotations,
 					Spec: corev1.ServiceSpec{
-						Ports: defaultLegacyServicePorts,
+						Ports: []corev1.ServicePort{},
 						Type:  item.ServiceType,
 					},
 				},

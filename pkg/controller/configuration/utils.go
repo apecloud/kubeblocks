@@ -30,3 +30,11 @@ func inDataContext() *multicluster.ClientOption {
 func inDataContextUnspecified() *multicluster.ClientOption {
 	return multicluster.InDataContextUnspecified()
 }
+
+func copyMap(data map[string]string) map[string]string {
+	r := make(map[string]string, len(data))
+	for k, v := range data {
+		r[k] = v
+	}
+	return r
+}

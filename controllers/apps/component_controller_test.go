@@ -157,17 +157,15 @@ var _ = Describe("Component Controller", func() {
 		allSettings   map[string]interface{}
 	)
 
-	resetViperCfg := func() {
+	resetTestContext := func() {
+		clusterDefObj = nil
+		compDefObj = nil
+		compVerObj = nil
+		clusterObj = nil
 		if allSettings != nil {
 			Expect(viper.MergeConfigMap(allSettings)).ShouldNot(HaveOccurred())
 			allSettings = nil
 		}
-	}
-
-	resetTestContext := func() {
-		clusterDefObj = nil
-		clusterObj = nil
-		resetViperCfg()
 	}
 
 	// Cleanups
@@ -378,32 +376,6 @@ var _ = Describe("Component Controller", func() {
 				g.Expect(int(*its.Spec.Replicas)).To(BeEquivalentTo(replicas))
 			})).Should(Succeed())
 		}
-	}
-
-	testChangeReplicasFromZero := func(compName, compDefName string) {
-		var (
-			init   = int32(0)
-			target = int32(3)
-		)
-
-		createClusterObjV2(compName, compDefObj.Name, func(f *testapps.MockClusterFactory) {
-			f.SetReplicas(init)
-		})
-
-		By(fmt.Sprintf("change replicas to %d", target))
-		changeComponentReplicas(clusterKey, target)
-
-		By("checking the number of replicas in component and ITS as expected")
-		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
-			g.Expect(comp.Spec.Replicas).Should(Equal(target))
-			g.Expect(comp.Generation).Should(Equal(comp.Status.ObservedGeneration))
-		})).Should(Succeed())
-
-		By("checking the number of replicas in ITS as expected")
-		itsKey := compKey
-		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
-			g.Expect(*its.Spec.Replicas).Should(Equal(target))
-		})).Should(Succeed())
 	}
 
 	testChangeReplicasToZero := func(compName, compDefName string) {
@@ -1284,7 +1256,7 @@ var _ = Describe("Component Controller", func() {
 		targetEnvVars := []corev1.EnvVar{
 			{
 				Name:  "SERVICE_HOST",
-				Value: constant.GenerateComponentServiceName(clusterObj.Name, compName, compDefObj.Spec.Services[0].Name),
+				Value: constant.GenerateComponentServiceName(clusterObj.Name, compName, compDefObj.Spec.Services[0].ServiceName),
 			},
 			{
 				Name:  "SERVICE_PORT",
@@ -2134,9 +2106,16 @@ var _ = Describe("Component Controller", func() {
 		})
 
 		It("with component zero replicas", func() {
-			createClusterObjV2(defaultCompName, compDefName, func(f *testapps.MockClusterFactory) {
-				f.SetReplicas(0)
-			})
+			phase := appsv1alpha1.ClusterPhase("")
+			createClusterObjVx("", defaultCompName, compDefName, true,
+				func(f *testapps.MockClusterFactory) {
+					f.SetReplicas(0)
+				}, &phase)
+
+			By("checking the component status can't be reconciled well")
+			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
+				g.Expect(comp.Generation > comp.Status.ObservedGeneration).Should(BeTrue())
+			})).Should(Succeed())
 		})
 
 		It("with component services", func() {
@@ -2200,10 +2179,6 @@ var _ = Describe("Component Controller", func() {
 
 		It("should create/delete pods to match the desired replica number", func() {
 			testChangeReplicas(replicationCompName, replicationCompDefName)
-		})
-
-		It("scale-out from 0", func() {
-			testChangeReplicasFromZero(replicationCompName, replicationCompDefName)
 		})
 
 		It("scale-in to 0", func() {
@@ -2340,10 +2315,6 @@ var _ = Describe("Component Controller", func() {
 				It("scale-in to 0 and PVCs should not been deleted", func() {
 					testHorizontalScale(compName, compDefObj.Name, 3, 0, appsv1alpha1.HScaleDataClonePolicyCloneVolume)
 				})
-
-				It("scale-out from 0 and should work well", func() {
-					testHorizontalScale(compName, compDefObj.Name, 0, 3, appsv1alpha1.HScaleDataClonePolicyCloneVolume)
-				})
 			})
 
 			Context(fmt.Sprintf("[comp: %s] scale-out after volume expansion", compName), func() {
@@ -2361,7 +2332,7 @@ var _ = Describe("Component Controller", func() {
 		}
 	})
 
-	When("creating cluster with workloadType=consensus component", func() {
+	Context("creating cluster with workloadType=consensus component", func() {
 		BeforeEach(func() {
 			createAllWorkloadTypesClusterDef()
 			createBackupPolicyTpl(clusterDefObj, compDefName)

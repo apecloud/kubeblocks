@@ -77,8 +77,7 @@ var (
 	}
 
 	statelessNginxComponent = appsv1alpha1.ClusterComponentDefinition{
-		WorkloadType:  appsv1alpha1.Stateless,
-		CharacterType: "stateless",
+		WorkloadType: appsv1alpha1.Stateless,
 		Probes: &appsv1alpha1.ClusterDefinitionProbes{
 			RoleProbe: &appsv1alpha1.ClusterDefinitionProbe{
 				FailureThreshold: 3,
@@ -86,18 +85,11 @@ var (
 				TimeoutSeconds:   5,
 			},
 		},
-		VolumeProtectionSpec: &appsv1alpha1.VolumeProtectionSpec{},
 		PodSpec: &corev1.PodSpec{
 			Containers: []corev1.Container{{
 				Name:      DefaultNginxContainerName,
 				Image:     NginxImage,
 				Resources: zeroResRequirements,
-			}},
-		},
-		Service: &appsv1alpha1.ServiceSpec{
-			Ports: []appsv1alpha1.ServicePort{{
-				Protocol: corev1.ProtocolTCP,
-				Port:     80,
 			}},
 		},
 	}
@@ -138,8 +130,7 @@ var (
 	}
 
 	statefulMySQLComponent = appsv1alpha1.ClusterComponentDefinition{
-		WorkloadType:  appsv1alpha1.Stateful,
-		CharacterType: "mysql",
+		WorkloadType: appsv1alpha1.Stateful,
 		Probes: &appsv1alpha1.ClusterDefinitionProbes{
 			RoleProbe: &appsv1alpha1.ClusterDefinitionProbe{
 				FailureThreshold: 3,
@@ -147,17 +138,9 @@ var (
 				TimeoutSeconds:   5,
 			},
 		},
-		VolumeProtectionSpec: &appsv1alpha1.VolumeProtectionSpec{},
-		Service:              &defaultMySQLService,
 		PodSpec: &corev1.PodSpec{
 			Containers: []corev1.Container{
 				defaultMySQLContainer,
-			},
-		},
-		VolumeTypes: []appsv1alpha1.VolumeTypeSpec{
-			{
-				Name: DataVolumeName,
-				Type: appsv1alpha1.VolumeTypeData,
 			},
 		},
 	}
@@ -176,17 +159,8 @@ var (
 		},
 	}
 
-	defaultMySQLService = appsv1alpha1.ServiceSpec{
-		Ports: []appsv1alpha1.ServicePort{{
-			Name:     "mysql",
-			Protocol: corev1.ProtocolTCP,
-			Port:     3306,
-		}},
-	}
-
 	consensusMySQLComponent = appsv1alpha1.ClusterComponentDefinition{
 		WorkloadType:  appsv1alpha1.Consensus,
-		CharacterType: "mysql",
 		ConsensusSpec: &defaultConsensusSpec,
 		Probes: &appsv1alpha1.ClusterDefinitionProbes{
 			RoleProbe: &appsv1alpha1.ClusterDefinitionProbe{
@@ -195,17 +169,9 @@ var (
 				TimeoutSeconds:   5,
 			},
 		},
-		VolumeProtectionSpec: &appsv1alpha1.VolumeProtectionSpec{},
-		Service:              &defaultMySQLService,
 		PodSpec: &corev1.PodSpec{
 			Containers: []corev1.Container{
 				defaultMySQLContainer,
-			},
-		},
-		VolumeTypes: []appsv1alpha1.VolumeTypeSpec{
-			{
-				Name: DataVolumeName,
-				Type: appsv1alpha1.VolumeTypeData,
 			},
 		},
 	}
@@ -231,6 +197,24 @@ var (
 			},
 		},
 		Services: []appsv1alpha1.ComponentService{
+			{
+				Service: appsv1alpha1.Service{
+					Name: "default",
+					Spec: corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{
+							{
+								Protocol: corev1.ProtocolTCP,
+								Port:     3306,
+								TargetPort: intstr.IntOrString{
+									Type:   intstr.String,
+									StrVal: "mysql",
+								},
+							},
+						},
+					},
+					RoleSelector: "leader",
+				},
+			},
 			{
 				Service: appsv1alpha1.Service{
 					Name:        "rw",
@@ -358,13 +342,6 @@ var (
 		},
 	}
 
-	defaultRedisService = appsv1alpha1.ServiceSpec{
-		Ports: []appsv1alpha1.ServicePort{{
-			Protocol: corev1.ProtocolTCP,
-			Port:     6379,
-		}},
-	}
-
 	defaultReplicationRedisVolumeMounts = []corev1.VolumeMount{
 		{
 			Name:      DataVolumeName,
@@ -417,8 +394,7 @@ var (
 	}
 
 	replicationRedisComponent = appsv1alpha1.ClusterComponentDefinition{
-		WorkloadType:  appsv1alpha1.Replication,
-		CharacterType: "redis",
+		WorkloadType: appsv1alpha1.Replication,
 		Probes: &appsv1alpha1.ClusterDefinitionProbes{
 			RoleProbe: &appsv1alpha1.ClusterDefinitionProbe{
 				FailureThreshold: 3,
@@ -426,12 +402,6 @@ var (
 				TimeoutSeconds:   5,
 			},
 		},
-		VolumeProtectionSpec: &appsv1alpha1.VolumeProtectionSpec{},
-		Service:              &defaultRedisService,
-		VolumeTypes: []appsv1alpha1.VolumeTypeSpec{{
-			Name: DataVolumeName,
-			Type: appsv1alpha1.VolumeTypeData,
-		}},
 		PodSpec: &corev1.PodSpec{
 			Volumes: []corev1.Volume{
 				{

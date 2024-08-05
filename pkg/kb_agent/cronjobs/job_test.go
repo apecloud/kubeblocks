@@ -24,9 +24,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestNewJob(t *testing.T) {

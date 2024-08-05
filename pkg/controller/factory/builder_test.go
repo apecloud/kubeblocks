@@ -49,7 +49,6 @@ var _ = Describe("builder", func() {
 	const mysqlCompDefName = "replicasets"
 	const proxyCompDefName = "proxy"
 	const mysqlCompName = "mysql"
-	const mysqlCharacterType = "mysql"
 
 	allFieldsClusterDefObj := func(needCreate bool) *appsv1alpha1.ClusterDefinition {
 		By("By assure an clusterDefinition obj")
@@ -152,7 +151,6 @@ var _ = Describe("builder", func() {
 			Expect(pvc.Spec.AccessModes).Should(Equal(its.Spec.VolumeClaimTemplates[0].Spec.AccessModes))
 			Expect(pvc.Spec.Resources).Should(Equal(synthesizedComponent.VolumeClaimTemplates[0].Spec.Resources))
 			Expect(pvc.Spec.StorageClassName).Should(Equal(synthesizedComponent.VolumeClaimTemplates[0].Spec.StorageClassName))
-			Expect(pvc.Labels[constant.VolumeTypeLabelKey]).ShouldNot(BeEmpty())
 		})
 
 		It("builds InstanceSet correctly", func() {
@@ -169,8 +167,6 @@ var _ = Describe("builder", func() {
 			Expect(err).Should(BeNil())
 			Expect(its).ShouldNot(BeNil())
 			Expect(*its.Spec.Replicas).Should(Equal(int32(0)))
-			Expect(its.Spec.VolumeClaimTemplates[0].Labels[constant.VolumeTypeLabelKey]).
-				Should(Equal(string(appsv1alpha1.VolumeTypeData)))
 
 			By("set workload type to Replication")
 			clusterDef.Spec.ComponentDefs[0].WorkloadType = appsv1alpha1.Replication
@@ -215,7 +211,6 @@ var _ = Describe("builder", func() {
 
 			By("set workload type to Consensus")
 			clusterDef.Spec.ComponentDefs[0].WorkloadType = appsv1alpha1.Consensus
-			clusterDef.Spec.ComponentDefs[0].CharacterType = mysqlCharacterType
 			clusterDef.Spec.ComponentDefs[0].ConsensusSpec = appsv1alpha1.NewConsensusSetSpec()
 			clusterDef.Spec.ComponentDefs[0].ConsensusSpec.UpdateStrategy = appsv1alpha1.BestEffortParallelStrategy
 			cluster.Spec.ComponentSpecs[0].Replicas = 3

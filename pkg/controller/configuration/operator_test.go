@@ -40,7 +40,7 @@ import (
 
 var _ = Describe("ConfigurationOperatorTest", func() {
 	var clusterObj *appsv1alpha1.Cluster
-	var clusterDefObj *appsv1alpha1.ClusterDefinition
+	var compDefObj *appsv1alpha1.ComponentDefinition
 	var componentObj *appsv1alpha1.Component
 	var synthesizedComponent *component.SynthesizedComponent
 	var configMapObj *corev1.ConfigMap
@@ -68,12 +68,12 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 	BeforeEach(func() {
 		// Add any setup steps that needs to be executed before each test
 		k8sMockClient = testutil.NewK8sMockClient()
-		clusterObj, clusterDefObj, _ = newAllFieldsClusterObj(nil, false)
-		synthesizedComponent = newAllFieldsSynthesizedComponent(clusterDefObj, clusterObj)
+		clusterObj, compDefObj, _ = newAllFieldsClusterObj(nil, false)
+		synthesizedComponent = newAllFieldsSynthesizedComponent(compDefObj, clusterObj)
 		componentObj = newAllFieldsComponent(clusterObj)
 		configMapObj = testapps.NewConfigMap("default", mysqlConfigName,
 			testapps.SetConfigMapData("test", "test"))
-		scriptsObj = testapps.NewConfigMap("default", mysqlScriptsConfigName,
+		scriptsObj = testapps.NewConfigMap("default", mysqlScriptsTemplateName,
 			testapps.SetConfigMapData("script.sh", "echo \"hello\""))
 		configurationObj = builder.NewConfigurationBuilder(testCtx.DefaultNamespace,
 			cfgcore.GenerateComponentConfigurationName(clusterName, mysqlCompName)).
@@ -111,7 +111,7 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 		It("NormalTest", func() {
 			k8sMockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult(
 				[]client.Object{
-					clusterDefObj,
+					compDefObj,
 					clusterObj,
 					clusterObj,
 					scriptsObj,
@@ -147,7 +147,7 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 			k8sMockClient.MockCreateMethod(testutil.WithCreateReturned(testutil.WithCreatedSucceedResult(), testutil.WithTimes(1)))
 			k8sMockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult(
 				[]client.Object{
-					clusterDefObj,
+					compDefObj,
 					clusterObj,
 					clusterObj,
 				},

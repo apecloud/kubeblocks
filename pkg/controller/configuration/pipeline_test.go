@@ -46,7 +46,7 @@ var _ = Describe("ConfigurationPipelineTest", func() {
 
 	var clusterObj *appsv1alpha1.Cluster
 	var componentObj *appsv1alpha1.Component
-	var clusterDefObj *appsv1alpha1.ClusterDefinition
+	var compDefObj *appsv1alpha1.ComponentDefinition
 	var synthesizedComponent *component.SynthesizedComponent
 	var configMapObj *corev1.ConfigMap
 	var configConstraint *appsv1beta1.ConfigConstraint
@@ -56,7 +56,7 @@ var _ = Describe("ConfigurationPipelineTest", func() {
 	mockAPIResource := func(lazyFetcher testutil.Getter) {
 		k8sMockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult(
 			[]client.Object{
-				clusterDefObj,
+				compDefObj,
 				clusterObj,
 				clusterObj,
 				configMapObj,
@@ -91,9 +91,9 @@ var _ = Describe("ConfigurationPipelineTest", func() {
 	BeforeEach(func() {
 		// Add any setup steps that needs to be executed before each test
 		k8sMockClient = testutil.NewK8sMockClient()
-		clusterObj, clusterDefObj, _ = newAllFieldsClusterObj(nil, false)
+		clusterObj, compDefObj, _ = newAllFieldsClusterObj(nil, false)
 		componentObj = newAllFieldsComponent(clusterObj)
-		synthesizedComponent = newAllFieldsSynthesizedComponent(clusterDefObj, clusterObj)
+		synthesizedComponent = newAllFieldsSynthesizedComponent(compDefObj, clusterObj)
 		configMapObj = testapps.NewConfigMap("default", mysqlConfigName,
 			testapps.SetConfigMapData(testConfigFile, `
 bgwriter_delay = '200ms'
@@ -195,7 +195,7 @@ max_connections = '1000'
 			By("update configuration resource")
 			err = reconcileTask.InitConfigSpec().
 				Configuration().
-				ConfigMap(configSpecName).
+				ConfigMap(configTemplateName).
 				ConfigConstraints(reconcileTask.ConfigSpec().ConfigConstraintRef).
 				PrepareForTemplate().
 				RerenderTemplate().
@@ -210,7 +210,7 @@ max_connections = '1000'
 			reconcileTask.item.Version = "v2"
 			err = reconcileTask.InitConfigSpec().
 				Configuration().
-				ConfigMap(configSpecName).
+				ConfigMap(configTemplateName).
 				ConfigConstraints(reconcileTask.ConfigSpec().ConfigConstraintRef).
 				PrepareForTemplate().
 				RerenderTemplate().

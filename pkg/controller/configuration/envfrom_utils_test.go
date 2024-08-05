@@ -36,17 +36,15 @@ import (
 )
 
 var _ = Describe("ConfigEnvFrom test", func() {
-
 	const (
-		clusterDefName = "test-clusterdef"
-		clusterName    = "test-cluster"
-
-		mysqlCompDefName = "replicasets"
-		mysqlCompName    = "mysql"
+		compDefName   = "test-compdef"
+		clusterName   = "test-cluster"
+		mysqlCompName = "mysql"
 	)
+
 	var (
-		clusterDef *appsv1alpha1.ClusterDefinition
-		cluster    *appsv1alpha1.Cluster
+		compDef *appsv1alpha1.ComponentDefinition
+		cluster *appsv1alpha1.Cluster
 
 		k8sMockClient    *testutil.K8sClientMockHelper
 		origCMObject     *corev1.ConfigMap
@@ -62,12 +60,14 @@ var _ = Describe("ConfigEnvFrom test", func() {
 		configConstraint = testapps.NewCustomizedObj("config/envfrom-constraint.yaml",
 			&appsv1beta1.ConfigConstraint{})
 
-		clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-			AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
+		compDef = testapps.NewComponentDefinitionFactory(compDefName).
+			SetDefaultSpec().
+			AddConfigTemplate(cm.Name, cm.Name, configConstraint.Name, testCtx.DefaultNamespace, "mysql-config", testapps.DefaultMySQLContainerName).
 			GetObject()
+
 		pvcSpec := testapps.NewPVCSpec("1Gi")
-		cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDef.Name).
-			AddComponent(mysqlCompName, mysqlCompDefName).
+		cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
+			AddComponentV2(mysqlCompName, compDef.Name).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			GetObject()
 
@@ -85,7 +85,10 @@ var _ = Describe("ConfigEnvFrom test", func() {
 				Ctx: ctx,
 				Log: logger,
 			}
-			synthesizeComp, err := component.BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli, clusterDef, cluster, &cluster.Spec.ComponentSpecs[0])
+			comp, err := component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
+			Expect(err).Should(Succeed())
+
+			synthesizeComp, err := component.BuildSynthesizedComponent(reqCtx, testCtx.Cli, cluster, compDef, comp)
 			Expect(err).Should(Succeed())
 
 			podSpec := &corev1.PodSpec{
@@ -95,12 +98,15 @@ var _ = Describe("ConfigEnvFrom test", func() {
 					},
 				},
 			}
-			k8sMockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult([]client.Object{
-				origCMObject,
-				configConstraint,
-			}), testutil.WithAnyTimes()))
-			k8sMockClient.MockCreateMethod(testutil.WithCreateReturned(testutil.WithCreatedFailedResult(), testutil.WithTimes(1)),
-				testutil.WithCreateReturned(testutil.WithCreatedSucceedResult(), testutil.WithAnyTimes()))
+			k8sMockClient.MockGetMethod(
+				testutil.WithGetReturned(testutil.WithConstructSimpleGetResult([]client.Object{
+					origCMObject,
+					configConstraint,
+				}), testutil.WithAnyTimes()))
+			k8sMockClient.MockCreateMethod(
+				testutil.WithCreateReturned(testutil.WithCreatedFailedResult(), testutil.WithTimes(1)),
+				testutil.WithCreateReturned(testutil.WithCreatedSucceedResult(), testutil.WithAnyTimes()),
+			)
 
 			Expect(injectTemplateEnvFrom(cluster, synthesizeComp, podSpec, k8sMockClient.Client(), reqCtx.Ctx, nil)).ShouldNot(Succeed())
 			Expect(injectTemplateEnvFrom(cluster, synthesizeComp, podSpec, k8sMockClient.Client(), reqCtx.Ctx, nil)).Should(Succeed())

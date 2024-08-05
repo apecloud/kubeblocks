@@ -40,10 +40,8 @@ var _ = Describe("Component Definition Convertor", func() {
 
 			clusterName = "mysql-test"
 
-			defaultHighWatermark = 90
-			lowerHighWatermark   = 85
-			dataVolumeName       = "data"
-			logVolumeName        = "log"
+			dataVolumeName = "data"
+			logVolumeName  = "log"
 
 			defaultVolumeMode = int32(0555)
 
@@ -66,9 +64,8 @@ var _ = Describe("Component Definition Convertor", func() {
 
 		BeforeEach(func() {
 			clusterCompDef = &appsv1alpha1.ClusterComponentDefinition{
-				Name:          "mysql",
-				WorkloadType:  appsv1alpha1.Consensus,
-				CharacterType: "mysql",
+				Name:         "mysql",
+				WorkloadType: appsv1alpha1.Consensus,
 				ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{
 					{
 						ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
@@ -244,26 +241,6 @@ var _ = Describe("Component Definition Convertor", func() {
 						},
 					},
 				},
-				VolumeTypes: []appsv1alpha1.VolumeTypeSpec{
-					{
-						Name: dataVolumeName,
-						Type: appsv1alpha1.VolumeTypeData,
-					},
-					{
-						Name: logVolumeName,
-						Type: appsv1alpha1.VolumeTypeLog,
-					},
-				},
-				SwitchoverSpec: &appsv1alpha1.SwitchoverSpec{},
-				VolumeProtectionSpec: &appsv1alpha1.VolumeProtectionSpec{
-					HighWatermark: defaultHighWatermark,
-					Volumes: []appsv1alpha1.ProtectedVolume{
-						{
-							Name:          logVolumeName,
-							HighWatermark: &lowerHighWatermark,
-						},
-					},
-				},
 			}
 		})
 
@@ -285,7 +262,7 @@ var _ = Describe("Component Definition Convertor", func() {
 			convertor := &compDefServiceKindConvertor{}
 			res, err := convertor.convert(clusterCompDef)
 			Expect(err).Should(Succeed())
-			Expect(res).Should(Equal(clusterCompDef.CharacterType))
+			Expect(res).Should(BeEmpty())
 		})
 
 		It("service version", func() {
@@ -347,48 +324,11 @@ var _ = Describe("Component Definition Convertor", func() {
 		})
 
 		Context("volumes", func() {
-			It("w/o volume types", func() {
-				clusterCompDefCopy := clusterCompDef.DeepCopy()
-				clusterCompDefCopy.VolumeTypes = nil
-
-				convertor := &compDefVolumesConvertor{}
-				res, err := convertor.convert(clusterCompDefCopy)
-				Expect(err).Should(Succeed())
-				Expect(res).Should(BeNil())
-			})
-
-			It("w/o volume protection", func() {
-				clusterCompDefCopy := clusterCompDef.DeepCopy()
-				clusterCompDefCopy.VolumeProtectionSpec = nil
-
-				convertor := &compDefVolumesConvertor{}
-				res, err := convertor.convert(clusterCompDefCopy)
-				Expect(err).Should(Succeed())
-
-				expectedVolumes := make([]appsv1alpha1.ComponentVolume, 0)
-				for _, vol := range clusterCompDef.VolumeTypes {
-					expectedVolumes = append(expectedVolumes, appsv1alpha1.ComponentVolume{Name: vol.Name})
-				}
-				Expect(res).Should(BeEquivalentTo(expectedVolumes))
-			})
-
 			It("ok", func() {
 				convertor := &compDefVolumesConvertor{}
 				res, err := convertor.convert(clusterCompDef)
 				Expect(err).Should(Succeed())
-
-				expectedVolumes := make([]appsv1alpha1.ComponentVolume, 0)
-				for _, vol := range clusterCompDef.VolumeTypes {
-					highWatermark := 0
-					if vol.Name == logVolumeName {
-						highWatermark = lowerHighWatermark
-					}
-					expectedVolumes = append(expectedVolumes, appsv1alpha1.ComponentVolume{
-						Name:          vol.Name,
-						HighWatermark: highWatermark,
-					})
-				}
-				Expect(res).Should(BeEquivalentTo(expectedVolumes))
+				Expect(res).Should(BeNil())
 			})
 		})
 
@@ -774,13 +714,12 @@ var _ = Describe("Component Definition Convertor", func() {
 				Expect(err).Should(Succeed())
 
 				actions := res.(*appsv1alpha1.ComponentLifecycleActions)
-				// mysql + consensus -> wesql
-				wesqlBuiltinHandler := func() *appsv1alpha1.BuiltinActionHandlerType {
-					handler := appsv1alpha1.WeSQLBuiltinActionHandler
+				builtinHandler := func() *appsv1alpha1.BuiltinActionHandlerType {
+					handler := appsv1alpha1.UnknownBuiltinActionHandler
 					return &handler
 				}
 				expectedRoleProbe := &appsv1alpha1.Probe{
-					BuiltinHandler: wesqlBuiltinHandler(),
+					BuiltinHandler: builtinHandler(),
 					Action: appsv1alpha1.Action{
 						TimeoutSeconds: clusterCompDef.Probes.RoleProbe.TimeoutSeconds,
 					},
@@ -814,7 +753,7 @@ var _ = Describe("Component Definition Convertor", func() {
 
 				actions := res.(*appsv1alpha1.ComponentLifecycleActions)
 				Expect(actions.RoleProbe).ShouldNot(BeNil())
-				Expect(*actions.RoleProbe.BuiltinHandler).Should(BeEquivalentTo(appsv1alpha1.WeSQLBuiltinActionHandler))
+				Expect(*actions.RoleProbe.BuiltinHandler).Should(BeEquivalentTo(appsv1alpha1.UnknownBuiltinActionHandler))
 				Expect(actions.RoleProbe.Exec).ShouldNot(BeNil())
 				Expect(actions.RoleProbe.Exec.Image).Should(BeEquivalentTo("mock-its-role-probe-image"))
 				Expect(actions.RoleProbe.Exec.Command).Should(BeEquivalentTo(mockCommand))

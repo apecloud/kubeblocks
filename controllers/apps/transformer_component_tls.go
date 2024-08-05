@@ -75,7 +75,8 @@ func checkAndTriggerReRender(ctx context.Context, synthesizedComp component.Synt
 	}
 
 	// TODO: (good-first-issue) don't hard code the tls keyword
-	tlsKeyword := plan.GetTLSKeyWord(synthesizedComp.CharacterType)
+	// TODO(v1.0): character-type
+	tlsKeyword := plan.GetTLSKeyWord(synthesizedComp.ServiceKind)
 	if tlsKeyword == "unsupported-character-type" {
 		return nil
 	}

@@ -89,10 +89,6 @@ spec:
 
                     Deprecated: Use ComponentDefinition instead. This type is deprecated as of version 0.8.
                   properties:
-                    characterType:
-                      description: Defines well-known database component name, such
-                        as mongos(mongodb), proxy(redis), mariadb(mysql).
-                      type: string
                     componentDefRef:
                       description: |-
                         Used to inject values from other components into the current component. Values will be saved and updated in a

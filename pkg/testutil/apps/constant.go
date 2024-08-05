@@ -77,8 +77,7 @@ var (
 	}
 
 	statelessNginxComponent = appsv1alpha1.ClusterComponentDefinition{
-		WorkloadType:  appsv1alpha1.Stateless,
-		CharacterType: "stateless",
+		WorkloadType: appsv1alpha1.Stateless,
 		Probes: &appsv1alpha1.ClusterDefinitionProbes{
 			RoleProbe: &appsv1alpha1.ClusterDefinitionProbe{
 				FailureThreshold: 3,
@@ -160,8 +159,7 @@ var (
 	}
 
 	statefulMySQLComponent = appsv1alpha1.ClusterComponentDefinition{
-		WorkloadType:  appsv1alpha1.Stateful,
-		CharacterType: "mysql",
+		WorkloadType: appsv1alpha1.Stateful,
 		Probes: &appsv1alpha1.ClusterDefinitionProbes{
 			RoleProbe: &appsv1alpha1.ClusterDefinitionProbe{
 				FailureThreshold: 3,
@@ -201,7 +199,6 @@ var (
 
 	consensusMySQLComponent = appsv1alpha1.ClusterComponentDefinition{
 		WorkloadType:  appsv1alpha1.Consensus,
-		CharacterType: "mysql",
 		ConsensusSpec: &defaultConsensusSpec,
 		Probes: &appsv1alpha1.ClusterDefinitionProbes{
 			RoleProbe: &appsv1alpha1.ClusterDefinitionProbe{
@@ -425,8 +422,7 @@ var (
 	}
 
 	replicationRedisComponent = appsv1alpha1.ClusterComponentDefinition{
-		WorkloadType:  appsv1alpha1.Replication,
-		CharacterType: "redis",
+		WorkloadType: appsv1alpha1.Replication,
 		Probes: &appsv1alpha1.ClusterDefinitionProbes{
 			RoleProbe: &appsv1alpha1.ClusterDefinitionProbe{
 				FailureThreshold: 3,

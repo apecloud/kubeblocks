@@ -492,11 +492,6 @@ type ClusterComponentDefinition struct {
 	// +kubebuilder:validation:Required
 	WorkloadType WorkloadType `json:"workloadType"`
 
-	// Defines well-known database component name, such as mongos(mongodb), proxy(redis), mariadb(mysql).
-	//
-	// +optional
-	CharacterType string `json:"characterType,omitempty"`
-
 	// Defines the template of configurations.
 	//
 	// +patchMergeKey=name

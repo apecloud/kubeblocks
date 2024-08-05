@@ -64,9 +64,8 @@ var _ = Describe("Component Definition Convertor", func() {
 
 		BeforeEach(func() {
 			clusterCompDef = &appsv1alpha1.ClusterComponentDefinition{
-				Name:          "mysql",
-				WorkloadType:  appsv1alpha1.Consensus,
-				CharacterType: "mysql",
+				Name:         "mysql",
+				WorkloadType: appsv1alpha1.Consensus,
 				ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{
 					{
 						ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
@@ -266,7 +265,7 @@ var _ = Describe("Component Definition Convertor", func() {
 			convertor := &compDefServiceKindConvertor{}
 			res, err := convertor.convert(clusterCompDef)
 			Expect(err).Should(Succeed())
-			Expect(res).Should(Equal(clusterCompDef.CharacterType))
+			Expect(res).Should(BeEmpty())
 		})
 
 		It("service version", func() {
@@ -718,13 +717,12 @@ var _ = Describe("Component Definition Convertor", func() {
 				Expect(err).Should(Succeed())
 
 				actions := res.(*appsv1alpha1.ComponentLifecycleActions)
-				// mysql + consensus -> wesql
-				wesqlBuiltinHandler := func() *appsv1alpha1.BuiltinActionHandlerType {
-					handler := appsv1alpha1.WeSQLBuiltinActionHandler
+				builtinHandler := func() *appsv1alpha1.BuiltinActionHandlerType {
+					handler := appsv1alpha1.UnknownBuiltinActionHandler
 					return &handler
 				}
 				expectedRoleProbe := &appsv1alpha1.Probe{
-					BuiltinHandler: wesqlBuiltinHandler(),
+					BuiltinHandler: builtinHandler(),
 					Action: appsv1alpha1.Action{
 						TimeoutSeconds: clusterCompDef.Probes.RoleProbe.TimeoutSeconds,
 					},
@@ -758,7 +756,7 @@ var _ = Describe("Component Definition Convertor", func() {
 
 				actions := res.(*appsv1alpha1.ComponentLifecycleActions)
 				Expect(actions.RoleProbe).ShouldNot(BeNil())
-				Expect(*actions.RoleProbe.BuiltinHandler).Should(BeEquivalentTo(appsv1alpha1.WeSQLBuiltinActionHandler))
+				Expect(*actions.RoleProbe.BuiltinHandler).Should(BeEquivalentTo(appsv1alpha1.UnknownBuiltinActionHandler))
 				Expect(actions.RoleProbe.Exec).ShouldNot(BeNil())
 				Expect(actions.RoleProbe.Exec.Image).Should(BeEquivalentTo("mock-its-role-probe-image"))
 				Expect(actions.RoleProbe.Exec.Command).Should(BeEquivalentTo(mockCommand))

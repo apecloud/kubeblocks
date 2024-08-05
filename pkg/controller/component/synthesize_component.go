@@ -154,6 +154,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		Name:                             compName,
 		FullCompName:                     comp.Name,
 		CompDefName:                      compDef.Name,
+		ServiceKind:                      compDefObj.Spec.ServiceKind,
 		ServiceVersion:                   comp.Spec.ServiceVersion,
 		ClusterGeneration:                clusterGeneration(cluster, comp),
 		UserDefinedLabels:                comp.Spec.Labels,
@@ -623,7 +624,6 @@ func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
 	buildWorkload := func() {
 		synthesizeComp.ClusterDefName = clusterDef.Name
 		synthesizeComp.ClusterCompDefName = clusterCompDef.Name
-		synthesizeComp.CharacterType = clusterCompDef.CharacterType
 		synthesizeComp.HorizontalScalePolicy = clusterCompDef.HorizontalScalePolicy
 	}
 

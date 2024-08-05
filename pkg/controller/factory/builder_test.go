@@ -49,7 +49,6 @@ var _ = Describe("builder", func() {
 	const mysqlCompDefName = "replicasets"
 	const proxyCompDefName = "proxy"
 	const mysqlCompName = "mysql"
-	const mysqlCharacterType = "mysql"
 
 	allFieldsClusterDefObj := func(needCreate bool) *appsv1alpha1.ClusterDefinition {
 		By("By assure an clusterDefinition obj")
@@ -279,7 +278,6 @@ var _ = Describe("builder", func() {
 
 			By("set workload type to Consensus")
 			clusterDef.Spec.ComponentDefs[0].WorkloadType = appsv1alpha1.Consensus
-			clusterDef.Spec.ComponentDefs[0].CharacterType = mysqlCharacterType
 			clusterDef.Spec.ComponentDefs[0].ConsensusSpec = appsv1alpha1.NewConsensusSetSpec()
 			clusterDef.Spec.ComponentDefs[0].ConsensusSpec.UpdateStrategy = appsv1alpha1.BestEffortParallelStrategy
 			cluster.Spec.ComponentSpecs[0].Replicas = 3

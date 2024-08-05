@@ -12,7 +12,7 @@ You can restart all pods of the cluster. When an exception occurs in a database,
 
 :::note
 
-All pods restart in the order of learner -> follower -> leader and the leader may change after the cluster restarts.
+The pod role may change after the cluster restarts.
 
 :::
 

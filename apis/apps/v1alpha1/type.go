@@ -26,7 +26,6 @@ import (
 
 const (
 	APIVersion            = "apps.kubeblocks.io/v1alpha1"
-	ClusterVersionKind    = "ClusterVersion"
 	ClusterDefinitionKind = "ClusterDefinition"
 	ClusterKind           = "Cluster"
 	ComponentKind         = "Component"
@@ -91,7 +90,6 @@ type ConfigTemplateExtension struct {
 	// Specifies the name of the referenced configuration template ConfigMap object.
 	//
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	TemplateRef string `json:"templateRef"`
 
@@ -99,7 +97,6 @@ type ConfigTemplateExtension struct {
 	// An empty namespace is equivalent to the "default" namespace.
 	//
 	// +kubebuilder:default="default"
-	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
@@ -307,7 +304,7 @@ const (
 	ConditionTypeSwitchoverPrefix    = "Switchover-"         // ConditionTypeSwitchoverPrefix component status condition of switchover
 )
 
-// Phase represents the current status of the ClusterDefinition and ClusterVersion CR.
+// Phase represents the current status of the ClusterDefinition CR.
 //
 // +enum
 // +kubebuilder:validation:Enum={Available,Unavailable}
@@ -686,22 +683,6 @@ const (
 	// Noop indicates that KubeBlocks will not perform any high-availability switching for the components. Users are
 	// required to implement their own HA solution or integrate an existing open-source HA solution.
 	Noop SwitchPolicyType = "Noop"
-)
-
-// VolumeType defines the type of volume, specifically distinguishing between volumes used for backup data and those used for logs.
-//
-// +enum
-// +kubebuilder:validation:Enum={data,log}
-type VolumeType string
-
-const (
-	// VolumeTypeData indicates a volume designated for storing backup data. This type of volume is optimized for the
-	// storage and retrieval of data backups, ensuring data persistence and reliability.
-	VolumeTypeData VolumeType = "data"
-
-	// VolumeTypeLog indicates a volume designated for storing logs. This type of volume is optimized for log data,
-	// facilitating efficient log storage, retrieval, and management.
-	VolumeTypeLog VolumeType = "log"
 )
 
 // BaseBackupType the base backup type, keep synchronized with the BaseBackupType of the data protection API.

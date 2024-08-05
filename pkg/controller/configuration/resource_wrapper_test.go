@@ -37,9 +37,8 @@ import (
 
 var _ = Describe("resource Fetcher", func() {
 	const (
-		clusterDefName     = "test-clusterdef"
-		clusterVersionName = "test-clusterversion"
-		clusterName        = "test-cluster"
+		clusterDefName = "test-clusterdef"
+		clusterName    = "test-cluster"
 
 		mysqlCompDefName = "replicasets"
 		mysqlCompName    = "mysql"
@@ -48,25 +47,18 @@ var _ = Describe("resource Fetcher", func() {
 	)
 
 	var (
-		k8sMockClient  *testutil.K8sClientMockHelper
-		clusterDef     *appsv1alpha1.ClusterDefinition
-		clusterVersion *appsv1alpha1.ClusterVersion
-		cluster        *appsv1alpha1.Cluster
+		k8sMockClient *testutil.K8sClientMockHelper
+		clusterDef    *appsv1alpha1.ClusterDefinition
+		cluster       *appsv1alpha1.Cluster
 	)
 
 	BeforeEach(func() {
 		k8sMockClient = testutil.NewK8sMockClient()
 		clusterDef = testapps.NewClusterDefFactory(clusterDefName).
 			AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
-			AddConfigTemplate(mysqlConfigName, mysqlConfigName, mysqlConfigName, "default", mysqlVolumeName).
-			GetObject()
-		clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-			AddComponentVersion(mysqlCompDefName).
-			AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 			GetObject()
 		pvcSpec := testapps.NewPVCSpec("1Gi")
-		cluster = testapps.NewClusterFactory("default", clusterName,
-			clusterDef.Name, clusterVersion.Name).
+		cluster = testapps.NewClusterFactory("default", clusterName, clusterDef.Name).
 			AddComponent(mysqlCompName, mysqlCompDefName).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			GetObject()
@@ -81,7 +73,6 @@ var _ = Describe("resource Fetcher", func() {
 			k8sMockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult(
 				[]client.Object{
 					clusterDef,
-					clusterVersion,
 					cluster,
 					testapps.NewConfigMap("default", cfgcore.GetComponentCfgName(clusterName, mysqlCompName, mysqlConfigName)),
 					&appsv1beta1.ConfigConstraint{
@@ -94,7 +85,6 @@ var _ = Describe("resource Fetcher", func() {
 			err := NewTest(k8sMockClient.Client(), ctx).
 				Cluster().
 				ClusterDef().
-				ClusterVer().
 				ComponentSpec().
 				ConfigMap(mysqlConfigName).
 				ConfigConstraints(mysqlConfigName).

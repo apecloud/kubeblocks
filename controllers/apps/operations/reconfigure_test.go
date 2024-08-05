@@ -24,8 +24,8 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/spf13/cast"
 
+	"github.com/spf13/cast"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -43,12 +43,10 @@ import (
 )
 
 var _ = Describe("Reconfigure OpsRequest", func() {
-
 	var (
-		randomStr             = testCtx.GetRandomStr()
-		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr
-		clusterVersionName    = "clusterversion-for-ops-" + randomStr
-		clusterName           = "cluster-for-ops-" + randomStr
+		randomStr   = testCtx.GetRandomStr()
+		compDefName = "test-compdef-" + randomStr
+		clusterName = "test-cluster-" + randomStr
 	)
 
 	cleanEnv := func() {
@@ -58,8 +56,8 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
+		// delete cluster(and all dependent sub-resources), cluster definition
+		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 
 		// delete rest resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
@@ -92,8 +90,8 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		return cfgCM, cfgTpl
 	}
 
-	assureConfigInstanceObj := func(clusterName, componentName, ns string, cdComponent *appsv1alpha1.ClusterComponentDefinition) (*appsv1alpha1.Configuration, *corev1.ConfigMap) {
-		if len(cdComponent.ConfigSpecs) == 0 {
+	assureConfigInstanceObj := func(clusterName, componentName, ns string, compDef *appsv1alpha1.ComponentDefinition) (*appsv1alpha1.Configuration, *corev1.ConfigMap) {
+		if len(compDef.Spec.Configs) == 0 {
 			return nil, nil
 		}
 
@@ -101,7 +99,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		configuration := builder.NewConfigurationBuilder(testCtx.DefaultNamespace, core.GenerateComponentConfigurationName(clusterName, componentName)).
 			ClusterRef(clusterName).
 			Component(componentName)
-		for _, configSpec := range cdComponent.ConfigSpecs {
+		for _, configSpec := range compDef.Spec.Configs {
 			configuration.AddConfigurationItem(configSpec)
 		}
 		Expect(testCtx.CheckedCreateObj(ctx, configuration.GetObject())).Should(Succeed())
@@ -119,7 +117,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 
 		By("create configmap for configSpecs")
 		var cmObj *corev1.ConfigMap
-		for _, configSpec := range cdComponent.ConfigSpecs {
+		for _, configSpec := range compDef.Spec.Configs {
 			cmInsName := core.GetComponentCfgName(clusterName, componentName, configSpec.Name)
 			By("create configmap: " + cmInsName)
 			cfgCM := testapps.NewCustomizedObj("operations_config/config-template.yaml",
@@ -144,13 +142,8 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 
 	assureMockReconfigureData := func(policyName string) (*OpsResource, *appsv1alpha1.Configuration, *corev1.ConfigMap) {
 		By("init operations resources ")
-		opsRes, clusterDef, clusterObject := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+		opsRes, compDef, clusterObject := initOperationsResources2(compDefName, clusterName)
 
-		var (
-			cfgObj       *corev1.ConfigMap
-			config       *appsv1alpha1.Configuration
-			stsComponent *appsv1alpha1.ClusterComponentDefinition
-		)
 		By("Test Reconfigure")
 		{
 			// mock cluster is Running to support reconfiguring ops
@@ -160,32 +153,24 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			Expect(k8sClient.Status().Patch(ctx, clusterObject, patch)).Should(Succeed())
 		}
 
-		{
-			By("mock config tpl")
-			cmObj, tplObj := assureCfgTplObj("mysql-tpl-test", "mysql-cm-test", testCtx.DefaultNamespace)
-			By("update clusterdefinition tpl")
-			patch := client.MergeFrom(clusterDef.DeepCopy())
-			for i := range clusterDef.Spec.ComponentDefs {
-				component := &clusterDef.Spec.ComponentDefs[i]
-				if component.Name != consensusComp {
-					continue
-				}
-				stsComponent = component
-				component.ConfigSpecs = []appsv1alpha1.ComponentConfigSpec{{
-					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-						Name:        "mysql-test",
-						TemplateRef: cmObj.Name,
-						VolumeName:  "mysql-config",
-						Namespace:   testCtx.DefaultNamespace,
-					},
-					ConfigConstraintRef: tplObj.Name,
-				}}
-			}
+		By("mock config tpl")
+		cmObj, tplObj := assureCfgTplObj("mysql-tpl-test", "mysql-cm-test", testCtx.DefaultNamespace)
 
-			Expect(k8sClient.Patch(ctx, clusterDef, patch)).Should(Succeed())
-			By("mock config cm object")
-			config, cfgObj = assureConfigInstanceObj(clusterName, consensusComp, testCtx.DefaultNamespace, stsComponent)
-		}
+		By("update clusterdefinition tpl")
+		patch := client.MergeFrom(compDef.DeepCopy())
+		compDef.Spec.Configs = []appsv1alpha1.ComponentConfigSpec{{
+			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+				Name:        "mysql-test",
+				TemplateRef: cmObj.Name,
+				VolumeName:  "mysql-config",
+				Namespace:   testCtx.DefaultNamespace,
+			},
+			ConfigConstraintRef: tplObj.Name,
+		}}
+		Expect(k8sClient.Patch(ctx, compDef, patch)).Should(Succeed())
+
+		By("mock config cm object")
+		config, cfgObj := assureConfigInstanceObj(clusterName, defaultCompName, testCtx.DefaultNamespace, compDef)
 
 		return opsRes, config, cfgObj
 	}
@@ -219,7 +204,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 						},
 					}},
 				}},
-				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: defaultCompName},
 			}
 
 			By("Init Reconfiguring opsrequest")
@@ -261,7 +246,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 
 			By("mock configmap controller to updated")
 			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKey{
-				Name:      core.GetComponentCfgName(clusterName, consensusComp, "mysql-test"),
+				Name:      core.GetComponentCfgName(clusterName, defaultCompName, "mysql-test"),
 				Namespace: testCtx.DefaultNamespace},
 				func(cm *corev1.ConfigMap) {
 					b, err := json.Marshal(item)
@@ -284,7 +269,6 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
 			_, _ = opsManager.Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsSucceedPhase))
-
 		})
 
 		It("Test Reconfigure OpsRequest with autoReload", func() {
@@ -310,7 +294,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 							}},
 					}},
 				}},
-				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: defaultCompName},
 			}
 
 			By("Init Reconfiguring opsrequest")
@@ -337,9 +321,9 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			mockClusterCompPhase := func(clusterObj *appsv1alpha1.Cluster, phase appsv1alpha1.ClusterComponentPhase) {
 				clusterObject := clusterObj.DeepCopy()
 				patch := client.MergeFrom(clusterObject.DeepCopy())
-				compStatus := clusterObject.Status.Components[consensusComp]
+				compStatus := clusterObject.Status.Components[defaultCompName]
 				compStatus.Phase = phase
-				clusterObject.Status.Components[consensusComp] = compStatus
+				clusterObject.Status.Components[defaultCompName] = compStatus
 				Expect(k8sClient.Status().Patch(ctx, clusterObject, patch)).Should(Succeed())
 			}
 			mockClusterCompPhase(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase)
@@ -347,7 +331,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 
 			By("check cluster.status.components[*].phase == Reconfiguring")
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
-			Expect(opsRes.Cluster.Status.Components[consensusComp].Phase).Should(Equal(appsv1alpha1.UpdatingClusterCompPhase)) // appsv1alpha1.ReconfiguringPhase
+			Expect(opsRes.Cluster.Status.Components[defaultCompName].Phase).Should(Equal(appsv1alpha1.UpdatingClusterCompPhase)) // appsv1alpha1.ReconfiguringPhase
 			// TODO: add status condition expect
 			_, _ = opsManager.Reconcile(reqCtx, k8sClient, opsRes)
 			// mock cluster.status.component.phase to Running
@@ -355,8 +339,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 
 			By("check cluster.status.components[*].phase == Running")
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.Cluster), opsRes.Cluster)).Should(Succeed())
-			Expect(opsRes.Cluster.Status.Components[consensusComp].Phase).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+			Expect(opsRes.Cluster.Status.Components[defaultCompName].Phase).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 		})
-
 	})
 })

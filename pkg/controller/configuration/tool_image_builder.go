@@ -29,6 +29,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -101,32 +102,36 @@ func checkAndInstallToolsImageVolume(toolContainers []appsv1beta1.ToolConfig, bu
 	return toolContainers, configManagerBinaryPath
 }
 
+func containerExists(containers []appsv1beta1.ToolConfig, containerName string) bool {
+	return generics.CountFunc(containers, func(container appsv1beta1.ToolConfig) bool {
+		return container.Name == containerName
+	}) != 0
+}
+
 func checkAndCreateRenderedInitContainer(toolContainers []appsv1beta1.ToolConfig, mountPoint string) []appsv1beta1.ToolConfig {
-	kbToolsImage := viper.GetString(constant.KBToolsImage)
-	for _, container := range toolContainers {
-		if container.Name == initSecRenderedToolContainerName {
-			return nil
-		}
+	if containerExists(toolContainers, initSecRenderedToolContainerName) {
+		return toolContainers
 	}
+
+	kbToolsImage := viper.GetString(constant.KBToolsImage)
 	toolContainers = append(toolContainers, appsv1beta1.ToolConfig{
 		Name:    initSecRenderedToolContainerName,
 		Image:   kbToolsImage,
-		Command: []string{"cp", constant.ConfigManagerToolPath, mountPoint},
+		Command: []string{"cp", constant.TPLRenderToolPath, mountPoint},
 	})
 	return toolContainers
 }
 
 func checkAndCreateConfigManagerToolsContainer(toolContainers []appsv1beta1.ToolConfig, mountPoint string) []appsv1beta1.ToolConfig {
-	kbToolsImage := viper.GetString(constant.KBToolsImage)
-	for _, container := range toolContainers {
-		if container.Name == installConfigMangerToolContainerName {
-			return nil
-		}
+	if containerExists(toolContainers, installConfigMangerToolContainerName) {
+		return toolContainers
 	}
+
+	kbToolsImage := viper.GetString(constant.KBToolsImage)
 	toolContainers = append(toolContainers, appsv1beta1.ToolConfig{
 		Name:    installConfigMangerToolContainerName,
 		Image:   kbToolsImage,
-		Command: []string{"cp", constant.TPLRenderToolPath, mountPoint},
+		Command: []string{"cp", constant.ConfigManagerToolPath, mountPoint},
 	})
 	return toolContainers
 }

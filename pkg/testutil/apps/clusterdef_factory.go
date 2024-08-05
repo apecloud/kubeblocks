@@ -91,55 +91,6 @@ func (factory *MockClusterDefFactory) AddComponentDef(tplType ComponentDefTplTyp
 	return factory
 }
 
-func (factory *MockClusterDefFactory) AddScriptTemplate(name,
-	configTemplateRef, namespace, volumeName string, mode *int32) *MockClusterDefFactory {
-	comp := factory.getLastCompDef()
-	if comp == nil {
-		return nil
-	}
-	comp.ScriptSpecs = append(comp.ScriptSpecs,
-		appsv1alpha1.ComponentTemplateSpec{
-			Name:        name,
-			TemplateRef: configTemplateRef,
-			Namespace:   namespace,
-			VolumeName:  volumeName,
-			DefaultMode: mode,
-		})
-	return factory
-}
-
-func (factory *MockClusterDefFactory) AddConfigTemplate(name,
-	configTemplateRef, configConstraintRef, namespace, volumeName string, injectEnvTo ...string) *MockClusterDefFactory {
-	comp := factory.getLastCompDef()
-	if comp == nil {
-		return nil
-	}
-	comp.ConfigSpecs = append(comp.ConfigSpecs,
-		appsv1alpha1.ComponentConfigSpec{
-			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-				Name:        name,
-				TemplateRef: configTemplateRef,
-				Namespace:   namespace,
-				VolumeName:  volumeName,
-			},
-			ConfigConstraintRef: configConstraintRef,
-			InjectEnvTo:         injectEnvTo,
-		})
-	return factory
-}
-
-func (factory *MockClusterDefFactory) AddLogConfig(name, filePathPattern string) *MockClusterDefFactory {
-	comp := factory.getLastCompDef()
-	if comp == nil {
-		return nil
-	}
-	comp.LogConfigs = append(comp.LogConfigs, appsv1alpha1.LogConfig{
-		FilePathPattern: filePathPattern,
-		Name:            name,
-	})
-	return factory
-}
-
 func (factory *MockClusterDefFactory) AddContainerEnv(containerName string, envVar corev1.EnvVar) *MockClusterDefFactory {
 	comp := factory.getLastCompDef()
 	if comp == nil {
@@ -188,15 +139,6 @@ func (factory *MockClusterDefFactory) AddSwitchoverSpec(switchoverSpec *appsv1al
 	return factory
 }
 
-func (factory *MockClusterDefFactory) AddServiceRefDeclarations(serviceRefDeclarations []appsv1alpha1.ServiceRefDeclaration) *MockClusterDefFactory {
-	comp := factory.getLastCompDef()
-	if comp == nil {
-		return factory
-	}
-	comp.ServiceRefDeclarations = serviceRefDeclarations
-	return factory
-}
-
 func (factory *MockClusterDefFactory) AddInitContainerVolumeMounts(containerName string, volumeMounts []corev1.VolumeMount) *MockClusterDefFactory {
 	comp := factory.getLastCompDef()
 	if comp == nil {
@@ -221,18 +163,6 @@ func (factory *MockClusterDefFactory) AddReplicationSpec(replicationSpec *appsv1
 		return factory
 	}
 	comp.ReplicationSpec = replicationSpec
-	return factory
-}
-
-func (factory *MockClusterDefFactory) AddComponentRef(ref *appsv1alpha1.ComponentDefRef) *MockClusterDefFactory {
-	comp := factory.getLastCompDef()
-	if comp == nil {
-		return factory
-	}
-	if len(comp.ComponentDefRef) == 0 {
-		comp.ComponentDefRef = make([]appsv1alpha1.ComponentDefRef, 0)
-	}
-	comp.ComponentDefRef = append(comp.ComponentDefRef, *ref)
 	return factory
 }
 

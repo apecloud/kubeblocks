@@ -10,13 +10,7 @@ sidebar_label: Scale
 
 ## Vertical scaling
 
-You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, if you need to change the resource class from 1C2G to 2C4G, vertical scaling is what you need.
-
-:::note
-
-During the vertical scaling process, all pods restart in the order of learner -> follower -> leader, and the leader pod may change after restarting.
-
-:::
+You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, you can change the resource class from 1C2G to 2C4G by performing vertical scaling.
 
 ### Before you start
 
@@ -28,9 +22,7 @@ kbcli cluster list pulsar-cluster
 
 ### Steps
 
-1. Change configuration. There are 3 ways to apply vertical scaling.
-
-   Configure the parameters `--components`, `--memory`, and `--cpu` and run the command.
+1. Configure the parameters `--components`, `--memory`, and `--cpu` and run the command.
 
    ```bash
    kbcli cluster vscale pulsar-cluster --cpu=3 --memory=10Gi --components=broker,bookies  
@@ -65,7 +57,9 @@ kbcli cluster list pulsar-cluster
 
 ## Horizontal scaling
 
-Horizontal scaling changes the amount of pods. For example, you can apply horizontal scaling to scale pods up from three to five. The scaling process includes the backup and restoration of data.
+Horizontal scaling changes the amount of pods. For example, you can scale out replicas from three to five.
+
+From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out instances, refer to [Horizontal Scale](./../../../api_docs/maintenance/scale/horizontal-scale.md) in API docs for more details and examples.
 
 ### Before you start
 
@@ -83,9 +77,8 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
    ```
 
    - `--components` describes the component name ready for horizontal scaling.
-   - `--replicas` describes the replicas with the specified components.
+   - `--replicas` describes the replica amount of the specified components. Edit the amount based on your demands to scale in or out replicas.
 
-   
 2. Validate the horizontal scaling operation.
 
    Check the cluster STATUS to identify the horizontal scaling status.

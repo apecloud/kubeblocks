@@ -89,7 +89,8 @@ func (o DataScriptOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.C
 
 	// create jobs
 	var jobs []*batchv1.Job
-	if jobs, err = buildDataScriptJobs(reqCtx, cli, opsResource.Cluster, component, opsRequest, componentDef.CharacterType); err != nil {
+	// TODO(v1.0): character-type
+	if jobs, err = buildDataScriptJobs(reqCtx, cli, opsResource.Cluster, component, opsRequest, ""); err != nil {
 		return err
 	}
 	for _, job := range jobs {
@@ -328,6 +329,7 @@ func buildDataScriptJobs(reqCtx intctrlutil.RequestCtx, cli client.Client, clust
 		job.Spec.BackoffLimit = pointer.Int32(0)
 		job.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyNever
 		job.Spec.Template.Spec.Containers = []corev1.Container{container}
+		job.Spec.Template.Spec.ImagePullSecrets = intctrlutil.BuildImagePullSecrets()
 
 		// add labels
 		job.Labels = getDataScriptJobLabels(cluster.Name, component.Name, ops.Name)

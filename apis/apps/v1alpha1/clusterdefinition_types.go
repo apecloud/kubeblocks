@@ -17,8 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"strings"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,18 +27,6 @@ import (
 
 // ClusterDefinitionSpec defines the desired state of ClusterDefinition.
 type ClusterDefinitionSpec struct {
-	// Specifies the well-known database type, such as mysql, redis, or mongodb.
-	//
-	// Deprecated since v0.9.
-	// This field is maintained for backward compatibility and its use is discouraged.
-	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
-	//
-	// +kubebuilder:validation:MaxLength=24
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
-	// +optional
-	Type string `json:"type,omitempty"`
-
 	// Provides the definitions for the cluster components.
 	//
 	// Deprecated since v0.9.
@@ -297,20 +283,6 @@ type LogConfig struct {
 	FilePathPattern string `json:"filePathPattern"`
 }
 
-// VolumeTypeSpec is deprecated since v0.9, replaced with ComponentVolume.
-type VolumeTypeSpec struct {
-	// Corresponds to the name of the VolumeMounts field in PodSpec.Container.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	Name string `json:"name"`
-
-	// Type of data the volume will persistent.
-	//
-	// +optional
-	Type VolumeType `json:"type,omitempty"`
-}
-
 // VolumeProtectionSpec is deprecated since v0.9, replaced with ComponentVolume.HighWatermark.
 type VolumeProtectionSpec struct {
 	// The high watermark threshold for volume space usage.
@@ -402,33 +374,6 @@ type ServiceRefDeclarationSpec struct {
 	ServiceVersion string `json:"serviceVersion"`
 }
 
-type ExporterConfig struct {
-	// scrapePort is exporter port for Time Series Database to scrape metrics.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:XIntOrString
-	ScrapePort intstr.IntOrString `json:"scrapePort"`
-
-	// scrapePath is exporter url path for Time Series Database to scrape metrics.
-	// +kubebuilder:validation:MaxLength=128
-	// +kubebuilder:default="/metrics"
-	// +optional
-	ScrapePath string `json:"scrapePath,omitempty"`
-}
-
-type MonitorConfig struct {
-	// builtIn is a switch to enable KubeBlocks builtIn monitoring.
-	// If BuiltIn is set to true, monitor metrics will be scraped automatically.
-	// If BuiltIn is set to false, the provider should set ExporterConfig and Sidecar container own.
-	// +kubebuilder:default=false
-	// +optional
-	BuiltIn bool `json:"builtIn,omitempty"`
-
-	// exporterConfig provided by provider, which specify necessary information to Time Series Database.
-	// exporterConfig is valid when builtIn is false.
-	// +optional
-	Exporter *ExporterConfig `json:"exporterConfig,omitempty"`
-}
-
 // ClusterComponentDefinition defines a Component within a ClusterDefinition but is deprecated and
 // has been replaced by ComponentDefinition.
 //
@@ -445,11 +390,6 @@ type ClusterComponentDefinition struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// Description of the component definition.
-	//
-	// +optional
-	Description string `json:"description,omitempty"`
-
 	// Defines the type of the workload.
 	//
 	// - `Stateless` describes stateless applications.
@@ -460,42 +400,10 @@ type ClusterComponentDefinition struct {
 	// +kubebuilder:validation:Required
 	WorkloadType WorkloadType `json:"workloadType"`
 
-	// Defines well-known database component name, such as mongos(mongodb), proxy(redis), mariadb(mysql).
-	//
-	// +optional
-	CharacterType string `json:"characterType,omitempty"`
-
-	// Defines the template of configurations.
-	//
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
-	// +optional
-	ConfigSpecs []ComponentConfigSpec `json:"configSpecs,omitempty"`
-
-	// Defines the template of scripts.
-	//
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
-	// +optional
-	ScriptSpecs []ComponentTemplateSpec `json:"scriptSpecs,omitempty"`
-
 	// Settings for health checks.
 	//
 	// +optional
 	Probes *ClusterDefinitionProbes `json:"probes,omitempty"`
-
-	// Specify the logging files which can be observed and configured by cluster users.
-	//
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
-	// +optional
-	LogConfigs []LogConfig `json:"logConfigs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// Defines the pod spec template of component.
 	//
@@ -539,68 +447,12 @@ type ClusterComponentDefinition struct {
 	// +optional
 	HorizontalScalePolicy *HorizontalScalePolicy `json:"horizontalScalePolicy,omitempty"`
 
-	// Used to describe the purpose of the volumes mapping the name of the VolumeMounts in the PodSpec.Container field,
-	// such as data volume, log volume, etc. When backing up the volume, the volume can be correctly backed up according
-	// to the volumeType.
-	//
-	// For example:
-	//
-	// - `name: data, type: data` means that the volume named `data` is used to store `data`.
-	// - `name: binlog, type: log` means that the volume named `binlog` is used to store `log`.
-	//
-	// NOTE: When volumeTypes is not defined, the backup function will not be supported, even if a persistent volume has
-	// been specified.
-	//
-	// +listType=map
-	// +listMapKey=name
-	// +optional
-	VolumeTypes []VolumeTypeSpec `json:"volumeTypes,omitempty"`
-
-	// Used for custom label tags which you want to add to the component resources.
-	//
-	// +listType=map
-	// +listMapKey=key
-	// +optional
-	CustomLabelSpecs []CustomLabelSpec `json:"customLabelSpecs,omitempty"`
-
 	// Defines command to do switchover.
 	// In particular, when workloadType=Replication, the command defined in switchoverSpec will only be executed under
 	// the condition of cluster.componentSpecs[x].SwitchPolicy.type=Noop.
 	//
 	// +optional
 	SwitchoverSpec *SwitchoverSpec `json:"switchoverSpec,omitempty"`
-
-	// Defines settings to do volume protect.
-	//
-	// +optional
-	VolumeProtectionSpec *VolumeProtectionSpec `json:"volumeProtectionSpec,omitempty"`
-
-	// Used to inject values from other components into the current component. Values will be saved and updated in a
-	// configmap and mounted to the current component.
-	//
-	// +patchMergeKey=componentDefName
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=componentDefName
-	// +optional
-	ComponentDefRef []ComponentDefRef `json:"componentDefRef,omitempty" patchStrategy:"merge" patchMergeKey:"componentDefName"`
-
-	// Used to declare the service reference of the current component.
-	//
-	// +optional
-	ServiceRefDeclarations []ServiceRefDeclaration `json:"serviceRefDeclarations,omitempty"`
-
-	// Defines the metrics exporter.
-	//
-	// +optional
-	Exporter *Exporter `json:"exporter,omitempty"`
-
-	// Deprecated since v0.9
-	// monitor is monitoring config which provided by provider.
-	//
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.10.0"
-	// +optional
-	Monitor *MonitorConfig `json:"monitor,omitempty"`
 }
 
 func (r *ClusterComponentDefinition) GetStatefulSetWorkload() StatefulSetWorkload {
@@ -1037,39 +889,6 @@ type CommandExecutorItem struct {
 	Args []string `json:"args,omitempty"`
 }
 
-// CustomLabelSpec is deprecated since v0.8.
-type CustomLabelSpec struct {
-	// The key of the label.
-	//
-	// +kubebuilder:validation:Required
-	Key string `json:"key"`
-
-	// The value of the label.
-	//
-	// +kubebuilder:validation:Required
-	Value string `json:"value"`
-
-	// The resources that will be patched with the label.
-	//
-	// +kubebuilder:validation:Required
-	Resources []GVKResource `json:"resources,omitempty"`
-}
-
-// GVKResource is deprecated since v0.8.
-type GVKResource struct {
-	// Represents the GVK of a resource, such as "v1/Pod", "apps/v1/StatefulSet", etc.
-	// When a resource matching this is found by the selector, a custom label will be added if it doesn't already exist,
-	// or updated if it does.
-	//
-	// +kubebuilder:validation:Required
-	GVK string `json:"gvk"`
-
-	// A label query used to filter a set of resources.
-	//
-	// +optional
-	Selector map[string]string `json:"selector,omitempty"`
-}
-
 // TODO(API):
 //  1. how to display the aggregated topologies and its service references line by line?
 //  2. the services and versions supported
@@ -1115,30 +934,6 @@ func init() {
 	SchemeBuilder.Register(&ClusterDefinition{}, &ClusterDefinitionList{})
 }
 
-// ValidateEnabledLogConfigs validates enabledLogs against component compDefName, and returns the invalid logNames undefined in ClusterDefinition.
-func (r *ClusterDefinition) ValidateEnabledLogConfigs(compDefName string, enabledLogs []string) []string {
-	invalidLogNames := make([]string, 0, len(enabledLogs))
-	logTypes := make(map[string]struct{})
-	for _, comp := range r.Spec.ComponentDefs {
-		if !strings.EqualFold(compDefName, comp.Name) {
-			continue
-		}
-		for _, logConfig := range comp.LogConfigs {
-			logTypes[logConfig.Name] = struct{}{}
-		}
-	}
-	// imply that all values in enabledLogs config are invalid.
-	if len(logTypes) == 0 {
-		return enabledLogs
-	}
-	for _, name := range enabledLogs {
-		if _, ok := logTypes[name]; !ok {
-			invalidLogNames = append(invalidLogNames, name)
-		}
-	}
-	return invalidLogNames
-}
-
 // GetComponentDefByName gets component definition from ClusterDefinition with compDefName
 func (r *ClusterDefinition) GetComponentDefByName(compDefName string) *ClusterComponentDefinition {
 	for _, component := range r.Spec.ComponentDefs {
@@ -1161,103 +956,3 @@ const (
 	// FailurePolicyFail means that an error will be reported.
 	FailurePolicyFail FailurePolicyType = "Fail"
 )
-
-// ComponentValueFromType specifies the type of component value from which the data is derived.
-//
-// Deprecated since v0.8.
-//
-// +enum
-// +kubebuilder:validation:Enum={FieldRef,ServiceRef,HeadlessServiceRef}
-type ComponentValueFromType string
-
-const (
-	// FromFieldRef refers to the value of a specific field in the object.
-	FromFieldRef ComponentValueFromType = "FieldRef"
-	// FromServiceRef refers to a service within the same namespace as the object.
-	FromServiceRef ComponentValueFromType = "ServiceRef"
-	// FromHeadlessServiceRef refers to a headless service within the same namespace as the object.
-	FromHeadlessServiceRef ComponentValueFromType = "HeadlessServiceRef"
-)
-
-// ComponentDefRef is used to select the component and its fields to be referenced.
-//
-// Deprecated since v0.8.
-type ComponentDefRef struct {
-	// The name of the componentDef to be selected.
-	//
-	// +kubebuilder:validation:Required
-	ComponentDefName string `json:"componentDefName"`
-
-	// Defines the policy to be followed in case of a failure in finding the component.
-	//
-	// +kubebuilder:validation:Enum={Ignore,Fail}
-	// +default="Ignore"
-	// +optional
-	FailurePolicy FailurePolicyType `json:"failurePolicy,omitempty"`
-
-	// The values that are to be injected as environment variables into each component.
-	//
-	// +kbubebuilder:validation:Required
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
-	// +optional
-	ComponentRefEnvs []ComponentRefEnv `json:"componentRefEnv" patchStrategy:"merge" patchMergeKey:"name"`
-}
-
-// ComponentRefEnv specifies name and value of an env.
-//
-// Deprecated since v0.8.
-type ComponentRefEnv struct {
-	// The name of the env, it must be a C identifier.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern=`^[A-Za-z_][A-Za-z0-9_]*$`
-	Name string `json:"name"`
-
-	// The value of the env.
-	//
-	// +optional
-	Value string `json:"value,omitempty"`
-
-	// The source from which the value of the env.
-	//
-	// +optional
-	ValueFrom *ComponentValueFrom `json:"valueFrom,omitempty"`
-}
-
-// ComponentValueFrom is deprecated since v0.8.
-type ComponentValueFrom struct {
-	// Specifies the source to select. It can be one of three types: `FieldRef`, `ServiceRef`, `HeadlessServiceRef`.
-	//
-	// +kubebuilder:validation:Enum={FieldRef,ServiceRef,HeadlessServiceRef}
-	// +kubebuilder:validation:Required
-	Type ComponentValueFromType `json:"type"`
-
-	// The jsonpath of the source to select when the Type is `FieldRef`.
-	// Two objects are registered in the jsonpath: `componentDef` and `components`:
-	//
-	// - `componentDef` is the component definition object specified in `componentRef.componentDefName`.
-	// - `components` are the component list objects referring to the component definition object.
-	//
-	// +optional
-	FieldPath string `json:"fieldPath,omitempty"`
-
-	// Defines the format of each headless service address.
-	// Three builtin variables can be used as placeholders: `$POD_ORDINAL`, `$POD_FQDN`, `$POD_NAME`
-	//
-	// - `$POD_ORDINAL` represents the ordinal of the pod.
-	// - `$POD_FQDN` represents the fully qualified domain name of the pod.
-	// - `$POD_NAME` represents the name of the pod.
-	//
-	// +kubebuilder:default=="$POD_FQDN"
-	// +optional
-	Format string `json:"format,omitempty"`
-
-	// The string used to join the values of headless service addresses.
-	//
-	// +kubebuilder:default=","
-	// +optional
-	JoinWith string `json:"joinWith,omitempty"`
-}

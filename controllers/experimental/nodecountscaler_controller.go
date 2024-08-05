@@ -60,13 +60,11 @@ type NodeCountScalerReconciler struct {
 func (r *NodeCountScalerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithValues("NodeCountScaler", req.NamespacedName)
 
-	err := kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
+	return kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
 		Prepare(objectTree()).
 		Do(scaleTargetCluster()).
 		Do(updateStatus()).
 		Commit()
-
-	return ctrl.Result{}, err
 }
 
 // SetupWithManager sets up the controller with the Manager.

@@ -24,6 +24,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
@@ -43,7 +44,6 @@ var _ = Describe("OpsUtil functions", func() {
 	var (
 		randomStr             = testCtx.GetRandomStr()
 		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr
-		clusterVersionName    = "clusterversion-for-ops-" + randomStr
 		clusterName           = "cluster-for-ops-" + randomStr
 	)
 
@@ -54,7 +54,7 @@ var _ = Describe("OpsUtil functions", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResources(&testCtx)
 
 		// delete rest resources
@@ -74,7 +74,7 @@ var _ = Describe("OpsUtil functions", func() {
 	Context("Test ops_util functions", func() {
 		It("Test ops_util functions", func() {
 			By("init operations resources ")
-			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterName)
 			testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusComp)
 
 			By("Test the functions in ops_util.go")
@@ -90,7 +90,7 @@ var _ = Describe("OpsUtil functions", func() {
 
 		It("Test opsRequest failed cases", func() {
 			By("init operations resources ")
-			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterName)
 			testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusComp)
 			pods := testapps.MockInstanceSetPods(&testCtx, nil, opsRes.Cluster, consensusComp)
 			time.Sleep(time.Second)
@@ -141,7 +141,7 @@ var _ = Describe("OpsUtil functions", func() {
 
 		It("Test opsRequest with disable ha", func() {
 			By("init operations resources ")
-			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterName)
 
 			By("Test the functions in ops_util.go")
 			ops := testapps.NewOpsRequestObj("restart-ops-"+randomStr, testCtx.DefaultNamespace,
@@ -193,7 +193,7 @@ var _ = Describe("OpsUtil functions", func() {
 		It("Test opsRequest Queue functions", func() {
 			By("init operations resources ")
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
-			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterName)
 
 			runHscaleOps := func(expectPhase appsv1alpha1.OpsPhase) *appsv1alpha1.OpsRequest {
 				ops := createHorizontalScaling(clusterName, appsv1alpha1.HorizontalScaling{
@@ -248,7 +248,7 @@ var _ = Describe("OpsUtil functions", func() {
 		It("Test opsRequest dependency", func() {
 			By("init operations resources ")
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
-			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterName)
 
 			By("create a first horizontal opsRequest")
 			ops1 := createHorizontalScaling(clusterName, appsv1alpha1.HorizontalScaling{

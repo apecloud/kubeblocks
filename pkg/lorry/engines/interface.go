@@ -112,7 +112,7 @@ type DBManager interface {
 	// user management
 	ListUsers(context.Context) ([]models.UserInfo, error)
 	ListSystemAccounts(context.Context) ([]models.UserInfo, error)
-	CreateUser(context.Context, string, string) error
+	CreateUser(context.Context, string, string, string) error
 	DeleteUser(context.Context, string) error
 	DescribeUser(context.Context, string) (*models.UserInfo, error)
 	GrantUserRole(context.Context, string, string) error

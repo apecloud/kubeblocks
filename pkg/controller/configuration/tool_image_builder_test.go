@@ -35,19 +35,17 @@ import (
 )
 
 var _ = Describe("ToolsImageBuilderTest", func() {
-
 	const kbToolsImage = "apecloud/kubeblocks-tools:latest"
 
 	var noneCommand = []string{"/bin/true"}
 	var clusterObj *appsv1alpha1.Cluster
-	var clusterVersionObj *appsv1alpha1.ClusterVersion
-	var ClusterDefObj *appsv1alpha1.ClusterDefinition
+	var compDefObj *appsv1alpha1.ComponentDefinition
 	var clusterComponent *component.SynthesizedComponent
 
 	BeforeEach(func() {
 		// Add any setup steps that needs to be executed before each test
-		clusterObj, ClusterDefObj, clusterVersionObj, _ = newAllFieldsClusterObj(nil, nil, false)
-		clusterComponent = newAllFieldsSynthesizedComponent(ClusterDefObj, clusterVersionObj, clusterObj)
+		clusterObj, compDefObj, _ = newAllFieldsClusterObj(nil, false)
+		clusterComponent = newAllFieldsSynthesizedComponent(compDefObj, clusterObj)
 		viper.SetDefault(constant.KBToolsImage, kbToolsImage)
 	})
 

@@ -74,12 +74,20 @@ func (a *preTerminate) parameters(ctx context.Context, cli client.Reader) (map[s
 		return nil, err
 	}
 
+	scalingInFlag, err := getScaledInFlag(ctx, cli, a.namespace, a.clusterName, a.compName)
+	if err != nil {
+		return nil, err
+	}
 	// - KB_CLUSTER_COMPONENT_IS_SCALING_IN: Indicates whether the component is currently scaling in.
 	//   If this variable is present and set to "true", it denotes that the component is undergoing a scale-in operation.
 	//   During scale-in, data rebalancing is necessary to maintain cluster integrity.
 	//   Contrast this with a cluster deletion scenario where data rebalancing is not required as the entire cluster
 	//   is being cleaned up.
-	m[scalingInFlagVar] = "" // TODO
+	if scalingInFlag {
+		m[scalingInFlagVar] = "true"
+	} else {
+		m[scalingInFlagVar] = "false"
+	}
 
 	return m, nil
 }
@@ -118,7 +126,6 @@ func parameters4Comp(ctx context.Context, cli client.Reader, namespace, clusterN
 	if err3 != nil {
 		return nil, err3
 	}
-
 	m := make(map[string]string)
 	m[clusterPodNameListVar] = clusterPods[podNameList]
 	m[clusterPodIPListVar] = clusterPods[podIPList]
@@ -129,7 +136,7 @@ func parameters4Comp(ctx context.Context, cli client.Reader, namespace, clusterN
 	m[podHostNameListVar] = compPods[podHostNameList]
 	m[podHostIPListVar] = compPods[podHostIPList]
 	m[compListVar] = comps[compName]
-	m[deletingCompListVar] = ""  // TODO
-	m[undeletedCompListVar] = "" // TODO
+	m[deletingCompListVar] = comps[deletingCompList]
+	m[undeletedCompListVar] = comps[undeletedCompList]
 	return m, nil
 }

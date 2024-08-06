@@ -21,7 +21,14 @@ package lifecycle
 
 import (
 	"context"
+	"strconv"
+	"strings"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -52,7 +59,7 @@ func (a *memberJoin) name() string {
 }
 
 func (a *memberJoin) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {
-	m, err := parameters4Member(ctx, cli, a.namespace, a.clusterName, a.compName)
+	m, err := parameters4Member(ctx, cli, a.namespace, a.clusterName, a.compName, nil, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -66,11 +73,14 @@ func (a *memberJoin) parameters(ctx context.Context, cli client.Reader) (map[str
 }
 
 type memberLeave struct {
-	namespace   string
-	clusterName string
-	compName    string
-	podName     string
-	podIP       string
+	namespace       string
+	clusterName     string
+	compName        string
+	podName         string
+	podIP           string
+	synthesizeComp  *component.SynthesizedComponent
+	clusterCompSpec *appsv1alpha1.ClusterComponentSpec
+	cluster         *dcs.Cluster
 }
 
 var _ lifecycleAction = &memberLeave{}
@@ -80,7 +90,7 @@ func (a *memberLeave) name() string {
 }
 
 func (a *memberLeave) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {
-	m, err := parameters4Member(ctx, cli, a.namespace, a.clusterName, a.compName)
+	m, err := parameters4Member(ctx, cli, a.namespace, a.clusterName, a.compName, a.synthesizeComp, a.clusterCompSpec, a.cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +103,8 @@ func (a *memberLeave) parameters(ctx context.Context, cli client.Reader) (map[st
 	return m, nil
 }
 
-func parameters4Member(ctx context.Context, cli client.Reader, namespace, clusterName, compName string) (map[string]string, error) {
+func parameters4Member(ctx context.Context, cli client.Reader, namespace, clusterName, compName string, synthesizeComp *component.SynthesizedComponent, clusterCompSpec *appsv1alpha1.ClusterComponentSpec, cluster *dcs.Cluster) (map[string]string, error) {
+	envs := getDBEnvs(synthesizeComp, clusterCompSpec)
 	// The container executing this action has access to following environment variables:
 	//
 	// - KB_SERVICE_PORT: The port used by the database service.
@@ -105,10 +116,32 @@ func parameters4Member(ctx context.Context, cli client.Reader, namespace, cluste
 	// Expected action output:
 	// - On Failure: An error message, if applicable, indicating why the action failed.
 	m := make(map[string]string)
-	m[servicePortVar] = "" // TODO
-	m[serviceUserVar] = ""
-	m[servicePasswordVar] = ""
-	m[primaryPodFQDNVar] = ""
-	m[membersAddressVar] = ""
+	for _, env := range envs {
+		if env.Name == serviceUserVar || env.Name == servicePasswordVar {
+			secret := &corev1.Secret{}
+			secretKey := types.NamespacedName{
+				Namespace: namespace,
+				Name:      env.ValueFrom.SecretKeyRef.Name,
+			}
+			if err := cli.Get(ctx, secretKey, secret); err != nil {
+				return nil, err
+			}
+			m[env.Name] = secret.StringData[env.ValueFrom.SecretKeyRef.Key]
+		}
+	}
+	mainContainer := getMainContainer(synthesizeComp.PodSpec.Containers)
+	if mainContainer != nil {
+		if len(mainContainer.Ports) > 0 {
+			port := mainContainer.Ports[0]
+			dbPort := port.ContainerPort
+			m[servicePortVar] = strconv.Itoa(int(dbPort))
+		}
+	}
+	if cluster.Leader != nil && cluster.Leader.Name != "" {
+		leaderMember := cluster.GetMemberWithName(cluster.Leader.Name)
+		primaryPodFQDN := cluster.GetMemberAddr(*leaderMember)
+		m[primaryPodFQDNVar] = primaryPodFQDN
+	}
+	m[membersAddressVar] = strings.Join(cluster.GetMemberAddrs(), ",")
 	return m, nil
 }

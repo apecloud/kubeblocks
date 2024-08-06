@@ -94,6 +94,12 @@ type OpsRequestSpec struct {
 	// +optional
 	PreConditionDeadlineSeconds *int32 `json:"preConditionDeadlineSeconds,omitempty"`
 
+	// Indicates whether the current operation should skip pre-conditions such as cluster phase validation.
+	//
+	// +kubebuilder:default=false
+	// +optional
+	SkipPreConditions bool `json:"ignorePreCondition,omitempty"`
+
 	// Specifies the maximum duration (in seconds) that an opsRequest is allowed to run.
 	// If the opsRequest runs longer than this duration, its phase will be marked as Aborted.
 	// If this value is not set or set to 0, the timeout will be ignored and the opsRequest will run indefinitely.

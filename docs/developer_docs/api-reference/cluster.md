@@ -2600,6 +2600,18 @@ If set to 0 (default), pre-conditions must be satisfied immediately for the OpsR
 </tr>
 <tr>
 <td>
+<code>ignorePreCondition</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates whether the current operation should skip pre-conditions such as cluster phase validation.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>timeoutSeconds</code><br/>
 <em>
 int32
@@ -13388,6 +13400,18 @@ int32
 <p>Specifies the maximum time in seconds that the OpsRequest will wait for its pre-conditions to be met
 before it aborts the operation.
 If set to 0 (default), pre-conditions must be satisfied immediately for the OpsRequest to proceed.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ignorePreCondition</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates whether the current operation should skip pre-conditions such as cluster phase validation.</p>
 </td>
 </tr>
 <tr>

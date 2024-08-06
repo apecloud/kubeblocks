@@ -300,5 +300,36 @@ var _ = Describe("OpsUtil functions", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops2))).Should(Equal(appsv1alpha1.OpsCancelledPhase))
 		})
+
+		It("Test skipPreConditions", func() {
+			By("init operations resources ")
+			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusComp)
+
+			By("mock cluster phase to Updating")
+			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
+				opsRes.Cluster.Status.Phase = appsv1alpha1.UpdatingClusterPhase
+			})).Should(Succeed())
+
+			By("expect the ops phase is failed")
+			opsRes.OpsRequest = createHorizontalScaling(clusterName, appsv1alpha1.HorizontalScaling{
+				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+				Replicas:     pointer.Int32(1),
+			})
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsFailedPhase))
+
+			By("set skipPreConditions to true")
+			opsRes.OpsRequest = createHorizontalScaling(clusterName, appsv1alpha1.HorizontalScaling{
+				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+				Replicas:     pointer.Int32(1),
+			})
+			opsRes.OpsRequest.Spec.SkipPreConditions = true
+			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase
+			By("expect the ops phase is Creating")
+			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
+		})
 	})
 })

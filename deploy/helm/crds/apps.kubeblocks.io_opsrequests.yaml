@@ -3795,6 +3795,11 @@ spec:
                 x-kubernetes-validations:
                 - message: forbidden to update spec.horizontalScaling
                   rule: self == oldSelf
+              ignorePreCondition:
+                default: false
+                description: Indicates whether the current operation should skip pre-conditions
+                  such as cluster phase validation.
+                type: boolean
               preConditionDeadlineSeconds:
                 default: 0
                 description: |-

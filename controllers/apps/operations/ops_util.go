@@ -198,14 +198,15 @@ func updateReconfigureStatusByCM(reconfiguringStatus *appsv1alpha1.Reconfiguring
 // validateOpsWaitingPhase validates whether the current cluster phase is expected, and whether the waiting time exceeds the limit.
 // only requests with `Pending` phase will be validated.
 func validateOpsWaitingPhase(cluster *appsv1alpha1.Cluster, ops *appsv1alpha1.OpsRequest, opsBehaviour OpsBehaviour) error {
-	if ops.Force() {
+	if ops.Force() || ops.Spec.SkipPreConditions {
 		return nil
 	}
 	// if opsRequest don't need to wait for the cluster phase
 	// or opsRequest status.phase is not Pending,
 	// or opsRequest will create cluster,
 	// we don't validate the cluster phase.
-	if len(opsBehaviour.FromClusterPhases) == 0 || ops.Status.Phase != appsv1alpha1.OpsPendingPhase || opsBehaviour.IsClusterCreation {
+	if len(opsBehaviour.FromClusterPhases) == 0 || ops.Status.Phase != appsv1alpha1.OpsPendingPhase ||
+		opsBehaviour.IsClusterCreation {
 		return nil
 	}
 	if slices.Contains(opsBehaviour.FromClusterPhases, cluster.Status.Phase) {
@@ -213,7 +214,7 @@ func validateOpsWaitingPhase(cluster *appsv1alpha1.Cluster, ops *appsv1alpha1.Op
 	}
 	// check if entry-condition is met
 	// if the cluster is not in the expected phase, we should wait for it for up to TTLSecondsBeforeAbort seconds.
-	if ops.Spec.PreConditionDeadlineSeconds == nil || (time.Now().After(ops.GetCreationTimestamp().Add(time.Duration(*ops.Spec.PreConditionDeadlineSeconds) * time.Second))) {
+	if !needWaitPreConditionDeadline(ops) {
 		return nil
 	}
 
@@ -222,6 +223,13 @@ func validateOpsWaitingPhase(cluster *appsv1alpha1.Cluster, ops *appsv1alpha1.Op
 		currentPhase:  cluster.Status.Phase,
 		expectedPhase: opsBehaviour.FromClusterPhases,
 	}
+}
+
+func needWaitPreConditionDeadline(ops *appsv1alpha1.OpsRequest) bool {
+	if ops.Spec.PreConditionDeadlineSeconds == nil {
+		return false
+	}
+	return time.Now().Before(ops.GetCreationTimestamp().Add(time.Duration(*ops.Spec.PreConditionDeadlineSeconds) * time.Second))
 }
 
 func abortEarlierOpsRequestWithSameKind(reqCtx intctrlutil.RequestCtx,

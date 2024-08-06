@@ -52,7 +52,7 @@ var _ = Describe("Cluster Controller", func() {
 		compDefName               = "test-compdef"
 		compVersionName           = "test-compversion"
 		clusterName               = "test-cluster"
-		defaultCompName           = "default"
+		defaultCompName           = "mysql"
 		defaultClusterCompDefName = "default" // TODO: remove this
 		defaultServiceVersion     = "8.0.31-r0"
 		latestServiceVersion      = "8.0.31-r1"
@@ -1476,16 +1476,35 @@ var _ = Describe("Cluster Controller", func() {
 
 func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition, compDef string) {
 	By("create actionSet")
-	fakeActionSet(clusterDefObj.Name)
+	if clusterDefObj != nil {
+		fakeActionSet(clusterDefObj.Name)
+	} else {
+		fakeActionSet("")
+	}
 
 	By("Creating a BackupPolicyTemplate")
-	bpt := testapps.NewBackupPolicyTemplateFactory(backupPolicyTPLName).
-		AddLabels(constant.ClusterDefLabelKey, clusterDefObj.Name).
-		AddLabels(compDef, compDef).
-		SetClusterDefRef(clusterDefObj.Name)
+	bpt := testapps.NewBackupPolicyTemplateFactory(backupPolicyTPLName)
+	if clusterDefObj != nil {
+		bpt.AddLabels(constant.ClusterDefLabelKey, clusterDefObj.Name).SetClusterDefRef(clusterDefObj.Name)
+	}
+	if len(compDef) > 0 {
+		bpt.AddLabels(compDef, compDef)
+	}
+
 	ttl := "7d"
-	for _, v := range clusterDefObj.Spec.ComponentDefs {
-		bpt = bpt.AddBackupPolicy(v.Name).
+	if clusterDefObj != nil {
+		for _, v := range clusterDefObj.Spec.ComponentDefs {
+			bpt = bpt.AddBackupPolicy(v.Name).
+				AddBackupMethod(backupMethodName, false, actionSetName).
+				SetComponentDef(compDef).
+				SetBackupMethodVolumeMounts("data", "/data").
+				AddBackupMethod(vsBackupMethodName, true, "").
+				SetBackupMethodVolumes([]string{"data"}).
+				AddSchedule(backupMethodName, "0 0 * * *", ttl, true).
+				AddSchedule(vsBackupMethodName, "0 0 * * *", ttl, true)
+		}
+	} else {
+		bpt = bpt.AddBackupPolicy(compDef).
 			AddBackupMethod(backupMethodName, false, actionSetName).
 			SetComponentDef(compDef).
 			SetBackupMethodVolumeMounts("data", "/data").

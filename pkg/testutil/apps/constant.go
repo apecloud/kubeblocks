@@ -235,6 +235,7 @@ var (
 				},
 			},
 		},
+		UpdateStrategy: &[]appsv1alpha1.UpdateStrategy{appsv1alpha1.BestEffortParallelStrategy}[0],
 		Roles: []appsv1alpha1.ReplicaRole{
 			{
 				Name:        "leader",

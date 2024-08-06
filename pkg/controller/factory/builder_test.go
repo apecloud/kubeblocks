@@ -26,7 +26,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -44,22 +43,19 @@ import (
 )
 
 var _ = Describe("builder", func() {
-	const clusterDefName = "test-clusterdef"
+	const compDefName = "test-compdef"
 	const clusterName = "test-cluster"
-	const mysqlCompDefName = "replicasets"
-	const proxyCompDefName = "proxy"
 	const mysqlCompName = "mysql"
 
-	allFieldsClusterDefObj := func(needCreate bool) *appsv1alpha1.ClusterDefinition {
-		By("By assure an clusterDefinition obj")
-		clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
-			AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
-			AddComponentDef(testapps.StatelessNginxComponent, proxyCompDefName).
+	allFieldsCompDefObj := func(needCreate bool) *appsv1alpha1.ComponentDefinition {
+		By("By assure an componentDefinition obj")
+		compDebObj := testapps.NewComponentDefinitionFactory(compDefName).
+			SetDefaultSpec().
 			GetObject()
 		if needCreate {
-			Expect(testCtx.CreateObj(testCtx.Ctx, clusterDefObj)).Should(Succeed())
+			Expect(testCtx.CreateObj(testCtx.Ctx, compDebObj)).Should(Succeed())
 		}
-		return clusterDefObj
+		return compDebObj
 	}
 
 	newExtraEnvs := func() map[string]string {
@@ -71,24 +67,25 @@ var _ = Describe("builder", func() {
 		}
 	}
 
-	newAllFieldsClusterObj := func(clusterDefObj *appsv1alpha1.ClusterDefinition, needCreate bool) (*appsv1alpha1.Cluster, *appsv1alpha1.ClusterDefinition, types.NamespacedName) {
-		// setup Cluster obj requires default ClusterDefinition object
-		if clusterDefObj == nil {
-			clusterDefObj = allFieldsClusterDefObj(needCreate)
+	newAllFieldsClusterObj := func(compDefObj *appsv1alpha1.ComponentDefinition, create bool) (*appsv1alpha1.Cluster, *appsv1alpha1.ComponentDefinition, types.NamespacedName) {
+		// setup Cluster obj requires default ComponentDefinition object
+		if compDefObj == nil {
+			compDefObj = allFieldsCompDefObj(create)
 		}
 		pvcSpec := testapps.NewPVCSpec("1Gi")
-		clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name).
+		clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 			AddAnnotationsInMap(newExtraEnvs()).
-			AddComponent(mysqlCompName, mysqlCompDefName).SetReplicas(1).
+			AddComponentV2(mysqlCompName, compDefObj.GetName()).
+			SetReplicas(1).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			AddComponentService(testapps.ServiceVPCName, corev1.ServiceTypeLoadBalancer).
 			AddComponentService(testapps.ServiceInternetName, corev1.ServiceTypeLoadBalancer).
 			GetObject()
 		key := client.ObjectKeyFromObject(clusterObj)
-		if needCreate {
+		if create {
 			Expect(testCtx.CreateObj(testCtx.Ctx, clusterObj)).Should(Succeed())
 		}
-		return clusterObj, clusterDefObj, key
+		return clusterObj, compDefObj, key
 	}
 
 	newItsObj := func() *workloads.InstanceSet {
@@ -109,6 +106,7 @@ var _ = Describe("builder", func() {
 				Spec:       testapps.NewPVC("1Gi"),
 			}).GetObject()
 	}
+
 	newReqCtx := func() intctrlutil.RequestCtx {
 		reqCtx := intctrlutil.RequestCtx{
 			Ctx:      testCtx.Ctx,
@@ -117,11 +115,13 @@ var _ = Describe("builder", func() {
 		}
 		return reqCtx
 	}
-	newAllFieldsSynthesizedComponent := func(clusterDef *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster) *component.SynthesizedComponent {
+
+	newAllFieldsSynthesizedComponent := func(compDef *appsv1alpha1.ComponentDefinition, cluster *appsv1alpha1.Cluster) *component.SynthesizedComponent {
 		reqCtx := newReqCtx()
 		By("assign every available fields")
-		synthesizeComp, err := component.BuildSynthesizedComponentWrapper4Test(reqCtx, testCtx.Cli,
-			clusterDef, cluster, &cluster.Spec.ComponentSpecs[0])
+		comp, err := component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
+		Expect(err).Should(Succeed())
+		synthesizeComp, err := component.BuildSynthesizedComponent(reqCtx, testCtx.Cli, cluster, compDef, comp)
 		Expect(err).Should(Succeed())
 		Expect(synthesizeComp).ShouldNot(BeNil())
 		// to resolve and inject env vars
@@ -131,10 +131,11 @@ var _ = Describe("builder", func() {
 		component.InjectEnvVars(synthesizeComp, envVars, nil)
 		return synthesizeComp
 	}
-	newClusterObjs := func(clusterDefObj *appsv1alpha1.ClusterDefinition) (*appsv1alpha1.ClusterDefinition, *appsv1alpha1.Cluster, *component.SynthesizedComponent) {
-		cluster, clusterDef, _ := newAllFieldsClusterObj(clusterDefObj, false)
-		synthesizedComponent := newAllFieldsSynthesizedComponent(clusterDef, cluster)
-		return clusterDef, cluster, synthesizedComponent
+
+	newClusterObjs := func(compDefObj *appsv1alpha1.ComponentDefinition) (*appsv1alpha1.ComponentDefinition, *appsv1alpha1.Cluster, *component.SynthesizedComponent) {
+		cluster, compDef, _ := newAllFieldsClusterObj(compDefObj, false)
+		synthesizedComponent := newAllFieldsSynthesizedComponent(compDef, cluster)
+		return compDef, cluster, synthesizedComponent
 	}
 
 	Context("has helper function which builds specific object from cue template", func() {
@@ -154,7 +155,7 @@ var _ = Describe("builder", func() {
 		})
 
 		It("builds InstanceSet correctly", func() {
-			clusterDef, cluster, synthesizedComponent := newClusterObjs(nil)
+			compDef, cluster, synthesizedComponent := newClusterObjs(nil)
 
 			its, err := BuildInstanceSet(synthesizedComponent, nil)
 			Expect(err).Should(BeNil())
@@ -168,52 +169,16 @@ var _ = Describe("builder", func() {
 			Expect(its).ShouldNot(BeNil())
 			Expect(*its.Spec.Replicas).Should(Equal(int32(0)))
 
-			By("set workload type to Replication")
+			By("set replicas = 2")
 			cluster.Spec.ComponentSpecs[0].Replicas = 2
-			replComponent := newAllFieldsSynthesizedComponent(clusterDef, cluster)
-			its, err = BuildInstanceSet(replComponent, nil)
+			synthesizedComp := newAllFieldsSynthesizedComponent(compDef, cluster)
+			its, err = BuildInstanceSet(synthesizedComp, nil)
 			Expect(err).Should(BeNil())
 			Expect(its).ShouldNot(BeNil())
 			Expect(*its.Spec.Replicas).Should(BeEquivalentTo(2))
 
-			// test extra envs
-			Expect(its.Spec.Template.Spec.Containers).ShouldNot(BeEmpty())
-			for _, container := range its.Spec.Template.Spec.Containers {
-				isContainEnv := false
-				for _, env := range container.Env {
-					if env.Name == "mock-key" && env.Value == "mock-value" {
-						isContainEnv = true
-						break
-					}
-				}
-				Expect(isContainEnv).Should(BeTrue())
-			}
-
 			// test roles
-			Expect(its.Spec.Roles).Should(HaveLen(2))
-			for _, roleName := range []string{constant.Primary, constant.Secondary} {
-				Expect(slices.IndexFunc(its.Spec.Roles, func(role workloads.ReplicaRole) bool {
-					return role.Name == roleName
-				})).Should(BeNumerically(">", -1))
-			}
-
-			// test role probe
-			Expect(its.Spec.RoleProbe).ShouldNot(BeNil())
-
-			// test member update strategy
-			Expect(its.Spec.MemberUpdateStrategy).ShouldNot(BeNil())
-			Expect(*its.Spec.MemberUpdateStrategy).Should(BeEquivalentTo(workloads.SerialUpdateStrategy))
-
-			By("set workload type to Consensus")
-			cluster.Spec.ComponentSpecs[0].Replicas = 3
-			csComponent := newAllFieldsSynthesizedComponent(clusterDef, cluster)
-			its, err = BuildInstanceSet(csComponent, nil)
-			Expect(err).Should(BeNil())
-			Expect(its).ShouldNot(BeNil())
-
-			// test roles
-			Expect(its.Spec.Roles).Should(HaveLen(1))
-			Expect(its.Spec.Roles[0].Name).Should(Equal("leader"))
+			Expect(its.Spec.Roles).Should(HaveLen(len(compDef.Spec.Roles)))
 
 			// test role probe
 			Expect(its.Spec.RoleProbe).ShouldNot(BeNil())

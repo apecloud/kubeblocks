@@ -37,15 +37,13 @@ import (
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
-var (
-	clusterDefObj *appsv1alpha1.ClusterDefinition
-	clusterObj    *appsv1alpha1.Cluster
-)
-
 var _ = Describe("", func() {
 	var (
 		randomStr   = testCtx.GetRandomStr()
-		clusterName = "cluster-for-ops-" + randomStr
+		compDefName = "test-compdef-" + randomStr
+		clusterName = "test-cluster-" + randomStr
+		compDefObj  *appsv1alpha1.ComponentDefinition
+		clusterObj  *appsv1alpha1.Cluster
 	)
 
 	defaultRole := func(index int32) string {
@@ -79,7 +77,7 @@ var _ = Describe("", func() {
 		By("clean resources")
 
 		// delete cluster(and all dependent sub-resources), cluster definition
-		testapps.ClearClusterResources(&testCtx)
+		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 
 		// delete rest resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
@@ -94,10 +92,11 @@ var _ = Describe("", func() {
 
 	Context("Test OpsRequest", func() {
 		BeforeEach(func() {
-			By("Create a clusterDefinition obj.")
-			clusterDefObj = testapps.NewClusterDefFactory(consensusComp).
-				AddComponentDef(testapps.ConsensusMySQLComponent, consensusComp).
-				Create(&testCtx).GetObject()
+			By("Create a componentDefinition obj.")
+			compDefObj = testapps.NewComponentDefinitionFactory(compDefName).
+				SetDefaultSpec().
+				Create(&testCtx).
+				GetObject()
 		})
 
 		// TODO(v1.0): workload and switchover have been removed from CD/CV.
@@ -107,9 +106,9 @@ var _ = Describe("", func() {
 				Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
 			}
 			By("Creating a cluster with consensus .")
-			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name).
+			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 				WithRandomName().
-				AddComponent(consensusComp, consensusComp).
+				AddComponentV2(defaultCompName, compDefObj.GetName()).
 				SetReplicas(2).
 				Create(&testCtx).GetObject()
 
@@ -120,11 +119,11 @@ var _ = Describe("", func() {
 				ImagePullPolicy: corev1.PullIfNotPresent,
 			}
 			its := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
-				clusterObj.Name+"-"+consensusComp, clusterObj.Name, consensusComp).
+				clusterObj.Name+"-"+defaultCompName, clusterObj.Name, defaultCompName).
 				AddFinalizers([]string{constant.DBClusterFinalizerName}).
 				AddContainer(container).
 				AddAppInstanceLabel(clusterObj.Name).
-				AddAppComponentLabel(consensusComp).
+				AddAppComponentLabel(defaultCompName).
 				AddAppManagedByLabel().
 				SetReplicas(2).
 				Create(&testCtx).GetObject()
@@ -155,7 +154,7 @@ var _ = Describe("", func() {
 			Expect(testapps.ChangeObjStatus(&testCtx, clusterObj, func() {
 				clusterObj.Status.Phase = appsv1alpha1.RunningClusterPhase
 				clusterObj.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
-					consensusComp: {
+					defaultCompName: {
 						Phase: appsv1alpha1.RunningClusterCompPhase,
 					},
 				}
@@ -167,8 +166,8 @@ var _ = Describe("", func() {
 				clusterObj.Name, appsv1alpha1.SwitchoverType)
 			ops.Spec.SwitchoverList = []appsv1alpha1.Switchover{
 				{
-					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
-					InstanceName: fmt.Sprintf("%s-%s-%d", clusterObj.Name, consensusComp, 1),
+					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+					InstanceName: fmt.Sprintf("%s-%s-%d", clusterObj.Name, defaultCompName, 1),
 				},
 			}
 			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
@@ -191,7 +190,7 @@ var _ = Describe("", func() {
 			Expect(err.Error()).Should(ContainSubstring("requeue to waiting for job"))
 
 			By("mock job status to success.")
-			jobName := fmt.Sprintf("%s-%s-%s-%d", KBSwitchoverJobNamePrefix, opsRes.Cluster.Name, consensusComp, opsRes.Cluster.Generation)
+			jobName := fmt.Sprintf("%s-%s-%s-%d", KBSwitchoverJobNamePrefix, opsRes.Cluster.Name, defaultCompName, opsRes.Cluster.Generation)
 			key := types.NamespacedName{
 				Name:      jobName,
 				Namespace: clusterObj.Namespace,

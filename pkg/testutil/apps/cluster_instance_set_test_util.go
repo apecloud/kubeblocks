@@ -98,7 +98,7 @@ func MockInstanceSetPods(
 	testCtx *testutil.TestContext,
 	its *workloads.InstanceSet,
 	cluster *appsv1alpha1.Cluster,
-	consensusCompName string) []*corev1.Pod {
+	compName string) []*corev1.Pod {
 	getReplicas := func() int {
 		if its == nil || its.Spec.Replicas == nil {
 			return ConsensusReplicas
@@ -130,7 +130,7 @@ func MockInstanceSetPods(
 	replicas := getReplicas()
 	replicasStr := strconv.Itoa(replicas)
 	podList := make([]*corev1.Pod, replicas)
-	podNames := generatePodNames(cluster, consensusCompName)
+	podNames := generatePodNames(cluster, compName)
 	for i, pName := range podNames {
 		var podRole, accessMode string
 		if its != nil && len(its.Spec.Roles) > 0 {
@@ -142,7 +142,7 @@ func MockInstanceSetPods(
 				accessMode = string(noneLeaderRole.AccessMode)
 			}
 		}
-		pod := MockInstanceSetPod(testCtx, its, cluster.Name, consensusCompName, pName, podRole, accessMode)
+		pod := MockInstanceSetPod(testCtx, its, cluster.Name, compName, pName, podRole, accessMode)
 		annotations := pod.Annotations
 		if annotations == nil {
 			annotations = make(map[string]string)

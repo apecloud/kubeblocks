@@ -325,7 +325,8 @@ var _ = Describe("OpsUtil functions", func() {
 				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
 				Replicas:     pointer.Int32(1),
 			})
-			opsRes.OpsRequest.Spec.SkipPreConditions = true
+			opsRes.OpsRequest.Spec.Force = true
+			opsRes.OpsRequest.Spec.EnqueueOnForce = true
 			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase
 			By("expect the ops phase is Creating")
 			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsRes)

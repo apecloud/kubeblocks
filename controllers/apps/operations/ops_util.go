@@ -198,15 +198,14 @@ func updateReconfigureStatusByCM(reconfiguringStatus *appsv1alpha1.Reconfiguring
 // validateOpsWaitingPhase validates whether the current cluster phase is expected, and whether the waiting time exceeds the limit.
 // only requests with `Pending` phase will be validated.
 func validateOpsWaitingPhase(cluster *appsv1alpha1.Cluster, ops *appsv1alpha1.OpsRequest, opsBehaviour OpsBehaviour) error {
-	if ops.Force() || ops.Spec.SkipPreConditions {
+	if ops.Force() {
 		return nil
 	}
 	// if opsRequest don't need to wait for the cluster phase
 	// or opsRequest status.phase is not Pending,
 	// or opsRequest will create cluster,
 	// we don't validate the cluster phase.
-	if len(opsBehaviour.FromClusterPhases) == 0 || ops.Status.Phase != appsv1alpha1.OpsPendingPhase ||
-		opsBehaviour.IsClusterCreation {
+	if len(opsBehaviour.FromClusterPhases) == 0 || ops.Status.Phase != appsv1alpha1.OpsPendingPhase || opsBehaviour.IsClusterCreation {
 		return nil
 	}
 	if slices.Contains(opsBehaviour.FromClusterPhases, cluster.Status.Phase) {

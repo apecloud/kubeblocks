@@ -2544,6 +2544,18 @@ simultaneously.</p>
 </tr>
 <tr>
 <td>
+<code>enqueueOnForce</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates whether opsRequest should continue to queue and run when &lsquo;force&rsquo; is set to true.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>type</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.OpsType">
@@ -2596,19 +2608,6 @@ int32
 <p>Specifies the maximum time in seconds that the OpsRequest will wait for its pre-conditions to be met
 before it aborts the operation.
 If set to 0 (default), pre-conditions must be satisfied immediately for the OpsRequest to proceed.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>skipPreConditions</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Indicates whether the current operation should skip pre-conditions such as cluster phase validation.
-Unlike &lsquo;force&rsquo;, setting &lsquo;skipPreconditions&rsquo; to true will only skip pre-conditions for runnable opsRequest.</p>
 </td>
 </tr>
 <tr>
@@ -13349,6 +13348,18 @@ simultaneously.</p>
 </tr>
 <tr>
 <td>
+<code>enqueueOnForce</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates whether opsRequest should continue to queue and run when &lsquo;force&rsquo; is set to true.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>type</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.OpsType">
@@ -13401,19 +13412,6 @@ int32
 <p>Specifies the maximum time in seconds that the OpsRequest will wait for its pre-conditions to be met
 before it aborts the operation.
 If set to 0 (default), pre-conditions must be satisfied immediately for the OpsRequest to proceed.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>skipPreConditions</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Indicates whether the current operation should skip pre-conditions such as cluster phase validation.
-Unlike &lsquo;force&rsquo;, setting &lsquo;skipPreconditions&rsquo; to true will only skip pre-conditions for runnable opsRequest.</p>
 </td>
 </tr>
 <tr>

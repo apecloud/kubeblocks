@@ -144,7 +144,7 @@ func (c CustomOpsHandler) checkExpression(reqCtx intctrlutil.RequestCtx,
 	rule *appsv1alpha1.Rule,
 	compCustomItem appsv1alpha1.CustomOpsComponent) error {
 	opsSpec := opsRes.OpsRequest.Spec
-	if opsSpec.Force || opsSpec.SkipPreConditions {
+	if opsSpec.Force {
 		return nil
 	}
 	comps, err := c.listComponents(reqCtx, cli, opsRes.Cluster, compCustomItem.ComponentName)

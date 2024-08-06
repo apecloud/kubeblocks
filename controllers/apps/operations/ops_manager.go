@@ -77,8 +77,7 @@ func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, o
 		}
 		// validate OpsRequest.spec
 		// if the operation will create a new cluster or skip the pre-conditions, don't validate the cluster phase
-		needCheckClusterPhase := !opsBehaviour.IsClusterCreation && !opsRequest.Spec.SkipPreConditions
-		if err = opsRequest.Validate(reqCtx.Ctx, cli, opsRes.Cluster, needCheckClusterPhase); err != nil {
+		if err = opsRequest.Validate(reqCtx.Ctx, cli, opsRes.Cluster, !opsBehaviour.IsClusterCreation); err != nil {
 			return &ctrl.Result{}, patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error())
 		}
 	}

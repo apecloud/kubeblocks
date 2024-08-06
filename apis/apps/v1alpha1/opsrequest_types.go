@@ -64,6 +64,11 @@ type OpsRequestSpec struct {
 	// +optional
 	Force bool `json:"force,omitempty"`
 
+	// Indicates whether opsRequest should continue to queue when 'force' is set to true.
+	// +kubebuilder:default=false
+	// +optional
+	EnqueueOnForce bool `json:"enqueueOnForce,omitempty"`
+
 	// Specifies the type of this operation. Supported types include "Start", "Stop", "Restart", "Switchover",
 	// "VerticalScaling", "HorizontalScaling", "VolumeExpansion", "Reconfiguring", "Upgrade", "Backup", "Restore",
 	// "Expose", "DataScript", "RebuildInstance", "Custom".
@@ -93,12 +98,6 @@ type OpsRequestSpec struct {
 	// +kubebuilder:default=0
 	// +optional
 	PreConditionDeadlineSeconds *int32 `json:"preConditionDeadlineSeconds,omitempty"`
-
-	// Indicates whether the current operation should skip pre-conditions such as cluster phase validation.
-	// Unlike 'force', setting 'skipPreconditions' to true will only skip pre-conditions for runnable opsRequest.
-	// +kubebuilder:default=false
-	// +optional
-	SkipPreConditions bool `json:"skipPreConditions,omitempty"`
 
 	// Specifies the maximum duration (in seconds) that an opsRequest is allowed to run.
 	// If the opsRequest runs longer than this duration, its phase will be marked as Aborted.

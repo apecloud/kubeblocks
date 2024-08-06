@@ -82,7 +82,7 @@ func newDataClone(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
-	if component.HorizontalScalePolicy == nil {
+	if component.HorizontalScaleBackupPolicyTemplate == nil {
 		return &dummyDataClone{
 			baseDataClone{
 				reqCtx:            reqCtx,
@@ -97,23 +97,19 @@ func newDataClone(reqCtx intctrlutil.RequestCtx,
 			},
 		}, nil
 	}
-	if component.HorizontalScalePolicy.Type == appsv1alpha1.HScaleDataClonePolicyCloneVolume {
-		return &backupDataClone{
-			baseDataClone{
-				reqCtx:            reqCtx,
-				cli:               cli,
-				cluster:           cluster,
-				component:         component,
-				itsObj:            itsObj,
-				itsProto:          itsProto,
-				backupKey:         backupKey,
-				desiredPodNames:   desiredPodNames,
-				currentPodNameSet: sets.New(currentPodNames...),
-			},
-		}, nil
-	}
-	// TODO: how about policy None and Snapshot?
-	return nil, nil
+	return &backupDataClone{
+		baseDataClone{
+			reqCtx:            reqCtx,
+			cli:               cli,
+			cluster:           cluster,
+			component:         component,
+			itsObj:            itsObj,
+			itsProto:          itsProto,
+			backupKey:         backupKey,
+			desiredPodNames:   desiredPodNames,
+			currentPodNameSet: sets.New(currentPodNames...),
+		},
+	}, nil
 }
 
 type baseDataClone struct {
@@ -379,7 +375,7 @@ func (d *backupDataClone) backup() ([]client.Object, error) {
 		}
 		return name
 	}()
-	backupPolicyTplName := d.component.HorizontalScalePolicy.BackupPolicyTemplateName
+	backupPolicyTplName := *d.component.HorizontalScaleBackupPolicyTemplate
 	backupPolicy, err := getBackupPolicyFromTemplate(d.reqCtx, d.cli, d.cluster, componentDef, backupPolicyTplName)
 	if err != nil {
 		return nil, err

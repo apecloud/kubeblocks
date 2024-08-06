@@ -33,7 +33,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/apiconversion"
 	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -84,24 +83,12 @@ func BuildSynthesizedComponentWrapper(reqCtx intctrlutil.RequestCtx,
 	cli client.Reader,
 	cluster *appsv1alpha1.Cluster,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*SynthesizedComponent, error) {
+	if clusterCompSpec == nil {
+		return nil, fmt.Errorf("cluster component spec is not provided")
+	}
 	clusterDef, err := getClusterReferencedResources(reqCtx.Ctx, cli, cluster)
 	if err != nil {
 		return nil, err
-	}
-	return BuildSynthesizedComponentWrapper4Test(reqCtx, cli, clusterDef, cluster, clusterCompSpec)
-}
-
-// BuildSynthesizedComponentWrapper4Test builds a new SynthesizedComponent object with a given ClusterComponentSpec.
-func BuildSynthesizedComponentWrapper4Test(reqCtx intctrlutil.RequestCtx,
-	cli client.Reader,
-	clusterDef *appsv1alpha1.ClusterDefinition,
-	cluster *appsv1alpha1.Cluster,
-	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*SynthesizedComponent, error) {
-	if clusterCompSpec == nil {
-		clusterCompSpec = apiconversion.HandleSimplifiedClusterAPI(clusterDef, cluster)
-	}
-	if clusterCompSpec == nil {
-		return nil, nil
 	}
 	compDef, err := getOrBuildComponentDefinition(reqCtx.Ctx, cli, clusterDef, cluster, clusterCompSpec)
 	if err != nil {
@@ -184,17 +171,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		EnabledLogs:                      comp.Spec.EnabledLogs,
 	}
 
-	// build backward compatible fields, including workload, services, componentRefEnvs, clusterDefName, clusterCompDefName, etc.
-	// if cluster referenced a clusterDefinition, for backward compatibility, we need to merge the clusterDefinition into the component
-	// TODO(xingran): it will be removed in the future
-	if clusterDef != nil && cluster != nil && clusterCompSpec != nil {
-		if err = buildBackwardCompatibleFields(reqCtx, clusterDef, cluster, clusterCompSpec, synthesizeComp); err != nil {
-			return nil, err
-		}
-	}
-	if synthesizeComp.HorizontalScalePolicy == nil {
-		buildCompatibleHorizontalScalePolicy(compDefObj, synthesizeComp)
-	}
+	buildCompatibleHorizontalScalePolicy(compDefObj, synthesizeComp)
 
 	if err = mergeUserDefinedEnv(synthesizeComp, comp); err != nil {
 		return nil, err
@@ -600,66 +577,11 @@ func buildRuntimeClassName(synthesizeComp *SynthesizedComponent, comp *appsv1alp
 	synthesizeComp.PodSpec.RuntimeClassName = comp.Spec.RuntimeClassName
 }
 
-// buildBackwardCompatibleFields builds backward compatible fields for component which referenced a clusterComponentDefinition and clusterComponentVersion
-// TODO(xingran): it will be removed in the future
-func buildBackwardCompatibleFields(reqCtx intctrlutil.RequestCtx,
-	clusterDef *appsv1alpha1.ClusterDefinition,
-	cluster *appsv1alpha1.Cluster,
-	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
-	synthesizeComp *SynthesizedComponent) error {
-	if clusterCompSpec.ComponentDefRef == "" {
-		return nil // no need to build backward compatible fields
-	}
-
-	clusterCompDef := clusterDef.GetComponentDefByName(clusterCompSpec.ComponentDefRef)
-	if clusterCompDef == nil {
-		return fmt.Errorf("referenced cluster component definition does not exist, cluster: %s, component: %s, component definition ref:%s",
-			cluster.Name, clusterCompSpec.Name, clusterCompSpec.ComponentDefRef)
-	}
-
-	buildWorkload := func() {
-		synthesizeComp.ClusterDefName = clusterDef.Name
-		synthesizeComp.ClusterCompDefName = clusterCompDef.Name
-		synthesizeComp.HorizontalScalePolicy = clusterCompDef.HorizontalScalePolicy
-	}
-
-	buildClusterCompServices := func() {
-		if len(synthesizeComp.ComponentServices) > 0 {
-			service := corev1.Service{
-				Spec: corev1.ServiceSpec{
-					Ports: synthesizeComp.ComponentServices[0].Spec.Ports,
-				},
-			}
-			for _, item := range clusterCompSpec.Services {
-				svc := appsv1alpha1.ComponentService{
-					Service: appsv1alpha1.Service{
-						Name:        item.Name,
-						ServiceName: item.Name,
-						Annotations: item.Annotations,
-						Spec:        *service.Spec.DeepCopy(),
-					},
-				}
-				svc.Spec.Type = item.ServiceType
-				synthesizeComp.ComponentServices = append(synthesizeComp.ComponentServices, svc)
-			}
-		}
-	}
-
-	// build workload
-	buildWorkload()
-
-	buildClusterCompServices()
-
-	return nil
-}
-
 func buildCompatibleHorizontalScalePolicy(compDef *appsv1alpha1.ComponentDefinition, synthesizeComp *SynthesizedComponent) {
 	if compDef.Annotations != nil {
-		if templateName, ok := compDef.Annotations[constant.HorizontalScaleBackupPolicyTemplateKey]; ok {
-			synthesizeComp.HorizontalScalePolicy = &appsv1alpha1.HorizontalScalePolicy{
-				Type:                     appsv1alpha1.HScaleDataClonePolicyCloneVolume,
-				BackupPolicyTemplateName: templateName,
-			}
+		templateName, ok := compDef.Annotations[constant.HorizontalScaleBackupPolicyTemplateKey]
+		if ok {
+			synthesizeComp.HorizontalScaleBackupPolicyTemplate = &templateName
 		}
 	}
 }

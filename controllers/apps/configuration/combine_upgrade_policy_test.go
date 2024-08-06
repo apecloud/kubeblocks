@@ -57,12 +57,7 @@ var _ = Describe("Reconfigure CombineSyncPolicy", func() {
 				withConfigSpec("for_test", map[string]string{
 					"key": "value",
 				}),
-				withClusterComponent(2),
-				withCDComponent("consensus", []appsv1alpha1.ComponentConfigSpec{{
-					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-						Name:       "for_test",
-						VolumeName: "test_volume",
-					}}}))
+				withClusterComponent(2))
 
 			Expect(testPolicyExecs.GetPolicyName()).Should(BeEquivalentTo(appsv1alpha1.DynamicReloadAndRestartPolicy))
 			status, err := testPolicyExecs.Upgrade(mockParam)
@@ -81,12 +76,7 @@ var _ = Describe("Reconfigure CombineSyncPolicy", func() {
 				withConfigSpec("for_test", map[string]string{
 					"key": "value",
 				}),
-				withClusterComponent(2),
-				withCDComponent("consensus", []appsv1alpha1.ComponentConfigSpec{{
-					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-						Name:       "for_test",
-						VolumeName: "test_volume",
-					}}}))
+				withClusterComponent(2))
 
 			Expect(testPolicyExecs.GetPolicyName()).Should(BeEquivalentTo(appsv1alpha1.DynamicReloadAndRestartPolicy))
 			status, err := testPolicyExecs.Upgrade(mockParam)

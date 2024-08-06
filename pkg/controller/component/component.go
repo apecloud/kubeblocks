@@ -32,7 +32,6 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/apiconversion"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -121,25 +120,12 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluste
 	return compBuilder.GetObject(), nil
 }
 
-func BuildComponentDefinition(clusterDef *appsv1alpha1.ClusterDefinition,
-	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.ComponentDefinition, error) {
-	clusterCompDef, err := getClusterCompDef(clusterDef, clusterCompSpec)
-	if err != nil {
-		return nil, err
-	}
-	compDef, err := buildComponentDefinitionByConversion(clusterCompDef)
-	if err != nil {
-		return nil, err
-	}
-	return compDef, nil
-}
-
 func getOrBuildComponentDefinition(ctx context.Context, cli client.Reader,
 	clusterDef *appsv1alpha1.ClusterDefinition,
 	cluster *appsv1alpha1.Cluster,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.ComponentDefinition, error) {
-	if len(cluster.Spec.ClusterDefRef) > 0 && len(clusterCompSpec.ComponentDefRef) > 0 {
-		return BuildComponentDefinition(clusterDef, clusterCompSpec)
+	if len(cluster.Spec.ClusterDefRef) > 0 && len(clusterCompSpec.ComponentDefRef) > 0 && len(clusterCompSpec.ComponentDef) == 0 {
+		return nil, fmt.Errorf("legacy cluster component definition is not supported any more")
 	}
 	if len(clusterCompSpec.ComponentDef) > 0 {
 		compDef := &appsv1alpha1.ComponentDefinition{}
@@ -172,18 +158,6 @@ func getClusterReferencedResources(ctx context.Context, cli client.Reader,
 	return clusterDef, nil
 }
 
-func getClusterCompDef(clusterDef *appsv1alpha1.ClusterDefinition,
-	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.ClusterComponentDefinition, error) {
-	if len(clusterCompSpec.ComponentDefRef) == 0 {
-		return nil, fmt.Errorf("cluster component definition ref is empty: %s", clusterCompSpec.Name)
-	}
-	clusterCompDef := clusterDef.GetComponentDefByName(clusterCompSpec.ComponentDefRef)
-	if clusterCompDef == nil {
-		return nil, fmt.Errorf("referenced cluster component definition is not defined: %s", clusterCompSpec.ComponentDefRef)
-	}
-	return clusterCompDef, nil
-}
-
 func getClusterCompSpec4Component(ctx context.Context, cli client.Reader,
 	clusterDef *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster,
 	comp *appsv1alpha1.Component) (*appsv1alpha1.ClusterComponentSpec, error) {
@@ -198,7 +172,7 @@ func getClusterCompSpec4Component(ctx context.Context, cli client.Reader,
 	if compSpec != nil {
 		return compSpec, nil
 	}
-	return apiconversion.HandleSimplifiedClusterAPI(clusterDef, cluster), nil
+	return nil, fmt.Errorf("cluster component spec is not found for component: %s", comp.Name)
 }
 
 func getCompLabelValue(comp *appsv1alpha1.Component, label string) (string, error) {

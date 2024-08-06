@@ -467,25 +467,6 @@ const (
 	WipeOut TerminationPolicyType = "WipeOut"
 )
 
-// HScaleDataClonePolicyType defines the data clone policy to be used during horizontal scaling.
-// This policy determines how data is handled when new nodes are added to the cluster.
-// The policy can be set to `None`, `CloneVolume`, or `Snapshot`.
-//
-// +enum
-// +kubebuilder:validation:Enum={None,CloneVolume,Snapshot}
-type HScaleDataClonePolicyType string
-
-const (
-	// HScaleDataClonePolicyNone indicates that no data cloning will occur during horizontal scaling.
-	HScaleDataClonePolicyNone HScaleDataClonePolicyType = "None"
-
-	// HScaleDataClonePolicyCloneVolume indicates that data will be cloned from existing volumes during horizontal scaling.
-	HScaleDataClonePolicyCloneVolume HScaleDataClonePolicyType = "CloneVolume"
-
-	// HScaleDataClonePolicyFromSnapshot indicates that data will be cloned from a snapshot during horizontal scaling.
-	HScaleDataClonePolicyFromSnapshot HScaleDataClonePolicyType = "Snapshot"
-)
-
 // PodAntiAffinity defines the pod anti-affinity strategy.
 //
 // This strategy determines how pods are scheduled in relation to other pods, with the aim of either spreading pods

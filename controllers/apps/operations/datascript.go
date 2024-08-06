@@ -81,24 +81,26 @@ func (o DataScriptOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.C
 		}
 		return err
 	}
-	// get componentDef
-	componentDef := clusterDef.GetComponentDefByName(component.ComponentDefRef)
-	if componentDef == nil {
-		return intctrlutil.NewFatalError(fmt.Sprintf("componentDef %s not found in clusterDef %s", component.ComponentDefRef, clusterDef.Name))
-	}
+	// TODO(v1.0): how to?
+	//// get componentDef
+	// componentDef := clusterDef.GetComponentDefByName(component.ComponentDefRef)
+	// if componentDef == nil {
+	//	return intctrlutil.NewFatalError(fmt.Sprintf("componentDef %s not found in clusterDef %s", component.ComponentDefRef, clusterDef.Name))
+	// }
+	return intctrlutil.NewFatalError(fmt.Sprintf("componentDef %s not found in clusterDef %s", component.ComponentDefRef, clusterDef.Name))
 
-	// create jobs
-	var jobs []*batchv1.Job
-	// TODO(v1.0): character-type
-	if jobs, err = buildDataScriptJobs(reqCtx, cli, opsResource.Cluster, component, opsRequest, ""); err != nil {
-		return err
-	}
-	for _, job := range jobs {
-		if err = cli.Create(reqCtx.Ctx, job); err != nil {
-			return err
-		}
-	}
-	return nil
+	//// create jobs
+	// var jobs []*batchv1.Job
+	//// TODO(v1.0): character-type
+	// if jobs, err = buildDataScriptJobs(reqCtx, cli, opsResource.Cluster, component, opsRequest, ""); err != nil {
+	//	return err
+	// }
+	// for _, job := range jobs {
+	//	if err = cli.Create(reqCtx.Ctx, job); err != nil {
+	//		return err
+	//	}
+	// }
+	// return nil
 }
 
 // ReconcileAction implements OpsHandler.ReconcileAction

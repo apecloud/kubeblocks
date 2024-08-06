@@ -17,28 +17,11 @@ limitations under the License.
 package v1alpha1
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // ClusterDefinitionSpec defines the desired state of ClusterDefinition.
 type ClusterDefinitionSpec struct {
-	// Provides the definitions for the cluster components.
-	//
-	// Deprecated since v0.9.
-	// Components should now be individually defined using ComponentDefinition and
-	// collectively referenced via `topology.components`.
-	// This field is maintained for backward compatibility and its use is discouraged.
-	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
-	//
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
-	// +optional
-	ComponentDefs []ClusterComponentDefinition `json:"componentDefs" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
-
 	// Topologies defines all possible topologies within the cluster.
 	//
 	// +kubebuilder:validation:MinItems=1
@@ -141,14 +124,6 @@ type ClusterTopologyOrders struct {
 	Update []string `json:"update,omitempty"`
 }
 
-// CmdExecutorConfig specifies how to perform creation and deletion statements.
-//
-// Deprecated since v0.8.
-type CmdExecutorConfig struct {
-	CommandExecutorEnvItem `json:",inline"`
-	CommandExecutorItem    `json:",inline"`
-}
-
 // PasswordConfig helps provide to customize complexity of password generation pattern.
 type PasswordConfig struct {
 	// The length of the password.
@@ -228,10 +203,6 @@ type ClusterDefinitionStatus struct {
 	ServiceRefs string `json:"serviceRefs,omitempty"`
 }
 
-func (r ClusterDefinitionStatus) GetTerminalPhases() []Phase {
-	return []Phase{AvailablePhase}
-}
-
 type LogConfig struct {
 	// Specifies a descriptive label for the log type, such as 'slow' for a MySQL slow log file.
 	// It provides a clear identification of the log's purpose and content.
@@ -252,6 +223,8 @@ type LogConfig struct {
 	// +kubebuilder:validation:MaxLength=4096
 	FilePathPattern string `json:"filePathPattern"`
 }
+
+// TODO(v1.0): remove this after lorry
 
 // VolumeProtectionSpec is deprecated since v0.9, replaced with ComponentVolume.HighWatermark.
 type VolumeProtectionSpec struct {
@@ -344,101 +317,6 @@ type ServiceRefDeclarationSpec struct {
 	ServiceVersion string `json:"serviceVersion"`
 }
 
-// ClusterComponentDefinition defines a Component within a ClusterDefinition but is deprecated and
-// has been replaced by ComponentDefinition.
-//
-// Deprecated: Use ComponentDefinition instead. This type is deprecated as of version 0.8.
-type ClusterComponentDefinition struct {
-	// This name could be used as default name of `cluster.spec.componentSpecs.name`, and needs to conform with same
-	// validation rules as `cluster.spec.componentSpecs.name`, currently complying with IANA Service Naming rule.
-	// This name will apply to cluster objects as the value of label "apps.kubeblocks.io/component-name".
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=22
-	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
-	Name string `json:"name"`
-
-	// Defines the pod spec template of component.
-	//
-	// +kubebuilder:pruning:PreserveUnknownFields
-	// +optional
-	PodSpec *corev1.PodSpec `json:"podSpec,omitempty"`
-
-	// Defines the behavior of horizontal scale.
-	//
-	// +optional
-	HorizontalScalePolicy *HorizontalScalePolicy `json:"horizontalScalePolicy,omitempty"`
-}
-
-// HorizontalScalePolicy is deprecated since v0.8.
-type HorizontalScalePolicy struct {
-	// Determines the data synchronization method when a component scales out.
-	// The policy can be one of the following: {None, CloneVolume}. The default policy is `None`.
-	//
-	// - `None`: This is the default policy. It creates an empty volume without data cloning.
-	// - `CloneVolume`: This policy clones data to newly scaled pods. It first tries to use a volume snapshot.
-	//   If volume snapshot is not enabled, it will attempt to use a backup tool. If neither method works, it will report an error.
-	// - `Snapshot`: This policy is deprecated and is an alias for CloneVolume.
-	//
-	// +kubebuilder:default=None
-	// +optional
-	Type HScaleDataClonePolicyType `json:"type,omitempty"`
-
-	// Refers to the backup policy template.
-	//
-	// +optional
-	BackupPolicyTemplateName string `json:"backupPolicyTemplateName,omitempty"`
-
-	// Specifies the volumeMount of the container to backup.
-	// This only works if Type is not None. If not specified, the first volumeMount will be selected.
-	//
-	// +optional
-	VolumeMountsName string `json:"volumeMountsName,omitempty"`
-}
-
-type ScriptSpecSelector struct {
-	// Represents the name of the ScriptSpec referent.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	Name string `json:"name"`
-}
-
-// CommandExecutorEnvItem is deprecated since v0.8.
-type CommandExecutorEnvItem struct {
-	// Specifies the image used to execute the command.
-	//
-	// +kubebuilder:validation:Required
-	Image string `json:"image"`
-
-	// A list of environment variables that will be injected into the command execution context.
-	//
-	// +kubebuilder:pruning:PreserveUnknownFields
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +optional
-	Env []corev1.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
-}
-
-// CommandExecutorItem is deprecated since v0.8.
-type CommandExecutorItem struct {
-	// The command to be executed.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
-	Command []string `json:"command"`
-
-	// Additional parameters used in the execution of the command.
-	//
-	// +optional
-	Args []string `json:"args,omitempty"`
-}
-
-// TODO(API):
-//  1. how to display the aggregated topologies and its service references line by line?
-//  2. the services and versions supported
-
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:openapi-gen=true
@@ -479,26 +357,3 @@ type ClusterDefinitionList struct {
 func init() {
 	SchemeBuilder.Register(&ClusterDefinition{}, &ClusterDefinitionList{})
 }
-
-// GetComponentDefByName gets component definition from ClusterDefinition with compDefName
-func (r *ClusterDefinition) GetComponentDefByName(compDefName string) *ClusterComponentDefinition {
-	for _, component := range r.Spec.ComponentDefs {
-		if component.Name == compDefName {
-			return &component
-		}
-	}
-	return nil
-}
-
-// FailurePolicyType specifies the type of failure policy.
-//
-// +enum
-// +kubebuilder:validation:Enum={Ignore,Fail}
-type FailurePolicyType string
-
-const (
-	// FailurePolicyIgnore means that an error will be ignored but logged.
-	FailurePolicyIgnore FailurePolicyType = "Ignore"
-	// FailurePolicyFail means that an error will be reported.
-	FailurePolicyFail FailurePolicyType = "Fail"
-)

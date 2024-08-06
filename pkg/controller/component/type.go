@@ -76,8 +76,8 @@ type SynthesizedComponent struct {
 	Stop                             *bool
 
 	// TODO(xingran): The following fields will be deprecated after KubeBlocks version 0.8.0
-	ClusterDefName        string                          `json:"clusterDefName,omitempty"`     // the name of the clusterDefinition
-	ClusterCompDefName    string                          `json:"clusterCompDefName,omitempty"` // the name of the clusterDefinition.Spec.ComponentDefs[*].Name
-	HorizontalScalePolicy *v1alpha1.HorizontalScalePolicy `json:"horizontalScalePolicy,omitempty"`
-	EnabledLogs           []string                        `json:"enabledLogs,omitempty"`
+	ClusterDefName                      string   `json:"clusterDefName,omitempty"`     // the name of the clusterDefinition
+	ClusterCompDefName                  string   `json:"clusterCompDefName,omitempty"` // the name of the clusterDefinition.Spec.ComponentDefs[*].Name
+	EnabledLogs                         []string `json:"enabledLogs,omitempty"`
+	HorizontalScaleBackupPolicyTemplate *string
 }

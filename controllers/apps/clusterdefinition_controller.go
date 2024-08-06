@@ -73,7 +73,7 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	if clusterDef.Status.ObservedGeneration == clusterDef.Generation &&
-		slices.Contains(clusterDef.Status.GetTerminalPhases(), clusterDef.Status.Phase) {
+		slices.Contains([]appsv1alpha1.Phase{appsv1alpha1.AvailablePhase}, clusterDef.Status.Phase) {
 		return intctrlutil.Reconciled()
 	}
 

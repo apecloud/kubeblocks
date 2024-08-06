@@ -271,6 +271,9 @@ func handleCancelProgressForPodsRollingUpdate(
 }
 
 func needToCheckRole(pgRes *progressResource) bool {
+	if pgRes.componentDef == nil {
+		panic("componentDef is nil")
+	}
 	return len(pgRes.componentDef.Spec.Roles) > 0
 }
 

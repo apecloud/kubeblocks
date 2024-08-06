@@ -105,6 +105,23 @@ type BackupTarget struct {
 	//
 	// +kubebuilder:validation:Required
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
+
+	// Specifies the container port in the target pod.
+	// If not specified, the first container and its first port will be used.
+	//
+	// +optional
+	ContainerPort *ContainerPort `json:"containerPort,omitempty"`
+}
+
+type ContainerPort struct {
+	// Specifies the name of container with the port.
+	//
+	// +kubebuilder:validation:Required
+	ContainerName string `json:"containerName,omitempty"`
+	// Specifies the port name.
+	//
+	// +kubebuilder:validation:Required
+	PortName string `json:"portName,omitempty"`
 }
 
 type PodSelector struct {

@@ -78,8 +78,8 @@ func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	opsCtrlHandler := &opsControllerHandler{}
 	return opsCtrlHandler.Handle(reqCtx, &operations.OpsResource{Recorder: r.Recorder},
 		r.fetchOpsRequest,
-		r.handleDeletion,
 		r.fetchCluster,
+		r.handleDeletion,
 		r.addClusterLabelAndSetOwnerReference,
 		r.handleCancelSignal,
 		r.handleOpsRequestByPhase,

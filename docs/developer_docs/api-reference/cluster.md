@@ -21428,6 +21428,19 @@ the <code>strategy</code> field below.</li>
 </tr>
 <tr>
 <td>
+<code>fallbackRole</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the fallback role to select one replica for backup, this only takes effect when the
+<code>strategy</code> field below is set to <code>Any</code>.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>account</code><br/>
 <em>
 string

@@ -2600,14 +2600,15 @@ If set to 0 (default), pre-conditions must be satisfied immediately for the OpsR
 </tr>
 <tr>
 <td>
-<code>ignorePreCondition</code><br/>
+<code>skipPreConditions</code><br/>
 <em>
 bool
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Indicates whether the current operation should skip pre-conditions such as cluster phase validation.</p>
+<p>Indicates whether the current operation should skip pre-conditions such as cluster phase validation.
+Unlike &lsquo;force&rsquo;, setting &lsquo;skipPreconditions&rsquo; to true will only skip pre-conditions for runnable opsRequest.</p>
 </td>
 </tr>
 <tr>
@@ -13404,14 +13405,15 @@ If set to 0 (default), pre-conditions must be satisfied immediately for the OpsR
 </tr>
 <tr>
 <td>
-<code>ignorePreCondition</code><br/>
+<code>skipPreConditions</code><br/>
 <em>
 bool
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Indicates whether the current operation should skip pre-conditions such as cluster phase validation.</p>
+<p>Indicates whether the current operation should skip pre-conditions such as cluster phase validation.
+Unlike &lsquo;force&rsquo;, setting &lsquo;skipPreconditions&rsquo; to true will only skip pre-conditions for runnable opsRequest.</p>
 </td>
 </tr>
 <tr>

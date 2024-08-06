@@ -3795,11 +3795,6 @@ spec:
                 x-kubernetes-validations:
                 - message: forbidden to update spec.horizontalScaling
                   rule: self == oldSelf
-              ignorePreCondition:
-                default: false
-                description: Indicates whether the current operation should skip pre-conditions
-                  such as cluster phase validation.
-                type: boolean
               preConditionDeadlineSeconds:
                 default: 0
                 description: |-
@@ -4501,6 +4496,12 @@ spec:
                 required:
                 - componentName
                 type: object
+              skipPreConditions:
+                default: false
+                description: |-
+                  Indicates whether the current operation should skip pre-conditions such as cluster phase validation.
+                  Unlike 'force', setting 'skipPreconditions' to true will only skip pre-conditions for runnable opsRequest.
+                type: boolean
               switchover:
                 description: Lists Switchover objects, each specifying a Component
                   to perform the switchover operation.

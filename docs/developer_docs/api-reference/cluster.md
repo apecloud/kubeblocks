@@ -2551,7 +2551,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Indicates whether opsRequest should continue to queue and run when &lsquo;force&rsquo; is set to true.</p>
+<p>Indicates whether opsRequest should continue to queue when &lsquo;force&rsquo; is set to true.</p>
 </td>
 </tr>
 <tr>
@@ -5007,8 +5007,8 @@ More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volum
 <td>
 <code>resources</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcerequirements-v1-core">
-Kubernetes core/v1.ResourceRequirements
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volumeresourcerequirements-v1-core">
+Kubernetes core/v1.VolumeResourceRequirements
 </a>
 </em>
 </td>
@@ -13355,7 +13355,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Indicates whether opsRequest should continue to queue and run when &lsquo;force&rsquo; is set to true.</p>
+<p>Indicates whether opsRequest should continue to queue when &lsquo;force&rsquo; is set to true.</p>
 </td>
 </tr>
 <tr>
@@ -14461,8 +14461,8 @@ More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volum
 <td>
 <code>resources</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcerequirements-v1-core">
-Kubernetes core/v1.ResourceRequirements
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volumeresourcerequirements-v1-core">
+Kubernetes core/v1.VolumeResourceRequirements
 </a>
 </em>
 </td>

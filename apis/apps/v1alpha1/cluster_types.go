@@ -394,6 +394,19 @@ type UserResourceRefs struct {
 	ConfigMapRefs []ConfigMapRef `json:"configMapRefs,omitempty"`
 }
 
+// InstanceUpdateStrategy indicates the strategy that the InstanceSet
+// controller will use to perform updates. It includes any additional parameters
+// necessary to perform the update for the indicated strategy.
+type InstanceUpdateStrategy struct {
+	// Type indicates the type of the InstanceUpdateStrategy.
+	// Default is RollingUpdate.
+	// +optional
+	Type workloads.InstanceSetUpdateStrategyType `json:"type,omitempty"`
+	// RollingUpdate is used to communicate parameters when Type is RollingUpdateStatefulSetStrategyType.
+	// +optional
+	RollingUpdate *workloads.RollingUpdateStrategy `json:"rollingUpdate,omitempty"`
+}
+
 // InstanceTemplate allows customization of individual replica configurations in a Component.
 type InstanceTemplate struct {
 	// Name specifies the unique name of the instance Pod created using this InstanceTemplate.
@@ -790,15 +803,12 @@ type ClusterComponentSpec struct {
 	// +optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 
-	// Defines the update strategy for the Component.
+	// Indicates the InstanceUpdateStrategy that will be
+	// employed to update Pods in the InstanceSet when a revision is made to
+	// Template.
 	//
-	// Deprecated since v0.9.
-	// This field is maintained for backward compatibility and its use is discouraged.
-	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
-	//
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
-	UpdateStrategy *UpdateStrategy `json:"updateStrategy,omitempty"`
+	InstanceUpdateStrategy InstanceUpdateStrategy `json:"instanceUpdateStrategy,omitempty"`
 
 	// Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
 	// or when scaling down. It only used when `PodManagementPolicy` is set to `Parallel`.

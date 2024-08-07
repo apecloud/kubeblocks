@@ -47,7 +47,6 @@ func BuildWorkloadFrom(synthesizeComp *SynthesizedComponent, protoITS *workloads
 		"roleprobe":                        &itsRoleProbeConvertor{},
 		"credential":                       &itsCredentialConvertor{},
 		"membershipreconfiguration":        &itsMembershipReconfigurationConvertor{},
-		"memberupdatestrategy":             &itsMemberUpdateStrategyConvertor{},
 		"podmanagementpolicy":              &itsPodManagementPolicyConvertor{},
 		"parallelpodmanagementconcurrency": &itsParallelPodManagementConcurrencyConvertor{},
 		"podupdatepolicy":                  &itsPodUpdatePolicyConvertor{},
@@ -78,17 +77,6 @@ type itsCredentialConvertor struct{}
 
 // itsMembershipReconfigurationConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.MembershipReconfiguration.
 type itsMembershipReconfigurationConvertor struct{}
-
-// itsMemberUpdateStrategyConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.MemberUpdateStrategy.
-type itsMemberUpdateStrategyConvertor struct{}
-
-func (c *itsMemberUpdateStrategyConvertor) convert(args ...any) (any, error) {
-	synthesizeComp, err := parseITSConvertorArgs(args...)
-	if err != nil {
-		return nil, err
-	}
-	return getMemberUpdateStrategy(synthesizeComp), nil
-}
 
 // itsPodManagementPolicyConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.PodManagementPolicy.
 type itsPodManagementPolicyConvertor struct{}
@@ -144,11 +132,15 @@ func (c *itsUpdateStrategyConvertor) convert(args ...any) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	if getMemberUpdateStrategy(synthesizedComp) != nil {
-		// appsv1.OnDeleteStatefulSetStrategyType is the default value if member update strategy is set.
-		return appsv1.StatefulSetUpdateStrategy{}, nil
+	if memberUpdateStrategy := getMemberUpdateStrategy(synthesizedComp); memberUpdateStrategy != nil {
+		return workloads.InstanceUpdateStrategy{
+			MemberUpdateStrategy: memberUpdateStrategy,
+		}, nil
 	}
-	return nil, nil
+	return workloads.InstanceUpdateStrategy{
+		Type:          synthesizedComp.InstanceUpdateStrategy.Type,
+		RollingUpdate: synthesizedComp.InstanceUpdateStrategy.RollingUpdate,
+	}, nil
 }
 
 // itsInstancesConvertor converts component instanceTemplate to ITS instanceTemplate

@@ -1,8 +1,6 @@
 module github.com/apecloud/kubeblocks
 
-go 1.22.0
-
-toolchain go1.22.5
+go 1.21
 
 require (
 	cuelang.org/go v0.8.0
@@ -72,9 +70,9 @@ require (
 	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/yaml.v2 v2.4.0
 	helm.sh/helm/v3 v3.12.3
-	k8s.io/api v0.30.3
+	k8s.io/api v0.29.2
 	k8s.io/apiextensions-apiserver v0.29.0
-	k8s.io/apimachinery v0.30.3
+	k8s.io/apimachinery v0.29.2
 	k8s.io/cli-runtime v0.29.0
 	k8s.io/client-go v0.29.2
 	k8s.io/code-generator v0.29.0

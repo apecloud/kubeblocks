@@ -42,9 +42,9 @@ import (
 var _ = Describe("OpsUtil functions", func() {
 
 	var (
-		randomStr             = testCtx.GetRandomStr()
-		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr
-		clusterName           = "cluster-for-ops-" + randomStr
+		randomStr   = testCtx.GetRandomStr()
+		compDefName = "test-compdef-" + randomStr
+		clusterName = "test-cluster-" + randomStr
 	)
 
 	cleanEnv := func() {
@@ -55,7 +55,7 @@ var _ = Describe("OpsUtil functions", func() {
 		By("clean resources")
 
 		// delete cluster(and all dependent sub-resources), cluster definition
-		testapps.ClearClusterResources(&testCtx)
+		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 
 		// delete rest resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
@@ -74,12 +74,12 @@ var _ = Describe("OpsUtil functions", func() {
 	Context("Test ops_util functions", func() {
 		It("Test ops_util functions", func() {
 			By("init operations resources ")
-			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterName)
-			testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusComp)
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
 
 			By("Test the functions in ops_util.go")
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, appsv1alpha1.HorizontalScaling{
-				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: defaultCompName},
 				Replicas:     pointer.Int32(1),
 			})
 			Expect(patchValidateErrorCondition(ctx, k8sClient, opsRes, "validate error")).Should(Succeed())
@@ -90,22 +90,22 @@ var _ = Describe("OpsUtil functions", func() {
 
 		It("Test opsRequest failed cases", func() {
 			By("init operations resources ")
-			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterName)
-			testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusComp)
-			pods := testapps.MockInstanceSetPods(&testCtx, nil, opsRes.Cluster, consensusComp)
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
+			pods := testapps.MockInstanceSetPods(&testCtx, nil, opsRes.Cluster, defaultCompName)
 			time.Sleep(time.Second)
 			By("Test the functions in ops_util.go")
 			ops := testapps.NewOpsRequestObj("restart-ops-"+randomStr, testCtx.DefaultNamespace,
 				clusterName, appsv1alpha1.RestartType)
-			ops.Spec.RestartList = []appsv1alpha1.ComponentOps{{ComponentName: consensusComp}}
+			ops.Spec.RestartList = []appsv1alpha1.ComponentOps{{ComponentName: defaultCompName}}
 			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
 			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsRunningPhase
 			opsRes.OpsRequest.Status.StartTimestamp = metav1.Now()
 
 			By("mock component failed")
-			clusterComp := opsRes.Cluster.Status.Components[consensusComp]
+			clusterComp := opsRes.Cluster.Status.Components[defaultCompName]
 			clusterComp.Phase = appsv1alpha1.FailedClusterCompPhase
-			opsRes.Cluster.Status.SetComponentStatus(consensusComp, clusterComp)
+			opsRes.Cluster.Status.SetComponentStatus(defaultCompName, clusterComp)
 
 			By("expect for opsRequest is running")
 			handleRestartProgress := func(reqCtx intctrlutil.RequestCtx,
@@ -131,7 +131,7 @@ var _ = Describe("OpsUtil functions", func() {
 			testk8s.MockPodIsTerminating(ctx, testCtx, pods[2])
 			testk8s.RemovePodFinalizer(ctx, testCtx, pods[2])
 			// recreate it
-			pod := testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp, pods[2].Name, "follower", "Readonly")
+			pod := testapps.MockInstanceSetPod(&testCtx, nil, clusterName, defaultCompName, pods[2].Name, "follower", "Readonly")
 			// mock pod is failed
 			testk8s.MockPodIsFailed(ctx, testCtx, pod)
 			opsPhase, _, err = compOpsHelper.reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes, "test", handleRestartProgress)
@@ -141,12 +141,12 @@ var _ = Describe("OpsUtil functions", func() {
 
 		It("Test opsRequest with disable ha", func() {
 			By("init operations resources ")
-			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterName)
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
 
 			By("Test the functions in ops_util.go")
 			ops := testapps.NewOpsRequestObj("restart-ops-"+randomStr, testCtx.DefaultNamespace,
 				clusterName, appsv1alpha1.RestartType)
-			ops.Spec.RestartList = []appsv1alpha1.ComponentOps{{ComponentName: consensusComp}}
+			ops.Spec.RestartList = []appsv1alpha1.ComponentOps{{ComponentName: defaultCompName}}
 			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
 			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.OpsRequest, func() {
 				opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsCreatingPhase
@@ -169,7 +169,7 @@ var _ = Describe("OpsUtil functions", func() {
 			}
 
 			By("mock instance set")
-			its := testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusComp)
+			its := testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
 
 			By("expect to disable ha")
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
@@ -181,7 +181,7 @@ var _ = Describe("OpsUtil functions", func() {
 
 			By("mock restart ops to succeed and expect to enable ha")
 			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsRunningPhase
-			_ = testapps.MockInstanceSetPods(&testCtx, its, opsRes.Cluster, consensusComp)
+			_ = testapps.MockInstanceSetPods(&testCtx, its, opsRes.Cluster, defaultCompName)
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsSucceedPhase))
@@ -193,11 +193,11 @@ var _ = Describe("OpsUtil functions", func() {
 		It("Test opsRequest Queue functions", func() {
 			By("init operations resources ")
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
-			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterName)
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
 
 			runHscaleOps := func(expectPhase appsv1alpha1.OpsPhase) *appsv1alpha1.OpsRequest {
 				ops := createHorizontalScaling(clusterName, appsv1alpha1.HorizontalScaling{
-					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: defaultCompName},
 					Replicas:     pointer.Int32(1),
 				})
 				opsRes.OpsRequest = ops
@@ -248,11 +248,11 @@ var _ = Describe("OpsUtil functions", func() {
 		It("Test opsRequest dependency", func() {
 			By("init operations resources ")
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
-			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterName)
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
 
 			By("create a first horizontal opsRequest")
 			ops1 := createHorizontalScaling(clusterName, appsv1alpha1.HorizontalScaling{
-				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: defaultCompName},
 				ScaleIn: &appsv1alpha1.ScaleIn{
 					ReplicaChanger: appsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)},
 				},
@@ -264,7 +264,7 @@ var _ = Describe("OpsUtil functions", func() {
 
 			By("create another horizontal opsRequest with force flag and dependent the first opsRequest")
 			ops2 := createHorizontalScaling(clusterName, appsv1alpha1.HorizontalScaling{
-				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: defaultCompName},
 				ScaleOut: &appsv1alpha1.ScaleOut{
 					ReplicaChanger: appsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)},
 				},
@@ -303,8 +303,8 @@ var _ = Describe("OpsUtil functions", func() {
 
 		It("Test EnqueueOnForce=true", func() {
 			By("init operations resources ")
-			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterName)
-			testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusComp)
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
 
 			By("mock cluster phase to Updating")
 			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
@@ -313,7 +313,7 @@ var _ = Describe("OpsUtil functions", func() {
 
 			By("expect the ops phase is failed")
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, appsv1alpha1.HorizontalScaling{
-				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: defaultCompName},
 				Replicas:     pointer.Int32(1),
 			})
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
@@ -322,7 +322,7 @@ var _ = Describe("OpsUtil functions", func() {
 
 			By("Test EnqueueOnForce=true")
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, appsv1alpha1.HorizontalScaling{
-				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: defaultCompName},
 				Replicas:     pointer.Int32(1),
 			})
 			opsRes.OpsRequest.Spec.Force = true

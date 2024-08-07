@@ -65,7 +65,7 @@ func newAllFieldsClusterObj(compDef *appsv1alpha1.ComponentDefinition, create bo
 	}
 	pvcSpec := testapps.NewPVCSpec("1Gi")
 	clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
-		AddComponentV2(mysqlCompName, compDef.Name).
+		AddComponent(mysqlCompName, compDef.Name).
 		SetReplicas(1).
 		AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 		AddComponentService(testapps.ServiceVPCName, corev1.ServiceTypeLoadBalancer).

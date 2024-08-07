@@ -65,7 +65,7 @@ var _ = Describe("", func() {
 	Context("Test OpsRequest", func() {
 		It("Test expose OpsRequest", func() {
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
-			opsRes, _, clusterObject := initOperationsResources2(compDefName, clusterName)
+			opsRes, _, clusterObject := initOperationsResources(compDefName, clusterName)
 
 			By("create Expose opsRequest")
 			ops := testapps.NewOpsRequestObj("expose-expose-"+randomStr, testCtx.DefaultNamespace,
@@ -103,7 +103,7 @@ var _ = Describe("", func() {
 
 		It("Test expose OpsRequest with empty ComponentName", func() {
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
-			opsRes, _, clusterObject := initOperationsResources2(compDefName, clusterName)
+			opsRes, _, clusterObject := initOperationsResources(compDefName, clusterName)
 
 			By("create Expose opsRequest")
 			ops := testapps.NewOpsRequestObj("expose-expose-"+randomStr, testCtx.DefaultNamespace,

@@ -5198,16 +5198,6 @@ spec:
                         in its current state.
                       maxLength: 1024
                       type: string
-                    workloadType:
-                      description: |-
-                        Records the workload type of Component in ClusterDefinition.
-                        Deprecated and should be removed in the future version.
-                      enum:
-                      - Stateless
-                      - Stateful
-                      - Consensus
-                      - Replication
-                      type: string
                   type: object
                 description: Records the status information of Components changed
                   due to the OpsRequest.

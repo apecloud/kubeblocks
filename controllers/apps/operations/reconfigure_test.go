@@ -142,7 +142,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 
 	assureMockReconfigureData := func(policyName string) (*OpsResource, *appsv1alpha1.Configuration, *corev1.ConfigMap) {
 		By("init operations resources ")
-		opsRes, compDef, clusterObject := initOperationsResources2(compDefName, clusterName)
+		opsRes, compDef, clusterObject := initOperationsResources(compDefName, clusterName)
 
 		By("Test Reconfigure")
 		{

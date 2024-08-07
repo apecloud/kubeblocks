@@ -82,7 +82,7 @@ func newDataClone(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
-	if component.HorizontalScalePolicy == nil {
+	if component.HorizontalScaleBackupPolicyTemplate == nil {
 		return &dummyDataClone{
 			baseDataClone{
 				reqCtx:            reqCtx,
@@ -97,23 +97,19 @@ func newDataClone(reqCtx intctrlutil.RequestCtx,
 			},
 		}, nil
 	}
-	if component.HorizontalScalePolicy.Type == appsv1alpha1.HScaleDataClonePolicyCloneVolume {
-		return &backupDataClone{
-			baseDataClone{
-				reqCtx:            reqCtx,
-				cli:               cli,
-				cluster:           cluster,
-				component:         component,
-				itsObj:            itsObj,
-				itsProto:          itsProto,
-				backupKey:         backupKey,
-				desiredPodNames:   desiredPodNames,
-				currentPodNameSet: sets.New(currentPodNames...),
-			},
-		}, nil
-	}
-	// TODO: how about policy None and Snapshot?
-	return nil, nil
+	return &backupDataClone{
+		baseDataClone{
+			reqCtx:            reqCtx,
+			cli:               cli,
+			cluster:           cluster,
+			component:         component,
+			itsObj:            itsObj,
+			itsProto:          itsProto,
+			backupKey:         backupKey,
+			desiredPodNames:   desiredPodNames,
+			currentPodNameSet: sets.New(currentPodNames...),
+		},
+	}, nil
 }
 
 type baseDataClone struct {
@@ -372,15 +368,8 @@ func (d *backupDataClone) GetTmpResources() ([]client.Object, error) {
 }
 
 func (d *backupDataClone) backup() ([]client.Object, error) {
-	componentDef := func() string {
-		name := d.component.CompDefName
-		if name == "" {
-			name = d.component.ClusterCompDefName
-		}
-		return name
-	}()
-	backupPolicyTplName := d.component.HorizontalScalePolicy.BackupPolicyTemplateName
-	backupPolicy, err := getBackupPolicyFromTemplate(d.reqCtx, d.cli, d.cluster, componentDef, backupPolicyTplName)
+	backupPolicyTplName := *d.component.HorizontalScaleBackupPolicyTemplate
+	backupPolicy, err := getBackupPolicyFromTemplate(d.reqCtx, d.cli, d.cluster, d.component.CompDefName, backupPolicyTplName)
 	if err != nil {
 		return nil, err
 	}

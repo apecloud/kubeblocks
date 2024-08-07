@@ -742,7 +742,7 @@ type ClusterComponentSpec struct {
 	// +optional
 	Configs []ClusterComponentConfig `json:"configs,omitempty"`
 
-	// Defines the strategy for switchover and failover when workloadType is Replication.
+	// Defines the strategy for switchover and failover.
 	//
 	// Deprecated since v0.9.
 	// This field is maintained for backward compatibility and its use is discouraged.

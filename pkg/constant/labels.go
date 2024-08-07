@@ -50,7 +50,6 @@ const (
 	VolumeClaimTemplateNameLabelKey        = "apps.kubeblocks.io/vct-name"
 	KBAppComponentInstanceTemplateLabelKey = "apps.kubeblocks.io/instance-template"
 	KBAppServiceVersionKey                 = "apps.kubeblocks.io/service-version"
-	WorkloadTypeLabelKey                   = "apps.kubeblocks.io/workload-type"
 	KBAppPodNameLabelKey                   = "apps.kubeblocks.io/pod-name"
 	ClusterDefLabelKey                     = "clusterdefinition.kubeblocks.io/name"
 	ComponentDefinitionLabelKey            = "componentdefinition.kubeblocks.io/name"
@@ -128,14 +127,6 @@ func GetComponentDefLabel(compDefName string) map[string]string {
 func GetShardingNameLabel(shardingName string) map[string]string {
 	return map[string]string{
 		KBAppShardingNameLabelKey: shardingName,
-	}
-}
-
-// GetClusterCompDefLabel returns the label for ClusterComponentDefinition (refer clusterDefinition.Spec.ComponentDefs[*].Name)
-// TODO:ClusterCompDef will be deprecated in the future
-func GetClusterCompDefLabel(clusterCompDefName string) map[string]string {
-	return map[string]string{
-		AppComponentLabelKey: clusterCompDefName,
 	}
 }
 

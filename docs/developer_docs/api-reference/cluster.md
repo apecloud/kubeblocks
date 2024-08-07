@@ -512,25 +512,6 @@ ClusterDefinitionSpec
 <table>
 <tr>
 <td>
-<code>componentDefs</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">
-[]ClusterComponentDefinition
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Provides the definitions for the cluster components.</p>
-<p>Deprecated since v0.9.
-Components should now be individually defined using ComponentDefinition and
-collectively referenced via <code>topology.components</code>.
-This field is maintained for backward compatibility and its use is discouraged.
-Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>topologies</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterTopology">
@@ -2825,9 +2806,6 @@ ServiceDescriptorStatus
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.AccessMode">AccessMode
 (<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConsensusMember">ConsensusMember</a>)
-</p>
 <div>
 <p>AccessMode defines the modes of access granted to the SVC.
 The modes can be <code>None</code>, <code>Readonly</code>, or <code>ReadWrite</code>.</p>
@@ -3968,188 +3946,6 @@ Kubernetes core/v1.ConfigMapVolumeSource
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterDefinitionSpec">ClusterDefinitionSpec</a>)
-</p>
-<div>
-<p>ClusterComponentDefinition defines a Component within a ClusterDefinition but is deprecated and
-has been replaced by ComponentDefinition.</p>
-<p>Deprecated: Use ComponentDefinition instead. This type is deprecated as of version 0.8.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>This name could be used as default name of <code>cluster.spec.componentSpecs.name</code>, and needs to conform with same
-validation rules as <code>cluster.spec.componentSpecs.name</code>, currently complying with IANA Service Naming rule.
-This name will apply to cluster objects as the value of label &ldquo;apps.kubeblocks.io/component-name&rdquo;.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>workloadType</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.WorkloadType">
-WorkloadType
-</a>
-</em>
-</td>
-<td>
-<p>Defines the type of the workload.</p>
-<ul>
-<li><code>Stateless</code> describes stateless applications.</li>
-<li><code>Stateful</code> describes common stateful applications.</li>
-<li><code>Consensus</code> describes applications based on consensus protocols, such as raft and paxos.</li>
-<li><code>Replication</code> describes applications based on the primary-secondary data replication protocol.</li>
-</ul>
-</td>
-</tr>
-<tr>
-<td>
-<code>probes</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterDefinitionProbes">
-ClusterDefinitionProbes
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Settings for health checks.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>podSpec</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podspec-v1-core">
-Kubernetes core/v1.PodSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the pod spec template of component.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>statelessSpec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.StatelessSetSpec">
-StatelessSetSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines spec for <code>Stateless</code> workloads.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>statefulSpec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.StatefulSetSpec">
-StatefulSetSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines spec for <code>Stateful</code> workloads.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>consensusSpec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ConsensusSetSpec">
-ConsensusSetSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines spec for <code>Consensus</code> workloads. It&rsquo;s required if the workload type is <code>Consensus</code>.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>replicationSpec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ReplicationSetSpec">
-ReplicationSetSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines spec for <code>Replication</code> workloads.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>rsmSpec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.RSMSpec">
-RSMSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines workload spec of this component.
-From KB 0.7.0, RSM(InstanceSetSpec) will be the underlying CR which powers all kinds of workload in KB.
-RSM is an enhanced stateful workload extension dedicated for heavy-state workloads like databases.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>horizontalScalePolicy</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.HorizontalScalePolicy">
-HorizontalScalePolicy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the behavior of horizontal scale.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>switchoverSpec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.SwitchoverSpec">
-SwitchoverSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines command to do switchover.
-In particular, when workloadType=Replication, the command defined in switchoverSpec will only be executed under
-the condition of cluster.componentSpecs[x].SwitchPolicy.type=Noop.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterComponentPhase">ClusterComponentPhase
 (<code>string</code> alias)</h3>
 <p>
@@ -4609,7 +4405,7 @@ ClusterSwitchPolicy
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the strategy for switchover and failover when workloadType is Replication.</p>
+<p>Defines the strategy for switchover and failover.</p>
 <p>Deprecated since v0.9.
 This field is maintained for backward compatibility and its use is discouraged.
 Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
@@ -5052,190 +4848,6 @@ Kubernetes core/v1.PersistentVolumeMode
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ClusterDefinitionProbe">ClusterDefinitionProbe
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterDefinitionProbes">ClusterDefinitionProbes</a>)
-</p>
-<div>
-<p>ClusterDefinitionProbe is deprecated since v0.8.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>periodSeconds</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<p>How often (in seconds) to perform the probe.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>timeoutSeconds</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<p>Number of seconds after which the probe times out. Defaults to 1 second.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>failureThreshold</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<p>Minimum consecutive failures for the probe to be considered failed after having succeeded.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>commands</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterDefinitionProbeCMDs">
-ClusterDefinitionProbeCMDs
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Commands used to execute for probe.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ClusterDefinitionProbeCMDs">ClusterDefinitionProbeCMDs
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterDefinitionProbe">ClusterDefinitionProbe</a>)
-</p>
-<div>
-<p>ClusterDefinitionProbeCMDs is deprecated since v0.8.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>writes</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines write checks that are executed on the probe sidecar.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>queries</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines read checks that are executed on the probe sidecar.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ClusterDefinitionProbes">ClusterDefinitionProbes
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>)
-</p>
-<div>
-<p>ClusterDefinitionProbes is deprecated since v0.8.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>runningProbe</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterDefinitionProbe">
-ClusterDefinitionProbe
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the probe used for checking the running status of the component.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>statusProbe</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterDefinitionProbe">
-ClusterDefinitionProbe
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the probe used for checking the status of the component.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>roleProbe</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterDefinitionProbe">
-ClusterDefinitionProbe
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the probe used for checking the role of the component.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>roleProbeTimeoutAfterPodsReady</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the timeout (in seconds) for the role probe after all pods of the component are ready.
-The system will check if the application is available in the pod.
-If pods exceed the InitializationTimeoutSeconds time without a role label, this component will enter the
-Failed/Abnormal phase.</p>
-<p>Note that this configuration will only take effect if the component supports RoleProbe
-and will not affect the life cycle of the pod. default values are 60 seconds.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterDefinitionSpec">ClusterDefinitionSpec
 </h3>
 <p>
@@ -5252,25 +4864,6 @@ and will not affect the life cycle of the pod. default values are 60 seconds.</p
 </tr>
 </thead>
 <tbody>
-<tr>
-<td>
-<code>componentDefs</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">
-[]ClusterComponentDefinition
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Provides the definitions for the cluster components.</p>
-<p>Deprecated since v0.9.
-Components should now be individually defined using ComponentDefinition and
-collectively referenced via <code>topology.components</code>.
-This field is maintained for backward compatibility and its use is discouraged.
-Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
-</td>
-</tr>
 <tr>
 <td>
 <code>topologies</code><br/>
@@ -6323,139 +5916,6 @@ separated by commas.</p>
 This sequence is designed for components that have dependencies or require specific update procedures.</p>
 <p>Components that can be updated independently or have no dependencies can be listed together in the same stage,
 separated by commas.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.CmdExecutorConfig">CmdExecutorConfig
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SwitchoverAction">SwitchoverAction</a>)
-</p>
-<div>
-<p>CmdExecutorConfig specifies how to perform creation and deletion statements.</p>
-<p>Deprecated since v0.8.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>CommandExecutorEnvItem</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.CommandExecutorEnvItem">
-CommandExecutorEnvItem
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>CommandExecutorEnvItem</code> are embedded into this type.)
-</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>CommandExecutorItem</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.CommandExecutorItem">
-CommandExecutorItem
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>CommandExecutorItem</code> are embedded into this type.)
-</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.CommandExecutorEnvItem">CommandExecutorEnvItem
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CmdExecutorConfig">CmdExecutorConfig</a>)
-</p>
-<div>
-<p>CommandExecutorEnvItem is deprecated since v0.8.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>image</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies the image used to execute the command.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>env</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
-[]Kubernetes core/v1.EnvVar
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>A list of environment variables that will be injected into the command execution context.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.CommandExecutorItem">CommandExecutorItem
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CmdExecutorConfig">CmdExecutorConfig</a>)
-</p>
-<div>
-<p>CommandExecutorItem is deprecated since v0.8.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>command</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<p>The command to be executed.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>args</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Additional parameters used in the execution of the command.</p>
 </td>
 </tr>
 </tbody>
@@ -10214,135 +9674,6 @@ string
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ConsensusMember">ConsensusMember
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConsensusSetSpec">ConsensusSetSpec</a>)
-</p>
-<div>
-<p>ConsensusMember is deprecated since v0.7.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies the name of the consensus member.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>accessMode</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.AccessMode">
-AccessMode
-</a>
-</em>
-</td>
-<td>
-<p>Specifies the services that this member is capable of providing.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>replicas</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Indicates the number of Pods that perform this role.
-The default is 1 for <code>Leader</code>, 0 for <code>Learner</code>, others for <code>Followers</code>.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ConsensusSetSpec">ConsensusSetSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>)
-</p>
-<div>
-<p>ConsensusSetSpec is deprecated since v0.7.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>StatefulSetSpec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.StatefulSetSpec">
-StatefulSetSpec
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>StatefulSetSpec</code> are embedded into this type.)
-</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>leader</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ConsensusMember">
-ConsensusMember
-</a>
-</em>
-</td>
-<td>
-<p>Represents a single leader in the consensus set.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>followers</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ConsensusMember">
-[]ConsensusMember
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Members of the consensus set that have voting rights but are not the leader.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>learner</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ConsensusMember">
-ConsensusMember
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Represents a member of the consensus set that does not have voting rights.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ContainerVars">ContainerVars
 </h3>
 <p>
@@ -11181,98 +10512,6 @@ in each OpsService definition.</p>
 <td><p>FailurePolicyIgnore means that an error will be ignored but logged.</p>
 </td>
 </tr></tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.HScaleDataClonePolicyType">HScaleDataClonePolicyType
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.HorizontalScalePolicy">HorizontalScalePolicy</a>)
-</p>
-<div>
-<p>HScaleDataClonePolicyType defines the data clone policy to be used during horizontal scaling.
-This policy determines how data is handled when new nodes are added to the cluster.
-The policy can be set to <code>None</code>, <code>CloneVolume</code>, or <code>Snapshot</code>.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;CloneVolume&#34;</p></td>
-<td><p>HScaleDataClonePolicyCloneVolume indicates that data will be cloned from existing volumes during horizontal scaling.</p>
-</td>
-</tr><tr><td><p>&#34;Snapshot&#34;</p></td>
-<td><p>HScaleDataClonePolicyFromSnapshot indicates that data will be cloned from a snapshot during horizontal scaling.</p>
-</td>
-</tr><tr><td><p>&#34;None&#34;</p></td>
-<td><p>HScaleDataClonePolicyNone indicates that no data cloning will occur during horizontal scaling.</p>
-</td>
-</tr></tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.HorizontalScalePolicy">HorizontalScalePolicy
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>)
-</p>
-<div>
-<p>HorizontalScalePolicy is deprecated since v0.8.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>type</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.HScaleDataClonePolicyType">
-HScaleDataClonePolicyType
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Determines the data synchronization method when a component scales out.
-The policy can be one of the following: &#123;None, CloneVolume&#125;. The default policy is <code>None</code>.</p>
-<ul>
-<li><code>None</code>: This is the default policy. It creates an empty volume without data cloning.</li>
-<li><code>CloneVolume</code>: This policy clones data to newly scaled pods. It first tries to use a volume snapshot.
-If volume snapshot is not enabled, it will attempt to use a backup tool. If neither method works, it will report an error.</li>
-<li><code>Snapshot</code>: This policy is deprecated and is an alias for CloneVolume.</li>
-</ul>
-</td>
-</tr>
-<tr>
-<td>
-<code>backupPolicyTemplateName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Refers to the backup policy template.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>volumeMountsName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the volumeMount of the container to backup.
-This only works if Type is not None. If not specified, the first volumeMount will be selected.</p>
-</td>
-</tr>
-</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling
 </h3>
@@ -13231,21 +12470,6 @@ PreCheckResult
 <td>
 <em>(Optional)</em>
 <p>Describes the progress details of objects or actions associated with the Component.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>workloadType</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.WorkloadType">
-WorkloadType
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Records the workload type of Component in ClusterDefinition.
-Deprecated and should be removed in the future version.</p>
 </td>
 </tr>
 <tr>
@@ -15259,85 +14483,6 @@ string
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.RSMSpec">RSMSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>)
-</p>
-<div>
-<p>RSMSpec is deprecated since v0.8.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>roles</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1alpha1.ReplicaRole">
-[]ReplicaRole
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies a list of roles defined within the system.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>roleProbe</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1alpha1.RoleProbe">
-RoleProbe
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the method used to probe a role.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>membershipReconfiguration</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1alpha1.MembershipReconfiguration">
-MembershipReconfiguration
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Indicates the actions required for dynamic membership reconfiguration.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>memberUpdateStrategy</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1alpha1.MemberUpdateStrategy">
-MemberUpdateStrategy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Describes the strategy for updating Members (Pods).</p>
-<ul>
-<li><code>Serial</code>: Updates Members sequentially to ensure minimum component downtime.</li>
-<li><code>BestEffortParallel</code>: Updates Members in parallel to ensure minimum component write downtime.</li>
-<li><code>Parallel</code>: Forces parallel updates.</li>
-</ul>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.RebuildInstance">RebuildInstance
 </h3>
 <p>
@@ -15887,39 +15032,6 @@ int32
 </td>
 <td>
 <p>The maximum limit of replicas.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ReplicationSetSpec">ReplicationSetSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>)
-</p>
-<div>
-<p>ReplicationSetSpec is deprecated since v0.7.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>StatefulSetSpec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.StatefulSetSpec">
-StatefulSetSpec
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>StatefulSetSpec</code> are embedded into this type.)
-</p>
 </td>
 </tr>
 </tbody>
@@ -16688,7 +15800,7 @@ In these cases, the script must be executed on all replica Pods matching the sel
 <h3 id="apps.kubeblocks.io/v1alpha1.ScriptSpecSelector">ScriptSpecSelector
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentSwitchover">ComponentSwitchover</a>, <a href="#apps.kubeblocks.io/v1alpha1.SwitchoverAction">SwitchoverAction</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentSwitchover">ComponentSwitchover</a>)
 </p>
 <div>
 </div>
@@ -18364,118 +17476,11 @@ CustomOps
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.StatefulSetSpec">StatefulSetSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>, <a href="#apps.kubeblocks.io/v1alpha1.ConsensusSetSpec">ConsensusSetSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ReplicationSetSpec">ReplicationSetSpec</a>)
-</p>
-<div>
-<p>StatefulSetSpec is deprecated since v0.7.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>updateStrategy</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.UpdateStrategy">
-UpdateStrategy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the strategy for updating Pods.
-For workloadType=<code>Consensus</code>, the update strategy can be one of the following:</p>
-<ul>
-<li><code>Serial</code>: Updates Members sequentially to minimize component downtime.</li>
-<li><code>BestEffortParallel</code>: Updates Members in parallel to minimize component write downtime. Majority remains online
-at all times.</li>
-<li><code>Parallel</code>: Forces parallel updates.</li>
-</ul>
-</td>
-</tr>
-<tr>
-<td>
-<code>llPodManagementPolicy</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podmanagementpolicytype-v1-apps">
-Kubernetes apps/v1.PodManagementPolicyType
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Controls the creation of pods during initial scale up, replacement of pods on nodes, and scaling down.</p>
-<ul>
-<li><code>OrderedReady</code>: Creates pods in increasing order (pod-0, then pod-1, etc). The controller waits until each pod
-is ready before continuing. Pods are removed in reverse order when scaling down.</li>
-<li><code>Parallel</code>: Creates pods in parallel to match the desired scale without waiting. All pods are deleted at once
-when scaling down.</li>
-</ul>
-</td>
-</tr>
-<tr>
-<td>
-<code>llUpdateStrategy</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#statefulsetupdatestrategy-v1-apps">
-Kubernetes apps/v1.StatefulSetUpdateStrategy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the low-level StatefulSetUpdateStrategy to be used when updating Pods in the StatefulSet upon a
-revision to the Template.
-<code>UpdateStrategy</code> will be ignored if this is provided.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.StatefulSetWorkload">StatefulSetWorkload
 </h3>
 <div>
 <p>StatefulSetWorkload interface</p>
 </div>
-<h3 id="apps.kubeblocks.io/v1alpha1.StatelessSetSpec">StatelessSetSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>)
-</p>
-<div>
-<p>StatelessSetSpec is deprecated since v0.7.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>updateStrategy</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#deploymentstrategy-v1-apps">
-Kubernetes apps/v1.DeploymentStrategy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the deployment strategy that will be used to replace existing pods with new ones.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.SwitchPolicyType">SwitchPolicyType
 (<code>string</code> alias)</h3>
 <p>
@@ -18570,98 +17575,6 @@ string
 <li>Executes the switchover action from <code>clusterDefinition.componentDefs[*].switchoverSpec.withCandidate</code>.</li>
 <li><code>clusterDefinition.componentDefs[*].switchoverSpec.withCandidate</code> must be defined when specifying a valid instance name.</li>
 </ul>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.SwitchoverAction">SwitchoverAction
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SwitchoverSpec">SwitchoverSpec</a>)
-</p>
-<div>
-<p>SwitchoverAction is deprecated since v0.8.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>cmdExecutorConfig</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.CmdExecutorConfig">
-CmdExecutorConfig
-</a>
-</em>
-</td>
-<td>
-<p>Specifies the switchover command.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>scriptSpecSelectors</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ScriptSpecSelector">
-[]ScriptSpecSelector
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Used to select the script that need to be referenced.
-When defined, the scripts defined in scriptSpecs can be referenced within the SwitchoverAction.CmdExecutorConfig.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.SwitchoverSpec">SwitchoverSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>)
-</p>
-<div>
-<p>SwitchoverSpec is deprecated since v0.8.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>withCandidate</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.SwitchoverAction">
-SwitchoverAction
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Represents the action of switching over to a specified candidate primary or leader instance.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>withoutCandidate</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.SwitchoverAction">
-SwitchoverAction
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Represents the action of switching over without specifying a candidate primary or leader instance.</p>
 </td>
 </tr>
 </tbody>
@@ -19097,7 +18010,7 @@ string
 <h3 id="apps.kubeblocks.io/v1alpha1.UpdateStrategy">UpdateStrategy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.StatefulSetSpec">StatefulSetSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
 </p>
 <div>
 <p>UpdateStrategy defines the update strategy for cluster components. This strategy determines how updates are applied
@@ -19761,38 +18674,6 @@ as read-only. And after that, if all volumes&rsquo; space usage drops under the 
 </td>
 </tr>
 </tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.WorkloadType">WorkloadType
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>, <a href="#apps.kubeblocks.io/v1alpha1.OpsRequestComponentStatus">OpsRequestComponentStatus</a>)
-</p>
-<div>
-<p>WorkloadType defines the type of workload for the components of the ClusterDefinition.
-It can be one of the following: <code>Stateless</code>, <code>Stateful</code>, <code>Consensus</code>, or <code>Replication</code>.</p>
-<p>Deprecated since v0.8.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;Consensus&#34;</p></td>
-<td><p>Consensus represents a workload type involving distributed consensus algorithms for coordinated decision-making.</p>
-</td>
-</tr><tr><td><p>&#34;Replication&#34;</p></td>
-<td><p>Replication represents a workload type that involves replication, typically used for achieving high availability
-and fault tolerance.</p>
-</td>
-</tr><tr><td><p>&#34;Stateful&#34;</p></td>
-<td><p>Stateful represents a workload type where components maintain state, and each instance has a unique identity.</p>
-</td>
-</tr><tr><td><p>&#34;Stateless&#34;</p></td>
-<td><p>Stateless represents a workload type where components do not maintain state, and instances are interchangeable.</p>
-</td>
-</tr></tbody>
 </table>
 <hr/>
 <h2 id="apps.kubeblocks.io/v1beta1">apps.kubeblocks.io/v1beta1</h2>
@@ -22782,7 +21663,7 @@ ReplicaRole
 <h3 id="workloads.kubeblocks.io/v1alpha1.MemberUpdateStrategy">MemberUpdateStrategy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RSMSpec">RSMSpec</a>, <a href="#workloads.kubeblocks.io/v1alpha1.InstanceSetSpec">InstanceSetSpec</a>)
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.InstanceSetSpec">InstanceSetSpec</a>)
 </p>
 <div>
 <p>MemberUpdateStrategy defines Cluster Component update strategy.</p>
@@ -22805,7 +21686,7 @@ ReplicaRole
 <h3 id="workloads.kubeblocks.io/v1alpha1.MembershipReconfiguration">MembershipReconfiguration
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RSMSpec">RSMSpec</a>, <a href="#workloads.kubeblocks.io/v1alpha1.InstanceSetSpec">InstanceSetSpec</a>)
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.InstanceSetSpec">InstanceSetSpec</a>)
 </p>
 <div>
 </div>
@@ -23006,7 +21887,7 @@ int32
 <h3 id="workloads.kubeblocks.io/v1alpha1.ReplicaRole">ReplicaRole
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RSMSpec">RSMSpec</a>, <a href="#workloads.kubeblocks.io/v1alpha1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1alpha1.MemberStatus">MemberStatus</a>)
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1alpha1.MemberStatus">MemberStatus</a>)
 </p>
 <div>
 </div>
@@ -23071,7 +21952,7 @@ bool
 <h3 id="workloads.kubeblocks.io/v1alpha1.RoleProbe">RoleProbe
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RSMSpec">RSMSpec</a>, <a href="#workloads.kubeblocks.io/v1alpha1.InstanceSetSpec">InstanceSetSpec</a>)
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.InstanceSetSpec">InstanceSetSpec</a>)
 </p>
 <div>
 <p>RoleProbe defines how to observe role</p>

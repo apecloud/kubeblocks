@@ -127,45 +127,37 @@ func (t *clusterServiceTransformer) convertLegacyClusterCompSpecServices(transCt
 			continue
 		}
 
-		clusterCompDef := transCtx.ClusterDef.GetComponentDefByName(compSpec.ComponentDefRef)
-		if clusterCompDef == nil {
-			continue
-		}
-
-		for _, item := range compSpec.Services {
-			legacyService := &appsv1alpha1.ClusterService{
-				Service: appsv1alpha1.Service{
-					Name:        constant.GenerateClusterServiceName(cluster.Name, item.Name),
-					ServiceName: constant.GenerateClusterServiceName(cluster.Name, item.Name),
-					Annotations: item.Annotations,
-					Spec: corev1.ServiceSpec{
-						Ports: []corev1.ServicePort{},
-						Type:  item.ServiceType,
-					},
-				},
-				ComponentSelector: compSpec.Name,
-			}
-			legacyServiceName := constant.GenerateComponentServiceName(cluster.Name, compSpec.Name, item.Name)
-			legacyServiceExist, err := checkLegacyServiceExist(transCtx, legacyServiceName, cluster.Namespace)
-			if err != nil {
-				return nil, err
-			}
-			// the generation converted service name is different with the exist legacy service name, if the legacy service exist, we should use the legacy service name
-			if legacyServiceExist {
-				legacyService.Name = legacyServiceName
-				legacyService.ServiceName = legacyServiceName
-			}
-			switch clusterCompDef.WorkloadType {
-			case appsv1alpha1.Replication:
-				legacyService.RoleSelector = constant.Primary
-			case appsv1alpha1.Consensus:
-				legacyService.RoleSelector = constant.Leader
-				if clusterCompDef.ConsensusSpec != nil {
-					legacyService.RoleSelector = clusterCompDef.ConsensusSpec.Leader.Name
-				}
-			}
-			convertedServices = append(convertedServices, *legacyService)
-		}
+		// TODO(v1.0): compatible with legacy cluster services
+		// clusterCompDef := transCtx.ClusterDef.GetComponentDefByName(compSpec.ComponentDefRef)
+		// if clusterCompDef == nil {
+		//	continue
+		// }
+		//
+		// for _, item := range compSpec.Services {
+		//	legacyService := &appsv1alpha1.ClusterService{
+		//		Service: appsv1alpha1.Service{
+		//			Name:        constant.GenerateClusterServiceName(cluster.Name, item.Name),
+		//			ServiceName: constant.GenerateClusterServiceName(cluster.Name, item.Name),
+		//			Annotations: item.Annotations,
+		//			Spec: corev1.ServiceSpec{
+		//				Ports: []corev1.ServicePort{},
+		//				Type:  item.ServiceType,
+		//			},
+		//		},
+		//		ComponentSelector: compSpec.Name,
+		//	}
+		//	legacyServiceName := constant.GenerateComponentServiceName(cluster.Name, compSpec.Name, item.Name)
+		//	legacyServiceExist, err := checkLegacyServiceExist(transCtx, legacyServiceName, cluster.Namespace)
+		//	if err != nil {
+		//		return nil, err
+		//	}
+		//	// the generation converted service name is different with the exist legacy service name, if the legacy service exist, we should use the legacy service name
+		//	if legacyServiceExist {
+		//		legacyService.Name = legacyServiceName
+		//		legacyService.ServiceName = legacyServiceName
+		//	}
+		//	convertedServices = append(convertedServices, *legacyService)
+		// }
 	}
 	return convertedServices, nil
 }
@@ -367,20 +359,20 @@ func resolveServiceDefaultFields(obj, objCopy *corev1.ServiceSpec) {
 	}
 }
 
-func checkLegacyServiceExist(ctx graph.TransformContext, serviceName, namespace string) (bool, error) {
-	key := types.NamespacedName{
-		Namespace: namespace,
-		Name:      serviceName,
-	}
-	obj := &corev1.Service{}
-	if err := ctx.GetClient().Get(ctx.GetContext(), key, obj); err != nil {
-		if apierrors.IsNotFound(err) {
-			return false, nil
-		}
-		return false, err
-	}
-	return true, nil
-}
+// func checkLegacyServiceExist(ctx graph.TransformContext, serviceName, namespace string) (bool, error) {
+//	key := types.NamespacedName{
+//		Namespace: namespace,
+//		Name:      serviceName,
+//	}
+//	obj := &corev1.Service{}
+//	if err := ctx.GetClient().Get(ctx.GetContext(), key, obj); err != nil {
+//		if apierrors.IsNotFound(err) {
+//			return false, nil
+//		}
+//		return false, err
+//	}
+//	return true, nil
+// }
 
 func enableShardService(cluster *appsv1alpha1.Cluster, shardingName string) bool {
 	enableShardSvcList, ok := cluster.Annotations[constant.ShardSvcAnnotationKey]

@@ -32,30 +32,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/testutil"
 )
 
-// InitClusterWithHybridComps initializes a cluster environment for testing, includes ClusterDefinition/Cluster resources.
-func InitClusterWithHybridComps(
-	testCtx *testutil.TestContext,
-	clusterDefName,
-	clusterName,
-	statelessCompDefName,
-	statefulCompDefName,
-	consensusCompDefName string) (*appsv1alpha1.ClusterDefinition, *appsv1alpha1.Cluster) {
-	clusterDef := NewClusterDefFactory(clusterDefName).
-		AddComponentDef(StatelessNginxComponent, statelessCompDefName).
-		AddComponentDef(ConsensusMySQLComponent, consensusCompDefName).
-		AddComponentDef(StatefulMySQLComponent, statefulCompDefName).
-		Create(testCtx).GetObject()
-	pvcSpec := NewPVCSpec("1Gi")
-	cluster := NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName).
-		AddComponent(statelessCompDefName, statelessCompDefName).SetReplicas(1).
-		AddComponent(consensusCompDefName, consensusCompDefName).SetReplicas(3).
-		AddVolumeClaimTemplate(DataVolumeName, pvcSpec).
-		AddComponent(statefulCompDefName, statefulCompDefName).SetReplicas(3).
-		AddVolumeClaimTemplate(DataVolumeName, pvcSpec).
-		Create(testCtx).GetObject()
-	return clusterDef, cluster
-}
-
 func CreateK8sResource(testCtx *testutil.TestContext, obj client.Object) client.Object {
 	gomega.Expect(testCtx.CreateObj(testCtx.Ctx, obj)).Should(gomega.Succeed())
 	// wait until cluster created

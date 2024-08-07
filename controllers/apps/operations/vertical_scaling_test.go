@@ -42,11 +42,12 @@ import (
 var _ = Describe("VerticalScaling OpsRequest", func() {
 
 	var (
-		randomStr             = testCtx.GetRandomStr()
-		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr
-		clusterName           = "cluster-for-ops-" + randomStr
-		reqCtx                intctrlutil.RequestCtx
+		randomStr   = testCtx.GetRandomStr()
+		compDefName = "test-compdef-" + randomStr
+		clusterName = "test-cluster-" + randomStr
+		reqCtx      intctrlutil.RequestCtx
 	)
+
 	cleanEnv := func() {
 		reqCtx = intctrlutil.RequestCtx{Ctx: ctx}
 		// must wait till resources deleted and no longer existed before the testcases start,
@@ -55,7 +56,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 		// create the new objects.
 		By("clean resources")
 		// delete cluster(and all dependent sub-resources), cluster definition
-		testapps.ClearClusterResources(&testCtx)
+		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 
 		// delete rest resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
@@ -72,7 +73,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 
 		testVerticalScaling := func(verticalScaling []appsv1alpha1.VerticalScaling) *OpsResource {
 			By("init operations resources ")
-			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterName)
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
 
 			By("create VerticalScaling ops")
 			ops := testapps.NewOpsRequestObj("vertical-scaling-ops-"+randomStr, testCtx.DefaultNamespace,
@@ -99,7 +100,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 		It("vertical scaling by resource", func() {
 			verticalScaling := []appsv1alpha1.VerticalScaling{
 				{
-					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: defaultCompName},
 					ResourceRequirements: corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
 							corev1.ResourceCPU:    resource.MustParse("400m"),
@@ -118,7 +119,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 		It("cancel vertical scaling opsRequest", func() {
 			By("init operations resources with CLusterDefinition/Hybrid components Cluster/consensus Pods")
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
-			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterName)
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
 			podList := initInstanceSetPods(ctx, k8sClient, opsRes)
 
 			By("create VerticalScaling ops")
@@ -126,7 +127,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 				clusterName, appsv1alpha1.VerticalScalingType)
 			ops.Spec.VerticalScalingList = []appsv1alpha1.VerticalScaling{
 				{
-					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: defaultCompName},
 					ResourceRequirements: corev1.ResourceRequirements{
 						Limits: corev1.ResourceList{
 							corev1.ResourceCPU:    resource.MustParse("400m"),
@@ -138,7 +139,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
 
 			By("mock opsRequest is Running")
-			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase, consensusComp)
+			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase, defaultCompName)
 			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.OpsRequest, func() {
 				opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsRunningPhase
 				opsRes.OpsRequest.Status.StartTimestamp = metav1.Time{Time: time.Now()}
@@ -149,7 +150,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 				pod.Kind = constant.PodKind
 				testk8s.MockPodIsTerminating(ctx, testCtx, pod)
 				testk8s.RemovePodFinalizer(ctx, testCtx, pod)
-				testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp,
+				testapps.MockInstanceSetPod(&testCtx, nil, clusterName, defaultCompName,
 					pod.Name, "leader", "ReadWrite", ops.Spec.VerticalScalingList[0].ResourceRequirements)
 			}
 
@@ -161,7 +162,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("the progress status of pod[0] should be Succeed ")
-			progressDetails := opsRes.OpsRequest.Status.Components[consensusComp].ProgressDetails
+			progressDetails := opsRes.OpsRequest.Status.Components[defaultCompName].ProgressDetails
 			progressDetail := findStatusProgressDetail(progressDetails, getProgressObjectKey(constant.PodKind, podList[0].Name))
 			Expect(progressDetail.Status).Should(Equal(appsv1alpha1.SucceedProgressStatus))
 
@@ -180,7 +181,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			opsRequest := opsRes.OpsRequest
 			Expect(opsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsCancelledPhase))
 			Expect(opsRequest.Status.Progress).Should(Equal("1/1"))
-			progressDetails = opsRequest.Status.Components[consensusComp].ProgressDetails
+			progressDetails = opsRequest.Status.Components[defaultCompName].ProgressDetails
 			Expect(len(progressDetails)).Should(Equal(1))
 			progressDetail = findStatusProgressDetail(progressDetails, getProgressObjectKey(constant.PodKind, podList[0].Name))
 			Expect(progressDetail.Status).Should(Equal(appsv1alpha1.SucceedProgressStatus))
@@ -191,7 +192,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			By("create the first vertical scaling")
 			verticalScaling1 := []appsv1alpha1.VerticalScaling{
 				{
-					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: defaultCompName},
 					ResourceRequirements: corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
 							corev1.ResourceCPU:    resource.MustParse("400m"),
@@ -216,7 +217,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			ops.Spec.Force = true
 			ops.Spec.VerticalScalingList = []appsv1alpha1.VerticalScaling{
 				{
-					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: defaultCompName},
 					ResourceRequirements: corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
 							corev1.ResourceCPU:    resource.MustParse("400m"),

@@ -29,7 +29,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/apiconversion"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -101,7 +100,8 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs(transCtx *clusterTra
 		return t.buildCompSpecs4Specified(transCtx, cluster)
 	}
 	if withClusterSimplifiedAPI(cluster) {
-		return t.buildCompSpecs4SimplifiedAPI(transCtx.ClusterDef, cluster), nil
+		// TODO(v1.0): check component definition
+		return nil, fmt.Errorf("simplified API is not supported")
 	}
 	return nil, nil
 }
@@ -177,11 +177,6 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Sharding(transCtx *c
 	return compSpecs, nil
 }
 
-func (t *ClusterAPINormalizationTransformer) buildCompSpecs4SimplifiedAPI(clusterDef *appsv1alpha1.ClusterDefinition,
-	cluster *appsv1alpha1.Cluster) []*appsv1alpha1.ClusterComponentSpec {
-	return []*appsv1alpha1.ClusterComponentSpec{apiconversion.HandleSimplifiedClusterAPI(clusterDef, cluster)}
-}
-
 func (t *ClusterAPINormalizationTransformer) buildCompLabelsInheritedFromCluster(transCtx *clusterTransformContext,
 	cluster *appsv1alpha1.Cluster) map[string]map[string]string {
 	clusterLabels := filterReservedLabels(cluster.Labels)
@@ -227,21 +222,9 @@ func (t *ClusterAPINormalizationTransformer) resolveCompDefinitions(transCtx *cl
 func (t *ClusterAPINormalizationTransformer) resolveCompDefinitionNServiceVersion(transCtx *clusterTransformContext,
 	compSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.ComponentDefinition, string, error) {
 	if withClusterLegacyDefinition(transCtx.Cluster) || withClusterSimplifiedAPI(transCtx.Cluster) {
-		compDef, err := t.buildCompDefinition4Legacy(transCtx, compSpec)
-		// compDef.Name = ""
-		return compDef, "", err
+		return nil, "", fmt.Errorf("legacy cluster definition or simplified API are not supported")
 	}
 	return t.resolveCompDefinitionNServiceVersionWithUpgrade(transCtx, compSpec)
-}
-
-func (t *ClusterAPINormalizationTransformer) buildCompDefinition4Legacy(transCtx *clusterTransformContext,
-	compSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.ComponentDefinition, error) {
-	compDef, err := component.BuildComponentDefinition(transCtx.ClusterDef, compSpec)
-	if err != nil {
-		return nil, err
-	}
-	compDef.Name = constant.GenerateVirtualComponentDefinition(compSpec.ComponentDefRef)
-	return compDef, nil
 }
 
 func (t *ClusterAPINormalizationTransformer) resolveCompDefinitionNServiceVersionWithUpgrade(transCtx *clusterTransformContext,

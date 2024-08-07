@@ -48,21 +48,14 @@ import (
 // BuildInstanceSet builds an InstanceSet object from SynthesizedComponent.
 func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, componentDef *appsv1alpha1.ComponentDefinition) (*workloads.InstanceSet, error) {
 	var (
-		clusterDefName     = synthesizedComp.ClusterDefName
-		clusterCompDefName = synthesizedComp.ClusterCompDefName
-		compDefName        = synthesizedComp.CompDefName
-		namespace          = synthesizedComp.Namespace
-		clusterName        = synthesizedComp.ClusterName
-		compName           = synthesizedComp.Name
+		compDefName = synthesizedComp.CompDefName
+		namespace   = synthesizedComp.Namespace
+		clusterName = synthesizedComp.ClusterName
+		compName    = synthesizedComp.Name
 	)
 	// build labels
 	labels := constant.GetKBWellKnownLabelsWithCompDef(compDefName, clusterName, compName)
 	compDefLabel := constant.GetComponentDefLabel(compDefName)
-	if len(compDefName) == 0 {
-		// TODO(xingran): for backward compatibility in kubeBlocks version 0.8.0, it will be removed in the future.
-		labels = constant.GetKBWellKnownLabels(clusterDefName, clusterName, compName)
-		compDefLabel = constant.GetClusterCompDefLabel(clusterCompDefName)
-	}
 	mergeLabels := intctrlutil.MergeMetadataMaps(labels, compDefLabel, synthesizedComp.Labels)
 
 	// build annotations
@@ -302,7 +295,7 @@ func BuildConfigMapWithTemplate(cluster *appsv1alpha1.Cluster,
 	cmName string,
 	configTemplateSpec appsv1alpha1.ComponentTemplateSpec) *corev1.ConfigMap {
 	wellKnownLabels := constant.GetKBWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
-	wellKnownLabels[constant.AppComponentLabelKey] = component.ClusterCompDefName
+	wellKnownLabels[constant.AppComponentLabelKey] = component.CompDefName
 	return builder.NewConfigMapBuilder(cluster.Namespace, cmName).
 		AddLabelsInMap(wellKnownLabels).
 		AddLabels(constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType).

@@ -447,37 +447,6 @@ const (
 	BestEffortParallelStrategy UpdateStrategy = "BestEffortParallel"
 )
 
-var DefaultLeader = ConsensusMember{
-	Name:       "leader",
-	AccessMode: ReadWrite,
-}
-
-// WorkloadType defines the type of workload for the components of the ClusterDefinition.
-// It can be one of the following: `Stateless`, `Stateful`, `Consensus`, or `Replication`.
-//
-// Deprecated since v0.8.
-//
-// +enum
-// +kubebuilder:validation:Enum={Stateless,Stateful,Consensus,Replication}
-type WorkloadType string
-
-const (
-	// Stateless represents a workload type where components do not maintain state, and instances are interchangeable.
-	Stateless WorkloadType = "Stateless"
-
-	// Stateful represents a workload type where components maintain state, and each instance has a unique identity.
-	Stateful WorkloadType = "Stateful"
-
-	// Consensus represents a workload type involving distributed consensus algorithms for coordinated decision-making.
-	Consensus WorkloadType = "Consensus"
-
-	// Replication represents a workload type that involves replication, typically used for achieving high availability
-	// and fault tolerance.
-	Replication WorkloadType = "Replication"
-)
-
-var WorkloadTypes = []string{"Stateless", "Stateful", "Consensus", "Replication"}
-
 // TerminationPolicyType defines termination policy types.
 //
 // +enum
@@ -496,25 +465,6 @@ const (
 
 	// WipeOut is based on Delete and wipe out all volume snapshots and snapshot data from backup storage location.
 	WipeOut TerminationPolicyType = "WipeOut"
-)
-
-// HScaleDataClonePolicyType defines the data clone policy to be used during horizontal scaling.
-// This policy determines how data is handled when new nodes are added to the cluster.
-// The policy can be set to `None`, `CloneVolume`, or `Snapshot`.
-//
-// +enum
-// +kubebuilder:validation:Enum={None,CloneVolume,Snapshot}
-type HScaleDataClonePolicyType string
-
-const (
-	// HScaleDataClonePolicyNone indicates that no data cloning will occur during horizontal scaling.
-	HScaleDataClonePolicyNone HScaleDataClonePolicyType = "None"
-
-	// HScaleDataClonePolicyCloneVolume indicates that data will be cloned from existing volumes during horizontal scaling.
-	HScaleDataClonePolicyCloneVolume HScaleDataClonePolicyType = "CloneVolume"
-
-	// HScaleDataClonePolicyFromSnapshot indicates that data will be cloned from a snapshot during horizontal scaling.
-	HScaleDataClonePolicyFromSnapshot HScaleDataClonePolicyType = "Snapshot"
 )
 
 // PodAntiAffinity defines the pod anti-affinity strategy.

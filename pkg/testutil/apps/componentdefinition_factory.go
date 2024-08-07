@@ -337,3 +337,19 @@ func (f *MockComponentDefinitionFactory) AddServiceRef(name, serviceKind, servic
 	f.Get().Spec.ServiceRefDeclarations = append(f.Get().Spec.ServiceRefDeclarations, serviceRef)
 	return f
 }
+
+func mergedAddVolumeMounts(c *corev1.Container, volumeMounts []corev1.VolumeMount) {
+	table := make(map[string]corev1.VolumeMount)
+	for _, v := range c.VolumeMounts {
+		table[v.Name] = v
+	}
+	for _, v := range volumeMounts {
+		table[v.Name] = v
+	}
+
+	mounts := make([]corev1.VolumeMount, 0)
+	for _, v := range table {
+		mounts = append(mounts, v)
+	}
+	c.VolumeMounts = mounts
+}

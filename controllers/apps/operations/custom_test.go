@@ -36,15 +36,14 @@ import (
 
 var _ = Describe("CustomOps", func() {
 	var (
-		randomStr             = testCtx.GetRandomStr()
-		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr
-		clusterName           = "cluster-for-ops-" + randomStr
-		compDefName           = "apecloud-mysql"
-		opsResource           *OpsResource
-		compObj               *appsv1alpha1.Component
-		opsDef                *appsv1alpha1.OpsDefinition
-		reqCtx                intctrlutil.RequestCtx
-		cluster               *appsv1alpha1.Cluster
+		randomStr   = testCtx.GetRandomStr()
+		compDefName = "test-compdef-" + randomStr
+		clusterName = "test-cluster-" + randomStr
+		opsResource *OpsResource
+		compObj     *appsv1alpha1.Component
+		opsDef      *appsv1alpha1.OpsDefinition
+		reqCtx      intctrlutil.RequestCtx
+		cluster     *appsv1alpha1.Cluster
 	)
 
 	cleanEnv := func() {
@@ -55,7 +54,7 @@ var _ = Describe("CustomOps", func() {
 		By("clean resources")
 
 		// delete cluster(and all dependent sub-resources), cluster definition
-		testapps.ClearClusterResources(&testCtx)
+		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 
 		// delete rest resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
@@ -67,7 +66,6 @@ var _ = Describe("CustomOps", func() {
 
 		// non-namespaced
 		testapps.ClearResources(&testCtx, generics.OpsDefinitionSignature, ml)
-		testapps.ClearResources(&testCtx, generics.ComponentDefinitionSignature, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -103,10 +101,10 @@ var _ = Describe("CustomOps", func() {
 				Create(&testCtx).
 				GetObject()
 
-			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefinitionName).
-				WithRandomName().AddComponentV2(consensusComp, componentDefObj.Name).SetReplicas(1).Create(&testCtx).GetObject()
+			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
+				WithRandomName().AddComponent(defaultCompName, componentDefObj.Name).SetReplicas(1).Create(&testCtx).GetObject()
 
-			fullCompName := constant.GenerateClusterComponentName(cluster.Name, consensusComp)
+			fullCompName := constant.GenerateClusterComponentName(cluster.Name, defaultCompName)
 			compObj = testapps.NewComponentFactory(testCtx.DefaultNamespace, fullCompName, compDefName).
 				AddLabels(constant.AppInstanceLabelKey, cluster.Name).
 				AddLabels(constant.KBAppClusterUIDLabelKey, string(cluster.UID)).
@@ -145,7 +143,7 @@ var _ = Describe("CustomOps", func() {
 				{Name: "test", Value: "test"},
 			}
 			By("validate json schema, 'sql' parameter is required")
-			ops := createCustomOps(consensusComp, params)
+			ops := createCustomOps(defaultCompName, params)
 			opsResource.OpsRequest = ops
 			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsResource)
 			Expect(ops.Status.Conditions).ShouldNot(BeEmpty())
@@ -159,7 +157,7 @@ var _ = Describe("CustomOps", func() {
 			params := []appsv1alpha1.Parameter{
 				{Name: "sql", Value: "select 1"},
 			}
-			ops := createCustomOps(consensusComp, params)
+			ops := createCustomOps(defaultCompName, params)
 
 			By("validate pass for json schema")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsResource)
@@ -170,8 +168,8 @@ var _ = Describe("CustomOps", func() {
 			opsResource.OpsRequest = ops
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsResource)
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(ops.Status.Components[consensusComp].PreCheckResult.Pass).Should(BeFalse())
-			Expect(ops.Status.Components[consensusComp].PreCheckResult.Message).Should(ContainSubstring("Component is not in Running status"))
+			Expect(ops.Status.Components[defaultCompName].PreCheckResult.Pass).Should(BeFalse())
+			Expect(ops.Status.Components[defaultCompName].PreCheckResult.Message).Should(ContainSubstring("Component is not in Running status"))
 			Expect(ops.Status.Phase).Should(Equal(appsv1alpha1.OpsFailedPhase))
 		})
 
@@ -180,7 +178,7 @@ var _ = Describe("CustomOps", func() {
 			params := []appsv1alpha1.Parameter{
 				{Name: "sql", Value: "select 1"},
 			}
-			ops := createCustomOps(consensusComp, params)
+			ops := createCustomOps(defaultCompName, params)
 
 			By("mock component is Running")
 			Expect(testapps.ChangeObjStatus(&testCtx, compObj, func() {
@@ -201,7 +199,7 @@ var _ = Describe("CustomOps", func() {
 			By("reconcile once and make the action succeed")
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsResource)
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(opsResource.OpsRequest.Status.Components[consensusComp].ProgressDetails[0].Status).Should(Equal(appsv1alpha1.SucceedProgressStatus))
+			Expect(opsResource.OpsRequest.Status.Components[defaultCompName].ProgressDetails[0].Status).Should(Equal(appsv1alpha1.SucceedProgressStatus))
 
 			By("reconcile again and make the opsRequest succeed")
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsResource)

@@ -119,7 +119,7 @@ func mockReconcileResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint, 
 
 	By("Creating a cluster")
 	clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
-		AddComponentV2(defaultCompName, compDefObj.GetName()).
+		AddComponent(defaultCompName, compDefObj.GetName()).
 		Create(&testCtx).
 		GetObject()
 

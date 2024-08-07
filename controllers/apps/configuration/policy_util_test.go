@@ -21,7 +21,6 @@ package configuration
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/sethvargo/go-password/password"
 	corev1 "k8s.io/api/core/v1"
@@ -152,33 +151,6 @@ func withConfigPatch(patch map[string]string) ParamsOps {
 	}
 }
 
-func withCDComponent(compType appsv1alpha1.WorkloadType, tpls []appsv1alpha1.ComponentConfigSpec) ParamsOps {
-	return func(params *reconfigureParams) {
-		params.Component = &appsv1alpha1.ClusterComponentDefinition{
-			WorkloadType: compType,
-			Name:         string(compType),
-		}
-		if compType == appsv1alpha1.Consensus || compType == appsv1alpha1.Replication {
-			params.Component.RSMSpec = &appsv1alpha1.RSMSpec{
-				Roles: []workloads.ReplicaRole{
-					{
-						Name:       "leader",
-						IsLeader:   true,
-						AccessMode: workloads.ReadWriteMode,
-						CanVote:    true,
-					},
-					{
-						Name:       "follower",
-						IsLeader:   false,
-						AccessMode: workloads.ReadonlyMode,
-						CanVote:    true,
-					},
-				},
-			}
-		}
-	}
-}
-
 func newMockReconfigureParams(testName string, cli client.Client, paramOps ...ParamsOps) reconfigureParams {
 	params := reconfigureParams{
 		Restart: true,
@@ -247,26 +219,6 @@ func withReadyPod(rMin, rMax int) PodOptions {
 			Status: corev1.ConditionTrue,
 		})
 
-		pod.Status.Phase = corev1.PodRunning
-	}
-}
-
-func withAvailablePod(rMin, rMax int) PodOptions {
-	return func(pod *corev1.Pod, index int) {
-		if index < rMin || index >= rMax {
-			return
-		}
-
-		if pod.Status.Conditions == nil {
-			pod.Status.Conditions = make([]corev1.PodCondition, 0)
-		}
-
-		h, _ := time.ParseDuration("-1h")
-		pod.Status.Conditions = append(pod.Status.Conditions, corev1.PodCondition{
-			Type:               corev1.PodReady,
-			Status:             corev1.ConditionTrue,
-			LastTransitionTime: metav1.NewTime(time.Now().Add(h)),
-		})
 		pod.Status.Phase = corev1.PodRunning
 	}
 }

@@ -89,11 +89,6 @@ func GeneratePodName(clusterName, compName string, ordinal int) string {
 	return fmt.Sprintf("%s-%d", GenerateClusterComponentName(clusterName, compName), ordinal)
 }
 
-// GenerateVirtualComponentDefinition generates the virtual component definition name.
-func GenerateVirtualComponentDefinition(compDefSuffix string) string {
-	return fmt.Sprintf("%s-%s", KBGeneratedVirtualCompDefPrefix, compDefSuffix)
-}
-
 // GenerateResourceNameWithScalingSuffix generates name with '-scaling' suffix.
 func GenerateResourceNameWithScalingSuffix(name string) string {
 	return fmt.Sprintf("%s-%s", name, SlashScalingLowerSuffix)

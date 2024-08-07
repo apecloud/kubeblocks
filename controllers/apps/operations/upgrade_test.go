@@ -55,18 +55,13 @@ var _ = Describe("Upgrade OpsRequest", func() {
 		By("clean resources")
 
 		// delete cluster(and all dependent sub-resources), cluster definition
-		testapps.ClearClusterResources(&testCtx)
+		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 
 		// delete rest resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
 		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
-
-		// non-namespaced
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentDefinitionSignature, true, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentVersionSignature, true, ml)
-
 	}
 
 	BeforeEach(cleanEnv)
@@ -81,15 +76,14 @@ var _ = Describe("Upgrade OpsRequest", func() {
 		// do upgrade
 		_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 		Expect(err).ShouldNot(HaveOccurred())
-		mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase,
-			consensusComp, statelessComp, statefulComp)
+		mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase, defaultCompName)
 	}
 
 	mockClusterRunning := func(clusterObject *appsv1alpha1.Cluster) {
 		Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
 			clusterObject.Status.Phase = appsv1alpha1.RunningClusterPhase
 			clusterObject.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
-				consensusComp: {
+				defaultCompName: {
 					Phase: appsv1alpha1.RunningClusterCompPhase,
 				},
 			}
@@ -184,7 +178,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 		}
 		// create the cluster with no clusterDefinition
 		clusterObject := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
-			AddComponentV2(consensusComp, compDef1.Name).
+			AddComponent(defaultCompName, compDef1.Name).
 			SetServiceVersion(testapps.ServiceVersion("v0")).
 			SetReplicas(int32(3)).Create(&testCtx).GetObject()
 		opsRes := &OpsResource{
@@ -215,7 +209,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 	}
 
 	mockPodsAppliedImage := func(cluster *appsv1alpha1.Cluster, releaseVersion string) {
-		pods := testapps.MockInstanceSetPods(&testCtx, nil, cluster, consensusComp)
+		pods := testapps.MockInstanceSetPods(&testCtx, nil, cluster, defaultCompName)
 		image := testapps.AppImage(testapps.AppName, releaseVersion)
 		for i := range pods {
 			pod := pods[i]
@@ -243,7 +237,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			opsRes.OpsRequest = createUpgradeOpsRequest(opsRes.Cluster, appsv1alpha1.Upgrade{
 				Components: []appsv1alpha1.UpgradeComponent{
 					{
-						ComponentOps:            appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+						ComponentOps:            appsv1alpha1.ComponentOps{ComponentName: defaultCompName},
 						ComponentDefinitionName: &compDef2.Name,
 					},
 				},
@@ -253,12 +247,12 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			makeUpgradeOpsIsRunning(reqCtx, opsRes)
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(g Gomega, ops *appsv1alpha1.OpsRequest) {
-				g.Expect(ops.Status.LastConfiguration.Components[consensusComp].ComponentDefinitionName).Should(Equal(compDef1.Name))
+				g.Expect(ops.Status.LastConfiguration.Components[defaultCompName].ComponentDefinitionName).Should(Equal(compDef1.Name))
 			})).Should(Succeed())
 
 			By("expect upgrade successfully with the image that is provided in the specified componentDefinition")
 			mockPodsAppliedImage(opsRes.Cluster, release2)
-			expectOpsSucceed(reqCtx, opsRes, consensusComp)
+			expectOpsSucceed(reqCtx, opsRes, defaultCompName)
 		})
 
 		It("Test upgrade OpsRequest with ComponentDef and ComponentVersion", func() {
@@ -269,7 +263,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			opsRes.OpsRequest = createUpgradeOpsRequest(opsRes.Cluster, appsv1alpha1.Upgrade{
 				Components: []appsv1alpha1.UpgradeComponent{
 					{
-						ComponentOps:            appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+						ComponentOps:            appsv1alpha1.ComponentOps{ComponentName: defaultCompName},
 						ServiceVersion:          pointer.String(serviceVer2),
 						ComponentDefinitionName: &compDef2.Name,
 					},
@@ -286,7 +280,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 
 			By("expect upgrade successfully")
 			mockPodsAppliedImage(opsRes.Cluster, release3)
-			expectOpsSucceed(reqCtx, opsRes, consensusComp)
+			expectOpsSucceed(reqCtx, opsRes, defaultCompName)
 		})
 
 		It("Test upgrade OpsRequest without ComponentDefinitionName but the cluster is created without clusterDefinition", func() {
@@ -297,7 +291,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			opsRes.OpsRequest = createUpgradeOpsRequest(opsRes.Cluster, appsv1alpha1.Upgrade{
 				Components: []appsv1alpha1.UpgradeComponent{
 					{
-						ComponentOps:            appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+						ComponentOps:            appsv1alpha1.ComponentOps{ComponentName: defaultCompName},
 						ComponentDefinitionName: pointer.String(""),
 						ServiceVersion:          pointer.String(serviceVer1),
 					},
@@ -314,7 +308,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 
 			By("expect upgrade successfully with the latest release of the specified serviceVersion")
 			mockPodsAppliedImage(opsRes.Cluster, release4)
-			expectOpsSucceed(reqCtx, opsRes, consensusComp)
+			expectOpsSucceed(reqCtx, opsRes, defaultCompName)
 		})
 
 		It("Test upgrade OpsRequest when specified serviceVersion is empty", func() {
@@ -325,7 +319,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			opsRes.OpsRequest = createUpgradeOpsRequest(opsRes.Cluster, appsv1alpha1.Upgrade{
 				Components: []appsv1alpha1.UpgradeComponent{
 					{
-						ComponentOps:            appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+						ComponentOps:            appsv1alpha1.ComponentOps{ComponentName: defaultCompName},
 						ComponentDefinitionName: pointer.String(compDef1.Name),
 						ServiceVersion:          pointer.String(""),
 					},
@@ -342,7 +336,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 
 			By("looking forward to using the latest serviceVersion and releaseVersion")
 			mockPodsAppliedImage(opsRes.Cluster, release4)
-			expectOpsSucceed(reqCtx, opsRes, consensusComp)
+			expectOpsSucceed(reqCtx, opsRes, defaultCompName)
 		})
 
 		It("Test upgrade OpsRequest when serviceVersion is nil", func() {
@@ -353,7 +347,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			opsRes.OpsRequest = createUpgradeOpsRequest(opsRes.Cluster, appsv1alpha1.Upgrade{
 				Components: []appsv1alpha1.UpgradeComponent{
 					{
-						ComponentOps:            appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+						ComponentOps:            appsv1alpha1.ComponentOps{ComponentName: defaultCompName},
 						ComponentDefinitionName: pointer.String(compDef2.Name),
 					},
 				},
@@ -376,7 +370,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			opsRes.OpsRequest = createUpgradeOpsRequest(opsRes.Cluster, appsv1alpha1.Upgrade{
 				Components: []appsv1alpha1.UpgradeComponent{
 					{
-						ComponentOps:   appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+						ComponentOps:   appsv1alpha1.ComponentOps{ComponentName: defaultCompName},
 						ServiceVersion: pointer.String(""),
 					},
 				},

@@ -68,9 +68,9 @@ var _ = Describe("clusterDeletionTransformer", func() {
 
 		cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, "test-cluster", clusterDef.Name).
 			SetTopology(clusterDef.Spec.Topologies[0].Name).
-			AddComponentV2("comp1", "compdef1").
-			AddComponentV2("comp2", "compdef2").
-			AddComponentV2("comp3", "compdef3").
+			AddComponent("comp1", "compdef1").
+			AddComponent("comp2", "compdef2").
+			AddComponent("comp3", "compdef3").
 			GetObject()
 		cluster.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 

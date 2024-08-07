@@ -43,25 +43,24 @@ var tlog = ctrl.Log.WithName("component_testing")
 var _ = Describe("Component LifeCycle Action Utils Test", func() {
 	Context("has the BuildComponent function", func() {
 		const (
-			clusterDefName   = "test-clusterdef"
-			clusterName      = "test-cluster"
-			mysqlCompDefName = "replicasets"
-			mysqlCompName    = "mysql"
+			compDefName   = "test-compdef"
+			clusterName   = "test-cluster"
+			mysqlCompName = "mysql"
 		)
 
 		var (
-			clusterDef *appsv1alpha1.ClusterDefinition
-			cluster    *appsv1alpha1.Cluster
+			compDef *appsv1alpha1.ComponentDefinition
+			cluster *appsv1alpha1.Cluster
 		)
 
 		BeforeEach(func() {
-			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
+			compDef = testapps.NewComponentDefinitionFactory(compDefName).
+				SetDefaultSpec().
 				GetObject()
 			pvcSpec := testapps.NewPVCSpec("1Gi")
-			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDef.Name).
+			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 				SetUID(clusterName).
-				AddComponent(mysqlCompName, mysqlCompDefName).
+				AddComponent(mysqlCompName, compDefName).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				GetObject()
 		})
@@ -103,21 +102,17 @@ var _ = Describe("Component LifeCycle Action Utils Test", func() {
 				Ctx: ctx,
 				Log: tlog,
 			}
-			synthesizeComp, err := BuildSynthesizedComponentWrapper4Test(
-				reqCtx,
-				testCtx.Cli,
-				clusterDef,
-				cluster,
-				&cluster.Spec.ComponentSpecs[0])
-			Expect(err).Should(Succeed())
-			Expect(synthesizeComp).ShouldNot(BeNil())
-			Expect(synthesizeComp.LifecycleActions).ShouldNot(BeNil())
-			Expect(synthesizeComp.LifecycleActions.PostProvision).Should(BeNil())
 
 			comp, err := BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
 			comp.UID = cluster.UID
 			Expect(err).Should(Succeed())
 			Expect(comp).ShouldNot(BeNil())
+
+			synthesizeComp, err := BuildSynthesizedComponent(reqCtx, testCtx.Cli, cluster, compDef, comp)
+			Expect(err).Should(Succeed())
+			Expect(synthesizeComp).ShouldNot(BeNil())
+			Expect(synthesizeComp.LifecycleActions).ShouldNot(BeNil())
+			Expect(synthesizeComp.LifecycleActions.PostProvision).ShouldNot(BeNil())
 
 			dag := graph.NewDAG()
 			dag.AddVertex(&model.ObjectVertex{Obj: cluster, Action: model.ActionUpdatePtr()})

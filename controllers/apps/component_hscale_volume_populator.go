@@ -368,15 +368,8 @@ func (d *backupDataClone) GetTmpResources() ([]client.Object, error) {
 }
 
 func (d *backupDataClone) backup() ([]client.Object, error) {
-	componentDef := func() string {
-		name := d.component.CompDefName
-		if name == "" {
-			name = d.component.ClusterCompDefName
-		}
-		return name
-	}()
 	backupPolicyTplName := *d.component.HorizontalScaleBackupPolicyTemplate
-	backupPolicy, err := getBackupPolicyFromTemplate(d.reqCtx, d.cli, d.cluster, componentDef, backupPolicyTplName)
+	backupPolicy, err := getBackupPolicyFromTemplate(d.reqCtx, d.cli, d.cluster, d.component.CompDefName, backupPolicyTplName)
 	if err != nil {
 		return nil, err
 	}

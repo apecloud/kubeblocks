@@ -130,14 +130,6 @@ func GetShardingNameLabel(shardingName string) map[string]string {
 	}
 }
 
-// GetClusterCompDefLabel returns the label for ClusterComponentDefinition (refer clusterDefinition.Spec.ComponentDefs[*].Name)
-// TODO:ClusterCompDef will be deprecated in the future
-func GetClusterCompDefLabel(clusterCompDefName string) map[string]string {
-	return map[string]string{
-		AppComponentLabelKey: clusterCompDefName,
-	}
-}
-
 // GetKBReservedLabelKeys returns the reserved label keys for KubeBlocks
 func GetKBReservedLabelKeys() []string {
 	return []string{

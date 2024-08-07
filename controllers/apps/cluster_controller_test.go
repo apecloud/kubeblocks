@@ -48,15 +48,14 @@ import (
 
 var _ = Describe("Cluster Controller", func() {
 	const (
-		clusterDefName            = "test-clusterdef"
-		compDefName               = "test-compdef"
-		compVersionName           = "test-compversion"
-		clusterName               = "test-cluster"
-		defaultCompName           = "mysql"
-		defaultClusterCompDefName = "default" // TODO: remove this
-		defaultServiceVersion     = "8.0.31-r0"
-		latestServiceVersion      = "8.0.31-r1"
-		defaultShardCount         = 2
+		clusterDefName        = "test-clusterdef"
+		compDefName           = "test-compdef"
+		compVersionName       = "test-compver"
+		clusterName           = "test-cluster"
+		defaultCompName       = "mysql"
+		defaultServiceVersion = "8.0.31-r0"
+		latestServiceVersion  = "8.0.31-r1"
+		defaultShardCount     = 2
 	)
 
 	var (
@@ -1120,7 +1119,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		It("test cluster conditions when cluster definition non-exist", func() {
 			By("create a cluster with cluster definition non-exist")
-			mockCompDefName := fmt.Sprintf("%s-%s", defaultClusterCompDefName, testCtx.GetRandomStr())
+			mockCompDefName := fmt.Sprintf("%s-%s", compDefName, testCtx.GetRandomStr())
 			createClusterObjNoWait(clusterDefObj.Name, componentProcessorWrapper(defaultCompName, mockCompDefName))
 
 			By("check conditions")

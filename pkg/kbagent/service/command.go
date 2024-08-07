@@ -85,7 +85,7 @@ func runCommandNonBlocking(ctx context.Context, action *proto.ExecAction, parame
 		stderrChan <- stderrBuf.Bytes()
 		errChan <- execErr
 	}()
-	return stdoutChan, stderrChan, execErrorChan, nil
+	return stdoutChan, stderrChan, errChan, nil
 }
 
 func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[string]string, timeout *int32,
@@ -152,7 +152,11 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 		defer close(errChan)
 
 		if err := cmd.Start(); err != nil {
-			errChan <- fmt.Errorf("failed to start command: %w", err)
+			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				errChan <- ErrTimeout
+			} else {
+				errChan <- fmt.Errorf("failed to start command: %w", err)
+			}
 			return
 		}
 
@@ -192,8 +196,13 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 
 		execErr := cmd.Wait()
 		if execErr != nil {
-			if exitErr, ok := execErr.(*exec.ExitError); ok && stderrWriter == nil {
-				execErr = errors.New(string(exitErr.Stderr))
+			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				execErr = ErrTimeout
+			} else {
+				var exitErr *exec.ExitError
+				if errors.As(execErr, &exitErr) && stderrWriter == nil {
+					execErr = errors.New(string(exitErr.Stderr))
+				}
 			}
 		}
 		errChan <- execErr

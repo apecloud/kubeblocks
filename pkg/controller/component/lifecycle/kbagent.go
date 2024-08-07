@@ -178,7 +178,13 @@ func (a *kbagent) error2(la lifecycleAction, err error) error {
 		return errors.Wrap(ErrActionInProgress, la.name())
 	case errors.Is(err, service.ErrBusy):
 		return errors.Wrap(ErrActionBusy, la.name())
-	default: // TODO: timeout, failed & internal error
+	case errors.Is(err, service.ErrTimeout):
+		return errors.Wrap(ErrActionTimeout, la.name())
+	case errors.Is(err, service.ErrFailed):
+		return errors.Wrap(ErrActionFailed, la.name())
+	case errors.Is(err, service.ErrInternalError):
+		return errors.Wrap(ErrActionInternalError, la.name())
+	default:
 		return err
 	}
 }

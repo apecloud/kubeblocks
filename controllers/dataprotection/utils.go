@@ -199,6 +199,9 @@ func GetTargetPods(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
+	// if selector.LabelSelector fails to filter a available target pod or the selected target pod,
+	// use selector.FallbackLabelSelector to filter, and selector.FallbackLabelSelector only takes effect
+	// when selector.Strategy equals to dpv1alpha1.PodSelectionStrategyAny.
 	if selector.Strategy == dpv1alpha1.PodSelectionStrategyAll || len(targetPods) > 0 ||
 		selector.FallbackLabelSelector == nil {
 		return targetPods, nil

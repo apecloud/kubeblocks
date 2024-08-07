@@ -154,8 +154,7 @@ var _ = Describe("Restore", func() {
 			By("By creating backup policyTemplate: ")
 			_ = testapps.NewBackupPolicyTemplateFactory("backup-policy-template").
 				WithRandomName().
-				AddBackupPolicy(defaultCompName).
-				SetComponentDef(compDef.Name).
+				AddBackupPolicy(compDef.Name).
 				AddBackupMethod(testdp.BackupMethodName, false, fullBackupActionSetName).
 				SetBackupMethodVolumeMounts(testapps.DataVolumeName, "/data")
 

@@ -1413,7 +1413,6 @@ func createBackupPolicyTpl(compDef string) {
 	ttl := "7d"
 	bpt = bpt.AddBackupPolicy(compDef).
 		AddBackupMethod(backupMethodName, false, actionSetName).
-		SetComponentDef(compDef).
 		SetBackupMethodVolumeMounts("data", "/data").
 		AddBackupMethod(vsBackupMethodName, true, "").
 		SetBackupMethodVolumes([]string{"data"}).

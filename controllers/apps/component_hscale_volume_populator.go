@@ -445,8 +445,8 @@ func getBackupPolicyFromTemplate(reqCtx intctrlutil.RequestCtx,
 	if err := cli.List(reqCtx.Ctx, backupPolicyList,
 		client.InNamespace(cluster.Namespace),
 		client.MatchingLabels{
-			constant.AppInstanceLabelKey:          cluster.Name,
-			constant.KBAppComponentDefRefLabelKey: componentDef,
+			constant.AppInstanceLabelKey:         cluster.Name,
+			constant.ComponentDefinitionLabelKey: componentDef,
 		}); err != nil {
 		return nil, err
 	}

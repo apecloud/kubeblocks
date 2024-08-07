@@ -45,8 +45,8 @@ type dataClone interface {
 	Succeed() (bool, error)
 	// CloneData do clone data, return objects that need to be created
 	CloneData(dataClone) ([]client.Object, []client.Object, error)
-	// ClearTmpResources clear all the temporary resources created during data clone, return objects that need to be deleted
-	ClearTmpResources() ([]client.Object, error)
+	// GetTmpResources get all the temporary resources created during data clone, return objects that need to be deleted
+	GetTmpResources() ([]client.Object, error)
 
 	CheckBackupStatus() (backupStatus, error)
 	CheckRestoreStatus(templateName string, startingIndex int32) (dpv1alpha1.RestorePhase, error)
@@ -82,7 +82,7 @@ func newDataClone(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
-	if component.HorizontalScalePolicy == nil {
+	if component.HorizontalScaleBackupPolicyTemplate == nil {
 		return &dummyDataClone{
 			baseDataClone{
 				reqCtx:            reqCtx,
@@ -97,23 +97,19 @@ func newDataClone(reqCtx intctrlutil.RequestCtx,
 			},
 		}, nil
 	}
-	if component.HorizontalScalePolicy.Type == appsv1alpha1.HScaleDataClonePolicyCloneVolume {
-		return &backupDataClone{
-			baseDataClone{
-				reqCtx:            reqCtx,
-				cli:               cli,
-				cluster:           cluster,
-				component:         component,
-				itsObj:            itsObj,
-				itsProto:          itsProto,
-				backupKey:         backupKey,
-				desiredPodNames:   desiredPodNames,
-				currentPodNameSet: sets.New(currentPodNames...),
-			},
-		}, nil
-	}
-	// TODO: how about policy None and Snapshot?
-	return nil, nil
+	return &backupDataClone{
+		baseDataClone{
+			reqCtx:            reqCtx,
+			cli:               cli,
+			cluster:           cluster,
+			component:         component,
+			itsObj:            itsObj,
+			itsProto:          itsProto,
+			backupKey:         backupKey,
+			desiredPodNames:   desiredPodNames,
+			currentPodNameSet: sets.New(currentPodNames...),
+		},
+	}, nil
 }
 
 type baseDataClone struct {
@@ -293,7 +289,7 @@ func (d *dummyDataClone) CloneData(dataClone) ([]client.Object, []client.Object,
 	return nil, pvcObjs, err
 }
 
-func (d *dummyDataClone) ClearTmpResources() ([]client.Object, error) {
+func (d *dummyDataClone) GetTmpResources() ([]client.Object, error) {
 	return nil, nil
 }
 
@@ -350,7 +346,7 @@ func (d *backupDataClone) Succeed() (bool, error) {
 	return true, nil
 }
 
-func (d *backupDataClone) ClearTmpResources() ([]client.Object, error) {
+func (d *backupDataClone) GetTmpResources() ([]client.Object, error) {
 	objs := make([]client.Object, 0)
 	// delete backup
 	brLabels := d.getBRLabels()
@@ -372,15 +368,8 @@ func (d *backupDataClone) ClearTmpResources() ([]client.Object, error) {
 }
 
 func (d *backupDataClone) backup() ([]client.Object, error) {
-	componentDef := func() string {
-		name := d.component.CompDefName
-		if name == "" {
-			name = d.component.ClusterCompDefName
-		}
-		return name
-	}()
-	backupPolicyTplName := d.component.HorizontalScalePolicy.BackupPolicyTemplateName
-	backupPolicy, err := getBackupPolicyFromTemplate(d.reqCtx, d.cli, d.cluster, componentDef, backupPolicyTplName)
+	backupPolicyTplName := *d.component.HorizontalScaleBackupPolicyTemplate
+	backupPolicy, err := getBackupPolicyFromTemplate(d.reqCtx, d.cli, d.cluster, d.component.CompDefName, backupPolicyTplName)
 	if err != nil {
 		return nil, err
 	}
@@ -475,8 +464,8 @@ func backupVCT(component *component.SynthesizedComponent) *corev1.PersistentVolu
 	}
 	vct := component.VolumeClaimTemplates[0]
 	for _, tmpVct := range component.VolumeClaimTemplates {
-		for _, volumeType := range component.VolumeTypes {
-			if volumeType.Type == appsv1alpha1.VolumeTypeData && volumeType.Name == tmpVct.Name {
+		for _, volume := range component.Volumes {
+			if volume.NeedSnapshot && volume.Name == tmpVct.Name {
 				vct = tmpVct
 				break
 			}

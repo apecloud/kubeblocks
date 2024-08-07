@@ -12,13 +12,7 @@ You can scale a Kafka cluster in two ways, vertical scaling and horizontal scali
 
 ## Vertical scaling
 
-You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, if you need to change the resource class from 1C2G to 2C4G, vertical scaling is what you need.
-
-:::note
-
-During the vertical scaling process, all pods restart in the order of learner -> follower -> leader and the leader pod may change after the restarting.
-
-:::
+You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, you can change the resource class from 1C2G to 2C4G by performing vertical scaling.
 
 ### Before you start
 
@@ -27,18 +21,18 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 ```bash
 kbcli cluster list
 >
-NAME    NAMESPACE   CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    CREATED-TIME                 
-ivy85   default     kafka                kafka-3.3.2   Delete               Running   Jul 19,2023 18:01 UTC+0800   
+NAME            NAMESPACE   CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    CREATED-TIME                 
+kafka-cluster   default     kafka                kafka-3.3.2   Delete               Running   Jul 19,2023 18:01 UTC+0800   
 ```
 
 ### Steps
 
-1. Change configuration. There are 3 ways to apply vertical scaling.
+1. Change configuration.
 
    Configure the parameters `--components`, `--memory`, and `--cpu` and run the command.
 
    ```bash
-    kbcli cluster vscale ivy85 --components="broker" --memory="4Gi" --cpu="2" 
+    kbcli cluster vscale kafka-cluster --components="broker" --memory="4Gi" --cpu="2" 
    ```
 
    - `--components` value can be `broker` or `controller`.
@@ -47,17 +41,16 @@ ivy85   default     kafka                kafka-3.3.2   Delete               Runn
    - `--memory` describes the requested and limited size of the component memory.
    - `--cpu` describes the requested and limited size of the component CPU.
 
-  
 2. Check the cluster status to validate the vertical scaling.
 
     ```bash
-    kbcli cluster list mysql-cluster
+    kbcli cluster list kafka-cluster
     >
-    NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS                 CREATED-TIME
-    ivy85                 default          kafka                kafka-3.3.2            Delete                    VerticalScaling        Jan 29,2023 14:29 UTC+0800
+    NAME                 NAMESPACE        CLUSTER-DEFINITION       VERSION                TERMINATION-POLICY        STATUS          CREATED-TIME
+    kafka-cluster        default          kafka                    kafka-3.3.2            Delete                    Updating        Jan 29,2023 14:29 UTC+0800
     ```
 
-   - STATUS=VerticalScaling: it means the vertical scaling is in progress.
+   - STATUS=Updating: it means the vertical scaling is in progress.
    - STATUS=Running: it means the vertical scaling operation has been applied.
    - STATUS=Abnormal: it means the vertical scaling is abnormal. The reason may be that the number of the normal instances is less than that of the total instance or the leader instance is running properly while others are abnormal.
      > To solve the problem, you can manually check whether this error is caused by insufficient resources. Then if AutoScaling is supported by the Kubernetes cluster, the system recovers when there are enough resources. Otherwise, you can create enough resources and troubleshoot with `kubectl describe` command.
@@ -71,12 +64,14 @@ ivy85   default     kafka                kafka-3.3.2   Delete               Runn
 3. Check whether the corresponding resources change.
 
     ```bash
-    kbcli cluster describe ivy85
+    kbcli cluster describe kafka-cluster
     ```
 
 ## Horizontal scaling
 
-Horizontal scaling changes the amount of pods. For example, you can apply horizontal scaling to scale pods up from three to five. The scaling process includes the backup and restoration of data.
+Horizontal scaling changes the amount of pods. For example, you can scale out replicas from three to five.
+
+From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out instances, refer to [Horizontal Scale](./../../../api_docs/maintenance/scale/horizontal-scale.md) in API docs for more details and examples.
 
 ### Before you start
 
@@ -87,44 +82,39 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
   ```bash
   kbcli cluster list
   >
-  NAME    NAMESPACE   CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    CREATED-TIME                 
-  ivy85   default     kafka                kafka-3.3.2   Delete               Running   Jul 19,2023 18:01 UTC+0800   
+  NAME            NAMESPACE   CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    CREATED-TIME                 
+  kafka-cluster   default     kafka                kafka-3.3.2   Delete               Running   Jul 19,2023 18:01 UTC+0800   
   ```
 
 ### Steps
 
-1. Change configuration. There are 3 ways to apply horizontal scaling.
+1. Change configuration.
 
    Configure the parameters `--components` and `--replicas`, and run the command.
 
    ```bash
-   kbcli cluster hscale mysql-cluster \
+   kbcli cluster hscale kafka-cluster \
    --components="broker" --replicas=3
    ```
 
- 
-   - `--components` value can be `broker` or `controller`.
-     - broker: all nodes in the combined mode, or all the broker node in the separated node.
-     - controller: all the corresponding nodes in the separated mode.
-   - `--memory` describes the requested and limited size of the component memory.
-   - `--cpu` describes the requested and limited size of the component CPU.
-
+   - `--components` describes the component name ready for horizontal scaling.
+   - `--replicas` describes the replica amount of the specified components. Edit the amount based on your demands to scale in or out replicas.
 
 2. Validate the horizontal scaling operation.
 
    Check the cluster STATUS to identify the horizontal scaling status.
 
    ```bash
-   kbcli cluster list ivy85
+   kbcli cluster list kafka-cluster
    ```
 
-   - STATUS=HorizontalScaling: it means horizontal scaling is in progress.
+   - STATUS=Updating: it means horizontal scaling is in progress.
    - STATUS=Running: it means horizontal scaling has been applied.
 
 3. Check whether the corresponding resources change.
 
     ```bash
-    kbcli cluster describe ivy85
+    kbcli cluster describe kafka-cluster
     ```
 
 ### Handle the snapshot exception
@@ -137,7 +127,7 @@ In the example below, a snapshot exception occurs.
 Status:
   conditions: 
   - lastTransitionTime: "2023-02-08T04:20:26Z"
-    message: VolumeSnapshot/ivy85-kafka-scaling-dbqgp: Failed to set default snapshot
+    message: VolumeSnapshot/kafka-cluster-kafka-scaling-dbqgp: Failed to set default snapshot
       class with error cannot find default snapshot class
     reason: ApplyResourcesFailed
     status: "False"
@@ -168,9 +158,9 @@ This exception occurs because the `VolumeSnapshotClass` is not configured. This 
 2. Delete the wrong backup (volumesnapshot is generated by backup) and volumesnapshot resources.
 
    ```bash
-   kubectl delete backup -l app.kubernetes.io/instance=ivy85
+   kubectl delete backup -l app.kubernetes.io/instance=kafka-cluster
    
-   kubectl delete volumesnapshot -l app.kubernetes.io/instance=ivy85
+   kubectl delete volumesnapshot -l app.kubernetes.io/instance=kafka-cluster
 
    ```
 

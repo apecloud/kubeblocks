@@ -7,9 +7,9 @@ sidebar_position: 1
 
 # Failure simulation and automatic recovery
 
-As an open-source data management platform, KubeBlocks supports two database forms, ReplicationSet and ConsensusSet. ReplicationSet can be used for single source with multiple replicas, and non-automatic switching database management, such as MySQL and Redis. ConsensusSet can be used for database management with multiple replicas and automatic switching capabilities, such as ApeCloud MySQL RaftGroup Cluster with multiple replicas, MongoDB, etc. The ConsensusSet database management capability has been released in KubeBlocks v0.3.0, and ReplicationSet is under development.
+As an open-source data management platform, Kubeblocks currently supports over thirty database engines and is continuously expanding. Due to the varying high availability capabilities of databases, KubeBlocks has designed and implemented a high availability (HA) system for database instances. The KubeBlocks HA system uses a unified HA framework to provide high availability for databases, allowing different databases on KubeBlocks to achieve similar high availability capabilities and experiences.
 
-This guide takes ApeCloud MySQL as an example to introduce the high availability capability of the database in the form of ConsensusSet. This capability is also applicable to other database engines.
+This tutorial uses Apecloud MySQL as an example to demonstrate its fault simulation and recovery capabilities.
 
 ## Recovery simulation
 
@@ -22,7 +22,7 @@ The faults here are all simulated by deleting pods. When there are sufficient re
 ### Before you start
 
 * [Install KubeBlocks](./../../installation/install-kubeblocks.md).
-* [Create an ApeCloud MySQL RaftGroup Cluster](./../cluster-management/create-and-connect-a-mysql-cluster.md).
+* [Create an ApeCloud MySQL RaftGroup Cluster](./../cluster-management/create-and-connect-an-apecloud-mysql-cluster.md).
 * Run `kubectl get cd apecloud-mysql -o yaml` to check whether _rolechangedprobe_ is enabled in the ApeCloud MySQL RaftGroup Cluster (it is enabled by default). If the following configuration exists, it indicates that it is enabled:
 
   ```bash
@@ -37,23 +37,23 @@ The faults here are all simulated by deleting pods. When there are sufficient re
 
 ***Steps:***
 
-1. View the pod role of the ApeCloud MySQL RaftGroup Cluster. In this example, the leader pod's name is `mysql-cluster-1`.
+1. View the pod role of the ApeCloud MySQL RaftGroup Cluster. In this example, the leader pod's name is `mycluster-mysql-1`.
 
     ```bash
     kubectl get pods --show-labels -n demo | grep role
     ```
 
     ![describe_pod](./../../../img/api-ha-grep-role.png)
-2. Delete the leader pod `mysql-cluster-mysql-1` to simulate a pod fault.
+2. Delete the leader pod `mycluster-mysql-1` to simulate a pod fault.
 
     ```bash
-    kubectl delete pod mysql-cluster-mysql-1 -n demo
+    kubectl delete pod mycluster-mysql-1 -n demo
     ```
 
     ![delete_pod](./../../../img/api-ha-delete-leader-pod.png)
 3. Check the status of the pods and RaftGroup Cluster connection.
 
-    The following example shows that the roles of pods have changed after the old leader pod was deleted and `mysql-cluster-mysql-0` is elected as the new leader pod.
+    The following example shows that the roles of pods have changed after the old leader pod was deleted and `mycluster-mysql-0` is elected as the new leader pod.
 
     ```bash
     kubectl get pods --show-labels -n demo | grep role
@@ -81,27 +81,27 @@ The faults here are all simulated by deleting pods. When there are sufficient re
 
    ***How the automatic recovery works***
 
-   After the leader pod is deleted, the ApeCloud MySQL RaftGroup Cluster elects a new leader. In this example, `mysql-cluster-mysql-0` is elected as the new leader. KubeBlocks detects that the leader has changed, and sends a notification to update the access link. The original exception node automatically rebuilds and recovers to the normal RaftGroup Cluster state. It normally takes 30 seconds from exception to recovery.
+   After the leader pod is deleted, the ApeCloud MySQL RaftGroup Cluster elects a new leader. In this example, `mycluster-mysql-0` is elected as the new leader. KubeBlocks detects that the leader has changed, and sends a notification to update the access link. The original exception node automatically rebuilds and recovers to the normal RaftGroup Cluster state. It normally takes 30 seconds from exception to recovery.
 
 ### Single follower pod exception
 
 ***Steps:***
 
-1. View the pod role again and in this example, the follower pods are `mysql-cluster-mysql-1` and `mysql-cluster-mysql-2`.
+1. View the pod role again and in this example, the follower pods are `mycluster-mysql-1` and `mycluster-mysql-2`.
 
     ```bash
     kubectl get pods --show-labels -n demo | grep role
     ```
 
     ![describe_cluster](./../../../img/api-ha-grep-role-single-follower-pod.png)
-2. Delete the follower pod `mysql-cluster-mysql-1`.
+2. Delete the follower pod `mycluster-mysql-1`.
 
     ```bash
     kubectl delete pod mycluster-mysql-1 -n demo
     ```
 
     ![delete_follower_pod](./../../../img/api-ha-single-follower-pod-delete.png)
-3. Open another terminal page and view the pod status. You can find the follower pod `mysql-cluster-mysql-1` is `Terminating`.
+3. Open another terminal page and view the pod status. You can find the follower pod `mycluster-mysql-1` is `Terminating`.
 
     ```bash
     kubectl get pod -n demo
@@ -135,7 +135,7 @@ In this way, whether exceptions occur to one leader and one follower or two foll
 
 ***Steps:***
 
-1. View the pod role again. In this example, the follower pods are `mysql-cluster-mysql-1` and `mysql-cluster-mysql-2`.
+1. View the pod role again. In this example, the follower pods are `mycluster-mysql-1` and `mycluster-mysql-2`.
 
     ```bash
     kubectl get pods --show-labels -n demo | grep role
@@ -149,7 +149,7 @@ In this way, whether exceptions occur to one leader and one follower or two foll
     ```
 
     ![delete_two_pods](./../../../img/api-ha-two-pod-get-status.png)
-3. Open another terminal page and view the pod status. You can find the follower pods `mysql-cluster-mysql-1` and `mysql-cluster-mysql-2` is `Terminating`.
+3. Open another terminal page and view the pod status. You can find the follower pods `mycluster-mysql-1` and `mycluster-mysql-2` is `Terminating`.
 
     ```bash
     kubectl get pod -n demo

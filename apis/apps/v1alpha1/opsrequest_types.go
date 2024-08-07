@@ -64,6 +64,11 @@ type OpsRequestSpec struct {
 	// +optional
 	Force bool `json:"force,omitempty"`
 
+	// Indicates whether opsRequest should continue to queue when 'force' is set to true.
+	// +kubebuilder:default=false
+	// +optional
+	EnqueueOnForce bool `json:"enqueueOnForce,omitempty"`
+
 	// Specifies the type of this operation. Supported types include "Start", "Stop", "Restart", "Switchover",
 	// "VerticalScaling", "HorizontalScaling", "VolumeExpansion", "Reconfiguring", "Upgrade", "Backup", "Restore",
 	// "Expose", "DataScript", "RebuildInstance", "Custom".
@@ -79,6 +84,12 @@ type OpsRequestSpec struct {
 	//
 	// +optional
 	TTLSecondsAfterSucceed int32 `json:"ttlSecondsAfterSucceed,omitempty"`
+
+	// Specifies the duration in seconds that an OpsRequest will remain in the system after completion
+	// for any phase other than "Succeed" (e.g., "Failed", "Cancelled", "Aborted") before automatic deletion.
+	//
+	// +optional
+	TTLSecondsAfterUnsuccessfulCompletion int32 `json:"ttlSecondsAfterUnsuccessfulCompletion,omitempty"`
 
 	// Specifies the maximum time in seconds that the OpsRequest will wait for its pre-conditions to be met
 	// before it aborts the operation.
@@ -248,8 +259,15 @@ type RebuildInstance struct {
 
 	// Specifies the instances (Pods) that need to be rebuilt, typically operating as standbys.
 	//
+	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:Required
 	Instances []Instance `json:"instances"`
+
+	// When it is set to true, the instance will be rebuilt in-place.
+	// By default, a new pod will be created. Once the new pod is ready to serve,
+	// the instance that require rebuilding will be taken offline.
+	// +kubebuilder:validation:default=false
+	InPlace bool `json:"inPlace,omitempty"`
 
 	// Indicates the name of the Backup custom resource from which to recover the instance.
 	// Defaults to an empty PersistentVolume if unspecified.
@@ -1229,11 +1247,6 @@ type OpsRequestComponentStatus struct {
 	// Describes the progress details of objects or actions associated with the Component.
 	// +optional
 	ProgressDetails []ProgressStatusDetail `json:"progressDetails,omitempty"`
-
-	// Records the workload type of Component in ClusterDefinition.
-	// Deprecated and should be removed in the future version.
-	// +optional
-	WorkloadType WorkloadType `json:"workloadType,omitempty"`
 
 	// Provides an explanation for the Component being in its current state.
 	// +kubebuilder:validation:MaxLength=1024

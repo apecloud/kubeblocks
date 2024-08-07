@@ -44,7 +44,6 @@ Configure replicas as 0 to delete pods.
 spec:
   affinity:
     podAntiAffinity: Preferred
-    tenancy: SharedNode
     topologyKeys:
     - kubernetes.io/hostname
   clusterDefinitionRef: redis
@@ -53,7 +52,7 @@ spec:
   - componentDefRef: redis
     enabledLogs:
     - running
-    monitor: false
+    disableExporter: true
     name: redis
     replicas: 0
     resources:
@@ -110,7 +109,6 @@ Change replicas back to the original amount to start this cluster again.
 spec:
   affinity:
     podAntiAffinity: Preferred
-    tenancy: SharedNode
     topologyKeys:
     - kubernetes.io/hostname
   clusterDefinitionRef: redis
@@ -119,7 +117,7 @@ spec:
   - componentDefRef: redis
     enabledLogs:
     - running
-    monitor: false
+    disableExporter: true
     name: redis
     replicas: 1
     resources:

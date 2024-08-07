@@ -28,19 +28,19 @@ There are 3 types of parameters:
 View the current configuration file of a cluster.
 
 ```bash
-kbcli cluster describe-config pulsar  
+kbcli cluster describe-config ppulsar-cluster  
 ```
 
 * View the details of the current configuration file.
 
   ```bash
-  kbcli cluster describe-config pulsar --show-detail
+  kbcli cluster describe-config pulsar-cluster --show-detail
   ```
 
 * View the parameter description.
 
   ```bash
-  kbcli cluster explain-config pulsar | head -n 20
+  kbcli cluster explain-config pulsar-cluster | head -n 20
   ```
 
 ## Configure parameters
@@ -53,29 +53,23 @@ kbcli cluster describe-config pulsar
 
 1. You need to specify the component name to configure parameters. Get the pulsar cluster component name.
 
-  ```bash
-  kbcli cluster list-components pulsar 
-  ```
-
-  ***Example***
-
-  ```bash
-  kbcli cluster list-components pulsar 
-
-  NAME               NAMESPACE   CLUSTER   TYPE               IMAGE
-  proxy              default     pulsar    pulsar-proxy       docker.io/apecloud/pulsar:2.11.2
-  broker             default     pulsar    pulsar-broker      docker.io/apecloud/pulsar:2.11.2
-  bookies-recovery   default     pulsar    bookies-recovery   docker.io/apecloud/pulsar:2.11.2
-  bookies            default     pulsar    bookies            docker.io/apecloud/pulsar:2.11.2
-  zookeeper          default     pulsar    zookeeper          docker.io/apecloud/pulsar:2.11.2
-  ```
+   ```bash
+   kbcli cluster list-components pulsar-cluster 
+   >
+   NAME               NAMESPACE   CLUSTER   TYPE               IMAGE
+   proxy              default     pulsar    pulsar-proxy       docker.io/apecloud/pulsar:2.11.2
+   broker             default     pulsar    pulsar-broker      docker.io/apecloud/pulsar:2.11.2
+   bookies-recovery   default     pulsar    bookies-recovery   docker.io/apecloud/pulsar:2.11.2
+   bookies            default     pulsar    bookies            docker.io/apecloud/pulsar:2.11.2
+   zookeeper          default     pulsar    zookeeper          docker.io/apecloud/pulsar:2.11.2
+   ```
 
 2. Configure parameters.
 
    We take `zookeeper` as an example.
 
    ```bash
-   kbcli cluster configure pulsar --components=zookeeper --set PULSAR_MEM="-XX:MinRAMPercentage=50 -XX:MaxRAMPercentage=70" 
+   kbcli cluster configure pulsar-cluster --components=zookeeper --set PULSAR_MEM="-XX:MinRAMPercentage=50 -XX:MaxRAMPercentage=70" 
    ```
 
 3. Verify the configuration.
@@ -101,8 +95,8 @@ The following steps take the configuration of dynamic parameter `brokerShutdownT
 1. Get configuration information.
 
    ```bash
-   kbcli cluster desc-config pulsar --components=broker
-   
+   kbcli cluster desc-config pulsar-cluster --components=broker
+   >
    ConfigSpecs Meta:
    CONFIG-SPEC-NAME         FILE                   ENABLED   TEMPLATE                   CONSTRAINT                   RENDERED                               COMPONENT   CLUSTER
    agamotto-configuration   agamotto-config.yaml   false     pulsar-agamotto-conf-tpl                                pulsar-broker-agamotto-configuration   broker      pulsar
@@ -113,7 +107,7 @@ The following steps take the configuration of dynamic parameter `brokerShutdownT
 2. Configure parameters.
 
    ```bash
-   kbcli cluster configure pulsar --components=broker --config-spec=broker-config --set brokerShutdownTimeoutMs=66600
+   kbcli cluster configure pulsar --components=broker --config-specs=broker-config --set brokerShutdownTimeoutMs=66600
    >
    Will updated configure file meta:
      ConfigSpec: broker-config          ConfigFile: broker.conf        ComponentName: broker        ClusterName: pulsar
@@ -126,13 +120,13 @@ The following steps take the configuration of dynamic parameter `brokerShutdownT
    The ops name is printed with the command above.
 
    ```bash
-   kbcli cluster describe-ops pulsar-reconfiguring-qxw8s -n default
+   kbcli cluster describe-ops pulsar-cluster-reconfiguring-qxw8s -n default
    >
    Spec:
-     Name: pulsar-reconfiguring-qxw8s        NameSpace: default        Cluster: pulsar        Type: Reconfiguring
+     Name: pulsar-cluster-reconfiguring-qxw8s        NameSpace: default        Cluster: pulsar        Type: Reconfiguring
 
    Command:
-     kbcli cluster configure pulsar --components=broker --config-spec=broker-config --config-file=broker.conf --set brokerShutdownTimeoutMs=66600 --namespace=default
+     kbcli cluster configure pulsar-cluster --components=broker --config-specs=broker-config --config-file=broker.conf --set brokerShutdownTimeoutMs=66600 --namespace=default
 
    Status:
      Start Time:         Jul 20,2023 09:53 UTC+0800
@@ -152,7 +146,7 @@ For Linux and macOS, you can edit configuration files by vi. For Windows, you ca
 1. Edit the configuration file.
 
    ```bash
-   kbcli cluster edit-config pulsar
+   kbcli cluster edit-config pulsar-cluster
    ```
 
    :::note
@@ -170,7 +164,7 @@ For Linux and macOS, you can edit configuration files by vi. For Windows, you ca
 3. Connect to the database to verify whether the parameters are configured as expected.
 
    ```bash
-   kbcli cluster connect pulsar
+   kbcli cluster connect pulsar-cluster
    ```
 
    :::note
@@ -180,28 +174,20 @@ For Linux and macOS, you can edit configuration files by vi. For Windows, you ca
 
    :::
 
-### Configure parameters with kubectl
+## View history and compare differences
 
-Using kubectl to configure pulsar cluster requires modifying the configuration file.
+After the configuration is completed, you can search the configuration history and compare the parameter differences.
 
-***Steps***
+View the parameter configuration history.
 
-1. Get the configmap where the configuration file is located. Take `broker` component as an example.
+```bash
+kbcli cluster describe-config pulsar-cluster --components=zookeeper
+```
 
-    ```bash
-    kbcli cluster desc-config pulsar --components=broker
+From the above results, there are three parameter modifications.
 
-    ConfigSpecs Meta:
-    CONFIG-SPEC-NAME         FILE                   ENABLED   TEMPLATE                   CONSTRAINT                   RENDERED                               COMPONENT   CLUSTER
-    agamotto-configuration   agamotto-config.yaml   false     pulsar-agamotto-conf-tpl                                pulsar-broker-agamotto-configuration   broker      pulsar
-    broker-env               conf                   true      pulsar-broker-env-tpl      pulsar-env-constraints       pulsar-broker-broker-env               broker      pulsar
-    broker-config            broker.conf            true      pulsar-broker-config-tpl   brokers-config-constraints   pulsar-broker-broker-config            broker      pulsar
-    ```
+Compare these modifications to view the configured parameters and their different values for different versions.
 
-    In the rendered column of the above output, you can check the broker's configmap is `pulsar-broker-broker-config`.
-
-2. Modify the `broker.conf` file, in this case, it is `pulsar-broker-broker-config`.
-
-    ```bash
-    kubectl edit cm pulsar-broker-broker-config
-    ```
+```bash
+kbcli cluster diff-config pulsar-cluster-reconfiguring-qxw8s pulsar-cluster-reconfiguring-mwbnw
+```

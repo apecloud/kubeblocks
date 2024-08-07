@@ -16386,6 +16386,15 @@ spec:
                 items:
                   type: string
                 type: array
+              parallelPodManagementConcurrency:
+                anyOf:
+                - type: integer
+                - type: string
+                description: |-
+                  Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
+                  or when scaling down. It only used when `PodManagementPolicy` is set to `Parallel`.
+                  The default Concurrency is 100%.
+                x-kubernetes-int-or-string: true
               paused:
                 description: Indicates that the InstanceSet is paused, meaning the
                   reconciliation of this InstanceSet object will be paused.
@@ -16404,6 +16413,17 @@ spec:
 
 
                   Note: This field will be removed in future version.
+                type: string
+              podUpdatePolicy:
+                description: |-
+                  PodUpdatePolicy indicates how pods should be updated
+
+
+                  - `StrictInPlace` indicates that only allows in-place upgrades.
+                  Any attempt to modify other fields will be rejected.
+                  - `PreferInPlace` indicates that we will first attempt an in-place upgrade of the Pod.
+                  If that fails, it will fall back to the ReCreate, where pod will be recreated.
+                  Default value is "PreferInPlace"
                 type: string
               replicas:
                 default: 1
@@ -24968,6 +24988,46 @@ spec:
                   controller.
                 format: int32
                 type: integer
+              templatesStatus:
+                description: TemplatesStatus represents status of each instance generated
+                  by InstanceTemplates
+                items:
+                  description: InstanceTemplateStatus aggregates the status of replicas
+                    for each InstanceTemplate
+                  properties:
+                    availableReplicas:
+                      description: AvailableReplicas is the number of Pods that ready
+                        for at least minReadySeconds.
+                      format: int32
+                      type: integer
+                    currentReplicas:
+                      description: |-
+                        currentReplicas is the number of instances created by the InstanceSet controller from the InstanceSet version
+                        indicated by CurrentRevisions.
+                      format: int32
+                      type: integer
+                    name:
+                      description: Name, the name of the InstanceTemplate.
+                      type: string
+                    readyReplicas:
+                      description: ReadyReplicas is the number of Pods that have a
+                        Ready Condition.
+                      format: int32
+                      type: integer
+                    replicas:
+                      description: Replicas is the number of replicas of the InstanceTemplate.
+                      format: int32
+                      type: integer
+                    updatedReplicas:
+                      description: |-
+                        UpdatedReplicas is the number of Pods created by the InstanceSet controller from the InstanceSet version
+                        indicated by UpdateRevisions.
+                      format: int32
+                      type: integer
+                  required:
+                  - name
+                  type: object
+                type: array
               updateRevision:
                 description: |-
                   updateRevision, if not empty, indicates the version of the InstanceSet used to generate instances in the sequence
@@ -24993,4 +25053,7 @@ spec:
     served: true
     storage: true
     subresources:
+      scale:
+        specReplicasPath: .spec.replicas
+        statusReplicasPath: .status.replicas
       status: {}

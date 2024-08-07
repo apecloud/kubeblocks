@@ -19,7 +19,7 @@ But it's also important to note that the dynamic parameter configuration doesn't
 ## Before you start
 
 1. [Install KubeBlocks](./../../installation/install-kubeblocks.md).
-2. [Create a MySQL cluster](./../cluster-management/create-and-connect-a-mysql-cluster.md).
+2. [Create an ApeCloud MySQL cluster](./../cluster-management/create-and-connect-an-apecloud-mysql-cluster.md).
 
 ## Configure cluster parameters by editing configuration file
 
@@ -184,10 +184,10 @@ You can also view the details of this configuration file and parameters.
 * View the user guide of a specified parameter.
   
    ```bash
-   kbcli cluster explain-config mycluster --param=innodb_buffer_pool_size --config-spec=mysql-consensusset-config -n demo
+   kbcli cluster explain-config mycluster --param=innodb_buffer_pool_size --config-specs=mysql-consensusset-config -n demo
    ```
 
-   `--config-spec` is required to specify a configuration template since ApeCloud MySQL currently supports multiple templates. You can run `kbcli cluster describe-config mycluster` to view the all template names.
+   `--config-specs` is required to specify a configuration template since ApeCloud MySQL currently supports multiple templates. You can run `kbcli cluster describe-config mycluster` to view the all template names.
 
   <details>
 

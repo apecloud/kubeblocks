@@ -21,31 +21,31 @@ You can initiate a switchover for a PostgreSQL Replication Cluster by executing 
    >
    probes:
      roleProbe:
-       failureThreshold: 3
-       periodSeconds: 2
+       failureThreshold: 2
+       periodSeconds: 1
        timeoutSeconds: 1
    ```
 
 ## Initiate the switchover
 
-You can switch over a secondary of a PostgreSQL PrimaeySecondary database to the primary role, and the former primary instance to a secondary.
+You can switch over a secondary of a PostgreSQL Replication Cluster to the primary role, and the former primary instance to a secondary.
 
 * Switchover with no primary instance specified
 
     ```bash
-    kbcli cluster promote mycluster
+    kbcli cluster promote pg-cluster
     ```
 
 * Switchover with a specified new primary instance
 
     ```bash
-    kbcli cluster promote mycluster --instance='mycluster-postgresql-2'
+    kbcli cluster promote pg-cluster --instance='pg-cluster-postgresql-2'
     ```
 
 * If there are multiple components, you can use `--components` to specify a component.
 
     ```bash
-    kbcli cluster promote mycluster --instance='mycluster-postgresql-2' --components='postgresql'
+    kbcli cluster promote pg-cluster --instance='pg-cluster-postgresql-2' --components='postgresql'
     ```
 
 

@@ -42,7 +42,7 @@ Restarting a PostgreSQL cluster triggers a concurrent restart and the primary ma
    kubectl get pod -n demo
    >
    NAME                     READY   STATUS            RESTARTS   AGE
-   mycluster-postgresql-0   4/4     Terminating       0          5m32s
+   mycluster-postgresql-0   3/4     Terminating       0          5m32s
    mycluster-postgresql-1   4/4     Running           0          6m36s
 
    kubectl get ops ops-restart -n demo

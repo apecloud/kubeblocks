@@ -29,13 +29,12 @@ type MockClusterFactory struct {
 	BaseFactory[appsv1alpha1.Cluster, *appsv1alpha1.Cluster, MockClusterFactory]
 }
 
-func NewClusterFactory(namespace, name, cdRef, cvRef string) *MockClusterFactory {
+func NewClusterFactory(namespace, name, cdRef string) *MockClusterFactory {
 	f := &MockClusterFactory{}
 	f.Init(namespace, name,
 		&appsv1alpha1.Cluster{
 			Spec: appsv1alpha1.ClusterSpec{
 				ClusterDefRef:     cdRef,
-				ClusterVersionRef: cvRef,
 				ComponentSpecs:    []appsv1alpha1.ClusterComponentSpec{},
 				TerminationPolicy: appsv1alpha1.WipeOut,
 			},
@@ -71,20 +70,6 @@ func (factory *MockClusterFactory) AddClusterToleration(toleration corev1.Tolera
 func (factory *MockClusterFactory) AddShardingSpec(shardingName string, compDefName string) *MockClusterFactory {
 	shardingSpec := appsv1alpha1.ShardingSpec{
 		Template: appsv1alpha1.ClusterComponentSpec{
-			Name:            "fake",
-			ComponentDefRef: compDefName,
-			Replicas:        1,
-		},
-		Name:   shardingName,
-		Shards: 1,
-	}
-	factory.Get().Spec.ShardingSpecs = append(factory.Get().Spec.ShardingSpecs, shardingSpec)
-	return factory
-}
-
-func (factory *MockClusterFactory) AddShardingSpecV2(shardingName string, compDefName string) *MockClusterFactory {
-	shardingSpec := appsv1alpha1.ShardingSpec{
-		Template: appsv1alpha1.ClusterComponentSpec{
 			Name:         "fake",
 			ComponentDef: compDefName,
 			Replicas:     1,
@@ -97,15 +82,6 @@ func (factory *MockClusterFactory) AddShardingSpecV2(shardingName string, compDe
 }
 
 func (factory *MockClusterFactory) AddComponent(compName string, compDefName string) *MockClusterFactory {
-	comp := appsv1alpha1.ClusterComponentSpec{
-		Name:            compName,
-		ComponentDefRef: compDefName,
-	}
-	factory.Get().Spec.ComponentSpecs = append(factory.Get().Spec.ComponentSpecs, comp)
-	return factory
-}
-
-func (factory *MockClusterFactory) AddComponentV2(compName string, compDefName string) *MockClusterFactory {
 	comp := appsv1alpha1.ClusterComponentSpec{
 		Name:         compName,
 		ComponentDef: compDefName,
@@ -326,5 +302,11 @@ func (factory *MockClusterFactory) AddUserConfigmapVolume(name, mountPoint, resN
 			comp.UserResourceRefs = userResourcesRefs
 		}
 		userResourcesRefs.ConfigMapRefs = append(userResourcesRefs.ConfigMapRefs, cmResource)
+	})
+}
+
+func (factory *MockClusterFactory) SetStop(stop *bool) *MockClusterFactory {
+	return factory.lastComponentRef(func(comp *appsv1alpha1.ClusterComponentSpec) {
+		comp.Stop = stop
 	})
 }

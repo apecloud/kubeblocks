@@ -78,8 +78,8 @@ func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	opsCtrlHandler := &opsControllerHandler{}
 	return opsCtrlHandler.Handle(reqCtx, &operations.OpsResource{Recorder: r.Recorder},
 		r.fetchOpsRequest,
-		r.handleDeletion,
 		r.fetchCluster,
+		r.handleDeletion,
 		r.addClusterLabelAndSetOwnerReference,
 		r.handleCancelSignal,
 		r.handleOpsRequestByPhase,
@@ -122,7 +122,7 @@ func (r *OpsRequestReconciler) fetchOpsRequest(reqCtx intctrlutil.RequestCtx, op
 
 // handleDeletion handles the delete event of the OpsRequest.
 func (r *OpsRequestReconciler) handleDeletion(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error) {
-	if opsRes.OpsRequest.Status.Phase == appsv1alpha1.OpsRunningPhase {
+	if opsRes.OpsRequest.Status.Phase == appsv1alpha1.OpsRunningPhase && !opsRes.Cluster.IsDeleting() {
 		return nil, nil
 	}
 	return intctrlutil.HandleCRDeletion(reqCtx, r, opsRes.OpsRequest, constant.OpsRequestFinalizerName, func() (*ctrl.Result, error) {
@@ -178,13 +178,7 @@ func (r *OpsRequestReconciler) handleOpsRequestByPhase(reqCtx intctrlutil.Reques
 	case appsv1alpha1.OpsSucceedPhase:
 		return r.handleSucceedOpsRequest(reqCtx, opsRes.OpsRequest)
 	default:
-		if err := r.annotateRelatedOps(reqCtx, opsRes.OpsRequest); err != nil {
-			return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
-		}
-		if err := r.cleanupOpsAnnotationForCluster(reqCtx, opsRes.Cluster); err != nil {
-			return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
-		}
-		return intctrlutil.ResultToP(intctrlutil.Reconciled())
+		return r.handleUnsuccessfulCompletionOpsRequest(reqCtx, opsRes)
 	}
 }
 
@@ -239,6 +233,28 @@ func (r *OpsRequestReconciler) handleSucceedOpsRequest(reqCtx intctrlutil.Reques
 		return intctrlutil.ResultToP(intctrlutil.RequeueAfter(time.Until(deadline), reqCtx.Log, ""))
 	}
 	// the opsRequest will be deleted after spec.ttlSecondsAfterSucceed seconds when status.phase is Succeed
+	if err := r.Client.Delete(reqCtx.Ctx, opsRequest); err != nil {
+		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
+	}
+	return intctrlutil.ResultToP(intctrlutil.Reconciled())
+}
+
+func (r *OpsRequestReconciler) handleUnsuccessfulCompletionOpsRequest(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error) {
+	opsRequest := opsRes.OpsRequest
+	if err := r.annotateRelatedOps(reqCtx, opsRes.OpsRequest); err != nil {
+		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
+	}
+	if err := r.cleanupOpsAnnotationForCluster(reqCtx, opsRes.Cluster); err != nil {
+		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
+	}
+	if opsRequest.Status.CompletionTimestamp.IsZero() || opsRequest.Spec.TTLSecondsAfterUnsuccessfulCompletion == 0 {
+		return intctrlutil.ResultToP(intctrlutil.Reconciled())
+	}
+	deadline := opsRequest.Status.CompletionTimestamp.Add(time.Duration(opsRequest.Spec.TTLSecondsAfterUnsuccessfulCompletion) * time.Second)
+	if time.Now().Before(deadline) {
+		return intctrlutil.ResultToP(intctrlutil.RequeueAfter(time.Until(deadline), reqCtx.Log, ""))
+	}
+	// the opsRequest will be deleted after spec.ttlSecondsAfterUnsuccessfulCompletion seconds when status.phase is Failed, Cancelled or Aborted
 	if err := r.Client.Delete(reqCtx.Ctx, opsRequest); err != nil {
 		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 	}

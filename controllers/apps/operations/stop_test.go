@@ -26,19 +26,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
 var _ = Describe("Stop OpsRequest", func() {
-
 	var (
-		randomStr             = testCtx.GetRandomStr()
-		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr
-		clusterVersionName    = "clusterversion-for-ops-" + randomStr
-		clusterName           = "cluster-for-ops-" + randomStr
+		randomStr   = testCtx.GetRandomStr()
+		compDefName = "test-compdef-" + randomStr
+		clusterName = "test-cluster-" + randomStr
 	)
 
 	cleanEnv := func() {
@@ -48,8 +45,8 @@ var _ = Describe("Stop OpsRequest", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
+		// delete cluster(and all dependent sub-resources), cluster definition
+		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 
 		// delete rest resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
@@ -66,10 +63,8 @@ var _ = Describe("Stop OpsRequest", func() {
 	Context("Test OpsRequest", func() {
 		It("Test stop OpsRequest", func() {
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
-			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
-			testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusComp)
-			testapps.MockInstanceSetComponent(&testCtx, clusterName, statelessComp)
-			testapps.MockInstanceSetComponent(&testCtx, clusterName, statefulComp)
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
 			By("create Stop opsRequest")
 			ops := testapps.NewOpsRequestObj("stop-ops-"+randomStr, testCtx.DefaultNamespace,
 				clusterName, appsv1alpha1.StopType)
@@ -85,13 +80,12 @@ var _ = Describe("Stop OpsRequest", func() {
 			// do stop cluster
 			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(len(opsRes.Cluster.Annotations[constant.SnapShotForStartAnnotationKey]) != 0).Should(BeTrue())
 			for _, v := range opsRes.Cluster.Spec.ComponentSpecs {
-				Expect(v.Replicas).Should(BeEquivalentTo(0))
+				Expect(v.Stop).ShouldNot(BeNil())
+				Expect(*v.Stop).Should(BeTrue())
 			}
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
-			Expect(err == nil).Should(BeTrue())
+			Expect(err).Should(BeNil())
 		})
-
 	})
 })

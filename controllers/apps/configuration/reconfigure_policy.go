@@ -107,10 +107,6 @@ type reconfigureParams struct {
 	// Associated component for component and component definition.
 	SynthesizedComponent *component.SynthesizedComponent
 
-	// Associated component for clusterdefinition.
-	// TODO(xingran): remove this field when test case is refactored.
-	Component *appsv1alpha1.ClusterComponentDefinition
-
 	// List of InstanceSet using this config template.
 	InstanceSetUnits []workloads.InstanceSet
 }

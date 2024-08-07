@@ -6,9 +6,6 @@ sidebar_position: 2
 sidebar_label: Connect
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 ## Overview
 
 Before you connect to the Kafka cluster, you must check your network environment, and from which network you would like to connect to the cluster.
@@ -28,18 +25,14 @@ Within the same Kubernetes cluster, you can directly access the Kafka cluster wi
 
    ```bash
    kubectl get svc 
+   > 
+   NAME                            TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)                               AGE
+   kubernetes                      ClusterIP   10.43.0.1     <none>        443/TCP                               9d
+   kafka-cluster-broker-headless   ClusterIP   None          <none>        9092/TCP,9093/TCP,9094/TCP,5556/TCP   7d16h
+   kafka-cluster-broker            ClusterIP   10.43.8.124   <none>        9093/TCP,9092/TCP,5556/TCP            7d16h
    ```
 
-   *Example:*
-
-   ```bash
-   NAME                    TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)                               AGE
-   kubernetes              ClusterIP   10.43.0.1     <none>        443/TCP                               9d
-   ivy85-broker-headless   ClusterIP   None          <none>        9092/TCP,9093/TCP,9094/TCP,5556/TCP   7d16h
-   ivy85-broker            ClusterIP   10.43.8.124   <none>        9093/TCP,9092/TCP,5556/TCP            7d16h
-   ```
-
-2. Connect to the kafka cluster with the port No..
+2. Connect to the Kafka cluster with the port No..
 
    Below is an example of connecting with the official client script.
 
@@ -92,58 +85,9 @@ If you use AWS EKS, you may want to access to the Kafka cluster from EC2 instanc
 
 1. Set the value of `host-network-accessible` as true.
 
-    <Tabs>
-    <TabItem value="kbcli" label="kbcli" default>
-
     ```bash
-    kbcli cluster create kafka --host-network-accessible=true
+    kbcli cluster create kafka-cluster --cluster-definition kafka --host-network-accessible=true
     ```
-
-    </TabItem>
-    <TabItem value="kubectl" label="kubectl" >
-
-    ```bash
-    kubectl apply -f - <<EOF
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: Cluster
-    metadata:
-      name: kafka
-      namespace: default
-    spec:
-      affinity:
-        podAntiAffinity: Preferred
-        tenancy: SharedNode
-        topologyKeys:
-        - kubernetes.io/hostname
-      clusterDefinitionRef: kafka
-      clusterVersionRef: kafka-3.3.2
-      componentSpecs:
-      - componentDefRef: kafka-server
-        monitor: false
-        name: broker
-        replicas: 1
-        resources:
-          limits:
-            cpu: "1"
-            memory: 1Gi
-          requests:
-            cpu: "1"
-            memory: 1Gi
-        serviceAccountName: kb-sa-kafka
-        services:
-        - annotations: 
-            service.beta.kubernetes.io/aws-load-balancer-type: nlb
-            service.beta.kubernetes.io/aws-load-balancer-internal: "true"
-          name: vpc
-          serviceType: LoadBalancer
-        tls: false
-      terminationPolicy: Delete
-    EOF
-    ```
-
-    </TabItem>
-
-    </Tabs>
 
 2. Get the corresponding ELB address.
 
@@ -175,59 +119,9 @@ The current version only supports Kafka broker with a single replica (combined: 
 
 1. Set the `--publicly-accessible` value as true when creating cluster.
 
-    <Tabs>
-    <TabItem value="kbcli" label="kbcli" default>
-
     ```bash
-    kbcli cluster create kafka --publicly-accessible=true
+    kbcli cluster create kafka-cluster --cluster-definition kafka --publicly-accessible=true
     ```
-
-    </TabItem>
-
-    <TabItem value="kubectl" label="kubectl" >
-
-    ```bash
-    kubectl apply -f - <<EOF
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: Cluster
-    metadata:
-      name: kafka
-      namespace: default
-    spec:
-      affinity:
-        podAntiAffinity: Preferred
-        tenancy: SharedNode
-        topologyKeys:
-        - kubernetes.io/hostname
-      clusterDefinitionRef: kafka
-      clusterVersionRef: kafka-3.3.2
-      componentSpecs:
-      - componentDefRef: kafka-server
-        monitor: false
-        name: broker
-        replicas: 1
-        resources:
-          limits:
-            cpu: "1"
-            memory: 1Gi
-          requests:
-            cpu: "1"
-            memory: 1Gi
-        serviceAccountName: kb-sa-kafka
-        services:
-        - annotations: 
-            service.beta.kubernetes.io/aws-load-balancer-type: nlb
-            service.beta.kubernetes.io/aws-load-balancer-internal: "false"
-          name: vpc
-          serviceType: LoadBalancer
-        tls: false
-      terminationPolicy: Delete
-    EOF
-    ```
-
-    </TabItem>
-
-    </Tabs>
 
 2. Get the corresponding ELB address.
 
@@ -244,6 +138,7 @@ The current version only supports Kafka broker with a single replica (combined: 
   :::
 
 3. Configure hostname mapping.
+
    1. Login to the remote machine.
    2. Check ELB address IP address.
 

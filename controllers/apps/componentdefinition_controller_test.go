@@ -26,10 +26,12 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
@@ -37,6 +39,9 @@ import (
 var _ = Describe("ComponentDefinition Controller", func() {
 	const (
 		componentDefName = "test-componentdef"
+		adminAccount     = "kbadmin"
+		probeAccount     = "kbprobe"
+		monitorAccount   = "kbmonitoring"
 	)
 
 	var (
@@ -248,7 +253,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			By("create a ComponentDefinition obj")
 			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
 				SetRuntime(nil).
-				AddSystemAccount(string(appsv1alpha1.AdminAccount), false, "create user").
+				AddSystemAccount(adminAccount, false, "create user").
 				Create(&testCtx).GetObject()
 
 			checkObjectStatus(componentDefObj, appsv1alpha1.UnavailablePhase)
@@ -258,7 +263,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			By("create a ComponentDefinition obj")
 			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
 				SetRuntime(nil).
-				AddSystemAccount(string(appsv1alpha1.AdminAccount), true, "create user").
+				AddSystemAccount(adminAccount, true, "create user").
 				SetLifecycleAction("AccountProvision", defaultActionHandler).
 				Create(&testCtx).GetObject()
 
@@ -269,8 +274,8 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			By("create a ComponentDefinition obj")
 			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
 				SetRuntime(nil).
-				AddSystemAccount(string(appsv1alpha1.AdminAccount), true, "create user").
-				AddSystemAccount(string(appsv1alpha1.AdminAccount), false, "create user").
+				AddSystemAccount(adminAccount, true, "create user").
+				AddSystemAccount(adminAccount, false, "create user").
 				SetLifecycleAction("AccountProvision", defaultActionHandler).
 				Create(&testCtx).GetObject()
 
@@ -281,9 +286,9 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			By("create a ComponentDefinition obj")
 			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
 				SetRuntime(nil).
-				AddSystemAccount(string(appsv1alpha1.AdminAccount), true, "create user").
-				AddSystemAccount(string(appsv1alpha1.ProbeAccount), true, "create user").
-				AddSystemAccount(string(appsv1alpha1.MonitorAccount), false, "create user").
+				AddSystemAccount(adminAccount, true, "create user").
+				AddSystemAccount(probeAccount, true, "create user").
+				AddSystemAccount(monitorAccount, false, "create user").
 				SetLifecycleAction("AccountProvision", defaultActionHandler).
 				Create(&testCtx).GetObject()
 
@@ -294,9 +299,9 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			By("create a ComponentDefinition obj")
 			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
 				SetRuntime(nil).
-				AddSystemAccount(string(appsv1alpha1.AdminAccount), true, "create user").
-				AddSystemAccount(string(appsv1alpha1.ProbeAccount), false, "create user").
-				AddSystemAccount(string(appsv1alpha1.MonitorAccount), false, "create user").
+				AddSystemAccount(adminAccount, true, "create user").
+				AddSystemAccount(probeAccount, false, "create user").
+				AddSystemAccount(monitorAccount, false, "create user").
 				SetLifecycleAction("AccountProvision", defaultActionHandler).
 				Create(&testCtx).GetObject()
 
@@ -328,6 +333,136 @@ var _ = Describe("ComponentDefinition Controller", func() {
 				Create(&testCtx).GetObject()
 
 			checkObjectStatus(componentDefObj, appsv1alpha1.UnavailablePhase)
+		})
+	})
+
+	Context("immutable", func() {
+		newCmpdFn := func(processor func(*testapps.MockComponentDefinitionFactory)) *appsv1alpha1.ComponentDefinition {
+			By("create a ComponentDefinition obj")
+			builder := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetDescription("v0.0.1").
+				SetRuntime(&corev1.Container{
+					Name:    "container",
+					Image:   "image:v0.0.1",
+					Command: []string{"command"},
+				}).
+				SetUpdateStrategy(nil).
+				SetPodManagementPolicy(nil)
+			if processor != nil {
+				processor(builder)
+			}
+			obj := builder.Create(&testCtx).GetObject()
+			checkObjectStatus(obj, appsv1alpha1.AvailablePhase)
+			return obj
+		}
+
+		newCmpd := func() *appsv1alpha1.ComponentDefinition {
+			return newCmpdFn(nil)
+		}
+
+		newCmpdSkipImmutableCheck := func() *appsv1alpha1.ComponentDefinition {
+			return newCmpdFn(func(f *testapps.MockComponentDefinitionFactory) {
+				f.AddAnnotations(constant.SkipImmutableCheckAnnotationKey, "true")
+			})
+		}
+
+		It("update mutable fields", func() {
+			componentDefObj := newCmpd()
+
+			By("update mutable fields")
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(componentDefObj), func(cmpd *appsv1alpha1.ComponentDefinition) {
+				cmpd.Spec.Description = "v0.0.2"
+				parallel := appsv1.ParallelPodManagement
+				cmpd.Spec.PodManagementPolicy = &parallel
+			})()).Should(Succeed())
+
+			By(fmt.Sprintf("checking the updated object as %s", strings.ToLower(string(appsv1alpha1.AvailablePhase))))
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentDefObj),
+				func(g Gomega, cmpd *appsv1alpha1.ComponentDefinition) {
+					g.Expect(cmpd.Status.ObservedGeneration).Should(Equal(cmpd.GetGeneration()))
+					g.Expect(cmpd.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
+					g.Expect(cmpd.Spec.Description).Should(Equal("v0.0.2"))
+					g.Expect(cmpd.Spec.PodManagementPolicy).ShouldNot(BeNil())
+					g.Expect(*cmpd.Spec.PodManagementPolicy).Should(Equal(appsv1.ParallelPodManagement))
+				})).Should(Succeed())
+		})
+
+		It("update immutable fields - w/ skip annotation", func() {
+			componentDefObj := newCmpdSkipImmutableCheck()
+
+			By("update mutable & immutable fields")
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(componentDefObj), func(cmpd *appsv1alpha1.ComponentDefinition) {
+				cmpd.Spec.Description = "v0.0.2"
+				cmpd.Spec.Runtime.Containers[0].Image = "image:v0.0.2"
+				parallel := appsv1alpha1.ParallelStrategy
+				cmpd.Spec.UpdateStrategy = &parallel
+			})()).Should(Succeed())
+
+			By(fmt.Sprintf("checking the updated object as %s", strings.ToLower(string(appsv1alpha1.AvailablePhase))))
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentDefObj),
+				func(g Gomega, cmpd *appsv1alpha1.ComponentDefinition) {
+					g.Expect(cmpd.Status.ObservedGeneration).Should(Equal(cmpd.GetGeneration()))
+					g.Expect(cmpd.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
+					g.Expect(cmpd.Spec.Description).Should(Equal("v0.0.2"))
+					c := corev1.Container{
+						Name:    "container",
+						Image:   "image:v0.0.2",
+						Command: []string{"command"},
+					}
+					g.Expect(cmpd.Spec.Runtime.Containers[0]).Should(BeEquivalentTo(c))
+					g.Expect(cmpd.Spec.UpdateStrategy).ShouldNot(BeNil())
+					g.Expect(*cmpd.Spec.UpdateStrategy).Should(Equal(appsv1alpha1.ParallelStrategy))
+				})).Should(Succeed())
+		})
+
+		It("update immutable fields - w/o skip annotation", func() {
+			componentDefObj := newCmpd()
+
+			By("update mutable & immutable fields")
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(componentDefObj), func(cmpd *appsv1alpha1.ComponentDefinition) {
+				cmpd.Spec.Description = "v0.0.2"
+				cmpd.Spec.Runtime.Containers[0].Image = "image:v0.0.2"
+				parallel := appsv1alpha1.ParallelStrategy
+				cmpd.Spec.UpdateStrategy = &parallel
+			})()).Should(Succeed())
+
+			By(fmt.Sprintf("checking the updated object as %s", strings.ToLower(string(appsv1alpha1.UnavailablePhase))))
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentDefObj),
+				func(g Gomega, cmpd *appsv1alpha1.ComponentDefinition) {
+					g.Expect(cmpd.Status.ObservedGeneration).Should(Equal(cmpd.GetGeneration()))
+					g.Expect(cmpd.Status.Phase).Should(Equal(appsv1alpha1.UnavailablePhase))
+					g.Expect(cmpd.Spec.Description).Should(Equal("v0.0.2"))
+					c := corev1.Container{
+						Name:    "container",
+						Image:   "image:v0.0.2",
+						Command: []string{"command"},
+					}
+					g.Expect(cmpd.Spec.Runtime.Containers[0]).Should(BeEquivalentTo(c))
+					g.Expect(cmpd.Spec.UpdateStrategy).ShouldNot(BeNil())
+					g.Expect(*cmpd.Spec.UpdateStrategy).Should(Equal(appsv1alpha1.ParallelStrategy))
+				})).Should(Succeed())
+
+			By("revert the change to immutable fields back")
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(componentDefObj), func(cmpd *appsv1alpha1.ComponentDefinition) {
+				cmpd.Spec.Runtime.Containers[0].Image = "image:v0.0.1"
+				cmpd.Spec.UpdateStrategy = nil
+			})()).Should(Succeed())
+
+			By(fmt.Sprintf("checking the updated object as %s", strings.ToLower(string(appsv1alpha1.AvailablePhase))))
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentDefObj),
+				func(g Gomega, cmpd *appsv1alpha1.ComponentDefinition) {
+					g.Expect(cmpd.Status.ObservedGeneration).Should(Equal(cmpd.GetGeneration()))
+					g.Expect(cmpd.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
+					g.Expect(cmpd.Spec.Description).Should(Equal("v0.0.2"))
+					c := corev1.Container{
+						Name:    "container",
+						Image:   "image:v0.0.1",
+						Command: []string{"command"},
+					}
+					g.Expect(cmpd.Spec.Runtime.Containers[0]).Should(BeEquivalentTo(c))
+					g.Expect(cmpd.Spec.UpdateStrategy).ShouldNot(BeNil())
+					g.Expect(*cmpd.Spec.UpdateStrategy).Should(Equal(appsv1alpha1.SerialStrategy))
+				})).Should(Succeed())
 		})
 	})
 })

@@ -90,8 +90,7 @@ func (f *MockBackupPolicyTemplateFactory) AddSchedule(method, schedule, retentio
 	return f
 }
 
-func (f *MockBackupPolicyTemplateFactory) AddBackupMethod(name string,
-	snapshotVolumes bool, actionSetName string, mappingEnvWithClusterVersion ...string) *MockBackupPolicyTemplateFactory {
+func (f *MockBackupPolicyTemplateFactory) AddBackupMethod(name string, snapshotVolumes bool, actionSetName string) *MockBackupPolicyTemplateFactory {
 	backupPolicy := f.getLastBackupPolicy()
 	backupMethod := appsv1alpha1.BackupMethod{
 		BackupMethod: dpv1alpha1.BackupMethod{
@@ -100,21 +99,6 @@ func (f *MockBackupPolicyTemplateFactory) AddBackupMethod(name string,
 			ActionSetName:   actionSetName,
 			TargetVolumes:   &dpv1alpha1.TargetVolumeInfo{},
 		}}
-	if len(mappingEnvWithClusterVersion) > 0 {
-		backupMethod.EnvMapping = []appsv1alpha1.EnvMappingVar{
-			{
-				Key: EnvKeyImageTag,
-				ValueFrom: appsv1alpha1.ValueFrom{
-					ClusterVersionRef: []appsv1alpha1.ValueMapping{
-						{
-							Names:        mappingEnvWithClusterVersion,
-							MappingValue: DefaultImageTag,
-						},
-					},
-				},
-			},
-		}
-	}
 	backupPolicy.BackupMethods = append(backupPolicy.BackupMethods, backupMethod)
 	return f
 }

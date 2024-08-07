@@ -63,12 +63,7 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 				withConfigSpec("for_test", map[string]string{
 					"key": "value",
 				}),
-				withClusterComponent(2),
-				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ComponentConfigSpec{{
-					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-						Name:       "for_test",
-						VolumeName: "test_volume",
-					}}}))
+				withClusterComponent(2))
 
 			// mock client update caller
 			updateErr := core.MakeError("update failed!")
@@ -126,13 +121,7 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 				withConfigSpec("for_test", map[string]string{
 					"key": "value",
 				}),
-				withClusterComponent(2),
-				withCDComponent(appsv1alpha1.Replication, []appsv1alpha1.ComponentConfigSpec{{
-					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-						Name:       "for_test",
-						VolumeName: "test_volume",
-					}}}),
-			)
+				withClusterComponent(2))
 
 			k8sMockClient.MockPatchMethod(testutil.WithSucceed(testutil.WithAnyTimes()))
 			k8sMockClient.MockListMethod(testutil.WithListReturned(
@@ -165,12 +154,7 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 				withConfigSpec("for_test", map[string]string{
 					"key": "value",
 				}),
-				withClusterComponent(2),
-				withCDComponent(appsv1alpha1.Stateless, []appsv1alpha1.ComponentConfigSpec{{
-					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-						Name:       "for_test",
-						VolumeName: "test_volume",
-					}}}))
+				withClusterComponent(2))
 
 			updateErr := core.MakeError("update failed!")
 			k8sMockClient.MockPatchMethod(

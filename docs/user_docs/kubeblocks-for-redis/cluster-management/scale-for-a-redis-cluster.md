@@ -12,23 +12,11 @@ You can scale Redis DB instances in two ways, vertical scaling and horizontal sc
 
 ## Vertical scaling
 
-You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, if you need to change the resource demand from 1C2G to 2C4G, vertical scaling is what you need.
-
-:::note
-
-During the vertical scaling process, a concurrent restart is triggered and the leader pod may change after the restarting.
-
-:::
+You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, you can change the resource class from 1C2G to 2C4G by performing vertical scaling.
 
 ### Before you start
 
 Run the command below to check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
-
-```bash
-kbcli cluster list <name>
-```
-
-***Example***
 
 ```bash
 kbcli cluster list redis-cluster
@@ -39,11 +27,9 @@ redis-cluster        default          redis                     redis-7.0.6     
 
 ### Steps
 
-1. Change configuration. There are 3 ways to apply vertical scaling.
+1. Change configuration. 
 
    Configure the parameters `--components`, `--memory`, and `--cpu` and run the command.
-
-   ***Example***
 
    ```bash
    kbcli cluster vscale redis-cluster \
@@ -60,19 +46,13 @@ redis-cluster        default          redis                     redis-7.0.6     
    Check the cluster status to identify the vertical scaling status.
 
    ```bash
-   kbcli cluster list <name>
-   ```
-
-   ***Example***
-
-   ```bash
    kbcli cluster list redis-cluster
    >
-   NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS                 CREATED-TIME
-   redis-cluster        default          redis                     redis-7.0.6              Delete                    VerticalScaling        Apr 10,2023 16:27 UTC+0800
+   NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS          CREATED-TIME
+   redis-cluster        default          redis                     redis-7.0.6              Delete                    Updating        Apr 10,2023 16:27 UTC+0800
    ```
 
-   - STATUS=VerticalScaling: it means the vertical scaling is in progress.
+   - STATUS=Updating: it means the vertical scaling is in progress.
    - STATUS=Running: it means the vertical scaling operation has been applied.
    - STATUS=Abnormal: it means the vertical scaling is abnormal. The reason may be the normal instances number is less than the total instance number or the leader instance is running properly while others are abnormal.
      > To solve the problem, you can check manually to see whether resources are sufficient. If AutoScaling is supported, the system recovers when there are enough resources, otherwise, you can create enough resources and check the result with kubectl describe command.
@@ -91,17 +71,13 @@ redis-cluster        default          redis                     redis-7.0.6     
 
 ## Horizontal scaling
 
-Horizontal scaling changes the amount of pods. For example, you can apply horizontal scaling to scale up from three pods to five pods. The scaling process includes the backup and restoration of data.
+Horizontal scaling changes the amount of pods. For example, you can scale out replicas from three to five.
+
+From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out instances, refer to [Horizontal Scale](./../../../api_docs/maintenance/scale/horizontal-scale.md) in API docs for more details and examples.
 
 ### Before you start
 
 Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
-
-```bash
-kbcli cluster list <name>
-```
-
-***Example***
 
 ```bash
 kbcli cluster list redis-cluster
@@ -112,39 +88,30 @@ redis-cluster        default          redis                     redis-7.0.6     
 
 ### Steps
 
-1. Change configuration. There are 3 ways to apply horizontal scaling.
+1. Change configuration.
 
    Configure the parameters `--components` and `--replicas`, and run the command.
-
-   ***Example***
 
    ```bash
    kbcli cluster hscale redis-cluster \
    --components="redis" --replicas=2
    ```
 
-   - `--components` describes the component name ready for vertical scaling.
-   - `--replicas` describes the replica amount of a specified component.
-
+   - `--components` describes the component name ready for horizontal scaling.
+   - `--replicas` describes the replica amount of the specified components. Edit the amount based on your demands to scale in or out replicas.
 
 2. Validate the horizontal scaling operation.
 
    Check the cluster STATUS to identify the horizontal scaling status.
 
    ```bash
-   kbcli cluster list <name>
-   ```
-
-   ***Example***
-
-   ```bash
    kbcli cluster list redis-cluster
    >
-   NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS                   CREATED-TIME
-   redis-cluster        default          redis                     redis-7.0.6              Delete                    HorizontalScaling        Apr 10,2023 16:58 UTC+0800
+   NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS          CREATED-TIME
+   redis-cluster        default          redis                     redis-7.0.6              Delete                    Updating        Apr 10,2023 16:58 UTC+0800
    ```
 
-   - STATUS=HorizontalScaling: it means horizontal scaling is in progress.
+   - STATUS=Updating: it means horizontal scaling is in progress.
    - STATUS=Running: it means horizontal scaling has been applied.
 
 ### Handle the snapshot exception

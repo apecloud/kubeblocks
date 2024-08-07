@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -742,7 +742,7 @@ type ClusterComponentSpec struct {
 	// +optional
 	Configs []ClusterComponentConfig `json:"configs,omitempty"`
 
-	// Defines the strategy for switchover and failover when workloadType is Replication.
+	// Defines the strategy for switchover and failover.
 	//
 	// Deprecated since v0.9.
 	// This field is maintained for backward compatibility and its use is discouraged.
@@ -799,6 +799,24 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	UpdateStrategy *UpdateStrategy `json:"updateStrategy,omitempty"`
+
+	// Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
+	// or when scaling down. It only used when `PodManagementPolicy` is set to `Parallel`.
+	// The default Concurrency is 100%.
+	//
+	// +optional
+	ParallelPodManagementConcurrency *intstr.IntOrString `json:"parallelPodManagementConcurrency,omitempty"`
+
+	// PodUpdatePolicy indicates how pods should be updated
+	//
+	// - `StrictInPlace` indicates that only allows in-place upgrades.
+	// Any attempt to modify other fields will be rejected.
+	// - `PreferInPlace` indicates that we will first attempt an in-place upgrade of the Pod.
+	// If that fails, it will fall back to the ReCreate, where pod will be recreated.
+	// Default value is "PreferInPlace"
+	//
+	// +optional
+	PodUpdatePolicy *workloads.PodUpdatePolicyType `json:"podUpdatePolicy,omitempty"`
 
 	// Allows users to specify custom ConfigMaps and Secrets to be mounted as volumes
 	// in the Cluster's Pods.
@@ -880,6 +898,12 @@ type ClusterComponentSpec struct {
 	// +optional
 	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.10.0"
 	Monitor *bool `json:"monitor,omitempty"`
+
+	// Stop the Component.
+	// If set, all the computing resources will be released.
+	//
+	// +optional
+	Stop *bool `json:"stop,omitempty"`
 }
 
 type ComponentMessageMap map[string]string
@@ -1558,33 +1582,6 @@ func (r ClusterSpec) GetComponentDefRefName(componentName string) string {
 		}
 	}
 	return ""
-}
-
-// ValidateEnabledLogs validates enabledLogs config in cluster.yaml, and returns metav1.Condition when detecting invalid values.
-func (r ClusterSpec) ValidateEnabledLogs(cd *ClusterDefinition) error {
-	message := make([]string, 0)
-	for _, comp := range r.ComponentSpecs {
-		invalidLogNames := cd.ValidateEnabledLogConfigs(comp.ComponentDefRef, comp.EnabledLogs)
-		if len(invalidLogNames) == 0 {
-			continue
-		}
-		message = append(message, fmt.Sprintf("EnabledLogs: %s are not defined in Component: %s of the clusterDefinition", invalidLogNames, comp.Name))
-	}
-	if len(message) > 0 {
-		return errors.New(strings.Join(message, ";"))
-	}
-	return nil
-}
-
-// GetDefNameMappingComponents returns ComponentDefRef name mapping ClusterComponentSpec.
-func (r ClusterSpec) GetDefNameMappingComponents() map[string][]ClusterComponentSpec {
-	m := map[string][]ClusterComponentSpec{}
-	for _, c := range r.ComponentSpecs {
-		v := m[c.ComponentDefRef]
-		v = append(v, c)
-		m[c.ComponentDefRef] = v
-	}
-	return m
 }
 
 // GetMessage gets message map deep copy object.

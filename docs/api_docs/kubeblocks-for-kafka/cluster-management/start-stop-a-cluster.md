@@ -52,7 +52,7 @@ spec:
   componentSpecs:
   - name: kafka
     componentDefRef: kafka
-    monitor: false  
+    disableExporter: true  
     replicas: 0
     volumeClaimTemplates:
     - name: data
@@ -111,7 +111,7 @@ spec:
   componentSpecs:
   - name: kafka
     componentDefRef: kafka
-    monitor: false  
+    disableExporter: true   
     replicas: 1
     volumeClaimTemplates:
     - name: data

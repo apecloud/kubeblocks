@@ -65,7 +65,7 @@ There are two ways to apply vertical scaling.
    demo        ops-vertical-scaling   VerticalScaling   mycluster   Succeed   3/3        6m
    ```
 
-   If an error occurs to the vertical scaling operation, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
+   If an error occurs, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
 
 3. Check whether the corresponding resources change.
 
@@ -77,7 +77,7 @@ There are two ways to apply vertical scaling.
     Component Def Ref:  kafka
     Enabled Logs:
       running
-    Monitor:   false
+    DisableExporter:   true
     Name:      kafka
     Replicas:  2
     Resources:
@@ -136,7 +136,7 @@ There are two ways to apply vertical scaling.
     Component Def Ref:  kafka
     Enabled Logs:
       running
-    Monitor:   false
+    DisableExporter:   true
     Name:      kafka
     Replicas:  2
     Resources:
@@ -151,16 +151,18 @@ There are two ways to apply vertical scaling.
 </TabItem>
 
 </Tabs>
-  
+
 ## Horizontal scaling
 
-Horizontal scaling changes the amount of pods. For example, you can apply horizontal scaling to scale pods up from three to five. The scaling process includes the backup and restoration of data.
+Horizontal scaling changes the amount of pods. For example, you can scale out replicas from three to five.
+
+From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out instances, refer to [Horizontal Scale](./../../maintenance/scale/horizontal-scale.md) for more details and examples.
 
 ### Before you start
 
 - Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
 - You are not recommended to perform horizontal scaling on the controller node, including the controller node both in combined mode and separated node.
-- When scaling in horizontally, you must know the topic partition storage. If the topic has only one replication, data loss may caused when you scale in broker.
+- When scaling horizontally, you must know the topic partition storage. If the topic has only one replication, data loss may caused when you scale in broker.
 
   ```bash
   kubectl get cluster mycluster -n demo  
@@ -176,6 +178,8 @@ There are two ways to apply horizontal scaling.
 
 1. Apply an OpsRequest to a specified cluster. Configure the parameters according to your needs.
 
+   The example below means adding two replicas.
+
    ```yaml
    kubectl apply -f - <<EOF
    apiVersion: apps.kubeblocks.io/v1alpha1
@@ -188,7 +192,29 @@ There are two ways to apply horizontal scaling.
      type: HorizontalScaling
      horizontalScaling:
      - componentName: broker
-       replicas: 3
+       scaleOut:
+         replicaChanges: 2
+   EOF
+   ```
+
+   If you want to scale in replicas, replace `scaleOut` with `scaleIn`.
+
+   The example below means deleting two replicas.
+
+   ```yaml
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: ops-horizontal-scaling
+     namespace: demo
+   spec:
+     clusterRef: mycluster
+     type: HorizontalScaling
+     horizontalScaling:
+     - componentName: broker
+       scaleIn:
+         replicaChanges: 2
    EOF
    ```
 
@@ -201,7 +227,7 @@ There are two ways to apply horizontal scaling.
    demo        ops-horizontal-scaling   HorizontalScaling   mycluster   Succeed   3/3        6m
    ```
 
-   If an error occurs to the horizontal scaling operation, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
+   If an error occurs, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
 
 3. Check whether the corresponding resources change.
 
@@ -213,7 +239,7 @@ There are two ways to apply horizontal scaling.
     Component Def Ref:  kafka
     Enabled Logs:
       running
-    Monitor:   false
+    DisableExporter:   true
     Name:      kafka
     Replicas:  2
     Resources:
@@ -267,7 +293,7 @@ There are two ways to apply horizontal scaling.
     Component Def Ref:  kafka
     Enabled Logs:
       running
-    Monitor:   false
+    DisableExporter:   true
     Name:      kafka
     Replicas:  2
     Resources:

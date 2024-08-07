@@ -14,15 +14,23 @@ You can restart all pods of the cluster. When an exception occurs in a database,
 
 1. Restart a cluster with `kbcli cluster restart` command and enter the cluster name again.
 
-  ```bash
-  kbcli cluster restart mongodb-cluster
-  >
-  OpsRequest mongodb-cluster-restart-pzsbj created successfully, you can view the progress:
-        kbcli cluster describe-ops mongodb-cluster-restart-pzsbj -n default
-  ```
+   ```bash
+   kbcli cluster restart mongodb-cluster
+   >
+   OpsRequest mongodb-cluster-restart-pzsbj created successfully, you can view the progress:
+         kbcli cluster describe-ops mongodb-cluster-restart-pzsbj -n default
+   ```
 
-2. Validate the restarting with the request code randomly generated, in this guide, it is `pzsbj`, see step 1.
+2. Validate the restart operation.
 
-  ```bash
-   kbcli cluster describe-ops mongodb-cluster-restart-pzsbj -n default
-  ```
+   Check the cluster status to identify the restart status.
+
+   ```bash
+   kbcli cluster list mongodb-cluster
+   >
+   NAME                   NAMESPACE        CLUSTER-DEFINITION        VERSION            TERMINATION-POLICY        STATUS         CREATED-TIME
+   mongodb-cluster        default          mongodb                   mongodb-5.0        Delete                    Running        Apr 26,2023 12:50 UTC+0800
+   ```
+
+   - STATUS=Updating: it means the cluster restart is in progress.
+   - STATUS=Running: it means the cluster has been restarted.

@@ -28,7 +28,6 @@ The termination policy determines how a cluster is deleted.
 
 To check the termination policy, execute the following command.
 
-
 ```bash
 kbcli cluster list redis-cluster
 >
@@ -40,8 +39,6 @@ redis-cluster	default  	redis    	        redis-7.0.6	    Delete            	Run
 
 Run the command below to delete a specified cluster.
 
-
 ```bash
 kbcli cluster delete redis-cluster
 ```
-

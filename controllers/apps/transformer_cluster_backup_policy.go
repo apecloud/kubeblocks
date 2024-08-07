@@ -168,6 +168,8 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 					graphCli.Patch(dag, oldBackupSchedule, newBackupSchedule)
 				}
 				graphCli.DependOn(dag, backupPolicy, newBackupSchedule)
+				comps := graphCli.FindAll(dag, &appsv1alpha1.Component{})
+				graphCli.DependOn(dag, backupPolicy, comps...)
 				backupScheduleNames[newBackupSchedule.Name] = struct{}{}
 			}
 
@@ -360,7 +362,7 @@ func (r *clusterBackupPolicyTransformer) syncBackupPolicy(comp componentItem, ba
 	r.syncBackupPolicyTargetSpec(backupPolicy, comp)
 }
 
-func (r *clusterBackupPolicyTransformer) syncRoleLabelSelector(comp componentItem, target *dpv1alpha1.BackupTarget, role string) {
+func (r *clusterBackupPolicyTransformer) syncRoleLabelSelector(comp componentItem, target *dpv1alpha1.BackupTarget, role, alternateRole string) {
 	if len(role) == 0 || target == nil {
 		return
 	}
@@ -370,8 +372,17 @@ func (r *clusterBackupPolicyTransformer) syncRoleLabelSelector(comp componentIte
 	}
 	if r.getCompReplicas(comp) == 1 {
 		delete(podSelector.LabelSelector.MatchLabels, constant.RoleLabelKey)
-	} else if podSelector.LabelSelector.MatchLabels[constant.RoleLabelKey] == "" {
+		if podSelector.FallbackLabelSelector != nil && podSelector.FallbackLabelSelector.MatchLabels != nil {
+			delete(podSelector.FallbackLabelSelector.MatchLabels, constant.RoleLabelKey)
+		}
+	} else {
 		podSelector.LabelSelector.MatchLabels[constant.RoleLabelKey] = role
+		if len(alternateRole) > 0 {
+			if podSelector.FallbackLabelSelector == nil || podSelector.FallbackLabelSelector.MatchLabels == nil {
+				podSelector.FallbackLabelSelector = &metav1.LabelSelector{MatchLabels: map[string]string{}}
+			}
+			podSelector.FallbackLabelSelector.MatchLabels[constant.RoleLabelKey] = alternateRole
+		}
 	}
 }
 
@@ -441,15 +452,6 @@ func (r *clusterBackupPolicyTransformer) syncBackupMethods(backupPolicy *dpv1alp
 func (r *clusterBackupPolicyTransformer) doEnvMapping(comp *appsv1alpha1.ClusterComponentSpec, envMapping []appsv1alpha1.EnvMappingVar) []corev1.EnvVar {
 	var env []corev1.EnvVar
 	for _, v := range envMapping {
-		for _, cv := range v.ValueFrom.ClusterVersionRef {
-			if !slices.Contains(cv.Names, r.Cluster.Spec.ClusterVersionRef) {
-				continue
-			}
-			env = append(env, corev1.EnvVar{
-				Name:  v.Key,
-				Value: cv.MappingValue,
-			})
-		}
 		for _, cm := range v.ValueFrom.ComponentDef {
 			if !slices.Contains(cm.Names, comp.ComponentDef) {
 				continue
@@ -496,7 +498,7 @@ func (r *clusterBackupPolicyTransformer) buildBackupTarget(
 ) *dpv1alpha1.BackupTarget {
 	if oldTarget != nil {
 		// if the target already exists, only sync the role by component replicas automatically.
-		r.syncRoleLabelSelector(comp, oldTarget, targetTpl.Role)
+		r.syncRoleLabelSelector(comp, oldTarget, targetTpl.Role, targetTpl.FallbackRole)
 		return oldTarget
 	}
 	clusterName := r.OrigCluster.Name
@@ -507,41 +509,27 @@ func (r *clusterBackupPolicyTransformer) buildBackupTarget(
 		PodSelector: &dpv1alpha1.PodSelector{
 			Strategy: targetTpl.Strategy,
 			LabelSelector: &metav1.LabelSelector{
-				MatchLabels: r.buildTargetPodLabels(targetTpl, comp),
+				MatchLabels: r.buildTargetPodLabels(targetTpl.Role, comp),
 			},
 		},
 		// dataprotection will use its dedicated service account if this field is empty.
 		ServiceAccountName: "",
 	}
+	if len(targetTpl.Role) != 0 && len(targetTpl.FallbackRole) != 0 {
+		target.PodSelector.FallbackLabelSelector = &metav1.LabelSelector{
+			MatchLabels: r.buildTargetPodLabels(targetTpl.FallbackRole, comp),
+		}
+	}
 	if comp.isSharding {
 		target.Name = comp.fullComponentName
 	}
 	// build the target connection credential
-	cc := dpv1alpha1.ConnectionCredential{}
-	switch {
-	case len(comp.compSpec.ComponentDef) > 0 && len(targetTpl.Account) > 0:
-		cc.SecretName = constant.GenerateAccountSecretName(clusterName, comp.fullComponentName, targetTpl.Account)
-		cc.PasswordKey = constant.AccountPasswdForSecret
-		cc.UsernameKey = constant.AccountNameForSecret
-	case len(comp.compSpec.ComponentDef) == 0 && len(comp.compSpec.ComponentDefRef) > 0:
-		// TODO: remove HACK code in version 0.9, only no componentDef can using connect credential
-		cc.SecretName = constant.GenerateDefaultConnCredential(clusterName)
-		ccKey := targetTpl.ConnectionCredentialKey
-		if ccKey.PasswordKey != nil {
-			cc.PasswordKey = *ccKey.PasswordKey
+	if targetTpl.Account != "" {
+		target.ConnectionCredential = &dpv1alpha1.ConnectionCredential{
+			SecretName:  constant.GenerateAccountSecretName(clusterName, comp.fullComponentName, targetTpl.Account),
+			PasswordKey: constant.AccountPasswdForSecret,
+			UsernameKey: constant.AccountNameForSecret,
 		}
-		if ccKey.UsernameKey != nil {
-			cc.UsernameKey = *ccKey.UsernameKey
-		}
-		if ccKey.PortKey != nil {
-			cc.PortKey = *ccKey.PortKey
-		}
-		if ccKey.HostKey != nil {
-			cc.HostKey = *ccKey.HostKey
-		}
-	}
-	if cc.SecretName != "" {
-		target.ConnectionCredential = &cc
 	}
 	return target
 }
@@ -671,6 +659,11 @@ func (r *clusterBackupPolicyTransformer) getClusterComponentItems() []componentI
 		}
 	}
 	for i, v := range r.clusterTransformContext.Cluster.Spec.ShardingSpecs {
+		shardComponents, _ := intctrlutil.ListShardingComponents(r.Context, r.Client, r.Cluster, v.Name)
+		if len(shardComponents) == 0 {
+			// waiting for sharding component to be created
+			continue
+		}
 		if matchedCompDef(v.Template) {
 			compSpecItems = append(compSpecItems, componentItem{
 				compSpec:      &r.clusterTransformContext.Cluster.Spec.ShardingSpecs[i].Template,
@@ -745,16 +738,16 @@ func (r *clusterBackupPolicyTransformer) compDefNameFromPolicy(policy *dpv1alpha
 
 // buildTargetPodLabels builds the target labels for the backup policy that will be
 // used to select the target pod.
-func (r *clusterBackupPolicyTransformer) buildTargetPodLabels(targetTpl appsv1alpha1.TargetInstance, comp componentItem) map[string]string {
+func (r *clusterBackupPolicyTransformer) buildTargetPodLabels(role string, comp componentItem) map[string]string {
 	labels := map[string]string{
 		constant.AppInstanceLabelKey:    r.OrigCluster.Name,
 		constant.AppManagedByLabelKey:   constant.AppName,
 		constant.KBAppComponentLabelKey: comp.fullComponentName,
 	}
 	// append label to filter specific role of the component.
-	if len(targetTpl.Role) > 0 && r.getCompReplicas(comp) > 1 {
+	if len(role) > 0 && r.getCompReplicas(comp) > 1 {
 		// the role only works when the component has multiple replicas.
-		labels[constant.RoleLabelKey] = targetTpl.Role
+		labels[constant.RoleLabelKey] = role
 	}
 	if comp.isSharding {
 		labels[constant.KBAppShardingNameLabelKey] = comp.componentName

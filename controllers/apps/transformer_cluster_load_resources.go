@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/controller/apiconversion"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
@@ -51,10 +50,6 @@ func (t *clusterLoadRefResourcesTransformer) Transform(ctx graph.TransformContex
 	}
 
 	if err = loadNCheckClusterDefinition(transCtx, cluster); err != nil {
-		return newRequeueError(requeueDuration, err.Error())
-	}
-
-	if err = loadNCheckClusterVersion(transCtx, cluster); err != nil {
 		return newRequeueError(requeueDuration, err.Error())
 	}
 
@@ -126,32 +121,6 @@ func loadNCheckClusterDefinition(transCtx *clusterTransformContext, cluster *app
 	return nil
 }
 
-func loadNCheckClusterVersion(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) error {
-	var cv *appsv1alpha1.ClusterVersion
-	if len(cluster.Spec.ClusterVersionRef) > 0 {
-		cv = &appsv1alpha1.ClusterVersion{}
-		key := types.NamespacedName{Name: cluster.Spec.ClusterVersionRef}
-		if err := transCtx.Client.Get(transCtx.Context, key, cv); err != nil {
-			return err
-		}
-	}
-
-	if cv != nil {
-		if cv.Generation != cv.Status.ObservedGeneration {
-			return fmt.Errorf("the referenced ClusterVersion is not up to date: %s", cv.Name)
-		}
-		if cv.Status.Phase != appsv1alpha1.AvailablePhase {
-			return fmt.Errorf("the referenced ClusterVersion is unavailable: %s", cv.Name)
-		}
-	}
-
-	if cv == nil {
-		cv = &appsv1alpha1.ClusterVersion{}
-	}
-	transCtx.ClusterVer = cv
-	return nil
-}
-
 func withClusterTopology(cluster *appsv1alpha1.Cluster) bool {
 	return len(cluster.Spec.ClusterDefRef) > 0 && legacyClusterCompCnt(cluster) == 0 && !compatibleUserDefinedInNewAPI(cluster)
 }
@@ -166,7 +135,14 @@ func withClusterLegacyDefinition(cluster *appsv1alpha1.Cluster) bool {
 }
 
 func withClusterSimplifiedAPI(cluster *appsv1alpha1.Cluster) bool {
-	return apiconversion.HasSimplifiedClusterAPI(cluster)
+	return cluster.Spec.Replicas != nil ||
+		!cluster.Spec.Resources.CPU.IsZero() ||
+		!cluster.Spec.Resources.Memory.IsZero() ||
+		!cluster.Spec.Storage.Size.IsZero() ||
+		// cluster.Spec.Monitor.MonitoringInterval != nil ||
+		cluster.Spec.Network != nil ||
+		len(cluster.Spec.Tenancy) > 0 ||
+		len(cluster.Spec.AvailabilityPolicy) > 0
 }
 
 func clusterCompCnt(cluster *appsv1alpha1.Cluster) int {

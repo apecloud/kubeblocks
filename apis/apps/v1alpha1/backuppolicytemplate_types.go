@@ -149,8 +149,7 @@ type ValueFrom struct {
 }
 
 type ValueMapping struct {
-	// Represents an array of names of ClusterVersion or ComponentDefinition that can be mapped to
-	// the appropriate version of the backup tool image.
+	// Represents an array of names of ComponentDefinition that can be mapped to the appropriate version of the backup tool image.
 	//
 	// This mapping allows different versions of component images to correspond to specific versions of backup tool images.
 	//
@@ -210,6 +209,12 @@ type TargetInstance struct {
 	// - If multiple replicas satisfy the specified role, the choice (`Any` or `All`) will be made according to
 	//   the `strategy` field below.
 	Role string `json:"role"`
+
+	// Specifies the fallback role to select one replica for backup, this only takes effect when the
+	// `strategy` field below is set to `Any`.
+	//
+	// +optional
+	FallbackRole string `json:"fallbackRole,omitempty"`
 
 	// If `backupPolicy.componentDefs` is set, this field is required to specify the system account name.
 	// This account must match one listed in `componentDefinition.spec.systemAccounts[*].name`.

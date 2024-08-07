@@ -7,7 +7,7 @@ sidebar_position: 1
 
 # Configure cluster parameters
 
-This guide shows how to configure cluster parameters by creating an opsRequest.
+This guide shows how to configure cluster parameters.
 
 ## Before you start
 
@@ -19,7 +19,9 @@ This guide shows how to configure cluster parameters by creating an opsRequest.
 1. Get the configuration file of this cluster.
 
    ```bash
-   kubectl edit configurations.apps.kubeblocks.io mycluster-kafka -n demo
+   kubectl get configurations.apps.kubeblocks.io -n demo
+
+   kubectl edit configurations.apps.kubeblocks.io mycluster-kafka-combine -n demo
    ```
 
 2. Configure parameters according to your needs. The example below adds the `spec.configFileParams` part to configure `log.cleanup.policy`.
@@ -30,18 +32,16 @@ This guide shows how to configure cluster parameters by creating an opsRequest.
      componentName: kafka
      configItemDetails:
      - configFileParams:
-         mongodb.cnf:
+         server.properties:
            parameters:
-             log.flush.interval.ms: "2000"
+             log.cleanup.policy: "compact"
        configSpec:
-         constraintRef: kafka-config-constraints
-         name: kafka-configuration
+         constraintRef: kafka-cc
+         name: kafka-configuration-tpl
          namespace: kb-system
-         templateRef: kafka3.3.2-config-template
+         templateRef: kafka-configuration-tpl
          volumeName: kafka-config
-       name: kafka-config
-     - configSpec:
-         defaultMode: 292
+       name: kafka-configuration-tpl
    ```
 
 3. Connect to this cluster to verify whether the configuration takes effect as expected.
@@ -55,7 +55,7 @@ This guide shows how to configure cluster parameters by creating an opsRequest.
 
 ## Configure cluster parameters with OpsRequest
 
-1. Define an OpsRequest file and configure the parameters in the OpsRequest in a yaml file named `mycluster-configuring-demo.yaml`. In this example, `max_connections` is configured as `600`.
+1. Define an OpsRequest file and configure the parameters in the OpsRequest in a yaml file named `mycluster-configuring-demo.yaml`. In this example, `log.cleanup.policy` is configured as `compact`.
 
    ```bash
    apiVersion: apps.kubeblocks.io/v1alpha1
@@ -71,8 +71,8 @@ This guide shows how to configure cluster parameters by creating an opsRequest.
        - keys:
          - key: server.properties
            parameters:
-           - key: log.flush.interval.ms
-             value: "2000"
+           - key: log.cleanup.policy
+             value: "compact"
          name: kafka-configuration-tpl
      preConditionDeadlineSeconds: 0
      type: Reconfiguring
@@ -100,13 +100,12 @@ This guide shows how to configure cluster parameters by creating an opsRequest.
    kubectl apply -f mycluster-configuring-demo.yaml
    ```
 
-3. Connect to this cluster to verify whether the configuration takes effect as expected.
+3. Verify whether the configuration takes effect as expected.
 
    ```bash
-   kbcli cluster describe-config mykafka --show-detail | grep log.cleanup.policy
+   kbcli cluster describe-config mycluster --show-detail | grep log.cleanup.policy
    >
    log.cleanup.policy = compact
-   mykafka-reconfiguring-wvqns   mykafka   broker      kafka-configuration-tpl   server.properties   Succeed   restart   1/1        May 10,2024 16:28 UTC+0800   {"server.properties":"{\"log.cleanup.policy\":\"compact\"}"}
    ```
 
 :::note
@@ -136,10 +135,10 @@ You can also view the details of this configuration file and parameters.
 * View the user guide of a specified parameter.
   
   ```bash
-  kbcli cluster explain-config mykafka --param=log.cleanup.policy
+  kbcli cluster explain-config mycluster --param=log.cleanup.policy
   ```
 
-  `--config-spec` is required to specify a configuration template since ApeCloud MySQL currently supports multiple templates. You can run `kbcli cluster describe-config mycluster` to view the all template names.
+  `--config-specs` is required to specify a configuration template since ApeCloud MySQL currently supports multiple templates. You can run `kbcli cluster describe-config mycluster` to view the all template names.
 
   <details>
 
@@ -147,7 +146,7 @@ You can also view the details of this configuration file and parameters.
 
   ```bash
   template meta:
-    ConfigSpec: kafka-configuration-tpl   ComponentName: broker   ClusterName: mykafka
+    ConfigSpec: kafka-configuration-tpl	ComponentName: kafka-combine	ClusterName: mycluster
 
   Configure Constraint:
     Parameter Name:     log.cleanup.policy
@@ -155,7 +154,7 @@ You can also view the details of this configuration file and parameters.
     Scope:              Global
     Dynamic:            false
     Type:               string
-    Description:        The default cleanup policy for segments beyond the retention window. A comma separated list of valid policies.   
+    Description:        The default cleanup policy for segments beyond the retention window. A comma separated list of valid policies. 
   ```
   
   </details>

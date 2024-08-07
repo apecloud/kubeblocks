@@ -12,29 +12,28 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
 ## Stop a cluster
 
-Configure the name of your cluster and run the command below to stop this cluster.
+1. Configure the name of your cluster and run the command below to stop this cluster.
 
-```bash
-kbcli cluster stop <name>
-```
+   ```bash
+   kbcli cluster stop redis-cluster
+   ```
 
-***Example***
+2. Check the status of the cluster to see whether it is stopped.
 
-```bash
-kbcli cluster stop redis-cluster
-```
+    ```bash
+    kbcli cluster list
+    ```
 
 ## Start a cluster
   
-Configure the name of your cluster and run the command below to start this cluster.
+1. Configure the name of your cluster and run the command below to start this cluster.
 
-```bash
-kbcli cluster start <name>
-```
+   ```bash
+   kbcli cluster start redis-cluster
+   ```
 
-***Example***
+2. Check the status of the cluster to see whether it is running again.
 
-```bash
-kbcli cluster start redis-cluster
-```
-
+    ```bash
+    kbcli cluster list
+    ```

@@ -45,7 +45,7 @@ var _ = Describe("Configuration Controller", func() {
 			_, _, clusterObj, componentObj, synthesizedComp := mockReconcileResource()
 
 			cfgKey := client.ObjectKey{
-				Name:      core.GenerateComponentConfigurationName(clusterName, statefulCompName),
+				Name:      core.GenerateComponentConfigurationName(clusterName, defaultCompName),
 				Namespace: testCtx.DefaultNamespace,
 			}
 			checkCfgStatus := func(phase appsv1alpha1.ConfigurationPhase) func() bool {
@@ -64,7 +64,7 @@ var _ = Describe("Configuration Controller", func() {
 				Context:       ctx,
 				Namespace:     testCtx.DefaultNamespace,
 				ClusterName:   clusterName,
-				ComponentName: statefulCompName,
+				ComponentName: defaultCompName,
 			}, synthesizedComp, clusterObj, componentObj)).Should(Succeed())
 
 			Eventually(checkCfgStatus(appsv1alpha1.CFinishedPhase)).Should(BeTrue())
@@ -114,5 +114,4 @@ var _ = Describe("Configuration Controller", func() {
 			}, time.Second*60, time.Second*1).Should(Succeed())
 		})
 	})
-
 })

@@ -17,7 +17,7 @@ This tutorial shows how to create and connect to a PostgreSQL cluster.
 * [Install KubeBlocks](./../../installation/install-kubeblocks.md).
 * View all the database types and versions available for creating a cluster.
   
-  Make sure the `postgresql` cluster definition is installed. If the cluster definition is not available, refer to [this doc](./../../overview/supported-addons.md#install-addons) to enable it first.
+  Make sure the `postgresql` cluster definition is installed. If the cluster definition is not available, refer to [this doc](./../../installation/install-addons.md) to enable it first.
 
   ```bash
   kubectl get clusterdefinition postgresql
@@ -61,7 +61,6 @@ spec:
     podAntiAffinity: Preferred
     topologyKeys:
     - kubernetes.io/hostname
-    tenancy: SharedNode
   tolerations:
     - key: kb-data
       operator: Equal
@@ -72,7 +71,7 @@ spec:
     componentDefRef: postgresql
     enabledLogs:
     - running
-    monitor: false
+    disableExporter: true
     replicas: 2
     resources:
       limits:
@@ -100,11 +99,11 @@ EOF
 | `spec.affinity`                       | It defines a set of node affinity scheduling rules for the cluster's Pods. This field helps control the placement of Pods on nodes within the cluster.  |
 | `spec.affinity.podAntiAffinity`       | It specifies the anti-affinity level of Pods within a component. It determines how pods should spread across nodes to improve availability and performance. |
 | `spec.affinity.topologyKeys`          | It represents the key of node labels used to define the topology domain for Pod anti-affinity and Pod spread constraints.   |
-| `spec.affinity.tenacy`                | It determines the level of resource isolation between Pods. It can have the following values: `SharedNode` and `DedicatedNode`. <p> - SharedNode: It allows that multiple Pods may share the same node, which is the default behavior of K8s. </p> - DedicatedNode: Each Pod runs on a dedicated node, ensuring that no two Pods share the same node.                                                                                                                |
 | `spec.tolerations`                    | It is an array that specifies tolerations attached to the cluster's Pods, allowing them to be scheduled onto nodes with matching taints.  |
 | `spec.componentSpecs`                 | It is the list of components that define the cluster components. This field allows customized configuration of each component within a cluster.   |
 | `spec.componentSpecs.componentDefRef` | It is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition apecloud-mysql -o json \| jq '.spec.componentDefs[].name'`.   |
 | `spec.componentSpecs.name`            | It specifies the name of the component.     |
+| `spec.componentSpecs.disableExporter` | It defines whether the monitoring function is enabled. |
 | `spec.componentSpecs.replicas`        | It specifies the number of replicas of the component.  |
 | `spec.componentSpecs.resources`       | It specifies the resource requirements of the component.  |
 
@@ -131,7 +130,7 @@ metadata:
   annotations:
     kubeblocks.io/reconcile: "2024-05-17T03:17:08.617771416Z"
     kubectl.kubernetes.io/last-applied-configuration: |
-      {"apiVersion":"apps.kubeblocks.io/v1alpha1","kind":"Cluster","metadata":{"annotations":{},"name":"mycluster","namespace":"demo"},"spec":{"affinity":{"podAntiAffinity":"Preferred","tenancy":"SharedNode","topologyKeys":null},"clusterDefinitionRef":"postgresql","clusterVersionRef":"postgresql-14.8.0","componentSpecs":[{"componentDefRef":"postgresql","enabledLogs":["running"],"monitor":false,"name":"postgresql","replicas":2,"resources":{"limits":{"cpu":"0.5","memory":"0.5Gi"},"requests":{"cpu":"0.5","memory":"0.5Gi"}},"volumeClaimTemplates":[{"name":"data","spec":{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"20Gi"}}}}]}],"terminationPolicy":"Delete","tolerations":[{"effect":"NoSchedule","key":"kb-data","operator":"Equal","value":"true"}]}}
+      {"apiVersion":"apps.kubeblocks.io/v1alpha1","kind":"Cluster","metadata":{"annotations":{},"name":"mycluster","namespace":"demo"},"spec":{"affinity":{"podAntiAffinity":"Preferred","topologyKeys":null},"clusterDefinitionRef":"postgresql","clusterVersionRef":"postgresql-14.8.0","componentSpecs":[{"componentDefRef":"postgresql","enabledLogs":["running"],"disableExporter":true,"name":"postgresql","replicas":2,"resources":{"limits":{"cpu":"0.5","memory":"0.5Gi"},"requests":{"cpu":"0.5","memory":"0.5Gi"}},"volumeClaimTemplates":[{"name":"data","spec":{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"20Gi"}}}}]}],"terminationPolicy":"Delete","tolerations":[{"effect":"NoSchedule","key":"kb-data","operator":"Equal","value":"true"}]}}
   creationTimestamp: "2024-05-17T02:36:28Z"
   finalizers:
   - cluster.kubeblocks.io/finalizer
@@ -146,14 +145,13 @@ metadata:
 spec:
   affinity:
     podAntiAffinity: Preferred
-    tenancy: SharedNode
   clusterDefinitionRef: postgresql
   clusterVersionRef: postgresql-14.8.0
   componentSpecs:
   - componentDefRef: postgresql
     enabledLogs:
     - running
-    monitor: false
+    disableExporter: true
     name: postgresql
     replicas: 1
     resources:

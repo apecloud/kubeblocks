@@ -47,7 +47,6 @@ var _ = Describe("Lorry Utils", func() {
 			lorryGRPCPort = 50001
 
 			component = &SynthesizedComponent{}
-			component.CharacterType = "mysql"
 			component.ComponentServices = append(component.ComponentServices, appsv1alpha1.ComponentService{
 				Service: appsv1alpha1.Service{
 					Spec: corev1.ServiceSpec{
@@ -79,7 +78,7 @@ var _ = Describe("Lorry Utils", func() {
 				},
 			}
 			component.LifecycleActions = &appsv1alpha1.ComponentLifecycleActions{
-				RoleProbe: &appsv1alpha1.RoleProbe{},
+				RoleProbe: &appsv1alpha1.Probe{},
 			}
 			component.PodSpec = &corev1.PodSpec{
 				Containers: []corev1.Container{},
@@ -95,10 +94,8 @@ var _ = Describe("Lorry Utils", func() {
 			}
 			defaultBuiltInHandler := appsv1alpha1.MySQLBuiltinActionHandler
 			component.LifecycleActions = &appsv1alpha1.ComponentLifecycleActions{
-				RoleProbe: &appsv1alpha1.RoleProbe{
-					LifecycleActionHandler: appsv1alpha1.LifecycleActionHandler{
-						BuiltinHandler: &defaultBuiltInHandler,
-					},
+				RoleProbe: &appsv1alpha1.Probe{
+					BuiltinHandler: &defaultBuiltInHandler,
 				},
 			}
 			Expect(buildLorryContainers(reqCtx, component, nil)).Should(Succeed())
@@ -143,9 +140,9 @@ var _ = Describe("Lorry Utils", func() {
 				MemberJoin: &appsv1alpha1.LifecycleActionHandler{
 					CustomHandler: &appsv1alpha1.Action{
 						Exec: &appsv1alpha1.ExecAction{
+							Image:   image,
 							Command: []string{"test"},
 						},
-						Image: image,
 					},
 				},
 			}
@@ -173,10 +170,8 @@ var _ = Describe("Lorry Utils", func() {
 			}
 			defaultBuiltInHandler := appsv1alpha1.MySQLBuiltinActionHandler
 			component.LifecycleActions = &appsv1alpha1.ComponentLifecycleActions{
-				RoleProbe: &appsv1alpha1.RoleProbe{
-					LifecycleActionHandler: appsv1alpha1.LifecycleActionHandler{
-						BuiltinHandler: &defaultBuiltInHandler,
-					},
+				RoleProbe: &appsv1alpha1.Probe{
+					BuiltinHandler: &defaultBuiltInHandler,
 				},
 			}
 			Expect(buildLorryContainers(reqCtx, component, nil)).Should(Succeed())
@@ -202,10 +197,8 @@ var _ = Describe("Lorry Utils", func() {
 			}
 			defaultBuiltInHandler := appsv1alpha1.MySQLBuiltinActionHandler
 			component.LifecycleActions = &appsv1alpha1.ComponentLifecycleActions{
-				RoleProbe: &appsv1alpha1.RoleProbe{
-					LifecycleActionHandler: appsv1alpha1.LifecycleActionHandler{
-						BuiltinHandler: &defaultBuiltInHandler,
-					},
+				RoleProbe: &appsv1alpha1.Probe{
+					BuiltinHandler: &defaultBuiltInHandler,
 				},
 			}
 			viper.SetDefault(constant.EnableRBACManager, true)

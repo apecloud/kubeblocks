@@ -40,53 +40,33 @@ import (
 )
 
 const (
-	errorLogName      = "error"
-	ConsensusReplicas = 3
+	errorLogName = "error"
+	replicas     = 3
 )
 
-// InitConsensusMysql initializes a cluster environment which only contains a component of ConsensusSet type for testing,
-// includes ClusterDefinition/ClusterVersion/Cluster resources.
-func InitConsensusMysql(testCtx *testutil.TestContext,
-	clusterDefName,
-	clusterVersionName,
-	clusterName,
-	consensusCompType,
-	consensusCompName string) (*appsv1alpha1.ClusterDefinition, *appsv1alpha1.ClusterVersion, *appsv1alpha1.Cluster) {
-	clusterDef := CreateConsensusMysqlClusterDef(testCtx, clusterDefName, consensusCompType)
-	clusterVersion := CreateConsensusMysqlClusterVersion(testCtx, clusterDefName, clusterVersionName, consensusCompType)
-	cluster := CreateConsensusMysqlCluster(testCtx, clusterDefName, clusterVersionName, clusterName, consensusCompType, consensusCompName)
-	return clusterDef, clusterVersion, cluster
+func InitConsensusMysql(testCtx *testutil.TestContext, clusterName, compDefName, compName string) (*appsv1alpha1.ComponentDefinition, *appsv1alpha1.Cluster) {
+	compDef := createCompDef(testCtx, compDefName)
+	cluster := CreateDefaultMysqlCluster(testCtx, clusterName, compDef.GetName(), compName)
+	return compDef, cluster
 }
 
-// CreateConsensusMysqlCluster creates a mysql cluster with a component of ConsensusSet type.
-func CreateConsensusMysqlCluster(
-	testCtx *testutil.TestContext,
-	clusterDefName,
-	clusterVersionName,
-	clusterName,
-	workloadType,
-	consensusCompName string, pvcSize ...string) *appsv1alpha1.Cluster {
+func CreateDefaultMysqlCluster(testCtx *testutil.TestContext, clusterName, compDefName, compName string, pvcSize ...string) *appsv1alpha1.Cluster {
 	size := "2Gi"
 	if len(pvcSize) > 0 {
 		size = pvcSize[0]
 	}
 	pvcSpec := NewPVCSpec(size)
-	return NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-		AddComponent(consensusCompName, workloadType).SetReplicas(ConsensusReplicas).SetEnabledLogs(errorLogName).
-		AddVolumeClaimTemplate("data", pvcSpec).Create(testCtx).GetObject()
+	return NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
+		AddComponent(compName, compDefName).
+		SetReplicas(replicas).
+		SetEnabledLogs(errorLogName).
+		AddVolumeClaimTemplate("data", pvcSpec).
+		Create(testCtx).
+		GetObject()
 }
 
-// CreateConsensusMysqlClusterDef creates a mysql clusterDefinition with a component of ConsensusSet type.
-func CreateConsensusMysqlClusterDef(testCtx *testutil.TestContext, clusterDefName, componentDefName string) *appsv1alpha1.ClusterDefinition {
-	filePathPattern := "/data/mysql/log/mysqld.err"
-	return NewClusterDefFactory(clusterDefName).AddComponentDef(ConsensusMySQLComponent, componentDefName).
-		AddLogConfig(errorLogName, filePathPattern).Create(testCtx).GetObject()
-}
-
-// CreateConsensusMysqlClusterVersion creates a mysql clusterVersion with a component of ConsensusSet type.
-func CreateConsensusMysqlClusterVersion(testCtx *testutil.TestContext, clusterDefName, clusterVersionName, workloadType string) *appsv1alpha1.ClusterVersion {
-	return NewClusterVersionFactory(clusterVersionName, clusterDefName).AddComponentVersion(workloadType).AddContainerShort("mysql", ApeCloudMySQLImage).
-		Create(testCtx).GetObject()
+func createCompDef(testCtx *testutil.TestContext, compDefName string) *appsv1alpha1.ComponentDefinition {
+	return NewComponentDefinitionFactory(compDefName).SetDefaultSpec().Create(testCtx).GetObject()
 }
 
 // MockInstanceSetComponent mocks the ITS component, just using in envTest
@@ -95,10 +75,10 @@ func MockInstanceSetComponent(
 	clusterName,
 	itsCompName string) *workloads.InstanceSet {
 	itsName := clusterName + "-" + itsCompName
-	return NewInstanceSetFactory(testCtx.DefaultNamespace, itsName, clusterName, itsCompName).SetReplicas(ConsensusReplicas).
+	return NewInstanceSetFactory(testCtx.DefaultNamespace, itsName, clusterName, itsCompName).SetReplicas(replicas).
 		AddContainer(corev1.Container{Name: DefaultMySQLContainerName, Image: ApeCloudMySQLImage}).
 		SetRoles([]workloads.ReplicaRole{
-			{Name: "Leader", AccessMode: workloads.ReadWriteMode, CanVote: true, IsLeader: true},
+			{Name: "leader", AccessMode: workloads.ReadWriteMode, CanVote: true, IsLeader: true},
 			{Name: "follower", AccessMode: workloads.ReadonlyMode, CanVote: true, IsLeader: false},
 		}).Create(testCtx).GetObject()
 }
@@ -108,10 +88,10 @@ func MockInstanceSetPods(
 	testCtx *testutil.TestContext,
 	its *workloads.InstanceSet,
 	cluster *appsv1alpha1.Cluster,
-	consensusCompName string) []*corev1.Pod {
+	compName string) []*corev1.Pod {
 	getReplicas := func() int {
 		if its == nil || its.Spec.Replicas == nil {
-			return ConsensusReplicas
+			return replicas
 		}
 		return int(*its.Spec.Replicas)
 	}
@@ -140,7 +120,7 @@ func MockInstanceSetPods(
 	replicas := getReplicas()
 	replicasStr := strconv.Itoa(replicas)
 	podList := make([]*corev1.Pod, replicas)
-	podNames := generatePodNames(cluster, consensusCompName)
+	podNames := generatePodNames(cluster, compName)
 	for i, pName := range podNames {
 		var podRole, accessMode string
 		if its != nil && len(its.Spec.Roles) > 0 {
@@ -152,7 +132,7 @@ func MockInstanceSetPods(
 				accessMode = string(noneLeaderRole.AccessMode)
 			}
 		}
-		pod := MockInstanceSetPod(testCtx, its, cluster.Name, consensusCompName, pName, podRole, accessMode)
+		pod := MockInstanceSetPod(testCtx, its, cluster.Name, compName, pName, podRole, accessMode)
 		annotations := pod.Annotations
 		if annotations == nil {
 			annotations = make(map[string]string)

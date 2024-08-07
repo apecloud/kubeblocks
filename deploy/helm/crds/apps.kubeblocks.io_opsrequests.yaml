@@ -280,6 +280,11 @@ spec:
                 - components
                 - opsDefinitionName
                 type: object
+              enqueueOnForce:
+                default: false
+                description: Indicates whether opsRequest should continue to queue
+                  when 'force' is set to true.
+                type: boolean
               expose:
                 description: Lists Expose objects, each specifying a Component and
                   its services to be exposed.
@@ -3824,6 +3829,12 @@ spec:
                     componentName:
                       description: Specifies the name of the Component.
                       type: string
+                    inPlace:
+                      description: |-
+                        When it is set to true, the instance will be rebuilt in-place.
+                        By default, a new pod will be created. Once the new pod is ready to serve,
+                        the instance that require rebuilding will be taken offline.
+                      type: boolean
                     instances:
                       description: Specifies the instances (Pods) that need to be
                         rebuilt, typically operating as standbys.
@@ -3840,6 +3851,7 @@ spec:
                         required:
                         - name
                         type: object
+                      minItems: 1
                       type: array
                     restoreEnv:
                       description: |-
@@ -4541,6 +4553,12 @@ spec:
                   (when `opsRequest.status.phase` is "Succeed") before automatic deletion.
                 format: int32
                 type: integer
+              ttlSecondsAfterUnsuccessfulCompletion:
+                description: |-
+                  Specifies the duration in seconds that an OpsRequest will remain in the system after completion
+                  for any phase other than "Succeed" (e.g., "Failed", "Cancelled", "Aborted") before automatic deletion.
+                format: int32
+                type: integer
               type:
                 description: |-
                   Specifies the type of this operation. Supported types include "Start", "Stop", "Restart", "Switchover",
@@ -5003,16 +5021,6 @@ spec:
                       description: Provides an explanation for the Component being
                         in its current state.
                       maxLength: 1024
-                      type: string
-                    workloadType:
-                      description: |-
-                        Records the workload type of Component in ClusterDefinition.
-                        Deprecated and should be removed in the future version.
-                      enum:
-                      - Stateless
-                      - Stateful
-                      - Consensus
-                      - Replication
                       type: string
                   type: object
                 description: Records the status information of Components changed

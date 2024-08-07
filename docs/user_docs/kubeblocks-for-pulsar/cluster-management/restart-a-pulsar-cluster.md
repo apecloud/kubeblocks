@@ -13,45 +13,32 @@ You can restart all pods of the cluster. When an exception occurs in a database,
 
 :::note
 
-Restarting a Kafka cluster triggers a concurrent restart and the leader may change after the cluster restarts.
+The pod role may change after the cluster restarts.
 
 :::
 
 ## Steps
 
-1. Restart a cluster.
-
-  You can use `kbcli` or create an OpsRequest to restart a cluster.
-  
-   Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
+1. Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
 
    ```bash
-   kbcli cluster restart NAME --components="pulsar" \
+   kbcli cluster restart pulsar-cluster --components="pulsar" \
    --ttlSecondsAfterSucceed=30
    ```
 
    - `components` describes the component name that needs to be restarted.
    - `ttlSecondsAfterSucceed` describes the time to live of an OpsRequest job after the restarting succeeds.
 
-
-
 2. Validate the restarting.
 
    Run the command below to check the cluster status to check the restarting status.
 
    ```bash
-   kbcli cluster list <name>
-   ```
-
-   ***Example***
-
-   ```bash
-   kbcli cluster list kafka
+   kbcli cluster list pulsar-cluster
    >
-   NAME    CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS     AGE
-   pulsar      pulsar                                pulsar-2.11    Delete                               Running    19m
+   NAME                CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS     AGE
+   pulsar-cluster      pulsar               pulsar-2.11    Delete              Running    19m
    ```
 
-   * STATUS=Restarting: it means the cluster restart is in progress.
+   * STATUS=Updating: it means the cluster restart is in progress.
    * STATUS=Running: it means the cluster has been restarted.
-

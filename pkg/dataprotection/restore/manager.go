@@ -537,7 +537,7 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 	}
 	actionSpec := backupSet.ActionSet.Spec.Restore.PostReady[step]
 	getTargetPodList := func(labelSelector metav1.LabelSelector, msgKey string) (*corev1.PodList, error) {
-		targetPodList, err := utils.GetPodListByLabelSelector(reqCtx, cli, labelSelector)
+		targetPodList, err := utils.GetPodListByLabelSelector(reqCtx, cli, &labelSelector)
 		if err != nil {
 			return nil, err
 		}

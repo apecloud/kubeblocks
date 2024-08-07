@@ -207,7 +207,6 @@ func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *a
 	cfgManagerParams := &cfgcm.CfgManagerBuildParams{
 		ManagerName:               constant.ConfigSidecarName,
 		ComponentName:             comp.Name,
-		SecreteName:               constant.GenerateDefaultConnCredential(cluster.Name),
 		Image:                     viper.GetString(constant.KBToolsImage),
 		Volumes:                   volumeDirs,
 		Cluster:                   cluster,

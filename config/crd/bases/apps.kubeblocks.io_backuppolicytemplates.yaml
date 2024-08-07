@@ -231,8 +231,7 @@ spec:
                                             type: string
                                           names:
                                             description: |-
-                                              Represents an array of names of ClusterVersion or ComponentDefinition that can be mapped to
-                                              the appropriate version of the backup tool image.
+                                              Represents an array of names of ComponentDefinition that can be mapped to the appropriate version of the backup tool image.
 
 
                                               This mapping allows different versions of component images to correspond to specific versions of backup tool images.
@@ -255,8 +254,7 @@ spec:
                                             type: string
                                           names:
                                             description: |-
-                                              Represents an array of names of ClusterVersion or ComponentDefinition that can be mapped to
-                                              the appropriate version of the backup tool image.
+                                              Represents an array of names of ComponentDefinition that can be mapped to the appropriate version of the backup tool image.
 
 
                                               This mapping allows different versions of component images to correspond to specific versions of backup tool images.
@@ -418,6 +416,11 @@ spec:
                                       If not specified, the default key "username" is used.
                                     type: string
                                 type: object
+                              fallbackRole:
+                                description: |-
+                                  Specifies the fallback role to select one replica for backup, this only takes effect when the
+                                  `strategy` field below is set to `Any`.
+                                type: string
                               name:
                                 description: |-
                                   Specifies a mandatory and unique identifier for each target when using the "targets" field.
@@ -427,6 +430,53 @@ spec:
                                 description: Used to find the target pod. The volumes
                                   of the target pod will be backed up.
                                 properties:
+                                  fallbackLabelSelector:
+                                    description: |-
+                                      fallbackLabelSelector is used to filter available pods when the labelSelector fails.
+                                      This only takes effect when the `strategy` field below is set to `Any`.
+                                    properties:
+                                      matchExpressions:
+                                        description: matchExpressions is a list of
+                                          label selector requirements. The requirements
+                                          are ANDed.
+                                        items:
+                                          description: |-
+                                            A label selector requirement is a selector that contains values, a key, and an operator that
+                                            relates the key and values.
+                                          properties:
+                                            key:
+                                              description: key is the label key that
+                                                the selector applies to.
+                                              type: string
+                                            operator:
+                                              description: |-
+                                                operator represents a key's relationship to a set of values.
+                                                Valid operators are In, NotIn, Exists and DoesNotExist.
+                                              type: string
+                                            values:
+                                              description: |-
+                                                values is an array of string values. If the operator is In or NotIn,
+                                                the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                                the values array must be empty. This array is replaced during a strategic
+                                                merge patch.
+                                              items:
+                                                type: string
+                                              type: array
+                                          required:
+                                          - key
+                                          - operator
+                                          type: object
+                                        type: array
+                                      matchLabels:
+                                        additionalProperties:
+                                          type: string
+                                        description: |-
+                                          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                                          map is equivalent to an element of matchExpressions, whose key field is "key", the
+                                          operator is "In", and the values array contains only "value". The requirements are ANDed.
+                                        type: object
+                                    type: object
+                                    x-kubernetes-map-type: atomic
                                   matchExpressions:
                                     description: matchExpressions is a list of label
                                       selector requirements. The requirements are
@@ -689,6 +739,53 @@ spec:
                                   description: Used to find the target pod. The volumes
                                     of the target pod will be backed up.
                                   properties:
+                                    fallbackLabelSelector:
+                                      description: |-
+                                        fallbackLabelSelector is used to filter available pods when the labelSelector fails.
+                                        This only takes effect when the `strategy` field below is set to `Any`.
+                                      properties:
+                                        matchExpressions:
+                                          description: matchExpressions is a list
+                                            of label selector requirements. The requirements
+                                            are ANDed.
+                                          items:
+                                            description: |-
+                                              A label selector requirement is a selector that contains values, a key, and an operator that
+                                              relates the key and values.
+                                            properties:
+                                              key:
+                                                description: key is the label key
+                                                  that the selector applies to.
+                                                type: string
+                                              operator:
+                                                description: |-
+                                                  operator represents a key's relationship to a set of values.
+                                                  Valid operators are In, NotIn, Exists and DoesNotExist.
+                                                type: string
+                                              values:
+                                                description: |-
+                                                  values is an array of string values. If the operator is In or NotIn,
+                                                  the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                                  the values array must be empty. This array is replaced during a strategic
+                                                  merge patch.
+                                                items:
+                                                  type: string
+                                                type: array
+                                            required:
+                                            - key
+                                            - operator
+                                            type: object
+                                          type: array
+                                        matchLabels:
+                                          additionalProperties:
+                                            type: string
+                                          description: |-
+                                            matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                                            map is equivalent to an element of matchExpressions, whose key field is "key", the
+                                            operator is "In", and the values array contains only "value". The requirements are ANDed.
+                                          type: object
+                                      type: object
+                                      x-kubernetes-map-type: atomic
                                     matchExpressions:
                                       description: matchExpressions is a list of label
                                         selector requirements. The requirements are
@@ -918,6 +1015,11 @@ spec:
                                 If not specified, the default key "username" is used.
                               type: string
                           type: object
+                        fallbackRole:
+                          description: |-
+                            Specifies the fallback role to select one replica for backup, this only takes effect when the
+                            `strategy` field below is set to `Any`.
+                          type: string
                         role:
                           description: |-
                             Specifies the role to select one or more replicas for backup.

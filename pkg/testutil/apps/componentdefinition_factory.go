@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"strings"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 
@@ -48,6 +49,16 @@ func NewComponentDefinitionFactoryExt(name, provider, description, serviceKind, 
 				ServiceVersion: serviceVersion,
 			},
 		}, f)
+	return f
+}
+
+func (f *MockComponentDefinitionFactory) SetDescription(description string) *MockComponentDefinitionFactory {
+	f.Get().Spec.Description = description
+	return f
+}
+
+func (f *MockComponentDefinitionFactory) SetServiceKind(serviceKind string) *MockComponentDefinitionFactory {
+	f.Get().Spec.ServiceKind = serviceKind
 	return f
 }
 
@@ -268,6 +279,11 @@ func (f *MockComponentDefinitionFactory) SetUpdateStrategy(strategy *appsv1alpha
 	return f
 }
 
+func (f *MockComponentDefinitionFactory) SetPodManagementPolicy(policy *appsv1.PodManagementPolicyType) *MockComponentDefinitionFactory {
+	f.Get().Spec.PodManagementPolicy = policy
+	return f
+}
+
 func (f *MockComponentDefinitionFactory) AddRole(name string, serviceable, writable bool) *MockComponentDefinitionFactory {
 	role := appsv1alpha1.ReplicaRole{
 		Name:        name,
@@ -320,4 +336,20 @@ func (f *MockComponentDefinitionFactory) AddServiceRef(name, serviceKind, servic
 	}
 	f.Get().Spec.ServiceRefDeclarations = append(f.Get().Spec.ServiceRefDeclarations, serviceRef)
 	return f
+}
+
+func mergedAddVolumeMounts(c *corev1.Container, volumeMounts []corev1.VolumeMount) {
+	table := make(map[string]corev1.VolumeMount)
+	for _, v := range c.VolumeMounts {
+		table[v.Name] = v
+	}
+	for _, v := range volumeMounts {
+		table[v.Name] = v
+	}
+
+	mounts := make([]corev1.VolumeMount, 0)
+	for _, v := range table {
+		mounts = append(mounts, v)
+	}
+	c.VolumeMounts = mounts
 }

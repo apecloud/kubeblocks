@@ -17,12 +17,6 @@ You can scale a MongoDB cluster in two ways, vertical scaling and horizontal sca
 
 You can vertically scale a cluster by changing resource requirements and limits (e.g. CPU and storage). For example, you can change the resource class from 1C2G to 2C4G by performing vertical scaling.
 
-:::note
-
-During the vertical scaling process, a restart is triggered and the primary pod may change after the restarting.
-
-:::
-
 ### Before you start
 
 Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
@@ -86,7 +80,7 @@ There are two ways to apply vertical scaling.
     Component Def Ref:  mongodb
     Enabled Logs:
       running
-    Monitor:   false
+    DisableExporter:   true
     Name:      mongodb
     Replicas:  1
     Resources:
@@ -100,7 +94,7 @@ There are two ways to apply vertical scaling.
 
 </TabItem>
 
-<TabItem value="Edit cluster YAML file" label="Edit Cluster YAML file">
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
 1. Change the configuration of `spec.components.resources` in the YAML file. 
 
@@ -113,7 +107,6 @@ There are two ways to apply vertical scaling.
    spec:
      affinity:
        podAntiAffinity: Preferred
-       tenancy: SharedNode
        topologyKeys:
        - kubernetes.io/hostname
      clusterDefinitionRef: mongodb
@@ -122,7 +115,7 @@ There are two ways to apply vertical scaling.
      - componentDefRef: mongodb
        enabledLogs:
        - running
-       monitor: false
+       disableExporter: true
        name: mongodb
        replicas: 2
        resources:
@@ -144,7 +137,7 @@ There are two ways to apply vertical scaling.
     Component Def Ref:  mongodb
     Enabled Logs:
       running
-    Monitor:   false
+    DisableExporter:   true
     Name:      mongodb
     Replicas:  1
     Resources:
@@ -162,7 +155,9 @@ There are two ways to apply vertical scaling.
 
 ## Horizontal scaling
 
-Horizontal scaling changes the amount of pods. For example, you can apply horizontal scaling to scale pods up from three to five. The scaling process includes the backup and restore of data.
+Horizontal scaling changes the amount of pods. For example, you can scale out replicas from three to five.
+
+From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out instances, refer to [Horizontal Scale](./../../maintenance/scale/horizontal-scale.md) for more details and examples.
 
 ### Before you start
 
@@ -185,6 +180,8 @@ There are two ways to apply horizontal scaling.
 
 1. Apply an OpsRequest to a specified cluster. Configure the parameters according to your needs.
 
+   The example below means adding two replicas.
+
    ```bash
    kubectl apply -f - <<EOF
    apiVersion: apps.kubeblocks.io/v1alpha1
@@ -197,7 +194,29 @@ There are two ways to apply horizontal scaling.
      type: HorizontalScaling
      horizontalScaling:
      - componentName: mongodb
-       replicas: 4
+       scaleOut:
+         replicaChanges: 2
+   EOF
+   ```
+
+   If you want to scale in replicas, replace `scaleOut` with `scaleIn`.
+
+   The example below means deleting two replicas.
+
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: mongo-horizontalscaling
+     namespace: default
+   spec:
+     clusterName: mycluster
+     type: HorizontalScaling
+     horizontalScaling:
+     - componentName: mongodb
+       scaleIn:
+         replicaChanges: 2
    EOF
    ```
 
@@ -210,7 +229,7 @@ There are two ways to apply horizontal scaling.
    demo        ops-horizontal-scaling   HorizontalScaling   mycluster   Succeed   3/3        6m
    ```
 
-   If an error occurs to the horizontal scaling operation, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
+   If an error occurs, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
 
 3. Check whether the corresponding resources change.
 

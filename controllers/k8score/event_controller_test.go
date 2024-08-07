@@ -118,21 +118,22 @@ var _ = Describe("Event Controller", func() {
 
 	Context("When receiving role changed event", func() {
 		It("should handle it properly", func() {
-			By("create cluster & clusterDef")
-			clusterDefName := "foo"
-			consensusCompName := "consensus"
-			consensusCompDefName := "consensus"
-			clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.ConsensusMySQLComponent, consensusCompDefName).
-				Create(&testCtx).GetObject()
-			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, "",
-				clusterDefObj.Name, "").WithRandomName().
-				AddComponent(consensusCompName, consensusCompDefName).
+			By("create cluster & compdef")
+			compDefName := "test-compdef"
+			clusterName := "test-cluster"
+			defaultCompName := "mysql"
+			compDefObj := testapps.NewComponentDefinitionFactory(compDefName).
+				SetDefaultSpec().
+				Create(&testCtx).
+				GetObject()
+			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
+				WithRandomName().
+				AddComponent(defaultCompName, compDefObj.GetName()).
 				Create(&testCtx).GetObject()
 			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(clusterObj), &appsv1alpha1.Cluster{}, true)).Should(Succeed())
 
-			itsName := fmt.Sprintf("%s-%s", clusterObj.Name, consensusCompName)
-			its := testapps.NewInstanceSetFactory(clusterObj.Namespace, itsName, clusterObj.Name, consensusCompName).
+			itsName := fmt.Sprintf("%s-%s", clusterObj.Name, defaultCompName)
+			its := testapps.NewInstanceSetFactory(clusterObj.Namespace, itsName, clusterObj.Name, defaultCompName).
 				SetReplicas(int32(3)).
 				AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
 				Create(&testCtx).GetObject()
@@ -155,7 +156,7 @@ var _ = Describe("Event Controller", func() {
 			By("create involved pod")
 			var uid types.UID
 			podName := fmt.Sprintf("%s-%d", itsName, 0)
-			pod := createInvolvedPod(podName, clusterObj.Name, consensusCompName, itsName)
+			pod := createInvolvedPod(podName, clusterObj.Name, defaultCompName, itsName)
 			Expect(testCtx.CreateObj(ctx, pod)).Should(Succeed())
 			Eventually(func() error {
 				p := &corev1.Pod{}

@@ -27,8 +27,6 @@ import (
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/component-base/featuregate"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -44,19 +42,8 @@ const (
 	InPlaceUpdatePolicy PodUpdatePolicy = "InPlaceUpdate"
 )
 
-const (
-	// InPlacePodVerticalScaling is copied from k8s.io/kubernetes/pkg/features/kube_features.go
-	// to avoid introducing huge pkg dependencies on k8s.io
-	//
-	// kep: http://kep.k8s.io/1287
-	// alpha: v1.27
-	//
-	// Enables In-Place Pod Vertical Scaling
-	InPlacePodVerticalScaling featuregate.Feature = "InPlacePodVerticalScaling"
-)
-
 func supportPodVerticalScaling() bool {
-	return utilfeature.DefaultFeatureGate.Enabled(InPlacePodVerticalScaling)
+	return viper.GetBool(constant.FeatureGateInPlacePodVerticalScaling)
 }
 
 func filterInPlaceFields(src *corev1.PodTemplateSpec) *corev1.PodTemplateSpec {

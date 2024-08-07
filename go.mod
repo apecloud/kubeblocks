@@ -70,20 +70,20 @@ require (
 	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/yaml.v2 v2.4.0
 	helm.sh/helm/v3 v3.12.3
-	k8s.io/api v0.29.0
+	k8s.io/api v0.30.3
 	k8s.io/apiextensions-apiserver v0.29.0
-	k8s.io/apimachinery v0.29.0
-	k8s.io/cli-runtime v0.28.3
-	k8s.io/client-go v0.28.3
-	k8s.io/code-generator v0.28.3
-	k8s.io/component-helpers v0.28.3
-	k8s.io/cri-api v0.28.3
+	k8s.io/apimachinery v0.30.3
+	k8s.io/cli-runtime v0.29.0
+	k8s.io/client-go v0.30.3
+	k8s.io/code-generator v0.29.0
+	k8s.io/component-helpers v0.29.0
+	k8s.io/cri-api v0.29.0
 	k8s.io/gengo v0.0.0-20230829151522-9cce18d56c01
 	k8s.io/klog v1.0.0
 	k8s.io/klog/v2 v2.120.1
 	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340
-	k8s.io/kubectl v0.28.2
-	k8s.io/kubelet v0.26.1
+	k8s.io/kubectl v0.29.0
+	k8s.io/kubelet v0.29.0
 	k8s.io/utils v0.0.0-20231127182322-b307cd553661
 	sigs.k8s.io/controller-runtime v0.17.2
 	sigs.k8s.io/yaml v1.4.0

@@ -339,15 +339,17 @@ func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (PodUpdateP
 	return NoOpsPolicy, nil
 }
 
-func isContainerInjected(ocs, ncs []corev1.Container) bool {
-	for _, nc := range ncs {
-		index := slices.IndexFunc(ocs, func(oc corev1.Container) bool {
-			return nc.Name == oc.Name
+// These lines're used for scenarios that user have other controllers/webhooks like OpenKruise SidecarSet running.
+// It'll mutate the pod to inject custom containers (e.g. sidecars) in. InstanceSet will tolerate these behaviors and avoid pod recreation if additional containers're injected.
+func isContainerInjected(cur, expect []corev1.Container) bool {
+	for _, ec := range expect {
+		index := slices.IndexFunc(cur, func(cc corev1.Container) bool {
+			return ec.Name == cc.Name
 		})
 		if index < 0 {
 			return false
 		}
-		if nc.Image != ocs[index].Image {
+		if ec.Image != cur[index].Image {
 			return false
 		}
 	}

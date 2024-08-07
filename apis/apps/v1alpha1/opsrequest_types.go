@@ -64,6 +64,11 @@ type OpsRequestSpec struct {
 	// +optional
 	Force bool `json:"force,omitempty"`
 
+	// Indicates whether opsRequest should continue to queue when 'force' is set to true.
+	// +kubebuilder:default=false
+	// +optional
+	EnqueueOnForce bool `json:"enqueueOnForce,omitempty"`
+
 	// Specifies the type of this operation. Supported types include "Start", "Stop", "Restart", "Switchover",
 	// "VerticalScaling", "HorizontalScaling", "VolumeExpansion", "Reconfiguring", "Upgrade", "Backup", "Restore",
 	// "Expose", "DataScript", "RebuildInstance", "Custom".

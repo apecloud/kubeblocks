@@ -2544,6 +2544,18 @@ simultaneously.</p>
 </tr>
 <tr>
 <td>
+<code>enqueueOnForce</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates whether opsRequest should continue to queue and run when &lsquo;force&rsquo; is set to true.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>type</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.OpsType">
@@ -13332,6 +13344,18 @@ pre-checks even if <code>force</code> is true.</p>
 By setting <code>force</code> to true, you can bypass the default checks and demand these opsRequests to run
 simultaneously.</p>
 <p>Note: Once set, the <code>force</code> field is immutable and cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>enqueueOnForce</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates whether opsRequest should continue to queue and run when &lsquo;force&rsquo; is set to true.</p>
 </td>
 </tr>
 <tr>

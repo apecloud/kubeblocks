@@ -280,6 +280,11 @@ spec:
                 - components
                 - opsDefinitionName
                 type: object
+              enqueueOnForce:
+                default: false
+                description: Indicates whether opsRequest should continue to queue
+                  when 'force' is set to true.
+                type: boolean
               expose:
                 description: Lists Expose objects, each specifying a Component and
                   its services to be exposed.

@@ -57,7 +57,7 @@ func CreateDefaultMysqlCluster(testCtx *testutil.TestContext, clusterName, compD
 	}
 	pvcSpec := NewPVCSpec(size)
 	return NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
-		AddComponentV2(compName, compDefName).
+		AddComponent(compName, compDefName).
 		SetReplicas(replicas).
 		SetEnabledLogs(errorLogName).
 		AddVolumeClaimTemplate("data", pvcSpec).

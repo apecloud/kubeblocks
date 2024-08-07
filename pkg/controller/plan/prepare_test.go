@@ -97,7 +97,7 @@ var _ = Describe("Prepare Test", func() {
 
 			pvcSpec := testapps.NewPVCSpec("1Gi")
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
-				AddComponentV2(mysqlCompName, compDefObj.Name).
+				AddComponent(mysqlCompName, compDefObj.Name).
 				SetReplicas(1).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				Create(&testCtx).

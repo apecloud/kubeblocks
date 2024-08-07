@@ -75,7 +75,6 @@ var _ = Describe("Job Utils Test", func() {
 		}
 
 		BeforeEach(func() {
-			testapps.NewComponentDefinitionFactory(compDefName).SetDefaultSpec().GetObject()
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 				AddComponent(mysqlCompName, compDefName).
 				GetObject()

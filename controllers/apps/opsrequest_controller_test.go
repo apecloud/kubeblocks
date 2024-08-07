@@ -138,7 +138,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		By("Create a cluster obj")
 		clusterFactory := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, "").
 			WithRandomName().
-			AddComponentV2(mysqlCompName, compDefName).
+			AddComponent(mysqlCompName, compDefName).
 			SetReplicas(1).
 			SetResources(scalingCtx.source)
 		clusterObj = clusterFactory.Create(&testCtx).GetObject()
@@ -322,7 +322,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			pvcSpec := testapps.NewPVCSpec("1Gi")
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, "").
 				WithRandomName().
-				AddComponentV2(mysqlCompName, compDefObj.GetName()).
+				AddComponent(mysqlCompName, compDefObj.GetName()).
 				SetServiceVersion(compDefObj.Spec.ServiceVersion).
 				SetReplicas(replicas).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).

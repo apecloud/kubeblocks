@@ -154,7 +154,7 @@ func initOperationsResources(compDefName, clusterName string) (*OpsResource, *ap
 
 	pvcSpec := testapps.NewPVCSpec("1Gi")
 	clusterObject := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
-		AddComponentV2(defaultCompName, compDef.GetName()).
+		AddComponent(defaultCompName, compDef.GetName()).
 		SetReplicas(3).
 		AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 		Create(&testCtx).

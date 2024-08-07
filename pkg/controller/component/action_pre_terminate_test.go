@@ -58,7 +58,7 @@ var _ = Describe("Component PreTerminate Test", func() {
 			pvcSpec := testapps.NewPVCSpec("1Gi")
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 				SetUID(clusterName).
-				AddComponentV2(mysqlCompName, compDefName).
+				AddComponent(mysqlCompName, compDefName).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				GetObject()
 		})

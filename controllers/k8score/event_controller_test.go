@@ -128,7 +128,7 @@ var _ = Describe("Event Controller", func() {
 				GetObject()
 			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 				WithRandomName().
-				AddComponentV2(defaultCompName, compDefObj.GetName()).
+				AddComponent(defaultCompName, compDefObj.GetName()).
 				Create(&testCtx).GetObject()
 			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(clusterObj), &appsv1alpha1.Cluster{}, true)).Should(Succeed())
 

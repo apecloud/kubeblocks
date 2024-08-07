@@ -108,7 +108,7 @@ var _ = Describe("", func() {
 			By("Creating a cluster with consensus .")
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 				WithRandomName().
-				AddComponentV2(defaultCompName, compDefObj.GetName()).
+				AddComponent(defaultCompName, compDefObj.GetName()).
 				SetReplicas(2).
 				Create(&testCtx).GetObject()
 

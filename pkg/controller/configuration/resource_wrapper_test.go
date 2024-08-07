@@ -55,7 +55,7 @@ var _ = Describe("resource Fetcher", func() {
 			GetObject()
 		pvcSpec := testapps.NewPVCSpec("1Gi")
 		cluster = testapps.NewClusterFactory("default", clusterName, "").
-			AddComponentV2(mysqlCompName, compDefName).
+			AddComponent(mysqlCompName, compDefName).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			GetObject()
 	})

@@ -102,7 +102,7 @@ var _ = Describe("CustomOps", func() {
 				GetObject()
 
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
-				WithRandomName().AddComponentV2(defaultCompName, componentDefObj.Name).SetReplicas(1).Create(&testCtx).GetObject()
+				WithRandomName().AddComponent(defaultCompName, componentDefObj.Name).SetReplicas(1).Create(&testCtx).GetObject()
 
 			fullCompName := constant.GenerateClusterComponentName(cluster.Name, defaultCompName)
 			compObj = testapps.NewComponentFactory(testCtx.DefaultNamespace, fullCompName, compDefName).

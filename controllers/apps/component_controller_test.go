@@ -237,7 +237,7 @@ var _ = Describe("Component Controller", func() {
 		processor func(*testapps.MockClusterFactory), phase *appsv1alpha1.ClusterPhase) {
 		factory := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName).
 			WithRandomName().
-			AddComponentV2(compName, compDefName).
+			AddComponent(compName, compDefName).
 			SetReplicas(1)
 		if processor != nil {
 			processor(factory)
@@ -1658,7 +1658,7 @@ var _ = Describe("Component Controller", func() {
 		pvcSpec := testapps.NewPVCSpec("1Gi")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 			WithRandomName().
-			AddComponentV2(compName, compDefName).
+			AddComponent(compName, compDefName).
 			SetReplicas(replicas).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			Create(&testCtx).GetObject()
@@ -1785,7 +1785,7 @@ var _ = Describe("Component Controller", func() {
 		replicas := 3
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 			WithRandomName().
-			AddComponentV2(compName, compDef.GetName()).
+			AddComponent(compName, compDef.GetName()).
 			SetServiceVersion(compDef.Spec.ServiceVersion).
 			SetReplicas(int32(replicas)).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
@@ -2070,7 +2070,7 @@ var _ = Describe("Component Controller", func() {
 
 				compNames := make([]string, 0, len(components))
 				for compName, compDefName := range components {
-					clusterBuilder = clusterBuilder.AddComponentV2(compName, compDefName)
+					clusterBuilder = clusterBuilder.AddComponent(compName, compDefName)
 					if processor != nil {
 						processor(compName, clusterBuilder)
 					}

@@ -54,7 +54,7 @@ var _ = Describe("Component", func() {
 				SetDefaultSpec().
 				GetObject()
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
-				AddComponentV2(mysqlCompName, compDef.GetName()).
+				AddComponent(mysqlCompName, compDef.GetName()).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, testapps.NewPVCSpec("1Gi")).
 				GetObject()
 

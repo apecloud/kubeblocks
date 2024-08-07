@@ -140,7 +140,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 				By("create cluster obj")
 				clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, "").
 					WithRandomName().
-					AddComponentV2(defaultCompName, compDefObj.Name).
+					AddComponent(defaultCompName, compDefObj.Name).
 					SetReplicas(3).
 					SetTLS(true).
 					SetIssuer(tlsIssuer).
@@ -158,7 +158,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 				By("create cluster with tls disabled")
 				clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, "").
 					WithRandomName().
-					AddComponentV2(defaultCompName, compDefObj.Name).
+					AddComponent(defaultCompName, compDefObj.Name).
 					SetReplicas(3).
 					SetTLS(false).
 					Create(&testCtx).

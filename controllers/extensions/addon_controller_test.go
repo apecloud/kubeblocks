@@ -839,7 +839,7 @@ var _ = Describe("Addon controller", func() {
 			fakeInstallationCompletedJob(2)
 
 			By("By creating cluster with addon")
-			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "test-cd").
+			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 				AddComponent(addon.Name, addon.Name).SetReplicas(1).
 				WithRandomName().
 				AddLabels(constant.ClusterDefLabelKey, addon.Name).
@@ -879,7 +879,7 @@ var _ = Describe("Addon controller", func() {
 			fakeInstallationCompletedJob(2)
 
 			By("By creating cluster with addon")
-			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "test-cd").
+			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 				AddComponent(addon.Name, addon.Name).SetReplicas(1).
 				WithRandomName().
 				AddLabels(constant.ClusterDefLabelKey, addon.Name).

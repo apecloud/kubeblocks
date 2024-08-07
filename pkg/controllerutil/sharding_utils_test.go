@@ -72,8 +72,8 @@ var _ = Describe("cluster shard component", func() {
 			testapps.NewComponentDefinitionFactory(compDefName).SetDefaultSpec().GetObject()
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 				SetUID(clusterName).
-				AddComponentV2(mysqlCompName, compDefName).
-				AddShardingSpecV2(mysqlShardingName, compDefName).
+				AddComponent(mysqlCompName, compDefName).
+				AddShardingSpec(mysqlShardingName, compDefName).
 				SetShards(1).
 				Create(&testCtx).GetObject()
 		})

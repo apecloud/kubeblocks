@@ -75,7 +75,7 @@ var _ = Describe("builder", func() {
 		pvcSpec := testapps.NewPVCSpec("1Gi")
 		clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 			AddAnnotationsInMap(newExtraEnvs()).
-			AddComponentV2(mysqlCompName, compDefObj.GetName()).
+			AddComponent(mysqlCompName, compDefObj.GetName()).
 			SetReplicas(1).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			AddComponentService(testapps.ServiceVPCName, corev1.ServiceTypeLoadBalancer).

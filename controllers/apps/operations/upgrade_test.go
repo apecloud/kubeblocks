@@ -178,7 +178,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 		}
 		// create the cluster with no clusterDefinition
 		clusterObject := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
-			AddComponentV2(defaultCompName, compDef1.Name).
+			AddComponent(defaultCompName, compDef1.Name).
 			SetServiceVersion(testapps.ServiceVersion("v0")).
 			SetReplicas(int32(3)).Create(&testCtx).GetObject()
 		opsRes := &OpsResource{

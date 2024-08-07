@@ -116,7 +116,7 @@ var _ = Describe("Restore", func() {
 
 			pvcSpec := testapps.NewPVCSpec("1Gi")
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
-				AddComponentV2(defaultCompName, compDefName).
+				AddComponent(defaultCompName, compDefName).
 				SetReplicas(3).
 				SetClusterAffinity(&appsv1alpha1.Affinity{
 					PodAntiAffinity: appsv1alpha1.Required,

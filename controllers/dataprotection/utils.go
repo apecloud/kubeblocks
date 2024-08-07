@@ -199,7 +199,7 @@ func GetTargetPods(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
-	if selector.Strategy == dpv1alpha1.PodSelectionStrategyAll || targetPods != nil ||
+	if selector.Strategy == dpv1alpha1.PodSelectionStrategyAll || len(targetPods) > 0 ||
 		selector.FallbackLabelSelector == nil {
 		return targetPods, nil
 	}

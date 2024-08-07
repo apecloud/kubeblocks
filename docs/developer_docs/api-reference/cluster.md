@@ -2525,6 +2525,18 @@ simultaneously.</p>
 </tr>
 <tr>
 <td>
+<code>enqueueOnForce</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates whether opsRequest should continue to queue when &lsquo;force&rsquo; is set to true.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>type</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.OpsType">
@@ -12560,6 +12572,18 @@ simultaneously.</p>
 </tr>
 <tr>
 <td>
+<code>enqueueOnForce</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates whether opsRequest should continue to queue when &lsquo;force&rsquo; is set to true.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>type</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.OpsType">
@@ -17788,6 +17812,19 @@ Future versions will address this special case using role priorities.</li>
 <li>If multiple replicas satisfy the specified role, the choice (<code>Any</code> or <code>All</code>) will be made according to
 the <code>strategy</code> field below.</li>
 </ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>fallbackRole</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the fallback role to select one replica for backup, this only takes effect when the
+<code>strategy</code> field below is set to <code>Any</code>.</p>
 </td>
 </tr>
 <tr>

@@ -301,7 +301,7 @@ var _ = Describe("OpsUtil functions", func() {
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops2))).Should(Equal(appsv1alpha1.OpsCancelledPhase))
 		})
 
-		It("Test skipPreConditions", func() {
+		It("Test EnqueueOnForce=true", func() {
 			By("init operations resources ")
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterName)
 			testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusComp)
@@ -320,7 +320,7 @@ var _ = Describe("OpsUtil functions", func() {
 			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsFailedPhase))
 
-			By("set skipPreConditions to true")
+			By("Test EnqueueOnForce=true")
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, appsv1alpha1.HorizontalScaling{
 				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
 				Replicas:     pointer.Int32(1),

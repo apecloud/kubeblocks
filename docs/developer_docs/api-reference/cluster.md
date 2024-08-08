@@ -2905,7 +2905,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Indicates whether opsRequest should continue to queue and run when &lsquo;force&rsquo; is set to true.</p>
+<p>Indicates whether opsRequest should continue to queue when &lsquo;force&rsquo; is set to true.</p>
 </td>
 </tr>
 <tr>
@@ -15272,7 +15272,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Indicates whether opsRequest should continue to queue and run when &lsquo;force&rsquo; is set to true.</p>
+<p>Indicates whether opsRequest should continue to queue when &lsquo;force&rsquo; is set to true.</p>
 </td>
 </tr>
 <tr>

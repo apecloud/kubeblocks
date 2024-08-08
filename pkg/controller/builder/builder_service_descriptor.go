@@ -82,3 +82,8 @@ func (builder *ServiceDescriptorBuilder) SetAuthPassword(password appsv1alpha1.C
 	builder.get().Spec.Auth = auth
 	return builder
 }
+
+func (builder *ServiceDescriptorBuilder) SetPodFQDNs(podFQDNs appsv1alpha1.CredentialVar) *ServiceDescriptorBuilder {
+	builder.get().Spec.PodFQDNs = &podFQDNs
+	return builder
+}

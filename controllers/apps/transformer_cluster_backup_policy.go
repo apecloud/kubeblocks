@@ -22,6 +22,7 @@ package apps
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
@@ -189,17 +190,10 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 // getBackupPolicyTemplates gets the backupPolicyTemplate for the cluster.
 func (r *clusterBackupPolicyTransformer) getBackupPolicyTemplates() (*appsv1alpha1.BackupPolicyTemplateList, error) {
 	backupPolicyTPLs := &appsv1alpha1.BackupPolicyTemplateList{}
-	if r.ClusterDef != nil && r.ClusterDef.Name != "" {
-		if err := r.Client.List(r.Context, backupPolicyTPLs,
-			client.MatchingLabels{constant.ClusterDefLabelKey: r.ClusterDef.Name}); err != nil {
-			return nil, err
-		}
-		return backupPolicyTPLs, nil
-	}
-	// get the backupPolicyTemplate if not exists spec.clusterDefRef
 	tplMap := map[string]sets.Empty{}
 	for _, v := range r.ComponentDefs {
 		tmpTPLs := &appsv1alpha1.BackupPolicyTemplateList{}
+		// TODO: prefix match for componentDef name?
 		if err := r.Client.List(r.Context, tmpTPLs, client.MatchingLabels{v.Name: v.Name}); err != nil {
 			return nil, err
 		}
@@ -641,12 +635,17 @@ func (r *clusterBackupPolicyTransformer) mergeClusterBackup(
 	return backupSchedule
 }
 
-// getClusterComponentSpec returns the component which matches the componentDef or componentDefRef.
 func (r *clusterBackupPolicyTransformer) getClusterComponentItems() []componentItem {
 	matchedCompDef := func(compSpec appsv1alpha1.ClusterComponentSpec) bool {
 		// TODO: support to create bp when using cluster topology and componentDef is empty
-		return (compSpec.ComponentDefRef != "" && compSpec.ComponentDefRef == r.backupPolicy.ComponentDefRef) ||
-			(compSpec.ComponentDef != "" && slices.Contains(r.backupPolicy.ComponentDefs, compSpec.ComponentDef))
+		if len(compSpec.ComponentDef) > 0 {
+			for _, compDef := range r.backupPolicy.ComponentDefs {
+				if strings.HasPrefix(compSpec.ComponentDef, compDef) || strings.HasPrefix(compDef, compSpec.ComponentDef) {
+					return true
+				}
+			}
+		}
+		return false
 	}
 	var compSpecItems []componentItem
 	for i, v := range r.clusterTransformContext.Cluster.Spec.ComponentSpecs {
@@ -693,12 +692,11 @@ func (r *clusterBackupPolicyTransformer) buildAnnotations() map[string]string {
 	return annotations
 }
 
-func (r *clusterBackupPolicyTransformer) buildLabels(compItem componentItem,
-	policy *dpv1alpha1.BackupPolicy) map[string]string {
+func (r *clusterBackupPolicyTransformer) buildLabels(compItem componentItem, policy *dpv1alpha1.BackupPolicy) map[string]string {
 	labels := map[string]string{
-		constant.AppInstanceLabelKey:          r.OrigCluster.Name,
-		constant.KBAppComponentDefRefLabelKey: r.compDefName(compItem.compSpec, policy),
-		constant.AppManagedByLabelKey:         constant.AppName,
+		constant.AppManagedByLabelKey:        constant.AppName,
+		constant.AppInstanceLabelKey:         r.OrigCluster.Name,
+		constant.ComponentDefinitionLabelKey: r.compDefName(compItem.compSpec, policy),
 	}
 	if compItem.isSharding {
 		labels[constant.KBAppShardingNameLabelKey] = compItem.componentName
@@ -721,17 +719,13 @@ func (r *clusterBackupPolicyTransformer) compDefName(comp *appsv1alpha1.ClusterC
 }
 
 func (r *clusterBackupPolicyTransformer) compDefNameFromSpec(comp *appsv1alpha1.ClusterComponentSpec) string {
-	compDefName := comp.ComponentDef
-	if compDefName == "" {
-		compDefName = comp.ComponentDefRef
-	}
-	return compDefName
+	return comp.ComponentDef
 }
 
 func (r *clusterBackupPolicyTransformer) compDefNameFromPolicy(policy *dpv1alpha1.BackupPolicy) string {
 	compDefName := ""
 	if policy.Labels != nil {
-		compDefName = policy.Labels[constant.KBAppComponentDefRefLabelKey]
+		compDefName = policy.Labels[constant.ComponentDefinitionLabelKey]
 	}
 	return compDefName
 }

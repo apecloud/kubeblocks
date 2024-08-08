@@ -118,12 +118,12 @@ func (builder *InstanceSetBuilder) SetPodUpdatePolicy(policy workloads.PodUpdate
 	return builder
 }
 
-func (builder *InstanceSetBuilder) SetUpdateStrategy(strategy apps.StatefulSetUpdateStrategy) *InstanceSetBuilder {
+func (builder *InstanceSetBuilder) SetUpdateStrategy(strategy workloads.InstanceUpdateStrategy) *InstanceSetBuilder {
 	builder.get().Spec.UpdateStrategy = strategy
 	return builder
 }
 
-func (builder *InstanceSetBuilder) SetUpdateStrategyType(strategyType apps.StatefulSetUpdateStrategyType) *InstanceSetBuilder {
+func (builder *InstanceSetBuilder) SetUpdateStrategyType(strategyType workloads.InstanceSetUpdateStrategyType) *InstanceSetBuilder {
 	builder.get().Spec.UpdateStrategy.Type = strategyType
 	return builder
 }
@@ -166,9 +166,9 @@ func (builder *InstanceSetBuilder) SetMembershipReconfiguration(reconfiguration 
 }
 
 func (builder *InstanceSetBuilder) SetMemberUpdateStrategy(strategy *workloads.MemberUpdateStrategy) *InstanceSetBuilder {
-	builder.get().Spec.MemberUpdateStrategy = strategy
+	builder.get().Spec.UpdateStrategy.MemberUpdateStrategy = strategy
 	if strategy != nil {
-		builder.SetUpdateStrategyType(apps.OnDeleteStatefulSetStrategyType)
+		builder.SetUpdateStrategyType(workloads.OnDeleteInstanceSetStrategyType)
 	}
 	return builder
 }

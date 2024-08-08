@@ -82,6 +82,11 @@ func (builder *ComponentBuilder) SetServiceAccountName(serviceAccountName string
 	return builder
 }
 
+func (builder *ComponentBuilder) SetInstanceUpdateStrategy(instanceUpdateStrategy appsv1alpha1.InstanceUpdateStrategy) *ComponentBuilder {
+	builder.get().Spec.InstanceUpdateStrategy = instanceUpdateStrategy
+	return builder
+}
+
 func (builder *ComponentBuilder) SetParallelPodManagementConcurrency(parallelPodManagementConcurrency *intstr.IntOrString) *ComponentBuilder {
 	builder.get().Spec.ParallelPodManagementConcurrency = parallelPodManagementConcurrency
 	return builder

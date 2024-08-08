@@ -21,7 +21,6 @@ package apps
 
 import (
 	"fmt"
-	"math"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -30,7 +29,7 @@ import (
 var (
 	defaultReplicasLimit = appsv1alpha1.ReplicasLimit{
 		MinReplicas: 1,
-		MaxReplicas: math.MaxInt32,
+		MaxReplicas: 16384,
 	}
 )
 

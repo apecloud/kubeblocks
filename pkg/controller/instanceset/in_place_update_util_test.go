@@ -198,6 +198,28 @@ var _ = Describe("instance util test", func() {
 			policy, err = getPodUpdatePolicy(its, pod5)
 			Expect(err).Should(BeNil())
 			Expect(policy).Should(Equal(NoOpsPolicy))
+
+			By("build a pod without revision updated, with IgnorePodVerticalScaling disabled")
+			pod6 := pod1.DeepCopy()
+			pod6.Spec.Containers = append(pod6.Spec.Containers, corev1.Container{
+				Name:  "sidecar1",
+				Image: "bar2",
+				Ports: []corev1.ContainerPort{
+					{
+						Name:          "my-svc",
+						Protocol:      corev1.ProtocolTCP,
+						ContainerPort: 54321,
+					},
+				},
+			})
+			randStr = rand.String(16)
+			mergeMap(&map[string]string{key: randStr}, &pod6.Annotations)
+			ignorePodVerticalScaling = viper.GetBool(FeatureGateIgnorePodVerticalScaling)
+			defer viper.Set(FeatureGateIgnorePodVerticalScaling, ignorePodVerticalScaling)
+			viper.Set(FeatureGateIgnorePodVerticalScaling, false)
+			policy, err = getPodUpdatePolicy(its, pod6)
+			Expect(err).Should(BeNil())
+			Expect(policy).Should(Equal(InPlaceUpdatePolicy))
 		})
 	})
 })

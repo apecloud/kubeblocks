@@ -4776,12 +4776,6 @@ spec:
                               - `componentDefinition.spec.serviceRefDeclarations[*].name`
                               - `clusterDefinition.spec.componentDefs[*].serviceRefDeclarations[*].name` (deprecated)
                             type: string
-                          namespace:
-                            description: |-
-                              Specifies the namespace of the referenced Cluster or the namespace of the referenced ServiceDescriptor object.
-                              If not provided, the referenced Cluster and ServiceDescriptor will be searched in the namespace of the current
-                              Cluster by default.
-                            type: string
                           serviceDescriptor:
                             description: |-
                               Specifies the name of the ServiceDescriptor object that describes a service provided by external sources.
@@ -4857,6 +4851,11 @@ spec:
                         - name
                         type: object
                       type: array
+                    stop:
+                      description: |-
+                        Stop the Component.
+                        If set, all the computing resources will be released.
+                      type: boolean
                     systemAccounts:
                       description: Overrides system accounts defined in referenced
                         ComponentDefinition.
@@ -12944,12 +12943,6 @@ spec:
                                   - `componentDefinition.spec.serviceRefDeclarations[*].name`
                                   - `clusterDefinition.spec.componentDefs[*].serviceRefDeclarations[*].name` (deprecated)
                                 type: string
-                              namespace:
-                                description: |-
-                                  Specifies the namespace of the referenced Cluster or the namespace of the referenced ServiceDescriptor object.
-                                  If not provided, the referenced Cluster and ServiceDescriptor will be searched in the namespace of the current
-                                  Cluster by default.
-                                type: string
                               serviceDescriptor:
                                 description: |-
                                   Specifies the name of the ServiceDescriptor object that describes a service provided by external sources.
@@ -13025,6 +13018,11 @@ spec:
                             - name
                             type: object
                           type: array
+                        stop:
+                          description: |-
+                            Stop the Component.
+                            If set, all the computing resources will be released.
+                          type: boolean
                         systemAccounts:
                           description: Overrides system accounts defined in referenced
                             ComponentDefinition.

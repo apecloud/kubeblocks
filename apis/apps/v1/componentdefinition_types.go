@@ -277,6 +277,8 @@ type ComponentDefinitionSpec struct {
 	//
 	// If set, the DNS policy will be automatically set to "ClusterFirstWithHostNet".
 	//
+	// This field is immutable.
+	//
 	// +optional
 	HostNetwork *HostNetwork `json:"hostNetwork,omitempty"`
 

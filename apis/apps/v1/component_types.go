@@ -260,6 +260,12 @@ type ComponentSpec struct {
 	//
 	// +optional
 	DisableExporter *bool `json:"disableExporter,omitempty"`
+
+	// Stop the Component.
+	// If set, all the computing resources will be released.
+	//
+	// +optional
+	Stop *bool `json:"stop,omitempty"`
 }
 
 // ComponentStatus defines the observed state of Component

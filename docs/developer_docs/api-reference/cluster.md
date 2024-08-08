@@ -788,6 +788,19 @@ bool
 <p>These annotations allow the Prometheus installed by KubeBlocks to discover and scrape metrics from the exporter.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>stop</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Stop the Component.
+If set, all the computing resources will be released.</p>
+</td>
+</tr>
 </table>
 </td>
 </tr>
@@ -1128,6 +1141,7 @@ When using hostNetwork, the operator will set the DNSPolicy to &lsquo;ClusterFir
 With this policy, DNS queries will first go through the K8s cluster&rsquo;s DNS service.
 If the query fails, it will fall back to the host&rsquo;s DNS settings.</p>
 <p>If set, the DNS policy will be automatically set to &ldquo;ClusterFirstWithHostNet&rdquo;.</p>
+<p>This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -2500,6 +2514,19 @@ bool
 <p>These annotations allow the Prometheus installed by KubeBlocks to discover and scrape metrics from the exporter.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>stop</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Stop the Component.
+If set, all the computing resources will be released.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.ClusterComponentVolumeClaimTemplate">ClusterComponentVolumeClaimTemplate
@@ -3216,8 +3243,7 @@ ClusterTopologyOrders
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the sequence in which components within a cluster topology are
-started, stopped, and upgraded.
+<p>Specifies the sequence in which components within a cluster topology are started, stopped, and upgraded.
 This ordering is crucial for maintaining the correct dependencies and operational flow across components.</p>
 </td>
 </tr>
@@ -3708,6 +3734,7 @@ When using hostNetwork, the operator will set the DNSPolicy to &lsquo;ClusterFir
 With this policy, DNS queries will first go through the K8s cluster&rsquo;s DNS service.
 If the query fails, it will fall back to the host&rsquo;s DNS settings.</p>
 <p>If set, the DNS policy will be automatically set to &ldquo;ClusterFirstWithHostNet&rdquo;.</p>
+<p>This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -5032,6 +5059,19 @@ bool
 <li>&ldquo;monitor.kubeblocks.io/scheme&rdquo;</li>
 </ul>
 <p>These annotations allow the Prometheus installed by KubeBlocks to discover and scrape metrics from the exporter.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>stop</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Stop the Component.
+If set, all the computing resources will be released.</p>
 </td>
 </tr>
 </tbody>
@@ -8183,20 +8223,6 @@ It corresponds to the serviceRefDeclaration name defined in either:</p>
 <li><code>componentDefinition.spec.serviceRefDeclarations[*].name</code></li>
 <li><code>clusterDefinition.spec.componentDefs[*].serviceRefDeclarations[*].name</code> (deprecated)</li>
 </ul>
-</td>
-</tr>
-<tr>
-<td>
-<code>namespace</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the namespace of the referenced Cluster or the namespace of the referenced ServiceDescriptor object.
-If not provided, the referenced Cluster and ServiceDescriptor will be searched in the namespace of the current
-Cluster by default.</p>
 </td>
 </tr>
 <tr>

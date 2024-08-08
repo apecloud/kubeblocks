@@ -520,6 +520,12 @@ type ClusterComponentSpec struct {
 	//
 	// +optional
 	DisableExporter *bool `json:"disableExporter,omitempty"`
+
+	// Stop the Component.
+	// If set, all the computing resources will be released.
+	//
+	// +optional
+	Stop *bool `json:"stop,omitempty"`
 }
 
 type ServiceRef struct {
@@ -531,13 +537,6 @@ type ServiceRef struct {
 	//
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
-
-	// Specifies the namespace of the referenced Cluster or the namespace of the referenced ServiceDescriptor object.
-	// If not provided, the referenced Cluster and ServiceDescriptor will be searched in the namespace of the current
-	// Cluster by default.
-	//
-	// +optional
-	Namespace string `json:"namespace,omitempty"`
 
 	// References a service provided by another KubeBlocks Cluster.
 	// It specifies the ClusterService and the account credentials needed for access.

@@ -114,8 +114,7 @@ type ClusterTopology struct {
 	// +kubebuilder:validation:MaxItems=128
 	Components []ClusterTopologyComponent `json:"components"`
 
-	// Specifies the sequence in which components within a cluster topology are
-	// started, stopped, and upgraded.
+	// Specifies the sequence in which components within a cluster topology are started, stopped, and upgraded.
 	// This ordering is crucial for maintaining the correct dependencies and operational flow across components.
 	//
 	// +optional

@@ -43,6 +43,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -198,6 +199,11 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 		resources.componentMatchLabels())
 	if err := reconcileContext.GetRelatedObjects(); err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(configMap, r.Recorder, err, reqCtx.Log)
+	}
+
+	if model.IsReconciliationPaused(configMap) {
+		reqCtx.Log.Info(fmt.Sprintf("reconfigure is paused because cluster %s is paused", resources.clusterName))
+		return intctrlutil.Reconciled()
 	}
 
 	// Assumption: It is required that the cluster must have a component.

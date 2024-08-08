@@ -653,7 +653,7 @@ type PersistentVolumeClaimSpec struct {
 	//
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
-	Resources corev1.ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
+	Resources corev1.VolumeResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
 
 	// The name of the StorageClass required by the claim.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1.

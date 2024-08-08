@@ -355,10 +355,6 @@ spec:
                                   If `backupPolicy.componentDefs` is set, this field is required to specify the system account name.
                                   This account must match one listed in `componentDefinition.spec.systemAccounts[*].name`.
                                   The corresponding secret created by this account is used to connect to the database.
-
-
-                                  If `backupPolicy.componentDefRef` (a legacy and deprecated API) is set, the secret defined in
-                                  `clusterDefinition.spec.ConnectionCredential` is used instead.
                                 type: string
                               connectionCredential:
                                 description: Specifies the connection credential to
@@ -391,30 +387,6 @@ spec:
                                     type: string
                                 required:
                                 - secretName
-                                type: object
-                              connectionCredentialKey:
-                                description: |-
-                                  Specifies the keys of the connection credential secret defined in `clusterDefinition.spec.ConnectionCredential`.
-                                  It will be ignored when the `account` is set.
-                                properties:
-                                  hostKey:
-                                    description: Defines the key of the host in the
-                                      connection credential secret.
-                                    type: string
-                                  passwordKey:
-                                    description: |-
-                                      Represents the key of the password in the connection credential secret.
-                                      If not specified, the default key "password" is used.
-                                    type: string
-                                  portKey:
-                                    description: Indicates map key of the port in
-                                      the connection credential secret.
-                                    type: string
-                                  usernameKey:
-                                    description: |-
-                                      Represents the key of the username in the connection credential secret.
-                                      If not specified, the default key "username" is used.
-                                    type: string
                                 type: object
                               fallbackRole:
                                 description: |-
@@ -920,18 +892,6 @@ spec:
                         - name
                         type: object
                       type: array
-                    componentDefRef:
-                      description: |-
-                        Specifies the name of ClusterComponentDefinition defined in the ClusterDefinition.
-                        Must comply with the IANA Service Naming rule.
-
-
-                        Deprecated since v0.9, should use `componentDefs` instead.
-                        This field is maintained for backward compatibility and its use is discouraged.
-                        Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
-                      maxLength: 22
-                      pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
-                      type: string
                     componentDefs:
                       description: |-
                         Specifies a list of names of ComponentDefinitions that the specified ClusterDefinition references.
@@ -986,35 +946,7 @@ spec:
                             If `backupPolicy.componentDefs` is set, this field is required to specify the system account name.
                             This account must match one listed in `componentDefinition.spec.systemAccounts[*].name`.
                             The corresponding secret created by this account is used to connect to the database.
-
-
-                            If `backupPolicy.componentDefRef` (a legacy and deprecated API) is set, the secret defined in
-                            `clusterDefinition.spec.ConnectionCredential` is used instead.
                           type: string
-                        connectionCredentialKey:
-                          description: |-
-                            Specifies the keys of the connection credential secret defined in `clusterDefinition.spec.ConnectionCredential`.
-                            It will be ignored when the `account` is set.
-                          properties:
-                            hostKey:
-                              description: Defines the key of the host in the connection
-                                credential secret.
-                              type: string
-                            passwordKey:
-                              description: |-
-                                Represents the key of the password in the connection credential secret.
-                                If not specified, the default key "password" is used.
-                              type: string
-                            portKey:
-                              description: Indicates map key of the port in the connection
-                                credential secret.
-                              type: string
-                            usernameKey:
-                              description: |-
-                                Represents the key of the username in the connection credential secret.
-                                If not specified, the default key "username" is used.
-                              type: string
-                          type: object
                         fallbackRole:
                           description: |-
                             Specifies the fallback role to select one replica for backup, this only takes effect when the
@@ -1055,16 +987,6 @@ spec:
                   type: object
                 minItems: 1
                 type: array
-              clusterDefinitionRef:
-                description: |-
-                  Specifies the name of a ClusterDefinition.
-                  This is an immutable attribute that cannot be changed after creation.
-                  And this field is deprecated since v0.9, consider using the ComponentDef instead.
-                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                type: string
-                x-kubernetes-validations:
-                - message: clusterDefinitionRef is immutable
-                  rule: self == oldSelf
               identifier:
                 description: |-
                   Specifies a unique identifier for the BackupPolicyTemplate.

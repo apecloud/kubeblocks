@@ -38,11 +38,6 @@ func NewBackupPolicyTemplateFactory(name string) *MockBackupPolicyTemplateFactor
 	return f
 }
 
-func (f *MockBackupPolicyTemplateFactory) SetClusterDefRef(clusterDefRef string) *MockBackupPolicyTemplateFactory {
-	f.Get().Spec.ClusterDefRef = clusterDefRef
-	return f
-}
-
 func (f *MockBackupPolicyTemplateFactory) getLastBackupPolicy() *appsv1alpha1.BackupPolicy {
 	l := len(f.Get().Spec.BackupPolicies)
 	if l == 0 {
@@ -62,9 +57,9 @@ func (f *MockBackupPolicyTemplateFactory) getLastBackupMethod() *dpv1alpha1.Back
 	return &backupMethods[l-1].BackupMethod
 }
 
-func (f *MockBackupPolicyTemplateFactory) AddBackupPolicy(componentDef string) *MockBackupPolicyTemplateFactory {
+func (f *MockBackupPolicyTemplateFactory) AddBackupPolicy(compDefs ...string) *MockBackupPolicyTemplateFactory {
 	f.Get().Spec.BackupPolicies = append(f.Get().Spec.BackupPolicies, appsv1alpha1.BackupPolicy{
-		ComponentDefRef: componentDef,
+		ComponentDefs: compDefs,
 	})
 	return f
 }
@@ -100,12 +95,6 @@ func (f *MockBackupPolicyTemplateFactory) AddBackupMethod(name string, snapshotV
 			TargetVolumes:   &dpv1alpha1.TargetVolumeInfo{},
 		}}
 	backupPolicy.BackupMethods = append(backupPolicy.BackupMethods, backupMethod)
-	return f
-}
-
-func (f *MockBackupPolicyTemplateFactory) SetComponentDef(compDefs ...string) *MockBackupPolicyTemplateFactory {
-	backupPolicy := f.getLastBackupPolicy()
-	backupPolicy.ComponentDefs = compDefs
 	return f
 }
 

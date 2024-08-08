@@ -2597,8 +2597,8 @@ More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volum
 <td>
 <code>resources</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcerequirements-v1-core">
-Kubernetes core/v1.ResourceRequirements
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volumeresourcerequirements-v1-core">
+Kubernetes core/v1.VolumeResourceRequirements
 </a>
 </em>
 </td>
@@ -7076,8 +7076,8 @@ More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volum
 <td>
 <code>resources</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcerequirements-v1-core">
-Kubernetes core/v1.ResourceRequirements
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volumeresourcerequirements-v1-core">
+Kubernetes core/v1.VolumeResourceRequirements
 </a>
 </em>
 </td>
@@ -12716,22 +12716,6 @@ or to a group of ComponentDefinitions that are different versions of definitions
 <tbody>
 <tr>
 <td>
-<code>componentDefRef</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the name of ClusterComponentDefinition defined in the ClusterDefinition.
-Must comply with the IANA Service Naming rule.</p>
-<p>Deprecated since v0.9, should use <code>componentDefs</code> instead.
-This field is maintained for backward compatibility and its use is discouraged.
-Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>componentDefs</code><br/>
 <em>
 []string
@@ -12851,19 +12835,6 @@ BackupPolicyTemplateSpec
 <table>
 <tr>
 <td>
-<code>clusterDefinitionRef</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies the name of a ClusterDefinition.
-This is an immutable attribute that cannot be changed after creation.
-And this field is deprecated since v0.9, consider using the ComponentDef instead.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>backupPolicies</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.BackupPolicy">
@@ -12927,19 +12898,6 @@ BackupPolicyTemplateStatus
 </tr>
 </thead>
 <tbody>
-<tr>
-<td>
-<code>clusterDefinitionRef</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies the name of a ClusterDefinition.
-This is an immutable attribute that cannot be changed after creation.
-And this field is deprecated since v0.9, consider using the ComponentDef instead.</p>
-</td>
-</tr>
 <tr>
 <td>
 <code>backupPolicies</code><br/>
@@ -14122,8 +14080,8 @@ More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volum
 <td>
 <code>resources</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcerequirements-v1-core">
-Kubernetes core/v1.ResourceRequirements
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volumeresourcerequirements-v1-core">
+Kubernetes core/v1.VolumeResourceRequirements
 </a>
 </em>
 </td>
@@ -18928,71 +18886,6 @@ CredentialVar
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ConnectionCredentialKey">ConnectionCredentialKey
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.TargetInstance">TargetInstance</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>passwordKey</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Represents the key of the password in the connection credential secret.
-If not specified, the default key &ldquo;password&rdquo; is used.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>usernameKey</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Represents the key of the username in the connection credential secret.
-If not specified, the default key &ldquo;username&rdquo; is used.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>hostKey</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Defines the key of the host in the connection credential secret.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>portKey</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Indicates map key of the port in the connection credential secret.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ContainerVars">ContainerVars
 </h3>
 <p>
@@ -23004,8 +22897,8 @@ More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volum
 <td>
 <code>resources</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcerequirements-v1-core">
-Kubernetes core/v1.ResourceRequirements
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volumeresourcerequirements-v1-core">
+Kubernetes core/v1.VolumeResourceRequirements
 </a>
 </em>
 </td>
@@ -27158,8 +27051,6 @@ string
 <p>If <code>backupPolicy.componentDefs</code> is set, this field is required to specify the system account name.
 This account must match one listed in <code>componentDefinition.spec.systemAccounts[*].name</code>.
 The corresponding secret created by this account is used to connect to the database.</p>
-<p>If <code>backupPolicy.componentDefRef</code> (a legacy and deprecated API) is set, the secret defined in
-<code>clusterDefinition.spec.ConnectionCredential</code> is used instead.</p>
 </td>
 </tr>
 <tr>
@@ -27178,21 +27069,6 @@ Valid values are:</p>
 <li>Any: Selects any one pod that matches the labelsSelector.</li>
 <li>All: Selects all pods that match the labelsSelector.</li>
 </ul>
-</td>
-</tr>
-<tr>
-<td>
-<code>connectionCredentialKey</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ConnectionCredentialKey">
-ConnectionCredentialKey
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the keys of the connection credential secret defined in <code>clusterDefinition.spec.ConnectionCredential</code>.
-It will be ignored when the <code>account</code> is set.</p>
 </td>
 </tr>
 </tbody>

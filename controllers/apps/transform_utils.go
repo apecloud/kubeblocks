@@ -131,6 +131,10 @@ func sendWarningEventWithError(
 	recorder.Event(obj, corev1.EventTypeWarning, reason, err.Error())
 }
 
+func isVolumeResourceRequirementsEqual(a, b corev1.VolumeResourceRequirements) bool {
+	return isResourceEqual(a.Requests, b.Requests) && isResourceEqual(a.Limits, b.Limits)
+}
+
 func isResourceRequirementsEqual(a, b corev1.ResourceRequirements) bool {
 	return isResourceEqual(a.Requests, b.Requests) && isResourceEqual(a.Limits, b.Limits)
 }
@@ -156,13 +160,13 @@ func isVolumeClaimTemplatesEqual(a, b []appsv1alpha1.ClusterComponentVolumeClaim
 		// first check resource requirements
 		c := a[i].DeepCopy()
 		d := b[i].DeepCopy()
-		if !isResourceRequirementsEqual(c.Spec.Resources, d.Spec.Resources) {
+		if !isVolumeResourceRequirementsEqual(c.Spec.Resources, d.Spec.Resources) {
 			return false
 		}
 
 		// then clear resource requirements and check other fields
-		c.Spec.Resources = corev1.ResourceRequirements{}
-		d.Spec.Resources = corev1.ResourceRequirements{}
+		c.Spec.Resources = corev1.VolumeResourceRequirements{}
+		d.Spec.Resources = corev1.VolumeResourceRequirements{}
 		if !reflect.DeepEqual(c, d) {
 			return false
 		}

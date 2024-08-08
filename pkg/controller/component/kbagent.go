@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 
@@ -42,6 +43,8 @@ const (
 
 	kbAgentSharedMountPath      = "/kubeblocks"
 	kbAgentCommandOnSharedMount = "/kubeblocks/kbagent"
+	minAvailablePort            = 1
+	maxAvailablePort            = 65535
 )
 
 var (
@@ -58,8 +61,12 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 		return err
 	}
 
-	port := 3501 // TODO: port
-
+	port := 3501
+	ports, err := getAvailablePorts(synthesizedComp.PodSpec.Containers, []int32{int32(port)})
+	if err != nil {
+		return err
+	}
+	port = int(ports[0])
 	container := builder.NewContainerBuilder(kbAgentContainerName).
 		SetImage(viper.GetString(constant.KBToolsImage)).
 		SetImagePullPolicy(corev1.PullIfNotPresent).
@@ -288,4 +295,52 @@ func buildKBAgentInitContainer() *corev1.Container {
 		AddCommands([]string{"cp", "-r", kbAgentCommand, "/bin/curl", kbAgentSharedMountPath + "/"}...).
 		AddVolumeMounts(sharedVolumeMount).
 		GetObject()
+}
+
+func getAvailablePorts(containers []corev1.Container, containerPorts []int32) ([]int32, error) {
+	inUse, err := getInUsePorts(containers)
+	if err != nil {
+		return nil, err
+	}
+	availablePort := make([]int32, len(containerPorts))
+	for i, p := range containerPorts {
+		if availablePort[i], err = iterAvailablePort(p, inUse); err != nil {
+			return nil, err
+		}
+	}
+	return availablePort, nil
+}
+
+func getInUsePorts(containers []corev1.Container) (map[int32]bool, error) {
+	inUse := map[int32]bool{}
+	for _, container := range containers {
+		for _, v := range container.Ports {
+			_, ok := inUse[v.ContainerPort]
+			if ok {
+				return nil, fmt.Errorf("containerPorts conflict: [%+v]", v.ContainerPort)
+			}
+			inUse[v.ContainerPort] = true
+		}
+	}
+	return inUse, nil
+}
+
+func iterAvailablePort(port int32, set map[int32]bool) (int32, error) {
+	if port < minAvailablePort || port > maxAvailablePort {
+		port = minAvailablePort
+	}
+	sentinel := port
+	for {
+		if _, ok := set[port]; !ok {
+			set[port] = true
+			return port, nil
+		}
+		port++
+		if port == sentinel {
+			return -1, errors.New("no available port for container")
+		}
+		if port > maxAvailablePort {
+			port = minAvailablePort
+		}
+	}
 }

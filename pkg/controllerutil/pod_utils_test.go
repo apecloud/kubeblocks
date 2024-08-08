@@ -38,6 +38,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type TestResourceUnit struct {
@@ -389,7 +390,7 @@ var _ = Describe("pod utils", func() {
 				// memory unit: Gi
 				{
 					pvc: corev1.PersistentVolumeClaimSpec{
-						Resources: corev1.ResourceRequirements{
+						Resources: corev1.VolumeResourceRequirements{
 							Requests: corev1.ResourceList{
 								corev1.ResourceStorage: resource.MustParse("100Gi"),
 							},
@@ -400,7 +401,7 @@ var _ = Describe("pod utils", func() {
 				// memory unit: G
 				{
 					pvc: corev1.PersistentVolumeClaimSpec{
-						Resources: corev1.ResourceRequirements{
+						Resources: corev1.VolumeResourceRequirements{
 							Requests: corev1.ResourceList{
 								corev1.ResourceStorage: resource.MustParse("100G"),
 							},
@@ -411,7 +412,7 @@ var _ = Describe("pod utils", func() {
 				// memory unit: no
 				{
 					pvc: corev1.PersistentVolumeClaimSpec{
-						Resources: corev1.ResourceRequirements{
+						Resources: corev1.VolumeResourceRequirements{
 							Requests: corev1.ResourceList{
 								corev1.ResourceStorage: resource.MustParse("10000"),
 							},
@@ -607,3 +608,37 @@ var _ = Describe("pod utils", func() {
 		})
 	})
 })
+
+func TestBuildImagePullSecretsByEnv(t *testing.T) {
+	tests := []struct {
+		value    string
+		expected []corev1.LocalObjectReference
+	}{
+		{
+			value:    "",
+			expected: nil,
+		},
+		{
+			value: "[{\"name\":\"test\"}]",
+			expected: []corev1.LocalObjectReference{
+				{
+					Name: "test",
+				},
+			},
+		},
+	}
+
+	Context("test BuildImagePullSecrets", func() {
+		It("Should succeed with no error", func() {
+			for _, t := range tests {
+				viper.Set(constant.KBImagePullSecrets, t.value)
+				secrets := BuildImagePullSecrets()
+				if t.value == "" {
+					Expect(len(secrets)).To(Equal(0))
+				} else {
+					Expect(secrets).To(Equal(t.expected))
+				}
+			}
+		})
+	})
+}

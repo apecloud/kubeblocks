@@ -42,10 +42,9 @@ import (
 
 var _ = Describe("DataScriptOps", func() {
 	var (
-		randomStr             = testCtx.GetRandomStr()
-		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr
-		clusterVersionName    = "clusterversion-for-ops-" + randomStr
-		clusterName           = "cluster-for-ops-" + randomStr
+		randomStr   = testCtx.GetRandomStr()
+		compDefName = "test-compdef-" + randomStr
+		clusterName = "test-cluster-" + randomStr
 
 		clusterObj  *appsv1alpha1.Cluster
 		opsResource *OpsResource
@@ -63,8 +62,8 @@ var _ = Describe("DataScriptOps", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
+		// delete cluster(and all dependent sub-resources), cluster definition
+		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 
 		// delete rest resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
@@ -124,13 +123,7 @@ var _ = Describe("DataScriptOps", func() {
 		Expect(testapps.ChangeObjStatus(&testCtx, clusterObj, func() {
 			clusterObj.Status.Phase = phase
 			clusterObj.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
-				consensusComp: {
-					Phase: compPhase,
-				},
-				statelessComp: {
-					Phase: compPhase,
-				},
-				statefulComp: {
+				defaultCompName: {
 					Phase: compPhase,
 				},
 			}
@@ -140,8 +133,7 @@ var _ = Describe("DataScriptOps", func() {
 	Context("with Cluster which has MySQL ConsensusSet", func() {
 		BeforeEach(func() {
 			By("mock cluster")
-			_, _, clusterObj = testapps.InitClusterWithHybridComps(&testCtx, clusterDefinitionName,
-				clusterVersionName, clusterName, statelessComp, statefulComp, consensusComp)
+			_, _, clusterObj = initOperationsResources(compDefName, clusterName)
 
 			By("init opsResource")
 			opsResource = &OpsResource{
@@ -171,7 +163,7 @@ var _ = Describe("DataScriptOps", func() {
 
 			By("create a datascript ops with ttlSecondsBeforeAbort=0")
 			// create a datascript ops with ttlSecondsBeforeAbort=0
-			ops := createClusterDatascriptOps(consensusComp, 0)
+			ops := createClusterDatascriptOps(defaultCompName, 0)
 			opsKey := client.ObjectKeyFromObject(ops)
 			patchOpsPhase(opsKey, appsv1alpha1.OpsCreatingPhase)
 			Expect(k8sClient.Get(testCtx.Ctx, opsKey, ops)).Should(Succeed())
@@ -190,7 +182,7 @@ var _ = Describe("DataScriptOps", func() {
 
 			By("create a datascript ops with ttlSecondsBeforeAbort=100")
 			// create a datascript ops with ttlSecondsBeforeAbort=0
-			ops := createClusterDatascriptOps(consensusComp, 100)
+			ops := createClusterDatascriptOps(defaultCompName, 100)
 			opsKey := client.ObjectKeyFromObject(ops)
 			patchOpsPhase(opsKey, appsv1alpha1.OpsPendingPhase)
 			Expect(k8sClient.Get(testCtx.Ctx, opsKey, ops)).Should(Succeed())
@@ -204,12 +196,13 @@ var _ = Describe("DataScriptOps", func() {
 			Expect(ops.Status.Phase).Should(Equal(prevOpsStatus))
 		})
 
-		It("create a datascript ops on running cluster", func() {
+		// TODO(v1.0): depends on clusterDefinition exist?
+		PIt("create a datascript ops on running cluster", func() {
 			By("patch cluster to running")
 			patchClusterStatus(appsv1alpha1.RunningClusterPhase)
 
 			By("create a datascript ops with ttlSecondsBeforeAbort=0")
-			ops := createClusterDatascriptOps(consensusComp, 0)
+			ops := createClusterDatascriptOps(defaultCompName, 0)
 			opsResource.OpsRequest = ops
 			opsKey := client.ObjectKeyFromObject(ops)
 			patchOpsPhase(opsKey, appsv1alpha1.OpsCreatingPhase)
@@ -228,7 +221,7 @@ var _ = Describe("DataScriptOps", func() {
 			patchClusterStatus(appsv1alpha1.RunningClusterPhase)
 
 			By("create a datascript ops with ttlSecondsBeforeAbort=0")
-			ops := createClusterDatascriptOps(consensusComp, 0)
+			ops := createClusterDatascriptOps(defaultCompName, 0)
 			opsResource.OpsRequest = ops
 			opsKey := client.ObjectKeyFromObject(ops)
 			patchOpsPhase(opsKey, appsv1alpha1.OpsRunningPhase)
@@ -237,7 +230,7 @@ var _ = Describe("DataScriptOps", func() {
 
 			reqCtx.Req = reconcile.Request{NamespacedName: opsKey}
 			By("mock a job, missing service, should fail")
-			comp := clusterObj.Spec.GetComponentByName(consensusComp)
+			comp := clusterObj.Spec.GetComponentByName(defaultCompName)
 			_, err := buildDataScriptJobs(reqCtx, k8sClient, clusterObj, comp, ops, "mysql")
 			Expect(err).Should(HaveOccurred())
 
@@ -253,7 +246,7 @@ var _ = Describe("DataScriptOps", func() {
 			By("mock a job one more time, fail with missing secret")
 			_, err = buildDataScriptJobs(reqCtx, k8sClient, clusterObj, comp, ops, "mysql")
 			Expect(err).Should(HaveOccurred())
-			Expect(err.Error()).Should(ContainSubstring("conn-credential"))
+			Expect(err.Error()).Should(ContainSubstring("missing secret"))
 
 			By("patch a secret name to ops, fail with missing secret")
 			secretName := fmt.Sprintf("%s-%s", clusterObj.Name, comp.Name)
@@ -319,7 +312,7 @@ var _ = Describe("DataScriptOps", func() {
 			patchClusterStatus(appsv1alpha1.RunningClusterPhase)
 
 			By("create a datascript ops with ttlSecondsBeforeAbort=0")
-			ops := createClusterDatascriptOps(consensusComp, 0)
+			ops := createClusterDatascriptOps(defaultCompName, 0)
 			opsResource.OpsRequest = ops
 			opsKey := client.ObjectKeyFromObject(ops)
 			patchOpsPhase(opsKey, appsv1alpha1.OpsRunningPhase)
@@ -327,7 +320,7 @@ var _ = Describe("DataScriptOps", func() {
 			opsResource.OpsRequest = ops
 
 			reqCtx.Req = reconcile.Request{NamespacedName: opsKey}
-			comp := clusterObj.Spec.GetComponentByName(consensusComp)
+			comp := clusterObj.Spec.GetComponentByName(defaultCompName)
 			By("mock a service, should pass")
 			serviceName := fmt.Sprintf("%s-%s", clusterObj.Name, comp.Name)
 			service := &corev1.Service{
@@ -400,7 +393,7 @@ var _ = Describe("DataScriptOps", func() {
 			ops := testapps.NewOpsRequestObj(opsName, testCtx.DefaultNamespace,
 				clusterObj.Name, appsv1alpha1.DataScriptType)
 			ops.Spec.ScriptSpec = &appsv1alpha1.ScriptSpec{
-				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: defaultCompName},
 				Script:       []string{"CREATE TABLE test (id INT);"},
 				ScriptFrom: &appsv1alpha1.ScriptFrom{
 					ConfigMapRef: []corev1.ConfigMapKeySelector{

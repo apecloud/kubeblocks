@@ -26,7 +26,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
-	"github.com/vmware-tanzu/velero/test/e2e/util/common"
+	"github.com/vmware-tanzu/velero/test/util/common"
 	"golang.org/x/net/context"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

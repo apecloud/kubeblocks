@@ -42,12 +42,10 @@ import (
 var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 
 	var (
-		// waitDuration          = time.Second * 3
-		randomStr             = testCtx.GetRandomStr()
-		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr
-		clusterVersionName    = "clusterversion-for-ops-" + randomStr
-		clusterName           = "cluster-for-ops-" + randomStr
-		storageClassName      = "csi-hostpath-sc-" + randomStr
+		randomStr        = testCtx.GetRandomStr()
+		compDefName      = "test-compdef-" + randomStr
+		clusterName      = "test-cluster-" + randomStr
+		storageClassName = "csi-hostpath-sc-" + randomStr
 	)
 
 	const (
@@ -62,7 +60,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResources(&testCtx)
 
 		// delete rest resources
@@ -219,8 +217,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 	Context("Test VolumeExpansion", func() {
 		It("VolumeExpansion should work", func() {
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
-			_, _, clusterObject := testapps.InitConsensusMysql(&testCtx, clusterDefinitionName,
-				clusterVersionName, clusterName, "consensus", consensusCompName)
+			_, clusterObject := testapps.InitConsensusMysql(&testCtx, clusterName, compDefName, consensusCompName)
 			// init storageClass
 			sc := testapps.CreateStorageClass(&testCtx, storageClassName, true)
 			Expect(testapps.ChangeObj(&testCtx, sc, func(lsc *storagev1.StorageClass) {

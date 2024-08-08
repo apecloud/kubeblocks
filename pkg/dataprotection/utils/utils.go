@@ -144,8 +144,8 @@ func GetBackupMethodByName(name string, backupPolicy *dpv1alpha1.BackupPolicy) *
 
 func GetPodListByLabelSelector(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
-	labelSelector metav1.LabelSelector) (*corev1.PodList, error) {
-	selector, err := metav1.LabelSelectorAsSelector(&labelSelector)
+	labelSelector *metav1.LabelSelector) (*corev1.PodList, error) {
+	selector, err := metav1.LabelSelectorAsSelector(labelSelector)
 	if err != nil {
 		return nil, err
 	}
@@ -284,6 +284,18 @@ func GetFirstIndexRunningPod(podList *corev1.PodList) *corev1.Pod {
 	for _, v := range podList.Items {
 		if intctrlutil.IsAvailable(&v, 0) {
 			return &v
+		}
+	}
+	return nil
+}
+
+func GetPodByName(podList *corev1.PodList, name string) *corev1.Pod {
+	if podList == nil {
+		return nil
+	}
+	for i, v := range podList.Items {
+		if v.Name == name {
+			return &podList.Items[i]
 		}
 	}
 	return nil

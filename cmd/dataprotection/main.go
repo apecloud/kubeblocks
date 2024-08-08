@@ -446,5 +446,13 @@ func validateRequiredToParseConfigs() error {
 	if err := validateWorkerServiceAccountAnnotations(viper.GetString(dptypes.CfgKeyWorkerServiceAccountAnnotations)); err != nil {
 		return err
 	}
+
+	if imagePullSecrets := viper.GetString(constant.KBImagePullSecrets); imagePullSecrets != "" {
+		secrets := make([]corev1.LocalObjectReference, 0)
+		if err := json.Unmarshal([]byte(imagePullSecrets), &secrets); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }

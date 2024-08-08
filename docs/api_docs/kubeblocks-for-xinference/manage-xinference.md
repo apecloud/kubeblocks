@@ -109,7 +109,7 @@ kubectl get cluster mycluster -n demo -o yaml
 
 ## Scale vertically
 
-You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, if you need to change the resource class from 1C2G to 2C4G, vertical scaling is what you need.
+You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, you can change the resource class from 1C2G to 2C4G by performing vertical scaling.
 
 ### Before you start
 

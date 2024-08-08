@@ -24,8 +24,6 @@ type ClusterExpansion interface{}
 
 type ClusterDefinitionExpansion interface{}
 
-type ClusterVersionExpansion interface{}
-
 type ComponentExpansion interface{}
 
 type ComponentDefinitionExpansion interface{}

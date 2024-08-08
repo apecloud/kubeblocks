@@ -22,6 +22,7 @@ package kubebuilderx
 import (
 	"context"
 	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -44,37 +46,71 @@ var _ = Describe("controller test", func() {
 	Context("Dummy Controller", func() {
 		It("should work well", func() {
 			ctx := context.Background()
+			cli := fake.NewFakeClient()
 			req := ctrl.Request{}
 			logger := log.FromContext(ctx).WithValues("InstanceSet", "test")
-			controller := NewController(context.Background(), nil, req, nil, logger)
+			var controller Controller
 			tree := NewObjectTree()
 
 			By("Load tree and reconcile it with no error")
-			err := controller.Prepare(&dummyLoader{tree: tree}).Do(&dummyReconciler{}).Commit()
+			controller = NewController(ctx, cli, req, nil, logger)
+			res, err := controller.Prepare(&dummyLoader{tree: tree}).Do(&dummyReconciler{res: Commit}).Commit()
 			Expect(err).Should(BeNil())
+			Expect(res.Requeue).Should(BeFalse())
 
 			By("Load tree with error")
+			controller = NewController(ctx, cli, req, nil, logger)
 			loadErr := fmt.Errorf("load tree failed")
-			err = controller.Prepare(&dummyLoader{err: loadErr}).Do(&dummyReconciler{}).Commit()
+			res, err = controller.Prepare(&dummyLoader{err: loadErr}).Do(&dummyReconciler{res: Commit}).Commit()
 			Expect(err).Should(Equal(loadErr))
+			Expect(res.Requeue).Should(BeFalse())
 
 			By("Reconcile with pre-condition error")
+			controller = NewController(ctx, cli, req, nil, logger)
 			reconcileCondErr := fmt.Errorf("reconcile pre-condition failed")
-			err = controller.Prepare(&dummyLoader{tree: tree}).Do(&dummyReconciler{preErr: reconcileCondErr}).Commit()
+			res, err = controller.Prepare(&dummyLoader{tree: tree}).Do(&dummyReconciler{preErr: reconcileCondErr, res: Commit}).Commit()
 			Expect(err).Should(Equal(reconcileCondErr))
+			Expect(res.Requeue).Should(BeFalse())
 
 			By("Reconcile with pre-condition unsatisfied")
-			Expect(tree.Add(builder.NewPodBuilder(namespace, name).GetObject())).Should(Succeed())
-			newTree, err := tree.DeepCopy()
+			controller = NewController(ctx, cli, req, nil, logger)
+			root := builder.NewPodBuilder(namespace, name).GetObject()
+			tree.SetRoot(root)
+			Expect(cli.Create(ctx, root)).Should(Succeed())
+			newTree := NewObjectTree()
+			newTree.SetRoot(root)
+			res, err = controller.Prepare(&dummyLoader{tree: newTree}).Do(&dummyReconciler{unsatisfied: true, res: Commit}).Commit()
 			Expect(err).Should(BeNil())
-			err = controller.Prepare(&dummyLoader{tree: newTree}).Do(&dummyReconciler{unsatisfied: true}).Commit()
-			Expect(err).Should(BeNil())
+			Expect(res.Requeue).Should(BeFalse())
 			Expect(newTree).Should(Equal(tree))
 
 			By("Reconcile with error")
+			controller = NewController(ctx, cli, req, nil, logger)
 			reconcileErr := fmt.Errorf("reconcile with error")
-			err = controller.Prepare(&dummyLoader{tree: tree}).Do(&dummyReconciler{err: reconcileErr}).Commit()
+			res, err = controller.Prepare(&dummyLoader{tree: tree}).Do(&dummyReconciler{err: reconcileErr, res: Commit}).Commit()
 			Expect(err).Should(Equal(reconcileErr))
+			Expect(res.Requeue).Should(BeFalse())
+
+			By("Reconcile with Commit method")
+			controller = NewController(ctx, cli, req, nil, logger)
+			newTree = NewObjectTree()
+			Expect(cli.Get(ctx, client.ObjectKeyFromObject(root), root)).Should(Succeed())
+			newTree.SetRoot(root)
+			res, err = controller.Prepare(&dummyLoader{tree: newTree}).Do(&dummyReconciler{res: Commit}).Commit()
+			Expect(err).Should(BeNil())
+			Expect(res.Requeue).Should(BeFalse())
+			Expect(newTree).Should(Equal(tree))
+
+			By("Reconcile with Retry method")
+			controller = NewController(ctx, cli, req, nil, logger)
+			newTree = NewObjectTree()
+			Expect(cli.Get(ctx, client.ObjectKeyFromObject(root), root)).Should(Succeed())
+			newTree.SetRoot(root)
+			res, err = controller.Prepare(&dummyLoader{tree: newTree}).Do(&dummyReconciler{res: RetryAfter(time.Second)}).Commit()
+			Expect(err).Should(BeNil())
+			Expect(res.Requeue).Should(BeTrue())
+			Expect(res.RequeueAfter).Should(Equal(time.Second))
+			Expect(newTree).Should(Equal(tree))
 		})
 	})
 })
@@ -93,6 +129,7 @@ var _ TreeLoader = &dummyLoader{}
 type dummyReconciler struct {
 	preErr      error
 	unsatisfied bool
+	res         Result
 	err         error
 }
 
@@ -101,18 +138,21 @@ func (d *dummyReconciler) PreCondition(tree *ObjectTree) *CheckResult {
 		return CheckResultWithError(d.preErr)
 	}
 	if d.unsatisfied {
-		return ResultUnsatisfied
+		return ConditionUnsatisfied
 	}
-	return ResultSatisfied
+	return ConditionSatisfied
 }
 
-func (d *dummyReconciler) Reconcile(tree *ObjectTree) (*ObjectTree, error) {
+func (d *dummyReconciler) Reconcile(tree *ObjectTree) (Result, error) {
+	if d.err != nil || d.res.Next != cntn {
+		return d.res, d.err
+	}
 	if tree != nil {
 		if err := tree.Add(builder.NewConfigMapBuilder("hello", "world").GetObject()); err != nil {
-			return nil, err
+			return Result{}, err
 		}
 	}
-	return tree, d.err
+	return d.res, d.err
 }
 
 var _ Reconciler = &dummyReconciler{}

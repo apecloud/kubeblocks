@@ -177,7 +177,7 @@ type ConfigConstraintSpec struct {
 type ConfigConstraintStatus struct {
 
 	// Specifies the status of the configuration template.
-	// When set to CCAvailablePhase, the ConfigConstraint can be referenced by ClusterDefinition or ClusterVersion.
+	// When set to CCAvailablePhase, the ConfigConstraint can be referenced by ClusterDefinition.
 	//
 	// +optional
 	Phase appsv1beta1.ConfigConstraintPhase `json:"phase,omitempty"`

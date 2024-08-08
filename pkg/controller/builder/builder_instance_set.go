@@ -23,6 +23,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
@@ -104,6 +105,11 @@ func (builder *InstanceSetBuilder) SetVolumeClaimTemplates(templates ...corev1.P
 
 func (builder *InstanceSetBuilder) SetPodManagementPolicy(policy apps.PodManagementPolicyType) *InstanceSetBuilder {
 	builder.get().Spec.PodManagementPolicy = policy
+	return builder
+}
+
+func (builder *InstanceSetBuilder) SetParallelPodManagementConcurrency(parallelPodManagementConcurrency *intstr.IntOrString) *InstanceSetBuilder {
+	builder.get().Spec.ParallelPodManagementConcurrency = parallelPodManagementConcurrency
 	return builder
 }
 

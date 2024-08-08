@@ -258,7 +258,7 @@ func NewExposingCondition(ops *OpsRequest) *metav1.Condition {
 	}
 }
 
-// NewUpgradingCondition creates a condition that the OpsRequest starts to upgrade the cluster version
+// NewUpgradingCondition creates a condition that the OpsRequest starts to upgrade the version
 func NewUpgradingCondition(ops *OpsRequest) *metav1.Condition {
 	return &metav1.Condition{
 		Type:               ConditionTypeVersionUpgrading,

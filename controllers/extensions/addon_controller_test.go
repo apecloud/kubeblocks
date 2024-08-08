@@ -53,11 +53,7 @@ import (
 
 var _ = Describe("Addon controller", func() {
 	const (
-		clusterDefName     = "test-clusterdef"
-		clusterVersionName = "test-clusterversion"
-		compDefName        = "test-compdef"
-		compVersionName    = "test-compversion"
-		clusterName        = "test-cluster"
+		clusterName = "test-cluster"
 	)
 	cleanEnv := func() {
 		// must wait till resources deleted and no longer existed before the testcases start,
@@ -851,8 +847,7 @@ var _ = Describe("Addon controller", func() {
 			fakeInstallationCompletedJob(2)
 
 			By("By creating cluster with addon")
-			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-				"test-cd", "test-cv").
+			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 				AddComponent(addon.Name, addon.Name).SetReplicas(1).
 				WithRandomName().
 				AddLabels(constant.ClusterDefLabelKey, addon.Name).
@@ -892,8 +887,7 @@ var _ = Describe("Addon controller", func() {
 			fakeInstallationCompletedJob(2)
 
 			By("By creating cluster with addon")
-			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-				"test-cd", "test-cv").
+			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 				AddComponent(addon.Name, addon.Name).SetReplicas(1).
 				WithRandomName().
 				AddLabels(constant.ClusterDefLabelKey, addon.Name).

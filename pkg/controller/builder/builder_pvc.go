@@ -31,7 +31,7 @@ func NewPVCBuilder(namespace, name string) *PVCBuilder {
 	return builder
 }
 
-func (builder *PVCBuilder) SetResources(resources corev1.ResourceRequirements) *PVCBuilder {
+func (builder *PVCBuilder) SetResources(resources corev1.VolumeResourceRequirements) *PVCBuilder {
 	builder.get().Spec.Resources = resources
 	return builder
 }

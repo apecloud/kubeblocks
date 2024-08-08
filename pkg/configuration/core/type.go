@@ -163,7 +163,6 @@ func GenerateConstraintsUniqLabelKeyWithConfig(configKey string) string {
 	return GenerateUniqKeyWithConfig(constant.ConfigurationConstraintsLabelPrefixKey, configKey)
 }
 
-// GetInstanceCMName  {{statefulset.Name}}-{{clusterVersion.Name}}-{{tpl.Name}}-"config"
 func GetInstanceCMName(obj client.Object, tpl *appsv1alpha1.ComponentTemplateSpec) string {
 	return getInstanceCfgCMName(obj.GetName(), tpl.Name)
 }

@@ -33,7 +33,7 @@ var _ = Describe("pvc builder", func() {
 			name = "foo"
 			ns   = "default"
 		)
-		resources := corev1.ResourceRequirements{
+		resources := corev1.VolumeResourceRequirements{
 			Requests: map[corev1.ResourceName]resource.Quantity{
 				"CPU": resource.MustParse("500m"),
 			},

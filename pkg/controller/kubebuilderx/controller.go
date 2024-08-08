@@ -30,18 +30,17 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
 
 // TODO(free6om): this is a new reconciler framework in the very early stage leaving the following tasks to do:
-// 1. don't expose the client.Client to the Reconciler, to prevent write operation in Prepare and Do stages.
-// 2. expose EventRecorder
-// 3. expose Logger
+// 1. expose EventRecorder & Logger
+// 2. parallel workflow-style reconciler chain
 
 type Controller interface {
 	Prepare(TreeLoader) Controller
 	Do(...Reconciler) Controller
-	Commit() error
+	Commit() (ctrl.Result, error)
 }
 
 type controller struct {
@@ -51,6 +50,7 @@ type controller struct {
 	recorder record.EventRecorder
 	logger   logr.Logger
 
+	res Result
 	err error
 
 	oldTree *ObjectTree
@@ -78,46 +78,58 @@ func (c *controller) Do(reconcilers ...Reconciler) Controller {
 	if c.err != nil {
 		return c
 	}
-
-	for _, reconciler := range reconcilers {
-		switch result := reconciler.PreCondition(c.tree); {
-		case result.Err != nil:
-			c.err = result.Err
-			return c
-		case !result.Satisfied:
-			return c
-		}
-
-		c.tree, c.err = reconciler.Reconcile(c.tree)
-		if c.err != nil {
-			return c
-		}
+	if c.res.Next != cntn && c.res.Next != cmmt && c.res.Next != rtry {
+		c.err = fmt.Errorf("unexpected next action: %s. should be one of Continue, Commit or Retry", c.res.Next)
+		return c
+	}
+	if c.res.Next != cntn {
+		return c
+	}
+	if len(reconcilers) == 0 {
+		return c
 	}
 
-	return c
+	reconciler := reconcilers[0]
+	switch result := reconciler.PreCondition(c.tree); {
+	case result.Err != nil:
+		c.err = result.Err
+		return c
+	case !result.Satisfied:
+		return c
+	}
+	c.res, c.err = reconciler.Reconcile(c.tree)
+
+	return c.Do(reconcilers[1:]...)
 }
 
-func (c *controller) Commit() error {
+func (c *controller) Commit() (ctrl.Result, error) {
 	defer c.emitFailureEvent()
 
-	if c.err != nil && !intctrlutil.IsDelayedRequeueError(c.err) {
-		return c.err
+	if c.err != nil {
+		return ctrl.Result{}, c.err
 	}
 	if c.oldTree.GetRoot() == nil {
-		return nil
+		return ctrl.Result{}, nil
 	}
 	builder := NewPlanBuilder(c.ctx, c.cli, c.oldTree, c.tree, c.recorder, c.logger)
-	if err := builder.Init(); err != nil {
-		return err
+	if c.err = builder.Init(); c.err != nil {
+		return ctrl.Result{}, c.err
 	}
-	plan, err := builder.Build()
-	if err != nil {
-		return err
+	var plan graph.Plan
+	plan, c.err = builder.Build()
+	if c.err != nil {
+		return ctrl.Result{}, c.err
 	}
-	if err = plan.Execute(); err != nil {
-		return err
+	if c.err = plan.Execute(); c.err != nil {
+		if apierrors.IsConflict(c.err) {
+			return ctrl.Result{Requeue: true}, nil
+		}
+		return ctrl.Result{}, c.err
 	}
-	return c.err
+	if c.res.Next == rtry {
+		return ctrl.Result{Requeue: true, RequeueAfter: c.res.RetryAfter}, nil
+	}
+	return ctrl.Result{}, nil
 }
 
 func (c *controller) emitFailureEvent() {
@@ -148,6 +160,7 @@ func NewController(ctx context.Context, cli client.Client, req ctrl.Request, rec
 		req:      req,
 		recorder: recorder,
 		logger:   logger,
+		res:      Continue,
 	}
 }
 

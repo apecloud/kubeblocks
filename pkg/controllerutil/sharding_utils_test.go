@@ -41,7 +41,7 @@ var _ = Describe("cluster shard component", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 
 		// delete rest mocked objects
@@ -55,36 +55,25 @@ var _ = Describe("cluster shard component", func() {
 
 	Context("cluster shard component", func() {
 		const (
-			clusterDefName        = "test-clusterdef"
-			clusterVersionName    = "test-clusterversion"
+			compDefName           = "test-compdef"
 			clusterName           = "test-cluster"
-			mysqlCompDefName      = "replicasets"
 			mysqlCompName         = "mysql"
 			mysqlShardingName     = "mysql-sharding"
 			mysqlShardingCompName = "mysql-sharding-comp"
 		)
 
 		var (
-			clusterDef     *appsv1alpha1.ClusterDefinition
-			clusterVersion *appsv1alpha1.ClusterVersion
-			cluster        *appsv1alpha1.Cluster
+			cluster *appsv1alpha1.Cluster
 		)
 
 		BeforeEach(func() {
 			cleanEnv()
 
-			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
-				GetObject()
-			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponentVersion(mysqlCompDefName).
-				AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-				GetObject()
-			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-				clusterDef.Name, clusterVersion.Name).
+			testapps.NewComponentDefinitionFactory(compDefName).SetDefaultSpec().GetObject()
+			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 				SetUID(clusterName).
-				AddComponent(mysqlCompName, mysqlCompDefName).
-				AddShardingSpecV2(mysqlShardingName, mysqlCompDefName).
+				AddComponent(mysqlCompName, compDefName).
+				AddShardingSpec(mysqlShardingName, compDefName).
 				SetShards(1).
 				Create(&testCtx).GetObject()
 		})

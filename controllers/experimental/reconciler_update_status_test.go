@@ -42,9 +42,10 @@ var _ = Describe("update status reconciler test", func() {
 
 			By("scale target cluster")
 			reconciler = scaleTargetCluster()
-			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ResultSatisfied))
-			newTree, err := reconciler.Reconcile(tree)
+			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ConditionSatisfied))
+			res, err := reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
 
 			By("mock the workload to scale ready")
 			nodes := tree.List(&corev1.Node{})
@@ -60,10 +61,11 @@ var _ = Describe("update status reconciler test", func() {
 
 			By("update status")
 			reconciler = updateStatus()
-			Expect(reconciler.PreCondition(newTree)).Should(Equal(kubebuilderx.ResultSatisfied))
-			newTree, err = reconciler.Reconcile(tree)
+			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ConditionSatisfied))
+			res, err = reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
-			newNCS, ok := newTree.GetRoot().(*experimentalv1alpha1.NodeCountScaler)
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			newNCS, ok := tree.GetRoot().(*experimentalv1alpha1.NodeCountScaler)
 			Expect(ok).Should(BeTrue())
 			Expect(newNCS.Status.ComponentStatuses).Should(HaveLen(2))
 			Expect(newNCS.Status.ComponentStatuses[0].CurrentReplicas).Should(Equal(desiredReplicas))

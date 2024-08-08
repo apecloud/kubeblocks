@@ -34,11 +34,10 @@ import (
 var _ = Describe("OpsRequest Controller", func() {
 
 	var (
-		randomStr             = testCtx.GetRandomStr()
-		clusterDefinitionName = "cluster-definition-" + randomStr
-		clusterVersionName    = "clusterversion-" + randomStr
-		clusterName           = "cluster-" + randomStr
-		consensusCompName     = "consensus"
+		randomStr       = testCtx.GetRandomStr()
+		compDefName     = "test-compdef-" + randomStr
+		clusterName     = "test-cluster-" + randomStr
+		defaultCompName = "mysql"
 	)
 
 	cleanupObjects := func() {
@@ -60,14 +59,13 @@ var _ = Describe("OpsRequest Controller", func() {
 
 	Context("Test OpsRequest", func() {
 		It("Should Test all OpsRequest", func() {
-			cluster := testapps.CreateConsensusMysqlCluster(&testCtx, clusterDefinitionName,
-				clusterVersionName, clusterName, "consensus", consensusCompName)
+			cluster := testapps.CreateDefaultMysqlCluster(&testCtx, clusterName, compDefName, defaultCompName)
 			By("init restart OpsRequest")
 			testOpsName := "restart-" + randomStr
 			ops := testapps.NewOpsRequestObj(testOpsName, testCtx.DefaultNamespace,
 				clusterName, appsv1alpha1.RestartType)
 			ops.Spec.RestartList = []appsv1alpha1.ComponentOps{
-				{ComponentName: consensusCompName},
+				{ComponentName: defaultCompName},
 			}
 			testapps.CreateOpsRequest(ctx, testCtx, ops)
 

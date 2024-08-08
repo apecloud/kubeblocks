@@ -12,13 +12,7 @@ You can scale a MongoDB cluster in two ways, vertical scaling and horizontal sca
 
 ## Vertical scaling
 
-You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, if you need to change the resource demand from 1C2G to 2C4G, vertical scaling is what you need.
-
-:::note
-
-During the vertical scaling process, a restart is triggered and the primary pod may change after the restarting.
-
-:::
+You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, you can change the resource class from 1C2G to 2C4G by performing vertical scaling.
 
 ### Before you start
 
@@ -70,7 +64,9 @@ Vertical scaling does not synchronize parameters related to CPU and memory and i
 
 ## Horizontal scaling
 
-Horizontal scaling changes the amount of pods. For example, you can apply horizontal scaling to scale pods up from one to two. The scaling process includes the backup and restore of data.
+Horizontal scaling changes the amount of pods. For example, you can scale out replicas from three to five.
+
+From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out instances, refer to [Horizontal Scale](./../../../api_docs/maintenance/scale/horizontal-scale.md) in API docs for more details and examples.
 
 ### Before you start
 
@@ -95,7 +91,7 @@ mongodb-cluster     default          mongodb               mongodb-5.0      Dele
     ```
 
     - `--components` describes the component name ready for horizontal scaling.
-    - `--replicas` describes the replica amount of the specified components.
+    - `--replicas` describes the replica amount of the specified components. Edit the amount based on your demands to scale in or out replicas.
 
 2. Validate the horizontal scaling operation.
 

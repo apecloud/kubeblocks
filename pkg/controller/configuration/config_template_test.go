@@ -149,17 +149,16 @@ single_thread_memory = 294912
 			},
 		}
 		component = &ctrlcomp.SynthesizedComponent{
-			ClusterDefName:     "mysql-three-node-definition",
-			Name:               "replicasets",
-			ClusterCompDefName: "replicasets",
-			Replicas:           5,
+			ClusterDefName: "mysql-three-node-definition",
+			Name:           "replicasets",
+			Replicas:       5,
 			VolumeClaimTemplates: []corev1.PersistentVolumeClaimTemplate{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "data",
 					},
 					Spec: corev1.PersistentVolumeClaimSpec{
-						Resources: corev1.ResourceRequirements{
+						Resources: corev1.VolumeResourceRequirements{
 							Requests: corev1.ResourceList{
 								corev1.ResourceStorage: resource.MustParse("10Gi"),
 							},

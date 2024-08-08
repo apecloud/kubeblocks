@@ -23,7 +23,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
@@ -31,8 +30,6 @@ import (
 var _ = Describe("", func() {
 	var (
 		BackupPolicyTemplateName = "test-bpt"
-		ClusterDefName           = "test-cd"
-		BackupPolicyName         = "test-bp"
 		BackupMethod             = "test-bm"
 		ActionSetName            = "test-as"
 		VsBackupMethodName       = "test-vs-bm"
@@ -63,9 +60,7 @@ var _ = Describe("", func() {
 			compDef1 := "compDef1"
 			compDef2 := "compDef2"
 			bpt := testapps.NewBackupPolicyTemplateFactory(BackupPolicyTemplateName).
-				SetClusterDefRef(ClusterDefName).
-				AddBackupPolicy(BackupPolicyName).
-				SetComponentDef(compDef1, compDef2).
+				AddBackupPolicy(compDef1, compDef2).
 				AddBackupMethod(BackupMethod, false, ActionSetName).
 				SetBackupMethodVolumeMounts("data", "/data").
 				AddBackupMethod(VsBackupMethodName, true, "").
@@ -75,7 +70,6 @@ var _ = Describe("", func() {
 				Create(&testCtx).GetObject()
 			key := client.ObjectKeyFromObject(bpt)
 			Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, pobj *v1alpha1.BackupPolicyTemplate) {
-				g.Expect(pobj.GetLabels()[constant.ClusterDefLabelKey]).To(Equal(bpt.Spec.ClusterDefRef))
 				g.Expect(pobj.GetLabels()[compDef1]).To(Equal(compDef1))
 				g.Expect(pobj.GetLabels()[compDef2]).To(Equal(compDef2))
 			})).Should(Succeed())

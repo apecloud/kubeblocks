@@ -35,9 +35,8 @@ import (
 
 var _ = Describe("cluster plan builder test", func() {
 	const (
-		clusterDefName     = "test-clusterdef"
-		clusterVersionName = "test-clusterversion"
-		clusterName        = "test-cluster" // this become cluster prefix name if used with testapps.NewClusterFactory().WithRandomName()
+		clusterDefName = "test-clusterdef"
+		clusterName    = "test-cluster" // this become cluster prefix name if used with testapps.NewClusterFactory().WithRandomName()
 	)
 
 	// Cleanups
@@ -48,7 +47,7 @@ var _ = Describe("cluster plan builder test", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 
 		// delete rest mocked objects
@@ -76,8 +75,9 @@ var _ = Describe("cluster plan builder test", func() {
 
 	Context("test init", func() {
 		It("should init successfully", func() {
-			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-				clusterDefName, clusterVersionName).WithRandomName().GetObject()
+			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName).
+				WithRandomName().
+				GetObject()
 			Expect(testCtx.Cli.Create(testCtx.Ctx, clusterObj)).Should(Succeed())
 			clusterKey := client.ObjectKeyFromObject(clusterObj)
 			Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, true)).Should(Succeed())

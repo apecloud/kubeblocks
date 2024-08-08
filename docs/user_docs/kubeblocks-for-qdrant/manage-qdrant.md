@@ -165,12 +165,19 @@ The scaling function for vector databases is also supported.
 
 ### Scale horizontally
 
+Horizontal scaling changes the amount of pods. For example, you can scale out replicas from three to five.
+
+From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out instances, refer to [Horizontal Scale](./../../api_docs/maintenance/scale/horizontal-scale.md) in API docs for more details and examples.
+
 Use the following command to perform horizontal scaling.
 
 ```bash
 kbcli cluster hscale qdrant --replicas=5 --components=qdrant
 ```
 
+- `--components` describes the component name ready for horizontal scaling.
+- `--replicas` describes the replica amount of the specified components. Edit the amount based on your demands to scale in or out replicas.
+  
 Please wait a few seconds until the scaling process is over.
 
 The `kbcli cluster hscale` command print the `opsname`, to check the progress of horizontal scaling, you can use the following command with the `opsname`.
@@ -197,7 +204,8 @@ kbcli cluster vscale qdrant --cpu=0.5 --memory=512Mi --components=qdrant
 ```
 
 Please wait a few seconds until the scaling process is over.
-The `kbcli cluster vscale` command print the `opsname`, to check the progress of scaling, you can use the following command with the `opsname`.
+
+The `kbcli cluster vscale` command prints a command to help check the progress of scaling.
 
 ```bash
 kubectl get ops qdrant-verticalscaling-rpw2l

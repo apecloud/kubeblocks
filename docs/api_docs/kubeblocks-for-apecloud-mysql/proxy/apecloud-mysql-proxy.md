@@ -330,7 +330,7 @@ kubectl exec -it myproxy-cluster-vtgate-8659d5db95-4dzt5 -- bash
 ls /vtdataroot
 ```
 
-Enter the container and view more logs of VTTable.
+Enter the container and view more logs of VTTablet.
 
 ```bash
 kubectl exec -it myproxy-cluster-mysql-0  -c vttablet -- bash

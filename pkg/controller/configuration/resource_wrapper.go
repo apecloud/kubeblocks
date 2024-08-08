@@ -57,8 +57,6 @@ type ResourceFetcher[T any] struct {
 
 	// Deprecated: this API will be removed from version 0.9.0
 	ClusterDefObj *appsv1alpha1.ClusterDefinition
-	// Deprecated: use ComponentDefinition instead
-	ClusterVerObj *appsv1alpha1.ClusterVersion
 
 	ConfigMapObj        *corev1.ConfigMap
 	ConfigurationObj    *appsv1alpha1.Configuration
@@ -133,22 +131,6 @@ func (r *ResourceFetcher[T]) ClusterDef() *T {
 	return r.Wrap(func() error {
 		r.ClusterDefObj = &appsv1alpha1.ClusterDefinition{}
 		return r.Client.Get(r.Context, clusterDefKey, r.ClusterDefObj)
-	})
-}
-
-// ClusterVer get clusterVersion cr
-// Deprecated: this API will be removed from version 0.9.0
-func (r *ResourceFetcher[T]) ClusterVer() *T {
-	clusterVerKey := client.ObjectKey{
-		Namespace: "",
-		Name:      r.ClusterObj.Spec.ClusterVersionRef,
-	}
-	return r.Wrap(func() error {
-		if clusterVerKey.Name == "" {
-			return nil
-		}
-		r.ClusterVerObj = &appsv1alpha1.ClusterVersion{}
-		return r.Client.Get(r.Context, clusterVerKey, r.ClusterVerObj)
 	})
 }
 

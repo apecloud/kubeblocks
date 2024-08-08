@@ -110,11 +110,18 @@ kbcli cluster describe mycluster
 
 ### Scale horizontally
 
+Horizontal scaling changes the amount of pods. For example, you can scale out replicas from three to five.
+
+From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out instances, refer to [Horizontal Scale](./../../api_docs/maintenance/scale/horizontal-scale.md) in API docs for more details and examples.
+
 Use the following command to perform horizontal scaling.
 
 ```bash
 kbcli cluster hscale mycluster --replicas=3 --components=be
 ```
+
+- `--components` describes the component name ready for horizontal scaling.
+- `--replicas` describes the replica amount of the specified components. Edit the amount based on your demands to scale in or out replicas.
 
 Please wait a few seconds until the scaling process is over.
 

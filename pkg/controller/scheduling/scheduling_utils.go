@@ -226,21 +226,9 @@ func buildNewAffinity4Legacy(clusterName, compName string, compAffinity *appsv1a
 		}
 	}
 	// Add pod PodAffinityTerm for dedicated node
-	if compAffinity.Tenancy == appsv1alpha1.DedicatedNode {
-		var labelSelectorReqs []metav1.LabelSelectorRequirement
-		labelSelectorReqs = append(labelSelectorReqs, metav1.LabelSelectorRequirement{
-			Key:      constant.WorkloadTypeLabelKey,
-			Operator: metav1.LabelSelectorOpIn,
-			Values:   appsv1alpha1.WorkloadTypes,
-		})
-		podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
-			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution, corev1.PodAffinityTerm{
-				TopologyKey: corev1.LabelHostname,
-				LabelSelector: &metav1.LabelSelector{
-					MatchExpressions: labelSelectorReqs,
-				},
-			})
-	}
+	// if compAffinity.Tenancy == appsv1alpha1.DedicatedNode {
+	//	// TODO(v1.0): workload type has been removed
+	// }
 	affinity.PodAntiAffinity = podAntiAffinity
 	return affinity
 }

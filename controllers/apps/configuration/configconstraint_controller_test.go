@@ -38,12 +38,6 @@ import (
 )
 
 var _ = Describe("ConfigConstraint Controller", func() {
-	const clusterDefName = "test-clusterdef"
-	const clusterVersionName = "test-clusterversion"
-	const statefulCompDefName = "replicasets"
-	const configSpecName = "mysql-config-tpl"
-	const configVolumeName = "mysql-config"
-
 	cleanEnv := func() {
 		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
@@ -51,7 +45,7 @@ var _ = Describe("ConfigConstraint Controller", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResources(&testCtx)
 
 		// delete rest mocked objects
@@ -70,30 +64,23 @@ var _ = Describe("ConfigConstraint Controller", func() {
 	Context("Create config constraint with cue validate", func() {
 		It("Should ready", func() {
 			By("creating a configmap and a config constraint")
-
 			configmap := testapps.CreateCustomizedObj(&testCtx,
 				"resources/mysql-config-template.yaml", &corev1.ConfigMap{},
 				testCtx.UseDefaultNamespace())
-
 			constraint := testapps.CreateCustomizedObj(&testCtx,
 				"resources/mysql-config-constraint.yaml",
 				&appsv1beta1.ConfigConstraint{})
 			constraintKey := client.ObjectKeyFromObject(constraint)
 
-			By("Create a clusterDefinition obj")
-			clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
+			By("Create a componentDefinition obj")
+			compDefObj := testapps.NewComponentDefinitionFactory(compDefName).
+				WithRandomName().
+				SetDefaultSpec().
 				AddConfigTemplate(configSpecName, configmap.Name, constraint.Name, testCtx.DefaultNamespace, configVolumeName).
 				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configSpecName), configmap.Name,
 					cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
-				Create(&testCtx).GetObject()
-
-			By("Create a clusterVersion obj")
-			clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponentVersion(statefulCompDefName).
-				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configSpecName), configmap.Name,
-					cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
-				Create(&testCtx).GetObject()
+				Create(&testCtx).
+				GetObject()
 
 			By("check ConfigConstraint(template) status and finalizer")
 			Eventually(testapps.CheckObj(&testCtx, constraintKey,
@@ -115,9 +102,8 @@ var _ = Describe("ConfigConstraint Controller", func() {
 					g.Expect(tpl.Status.Phase).To(BeEquivalentTo(appsv1beta1.CCDeletingPhase))
 				})).Should(Succeed())
 
-			By("By delete referencing clusterdefinition and clusterversion")
-			Expect(k8sClient.Delete(testCtx.Ctx, clusterVersionObj)).Should(Succeed())
-			Expect(k8sClient.Delete(testCtx.Ctx, clusterDefObj)).Should(Succeed())
+			By("By delete referencing componentdefinition")
+			Expect(k8sClient.Delete(testCtx.Ctx, compDefObj)).Should(Succeed())
 
 			By("check ConfigConstraint should be deleted")
 			Eventually(testapps.CheckObjExists(&testCtx, constraintKey, &appsv1beta1.ConfigConstraint{}, false), time.Second*60, time.Second*1).Should(Succeed())

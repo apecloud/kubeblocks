@@ -758,7 +758,7 @@ spec:
               phase:
                 description: |-
                   Specifies the status of the configuration template.
-                  When set to CCAvailablePhase, the ConfigConstraint can be referenced by ClusterDefinition or ClusterVersion.
+                  When set to CCAvailablePhase, the ConfigConstraint can be referenced by ClusterDefinition.
                 enum:
                 - Available
                 - Unavailable
@@ -1418,7 +1418,7 @@ spec:
               phase:
                 description: |-
                   Specifies the status of the configuration template.
-                  When set to CCAvailablePhase, the ConfigConstraint can be referenced by ClusterDefinition or ClusterVersion.
+                  When set to CCAvailablePhase, the ConfigConstraint can be referenced by ClusterDefinition.
                 enum:
                 - Available
                 - Unavailable

@@ -41,13 +41,12 @@ import (
 
 var _ = Describe("Restore OpsRequest", func() {
 	var (
-		randomStr             = testCtx.GetRandomStr()
-		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr
-		clusterVersionName    = "clusterversion-for-ops-" + randomStr
-		clusterName           = "cluster-for-ops-" + randomStr
-		restoreClusterName    = "restore-cluster"
-		backupName            = "backup-for-ops-" + randomStr
-		nodePort              = int32(31212)
+		randomStr          = testCtx.GetRandomStr()
+		compDefName        = "test-compdef-" + randomStr
+		clusterName        = "test-cluster-" + randomStr
+		restoreClusterName = "restore-cluster"
+		backupName         = "backup-for-ops-" + randomStr
+		nodePort           = int32(31212)
 	)
 
 	cleanEnv := func() {
@@ -57,8 +56,8 @@ var _ = Describe("Restore OpsRequest", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
+		// delete cluster(and all dependent sub-resources), cluster definition
+		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 
 		// delete rest resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
@@ -80,7 +79,7 @@ var _ = Describe("Restore OpsRequest", func() {
 		)
 		BeforeEach(func() {
 			By("init operations resources ")
-			opsRes, _, _ = initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			opsRes, _, _ = initOperationsResources(compDefName, clusterName)
 			reqCtx = intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 
 			By("create Backup")
@@ -121,7 +120,7 @@ var _ = Describe("Restore OpsRequest", func() {
 			By("mock backup annotations and labels")
 			opsRes.Cluster.Spec.Services = []appsv1alpha1.ClusterService{
 				{
-					ComponentSelector: consensusComp,
+					ComponentSelector: defaultCompName,
 					Service: appsv1alpha1.Service{
 						Name: "svc",
 						Spec: corev1.ServiceSpec{
@@ -132,7 +131,7 @@ var _ = Describe("Restore OpsRequest", func() {
 					},
 				},
 				{
-					ComponentSelector: consensusComp,
+					ComponentSelector: defaultCompName,
 					Service: appsv1alpha1.Service{
 						Name:        "svc-2",
 						ServiceName: "svc-2",
@@ -147,7 +146,7 @@ var _ = Describe("Restore OpsRequest", func() {
 			Expect(testapps.ChangeObj(&testCtx, backup, func(backup *dpv1alpha1.Backup) {
 				backup.Labels = map[string]string{
 					dptypes.BackupTypeLabelKey:      string(dpv1alpha1.BackupTypeFull),
-					constant.KBAppComponentLabelKey: consensusComp,
+					constant.KBAppComponentLabelKey: defaultCompName,
 				}
 				opsRes.Cluster.ResourceVersion = ""
 				clusterBytes, _ := json.Marshal(opsRes.Cluster)

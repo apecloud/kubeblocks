@@ -44,7 +44,7 @@ type CfgManagerBuildParams struct {
 
 	Volumes       []corev1.VolumeMount `json:"volumes"`
 	ComponentName string               `json:"componentName"`
-	SecreteName   string               `json:"secreteName"`
+	SecreteName   string               `json:"secreteName"` // TODO(v1.0): conn-credential
 
 	// add volume to pod
 	ScriptVolume           []corev1.Volume

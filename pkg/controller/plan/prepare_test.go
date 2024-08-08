@@ -37,7 +37,6 @@ import (
 )
 
 var _ = Describe("Prepare Test", func() {
-
 	cleanEnv := func() {
 		// must wait until resources deleted and no longer exist before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
@@ -64,40 +63,22 @@ var _ = Describe("Prepare Test", func() {
 	})
 
 	const (
-		clusterDefName     = "test-clusterdef"
-		clusterVersionName = "test-clusterversion"
-		clusterName        = "test-cluster"
-
-		mysqlClusterCompDefName = "mysql-cluster-comp-def"
-		mysqlCompDefName        = "mysql-comp-def"
-		mysqlCompName           = "mysql"
+		compDefName   = "test-compdef"
+		clusterName   = "test-cluster"
+		mysqlCompName = "mysql"
 	)
+
 	var (
-		clusterDefObj     *appsv1alpha1.ClusterDefinition
-		clusterVersionObj *appsv1alpha1.ClusterVersion
-		compDefObj        *appsv1alpha1.ComponentDefinition
-		cluster           *appsv1alpha1.Cluster
-		comp              *appsv1alpha1.Component
-		configSpecName    string
+		compDefObj     *appsv1alpha1.ComponentDefinition
+		cluster        *appsv1alpha1.Cluster
+		comp           *appsv1alpha1.Component
+		configSpecName string
 	)
 
 	Context("create cluster with component and component definition API, testing render configuration", func() {
-		createAllWorkloadTypesClusterDef := func(noCreateAssociateCV ...bool) {
-			By("Create a clusterDefinition obj")
-			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.ConsensusMySQLComponent, mysqlClusterCompDefName).
-				Create(&testCtx).GetObject()
-
-			if len(noCreateAssociateCV) > 0 && noCreateAssociateCV[0] {
-				return
-			}
-			By("Create a clusterVersion obj")
-			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponentVersion(mysqlClusterCompDefName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-				Create(&testCtx).GetObject()
-
+		createAllTypesClusterDef := func() {
 			By("Create a componentDefinition obj")
-			compDefObj = testapps.NewComponentDefinitionFactory(mysqlCompDefName).
+			compDefObj = testapps.NewComponentDefinitionFactory(compDefName).
 				WithRandomName().
 				SetDefaultSpec().
 				AddConfigs(testapps.DefaultCompDefConfigs).
@@ -108,21 +89,23 @@ var _ = Describe("Prepare Test", func() {
 		}
 
 		BeforeEach(func() {
-			createAllWorkloadTypesClusterDef()
+			createAllTypesClusterDef()
 
 			testapps.CreateCustomizedObj(&testCtx, "config/envfrom-config.yaml", &corev1.ConfigMap{}, testCtx.UseDefaultNamespace())
 			tpl := testapps.CreateCustomizedObj(&testCtx, "config/envfrom-constraint.yaml", &appsv1beta1.ConfigConstraint{})
 			configSpecName = tpl.Name
 
 			pvcSpec := testapps.NewPVCSpec("1Gi")
-			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name, clusterVersionObj.Name).
-				AddComponentV2(mysqlCompName, compDefObj.Name).
+			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
+				AddComponent(mysqlCompName, compDefObj.Name).
 				SetReplicas(1).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				Create(&testCtx).
 				GetObject()
 
-			comp, _ = component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
+			var err error
+			comp, err = component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
+			Expect(err).Should(Succeed())
 			comp.SetUID("test-uid")
 		})
 
@@ -131,7 +114,8 @@ var _ = Describe("Prepare Test", func() {
 				Ctx: ctx,
 				Log: logger,
 			}
-			synthesizeComp, err := component.BuildSynthesizedComponentWrapper(reqCtx, testCtx.Cli, cluster, &cluster.Spec.ComponentSpecs[0])
+
+			synthesizeComp, err := component.BuildSynthesizedComponent(reqCtx, testCtx.Cli, cluster, compDefObj, comp)
 			Expect(err).Should(Succeed())
 			Expect(synthesizeComp.PodSpec).ShouldNot(BeNil())
 			resCtx := &configuration.ResourceCtx{
@@ -144,8 +128,6 @@ var _ = Describe("Prepare Test", func() {
 			err = RenderConfigNScriptFiles(resCtx, cluster, comp, synthesizeComp, synthesizeComp.PodSpec, nil)
 			Expect(err).Should(Succeed())
 			Expect(configuration.CheckEnvFrom(&synthesizeComp.PodSpec.Containers[0], cfgcore.GenerateEnvFromName(cfgcore.GetComponentCfgName(cluster.Name, synthesizeComp.Name, configSpecName)))).Should(BeFalse())
-			// TODO(xingran): add more test cases
-			// Expect(len(synthesizeComp.PodSpec.Containers) >= 3).Should(BeTrue())
 		})
 	})
 })

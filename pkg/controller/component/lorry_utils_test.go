@@ -47,7 +47,6 @@ var _ = Describe("Lorry Utils", func() {
 			lorryGRPCPort = 50001
 
 			component = &SynthesizedComponent{}
-			component.CharacterType = "mysql"
 			component.ComponentServices = append(component.ComponentServices, appsv1alpha1.ComponentService{
 				Service: appsv1alpha1.Service{
 					Spec: corev1.ServiceSpec{

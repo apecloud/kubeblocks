@@ -117,3 +117,8 @@ func (builder *PodBuilder) SetActiveDeadlineSeconds(activeDeadline *int64) *PodB
 	builder.get().Spec.ActiveDeadlineSeconds = activeDeadline
 	return builder
 }
+
+func (builder *PodBuilder) SetImagePullSecrets(secrets []corev1.LocalObjectReference) *PodBuilder {
+	builder.get().Spec.ImagePullSecrets = secrets
+	return builder
+}

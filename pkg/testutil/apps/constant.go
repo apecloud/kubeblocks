@@ -38,24 +38,11 @@ const (
 	ServiceVPCName      = "vpc-lb"
 	ServiceInternetName = "internet-lb"
 
-	ReplicationPodRoleVolume      = "pod-role"
-	ReplicationRoleLabelFieldPath = "metadata.labels['kubeblocks.io/role']"
-	DefaultReplicationReplicas    = 2
-
 	ApeCloudMySQLImage        = "docker.io/apecloud/apecloud-mysql-server:latest"
 	DefaultMySQLContainerName = "mysql"
 
 	NginxImage                = "nginx"
 	DefaultNginxContainerName = "nginx"
-
-	DefaultRedisCompDefName       = "redis"
-	DefaultRedisCompSpecName      = "redis-rsts"
-	DefaultRedisImageName         = "redis:7.0.5"
-	DefaultRedisContainerName     = "redis"
-	DefaultRedisInitContainerName = "redis-init-container"
-
-	EnvKeyImageTag  = "IMAGE_TAG"
-	DefaultImageTag = "test"
 
 	DefaultConfigSpecName          = "config-cm"
 	DefaultConfigSpecTplRef        = "env-from-config-tpl"
@@ -76,55 +63,6 @@ var (
 		Limits: map[corev1.ResourceName]resource.Quantity{
 			corev1.ResourceCPU:    resource.MustParse("0"),
 			corev1.ResourceMemory: resource.MustParse("0"),
-		},
-	}
-
-	statelessNginxComponent = appsv1alpha1.ClusterComponentDefinition{
-		WorkloadType:  appsv1alpha1.Stateless,
-		CharacterType: "stateless",
-		Probes: &appsv1alpha1.ClusterDefinitionProbes{
-			RoleProbe: &appsv1alpha1.ClusterDefinitionProbe{
-				FailureThreshold: 3,
-				PeriodSeconds:    1,
-				TimeoutSeconds:   5,
-			},
-		},
-		VolumeProtectionSpec: &appsv1alpha1.VolumeProtectionSpec{},
-		PodSpec: &corev1.PodSpec{
-			Containers: []corev1.Container{{
-				Name:      DefaultNginxContainerName,
-				Image:     NginxImage,
-				Resources: zeroResRequirements,
-			}},
-		},
-		Service: &appsv1alpha1.ServiceSpec{
-			Ports: []appsv1alpha1.ServicePort{{
-				Protocol: corev1.ProtocolTCP,
-				Port:     80,
-			}},
-		},
-	}
-
-	// defaultSvc value are corresponding to defaultMySQLContainer.Ports name mapping and
-	// corresponding to defaultConnectionCredential variable placeholder
-	defaultSvcSpec = appsv1alpha1.ServiceSpec{
-		Ports: []appsv1alpha1.ServicePort{
-			{
-				Name: "mysql",
-				TargetPort: intstr.IntOrString{
-					Type:   intstr.String,
-					StrVal: "mysql",
-				},
-				Port: 3306,
-			},
-			{
-				Name: "paxos",
-				TargetPort: intstr.IntOrString{
-					Type:   intstr.String,
-					StrVal: "paxos",
-				},
-				Port: 13306,
-			},
 		},
 	}
 
@@ -163,79 +101,6 @@ var (
 		Command: []string{"/scripts/setup.sh"},
 	}
 
-	statefulMySQLComponent = appsv1alpha1.ClusterComponentDefinition{
-		WorkloadType:  appsv1alpha1.Stateful,
-		CharacterType: "mysql",
-		Probes: &appsv1alpha1.ClusterDefinitionProbes{
-			RoleProbe: &appsv1alpha1.ClusterDefinitionProbe{
-				FailureThreshold: 3,
-				PeriodSeconds:    1,
-				TimeoutSeconds:   5,
-			},
-		},
-		VolumeProtectionSpec: &appsv1alpha1.VolumeProtectionSpec{},
-		Service:              &defaultMySQLService,
-		PodSpec: &corev1.PodSpec{
-			Containers: []corev1.Container{
-				defaultMySQLContainer,
-			},
-		},
-		VolumeTypes: []appsv1alpha1.VolumeTypeSpec{
-			{
-				Name: DataVolumeName,
-				Type: appsv1alpha1.VolumeTypeData,
-			},
-		},
-	}
-
-	defaultConsensusSpec = appsv1alpha1.ConsensusSetSpec{
-		Leader: appsv1alpha1.ConsensusMember{
-			Name:       "leader",
-			AccessMode: appsv1alpha1.ReadWrite,
-		},
-		Followers: []appsv1alpha1.ConsensusMember{{
-			Name:       "follower",
-			AccessMode: appsv1alpha1.Readonly,
-		}},
-		StatefulSetSpec: appsv1alpha1.StatefulSetSpec{
-			UpdateStrategy: appsv1alpha1.BestEffortParallelStrategy,
-		},
-	}
-
-	defaultMySQLService = appsv1alpha1.ServiceSpec{
-		Ports: []appsv1alpha1.ServicePort{{
-			Name:     "mysql",
-			Protocol: corev1.ProtocolTCP,
-			Port:     3306,
-		}},
-	}
-
-	consensusMySQLComponent = appsv1alpha1.ClusterComponentDefinition{
-		WorkloadType:  appsv1alpha1.Consensus,
-		CharacterType: "mysql",
-		ConsensusSpec: &defaultConsensusSpec,
-		Probes: &appsv1alpha1.ClusterDefinitionProbes{
-			RoleProbe: &appsv1alpha1.ClusterDefinitionProbe{
-				FailureThreshold: 3,
-				PeriodSeconds:    1,
-				TimeoutSeconds:   5,
-			},
-		},
-		VolumeProtectionSpec: &appsv1alpha1.VolumeProtectionSpec{},
-		Service:              &defaultMySQLService,
-		PodSpec: &corev1.PodSpec{
-			Containers: []corev1.Container{
-				defaultMySQLContainer,
-			},
-		},
-		VolumeTypes: []appsv1alpha1.VolumeTypeSpec{
-			{
-				Name: DataVolumeName,
-				Type: appsv1alpha1.VolumeTypeData,
-			},
-		},
-	}
-
 	defaultComponentDefSpec = appsv1alpha1.ComponentDefinitionSpec{
 		Provider:       "kubeblocks.io",
 		Description:    "ApeCloud MySQL is a database that is compatible with MySQL syntax and achieves high availability\n  through the utilization of the RAFT consensus protocol.",
@@ -257,6 +122,24 @@ var (
 			},
 		},
 		Services: []appsv1alpha1.ComponentService{
+			{
+				Service: appsv1alpha1.Service{
+					Name: "default",
+					Spec: corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{
+							{
+								Protocol: corev1.ProtocolTCP,
+								Port:     3306,
+								TargetPort: intstr.IntOrString{
+									Type:   intstr.String,
+									StrVal: "mysql",
+								},
+							},
+						},
+					},
+					RoleSelector: "leader",
+				},
+			},
 			{
 				Service: appsv1alpha1.Service{
 					Name:        "rw",
@@ -318,6 +201,7 @@ var (
 				},
 			},
 		},
+		UpdateStrategy: &[]appsv1alpha1.UpdateStrategy{appsv1alpha1.BestEffortParallelStrategy}[0],
 		Roles: []appsv1alpha1.ReplicaRole{
 			{
 				Name:        "leader",
@@ -381,109 +265,6 @@ var (
 			Name:        DefaultScriptSpecName,
 			TemplateRef: DefaultScriptSpecTplRef,
 			VolumeName:  DefaultScriptSpecVolumeName,
-		},
-	}
-
-	defaultRedisService = appsv1alpha1.ServiceSpec{
-		Ports: []appsv1alpha1.ServicePort{{
-			Protocol: corev1.ProtocolTCP,
-			Port:     6379,
-		}},
-	}
-
-	defaultReplicationRedisVolumeMounts = []corev1.VolumeMount{
-		{
-			Name:      DataVolumeName,
-			MountPath: "/data",
-		},
-		{
-			Name:      ScriptsVolumeName,
-			MountPath: "/scripts",
-		},
-		{
-			Name:      ConfVolumeName,
-			MountPath: "/etc/conf",
-		},
-		{
-			Name:      ReplicationPodRoleVolume,
-			MountPath: "/etc/conf/role",
-		},
-	}
-
-	defaultRedisInitContainer = corev1.Container{
-		Name:            DefaultRedisInitContainerName,
-		Image:           DefaultRedisImageName,
-		ImagePullPolicy: corev1.PullIfNotPresent,
-		VolumeMounts:    defaultReplicationRedisVolumeMounts,
-		Command:         []string{"/scripts/init.sh"},
-		Resources:       zeroResRequirements,
-	}
-
-	defaultRedisContainer = corev1.Container{
-		Name:            DefaultRedisContainerName,
-		Image:           DefaultRedisImageName,
-		ImagePullPolicy: corev1.PullIfNotPresent,
-		Ports: []corev1.ContainerPort{
-			{
-				Name:          "redis",
-				Protocol:      corev1.ProtocolTCP,
-				ContainerPort: 6379,
-			},
-		},
-		VolumeMounts: defaultReplicationRedisVolumeMounts,
-		Args:         []string{"/etc/conf/redis.conf"},
-		Lifecycle: &corev1.Lifecycle{
-			PostStart: &corev1.LifecycleHandler{
-				Exec: &corev1.ExecAction{
-					Command: []string{"/scripts/setup.sh"},
-				},
-			},
-		},
-		Resources: zeroResRequirements,
-	}
-
-	replicationRedisComponent = appsv1alpha1.ClusterComponentDefinition{
-		WorkloadType:  appsv1alpha1.Replication,
-		CharacterType: "redis",
-		Probes: &appsv1alpha1.ClusterDefinitionProbes{
-			RoleProbe: &appsv1alpha1.ClusterDefinitionProbe{
-				FailureThreshold: 3,
-				PeriodSeconds:    1,
-				TimeoutSeconds:   5,
-			},
-		},
-		VolumeProtectionSpec: &appsv1alpha1.VolumeProtectionSpec{},
-		Service:              &defaultRedisService,
-		VolumeTypes: []appsv1alpha1.VolumeTypeSpec{{
-			Name: DataVolumeName,
-			Type: appsv1alpha1.VolumeTypeData,
-		}},
-		PodSpec: &corev1.PodSpec{
-			Volumes: []corev1.Volume{
-				{
-					Name: ConfVolumeName,
-					VolumeSource: corev1.VolumeSource{
-						EmptyDir: &corev1.EmptyDirVolumeSource{},
-					},
-				},
-				{
-					Name: ReplicationPodRoleVolume,
-					VolumeSource: corev1.VolumeSource{
-						DownwardAPI: &corev1.DownwardAPIVolumeSource{
-							Items: []corev1.DownwardAPIVolumeFile{
-								{
-									Path: "labels",
-									FieldRef: &corev1.ObjectFieldSelector{
-										FieldPath: ReplicationRoleLabelFieldPath,
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			InitContainers: []corev1.Container{defaultRedisInitContainer},
-			Containers:     []corev1.Container{defaultRedisContainer},
 		},
 	}
 

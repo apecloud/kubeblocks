@@ -23,10 +23,11 @@ import (
 	"os"
 	"testing"
 
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/valyala/fasthttp"
+
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
 func TestNewServer(t *testing.T) {

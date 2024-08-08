@@ -82,7 +82,10 @@ func (c CustomOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cli
 	// TODO: support Parallelism
 	for _, v := range customSpec.CustomOpsComponents {
 		// 1. init component action progress and preCheck if the conditions for executing ops are met.
-		passed := c.initCompActionStatusAndPreCheck(reqCtx, cli, opsRes, v)
+		requeueAfter, passed := c.initCompActionStatusAndPreCheck(reqCtx, cli, opsRes, v)
+		if requeueAfter != 0 {
+			return opsRequestPhase, requeueAfter, nil
+		}
 		if !passed {
 			compCompleteCount += 1
 			compFailedCount += 1
@@ -180,6 +183,9 @@ func (c CustomOpsHandler) checkExpression(reqCtx intctrlutil.RequestCtx,
 			return err
 		}
 		if buf.String() == "false" {
+			if needWaitPreConditionDeadline(opsRes.OpsRequest) {
+				return intctrlutil.NewRequeueError(time.Second, rule.Message)
+			}
 			return fmt.Errorf(rule.Message)
 		}
 	}
@@ -190,7 +196,7 @@ func (c CustomOpsHandler) checkExpression(reqCtx intctrlutil.RequestCtx,
 func (c CustomOpsHandler) initCompActionStatusAndPreCheck(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
-	compCustomItem appsv1alpha1.CustomOpsComponent) bool {
+	compCustomItem appsv1alpha1.CustomOpsComponent) (time.Duration, bool) {
 	if opsRes.OpsRequest.Status.Components == nil {
 		opsRes.OpsRequest.Status.Components = map[string]appsv1alpha1.OpsRequestComponentStatus{}
 	}
@@ -204,7 +210,10 @@ func (c CustomOpsHandler) initCompActionStatusAndPreCheck(reqCtx intctrlutil.Req
 					compStatus.PreCheckResult = &appsv1alpha1.PreCheckResult{Pass: false, Message: err.Error()}
 					opsRes.OpsRequest.Status.Components[compCustomItem.ComponentName] = compStatus
 					opsRes.Recorder.Event(opsRes.OpsRequest, corev1.EventTypeWarning, "PreCheckFailed", err.Error())
-					return false
+					if intctrlutil.IsRequeueError(err) {
+						return err.(intctrlutil.RequeueError).RequeueAfter(), false
+					}
+					return 0, false
 				}
 				compStatus.PreCheckResult = &appsv1alpha1.PreCheckResult{Pass: true}
 			}
@@ -218,7 +227,7 @@ func (c CustomOpsHandler) initCompActionStatusAndPreCheck(reqCtx intctrlutil.Req
 		}
 		opsRes.OpsRequest.Status.Components[compCustomItem.ComponentName] = compStatus
 	}
-	return true
+	return 0, true
 }
 
 func covertParametersToMap(parameters []appsv1alpha1.Parameter) map[string]string {

@@ -32,3 +32,8 @@ func NewServiceAccountBuilder(namespace, name string) *ServiceAccountBuilder {
 	builder.init(namespace, name, &corev1.ServiceAccount{}, builder)
 	return builder
 }
+
+func (b *ServiceAccountBuilder) SetImagePullSecrets(secrets []corev1.LocalObjectReference) *ServiceAccountBuilder {
+	b.get().ImagePullSecrets = secrets
+	return b
+}

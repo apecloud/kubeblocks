@@ -156,12 +156,13 @@ var _ = BeforeSuite(func() {
 	Expect(k8sClient).NotTo(BeNil())
 
 	// run reconcile
+	unCachedObjs := intctrlutil.GetUncachedObjects()
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme:  scheme.Scheme,
 		Metrics: server.Options{BindAddress: "0"},
 		Client: client.Options{
 			Cache: &client.CacheOptions{
-				DisableFor: intctrlutil.GetUncachedObjects(),
+				DisableFor: append(unCachedObjs, &dpv1alpha1.Restore{}),
 			},
 		},
 	})
@@ -190,13 +191,6 @@ var _ = BeforeSuite(func() {
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("cluster-definition-controller"),
-	}).SetupWithManager(k8sManager)
-	Expect(err).ToNot(HaveOccurred())
-
-	err = (&ClusterVersionReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("cluster-version-controller"),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 

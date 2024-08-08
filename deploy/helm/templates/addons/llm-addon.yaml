@@ -3,7 +3,7 @@
   "kbVersion" ">=0.7.0"
   "selectorLabels" $selectorLabels
   "name" "llm"
-  "version" "0.9.0"
+  "version" "1.0.0-alpha.0"
   "model" "LLM"
   "provider" "community"
   "description" "Large Language Models."

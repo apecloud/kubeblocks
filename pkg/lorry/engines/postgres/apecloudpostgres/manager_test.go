@@ -608,7 +608,7 @@ func TestLeaveMemberFromCluster(t *testing.T) {
 		mock.ExpectExec("alter system").
 			WillReturnResult(pgxmock.NewResult("alter system", 1))
 
-		err := manager.LeaveMemberFromCluster(ctx, cluster, "")
+		err := manager.LeaveMemberFromCluster(ctx, cluster, manager.CurrentMemberName)
 		assert.Nil(t, err)
 	})
 

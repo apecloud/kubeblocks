@@ -22,6 +22,7 @@ package apecloudpostgres
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -313,13 +314,25 @@ func (mgr *Manager) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs
 func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Cluster, memberName string) error {
 	addr := mgr.GetMemberAddrWithName(ctx, cluster, memberName)
 	if addr == "" {
-		mgr.Logger.Info(fmt.Sprintf("member %s already deleted", memberName))
+		mgr.Logger.Info(fmt.Sprintf("member %s not found or already deleted", memberName))
 		return nil
 	}
 
-	sql := fmt.Sprintf(`alter system consensus drop follower '%s:%d';`, addr, mgr.Config.GetDBPort())
+	var port int
+	var err error
+	mem := cluster.GetMemberWithName(memberName)
+	if mem == nil {
+		mgr.Logger.Info(fmt.Sprintf("member %s not found or already deleted", memberName))
+		return nil
+	}
+	port, err = strconv.Atoi(mem.DBPort)
+	if err != nil {
+		mgr.Logger.Error(err, fmt.Sprintf("get member %v port failed", memberName))
+	}
 
-	_, err := mgr.ExecLeader(ctx, sql, cluster)
+	sql := fmt.Sprintf(`alter system consensus drop follower '%s:%d';`, addr, port)
+
+	_, err = mgr.ExecLeader(ctx, sql, cluster)
 	if err != nil {
 		mgr.Logger.Error(err, fmt.Sprintf("exec sql:%s failed", sql))
 		return err

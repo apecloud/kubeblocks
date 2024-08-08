@@ -38,7 +38,7 @@ type Client interface {
 	JoinMember(ctx context.Context) error
 
 	// LeaveMember sends a Leave member operation request to Lorry, located on the target pod that is about to leave.
-	LeaveMember(ctx context.Context) error
+	LeaveMember(ctx context.Context, parameters map[string]any) error
 
 	Switchover(ctx context.Context, primary, candidate string, force bool) error
 	Lock(ctx context.Context) error

@@ -153,7 +153,7 @@ func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Clu
 	}
 	addr := mgr.GetAddrWithMemberName(ctx, cluster, memberName)
 	if addr == "" {
-		mgr.Logger.Info(fmt.Sprintf("member %s already deleted", memberName))
+		mgr.Logger.Info(fmt.Sprintf("member %s not found or already deleted", memberName))
 		return nil
 	}
 

@@ -97,6 +97,26 @@ var _ = Describe("utils test", func() {
 		})
 	})
 
+	Context("SortPodsByName function", func() {
+		It("should work well", func() {
+			pods := []*corev1.Pod{
+				builder.NewPodBuilder(namespace, "pod-6").GetObject(),
+				builder.NewPodBuilder(namespace, "pod-2").GetObject(),
+				builder.NewPodBuilder(namespace, "pod-1").GetObject(),
+				builder.NewPodBuilder(namespace, "pod-0").GetObject(),
+				builder.NewPodBuilder(namespace, "pod-5").GetObject(),
+				builder.NewPodBuilder(namespace, "pod-3").GetObject(),
+				builder.NewPodBuilder(namespace, "pod-4").GetObject(),
+			}
+			expectedOrder := []string{"pod-0", "pod-1", "pod-2", "pod-3", "pod-4", "pod-5", "pod-6"}
+
+			SortPodsByName(pods, true)
+			for i, pod := range pods {
+				Expect(pod.Name).Should(Equal(expectedOrder[i]))
+			}
+		})
+	})
+
 	Context("getRoleName function", func() {
 		It("should work well", func() {
 			pod := builder.NewPodBuilder(namespace, name).AddLabels(RoleLabelKey, "LEADER").GetObject()

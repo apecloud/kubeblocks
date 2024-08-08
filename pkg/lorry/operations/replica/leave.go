@@ -86,21 +86,28 @@ func (s *Leave) Do(ctx context.Context, req *operations.OpsRequest) (*operations
 		return nil, err
 	}
 
-	currentMember := cluster.GetMemberWithName(manager.GetCurrentMemberName())
-	if !cluster.HaConfig.IsDeleting(currentMember) {
-		cluster.HaConfig.AddMemberToDelete(currentMember)
+	var memberNameToLeave string
+	if req.Parameters != nil && req.GetString("podName") != "" {
+		memberNameToLeave = req.GetString("podName")
+	} else {
+		memberNameToLeave = manager.GetCurrentMemberName()
+	}
+
+	memberToLeave := cluster.GetMemberWithName(memberNameToLeave)
+	if !cluster.HaConfig.IsDeleting(memberToLeave) {
+		cluster.HaConfig.AddMemberToDelete(memberToLeave)
 		_ = s.dcsStore.UpdateHaConfig()
 	}
 
-	// remove current member from db cluster
-	err = manager.LeaveMemberFromCluster(ctx, cluster, manager.GetCurrentMemberName())
+	// remove member from db cluster, the member may be other pod, depending on if podName is assigned in req.Parameters
+	err = manager.LeaveMemberFromCluster(ctx, cluster, memberNameToLeave)
 	if err != nil {
 		s.logger.Error(err, "Leave member from cluster failed")
 		return nil, err
 	}
 
-	if cluster.HaConfig.IsDeleting(currentMember) {
-		cluster.HaConfig.FinishDeleted(currentMember)
+	if cluster.HaConfig.IsDeleting(memberToLeave) {
+		cluster.HaConfig.FinishDeleted(memberToLeave)
 		_ = s.dcsStore.UpdateHaConfig()
 	}
 

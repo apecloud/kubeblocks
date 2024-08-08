@@ -560,7 +560,7 @@ func (mgr *Manager) LeaveMemberFromCluster(ctx context.Context, cluster *dcs.Clu
 		configMembers = append(configMembers, configMember)
 	}
 	if isDeleted {
-		mgr.Logger.Info("member is already deleted", "member", memberName)
+		mgr.Logger.Info("member not found or is already deleted", "member", memberName)
 		return nil
 	}
 

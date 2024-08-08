@@ -25,6 +25,8 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+
 	"github.com/spf13/viper"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
@@ -578,15 +580,23 @@ func (r *componentWorkloadOps) scaleOut(itsObj *workloads.InstanceSet) error {
 	}
 }
 
+func getHealthyLorryClient(pods []*corev1.Pod) (lorry.Client, error) {
+	for _, pod := range pods {
+		lorryCli, err := lorry.NewClient(*pod)
+		if err == nil && !intctrlutil.IsNil(lorryCli) {
+			return lorryCli, nil
+		}
+	}
+	return nil, fmt.Errorf("no health lorry client found")
+}
+
 func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 	pods, err := component.ListOwnedPods(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, r.cluster.Name, r.synthesizeComp.Name)
 	if err != nil {
 		return err
 	}
+
 	isLeader := func(pod *corev1.Pod) bool {
-		if pod == nil || len(pod.Labels) == 0 {
-			return false
-		}
 		roleName, ok := pod.Labels[constant.RoleLabelKey]
 		if !ok {
 			return false
@@ -601,6 +611,10 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 	}
 
 	tryToSwitchover := func(lorryCli lorry.Client, pod *corev1.Pod) error {
+		if pod == nil || len(pod.Labels) == 0 {
+			return nil
+		}
+
 		// if pod is not leader/primary, no need to switchover
 		if !isLeader(pod) {
 			return nil
@@ -625,6 +639,7 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 
 	// TODO: Move memberLeave to the ITS controller. Instead of performing a switchover, we can directly scale down the non-leader nodes. This is because the pod ordinal is not guaranteed to be continuous.
 	podsToMemberLeave := make([]*corev1.Pod, 0)
+
 	for _, pod := range pods {
 		// if the pod not exists in the generated pod names, it should be a member that needs to leave
 		if _, ok := r.desiredCompPodNameSet[pod.Name]; ok {
@@ -632,31 +647,35 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 		}
 		podsToMemberLeave = append(podsToMemberLeave, pod)
 	}
+
+	instanceset.SortPodsByName(pods, false)
 	for _, pod := range podsToMemberLeave {
-		if !(isLeader(pod) || // if the pod is leader, it needs to call switchover
-			(r.synthesizeComp.LifecycleActions != nil && r.synthesizeComp.LifecycleActions.MemberLeave != nil)) { // if the memberLeave action is defined, it needs to call it
-			continue
-		}
-
 		lorryCli, err1 := lorry.NewClient(*pod)
-		if err1 != nil {
-			if err == nil {
-				err = err1
+		if err1 != nil || intctrlutil.IsNil(lorryCli) {
+			lorryCli, err1 = getHealthyLorryClient(pods)
+			if err1 != nil {
+				if err == nil {
+					err = err1
+				}
+				continue
 			}
+		}
+
+		if isLeader(pod) {
+			// switchover if the leaving pod is leader
+			if switchoverErr := tryToSwitchover(lorryCli, pod); switchoverErr != nil {
+				return switchoverErr
+			}
+		}
+
+		if r.synthesizeComp.LifecycleActions == nil || r.synthesizeComp.LifecycleActions.MemberLeave == nil {
 			continue
 		}
 
-		if intctrlutil.IsNil(lorryCli) {
-			// no lorry in the pod
-			continue
-		}
-
-		// switchover if the leaving pod is leader
-		if switchoverErr := tryToSwitchover(lorryCli, pod); switchoverErr != nil {
-			return switchoverErr
-		}
-
-		if err2 := lorryCli.LeaveMember(r.reqCtx.Ctx); err2 != nil {
+		parameters := make(map[string]any)
+		parameters["podName"] = pod.Spec.Hostname
+		err2 := lorryCli.LeaveMember(r.reqCtx.Ctx, parameters)
+		if err2 != nil {
 			// For the purpose of upgrade compatibility, if the version of Lorry is 0.7 and
 			// the version of KB is upgraded to 0.8 or newer, lorry client will return an NotImplemented error,
 			// in this case, here just ignore it.

@@ -303,7 +303,7 @@ var _ = Describe("OpsUtil functions", func() {
 
 		It("Test EnqueueOnForce=true", func() {
 			By("init operations resources ")
-			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterName)
+			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
 			testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusComp)
 
 			By("mock cluster phase to Updating")

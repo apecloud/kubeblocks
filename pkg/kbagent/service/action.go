@@ -87,7 +87,7 @@ func (s *actionService) Decode(payload []byte) (interface{}, error) {
 func (s *actionService) HandleRequest(ctx context.Context, i interface{}) ([]byte, error) {
 	req := i.(*proto.ActionRequest)
 	if _, ok := s.actions[req.Action]; !ok {
-		return nil, errors.Wrap(ErrNotDefined, fmt.Sprintf("%s is not defined", req.Action))
+		return nil, errors.Wrapf(ErrNotDefined, "%s is not defined", req.Action)
 	}
 	return s.handleActionRequest(ctx, req)
 }

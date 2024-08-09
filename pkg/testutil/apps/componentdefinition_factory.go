@@ -255,8 +255,8 @@ func (f *MockComponentDefinitionFactory) SetLabels(labels map[string]string) *Mo
 
 func (f *MockComponentDefinitionFactory) SetReplicasLimit(minReplicas, maxReplicas int32) *MockComponentDefinitionFactory {
 	f.Get().Spec.ReplicasLimit = &appsv1alpha1.ReplicasLimit{
-		MinReplicas: minReplicas,
-		MaxReplicas: maxReplicas,
+		MinReplicas: &minReplicas,
+		MaxReplicas: &maxReplicas,
 	}
 	return f
 }

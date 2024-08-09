@@ -28,9 +28,11 @@ import (
 )
 
 var (
-	defaultReplicasLimit = appsv1alpha1.ReplicasLimit{
-		MinReplicas: 1,
-		MaxReplicas: math.MaxInt32,
+	defaultMinReplicasLimit = int32(1)
+	defaultMaxReplicasLimit = int32(math.MaxInt32)
+	defaultReplicasLimit    = appsv1alpha1.ReplicasLimit{
+		MinReplicas: &defaultMinReplicasLimit,
+		MaxReplicas: &defaultMaxReplicasLimit,
 	}
 )
 
@@ -96,12 +98,12 @@ func validateCompReplicas(comp *appsv1alpha1.Component, compDef *appsv1alpha1.Co
 	}
 
 	replicas := comp.Spec.Replicas
-	if replicas >= replicasLimit.MinReplicas && replicas <= replicasLimit.MaxReplicas {
+	if replicas >= *replicasLimit.MinReplicas && replicas <= *replicasLimit.MaxReplicas {
 		return nil
 	}
 	return replicasOutOfLimitError(replicas, *replicasLimit)
 }
 
 func replicasOutOfLimitError(replicas int32, replicasLimit appsv1alpha1.ReplicasLimit) error {
-	return fmt.Errorf("replicas %d out-of-limit [%d, %d]", replicas, replicasLimit.MinReplicas, replicasLimit.MaxReplicas)
+	return fmt.Errorf("replicas %d out-of-limit [%d, %d]", replicas, *replicasLimit.MinReplicas, *replicasLimit.MaxReplicas)
 }

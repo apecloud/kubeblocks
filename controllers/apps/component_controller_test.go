@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -389,9 +390,10 @@ var _ = Describe("Component Controller", func() {
 		By("set min replicas limit to 0")
 		compDefKey := client.ObjectKeyFromObject(compDefObj)
 		Eventually(testapps.GetAndChangeObj(&testCtx, compDefKey, func(compDef *appsv1alpha1.ComponentDefinition) {
+			maxReplicas, minReplicas := int32(5), int32(0)
 			compDef.Spec.ReplicasLimit = &appsv1alpha1.ReplicasLimit{
-				MinReplicas: 0,
-				MaxReplicas: 5,
+				MinReplicas: &minReplicas,
+				MaxReplicas: &maxReplicas,
 			}
 		})).Should(Succeed())
 
@@ -405,7 +407,7 @@ var _ = Describe("Component Controller", func() {
 		By("checking the number of replicas in component as expected")
 		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
 			g.Expect(comp.Spec.Replicas).Should(Equal(target))
-			g.Expect(comp.Generation).Should(Equal(comp.Status.ObservedGeneration))
+			g.Expect(comp.Generation).Should(Equal(comp.Status.ObservedGeneration), fmt.Sprintf("Component info: %#v", comp))
 		})).Should(Succeed())
 
 		By("checking the number of replicas in ITS as expected")
@@ -1362,30 +1364,45 @@ var _ = Describe("Component Controller", func() {
 	}
 
 	testCompReplicasLimit := func(compName, compDefName string) {
+
+		replicasLimitWithoutFilling := &appsv1alpha1.ReplicasLimit{}
+		minReplicas, maxReplicas := int32(4), int32(16)
 		replicasLimit := &appsv1alpha1.ReplicasLimit{
-			MinReplicas: 4,
-			MaxReplicas: 16,
+			MinReplicas: &minReplicas,
+			MaxReplicas: &maxReplicas,
 		}
+		compDefKey := client.ObjectKeyFromObject(compDefObj)
+
+		By("set replicas limit w/o filling")
+		Eventually(testapps.GetAndChangeObj(&testCtx, compDefKey, func(compDef *appsv1alpha1.ComponentDefinition) {
+			compDef.Spec.ReplicasLimit = replicasLimitWithoutFilling
+		})).Should(Succeed())
+
+		By("verify replicas limit value w/o filling")
+		Eventually(testapps.CheckObj(&testCtx, compDefKey, func(g Gomega, compDef *appsv1alpha1.ComponentDefinition) {
+			g.Expect(*compDef.Spec.ReplicasLimit.MinReplicas).Should(BeEquivalentTo(int32(1)))
+			g.Expect(*compDef.Spec.ReplicasLimit.MaxReplicas).Should(BeEquivalentTo(int32(math.MaxInt32)))
+		})).Should(Succeed())
+
 		By("create component w/o replicas limit set")
 		createClusterObj(compName, compDefName, func(f *testapps.MockClusterFactory) {
-			f.SetReplicas(replicasLimit.MaxReplicas * 2)
+			f.SetReplicas(*replicasLimit.MaxReplicas * 2)
 		})
 		itsKey := types.NamespacedName{
 			Namespace: compObj.Namespace,
 			Name:      compObj.Name,
 		}
 		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
-			g.Expect(*its.Spec.Replicas).Should(BeEquivalentTo(replicasLimit.MaxReplicas * 2))
+			g.Expect(*its.Spec.Replicas).Should(BeEquivalentTo(*replicasLimit.MaxReplicas * 2))
 		})).Should(Succeed())
 
 		By("set replicas limit")
-		compDefKey := client.ObjectKeyFromObject(compDefObj)
 		Eventually(testapps.GetAndChangeObj(&testCtx, compDefKey, func(compDef *appsv1alpha1.ComponentDefinition) {
 			compDef.Spec.ReplicasLimit = replicasLimit
 		})).Should(Succeed())
 
 		By("create component w/ replicas limit set - out-of-limit")
-		for _, replicas := range []int32{replicasLimit.MinReplicas / 2, replicasLimit.MaxReplicas * 2} {
+		for _, replicas := range []int32{*replicasLimit.MinReplicas / 2, *replicasLimit.MaxReplicas * 2} {
 			createClusterObjWithPhase(compName, compDefName, func(f *testapps.MockClusterFactory) {
 				f.SetReplicas(replicas)
 			}, "")
@@ -1404,7 +1421,7 @@ var _ = Describe("Component Controller", func() {
 		}
 
 		By("create component w/ replicas limit set - ok")
-		for _, replicas := range []int32{replicasLimit.MinReplicas, (replicasLimit.MinReplicas + replicasLimit.MaxReplicas) / 2, replicasLimit.MaxReplicas} {
+		for _, replicas := range []int32{*replicasLimit.MinReplicas, (*replicasLimit.MinReplicas + *replicasLimit.MaxReplicas) / 2, *replicasLimit.MaxReplicas} {
 			createClusterObj(compName, compDefName, func(f *testapps.MockClusterFactory) {
 				f.SetReplicas(replicas)
 			})

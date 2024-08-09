@@ -5023,21 +5023,20 @@ spec:
                   This field is immutable.
                 properties:
                   maxReplicas:
+                    default: 2147483647
                     description: The maximum limit of replicas.
                     format: int32
                     type: integer
                   minReplicas:
+                    default: 1
                     description: The minimum limit of replicas.
                     format: int32
                     type: integer
-                required:
-                - maxReplicas
-                - minReplicas
                 type: object
                 x-kubernetes-validations:
                 - message: the minimum and maximum limit of replicas should be in
-                    the range of [0, 128]
-                  rule: self.minReplicas >= 0 && self.maxReplicas <= 128
+                    the range of [0, math.MaxInt32]
+                  rule: self.minReplicas >= 0 && self.maxReplicas <= 2147483647
                 - message: the minimum replicas limit should be no greater than the
                     maximum
                   rule: self.minReplicas <= self.maxReplicas

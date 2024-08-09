@@ -565,18 +565,20 @@ type ComponentVolume struct {
 
 // ReplicasLimit defines the valid range of number of replicas supported.
 //
-// +kubebuilder:validation:XValidation:rule="self.minReplicas >= 0 && self.maxReplicas <= 128",message="the minimum and maximum limit of replicas should be in the range of [0, 128]"
+// +kubebuilder:validation:XValidation:rule="self.minReplicas >= 0 && self.maxReplicas <= 2147483647",message="the minimum and maximum limit of replicas should be in the range of [0, math.MaxInt32]"
 // +kubebuilder:validation:XValidation:rule="self.minReplicas <= self.maxReplicas",message="the minimum replicas limit should be no greater than the maximum"
 type ReplicasLimit struct {
 	// The minimum limit of replicas.
 	//
-	// +kubebuilder:validation:Required
-	MinReplicas int32 `json:"minReplicas"`
+	// +kubebuilder:default=1
+	// +optional
+	MinReplicas *int32 `json:"minReplicas,omitempty"`
 
 	// The maximum limit of replicas.
 	//
-	// +kubebuilder:validation:Required
-	MaxReplicas int32 `json:"maxReplicas"`
+	// +kubebuilder:default=2147483647
+	// +optional
+	MaxReplicas *int32 `json:"maxReplicas,omitempty"`
 }
 
 type SystemAccount struct {

@@ -35,7 +35,7 @@ var (
 	ErrBusy           = errors.New("busy")
 	ErrTimeout        = errors.New("timeout")
 	ErrFailed         = errors.New("failed")
-	ErrInternalError  = errors.New("internal error")
+	ErrInternalError  = errors.New("InternalError")
 )
 
 type Service interface {

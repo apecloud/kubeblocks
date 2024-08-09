@@ -21,9 +21,9 @@ package extensions
 
 import (
 	"context"
+	"fmt"
 	"runtime"
 
-	ctrlerihandler "github.com/authzed/controller-idioms/handler"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
@@ -39,6 +39,7 @@ import (
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -80,65 +81,26 @@ func (r *AddonReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		Recorder: r.Recorder,
 	}
 
-	// TODO (good-first-issue) rewrite it using the new kubebuilderx framework
-
-	buildStageCtx := func(next ...ctrlerihandler.Handler) stageCtx {
+	buildStageCtx := func() stageCtx {
 		return stageCtx{
 			reqCtx:     &reqCtx,
 			reconciler: r,
-			next:       ctrlerihandler.Handlers(next).MustOne(),
 		}
 	}
 
-	fetchNDeletionCheckStageBuilder := func(next ...ctrlerihandler.Handler) ctrlerihandler.Handler {
-		return ctrlerihandler.NewTypeHandler(&fetchNDeletionCheckStage{
-			stageCtx: buildStageCtx(next...),
-			deletionStage: deletionStage{
-				stageCtx: buildStageCtx(ctrlerihandler.NoopHandler),
-			},
-		})
-	}
+	logger := log.FromContext(ctx).WithValues("addon", req.NamespacedName)
+	err := kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
+		Prepare(NewTreeLoader()).
+		Do(NewfetchNDeletionCheckReconciler(reqCtx, buildStageCtx)).
+		Do(NewGenIDProceedCheckReconciler(reqCtx, buildStageCtx)).
+		Do(NewMetadataCheckReconciler(reqCtx, buildStageCtx)).
+		Do(NewInstallableCheckReconciler(reqCtx, buildStageCtx)).
+		Do(NewAutoInstallCheckReconciler(reqCtx, buildStageCtx)).
+		Do(NewEnabledWithDefaultValuesReconciler(reqCtx, buildStageCtx)).
+		Do(NewProgressingReconciler(reqCtx, buildStageCtx)).
+		Do(NewTerminalStateReconciler(reqCtx, buildStageCtx)).
+		Commit()
 
-	genIDProceedStageBuilder := func(next ...ctrlerihandler.Handler) ctrlerihandler.Handler {
-		return ctrlerihandler.NewTypeHandler(&genIDProceedCheckStage{stageCtx: buildStageCtx(next...)})
-	}
-
-	metadataCheckStageBuilder := func(next ...ctrlerihandler.Handler) ctrlerihandler.Handler {
-		return ctrlerihandler.NewTypeHandler(&metadataCheckStage{stageCtx: buildStageCtx(next...)})
-	}
-
-	installableCheckStageBuilder := func(next ...ctrlerihandler.Handler) ctrlerihandler.Handler {
-		return ctrlerihandler.NewTypeHandler(&installableCheckStage{stageCtx: buildStageCtx(next...)})
-	}
-
-	autoInstallCheckStageBuilder := func(next ...ctrlerihandler.Handler) ctrlerihandler.Handler {
-		return ctrlerihandler.NewTypeHandler(&autoInstallCheckStage{stageCtx: buildStageCtx(next...)})
-	}
-
-	enabledAutoValuesStageBuilder := func(next ...ctrlerihandler.Handler) ctrlerihandler.Handler {
-		return ctrlerihandler.NewTypeHandler(&enabledWithDefaultValuesStage{stageCtx: buildStageCtx(next...)})
-	}
-
-	progressingStageBuilder := func(next ...ctrlerihandler.Handler) ctrlerihandler.Handler {
-		return ctrlerihandler.NewTypeHandler(&progressingHandler{stageCtx: buildStageCtx(next...)})
-	}
-
-	terminalStateStageBuilder := func(next ...ctrlerihandler.Handler) ctrlerihandler.Handler {
-		return ctrlerihandler.NewTypeHandler(&terminalStateStage{stageCtx: buildStageCtx(next...)})
-	}
-
-	handlers := ctrlerihandler.Chain(
-		fetchNDeletionCheckStageBuilder,
-		genIDProceedStageBuilder,
-		metadataCheckStageBuilder,
-		installableCheckStageBuilder,
-		autoInstallCheckStageBuilder,
-		enabledAutoValuesStageBuilder,
-		progressingStageBuilder,
-		terminalStateStageBuilder,
-	).Handler("")
-
-	handlers.Handle(ctx)
 	res, ok := reqCtx.Ctx.Value(resultValueKey).(*ctrl.Result)
 	if ok && res != nil {
 		err, ok := reqCtx.Ctx.Value(errorValueKey).(error)
@@ -148,7 +110,7 @@ func (r *AddonReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return *res, nil
 	}
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{}, err
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -204,17 +166,23 @@ func (r *AddonReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx,
 		}
 		job := &batchv1.Job{}
 		if err := r.Get(reqCtx.Ctx, key, job); err != nil {
+			fmt.Println("not found: ", jobName)
 			return client.IgnoreNotFound(err)
 		}
 		if !job.DeletionTimestamp.IsZero() {
+			fmt.Println("DeletionTimestamp.IsZero: ", jobName)
+			fmt.Println(job.DeletionTimestamp)
 			return nil
 		}
 		if err := r.Delete(reqCtx.Ctx, job); err != nil {
+			fmt.Println("can not found when delete: ", jobName)
 			return client.IgnoreNotFound(err)
 		}
+		fmt.Println("succee delete: ", jobName)
 		return nil
 	}
 	for _, j := range []string{getInstallJobName(addon), getUninstallJobName(addon)} {
+		fmt.Println("job name: ", j)
 		if err := deleteJobIfExist(j); err != nil {
 			return nil, err
 		}

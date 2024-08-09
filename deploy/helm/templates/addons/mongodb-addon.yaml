@@ -3,7 +3,7 @@
   "kbVersion" ">=0.7.0"
   "selectorLabels" $selectorLabels
   "name" "mongodb"
-  "version" "0.9.0"
+  "version" "1.0.0-alpha.0"
   "model" "document"
   "provider" "apecloud"
   "description" "MongoDB is a document database designed for ease of application development and scaling."

@@ -26,7 +26,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-func DoMerge(baseData map[string]string, patch map[string]appsv1alpha1.ConfigParams, cc *appsv1beta1.ConfigConstraint, configSpec appsv1alpha1.ComponentConfigSpec) (map[string]string, error) {
+func DoMerge(baseData map[string]string, patch map[string]appsv1alpha1.ParametersInFile, cc *appsv1beta1.ConfigConstraint, configSpec appsv1alpha1.ComponentConfigSpec) (map[string]string, error) {
 	var (
 		updatedFiles  = make(map[string]string, len(patch))
 		updatedParams = make([]core.ParamPairs, 0, len(patch))

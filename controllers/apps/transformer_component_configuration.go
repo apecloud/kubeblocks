@@ -68,6 +68,10 @@ func (t *componentConfigurationTransformer) Transform(ctx graph.TransformContext
 		}
 	}
 
+	// refactor(sophon): Split into two transformers
+	// 1. build configuration cr, manager the configuration life cycle
+	// 2. build config-manager sidecar
+
 	// configuration render
 	if err := plan.RenderConfigNScriptFiles(
 		&configctrl.ResourceCtx{

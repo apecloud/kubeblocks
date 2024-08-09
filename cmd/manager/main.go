@@ -447,7 +447,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&configuration.ReconfigureReconciler{
+		if err = (&configuration.ParameterReconciler{
 			Client:   client,
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("reconfigure-controller"),
@@ -525,6 +525,14 @@ func main() {
 			setupLog.Error(err, "unable to create controller", "controller", "NodeCountScaler")
 			os.Exit(1)
 		}
+	}
+	if err = (&configuration.ParametersDefinitionReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("parameters-definition-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ParametersDefinition")
+		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
 

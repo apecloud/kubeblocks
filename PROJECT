@@ -227,4 +227,12 @@ resources:
   kind: NodeCountScaler
   path: github.com/apecloud/kubeblocks/apis/experimental/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+  controller: true
+  domain: kubeblocks.io
+  group: apps
+  kind: ParametersDefinition
+  path: github.com/apecloud/kubeblocks/apis/apps/v1beta1
+  version: v1beta1
 version: "3"

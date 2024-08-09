@@ -242,6 +242,7 @@ func (r *reconfigureAction) doReconfiguring(params reconfigureParams) error {
 		componentName: params.componentName,
 	})
 
+	// TODO(sophon): update parameters to cluster cr
 	result := opsPipeline.
 		Configuration().
 		Validate().

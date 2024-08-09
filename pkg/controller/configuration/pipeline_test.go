@@ -163,7 +163,7 @@ max_connections = '1000'
 
 			err := createPipeline.Prepare().
 				UpdateConfiguration(). // reconcile Configuration
-				Configuration().       // sync Configuration
+				Configuration(). // sync Configuration
 				CreateConfigTemplate().
 				UpdatePodVolumes().
 				BuildConfigManagerSidecar().
@@ -174,7 +174,7 @@ max_connections = '1000'
 
 			By("update configuration resource for mocking reconfiguring")
 			item := configurationObj.Spec.ConfigItemDetails[0]
-			item.ConfigFileParams = map[string]appsv1alpha1.ConfigParams{
+			item.ConfigFileParams = map[string]appsv1alpha1.ParametersInFile{
 				testConfigFile: {
 					Parameters: map[string]*string{
 						"max_connections": cfgutil.ToPointer("2000"),

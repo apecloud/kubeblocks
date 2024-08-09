@@ -601,7 +601,7 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 		return false
 	}
 
-	tryToSwitchover := func(lifecycleActions lifecycle.Actions, pod *corev1.Pod) error {
+	tryToSwitchover := func(lifecycleActions lifecycle.Lifecycle, pod *corev1.Pod) error {
 		// if pod is not leader/primary, no need to switchover
 		if !isLeader(pod) {
 			return nil
@@ -632,7 +632,7 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 			continue
 		}
 
-		lifecycleActions, err1 := lifecycle.NewActions(r.synthesizeComp.LifecycleActions, pod)
+		lifecycleActions, err1 := lifecycle.New(r.synthesizeComp.LifecycleActions, pod)
 		if err1 != nil || lifecycleActions == nil {
 			if err == nil {
 				err = err1

@@ -27,7 +27,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 )
 
 var (
@@ -41,18 +40,14 @@ var (
 	ErrActionInternalError  = errors.New("action internal error")
 )
 
-func NewActions(lifecycleActions *appsv1alpha1.ComponentLifecycleActions, pod *corev1.Pod) (Actions, error) {
-	var err error
-	var agentCli kbacli.Client
-	if pod != nil {
-		agentCli, err = kbacli.NewClient(*pod)
-		if err != nil {
-			return nil, err
-		}
+func New(lifecycleActions *appsv1alpha1.ComponentLifecycleActions, pod *corev1.Pod, pods ...*corev1.Pod) (Lifecycle, error) {
+	if len(pods) == 0 {
+		pods = []*corev1.Pod{pod}
 	}
 	return &kbagent{
 		lifecycleActions: lifecycleActions,
-		agentCli:         agentCli,
+		pods:             pods,
+		pod:              pod,
 	}, nil
 }
 
@@ -62,7 +57,7 @@ type Options struct {
 	RetryPolicy    *appsv1alpha1.RetryPolicy
 }
 
-type Actions interface {
+type Lifecycle interface {
 	PostProvision(ctx context.Context, cli client.Reader, opts *Options) error
 
 	PreTerminate(ctx context.Context, cli client.Reader, opts *Options) error

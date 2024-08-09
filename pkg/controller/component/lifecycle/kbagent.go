@@ -21,11 +21,15 @@ package lifecycle
 
 import (
 	"context"
+	"fmt"
+	"math/rand"
 
 	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/service"
@@ -38,28 +42,21 @@ type lifecycleAction interface {
 
 type kbagent struct {
 	lifecycleActions *appsv1alpha1.ComponentLifecycleActions
-	agentCli         kbacli.Client
+	pods             []*corev1.Pod
+	pod              *corev1.Pod
 }
+
+var _ Lifecycle = &kbagent{}
 
 func (a *kbagent) PostProvision(ctx context.Context, cli client.Reader, opts *Options) error {
 	la := &postProvision{}
-	if a.lifecycleActions.PostProvision == nil || a.lifecycleActions.PostProvision.CustomHandler == nil {
-		return errors.Wrap(ErrActionNotDefined, la.name())
-	}
-	return a.callAction(ctx, cli, a.lifecycleActions.PostProvision.CustomHandler, la, opts)
+	return a.checkedCallAction(ctx, cli, a.lifecycleActions.PostProvision, la, opts)
 }
 
 func (a *kbagent) PreTerminate(ctx context.Context, cli client.Reader, opts *Options) error {
 	la := &preTerminate{}
-	if a.lifecycleActions.PreTerminate == nil || a.lifecycleActions.PreTerminate.CustomHandler == nil {
-		return errors.Wrap(ErrActionNotDefined, la.name())
-	}
-	return a.callAction(ctx, cli, a.lifecycleActions.PreTerminate.CustomHandler, la, opts)
+	return a.checkedCallAction(ctx, cli, a.lifecycleActions.PreTerminate, la, opts)
 }
-
-// func (a *kbagent) RoleProbe(ctx context.Context, cli client.Reader, opts *Options) ([]byte, error) {
-//	return nil, nil
-// }
 
 func (a *kbagent) Switchover(ctx context.Context, cli client.Reader, opts *Options) error {
 	la := &switchover{}
@@ -71,72 +68,43 @@ func (a *kbagent) Switchover(ctx context.Context, cli client.Reader, opts *Optio
 
 func (a *kbagent) MemberJoin(ctx context.Context, cli client.Reader, opts *Options) error {
 	la := &memberJoin{}
-	if a.lifecycleActions.MemberJoin == nil || a.lifecycleActions.MemberJoin.CustomHandler == nil {
-		return errors.Wrap(ErrActionNotDefined, la.name())
-	}
-	return a.callAction(ctx, cli, a.lifecycleActions.MemberJoin.CustomHandler, la, opts)
+	return a.checkedCallAction(ctx, cli, a.lifecycleActions.MemberJoin, la, opts)
 }
 
 func (a *kbagent) MemberLeave(ctx context.Context, cli client.Reader, opts *Options) error {
 	la := &memberLeave{}
-	if a.lifecycleActions.MemberLeave == nil || a.lifecycleActions.MemberLeave.CustomHandler == nil {
-		return errors.Wrap(ErrActionNotDefined, la.name())
-	}
-	return a.callAction(ctx, cli, a.lifecycleActions.MemberLeave.CustomHandler, la, opts)
+	return a.checkedCallAction(ctx, cli, a.lifecycleActions.MemberLeave, la, opts)
 }
-
-// func (a *kbagent) Readonly(ctx context.Context, cli client.Reader, opts *Options) error {
-//	return nil
-// }
-//
-// func (a *kbagent) Readwrite(ctx context.Context, cli client.Reader, opts *Options) error {
-//	return nil
-// }
 
 func (a *kbagent) DataDump(ctx context.Context, cli client.Reader, opts *Options) error {
 	la := &dataDump{}
-	if a.lifecycleActions.DataDump == nil || a.lifecycleActions.DataDump.CustomHandler == nil {
-		return errors.Wrap(ErrActionNotDefined, la.name())
-	}
-	return a.callAction(ctx, cli, a.lifecycleActions.DataDump.CustomHandler, la, opts)
+	return a.checkedCallAction(ctx, cli, a.lifecycleActions.DataDump, la, opts)
 }
 
 func (a *kbagent) DataLoad(ctx context.Context, cli client.Reader, opts *Options) error {
 	la := &dataLoad{}
-	if a.lifecycleActions.DataLoad == nil || a.lifecycleActions.DataLoad.CustomHandler == nil {
-		return errors.Wrap(ErrActionNotDefined, la.name())
-	}
-	return a.callAction(ctx, cli, a.lifecycleActions.DataLoad.CustomHandler, la, opts)
+	return a.checkedCallAction(ctx, cli, a.lifecycleActions.DataLoad, la, opts)
 }
-
-// func (a *kbagent) Reconfigure(ctx context.Context, cli client.Reader, opts *Options) error {
-//	return nil
-// }
 
 func (a *kbagent) AccountProvision(ctx context.Context, cli client.Reader, opts *Options, args ...any) error {
 	la := &accountProvision{args: args}
-	if a.lifecycleActions.AccountProvision == nil || a.lifecycleActions.AccountProvision.CustomHandler == nil {
+	return a.checkedCallAction(ctx, cli, a.lifecycleActions.AccountProvision, la, opts)
+}
+
+func (a *kbagent) checkedCallAction(ctx context.Context, cli client.Reader,
+	handler *appsv1alpha1.LifecycleActionHandler, la lifecycleAction, opts *Options) error {
+	if handler == nil || handler.CustomHandler == nil {
 		return errors.Wrap(ErrActionNotDefined, la.name())
 	}
-	return a.callAction(ctx, cli, a.lifecycleActions.AccountProvision.CustomHandler, la, opts)
+	return a.callAction(ctx, cli, handler.CustomHandler, la, opts)
 }
 
 func (a *kbagent) callAction(ctx context.Context, cli client.Reader, spec *appsv1alpha1.Action, la lifecycleAction, opts *Options) error {
-	_, err := a.callActionByKBAgent(ctx, cli, spec, la, opts)
-	return err
-}
-
-func (a *kbagent) callActionByKBAgent(ctx context.Context, cli client.Reader,
-	_ *appsv1alpha1.Action, la lifecycleAction, opts *Options) ([]byte, error) {
-	req, err := a.buildActionRequest(ctx, cli, la, opts)
-	if err != nil {
-		return nil, err
+	req, err1 := a.buildActionRequest(ctx, cli, la, opts)
+	if err1 != nil {
+		return err1
 	}
-	rsp, err := a.agentCli.CallAction(ctx, *req)
-	if err != nil {
-		return nil, a.error2(la, err)
-	}
-	return rsp.Output, nil
+	return a.callActionWithSelector(ctx, spec, la, req)
 }
 
 func (a *kbagent) buildActionRequest(ctx context.Context, cli client.Reader, la lifecycleAction, opts *Options) (*proto.ActionRequest, error) {
@@ -164,6 +132,69 @@ func (a *kbagent) buildActionRequest(ctx context.Context, cli client.Reader, la 
 		}
 	}
 	return req, nil
+}
+
+func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1alpha1.Action, la lifecycleAction, req *proto.ActionRequest) error {
+	pods, err := a.targetPods(spec)
+	if err != nil {
+		return err
+	}
+	if len(pods) == 0 {
+		return fmt.Errorf("no available pod to call action %s", la.name())
+	}
+
+	for _, pod := range a.pods {
+		cli, err1 := kbacli.NewClient(*pod)
+		if err1 != nil {
+			return err1
+		}
+		_, err2 := cli.CallAction(ctx, *req)
+		if err2 != nil {
+			return a.error2(la, err2)
+		}
+	}
+	return nil
+}
+
+func (a *kbagent) targetPods(spec *appsv1alpha1.Action) ([]*corev1.Pod, error) {
+	if spec.Exec == nil || len(spec.Exec.TargetPodSelector) == 0 {
+		return []*corev1.Pod{a.pod}, nil
+	}
+
+	any := func() []*corev1.Pod {
+		i := rand.Int() % len(a.pods)
+		return []*corev1.Pod{a.pods[i]}
+	}
+
+	all := func() []*corev1.Pod {
+		return a.pods
+	}
+
+	role := func() []*corev1.Pod {
+		roleName := spec.Exec.MatchingKey
+		var pods []*corev1.Pod
+		for i, pod := range a.pods {
+			if len(pod.Labels) != 0 {
+				if pod.Labels[constant.RoleLabelKey] == roleName {
+					pods = append(pods, a.pods[i])
+				}
+			}
+		}
+		return pods
+	}
+
+	switch spec.Exec.TargetPodSelector {
+	case appsv1alpha1.AnyReplica:
+		return any(), nil
+	case appsv1alpha1.AllReplicas:
+		return all(), nil
+	case appsv1alpha1.RoleSelector:
+		return role(), nil
+	case appsv1alpha1.OrdinalSelector:
+		return nil, fmt.Errorf("ordinal selector is not supported")
+	default:
+		return nil, fmt.Errorf("unknown pod selector: %s", spec.Exec.TargetPodSelector)
+	}
 }
 
 func (a *kbagent) error2(la lifecycleAction, err error) error {

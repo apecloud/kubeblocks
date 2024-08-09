@@ -183,7 +183,7 @@ func (t *componentAccountProvisionTransformer) markAccountProvisioned(cond *meta
 	cond.Message = strings.Join(accounts, ",")
 }
 
-func (t *componentAccountProvisionTransformer) buildLifecycleActions(transCtx *componentTransformContext) (lifecycle.Actions, error) {
+func (t *componentAccountProvisionTransformer) buildLifecycleActions(transCtx *componentTransformContext) (lifecycle.Lifecycle, error) {
 	synthesizedComp := transCtx.SynthesizeComponent
 
 	roleName := ""
@@ -205,7 +205,7 @@ func (t *componentAccountProvisionTransformer) buildLifecycleActions(transCtx *c
 		return nil, fmt.Errorf("unable to find appropriate pods to create accounts")
 	}
 
-	lifecycle, err := lifecycle.NewActions(transCtx.SynthesizeComponent.LifecycleActions, pods[0])
+	lifecycle, err := lifecycle.New(transCtx.SynthesizeComponent.LifecycleActions, pods[0])
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +213,7 @@ func (t *componentAccountProvisionTransformer) buildLifecycleActions(transCtx *c
 }
 
 func (t *componentAccountProvisionTransformer) provisionAccount(transCtx *componentTransformContext,
-	_ metav1.Condition, lifecycle lifecycle.Actions, account appsv1alpha1.SystemAccount) error {
+	_ metav1.Condition, lifecycle lifecycle.Lifecycle, account appsv1alpha1.SystemAccount) error {
 
 	synthesizedComp := transCtx.SynthesizeComponent
 	secret, err := t.getAccountSecret(transCtx, synthesizedComp, account)

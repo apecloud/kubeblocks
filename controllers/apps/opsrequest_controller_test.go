@@ -26,7 +26,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"k8s.io/utils/pointer"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"golang.org/x/exp/slices"
@@ -36,6 +35,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -261,8 +261,16 @@ var _ = Describe("OpsRequest Controller", func() {
 				Create(&testCtx).
 				GetObject()
 
+			By("Create a componentDefinition obj")
+			compDefObj = testapps.NewComponentDefinitionFactory(compDefName).
+				WithRandomName().
+				AddAnnotations(constant.SkipImmutableCheckAnnotationKey, "true").
+				SetDefaultSpec().
+				Create(&testCtx).
+				GetObject()
+
 			By("Mock lorry client for the default transformer of system accounts provision")
-			mockLorryClientDefault()
+			mockKBAgentClientDefault()
 		})
 
 		componentWorkload := func() client.Object {
@@ -309,8 +317,9 @@ var _ = Describe("OpsRequest Controller", func() {
 		createMysqlCluster := func(replicas int32) {
 			createBackupPolicyTpl(compDefObj.GetName())
 
-			By("set component to horizontal with snapshot policy and create a cluster")
+			By("set component to horizontal with snapshot policy")
 			testk8s.MockEnableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
+
 			// TODO(v1.0): bpt
 			// if clusterDefObj.Spec.ComponentDefs[0].HorizontalScalePolicy == nil {
 			//	Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
@@ -346,12 +355,17 @@ var _ = Describe("OpsRequest Controller", func() {
 					pvc.Status.Phase = corev1.ClaimBound
 				})()).ShouldNot(HaveOccurred())
 			}
-			// wait for cluster observed generation
-			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+
+			// mock and wait for the cluster running
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
+				g.Expect(cluster.Status.ObservedGeneration).Should(Equal(cluster.Generation))
+			})).Should(Succeed())
 			mockSetClusterStatusPhaseToRunning(clusterKey)
-			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
-			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
+				g.Expect(cluster.Status.ObservedGeneration).Should(Equal(cluster.Generation))
+				g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.RunningClusterPhase))
+				g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+			})).Should(Succeed())
 		}
 
 		createClusterHscaleOps := func(replicas int32) *appsv1alpha1.OpsRequest {
@@ -544,8 +558,9 @@ var _ = Describe("OpsRequest Controller", func() {
 		})
 
 		It("HorizontalScaling when the number of pods is inconsistent with the number of replicas", func() {
-			mockLorryClient4HScale(clusterKey, mysqlCompName, 2)
+			mockKBAgentClient4HScale(clusterKey, mysqlCompName, 2)
 
+			// create it with new API since the scale-in operation depends on the member leave action.
 			By("create a cluster with 3 pods")
 			createMysqlCluster(3)
 

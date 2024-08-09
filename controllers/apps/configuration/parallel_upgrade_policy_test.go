@@ -25,7 +25,6 @@ import (
 
 	"github.com/golang/mock/gomock"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgproto "github.com/apecloud/kubeblocks/pkg/configuration/proto"
 	mock_proto "github.com/apecloud/kubeblocks/pkg/configuration/proto/mocks"
@@ -69,13 +68,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 				withClusterComponent(3),
 				withConfigSpec("for_test", map[string]string{
 					"a": "b",
-				}),
-				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ComponentConfigSpec{{
-					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-						Name:       "for_test",
-						VolumeName: "test_volume",
-					},
-				}}))
+				}))
 
 			k8sMockClient.MockListMethod(testutil.WithListReturned(
 				testutil.WithConstructListReturnedResult(fromPodObjectList(
@@ -98,13 +91,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 				withClusterComponent(3),
 				withConfigSpec("for_test", map[string]string{
 					"a": "b",
-				}),
-				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ComponentConfigSpec{{
-					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-						Name:       "for_test",
-						VolumeName: "test_volume",
-					},
-				}}))
+				}))
 
 			// first failed
 			getPodsError := cfgcore.MakeError("for grpc failed.")
@@ -138,12 +125,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 				withClusterComponent(3),
 				withConfigSpec("for_test", map[string]string{
 					"a": "b",
-				}),
-				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ComponentConfigSpec{{
-					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-						Name:       "for_test",
-						VolumeName: "test_volume",
-					}}}))
+				}))
 
 			k8sMockClient.MockListMethod(testutil.WithListReturned(
 				testutil.WithConstructListReturnedResult(
@@ -180,12 +162,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 				withClusterComponent(3),
 				withConfigSpec("for_test", map[string]string{
 					"a": "b",
-				}),
-				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ComponentConfigSpec{{
-					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-						Name:       "for_test",
-						VolumeName: "test_volume",
-					}}}))
+				}))
 
 			setPods := newMockPodsWithInstanceSet(&mockParam.InstanceSetUnits[0], 5)
 			k8sMockClient.MockListMethod(testutil.WithListReturned(
@@ -196,28 +173,6 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 			// first failed
 			Expect(err).Should(BeEquivalentTo(patchError))
 			Expect(status.Status).Should(BeEquivalentTo(ESFailedAndRetry))
-		})
-	})
-
-	// TODO(component)
-	PContext("parallel reconfigure policy test for not supported component", func() {
-		It("Should failed", func() {
-			// not support type
-			mockParam := newMockReconfigureParams("parallelPolicy", k8sMockClient.Client(),
-				withMockInstanceSet(2, nil),
-				withConfigSpec("for_test", map[string]string{
-					"key": "value",
-				}),
-				withClusterComponent(2),
-				withCDComponent(appsv1alpha1.Stateless, []appsv1alpha1.ComponentConfigSpec{{
-					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-						Name:       "for_test",
-						VolumeName: "test_volume",
-					}}}))
-			status, err := parallelPolicy.Upgrade(mockParam)
-			Expect(err).ShouldNot(Succeed())
-			Expect(err.Error()).Should(ContainSubstring("not supported component workload type"))
-			Expect(status.Status).Should(BeEquivalentTo(ESNotSupport))
 		})
 	})
 })

@@ -321,12 +321,12 @@ var _ = Describe("instance util test", func() {
 
 			By("merge pvc")
 			oldPvc := builder.NewPVCBuilder(namespace, name).
-				SetResources(corev1.ResourceRequirements{Requests: map[corev1.ResourceName]resource.Quantity{
+				SetResources(corev1.VolumeResourceRequirements{Requests: map[corev1.ResourceName]resource.Quantity{
 					corev1.ResourceStorage: resource.MustParse("1G"),
 				}}).
 				GetObject()
 			newPvc := builder.NewPVCBuilder(namespace, name).
-				SetResources(corev1.ResourceRequirements{Requests: map[corev1.ResourceName]resource.Quantity{
+				SetResources(corev1.VolumeResourceRequirements{Requests: map[corev1.ResourceName]resource.Quantity{
 					corev1.ResourceStorage: resource.MustParse("2G"),
 				}}).
 				GetObject()

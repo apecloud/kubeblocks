@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package controllerutil
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -33,6 +34,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 const (
@@ -594,4 +596,17 @@ func isContainerFailedAndTimedOut(pod *corev1.Pod, podConditionType corev1.PodCo
 		return false
 	}
 	return time.Now().After(containerReadyCondition.LastTransitionTime.Add(PodContainerFailedTimeout))
+}
+
+func BuildImagePullSecrets() []corev1.LocalObjectReference {
+	secrets := make([]corev1.LocalObjectReference, 0)
+	secretsVal := viper.GetString(constant.KBImagePullSecrets)
+	if secretsVal == "" {
+		return secrets
+	}
+
+	// we already validate the value of KBImagePullSecrets when start server,
+	// so we can ignore the error here
+	_ = json.Unmarshal([]byte(secretsVal), &secrets)
+	return secrets
 }

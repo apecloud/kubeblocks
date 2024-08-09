@@ -21,6 +21,7 @@ package apps
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -112,15 +113,10 @@ func isLifecycleActionsEnabled(compDef *appsv1alpha1.ComponentDefinition) bool {
 }
 
 func isDataProtectionEnabled(backupTpl *appsv1alpha1.BackupPolicyTemplate, cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component) bool {
-	if backupTpl != nil {
+	if backupTpl != nil && len(comp.Spec.CompDef) > 0 {
 		for _, policy := range backupTpl.Spec.BackupPolicies {
-			// TODO(component): the definition of component referenced by backup policy.
-			if policy.ComponentDefRef == comp.Spec.CompDef {
-				return true
-			}
-			// TODO: Compatibility handling, remove it if the clusterDefinition is removed.
-			for _, v := range cluster.Spec.ComponentSpecs {
-				if v.ComponentDefRef == policy.ComponentDefRef {
+			for _, compDef := range policy.ComponentDefs {
+				if strings.HasPrefix(comp.Spec.CompDef, compDef) {
 					return true
 				}
 			}

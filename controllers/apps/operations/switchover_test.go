@@ -37,17 +37,13 @@ import (
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
-var (
-	clusterDefObj     *appsv1alpha1.ClusterDefinition
-	clusterVersionObj *appsv1alpha1.ClusterVersion
-	clusterObj        *appsv1alpha1.Cluster
-)
-
 var _ = Describe("", func() {
 	var (
-		randomStr          = testCtx.GetRandomStr()
-		clusterVersionName = "cluster-version-for-ops-" + randomStr
-		clusterName        = "cluster-for-ops-" + randomStr
+		randomStr   = testCtx.GetRandomStr()
+		compDefName = "test-compdef-" + randomStr
+		clusterName = "test-cluster-" + randomStr
+		compDefObj  *appsv1alpha1.ComponentDefinition
+		clusterObj  *appsv1alpha1.Cluster
 	)
 
 	defaultRole := func(index int32) string {
@@ -80,8 +76,8 @@ var _ = Describe("", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
+		// delete cluster(and all dependent sub-resources), cluster definition
+		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 
 		// delete rest resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
@@ -96,48 +92,23 @@ var _ = Describe("", func() {
 
 	Context("Test OpsRequest", func() {
 		BeforeEach(func() {
-			By("Create a clusterDefinition obj with switchoverSpec.")
-			commandExecutorEnvItem := &appsv1alpha1.CommandExecutorEnvItem{
-				Image: testapps.ApeCloudMySQLImage,
-			}
-			commandExecutorItem := &appsv1alpha1.CommandExecutorItem{
-				Command: []string{"echo", "hello"},
-				Args:    []string{},
-			}
-			switchoverSpec := &appsv1alpha1.SwitchoverSpec{
-				WithCandidate: &appsv1alpha1.SwitchoverAction{
-					CmdExecutorConfig: &appsv1alpha1.CmdExecutorConfig{
-						CommandExecutorEnvItem: *commandExecutorEnvItem,
-						CommandExecutorItem:    *commandExecutorItem,
-					},
-				},
-				WithoutCandidate: &appsv1alpha1.SwitchoverAction{
-					CmdExecutorConfig: &appsv1alpha1.CmdExecutorConfig{
-						CommandExecutorEnvItem: *commandExecutorEnvItem,
-						CommandExecutorItem:    *commandExecutorItem,
-					},
-				},
-			}
-			clusterDefObj = testapps.NewClusterDefFactory(consensusComp).
-				AddComponentDef(testapps.ConsensusMySQLComponent, consensusComp).
-				AddSwitchoverSpec(switchoverSpec).
-				Create(&testCtx).GetObject()
-
-			By("Create a clusterVersion obj with replication workloadType.")
-			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponentVersion(consensusComp).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
-				Create(&testCtx).GetObject()
+			By("Create a componentDefinition obj.")
+			compDefObj = testapps.NewComponentDefinitionFactory(compDefName).
+				SetDefaultSpec().
+				Create(&testCtx).
+				GetObject()
 		})
 
-		It("Test switchover OpsRequest", func() {
+		// TODO(v1.0): workload and switchover have been removed from CD/CV.
+		PIt("Test switchover OpsRequest", func() {
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx:      testCtx.Ctx,
 				Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
 			}
 			By("Creating a cluster with consensus .")
-			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-				AddComponent(consensusComp, consensusComp).
+			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
+				WithRandomName().
+				AddComponent(defaultCompName, compDefObj.GetName()).
 				SetReplicas(2).
 				Create(&testCtx).GetObject()
 
@@ -148,16 +119,16 @@ var _ = Describe("", func() {
 				ImagePullPolicy: corev1.PullIfNotPresent,
 			}
 			its := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
-				clusterObj.Name+"-"+consensusComp, clusterObj.Name, consensusComp).
+				clusterObj.Name+"-"+defaultCompName, clusterObj.Name, defaultCompName).
 				AddFinalizers([]string{constant.DBClusterFinalizerName}).
 				AddContainer(container).
 				AddAppInstanceLabel(clusterObj.Name).
-				AddAppComponentLabel(consensusComp).
+				AddAppComponentLabel(defaultCompName).
 				AddAppManagedByLabel().
 				SetReplicas(2).
 				Create(&testCtx).GetObject()
 
-			By("Creating Pods of replication workloadType.")
+			By("Creating Pods of replication.")
 			var (
 				leaderPod   *corev1.Pod
 				followerPod *corev1.Pod
@@ -183,7 +154,7 @@ var _ = Describe("", func() {
 			Expect(testapps.ChangeObjStatus(&testCtx, clusterObj, func() {
 				clusterObj.Status.Phase = appsv1alpha1.RunningClusterPhase
 				clusterObj.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
-					consensusComp: {
+					defaultCompName: {
 						Phase: appsv1alpha1.RunningClusterCompPhase,
 					},
 				}
@@ -195,8 +166,8 @@ var _ = Describe("", func() {
 				clusterObj.Name, appsv1alpha1.SwitchoverType)
 			ops.Spec.SwitchoverList = []appsv1alpha1.Switchover{
 				{
-					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
-					InstanceName: fmt.Sprintf("%s-%s-%d", clusterObj.Name, consensusComp, 1),
+					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+					InstanceName: fmt.Sprintf("%s-%s-%d", clusterObj.Name, defaultCompName, 1),
 				},
 			}
 			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
@@ -219,7 +190,7 @@ var _ = Describe("", func() {
 			Expect(err.Error()).Should(ContainSubstring("requeue to waiting for job"))
 
 			By("mock job status to success.")
-			jobName := fmt.Sprintf("%s-%s-%s-%d", KBSwitchoverJobNamePrefix, opsRes.Cluster.Name, consensusComp, opsRes.Cluster.Generation)
+			jobName := fmt.Sprintf("%s-%s-%s-%d", KBSwitchoverJobNamePrefix, opsRes.Cluster.Name, defaultCompName, opsRes.Cluster.Generation)
 			key := types.NamespacedName{
 				Name:      jobName,
 				Namespace: clusterObj.Namespace,

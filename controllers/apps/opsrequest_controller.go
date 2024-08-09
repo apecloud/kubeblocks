@@ -78,8 +78,8 @@ func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	opsCtrlHandler := &opsControllerHandler{}
 	return opsCtrlHandler.Handle(reqCtx, &operations.OpsResource{Recorder: r.Recorder},
 		r.fetchOpsRequest,
-		r.handleDeletion,
 		r.fetchCluster,
+		r.handleDeletion,
 		r.addClusterLabelAndSetOwnerReference,
 		r.handleCancelSignal,
 		r.handleOpsRequestByPhase,
@@ -122,7 +122,7 @@ func (r *OpsRequestReconciler) fetchOpsRequest(reqCtx intctrlutil.RequestCtx, op
 
 // handleDeletion handles the delete event of the OpsRequest.
 func (r *OpsRequestReconciler) handleDeletion(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error) {
-	if opsRes.OpsRequest.Status.Phase == appsv1alpha1.OpsRunningPhase {
+	if opsRes.OpsRequest.Status.Phase == appsv1alpha1.OpsRunningPhase && !opsRes.Cluster.IsDeleting() {
 		return nil, nil
 	}
 	return intctrlutil.HandleCRDeletion(reqCtx, r, opsRes.OpsRequest, constant.OpsRequestFinalizerName, func() (*ctrl.Result, error) {

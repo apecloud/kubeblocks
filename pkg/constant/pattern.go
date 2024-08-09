@@ -69,12 +69,6 @@ func GenerateDefaultComponentHeadlessServiceName(clusterName, compName string) s
 	return GenerateComponentHeadlessServiceName(clusterName, compName, "")
 }
 
-// GenerateDefaultConnCredential generates the default connection credential name for cluster.
-// TODO: deprecated, will be removed later.
-func GenerateDefaultConnCredential(clusterName string) string {
-	return fmt.Sprintf("%s-conn-credential", clusterName)
-}
-
 // GenerateClusterComponentEnvPattern generates cluster and component pattern
 func GenerateClusterComponentEnvPattern(clusterName, compName string) string {
 	return fmt.Sprintf("%s-%s-env", clusterName, compName)
@@ -93,11 +87,6 @@ func GenerateWorkloadNamePattern(clusterName, compName string) string {
 // GeneratePodName generates the connection credential name for component.
 func GeneratePodName(clusterName, compName string, ordinal int) string {
 	return fmt.Sprintf("%s-%d", GenerateClusterComponentName(clusterName, compName), ordinal)
-}
-
-// GenerateVirtualComponentDefinition generates the virtual component definition name.
-func GenerateVirtualComponentDefinition(compDefSuffix string) string {
-	return fmt.Sprintf("%s-%s", KBGeneratedVirtualCompDefPrefix, compDefSuffix)
 }
 
 // GenerateResourceNameWithScalingSuffix generates name with '-scaling' suffix.

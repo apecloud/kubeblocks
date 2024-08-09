@@ -31,32 +31,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
 var _ = Describe("Component Utils", func() {
-	var (
-		randomStr          = testCtx.GetRandomStr()
-		clusterDefName     = "mysql-clusterdef-" + randomStr
-		clusterVersionName = "mysql-clusterversion-" + randomStr
-		clusterName        = "mysql-" + randomStr
-	)
-
-	const (
-		consensusCompName = "consensus"
-		statelessCompName = "stateless"
-	)
-
 	cleanAll := func() {
 		// must wait until resources deleted and no longer exist before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
 		By("clean resources")
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 
 		// clear rest resources
@@ -70,20 +57,6 @@ var _ = Describe("Component Utils", func() {
 	BeforeEach(cleanAll)
 
 	AfterEach(cleanAll)
-
-	Context("Component test", func() {
-		It("Component test", func() {
-			By(" init cluster, instanceSet, pods")
-			_, _, cluster := testapps.InitClusterWithHybridComps(&testCtx, clusterDefName,
-				clusterVersionName, clusterName, statelessCompName, "stateful", consensusCompName)
-			its := testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusCompName)
-			_ = testapps.MockInstanceSetPods(&testCtx, its, cluster, consensusCompName)
-
-			By("test GetMinReadySeconds function")
-			minReadySeconds, _ := component.GetMinReadySeconds(ctx, k8sClient, *cluster, consensusCompName)
-			Expect(minReadySeconds).To(Equal(int32(0)))
-		})
-	})
 
 	Context("test mergeServiceAnnotations", func() {
 		It("test sync pod spec default values set by k8s", func() {

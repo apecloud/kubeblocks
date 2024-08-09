@@ -56,4 +56,4 @@ All pods restart in the order of learner -> follower -> leader and the leader ma
    - STATUS=Terminating: it means the cluster restart is in progress.
    - STATUS=Running: it means the cluster has been restarted.
 
-   If an error occurs to the horizontal scaling operation, you can troubleshoot with `kubectl describe` command to view the events of this operation.
+   If an error occurs, you can troubleshoot with `kubectl describe` command to view the events of this operation.

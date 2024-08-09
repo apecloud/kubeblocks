@@ -25,13 +25,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/apecloud/kubeblocks/pkg/constant"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 )
 
@@ -197,12 +196,8 @@ func getDBEnvs(synthesizeComp *component.SynthesizedComponent, clusterCompSpec *
 		}
 	}
 
-	if clusterCompSpec == nil || clusterCompSpec.ComponentDef != "" {
-		if sysInitAccount != nil {
-			secretName = constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, sysInitAccount.Name)
-		}
-	} else {
-		secretName = constant.GenerateDefaultConnCredential(synthesizeComp.ClusterName)
+	if sysInitAccount != nil {
+		secretName = constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, sysInitAccount.Name)
 	}
 
 	var envs []corev1.EnvVar

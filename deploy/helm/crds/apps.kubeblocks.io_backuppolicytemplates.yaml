@@ -388,11 +388,6 @@ spec:
                                 required:
                                 - secretName
                                 type: object
-                              fallbackRole:
-                                description: |-
-                                  Specifies the fallback role to select one replica for backup, this only takes effect when the
-                                  `strategy` field below is set to `Any`.
-                                type: string
                               containerPort:
                                 description: |-
                                   Specifies the container port in the target pod.
@@ -406,6 +401,11 @@ spec:
                                     description: Specifies the port name.
                                     type: string
                                 type: object
+                              fallbackRole:
+                                description: |-
+                                  Specifies the fallback role to select one replica for backup, this only takes effect when the
+                                  `strategy` field below is set to `Any`.
+                                type: string
                               name:
                                 description: |-
                                   Specifies a mandatory and unique identifier for each target when using the "targets" field.
@@ -973,11 +973,6 @@ spec:
                             This account must match one listed in `componentDefinition.spec.systemAccounts[*].name`.
                             The corresponding secret created by this account is used to connect to the database.
                           type: string
-                        fallbackRole:
-                          description: |-
-                            Specifies the fallback role to select one replica for backup, this only takes effect when the
-                            `strategy` field below is set to `Any`.
-                          type: string
                         containerPort:
                           description: |-
                             Specifies the container port in the target pod.
@@ -991,6 +986,11 @@ spec:
                               description: Specifies the port name.
                               type: string
                           type: object
+                        fallbackRole:
+                          description: |-
+                            Specifies the fallback role to select one replica for backup, this only takes effect when the
+                            `strategy` field below is set to `Any`.
+                          type: string
                         role:
                           description: |-
                             Specifies the role to select one or more replicas for backup.

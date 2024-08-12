@@ -21,7 +21,19 @@ KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，�
           kbcli cluster describe-ops mongodb-cluster-restart-pzsbj -n default
     ```
 
-2. 使用在步骤 1 中随机生成的请求代码（本例中为 `pzsbj`）验证重启操作。
+2. 查看集群状态，验证重启操作。
+
+   ```bash
+   kbcli cluster list mongodb-cluster
+   >
+   NAME                   NAMESPACE        CLUSTER-DEFINITION        VERSION            TERMINATION-POLICY        STATUS         CREATED-TIME
+   mongodb-cluster        default          mongodb                   mongodb-5.0        Delete                    Running        Apr 26,2023 12:50 UTC+0800
+   ```
+
+   - STATUS=Updating 表示集群正在重启中。
+   - STATUS=Running 表示集群已重启。
+
+   您也可以使用在步骤 1 中随机生成的请求代码（本例中为 `pzsbj`）验证重启操作是否成功。
 
     ```bash
     kbcli cluster describe-ops mongodb-cluster-restart-pzsbj -n default

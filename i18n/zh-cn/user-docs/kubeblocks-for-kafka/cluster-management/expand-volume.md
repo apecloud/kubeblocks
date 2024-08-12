@@ -23,7 +23,7 @@ kbcli cluster list kafka
 1. 使用 `kbcli cluster volume-expand` 命令配置所需资源，然后再次输入集群名称进行磁盘扩容。
 
    ```bash
-   kbcli cluster volume-expand --storage=30G --components=kafka --volume-claim-templates=data kafka
+   kbcli cluster volume-expand --storage=40Gi --components=kafka --volume-claim-templates=data kafka
    ```
 
    - `--components` 表示需扩容的组件名称。
@@ -38,3 +38,9 @@ kbcli cluster list kafka
    NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS          CREATED-TIME
    kafka-cluster        default          redis                     kafka-3.3.2              Delete                    Running        May 11,2023 15:27 UTC+0800
    ```
+
+3. 检查资源规格是否已变更。
+
+    ```bash
+    kbcli cluster describe kafka-cluster
+    ```

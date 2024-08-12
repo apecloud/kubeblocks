@@ -16,7 +16,7 @@ Milvus 是高度灵活、可靠且速度极快的云原生开源矢量数据库�
 
 - [安装 kbcli](./../installation/install-with-kbcli/install-kbcli.md)。
 - [安装 KubeBlocks](./../installation/install-with-helm/install-kubeblocks-with-helm.md)。
-- [安装并启用 milvus 引擎](./../overview/database-engines-supported.md#使用引擎)
+- [安装并启用 milvus 引擎](./../overview/database-engines-supported.md#使用引擎)。
 
 ## 创建集群
 

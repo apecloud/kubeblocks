@@ -34,7 +34,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
 
     ```bash
     kbcli cluster volume-expand mysql-cluster --components="mysql" \
-    --volume-claim-templates="data" --storage="2Gi"
+    --volume-claim-templates="data" --storage="40Gi"
     ```
 
     - `--components` 表示需扩容的组件名称。
@@ -46,8 +46,8 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    ```bash
    kbcli cluster list mysql-cluster
    >
-   NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS                 CREATED-TIME
-   mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30          Delete                    VolumeExpanding        Jan 29,2023 14:35 UTC+0800
+   NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS          CREATED-TIME
+   mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30          Delete                    Updating        Jan 29,2023 14:35 UTC+0800
    ```
 
    * STATUS=Updating 表示扩容正在进行中。

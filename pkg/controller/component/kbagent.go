@@ -204,7 +204,7 @@ func buildProbe4KBAgent(probe *appsv1alpha1.Probe, name string) (*proto.Action, 
 }
 
 func adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp *SynthesizedComponent, container *corev1.Container) error {
-	image, _, err := customExecActionImageNContainer(synthesizedComp)
+	image, c, err := customExecActionImageNContainer(synthesizedComp)
 	if err != nil {
 		return err
 	}
@@ -220,13 +220,17 @@ func adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp *SynthesizedComp
 	container.Command[0] = kbAgentCommandOnSharedMount
 	container.VolumeMounts = append(container.VolumeMounts, sharedVolumeMount)
 
-	// TODO: exec container resources
+	// TODO: share more container resources
+	if c != nil {
+		container.VolumeMounts = append(container.VolumeMounts, c.VolumeMounts...)
+	}
+
 	return nil
 }
 
-func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) (string, string, error) {
+func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) (string, *corev1.Container, error) {
 	if synthesizedComp.LifecycleActions == nil {
-		return "", "", nil
+		return "", nil, nil
 	}
 
 	handlers := []*appsv1alpha1.LifecycleActionHandler{
@@ -254,13 +258,13 @@ func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) (str
 		}
 		if handler.CustomHandler.Exec.Image != "" {
 			if len(image) > 0 && image != handler.CustomHandler.Exec.Image {
-				return "", "", fmt.Errorf("only one exec image is allowed in lifecycle actions")
+				return "", nil, fmt.Errorf("only one exec image is allowed in lifecycle actions")
 			}
 			image = handler.CustomHandler.Exec.Image
 		}
 		if handler.CustomHandler.Exec.Container != "" {
 			if len(container) > 0 && container != handler.CustomHandler.Exec.Container {
-				return "", "", fmt.Errorf("only one exec container is allowed in lifecycle actions")
+				return "", nil, fmt.Errorf("only one exec container is allowed in lifecycle actions")
 			}
 			container = handler.CustomHandler.Exec.Container
 		}
@@ -268,26 +272,26 @@ func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) (str
 
 	var c *corev1.Container
 	if len(container) > 0 {
-		for _, cc := range synthesizedComp.PodSpec.Containers {
+		for i, cc := range synthesizedComp.PodSpec.Containers {
 			if cc.Name == container {
-				c = &cc
+				c = &synthesizedComp.PodSpec.Containers[i]
 				break
 			}
 		}
 		if c == nil {
-			return "", "", fmt.Errorf("exec container %s not found", container)
+			return "", nil, fmt.Errorf("exec container %s not found", container)
 		}
 	}
 	if len(image) > 0 && len(container) > 0 {
 		if c.Image == image {
-			return image, container, nil
+			return image, c, nil
 		}
-		return "", "", fmt.Errorf("exec image and container must be the same")
+		return "", nil, fmt.Errorf("exec image and container must be the same")
 	}
 	if len(image) == 0 && len(container) > 0 {
 		image = c.Image
 	}
-	return image, container, nil
+	return image, c, nil
 }
 
 func buildKBAgentInitContainer() *corev1.Container {

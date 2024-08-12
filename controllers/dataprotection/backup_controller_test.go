@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package dataprotection
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"strconv"
@@ -148,7 +149,7 @@ var _ = Describe("Backup Controller test", func() {
 					g.Expect(fetched.Status.PersistentVolumeClaimName).Should(Equal(repoPVCName))
 					g.Expect(fetched.Status.Path).Should(Equal(dpbackup.BuildBaseBackupPath(fetched, "", backupPolicy.Spec.PathPrefix)))
 					g.Expect(fetched.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
-					g.Expect(fetched.Annotations[dptypes.ConnectionPasswordAnnotationKey]).ShouldNot(BeEmpty())
+					g.Expect(fetched.Annotations[constant.EncryptedSystemAccountsAnnotationKey]).ShouldNot(BeEmpty())
 				})).Should(Succeed())
 
 				By("check backup job's nodeName equals pod's nodeName")
@@ -358,6 +359,78 @@ var _ = Describe("Backup Controller test", func() {
 			By("mock backup jobs to completed and backup should be completed")
 			testdp.PatchK8sJobStatus(&testCtx, getJobKey(targets[0].Name), batchv1.JobComplete)
 			testdp.PatchK8sJobStatus(&testCtx, getJobKey(targets[1].Name), batchv1.JobComplete)
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup), func(g Gomega, fetched *dpv1alpha1.Backup) {
+				g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
+			})).Should(Succeed())
+		})
+
+		It("create an backup using fallbackLabelSelector", func() {
+			podFactory := func(name string) *testapps.MockPodFactory {
+				return testapps.NewPodFactory(testCtx.DefaultNamespace, name).
+					AddAppInstanceLabel(testdp.ClusterName).
+					AddAppComponentLabel(testdp.ComponentName).
+					AddContainer(corev1.Container{Name: testdp.ContainerName, Image: testapps.ApeCloudMySQLImage})
+			}
+			podName := "fallback" + testdp.ClusterName + "-" + testdp.ComponentName
+			By("mock a primary pod that is available ")
+			pod0 := podFactory(podName + "-0").
+				AddRoleLabel("primary").
+				Create(&testCtx).GetObject()
+			Expect(testapps.ChangeObjStatus(&testCtx, pod0, func() {
+				pod0.Status.Phase = corev1.PodRunning
+				testk8s.MockPodAvailable(pod0, metav1.Now())
+			})).Should(Succeed())
+			By("mock a secondary pod that is unavailable")
+			pod1 := podFactory(podName + "-1").
+				AddRoleLabel("secondary").
+				Create(&testCtx).GetObject()
+			Expect(testapps.ChangeObjStatus(&testCtx, pod1, func() {
+				pod1.Status.Phase = corev1.PodFailed
+				testk8s.MockPodIsFailed(context.Background(), testCtx, pod1)
+			})).Should(Succeed())
+
+			By("Set backupPolicy's target with fallbackLabelSelector")
+			Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(bp *dpv1alpha1.BackupPolicy) {
+				podSelector := &dpv1alpha1.PodSelector{
+					LabelSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							constant.AppInstanceLabelKey:    testdp.ClusterName,
+							constant.KBAppComponentLabelKey: testdp.ComponentName,
+							constant.RoleLabelKey:           "secondary",
+						},
+					},
+					FallbackLabelSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							constant.AppInstanceLabelKey:    testdp.ClusterName,
+							constant.KBAppComponentLabelKey: testdp.ComponentName,
+							constant.RoleLabelKey:           "primary",
+						},
+					},
+					Strategy: dpv1alpha1.PodSelectionStrategyAny,
+				}
+				backupPolicy.Spec.Target = &dpv1alpha1.BackupTarget{
+					Name: testdp.ComponentName + "-0", PodSelector: podSelector,
+				}
+			})).Should(Succeed())
+
+			By("check targets pod")
+			target := backupPolicy.Spec.Target
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			targetPods, err := GetTargetPods(reqCtx, k8sClient, nil, backupPolicy, target, dpv1alpha1.BackupTypeFull)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(targetPods).Should(HaveLen(1))
+			Expect(targetPods[0].Name).Should(Equal(pod0.Name))
+
+			By("create a backup")
+			backup := testdp.NewFakeBackup(&testCtx, nil)
+			getJobKey := func(targetName string) client.ObjectKey {
+				return client.ObjectKey{
+					Name:      dpbackup.GenerateBackupJobName(backup, fmt.Sprintf("%s-%s-0", dpbackup.BackupDataJobNamePrefix, targetName)),
+					Namespace: backup.Namespace,
+				}
+			}
+			By("mock backup jobs to completed and backup should be completed")
+			testdp.PatchK8sJobStatus(&testCtx, getJobKey(target.Name), batchv1.JobComplete)
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup), func(g Gomega, fetched *dpv1alpha1.Backup) {
 				g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
 			})).Should(Succeed())
@@ -1030,7 +1103,7 @@ var _ = Describe("Backup Controller test", func() {
 					g.Expect(fetched.Status.Path).Should(Equal(dpbackup.BuildBaseBackupPath(fetched, "", backupPolicy.Spec.PathPrefix)))
 					g.Expect(fetched.Status.KopiaRepoPath).Should(Equal(dpbackup.BuildKopiaRepoPath(fetched, "", backupPolicy.Spec.PathPrefix)))
 					g.Expect(fetched.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
-					g.Expect(fetched.Annotations[dptypes.ConnectionPasswordAnnotationKey]).ShouldNot(BeEmpty())
+					g.Expect(fetched.Annotations[constant.EncryptedSystemAccountsAnnotationKey]).ShouldNot(BeEmpty())
 				})).Should(Succeed())
 
 				testdp.PatchK8sJobStatus(&testCtx, getJobKey(), batchv1.JobComplete)

@@ -22,6 +22,13 @@ rules:
 - apiGroups:
   - apps
   resources:
+  - deployments
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - apps
+  resources:
   - statefulsets
   verbs:
   - create
@@ -118,32 +125,6 @@ rules:
   - apps.kubeblocks.io
   resources:
   - clusters/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - clusterversions
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - clusterversions/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - clusterversions/status
   verbs:
   - get
   - patch

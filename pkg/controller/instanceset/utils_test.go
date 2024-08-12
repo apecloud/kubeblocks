@@ -26,6 +26,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -230,6 +231,124 @@ var _ = Describe("utils test", func() {
 				},
 			}
 			Expect(IsInstanceSetReady(its)).Should(BeTrue())
+		})
+	})
+
+	Context("CalculateConcurrencyReplicas function", func() {
+		It("should work well", func() {
+			By("concurrency = 50%, replicas = 10")
+			concurrent := &intstr.IntOrString{Type: intstr.String, StrVal: "50%"}
+			replicas := 10
+			concurrencyReplicas, err := CalculateConcurrencyReplicas(concurrent, replicas)
+			Expect(err).Should(BeNil())
+			Expect(concurrencyReplicas).Should(Equal(5))
+
+			By("concurrency = 50%, replicas = 0")
+			concurrent = &intstr.IntOrString{Type: intstr.String, StrVal: "50%"}
+			replicas = 0
+			concurrencyReplicas, err = CalculateConcurrencyReplicas(concurrent, replicas)
+			Expect(err).Should(BeNil())
+			Expect(concurrencyReplicas).Should(Equal(1))
+
+			By("concurrency = 0%, replicas = 10")
+			concurrent = &intstr.IntOrString{Type: intstr.String, StrVal: "0%"}
+			replicas = 10
+			concurrencyReplicas, err = CalculateConcurrencyReplicas(concurrent, replicas)
+			Expect(err).Should(BeNil())
+			Expect(concurrencyReplicas).Should(Equal(1))
+
+			By("concurrency = 5, replicas = 10")
+			concurrent = &intstr.IntOrString{Type: intstr.Int, IntVal: 5}
+			replicas = 10
+			concurrencyReplicas, err = CalculateConcurrencyReplicas(concurrent, replicas)
+			Expect(err).Should(BeNil())
+			Expect(concurrencyReplicas).Should(Equal(5))
+
+			By("concurrency = 5, replicas = 0")
+			concurrent = &intstr.IntOrString{Type: intstr.Int, IntVal: 5}
+			replicas = 0
+			concurrencyReplicas, err = CalculateConcurrencyReplicas(concurrent, replicas)
+			Expect(err).Should(BeNil())
+			Expect(concurrencyReplicas).Should(Equal(1))
+
+			By("concurrency = 0, replicas = 10")
+			concurrent = &intstr.IntOrString{Type: intstr.Int, IntVal: 0}
+			replicas = 10
+			concurrencyReplicas, err = CalculateConcurrencyReplicas(concurrent, replicas)
+			Expect(err).Should(BeNil())
+			Expect(concurrencyReplicas).Should(Equal(1))
+
+			By("concurrency = 10%, replicas = 1")
+			concurrent = &intstr.IntOrString{Type: intstr.String, StrVal: "10%"}
+			replicas = 1
+			concurrencyReplicas, err = CalculateConcurrencyReplicas(concurrent, replicas)
+			Expect(err).Should(BeNil())
+			Expect(concurrencyReplicas).Should(Equal(1))
+
+			By("concurrency = 60%, replicas = 2")
+			concurrent = &intstr.IntOrString{Type: intstr.String, StrVal: "60%"}
+			replicas = 2
+			concurrencyReplicas, err = CalculateConcurrencyReplicas(concurrent, replicas)
+			Expect(err).Should(BeNil())
+			Expect(concurrencyReplicas).Should(Equal(1))
+
+			By("concurrency is nil")
+			replicas = 10
+			concurrencyReplicas, err = CalculateConcurrencyReplicas(nil, replicas)
+			Expect(err).Should(BeNil())
+			Expect(concurrencyReplicas).Should(Equal(10))
+
+			By("concurrency is a string but not a percentage")
+			replicas = 10
+			concurrent = &intstr.IntOrString{Type: intstr.String, StrVal: "50"}
+			concurrencyReplicas, err = CalculateConcurrencyReplicas(concurrent, replicas)
+			ErrConcurrencyNotPercentage := fmt.Errorf("invalid value for IntOrString: invalid type: string is not a percentage")
+			Expect(err).Should(Equal(ErrConcurrencyNotPercentage))
+			Expect(concurrencyReplicas).Should(Equal(0))
+
+			By("concurrency percentage < 0%")
+			replicas = 10
+			concurrent = &intstr.IntOrString{Type: intstr.String, StrVal: "-50%"}
+			concurrencyReplicas, err = CalculateConcurrencyReplicas(concurrent, replicas)
+			Expect(err).Should(BeNil())
+			Expect(concurrencyReplicas).Should(Equal(1))
+
+			By("concurrency percentage > 100%")
+			replicas = 10
+			concurrent = &intstr.IntOrString{Type: intstr.String, StrVal: "150%"}
+			concurrencyReplicas, err = CalculateConcurrencyReplicas(concurrent, replicas)
+			Expect(err).Should(BeNil())
+			Expect(concurrencyReplicas).Should(Equal(10))
+
+			By("concurrency type neither int nor percentage")
+			replicas = 10
+			unknownType := intstr.Type(2)
+			concurrent = &intstr.IntOrString{Type: unknownType, StrVal: "50%"}
+			concurrencyReplicas, err = CalculateConcurrencyReplicas(concurrent, replicas)
+			ErrConcurrencyInvalidType := fmt.Errorf("invalid value for IntOrString: invalid type: neither int nor percentage")
+			Expect(err).Should(Equal(ErrConcurrencyInvalidType))
+			Expect(concurrencyReplicas).Should(Equal(0))
+
+			By("concurrency > replicas")
+			replicas = 10
+			concurrent = &intstr.IntOrString{Type: intstr.Int, IntVal: 15}
+			concurrencyReplicas, err = CalculateConcurrencyReplicas(concurrent, replicas)
+			Expect(err).Should(BeNil())
+			Expect(concurrencyReplicas).Should(Equal(10))
+
+			By("concurrent is nil, replicas = 10")
+			replicas = 10
+			concurrent = nil
+			concurrencyReplicas, err = CalculateConcurrencyReplicas(concurrent, replicas)
+			Expect(err).Should(BeNil())
+			Expect(concurrencyReplicas).Should(Equal(10))
+
+			By("concurrent is nil, replicas = 0")
+			replicas = 0
+			concurrent = nil
+			concurrencyReplicas, err = CalculateConcurrencyReplicas(concurrent, replicas)
+			Expect(err).Should(BeNil())
+			Expect(concurrencyReplicas).Should(Equal(1))
 		})
 	})
 })

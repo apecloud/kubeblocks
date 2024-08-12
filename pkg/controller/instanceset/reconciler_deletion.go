@@ -32,27 +32,27 @@ type deletionReconciler struct{}
 
 func (r *deletionReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || !model.IsObjectDeleting(tree.GetRoot()) {
-		return kubebuilderx.ResultUnsatisfied
+		return kubebuilderx.ConditionUnsatisfied
 	}
 	if model.IsReconciliationPaused(tree.GetRoot()) {
-		return kubebuilderx.ResultUnsatisfied
+		return kubebuilderx.ConditionUnsatisfied
 	}
-	return kubebuilderx.ResultSatisfied
+	return kubebuilderx.ConditionSatisfied
 }
 
-func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
+func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	// delete secondary objects first
 	// retain all pvcs
 	// TODO(free6om): respect PVCManagementPolicy
 	allObjects := tree.GetSecondaryObjects()
 	objects := filterByType[*corev1.PersistentVolumeClaim](allObjects)
 	if len(objects) > 0 {
-		return tree, tree.Delete(objects...)
+		return kubebuilderx.Continue, tree.Delete(objects...)
 	}
 
 	// delete root object
 	tree.DeleteRoot()
-	return tree, nil
+	return kubebuilderx.Continue, nil
 }
 
 func filterByType[T client.Object](snapshot model.ObjectSnapshot) []client.Object {

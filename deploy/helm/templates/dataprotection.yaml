@@ -76,6 +76,9 @@ spec:
             {{- if .Values.multiCluster.contextsDisabled }}
             - "--multi-cluster-contexts-disabled={{ .Values.multiCluster.contextsDisabled }}"
             {{- end }}
+            {{- if .Values.userAgent }}
+            - "--user-agent={{ .Values.userAgent }}"
+            {{- end }}
           env:
             - name: CM_NAMESPACE
               value: {{ .Release.Namespace }}
@@ -93,6 +96,8 @@ spec:
             {{- end }}
             - name: KUBEBLOCKS_IMAGE_PULL_POLICY
               value: {{ .Values.dataProtection.image.pullPolicy }}
+            - name: KUBEBLOCKS_IMAGE_PULL_SECRETS
+              value: {{ .Values.dataProtection.image.imagePullSecrets | toJson | quote }}
             - name: KUBEBLOCKS_TOOLS_IMAGE
               value: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.tools.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
             - name: KUBEBLOCKS_SERVICEACCOUNT_NAME

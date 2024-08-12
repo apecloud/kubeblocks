@@ -3954,6 +3954,21 @@ Kubernetes meta/v1.LabelSelector
 </tr>
 <tr>
 <td>
+<code>fallbackLabelSelector</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#labelselector-v1-meta">
+Kubernetes meta/v1.LabelSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>fallbackLabelSelector is used to filter available pods when the labelSelector fails.
+This only takes effect when the <code>strategy</code> field below is set to <code>Any</code>.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>strategy</code><br/>
 <em>
 <a href="#dataprotection.kubeblocks.io/v1alpha1.PodSelectionStrategy">

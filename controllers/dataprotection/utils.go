@@ -24,7 +24,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
-	"sort"
 	"strings"
 	"sync"
 
@@ -149,59 +148,66 @@ func GetTargetPods(reqCtx intctrlutil.RequestCtx,
 	if !existPodSelector(selector) {
 		return nil, nil
 	}
-	labelSelector, err := metav1.LabelSelectorAsSelector(selector.LabelSelector)
-	if err != nil {
-		return nil, err
-	}
-	pods := &corev1.PodList{}
-	if err = cli.List(reqCtx.Ctx, pods,
-		client.InNamespace(reqCtx.Req.Namespace),
-		client.MatchingLabelsSelector{Selector: labelSelector}); err != nil {
-		return nil, err
-	}
 
-	if len(pods.Items) == 0 {
-		return nil, fmt.Errorf("failed to find target pods by backup policy %s/%s",
-			backupPolicy.Namespace, backupPolicy.Name)
-	}
-	sort.Sort(intctrlutil.ByPodName(pods.Items))
-	var targetPods []*corev1.Pod
-	if len(selectedPodNames) == 0 || backupType == dpv1alpha1.BackupTypeContinuous {
-		switch selector.Strategy {
+	filterTargetPods := func(strategy dpv1alpha1.PodSelectionStrategy,
+		labelSelector *metav1.LabelSelector) ([]*corev1.Pod, error) {
+		var targetPods []*corev1.Pod
+		pods, err := dputils.GetPodListByLabelSelector(reqCtx, cli, labelSelector)
+		if err != nil {
+			return nil, err
+		}
+		switch strategy {
 		case dpv1alpha1.PodSelectionStrategyAny:
-			// always selecting the first pod
-			pod := dputils.GetFirstIndexRunningPod(pods)
+			var pod *corev1.Pod
+			if len(selectedPodNames) == 0 || backupType == dpv1alpha1.BackupTypeContinuous {
+				pod = dputils.GetFirstIndexRunningPod(pods)
+			} else {
+				// if already selected target pods and backupType is not Continuous, we should re-use them.
+				pod = dputils.GetPodByName(pods, selectedPodNames[0])
+			}
 			if pod != nil {
 				targetPods = append(targetPods, pod)
 			}
 		case dpv1alpha1.PodSelectionStrategyAll:
+			if len(selectedPodNames) == 0 || backupType == dpv1alpha1.BackupTypeContinuous {
+				for i := range pods.Items {
+					targetPods = append(targetPods, &pods.Items[i])
+				}
+				return targetPods, nil
+			}
+			// if already selected target pods and backupType is not Continuous, we should re-use them.
+			if len(pods.Items) == 0 {
+				return nil, fmt.Errorf("failed to find target pods by backup policy %s/%s",
+					backupPolicy.Namespace, backupPolicy.Name)
+			}
+			podMap := map[string]*corev1.Pod{}
 			for i := range pods.Items {
-				targetPods = append(targetPods, &pods.Items[i])
+				podMap[pods.Items[i].Name] = &pods.Items[i]
+			}
+			for _, podName := range selectedPodNames {
+				pod, ok := podMap[podName]
+				if !ok {
+					return nil, intctrlutil.NewFatalError(fmt.Sprintf(`can not found the target pod "%s"`, podName))
+				}
+				targetPods = append(targetPods, pod)
 			}
 		}
 		return targetPods, nil
 	}
-	// if already selected target pods and backupType is not Continuous, we should re-use them.
-	switch selector.Strategy {
-	case dpv1alpha1.PodSelectionStrategyAny:
-		for _, pod := range pods.Items {
-			if pod.Name == selectedPodNames[0] {
-				targetPods = append(targetPods, &pod)
-				break
-			}
-		}
-	case dpv1alpha1.PodSelectionStrategyAll:
-		podMap := map[string]corev1.Pod{}
-		for i := range pods.Items {
-			podMap[pods.Items[i].Name] = pods.Items[i]
-		}
-		for _, podName := range selectedPodNames {
-			pod, ok := podMap[podName]
-			if !ok {
-				return nil, intctrlutil.NewFatalError(fmt.Sprintf(`can not found the target pod "%s"`, podName))
-			}
-			targetPods = append(targetPods, &pod)
-		}
+
+	targetPods, err := filterTargetPods(selector.Strategy, selector.LabelSelector)
+	if err != nil {
+		return nil, err
+	}
+	// if selector.LabelSelector fails to filter a available target pod or the selected target pod,
+	// use selector.FallbackLabelSelector to filter, and selector.FallbackLabelSelector only takes effect
+	// when selector.Strategy equals to dpv1alpha1.PodSelectionStrategyAny.
+	if selector.Strategy == dpv1alpha1.PodSelectionStrategyAll || len(targetPods) > 0 ||
+		selector.FallbackLabelSelector == nil {
+		return targetPods, nil
+	}
+	if targetPods, err = filterTargetPods(selector.Strategy, selector.FallbackLabelSelector); err != nil {
+		return nil, err
 	}
 	return targetPods, nil
 }
@@ -223,6 +229,31 @@ func getCluster(ctx context.Context,
 		return nil
 	}
 	return cluster
+}
+
+// listObjectsOfCluster list the objects of the cluster by labels.
+func listObjectsOfCluster(ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	object client.ObjectList) (client.ObjectList, error) {
+	labels := constant.GetClusterWellKnownLabels(cluster.Name)
+	if err := cli.List(ctx, object, client.InNamespace(cluster.Namespace), client.MatchingLabels(labels)); err != nil {
+		return nil, err
+	}
+	return object, nil
+}
+
+// getObjectString convert object to string
+func getObjectString(object any) (*string, error) {
+	if object == nil {
+		return nil, nil
+	}
+	objectBytes, err := json.Marshal(object)
+	if err != nil {
+		return nil, err
+	}
+	objectString := string(objectBytes)
+	return &objectString, nil
 }
 
 func getClusterLabelKeys() []string {
@@ -358,6 +389,7 @@ func EnsureWorkerServiceAccount(reqCtx intctrlutil.RequestCtx, cli client.Client
 				sa.Annotations[k] = v
 			}
 		}
+		sa.ImagePullSecrets = intctrlutil.BuildImagePullSecrets()
 		if !reflect.DeepEqual(sa, saCopy) {
 			err := cli.Patch(ctx, sa, client.MergeFrom(saCopy), multicluster.InUniversalContext())
 			if err != nil {
@@ -393,6 +425,7 @@ func EnsureWorkerServiceAccount(reqCtx intctrlutil.RequestCtx, cli client.Client
 		sa.Name = saName
 		sa.Namespace = namespace
 		sa.Annotations = extraAnnotations
+		sa.ImagePullSecrets = intctrlutil.BuildImagePullSecrets()
 		if err := cli.Create(ctx, sa, multicluster.InUniversalContext()); err != nil {
 			return client.IgnoreAlreadyExists(err)
 		}

@@ -17,15 +17,16 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package apiconversion
+package version
 
-type cloudProvider string
+// Version is the string that contains version
+var Version = "dev"
 
-const (
-	cloudProviderAWS     cloudProvider = "aws"
-	cloudProviderGCP     cloudProvider = "gcp"
-	cloudProviderAliyun  cloudProvider = "aliyun"
-	cloudProviderAzure   cloudProvider = "azure"
-	cloudProviderTencent cloudProvider = "tencent"
-	cloudProviderUnknown cloudProvider = "unknown"
-)
+// BuildDate is the string of binary build date
+var BuildDate string
+
+// GitCommit is the string of git commit ID
+var GitCommit string
+
+// GitVersion is the string of git version tag
+var GitVersion = "unknown"

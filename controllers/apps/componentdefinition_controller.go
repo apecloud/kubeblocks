@@ -191,7 +191,6 @@ func (r *ComponentDefinitionReconciler) validate(cli client.Client, rctx intctrl
 		r.validateSystemAccounts,
 		r.validateReplicaRoles,
 		r.validateLifecycleActions,
-		r.validateComponentDefRef,
 	} {
 		if err := validator(cli, rctx, cmpd); err != nil {
 			return err
@@ -398,11 +397,6 @@ func (r *ComponentDefinitionReconciler) validateLifecycleActionBuiltInHandlers(l
 	return nil
 }
 
-func (r *ComponentDefinitionReconciler) validateComponentDefRef(cli client.Client, reqCtx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition) error {
-	return nil
-}
-
 func (r *ComponentDefinitionReconciler) immutableCheck(cmpd *appsv1alpha1.ComponentDefinition) error {
 	if r.skipImmutableCheck(cmpd) {
 		return nil
@@ -435,7 +429,6 @@ func (r *ComponentDefinitionReconciler) cmpdHash(cmpd *appsv1alpha1.ComponentDef
 	// reset all mutable fields
 	objCopy.Spec.Provider = ""
 	objCopy.Spec.Description = ""
-	objCopy.Spec.Monitor = nil
 	objCopy.Spec.Exporter = nil
 	objCopy.Spec.PodManagementPolicy = nil
 

@@ -41,12 +41,12 @@ type updateStatusReconciler struct{}
 
 func (r *updateStatusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
-		return kubebuilderx.ResultUnsatisfied
+		return kubebuilderx.ConditionUnsatisfied
 	}
-	return kubebuilderx.ResultSatisfied
+	return kubebuilderx.ConditionSatisfied
 }
 
-func (r *updateStatusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
+func (r *updateStatusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	scaler, _ := tree.GetRoot().(*experimental.NodeCountScaler)
 	itsList := tree.List(&workloads.InstanceSet{})
 	nodes := tree.List(&corev1.Node{})
@@ -81,7 +81,7 @@ func (r *updateStatusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kube
 	condition := buildScaleReadyCondition(scaler)
 	meta.SetStatusCondition(&scaler.Status.Conditions, *condition)
 
-	return tree, nil
+	return kubebuilderx.Continue, nil
 }
 
 func buildScaleReadyCondition(scaler *experimental.NodeCountScaler) *metav1.Condition {

@@ -63,9 +63,9 @@ var _ = Describe("object rbac transformer test.", func() {
 			GetObject()
 
 		By("Creating a cluster")
-		cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "", "").
+		cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 			WithRandomName().
-			AddComponentV2(compName, compDefName).
+			AddComponent(compName, compDefName).
 			SetReplicas(1).
 			SetServiceAccountName(serviceAccountName).
 			GetObject()

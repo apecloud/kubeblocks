@@ -135,22 +135,22 @@ func deleteCompsInOrder(transCtx *clusterTransformContext, dag *graph.DAG, delet
 
 func handleCompsInOrder(transCtx *clusterTransformContext, dag *graph.DAG,
 	compNameSet sets.Set[string], handler compConditionalHandler) error {
-	var unmatched []string
+	unmatched := ""
 	for _, compName := range handler.ordered(sets.List(compNameSet)) {
 		ok, err := handler.match(transCtx, dag, compName)
 		if err != nil {
 			return err
 		}
-		if ok {
-			if err = handler.handle(transCtx, dag, compName); err != nil {
-				return err
-			}
-		} else {
-			unmatched = append(unmatched, compName)
+		if !ok {
+			unmatched = compName
+			break
+		}
+		if err = handler.handle(transCtx, dag, compName); err != nil {
+			return err
 		}
 	}
 	if len(unmatched) > 0 {
-		return ictrlutil.NewDelayedRequeueError(0, fmt.Sprintf("retry later: %s are not ready", strings.Join(unmatched, ",")))
+		return ictrlutil.NewDelayedRequeueError(0, fmt.Sprintf("retry later: %s are not ready", unmatched))
 	}
 	return nil
 }
@@ -218,6 +218,8 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component) *apps
 	// compObjCopy.Spec.Monitor = compProto.Spec.Monitor
 	compObjCopy.Spec.EnabledLogs = compProto.Spec.EnabledLogs
 	compObjCopy.Spec.ServiceAccountName = compProto.Spec.ServiceAccountName
+	compObjCopy.Spec.ParallelPodManagementConcurrency = compProto.Spec.ParallelPodManagementConcurrency
+	compObjCopy.Spec.PodUpdatePolicy = compProto.Spec.PodUpdatePolicy
 	compObjCopy.Spec.Affinity = compProto.Spec.Affinity
 	compObjCopy.Spec.Tolerations = compProto.Spec.Tolerations
 	compObjCopy.Spec.TLSConfig = compProto.Spec.TLSConfig
@@ -304,6 +306,13 @@ func newParallelHandler(compSpecs map[string]*appsv1alpha1.ClusterComponentSpec,
 
 func newOrderedHandler(compSpecs map[string]*appsv1alpha1.ClusterComponentSpec,
 	labels, annotations map[string]map[string]string, orders []string, op int) compConditionalHandler {
+	upworking := func(comp *appsv1alpha1.Component) bool {
+		target := appsv1alpha1.RunningClusterCompPhase
+		if comp.Spec.Stop != nil && *comp.Spec.Stop {
+			target = appsv1alpha1.StoppedClusterCompPhase
+		}
+		return comp.Status.Phase == target
+	}
 	switch op {
 	case createOp:
 		return &orderedCreateCompHandler{
@@ -311,8 +320,8 @@ func newOrderedHandler(compSpecs map[string]*appsv1alpha1.ClusterComponentSpec,
 				orders: orders,
 			},
 			compPhasePrecondition: compPhasePrecondition{
-				orders:         orders,
-				expectedPhases: []appsv1alpha1.ClusterComponentPhase{appsv1alpha1.RunningClusterCompPhase},
+				orders:           orders,
+				phaseExpectation: upworking,
 			},
 			createCompHandler: createCompHandler{
 				compSpecs:   compSpecs,
@@ -336,8 +345,8 @@ func newOrderedHandler(compSpecs map[string]*appsv1alpha1.ClusterComponentSpec,
 				orders: orders,
 			},
 			compPhasePrecondition: compPhasePrecondition{
-				orders:         orders,
-				expectedPhases: []appsv1alpha1.ClusterComponentPhase{appsv1alpha1.RunningClusterCompPhase},
+				orders:           orders,
+				phaseExpectation: upworking,
 			},
 			updateCompHandler: updateCompHandler{
 				compSpecs:   compSpecs,
@@ -431,8 +440,8 @@ func (c *compNotExistPrecondition) match(transCtx *clusterTransformContext, dag 
 }
 
 type compPhasePrecondition struct {
-	orders         []string
-	expectedPhases []appsv1alpha1.ClusterComponentPhase
+	orders           []string
+	phaseExpectation func(component2 *appsv1alpha1.Component) bool
 }
 
 func (c *compPhasePrecondition) match(transCtx *clusterTransformContext, dag *graph.DAG, compName string) (bool, error) {
@@ -454,7 +463,7 @@ func (c *compPhasePrecondition) match(transCtx *clusterTransformContext, dag *gr
 		if err := transCtx.Client.Get(transCtx.Context, compKey, comp); err != nil {
 			return false, client.IgnoreNotFound(err)
 		}
-		if comp.Generation != comp.Status.ObservedGeneration || slices.Index(c.expectedPhases, comp.Status.Phase) < 0 {
+		if comp.Generation != comp.Status.ObservedGeneration || !c.phaseExpectation(comp) {
 			return false, nil
 		}
 		// create or update if exists in DAG

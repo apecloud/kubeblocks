@@ -355,13 +355,9 @@ func ClearResourcesWithRemoveFinalizerOption[T intctrlutil.Object, PT intctrluti
 // environment without UseExistingCluster set, where garbage collection lacks.
 func ClearClusterResources(testCtx *testutil.TestContext) {
 	inNS := client.InNamespace(testCtx.DefaultNamespace)
-	ClearResources(testCtx, intctrlutil.ClusterSignature, inNS,
-		client.HasLabels{testCtx.TestObjLabelKey})
-	// finalizer of ConfigMap are deleted in ClusterDef&ClusterVersion controller
-	ClearResources(testCtx, intctrlutil.ClusterVersionSignature,
-		client.HasLabels{testCtx.TestObjLabelKey})
-	ClearResources(testCtx, intctrlutil.ClusterDefinitionSignature,
-		client.HasLabels{testCtx.TestObjLabelKey})
+	ClearResources(testCtx, intctrlutil.ClusterSignature, inNS, client.HasLabels{testCtx.TestObjLabelKey})
+	// finalizer of ConfigMap are deleted in ClusterDefinition controller
+	ClearResources(testCtx, intctrlutil.ClusterDefinitionSignature, client.HasLabels{testCtx.TestObjLabelKey})
 }
 
 // ClearClusterResourcesWithRemoveFinalizerOption clears all dependent resources belonging to existing clusters.
@@ -369,8 +365,7 @@ func ClearClusterResourcesWithRemoveFinalizerOption(testCtx *testutil.TestContex
 	inNs := client.InNamespace(testCtx.DefaultNamespace)
 	hasLabels := client.HasLabels{testCtx.TestObjLabelKey}
 	ClearResourcesWithRemoveFinalizerOption(testCtx, intctrlutil.ClusterSignature, true, inNs, hasLabels)
-	// finalizer of ConfigMap are deleted in ClusterDef & ClusterVersion controller
-	ClearResourcesWithRemoveFinalizerOption(testCtx, intctrlutil.ClusterVersionSignature, true, hasLabels)
+	// finalizer of ConfigMap are deleted in ClusterDefinition controller
 	ClearResourcesWithRemoveFinalizerOption(testCtx, intctrlutil.ClusterDefinitionSignature, true, hasLabels)
 	ClearResourcesWithRemoveFinalizerOption(testCtx, intctrlutil.ComponentDefinitionSignature, true, hasLabels)
 	ClearResourcesWithRemoveFinalizerOption(testCtx, intctrlutil.ComponentVersionSignature, true, hasLabels)

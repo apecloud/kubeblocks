@@ -30,6 +30,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type componentHostNetworkTransformer struct{}
@@ -145,6 +146,13 @@ func updateLorry(synthesizeComp *component.SynthesizedComponent, container *core
 	container.Command = []string{"lorry",
 		"--port", strconv.Itoa(httpPort),
 		"--grpcport", strconv.Itoa(grpcPort),
+	}
+	if container.Image != viper.GetString(constant.KBToolsImage) {
+		container.Command = []string{"/kubeblocks/lorry",
+			"--port", strconv.Itoa(httpPort),
+			"--grpcport", strconv.Itoa(grpcPort),
+			"--config-path", "/kubeblocks/config/lorry/components/",
+		}
 	}
 
 	if container.StartupProbe != nil && container.StartupProbe.TCPSocket != nil {

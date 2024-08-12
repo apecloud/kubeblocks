@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"slices"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
@@ -30,7 +31,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type componentHostNetworkTransformer struct{}
@@ -143,18 +143,19 @@ func updateLorrySpecAfterPortsChanged(synthesizeComp *component.SynthesizedCompo
 }
 
 func updateLorry(synthesizeComp *component.SynthesizedComponent, container *corev1.Container, httpPort, grpcPort int) error {
-	container.Command = []string{"lorry",
-		"--port", strconv.Itoa(httpPort),
-		"--grpcport", strconv.Itoa(grpcPort),
-	}
-	if container.Image != viper.GetString(constant.KBToolsImage) {
-		container.Command = []string{"/kubeblocks/lorry",
+	kbLorryBinary := "/kubeblocks/lorry"
+	if slices.Contains(container.Command, kbLorryBinary) {
+		container.Command = []string{kbLorryBinary,
 			"--port", strconv.Itoa(httpPort),
 			"--grpcport", strconv.Itoa(grpcPort),
 			"--config-path", "/kubeblocks/config/lorry/components/",
 		}
+	} else {
+		container.Command = []string{"lorry",
+			"--port", strconv.Itoa(httpPort),
+			"--grpcport", strconv.Itoa(grpcPort),
+		}
 	}
-
 	if container.StartupProbe != nil && container.StartupProbe.TCPSocket != nil {
 		container.StartupProbe.TCPSocket.Port = intstr.FromInt(httpPort)
 	}

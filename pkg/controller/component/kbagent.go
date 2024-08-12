@@ -173,8 +173,7 @@ func buildAction4KBAgentLow(action *appsv1alpha1.Action, name string) *proto.Act
 		Exec: &proto.ExecAction{
 			Commands: action.Exec.Command,
 			Args:     action.Exec.Args,
-			// Env:       action.Exec.Env,
-			Container: action.Exec.Container,
+			// Env:      action.Exec.Env,
 		},
 		TimeoutSeconds: action.TimeoutSeconds,
 	}

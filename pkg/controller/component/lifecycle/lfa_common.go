@@ -182,62 +182,6 @@ func getScaledInFlag(ctx context.Context, cli client.Reader, namespace, clusterN
 	return false, nil
 }
 
-func getDBEnvs(synthesizeComp *component.SynthesizedComponent) []corev1.EnvVar {
-	var (
-		secretName     string
-		sysInitAccount *appsv1alpha1.SystemAccount
-	)
-
-	for index, sysAccount := range synthesizeComp.SystemAccounts {
-		// use first init account
-		if sysAccount.InitAccount {
-			sysInitAccount = &synthesizeComp.SystemAccounts[index]
-			break
-		}
-	}
-
-	if sysInitAccount != nil {
-		secretName = constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, sysInitAccount.Name)
-	}
-
-	var envs []corev1.EnvVar
-	if secretName == "" {
-		return envs
-	}
-
-	envs = append(envs,
-		corev1.EnvVar{
-			Name: serviceUserVar,
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: secretName,
-					},
-					Key: constant.AccountNameForSecret,
-				},
-			},
-		},
-		corev1.EnvVar{
-			Name: servicePasswordVar,
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: secretName,
-					},
-					Key: constant.AccountPasswdForSecret,
-				},
-			},
-		})
-	return envs
-}
-
-func getMainContainer(containers []corev1.Container) *corev1.Container {
-	if len(containers) > 0 {
-		return &containers[0]
-	}
-	return nil
-}
-
 func traverse[T any, R any](items []T, f func(T) R) []R {
 	var result []R
 	for _, item := range items {

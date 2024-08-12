@@ -6911,12 +6911,9 @@ which initiates an update of the replica&rsquo;s role.</p>
 <p>Defining a RoleProbe Action for a Component is required if roles are defined for the Component.
 It ensures replicas are correctly labeled with their respective roles.
 Without this, services that rely on roleSelectors might improperly direct traffic to wrong replicas.</p>
-<p>The container executing this action has access to following environment variables:</p>
+<p>The container executing this action has access to following variables:</p>
 <ul>
 <li>KB_POD_FQDN: The FQDN of the Pod whose role is being assessed.</li>
-<li>KB_SERVICE_PORT: The port used by the database service.</li>
-<li>KB_SERVICE_USER: The username with the necessary permissions to interact with the database service.</li>
-<li>KB_SERVICE_PASSWORD: The corresponding password for KB_SERVICE_USER to authenticate with the database service.</li>
 </ul>
 <p>Expected output of this action:
 - On Success: The determined role of the replica, which must align with one of the roles specified
@@ -6972,15 +6969,10 @@ LifecycleActionHandler
 <p>The role of the replica (e.g., primary, secondary) will be determined and assigned as part of the action command
 implementation, or automatically by the database kernel or a sidecar utility like Patroni that implements
 a consensus algorithm.</p>
-<p>The container executing this action has access to following environment variables:</p>
+<p>The container executing this action has access to following variables:</p>
 <ul>
-<li>KB_SERVICE_PORT: The port used by the database service.</li>
-<li>KB_SERVICE_USER: The username with the necessary permissions to interact with the database service.</li>
-<li>KB_SERVICE_PASSWORD: The corresponding password for KB_SERVICE_USER to authenticate with the database service.</li>
-<li>KB_PRIMARY_POD_FQDN: The FQDN of the primary Pod within the replication group.</li>
-<li>KB_MEMBER_ADDRESSES: A comma-separated list of Pod addresses for all replicas in the group.</li>
-<li>KB_NEW_MEMBER_POD_NAME: The pod name of the replica being added to the group.</li>
-<li>KB_NEW_MEMBER_POD_IP: The IP address of the replica being added to the group.</li>
+<li>KB_JOIN_MEMBER_POD_FQDN: The pod FQDN of the replica being added to the group.</li>
+<li>KB_JOIN_MEMBER_POD_NAME: The pod name of the replica being added to the group.</li>
 </ul>
 <p>Expected action output:
 - On Failure: An error message detailing the reason for any failure encountered
@@ -6990,11 +6982,8 @@ during the addition of the new member.</p>
 - bash
 - -c
 - |
-   ADDRESS=$(KB_MEMBER_ADDRESSES%%,*)
-   HOST=$(echo $ADDRESS | cut -d ':' -f 1)
-   PORT=$(echo $ADDRESS | cut -d ':' -f 2)
-   CLIENT=&quot;mysql -u $KB_SERVICE_USER -p$KB_SERVICE_PASSWORD -P $PORT -h $HOST -e&quot;
-	  $CLIENT &quot;ALTER SYSTEM ADD SERVER '$KB_NEW_MEMBER_POD_IP:$KB_SERVICE_PORT' ZONE 'zone1'&quot;
+   CLIENT=&quot;mysql -u $SERVICE_USER -p$SERVICE_PASSWORD -P $SERVICE_PORT -h $SERVICE_HOST -e&quot;
+	  $CLIENT &quot;ALTER SYSTEM ADD SERVER '$KB_POD_FQDN:$SERVICE_PORT' ZONE 'zone1'&quot;
 </code></pre>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
@@ -7016,15 +7005,10 @@ The operator will wait for MemberLeave to complete successfully before releasing
 related Kubernetes resources.</p>
 <p>The process typically includes updating configurations and informing other group members about the removal.
 Data migration is generally not part of this action and should be handled separately if needed.</p>
-<p>The container executing this action has access to following environment variables:</p>
+<p>The container executing this action has access to following variables:</p>
 <ul>
-<li>KB_SERVICE_PORT: The port used by the database service.</li>
-<li>KB_SERVICE_USER: The username with the necessary permissions to interact with the database service.</li>
-<li>KB_SERVICE_PASSWORD: The corresponding password for KB_SERVICE_USER to authenticate with the database service.</li>
-<li>KB_PRIMARY_POD_FQDN: The FQDN of the primary Pod within the replication group.</li>
-<li>KB_MEMBER_ADDRESSES: A comma-separated list of Pod addresses for all replicas in the group.</li>
+<li>KB_LEAVE_MEMBER_POD_FQDN: The pod name of the replica being removed from the group.</li>
 <li>KB_LEAVE_MEMBER_POD_NAME: The pod name of the replica being removed from the group.</li>
-<li>KB_LEAVE_MEMBER_POD_IP: The IP address of the replica being removed from the group.</li>
 </ul>
 <p>Expected action output:
 - On Failure: An error message, if applicable, indicating why the action failed.</p>
@@ -7033,11 +7017,8 @@ Data migration is generally not part of this action and should be handled separa
 - bash
 - -c
 - |
-   ADDRESS=$(KB_MEMBER_ADDRESSES%%,*)
-   HOST=$(echo $ADDRESS | cut -d ':' -f 1)
-   PORT=$(echo $ADDRESS | cut -d ':' -f 2)
-   CLIENT=&quot;mysql -u $KB_SERVICE_USER  -p$KB_SERVICE_PASSWORD -P $PORT -h $HOST -e&quot;
-	  $CLIENT &quot;ALTER SYSTEM DELETE SERVER '$KB_LEAVE_MEMBER_POD_IP:$KB_SERVICE_PORT' ZONE 'zone1'&quot;
+   CLIENT=&quot;mysql -u $SERVICE_USER -p$SERVICE_PASSWORD -P $SERVICE_PORT -h $SERVICE_HOST -e&quot;
+	  $CLIENT &quot;ALTER SYSTEM DELETE SERVER '$KB_POD_FQDN:$SERVICE_PORT' ZONE 'zone1'&quot;
 </code></pre>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
@@ -7059,9 +7040,6 @@ This action is invoked when the database&rsquo;s volume capacity nears its upper
 <p>The container executing this action has access to following environment variables:</p>
 <ul>
 <li>KB_POD_FQDN: The FQDN of the replica pod whose role is being checked.</li>
-<li>KB_SERVICE_PORT: The port used by the database service.</li>
-<li>KB_SERVICE_USER: The username with the necessary permissions to interact with the database service.</li>
-<li>KB_SERVICE_PASSWORD: The corresponding password for KB_SERVICE_USER to authenticate with the database service.</li>
 </ul>
 <p>Expected action output:
 - On Failure: An error message, if applicable, indicating why the action failed.</p>
@@ -7087,9 +7065,6 @@ both read and write operations.</p>
 <p>The container executing this action has access to following environment variables:</p>
 <ul>
 <li>KB_POD_FQDN: The FQDN of the replica pod whose role is being checked.</li>
-<li>KB_SERVICE_PORT: The port used by the database service.</li>
-<li>KB_SERVICE_USER: The username with the necessary permissions to interact with the database service.</li>
-<li>KB_SERVICE_PASSWORD: The corresponding password for KB_SERVICE_USER to authenticate with the database service.</li>
 </ul>
 <p>Expected action output:
 - On Failure: An error message, if applicable, indicating why the action failed.</p>

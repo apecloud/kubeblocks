@@ -21,25 +21,18 @@ package lifecycle
 
 import (
 	"context"
-	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 )
 
 const (
-	servicePortVar        = "KB_SERVICE_PORT"
-	serviceUserVar        = "KB_SERVICE_USER"
-	servicePasswordVar    = "KB_SERVICE_PASSWORD"
-	primaryPodFQDNVar     = "KB_PRIMARY_POD_FQDN"
-	membersAddressVar     = "KB_MEMBER_ADDRESSES"
-	newMemberPodNameVar   = "KB_NEW_MEMBER_POD_NAME"
-	newMemberPodIPVar     = "KB_NEW_MEMBER_POD_IP"
+	joinMemberPodFQDNVar  = "KB_JOIN_MEMBER_POD_FQDN"
+	joinMemberPodNameVar  = "KB_JOIN_MEMBER_POD_NAME"
+	leaveMemberPodFQDNVar = "KB_LEAVE_MEMBER_POD_FQDN"
 	leaveMemberPodNameVar = "KB_LEAVE_MEMBER_POD_NAME"
-	leaveMemberPodIPVar   = "KB_LEAVE_MEMBER_POD_IP"
 )
 
 type memberJoin struct {
@@ -54,17 +47,14 @@ func (a *memberJoin) name() string {
 }
 
 func (a *memberJoin) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {
-	m, err := parameters4Member(ctx, cli, a.synthesizedComp)
-	if err != nil {
-		return nil, err
-	}
-
-	// - KB_NEW_MEMBER_POD_NAME: The pod name of the replica being added to the group.
-	// - KB_NEW_MEMBER_POD_IP: The IP address of the replica being added to the group.
-	m[newMemberPodNameVar] = a.pod.Name
-	m[newMemberPodIPVar] = a.pod.Status.PodIP
-
-	return m, nil
+	// The container executing this action has access to following environment variables:
+	//
+	// - KB_JOIN_MEMBER_POD_FQDN: The pod FQDN of the replica being added to the group.
+	// - KB_JOIN_MEMBER_POD_NAME: The pod name of the replica being added to the group.
+	return map[string]string{
+		joinMemberPodFQDNVar: component.PodFQDN(a.synthesizedComp.Namespace, a.synthesizedComp.FullCompName, a.pod.Name),
+		joinMemberPodNameVar: a.pod.Name,
+	}, nil
 }
 
 type memberLeave struct {
@@ -79,59 +69,12 @@ func (a *memberLeave) name() string {
 }
 
 func (a *memberLeave) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {
-	m, err := parameters4Member(ctx, cli, a.synthesizedComp)
-	if err != nil {
-		return nil, err
-	}
-
-	// - KB_LEAVE_MEMBER_POD_NAME: The pod name of the replica being removed from the group.
-	// - KB_LEAVE_MEMBER_POD_IP: The IP address of the replica being removed from the group.
-	m[leaveMemberPodNameVar] = a.pod.Name
-	m[leaveMemberPodIPVar] = a.pod.Status.PodIP
-
-	return m, nil
-}
-
-func parameters4Member(ctx context.Context, cli client.Reader, synthesizedComp *component.SynthesizedComponent) (map[string]string, error) {
-	envs := getDBEnvs(synthesizedComp)
 	// The container executing this action has access to following environment variables:
 	//
-	// - KB_SERVICE_PORT: The port used by the database service.
-	// - KB_SERVICE_USER: The username with the necessary permissions to interact with the database service.
-	// - KB_SERVICE_PASSWORD: The corresponding password for KB_SERVICE_USER to authenticate with the database service.
-	// - KB_PRIMARY_POD_FQDN: The FQDN of the primary Pod within the replication group.
-	// - KB_MEMBER_ADDRESSES: A comma-separated list of Pod addresses for all replicas in the group.
-	//
-	// Expected action output:
-	// - On Failure: An error message, if applicable, indicating why the action failed.
-	m := make(map[string]string)
-	for _, env := range envs {
-		if env.Name == serviceUserVar || env.Name == servicePasswordVar {
-			secret := &corev1.Secret{}
-			secretKey := types.NamespacedName{
-				Namespace: synthesizedComp.Namespace,
-				Name:      env.ValueFrom.SecretKeyRef.Name,
-			}
-			if err := cli.Get(ctx, secretKey, secret); err != nil {
-				return nil, err
-			}
-			m[env.Name] = secret.StringData[env.ValueFrom.SecretKeyRef.Key]
-		}
-	}
-	mainContainer := getMainContainer(synthesizedComp.PodSpec.Containers)
-	if mainContainer != nil {
-		if len(mainContainer.Ports) > 0 {
-			port := mainContainer.Ports[0]
-			dbPort := port.ContainerPort
-			m[servicePortVar] = strconv.Itoa(int(dbPort))
-		}
-	}
-	// TODO: impl
-	// if cluster.Leader != nil && cluster.Leader.Name != "" {
-	//	leaderMember := cluster.GetMemberWithName(cluster.Leader.Name)
-	//	primaryPodFQDN := cluster.GetMemberAddr(*leaderMember)
-	//	m[primaryPodFQDNVar] = primaryPodFQDN
-	// }
-	// m[membersAddressVar] = strings.Join(cluster.GetMemberAddrs(), ",")
-	return m, nil
+	// - KB_LEAVE_MEMBER_POD_FQDN: The pod name of the replica being removed from the group.
+	// - KB_LEAVE_MEMBER_POD_NAME: The pod name of the replica being removed from the group.
+	return map[string]string{
+		leaveMemberPodFQDNVar: component.PodFQDN(a.synthesizedComp.Namespace, a.synthesizedComp.FullCompName, a.pod.Name),
+		leaveMemberPodNameVar: a.pod.Name,
+	}, nil
 }

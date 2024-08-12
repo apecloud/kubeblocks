@@ -1178,18 +1178,12 @@ func resolveComponentPodFQDNsRef(ctx context.Context, cli client.Reader, synthes
 		for i := range comp.Spec.Instances {
 			templates = append(templates, &comp.Spec.Instances[i])
 		}
-		clusterDomainFn := func(name string) string {
-			return fmt.Sprintf("%s.%s", name, viper.GetString(constant.KubernetesClusterDomainEnv))
-		}
 		names, err := instanceset.GenerateAllInstanceNames(comp.Name, comp.Spec.Replicas, templates, comp.Spec.OfflineInstances, workloads.Ordinals{})
 		if err != nil {
 			return nil, nil, err
 		}
-		fqdn := func(name string) string {
-			return clusterDomainFn(fmt.Sprintf("%s.%s-headless.%s.svc", name, comp.Name, synthesizedComp.Namespace))
-		}
 		for i := range names {
-			names[i] = fqdn(names[i])
+			names[i] = PodFQDN(synthesizedComp.Namespace, comp.Name, names[i])
 		}
 		return &corev1.EnvVar{Name: defineKey, Value: strings.Join(names, ",")}, nil, nil
 	}

@@ -455,6 +455,7 @@ var _ = Describe("Backup Controller test", func() {
 				backupPolicy.Spec.BackupMethods[0].Target = &dpv1alpha1.BackupTarget{
 					Name: testdp.ComponentName, PodSelector: podSelector, ContainerPort: containerPort,
 				}
+				backupPolicy.Spec.Target.ConnectionCredential = nil
 			})).Should(Succeed())
 
 			By("create a backup")

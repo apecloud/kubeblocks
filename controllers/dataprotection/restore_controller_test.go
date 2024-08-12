@@ -490,7 +490,9 @@ var _ = Describe("Restore Controller test", func() {
 				restore := initResourcesAndWaitRestore(true, false, false, dpv1alpha1.RestorePhaseRunning,
 					func(f *testdp.MockRestoreFactory) {
 						f.SetJobActionConfig(matchLabels).SetExecActionConfig(matchLabels)
-					}, nil)
+					}, func(b *dpv1alpha1.Backup) {
+						b.Status.Target.ConnectionCredential = nil
+					})
 
 				getJobKey := func(jobIndex int) client.ObjectKey {
 					return client.ObjectKey{

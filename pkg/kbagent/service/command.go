@@ -28,9 +28,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/util"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -128,21 +129,21 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 		var stdinErr error
 		stdin, stdinErr = cmd.StdinPipe()
 		if stdinErr != nil {
-			return nil, errors.Wrapf(ErrInternalError, "failed to create stdin pipe: %w", stdinErr)
+			return nil, errors.Wrapf(ErrInternalError, "failed to create stdin pipe: %v", stdinErr)
 		}
 	}
 	if stdoutWriter != nil {
 		var stdoutErr error
 		stdout, stdoutErr = cmd.StdoutPipe()
 		if stdoutErr != nil {
-			return nil, errors.Wrapf(ErrInternalError, "failed to create stdout pipe: %w", stdoutErr)
+			return nil, errors.Wrapf(ErrInternalError, "failed to create stdout pipe: %v", stdoutErr)
 		}
 	}
 	if stderrWriter != nil {
 		var stderrErr error
 		stderr, stderrErr = cmd.StderrPipe()
 		if stderrErr != nil {
-			return nil, errors.Wrapf(ErrInternalError, "failed to create stderr pipe: %w", stderrErr)
+			return nil, errors.Wrapf(ErrInternalError, "failed to create stderr pipe: %v", stderrErr)
 		}
 	}
 
@@ -154,7 +155,7 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 				errChan <- ErrTimeout
 			} else {
-				errChan <- errors.Wrapf(ErrFailed, "failed to start command: %w", err)
+				errChan <- errors.Wrapf(ErrFailed, "failed to start command: %v", err)
 			}
 			return
 		}
@@ -168,7 +169,7 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 				defer stdin.Close()
 				_, copyErr := io.Copy(stdin, stdinReader)
 				if copyErr != nil {
-					errChan <- errors.Wrapf(ErrFailed, "failed to copy from input reader to stdin: %w", copyErr)
+					errChan <- errors.Wrapf(ErrFailed, "failed to copy from input reader to stdin: %v", copyErr)
 				}
 			}
 		}()
@@ -177,7 +178,7 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 			if stdoutWriter != nil {
 				_, copyErr := io.Copy(stdoutWriter, stdout)
 				if copyErr != nil {
-					errChan <- errors.Wrapf(ErrFailed, "failed to copy stdout to output writer: %w", copyErr)
+					errChan <- errors.Wrapf(ErrFailed, "failed to copy stdout to output writer: %v", copyErr)
 				}
 			}
 		}()
@@ -186,7 +187,7 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 			if stderrWriter != nil {
 				_, copyErr := io.Copy(stderrWriter, stderr)
 				if copyErr != nil {
-					errChan <- errors.Wrapf(ErrFailed, "failed to copy stderr to error writer: %w", copyErr)
+					errChan <- errors.Wrapf(ErrFailed, "failed to copy stderr to error writer: %v", copyErr)
 				}
 			}
 		}()
@@ -208,17 +209,3 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 	}()
 	return errChan, nil
 }
-
-// type chanWriter struct {
-//	ch chan []byte
-// }
-//
-// func (w *chanWriter) Write(p []byte) (n int, err error) {
-//	w.ch <- p
-//	return len(p), nil
-// }
-//
-// func newChanWriter() (chan []byte, io.Writer) {
-//	ch := make(chan []byte)
-//	return ch, &chanWriter{ch: ch}
-// }

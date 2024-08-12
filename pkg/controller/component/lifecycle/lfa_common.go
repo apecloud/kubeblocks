@@ -182,7 +182,7 @@ func getScaledInFlag(ctx context.Context, cli client.Reader, namespace, clusterN
 	return false, nil
 }
 
-func getDBEnvs(synthesizeComp *component.SynthesizedComponent, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) []corev1.EnvVar {
+func getDBEnvs(synthesizeComp *component.SynthesizedComponent) []corev1.EnvVar {
 	var (
 		secretName     string
 		sysInitAccount *appsv1alpha1.SystemAccount

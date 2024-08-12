@@ -21,35 +21,14 @@ package lifecycle
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 )
-
-var (
-	ErrActionNotDefined     = errors.New("action is not defined")
-	ErrActionNotImplemented = errors.New("action is not implemented")
-	ErrActionInProgress     = errors.New("action is in progress")
-	ErrActionBusy           = errors.New("action is busy")
-	ErrActionTimeout        = errors.New("action timeout")
-	ErrActionFailed         = errors.New("action failed")
-	ErrActionCanceled       = errors.New("action canceled")
-	ErrActionInternalError  = errors.New("action internal error")
-)
-
-func New(lifecycleActions *appsv1alpha1.ComponentLifecycleActions, pod *corev1.Pod, pods ...*corev1.Pod) (Lifecycle, error) {
-	if len(pods) == 0 {
-		pods = []*corev1.Pod{pod}
-	}
-	return &kbagent{
-		lifecycleActions: lifecycleActions,
-		pods:             pods,
-		pod:              pod,
-	}, nil
-}
 
 type Options struct {
 	NonBlocking    *bool
@@ -81,4 +60,22 @@ type Lifecycle interface {
 	// Reconfigure(ctx context.Context, cli client.Reader, opts *Options) error
 
 	AccountProvision(ctx context.Context, cli client.Reader, opts *Options, args ...any) error
+}
+
+func New(synthesizedComp *component.SynthesizedComponent, pod *corev1.Pod, pods ...*corev1.Pod) (Lifecycle, error) {
+	if pod == nil && len(pods) == 0 {
+		return nil, fmt.Errorf("either pod or pods must be provided to call lifecycle actions")
+	}
+	if pod == nil {
+		pod = pods[0]
+	}
+	if len(pods) == 0 {
+		pods = []*corev1.Pod{pod}
+	}
+	return &kbagent{
+		synthesizedComp:  synthesizedComp,
+		lifecycleActions: synthesizedComp.LifecycleActions,
+		pods:             pods,
+		pod:              pod,
+	}, nil
 }

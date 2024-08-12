@@ -181,16 +181,10 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		By("wait for VerticalScalingOpsRequest is running")
 		Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsRunningPhase))
+
+		By("check cluster & component phase as updating")
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.UpdatingClusterPhase))
 		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, mysqlCompName)).Should(Equal(appsv1alpha1.UpdatingClusterCompPhase))
-		// TODO(refactor): try to check some ephemeral states?
-		// checkLatestOpsIsProcessing(clusterKey, verticalScalingOpsRequest.Spec.Type)
-
-		// By("check Cluster and changed component phase is VerticalScaling")
-		// Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
-		//	g.Expect(cluster.Status.Phase).To(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
-		//	g.Expect(cluster.Status.Components[mysqlCompName].Phase).To(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase))
-		// })).Should(Succeed())
 
 		By("mock bring Cluster and changed component back to running status")
 		Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(mysqlIts), func(tmpIts *workloads.InstanceSet) {
@@ -198,7 +192,6 @@ var _ = Describe("OpsRequest Controller", func() {
 		})()).ShouldNot(HaveOccurred())
 		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
-		// checkLatestOpsHasProcessed(clusterKey)
 
 		By("notice opsrequest controller to run")
 		testk8s.MockPodIsTerminating(ctx, testCtx, pod)
@@ -320,14 +313,14 @@ var _ = Describe("OpsRequest Controller", func() {
 			By("set component to horizontal with snapshot policy")
 			testk8s.MockEnableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
 
-			// TODO(v1.0): bpt
-			// if clusterDefObj.Spec.ComponentDefs[0].HorizontalScalePolicy == nil {
-			//	Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
-			//		func(clusterDef *appsv1alpha1.ClusterDefinition) {
-			//			clusterDef.Spec.ComponentDefs[0].HorizontalScalePolicy =
-			//				&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyCloneVolume}
-			//		})()).ShouldNot(HaveOccurred())
-			// }
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compDefObj),
+				func(compDef *appsv1alpha1.ComponentDefinition) {
+					if compDef.Annotations == nil {
+						compDef.Annotations = map[string]string{}
+					}
+					compDef.Annotations[constant.HorizontalScaleBackupPolicyTemplateKey] = backupPolicyTPLName
+				})()).ShouldNot(HaveOccurred())
+
 			pvcSpec := testapps.NewPVCSpec("1Gi")
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, "").
 				WithRandomName().

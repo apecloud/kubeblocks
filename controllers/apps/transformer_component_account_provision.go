@@ -36,7 +36,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 const (
@@ -78,12 +77,9 @@ func (t *componentAccountProvisionTransformer) Transform(ctx graph.TransformCont
 		return nil
 	}
 
-	lifecycle, err := t.buildLifecycleActions(transCtx)
+	lfa, err := t.lifecycleAction(transCtx)
 	if err != nil {
 		return err
-	}
-	if controllerutil.IsNil(lifecycle) {
-		return nil
 	}
 	for _, account := range transCtx.SynthesizeComponent.SystemAccounts {
 		// The secret of initAccount should be rendered into the config file,
@@ -101,7 +97,7 @@ func (t *componentAccountProvisionTransformer) Transform(ctx graph.TransformCont
 		if transCtx.SynthesizeComponent.Annotations[constant.RestoreFromBackupAnnotationKey] == "" {
 			// TODO: restore account secret from backup.
 			// provision account when the component is not recovered from backup
-			if err = t.provisionAccount(transCtx, cond, lifecycle, account); err != nil {
+			if err = t.provisionAccount(transCtx, cond, lfa, account); err != nil {
 				t.markProvisionAsFailed(transCtx, &cond, err)
 				return err
 			}
@@ -183,9 +179,10 @@ func (t *componentAccountProvisionTransformer) markAccountProvisioned(cond *meta
 	cond.Message = strings.Join(accounts, ",")
 }
 
-func (t *componentAccountProvisionTransformer) buildLifecycleActions(transCtx *componentTransformContext) (lifecycle.Lifecycle, error) {
+func (t *componentAccountProvisionTransformer) lifecycleAction(transCtx *componentTransformContext) (lifecycle.Lifecycle, error) {
 	synthesizedComp := transCtx.SynthesizeComponent
 
+	// TODO(v1.0): remove this, and use the role selector in lifecycle action.
 	roleName := ""
 	for _, role := range synthesizedComp.Roles {
 		if role.Serviceable && role.Writable {
@@ -205,15 +202,15 @@ func (t *componentAccountProvisionTransformer) buildLifecycleActions(transCtx *c
 		return nil, fmt.Errorf("unable to find appropriate pods to create accounts")
 	}
 
-	lifecycle, err := lifecycle.New(transCtx.SynthesizeComponent.LifecycleActions, pods[0])
+	lfa, err := lifecycle.New(transCtx.SynthesizeComponent, pods[0])
 	if err != nil {
 		return nil, err
 	}
-	return lifecycle, nil
+	return lfa, nil
 }
 
 func (t *componentAccountProvisionTransformer) provisionAccount(transCtx *componentTransformContext,
-	_ metav1.Condition, lifecycle lifecycle.Lifecycle, account appsv1alpha1.SystemAccount) error {
+	_ metav1.Condition, lfa lifecycle.Lifecycle, account appsv1alpha1.SystemAccount) error {
 
 	synthesizedComp := transCtx.SynthesizeComponent
 	secret, err := t.getAccountSecret(transCtx, synthesizedComp, account)
@@ -226,10 +223,13 @@ func (t *componentAccountProvisionTransformer) provisionAccount(transCtx *compon
 		return nil
 	}
 
-	namedVars := getEnvReplacementMapForAccount(string(username), string(password))
-	stmt := component.ReplaceNamedVars(namedVars, account.Statement, -1, true)
-	// TODO: re-define the role
-	return lifecycle.AccountProvision(transCtx.Context, transCtx.Client, nil, string(username), string(password), stmt)
+	vars := map[string]string{
+		"$(USERNAME)": string(username),
+		"$(PASSWD)":   string(password),
+	}
+	stmt := component.ReplaceNamedVars(vars, account.Statement, -1, true)
+	err = lfa.AccountProvision(transCtx.Context, transCtx.Client, nil, string(username), string(password), stmt)
+	return lifecycle.IgnoreNotDefined(err)
 }
 
 func (t *componentAccountProvisionTransformer) getAccountSecret(ctx graph.TransformContext,
@@ -243,11 +243,4 @@ func (t *componentAccountProvisionTransformer) getAccountSecret(ctx graph.Transf
 		return nil, err
 	}
 	return secret, nil
-}
-
-func getEnvReplacementMapForAccount(name, passwd string) map[string]string {
-	return map[string]string{
-		"$(USERNAME)": name,
-		"$(PASSWD)":   passwd,
-	}
 }

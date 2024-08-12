@@ -35,7 +35,7 @@ const (
 	probeEnvName  = "KB_AGENT_PROBE"
 )
 
-func BuildEnvVars(actions []proto.Action, probes []proto.Probe) ([]corev1.EnvVar, error) {
+func BuildStartupEnvs(actions []proto.Action, probes []proto.Probe) ([]corev1.EnvVar, error) {
 	da, dp, err := serializeActionNProbe(actions, probes)
 	if err != nil {
 		return nil, err

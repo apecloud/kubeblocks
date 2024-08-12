@@ -22,14 +22,12 @@ package lifecycle
 import (
 	"context"
 	"strconv"
-	"strings"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 )
 
 const (
@@ -45,11 +43,8 @@ const (
 )
 
 type memberJoin struct {
-	namespace   string
-	clusterName string
-	compName    string
-	podName     string
-	podIP       string
+	synthesizedComp *component.SynthesizedComponent
+	pod             *corev1.Pod
 }
 
 var _ lifecycleAction = &memberJoin{}
@@ -59,28 +54,22 @@ func (a *memberJoin) name() string {
 }
 
 func (a *memberJoin) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {
-	m, err := parameters4Member(ctx, cli, a.namespace, a.clusterName, a.compName, nil, nil, nil)
+	m, err := parameters4Member(ctx, cli, a.synthesizedComp)
 	if err != nil {
 		return nil, err
 	}
 
 	// - KB_NEW_MEMBER_POD_NAME: The pod name of the replica being added to the group.
 	// - KB_NEW_MEMBER_POD_IP: The IP address of the replica being added to the group.
-	m[newMemberPodNameVar] = a.podName
-	m[newMemberPodIPVar] = a.podIP
+	m[newMemberPodNameVar] = a.pod.Name
+	m[newMemberPodIPVar] = a.pod.Status.PodIP
 
 	return m, nil
 }
 
 type memberLeave struct {
-	namespace       string
-	clusterName     string
-	compName        string
-	podName         string
-	podIP           string
-	synthesizeComp  *component.SynthesizedComponent
-	clusterCompSpec *appsv1alpha1.ClusterComponentSpec
-	cluster         *dcs.Cluster
+	synthesizedComp *component.SynthesizedComponent
+	pod             *corev1.Pod
 }
 
 var _ lifecycleAction = &memberLeave{}
@@ -90,21 +79,21 @@ func (a *memberLeave) name() string {
 }
 
 func (a *memberLeave) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {
-	m, err := parameters4Member(ctx, cli, a.namespace, a.clusterName, a.compName, a.synthesizeComp, a.clusterCompSpec, a.cluster)
+	m, err := parameters4Member(ctx, cli, a.synthesizedComp)
 	if err != nil {
 		return nil, err
 	}
 
 	// - KB_LEAVE_MEMBER_POD_NAME: The pod name of the replica being removed from the group.
 	// - KB_LEAVE_MEMBER_POD_IP: The IP address of the replica being removed from the group.
-	m[leaveMemberPodNameVar] = a.podName
-	m[leaveMemberPodIPVar] = a.podIP
+	m[leaveMemberPodNameVar] = a.pod.Name
+	m[leaveMemberPodIPVar] = a.pod.Status.PodIP
 
 	return m, nil
 }
 
-func parameters4Member(ctx context.Context, cli client.Reader, namespace, clusterName, compName string, synthesizeComp *component.SynthesizedComponent, clusterCompSpec *appsv1alpha1.ClusterComponentSpec, cluster *dcs.Cluster) (map[string]string, error) {
-	envs := getDBEnvs(synthesizeComp, clusterCompSpec)
+func parameters4Member(ctx context.Context, cli client.Reader, synthesizedComp *component.SynthesizedComponent) (map[string]string, error) {
+	envs := getDBEnvs(synthesizedComp)
 	// The container executing this action has access to following environment variables:
 	//
 	// - KB_SERVICE_PORT: The port used by the database service.
@@ -120,7 +109,7 @@ func parameters4Member(ctx context.Context, cli client.Reader, namespace, cluste
 		if env.Name == serviceUserVar || env.Name == servicePasswordVar {
 			secret := &corev1.Secret{}
 			secretKey := types.NamespacedName{
-				Namespace: namespace,
+				Namespace: synthesizedComp.Namespace,
 				Name:      env.ValueFrom.SecretKeyRef.Name,
 			}
 			if err := cli.Get(ctx, secretKey, secret); err != nil {
@@ -129,7 +118,7 @@ func parameters4Member(ctx context.Context, cli client.Reader, namespace, cluste
 			m[env.Name] = secret.StringData[env.ValueFrom.SecretKeyRef.Key]
 		}
 	}
-	mainContainer := getMainContainer(synthesizeComp.PodSpec.Containers)
+	mainContainer := getMainContainer(synthesizedComp.PodSpec.Containers)
 	if mainContainer != nil {
 		if len(mainContainer.Ports) > 0 {
 			port := mainContainer.Ports[0]
@@ -137,11 +126,12 @@ func parameters4Member(ctx context.Context, cli client.Reader, namespace, cluste
 			m[servicePortVar] = strconv.Itoa(int(dbPort))
 		}
 	}
-	if cluster.Leader != nil && cluster.Leader.Name != "" {
-		leaderMember := cluster.GetMemberWithName(cluster.Leader.Name)
-		primaryPodFQDN := cluster.GetMemberAddr(*leaderMember)
-		m[primaryPodFQDNVar] = primaryPodFQDN
-	}
-	m[membersAddressVar] = strings.Join(cluster.GetMemberAddrs(), ",")
+	// TODO: impl
+	// if cluster.Leader != nil && cluster.Leader.Name != "" {
+	//	leaderMember := cluster.GetMemberWithName(cluster.Leader.Name)
+	//	primaryPodFQDN := cluster.GetMemberAddr(*leaderMember)
+	//	m[primaryPodFQDNVar] = primaryPodFQDN
+	// }
+	// m[membersAddressVar] = strings.Join(cluster.GetMemberAddrs(), ",")
 	return m, nil
 }

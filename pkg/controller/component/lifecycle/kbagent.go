@@ -30,6 +30,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/service"
@@ -41,6 +42,7 @@ type lifecycleAction interface {
 }
 
 type kbagent struct {
+	synthesizedComp  *component.SynthesizedComponent
 	lifecycleActions *appsv1alpha1.ComponentLifecycleActions
 	pods             []*corev1.Pod
 	pod              *corev1.Pod
@@ -67,12 +69,18 @@ func (a *kbagent) Switchover(ctx context.Context, cli client.Reader, opts *Optio
 }
 
 func (a *kbagent) MemberJoin(ctx context.Context, cli client.Reader, opts *Options) error {
-	la := &memberJoin{}
+	la := &memberJoin{
+		synthesizedComp: a.synthesizedComp,
+		pod:             a.pod,
+	}
 	return a.checkedCallAction(ctx, cli, a.lifecycleActions.MemberJoin, la, opts)
 }
 
 func (a *kbagent) MemberLeave(ctx context.Context, cli client.Reader, opts *Options) error {
-	la := &memberLeave{}
+	la := &memberLeave{
+		synthesizedComp: a.synthesizedComp,
+		pod:             a.pod,
+	}
 	return a.checkedCallAction(ctx, cli, a.lifecycleActions.MemberLeave, la, opts)
 }
 
@@ -135,7 +143,7 @@ func (a *kbagent) buildActionRequest(ctx context.Context, cli client.Reader, la 
 }
 
 func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1alpha1.Action, la lifecycleAction, req *proto.ActionRequest) error {
-	pods, err := a.targetPods(spec)
+	pods, err := a.selectTargetPods(spec)
 	if err != nil {
 		return err
 	}
@@ -143,10 +151,16 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1alpha1
 		return fmt.Errorf("no available pod to call action %s", la.name())
 	}
 
+	// TODO: impl
+	//  - back-off to retry
+	//  - timeout
 	for _, pod := range a.pods {
 		cli, err1 := kbacli.NewClient(*pod)
 		if err1 != nil {
 			return err1
+		}
+		if cli == nil {
+			continue // not defined, for test only
 		}
 		_, err2 := cli.CallAction(ctx, *req)
 		if err2 != nil {
@@ -156,21 +170,21 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1alpha1
 	return nil
 }
 
-func (a *kbagent) targetPods(spec *appsv1alpha1.Action) ([]*corev1.Pod, error) {
+func (a *kbagent) selectTargetPods(spec *appsv1alpha1.Action) ([]*corev1.Pod, error) {
 	if spec.Exec == nil || len(spec.Exec.TargetPodSelector) == 0 {
 		return []*corev1.Pod{a.pod}, nil
 	}
 
-	any := func() []*corev1.Pod {
+	anyPod := func() []*corev1.Pod {
 		i := rand.Int() % len(a.pods)
 		return []*corev1.Pod{a.pods[i]}
 	}
 
-	all := func() []*corev1.Pod {
+	allPods := func() []*corev1.Pod {
 		return a.pods
 	}
 
-	role := func() []*corev1.Pod {
+	podsWithRole := func() []*corev1.Pod {
 		roleName := spec.Exec.MatchingKey
 		var pods []*corev1.Pod
 		for i, pod := range a.pods {
@@ -185,11 +199,11 @@ func (a *kbagent) targetPods(spec *appsv1alpha1.Action) ([]*corev1.Pod, error) {
 
 	switch spec.Exec.TargetPodSelector {
 	case appsv1alpha1.AnyReplica:
-		return any(), nil
+		return anyPod(), nil
 	case appsv1alpha1.AllReplicas:
-		return all(), nil
+		return allPods(), nil
 	case appsv1alpha1.RoleSelector:
-		return role(), nil
+		return podsWithRole(), nil
 	case appsv1alpha1.OrdinalSelector:
 		return nil, fmt.Errorf("ordinal selector is not supported")
 	default:

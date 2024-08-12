@@ -601,13 +601,13 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 		return false
 	}
 
-	tryToSwitchover := func(lifecycleActions lifecycle.Lifecycle, pod *corev1.Pod) error {
+	tryToSwitchover := func(lfa lifecycle.Lifecycle, pod *corev1.Pod) error {
 		// if pod is not leader/primary, no need to switchover
 		if !isLeader(pod) {
 			return nil
 		}
 		// if HA functionality is not enabled, no need to switchover
-		err := lifecycleActions.Switchover(r.reqCtx.Ctx, r.cli, nil)
+		err := lfa.Switchover(r.reqCtx.Ctx, r.cli, nil)
 		if err != nil && errors.Is(err, lifecycle.ErrActionNotDefined) {
 			return nil
 		}
@@ -632,8 +632,8 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 			continue
 		}
 
-		lifecycleActions, err1 := lifecycle.New(r.synthesizeComp.LifecycleActions, pod)
-		if err1 != nil || lifecycleActions == nil {
+		lfa, err1 := lifecycle.New(r.synthesizeComp, pod, pods...)
+		if err1 != nil {
 			if err == nil {
 				err = err1
 			}
@@ -641,11 +641,11 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 		}
 
 		// switchover if the leaving pod is leader
-		if switchoverErr := tryToSwitchover(lifecycleActions, pod); switchoverErr != nil {
+		if switchoverErr := tryToSwitchover(lfa, pod); switchoverErr != nil {
 			return switchoverErr
 		}
 
-		if err2 := lifecycleActions.MemberLeave(r.reqCtx.Ctx, r.cli, nil); err2 != nil {
+		if err2 := lfa.MemberLeave(r.reqCtx.Ctx, r.cli, nil); err2 != nil {
 			if !errors.Is(err2, lifecycle.ErrActionNotDefined) && err == nil {
 				err = err2
 			}

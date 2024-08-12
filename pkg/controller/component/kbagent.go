@@ -43,8 +43,10 @@ const (
 
 	kbAgentSharedMountPath      = "/kubeblocks"
 	kbAgentCommandOnSharedMount = "/kubeblocks/kbagent"
-	minAvailablePort            = 1
-	maxAvailablePort            = 65535
+
+	minAvailablePort   = 1
+	maxAvailablePort   = 65535
+	kbAgentDefaultPort = 3501
 )
 
 var (
@@ -56,17 +58,17 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 		return nil
 	}
 
-	envVars, err := buildKBAgentStartupEnv(synthesizedComp)
+	envVars, err := buildKBAgentStartupEnvs(synthesizedComp)
 	if err != nil {
 		return err
 	}
 
-	port := 3501
-	ports, err := getAvailablePorts(synthesizedComp.PodSpec.Containers, []int32{int32(port)})
+	ports, err := getAvailablePorts(synthesizedComp.PodSpec.Containers, []int32{int32(kbAgentDefaultPort)})
 	if err != nil {
 		return err
 	}
-	port = int(ports[0])
+
+	port := int(ports[0])
 	container := builder.NewContainerBuilder(kbAgentContainerName).
 		SetImage(viper.GetString(constant.KBToolsImage)).
 		SetImagePullPolicy(corev1.PullIfNotPresent).
@@ -105,7 +107,7 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 	return nil
 }
 
-func buildKBAgentStartupEnv(synthesizedComp *SynthesizedComponent) ([]corev1.EnvVar, error) {
+func buildKBAgentStartupEnvs(synthesizedComp *SynthesizedComponent) ([]corev1.EnvVar, error) {
 	var (
 		actions []proto.Action
 		probes  []proto.Probe
@@ -152,7 +154,7 @@ func buildKBAgentStartupEnv(synthesizedComp *SynthesizedComponent) ([]corev1.Env
 		probes = append(probes, *p)
 	}
 
-	return kbagent.BuildEnvVars(actions, probes)
+	return kbagent.BuildStartupEnvs(actions, probes)
 }
 
 func buildAction4KBAgent(handler *appsv1alpha1.LifecycleActionHandler, name string) *proto.Action {
@@ -196,7 +198,7 @@ func buildProbe4KBAgent(probe *appsv1alpha1.Probe, name string) (*proto.Action, 
 		PeriodSeconds:       probe.PeriodSeconds,
 		SuccessThreshold:    probe.SuccessThreshold,
 		FailureThreshold:    probe.FailureThreshold,
-		ReportPeriodSeconds: nil, // TODO
+		ReportPeriodSeconds: nil, // TODO: impl
 	}
 	return a, p
 }

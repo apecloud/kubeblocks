@@ -508,6 +508,7 @@ func (r *clusterBackupPolicyTransformer) buildBackupTarget(
 		},
 		// dataprotection will use its dedicated service account if this field is empty.
 		ServiceAccountName: "",
+		ContainerPort:      targetTpl.ContainerPort,
 	}
 	if len(targetTpl.Role) != 0 && len(targetTpl.FallbackRole) != 0 {
 		target.PodSelector.FallbackLabelSelector = &metav1.LabelSelector{

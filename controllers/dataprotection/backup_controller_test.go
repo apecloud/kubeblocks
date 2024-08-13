@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strconv"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -260,7 +261,7 @@ var _ = Describe("Backup Controller test", func() {
 				})).Should(Succeed())
 			})
 
-			It("create an backup with backupMethod and target", func() {
+			It("create a backup with backupMethod and target", func() {
 				By("Set backupMethod's target")
 				Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(bp *dpv1alpha1.BackupPolicy) {
 					backupPolicy.Spec.BackupMethods[0].Target = &dpv1alpha1.BackupTarget{
@@ -283,7 +284,7 @@ var _ = Describe("Backup Controller test", func() {
 				Expect(targets[0].Name).Should(Equal(testdp.ClusterName + "-" + testdp.ComponentName + "-1"))
 			})
 
-			It("create an backup with backupMethod and podSelection strategy is All", func() {
+			It("create a backup with backupMethod and podSelection strategy is All", func() {
 				By("Set backupMethod's target and podSelection strategy to All")
 				Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(bp *dpv1alpha1.BackupPolicy) {
 					backupPolicy.Spec.BackupMethods[0].Target = &dpv1alpha1.BackupTarget{
@@ -324,7 +325,7 @@ var _ = Describe("Backup Controller test", func() {
 			})
 		})
 
-		It("create an backup with backupMethod and multi targets", func() {
+		It("create a backup with backupMethod and multi targets", func() {
 			By("Set backupMethod's targets")
 			Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(bp *dpv1alpha1.BackupPolicy) {
 				podSelector := &dpv1alpha1.PodSelector{
@@ -435,6 +436,52 @@ var _ = Describe("Backup Controller test", func() {
 			})).Should(Succeed())
 		})
 
+		It("create a backup with backupMethod and specify the port by name", func() {
+			By("Set backupMethod's targets with containerPort")
+			Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(bp *dpv1alpha1.BackupPolicy) {
+				podSelector := &dpv1alpha1.PodSelector{
+					LabelSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							constant.AppInstanceLabelKey:    testdp.ClusterName,
+							constant.KBAppComponentLabelKey: testdp.ComponentName,
+						},
+					},
+					Strategy: dpv1alpha1.PodSelectionStrategyAny,
+				}
+				containerPort := &dpv1alpha1.ContainerPort{
+					ContainerName: testdp.ContainerName + "-1",
+					PortName:      testdp.PortName,
+				}
+				backupPolicy.Spec.BackupMethods[0].Target = &dpv1alpha1.BackupTarget{
+					Name: testdp.ComponentName, PodSelector: podSelector, ContainerPort: containerPort,
+				}
+				backupPolicy.Spec.Target.ConnectionCredential = nil
+			})).Should(Succeed())
+
+			By("create a backup")
+			backup := testdp.NewFakeBackup(&testCtx, nil)
+			getJobKey := func(targetName string) client.ObjectKey {
+				return client.ObjectKey{
+					Name:      dpbackup.GenerateBackupJobName(backup, fmt.Sprintf("%s-%s-0", dpbackup.BackupDataJobNamePrefix, targetName)),
+					Namespace: backup.Namespace,
+				}
+			}
+
+			getDPDBPortEnv := func(container *corev1.Container) corev1.EnvVar {
+				for _, env := range container.Env {
+					if env.Name == dptypes.DPDBPort {
+						return env
+					}
+				}
+				return corev1.EnvVar{}
+			}
+
+			By("check backup job's port env")
+			Eventually(testapps.CheckObj(&testCtx, getJobKey(backupPolicy.Spec.BackupMethods[0].Target.Name), func(g Gomega, fetched *batchv1.Job) {
+				// image should be expanded by env
+				g.Expect(getDPDBPortEnv(&fetched.Spec.Template.Spec.Containers[0]).Value).Should(Equal(strconv.Itoa(testdp.PortNum)))
+			})).Should(Succeed())
+		})
 		Context("creates a backup with encryption", func() {
 			const (
 				encryptionKeySecretName = "backup-encryption"

@@ -17752,6 +17752,19 @@ Valid values are:</p>
 </ul>
 </td>
 </tr>
+<tr>
+<td>
+<code>containerPort</code><br/>
+<em>
+github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1.ContainerPort
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the container port in the target pod.
+If not specified, the first container and its first port will be used.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.TargetPodSelector">TargetPodSelector

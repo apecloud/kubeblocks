@@ -492,6 +492,19 @@ spec:
                         required:
                         - secretName
                         type: object
+                      containerPort:
+                        description: |-
+                          Specifies the container port in the target pod.
+                          If not specified, the first container and its first port will be used.
+                        properties:
+                          containerName:
+                            description: Specifies the name of container with the
+                              port.
+                            type: string
+                          portName:
+                            description: Specifies the port name.
+                            type: string
+                        type: object
                       name:
                         description: |-
                           Specifies a mandatory and unique identifier for each target when using the "targets" field.
@@ -767,6 +780,19 @@ spec:
                               type: string
                           required:
                           - secretName
+                          type: object
+                        containerPort:
+                          description: |-
+                            Specifies the container port in the target pod.
+                            If not specified, the first container and its first port will be used.
+                          properties:
+                            containerName:
+                              description: Specifies the name of container with the
+                                port.
+                              type: string
+                            portName:
+                              description: Specifies the port name.
+                              type: string
                           type: object
                         name:
                           description: |-
@@ -1096,6 +1122,18 @@ spec:
                     required:
                     - secretName
                     type: object
+                  containerPort:
+                    description: |-
+                      Specifies the container port in the target pod.
+                      If not specified, the first container and its first port will be used.
+                    properties:
+                      containerName:
+                        description: Specifies the name of container with the port.
+                        type: string
+                      portName:
+                        description: Specifies the port name.
+                        type: string
+                    type: object
                   name:
                     description: |-
                       Specifies a mandatory and unique identifier for each target when using the "targets" field.
@@ -1317,6 +1355,18 @@ spec:
                           type: string
                       required:
                       - secretName
+                      type: object
+                    containerPort:
+                      description: |-
+                        Specifies the container port in the target pod.
+                        If not specified, the first container and its first port will be used.
+                      properties:
+                        containerName:
+                          description: Specifies the name of container with the port.
+                          type: string
+                        portName:
+                          description: Specifies the port name.
+                          type: string
                       type: object
                     name:
                       description: |-

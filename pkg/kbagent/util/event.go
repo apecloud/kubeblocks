@@ -53,6 +53,7 @@ func SendEventWithMessage(logger *logr.Logger, reason string, message string) {
 }
 
 func createEvent(reason string, message string) *corev1.Event {
+	// TODO(v1.0): pod variables
 	podName := os.Getenv(constant.KBEnvPodName)
 	podUID := os.Getenv(constant.KBEnvPodUID)
 	nodeName := os.Getenv(constant.KBEnvNodeName)

@@ -100,7 +100,7 @@ If you have any questions, you can reach out to us through:
 You can also follow us on:
 
 - [Twitter](https://x.com/KubeBlocks)
-- Or [LinkedIn](https://www.linkedin.com/company/apecloud-ptd-ltd/)
+- [LinkedIn](https://www.linkedin.com/company/apecloud-ptd-ltd/)
 
 ## Contributing to KubeBlocks
 

@@ -26,7 +26,6 @@ import (
 
 	"github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -47,7 +46,6 @@ func delayUpdatePodSpecSystemFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 	for i := range pobj.InitContainers {
 		delayUpdateKubeBlocksToolsImage(obj.InitContainers, &pobj.InitContainers[i])
 	}
-	updateLorryContainer(obj.Containers, pobj.Containers)
 }
 
 func updateInstanceSetSystemFields(obj v1alpha1.InstanceSetSpec, pobj *v1alpha1.InstanceSetSpec) {
@@ -62,22 +60,6 @@ func updateInstanceSetSystemFields(obj v1alpha1.InstanceSetSpec, pobj *v1alpha1.
 func updatePodSpecSystemFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 	for i := range pobj.Containers {
 		updateKubeBlocksToolsImage(&pobj.Containers[i])
-	}
-
-	updateLorryContainer(obj.Containers, pobj.Containers)
-}
-
-func updateLorryContainer(containers []corev1.Container, pcontainers []corev1.Container) {
-	srcLorryContainer := controllerutil.GetLorryContainer(containers)
-	dstLorryContainer := controllerutil.GetLorryContainer(pcontainers)
-	if srcLorryContainer == nil || dstLorryContainer == nil {
-		return
-	}
-	for i, c := range pcontainers {
-		if c.Name == dstLorryContainer.Name {
-			pcontainers[i] = *srcLorryContainer.DeepCopy()
-			return
-		}
 	}
 }
 

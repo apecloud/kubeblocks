@@ -29,7 +29,6 @@ const (
 
 // TODO: deprecated, will be removed later.
 const (
-	KBConnCredentialPlaceHolder = "$(CONN_CREDENTIAL_SECRET_NAME)"
 	KBComponentEnvCMPlaceHolder = "$(COMP_ENV_CM_NAME)"
 	KBToolsImagePlaceHolder     = "$(KUBEBLOCKS_TOOLS_IMAGE)"
 )

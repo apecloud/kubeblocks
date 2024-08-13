@@ -191,7 +191,6 @@ func (r *ComponentDefinitionReconciler) validate(cli client.Client, rctx intctrl
 		r.validateSystemAccounts,
 		r.validateReplicaRoles,
 		r.validateLifecycleActions,
-		r.validateComponentDefRef,
 	} {
 		if err := validator(cli, rctx, cmpd); err != nil {
 			return err
@@ -395,11 +394,6 @@ func (r *ComponentDefinitionReconciler) validateLifecycleActionBuiltInHandlers(l
 		return fmt.Errorf("the builtin handler within the same lifecycle actions should be consistent")
 	}
 
-	return nil
-}
-
-func (r *ComponentDefinitionReconciler) validateComponentDefRef(cli client.Client, reqCtx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition) error {
 	return nil
 }
 

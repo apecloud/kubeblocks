@@ -335,6 +335,20 @@ var _ = Describe("utils test", func() {
 			concurrencyReplicas, err = CalculateConcurrencyReplicas(concurrent, replicas)
 			Expect(err).Should(BeNil())
 			Expect(concurrencyReplicas).Should(Equal(10))
+
+			By("concurrent is nil, replicas = 10")
+			replicas = 10
+			concurrent = nil
+			concurrencyReplicas, err = CalculateConcurrencyReplicas(concurrent, replicas)
+			Expect(err).Should(BeNil())
+			Expect(concurrencyReplicas).Should(Equal(10))
+
+			By("concurrent is nil, replicas = 0")
+			replicas = 0
+			concurrent = nil
+			concurrencyReplicas, err = CalculateConcurrencyReplicas(concurrent, replicas)
+			Expect(err).Should(BeNil())
+			Expect(concurrencyReplicas).Should(Equal(1))
 		})
 	})
 })

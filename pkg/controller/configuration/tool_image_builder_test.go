@@ -39,13 +39,13 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 
 	var noneCommand = []string{"/bin/true"}
 	var clusterObj *appsv1alpha1.Cluster
-	var ClusterDefObj *appsv1alpha1.ClusterDefinition
+	var compDefObj *appsv1alpha1.ComponentDefinition
 	var clusterComponent *component.SynthesizedComponent
 
 	BeforeEach(func() {
 		// Add any setup steps that needs to be executed before each test
-		clusterObj, ClusterDefObj, _ = newAllFieldsClusterObj(nil, false)
-		clusterComponent = newAllFieldsSynthesizedComponent(ClusterDefObj, clusterObj)
+		clusterObj, compDefObj, _ = newAllFieldsClusterObj(nil, false)
+		clusterComponent = newAllFieldsSynthesizedComponent(compDefObj, clusterObj)
 		viper.SetDefault(constant.KBToolsImage, kbToolsImage)
 	})
 
@@ -61,7 +61,6 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 			cfgManagerParams := &cfgcm.CfgManagerBuildParams{
 				ManagerName:   constant.ConfigSidecarName,
 				ComponentName: clusterComponent.Name,
-				SecreteName:   constant.GenerateDefaultConnCredential(clusterObj.Name),
 				Image:         viper.GetString(constant.KBToolsImage),
 				Volumes:       make([]corev1.VolumeMount, 0),
 				Cluster:       clusterObj,

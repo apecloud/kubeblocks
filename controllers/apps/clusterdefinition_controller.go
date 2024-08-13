@@ -23,7 +23,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
@@ -74,7 +73,7 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	if clusterDef.Status.ObservedGeneration == clusterDef.Generation &&
-		slices.Contains(clusterDef.Status.GetTerminalPhases(), clusterDef.Status.Phase) {
+		slices.Contains([]appsv1alpha1.Phase{appsv1alpha1.AvailablePhase}, clusterDef.Status.Phase) {
 		return intctrlutil.Reconciled()
 	}
 
@@ -162,11 +161,6 @@ func (r *ClusterDefinitionReconciler) referredServiceRefs(clusterDef *appsv1alph
 func (r *ClusterDefinitionReconciler) reconcile(rctx intctrlutil.RequestCtx, clusterDef *appsv1alpha1.ClusterDefinition) (*ctrl.Result, error) {
 	if err := r.reconcileTopologies(rctx, clusterDef); err != nil {
 		res, err1 := intctrlutil.CheckedRequeueWithError(err, rctx.Log, "")
-		return &res, err1
-	}
-
-	if err := appsconfig.ReconcileConfigSpecsForReferencedCR(r.Client, rctx, clusterDef); err != nil {
-		res, err1 := intctrlutil.RequeueAfter(time.Second, rctx.Log, err.Error())
 		return &res, err1
 	}
 	return nil, nil

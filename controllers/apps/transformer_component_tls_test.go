@@ -45,12 +45,15 @@ import (
 
 var _ = Describe("TLS self-signed cert function", func() {
 	const (
-		clusterDefName      = "test-clusterdef-tls"
-		clusterNamePrefix   = "test-cluster"
-		statefulCompDefName = "mysql"
-		statefulCompName    = "mysql"
-		mysqlContainerName  = "mysql"
-		configSpecName      = "mysql-config-tpl"
+		compDefName        = "test-compdef"
+		clusterNamePrefix  = "test-cluster"
+		serviceKind        = "mysql"
+		defaultCompName    = "mysql"
+		configTemplateName = "mysql-config-tpl"
+	)
+
+	var (
+		compDefObj *appsv1alpha1.ComponentDefinition
 	)
 
 	ctx := context.Background()
@@ -90,13 +93,16 @@ var _ = Describe("TLS self-signed cert function", func() {
 				"resources/mysql-config-constraint.yaml",
 				&appsv1beta1.ConfigConstraint{})
 
-			By("Create a clusterDef obj")
-			testapps.NewClusterDefFactory(clusterDefName).
-				SetConnectionCredential(map[string]string{"username": "root", "password": ""}, nil).
-				AddComponentDef(testapps.ConsensusMySQLComponent, statefulCompDefName).
-				AddConfigTemplate(configSpecName, configMapObj.Name, configConstraintObj.Name, testCtx.DefaultNamespace, testapps.ConfVolumeName).
-				AddContainerEnv(mysqlContainerName, corev1.EnvVar{Name: "MYSQL_ALLOW_EMPTY_PASSWORD", Value: "yes"}).
-				CheckedCreate(&testCtx).GetObject()
+			By("Create a componentDefinition obj")
+			compDefObj = testapps.NewComponentDefinitionFactory(compDefName).
+				WithRandomName().
+				AddAnnotations(constant.SkipImmutableCheckAnnotationKey, "true").
+				SetDefaultSpec().
+				SetServiceKind(serviceKind).
+				AddConfigTemplate(configTemplateName, configMapObj.Name, configConstraintObj.Name, testCtx.DefaultNamespace, testapps.ConfVolumeName).
+				AddEnv(testapps.DefaultMySQLContainerName, corev1.EnvVar{Name: "MYSQL_ALLOW_EMPTY_PASSWORD", Value: "yes"}).
+				Create(&testCtx).
+				GetObject()
 		})
 
 		Context("when issuer is UserProvided", func() {
@@ -109,6 +115,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 				Expect(err).Should(BeNil())
 				Expect(k8sClient.Create(ctx, userProvidedTLSSecretObj)).Should(Succeed())
 			})
+
 			AfterEach(func() {
 				// delete self provided tls certs secret
 				Expect(k8sClient.Delete(ctx, userProvidedTLSSecretObj)).Should(Succeed())
@@ -119,6 +126,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 					return apierrors.IsNotFound(err)
 				}).Should(BeTrue())
 			})
+
 			It("should create the cluster when secret referenced exist", func() {
 				tlsIssuer := &appsv1alpha1.Issuer{
 					Name: appsv1alpha1.IssuerUserProvided,
@@ -130,9 +138,9 @@ var _ = Describe("TLS self-signed cert function", func() {
 					},
 				}
 				By("create cluster obj")
-				clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefName).
+				clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, "").
 					WithRandomName().
-					AddComponent(statefulCompName, statefulCompDefName).
+					AddComponent(defaultCompName, compDefObj.Name).
 					SetReplicas(3).
 					SetTLS(true).
 					SetIssuer(tlsIssuer).
@@ -148,9 +156,9 @@ var _ = Describe("TLS self-signed cert function", func() {
 		Context("when switch between disabled and enabled", func() {
 			It("should handle tls settings properly", func() {
 				By("create cluster with tls disabled")
-				clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefName).
+				clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, "").
 					WithRandomName().
-					AddComponent(statefulCompName, statefulCompDefName).
+					AddComponent(defaultCompName, compDefObj.Name).
 					SetReplicas(3).
 					SetTLS(false).
 					Create(&testCtx).
@@ -162,14 +170,12 @@ var _ = Describe("TLS self-signed cert function", func() {
 
 				itsList := testk8s.ListAndCheckInstanceSet(&testCtx, clusterKey)
 				its := itsList.Items[0]
-				cd := &appsv1alpha1.ClusterDefinition{}
-				Expect(k8sClient.Get(ctx, types.NamespacedName{Name: clusterDefName, Namespace: testCtx.DefaultNamespace}, cd)).Should(Succeed())
-				cmName := cfgcore.GetInstanceCMName(&its, &cd.Spec.ComponentDefs[0].ConfigSpecs[0].ComponentTemplateSpec)
+				cmName := cfgcore.GetInstanceCMName(&its, &compDefObj.Spec.Configs[0].ComponentTemplateSpec)
 				cmKey := client.ObjectKey{Namespace: its.Namespace, Name: cmName}
 				hasTLSSettings := func() bool {
 					cm := &corev1.ConfigMap{}
 					Expect(k8sClient.Get(ctx, cmKey, cm)).Should(Succeed())
-					tlsKeyWord := plan.GetTLSKeyWord("mysql")
+					tlsKeyWord := plan.GetTLSKeyWord(serviceKind)
 					for _, cfgFile := range cm.Data {
 						index := strings.Index(cfgFile, tlsKeyWord)
 						if index >= 0 {
@@ -208,6 +214,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 				Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, false)).Should(Succeed())
 			})
 		})
+
 		Context("when issuer is KubeBlocks check secret exists or not", func() {
 			var (
 				kbTLSSecretObj  *corev1.Secret
@@ -215,6 +222,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 				dag             *graph.DAG
 				err             error
 			)
+
 			BeforeEach(func() {
 				synthesizedComp = component.SynthesizedComponent{
 					Namespace:   testCtx.DefaultNamespace,
@@ -232,6 +240,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 				Expect(err).Should(BeNil())
 				Expect(k8sClient.Create(ctx, kbTLSSecretObj)).Should(Succeed())
 			})
+
 			AfterEach(func() {
 				// delete self provided tls certs secret
 				Expect(k8sClient.Delete(ctx, kbTLSSecretObj)).Should(Succeed())
@@ -242,6 +251,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 					return apierrors.IsNotFound(err)
 				}).Should(BeTrue())
 			})
+
 			It("should skip if the existence of the secret is confirmed", func() {
 				err := buildTLSCert(ctx, k8sClient, synthesizedComp, dag)
 				Expect(err).Should(BeNil())

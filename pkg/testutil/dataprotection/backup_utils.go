@@ -177,9 +177,10 @@ func NewFakeCluster(testCtx *testutil.TestContext) *BackupClusterInfo {
 	}
 
 	By("mocking a cluster")
-	cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, ClusterName, "test-cd").
+	cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, ClusterName, "").
 		AddLabels(constant.AppInstanceLabelKey, ClusterName).
-		AddComponent("test-cmp", "test-cmpd").AddSystemAccount("test-account", nil, nil).
+		AddComponent("test-cmp", "test-cmpd").
+		AddSystemAccount("test-account", nil, nil).
 		Create(testCtx).GetObject()
 	podName := ClusterName + "-" + ComponentName
 
@@ -197,7 +198,9 @@ func NewFakeCluster(testCtx *testutil.TestContext) *BackupClusterInfo {
 		PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvc.Name}}}
 	pod := podFactory(podName + "-0").
 		AddRoleLabel("leader").
-		AddVolume(volume).
+		AddVolume(volume).AddContainer(corev1.Container{Name: ContainerName + "-1", Image: testapps.ApeCloudMySQLImage,
+		Ports: []corev1.ContainerPort{{Protocol: ProtocolName, ContainerPort: PortNum + 1},
+			{Name: PortName, Protocol: ProtocolName, ContainerPort: PortNum}}}).
 		Create(testCtx).GetObject()
 	Expect(testapps.ChangeObjStatus(testCtx, pod, func() {
 		pod.Status.Phase = corev1.PodRunning
@@ -209,7 +212,9 @@ func NewFakeCluster(testCtx *testutil.TestContext) *BackupClusterInfo {
 		PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvc1.Name}}}
 	pod1 := podFactory(podName + "-1").
 		AddRoleLabel("follower").
-		AddVolume(volume2).
+		AddVolume(volume2).AddContainer(corev1.Container{Name: ContainerName + "-1", Image: testapps.ApeCloudMySQLImage,
+		Ports: []corev1.ContainerPort{{Protocol: ProtocolName, ContainerPort: PortNum + 1},
+			{Name: PortName, Protocol: ProtocolName, ContainerPort: PortNum}}}).
 		Create(testCtx).GetObject()
 	Expect(testapps.ChangeObjStatus(testCtx, pod1, func() {
 		pod1.Status.Phase = corev1.PodRunning

@@ -25,8 +25,9 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/apecloud/kubeblocks/pkg/kb_agent/util"
 )
 
 func TestNewExecHandler(t *testing.T) {

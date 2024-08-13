@@ -85,7 +85,7 @@ func (r *ConfigConstraintReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		}
 		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, configConstraint,
 			cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(configConstraint.GetName()),
-			recordEvent, &appsv1alpha1.ClusterDefinitionList{}); res != nil || err != nil {
+			recordEvent, &appsv1alpha1.ClusterDefinitionList{}, &appsv1alpha1.ComponentDefinitionList{}); res != nil || err != nil {
 			return res, err
 		}
 		return nil, nil

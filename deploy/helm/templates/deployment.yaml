@@ -183,6 +183,8 @@ spec:
             {{- end }}
             - name: COMPONENT_REPLICAS_ANNOTATION
               value: {{ .Values.featureGates.componentReplicasAnnotation.enabled | quote }}
+            - name: IN_PLACE_POD_VERTICAL_SCALING
+              value: {{ .Values.featureGates.inPlacePodVerticalScaling.enabled | quote }}
           {{- with .Values.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}

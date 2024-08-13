@@ -102,7 +102,7 @@ func (f *MockRestoreFactory) buildRestoreVolumeClaim(name, volumeSource, mountPa
 		},
 		VolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
 			StorageClassName: &storageClass,
-			Resources: corev1.ResourceRequirements{
+			Resources: corev1.VolumeResourceRequirements{
 				Requests: corev1.ResourceList{
 					corev1.ResourceStorage: resource.MustParse("20Gi"),
 				},

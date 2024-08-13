@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/controller/apiconversion"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
@@ -136,7 +135,14 @@ func withClusterLegacyDefinition(cluster *appsv1alpha1.Cluster) bool {
 }
 
 func withClusterSimplifiedAPI(cluster *appsv1alpha1.Cluster) bool {
-	return apiconversion.HasSimplifiedClusterAPI(cluster)
+	return cluster.Spec.Replicas != nil ||
+		!cluster.Spec.Resources.CPU.IsZero() ||
+		!cluster.Spec.Resources.Memory.IsZero() ||
+		!cluster.Spec.Storage.Size.IsZero() ||
+		// cluster.Spec.Monitor.MonitoringInterval != nil ||
+		cluster.Spec.Network != nil ||
+		len(cluster.Spec.Tenancy) > 0 ||
+		len(cluster.Spec.AvailabilityPolicy) > 0
 }
 
 func clusterCompCnt(cluster *appsv1alpha1.Cluster) int {

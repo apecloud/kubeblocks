@@ -55,29 +55,25 @@ var _ = Describe("cluster utils test", func() {
 
 	Context("cluster utils test", func() {
 		const (
-			clusterDefName        = "test-clusterdef"
+			compDefName           = "test-compdef"
 			clusterName           = "test-cls"
-			mysqlCompDefName      = "replicasets"
 			mysqlCompName         = "mysql"
 			mysqlShardingName     = "mysql-sharding"
 			mysqlShardingCompName = "mysql-sharding-comp"
 		)
 
 		var (
-			clusterDef *appsv1alpha1.ClusterDefinition
-			cluster    *appsv1alpha1.Cluster
+			cluster *appsv1alpha1.Cluster
 		)
 
 		BeforeEach(func() {
 			cleanEnv()
 
-			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
-				GetObject()
-			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDef.Name).
+			testapps.NewComponentDefinitionFactory(compDefName).SetDefaultSpec().GetObject()
+			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 				SetUID(clusterName).
-				AddComponent(mysqlCompName, mysqlCompDefName).
-				AddShardingSpecV2(mysqlShardingName, mysqlCompDefName).
+				AddComponent(mysqlCompName, compDefName).
+				AddShardingSpec(mysqlShardingName, compDefName).
 				SetShards(0).
 				Create(&testCtx).GetObject()
 		})

@@ -28,7 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgproto "github.com/apecloud/kubeblocks/pkg/configuration/proto"
 	mock_proto "github.com/apecloud/kubeblocks/pkg/configuration/proto/mocks"
@@ -69,13 +68,7 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 				withConfigPatch(map[string]string{
 					"a": "c b e f",
 				}),
-				withClusterComponent(3),
-				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ComponentConfigSpec{{
-					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-						Name:       "for_test",
-						VolumeName: "test_volume",
-					},
-				}}))
+				withClusterComponent(3))
 
 			By("mock client get pod caller")
 			k8sMockClient.MockListMethod(testutil.WithListReturned(
@@ -126,13 +119,7 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 				withConfigPatch(map[string]string{
 					"a": "c b e f",
 				}),
-				withClusterComponent(3),
-				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ComponentConfigSpec{{
-					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-						Name:       "for_test",
-						VolumeName: "test_volume",
-					},
-				}}))
+				withClusterComponent(3))
 
 			// add selector
 			mockParam.ConfigConstraint.ReloadAction = &appsv1beta1.ReloadAction{

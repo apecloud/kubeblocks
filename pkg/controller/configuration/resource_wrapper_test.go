@@ -37,30 +37,25 @@ import (
 
 var _ = Describe("resource Fetcher", func() {
 	const (
-		clusterDefName = "test-clusterdef"
-		clusterName    = "test-cluster"
-
-		mysqlCompDefName = "replicasets"
-		mysqlCompName    = "mysql"
-		mysqlConfigName  = "mysql-config-template"
-		mysqlVolumeName  = "mysql-config"
+		compDefName     = "test-compdef"
+		clusterName     = "test-cluster"
+		mysqlCompName   = "mysql"
+		mysqlConfigName = "mysql-config-template"
 	)
 
 	var (
 		k8sMockClient *testutil.K8sClientMockHelper
-		clusterDef    *appsv1alpha1.ClusterDefinition
 		cluster       *appsv1alpha1.Cluster
 	)
 
 	BeforeEach(func() {
 		k8sMockClient = testutil.NewK8sMockClient()
-		clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-			AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
-			AddConfigTemplate(mysqlConfigName, mysqlConfigName, mysqlConfigName, "default", mysqlVolumeName).
+		testapps.NewComponentDefinitionFactory(compDefName).
+			SetDefaultSpec().
 			GetObject()
 		pvcSpec := testapps.NewPVCSpec("1Gi")
-		cluster = testapps.NewClusterFactory("default", clusterName, clusterDef.Name).
-			AddComponent(mysqlCompName, mysqlCompDefName).
+		cluster = testapps.NewClusterFactory("default", clusterName, "").
+			AddComponent(mysqlCompName, compDefName).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			GetObject()
 	})
@@ -73,7 +68,6 @@ var _ = Describe("resource Fetcher", func() {
 		It("Should succeed with no error", func() {
 			k8sMockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult(
 				[]client.Object{
-					clusterDef,
 					cluster,
 					testapps.NewConfigMap("default", cfgcore.GetComponentCfgName(clusterName, mysqlCompName, mysqlConfigName)),
 					&appsv1beta1.ConfigConstraint{
@@ -85,7 +79,6 @@ var _ = Describe("resource Fetcher", func() {
 			), testutil.WithAnyTimes()))
 			err := NewTest(k8sMockClient.Client(), ctx).
 				Cluster().
-				ClusterDef().
 				ComponentSpec().
 				ConfigMap(mysqlConfigName).
 				ConfigConstraints(mysqlConfigName).

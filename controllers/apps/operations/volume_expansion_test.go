@@ -42,11 +42,10 @@ import (
 var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 
 	var (
-		// waitDuration          = time.Second * 3
-		randomStr             = testCtx.GetRandomStr()
-		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr
-		clusterName           = "cluster-for-ops-" + randomStr
-		storageClassName      = "csi-hostpath-sc-" + randomStr
+		randomStr        = testCtx.GetRandomStr()
+		compDefName      = "test-compdef-" + randomStr
+		clusterName      = "test-cluster-" + randomStr
+		storageClassName = "csi-hostpath-sc-" + randomStr
 	)
 
 	const (
@@ -218,8 +217,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 	Context("Test VolumeExpansion", func() {
 		It("VolumeExpansion should work", func() {
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
-			_, clusterObject := testapps.InitConsensusMysql(&testCtx, clusterDefinitionName,
-				clusterName, "consensus", consensusCompName)
+			_, clusterObject := testapps.InitConsensusMysql(&testCtx, clusterName, compDefName, consensusCompName)
 			// init storageClass
 			sc := testapps.CreateStorageClass(&testCtx, storageClassName, true)
 			Expect(testapps.ChangeObj(&testCtx, sc, func(lsc *storagev1.StorageClass) {

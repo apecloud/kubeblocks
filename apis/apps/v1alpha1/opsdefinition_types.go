@@ -298,6 +298,19 @@ type OpsAction struct {
 	ResourceModifier *OpsResourceModifierAction `json:"resourceModifier,omitempty"`
 }
 
+// FailurePolicyType specifies the type of failure policy.
+//
+// +enum
+// +kubebuilder:validation:Enum={Ignore,Fail}
+type FailurePolicyType string
+
+const (
+	// FailurePolicyIgnore means that an error will be ignored but logged.
+	FailurePolicyIgnore FailurePolicyType = "Ignore"
+	// FailurePolicyFail means that an error will be reported.
+	FailurePolicyFail FailurePolicyType = "Fail"
+)
+
 type OpsWorkloadAction struct {
 	// Defines the workload type of the action. Valid values include "Job" and "Pod".
 	//

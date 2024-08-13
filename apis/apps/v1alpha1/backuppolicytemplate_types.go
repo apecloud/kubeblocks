@@ -24,15 +24,6 @@ import (
 
 // BackupPolicyTemplateSpec contains the settings in a BackupPolicyTemplate.
 type BackupPolicyTemplateSpec struct {
-	// Specifies the name of a ClusterDefinition.
-	// This is an immutable attribute that cannot be changed after creation.
-	// And this field is deprecated since v0.9, consider using the ComponentDef instead.
-	//
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="clusterDefinitionRef is immutable"
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0, consider using the ComponentDef instead"
-	ClusterDefRef string `json:"clusterDefinitionRef,omitempty"`
-
 	// Represents an array of BackupPolicy templates, with each template corresponding to a specified ComponentDefinition
 	// or to a group of ComponentDefinitions that are different versions of definitions of the same component.
 	//
@@ -56,18 +47,6 @@ type BackupPolicyTemplateSpec struct {
 // BackupPolicy is the template corresponding to a specified ComponentDefinition
 // or to a group of ComponentDefinitions that are different versions of definitions of the same component.
 type BackupPolicy struct {
-	// Specifies the name of ClusterComponentDefinition defined in the ClusterDefinition.
-	// Must comply with the IANA Service Naming rule.
-	//
-	// Deprecated since v0.9, should use `componentDefs` instead.
-	// This field is maintained for backward compatibility and its use is discouraged.
-	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
-	//
-	// +kubebuilder:validation:MaxLength=22
-	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
-	// +optional
-	ComponentDefRef string `json:"componentDefRef,omitempty"`
-
 	// Specifies a list of names of ComponentDefinitions that the specified ClusterDefinition references.
 	// They should be different versions of definitions of the same component,
 	// thus allowing them to share a single BackupPolicy.
@@ -210,12 +189,15 @@ type TargetInstance struct {
 	//   the `strategy` field below.
 	Role string `json:"role"`
 
+	// Specifies the fallback role to select one replica for backup, this only takes effect when the
+	// `strategy` field below is set to `Any`.
+	//
+	// +optional
+	FallbackRole string `json:"fallbackRole,omitempty"`
+
 	// If `backupPolicy.componentDefs` is set, this field is required to specify the system account name.
 	// This account must match one listed in `componentDefinition.spec.systemAccounts[*].name`.
 	// The corresponding secret created by this account is used to connect to the database.
-	//
-	// If `backupPolicy.componentDefRef` (a legacy and deprecated API) is set, the secret defined in
-	// `clusterDefinition.spec.ConnectionCredential` is used instead.
 	//
 	// +optional
 	Account string `json:"account,omitempty"`
@@ -230,36 +212,15 @@ type TargetInstance struct {
 	// +optional
 	Strategy dpv1alpha1.PodSelectionStrategy `json:"strategy,omitempty"`
 
-	// Specifies the keys of the connection credential secret defined in `clusterDefinition.spec.ConnectionCredential`.
-	// It will be ignored when the `account` is set.
+	// Specifies the container port in the target pod.
+	// If not specified, the first container and its first port will be used.
 	//
 	// +optional
-	ConnectionCredentialKey ConnectionCredentialKey `json:"connectionCredentialKey,omitempty"`
-}
-
-type ConnectionCredentialKey struct {
-	// Represents the key of the password in the connection credential secret.
-	// If not specified, the default key "password" is used.
-	//
-	// +optional
-	PasswordKey *string `json:"passwordKey,omitempty"`
-
-	// Represents the key of the username in the connection credential secret.
-	// If not specified, the default key "username" is used.
-	//
-	// +optional
-	UsernameKey *string `json:"usernameKey,omitempty"`
-
-	// Defines the key of the host in the connection credential secret.
-	HostKey *string `json:"hostKey,omitempty"`
-
-	// Indicates map key of the port in the connection credential secret.
-	PortKey *string `json:"portKey,omitempty"`
+	ContainerPort *dpv1alpha1.ContainerPort `json:"containerPort,omitempty"`
 }
 
 // BackupPolicyTemplateStatus defines the observed state of BackupPolicyTemplate.
-type BackupPolicyTemplateStatus struct {
-}
+type BackupPolicyTemplateStatus struct{}
 
 // BackupPolicyTemplate should be provided by addon developers and is linked to a ClusterDefinition
 // and its associated ComponentDefinitions.

@@ -42,14 +42,15 @@ import (
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
-const clusterDefName = "test-clusterdef"
-const clusterName = "test-cluster"
-const statefulCompDefName = "replicasets"
-const statefulCompName = "mysql"
-const statefulSetName = "mysql-statefulset"
-const configSpecName = "mysql-config-tpl"
-const configVolumeName = "mysql-config"
-const cmName = "mysql-tree-node-template-8.0"
+const (
+	compDefName      = "test-compdef"
+	clusterName      = "test-cluster"
+	defaultCompName  = "mysql"
+	defaultITSName   = "mysql-statefulset"
+	configSpecName   = "mysql-config-tpl"
+	configVolumeName = "mysql-config"
+	cmName           = "mysql-tree-node-template-8.0"
+)
 
 func mockConfigResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint) {
 	By("Create a config template obj")
@@ -59,7 +60,7 @@ func mockConfigResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint) {
 		testapps.WithLabels(
 			constant.AppNameLabelKey, clusterName,
 			constant.AppInstanceLabelKey, clusterName,
-			constant.KBAppComponentLabelKey, statefulCompName,
+			constant.KBAppComponentLabelKey, defaultCompName,
 			constant.CMConfigurationTemplateNameLabelKey, configSpecName,
 			constant.CMConfigurationConstraintsNameLabelKey, cmName,
 			constant.CMConfigurationSpecProviderLabelKey, configSpecName,
@@ -82,9 +83,9 @@ func mockConfigResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint) {
 
 	By("Create a configuration obj")
 	// test-cluster-mysql-mysql-config-tpl
-	configuration := builder.NewConfigurationBuilder(testCtx.DefaultNamespace, core.GenerateComponentConfigurationName(clusterName, statefulCompName)).
+	configuration := builder.NewConfigurationBuilder(testCtx.DefaultNamespace, core.GenerateComponentConfigurationName(clusterName, defaultCompName)).
 		ClusterRef(clusterName).
-		Component(statefulCompName).
+		Component(defaultCompName).
 		AddConfigurationItem(appsv1alpha1.ComponentConfigSpec{
 			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
 				Name:        configSpecName,
@@ -103,29 +104,28 @@ func mockConfigResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint) {
 func mockReconcileResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint, *appsv1alpha1.Cluster, *appsv1alpha1.Component, *component.SynthesizedComponent) {
 	configmap, constraint := mockConfigResource()
 
-	By("Create a clusterDefinition obj")
-	clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
-		AddComponentDef(testapps.StatefulMySQLComponent, statefulCompDefName).
+	By("Create a component definition obj and mock to available")
+	compDefObj := testapps.NewComponentDefinitionFactory(compDefName).
+		WithRandomName().
+		SetDefaultSpec().
 		AddConfigTemplate(configSpecName, configmap.Name, constraint.Name, testCtx.DefaultNamespace, configVolumeName).
 		AddLabels(core.GenerateTPLUniqLabelKeyWithConfig(configSpecName), configmap.Name,
 			core.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
-		Create(&testCtx).GetObject()
-
-	By("Creating a cluster")
-	clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefObj.Name).
-		AddComponent(statefulCompName, statefulCompDefName).Create(&testCtx).GetObject()
-
-	By("Create a component definition obj and mock to available")
-	componentDefObj := testapps.NewComponentDefinitionFactory(statefulCompDefName).
-		SetRuntime(nil).
-		Create(&testCtx).GetObject()
-	Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(componentDefObj), func(obj *appsv1alpha1.ComponentDefinition) {
+		Create(&testCtx).
+		GetObject()
+	Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(compDefObj), func(obj *appsv1alpha1.ComponentDefinition) {
 		obj.Status.Phase = appsv1alpha1.AvailablePhase
 	})()).Should(Succeed())
 
+	By("Creating a cluster")
+	clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
+		AddComponent(defaultCompName, compDefObj.GetName()).
+		Create(&testCtx).
+		GetObject()
+
 	By("Create a component obj")
-	fullCompName := constant.GenerateClusterComponentName(clusterName, statefulCompName)
-	componentObj := testapps.NewComponentFactory(testCtx.DefaultNamespace, fullCompName, componentDefObj.Name).
+	fullCompName := constant.GenerateClusterComponentName(clusterName, defaultCompName)
+	compObj := testapps.NewComponentFactory(testCtx.DefaultNamespace, fullCompName, compDefObj.Name).
 		AddLabels(constant.AppInstanceLabelKey, clusterName).
 		AddLabels(constant.KBAppClusterUIDLabelKey, string(clusterObj.UID)).
 		SetUID(types.UID(fmt.Sprintf("%s-%s", clusterObj.Name, "test-uid"))).
@@ -137,22 +137,23 @@ func mockReconcileResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint, 
 			Name:      configVolumeName,
 			MountPath: "/mnt/config",
 		}).GetObject()
-	_ = testapps.NewInstanceSetFactory(testCtx.DefaultNamespace, statefulSetName, clusterObj.Name, statefulCompName).
+	_ = testapps.NewInstanceSetFactory(testCtx.DefaultNamespace, defaultITSName, clusterObj.Name, defaultCompName).
 		AddConfigmapVolume(configVolumeName, configmap.Name).
 		AddContainer(container).
 		AddAppNameLabel(clusterName).
 		AddAppInstanceLabel(clusterName).
-		AddAppComponentLabel(statefulCompName).
+		AddAppComponentLabel(defaultCompName).
 		AddAnnotations(core.GenerateTPLUniqLabelKeyWithConfig(configSpecName), configmap.Name).
 		Create(&testCtx).GetObject()
 
-	synthesizedComp, err := component.BuildSynthesizedComponentWrapper(intctrlutil.RequestCtx{
+	reqCtx := intctrlutil.RequestCtx{
 		Ctx: testCtx.Ctx,
 		Log: log.FromContext(testCtx.Ctx),
-	}, testCtx.Cli, clusterObj, clusterObj.Spec.GetComponentByName(statefulCompName))
+	}
+	synthesizedComp, err := component.BuildSynthesizedComponent(reqCtx, testCtx.Cli, clusterObj, compDefObj, compObj)
 	Expect(err).ShouldNot(HaveOccurred())
 
-	return configmap, constraint, clusterObj, componentObj, synthesizedComp
+	return configmap, constraint, clusterObj, compObj, synthesizedComp
 }
 
 func initConfiguration(resourceCtx *configctrl.ResourceCtx,
@@ -183,14 +184,13 @@ func cleanEnv() {
 	By("clean resources")
 
 	// delete cluster(and all dependent sub-resources), cluster definition
-	testapps.ClearClusterResources(&testCtx)
+	testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 
 	// delete rest mocked objects
 	inNS := client.InNamespace(testCtx.DefaultNamespace)
 	ml := client.HasLabels{testCtx.TestObjLabelKey}
 	// non-namespaced
 	testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
-	testapps.ClearResources(&testCtx, generics.ComponentDefinitionSignature, ml)
 	// namespaced
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentSignature, true, inNS, ml)
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ConfigMapSignature, true, inNS, ml)

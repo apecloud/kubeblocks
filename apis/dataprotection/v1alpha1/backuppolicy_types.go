@@ -105,11 +105,34 @@ type BackupTarget struct {
 	//
 	// +kubebuilder:validation:Required
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
+
+	// Specifies the container port in the target pod.
+	// If not specified, the first container and its first port will be used.
+	//
+	// +optional
+	ContainerPort *ContainerPort `json:"containerPort,omitempty"`
+}
+
+type ContainerPort struct {
+	// Specifies the name of container with the port.
+	//
+	// +kubebuilder:validation:Required
+	ContainerName string `json:"containerName,omitempty"`
+	// Specifies the port name.
+	//
+	// +kubebuilder:validation:Required
+	PortName string `json:"portName,omitempty"`
 }
 
 type PodSelector struct {
 	// labelsSelector is the label selector to filter the target pods.
 	*metav1.LabelSelector `json:",inline"`
+
+	// fallbackLabelSelector is used to filter available pods when the labelSelector fails.
+	// This only takes effect when the `strategy` field below is set to `Any`.
+	//
+	// +optional
+	FallbackLabelSelector *metav1.LabelSelector `json:"fallbackLabelSelector,omitempty"`
 
 	// Specifies the strategy to select the target pod when multiple pods are selected.
 	// Valid values are:

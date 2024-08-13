@@ -565,7 +565,7 @@ type ComponentVolume struct {
 
 // ReplicasLimit defines the valid range of number of replicas supported.
 //
-// +kubebuilder:validation:XValidation:rule="self.minReplicas >= 0 && self.maxReplicas <= 128",message="the minimum and maximum limit of replicas should be in the range of [0, 128]"
+// +kubebuilder:validation:XValidation:rule="self.minReplicas >= 0 && self.maxReplicas <= 16384",message="the minimum and maximum limit of replicas should be in the range of [0, 16384]"
 // +kubebuilder:validation:XValidation:rule="self.minReplicas <= self.maxReplicas",message="the minimum replicas limit should be no greater than the maximum"
 type ReplicasLimit struct {
 	// The minimum limit of replicas.
@@ -1353,4 +1353,13 @@ type ComponentSwitchover struct {
 	// +kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.9.0"
 	// +optional
 	ScriptSpecSelectors []ScriptSpecSelector `json:"scriptSpecSelectors,omitempty"`
+}
+
+type ScriptSpecSelector struct {
+	// Represents the name of the ScriptSpec referent.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	Name string `json:"name"`
 }

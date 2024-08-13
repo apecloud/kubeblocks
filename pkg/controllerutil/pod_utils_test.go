@@ -390,7 +390,7 @@ var _ = Describe("pod utils", func() {
 				// memory unit: Gi
 				{
 					pvc: corev1.PersistentVolumeClaimSpec{
-						Resources: corev1.ResourceRequirements{
+						Resources: corev1.VolumeResourceRequirements{
 							Requests: corev1.ResourceList{
 								corev1.ResourceStorage: resource.MustParse("100Gi"),
 							},
@@ -401,7 +401,7 @@ var _ = Describe("pod utils", func() {
 				// memory unit: G
 				{
 					pvc: corev1.PersistentVolumeClaimSpec{
-						Resources: corev1.ResourceRequirements{
+						Resources: corev1.VolumeResourceRequirements{
 							Requests: corev1.ResourceList{
 								corev1.ResourceStorage: resource.MustParse("100G"),
 							},
@@ -412,7 +412,7 @@ var _ = Describe("pod utils", func() {
 				// memory unit: no
 				{
 					pvc: corev1.PersistentVolumeClaimSpec{
-						Resources: corev1.ResourceRequirements{
+						Resources: corev1.VolumeResourceRequirements{
 							Requests: corev1.ResourceList{
 								corev1.ResourceStorage: resource.MustParse("10000"),
 							},

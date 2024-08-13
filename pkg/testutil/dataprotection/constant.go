@@ -23,6 +23,9 @@ const (
 	ClusterName   = "test-cluster"
 	ComponentName = "test-comp"
 	ContainerName = "test-container"
+	PortName      = "test-port"
+	ProtocolName  = "TCP"
+	PortNum       = 10000
 
 	BackupName         = "test-backup"
 	BackupRepoName     = "test-repo"

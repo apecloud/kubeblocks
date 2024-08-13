@@ -34,9 +34,9 @@ import (
 var _ = Describe("Restart OpsRequest", func() {
 
 	var (
-		randomStr             = testCtx.GetRandomStr()
-		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr
-		clusterName           = "cluster-for-ops-" + randomStr
+		randomStr   = testCtx.GetRandomStr()
+		compDefName = "test-compdef-" + randomStr
+		clusterName = "test-cluster-" + randomStr
 	)
 
 	cleanEnv := func() {
@@ -47,7 +47,7 @@ var _ = Describe("Restart OpsRequest", func() {
 		By("clean resources")
 
 		// delete cluster(and all dependent sub-resources), cluster definition
-		testapps.ClearClusterResources(&testCtx)
+		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 
 		// delete rest resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
@@ -66,16 +66,17 @@ var _ = Describe("Restart OpsRequest", func() {
 			cluster *appsv1alpha1.Cluster
 			reqCtx  intctrlutil.RequestCtx
 		)
+
 		BeforeEach(func() {
 			By("init operations resources ")
-			opsRes, _, cluster = initOperationsResources(clusterDefinitionName, clusterName)
+			opsRes, _, cluster = initOperationsResources(compDefName, clusterName)
 			reqCtx = intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 		})
 
 		It("Test restart OpsRequest", func() {
 			By("create Restart opsRequest")
 			opsRes.OpsRequest = createRestartOpsObj(clusterName, "restart-ops-"+randomStr)
-			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase, consensusComp, statelessComp)
+			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase, defaultCompName)
 
 			By("mock restart OpsRequest is Running")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
@@ -113,8 +114,7 @@ func createRestartOpsObj(clusterName, restartOpsName string) *appsv1alpha1.OpsRe
 	ops := testapps.NewOpsRequestObj(restartOpsName, testCtx.DefaultNamespace,
 		clusterName, appsv1alpha1.RestartType)
 	ops.Spec.RestartList = []appsv1alpha1.ComponentOps{
-		{ComponentName: consensusComp},
-		{ComponentName: statelessComp},
+		{ComponentName: defaultCompName},
 	}
 	opsRequest := testapps.CreateOpsRequest(ctx, testCtx, ops)
 	opsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase

@@ -55,6 +55,10 @@ import (
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
+const (
+	defaultCompName = "default"
+)
+
 var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
@@ -63,12 +67,6 @@ var cancel context.CancelFunc
 var k8sManager ctrl.Manager
 var testCtx testutil.TestContext
 var eventRecorder record.EventRecorder
-
-const (
-	statelessComp = "stateless"
-	statefulComp  = "stateful"
-	consensusComp = "consensus"
-)
 
 func init() {
 	viper.AutomaticEnv()
@@ -148,37 +146,42 @@ var _ = AfterSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 })
 
-// initOperationsResources inits the operations resources.
-func initOperationsResources(clusterDefinitionName, clusterName string) (*OpsResource, *appsv1alpha1.ClusterDefinition, *appsv1alpha1.Cluster) {
-	clusterDef, clusterObject := testapps.InitClusterWithHybridComps(&testCtx, clusterDefinitionName,
-		clusterName, statelessComp, statefulComp, consensusComp)
+func initOperationsResources(compDefName, clusterName string) (*OpsResource, *appsv1alpha1.ComponentDefinition, *appsv1alpha1.Cluster) {
+	compDef := testapps.NewComponentDefinitionFactory(compDefName).
+		SetDefaultSpec().
+		Create(&testCtx).
+		GetObject()
+
+	pvcSpec := testapps.NewPVCSpec("1Gi")
+	clusterObject := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
+		AddComponent(defaultCompName, compDef.GetName()).
+		SetReplicas(3).
+		AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
+		Create(&testCtx).
+		GetObject()
+
 	opsRes := &OpsResource{
 		Cluster:  clusterObject,
 		Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
 	}
+
 	By("mock cluster is Running and the status operations")
 	Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
 		clusterObject.Status.Phase = appsv1alpha1.RunningClusterPhase
 		clusterObject.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
-			consensusComp: {
-				Phase: appsv1alpha1.RunningClusterCompPhase,
-			},
-			statelessComp: {
-				Phase: appsv1alpha1.RunningClusterCompPhase,
-			},
-			statefulComp: {
+			defaultCompName: {
 				Phase: appsv1alpha1.RunningClusterCompPhase,
 			},
 		}
 	})).Should(Succeed())
 	opsRes.Cluster = clusterObject
-	return opsRes, clusterDef, clusterObject
+	return opsRes, compDef, clusterObject
 }
 
 func initInstanceSetPods(ctx context.Context, cli client.Client, opsRes *OpsResource) []*corev1.Pod {
 	// mock the pods of consensusSet component
-	testapps.MockInstanceSetPods(&testCtx, nil, opsRes.Cluster, consensusComp)
-	pods, err := intctrlcomp.ListOwnedPods(ctx, cli, opsRes.Cluster.Namespace, opsRes.Cluster.Name, consensusComp)
+	testapps.MockInstanceSetPods(&testCtx, nil, opsRes.Cluster, defaultCompName)
+	pods, err := intctrlcomp.ListOwnedPods(ctx, cli, opsRes.Cluster.Namespace, opsRes.Cluster.Name, defaultCompName)
 	Expect(err).Should(Succeed())
 	// the opsRequest will use startTime to check some condition.
 	// if there is no sleep for 1 second, unstable error may occur.

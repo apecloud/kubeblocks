@@ -224,44 +224,6 @@ type LogConfig struct {
 	FilePathPattern string `json:"filePathPattern"`
 }
 
-// TODO(v1.0): remove this after lorry
-
-// VolumeProtectionSpec is deprecated since v0.9, replaced with ComponentVolume.HighWatermark.
-type VolumeProtectionSpec struct {
-	// The high watermark threshold for volume space usage.
-	// If there is any specified volumes who's space usage is over the threshold, the pre-defined "LOCK" action
-	// will be triggered to degrade the service to protect volume from space exhaustion, such as to set the instance
-	// as read-only. And after that, if all volumes' space usage drops under the threshold later, the pre-defined
-	// "UNLOCK" action will be performed to recover the service normally.
-	//
-	// +kubebuilder:validation:Maximum=100
-	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:default=90
-	// +optional
-	HighWatermark int `json:"highWatermark,omitempty"`
-
-	// The Volumes to be protected.
-	//
-	// +optional
-	Volumes []ProtectedVolume `json:"volumes,omitempty"`
-}
-
-// ProtectedVolume is deprecated since v0.9, replaced with ComponentVolume.HighWatermark.
-type ProtectedVolume struct {
-	// The Name of the volume to protect.
-	//
-	// +optional
-	Name string `json:"name,omitempty"`
-
-	// Defines the high watermark threshold for the volume, it will override the component level threshold.
-	// If the value is invalid, it will be ignored and the component level threshold will be used.
-	//
-	// +kubebuilder:validation:Maximum=100
-	// +kubebuilder:validation:Minimum=0
-	// +optional
-	HighWatermark *int `json:"highWatermark,omitempty"`
-}
-
 // ServiceRefDeclaration represents a reference to a service that can be either provided by a KubeBlocks Cluster
 // or an external service.
 // It acts as a placeholder for the actual service reference, which is determined later when a Cluster is created.

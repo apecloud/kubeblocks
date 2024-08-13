@@ -105,10 +105,6 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 }
 
 func isLifecycleActionsEnabled(compDef *appsv1alpha1.ComponentDefinition) bool {
-	// TODO(component): in KB 0.9, LifeCycleActions is executed throuth lorry, and
-	// lorry requires the service account to have the permission defined in "kubeblocks-cluster-pod-role".
-	// In KB 1.0, LifeCycleActions is executed throuth the kb-agent, and it does not require the permission anymore.
-	// So, we can remove this check in KB 1.0.
 	return compDef.Spec.LifecycleActions != nil
 }
 

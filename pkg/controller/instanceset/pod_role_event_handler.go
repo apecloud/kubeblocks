@@ -39,7 +39,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
-	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 type PodRoleEventHandler struct{}
@@ -62,6 +61,11 @@ type probeMessage struct {
 const (
 	// roleChangedAnnotKey is used to mark the role change event has been handled.
 	roleChangedAnnotKey = "role.kubeblocks.io/event-handled"
+
+	// TODO(v1.0): remove this later.
+	checkRoleOperation   = "checkRole"
+	legacyEventFieldPath = "spec.containers{kb-checkrole}"
+	lorryEventFieldPath  = "spec.containers{lorry}"
 )
 
 var roleMessageRegex = regexp.MustCompile(`Readiness probe failed: .*({.*})`)
@@ -70,8 +74,8 @@ func (h *PodRoleEventHandler) Handle(cli client.Client, reqCtx intctrlutil.Reque
 	// HACK: to support kb-agent probe event
 	event = h.transformKBAgentProbeEvent(reqCtx.Log, event)
 
-	filePaths := []string{readinessProbeEventFieldPath, util.LegacyEventFieldPath, util.LorryEventFieldPath}
-	if !slices.Contains(filePaths, event.InvolvedObject.FieldPath) || event.Reason != string(util.CheckRoleOperation) {
+	filePaths := []string{readinessProbeEventFieldPath, legacyEventFieldPath, lorryEventFieldPath}
+	if !slices.Contains(filePaths, event.InvolvedObject.FieldPath) || event.Reason != checkRoleOperation {
 		return nil
 	}
 	var (
@@ -117,8 +121,8 @@ func (h *PodRoleEventHandler) transformKBAgentProbeEvent(logger logr.Logger, eve
 	}
 	data, _ := json.Marshal(message)
 
-	event.InvolvedObject.FieldPath = util.LorryEventFieldPath
-	event.Reason = string(util.CheckRoleOperation)
+	event.InvolvedObject.FieldPath = lorryEventFieldPath
+	event.Reason = checkRoleOperation
 	event.Message = string(data)
 	return event
 }

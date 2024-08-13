@@ -697,8 +697,6 @@ const (
 )
 
 // ExecAction describes an Action that executes a command inside a container.
-// Which may run as a K8s job or be executed inside the Lorry sidecar container, depending on the implementation.
-// Future implementations will standardize execution within Lorry.
 type ExecAction struct {
 	// Specifies the container image to be used for running the Action.
 	//
@@ -826,8 +824,6 @@ const (
 // Actions can be executed in different ways:
 //
 //   - ExecAction: Executes a command inside a container.
-//     which may run as a K8s job or be executed inside the Lorry sidecar container, depending on the implementation.
-//     Future implementations will standardize execution within Lorry.
 //     A set of predefined environment variables are available and can be leveraged within the `exec.command`
 //     to access context information such as details about pods, components, the overall cluster state,
 //     or database connection credentials.
@@ -1007,7 +1003,7 @@ type ComponentLifecycleActions struct {
 
 	// Defines the procedure which is invoked regularly to assess the role of replicas.
 	//
-	// This action is periodically triggered by Lorry at the specified interval to determine the role of each replica.
+	// This action is periodically triggered at the specified interval to determine the role of each replica.
 	// Upon successful execution, the action's output designates the role of the replica,
 	// which should match one of the predefined role names within `componentDefinition.spec.roles`.
 	// The output is then compared with the previous successful execution result.

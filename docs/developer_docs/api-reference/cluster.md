@@ -2859,8 +2859,6 @@ such as during planned maintenance or upgrades on the current leader node.</li>
 <p>Actions can be executed in different ways:</p>
 <ul>
 <li>ExecAction: Executes a command inside a container.
-which may run as a K8s job or be executed inside the Lorry sidecar container, depending on the implementation.
-Future implementations will standardize execution within Lorry.
 A set of predefined environment variables are available and can be leveraged within the <code>exec.command</code>
 to access context information such as details about pods, components, the overall cluster state,
 or database connection credentials.
@@ -6847,7 +6845,7 @@ Probe
 <td>
 <em>(Optional)</em>
 <p>Defines the procedure which is invoked regularly to assess the role of replicas.</p>
-<p>This action is periodically triggered by Lorry at the specified interval to determine the role of each replica.
+<p>This action is periodically triggered at the specified interval to determine the role of each replica.
 Upon successful execution, the action&rsquo;s output designates the role of the replica,
 which should match one of the predefined role names within <code>componentDefinition.spec.roles</code>.
 The output is then compared with the previous successful execution result.
@@ -9954,9 +9952,7 @@ This name can originate from an &lsquo;env&rsquo; entry or be a data key from an
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.Action">Action</a>)
 </p>
 <div>
-<p>ExecAction describes an Action that executes a command inside a container.
-Which may run as a K8s job or be executed inside the Lorry sidecar container, depending on the implementation.
-Future implementations will standardize execution within Lorry.</p>
+<p>ExecAction describes an Action that executes a command inside a container.</p>
 </div>
 <table>
 <thead>
@@ -14044,49 +14040,6 @@ Kubernetes meta/v1.Time
 </tr><tr><td><p>&#34;https&#34;</p></td>
 <td></td>
 </tr></tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ProtectedVolume">ProtectedVolume
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.VolumeProtectionSpec">VolumeProtectionSpec</a>)
-</p>
-<div>
-<p>ProtectedVolume is deprecated since v0.9, replaced with ComponentVolume.HighWatermark.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The Name of the volume to protect.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>highWatermark</code><br/>
-<em>
-int
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the high watermark threshold for the volume, it will override the component level threshold.
-If the value is invalid, it will be ignored and the component level threshold will be used.</p>
-</td>
-</tr>
-</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ProvisionSecretRef">ProvisionSecretRef
 </h3>
@@ -18239,51 +18192,6 @@ that are used to expand the storage and the desired storage size for each one.</
 <td>
 <em>(Optional)</em>
 <p>Specifies the desired storage size of the instance template that need to volume expand.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.VolumeProtectionSpec">VolumeProtectionSpec
-</h3>
-<div>
-<p>VolumeProtectionSpec is deprecated since v0.9, replaced with ComponentVolume.HighWatermark.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>highWatermark</code><br/>
-<em>
-int
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The high watermark threshold for volume space usage.
-If there is any specified volumes who&rsquo;s space usage is over the threshold, the pre-defined &ldquo;LOCK&rdquo; action
-will be triggered to degrade the service to protect volume from space exhaustion, such as to set the instance
-as read-only. And after that, if all volumes&rsquo; space usage drops under the threshold later, the pre-defined
-&ldquo;UNLOCK&rdquo; action will be performed to recover the service normally.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>volumes</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ProtectedVolume">
-[]ProtectedVolume
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The Volumes to be protected.</p>
 </td>
 </tr>
 </tbody>

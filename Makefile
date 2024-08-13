@@ -255,11 +255,6 @@ endif
 goimports: goimportstool ## Run goimports against code.
 	$(GOIMPORTS) -local github.com/apecloud/kubeblocks -w $$(git ls-files|grep "\.go$$" | grep -v $(GENERATED_CLIENT_PKG) | grep -v $(GENERATED_DEEP_COPY_FILE))
 
-
-.PHONY: lorryctl-doc
-lorryctl-doc: generate test-go-generate ## generate CLI command reference manual.
-	$(GO) run ./hack/docgen/lorryctl/main.go ./docs/user_docs/lorryctl
-
 .PHONY: api-doc
 api-doc:  ## generate API reference manual.
 	$(GO) run ./hack/docgen/api/main.go -api-dir github.com/apecloud/kubeblocks/apis -config ./hack/docgen/api/gen-api-doc-config.json -template-dir ./hack/docgen/api/template -out-dir ./docs/developer_docs/api-reference/

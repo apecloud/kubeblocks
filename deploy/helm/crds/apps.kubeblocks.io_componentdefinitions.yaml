@@ -3299,7 +3299,7 @@ spec:
                       Defines the procedure which is invoked regularly to assess the role of replicas.
 
 
-                      This action is periodically triggered by Lorry at the specified interval to determine the role of each replica.
+                      This action is periodically triggered at the specified interval to determine the role of each replica.
                       Upon successful execution, the action's output designates the role of the replica,
                       which should match one of the predefined role names within `componentDefinition.spec.roles`.
                       The output is then compared with the previous successful execution result.

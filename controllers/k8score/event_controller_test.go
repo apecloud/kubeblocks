@@ -40,7 +40,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/generics"
-	lorryutil "github.com/apecloud/kubeblocks/pkg/lorry/util"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
@@ -65,6 +64,10 @@ var _ = Describe("Event Controller", func() {
 	const (
 		// roleChangedAnnotKey is used to mark the role change event has been handled.
 		roleChangedAnnotKey = "role.kubeblocks.io/event-handled"
+
+		// TODO(v1.0): remove this later.
+		checkRoleOperation  = "checkRole"
+		lorryEventFieldPath = "spec.containers{lorry}"
 	)
 
 	var (
@@ -81,13 +84,13 @@ var _ = Describe("Event Controller", func() {
 			Namespace:  testCtx.DefaultNamespace,
 			Name:       podName,
 			UID:        podUid,
-			FieldPath:  lorryutil.LorryEventFieldPath,
+			FieldPath:  lorryEventFieldPath,
 		}
 		eventName := strings.Join([]string{podName, seq}, ".")
 		return builder.NewEventBuilder(testCtx.DefaultNamespace, eventName).
 			SetInvolvedObject(objectRef).
 			SetMessage(fmt.Sprintf("{\"event\":\"roleChanged\",\"originalRole\":\"secondary\",\"role\":\"%s\"}", role)).
-			SetReason(string(lorryutil.CheckRoleOperation)).
+			SetReason(checkRoleOperation).
 			SetType(corev1.EventTypeNormal).
 			SetFirstTimestamp(metav1.NewTime(initLastTS)).
 			SetLastTimestamp(metav1.NewTime(initLastTS)).

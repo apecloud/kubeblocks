@@ -59,7 +59,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	kbagent "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	kbagentproto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
-	lorry "github.com/apecloud/kubeblocks/pkg/lorry/client"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
@@ -213,7 +212,7 @@ var _ = Describe("Component Controller", func() {
 			Create(&testCtx).
 			GetObject()
 
-		By("Mock lorry client for the default transformer of system accounts provision")
+		By("Mock kb-agent client for the default transformer of system accounts provision")
 		mockKBAgentClientDefault()
 	}
 
@@ -697,7 +696,7 @@ var _ = Describe("Component Controller", func() {
 	}
 
 	horizontalScale := func(updatedReplicas int, storageClassName string, policyType *string, compDefNames ...string) {
-		defer lorry.UnsetMockClient()
+		defer kbagent.UnsetMockClient()
 
 		cluster := &appsv1alpha1.Cluster{}
 		Expect(k8sClient.Get(testCtx.Ctx, clusterKey, cluster)).Should(Succeed())

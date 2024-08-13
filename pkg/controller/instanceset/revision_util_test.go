@@ -92,7 +92,6 @@ var _ = Describe("revision util test", func() {
         "podManagementPolicy": "Parallel",
         "replicas": 1,
         "roleProbe": {
-            "builtinHandlerName": "redis",
             "failureThreshold": 2,
             "initialDelaySeconds": 0,
             "periodSeconds": 2,

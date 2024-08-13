@@ -45,7 +45,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 	)
 
 	var (
-		defaultActionHandler = &appsv1alpha1.LifecycleActionHandler{}
+		defaultActionHandler = &appsv1alpha1.Action{}
 	)
 
 	cleanEnv := func() {

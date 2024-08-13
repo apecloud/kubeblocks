@@ -301,9 +301,6 @@ func injectRoleProbeBaseContainer(its *workloads.InstanceSet, template *corev1.P
 	)
 
 	characterType := "custom"
-	if roleProbe.BuiltinHandler != nil {
-		characterType = *roleProbe.BuiltinHandler
-	}
 	env = append(env, corev1.EnvVar{
 		Name:  constant.KBEnvCharacterType,
 		Value: characterType,

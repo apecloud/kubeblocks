@@ -99,12 +99,11 @@ func (a *kbagent) AccountProvision(ctx context.Context, cli client.Reader, opts 
 	return a.checkedCallAction(ctx, cli, a.lifecycleActions.AccountProvision, la, opts)
 }
 
-func (a *kbagent) checkedCallAction(ctx context.Context, cli client.Reader,
-	handler *appsv1alpha1.LifecycleActionHandler, la lifecycleAction, opts *Options) error {
-	if handler == nil || handler.CustomHandler == nil {
+func (a *kbagent) checkedCallAction(ctx context.Context, cli client.Reader, action *appsv1alpha1.Action, la lifecycleAction, opts *Options) error {
+	if action == nil {
 		return errors.Wrap(ErrActionNotDefined, la.name())
 	}
-	return a.callAction(ctx, cli, handler.CustomHandler, la, opts)
+	return a.callAction(ctx, cli, action, la, opts)
 }
 
 func (a *kbagent) callAction(ctx context.Context, cli client.Reader, spec *appsv1alpha1.Action, la lifecycleAction, opts *Options) error {

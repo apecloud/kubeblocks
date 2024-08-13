@@ -56,16 +56,10 @@ const (
 )
 
 var (
-	defaultBuiltinHandler         = appsv1alpha1.MySQLBuiltinActionHandler
-	defaultLifecycleActionHandler = &appsv1alpha1.LifecycleActionHandler{
-		BuiltinHandler: &defaultBuiltinHandler,
-	}
-	newLifecycleActionHandler = func(name string) *appsv1alpha1.LifecycleActionHandler {
-		return &appsv1alpha1.LifecycleActionHandler{
-			CustomHandler: &appsv1alpha1.Action{
-				Exec: &appsv1alpha1.ExecAction{
-					Command: []string{"/bin/sh", "-c", fmt.Sprintf("echo %s", name)},
-				},
+	newLifecycleAction = func(name string) *appsv1alpha1.Action {
+		return &appsv1alpha1.Action{
+			Exec: &appsv1alpha1.ExecAction{
+				Command: []string{"/bin/sh", "-c", fmt.Sprintf("echo %s", name)},
 			},
 		}
 	}
@@ -239,24 +233,21 @@ var (
 			ScrapeScheme: appsv1alpha1.HTTPProtocol,
 		},
 		LifecycleActions: &appsv1alpha1.ComponentLifecycleActions{
-			PostProvision: defaultLifecycleActionHandler,
-			PreTerminate:  defaultLifecycleActionHandler,
+			PostProvision: newLifecycleAction("post-provision"),
+			PreTerminate:  newLifecycleAction("pre-terminate"),
 			RoleProbe: &appsv1alpha1.Probe{
-				BuiltinHandler: defaultLifecycleActionHandler.BuiltinHandler,
-				Action: appsv1alpha1.Action{
-					TimeoutSeconds: 5,
-				},
+				Action:        *newLifecycleAction("role-probe"),
 				PeriodSeconds: 1,
 			},
-			Switchover:       nil,
-			MemberJoin:       defaultLifecycleActionHandler,
-			MemberLeave:      newLifecycleActionHandler("member-leave"),
-			Readonly:         defaultLifecycleActionHandler,
-			Readwrite:        defaultLifecycleActionHandler,
-			DataDump:         defaultLifecycleActionHandler,
-			DataLoad:         defaultLifecycleActionHandler,
-			Reconfigure:      defaultLifecycleActionHandler,
-			AccountProvision: newLifecycleActionHandler("account-provision"),
+			Switchover:       newLifecycleAction("switchover"),
+			MemberJoin:       newLifecycleAction("member-join"),
+			MemberLeave:      newLifecycleAction("member-leave"),
+			Readonly:         newLifecycleAction("readonly"),
+			Readwrite:        newLifecycleAction("readwrite"),
+			DataDump:         newLifecycleAction("data-dump"),
+			DataLoad:         newLifecycleAction("data-load"),
+			Reconfigure:      newLifecycleAction("reconfigure"),
+			AccountProvision: newLifecycleAction("account-provision"),
 		},
 	}
 

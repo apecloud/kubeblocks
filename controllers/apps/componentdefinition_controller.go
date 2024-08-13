@@ -345,55 +345,6 @@ func (r *ComponentDefinitionReconciler) validateReplicaRoles(cli client.Client, 
 }
 
 func (r *ComponentDefinitionReconciler) validateLifecycleActions(cli client.Client, reqCtx intctrlutil.RequestCtx, cmpd *appsv1alpha1.ComponentDefinition) error {
-	if err := r.validateLifecycleActionBuiltInHandlers(cmpd.Spec.LifecycleActions); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (r *ComponentDefinitionReconciler) validateLifecycleActionBuiltInHandlers(lifecycleActions *appsv1alpha1.ComponentLifecycleActions) error {
-	if lifecycleActions == nil {
-		return nil
-	}
-
-	builtInHandlerMap := make(map[appsv1alpha1.BuiltinActionHandlerType]bool)
-	supportedBuiltInHandlers := getBuiltinActionHandlers()
-
-	if lifecycleActions.RoleProbe != nil && lifecycleActions.RoleProbe.BuiltinHandler != nil {
-		if !slices.Contains(supportedBuiltInHandlers, *lifecycleActions.RoleProbe.BuiltinHandler) {
-			return fmt.Errorf("the builtin handler %s is not supported", *lifecycleActions.RoleProbe.BuiltinHandler)
-		}
-		builtInHandlerMap[*lifecycleActions.RoleProbe.BuiltinHandler] = true
-	}
-
-	actions := []struct {
-		LifeCycleActionHandlers *appsv1alpha1.LifecycleActionHandler
-	}{
-		{lifecycleActions.PostProvision},
-		{lifecycleActions.PreTerminate},
-		{lifecycleActions.MemberJoin},
-		{lifecycleActions.MemberLeave},
-		{lifecycleActions.Readonly},
-		{lifecycleActions.Readwrite},
-		{lifecycleActions.DataDump},
-		{lifecycleActions.DataLoad},
-		{lifecycleActions.Reconfigure},
-		{lifecycleActions.AccountProvision},
-	}
-
-	for _, action := range actions {
-		if action.LifeCycleActionHandlers != nil && action.LifeCycleActionHandlers.BuiltinHandler != nil {
-			if !slices.Contains(supportedBuiltInHandlers, *lifecycleActions.RoleProbe.BuiltinHandler) {
-				return fmt.Errorf("the builtin handler %s is not supported", *lifecycleActions.RoleProbe.BuiltinHandler)
-			}
-			builtInHandlerMap[*lifecycleActions.RoleProbe.BuiltinHandler] = true
-		}
-	}
-
-	if len(builtInHandlerMap) > 1 {
-		return fmt.Errorf("the builtin handler within the same lifecycle actions should be consistent")
-	}
-
 	return nil
 }
 
@@ -514,20 +465,4 @@ func checkUniqueItemWithValue(slice any, fieldName string, val any) bool {
 		lookupTable[fieldValue] = true
 	}
 	return true
-}
-
-func getBuiltinActionHandlers() []appsv1alpha1.BuiltinActionHandlerType {
-	return []appsv1alpha1.BuiltinActionHandlerType{
-		appsv1alpha1.MySQLBuiltinActionHandler,
-		appsv1alpha1.WeSQLBuiltinActionHandler,
-		appsv1alpha1.OceanbaseBuiltinActionHandler,
-		appsv1alpha1.RedisBuiltinActionHandler,
-		appsv1alpha1.MongoDBBuiltinActionHandler,
-		appsv1alpha1.ETCDBuiltinActionHandler,
-		appsv1alpha1.PostgresqlBuiltinActionHandler,
-		appsv1alpha1.OfficialPostgresqlBuiltinActionHandler,
-		appsv1alpha1.ApeCloudPostgresqlBuiltinActionHandler,
-		appsv1alpha1.PolarDBXBuiltinActionHandler,
-		appsv1alpha1.CustomActionHandler,
-	}
 }

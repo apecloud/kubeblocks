@@ -26,6 +26,16 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
 
+<<<<<<< HEAD
+=======
+var (
+	defaultReplicasLimit = appsv1alpha1.ReplicasLimit{
+		MinReplicas: 1,
+		MaxReplicas: 16384,
+	}
+)
+
+>>>>>>> 09bc7e4b3 (chore: increase the range of maxReplicasLimit and set default value o… (#7953))
 // componentValidationTransformer validates the consistency between spec & definition.
 type componentValidationTransformer struct{}
 

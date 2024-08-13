@@ -584,7 +584,7 @@ type ComponentVolume struct {
 
 // ReplicasLimit defines the valid range of number of replicas supported.
 //
-// +kubebuilder:validation:XValidation:rule="self.minReplicas >= 0 && self.maxReplicas <= 128",message="the minimum and maximum limit of replicas should be in the range of [0, 128]"
+// +kubebuilder:validation:XValidation:rule="self.minReplicas >= 0 && self.maxReplicas <= 16384",message="the minimum and maximum limit of replicas should be in the range of [0, 16384]"
 // +kubebuilder:validation:XValidation:rule="self.minReplicas <= self.maxReplicas",message="the minimum replicas limit should be no greater than the maximum"
 type ReplicasLimit struct {
 	// The minimum limit of replicas.

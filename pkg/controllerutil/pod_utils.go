@@ -346,44 +346,6 @@ func GetPortByName(pod corev1.Pod, cname, pname string) (int32, error) {
 	return 0, fmt.Errorf("port %s not found", pname)
 }
 
-func GetLorryGRPCPort(pod *corev1.Pod) (int32, error) {
-	return GetLorryGRPCPortFromContainers(pod.Spec.Containers)
-}
-
-func GetLorryGRPCPortFromContainers(containers []corev1.Container) (int32, error) {
-	return GetPortByPortName(containers, constant.LorryGRPCPortName)
-}
-
-func GetLorryHTTPPort(pod *corev1.Pod) (int32, error) {
-	return GetLorryHTTPPortFromContainers(pod.Spec.Containers)
-}
-
-func GetLorryHTTPPortFromContainers(containers []corev1.Container) (int32, error) {
-	return GetPortByPortName(containers, constant.LorryHTTPPortName)
-}
-
-// GetLorryContainerName gets the lorry container from pod
-func GetLorryContainerName(pod *corev1.Pod) (string, error) {
-	container := GetLorryContainer(pod.Spec.Containers)
-	if container != nil {
-		return container.Name, nil
-	}
-	return "", fmt.Errorf("lorry container not found")
-}
-
-func GetLorryContainer(containers []corev1.Container) *corev1.Container {
-	var container *corev1.Container
-	for i := range containers {
-		container = &containers[i]
-		for _, port := range container.Ports {
-			if port.Name == constant.LorryHTTPPortName {
-				return container
-			}
-		}
-	}
-	return nil
-}
-
 // PodIsReadyWithLabel checks if pod is ready for ConsensusSet/ReplicationSet component,
 // it will be available when the pod is ready and labeled with role.
 func PodIsReadyWithLabel(pod corev1.Pod) bool {

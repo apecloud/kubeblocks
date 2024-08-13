@@ -131,15 +131,15 @@ var _ = Describe("object generation transformer test.", func() {
 		It("should reuse container 'kb-checkrole' if exists", func() {
 			templateCopy := template.DeepCopy()
 			templateCopy.Spec.Containers = append(templateCopy.Spec.Containers, corev1.Container{
-				Name:  constant.RoleProbeContainerName,
+				Name:  roleProbeContainerName,
 				Image: "bar",
 				Ports: []corev1.ContainerPort{
 					{
-						Name:          constant.LorryGRPCPortName,
+						Name:          roleProbeGRPCPortName,
 						ContainerPort: defaultRoleProbeGRPCPort,
 					},
 					{
-						Name:          constant.LorryHTTPPortName,
+						Name:          roleProbeDaemonPortName,
 						ContainerPort: defaultRoleProbeDaemonPort,
 					},
 				},
@@ -151,19 +151,19 @@ var _ = Describe("object generation transformer test.", func() {
 			Expect(probeContainer.Ports[0].ContainerPort).Should(BeElementOf([]int32{int32(defaultRoleProbeGRPCPort), int32(defaultRoleProbeDaemonPort)}))
 		})
 
-		It("should not use default grpcPort in case of 'lorry-grpc-port' existence", func() {
+		It("should not use default grpcPort in case of 'probe-grpc-port' existence", func() {
 			its.Spec.RoleProbe.RoleUpdateMechanism = workloads.ReadinessProbeEventUpdate
 			templateCopy := template.DeepCopy()
 			templateCopy.Spec.Containers = append(templateCopy.Spec.Containers, corev1.Container{
-				Name:  constant.RoleProbeContainerName,
+				Name:  roleProbeContainerName,
 				Image: "bar",
 				Ports: []corev1.ContainerPort{
 					{
-						Name:          constant.LorryGRPCPortName,
+						Name:          roleProbeGRPCPortName,
 						ContainerPort: 9555,
 					},
 					{
-						Name:          constant.LorryHTTPPortName,
+						Name:          roleProbeDaemonPortName,
 						ContainerPort: defaultRoleProbeDaemonPort,
 					},
 				},
@@ -179,15 +179,15 @@ var _ = Describe("object generation transformer test.", func() {
 			its.Spec.RoleProbe.RoleUpdateMechanism = workloads.ReadinessProbeEventUpdate
 			templateCopy := template.DeepCopy()
 			templateCopy.Spec.Containers = append(templateCopy.Spec.Containers, corev1.Container{
-				Name:  constant.RoleProbeContainerName,
+				Name:  roleProbeContainerName,
 				Image: "bar",
 				Ports: []corev1.ContainerPort{
 					{
-						Name:          constant.LorryGRPCPortName,
+						Name:          roleProbeGRPCPortName,
 						ContainerPort: defaultRoleProbeGRPCPort,
 					},
 					{
-						Name:          constant.LorryHTTPPortName,
+						Name:          roleProbeDaemonPortName,
 						ContainerPort: defaultRoleProbeDaemonPort,
 					},
 				},
@@ -203,15 +203,15 @@ var _ = Describe("object generation transformer test.", func() {
 			its.Spec.RoleProbe.RoleUpdateMechanism = workloads.ReadinessProbeEventUpdate
 			templateCopy := template.DeepCopy()
 			templateCopy.Spec.Containers = append(templateCopy.Spec.Containers, corev1.Container{
-				Name:  constant.RoleProbeContainerName,
+				Name:  roleProbeContainerName,
 				Image: "bar",
 				Ports: []corev1.ContainerPort{
 					{
-						Name:          constant.LorryGRPCPortName,
+						Name:          roleProbeGRPCPortName,
 						ContainerPort: defaultRoleProbeGRPCPort,
 					},
 					{
-						Name:          constant.LorryHTTPPortName,
+						Name:          roleProbeDaemonPortName,
 						ContainerPort: defaultRoleProbeDaemonPort,
 					},
 				},

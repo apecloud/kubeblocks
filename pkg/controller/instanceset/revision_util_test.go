@@ -585,7 +585,7 @@ var _ = Describe("revision util test", func() {
                     },
                     {
                         "command": [
-                            "lorry",
+                            "role-probe",
                             "--port",
                             "3501",
                             "--grpcport",
@@ -780,12 +780,12 @@ var _ = Describe("revision util test", func() {
                         "ports": [
                             {
                                 "containerPort": 3501,
-                                "name": "lorry-http-port",
+                                "name": "http-port",
                                 "protocol": "TCP"
                             },
                             {
                                 "containerPort": 50001,
-                                "name": "lorry-grpc-port",
+                                "name": "grpc-port",
                                 "protocol": "TCP"
                             }
                         ],

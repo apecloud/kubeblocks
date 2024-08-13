@@ -2831,7 +2831,7 @@ The modes can be <code>None</code>, <code>Readonly</code>, or <code>ReadWrite</c
 <h3 id="apps.kubeblocks.io/v1alpha1.Action">Action
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSwitchover">ComponentSwitchover</a>, <a href="#apps.kubeblocks.io/v1alpha1.LifecycleActionHandler">LifecycleActionHandler</a>, <a href="#apps.kubeblocks.io/v1alpha1.Probe">Probe</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1alpha1.LifecycleActionHandler">LifecycleActionHandler</a>, <a href="#apps.kubeblocks.io/v1alpha1.Probe">Probe</a>)
 </p>
 <div>
 <p>Action defines a customizable hook or procedure tailored for different database engines,
@@ -7860,68 +7860,6 @@ ComponentMessageMap
 Each entry in the map provides insights into specific elements of the Component, such as Pods or workloads.</p>
 <p>Keys in this map are formatted as <code>ObjectKind/Name</code>, where <code>ObjectKind</code> could be a type like Pod,
 and <code>Name</code> is the specific name of the object.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ComponentSwitchover">ComponentSwitchover
-</h3>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>withCandidate</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.Action">
-Action
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Represents the switchover process for a specified candidate primary or leader instance.
-Note that only Action.Exec is currently supported, while Action.HTTP is not.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>withoutCandidate</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.Action">
-Action
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Represents a switchover process that does not involve a specific candidate primary or leader instance.
-As with the previous field, only Action.Exec is currently supported, not Action.HTTP.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>scriptSpecSelectors</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ScriptSpecSelector">
-[]ScriptSpecSelector
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Used to define the selectors for the scriptSpecs that need to be referenced.
-If this field is set, the scripts defined under the &lsquo;scripts&rsquo; field can be invoked or referenced within an Action.</p>
-<p>This field is deprecated from v0.9.
-This field is maintained for backward compatibility and its use is discouraged.
-Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
 </td>
 </tr>
 </tbody>
@@ -15678,34 +15616,6 @@ which typically routes to the Pod with the primary/leader role.</p>
 <p>However, some Components, such as Redis, do not synchronize account information between primary and secondary Pods.
 In these cases, the script must be executed on all replica Pods matching the selector.</p>
 <p>Note: this field cannot be modified once set.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ScriptSpecSelector">ScriptSpecSelector
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentSwitchover">ComponentSwitchover</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Represents the name of the ScriptSpec referent.</p>
 </td>
 </tr>
 </tbody>

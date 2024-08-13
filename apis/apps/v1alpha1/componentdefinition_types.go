@@ -1329,37 +1329,3 @@ type ComponentLifecycleActions struct {
 	// +optional
 	AccountProvision *LifecycleActionHandler `json:"accountProvision,omitempty"`
 }
-
-type ComponentSwitchover struct {
-	// Represents the switchover process for a specified candidate primary or leader instance.
-	// Note that only Action.Exec is currently supported, while Action.HTTP is not.
-	//
-	// +optional
-	WithCandidate *Action `json:"withCandidate,omitempty"`
-
-	// Represents a switchover process that does not involve a specific candidate primary or leader instance.
-	// As with the previous field, only Action.Exec is currently supported, not Action.HTTP.
-	//
-	// +optional
-	WithoutCandidate *Action `json:"withoutCandidate,omitempty"`
-
-	// Used to define the selectors for the scriptSpecs that need to be referenced.
-	// If this field is set, the scripts defined under the 'scripts' field can be invoked or referenced within an Action.
-	//
-	// This field is deprecated from v0.9.
-	// This field is maintained for backward compatibility and its use is discouraged.
-	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
-	//
-	// +kubebuilder:deprecatedversion:warning="This field is deprecated from KB 0.9.0"
-	// +optional
-	ScriptSpecSelectors []ScriptSpecSelector `json:"scriptSpecSelectors,omitempty"`
-}
-
-type ScriptSpecSelector struct {
-	// Represents the name of the ScriptSpec referent.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	Name string `json:"name"`
-}

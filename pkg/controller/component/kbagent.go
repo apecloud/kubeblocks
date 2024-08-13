@@ -120,7 +120,7 @@ func buildKBAgentStartupEnvs(synthesizedComp *SynthesizedComponent) ([]corev1.En
 		actions = append(actions, *a)
 	}
 	if synthesizedComp.LifecycleActions.Switchover != nil {
-		if a := buildAction4KBAgentLow(synthesizedComp.LifecycleActions.Switchover.WithoutCandidate, "switchover"); a != nil {
+		if a := buildAction4KBAgentLow(synthesizedComp.LifecycleActions.Switchover, "switchover"); a != nil {
 			actions = append(actions, *a)
 		}
 	}

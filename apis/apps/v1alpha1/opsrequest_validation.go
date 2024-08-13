@@ -850,16 +850,6 @@ func validateSwitchoverResourceList(ctx context.Context, cli client.Client, clus
 			if compDefObj.Spec.LifecycleActions == nil || compDefObj.Spec.LifecycleActions.Switchover == nil {
 				return fmt.Errorf("this cluster component %s does not support switchover", switchover.ComponentName)
 			}
-			switch switchover.InstanceName {
-			case KBSwitchoverCandidateInstanceForAnyPod:
-				if compDefObj.Spec.LifecycleActions.Switchover.WithoutCandidate == nil {
-					return fmt.Errorf("this cluster component %s does not support promote without specifying an instance. Please specify a specific instance for the promotion", switchover.ComponentName)
-				}
-			default:
-				if compDefObj.Spec.LifecycleActions.Switchover.WithCandidate == nil {
-					return fmt.Errorf("this cluster component %s does not support specifying an instance for promote. If you want to perform a promote operation, please do not specify an instance", switchover.ComponentName)
-				}
-			}
 			// check switchover.InstanceName whether exist and role label is correct
 			if switchover.InstanceName == KBSwitchoverCandidateInstanceForAnyPod {
 				return nil

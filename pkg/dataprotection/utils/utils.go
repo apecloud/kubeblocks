@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strconv"
 
 	"github.com/rogpeppe/go-internal/semver"
 	batchv1 "k8s.io/api/batch/v1"
@@ -321,12 +322,33 @@ func SupportsCronJobV1() bool {
 	}
 	return semver.Compare(kubeVersion, "v1.21") >= 0
 }
+
 func GetPodFirstContainerPort(pod *corev1.Pod) int32 {
 	ports := pod.Spec.Containers[0].Ports
 	if len(ports) == 0 {
 		return 0
 	}
 	return ports[0].ContainerPort
+}
+
+// GetDPDBPortEnv get the EnvVar which consists of the port number of targetPod.
+func GetDPDBPortEnv(pod *corev1.Pod, containerPort *dpv1alpha1.ContainerPort) (*corev1.EnvVar, error) {
+	if containerPort == nil {
+		return &corev1.EnvVar{Name: dptypes.DPDBPort, Value: strconv.Itoa(int(GetPodFirstContainerPort(pod)))}, nil
+	}
+	containerName := containerPort.ContainerName
+	portName := containerPort.PortName
+	for _, container := range pod.Spec.Containers {
+		if container.Name != containerName {
+			continue
+		}
+		for _, port := range container.Ports {
+			if port.Name == portName {
+				return &corev1.EnvVar{Name: dptypes.DPDBPort, Value: strconv.Itoa(int(port.ContainerPort))}, nil
+			}
+		}
+	}
+	return nil, fmt.Errorf("the specified containerPort of targetPod is not found")
 }
 
 // ExistTargetVolume checks if the backup.status.backupMethod.targetVolumes exists the target volume which should be restored.

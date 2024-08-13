@@ -211,6 +211,12 @@ type TargetInstance struct {
 	//
 	// +optional
 	Strategy dpv1alpha1.PodSelectionStrategy `json:"strategy,omitempty"`
+
+	// Specifies the container port in the target pod.
+	// If not specified, the first container and its first port will be used.
+	//
+	// +optional
+	ContainerPort *dpv1alpha1.ContainerPort `json:"containerPort,omitempty"`
 }
 
 // BackupPolicyTemplateStatus defines the observed state of BackupPolicyTemplate.

@@ -20,13 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"slices"
-	"strconv"
-
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -107,7 +102,6 @@ func allocateHostPortsWithFunc(pm *intctrlutil.PortManager, synthesizedComp *com
 func updateObjectsWithAllocatedPorts(synthesizedComp *component.SynthesizedComponent, ports map[string]map[string]int32) error {
 	synthesizedComp.PodSpec.HostNetwork = true
 	synthesizedComp.PodSpec.DNSPolicy = corev1.DNSClusterFirstWithHostNet
-
 	for i, c := range synthesizedComp.PodSpec.Containers {
 		containerPorts, ok := ports[c.Name]
 		if ok {
@@ -118,100 +112,6 @@ func updateObjectsWithAllocatedPorts(synthesizedComp *component.SynthesizedCompo
 			}
 		}
 	}
-	if err := updateLorrySpecAfterPortsChanged(synthesizedComp); err != nil {
-		return err
-	}
+	component.UpdateKBAgentContainer4HostNetwork(synthesizedComp)
 	return nil
-}
-
-func updateLorrySpecAfterPortsChanged(synthesizeComp *component.SynthesizedComponent) error {
-	lorryContainer := intctrlutil.GetLorryContainer(synthesizeComp.PodSpec.Containers)
-	if lorryContainer == nil {
-		return nil
-	}
-
-	lorryHTTPPort := getLorryHTTPPort(lorryContainer)
-	lorryGRPCPort := getLorryGRPCPort(lorryContainer)
-	if err := updateLorry(synthesizeComp, lorryContainer, lorryHTTPPort, lorryGRPCPort); err != nil {
-		return err
-	}
-
-	if err := updateReadinessProbe(synthesizeComp, lorryHTTPPort); err != nil {
-		return err
-	}
-	return nil
-}
-
-func updateLorry(synthesizeComp *component.SynthesizedComponent, container *corev1.Container, httpPort, grpcPort int) error {
-	kbLorryBinary := "/kubeblocks/lorry"
-	if slices.Contains(container.Command, kbLorryBinary) {
-		container.Command = []string{kbLorryBinary,
-			"--port", strconv.Itoa(httpPort),
-			"--grpcport", strconv.Itoa(grpcPort),
-			"--config-path", "/kubeblocks/config/lorry/components/",
-		}
-	} else {
-		container.Command = []string{"lorry",
-			"--port", strconv.Itoa(httpPort),
-			"--grpcport", strconv.Itoa(grpcPort),
-		}
-	}
-	if container.StartupProbe != nil && container.StartupProbe.TCPSocket != nil {
-		container.StartupProbe.TCPSocket.Port = intstr.FromInt(httpPort)
-	}
-
-	for i := range container.Env {
-		if container.Env[i].Name != constant.KBEnvServicePort {
-			continue
-		}
-		if len(synthesizeComp.PodSpec.Containers) > 0 {
-			mainContainer := synthesizeComp.PodSpec.Containers[0]
-			if len(mainContainer.Ports) > 0 {
-				port := mainContainer.Ports[0]
-				dbPort := port.ContainerPort
-				container.Env[i] = corev1.EnvVar{
-					Name:      constant.KBEnvServicePort,
-					Value:     strconv.Itoa(int(dbPort)),
-					ValueFrom: nil,
-				}
-			}
-		}
-	}
-	return nil
-}
-
-func updateReadinessProbe(synthesizeComp *component.SynthesizedComponent, lorryHTTPPort int) error {
-	var container *corev1.Container
-	for i := range synthesizeComp.PodSpec.Containers {
-		container = &synthesizeComp.PodSpec.Containers[i]
-		if container.ReadinessProbe == nil {
-			continue
-		}
-		if container.ReadinessProbe.HTTPGet == nil {
-			continue
-		}
-		if container.ReadinessProbe.HTTPGet.Path == constant.LorryRoleProbePath ||
-			container.ReadinessProbe.HTTPGet.Path == constant.LorryVolumeProtectPath {
-			container.ReadinessProbe.HTTPGet.Port = intstr.FromInt(lorryHTTPPort)
-		}
-	}
-	return nil
-}
-
-func getLorryHTTPPort(container *corev1.Container) int {
-	for _, port := range container.Ports {
-		if port.Name == constant.LorryHTTPPortName {
-			return int(port.ContainerPort)
-		}
-	}
-	return 0
-}
-
-func getLorryGRPCPort(container *corev1.Container) int {
-	for _, port := range container.Ports {
-		if port.Name == constant.LorryGRPCPortName {
-			return int(port.ContainerPort)
-		}
-	}
-	return 0
 }

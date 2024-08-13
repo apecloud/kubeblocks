@@ -262,7 +262,7 @@ var _ = Describe("OpsRequest Controller", func() {
 				Create(&testCtx).
 				GetObject()
 
-			By("Mock lorry client for the default transformer of system accounts provision")
+			By("Mock kb-agent client for the default transformer of system accounts provision")
 			mockKBAgentClientDefault()
 		})
 

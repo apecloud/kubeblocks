@@ -30,6 +30,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	kbagent "github.com/apecloud/kubeblocks/pkg/kbagent"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -44,7 +45,7 @@ const (
 	kbAgentSharedMountPath      = "/kubeblocks"
 	kbAgentCommandOnSharedMount = "/kubeblocks/kbagent"
 
-	minAvailablePort   = 1
+	minAvailablePort   = 1025
 	maxAvailablePort   = 65535
 	kbAgentDefaultPort = 3501
 )
@@ -52,6 +53,43 @@ const (
 var (
 	sharedVolumeMount = corev1.VolumeMount{Name: "kubeblocks", MountPath: kbAgentSharedMountPath}
 )
+
+func IsKBAgentContainer(c *corev1.Container) bool {
+	return c.Name == kbAgentContainerName || c.Name == kbAgentInitContainerName
+}
+
+func UpdateKBAgentContainer4HostNetwork(synthesizedComp *SynthesizedComponent) {
+	idx, c := intctrlutil.GetContainerByName(synthesizedComp.PodSpec.Containers, kbAgentContainerName)
+	if c == nil {
+		return
+	}
+
+	httpPort := 0
+	for _, port := range c.Ports {
+		if port.Name == kbAgentPortName {
+			httpPort = int(port.ContainerPort)
+			break
+		}
+	}
+	if httpPort == 0 {
+		return
+	}
+
+	// update port in args
+	for i, arg := range c.Args {
+		if arg == "--port" {
+			c.Args[i+1] = strconv.Itoa(httpPort)
+			break
+		}
+	}
+
+	// update startup probe
+	if c.StartupProbe != nil && c.StartupProbe.TCPSocket != nil {
+		c.StartupProbe.TCPSocket.Port = intstr.FromInt(httpPort)
+	}
+
+	synthesizedComp.PodSpec.Containers[idx] = *c
+}
 
 func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 	if synthesizedComp.LifecycleActions == nil {

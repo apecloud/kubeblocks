@@ -85,9 +85,6 @@ func (t *componentAccountProvisionTransformer) Transform(ctx graph.TransformCont
 		// The secret of initAccount should be rendered into the config file,
 		// or injected into the container through specific account&password environment variables name supported by the engine.
 		// When the engine starts up, it will automatically load and create this account.
-		// There's no need for lorry to create it again.
-		//
-		// InitAccount is necessary because lorry itself requires an account to connect in the first place.
 		if account.InitAccount {
 			continue
 		}

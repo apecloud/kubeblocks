@@ -26,8 +26,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
 
-<<<<<<< HEAD
-=======
 var (
 	defaultReplicasLimit = appsv1alpha1.ReplicasLimit{
 		MinReplicas: 1,
@@ -35,7 +33,6 @@ var (
 	}
 )
 
->>>>>>> 09bc7e4b3 (chore: increase the range of maxReplicasLimit and set default value o… (#7953))
 // componentValidationTransformer validates the consistency between spec & definition.
 type componentValidationTransformer struct{}
 
@@ -56,29 +53,8 @@ func (t *componentValidationTransformer) Transform(ctx graph.TransformContext, d
 	if err = validateCompReplicas(comp, transCtx.CompDef); err != nil {
 		return newRequeueError(requeueDuration, err.Error())
 	}
-	// if err = validateSidecarContainers(comp, transCtx.CompDef); err != nil {
-	// 	return newRequeueError(requeueDuration, err.Error())
-	// }
 	return nil
 }
-
-// func validateSidecarContainers(comp *appsv1alpha1.Component, compDef *appsv1alpha1.ComponentDefinition) error {
-// 	if len(comp.Spec.Sidecars) == 0 {
-// 		return nil
-// 	}
-//
-// 	var notFoundSidecar []string
-// 	for _, sidecar := range comp.Spec.Sidecars {
-// 		if !HasSidecar(compDef, sidecar) {
-// 			notFoundSidecar = append(notFoundSidecar, sidecar)
-// 		}
-// 	}
-//
-// 	if len(notFoundSidecar) == 0 {
-// 		return nil
-// 	}
-// 	return errors.Errorf("sidecars %v are not found in the componentDefinition", notFoundSidecar)
-// }
 
 func validateEnabledLogs(comp *appsv1alpha1.Component, compDef *appsv1alpha1.ComponentDefinition) error {
 	invalidLogNames := validateEnabledLogConfigs(compDef, comp.Spec.EnabledLogs)
@@ -109,11 +85,12 @@ func validateEnabledLogConfigs(compDef *appsv1alpha1.ComponentDefinition, enable
 }
 
 func validateCompReplicas(comp *appsv1alpha1.Component, compDef *appsv1alpha1.ComponentDefinition) error {
-	if compDef.Spec.ReplicasLimit == nil {
-		return nil
+	replicasLimit := &defaultReplicasLimit
+	// always respect the replicas limit if set.
+	if compDef.Spec.ReplicasLimit != nil {
+		replicasLimit = compDef.Spec.ReplicasLimit
 	}
 	replicas := comp.Spec.Replicas
-	replicasLimit := compDef.Spec.ReplicasLimit
 	if replicas >= replicasLimit.MinReplicas && replicas <= replicasLimit.MaxReplicas {
 		return nil
 	}

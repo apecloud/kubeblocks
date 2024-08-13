@@ -5036,8 +5036,8 @@ spec:
                 type: object
                 x-kubernetes-validations:
                 - message: the minimum and maximum limit of replicas should be in
-                    the range of [0, 128]
-                  rule: self.minReplicas >= 0 && self.maxReplicas <= 128
+                    the range of [0, 16384]
+                  rule: self.minReplicas >= 0 && self.maxReplicas <= 16384
                 - message: the minimum replicas limit should be no greater than the
                     maximum
                   rule: self.minReplicas <= self.maxReplicas

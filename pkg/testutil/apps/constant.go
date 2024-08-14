@@ -55,7 +55,7 @@ const (
 )
 
 var (
-	newLifecycleAction = func(name string) *appsv1alpha1.Action {
+	NewLifecycleAction = func(name string) *appsv1alpha1.Action {
 		return &appsv1alpha1.Action{
 			Exec: &appsv1alpha1.ExecAction{
 				Command: []string{"/bin/sh", "-c", fmt.Sprintf("echo %s", name)},
@@ -232,21 +232,21 @@ var (
 			ScrapeScheme: appsv1alpha1.HTTPProtocol,
 		},
 		LifecycleActions: &appsv1alpha1.ComponentLifecycleActions{
-			PostProvision: newLifecycleAction("post-provision"),
-			PreTerminate:  newLifecycleAction("pre-terminate"),
+			PostProvision: nil,
+			PreTerminate:  nil,
 			RoleProbe: &appsv1alpha1.Probe{
-				Action:        *newLifecycleAction("role-probe"),
+				Action:        *NewLifecycleAction("role-probe"),
 				PeriodSeconds: 1,
 			},
-			Switchover:       newLifecycleAction("switchover"),
-			MemberJoin:       newLifecycleAction("member-join"),
-			MemberLeave:      newLifecycleAction("member-leave"),
-			Readonly:         newLifecycleAction("readonly"),
-			Readwrite:        newLifecycleAction("readwrite"),
-			DataDump:         newLifecycleAction("data-dump"),
-			DataLoad:         newLifecycleAction("data-load"),
-			Reconfigure:      newLifecycleAction("reconfigure"),
-			AccountProvision: newLifecycleAction("account-provision"),
+			Switchover:       nil,
+			MemberJoin:       nil,
+			MemberLeave:      NewLifecycleAction("member-leave"),
+			Readonly:         nil,
+			Readwrite:        nil,
+			DataDump:         nil,
+			DataLoad:         nil,
+			Reconfigure:      nil,
+			AccountProvision: NewLifecycleAction("account-provision"),
 		},
 	}
 

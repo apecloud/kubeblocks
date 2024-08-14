@@ -1583,6 +1583,8 @@ var _ = Describe("Component Controller", func() {
 					compDef.Spec.Volumes[i].HighWatermark = 85
 				}
 			}
+			compDef.Spec.LifecycleActions.Readonly = testapps.NewLifecycleAction("readonly")
+			compDef.Spec.LifecycleActions.Readwrite = testapps.NewLifecycleAction("readwrite")
 		})()).Should(Succeed())
 
 		By("creating a component with target service account name")

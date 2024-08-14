@@ -128,7 +128,7 @@ var _ = Describe("object generation transformer test.", func() {
 	})
 
 	Context("injectRoleProbeBaseContainer function", func() {
-		It("should reuse container 'kb-checkrole' if exists", func() {
+		It("should reuse container 'kb-role-probe' if exists", func() {
 			templateCopy := template.DeepCopy()
 			templateCopy.Spec.Containers = append(templateCopy.Spec.Containers, corev1.Container{
 				Name:  roleProbeContainerName,

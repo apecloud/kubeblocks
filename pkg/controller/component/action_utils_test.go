@@ -112,7 +112,7 @@ var _ = Describe("Component LifeCycle Action Utils Test", func() {
 			Expect(err).Should(Succeed())
 			Expect(synthesizeComp).ShouldNot(BeNil())
 			Expect(synthesizeComp.LifecycleActions).ShouldNot(BeNil())
-			Expect(synthesizeComp.LifecycleActions.PostProvision).ShouldNot(BeNil())
+			Expect(synthesizeComp.LifecycleActions.PostProvision).Should(BeNil())
 
 			dag := graph.NewDAG()
 			dag.AddVertex(&model.ObjectVertex{Obj: cluster, Action: model.ActionUpdatePtr()})

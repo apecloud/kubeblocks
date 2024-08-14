@@ -31,6 +31,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -187,6 +188,12 @@ func injectRoleProbeBaseContainer(its *workloads.InstanceSet, template *corev1.P
 	if roleProbe == nil {
 		return
 	}
+
+	// already has role probe container, for test purpose
+	if _, c := controllerutil.GetContainerByName(template.Spec.Containers, roleProbeContainerName); c != nil {
+		return
+	}
+
 	credential := its.Spec.Credential
 	image := viper.GetString(constant.KBToolsImage)
 	probeHTTPPort := viper.GetInt("ROLE_SERVICE_HTTP_PORT")

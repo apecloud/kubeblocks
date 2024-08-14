@@ -111,7 +111,7 @@ var _ = Describe("Component PreTerminate Test", func() {
 			Expect(err).Should(Succeed())
 			Expect(synthesizeComp).ShouldNot(BeNil())
 			Expect(synthesizeComp.LifecycleActions).ShouldNot(BeNil())
-			Expect(synthesizeComp.LifecycleActions.PreTerminate).ShouldNot(BeNil())
+			Expect(synthesizeComp.LifecycleActions.PreTerminate).Should(BeNil())
 
 			By("test component without preTerminate action and no need to do PreTerminate action")
 			dag := graph.NewDAG()

@@ -23,14 +23,11 @@ import (
 	"context"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 )
 
 type switchover struct {
-	synthesizedComp *component.SynthesizedComponent
-	switchover      *appsv1alpha1.Switchover
+	// synthesizedComp *component.SynthesizedComponent
+	// switchover      *appsv1alpha1.Switchover
 }
 
 var _ lifecycleAction = &switchover{}

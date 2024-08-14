@@ -26,9 +26,9 @@ import (
 )
 
 type postProvision struct {
-	namespace   string
-	clusterName string
-	compName    string
+	// namespace   string
+	// clusterName string
+	// compName    string
 }
 
 var _ lifecycleAction = &postProvision{}
@@ -42,9 +42,9 @@ func (a *postProvision) parameters(ctx context.Context, cli client.Reader) (map[
 }
 
 type preTerminate struct {
-	namespace   string
-	clusterName string
-	compName    string
+	// namespace   string
+	// clusterName string
+	// compName    string
 }
 
 var _ lifecycleAction = &preTerminate{}

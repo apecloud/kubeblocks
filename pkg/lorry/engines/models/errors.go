@@ -32,11 +32,11 @@ const (
 )
 
 var (
-	ErrNoSQL           = fmt.Errorf(errMsgNoSQL)
-	ErrNoUserName      = fmt.Errorf(errMsgNoUserName)
-	ErrNoPassword      = fmt.Errorf(errMsgNoPassword)
-	ErrNoRoleName      = fmt.Errorf(errMsgNoRoleName)
-	ErrInvalidRoleName = fmt.Errorf(errMsgInvalidRoleName)
-	ErrNoSuchUser      = fmt.Errorf(errMsgNoSuchUser)
-	ErrNotImplemented  = fmt.Errorf(errMsgNotImplemented)
+	ErrNoSQL           = fmt.Errorf("%s", errMsgNoSQL)
+	ErrNoUserName      = fmt.Errorf("%s", errMsgNoUserName)
+	ErrNoPassword      = fmt.Errorf("%s", errMsgNoPassword)
+	ErrNoRoleName      = fmt.Errorf("%s", errMsgNoRoleName)
+	ErrInvalidRoleName = fmt.Errorf("%s", errMsgInvalidRoleName)
+	ErrNoSuchUser      = fmt.Errorf("%s", errMsgNoSuchUser)
+	ErrNotImplemented  = fmt.Errorf("%s", errMsgNotImplemented)
 )

@@ -313,7 +313,7 @@ func GenerateInstanceNamesWithOrdinalList(parentName, templateName string,
 	if int32(len(instanceNameList)) != replicas {
 		errorMessage := fmt.Sprintf("for template '%s', expected %d instance names but generated %d: [%s]",
 			templateName, replicas, len(instanceNameList), strings.Join(instanceNameList, ", "))
-		return instanceNameList, fmt.Errorf(errorMessage)
+		return instanceNameList, fmt.Errorf("%s", errorMessage)
 	}
 	return instanceNameList, nil
 }

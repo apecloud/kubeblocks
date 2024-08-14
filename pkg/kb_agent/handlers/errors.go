@@ -26,5 +26,5 @@ const (
 )
 
 var (
-	ErrNotImplemented = fmt.Errorf(errMsgNotImplemented)
+	ErrNotImplemented = fmt.Errorf("%s", errMsgNotImplemented)
 )

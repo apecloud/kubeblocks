@@ -1113,12 +1113,9 @@ type ComponentLifecycleActions struct {
 	// It ensures replicas are correctly labeled with their respective roles.
 	// Without this, services that rely on roleSelectors might improperly direct traffic to wrong replicas.
 	//
-	// The container executing this action has access to following environment variables:
+	// The container executing this action has access to following variables:
 	//
 	// - KB_POD_FQDN: The FQDN of the Pod whose role is being assessed.
-	// - KB_SERVICE_PORT: The port used by the database service.
-	// - KB_SERVICE_USER: The username with the necessary permissions to interact with the database service.
-	// - KB_SERVICE_PASSWORD: The corresponding password for KB_SERVICE_USER to authenticate with the database service.
 	//
 	// Expected output of this action:
 	// - On Success: The determined role of the replica, which must align with one of the roles specified
@@ -1156,15 +1153,10 @@ type ComponentLifecycleActions struct {
 	// implementation, or automatically by the database kernel or a sidecar utility like Patroni that implements
 	// a consensus algorithm.
 	//
-	// The container executing this action has access to following environment variables:
+	// The container executing this action has access to following variables:
 	//
-	// - KB_SERVICE_PORT: The port used by the database service.
-	// - KB_SERVICE_USER: The username with the necessary permissions to interact with the database service.
-	// - KB_SERVICE_PASSWORD: The corresponding password for KB_SERVICE_USER to authenticate with the database service.
-	// - KB_PRIMARY_POD_FQDN: The FQDN of the primary Pod within the replication group.
-	// - KB_MEMBER_ADDRESSES: A comma-separated list of Pod addresses for all replicas in the group.
-	// - KB_NEW_MEMBER_POD_NAME: The pod name of the replica being added to the group.
-	// - KB_NEW_MEMBER_POD_IP: The IP address of the replica being added to the group.
+	// - KB_JOIN_MEMBER_POD_FQDN: The pod FQDN of the replica being added to the group.
+	// - KB_JOIN_MEMBER_POD_NAME: The pod name of the replica being added to the group.
 	//
 	// Expected action output:
 	// - On Failure: An error message detailing the reason for any failure encountered
@@ -1177,11 +1169,8 @@ type ComponentLifecycleActions struct {
 	// - bash
 	// - -c
 	// - |
-	//    ADDRESS=$(KB_MEMBER_ADDRESSES%%,*)
-	//    HOST=$(echo $ADDRESS | cut -d ':' -f 1)
-	//    PORT=$(echo $ADDRESS | cut -d ':' -f 2)
-	//    CLIENT="mysql -u $KB_SERVICE_USER -p$KB_SERVICE_PASSWORD -P $PORT -h $HOST -e"
-	// 	  $CLIENT "ALTER SYSTEM ADD SERVER '$KB_NEW_MEMBER_POD_IP:$KB_SERVICE_PORT' ZONE 'zone1'"
+	//    CLIENT="mysql -u $SERVICE_USER -p$SERVICE_PASSWORD -P $SERVICE_PORT -h $SERVICE_HOST -e"
+	// 	  $CLIENT "ALTER SYSTEM ADD SERVER '$KB_POD_FQDN:$SERVICE_PORT' ZONE 'zone1'"
 	// ```
 	//
 	// Note: This field is immutable once it has been set.
@@ -1198,15 +1187,10 @@ type ComponentLifecycleActions struct {
 	// The process typically includes updating configurations and informing other group members about the removal.
 	// Data migration is generally not part of this action and should be handled separately if needed.
 	//
-	// The container executing this action has access to following environment variables:
+	// The container executing this action has access to following variables:
 	//
-	// - KB_SERVICE_PORT: The port used by the database service.
-	// - KB_SERVICE_USER: The username with the necessary permissions to interact with the database service.
-	// - KB_SERVICE_PASSWORD: The corresponding password for KB_SERVICE_USER to authenticate with the database service.
-	// - KB_PRIMARY_POD_FQDN: The FQDN of the primary Pod within the replication group.
-	// - KB_MEMBER_ADDRESSES: A comma-separated list of Pod addresses for all replicas in the group.
+	// - KB_LEAVE_MEMBER_POD_FQDN: The pod name of the replica being removed from the group.
 	// - KB_LEAVE_MEMBER_POD_NAME: The pod name of the replica being removed from the group.
-	// - KB_LEAVE_MEMBER_POD_IP: The IP address of the replica being removed from the group.
 	//
 	// Expected action output:
 	// - On Failure: An error message, if applicable, indicating why the action failed.
@@ -1218,11 +1202,8 @@ type ComponentLifecycleActions struct {
 	// - bash
 	// - -c
 	// - |
-	//    ADDRESS=$(KB_MEMBER_ADDRESSES%%,*)
-	//    HOST=$(echo $ADDRESS | cut -d ':' -f 1)
-	//    PORT=$(echo $ADDRESS | cut -d ':' -f 2)
-	//    CLIENT="mysql -u $KB_SERVICE_USER  -p$KB_SERVICE_PASSWORD -P $PORT -h $HOST -e"
-	// 	  $CLIENT "ALTER SYSTEM DELETE SERVER '$KB_LEAVE_MEMBER_POD_IP:$KB_SERVICE_PORT' ZONE 'zone1'"
+	//    CLIENT="mysql -u $SERVICE_USER -p$SERVICE_PASSWORD -P $SERVICE_PORT -h $SERVICE_HOST -e"
+	// 	  $CLIENT "ALTER SYSTEM DELETE SERVER '$KB_POD_FQDN:$SERVICE_PORT' ZONE 'zone1'"
 	// ```
 	//
 	// Note: This field is immutable once it has been set.
@@ -1238,9 +1219,6 @@ type ComponentLifecycleActions struct {
 	// The container executing this action has access to following environment variables:
 	//
 	// - KB_POD_FQDN: The FQDN of the replica pod whose role is being checked.
-	// - KB_SERVICE_PORT: The port used by the database service.
-	// - KB_SERVICE_USER: The username with the necessary permissions to interact with the database service.
-	// - KB_SERVICE_PASSWORD: The corresponding password for KB_SERVICE_USER to authenticate with the database service.
 	//
 	// Expected action output:
 	// - On Failure: An error message, if applicable, indicating why the action failed.
@@ -1260,9 +1238,6 @@ type ComponentLifecycleActions struct {
 	// The container executing this action has access to following environment variables:
 	//
 	// - KB_POD_FQDN: The FQDN of the replica pod whose role is being checked.
-	// - KB_SERVICE_PORT: The port used by the database service.
-	// - KB_SERVICE_USER: The username with the necessary permissions to interact with the database service.
-	// - KB_SERVICE_PASSWORD: The corresponding password for KB_SERVICE_USER to authenticate with the database service.
 	//
 	// Expected action output:
 	// - On Failure: An error message, if applicable, indicating why the action failed.

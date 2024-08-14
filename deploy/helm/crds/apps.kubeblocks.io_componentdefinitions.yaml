@@ -1451,25 +1451,16 @@ spec:
                       command\nimplementation, or automatically by the database kernel
                       or a sidecar utility like Patroni that implements\na consensus
                       algorithm.\n\n\nThe container executing this action has access
-                      to following environment variables:\n\n\n- KB_SERVICE_PORT:
-                      The port used by the database service.\n- KB_SERVICE_USER: The
-                      username with the necessary permissions to interact with the
-                      database service.\n- KB_SERVICE_PASSWORD: The corresponding
-                      password for KB_SERVICE_USER to authenticate with the database
-                      service.\n- KB_PRIMARY_POD_FQDN: The FQDN of the primary Pod
-                      within the replication group.\n- KB_MEMBER_ADDRESSES: A comma-separated
-                      list of Pod addresses for all replicas in the group.\n- KB_NEW_MEMBER_POD_NAME:
-                      The pod name of the replica being added to the group.\n- KB_NEW_MEMBER_POD_IP:
-                      The IP address of the replica being added to the group.\n\n\nExpected
+                      to following variables:\n\n\n- KB_JOIN_MEMBER_POD_FQDN: The
+                      pod FQDN of the replica being added to the group.\n- KB_JOIN_MEMBER_POD_NAME:
+                      The pod name of the replica being added to the group.\n\n\nExpected
                       action output:\n- On Failure: An error message detailing the
                       reason for any failure encountered\n  during the addition of
                       the new member.\n\n\nFor example, to add a new OBServer to an
                       OceanBase Cluster in 'zone1', the following command may be used:\n\n\n```yaml\ncommand:\n-
-                      bash\n- -c\n- |\n   ADDRESS=$(KB_MEMBER_ADDRESSES%%,*)\n   HOST=$(echo
-                      $ADDRESS | cut -d ':' -f 1)\n   PORT=$(echo $ADDRESS | cut -d
-                      ':' -f 2)\n   CLIENT=\"mysql -u $KB_SERVICE_USER -p$KB_SERVICE_PASSWORD
-                      -P $PORT -h $HOST -e\"\n\t  $CLIENT \"ALTER SYSTEM ADD SERVER
-                      '$KB_NEW_MEMBER_POD_IP:$KB_SERVICE_PORT' ZONE 'zone1'\"\n```\n\n\nNote:
+                      bash\n- -c\n- |\n   CLIENT=\"mysql -u $SERVICE_USER -p$SERVICE_PASSWORD
+                      -P $SERVICE_PORT -h $SERVICE_HOST -e\"\n\t  $CLIENT \"ALTER
+                      SYSTEM ADD SERVER '$KB_POD_FQDN:$SERVICE_PORT' ZONE 'zone1'\"\n```\n\n\nNote:
                       This field is immutable once it has been set."
                     properties:
                       builtinHandler:
@@ -1807,26 +1798,17 @@ spec:
                       includes updating configurations and informing other group members
                       about the removal.\nData migration is generally not part of
                       this action and should be handled separately if needed.\n\n\nThe
-                      container executing this action has access to following environment
-                      variables:\n\n\n- KB_SERVICE_PORT: The port used by the database
-                      service.\n- KB_SERVICE_USER: The username with the necessary
-                      permissions to interact with the database service.\n- KB_SERVICE_PASSWORD:
-                      The corresponding password for KB_SERVICE_USER to authenticate
-                      with the database service.\n- KB_PRIMARY_POD_FQDN: The FQDN
-                      of the primary Pod within the replication group.\n- KB_MEMBER_ADDRESSES:
-                      A comma-separated list of Pod addresses for all replicas in
-                      the group.\n- KB_LEAVE_MEMBER_POD_NAME: The pod name of the
-                      replica being removed from the group.\n- KB_LEAVE_MEMBER_POD_IP:
-                      The IP address of the replica being removed from the group.\n\n\nExpected
+                      container executing this action has access to following variables:\n\n\n-
+                      KB_LEAVE_MEMBER_POD_FQDN: The pod name of the replica being
+                      removed from the group.\n- KB_LEAVE_MEMBER_POD_NAME: The pod
+                      name of the replica being removed from the group.\n\n\nExpected
                       action output:\n- On Failure: An error message, if applicable,
                       indicating why the action failed.\n\n\nFor example, to remove
                       an OBServer from an OceanBase Cluster in 'zone1', the following
                       command can be executed:\n\n\n```yaml\ncommand:\n- bash\n- -c\n-
-                      |\n   ADDRESS=$(KB_MEMBER_ADDRESSES%%,*)\n   HOST=$(echo $ADDRESS
-                      | cut -d ':' -f 1)\n   PORT=$(echo $ADDRESS | cut -d ':' -f
-                      2)\n   CLIENT=\"mysql -u $KB_SERVICE_USER  -p$KB_SERVICE_PASSWORD
-                      -P $PORT -h $HOST -e\"\n\t  $CLIENT \"ALTER SYSTEM DELETE SERVER
-                      '$KB_LEAVE_MEMBER_POD_IP:$KB_SERVICE_PORT' ZONE 'zone1'\"\n```\n\n\nNote:
+                      |\n   CLIENT=\"mysql -u $SERVICE_USER -p$SERVICE_PASSWORD -P
+                      $SERVICE_PORT -h $SERVICE_HOST -e\"\n\t  $CLIENT \"ALTER SYSTEM
+                      DELETE SERVER '$KB_POD_FQDN:$SERVICE_PORT' ZONE 'zone1'\"\n```\n\n\nNote:
                       This field is immutable once it has been set."
                     properties:
                       builtinHandler:
@@ -2913,9 +2895,6 @@ spec:
 
 
                       - KB_POD_FQDN: The FQDN of the replica pod whose role is being checked.
-                      - KB_SERVICE_PORT: The port used by the database service.
-                      - KB_SERVICE_USER: The username with the necessary permissions to interact with the database service.
-                      - KB_SERVICE_PASSWORD: The corresponding password for KB_SERVICE_USER to authenticate with the database service.
 
 
                       Expected action output:
@@ -3265,9 +3244,6 @@ spec:
 
 
                       - KB_POD_FQDN: The FQDN of the replica pod whose role is being checked.
-                      - KB_SERVICE_PORT: The port used by the database service.
-                      - KB_SERVICE_USER: The username with the necessary permissions to interact with the database service.
-                      - KB_SERVICE_PASSWORD: The corresponding password for KB_SERVICE_USER to authenticate with the database service.
 
 
                       Expected action output:
@@ -3956,13 +3932,10 @@ spec:
                       Without this, services that rely on roleSelectors might improperly direct traffic to wrong replicas.
 
 
-                      The container executing this action has access to following environment variables:
+                      The container executing this action has access to following variables:
 
 
                       - KB_POD_FQDN: The FQDN of the Pod whose role is being assessed.
-                      - KB_SERVICE_PORT: The port used by the database service.
-                      - KB_SERVICE_USER: The username with the necessary permissions to interact with the database service.
-                      - KB_SERVICE_PASSWORD: The corresponding password for KB_SERVICE_USER to authenticate with the database service.
 
 
                       Expected output of this action:

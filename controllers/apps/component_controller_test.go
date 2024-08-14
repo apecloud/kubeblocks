@@ -57,7 +57,8 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/generics"
-	lorry "github.com/apecloud/kubeblocks/pkg/lorry/client"
+	kbagent "github.com/apecloud/kubeblocks/pkg/kbagent/client"
+	kbagentproto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
@@ -75,38 +76,36 @@ var (
 	podAnnotationKey4Test = fmt.Sprintf("%s-test", constant.ComponentReplicasAnnotationKey)
 )
 
-var mockLorryClient = func(mock func(*lorry.MockClientMockRecorder)) {
-	mockLorryCli := lorry.GetMockClient()
-	if mockLorryCli == nil {
-		ctrl := gomock.NewController(GinkgoT())
-		mockLorryCli = lorry.NewMockClient(ctrl)
-	}
+var mockKBAgentClient = func(mock func(*kbagent.MockClientMockRecorder)) {
+	cli := kbagent.NewMockClient(gomock.NewController(GinkgoT()))
 	if mock != nil {
-		mockCli := mockLorryCli.(*lorry.MockClient)
-		mock(mockCli.EXPECT())
+		mock(cli.EXPECT())
 	}
-	lorry.SetMockClient(mockLorryCli, nil)
+	kbagent.SetMockClient(cli, nil)
 }
 
-var mockLorryClientDefault = func() {
-	mockLorryClient(func(recorder *lorry.MockClientMockRecorder) {
-		recorder.CreateUser(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-		recorder.DescribeUser(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
-		recorder.GrantUserRole(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+var mockKBAgentClientDefault = func() {
+	mockKBAgentClient(func(recorder *kbagent.MockClientMockRecorder) {
+		recorder.CallAction(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+			return kbagentproto.ActionResponse{}, nil
+		}).AnyTimes()
 	})
 }
 
-var mockLorryClient4HScale = func(clusterKey types.NamespacedName, compName string, replicas int) {
-	mockLorryClient(func(recorder *lorry.MockClientMockRecorder) {
-		recorder.JoinMember(gomock.Any()).Return(nil).AnyTimes()
-		recorder.LeaveMember(gomock.Any()).DoAndReturn(func(ctx context.Context) error {
+var mockKBAgentClient4HScale = func(clusterKey types.NamespacedName, compName string, replicas int) {
+	mockKBAgentClient(func(recorder *kbagent.MockClientMockRecorder) {
+		recorder.CallAction(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+			rsp := kbagentproto.ActionResponse{}
+			if req.Action != "memberLeave" {
+				return rsp, nil
+			}
 			var podList corev1.PodList
 			labels := client.MatchingLabels{
 				constant.AppInstanceLabelKey:    clusterKey.Name,
 				constant.KBAppComponentLabelKey: compName,
 			}
-			if err := k8sClient.List(ctx, &podList, labels, client.InNamespace(clusterKey.Namespace)); err != nil {
-				return err
+			if err := testCtx.Cli.List(ctx, &podList, labels, client.InNamespace(clusterKey.Namespace)); err != nil {
+				return rsp, err
 			}
 			for _, pod := range podList.Items {
 				if pod.Annotations == nil {
@@ -116,13 +115,12 @@ var mockLorryClient4HScale = func(clusterKey types.NamespacedName, compName stri
 					continue
 				}
 				pod.Annotations[podAnnotationKey4Test] = fmt.Sprintf("%d", replicas)
-				if err := k8sClient.Update(ctx, &pod); err != nil {
-					return err
+				if err := testCtx.Cli.Update(ctx, &pod); err != nil {
+					return rsp, err
 				}
 			}
-			return nil
+			return rsp, nil
 		}).AnyTimes()
-		recorder.Switchover(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	})
 }
 
@@ -214,8 +212,8 @@ var _ = Describe("Component Controller", func() {
 			Create(&testCtx).
 			GetObject()
 
-		By("Mock lorry client for the default transformer of system accounts provision")
-		mockLorryClientDefault()
+		By("Mock kb-agent client for the default transformer of system accounts provision")
+		mockKBAgentClientDefault()
 	}
 
 	waitForCreatingResourceCompletely := func(clusterKey client.ObjectKey, compNames ...string) {
@@ -662,6 +660,7 @@ var _ = Describe("Component Controller", func() {
 					if ordinal >= updatedReplicas {
 						continue
 					}
+					// The annotation was updated by the mocked member leave action.
 					g.Expect(pod.Annotations[podAnnotationKey4Test]).Should(Equal(fmt.Sprintf("%d", updatedReplicas)))
 				}
 			}).Should(Succeed())
@@ -697,7 +696,7 @@ var _ = Describe("Component Controller", func() {
 	}
 
 	horizontalScale := func(updatedReplicas int, storageClassName string, policyType *string, compDefNames ...string) {
-		defer lorry.UnsetMockClient()
+		defer kbagent.UnsetMockClient()
 
 		cluster := &appsv1alpha1.Cluster{}
 		Expect(k8sClient.Get(testCtx.Ctx, clusterKey, cluster)).Should(Succeed())
@@ -723,7 +722,7 @@ var _ = Describe("Component Controller", func() {
 		}
 
 		for i, comp := range cluster.Spec.ComponentSpecs {
-			mockLorryClient4HScale(clusterKey, comp.Name, updatedReplicas)
+			mockKBAgentClient4HScale(clusterKey, comp.Name, updatedReplicas)
 
 			By(fmt.Sprintf("H-scale component %s with policy %v", comp.Name, bpt(comp)))
 			horizontalScaleComp(updatedReplicas, &cluster.Spec.ComponentSpecs[i], storageClassName, bpt(comp))

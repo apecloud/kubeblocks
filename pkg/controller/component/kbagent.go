@@ -157,10 +157,8 @@ func buildKBAgentStartupEnvs(synthesizedComp *SynthesizedComponent) ([]corev1.En
 	if a := buildAction4KBAgent(synthesizedComp.LifecycleActions.PreTerminate, "preTerminate"); a != nil {
 		actions = append(actions, *a)
 	}
-	if synthesizedComp.LifecycleActions.Switchover != nil {
-		if a := buildAction4KBAgentLow(synthesizedComp.LifecycleActions.Switchover, "switchover"); a != nil {
-			actions = append(actions, *a)
-		}
+	if a := buildAction4KBAgent(synthesizedComp.LifecycleActions.Switchover, "switchover"); a != nil {
+		actions = append(actions, *a)
 	}
 	if a := buildAction4KBAgent(synthesizedComp.LifecycleActions.MemberJoin, "memberJoin"); a != nil {
 		actions = append(actions, *a)
@@ -195,14 +193,7 @@ func buildKBAgentStartupEnvs(synthesizedComp *SynthesizedComponent) ([]corev1.En
 	return kbagent.BuildStartupEnvs(actions, probes)
 }
 
-func buildAction4KBAgent(handler *appsv1alpha1.LifecycleActionHandler, name string) *proto.Action {
-	if handler == nil {
-		return nil
-	}
-	return buildAction4KBAgentLow(handler.CustomHandler, name)
-}
-
-func buildAction4KBAgentLow(action *appsv1alpha1.Action, name string) *proto.Action {
+func buildAction4KBAgent(action *appsv1alpha1.Action, name string) *proto.Action {
 	if action == nil || action.Exec == nil {
 		return nil
 	}
@@ -228,7 +219,7 @@ func buildProbe4KBAgent(probe *appsv1alpha1.Probe, name string) (*proto.Action, 
 	if probe == nil || probe.Exec == nil {
 		return nil, nil
 	}
-	a := buildAction4KBAgentLow(&probe.Action, name)
+	a := buildAction4KBAgent(&probe.Action, name)
 	p := &proto.Probe{
 		Action:              name,
 		InitialDelaySeconds: probe.InitialDelaySeconds,
@@ -270,9 +261,10 @@ func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) (str
 		return "", nil, nil
 	}
 
-	handlers := []*appsv1alpha1.LifecycleActionHandler{
+	actions := []*appsv1alpha1.Action{
 		synthesizedComp.LifecycleActions.PostProvision,
 		synthesizedComp.LifecycleActions.PreTerminate,
+		synthesizedComp.LifecycleActions.Switchover,
 		synthesizedComp.LifecycleActions.MemberJoin,
 		synthesizedComp.LifecycleActions.MemberLeave,
 		synthesizedComp.LifecycleActions.Readonly,
@@ -283,27 +275,25 @@ func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) (str
 		synthesizedComp.LifecycleActions.AccountProvision,
 	}
 	if synthesizedComp.LifecycleActions.RoleProbe != nil && synthesizedComp.LifecycleActions.RoleProbe.Exec != nil {
-		handlers = append(handlers, &appsv1alpha1.LifecycleActionHandler{
-			CustomHandler: &synthesizedComp.LifecycleActions.RoleProbe.Action,
-		})
+		actions = append(actions, &synthesizedComp.LifecycleActions.RoleProbe.Action)
 	}
 
 	var image, container string
-	for _, handler := range handlers {
-		if handler == nil || handler.CustomHandler == nil || handler.CustomHandler.Exec == nil {
+	for _, action := range actions {
+		if action == nil || action.Exec == nil {
 			continue
 		}
-		if handler.CustomHandler.Exec.Image != "" {
-			if len(image) > 0 && image != handler.CustomHandler.Exec.Image {
+		if action.Exec.Image != "" {
+			if len(image) > 0 && image != action.Exec.Image {
 				return "", nil, fmt.Errorf("only one exec image is allowed in lifecycle actions")
 			}
-			image = handler.CustomHandler.Exec.Image
+			image = action.Exec.Image
 		}
-		if handler.CustomHandler.Exec.Container != "" {
-			if len(container) > 0 && container != handler.CustomHandler.Exec.Container {
+		if action.Exec.Container != "" {
+			if len(container) > 0 && container != action.Exec.Container {
 				return "", nil, fmt.Errorf("only one exec container is allowed in lifecycle actions")
 			}
-			container = handler.CustomHandler.Exec.Container
+			container = action.Exec.Container
 		}
 	}
 

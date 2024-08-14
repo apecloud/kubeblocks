@@ -2831,7 +2831,7 @@ The modes can be <code>None</code>, <code>Readonly</code>, or <code>ReadWrite</c
 <h3 id="apps.kubeblocks.io/v1alpha1.Action">Action
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1alpha1.LifecycleActionHandler">LifecycleActionHandler</a>, <a href="#apps.kubeblocks.io/v1alpha1.Probe">Probe</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1alpha1.Probe">Probe</a>)
 </p>
 <div>
 <p>Action defines a customizable hook or procedure tailored for different database engines,
@@ -2859,8 +2859,6 @@ such as during planned maintenance or upgrades on the current leader node.</li>
 <p>Actions can be executed in different ways:</p>
 <ul>
 <li>ExecAction: Executes a command inside a container.
-which may run as a K8s job or be executed inside the Lorry sidecar container, depending on the implementation.
-Future implementations will standardize execution within Lorry.
 A set of predefined environment variables are available and can be leveraged within the <code>exec.command</code>
 to access context information such as details about pods, components, the overall cluster state,
 or database connection credentials.
@@ -3658,61 +3656,6 @@ RefNamespaceName
 <div>
 <p>BaseBackupType the base backup type, keep synchronized with the BaseBackupType of the data protection API.</p>
 </div>
-<h3 id="apps.kubeblocks.io/v1alpha1.BuiltinActionHandlerType">BuiltinActionHandlerType
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.LifecycleActionHandler">LifecycleActionHandler</a>, <a href="#apps.kubeblocks.io/v1alpha1.Probe">Probe</a>)
-</p>
-<div>
-<p>BuiltinActionHandlerType defines build-in action handlers provided by Lorry, including:</p>
-<ul>
-<li><code>mysql</code></li>
-<li><code>wesql</code></li>
-<li><code>oceanbase</code></li>
-<li><code>redis</code></li>
-<li><code>mongodb</code></li>
-<li><code>etcd</code></li>
-<li><code>postgresql</code></li>
-<li><code>official-postgresql</code></li>
-<li><code>apecloud-postgresql</code></li>
-<li><code>polardbx</code></li>
-<li><code>custom</code></li>
-<li><code>unknown</code></li>
-</ul>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;apecloud-postgresql&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;custom&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;etcd&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;mongodb&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;mysql&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;oceanbase&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;official-postgresql&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;polardbx&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;postgresql&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;redis&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;unknown&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;wesql&#34;</p></td>
-<td></td>
-</tr></tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterBackup">ClusterBackup
 </h3>
 <p>
@@ -6807,8 +6750,8 @@ The <code>portName</code> is transformed by replacing &lsquo;-&rsquo; with &lsqu
 <td>
 <code>postProvision</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.LifecycleActionHandler">
-LifecycleActionHandler
+<a href="#apps.kubeblocks.io/v1alpha1.Action">
+Action
 </a>
 </em>
 </td>
@@ -6848,8 +6791,8 @@ matching the order of pods in KB_CLUSTER_COMPONENT_POD_NAME_LIST (e.g., &ldquo;h
 <td>
 <code>preTerminate</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.LifecycleActionHandler">
-LifecycleActionHandler
+<a href="#apps.kubeblocks.io/v1alpha1.Action">
+Action
 </a>
 </em>
 </td>
@@ -6902,7 +6845,7 @@ Probe
 <td>
 <em>(Optional)</em>
 <p>Defines the procedure which is invoked regularly to assess the role of replicas.</p>
-<p>This action is periodically triggered by Lorry at the specified interval to determine the role of each replica.
+<p>This action is periodically triggered at the specified interval to determine the role of each replica.
 Upon successful execution, the action&rsquo;s output designates the role of the replica,
 which should match one of the predefined role names within <code>componentDefinition.spec.roles</code>.
 The output is then compared with the previous successful execution result.
@@ -6952,8 +6895,8 @@ involving the current leader node.</p>
 <td>
 <code>memberJoin</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.LifecycleActionHandler">
-LifecycleActionHandler
+<a href="#apps.kubeblocks.io/v1alpha1.Action">
+Action
 </a>
 </em>
 </td>
@@ -6987,8 +6930,8 @@ during the addition of the new member.</p>
 <td>
 <code>memberLeave</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.LifecycleActionHandler">
-LifecycleActionHandler
+<a href="#apps.kubeblocks.io/v1alpha1.Action">
+Action
 </a>
 </em>
 </td>
@@ -7022,8 +6965,8 @@ Data migration is generally not part of this action and should be handled separa
 <td>
 <code>readonly</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.LifecycleActionHandler">
-LifecycleActionHandler
+<a href="#apps.kubeblocks.io/v1alpha1.Action">
+Action
 </a>
 </em>
 </td>
@@ -7045,8 +6988,8 @@ This action is invoked when the database&rsquo;s volume capacity nears its upper
 <td>
 <code>readwrite</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.LifecycleActionHandler">
-LifecycleActionHandler
+<a href="#apps.kubeblocks.io/v1alpha1.Action">
+Action
 </a>
 </em>
 </td>
@@ -7070,8 +7013,8 @@ both read and write operations.</p>
 <td>
 <code>dataDump</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.LifecycleActionHandler">
-LifecycleActionHandler
+<a href="#apps.kubeblocks.io/v1alpha1.Action">
+Action
 </a>
 </em>
 </td>
@@ -7094,8 +7037,8 @@ that only the necessary data is exported for import into the new replica.</p>
 <td>
 <code>dataLoad</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.LifecycleActionHandler">
-LifecycleActionHandler
+<a href="#apps.kubeblocks.io/v1alpha1.Action">
+Action
 </a>
 </em>
 </td>
@@ -7117,8 +7060,8 @@ the action must be able to guarantee idempotence to allow for retries from the b
 <td>
 <code>reconfigure</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.LifecycleActionHandler">
-LifecycleActionHandler
+<a href="#apps.kubeblocks.io/v1alpha1.Action">
+Action
 </a>
 </em>
 </td>
@@ -7133,8 +7076,8 @@ LifecycleActionHandler
 <td>
 <code>accountProvision</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.LifecycleActionHandler">
-LifecycleActionHandler
+<a href="#apps.kubeblocks.io/v1alpha1.Action">
+Action
 </a>
 </em>
 </td>
@@ -10009,9 +9952,7 @@ This name can originate from an &lsquo;env&rsquo; entry or be a data key from an
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.Action">Action</a>)
 </p>
 <div>
-<p>ExecAction describes an Action that executes a command inside a container.
-Which may run as a K8s job or be executed inside the Lorry sidecar container, depending on the implementation.
-Future implementations will standardize execution within Lorry.</p>
+<p>ExecAction describes an Action that executes a command inside a container.</p>
 </div>
 <table>
 <thead>
@@ -11250,91 +11191,6 @@ ConfigTemplateExtension
 <td><p>UpperCases represents the use of upper case letters only.</p>
 </td>
 </tr></tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.LifecycleActionHandler">LifecycleActionHandler
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentLifecycleActions">ComponentLifecycleActions</a>)
-</p>
-<div>
-<p>LifecycleActionHandler describes the implementation of a specific lifecycle action.</p>
-<p>Each action is deemed successful if it returns an exit code of 0 for command executions,
-or an HTTP 200 status for HTTP(s) actions.
-Any other exit code or HTTP status is considered an indication of failure.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>builtinHandler</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.BuiltinActionHandlerType">
-BuiltinActionHandlerType
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the name of the predefined action handler to be invoked for lifecycle actions.</p>
-<p>Lorry, as a sidecar agent co-located with the database container in the same Pod,
-includes a suite of built-in action implementations that are tailored to different database engines.
-These are known as &ldquo;builtin&rdquo; handlers, includes: <code>mysql</code>, <code>redis</code>, <code>mongodb</code>, <code>etcd</code>,
-<code>postgresql</code>, <code>official-postgresql</code>, <code>apecloud-postgresql</code>, <code>wesql</code>, <code>oceanbase</code>, <code>polardbx</code>.</p>
-<p>If the <code>builtinHandler</code> field is specified, it instructs Lorry to utilize its internal built-in action handler
-to execute the specified lifecycle actions.</p>
-<p>The <code>builtinHandler</code> field is of type <code>BuiltinActionHandlerType</code>,
-which represents the name of the built-in handler.
-The <code>builtinHandler</code> specified within the same <code>ComponentLifecycleActions</code> should be consistent across all
-actions.
-This means that if you specify a built-in handler for one action, you should use the same handler
-for all other actions throughout the entire <code>ComponentLifecycleActions</code> collection.</p>
-<p>If you need to define lifecycle actions for database engines not covered by the existing built-in support,
-or when the pre-existing built-in handlers do not meet your specific needs,
-you can use the <code>customHandler</code> field to define your own action implementation.</p>
-<p>Deprecation Notice:</p>
-<ul>
-<li>In the future, the <code>builtinHandler</code> field will be deprecated in favor of using the <code>customHandler</code> field
-for configuring all lifecycle actions.</li>
-<li>Instead of using a name to indicate the built-in action implementations in Lorry,
-the recommended approach will be to explicitly invoke the desired action implementation through
-a gRPC interface exposed by the sidecar agent.</li>
-<li>Developers will have the flexibility to either use the built-in action implementations provided by Lorry
-or develop their own sidecar agent to implement custom actions and expose them via gRPC interfaces.</li>
-<li>This change will allow for greater customization and extensibility of lifecycle actions,
-as developers can create their own &ldquo;builtin&rdquo; implementations tailored to their specific requirements.</li>
-</ul>
-</td>
-</tr>
-<tr>
-<td>
-<code>customHandler</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.Action">
-Action
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies a user-defined hook or procedure that is called to perform the specific lifecycle action.
-It offers a flexible and expandable approach for customizing the behavior of a Component by leveraging
-tailored actions.</p>
-<p>An Action can be implemented as either an ExecAction or an HTTPAction, with future versions planning
-to support GRPCAction,
-thereby accommodating unique logic for different database systems within the Action&rsquo;s framework.</p>
-<p>In future iterations, all built-in handlers are expected to transition to GRPCAction.
-This change means that Lorry or other sidecar agents will expose the implementation of actions
-through a GRPC interface for external invocation.
-Then the controller will interact with these actions via GRPCAction calls.</p>
-</td>
-</tr>
-</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.LogConfig">LogConfig
 </h3>
@@ -13965,19 +13821,6 @@ Action
 </tr>
 <tr>
 <td>
-<code>builtinHandler</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.BuiltinActionHandlerType">
-BuiltinActionHandlerType
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-</td>
-</tr>
-<tr>
-<td>
 <code>initialDelaySeconds</code><br/>
 <em>
 int32
@@ -14197,49 +14040,6 @@ Kubernetes meta/v1.Time
 </tr><tr><td><p>&#34;https&#34;</p></td>
 <td></td>
 </tr></tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ProtectedVolume">ProtectedVolume
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.VolumeProtectionSpec">VolumeProtectionSpec</a>)
-</p>
-<div>
-<p>ProtectedVolume is deprecated since v0.9, replaced with ComponentVolume.HighWatermark.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The Name of the volume to protect.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>highWatermark</code><br/>
-<em>
-int
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the high watermark threshold for the volume, it will override the component level threshold.
-If the value is invalid, it will be ignored and the component level threshold will be used.</p>
-</td>
-</tr>
-</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ProvisionSecretRef">ProvisionSecretRef
 </h3>
@@ -18396,51 +18196,6 @@ that are used to expand the storage and the desired storage size for each one.</
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.VolumeProtectionSpec">VolumeProtectionSpec
-</h3>
-<div>
-<p>VolumeProtectionSpec is deprecated since v0.9, replaced with ComponentVolume.HighWatermark.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>highWatermark</code><br/>
-<em>
-int
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The high watermark threshold for volume space usage.
-If there is any specified volumes who&rsquo;s space usage is over the threshold, the pre-defined &ldquo;LOCK&rdquo; action
-will be triggered to degrade the service to protect volume from space exhaustion, such as to set the instance
-as read-only. And after that, if all volumes&rsquo; space usage drops under the threshold later, the pre-defined
-&ldquo;UNLOCK&rdquo; action will be performed to recover the service normally.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>volumes</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ProtectedVolume">
-[]ProtectedVolume
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The Volumes to be protected.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <hr/>
 <h2 id="apps.kubeblocks.io/v1beta1">apps.kubeblocks.io/v1beta1</h2>
 <div>
@@ -21733,20 +21488,6 @@ bool
 <tbody>
 <tr>
 <td>
-<code>builtinHandlerName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the builtin handler name to use to probe the role of the main container.
-Available handlers include: mysql, postgres, mongodb, redis, etcd, kafka.
-Use CustomHandler to define a custom role probe function if none of the built-in handlers meet the requirement.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>customHandler</code><br/>
 <em>
 <a href="#workloads.kubeblocks.io/v1alpha1.Action">
@@ -21757,7 +21498,6 @@ Use CustomHandler to define a custom role probe function if none of the built-in
 <td>
 <em>(Optional)</em>
 <p>Defines a custom method for role probing.
-If the BuiltinHandler meets the requirement, use it instead.
 Actions defined here are executed in series.
 Upon completion of all actions, the final output should be a single string representing the role name defined in spec.Roles.
 The latest <a href="https://busybox.net/">BusyBox</a> image will be used if Image is not configured.

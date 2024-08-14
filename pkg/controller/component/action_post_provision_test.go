@@ -110,7 +110,7 @@ var _ = Describe("Component PostProvision Test", func() {
 			Expect(err).Should(Succeed())
 			Expect(synthesizeComp).ShouldNot(BeNil())
 			Expect(synthesizeComp.LifecycleActions).ShouldNot(BeNil())
-			Expect(synthesizeComp.LifecycleActions.PostProvision).ShouldNot(BeNil())
+			Expect(synthesizeComp.LifecycleActions.PostProvision).Should(BeNil())
 
 			dag := graph.NewDAG()
 			dag.AddVertex(&model.ObjectVertex{Obj: cluster, Action: model.ActionUpdatePtr()})
@@ -123,17 +123,15 @@ var _ = Describe("Component PostProvision Test", func() {
 			By("build component with postProvision without PodList, do not need to do PostProvision action")
 			synthesizeComp.LifecycleActions = &appsv1alpha1.ComponentLifecycleActions{}
 			defaultPreCondition := appsv1alpha1.ComponentReadyPreConditionType
-			postProvision := appsv1alpha1.LifecycleActionHandler{
-				CustomHandler: &appsv1alpha1.Action{
-					Exec: &appsv1alpha1.ExecAction{
-						Image:   constant.KBToolsImage,
-						Command: []string{"echo", "mock"},
-						Args:    []string{},
-					},
-					PreCondition: &defaultPreCondition,
+			postProvision := &appsv1alpha1.Action{
+				Exec: &appsv1alpha1.ExecAction{
+					Image:   constant.KBToolsImage,
+					Command: []string{"echo", "mock"},
+					Args:    []string{},
 				},
+				PreCondition: &defaultPreCondition,
 			}
-			synthesizeComp.LifecycleActions.PostProvision = &postProvision
+			synthesizeComp.LifecycleActions.PostProvision = postProvision
 			actionCtx, err = NewActionContext(cluster, comp, nil, synthesizeComp.LifecycleActions, synthesizeComp.ScriptTemplates, PostProvisionAction)
 			Expect(err).Should(Succeed())
 			need, err := NeedDoPostProvision(testCtx.Ctx, k8sClient, actionCtx)

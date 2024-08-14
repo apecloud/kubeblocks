@@ -92,7 +92,7 @@ func NeedDoPostProvision(ctx context.Context, cli client.Reader, actionCtx *Acti
 		return false, nil
 	}
 
-	actionPreCondition := actionCtx.lifecycleActions.PostProvision.CustomHandler.PreCondition
+	actionPreCondition := actionCtx.lifecycleActions.PostProvision.PreCondition
 	if actionPreCondition != nil {
 		switch *actionPreCondition {
 		case appsv1alpha1.ImmediatelyPreConditionType:

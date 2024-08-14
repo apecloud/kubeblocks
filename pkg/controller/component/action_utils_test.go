@@ -112,7 +112,7 @@ var _ = Describe("Component LifeCycle Action Utils Test", func() {
 			Expect(err).Should(Succeed())
 			Expect(synthesizeComp).ShouldNot(BeNil())
 			Expect(synthesizeComp.LifecycleActions).ShouldNot(BeNil())
-			Expect(synthesizeComp.LifecycleActions.PostProvision).ShouldNot(BeNil())
+			Expect(synthesizeComp.LifecycleActions.PostProvision).Should(BeNil())
 
 			dag := graph.NewDAG()
 			dag.AddVertex(&model.ObjectVertex{Obj: cluster, Action: model.ActionUpdatePtr()})
@@ -123,16 +123,14 @@ var _ = Describe("Component LifeCycle Action Utils Test", func() {
 
 			By("build component with preTerminate without PodList, check the built-in envs of cluster component available in action job")
 			synthesizeComp.LifecycleActions = &appsv1alpha1.ComponentLifecycleActions{}
-			preTerminate := appsv1alpha1.LifecycleActionHandler{
-				CustomHandler: &appsv1alpha1.Action{
-					Exec: &appsv1alpha1.ExecAction{
-						Image:   constant.KBToolsImage,
-						Command: []string{"echo", "mock"},
-						Args:    []string{},
-					},
+			preTerminate := &appsv1alpha1.Action{
+				Exec: &appsv1alpha1.ExecAction{
+					Image:   constant.KBToolsImage,
+					Command: []string{"echo", "mock"},
+					Args:    []string{},
 				},
 			}
-			synthesizeComp.LifecycleActions.PreTerminate = &preTerminate
+			synthesizeComp.LifecycleActions.PreTerminate = preTerminate
 
 			By("check built-in envs of cluster component available in action job")
 			pods := mockPodsForTest(cluster, 1)

@@ -554,8 +554,6 @@ func overrideConfigTemplates(synthesizedComp *SynthesizedComponent, comp *appsv1
 
 // buildServiceAccountName builds serviceAccountName for component and podSpec.
 func buildServiceAccountName(synthesizeComp *SynthesizedComponent) {
-	// lorry container requires a service account with adequate privileges.
-	// If lorry required and the serviceAccountName is not set, a default serviceAccountName will be assigned.
 	if synthesizeComp.ServiceAccountName != "" {
 		synthesizeComp.PodSpec.ServiceAccountName = synthesizeComp.ServiceAccountName
 		return

@@ -38,7 +38,6 @@ COPY go.sum go.sum
 #COPY pkg/ pkg/
 #COPY controllers/ controllers/
 #COPY cmd/reloader/ cmd/reloader/
-#COPY cmd/lorry/ cmd/lorry/
 #COPY externalapis/ externalapis/
 #COPY version/ version/
 #COPY cmd/cli/ cmd/cli/
@@ -71,16 +70,6 @@ RUN --mount=type=bind,target=. \
     --mount=type=cache,target=/go/pkg/mod \
     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o /out/config_render cmd/reloader/template/*.go
 
-# RUN --mount=type=bind,target=. \
-#     --mount=type=cache,target=/root/.cache/go-build \
-#     --mount=type=cache,target=/go/pkg/mod \
-#     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o /out/lorry cmd/lorry/main.go
-
-# RUN --mount=type=bind,target=. \
-#     --mount=type=cache,target=/root/.cache/go-build \
-#     --mount=type=cache,target=/go/pkg/mod \
-#     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o /out/lorryctl cmd/lorry/ctl/main.go
-
 RUN --mount=type=bind,target=. \
     --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
@@ -104,21 +93,14 @@ RUN apk add --no-cache kubectl helm jq --allow-untrusted \
     && rm -rf /var/cache/apk/*
 
 # copy kubeblocks tools
-# COPY config/lorry config/lorry
 COPY config/crd/bases /kubeblocks/crd
 COPY --from=builder /out/killer /bin
 COPY --from=builder /out/reloader /bin
 COPY --from=builder /out/config_render /bin
-# COPY --from=builder /out/lorry /bin
-# COPY --from=builder /out/lorryctl /bin
 COPY --from=builder /out/kbagent /bin
 COPY --from=builder /bin/grpc_health_probe /bin
 COPY --from=builder /out/helm_hook /bin
 COPY --from=binary-downloader /bin/curl /bin/
-
-# make breaking change compatible
-# RUN ln -s /bin/lorry /bin/probe
-# RUN ln -s /config/lorry /config/probe
 
 # enable grpc_health_probe binary
 RUN chmod +x /bin/grpc_health_probe

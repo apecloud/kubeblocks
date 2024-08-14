@@ -270,7 +270,7 @@ jobs:
   apis-doc:
     needs: [ trigger-mode ]
     runs-on: ubuntu-latest
-    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[apis]') || contains(needs.trigger-mode.outputs.trigger-mode, '[lorry]') }}
+    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[apis]') }}
     steps:
       - uses: actions/checkout@v4
       - name: install lib

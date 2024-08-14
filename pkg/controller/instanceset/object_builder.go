@@ -25,7 +25,6 @@ import (
 	"strconv"
 	"strings"
 
-	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
@@ -189,6 +188,12 @@ func injectRoleProbeBaseContainer(its *workloads.InstanceSet, template *corev1.P
 	if roleProbe == nil {
 		return
 	}
+
+	// already has role probe container, for test purpose
+	if _, c := controllerutil.GetContainerByName(template.Spec.Containers, roleProbeContainerName); c != nil {
+		return
+	}
+
 	credential := its.Spec.Credential
 	image := viper.GetString(constant.KBToolsImage)
 	probeHTTPPort := viper.GetInt("ROLE_SERVICE_HTTP_PORT")
@@ -300,15 +305,6 @@ func injectRoleProbeBaseContainer(its *workloads.InstanceSet, template *corev1.P
 		},
 	)
 
-	characterType := "custom"
-	if roleProbe.BuiltinHandler != nil {
-		characterType = *roleProbe.BuiltinHandler
-	}
-	env = append(env, corev1.EnvVar{
-		Name:  constant.KBEnvCharacterType,
-		Value: characterType,
-	})
-
 	readinessProbe := &corev1.Probe{
 		InitialDelaySeconds: roleProbe.InitialDelaySeconds,
 		TimeoutSeconds:      roleProbe.TimeoutSeconds,
@@ -324,43 +320,6 @@ func injectRoleProbeBaseContainer(its *workloads.InstanceSet, template *corev1.P
 				fmt.Sprintf(grpcHealthProbeArgsFormat, probeGRPCPort),
 			},
 		},
-	}
-
-	tryToGetLorryGrpcPort := func(container *corev1.Container) *corev1.ContainerPort {
-		for i, port := range container.Ports {
-			if port.Name == constant.LorryGRPCPortName {
-				return &container.Ports[i]
-			}
-		}
-		return nil
-	}
-
-	// if role probe container exists, update the readiness probe, env and serving container port
-	if container := controllerutil.GetLorryContainer(template.Spec.Containers); container != nil {
-		if roleProbe.RoleUpdateMechanism == workloads.ReadinessProbeEventUpdate ||
-			// for compatibility when upgrading from 0.7 to 0.8
-			(container.ReadinessProbe != nil && container.ReadinessProbe.HTTPGet != nil &&
-				strings.HasPrefix(container.ReadinessProbe.HTTPGet.Path, "/v1.0/bindings")) {
-			port := tryToGetLorryGrpcPort(container)
-			if port != nil && port.ContainerPort != int32(probeGRPCPort) {
-				readinessProbe.Exec.Command = []string{
-					grpcHealthProbeBinaryPath,
-					fmt.Sprintf(grpcHealthProbeArgsFormat, port.ContainerPort),
-				}
-			}
-			container.ReadinessProbe = readinessProbe
-		}
-
-		for _, e := range env {
-			if slices.IndexFunc(container.Env, func(v corev1.EnvVar) bool {
-				return v.Name == e.Name || e.Name == constant.KBEnvServiceUser ||
-					e.Name == constant.KBEnvServicePassword || e.Name == usernameCredentialVarName || e.Name == passwordCredentialVarName
-			}) >= 0 {
-				continue
-			}
-			container.Env = append(container.Env, e)
-		}
-		return
 	}
 
 	// if role probe container doesn't exist, create a new one
@@ -545,12 +504,6 @@ func buildEnvConfigData(its workloads.InstanceSet) (map[string]string, error) {
 	generateReplicaEnv(prefixWithCompDefName, podNames)
 	generateMemberEnv(prefixWithCompDefName)
 	envData[prefixWithCompDefName+"CLUSTER_UID"] = uid
-
-	lorryHTTPPort, err := controllerutil.GetLorryHTTPPortFromContainers(its.Spec.Template.Spec.Containers)
-	if err == nil {
-		envData[constant.KBEnvLorryHTTPPort] = strconv.Itoa(int(lorryHTTPPort))
-
-	}
 
 	return envData, nil
 }

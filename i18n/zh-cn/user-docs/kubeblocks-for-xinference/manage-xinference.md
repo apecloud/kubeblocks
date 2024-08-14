@@ -1,40 +1,38 @@
 ---
-title: Manage Xinference with KubeBlocks
-description: How to manage Xinference on KubeBlocks
-keywords: [xinference, LLM, AI, control plane]
+title: 用 KubeBlocks 管理 Xinference
+description: 如何用 KubeBlocks 管理 Xinference
+keywords: [xinference, LLM, AI]
 sidebar_position: 1
-sidebar_label: Manage Xinference with KubeBlocks
+sidebar_label: 用 KubeBlocks 管理 Xinference
 ---
 
-# Manage Xinference with KubeBlocks
+# 用 KubeBlocks 管理 Xinference
 
-Xorbits Inference (Xinference) is an open-source platform to streamline the operation and integration of a wide array of AI models. With Xinference, you’re empowered to run inference using any open-source LLMs, embedding models, and multimodal models either in the cloud or on your premises, and create robust AI-driven applications.
+Xorbits Inference (Xinference) 是一个开源平台，用于简化各种 AI 模型的运行和集成。借助 Xinference，您可以使用任何开源 LLM、嵌入模型和多模态模型在云端或本地环境中运行推理，并创建强大的 AI 应用。
 
-KubeBlocks supports the management of Xinference.
+## 开始之前
 
-## Before you start
+- [安装 kbcli](./../installation/install-with-kbcli/install-kbcli.md)。
+- [安装 KubeBlocks](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md)。
+- [安装并启用 xinference 引擎](./../overview/supported-addons.md#use-addons)。
 
-- [Install kbcli](./../installation/install-with-kbcli/install-kbcli.md).
-- [Install KubeBlocks](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md).
-- [Install and enable the xinference addon](./../overview/supported-addons.md#use-addons).
+## 创建集群
 
-## Create a cluster
+***步骤：***
 
-***Steps***
-
-1. Execute the following command to create a Xinference cluster. You can change the `cluster-definition` value as any other database supported.
+1. 创建集群。
 
    ```bash
    kbcli cluster create mycluster --cluster-definition=xinference
    ```
 
-   If you want to create a Xinference cluster with multiple replicas. Use the following command and set the replica numbers.
+   如需创建多副本 Weaviate 集群，可使用以下命令，设置副本数量。
 
    ```bash
    kbcli cluster create mycluster --cluster-definition=xinference --set replicas=3
    ```
 
-   You can also create a cluster with specified CPU, memory and storage values.
+   您也可使用 `--set` 指定 CPU、memory、存储的值。
 
    ```bash
    kbcli cluster create mycluster --cluster-definition=xinference --set cpu=1,memory=2Gi,storage=10Gi
@@ -42,15 +40,15 @@ KubeBlocks supports the management of Xinference.
 
 :::note
 
-View more flags for creating a MySQL cluster to create a cluster with customized specifications.
-  
+执行以下命令，查看更多集群创建的选项和默认值。
+
 ```bash
 kbcli cluster create --help
 ```
 
 :::
 
-2. Check whether the cluster is created.
+2. 查看集群是否已创建。
 
    ```bash
    kbcli cluster list
@@ -59,7 +57,7 @@ kbcli cluster create --help
    mycluster   default     xinference           xinference-0.11.0   Delete               Running   Jul 17,2024 17:24 UTC+0800   
    ```
 
-3. Check the cluster information.
+3. 查看集群信息。
 
    ```bash
     kbcli cluster describe mycluster
@@ -87,45 +85,56 @@ kbcli cluster create --help
     Show cluster events: kbcli cluster list-events -n default mycluster
    ```
 
-## Scale vertically
+## 垂直扩缩容
 
-Use the following command to perform vertical scaling.
+#### 开始之前
+
+确认集群状态是否为 `Running`。否则，后续相关操作可能会失败。
+
+```bash
+kbcli cluster list
+>
+   NAME         NAMESPACE   CLUSTER-DEFINITION     VERSION              TERMINATION-POLICY   STATUS    CREATED-TIME
+   mycluster    default     xinference             xinference-0.11.0    Delete               Running   Jul 05,2024 17:29 UTC+0800
+```
+
+#### 步骤
+
+执行以下命令进行垂直扩缩容。
 
 ```bash
 kbcli cluster vscale mycluster --cpu=0.5 --memory=512Mi --components=xinference 
 ```
 
-Please wait a few seconds until the scaling process is over.
-
-The `kbcli cluster vscale` command prints a command to help check the progress of scaling operations.
+执行 `kbcli cluster vscale` 后会输出一条 ops 相关命令，可使用该命令查看扩缩容任务进度。
 
 ```bash
 kbcli cluster describe-ops mycluster-verticalscaling-smx8b -n default
 ```
 
-To check whether the scaling is done, use the following command.
+也可通过以下命令，查看扩缩容任务是否完成。
 
 ```bash
 kbcli cluster describe mycluster
 ```
 
-## Restart
+## 重启集群
 
-1. Restart a cluster.
+1. 执行以下命令，重启集群。
 
-   Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
+   配置 `components` 和 `ttlSecondsAfterSucceed` 的值，执行以下命令来重启指定集群。
 
    ```bash
    kbcli cluster restart mycluster --components="xinference" \
    --ttlSecondsAfterSucceed=30
    ```
 
-   - `components` describes the component name that needs to be restarted.
-   - `ttlSecondsAfterSucceed` describes the time to live of an OpsRequest job after the restarting succeeds.
+   - `components` 表示需要重启的组件名称。
+   - `ttlSecondsAfterSucceed` 表示重启成功后 OpsRequest 作业的生存时间。
 
-2. Validate the restarting.
+2. 验证重启是否成功。
 
-   Run the command below to check the cluster status to check the restarting status.
+   检查集群状态，验证重启操作是否成功。
 
    ```bash
    kbcli cluster list mycluster
@@ -134,36 +143,36 @@ kbcli cluster describe mycluster
    mycluster    default     xinference             xinference-0.11.0    Delete               Running   Jul 05,2024 18:42 UTC+0800
    ```
 
-   * STATUS=Updating: it means the cluster restart is in progress.
-   * STATUS=Running: it means the cluster has been restarted.
+   - STATUS=Updating 表示集群正在重启中。
+   - STATUS=Running 表示集群已重启。
 
-## Stop/Start a cluster
+## 停止/启动集群
 
-You can stop/start a cluster to save computing resources. When a cluster is stopped, the computing resources of this cluster are released, which means the pods of Kubernetes are released, but the storage resources are reserved. You can start this cluster again by snapshots if you want to restore the cluster resources.
+你可以停止/启动集群以释放计算资源。当集群被停止时，其计算资源将被释放，也就是说 Kubernetes 的 Pod 将被释放，但其存储资源仍将被保留。如果你希望通过快照从原始存储中恢复集群资源，请重新启动该集群。
 
-### Stop a cluster
+## 停止集群
 
-1. Configure the name of your cluster and run the command below to stop this cluster.
+1. 配置集群名称，并执行以下命令来停止该集群。
 
    ```bash
    kbcli cluster stop mycluster
    ```
 
-2. Check the status of the cluster to see whether it is stopped.
+2. 查看集群状态，确认集群是否已停止。
 
     ```bash
     kbcli cluster list
     ```
 
-### Start a cluster
+### 启动集群
 
-1. Configure the name of your cluster and run the command below to start this cluster.
+1. 配置集群名称，并执行以下命令来启动该集群。
 
    ```bash
    kbcli cluster start mycluster
    ```
 
-2. Check the status of the cluster to see whether it is running again.
+2. 查看集群状态，确认集群是否已再次运行。
 
     ```bash
     kbcli cluster list

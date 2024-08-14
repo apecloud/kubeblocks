@@ -29,10 +29,6 @@ KubeBlocks 支持从备份集中恢复数据。
 
 2. 从特定的备份中恢复集群。
 
-    <Tabs>
-
-    <TabItem value="kbcli" label="kbcli" default>
-
     ```bash
     # 恢复集群
     kbcli cluster restore myrestore --backup mybackup
@@ -44,44 +40,6 @@ KubeBlocks 支持从备份集中恢复数据。
     NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
     myrestore   default     apecloud-mysql       ac-mysql-8.0.30   Delete               Running   Oct 30,2023 16:26 UTC+0800
     ```
-
-    </TabItem>
-
-    <TabItem value="kubectl" label="kubectl">
-
-    可使用原集群的 connection password 作为恢复的集群的 `connectionPassword.annotations` 值。可从备份 YAML 文件中的 `dataprotection.kubeblocks.io/connection-password` annotation 中获取原集群的 connection password。
-
-    ```bash
-    $ kubectl apply -f - <<-'EOF'
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: Cluster
-    metadata:
-      name: myrestore
-      namespace: default
-      annotations:
-        kubeblocks.io/restore-from-backup: '{"mysql":{"name":"mybackup","namespace":"default","connectionPassword": "Bw1cR15mzfldc9hzGuK4m1BZQOzha6aBb1i9nlvoBdoE9to4"}}'
-    spec:
-      clusterDefinitionRef: apecloud-mysql
-      clusterVersionRef: ac-mysql-8.0.30
-      terminationPolicy: WipeOut
-      componentSpecs:
-        - name: mysql
-          componentDefRef: mysql
-          replicas: 1
-          volumeClaimTemplates:
-            - name: data
-              spec:
-                accessModes:
-                  - ReadWriteOnce
-                resources:
-                  requests:
-                    storage: 20Gi
-    EOF
-    ```
-
-    </TabItem>
-
-    </Tabs>
 
 3. 连接被恢复集群，进行验证。
 

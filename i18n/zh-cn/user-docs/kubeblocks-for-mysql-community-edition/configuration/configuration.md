@@ -6,51 +6,51 @@ sidebar_position: 1
 sidebar_label: Configuration
 ---
 
-# Configure cluster parameters
+# 配置集群参数
 
-This guide shows how to configure cluster parameters.
+本文档将说明如何配置集群参数。
 
-From v0.9.0, KubeBlocks supports dynamic configuration. When the specification of a database instance changes (e.g. a user vertically scales a cluster), KubeBlocks automatically matches the appropriate configuration template based on the new specification. This is because different specifications of a database instance may require different optimal configurations to optimize performance and resource utilization. When you choose a different database instance specification, KubeBlocks automatically detects it and determines the best database configuration for the new specification, ensuring optimal performance and configuration of the database under the new specifications.
+从 v0.9.0 开始，KubeBlocks 支持数据库参数配置动态渲染。当数据库实例的规格发生变化时（例如，用户进行了实例的升降配），KubeBlocks 会根据新的规格自动匹配适用的参数模板。这是因为不同规格的数据库实例可能需要不同的最佳参数配置以优化性能和资源利用率。当用户选择不同的数据库实例规格时，KubeBlocks 会自动检测并确定适用于新规格的最佳数据库参数配置，以确保数据库在新规格下具有最优的性能和配置。
 
-This feature simplifies the process of configuring parameters, which saves you from manually configuring database parameters as KubeBlocks handles the updates and configurations automatically to adapt to the new specifications. This saves time and effort and reduces performance issues caused by incorrect configuration.
+配置动态渲染功能简化了数据库规格调整的过程。用户无需手动更改数据库参数，KubeBlocks 会自动处理参数的更新和配置，以适应新的规格。这样可以节省时间和精力，并减少由于参数设置不正确而导致的性能问题。
 
-But it's also important to note that the dynamic parameter configuration doesn't apply to all parameters. Some parameters may require manual configuration. Additionally, if you have manually modified database parameters before, KubeBlocks may overwrite your customized configurations when updating the database configuration template. Therefore, when using the dynamic configuration feature, it is recommended to back up and record your custom configuration so that you can restore them if needed.
+需要注意的是，配置动态渲染功能并不适用于所有参数。有些参数可能需要手动进行调整和配置。此外，如果你对数据库参数进行了手动修改，KubeBlocks 在更新数据库参数模板时可能会覆盖手动修改。因此，在使用动态调整功能时，建议先备份和记录自定义的参数设置，以便在需要时进行恢复。
 
-## View parameter information
+## 查看参数信息
 
-View the current configuration file of a cluster.
+查看集群的配置文件。
 
 ```bash
 kbcli cluster describe-config mycluster  
 ```
 
-From the meta information, the cluster `mycluster` has a configuration file named `my.cnf`.
+从元信息中可以看到，集群 `mycluster` 有一个名为 `my.cnf` 的配置文件。
 
-You can also view the details of this configuration file and parameters.
+你也可以查看此配置文件和参数的详细信息。
 
-* View the details of the current configuration file.
+* 查看当前配置文件的详细信息。
 
    ```bash
    kbcli cluster describe-config mycluster --show-detail
    ```
 
-* View the parameter description.
+* 查看参数描述。
 
   ```bash
   kbcli cluster explain-config mycluster | head -n 20
   ```
 
-* View the user guide of a specified parameter.
+* 查看指定参数的使用文档。
   
   ```bash
   kbcli cluster explain-config mycluster --param=innodb_buffer_pool_size --config-specs=mysql-replication-config
   ```
 
-  `--config-specs` is required to specify a configuration template since ApeCloud MySQL currently supports multiple templates. You can run `kbcli cluster describe-config mycluster` to view the all template names.
+  MySQL 目前支持多个模板，可通过 `--config-specs` 来指定一个配置模板。执行 `kbcli cluster describe-config mysql-cluster` 查看所有模板的名称。
 
   <details>
 
-  <summary>Output</summary>
+  <summary>输出</summary>
 
   ```bash
   component: mysql
@@ -68,19 +68,19 @@ You can also view the details of this configuration file and parameters.
   
   </details>
 
-  * Allowed Values: It defines the valid value range of this parameter.
-  * Dynamic: The value of `Dynamic` in `Configure Constraint` defines how the parameter configuration takes effect. There are two different configuration strategies based on the effectiveness type of modified parameters, i.e. **dynamic** and **static**.
-    * When `Dynamic` is `true`, it means the effectiveness type of parameters is **dynamic** and can be configured online.
-    * When `Dynamic` is `false`, it means the effectiveness type of parameters is **static** and a pod restarting is required to make the configuration effective.
-  * Description: It describes the parameter definition.
+  * Allowed Values：定义了参数的有效值范围。
+  * Dynamic: 决定了参数配置的生效方式。根据被修改参数的生效类型，有**动态**和**静态**两种不同的配置策略。
+    * `Dynamic` 为 `true` 时，参数**动态**生效，可在线配置。
+    * `Dynamic` 为 `false` 时，参数**静态**生效，需要重新启动 Pod 才能生效。
+  * Description：描述了参数的定义。
 
-## Configure parameters
+## 配置参数
 
-### Configure parameters with configure command
+### 使用 configure 命令配置参数
 
-The example below takes configuring `max_connections` and `innodb_buffer_pool_size` as an example.
+以下示例以配置 `max_connections` 和 `innodb_buffer_pool_size` 为例。
 
-1. View the current values of `max_connections` and `innodb_buffer_pool_size`.
+1. 查看 `max_connections` 和 `innodb_buffer_pool_size` 的当前值。
 
    ```bash
    kbcli cluster connect mycluster
@@ -108,7 +108,7 @@ The example below takes configuring `max_connections` and `innodb_buffer_pool_si
    1 row in set (0.00 sec)
    ```
 
-2. Adjust the values of `max_connections` and `innodb_buffer_pool_size`.
+2. 调整 `max_connections` 和 `innodb_buffer_pool_size` 的值。
 
    ```bash
    kbcli cluster configure mycluster --set=max_connections=600,innodb_buffer_pool_size=512M
@@ -116,7 +116,7 @@ The example below takes configuring `max_connections` and `innodb_buffer_pool_si
 
    :::note
 
-   Make sure the value you set is within the Allowed Values of this parameter. If you set a value that does not meet the value range, the system prompts an error. For example,
+   确保设置的值在该参数的 Allowed Values 范围内。如果设置的值不符合取值范围，系统会提示错误。例如：
 
    ```bash
    kbcli cluster configure mycluster  --set=max_connections=200,innodb_buffer_pool_size=2097152
@@ -128,9 +128,9 @@ The example below takes configuring `max_connections` and `innodb_buffer_pool_si
 
    :::
 
-3. Search the status of the parameter configuration.
+3. 查看参数配置状态。
 
-   `Status.Progress` shows the overall status of the parameter configuration and `Conditions` show the details.
+   `Status.Progress` 展示参数配置的整体状态，而 `Conditions` 展示详细信息。
 
    ```bash
    kbcli cluster describe-ops mycluster-reconfiguring-pxs46 -n default
@@ -138,7 +138,7 @@ The example below takes configuring `max_connections` and `innodb_buffer_pool_si
 
    <details>
 
-   <summary>Output</summary>
+   <summary>输出</summary>
 
    ```bash
    Spec:
@@ -167,9 +167,9 @@ The example below takes configuring `max_connections` and `innodb_buffer_pool_si
 
    </details>
 
-4. Connect to the database to verify whether the parameters are configured as expected.
+4. 连接到数据库，验证参数是否按预期配置。
 
-   The whole searching process has a 30-second delay since it takes some time for kubelet to synchronize modifications to the volume of the pod.
+   整体搜索过程有 30 秒的延迟，因为 kubelet 需要一些时间同步对 Pod 卷的修改。
 
    ```bash
    kbcli cluster connect mycluster
@@ -197,13 +197,13 @@ The example below takes configuring `max_connections` and `innodb_buffer_pool_si
    1 row in set (0.00 sec)
    ```
 
-### Configure parameters with edit-config command
+### 使用 edit-config 命令配置参数
 
-For your convenience, KubeBlocks offers a tool `edit-config` to help you configure parameters in a visualized way.
+KubeBlocks 提供了一个名为 `edit-config` 的工具，帮助以可视化的方式配置参数。
 
-For Linux and macOS, you can edit configuration files by vi. For Windows, you can edit files on the notepad.
+Linux 和 macOS 系统可以使用 vi 编辑器编辑配置文件，Windows 系统可以使用 notepad。
 
-1. Edit the configuration file.
+1. 编辑配置文件。
 
    ```bash
    kbcli cluster edit-config mycluster --config-specs=mysql-replication-config
@@ -211,18 +211,18 @@ For Linux and macOS, you can edit configuration files by vi. For Windows, you ca
 
    :::note
 
-   * Since MySQL currently supports multiple templates, it is required to use `--config-specs` to specify a configuration template. You can run `kbcli cluster describe-config mycluster` to view all template names.
-   * If there are multiple components in a cluster, use `--components` to specify a component.
+   * MySQL 目前支持多个模板，需通过 `--config-spec` 指定一个配置模板。执行 `kbcli cluster describe-config mysql-cluster` 查看所有模板的名称。
+   * 如果集群中有多个组件，请使用 `--components` 参数指定一个组件。
 
    :::
 
-2. View the status of the parameter configuration.
+2. 查看参数配置状态。
 
    ```bash
    kbcli cluster describe-ops xxx -n default
    ```
 
-3. Connect to the database to verify whether the parameters are configured as expected.
+3. 连接到数据库，验证参数是否按预期配置。
 
    ```bash
    kbcli cluster connect mycluster
@@ -230,16 +230,16 @@ For Linux and macOS, you can edit configuration files by vi. For Windows, you ca
 
    :::note
 
-   1. For the `edit-config` function, static parameters and dynamic parameters cannot be edited at the same time.
-   2. Deleting a parameter will be supported later.
+   1. `edit-config` 不能同时编辑静态参数和动态参数。
+   2.  KubeBlocks 未来将支持删除参数。
 
    :::
 
-## View history and compare differences
+## 查看历史记录并比较参数差异
 
-After the configuration is completed, you can search the configuration history and compare the parameter differences.
+配置完成后，你可以搜索历史配置并比较参数差异。
 
-View the parameter configuration history.
+查看参数配置历史记录。
 
 ```bash
 kbcli cluster describe-config mycluster
@@ -258,9 +258,9 @@ mycluster-reconfiguring-pxs46   mycluster   mysql       mysql-replication-config
 mycluster-reconfiguring-x52fb   mycluster   mysql       mysql-replication-config   my.cnf   Succeed   syncDynamicReload   2/2        Jul 05,2024 19:04 UTC+0800   {"my.cnf":"{\"mysqld\":{\"max_connections\":\"1000\"}}"}                    
 ```
 
-From the above results, there are two parameter modifications.
+从上面可以看到，有三个参数被修改过。
 
-Compare these modifications to view the configured parameters and their different values for different versions.
+比较这些改动，查看不同版本中配置的参数和参数值。
 
 ```bash
 kbcli cluster diff-config mycluster-reconfiguring-pxs46 mycluster-reconfiguring-x9zsf

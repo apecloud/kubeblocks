@@ -1,34 +1,32 @@
 ---
-title: Manage Weaviate with KubeBlocks
-description: How to manage Weaviate on KubeBlocks
-keywords: [weaviate, vector database, control plane]
+title: 用 KubeBlocks 管理 Weaviate
+description: 如何用 KubeBlocks 管理 Weaviate
+keywords: [weaviate, 向量数据库]
 sidebar_position: 1
-sidebar_label: Manage Weaviate with KubeBlocks
+sidebar_label: 用 KubeBlocks 管理 Weaviate
 ---
 
-# Manage Weaviate with KubeBlocks
+# 用 KubeBlocks 管理 Weaviate
 
-The popularity of generative AI (Generative AI) has aroused widespread attention and completely ignited the vector database (Vector Database) market. Weaviate is an open-source vector database that simplifies the development of AI applications. Built-in vector and hybrid search, easy-to-connect machine learning models, and a focus on data privacy enable developers of all levels to build, iterate, and scale AI capabilities faster.
+生成式人工智能的爆火引发了人们对向量数据库的关注。Weaviate 是开源向量数据库，可简化人工智能应用程序的开发。内置向量和混合搜索、易于连接的机器学习模型以及对数据隐私的关注使各级开发人员能够更快地构建、迭代和扩展 AI 功能。
 
-KubeBlocks supports the management of Weaviate.
+## 开始之前
 
-## Before you start
+- [安装 kbcli](./../installation/install-with-kbcli/install-kbcli.md)。
+- [安装 KubeBlocks](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md)。
+- [安装并启用 weaviate 引擎](./../overview/supported-addons.md#use-addons)。
 
-- [Install kbcli](./../installation/install-with-kbcli/install-kbcli.md).
-- [Install KubeBlocks](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md).
-- [Install and enable the weaviate addon](./../overview/supported-addons.md#use-addons).
+## 创建集群
 
-## Create a cluster
+***步骤：***
 
-***Steps***
-
-1. Execute the following command to create a Weaviate cluster. You can change the `cluster-definition` value as any other databases supported.
+1. 创建集群
 
    ```bash
    kbcli cluster create weaviate --cluster-definition=weaviate
    ```
 
-   If you want to create a Weaviate cluster with multiple replicas. Use the following command and set the replica numbers.
+   如需创建多副本 Weaviate 集群，可使用以下命令，设置副本数量。
 
    ```bash
    kbcli cluster create weaviate --cluster-definition=weaviate --set replicas=3
@@ -36,15 +34,15 @@ KubeBlocks supports the management of Weaviate.
 
 :::note
 
-View more flags for creating a MySQL cluster to create a cluster with customized specifications.
-  
+执行以下命令，查看更多集群创建的选项和默认值。
+
 ```bash
 kbcli cluster create --help
 ```
 
 :::
 
-2. Check whether the cluster is created.
+2. 查看集群是否已创建。
 
    ```bash
    kbcli cluster list
@@ -53,7 +51,7 @@ kbcli cluster create --help
    weaviate        default     weaviate             weaviate-1.18.0       Delete               Running          Jul 05,2024 17:42 UTC+0800   
    ```
 
-3. Check the cluster information.
+3. 查看集群信息。
 
    ```bash
     kbcli cluster describe weaviate
@@ -82,19 +80,19 @@ kbcli cluster create --help
     BACKUP-REPO   AUTO-BACKUP   BACKUP-SCHEDULE   BACKUP-METHOD   BACKUP-RETENTION   RECOVERABLE-TIME 
    ```
 
-## Connect to a Weaviate cluster
+## 连接集群
 
-Weaviate provides the HTTP protocol for client access on port 8080. You can visit the cluster by the local host.
+Weaviate 提供 HTTP 访问协议，使用端口 8080 进行通信。您可通过本地主机访问集群。
 
 ```bash
 curl http://localhost:8080/v1/meta | jq
 ```
 
-## Monitor the database
+## 监控集群
 
-For the testing environment, you can run the command below to open the Grafana monitor web page.
+对于测试环境，您可以执行以下命令，打开 Grafana 监控大盘。
 
-1. View all built-in addons and make sure the monitoring addons are enabled. If the monitoring addons are not enabled, [enable these addons](./../overview/supported-addons.md#use-addons) first.
+1. 查看内置监控引擎，确认监控引擎已启用。如果未启用，可参考[该文档](./../overview/database-engines-supported.md#使用引擎)启用引擎。
 
    ```bash
    # View all addons supported
@@ -106,7 +104,7 @@ For the testing environment, you can run the command below to open the Grafana m
    ...
    ```
 
-2. Check whether the monitoring function of the cluster is enabled. If the monitoring function is enabled, the output shows `disableExporter: false`.
+2. 查看集群监控功能是否开启。可通过查看集群 YAML 文件中是否显示 `disableExporter: false`，如果有该字段，则说明集群监控功能已开启。
 
    ```bash
    kubectl get cluster weaviate -o yaml
@@ -122,13 +120,13 @@ For the testing environment, you can run the command below to open the Grafana m
        disableExporter: false
    ```
 
-   If `disableExporter: false` is not shown in the output, it means the monitoring function of this cluster is not enabled and you need to enable it first.
+   如果输出结果未显示 `disableExporter: false`，则说明集群未开启监控功能，可执行以下命令，开启该功能。
 
    ```bash
    kbcli cluster update weaviate --disable-exporter=false
    ```
 
-3. View the dashboard list.
+3. 查看大盘列表。
 
    ```bash
    kbcli dashboard list
@@ -139,106 +137,128 @@ For the testing environment, you can run the command below to open the Grafana m
    kubeblocks-prometheus-server         kb-system   19090   Jul 24,2023 11:38 UTC+0800
    ```
 
-4. Open and view the web console of a monitoring dashboard. For example,
+4. 打开监控大盘网页控制台。
 
    ```bash
    kbcli dashboard open kubeblocks-grafana
    ```
 
-For the production environment, it is highly recommended to build your monitoring system or purchase a third-party monitoring service and you can refer to [the monitoring document](./../observability/monitor-database.md#for-production-environment) for details.
+对于生产环境，强烈建议您搭建专属监控系统或者购买第三方监控服务，详情可参考[监控文档](./../observability/monitor-database.md#生产环境)。
 
-## Scale
+## 扩缩容
 
-### Scale horizontally
+### 水平扩缩容
 
-Horizontal scaling changes the amount of pods. For example, you can scale out replicas from three to five.
+水平扩展改变 Pod 的数量。例如，您可以将副本从三个扩展到五个。
 
-From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out instances, refer to [Horizontal Scale](./../../api_docs/maintenance/scale/horizontal-scale.md) in API docs for more details and examples.
+从 v0.9.0 开始，KubeBlocks 还支持了指定实例扩缩容。可通过 [水平扩缩容 API 文档](./../../api-docs/maintenance/scale/horizontal-scale.md) 文档了解更多细节和示例。
 
-Use the following command to perform horizontal scaling.
+#### 开始之前
+
+确认集群状态是否为 `Running`。否则，后续相关操作可能会失败。
+
+```bash
+kbcli cluster list weaviate
+>
+NAME       NAMESPACE   CLUSTER-DEFINITION     VERSION            TERMINATION-POLICY   STATUS    CREATED-TIME
+weaviate   default     weaviate               weaviate-1.18.0    Delete               Running   Jul 24,2023 11:38 UTC+0800
+```
+
+#### 步骤
+
+执行以下命令进行水平扩缩容。
 
 ```bash
 kbcli cluster hscale weaviate --replicas=3 --components=weaviate
 ```
 
-- `--components` describes the component name ready for horizontal scaling.
-- `--replicas` describes the replica amount of the specified components. Edit the amount based on your demands to scale in or out replicas.
+- `--components` 表示准备进行水平扩容的组件名称。
+- `--replicas` 表示指定组件的副本数。 根据需要设定数值，进行扩缩容。
 
-Please wait a few seconds until the scaling process is over.
-
-The `kbcli cluster hscale` command prints a command to help check the progress of scaling operations.
+执行 `kbcli cluster hscale` 后会输出一条 ops 相关命令，可使用该命令查看扩缩容任务进度。
 
 ```bash
 kbcli cluster describe-ops weaviate-horizontalscaling-xpdwz -n default
 ```
 
-To check whether the scaling is done, use the following command.
+也可通过以下命令，查看扩缩容任务是否完成。
 
 ```bash
 kbcli cluster describe weaviate
 ```
 
-### Scale vertically
+### 垂直扩缩容
 
-Use the following command to perform vertical scaling.
+#### 开始之前
+
+确认集群状态是否为 `Running`。否则，后续相关操作可能会失败。
+
+```bash
+kbcli cluster list weaviate
+>
+NAME       NAMESPACE   CLUSTER-DEFINITION     VERSION            TERMINATION-POLICY   STATUS    CREATED-TIME
+weaviate   default     weaviate               weaviate-1.18.0    Delete               Running   Jul 24,2023 11:38 UTC+0800
+```
+
+#### 步骤
+
+执行以下命令进行垂直扩缩容。
 
 ```bash
 kbcli cluster vscale weaviate --cpu=0.5 --memory=512Mi --components=weaviate 
 ```
 
-Please wait a few seconds until the scaling process is over.
-
-The `kbcli cluster vscale` command prints a command to help check the progress of scaling operations.
+执行 `kbcli cluster vscale` 后会输出一条 ops 相关命令，可使用该命令查看扩缩容任务进度。
 
 ```bash
 kbcli cluster describe-ops weaviate-verticalscaling-rpw2l -n default
 ```
 
-To check whether the scaling is done, use the following command.
+也可通过以下命令，查看扩缩容任务是否完成。
 
 ```bash
 kbcli cluster describe weaviate
 ```
 
-## Volume Expansion
+## 磁盘扩容
 
-***Steps:***
+***步骤：***
 
 ```bash
 kbcli cluster volume-expand weaviate --storage=40Gi --components=weaviate -t data
 ```
 
-The volume expansion may take a few minutes.
+执行磁盘扩容任务可能需要几分钟。
 
-The `kbcli cluster volume-expand` command prints a command to help check the progress of scaling operations.
+执行 `kbcli cluster volume-expand` 后会输出一条 ops 相关命令，可使用该命令查看扩缩容任务进度。
 
 ```bash
 kbcli cluster describe-ops weaviate-volumeexpansion-5pbd2 -n default
 ```
 
-To check whether the expanding is done, use the following command.
+也可通过以下命令，查看磁盘扩容任务是否完成。
 
 ```bash
 kbcli cluster describe weaviate
 ```
 
-## Restart
+## 重启集群
 
-1. Restart a cluster.
+1. 执行以下命令，重启集群。
 
-   Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
+   配置 `components` 和 `ttlSecondsAfterSucceed` 的值，执行以下命令来重启指定集群。
 
    ```bash
    kbcli cluster restart weaviate --components="weaviate" \
    --ttlSecondsAfterSucceed=30
    ```
 
-   - `components` describes the component name that needs to be restarted.
-   - `ttlSecondsAfterSucceed` describes the time to live of an OpsRequest job after the restarting succeeds.
+   - `components` 表示需要重启的组件名称。
+   - `ttlSecondsAfterSucceed` 表示重启成功后 OpsRequest 作业的生存时间。
 
-2. Validate the restarting.
+2. 验证重启是否成功。
 
-   Run the command below to check the cluster status to check the restarting status.
+   检查集群状态，验证重启操作是否成功。
 
    ```bash
    kbcli cluster list weaviate
@@ -247,36 +267,36 @@ kbcli cluster describe weaviate
    weaviate   default     weaviate               weaviate-1.18.0    Delete               Running   Jul 05,2024 18:42 UTC+0800
    ```
 
-   * STATUS=Updating: it means the cluster restart is in progress.
-   * STATUS=Running: it means the cluster has been restarted.
+   - STATUS=Updating 表示集群正在重启中。
+   - STATUS=Running 表示集群已重启。
 
-## Stop/Start a cluster
+## 停止/启动集群
 
-You can stop/start a cluster to save computing resources. When a cluster is stopped, the computing resources of this cluster are released, which means the pods of Kubernetes are released, but the storage resources are reserved. You can start this cluster again by snapshots if you want to restore the cluster resources.
+你可以停止/启动集群以释放计算资源。当集群被停止时，其计算资源将被释放，也就是说 Kubernetes 的 Pod 将被释放，但其存储资源仍将被保留。如果你希望通过快照从原始存储中恢复集群资源，请重新启动该集群。
 
-### Stop a cluster
+## 停止集群
 
-1. Configure the name of your cluster and run the command below to stop this cluster.
+1. 配置集群名称，并执行以下命令来停止该集群。
 
    ```bash
    kbcli cluster stop weaviate
    ```
 
-2. Check the status of the cluster to see whether it is stopped.
+2. 查看集群状态，确认集群是否已停止。
 
     ```bash
     kbcli cluster list
     ```
 
-### Start a cluster
+### 启动集群
 
-1. Configure the name of your cluster and run the command below to start this cluster.
+1. 配置集群名称，并执行以下命令来启动该集群。
 
    ```bash
    kbcli cluster start weaviate
    ```
 
-2. Check the status of the cluster to see whether it is running again.
+2. 查看集群状态，确认集群是否已再次运行。
 
     ```bash
     kbcli cluster list

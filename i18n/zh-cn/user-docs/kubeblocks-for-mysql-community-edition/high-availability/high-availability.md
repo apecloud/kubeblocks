@@ -1,29 +1,29 @@
 ---
-title: Failure simulation and automatic recovery
-description: Automatic recovery of cluster
-keywords: [mysql, high availability, failure simulation, automatic recovery]
+title: 故障模拟与自动恢复
+description: 集群自动恢复
+keywords: [mysql, 高可用, 故障模拟, 自动恢复]
 sidebar_position: 1
 ---
 
-# Failure simulation and automatic recovery
+# 故障模拟与自动恢复
 
-As an open-source data management platform, Kubeblocks currently supports over thirty database engines and is continuously expanding. Due to the varying high availability capabilities of databases, KubeBlocks has designed and implemented a high availability (HA) system for database instances. The KubeBlocks HA system uses a unified HA framework to provide high availability for databases, allowing different databases on KubeBlocks to achieve similar high availability capabilities and experiences.
+作为一个开源数据管理平台，Kubeblocks目前支持三十多种数据库引擎，并且持续扩展中。由于这些数据库本身的高可用能力是参差不齐的，因此KubeBlocks设计实现了一套高可用系统用于保障数据库实例的高可用能力。KubeBlocks高可用系统采用了统一的HA框架设计，实现对数据库的高可用支持，使得不同的数据库在KubeBlocks上可以获得类似的高可用能力和体验。
 
-This tutorial uses MySQL Community edition as an example to demonstrate its fault simulation and recovery capabilities.
+下面以 MySQL 社区版为例，演示它的故障模拟和恢复能力。
 
-## Recovery simulation
+## 故障恢复
 
 :::note
 
-The faults here are all simulated by deleting a pod. When there are sufficient resources, the fault can also be simulated by machine downtime or container deletion, and its automatic recovery is the same as described here.
+下面通过删除 Pod 来模拟故障。在资源充足的情况下，也可以通过机器宕机或删除容器来模拟故障，其自动恢复过程与本文描述的相同。
 
 :::
 
-### Before you start
+### 开始之前
 
-* [Install KubeBlocks](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md).
-* Create a MySQL Replication Cluster, refer to [Create a MySQL cluster](./../cluster-management/create-and-connect-a-mysql-cluster.md).
-* Run `kubectl get cd mysql -o yaml` to check whether _rolechangedprobe_ is enabled in the MySQL Replication (it is enabled by default). If the following configuration exists, it indicates that it is enabled:
+* [安装 KubeBlocks](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md)。
+* 创建 MySQL 主备版集群，详情可参考 [创建 MySQL 集群](./../cluster-management/create-and-connect-a-mysql-cluster.md)。
+* 执行 `kubectl get cd mysql -o yaml` 检查 MySQL 集群版是否已启用 _rolechangedprobe_（默认情况下是启用的）。如果出现以下配置信息，则表明已启用：
 
   ```bash
   probes:
@@ -33,29 +33,29 @@ The faults here are all simulated by deleting a pod. When there are sufficient r
       timeoutSeconds: 1
   ```
 
-### Primary pod fault
+### 主节点异常
 
-***Steps:***
+***步骤：***
 
-1. View the MySQL Replication Cluster information. View the primary pod name in `Topology`. In this example, the primary pod's name is `mycluster-mysql-1`.
+1. 查看集群信息。可在 `Topology` 中查看主节点的名称，在如下例子中，主节点为 `mycluster-mysql-1`。
 
     ```bash
     kbcli cluster describe mycluster
     ```
 
     ![describe_cluster](./../../../img/ha-mysql-describe-cluster.png)
-2. Delete the primary pod `mycluster-mysql-0` to simulate a pod fault.
+2. 删除主节点 `mycluster-mysql-0`，模拟节点故障。
 
     ```bash
     kubectl delete pod mycluster-mysql-0
     ```
 
     ![delete_pod](./../../../img/ha-mysql-delete-primary-pod.png)
-3. Run `kbcli cluster describe` to check the status of the pods and Replication Cluster connection.
+3. 执行命令，查看 pod 状态和集群连接。
 
     ***Results***
 
-    The following example shows that the roles of pods have changed after the old primary pod was deleted and `mycluster-mysql-0` is elected as the new primary pod.
+    此处示例显示 pod 角色发生变化。原主节点删除后，系统选出新的主节点为 `mycluster-mysql-0`。
 
     ```bash
     kbcli cluster describe mycluster
@@ -63,31 +63,31 @@ The faults here are all simulated by deleting a pod. When there are sufficient r
 
     ![describe_cluster_after](./../../../img/ha-mysql-primary-pod-describe-after.png)
 
-    It shows that this MySQL Replication Cluster can be connected within seconds.
+    MySQL 主备版集群可在几秒钟连接。
 
-   ***How the automatic recovery works***
+   ***自动恢复机制***
 
-   After the primary pod is deleted, the MySQL Replication elects a new primary pod. In this example, `mycluster-mysql-1` is elected as the new primary pod. KubeBlocks detects that the primary pod has changed, and sends a notification to update the access link. The original exception node automatically rebuilds and recovers to the normal Replciation Cluster state. It normally takes 30 seconds from exception to recovery.
+   这是因为主节点删除后，MySQL 主备版会自行选主，选出新的主节点为 `mysql-cluster-mysql-0`，KubeBlocks 探测到主角点角色发生变化，会发出通知，更新访问链路。原先异常节点会自动重建，恢复正常主备集群状态。从异常开始到恢复完成，整体耗时在 30 秒内。
 
-### Secondary pod exception
+### 备节点异常
 
-***Steps:***
+***步骤：***
 
-1. View the MySQL Replication Cluster information and view the secondary pod name in `Topology`. In this example, the secondary pod is `mycluster-mysql-0`.
+1. 查看集群信息。可在 `Topology` 中查看备节点的名称，在如下例子中，备节点为 `mycluster-mysql-0`。
 
     ```bash
     kbcli cluster describe mycluster
     ```
 
     ![describe_cluster](./../../../img/ha-mysql-primary-pod-describe-after.png)
-2. Delete the secondary pod mycluster-mysql-0.
+2. 删除备节点 `mycluster-mysql-0`。
 
     ```bash
     kubectl delete pod mycluster-mysql-0
     ```
 
     ![delete_secondary_pod](./../../../img/ha-mysql-delete-secondary.png)
-3. View the Replication Cluster status and you can find the secondary pod is being terminated in `Component.Instance`.
+3. 查看集群状态，可在 `Component.Instance` 看到备节点处于终止状态。
 
     ```bash
     kbcli cluster describe mycluster
@@ -95,29 +95,29 @@ The faults here are all simulated by deleting a pod. When there are sufficient r
 
     ![describe_cluster_secondary](./../../../img/ha-mysql-delete-secondary-after.png)
 
-   ***How the automatic recovery works***
+   ***自动恢复机制***
 
-   One secondary exception doesn't trigger re-electing of the primary or access link switch, so the R/W of the cluster is not affected. The secondary pod exception triggers recreation and recovery. The process takes no more than 30 seconds.
+   这是因为单个备节点异常不会触发角色重新选主，也不会切换访问链路，所以集群读写不受影响，备节点异常后会自动触发重建，恢复正常，整体耗时在 30 秒内。
 
-### Both pods exception
+### 两个节点异常
 
-***Steps:***
+***步骤：***
 
-1. Run the command below to view the MySQL Replication Cluster information and view the pods' names in `Topology`.
+1. 查看集群信息，在 `Topology` 中查看节点名称。
 
     ```bash
     kbcli cluster describe mycluster
     ```
 
     ![describe_cluster](./../../../img/ha-mysql-delete-secondary-after.png)
-2. Delete all pods.
+2. 删除所有节点。
 
     ```bash
     kubectl delete pod mycluster-mysql-1 mycluster-mysql-0
     ```
 
     ![delete_three_pods](./../../../img/ha-mysql-delete-both-pods.png)
-3. Run the command below to view the deleting process. You can find the pods are pending.
+3. 查看删除任务进展，发现所有节点都处于 pending 状态，几秒后恢复正常。
 
     ```bash
     kbcli cluster describe mycluster
@@ -125,6 +125,6 @@ The faults here are all simulated by deleting a pod. When there are sufficient r
 
     ![describe_three_clusters](./../../../img/ha-mysql-delete-both-pods-after.png)
 
-   ***How the automatic recovery works***
+   ***自动恢复机制***
 
-   Every time the pod is deleted, recreation is triggered. And then MySQL automatically completes the cluster recovery and the election of a new primary. After the election of the primary is completed, KubeBlocks detects the new primary and updates the access link. This process takes less than 30 seconds.
+   这是因为节点删除后，都会自动触发重建，然后 MySQL 会自动完成集群恢复及选主。选主完成后，Kubeblocks 会探测新的主节点，并更新访问链路，恢复可用。整体耗时在 30 秒内。

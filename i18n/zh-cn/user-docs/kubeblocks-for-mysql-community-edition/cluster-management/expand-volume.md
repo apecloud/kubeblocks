@@ -1,17 +1,17 @@
 ---
-title: Expand volume
-description: How to expand the volume of a MySQL cluster
+title: 磁盘扩容
+description: 如何调整集群所使用的磁盘大小
 sidebar_position: 3
-sidebar_label: Expand volume
+sidebar_label: 磁盘扩容
 ---
 
-# Expand volume
+# 磁盘扩容
 
-You can expand the storage volume size of each pod.
+KubeBlocks 支持 Pod 存储磁盘扩容。
 
-## Before you start
+## 开始之前
 
-Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
+确保集群处于 `Running` 状态，否则以下操作可能会失败。
 
 ```bash
 kbcli cluster list mycluster
@@ -20,23 +20,22 @@ NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY  
 mycluster   default     mysql                mysql-8.0.33   Delete               Running   Jul 05,2024 18:46 UTC+0800
 ```
 
-## Steps
+## 步骤
 
-1. Change configuration.
+1. 更改配置。
 
-    Configure the values of `--components`, `--volume-claim-templates`, and `--storage`, and run the command below to expand the volume.
+    配置参数 `--components`、`--volume-claim-templates` 和 `--storage`，并执行以下命令。
 
     ```bash
     kbcli cluster volume-expand mycluster --components="mysql" \
     --volume-claim-templates="data" --storage="2Gi"
     ```
 
-    - `--components` describes the component name for volume expansion.
-    - `--volume-claim-templates` describes the VolumeClaimTemplate names in components.
-    - `--storage` describes the volume storage size.
+    - `--components` 表示需扩容的组件名称。
+    - `--volume-claim-templates` 表示组件中的 VolumeClaimTemplate 名称。
+    - `--storage` 表示磁盘需扩容至的大小。
 
-
-2. Validate the volume expansion operation.
+2. 验证扩容操作是否成功。
 
    ```bash
    kbcli cluster list mycluster
@@ -45,10 +44,10 @@ mycluster   default     mysql                mysql-8.0.33   Delete              
    mycluster   default     mysql                mysql-8.0.33   Delete               Running   Jul 05,2024 18:46 UTC+0800
    ```
 
-   * STATUS=Updating: it means the volume expansion is in progress.
-   * STATUS=Running: it means the volume expansion operation has been applied.
+   * STATUS=Updating 表示扩容正在进行中。
+   * STATUS=Running 表示扩容已完成。
 
-3. Check whether the corresponding resources change.
+3. 检查资源规格是否已变更。
 
     ```bash
     kbcli cluster describe mycluster

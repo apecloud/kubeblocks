@@ -8,14 +8,16 @@ sidebar_label: 用 KubeBlocks 管理 Qdrant
 
 # 用 KubeBlocks 管理 Qdrant
 
-生成式人工智能的爆火引发了人们对向量数据库的关注。目前，KubeBlocks 支持 Qdrant 的管理和运维。本文档展示如何使用 KubeBlocks 管理 Qdrant。
+生成式人工智能的爆火引发了人们对向量数据库的关注。
 
-在开始之前，请[安装 kbcli](./../installation/install-with-kbcli/install-kbcli.md) 和 [KubeBlocks](./../installation/install-with-helm/install-kubeblocks-with-helm.md)。
+Qdrant（读作：quadrant）是向量相似性搜索引擎和向量数据库。它提供了生产可用的服务和便捷的 API，用于存储、搜索和管理点（即带有额外负载的向量）。Qdrant 专门针对扩展过滤功能进行了优化，使其在各种神经网络或基于语义的匹配、分面搜索以及其他应用中充分发挥作用。
+
+目前，KubeBlocks 支持 Qdrant 的管理和运维。本文档展示如何使用 KubeBlocks 管理 Qdrant。
 
 ## 开始之前
 
 - [安装 kbcli](./../installation/install-with-kbcli/install-kbcli.md)。
-- [安装 KubeBlocks](./../installation/install-with-helm/install-kubeblocks-with-helm.md)。
+- [安装 KubeBlocks](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md)。
 - [安装并启用 qdrant 引擎](./../overview/database-engines-supported.md#使用引擎)
 
 ## 创建集群
@@ -23,8 +25,6 @@ sidebar_label: 用 KubeBlocks 管理 Qdrant
 ***步骤：***
 
 1. 创建一个 Qdrant 集群。
-
-   如需管理其他向量数据库，可将 `cluster-definition` 的值更改为其他的数据库。
 
    ```bash
    kbcli cluster create qdrant --cluster-definition=qdrant
@@ -36,7 +36,17 @@ sidebar_label: 用 KubeBlocks 管理 Qdrant
    kbcli cluster create qdrant --cluster-definition=qdrant --set replicas=3
    ```
 
-2. 检查集群是否已创建。
+:::note
+
+执行以下命令，查看更多集群创建的选项和默认值。
+  
+```bash
+kbcli cluster create --help
+```
+
+:::
+
+1. 检查集群是否已创建。
 
    ```bash
    kbcli cluster list
@@ -45,7 +55,7 @@ sidebar_label: 用 KubeBlocks 管理 Qdrant
    qdrant   default     qdrant               qdrant-1.1.0   Delete               Running   Aug 15,2023 23:03 UTC+0800
    ```
 
-3. 查看集群信息。
+2. 查看集群信息。
 
    ```bash
    kbcli cluster describe qdrant
@@ -94,21 +104,81 @@ Qdrant 提供两种客户端访问协议：HTTP 和 gRPC，它们分别使用端
 - 如果客户端在 K8s 集群外部但在同一 VPC 内，执行 `kbcli cluster expose qdrant --enable=true --type=vpc` 命令获取数据库集群的 VPC 负载均衡器地址。
 - 如果客户端在 VPC 外部，执行 `kbcli cluster expose qdrant --enable=true --type=internet` 命令打开数据库集群的公共网络可达地址。
 
-## 监控向量数据库
+## 监控集群
 
-打开 Grafana 监控页。
+对于测试环境，您可以执行以下命令，打开 Grafana 监控大盘。
 
-```bash
-kbcli dashboard open kubeblocks-grafana
-```
+1. 查看内置监控引擎，确认监控引擎已启用。如果未启用，可参考[该文档](./../overview/database-engines-supported.md#使用引擎)启用引擎。
 
-此命令会打开浏览器，然后就可以看到仪表盘。
+   ```bash
+   # View all addons supported
+   kbcli addon list
+   ...
+   grafana                        Helm   Enabled                   true                                                                                    
+   alertmanager-webhook-adaptor   Helm   Enabled                   true                                                                                    
+   prometheus                     Helm   Enabled    alertmanager   true 
+   ...
+   ```
+
+2. 检查集群的监控功能是否启用。如果监控功能已启用，输出结果中将会显示 `disableExporter: false`。
+
+   ```bash
+   kubectl get cluster qdrant -o yaml
+   >
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: Cluster
+   metadata:
+   ......
+   spec:
+     ......
+     componentSpecs:
+     ......
+       disableExporter: false
+   ```
+
+   如果输出结果未显示 `disableExporter: false`，这表示集群监控功能未开启，需先启用该功能。
+
+   ```bash
+   kbcli cluster update qdrant --disable-exporter=false
+   ```
+
+3. 查看大盘列表。
+
+   ```bash
+   kbcli dashboard list
+   >
+   NAME                                 NAMESPACE   PORT    CREATED-TIME
+   kubeblocks-grafana                   kb-system   13000   Jul 24,2023 11:38 UTC+0800
+   kubeblocks-prometheus-alertmanager   kb-system   19093   Jul 24,2023 11:38 UTC+0800
+   kubeblocks-prometheus-server         kb-system   19090   Jul 24,2023 11:38 UTC+0800
+   ```
+
+4. 打开监控大盘，查看控制台。
+
+   ```bash
+   kbcli dashboard open kubeblocks-grafana
+   ```
+
+对于生产环境，强烈建议您搭建您专用的监控系统或者购买第三方监控服务。可参考[监控文档](./../observability/monitor-database.md#生产环境)了解详情。
 
 ## 扩缩容
 
-KubeBlocks 支持对向量数据库的水平/垂直扩缩容。
+水平扩展改变 Pod 的数量。例如，您可以将副本从三个扩展到五个。
 
-### 水平扩缩容
+从 v0.9.0 开始，KubeBlocks 还支持了指定实例扩缩容。可通过 [水平扩缩容 API 文档](./../../api-docs/maintenance/scale/horizontal-scale.md) 文档了解更多细节和示例。
+
+#### 开始之前
+
+确认集群状态是否为 `Running`。否则，后续相关操作可能会失败。
+
+```bash
+kbcli cluster list qdrant
+>
+NAME     CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY    STATUS    AGE
+qdrant   qdrant               qdrant-1.8.1   Delete                Running   47m
+```
+
+#### 步骤
 
 执行以下命令进行水平扩缩容。
 
@@ -134,6 +204,21 @@ kbcli cluster describe qdrant
 ```
 
 ### 垂直扩缩容
+
+你可以通过更改资源需求和限制（CPU 和存储）来垂直扩展集群。例如，可通过垂直扩容将资源类别从 1C2G 调整为 2C4G。
+
+#### 开始之前
+
+确认集群状态是否为 `Running`。否则，后续相关操作可能会失败。
+
+```bash
+kbcli cluster list mycluster
+>
+NAME     CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY    STATUS    AGE
+qdrant   qdrant               qdrant-1.8.1   Delete                Running   47m
+```
+
+#### 步骤
 
 执行以下命令进行垂直扩缩容。
 
@@ -174,7 +259,7 @@ kbcli cluster volume-expand qdrant --storage=40Gi --components=qdrant -t data
 kubectl get ops qdrant-volumeexpansion-5pbd2
 >
 NAME                           TYPE              CLUSTER   STATUS   PROGRESS   AGE
-qdrant-volumeexpansion-5pbd2   VolumeExpansion   qdrant    Running  -/-        67s
+qdrant-volumeexpansion-5pbd2   VolumeExpansion   qdrant    Running  1/1        67s
 ```
 
 查看磁盘扩容是否已经完成。
@@ -182,3 +267,63 @@ qdrant-volumeexpansion-5pbd2   VolumeExpansion   qdrant    Running  -/-        6
 ```bash
 kbcli cluster describe qdrant
 ```
+
+## 重启
+
+1. 重启集群。
+
+   配置 `--components` 和 `--ttlSecondsAfterSucceed` 的值，重启指定集群。
+
+   ```bash
+   kbcli cluster restart qdrant --components="qdrant" \
+   --ttlSecondsAfterSucceed=30
+   ```
+
+   - `--components` 表示需要重启的组件名称。
+   - `--ttlSecondsAfterSucceed` 表示重启成功后 OpsRequest 作业的生存时间。
+
+2. 验证重启操作。
+
+   执行以下命令检查集群状态，并验证重启操作。
+
+   ```bash
+   kbcli cluster list qdrant
+   >
+   NAME     NAMESPACE   CLUSTER-DEFINITION     VERSION         TERMINATION-POLICY   STATUS    CREATED-TIME
+   qdrant   default     qdrant                 qdrant-1.8.1    Delete               Running   Aug 15,2023 23:03 UTC+0800
+   ```
+
+   * STATUS=Updating 表示集群正在重启中。
+   * STATUS=Running 表示集群已重启。
+
+## 停止/启动集群
+
+你可以停止/启动集群以释放计算资源。当集群被停止时，其计算资源将被释放，也就是说 Kubernetes 的 Pod 将被释放，但其存储资源仍将被保留。如果你希望通过快照从原始存储中恢复集群资源，请重新启动该集群。
+
+### 停止集群
+
+1. 配置集群名称，并执行以下命令来停止该集群。
+
+   ```bash
+   kbcli cluster stop qdrant
+   ```
+
+2. 查看集群状态，确认集群是否已停止。
+
+    ```bash
+    kbcli cluster list
+    ```
+
+### 启动集群
+
+1. 配置集群名称，并执行以下命令来启动该集群。
+
+   ```bash
+   kbcli cluster start qdrant
+   ```
+
+2. 查看集群状态，确认集群是否已再次运行。
+
+    ```bash
+    kbcli cluster list
+    ```

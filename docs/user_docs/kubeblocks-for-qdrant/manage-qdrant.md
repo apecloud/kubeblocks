@@ -36,7 +36,7 @@ KubeBlocks supports the management of Qdrant.
 
 :::note
 
-View more flags for creating a MySQL cluster to create a cluster with customized specifications.
+View more flags for creating a cluster to create a cluster with customized specifications.
   
 ```bash
 kbcli cluster create --help
@@ -44,23 +44,23 @@ kbcli cluster create --help
 
 :::
 
-2. Check whether the cluster is created.
+1. Check whether the cluster is created.
 
    ```bash
    kbcli cluster list
    >
    NAME     NAMESPACE   CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    CREATED-TIME
-   qdrant   default     qdrant               qdrant-1.5.0   Delete               Running   Aug 15,2023 23:03 UTC+0800
+   qdrant   default     qdrant               qdrant-1.8.1   Delete               Running   Aug 15,2023 23:03 UTC+0800
    ```
 
-3. Check the cluster information.
+2. Check the cluster information.
 
    ```bash
    kbcli cluster describe qdrant
    >
    Name: qdrant         Created Time: Aug 15,2023 23:03 UTC+0800
    NAMESPACE   CLUSTER-DEFINITION   VERSION        STATUS    TERMINATION-POLICY
-   default     qdrant               qdrant-1.5.0   Running   Delete
+   default     qdrant               qdrant-1.8.1   Running   Delete
 
    Endpoints:
    COMPONENT   MODE        INTERNAL                                       EXTERNAL
@@ -169,6 +169,19 @@ Horizontal scaling changes the amount of pods. For example, you can scale out re
 
 From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out instances, refer to [Horizontal Scale](./../../api_docs/maintenance/scale/horizontal-scale.md) in API docs for more details and examples.
 
+#### Before you start
+
+Check whether the cluster status is Running. Otherwise, the following operations may fail.
+
+```bash
+kbcli cluster list qdrant
+>
+NAME     CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY    STATUS    AGE
+qdrant   qdrant               qdrant-1.8.1   Delete                Running   47m
+```
+
+#### Steps
+
 Use the following command to perform horizontal scaling.
 
 ```bash
@@ -196,6 +209,21 @@ kbcli cluster describe qdrant
 ```
 
 ### Scale vertically
+
+You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, you can change the resource class from 1C2G to 2C4G by performing vertical scaling.
+
+#### Before you start
+
+Check whether the cluster status is Running. Otherwise, the following operations may fail.
+
+```bash
+kbcli cluster list qdrant
+>
+NAME     CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY    STATUS    AGE
+qdrant   qdrant               qdrant-1.8.1   Delete                Running   47m
+```
+
+#### Steps
 
 Use the following command to perform vertical scaling.
 
@@ -267,7 +295,7 @@ kbcli cluster describe qdrant
    kbcli cluster list qdrant
    >
    NAME     NAMESPACE   CLUSTER-DEFINITION     VERSION         TERMINATION-POLICY   STATUS    CREATED-TIME
-   qdrant   default     qdrant                 qdrant-1.5.0    Delete               Running   Aug 15,2023 23:03 UTC+0800
+   qdrant   default     qdrant                 qdrant-1.8.1    Delete               Running   Aug 15,2023 23:03 UTC+0800
    ```
 
    * STATUS=Updating: it means the cluster restart is in progress.

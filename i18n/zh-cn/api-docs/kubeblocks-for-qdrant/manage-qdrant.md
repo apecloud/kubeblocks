@@ -157,7 +157,7 @@ Qdrant 通过 6333 和 6334 端口提供 HTTP 和 gRPC 协议供客户端访问�
 kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY     STATUS    AGE
-mycluster   qdrant               qdrant-1.5.0   Delete                 Running   47m
+mycluster   qdrant               qdrant-1.8.1   Delete                 Running   47m
 ```
 
 #### 步骤
@@ -242,7 +242,7 @@ mycluster   qdrant               qdrant-1.5.0   Delete                 Running  
      namespace: demo
    spec:
      clusterDefinitionRef: qdrant
-     clusterVersionRef: qdrant-1.5.0
+     clusterVersionRef: qdrant-1.8.1
      componentSpecs:
      - name: qdrant
        componentDefRef: qdrant
@@ -330,7 +330,7 @@ Status:
 kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY     STATUS    AGE
-mycluster   qdrant               qdrant-1.5.0   Delete                 Running   47m
+mycluster   qdrant               qdrant-1.8.1   Delete                 Running   47m
 ```
 
 #### 步骤
@@ -395,7 +395,7 @@ mycluster   qdrant               qdrant-1.5.0   Delete                 Running  
      namespace: demo
    spec:
      clusterDefinitionRef: qdrant
-     clusterVersionRef: qdrant-1.5.0
+     clusterVersionRef: qdrant-1.8.1
      componentSpecs:
      - name: qdrant
        componentDefRef: qdrant
@@ -437,7 +437,7 @@ mycluster   qdrant               qdrant-1.5.0   Delete                 Running  
 kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    AGE
-mycluster   qdrant               qdrant-1.5.0      Delete               Running   4m29s
+mycluster   qdrant               qdrant-1.8.1      Delete               Running   4m29s
 ```
 
 ### 步骤
@@ -502,7 +502,7 @@ mycluster   qdrant               qdrant-1.5.0      Delete               Running 
      namespace: demo
    spec:
      clusterDefinitionRef: qdrant
-     clusterVersionRef: qdrant-1.5.0
+     clusterVersionRef: qdrant-1.8.1
      componentSpecs:
      - name: qdrant
        componentDefRef: qdrant

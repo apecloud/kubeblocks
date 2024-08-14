@@ -1,22 +1,22 @@
 ---
-title: Switch over a MySQL cluster
-description: How to switch over a MySQL cluster
-keywords: [mysql, switch over a cluster, switchover]
+title: 切换 MySQL 集群
+description: 如何切换 MySQL 集群
+keywords: [mysql, 切换集群, switchover]
 sidebar_position: 6
-sidebar_label: Switchover
+sidebar_label: 切换
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Switch over a MySQL cluster
+# 切换 MySQL 集群
 
-You can initiate a switchover for a MySQL Replication Cluster. Then KubeBlocks switches the instance roles.
+数据库 switchover 是指在数据库集群中将主数据库的角色切换到备用数据库的过程，使备用数据库成为新的主数据库实例。通常在主数据库故障、维护或升级时执行 switchover 操作，以确保数据库服务的高可用性和连续性。可使用 kbcli 命令对 MySQL 集群版执行切换，KubeBlocks 将切换实例角色。
 
-## Before you start
+## 开始之前
 
-* Make sure the cluster is running normally.
-* Check whether the following role probe parameters exist to verify whether the role probe is enabled.
+* 确保集群正常运行。
+* 检查以下角色探针参数是否存在，确认是否已启用探针。
 
    ```bash
    kubectl get cd apecloud-mysql -o yaml
@@ -28,30 +28,30 @@ You can initiate a switchover for a MySQL Replication Cluster. Then KubeBlocks s
        timeoutSeconds: 1
    ```
 
-## Initiate the switchover
+## 切换集群
 
-You can switch over a secondary of a MySQL Replication to the primary role, and the former primary instance to a secondary one.
+将 MySQL 主备版集群的一个备节点切换为主节点，并将原主节点实例切换为备节点。
 
-* Initiate a switchover with a specified new leader instance.
+* 不指定主节点实例进行切换。
 
     ```bash
     kbcli cluster promote mycluster --instance='mycluster-mysql-1'
     ```
 
-* If there are multiple components, you can use `--components` to specify a component.
+* 如果有多个组件，可以使用 `--components` 参数指定一个组件。
 
     ```bash
     kbcli cluster promote mycluster --instance='mycluster-mysql-1' --components='apecloud-mysql'
     ```
 
-## Verify the switchover
+## 验证集群切换
 
-Check the instance status to verify whether the switchover is performed successfully.
+查看实例状态，验证切换是否成功。
 
 ```bash
 kbcli cluster list-instances
 ```
 
-## Handle an exception
+## 处理异常情况
 
-If an error occurs, refer to [Handle an exception](./../../handle-an-exception/handle-a-cluster-exception.md) to troubleshoot the operation.
+如果报错，请参考[异常处理](./../../handle-an-exception/handle-a-cluster-exception.md)排查问题。

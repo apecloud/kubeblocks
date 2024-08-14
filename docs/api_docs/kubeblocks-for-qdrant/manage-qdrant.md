@@ -151,7 +151,7 @@ Check whether the cluster STATUS is `Running`. Otherwise, the following operatio
 kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY     STATUS    AGE
-mycluster   qdrant               qdrant-1.5.0   Delete                 Running   47m
+mycluster   qdrant               qdrant-1.8.1   Delete                 Running   47m
 ```
 
 #### Steps
@@ -236,7 +236,7 @@ There are two ways to apply horizontal scaling.
      namespace: demo
    spec:
      clusterDefinitionRef: qdrant
-     clusterVersionRef: qdrant-1.5.0
+     clusterVersionRef: qdrant-1.8.1
      componentSpecs:
      - name: qdrant
        componentDefRef: qdrant
@@ -323,7 +323,7 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY     STATUS    AGE
-mycluster   qdrant               qdrant-1.5.0   Delete                 Running   47m
+mycluster   qdrant               qdrant-1.8.1   Delete                 Running   47m
 ```
 
 #### Steps
@@ -388,7 +388,7 @@ There are two ways to apply vertical scaling.
      namespace: demo
    spec:
      clusterDefinitionRef: qdrant
-     clusterVersionRef: qdrant-1.5.0
+     clusterVersionRef: qdrant-1.8.1
      componentSpecs:
      - name: qdrant
        componentDefRef: qdrant
@@ -430,7 +430,7 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    AGE
-mycluster   qdrant               qdrant-1.5.0      Delete               Running   4m29s
+mycluster   qdrant               qdrant-1.8.1      Delete               Running   4m29s
 ```
 
 ### Steps
@@ -495,7 +495,7 @@ There are two ways to apply volume expansion.
      namespace: demo
    spec:
      clusterDefinitionRef: qdrant
-     clusterVersionRef: qdrant-1.5.0
+     clusterVersionRef: qdrant-1.8.1
      componentSpecs:
      - name: qdrant
        componentDefRef: qdrant

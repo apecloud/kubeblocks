@@ -60,10 +60,10 @@ kbcli cluster create mysql <clustername>
 kbcli cluster create mysql --mode raftGroup <clustername>
 ```
 
-如果只有一个节点用于部署三节点集群，请在创建集群时将 `availability-policy` 设置为 `none`。
+如果只有一个节点用于部署三节点集群，请在创建集群时将 `topology-keys` 设置为 `null`。
 
 ```bash
-kbcli cluster create mysql --mode raftGroup --availability-policy none <clustername>
+kbcli cluster create mysql --mode raftGroup --topology-keys null <clustername>
 ```
 
 :::note

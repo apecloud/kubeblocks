@@ -62,10 +62,10 @@ kbcli cluster create mongodb <clustername>
 kbcli cluster create mongodb --mode replicaset <clustername>
 ```
 
-如果只有一个节点用于部署主备版集群，请在创建集群时将 `availability-policy` 设置为 `none`。
+如果只有一个节点用于部署主备版集群，请在创建集群时将 `topology-keys` 设置为 `null`。
 
 ```bash
-kbcli cluster create mongodb --mode replicaset --availability-policy none <clustername>
+kbcli cluster create mongodb --mode replicaset --topology-keys null <clustername>
 ```
 
 :::note

@@ -1,7 +1,7 @@
 ---
 title: 停止/启动集群
 description: 如何停止/启动集群
-keywords: [mysql, 停止集群, 启动集群]
+keywords: [pulsar, 停止集群, 启动集群]
 sidebar_position: 5
 sidebar_label: 停止/启动
 ---
@@ -15,7 +15,7 @@ sidebar_label: 停止/启动
 1. 配置集群名称，并执行以下命令来停止该集群。
 
    ```bash
-   kbcli cluster stop mycluster
+   kbcli cluster stop pulsar-cluster
    ```
 
 2. 查看集群状态，确认集群是否已停止。
@@ -25,11 +25,11 @@ sidebar_label: 停止/启动
     ```
 
 ## 启动集群
-
+  
 1. 配置集群名称，并执行以下命令来启动该集群。
 
    ```bash
-   kbcli cluster start mycluster
+   kbcli cluster start pulsar-cluster
    ```
 
 2. 查看集群状态，确认集群是否再次启动。

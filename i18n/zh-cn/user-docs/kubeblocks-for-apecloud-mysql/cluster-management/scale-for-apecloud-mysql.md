@@ -10,6 +10,12 @@ sidebar_label: 扩缩容
 
 KubeBlocks 支持对 ApeCloud MySQL 集群进行垂直扩缩容和水平扩缩容。
 
+:::note
+
+集群垂直或水平扩缩容后，KubeBlocks 会根据新的规格自动匹配合适的配置模板。这因为 KubeBlocks 在 v0.9.0 中引入了动态配置功能。该功能简化了配置参数的过程，节省了时间和精力，并减少了由于配置错误引起的性能问题。有关详细说明，请参阅[配置](./../configuration/configuration.md)。
+
+:::
+
 ## 垂直扩缩容
 
 你可以通过更改资源需求和限制（CPU 和存储）来垂直扩展集群。例如，可通过垂直扩容将资源类别从 1C2G 调整为 2C4G。
@@ -39,7 +45,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
 
    - `--components` 表示可进行垂直扩容的组件名称。
    - `--memory` 表示组件请求和限制的内存大小。
-   - `--cpu` 表示组件请求和限制的CPU大小。
+   - `--cpu` 表示组件请求和限制的 CPU 大小。
 
 2. 查看集群状态，以验证垂直扩容是否成功。
 
@@ -54,12 +60,6 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    - STATUS=Running 表示垂直扩容已完成。
    - STATUS=Abnormal 表示垂直扩容异常。原因可能是正常实例的数量少于总实例数，或者 Leader 实例正常运行而其他实例异常。
      > 你可以手动检查是否由于资源不足而导致报错。如果 Kubernetes 集群支持 AutoScaling，系统在资源充足的情况下会执行自动恢复。或者你也可以创建足够的资源，并使用 `kubectl describe` 命令进行故障排除。
-
-    :::note
-
-    垂直扩容不会同步与 CPU 和内存相关的参数，需要手动调用配置的 OpsRequest 来进行更改。详情请参考[配置](./../../kubeblocks-for-mysql/configuration/configuration.md)。
-
-    :::
 
 3. 检查资源规格是否已变更。
 

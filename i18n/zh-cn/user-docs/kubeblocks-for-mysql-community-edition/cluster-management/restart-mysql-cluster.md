@@ -1,36 +1,36 @@
 ---
-title: Restart MySQL cluster
-description: How to restart a MySQL cluster
-keywords: [mysql, restart, restart a cluster]
+title: 重启集群
+description: 如何重启集群
+keywords: [mysql, 重启, 集群重启]
 sidebar_position: 4
-sidebar_label: Restart
+sidebar_label: 重启
 ---
 
-# Restart MySQL cluster
+# 重启集群
 
-You can restart all pods of the cluster. When an exception occurs in a database, you can try to restart it.
+KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，也可以尝试重启集群。
 
 :::note
 
-The pod role may change after the cluster restarts.
+集群重启后，主节点可能会发生变化。
 
 :::
 
-## Steps
+## 步骤
 
-1. Restart a cluster.  
+1. 重启集群。
 
-   Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
+   配置 `components` 和 `ttlSecondsAfterSucceed` 的值，执行以下命令来重启指定集群。
 
    ```bash
    kbcli cluster restart mycluster --components="mysql" \
    --ttlSecondsAfterSucceed=30
    ```
 
-   - `components` describes the component name that needs to be restarted.
-   - `ttlSecondsAfterSucceed` describes the time to live of an OpsRequest job after the restarting succeeds.
+   - `components` 表示需要重启的组件名称。
+   - `ttlSecondsAfterSucceed` 表示重启成功后 OpsRequest 作业的生存时间。
 
-2. Check the cluster status to validate the restarting.
+2. 检查集群状态，验证重启操作是否成功。
 
    ```bash
    kbcli cluster list mycluster
@@ -39,5 +39,5 @@ The pod role may change after the cluster restarts.
    mycluster   default     mysql                mysql-8.0.33   Delete               Updating   Jul 05,2024 19:01 UTC+0800
    ```
 
-   - STATUS=Updating: it means the cluster restart is in progress.
-   - STATUS=Running: it means the cluster has been restarted.
+   - STATUS=Updating 表示集群正在重启中。
+   - STATUS=Running 表示集群已重启。

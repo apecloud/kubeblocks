@@ -1,28 +1,28 @@
 ---
-title: Scale for a MySQL cluster
-description: How to scale a MySQL cluster, horizontal scaling, vertical scaling
-keywords: [mysql, horizontal scaling, vertical scaling]
+title: 集群扩缩容
+description: 如何对集群进行扩缩容操作？
+keywords: [mysql, 水平扩缩容, 垂直扩缩容]
 sidebar_position: 2
-sidebar_label: Scale
+sidebar_label: 扩缩容
 ---
 
-# Scale for a MySQL cluster
+# MySQL 集群扩缩容
 
-You can scale a MySQL cluster in two ways, vertical scaling and horizontal scaling.
+KubeBlocks 支持对 MySQL 集群进行垂直扩缩容和水平扩缩容。
 
 :::note
 
-After vertical scaling or horizontal scaling is performed, KubeBlocks automatically matches the appropriate configuration template based on the new specification. This is the KubeBlocks dynamic configuration feature. This feature simplifies the process of configuring parameters, saves time and effort and reduces performance issues caused by incorrect configuration. For detailed instructions, refer to [Configuration](./../configuration/configuration.md).
+集群垂直或水平扩缩容后，KubeBlocks 会根据新的规格自动匹配合适的配置模板。这因为 KubeBlocks 在 v0.9.0 中引入了动态配置功能。该功能简化了配置参数的过程，节省了时间和精力，并减少了由于配置错误引起的性能问题。有关详细说明，请参阅[配置](./../configuration/configuration.md)。
 
 :::
 
-## Vertical scaling
+## 垂直扩缩容
 
-You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, you can change the resource class from 1C2G to 2C4G by performing vertical scaling.
+你可以通过更改资源需求和限制（CPU 和存储）来垂直扩展集群。例如，可通过垂直扩容将资源类别从 1C2G 调整为 2C4G。
 
-### Before you start
+### 开始之前
 
-Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
+确保集群处于 `Running` 状态，否则以下操作可能会失败。
 
 ```bash
 kbcli cluster list mycluster
@@ -31,11 +31,11 @@ NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY  
 mycluster   default     mysql                mysql-8.0.33   Delete               Running   Jul 05,2024 19:06 UTC+0800
 ```
 
-### Steps
+### 步骤
 
-1. Change configuration.
+1. 更改配置
 
-    Configure the parameters `--components`, `--memory`, and `--cpu` and run the command.
+    配置参数 `--components`、`--memory` 和 `--cpu`，并执行以下命令。
 
     ```bash
     kbcli cluster vscale mycluster \
@@ -43,11 +43,11 @@ mycluster   default     mysql                mysql-8.0.33   Delete              
     --memory="4Gi" --cpu="2" \
     ```
 
-    - `--components` describes the component name ready for vertical scaling.
-    - `--memory` describes the requested and limited size of the component memory.
-    - `--cpu` describes the requested and limited size of the component CPU.
+    - `--components` 表示可进行垂直扩容的组件名称。
+    - `--memory` 表示组件请求和限制的内存大小。
+    - `--cpu` 表示组件请求和限制的 CPU 大小。
 
-2. Check the cluster status to validate the vertical scaling.
+2. 查看集群状态，以验证垂直扩容是否成功。
 
     ```bash
     kbcli cluster list mycluster
@@ -56,27 +56,26 @@ mycluster   default     mysql                mysql-8.0.33   Delete              
     mycluster   default     mysql                mysql-8.0.33   Delete               Updating   Jul 05,2024 19:11 UTC+0800
     ```
 
-    - STATUS=Updating: it means the vertical scaling is in progress.
-    - STATUS=Running: it means the vertical scaling operation has been applied.
-    - STATUS=Abnormal: it means the vertical scaling is abnormal. The reason may be that the number of the normal instances is less than that of the total instance or the leader instance is running properly while others are abnormal.
+   - STATUS=Updating 表示正在进行垂直扩容。
+   - STATUS=Running 表示垂直扩容已完成。
+   - STATUS=Abnormal 表示垂直扩容异常。原因可能是正常实例的数量少于总实例数，或者 Leader 实例正常运行而其他实例异常。
+     > 你可以手动检查是否由于资源不足而导致报错。如果 Kubernetes 集群支持 AutoScaling，系统在资源充足的情况下会执行自动恢复。或者你也可以创建足够的资源，并使用 `kubectl describe` 命令进行故障排除。
 
-       To solve the problem, you can manually check whether this error is caused by insufficient resources. Then if AutoScaling is supported by the Kubernetes cluster, the system recovers when there are enough resources. Otherwise, you can create enough resources and troubleshoot with `kubectl describe` command.
-
-3. Check whether the corresponding resources change.
+3. 检查资源规格是否已变更。
 
     ```bash
     kbcli cluster describe mycluster
     ```
 
-## Horizontal scaling
+## 水平扩缩容
 
-Horizontal scaling changes the amount of pods. For example, you can scale out replicas from three to five.
+水平扩缩容会改变 Pod 的数量。例如，你可以应用水平扩容将 Pod 的数量从三个增加到五个。
 
-From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out instances, refer to [Horizontal Scale](./../../../api_docs/maintenance/scale/horizontal-scale.md) in API docs for more details and examples.
+从 v0.9.0 开始，KubeBlocks 支持指定实例水平扩缩容，可参考 [API 文档](./../../../api-docs/maintenance/scale/horizontal-scale.md)，查看详细介绍及示例。
 
-### Before you start
+### 开始之前
 
-Check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
+确保集群处于 `Running` 状态，否则以下操作可能会失败。
 
 ```bash
 kbcli cluster list mycluster
@@ -85,41 +84,40 @@ NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY  
 mycluster   default     mysql                mysql-8.0.33   Delete               Running   Jul 05,2024 18:46 UTC+0800
 ```
 
-### Steps
+### 步骤
 
-1. Change configuration.
+1. 更改配置。
 
-    Configure the parameters `--components` and `--replicas`, and run the command.
+    配置参数 `--components` 和 `--replicas`，并执行以下命令。
 
     ```bash
     kbcli cluster hscale mycluster \
     --components="mysql" --replicas=3
     ```
 
-    - `--components` describes the component name ready for horizontal scaling.
-    - `--replicas` describes the replica amount of the specified components. Edit the amount based on your demands to scale in or out replicas.
+    - `--components` 表示准备进行水平扩容的组件名称。
+    - `--replicas` 表示指定组件的副本数。可按需修改该参数值，对应执行扩缩容操作。
 
-2. Validate the horizontal scaling operation.
+2. 验证水平扩容。
 
-    Check the cluster STATUS to identify the horizontal scaling status.
+   检查集群状态，确定水平扩容的情况。
 
     ```bash
     kbcli cluster list mycluster
     ```
 
-    - STATUS=Updating: it means horizontal scaling is in progress.
-    - STATUS=Running: it means horizontal scaling has been applied.
+    - STATUS=Updating 表示正在进行水平扩容。
+    - STATUS=Running 表示水平扩容已完成。
 
-3. Check whether the corresponding resources change.
+3. 检查相关资源规格是否已变更。
 
     ```bash
     kbcli cluster describe mycluster
     ```
 
-### Handle the snapshot exception
+### 处理快照异常
 
-If `STATUS=ConditionsError` occurs during the horizontal scaling process, you can find the cause from `cluster.status.condition.message` for troubleshooting.
-In the example below, a snapshot exception occurs.
+如果在水平扩容过程中出现 `STATUS=ConditionsError`，你可以从 `cluster.status.condition.message` 中找到原因并进行故障排除。如下所示，该例子中发生了快照异常。
 
 ```bash
 Status:
@@ -132,13 +130,15 @@ Status:
     type: ApplyResources
 ```
 
-***Reason***
+***原因***
 
-This exception occurs because the `VolumeSnapshotClass` is not configured. This exception can be fixed after configuring `VolumeSnapshotClass`, but the horizontal scaling cannot continue to run. It is because the wrong backup (volumesnapshot is generated by backup) and volumesnapshot generated before still exist. First delete these two wrong resources and then KubeBlocks re-generates new resources.
+此异常发生的原因是未配置 `VolumeSnapshotClass`。可以通过配置 `VolumeSnapshotClass` 解决问题。
 
-***Steps:***
+但此时，水平扩容仍然无法继续运行。这是因为错误的备份（volumesnapshot 由备份生成）和之前生成的 volumesnapshot 仍然存在。需删除这两个错误的资源，KubeBlocks 才能重新生成新的资源。
 
-1. Configure the VolumeSnapshotClass by running the command below.
+***步骤：***
+
+1. 配置 VolumeSnapshotClass。
 
     ```bash
     kubectl create -f - <<EOF
@@ -153,7 +153,7 @@ This exception occurs because the `VolumeSnapshotClass` is not configured. This 
     EOF
     ```
 
-2. Delete the wrong backup (volumesnapshot is generated by backup) and volumesnapshot resources.
+2. 删除错误的备份和 volumesnapshot 资源。
 
     ```bash
     kubectl delete backup -l app.kubernetes.io/instance=mycluster
@@ -161,6 +161,6 @@ This exception occurs because the `VolumeSnapshotClass` is not configured. This 
     kubectl delete volumesnapshot -l app.kubernetes.io/instance=mycluster
     ```
 
-***Result***
+***结果***
 
-The horizontal scaling continues after backup and volumesnapshot are deleted and the cluster restores to running status.
+删除备份和 volumesnapshot 后，水平扩容继续进行，集群恢复到 `Running` 状态。

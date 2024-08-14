@@ -28,7 +28,7 @@ Elasticsearch 是一个分布式、RESTful 风格的搜索和数据分析引擎�
 
 :::note
 
-执行以下命令，查看创建 MySQL 集群的选项和默认值。
+执行以下命令，查看更多集群创建的选项和默认值。
   
 ```bash
 kbcli cluster create --help
@@ -36,7 +36,7 @@ kbcli cluster create --help
 
 :::
 
-2. 查看集群是否已创建。
+1. 查看集群是否已创建。
 
    ```bash
    kbcli cluster list
@@ -45,7 +45,7 @@ kbcli cluster create --help
    elasticsearch   default     elasticsearch        elasticsearch-8.8.2   Delete               Running          Jul 05,2024 16:51 UTC+0800   
    ```
 
-3. 查看集群信息。
+2. 查看集群信息。
 
    ```bash
    kbcli cluster describe elasticsearch

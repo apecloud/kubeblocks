@@ -32,7 +32,7 @@ KubeBlocks supports the management of Milvus.
 
 :::note
 
-View more flags for creating a MySQL cluster to create a cluster with customized specifications.
+View more flags for creating a cluster to create a cluster with customized specifications.
   
 ```bash
 kbcli cluster create --help
@@ -40,7 +40,7 @@ kbcli cluster create --help
 
 :::
 
-2. Check whether the cluster is created.
+1. Check whether the cluster is created.
 
    ```bash
    kbcli cluster list
@@ -49,7 +49,7 @@ kbcli cluster create --help
    milvus   default     milvus-2.3.2              milvus-2.3.2          Delete               Running          Jul 05,2024 17:35 UTC+0800   
    ```
 
-3. Check the cluster information.
+2. Check the cluster information.
 
    ```bash
    kbcli cluster describe milvus

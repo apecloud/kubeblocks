@@ -24,7 +24,7 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
 * [安装 kbcli](./../../installation/install-with-kbcli/install-kbcli.md)。
 * [安装 kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)。
 * [安装 Helm](https://helm.sh/docs/intro/install/)。
-* 使用 [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](./../../installation/install-with-helm/install-kubeblocks-with-helm.md) 安装 KubeBlocks。
+* [安装 KubeBlocks](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md)。
 
 ## 安装 MinIO
 
@@ -119,7 +119,7 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
 :::note
 
 * 在 KubeBlocks v0.8.0 中，`storageProvider` 目前可选 `s3`、`cos`、`gcs-s3comp`、`obs`、`oss`、`minio`、`pvc`、`ftp`、`nfs`。
-* 不同 `storageProvider` 所需的配置信息并不统一，上面展示的 `config` 和 `secrets` 适用于 s3。
+* 不同 `storageProvider` 所需的配置信息并不统一，上面展示的 `config` 和 `secrets` 适用于 S3。
 * 执行 `kubectl get storageproviders.dataprotection.kubeblocks.io` 命令可以查看支持的 `storageProvider`。
 
 :::
@@ -132,35 +132,15 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
 
    安装完成后，可以执行命令查看 BackupRepo。
 
-   <Tabs>
-
-   <TabItem value="kbcli" label="kbcli" default>
-
    ```bash
    kbcli backuprepo list
    ```
-
-   </TabItem>
-
-   <TabItem value="kubectl" label="kubectl">
-
-   ```bash
-   kubectl get backuprepo
-   ```
-
-   </TabItem>
-
-   </Tabs>
 
 ### 手动配置 BackupRepo
 
 如果在安装 KubeBlocks 时没有配置 BackupRepo 信息，你可以按照以下说明进行手动配置。
 
 1. 安装 S3 CSI driver （仅访问方式为 “Mount” 时需要安装）。
-
-    <Tabs>
-
-    <TabItem value="kbcli" label="kbcli" default>
 
     ```bash
     # 启用 CSI-S3 引擎
@@ -172,408 +152,148 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
       --tolerations '[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]' \
       --tolerations 'daemonset:[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]'
 
-    # 查看 csi-s3 状态，确保其状态为 enabled  
+    # 查看 CSI-S3 状态，确保其状态为 enabled  
     kbcli addon list csi-s3
     ```
 
-    </TabItem>
-
-    <TabItem value="Helm" label="Helm">
-
-    ```bash
-    helm repo add kubeblocks https://jihulab.com/api/v4/projects/85949/packages/helm/stable
-    helm install csi-s3 kubeblocks/csi-s3 --version=0.7.0 -n kb-system
-
-    # 还可以添加下面的参数来控制安装
-    # 默认 csi-s3 会在所有 node 安装 daemonSet pod，可以配置 tolerations，安装在指定 node
-    --set-json tolerations='[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"taintValue"}]'
-    --set-json daemonsetTolerations='[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"taintValue"}]'
-    ```
-
-    </TabItem>
-
-    </Tabs>
-
 2. 创建 BackupRepo。
-
-    <Tabs>
-
-    <TabItem value="kbcli" label="kbcli" default>
-
-      <Tabs>
-
-      <TabItem value="S3" label="S3" default>
-
-      ```bash
-      kbcli backuprepo create my-repo \
-        --provider s3 \
-        --region cn-northwest-1 \
-        --bucket test-kb-backup \
-        --access-key-id <ACCESS KEY> \
-        --secret-access-key <SECRET KEY> \
-        --access-method Tool \ # 也可以填 Mount
-        --default
-      ```
-
-      </TabItem>
-
-      <TabItem value="OSS" label="OSS">
-
-      ```bash
-      kbcli backuprepo create my-repo \
-        --provider oss \
-        --region cn-zhangjiakou \
-        --bucket  test-kb-backup \
-        # --endpoint https://oss-cn-zhangjiakou-internal.aliyuncs.com \ 可以显示指定 oss endpoint
-        --access-key-id <ACCESS KEY> \
-        --secret-access-key <SECRET KEY> \
-        --access-method Tool \ 
-        --default
-      ```
-
-      </TabItem>
-
-      <TabItem value="OBS" label="OBS">
-
-      ```bash
-      kbcli backuprepo create my-repo \
-        --provider obs \
-        --region cn-north-4 \
-        --bucket  test-kb-backup \
-        --access-key-id <ACCESS KEY> \
-        --secret-access-key <SECRET KEY> \
-        --access-method Tool \
-        --default
-      ```
-
-      </TabItem>
-
-      <TabItem value="COS" label="COS">
-
-      ```bash
-      kbcli backuprepo create my-repo \
-        --provider cos \
-        --region ap-guangzhou \
-        # 腾讯云中存储桶的命名格式为 <BucketName-APPID>，APPID 为腾讯云自动生成
-        # 设置 bucket 时先通过腾讯云的控制台创建 bucket，获取存储桶名称
-        --bucket  test-kb-backup \ 
-        --access-key-id <ACCESS KEY> \
-        --secret-access-key <SECRET KEY> \
-        --access-method Tool \
-        --default
-      ```
-
-      </TabItem>
-
-      <TabItem value="GCS" label="GCS">
-
-      ```bash
-      # 目前的 gcs 为谷歌云的 s3 兼容版
-      kbcli backuprepo create my-repo \
-        --provider gcs \
-        --region auto \
-        --bucket  test-kb-backup \
-        --access-key-id <ACCESS KEY> \
-        --secret-access-key <SECRET KEY> \
-        --access-method Tool \
-        --default
-      ```
-
-      </TabItem>
-
-      <TabItem value="MinIO" label="MinIO">
-
-      ```bash
-      kbcli backuprepo create my-repo \
-        --provider minio \
-        --endpoint <ip:port> \    # 以上部署的 MinIO 的访问地址为 http://minio.kb-system.svc.cluster.local:9000
-        --bucket test-minio \
-        --access-key-id <ACCESS KEY> \
-        --secret-access-key <SECRET KEY> \
-        --access-method Tool \
-        --default
-      ```
-
-      </TabItem>
-
-      <TabItem value="PVC" label="PVC">
-
-      ```bash
-      kbcli backuprepo create my-repo \
-        --provider pvc \
-        --storage-class-name "nfs-storage" \
-        --access-mode "ReadWriteMany" \
-        --volume-capacity "100Gi" \
-        --default
-      ```
-
-      </TabItem>
-      </Tabs>
-
-      以上命令创建了一个名为 `my-repo` 的默认备份仓库。
-
-      * `my-repo` 为仓库名，可以留空不填，此时 kbcli 会使用形如 `backuprepo-xxxxx` 的随机名字。
-      * `--default` 表示该仓库是默认仓库。全局只能有一个默认仓库，如果系统中存在多个默认仓库，KubeBlocks 无法选出应该使用哪个仓库（这个行为跟 K8s 的 default StorageClass 类似），会导致备份失败。使用 kbcli 创建 BackupRepo 能避免出现这种情况，因为 kbcli 在创建时会确保当前没有第二个默认仓库。
-      * `--provider` 参数对应后端存储类型，即 `storageProvider`，可选值为 `s3`、`cos`、`gcs-s3comp`、`obs`、`oss`、`minio`、`ftp`、`nfs`。不同存储所需的命令行参数不同，可以通过 `kbcli backuprepo create --provider STORAGE-PROVIDER-NAME -h` 命令查看参数信息（注意 `--provider` 参数是必需的）。
-
-        `kbcli backuprepo create` 命令执行成功后，就会在系统中创建一个类型为 BackupRepo 的 K8s 资源，可以通过修改该资源的 annotation 来调整默认仓库。
-
-        ```bash
-        # 取消默认仓库
-        kubectl annotate backuprepo old-default-repo \
-          --overwrite=true \
-          dataprotection.kubeblocks.io/is-default-repo=false
-        ```
-
-        ```bash
-        # 设置新的默认仓库
-        kubectl annotate backuprepo backuprepo-4qms6 \
-          --overwrite=true \
-          dataprotection.kubeblocks.io/is-default-repo=true
-        ```
-
-    </TabItem>
-
-    <TabItem value="kubectl" label="kubectl">
-
-      使用 `kubectl` 同样可以配置 BackupRepo，但相比使用 kbcli，会缺少参数校验和默认仓库检查，推荐使用 kbcli。
-
-      <Tabs>
-
-      <TabItem value="S3" label="S3" default>
-
-      ```bash
-      # 创建 secret，保存 S3 的访问 AK
-      kubectl create secret generic s3-credential-for-backuprepo \
-        -n kb-system \
-        --from-literal=accessKeyId=<ACCESS KEY> \
-        --from-literal=secretAccessKey=<SECRET KEY>
-
-      # 创建 BackupRepo 资源
-      kubectl apply -f - <<-'EOF'
-      apiVersion: dataprotection.kubeblocks.io/v1alpha1
-      kind: BackupRepo
-      metadata:
-        name: my-repo
-        annotations:
-          dataprotection.kubeblocks.io/is-default-repo: "true"
-      spec:
-        storageProviderRef: s3
-        accessMethod: Tool
-        pvReclaimPolicy: Retain
-        volumeCapacity: 100Gi
-        config:
-          bucket: test-kb-backup
-          endpoint: ""
-          mountOptions: --memory-limit 1000 --dir-mode 0777 --file-mode 0666
-          region: cn-northwest-1
-        credential:
-          name: s3-credential-for-backuprepo
-          namespace: kb-system
-      EOF
-      ```
-
-      </TabItem>
-
-      <TabItem value="OSS" label="OSS">
-
-      ```bash
-      # 创建 secret，保存 OSS 的访问 AK
-      kubectl create secret generic oss-credential-for-backuprepo \
-        -n kb-system \
-        --from-literal=accessKeyId=<ACCESS KEY> \
-        --from-literal=secretAccessKey=<SECRET KEY>
-
-      # 创建 BackupRepo 资源
-      kubectl apply -f - <<-'EOF'
-      apiVersion: dataprotection.kubeblocks.io/v1alpha1
-      kind: BackupRepo
-      metadata:
-        name: my-repo
-        annotations:
-          dataprotection.kubeblocks.io/is-default-repo: "true"
-      spec:
-        storageProviderRef: oss
-        accessMethod: Tool
-        pvReclaimPolicy: Retain
-        volumeCapacity: 100Gi
-        config:
-          bucket: test-kb-backup
-          mountOptions: ""
-          endpoint: ""
-          region: cn-zhangjiakou
-        credential:
-          name: oss-credential-for-backuprepo
-          namespace: kb-system
-      EOF
-      ```
-
-      </TabItem>
-
-      <TabItem value="OBS" label="OBS">
-
-      ```bash
-      # 创建 secret，保存 OBS 的访问 AK
-      kubectl create secret generic obs-credential-for-backuprepo \
-      -n kb-system \
-      --from-literal=accessKeyId=<ACCESS KEY> \
-      --from-literal=secretAccessKey=<SECRET KEY>
-
-      # 创建 BackupRepo 资源
-      kubectl apply -f - <<-'EOF'
-      apiVersion: dataprotection.kubeblocks.io/v1alpha1
-      kind: BackupRepo
-      metadata:
-        name: my-repo
-        annotations:
-          dataprotection.kubeblocks.io/is-default-repo: "true"
-      spec:
-        storageProviderRef: obs
-        accessMethod: Tool
-        pvReclaimPolicy: Retain
-        volumeCapacity: 100Gi
-        config:
-          bucket: test-kb-backup
-          mountOptions: ""
-          endpoint: ""
-          region: cn-north-4
-        credential:
-          name: obs-credential-for-backuprepo
-          namespace: kb-system
-      EOF
-      ```
-
-      </TabItem>
-
-      <TabItem value="COS" label="COS">
-
-      ```bash
-      # 创建 secret，保存 COS 的访问 AK
-      kubectl create secret generic cos-credential-for-backuprepo \
-        -n kb-system \
-        --from-literal=accessKeyId=<ACCESS KEY> \
-        --from-literal=secretAccessKey=<SECRET KEY>
-
-      # 创建 BackupRepo 资源
-      kubectl apply -f - <<-'EOF'
-      apiVersion: dataprotection.kubeblocks.io/v1alpha1
-      kind: BackupRepo
-      metadata:
-        name: my-repo
-        annotations:
-          dataprotection.kubeblocks.io/is-default-repo: "true"
-      spec:
-        storageProviderRef: cos
-        accessMethod: Tool
-        pvReclaimPolicy: Retain
-        volumeCapacity: 100Gi
-        config:
-          bucket: test-kb-backup
-          mountOptions: ""
-          endpoint: ""
-          region: ap-guangzhou
-        credential:
-          name: cos-credential-for-backuprepo
-          namespace: kb-system
-      EOF
-      ```
-
-      </TabItem>
-
-      <TabItem value="GCS" label="GCS">
-
-      ```bash
-      # 创建 secret，保存 GCS 的访问 AK
-      kubectl create secret generic gcs-credential-for-backuprepo \
-        -n kb-system \
-        --from-literal=accessKeyId=<ACCESS KEY> \
-        --from-literal=secretAccessKey=<SECRET KEY>
-
-      # 创建 BackupRepo 资源
-      kubectl apply -f - <<-'EOF'
-      apiVersion: dataprotection.kubeblocks.io/v1alpha1
-      kind: BackupRepo
-      metadata:
-        name: my-repo
-        annotations:
-          dataprotection.kubeblocks.io/is-default-repo: "true"
-      spec:
-        storageProviderRef: gcs
-        accessMethod: Tool
-        pvReclaimPolicy: Retain
-        volumeCapacity: 100Gi
-        config:
-          bucket: test-kb-backup
-          mountOptions: ""
-          endpoint: ""
-          region: auto
-        credential:
-          name: gcs-credential-for-backuprepo
-          namespace: kb-system
-      EOF
-      ```
-
-      </TabItem>
-
-      <TabItem value="MinIO" label="MinIO">
-
-      ```bash
-      # 创建 secret，保存 MinIO 的访问 AK
-      kubectl create secret generic minio-credential-for-backuprepo \
-        -n kb-system \
-        --from-literal=accessKeyId=<ACCESS KEY> \
-        --from-literal=secretAccessKey=<SECRET KEY>
-
-      # 创建 BackupRepo 资源
-      kubectl apply -f - <<-'EOF'
-      apiVersion: dataprotection.kubeblocks.io/v1alpha1
-      kind: BackupRepo
-      metadata:
-        name: my-repo
-        annotations:
-          dataprotection.kubeblocks.io/is-default-repo: "true"
-      spec:
-        storageProviderRef: minio
-        accessMethod: Tool
-        pvReclaimPolicy: Retain
-        volumeCapacity: 100Gi
-        config:
-          bucket: test-kb-backup
-          mountOptions: ""
-          endpoint: <ip:port>
-        credential:
-          name: minio-credential-for-backuprepo
-          namespace: kb-system
-      EOF
-      ```
-
-      </TabItem>
-
-      </Tabs>
-
-    </TabItem>
-
-    </Tabs>
-
-3. 查看 BackupRepo 及其状态。
-   如果 STATUS 为 `Ready`，说明 BackupRepo 已经准备就绪。
 
    <Tabs>
 
-   <TabItem value="kbcli" label="kbcli" default>
+   <TabItem value="S3" label="S3" default>
+
+   ```bash
+   kbcli backuprepo create my-repo \
+     --provider s3 \
+     --region cn-northwest-1 \
+     --bucket test-kb-backup \
+     --access-key-id <ACCESS KEY> \
+     --secret-access-key <SECRET KEY> \
+     --access-method Tool \ # 也可以填 Mount
+     --default
+   ```
+
+   </TabItem>
+
+   <TabItem value="OSS" label="OSS">
+
+   ```bash
+   kbcli backuprepo create my-repo \
+     --provider oss \
+     --region cn-zhangjiakou \
+     --bucket  test-kb-backup \
+     # --endpoint https://oss-cn-zhangjiakou-internal.aliyuncs.com \ 可以显示指定 oss endpoint
+     --access-key-id <ACCESS KEY> \
+     --secret-access-key <SECRET KEY> \
+     --access-method Tool \ 
+     --default
+   ```
+
+   </TabItem>
+
+   <TabItem value="OBS" label="OBS">
+
+   ```bash
+   kbcli backuprepo create my-repo \
+     --provider obs \
+     --region cn-north-4 \
+     --bucket  test-kb-backup \
+     --access-key-id <ACCESS KEY> \
+     --secret-access-key <SECRET KEY> \
+     --access-method Tool \
+     --default
+   ```
+
+   </TabItem>
+
+   <TabItem value="COS" label="COS">
+
+   ```bash
+   kbcli backuprepo create my-repo \
+     --provider cos \
+     --region ap-guangzhou \
+     # 腾讯云中存储桶的命名格式为 <BucketName-APPID>，APPID 为腾讯云自动生成
+     # 设置 bucket 时先通过腾讯云的控制台创建 bucket，获取存储桶名称
+     --bucket  test-kb-backup \ 
+     --access-key-id <ACCESS KEY> \
+     --secret-access-key <SECRET KEY> \
+     --access-method Tool \
+     --default
+   ```
+
+   </TabItem>
+
+   <TabItem value="GCS" label="GCS">
+
+   ```bash
+   # 目前的 gcs 为谷歌云的 s3 兼容版
+   kbcli backuprepo create my-repo \
+     --provider gcs \
+     --region auto \
+     --bucket  test-kb-backup \
+     --access-key-id <ACCESS KEY> \
+     --secret-access-key <SECRET KEY> \
+     --access-method Tool \
+     --default
+   ```
+
+   </TabItem>
+
+   <TabItem value="MinIO" label="MinIO">
+
+   ```bash
+   kbcli backuprepo create my-repo \
+     --provider minio \
+     --endpoint <ip:port> \    # 以上部署的 MinIO 的访问地址为 http://minio.kb-system.svc.cluster.local:9000
+     --bucket test-minio \
+     --access-key-id <ACCESS KEY> \
+     --secret-access-key <SECRET KEY> \
+     --access-method Tool \
+     --default
+   ```
+
+   </TabItem>
+
+   <TabItem value="PVC" label="PVC">
+
+   ```bash
+   kbcli backuprepo create my-repo \
+     --provider pvc \
+     --storage-class-name "nfs-storage" \
+     --access-mode "ReadWriteMany" \
+     --volume-capacity "100Gi" \
+     --default
+   ```
+
+   </TabItem>
+   </Tabs>
+
+   以上命令创建了一个名为 `my-repo` 的默认备份仓库。
+
+   * `my-repo` 为仓库名，可以留空不填，此时 kbcli 会使用形如 `backuprepo-xxxxx` 的随机名字。
+   * `--default` 表示该仓库是默认仓库。全局只能有一个默认仓库，如果系统中存在多个默认仓库，KubeBlocks 无法选出应该使用哪个仓库（这个行为跟 K8s 的 default StorageClass 类似），会导致备份失败。使用 kbcli 创建 BackupRepo 能避免出现这种情况，因为 kbcli 在创建时会确保当前没有第二个默认仓库。
+   * `--provider` 参数对应后端存储类型，即 `storageProvider`，可选值为 `s3`、`cos`、`gcs-s3comp`、`obs`、`oss`、`minio`、`ftp`、`nfs`。不同存储所需的命令行参数不同，可以通过 `kbcli backuprepo create --provider STORAGE-PROVIDER-NAME -h` 命令查看参数信息（注意 `--provider` 参数是必需的）。
+
+     `kbcli backuprepo create` 命令执行成功后，就会在系统中创建一个类型为 BackupRepo 的 K8s 资源，可以通过修改该资源的 annotation 来调整默认仓库。
+
+     ```bash
+     # 取消默认仓库
+     kubectl annotate backuprepo old-default-repo \
+       --overwrite=true \
+       dataprotection.kubeblocks.io/is-default-repo=false
+     ```
+
+     ```bash
+     # 设置新的默认仓库
+     kubectl annotate backuprepo backuprepo-4qms6 \
+       --overwrite=true \
+       dataprotection.kubeblocks.io/is-default-repo=true
+     ```
+
+3. 查看 BackupRepo 及其状态。
+
+   如果 STATUS 为 `Ready`，说明 BackupRepo 已经准备就绪。
 
    ```bash
    kbcli backuprepo list
    ```
-
-   </TabItem>
-
-   <TabItem value="kubectl" label="kubectl">
-
-   ```bash
-   kubectl get backuprepo
-   ```
-
-   </TabItem>
-
-   </Tabs>

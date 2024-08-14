@@ -1,34 +1,34 @@
 ---
-title: Manage StarRocks with KubeBlocks
-description: How to manage StarRocks on KubeBlocks
-keywords: [starrocks, analytic, data warehouse, control plane]
+title: 用 KubeBlocks 管理 StarRocks
+description: 如何使用 KubeBlocks 管理 StarRocks
+keywords: [starrocks, 分析型数据库, data warehouse]
 sidebar_position: 1
-sidebar_label: Manage StarRocks with KubeBlocks
+sidebar_label: 用 KubeBlocks 管理 StarRocks
 ---
 
-# Manage StarRocks with KubeBlocks
+# 用 KubeBlocks 管理 StarRocks
 
-StarRocks is a next-gen, high-performance analytical data warehouse that enables real-time, multi-dimensional, and highly concurrent data analysis.
+StarRocks 是一款高性能分析型数据仓库，使用向量化、MPP 架构、CBO、智能物化视图、可实时更新的列式存储引擎等技术实现多维、实时、高并发的数据分析。
 
 KubeBlocks supports the management of StarRocks.
 
-## Before you start
+## 开始之前
 
-- [Install kbcli](./../installation/install-with-kbcli/install-kbcli.md).
-- [Install KubeBlocks](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md).
-- [Install and enable the starrocks addon](./../overview/supported-addons.md#use-addons).
+- [安装 kbcli](./../installation/install-with-kbcli/install-kbcli.md)。
+- [安装 KubeBlocks](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md)。
+- [安装并启用 starrocks 引擎](./../overview/supported-addons.md#use-addons)。
 
-## Create a cluster
+## 创建集群
 
-***Steps***
+***步骤：***
 
-1. Execute the following command to create a StarRocks cluster. You can change the `cluster-definition` value as any other database supported.
+1. 执行以下命令，创建 StarRocks 集群。
 
    ```bash
    kbcli cluster create mycluster --cluster-definition=starrocks
    ```
 
-   You can also create a cluster with specified CPU, memory and storage values.
+   您可使用 `--set` 指定 CPU、memory、存储的值。
 
    ```bash
    kbcli cluster create mycluster --cluster-definition=starrocks --set cpu=1,memory=2Gi,storage=10Gi
@@ -36,7 +36,7 @@ KubeBlocks supports the management of StarRocks.
 
 :::note
 
-View more flags for creating a MySQL cluster to create a cluster with customized specifications.
+执行以下命令，查看更多集群创建的选项和默认值。
   
 ```bash
 kbcli cluster create --help
@@ -44,7 +44,7 @@ kbcli cluster create --help
 
 :::
 
-2. Check whether the cluster is created.
+2. 验证集群是否创建成功。
 
    ```bash
    kbcli cluster list
@@ -53,7 +53,7 @@ kbcli cluster create --help
    mycluster   default     starrocks            starrocks-3.1.1   Delete               Running    Jul 17,2024 19:06 UTC+0800   
    ```
 
-3. Check the cluster information.
+3. 查看集群信息。
 
    ```bash
     kbcli cluster describe mycluster
@@ -84,136 +84,160 @@ kbcli cluster create --help
     Show cluster events: kbcli cluster list-events -n default mycluster
    ```
 
-## Scale
+## 扩缩容
 
-### Scale vertically
+### 垂直扩缩容
 
-Use the following command to perform vertical scaling.
+#### 开始之前
+
+确认集群状态是否为 `Running`。否则，后续相关操作可能会失败。
+
+```bash
+kbcli cluster list
+>
+NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS     CREATED-TIME
+mycluster   default     starrocks            starrocks-3.1.1   Delete               Running    Jul 17,2024 19:06 UTC+0800  
+```
+
+#### 步骤
+
+执行以下命令进行垂直扩缩容。
 
 ```bash
 kbcli cluster vscale mycluster --cpu=2 --memory=20Gi --components=be
 ```
 
-Please wait a few seconds until the scaling process is over.
+这里需要等待几秒钟，直到扩缩容完成。
 
-The `kbcli cluster vscale` command prints a command to help check the progress of scaling operations.
+`kbcli cluster vscale` 命令会打印输出 `opsname`。执行以下命令检查扩缩容进度：
 
 ```bash
 kbcli cluster describe-ops mycluster-verticalscaling-smx8b -n default
 ```
 
-Validate the vertical scale operation. When the cluster is running again, the operation is completed.
+也可通过以下命令，查看扩缩容任务是否完成。
 
 ```bash
 kbcli cluster describe mycluster
 ```
 
-### Scale horizontally
+### 水平扩缩容
 
-Horizontal scaling changes the amount of pods. For example, you can scale out replicas from three to five.
+水平扩展改变 Pod 的数量。例如，您可以将副本从三个扩展到五个。
 
-From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out instances, refer to [Horizontal Scale](./../../api_docs/maintenance/scale/horizontal-scale.md) in API docs for more details and examples.
+从 v0.9.0 开始，KubeBlocks 还支持了指定实例扩缩容。可通过 [水平扩缩容 API 文档](./../../api-docs/maintenance/scale/horizontal-scale.md) 文档了解更多细节和示例。
 
-Use the following command to perform horizontal scaling.
+#### 开始之前
+
+确认集群状态是否为 `Running`。否则，后续相关操作可能会失败。
+
+```bash
+kbcli cluster list
+>
+NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS     CREATED-TIME
+mycluster   default     starrocks            starrocks-3.1.1   Delete               Running    Jul 17,2024 19:06 UTC+0800   
+```
+
+#### 步骤
+
+执行以下命令进行水平扩缩容。
 
 ```bash
 kbcli cluster hscale mycluster --replicas=3 --components=be
 ```
 
-- `--components` describes the component name ready for horizontal scaling.
-- `--replicas` describes the replica amount of the specified components. Edit the amount based on your demands to scale in or out replicas.
+- `--components` 表示准备进行水平扩容的组件名称。
+- `--replicas` 表示指定组件的副本数。根据需要设定数值，进行扩缩容。
 
-Please wait a few seconds until the scaling process is over.
-
-The `kbcli cluster hscale` command prints a command to help check the progress of scaling operations.
+执行 `kbcli cluster hscale` 后会输出一条 ops 相关命令，可使用该命令查看扩缩容任务进度。
 
 ```bash
 kbcli cluster describe-ops mycluster-horizontalscaling-smx8b -n default
 ```
 
-Validate the horizontal scale operation. When the cluster is running again, the operation is completed.
+也可通过以下命令，查看扩缩容任务是否完成。
 
 ```bash
 kbcli cluster describe mycluster
 ```
 
-## Volume expansion
+## 磁盘扩容
 
-Use the following command to perform volume expansion.
+执行以下命令进行磁盘扩容。
 
 ```bash
 kbcli cluster volume-expand mycluster --storage=40Gi --components=be
 ```
 
-The volume expansion may take a few minutes.
+执行磁盘扩容任务可能需要几分钟。
 
-The `kbcli cluster volume-expand` command prints a command to help check the progress of scaling operations.
+执行 `kbcli cluster volume-expand` 后会输出一条 ops 相关命令，可使用该命令查看扩缩容任务进度。
 
 ```bash
 kbcli cluster describe-ops mycluster-volumeexpansion-smx8b -n default
 ```
 
-Validate the volume expansion operation. When the cluster is running again, the operation is completed.
+也可通过以下命令，查看磁盘扩容任务是否完成。
 
 ```bash
 kbcli cluster describe mycluster
 ```
 
-## Restart
+## 重启集群
 
-1. Restart a cluster.
+1. 执行以下命令，重启集群。
 
-   Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
+   配置 `components` 和 `ttlSecondsAfterSucceed` 的值，执行以下命令来重启指定集群。
 
    ```bash
    kbcli cluster restart mycluster --components="starrocks" \
    --ttlSecondsAfterSucceed=30
    ```
 
-   - `components` describes the component name that needs to be restarted.
-   - `ttlSecondsAfterSucceed` describes the time to live of an OpsRequest job after the restarting succeeds.
+   - `components` 表示需要重启的组件名称。
+   - `ttlSecondsAfterSucceed` 表示重启成功后 OpsRequest 作业的生存时间。
 
-2. Validate the restarting.
+2. 验证重启是否成功。
 
-   Run the command below to check the cluster status to check the restarting status.
+   检查集群状态，验证重启操作是否成功。
 
    ```bash
    kbcli cluster list mycluster
    >
    NAME        NAMESPACE   CLUSTER-DEFINITION     VERSION             TERMINATION-POLICY   STATUS    CREATED-TIME
-   mycluster   default     starrocks               starrocks-3.1.1    Delete               Running   Jul 17,2024 19:06 UTC+0800
+   mycluster   default     starrocks              starrocks-3.1.1    Delete               Running   Jul 17,2024 19:06 UTC+0800
    ```
 
-   * STATUS=Updating: it means the cluster restart is in progress.
-   * STATUS=Running: it means the cluster has been restarted.
+   - STATUS=Updating 表示集群正在重启中。
+   - STATUS=Running 表示集群已重启。
 
-## Stop/Start a cluster
+## 停止/启动集群
 
-You can stop/start a cluster to save computing resources. When a cluster is stopped, the computing resources of this cluster are released, which means the pods of Kubernetes are released, but the storage resources are reserved. You can start this cluster again by snapshots if you want to restore the cluster resources.
+你可以停止/启动集群以释放计算资源。当集群被停止时，其计算资源将被释放，也就是说 Kubernetes 的 Pod 将被释放，但其存储资源仍将被保留。如果你希望通过快照从原始存储中恢复集群资源，请重新启动该集群。
 
-### Stop a cluster
+## 停止集群
 
-1. Configure the name of your cluster and run the command below to stop this cluster.
+1. 配置集群名称，并执行以下命令来停止该集群。
 
    ```bash
    kbcli cluster stop mycluster
    ```
 
-2. Check the status of the cluster to see whether it is stopped.
+2. 查看集群状态，确认集群是否已停止。
 
     ```bash
     kbcli cluster list
     ```
 
-### Start a cluster
+### 启动集群
 
-1. Configure the name of your cluster and run the command below to start this cluster.
+1. 配置集群名称，并执行以下命令来启动该集群。
 
    ```bash
    kbcli cluster start mycluster
    ```
 
-2. Check the status of the cluster to see whether it is running again.
+2. 查看集群状态，确认集群是否已再次运行。
 
     ```bash
     kbcli cluster list

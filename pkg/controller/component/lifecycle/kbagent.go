@@ -38,6 +38,7 @@ import (
 
 type lifecycleAction interface {
 	name() string
+	precondition(ctx context.Context, cli client.Reader) error
 	parameters(ctx context.Context, cli client.Reader) (map[string]string, error)
 }
 
@@ -51,74 +52,84 @@ type kbagent struct {
 var _ Lifecycle = &kbagent{}
 
 func (a *kbagent) PostProvision(ctx context.Context, cli client.Reader, opts *Options) error {
-	la := &postProvision{}
-	return a.checkedCallAction(ctx, cli, a.lifecycleActions.PostProvision, la, opts)
+	lfa := &postProvision{
+		synthesizedComp: a.synthesizedComp,
+		action:          a.lifecycleActions.PostProvision,
+	}
+	return a.checkedCallAction(ctx, cli, a.lifecycleActions.PostProvision, lfa, opts)
 }
 
 func (a *kbagent) PreTerminate(ctx context.Context, cli client.Reader, opts *Options) error {
-	la := &preTerminate{}
-	return a.checkedCallAction(ctx, cli, a.lifecycleActions.PreTerminate, la, opts)
+	lfa := &preTerminate{
+		synthesizedComp: a.synthesizedComp,
+		action:          a.lifecycleActions.PreTerminate,
+	}
+	return a.checkedCallAction(ctx, cli, a.lifecycleActions.PreTerminate, lfa, opts)
 }
 
 func (a *kbagent) Switchover(ctx context.Context, cli client.Reader, opts *Options) error {
-	la := &switchover{}
-	return a.checkedCallAction(ctx, cli, a.lifecycleActions.Switchover, la, opts)
+	lfa := &switchover{}
+	return a.checkedCallAction(ctx, cli, a.lifecycleActions.Switchover, lfa, opts)
 }
 
 func (a *kbagent) MemberJoin(ctx context.Context, cli client.Reader, opts *Options) error {
-	la := &memberJoin{
+	lfa := &memberJoin{
 		synthesizedComp: a.synthesizedComp,
 		pod:             a.pod,
 	}
-	return a.checkedCallAction(ctx, cli, a.lifecycleActions.MemberJoin, la, opts)
+	return a.checkedCallAction(ctx, cli, a.lifecycleActions.MemberJoin, lfa, opts)
 }
 
 func (a *kbagent) MemberLeave(ctx context.Context, cli client.Reader, opts *Options) error {
-	la := &memberLeave{
+	lfa := &memberLeave{
 		synthesizedComp: a.synthesizedComp,
 		pod:             a.pod,
 	}
-	return a.checkedCallAction(ctx, cli, a.lifecycleActions.MemberLeave, la, opts)
+	return a.checkedCallAction(ctx, cli, a.lifecycleActions.MemberLeave, lfa, opts)
 }
 
 func (a *kbagent) DataDump(ctx context.Context, cli client.Reader, opts *Options) error {
-	la := &dataDump{}
-	return a.checkedCallAction(ctx, cli, a.lifecycleActions.DataDump, la, opts)
+	lfa := &dataDump{}
+	return a.checkedCallAction(ctx, cli, a.lifecycleActions.DataDump, lfa, opts)
 }
 
 func (a *kbagent) DataLoad(ctx context.Context, cli client.Reader, opts *Options) error {
-	la := &dataLoad{}
-	return a.checkedCallAction(ctx, cli, a.lifecycleActions.DataLoad, la, opts)
+	lfa := &dataLoad{}
+	return a.checkedCallAction(ctx, cli, a.lifecycleActions.DataLoad, lfa, opts)
 }
 
 func (a *kbagent) AccountProvision(ctx context.Context, cli client.Reader, opts *Options, args ...any) error {
-	la := &accountProvision{args: args}
-	return a.checkedCallAction(ctx, cli, a.lifecycleActions.AccountProvision, la, opts)
+	lfa := &accountProvision{args: args}
+	return a.checkedCallAction(ctx, cli, a.lifecycleActions.AccountProvision, lfa, opts)
 }
 
-func (a *kbagent) checkedCallAction(ctx context.Context, cli client.Reader, action *appsv1alpha1.Action, la lifecycleAction, opts *Options) error {
+func (a *kbagent) checkedCallAction(ctx context.Context, cli client.Reader, action *appsv1alpha1.Action, lfa lifecycleAction, opts *Options) error {
 	if action == nil {
-		return errors.Wrap(ErrActionNotDefined, la.name())
+		return errors.Wrap(ErrActionNotDefined, lfa.name())
 	}
-	return a.callAction(ctx, cli, action, la, opts)
+	if err := lfa.precondition(ctx, cli); err != nil {
+		return err
+	}
+	// TODO: exactly once
+	return a.callAction(ctx, cli, action, lfa, opts)
 }
 
-func (a *kbagent) callAction(ctx context.Context, cli client.Reader, spec *appsv1alpha1.Action, la lifecycleAction, opts *Options) error {
-	req, err1 := a.buildActionRequest(ctx, cli, la, opts)
+func (a *kbagent) callAction(ctx context.Context, cli client.Reader, spec *appsv1alpha1.Action, lfa lifecycleAction, opts *Options) error {
+	req, err1 := a.buildActionRequest(ctx, cli, lfa, opts)
 	if err1 != nil {
 		return err1
 	}
-	return a.callActionWithSelector(ctx, spec, la, req)
+	return a.callActionWithSelector(ctx, spec, lfa, req)
 }
 
-func (a *kbagent) buildActionRequest(ctx context.Context, cli client.Reader, la lifecycleAction, opts *Options) (*proto.ActionRequest, error) {
-	parameters, err := la.parameters(ctx, cli)
+func (a *kbagent) buildActionRequest(ctx context.Context, cli client.Reader, lfa lifecycleAction, opts *Options) (*proto.ActionRequest, error) {
+	parameters, err := lfa.parameters(ctx, cli)
 	if err != nil {
 		return nil, err
 	}
 
 	req := &proto.ActionRequest{
-		Action:     la.name(),
+		Action:     lfa.name(),
 		Parameters: parameters,
 	}
 	if opts != nil {
@@ -138,13 +149,13 @@ func (a *kbagent) buildActionRequest(ctx context.Context, cli client.Reader, la 
 	return req, nil
 }
 
-func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1alpha1.Action, la lifecycleAction, req *proto.ActionRequest) error {
+func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1alpha1.Action, lfa lifecycleAction, req *proto.ActionRequest) error {
 	pods, err := a.selectTargetPods(spec)
 	if err != nil {
 		return err
 	}
 	if len(pods) == 0 {
-		return fmt.Errorf("no available pod to call action %s", la.name())
+		return fmt.Errorf("no available pod to call action %s", lfa.name())
 	}
 
 	// TODO: impl
@@ -160,7 +171,7 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1alpha1
 		}
 		_, err2 := cli.CallAction(ctx, *req)
 		if err2 != nil {
-			return a.error2(la, err2)
+			return a.error2(lfa, err2)
 		}
 	}
 	return nil
@@ -207,24 +218,24 @@ func (a *kbagent) selectTargetPods(spec *appsv1alpha1.Action) ([]*corev1.Pod, er
 	}
 }
 
-func (a *kbagent) error2(la lifecycleAction, err error) error {
+func (a *kbagent) error2(lfa lifecycleAction, err error) error {
 	switch {
 	case err == nil:
 		return nil
 	case errors.Is(err, service.ErrNotDefined):
-		return errors.Wrap(ErrActionNotDefined, la.name())
+		return errors.Wrap(ErrActionNotDefined, lfa.name())
 	case errors.Is(err, service.ErrNotImplemented):
-		return errors.Wrap(ErrActionNotImplemented, la.name())
+		return errors.Wrap(ErrActionNotImplemented, lfa.name())
 	case errors.Is(err, service.ErrInProgress):
-		return errors.Wrap(ErrActionInProgress, la.name())
+		return errors.Wrap(ErrActionInProgress, lfa.name())
 	case errors.Is(err, service.ErrBusy):
-		return errors.Wrap(ErrActionBusy, la.name())
+		return errors.Wrap(ErrActionBusy, lfa.name())
 	case errors.Is(err, service.ErrTimeout):
-		return errors.Wrap(ErrActionTimeout, la.name())
+		return errors.Wrap(ErrActionTimeout, lfa.name())
 	case errors.Is(err, service.ErrFailed):
-		return errors.Wrap(ErrActionFailed, la.name())
+		return errors.Wrap(ErrActionFailed, lfa.name())
 	case errors.Is(err, service.ErrInternalError):
-		return errors.Wrap(ErrActionInternalError, la.name())
+		return errors.Wrap(ErrActionInternalError, lfa.name())
 	default:
 		return err
 	}

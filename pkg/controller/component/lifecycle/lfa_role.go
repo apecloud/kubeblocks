@@ -36,6 +36,10 @@ func (a *switchover) name() string {
 	return "switchover"
 }
 
+func (a *switchover) precondition(ctx context.Context, cli client.Reader) error {
+	return nil
+}
+
 func (a *switchover) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {
 	return nil, nil
 }

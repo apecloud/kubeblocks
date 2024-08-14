@@ -35,6 +35,10 @@ func (a *accountProvision) name() string {
 	return "accountProvision"
 }
 
+func (a *accountProvision) precondition(ctx context.Context, cli client.Reader) error {
+	return nil
+}
+
 func (a *accountProvision) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {
 	return nil, nil
 }

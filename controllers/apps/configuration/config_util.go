@@ -337,7 +337,7 @@ func validateConfigTemplate(cli client.Client, ctx intctrlutil.RequestCtx, confi
 		if !validateConfigConstraintStatus(configConstraint.Status) {
 			errMsg := fmt.Sprintf("Configuration template CR[%s] status not ready! current status: %s", configConstraint.Name, configConstraint.Status.Phase)
 			logger.V(1).Info(errMsg)
-			return false, fmt.Errorf(errMsg)
+			return false, fmt.Errorf("%s", errMsg)
 		}
 	}
 	return true, nil

@@ -165,7 +165,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 		})
 
 		It("not implemented", func() {
-			mockDBManager.EXPECT().GetReplicaRole(gomock.Any(), gomock.Any()).Return(string(""), fmt.Errorf(msg))
+			mockDBManager.EXPECT().GetReplicaRole(gomock.Any(), gomock.Any()).Return(string(""), fmt.Errorf("%s", msg))
 			mockDCSStore.EXPECT().GetClusterFromCache().Return(&dcs.Cluster{})
 			role, err := lorryClient.GetRole(context.TODO())
 			Expect(err).Should(HaveOccurred())
@@ -197,7 +197,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 		})
 
 		It("not implemented", func() {
-			mockDBManager.EXPECT().ListSystemAccounts(gomock.Any()).Return(nil, fmt.Errorf(msg))
+			mockDBManager.EXPECT().ListSystemAccounts(gomock.Any()).Return(nil, fmt.Errorf("%s", msg))
 			accounts, err := lorryClient.ListSystemAccounts(context.TODO())
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring(msg))
@@ -221,7 +221,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 
 		It("not implemented", func() {
 			mockDBManager.EXPECT().DescribeUser(gomock.Any(), gomock.Any()).Return(nil, nil)
-			mockDBManager.EXPECT().CreateUser(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf(msg))
+			mockDBManager.EXPECT().CreateUser(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("%s", msg))
 			err := lorryClient.CreateUser(context.TODO(), "user-test", "password-test", "", "")
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring(msg))
@@ -242,7 +242,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 		})
 
 		It("not implemented", func() {
-			mockDBManager.EXPECT().DeleteUser(gomock.Any(), gomock.Any()).Return(fmt.Errorf(msg))
+			mockDBManager.EXPECT().DeleteUser(gomock.Any(), gomock.Any()).Return(fmt.Errorf("%s", msg))
 			err := lorryClient.DeleteUser(context.TODO(), "user-test")
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring(msg))
@@ -269,7 +269,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 		})
 
 		It("not implemented", func() {
-			mockDBManager.EXPECT().DescribeUser(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf(msg))
+			mockDBManager.EXPECT().DescribeUser(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("%s", msg))
 			_, err := lorryClient.DescribeUser(context.TODO(), "user-test")
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring(msg))
@@ -290,7 +290,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 		})
 
 		It("not implemented", func() {
-			mockDBManager.EXPECT().GrantUserRole(gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf(msg))
+			mockDBManager.EXPECT().GrantUserRole(gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("%s", msg))
 			err := lorryClient.GrantUserRole(context.TODO(), "user-test", "readwrite")
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring(msg))
@@ -311,7 +311,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 		})
 
 		It("not implemented", func() {
-			mockDBManager.EXPECT().RevokeUserRole(gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf(msg))
+			mockDBManager.EXPECT().RevokeUserRole(gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("%s", msg))
 			err := lorryClient.RevokeUserRole(context.TODO(), "user-test", "readwrite")
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring(msg))
@@ -341,7 +341,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 		})
 
 		It("not implemented", func() {
-			mockDBManager.EXPECT().ListUsers(gomock.Any()).Return(nil, fmt.Errorf(msg))
+			mockDBManager.EXPECT().ListUsers(gomock.Any()).Return(nil, fmt.Errorf("%s", msg))
 			users, err := lorryClient.ListUsers(context.TODO())
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring(msg))
@@ -383,7 +383,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 		})
 
 		It("not implemented", func() {
-			mockDBManager.EXPECT().JoinCurrentMemberToCluster(gomock.Any(), gomock.Any()).Return(fmt.Errorf(msg))
+			mockDBManager.EXPECT().JoinCurrentMemberToCluster(gomock.Any(), gomock.Any()).Return(fmt.Errorf("%s", msg))
 			mockDCSStore.EXPECT().GetCluster().Return(cluster, nil)
 			err := lorryClient.JoinMember(context.TODO())
 			Expect(err).Should(HaveOccurred())
@@ -470,7 +470,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 
 		It("not implemented", func() {
 			mockDBManager.EXPECT().GetCurrentMemberName().Return(podName).Times(2)
-			mockDBManager.EXPECT().LeaveMemberFromCluster(gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf(msg))
+			mockDBManager.EXPECT().LeaveMemberFromCluster(gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("%s", msg))
 			mockDCSStore.EXPECT().GetCluster().Return(cluster, nil)
 			mockDCSStore.EXPECT().UpdateHaConfig().Return(nil)
 			err := lorryClient.LeaveMember(context.TODO())
@@ -624,7 +624,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 		})
 
 		It("not implemented", func() {
-			mockDBManager.EXPECT().Lock(gomock.Any(), gomock.Any()).Return(fmt.Errorf(msg))
+			mockDBManager.EXPECT().Lock(gomock.Any(), gomock.Any()).Return(fmt.Errorf("%s", msg))
 			err := lorryClient.Lock(context.TODO())
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring(msg))
@@ -681,7 +681,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 		})
 
 		It("not implemented", func() {
-			mockDBManager.EXPECT().Unlock(gomock.Any()).Return(fmt.Errorf(msg))
+			mockDBManager.EXPECT().Unlock(gomock.Any()).Return(fmt.Errorf("%s", msg))
 			err := lorryClient.Unlock(context.TODO())
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring(msg))

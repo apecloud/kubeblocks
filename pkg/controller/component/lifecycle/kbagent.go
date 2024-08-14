@@ -62,10 +62,7 @@ func (a *kbagent) PreTerminate(ctx context.Context, cli client.Reader, opts *Opt
 
 func (a *kbagent) Switchover(ctx context.Context, cli client.Reader, opts *Options) error {
 	la := &switchover{}
-	if a.lifecycleActions.Switchover == nil {
-		return errors.Wrap(ErrActionNotDefined, la.name())
-	}
-	return a.callAction(ctx, cli, a.lifecycleActions.Switchover, la, opts)
+	return a.checkedCallAction(ctx, cli, a.lifecycleActions.Switchover, la, opts)
 }
 
 func (a *kbagent) MemberJoin(ctx context.Context, cli client.Reader, opts *Options) error {

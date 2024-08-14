@@ -43,8 +43,7 @@ const (
 	ApeCloudMySQLImage        = "docker.io/apecloud/apecloud-mysql-server:latest"
 	DefaultMySQLContainerName = "mysql"
 
-	NginxImage                = "nginx"
-	DefaultNginxContainerName = "nginx"
+	NginxImage = "nginx"
 
 	DefaultConfigSpecName          = "config-cm"
 	DefaultConfigSpecTplRef        = "env-from-config-tpl"

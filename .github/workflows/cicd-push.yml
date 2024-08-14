@@ -3,10 +3,9 @@ name: CICD Push
 on:
   push:
     branches:
-      - '*'
-      - '*/*'
+      - '**'
     tags-ignore:
-      - '*'
+      - '**'
 
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}

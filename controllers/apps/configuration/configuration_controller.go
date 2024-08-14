@@ -127,7 +127,7 @@ func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 func (r *ConfigurationReconciler) failWithInvalidComponent(configuration *appsv1alpha1.Configuration, reqCtx intctrlutil.RequestCtx) (ctrl.Result, error) {
 	msg := fmt.Sprintf("not found cluster component or cluster definition component: [%s]", configuration.Spec.ComponentName)
-	reqCtx.Log.Error(fmt.Errorf(msg), "")
+	reqCtx.Log.Error(fmt.Errorf("%s", msg), "")
 	patch := client.MergeFrom(configuration.DeepCopy())
 	configuration.Status.Message = msg
 	if err := r.Client.Status().Patch(reqCtx.Ctx, configuration, patch); err != nil {

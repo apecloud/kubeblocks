@@ -87,7 +87,7 @@ func (c *httpClient) request(ctx context.Context, method, url string, body io.Re
 		if err != nil {
 			return nil, err
 		}
-		return nil, fmt.Errorf(string(msg))
+		return nil, fmt.Errorf("%s", string(msg))
 	}
 }
 

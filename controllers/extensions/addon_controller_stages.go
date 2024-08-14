@@ -1148,7 +1148,7 @@ func getKubeBlocksDeploy(ctx context.Context, r *AddonReconciler) (*v1.Deploymen
 		client.MatchingLabelsSelector{Selector: labelSelector}); err != nil {
 		return nil, err
 	}
-	if deploys.Items == nil || len(deploys.Items) == 0 {
+	if len(deploys.Items) == 0 {
 		return nil, fmt.Errorf("there is no KubeBlocks deployment, please check your cluster")
 	}
 	if len(deploys.Items) > 1 {

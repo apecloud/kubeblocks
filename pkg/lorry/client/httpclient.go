@@ -174,7 +174,7 @@ func (cli *HTTPClient) Request(ctx context.Context, operation, method string, re
 		if err != nil {
 			return nil, err
 		}
-		return nil, fmt.Errorf(string(msg))
+		return nil, fmt.Errorf("%s", string(msg))
 	}
 }
 

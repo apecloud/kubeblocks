@@ -68,7 +68,10 @@ func (a *kbagent) PreTerminate(ctx context.Context, cli client.Reader, opts *Opt
 }
 
 func (a *kbagent) Switchover(ctx context.Context, cli client.Reader, opts *Options) error {
-	lfa := &switchover{}
+	lfa := &switchover{
+		synthesizedComp: a.synthesizedComp,
+		pod:             a.pod,
+	}
 	return a.checkedCallAction(ctx, cli, a.lifecycleActions.Switchover, lfa, opts)
 }
 

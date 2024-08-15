@@ -51,7 +51,7 @@ func (a *memberJoin) precondition(ctx context.Context, cli client.Reader) error 
 }
 
 func (a *memberJoin) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {
-	// The container executing this action has access to following environment variables:
+	// The container executing this action has access to following variables:
 	//
 	// - KB_JOIN_MEMBER_POD_FQDN: The pod FQDN of the replica being added to the group.
 	// - KB_JOIN_MEMBER_POD_NAME: The pod name of the replica being added to the group.
@@ -77,7 +77,7 @@ func (a *memberLeave) precondition(ctx context.Context, cli client.Reader) error
 }
 
 func (a *memberLeave) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {
-	// The container executing this action has access to following environment variables:
+	// The container executing this action has access to following variables:
 	//
 	// - KB_LEAVE_MEMBER_POD_FQDN: The pod name of the replica being removed from the group.
 	// - KB_LEAVE_MEMBER_POD_NAME: The pod name of the replica being removed from the group.

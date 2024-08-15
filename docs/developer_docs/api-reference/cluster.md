@@ -6831,11 +6831,8 @@ Action
 This approach aims to minimize downtime and maintain availability in systems with a leader-follower topology,
 during events such as planned maintenance or when performing stop, shutdown, restart, or upgrade operations
 involving the current leader node.</p>
-<p>The container executing this action has access to following environment variables:</p>
+<p>The container executing this action has access to following variables:</p>
 <ul>
-<li>KB_LEADER_POD_IP: The IP address of the current leader&rsquo;s pod prior to the switchover.</li>
-<li>KB_LEADER_POD_NAME: The name of the current leader&rsquo;s pod prior to the switchover.</li>
-<li>KB_LEADER_POD_FQDN: The FQDN of the current leader&rsquo;s pod prior to the switchover.</li>
 <li>KB_SWITCHOVER_CANDIDATE_NAME: The name of the pod for the new leader candidate, which may not be specified (empty).</li>
 <li>KB_SWITCHOVER_CANDIDATE_FQDN: The FQDN of the new leader candidate&rsquo;s pod, which may not be specified (empty).</li>
 </ul>

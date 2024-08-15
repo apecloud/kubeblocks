@@ -979,11 +979,8 @@ type ComponentLifecycleActions struct {
 	// during events such as planned maintenance or when performing stop, shutdown, restart, or upgrade operations
 	// involving the current leader node.
 	//
-	// The container executing this action has access to following environment variables:
+	// The container executing this action has access to following variables:
 	//
-	// - KB_LEADER_POD_IP: The IP address of the current leader's pod prior to the switchover.
-	// - KB_LEADER_POD_NAME: The name of the current leader's pod prior to the switchover.
-	// - KB_LEADER_POD_FQDN: The FQDN of the current leader's pod prior to the switchover.
 	// - KB_SWITCHOVER_CANDIDATE_NAME: The name of the pod for the new leader candidate, which may not be specified (empty).
 	// - KB_SWITCHOVER_CANDIDATE_FQDN: The FQDN of the new leader candidate's pod, which may not be specified (empty).
 	//

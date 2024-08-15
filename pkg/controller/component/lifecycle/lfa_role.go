@@ -22,12 +22,20 @@ package lifecycle
 import (
 	"context"
 
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+)
+
+const (
+	switchoverCandidateName = "KB_SWITCHOVER_CANDIDATE_NAME"
+	switchoverCandidateFQDN = "KB_SWITCHOVER_CANDIDATE_FQDN"
 )
 
 type switchover struct {
-	// synthesizedComp *component.SynthesizedComponent
-	// switchover      *appsv1alpha1.Switchover
+	synthesizedComp *component.SynthesizedComponent
+	pod             *corev1.Pod
 }
 
 var _ lifecycleAction = &switchover{}
@@ -41,5 +49,12 @@ func (a *switchover) precondition(ctx context.Context, cli client.Reader) error 
 }
 
 func (a *switchover) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {
-	return nil, nil
+	// The container executing this action has access to following variables:
+	//
+	// - KB_SWITCHOVER_CANDIDATE_NAME: The name of the pod for the new leader candidate, which may not be specified (empty).
+	// - KB_SWITCHOVER_CANDIDATE_FQDN: The FQDN of the new leader candidate's pod, which may not be specified (empty).
+	return map[string]string{
+		switchoverCandidateName: a.pod.Name,
+		switchoverCandidateFQDN: component.PodFQDN(a.synthesizedComp.Namespace, a.synthesizedComp.FullCompName, a.pod.Name),
+	}, nil
 }

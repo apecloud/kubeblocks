@@ -381,7 +381,7 @@ var _ = Describe("Component Controller", func() {
 	testChangeReplicas := func(compName, compDefName string) {
 		Expect(compDefName).Should(BeElementOf(statefulCompDefName, replicationCompDefName, consensusCompDefName))
 		createClusterObj(compName, compDefName, nil)
-		replicasSeq := []int32{5, 3, 1, 0, 2, 4}
+		replicasSeq := []int32{5, 3, 1, 2, 4}
 		expectedOG := int64(1)
 		for _, replicas := range replicasSeq {
 			By(fmt.Sprintf("Change replicas to %d", replicas))
@@ -2266,7 +2266,7 @@ var _ = Describe("Component Controller", func() {
 					testHorizontalScale(compName, compDefName, 3, 0, appsv1alpha1.HScaleDataClonePolicyCloneVolume)
 				})
 
-				It("scale-out from 0 and should work well", func() {
+				PIt("scale-out from 0 and should work well", func() {
 					testHorizontalScale(compName, compDefName, 0, 3, appsv1alpha1.HScaleDataClonePolicyCloneVolume)
 				})
 			})

@@ -225,8 +225,8 @@ func renderSwitchoverCmdJob(ctx context.Context,
 		for i := range job.Spec.Template.Spec.Containers {
 			intctrlutil.InjectZeroResourcesLimitsIfEmpty(&job.Spec.Template.Spec.Containers[i])
 		}
-		if len(cluster.Spec.Tolerations) > 0 {
-			job.Spec.Template.Spec.Tolerations = cluster.Spec.Tolerations
+		if err := component.BuildJobTolerations(job, cluster); err != nil {
+			return nil, err
 		}
 		return job, nil
 	}

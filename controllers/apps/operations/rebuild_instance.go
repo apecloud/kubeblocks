@@ -80,7 +80,7 @@ func (r rebuildInstanceOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli cli
 		}
 		// check if the component has matched the `Phase` condition
 		if !opsRes.OpsRequest.Spec.Force && !slices.Contains([]appsv1alpha1.ClusterComponentPhase{appsv1alpha1.FailedClusterCompPhase,
-			appsv1alpha1.AbnormalClusterCompPhase, appsv1alpha1.UpdatingClusterCompPhase}, compStatus.Phase) {
+			appsv1alpha1.UpdatingClusterCompPhase}, compStatus.Phase) {
 			return intctrlutil.NewFatalError(fmt.Sprintf(`the phase of component "%s" can not be %s`, v.ComponentName, compStatus.Phase))
 		}
 		var (

@@ -1028,6 +1028,13 @@ type ComponentLifecycleActions struct {
 	// +optional
 	RoleProbe *Probe `json:"roleProbe,omitempty"`
 
+	// Defines the procedure which is invoked regularly to assess the availability of component.
+	//
+	// Note: This field is immutable once it has been set.
+	//
+	// +optional
+	AvailableProbe *Probe `json:"availableProbe,omitempty"`
+
 	// Defines the procedure for a controlled transition of leadership from the current leader to a new replica.
 	// This approach aims to minimize downtime and maintain availability in systems with a leader-follower topology,
 	// during events such as planned maintenance or when performing stop, shutdown, restart, or upgrade operations

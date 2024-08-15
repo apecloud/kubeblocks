@@ -286,22 +286,17 @@ const (
 	DeletingClusterCompPhase ClusterComponentPhase = "Deleting"
 
 	// FailedClusterCompPhase indicates the component has more than zero replicas, but there are some failed pods.
-	// The component is not functioning.
 	FailedClusterCompPhase ClusterComponentPhase = "Failed"
-
-	// AbnormalClusterCompPhase indicates the component has more than zero replicas, but there are some failed pods.
-	// The component is functioning, but it is in a fragile state.
-	AbnormalClusterCompPhase ClusterComponentPhase = "Abnormal"
 )
 
 const (
-	// define the cluster condition type
 	ConditionTypeHaltRecovery        = "HaltRecovery"        // ConditionTypeHaltRecovery describe Halt recovery processing stage
 	ConditionTypeProvisioningStarted = "ProvisioningStarted" // ConditionTypeProvisioningStarted the operator starts resource provisioning to create or change the cluster
 	ConditionTypeApplyResources      = "ApplyResources"      // ConditionTypeApplyResources the operator start to apply resources to create or change the cluster
 	ConditionTypeReplicasReady       = "ReplicasReady"       // ConditionTypeReplicasReady all pods of components are ready
 	ConditionTypeReady               = "Ready"               // ConditionTypeReady all components are running
-	ConditionTypeSwitchoverPrefix    = "Switchover-"         // ConditionTypeSwitchoverPrefix component status condition of switchover
+	// ConditionTypeAvailable indicates whether the target object is available for serving.
+	ConditionTypeAvailable = "Available"
 )
 
 // Phase represents the current status of the ClusterDefinition CR.

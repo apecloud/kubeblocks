@@ -1709,7 +1709,6 @@ func GetComponentTerminalPhases() []ClusterComponentPhase {
 		RunningClusterCompPhase,
 		StoppedClusterCompPhase,
 		FailedClusterCompPhase,
-		AbnormalClusterCompPhase,
 	}
 }
 
@@ -1717,7 +1716,6 @@ func GetComponentTerminalPhases() []ClusterComponentPhase {
 func GetComponentUpRunningPhase() []ClusterComponentPhase {
 	return []ClusterComponentPhase{
 		RunningClusterCompPhase,
-		AbnormalClusterCompPhase,
 		FailedClusterCompPhase,
 	}
 }

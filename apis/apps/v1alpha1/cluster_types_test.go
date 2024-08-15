@@ -180,14 +180,12 @@ var _ = Describe("", func() {
 			RunningClusterCompPhase,
 			StoppedClusterCompPhase,
 			FailedClusterCompPhase,
-			AbnormalClusterCompPhase,
 		}))
 	})
 
 	It("GetComponentUpRunningPhase", func() {
 		Expect(GetComponentUpRunningPhase()).Should(ContainElements([]ClusterComponentPhase{
 			RunningClusterCompPhase,
-			AbnormalClusterCompPhase,
 			FailedClusterCompPhase,
 		}))
 	})

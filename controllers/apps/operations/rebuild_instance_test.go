@@ -180,18 +180,6 @@ var _ = Describe("OpsUtil functions", func() {
 			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsFailedPhase))
 			Expect(opsRes.OpsRequest.Status.Conditions[0].Message).Should(ContainSubstring(fmt.Sprintf(`the phase of component "%s" can not be %s`, defaultCompName, appsv1alpha1.RunningClusterCompPhase)))
 
-			By("fake component phase to Abnormal")
-			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsCreatingPhase
-			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
-				compStatus := opsRes.Cluster.Status.Components[defaultCompName]
-				compStatus.Phase = appsv1alpha1.AbnormalClusterCompPhase
-				opsRes.Cluster.Status.Components[defaultCompName] = compStatus
-			})).Should(Succeed())
-
-			By("expect for opsRequest phase is Failed due to the pod is Available")
-			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
-			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsFailedPhase))
-
 			By("fake pod is unavailable")
 			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsCreatingPhase
 			for _, ins := range opsRes.OpsRequest.Spec.RebuildFrom[0].Instances {
@@ -393,15 +381,6 @@ var _ = Describe("OpsUtil functions", func() {
 			its := testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
 			podList := testapps.MockInstanceSetPods(&testCtx, its, opsRes.Cluster, defaultCompName)
 			opsRes.OpsRequest = createRebuildInstanceOps("", false, podList[1].Name, podList[2].Name)
-
-			By("mock cluster/component phase to Abnormal")
-			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsCreatingPhase
-			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
-				compStatus := opsRes.Cluster.Status.Components[defaultCompName]
-				compStatus.Phase = appsv1alpha1.AbnormalClusterCompPhase
-				opsRes.Cluster.Status.Phase = appsv1alpha1.AbnormalClusterPhase
-				opsRes.Cluster.Status.Components[defaultCompName] = compStatus
-			})).Should(Succeed())
 
 			By("mock pods are available")
 			for i := range podList {

@@ -33,10 +33,6 @@ func (a *dataDump) name() string {
 	return "dataDump"
 }
 
-func (a *dataDump) precondition(ctx context.Context, cli client.Reader) error {
-	return nil
-}
-
 func (a *dataDump) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {
 	return nil, nil
 }
@@ -47,10 +43,6 @@ var _ lifecycleAction = &dataLoad{}
 
 func (a *dataLoad) name() string {
 	return "dataLoad"
-}
-
-func (a *dataLoad) precondition(ctx context.Context, cli client.Reader) error {
-	return nil
 }
 
 func (a *dataLoad) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {

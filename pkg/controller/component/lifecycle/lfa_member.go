@@ -46,10 +46,6 @@ func (a *memberJoin) name() string {
 	return "memberJoin"
 }
 
-func (a *memberJoin) precondition(ctx context.Context, cli client.Reader) error {
-	return nil
-}
-
 func (a *memberJoin) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {
 	// The container executing this action has access to following variables:
 	//
@@ -70,10 +66,6 @@ var _ lifecycleAction = &memberLeave{}
 
 func (a *memberLeave) name() string {
 	return "memberLeave"
-}
-
-func (a *memberLeave) precondition(ctx context.Context, cli client.Reader) error {
-	return nil
 }
 
 func (a *memberLeave) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {

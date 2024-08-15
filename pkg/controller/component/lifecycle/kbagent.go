@@ -26,11 +26,14 @@ import (
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/service"
@@ -38,7 +41,6 @@ import (
 
 type lifecycleAction interface {
 	name() string
-	precondition(ctx context.Context, cli client.Reader) error
 	parameters(ctx context.Context, cli client.Reader) (map[string]string, error)
 }
 
@@ -110,15 +112,72 @@ func (a *kbagent) AccountProvision(ctx context.Context, cli client.Reader, opts 
 	return a.checkedCallAction(ctx, cli, a.lifecycleActions.AccountProvision, lfa, opts)
 }
 
-func (a *kbagent) checkedCallAction(ctx context.Context, cli client.Reader, action *appsv1alpha1.Action, lfa lifecycleAction, opts *Options) error {
-	if action == nil {
+func (a *kbagent) checkedCallAction(ctx context.Context, cli client.Reader, spec *appsv1alpha1.Action, lfa lifecycleAction, opts *Options) error {
+	if spec == nil {
 		return errors.Wrap(ErrActionNotDefined, lfa.name())
 	}
-	if err := lfa.precondition(ctx, cli); err != nil {
+	if err := a.precondition(ctx, cli, spec); err != nil {
 		return err
 	}
 	// TODO: exactly once
-	return a.callAction(ctx, cli, action, lfa, opts)
+	return a.callAction(ctx, cli, spec, lfa, opts)
+}
+
+func (a *kbagent) precondition(ctx context.Context, cli client.Reader, spec *appsv1alpha1.Action) error {
+	if spec.PreCondition == nil {
+		return nil
+	}
+	switch *spec.PreCondition {
+	case appsv1alpha1.ImmediatelyPreConditionType:
+		return nil
+	case appsv1alpha1.RuntimeReadyPreConditionType:
+		return a.runtimeReadyCheck(ctx, cli)
+	case appsv1alpha1.ComponentReadyPreConditionType:
+		return a.compReadyCheck(ctx, cli)
+	case appsv1alpha1.ClusterReadyPreConditionType:
+		return a.clusterReadyCheck(ctx, cli)
+	default:
+		return fmt.Errorf("unknown precondition type %s", *spec.PreCondition)
+	}
+}
+
+func (a *kbagent) clusterReadyCheck(ctx context.Context, cli client.Reader) error {
+	ready := func(object client.Object) bool {
+		cluster := object.(*appsv1alpha1.Cluster)
+		return cluster.Status.Phase == appsv1alpha1.RunningClusterPhase
+	}
+	return a.readyCheck(ctx, cli, a.synthesizedComp.ClusterName, "cluster", &appsv1alpha1.Cluster{}, ready)
+}
+
+func (a *kbagent) compReadyCheck(ctx context.Context, cli client.Reader) error {
+	ready := func(object client.Object) bool {
+		comp := object.(*appsv1alpha1.Component)
+		return comp.Status.Phase == appsv1alpha1.RunningClusterCompPhase
+	}
+	return a.readyCheck(ctx, cli, a.synthesizedComp.FullCompName, "component", &appsv1alpha1.Component{}, ready)
+}
+
+func (a *kbagent) runtimeReadyCheck(ctx context.Context, cli client.Reader) error {
+	name := constant.GenerateWorkloadNamePattern(a.synthesizedComp.ClusterName, a.synthesizedComp.Name)
+	ready := func(object client.Object) bool {
+		its := object.(*workloads.InstanceSet)
+		return instanceset.IsInstancesReady(its)
+	}
+	return a.readyCheck(ctx, cli, name, "runtime", &workloads.InstanceSet{}, ready)
+}
+
+func (a *kbagent) readyCheck(ctx context.Context, cli client.Reader, name, kind string, obj client.Object, ready func(object client.Object) bool) error {
+	key := types.NamespacedName{
+		Namespace: a.synthesizedComp.Namespace,
+		Name:      name,
+	}
+	if err := cli.Get(ctx, key, obj); err != nil {
+		return errors.Wrap(err, fmt.Sprintf("precondition check error for %s ready", kind))
+	}
+	if !ready(obj) {
+		return fmt.Errorf("precondition check error, %s is not ready", kind)
+	}
+	return nil
 }
 
 func (a *kbagent) callAction(ctx context.Context, cli client.Reader, spec *appsv1alpha1.Action, lfa lifecycleAction, opts *Options) error {

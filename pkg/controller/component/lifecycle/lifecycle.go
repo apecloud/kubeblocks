@@ -43,7 +43,7 @@ type Lifecycle interface {
 
 	// RoleProbe(ctx context.Context, cli client.Reader, opts *Options) ([]byte, error)
 
-	Switchover(ctx context.Context, cli client.Reader, opts *Options) error
+	Switchover(ctx context.Context, cli client.Reader, opts *Options, candidate string) error
 
 	MemberJoin(ctx context.Context, cli client.Reader, opts *Options) error
 
@@ -59,7 +59,7 @@ type Lifecycle interface {
 
 	// Reconfigure(ctx context.Context, cli client.Reader, opts *Options) error
 
-	AccountProvision(ctx context.Context, cli client.Reader, opts *Options, args ...any) error
+	AccountProvision(ctx context.Context, cli client.Reader, opts *Options, statement, user, password string) error
 }
 
 func New(synthesizedComp *component.SynthesizedComponent, pod *corev1.Pod, pods ...*corev1.Pod) (Lifecycle, error) {

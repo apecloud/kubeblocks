@@ -67,10 +67,10 @@ func (a *kbagent) PreTerminate(ctx context.Context, cli client.Reader, opts *Opt
 	return a.checkedCallAction(ctx, cli, a.lifecycleActions.PreTerminate, lfa, opts)
 }
 
-func (a *kbagent) Switchover(ctx context.Context, cli client.Reader, opts *Options) error {
+func (a *kbagent) Switchover(ctx context.Context, cli client.Reader, opts *Options, candidate string) error {
 	lfa := &switchover{
 		synthesizedComp: a.synthesizedComp,
-		pod:             a.pod,
+		candidate:       candidate,
 	}
 	return a.checkedCallAction(ctx, cli, a.lifecycleActions.Switchover, lfa, opts)
 }
@@ -101,8 +101,12 @@ func (a *kbagent) DataLoad(ctx context.Context, cli client.Reader, opts *Options
 	return a.checkedCallAction(ctx, cli, a.lifecycleActions.DataLoad, lfa, opts)
 }
 
-func (a *kbagent) AccountProvision(ctx context.Context, cli client.Reader, opts *Options, args ...any) error {
-	lfa := &accountProvision{args: args}
+func (a *kbagent) AccountProvision(ctx context.Context, cli client.Reader, opts *Options, statement, user, password string) error {
+	lfa := &accountProvision{
+		statement: statement,
+		user:      user,
+		password:  password,
+	}
 	return a.checkedCallAction(ctx, cli, a.lifecycleActions.AccountProvision, lfa, opts)
 }
 

@@ -7035,6 +7035,11 @@ Action
 <p>Use Case:
 This action is designed to create system accounts that are utilized for replication, monitoring, backup,
 and other administrative tasks.</p>
+<p>The container executing this action has access to following variables:</p>
+<ul>
+<li>KB_ACCOUNT_NAME: The name of the system account to be created.</li>
+<li>KB_ACCOUNT_STATEMENT: The statement used to create the system account.</li>
+</ul>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
 </tr>

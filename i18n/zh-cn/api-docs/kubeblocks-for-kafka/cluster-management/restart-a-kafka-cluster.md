@@ -36,7 +36,7 @@ KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，�
   EOF
   ```
 
-1. 查看 pod 和运维操作状态，验证重启操作。
+2. 查看 pod 和运维操作状态，验证重启操作。
 
    ```bash
    kubectl get pod -n demo

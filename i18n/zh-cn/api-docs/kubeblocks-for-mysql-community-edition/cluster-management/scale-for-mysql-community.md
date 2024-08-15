@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 
 # 集群扩缩容
 
-KubeBlocks 支持对 ApeCloud MySQL 集群进行垂直扩缩容和水平扩缩容。
+KubeBlocks 支持对 MySQL 集群进行垂直扩缩容和水平扩缩容。
 
 :::note
 
@@ -133,7 +133,7 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   1
 
 ## 水平扩缩容
 
-水平扩展改变 Pod 的数量。例如，您可以将副本从三个扩展到五个。水平扩缩容过程包括数据的备份和恢复。
+水平扩展改变 Pod 的数量。例如，您可以将副本从三个扩展到五个。
 
 从 v0.9.0 开始，除了支持副本（replica）的扩缩容外，KubeBlocks 还支持了实例（instance）的扩缩容。可通过 [水平扩缩容](./../../maintenance/scale/horizontal-scale.md) 文档了解更多细节和示例。
 
@@ -236,7 +236,7 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   1
      componentSpecs:
      - name: mysql
        componentDefRef: mysql
-       replicas: 1 # Change the amount
+       replicas: 1 # 修改该参数值
        volumeClaimTemplates:
        - name: data
          spec:

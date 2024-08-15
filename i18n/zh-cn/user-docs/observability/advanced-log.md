@@ -56,7 +56,7 @@ Loki 引擎用于存储日志数据，并接受来自前端的搜索请求。详
     ```bash
     kbcli addon enable loki
     >
-    NAME                           TYPE   PROVIDER    STATUS     AUTO-INSTALL   AUTO-INSTALLABLE-SELECTOR   
+    NAME                           TYPE   PROVIDER    STATUS     AUTO-INSTALL     
     loki                           Helm   apecloud    Enabled    false   
     ```
 
@@ -135,7 +135,7 @@ pvc-ed20ec94-9a58-46e4-9c28-b692cba70e79   8Gi        RWO            Delete     
     ```bash
     kbcli addon enable agamotto
     >
-    NAME                           TYPE   PROVIDER    STATUS     AUTO-INSTALL   AUTO-INSTALLABLE-SELECTOR   
+    NAME                           TYPE   PROVIDER    STATUS     AUTO-INSTALL     
     agamotto                       Helm   apecloud    Enabled    false  
     ```
 

@@ -18,7 +18,7 @@ Qdrant（读作：quadrant）是向量相似性搜索引擎和向量数据库。
 
 - [安装 kbcli](./../installation/install-with-kbcli/install-kbcli.md)。
 - [安装 KubeBlocks](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md)。
-- [安装并启用 qdrant 引擎](./../overview/database-engines-supported.md#使用引擎)
+- [安装并启用 qdrant 引擎](./../overview/database-engines-supported.md#使用引擎)。
 
 ## 创建集群
 

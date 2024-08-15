@@ -32,7 +32,7 @@ NAME        CLUSTER-DEFINITION   VERSION             TERMINATION-POLICY   STATUS
 mycluster   postgresql           postgresql-14.8.0   Delete               Running   29m
 ```
 
-## S步骤
+## 步骤
 
 删除指定集群。
 

@@ -1,29 +1,29 @@
 ---
-title: Vertical Scale
-description: How to vertically scale a cluster
-keywords: [vertical scaling, vertical scale]
+title: 垂直扩缩容
+description: 如何对集群进行垂直扩缩容
+keywords: [垂直扩缩容, 变配]
 sidebar_position: 2
-sidebar_label: Vertical Scale
+sidebar_label: 垂直扩缩容
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Vertical Scale
+# 垂直扩缩容
 
-You can change the resource requirements and limits (CPU and storage) by performing the vertical scale. For example, you can change the resource class from 1C2G to 2C4G.
+你可以通过更改资源需求和限制（CPU 和存储）来垂直扩展集群。例如，可通过垂直扩容将资源类别从 1C2G 调整为 2C4G。
 
-This tutorial takes MySQL as an example to illustrate how to vertically scale a cluster.
+本文档以 MySQL 为示例，演示如何对集群进行垂直扩缩容。
 
 :::note
 
-From v0.9.0, for MySQL and PostgreSQL, after vertical scaling is performed, KubeBlocks automatically matches the appropriate configuration template based on the new specification. This is the KubeBlocks dynamic configuration feature. This feature simplifies the process of configuring parameters, saves time and effort and reduces performance issues caused by incorrect configuration. For detailed instructions, refer to [Configuration](./../../kubeblocks-for-apecloud-mysql/configuration/configuration.md).
+从 v0.9.0 开始，MySQL 和 PostgreSQL 集群在进行水平扩缩容后，KubeBlocks 会根据新的规格自动匹配合适的配置模板。这因为 KubeBlocks 在 v0.9.0 中引入了动态配置功能。该功能简化了配置参数的过程，节省了时间和精力，并减少了由于配置错误引起的性能问题。有关详细说明，请参阅[配置](./../../kubeblocks-for-apecloud-mysql/configuration/configuration.md)。
 
 :::
 
-## Before you start
+## 开始之前
 
-Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
+查看集群状态是否为 `Running`，否则，后续操作可能失败。
 
 ```bash
 kubectl get cluster mycluster
@@ -32,15 +32,15 @@ NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    A
 mycluster   mysql                mysql-8.0.33   Delete               Running   4d18h
 ```
 
-## Steps
+## 步骤
 
-There are two ways to apply vertical scaling.
+可通过以下两种方式进行垂直扩缩容。
 
 <Tabs>
 
 <TabItem value="OpsRequest" label="OpsRequest" default>
 
-1. Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
+1. 对指定集群应用 OpsRequest，可按需修改参数值。
 
    ```bash
    kubectl apply -f - <<EOF
@@ -63,7 +63,7 @@ There are two ways to apply vertical scaling.
    EOF
    ```
 
-2. Check the operation status to validate the vertical scaling.
+2. 查看运维任务状态，验证该任务是否执行成功。
 
    ```bash
    kubectl get ops -n demo
@@ -72,9 +72,9 @@ There are two ways to apply vertical scaling.
    demo        ops-vertical-scaling   VerticalScaling   mycluster   Succeed   3/3        6m
    ```
 
-   If an error occurs, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
+   如果有报错，可执行 `kubectl describe ops -n demo` 命令查看该运维操作的相关事件，协助排障。
 
-3. Check whether the corresponding resources change.
+3. 查看相应资源是否变更。
 
    ```bash
    kubectl describe cluster mycluster -n demo
@@ -82,9 +82,9 @@ There are two ways to apply vertical scaling.
 
 </TabItem>
   
-<TabItem value="Edit the cluster YAML file" label="Edit the cluster YAML file">
+<TabItem value="修改集群 YAML 文件" label="修改集群 YAML 文件">
 
-1. Change the configuration of `spec.componentSpecs.resources` in the YAML file. `spec.componentSpecs.resources` controls the requirement and limit of resources and changing them triggers a vertical scaling.
+1. 修改 YAML 文件中 `spec.componentSpecs.resources` 的配置。`spec.componentSpecs.resources` 控制资源的请求值和限制值，修改参数值将触发垂直扩缩容。
 
    ```yaml
    kubectl edit cluster mycluster -n demo
@@ -101,7 +101,7 @@ There are two ways to apply vertical scaling.
      - name: mysql
        componentDefRef: mysql
        replicas: 3
-       resources: # Change the values of resources.
+       resources: # 修改参数值
          requests:
            memory: "2Gi"
            cpu: "1"
@@ -119,7 +119,7 @@ There are two ways to apply vertical scaling.
      terminationPolicy: Delete
    ```
 
-2. Check whether the corresponding resources change.
+2. 查看相应资源是否变更。
 
    ```bash
    kubectl describe cluster mycluster -n demo

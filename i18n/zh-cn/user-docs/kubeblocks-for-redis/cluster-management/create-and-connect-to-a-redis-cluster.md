@@ -24,7 +24,7 @@ import TabItem from '@theme/TabItem';
   ```bash
   kbcli addon list
   >
-  NAME                      TYPE   STATUS     EXTRAS         AUTO-INSTALL   INSTALLABLE-SELECTOR
+  NAME                      TYPE   STATUS     EXTRAS         AUTO-INSTALL  
   ...
   redis                     Helm   Enabled                   true
   ...

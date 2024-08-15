@@ -1,62 +1,91 @@
 ---
-title: Horizontal Scale
-description: How to scale a cluster, scale replicas, scale instances
-keywords: [horizontal scaling, Horizontal Scale]
+title: 水平扩缩容
+description: 如何对集群和实例进行水平扩缩容
+keywords: [水平扩缩容, 水平伸缩]
 sidebar_position: 2
-sidebar_label: Horizontal Scale
+sidebar_label: 水平扩缩容
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Horizontal Scale
+# 水平扩缩容
 
-From v0.9.0, the horizontal scale provided by KubeBlocks supports ScaleIn and ScaleOut operations and supports scaling both replicas and instances.
+从 v0.9.0 开始，KubeBlocks 支持 ScaleIn 和 ScaleOut 两类操作，同时支持副本（replcia）和具体实例（instance）的扩缩容。
 
-- ScaleIn: It supports scaling in the specified replicas and offloading specified instances.
-- ScaleOut: It supports scaling out the specified replicas and makes the offline instances online again.
+- ScaleIn：支持水平缩容指定副本及指定实例下线。
+- ScaleOut: 支持水平扩容指定副本及指定实例重新上线。
 
-You can perform the horizontal scale by modifying the cluster in a declarative API style or creating an OpsRequest:
+可通过声明式 API 或创建 OpsRequest 的方式执行水平扩缩容：
 
-- Modifying the Cluster in a declarative API style
+- 以声明式 API 的方式修改集群
 
-    With the declarative API style, users can directly modify the Cluster YAML file to specify the number of replicas for each component and instance template. If the new number of replicas is greater than the current number of Pods, it indicates a scale-out; conversely, if the new number of replicas is less than the current number of Pods, it indicates a scale-in.
+    通过声明式 API 方式，可直接修改 Cluster YAML 文件来指定每个组件的副本数量和实例模板。如果新的副本数量大于当前 Pod 的数量，则表示扩展（scale-out）；相反，如果新的副本数量少于当前 Pod 的数量，则表示缩容（scale-in）。
 
-- Creating an OpsRequest
+- 创建 OpsRequest
 
-    Another approach is to specify the replica count increment in the OpsRequest. The controller will calculate the desired number of replicas based on the current number of Pods in the Cluster's components and the increment value, and perform scaling accordingly.
+    另一种方法是在 OpsRequest 中指定副本数量的增量。控制器（controller）将根据集群组件中当前 Pod 的数量和增量值计算所需的副本数量，并相应地执行扩缩容操作。
 
 :::note
 
-- In cases of concurrent modifications, such as multiple controllers concurrently modifying the number of Pods, the calculated number of Pods might be inaccurate. You can ensure the order is on the client side or set KUBEBLOCKS_RECONCILE_WORKERS=1.
-- If there is an ongoing scaling operation using the declarative API, this operation will be terminated.
-- From v0.9.0, for MySQL and PostgreSQL, after horizontal scaling is performed, KubeBlocks automatically matches the appropriate configuration template based on the new specification. This is the KubeBlocks dynamic configuration feature, which simplifies the process of configuring parameters, saves time and effort and reduces performance issues caused by incorrect configuration. For detailed instructions, refer to [Configuration](./../../kubeblocks-for-apecloud-mysql/configuration/configuration.md).
+- 在并发修改的情况下，例如多个控制器同时修改 Pod 的数量，计算出的 Pod 数量可能会不准确。你可以在客户端确保操作顺序，或者设置 `KUBEBLOCKS_RECONCILE_WORKERS=1`。
+- 如果正在使用声明式 API 进行扩缩容操作，该操作将被终止。
+- 从 v0.9.0 开始，MySQL 和 PostgreSQL 集群在进行水平扩缩容后，KubeBlocks 会根据新的规格自动匹配合适的配置模板。这因为 KubeBlocks 在 v0.9.0 中引入了动态配置功能。该功能简化了配置参数的过程，节省了时间和精力，并减少了由于配置错误引起的性能问题。有关详细说明，请参阅[配置](./../../kubeblocks-for-apecloud-mysql/configuration/configuration.md)。
 
 :::
 
-## Why do you need to scale for specified instances
+## 为什么需要指定实例扩缩容
 
-Before v0.9.0, KubeBlocks generated workloads as *StatefulSets*, which was a double-edged sword. While KubeBlocks could leverage the advantages of a *StatefulSets* to manage stateful applications like databases, it inherited its limitations.
+早期版本中，KubeBlocks 最终生成的 Workload 是 *StatefulSet*，这是一把双刃剑。一方面，KubeBlocks 可以借助 *StatefulSet* 实现对数据库等有状态应用的管理，另一方面，这也导致 KubeBlocks 继承了其局限性。
 
-One of these limitations is evident in horizontal scaling scenarios, where *StatefulSets* offload Pods sequentially based on *Ordinal* order, potentially impacting the availability of databases running within.
+其中的局限性之一是，在水平缩容场景下，*StatefulSet* 会按照 *Ordinal* 顺序从大到小依次下线 Pod。当 *StatefulSet* 中运行的是数据库时，这个局限性会使得数据库的可用性降低。
 
-Another issue arises in the same scenario: if the node hosting Pods experiences a hardware failure, causing disk damage and rendering data read-write inaccessible, according to operational best practices, we need to offload the damaged Pod and rebuild replicas on healthy nodes. However, performing such operational tasks based on *StatefulSets* isn't easy. [Similar discussions](https://github.com/kubernetes/kubernetes/issues/83224) can be observed in the Kubernetes community.
+另一个问题是，我们仍以上面的场景为例。某一天，Pod 所在 Node 因为物理机故障，导致磁盘损坏，最终导致数据无法正常读写。按照数据库运维最佳实践，我们需要将受损的 Pod 下线，并在其它健康 Node 上搭建新的副本，但基于 *StatefulSet* 来做这样的运维操作并不容易。在 Kubernetes 社区中，我们也可以看到[类似场景的讨论](https://github.com/kubernetes/kubernetes/issues/83224)。
 
-To solve the limitations mentioned above, starting from version 0.9, KubeBlocks replaces *StatefulStes* with *InstanceSet* which is a general workload API and is in charge of a set of instances. With *InstanceSet*, KubeBlocks introduces the *specified instance scaling* feature to improve the availability.
+为了解决上述局限性，KubeBlocks 从 0.9 版本开始使用 *InstanceSet* 替代 *StatefulSet*。*InstanceSet* 是一个通用 Workload API，负责管理一组实例。引入 *InstanceSet* 后，KubeBlocks 支持了“指定实例缩容”特性，以提升可用性。
 
-## Before you start
+## 开始之前
 
-Check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
+本文档以 Redis 为例进行演示，以下为原组件拓扑。
+
+```yaml
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: redis
+  namespace: kubeblocks-cloud-ns
+spec:
+  componentSpecs:
+  - name: proxy
+    componentDef: redis-proxy
+    replicas: 10
+    instances:
+    - name: proxy-2c
+      replicas: 3
+      resources:
+        limits:
+          cpu: 2
+          memory: 4Gi
+    resources:
+      limits:
+        cpu: 4
+        memory: 8Gi
+    offlineInstances:
+    - redis-proxy-proxy-2c4g-0
+    - redis-proxy-proxy-2c4g-1     
+```
+
+查看集群状态是否为 `Running`，否则，后续操作可能失败。
 
 ```bash
 kubectl get cluster redis
 ```
 
-## ScaleIn
+## 水平缩容
 
-### Example 1
+### 示例 1
 
-This example illustrates how to apply an OpsRequest to scale in replicas to 8. This example deletes pods according to the default rules without specifying any instances.
+本示例演示了如何应用 OpsRequest 将副本数缩容至 8。本示例将按照默认规则删除 pod，未指定任何实例。
 
 ```yaml
 kubectl apply -f - <<EOF
@@ -74,9 +103,9 @@ spec:
 EOF 
 ```
 
-### Example 2
+### 示例 2
 
-This example illustrates how to apply an OpsRequest to scale in replicas to 8 and the specifications of the deleted instances should be 2C4G.
+示例 2 演示了如何应用 OpsRequest 将副本数缩容至 8，并指定仅缩容 2 个 2C4G 的实例。
 
 ```yaml
 kubectl apply -f - <<EOF
@@ -97,9 +126,9 @@ spec:
 EOF
 ```
 
-### Example 3
+### 示例 3
 
-This example illustrates how to scale in the specified instance. In this exampler, both `replicas` and `instance replicas` will decrease 1 in amount.
+示例 3 演示了如何下线指定实例。本示例中，`replicas` 和 `instance replicas` 的数量都会减少 1。
 
 <Tabs>
 
@@ -125,9 +154,9 @@ EOF
 
 </TabItem>
 
-<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
+<TabItem value="修改集群 YAML 文件" label="修改集群 YAML 文件">
 
-You can also edit the cluster YAML file to scale in a specified instance.
+您也可通过修改集群 YAML 文件指定实例下线。
 
 ```yaml
 kubectl edit cluster redis
@@ -147,9 +176,9 @@ spec:
 </TabItem>
 </Tabs>
 
-## ScaleOut
+## 水平扩容
 
-The following examples illustrate scaling out both replicas and instances. If you only need to scale out replicas, just edit `replicaChanges`. For example,
+后续实例演示了如何对副本和实例进行水平扩容。如果您只想对副本进行扩容，仅需修改 `replicaChanges`，例如，
 
 ```yaml
 kubectl apply -f - <<EOF
@@ -167,14 +196,14 @@ spec:
 EOF
 ```
 
-### Example 1
+### 示例 1
 
-This example illustrates how to scale out replicas to 16 by applying an OpsRequest.
+示例 1 演示了如何通过应用 OpsRequest 将副本数扩容至 16。
 
-The created instances are as follows:
+新创建的实例如下：
 
-Three replicas equipped with 4C8G: `redis-proxy-7`, `redis-proxy-8`, `redis-proxy-9`
-Three replicas equipped with 2C4G: `redis-proxy-2c4g-5`, `redis-proxy-2c4g-6`, `redis-proxy-2c4g-7`
+3 个 4C8G 的实例: `redis-proxy-7`, `redis-proxy-8`, `redis-proxy-9`
+3 个 2C4G 的实例: `redis-proxy-2c4g-5`, `redis-proxy-2c4g-6`, `redis-proxy-2c4g-7`
 
 ```yaml
 kubectl apply -f - <<EOF
@@ -195,14 +224,14 @@ spec:
 EOF
 ```
 
-### Example 2
+### 示例 2
 
-This example illustrates how to apply an OpsRequest to scale out replicas to 16 and three of the new replicas are proxies equipped with 8C16G.
+示例 2 演示了如何通过应用 OpsRequest 将副本数扩容至 16，同时其中 3 个为 8C16G 的 proxy。
 
-The created instances are as follows:
+新创建的实例如下：
 
 4C8G: `redis-proxy-7`, `redis-proxy-8`, `redis-proxy-9`
-2C4G: `redis-proxy-8c16g-0`, `redis-proxy-8c16g-1`, `redis-proxy-8c16g-2`
+8C16G: `redis-proxy-8c16g-0`, `redis-proxy-8c16g-1`, `redis-proxy-8c16g-2`
 
 ```yaml
 kubectl apply -f - <<EOF
@@ -227,11 +256,11 @@ spec:
 EOF
 ```
 
-### Example 3
+### 示例 3
 
-This example illustrates how to apply an OpsRequest to add the offline instances to the cluster. After the operation, there will be 12 replicas.
+示例 3 演示了如何通过应用 OpsRequest 将已下线的实例重新添加到集群。该运维任务执行完成后，副本数为 12。
 
-The added pods in this example are `redis-proxy-2c4g-0` and `redis-proxy-2c4g-1`.
+本示例中添加的 pod 为  `redis-proxy-2c4g-0` 和 `redis-proxy-2c4g-1`。
 
 ```yaml
 kubectl apply -f - <<EOF
@@ -251,11 +280,11 @@ spec:
 EOF   
 ```
 
-## ScaleIn and ScaleOut
+## 水平扩缩容
 
-### Example 1
+### 示例 1
 
-This example illustrates how to apply an OpsRequest to scale in a specified instance and create a new instance.
+示例 1 演示了如何通过应用 OpsRequest 实现指定实例下线并创建新实例。
 
 ```yaml
 kubectl apply -f - <<EOF
@@ -278,9 +307,9 @@ spec:
 EOF
 ```
 
-### Example 2
+### 示例 2
 
-This example illustrates how to apply an OpsRequest to scale in replicas to 8 and add the offline instances to the cluster.
+示例 2 演示了如何通过应用 OpsRequest 将副本数缩容至 8 并将已下线的实例重新加入到集群。
 
 ```yaml
 kubectl apply -f - <<EOF
@@ -305,11 +334,9 @@ spec:
 EOF
 ```
 
-## Handle the snapshot exception
+## 处理快照异常
 
-If `STATUS=ConditionsError` occurs during the horizontal scaling process, you can find the cause from `cluster.status.condition.message` for troubleshooting.
-
-In the example below, a snapshot exception occurs.
+如果在水平扩容过程中出现 `STATUS=ConditionsError`，你可以从 `cluster.status.condition.message` 中找到原因并进行故障排除。如下所示，该例子中发生了快照异常。
 
 ```bash
 Status:
@@ -322,13 +349,15 @@ Status:
     type: ApplyResources
 ```
 
-***Reason***
+***原因***
 
-This exception occurs because the `VolumeSnapshotClass` is not configured. This exception can be fixed after configuring `VolumeSnapshotClass`, but the horizontal scaling cannot continue to run. It is because the wrong backup (volumesnapshot is generated by backup) and volumesnapshot generated before still exist. First, delete these two wrong resources and then KubeBlocks re-generates new resources.
+此异常发生的原因是未配置 `VolumeSnapshotClass`。可以通过配置 `VolumeSnapshotClass` 解决问题。
 
-***Steps:***
+但此时，水平扩容仍然无法继续运行。这是因为错误的备份（volumesnapshot 由备份生成）和之前生成的 volumesnapshot 仍然存在。需删除这两个错误的资源，KubeBlocks 才能重新生成新的资源。
 
-1. Configure the VolumeSnapshotClass by running the command below.
+***步骤：***
+
+1. 配置 VolumeSnapshotClass。
 
    ```bash
    kubectl create -f - <<EOF
@@ -343,7 +372,7 @@ This exception occurs because the `VolumeSnapshotClass` is not configured. This 
    EOF
    ```
 
-2. Delete the wrong backup (volumesnapshot is generated by backup) and volumesnapshot resources.
+2. 删除错误的备份和 volumesnapshot 资源。
 
    ```bash
    kubectl delete backup -l app.kubernetes.io/instance=redis
@@ -351,6 +380,6 @@ This exception occurs because the `VolumeSnapshotClass` is not configured. This 
    kubectl delete volumesnapshot -l app.kubernetes.io/instance=redis
    ```
 
-***Result***
+***结果***
 
-The horizontal scaling continues after backup and volumesnapshot are deleted and the cluster restores to running status.
+删除备份和 volumesnapshot 后，水平扩容继续进行，集群恢复到 `Running` 状态。

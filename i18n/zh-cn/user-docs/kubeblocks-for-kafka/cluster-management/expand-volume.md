@@ -8,7 +8,7 @@ sidebar_label: 磁盘扩容
 
 # 磁盘扩容
 
-KubeBlocks 支 支持 Pod 磁盘存储扩容。
+KubeBlocks 支持 Pod 磁盘存储扩容。
 
 ## 开始之前
 

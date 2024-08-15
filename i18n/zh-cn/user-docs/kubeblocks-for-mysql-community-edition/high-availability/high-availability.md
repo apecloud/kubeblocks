@@ -37,7 +37,7 @@ sidebar_position: 1
 
 ***步骤：***
 
-1. 查看集群信息。可在 `Topology` 中查看主节点的名称，在如下例子中，主节点为 `mycluster-mysql-1`。
+1. 查看集群信息。可在 `Topology` 中查看主节点的名称，在如下例子中，主节点为 `mycluster-mysql-0`。
 
     ```bash
     kbcli cluster describe mycluster
@@ -55,7 +55,7 @@ sidebar_position: 1
 
     ***Results***
 
-    此处示例显示 pod 角色发生变化。原主节点删除后，系统选出新的主节点为 `mycluster-mysql-0`。
+    此处示例显示 pod 角色发生变化。原主节点删除后，系统选出新的主节点为 `mycluster-mysql-1`。
 
     ```bash
     kbcli cluster describe mycluster

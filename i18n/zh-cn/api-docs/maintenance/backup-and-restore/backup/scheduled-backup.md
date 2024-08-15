@@ -32,8 +32,7 @@ spec:
     repoName: my-repo
 ```
 
-In the above YAML file, you can set whether to enable automatic backups and PITR as needed, and also specify backup methods, repo names, retention periods, etc.
-您可在以上 YAML 文件中按需设置是否开启自动备份和PITR，也可以指定备份方式、仓库名称、保留时长等。
+您可在以上 YAML 文件中按需设置是否开启自动备份和 PITR，也可以指定备份方式、仓库名称、保留时长等。
 
 开启自动备份后，可以执行如下命令查看是否有 CronJob 对象被创建：
 

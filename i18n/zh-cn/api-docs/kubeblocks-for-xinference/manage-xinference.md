@@ -9,7 +9,7 @@ sidebar_label: 用 KubeBlocks 管理 Xinference
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Manage Xinference with KubeBlocks
+# 用 KubeBlocks 管理 Xinference
 
 Xorbits Inference (Xinference) 是一个开源平台，用于简化各种 AI 模型的运行和集成。借助 Xinference，您可以使用任何开源 LLM、嵌入模型和多模态模型在云端或本地环境中运行推理，并创建强大的 AI 应用。
 

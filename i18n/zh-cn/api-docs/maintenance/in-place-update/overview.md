@@ -23,9 +23,9 @@ sidebar_label: 概述
 * `spec.containers[*].image`
 * `spec.tolerations (only supports adding Toleration)`
 
-Kubernetes 从 v1.27 开始，通过 `PodInPlaceVerticalScaling` 特性开关可进一步开启对 CPU 和 Memory 的原地更新支持，并从 v1.29 开始，该特性默认打开。KubeBlocks 会自动探测 Kubernetes 版本和特性开关，并进一步支持如下能力：
+Kubernetes 从 1.27 版本开始，通过 `InPlacePodVerticalScaling` 特性开关可进一步开启对 CPU 和 Memory 的原地更新支持。KubeBlocks 同样增加了 `InPlacePodVerticalScaling` 特性开关，以便进一步支持如下能力：
 
-对于大于或等于 v1.29 的 Kubernetes，或大于等于 v1.27 且小于 v1.29 并且 `PodInPlaceVerticalScaling` 已开启的 Kubernetes，支持如下字段的原地更新：
+对于大于等于 1.27 且 InPlacePodVerticalScaling 已开启的 Kubernetes，支持如下字段的原地更新：
 
 * `spec.containers[*].resources.requests["cpu"]`
 * `spec.containers[*].resources.requests["memory"]`
@@ -34,7 +34,7 @@ Kubernetes 从 v1.27 开始，通过 `PodInPlaceVerticalScaling` 特性开关可
 
 需要注意的是，当 resource resize 成功后，有的应用可能需要重启才能感知到新的资源配置，此时需要在 ClusterDefinition 或 ComponentDefinition 中进一步配置 container `restartPolicy`。
 
-对于 PVC，KubeBlocks 同样复用 PVC API 的能力，仅支持 Volume 的扩容。
+对于 PVC，KubeBlocks 同样复用 PVC API 的能力，仅支持 Volume 的扩容，当因为某些原因扩容失败时，支持缩容回原来的容量值。而 StatefulSet 中的 VolumeClaimTemplate 一经声明，便不能修改，目前官方正在[开发相关能力](https://github.com/kubernetes/enhancements/pull/4651)，但至少需要等到 K8s 1.32 版本了。
 
 ## 从上层 API 视角，哪些字段更新后使用的是原地更新
 

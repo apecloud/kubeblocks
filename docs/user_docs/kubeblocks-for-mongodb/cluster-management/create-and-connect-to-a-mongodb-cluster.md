@@ -21,7 +21,7 @@ This tutorial shows how to create and connect to a MongoDB cluster.
   ```bash
   kbcli addon list
   >
-  NAME                           TYPE   STATUS     EXTRAS         AUTO-INSTALL   INSTALLABLE-SELECTOR
+  NAME                           TYPE   STATUS     EXTRAS         AUTO-INSTALL   
   ...
   mongodb                        Helm   Enabled                   true
   ...

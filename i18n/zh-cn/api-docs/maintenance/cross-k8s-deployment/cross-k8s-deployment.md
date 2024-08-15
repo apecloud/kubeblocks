@@ -17,7 +17,6 @@ KubeBlocks 支持管理多个 Kubernetes 集群，为用户在实例容灾、k8s
 
 ## 环境准备
 
-Create several K8s clusters and prepare the configuration information for deploying KubeBlocks. This tutorial takes three data plane K8s clusters as an example and their contexts are named as k8s-1, k8s-2, and k8s-3.
 准备 K8s 集群，并准备部署 KubeBlocks 所需的配置信息。本文示例准备了三个 data plane 集群，context 分别命名为：k8s-1、k8s-2、k8s-3。
 
 * 准备 K8s 集群：1 个设定为 control plane，其他几个设定为 data plane，确保这些 data plane 集群的 API server 在 control plane 集群中可以联通。这里的联通包含两个层面：一是网络连通，二是访问配置。

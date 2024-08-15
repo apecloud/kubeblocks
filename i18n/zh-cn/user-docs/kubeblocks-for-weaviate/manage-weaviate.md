@@ -14,7 +14,7 @@ sidebar_label: 用 KubeBlocks 管理 Weaviate
 
 - [安装 kbcli](./../installation/install-with-kbcli/install-kbcli.md)。
 - [安装 KubeBlocks](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md)。
-- [安装并启用 weaviate 引擎](./../overview/supported-addons.md#use-addons)。
+- [安装并启用 weaviate 引擎](./../overview/database-engines-supported.md#使用引擎)。
 
 ## 创建集群
 

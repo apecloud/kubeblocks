@@ -21,7 +21,7 @@ import TabItem from '@theme/TabItem';
 
 ## 兼容性说明
 
-KubeBlocks 0.9 可以兼容 KubeBlocks 0.8 的 API，但不保证兼容 0.8 之前版本的 API，如果您正在使用 KubeBlocks 0.7 或者更老版本的 Addon（版本号为 0.7.*, 0.6.*），请务必参考 [0.8 升级文档](./upgrade-kubeblocks-to-0.8.md)将 KubeBlocks 升级至 0.8 并将所有引擎（addon）升级至 0.8，以确保升级至 0.9 版本后服务的可用性。
+KubeBlocks 0.9 可以兼容 KubeBlocks 0.8 的 API，但不保证兼容 0.8 之前版本的 API，如果您正在使用 KubeBlocks 0.7 或者更老版本的 Addon（版本号为 0.7., *0.6.*），请务必参考 [0.8 升级文档](./upgrade-kubeblocks-to-0.8.md)将 KubeBlocks 升级至 0.8 并将所有引擎（addon）升级至 0.8，以确保升级至 0.9 版本后服务的可用性。
 
 ## 从 0.8 版本升级
 

@@ -41,8 +41,6 @@ pg-cluster   default     postgresql-cluster           postgresql-14.7.0   Delete
 
 1. 更改配置。
 
-   **选项 1.** （**推荐**） 使用 kbcli
-
    配置参数 `--components`、`--memory` 和 `--cpu`，并执行以下命令。
 
    ```bash
@@ -58,12 +56,6 @@ pg-cluster   default     postgresql-cluster           postgresql-14.7.0   Delete
 2. 验证垂直扩容。
 
     执行以下命令检查集群状态，验证垂直扩容。
-
-    ```bash
-    kbcli cluster list <name>
-    ```
-
-    ***示例***
 
     ```bash
     kbcli cluster list pg-cluster

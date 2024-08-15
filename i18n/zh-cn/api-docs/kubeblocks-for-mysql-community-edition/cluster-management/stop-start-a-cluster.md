@@ -18,7 +18,7 @@ sidebar_label: 停止/启动
 
 <TabItem value="OpsRequest" label="OpsRequest" default>
 
-执行以下命令，停止集群
+执行以下命令，停止集群。
 
 ```bash
 kubectl apply -f - <<EOF
@@ -77,7 +77,7 @@ spec:
 
 <TabItem value="OpsRequest" label="OpsRequest" default>
 
-执行以下命令，启动集群
+执行以下命令，启动集群。
 
 ```bash
 kubectl apply -f - <<EOF

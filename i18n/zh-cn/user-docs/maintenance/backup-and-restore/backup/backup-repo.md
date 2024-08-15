@@ -21,10 +21,10 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
 
 请确保你已经：
 
-* [安装 kbcli](./../../installation/install-with-kbcli/install-kbcli.md)。
+* [安装 kbcli](./../../../installation/install-with-kbcli/install-kbcli.md)。
 * [安装 kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)。
 * [安装 Helm](https://helm.sh/docs/intro/install/)。
-* [安装 KubeBlocks](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md)。
+* [安装 KubeBlocks](./../../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md)。
 
 ## 安装 MinIO
 
@@ -55,14 +55,14 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
 
    登录到仪表盘后，生成 `access key` 和 `secret key`。
 
-   ![backup-and-restore-backup-repo-1](../img/../../../img/backup-and-restore-backup-repo-1.png)
+   ![backup-and-restore-backup-repo-1](./../../../../img/backup-and-restore-backup-repo-1.png)
 
 3. 创建 bucket。
 
    在 MinIO 仪表盘上创建一个名为 `test-minio` 的存储桶。
 
-   ![backup-and-restore-backup-repo-2](../../../img/backup-and-restore-backup-repo-2.png)
-   ![backup-and-restore-backup-repo3](../../../img/backup-and-restore-backup-repo-3.png)
+   ![backup-and-restore-backup-repo-2](./../../../../img/backup-and-restore-backup-repo-2.png)
+   ![backup-and-restore-backup-repo3](./../../../../img/backup-and-restore-backup-repo-3.png)
 
   :::note
 

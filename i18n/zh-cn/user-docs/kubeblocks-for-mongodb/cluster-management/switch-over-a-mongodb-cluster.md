@@ -23,9 +23,9 @@ import TabItem from '@theme/TabItem';
    >
    probes:
      roleProbe:
-       failureThreshold: 2
-       periodSeconds: 1
-       timeoutSeconds: 1
+       failureThreshold: 3
+       periodSeconds: 2
+       timeoutSeconds: 2
    ```
 
 ## 切换集群

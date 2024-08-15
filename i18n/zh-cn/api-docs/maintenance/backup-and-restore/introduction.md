@@ -28,4 +28,4 @@ KubeBlocks 支持从备份集中恢复数据。
 1. [配置 BackupRepo](./backup/backup-repo.md)。
 2. [配置 BackupPolicy](./backup/configure-backuppolicy.md)。
 3. [定时备份](./backup/scheduled-backup.md)或者[按需备份](./backup/on-demand-backup.md)集群数据。
-4. 从备份集中[恢复集群数据](./restore/restore-data-from-backup-set.md)。
+4. 从备份集中[恢复集群数据](./restore/restore-data-from-backup-set.md)。MySQL 和 PostgreSQL 可[按时间点恢复](./restore/pitr.md)。

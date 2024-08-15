@@ -35,8 +35,8 @@ KubeBlocks 集成[开源的 Patroni 方案](https://patroni.readthedocs.io/en/la
     >
     probes:
       roleProbe:
-        failureThreshold: 3
-        periodSeconds: 2
+        failureThreshold: 2
+        periodSeconds: 1
         timeoutSeconds: 1
     ```
 

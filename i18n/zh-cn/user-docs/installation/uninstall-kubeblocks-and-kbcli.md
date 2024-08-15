@@ -53,8 +53,9 @@ kbcli 会在 HOME 目录下创建一个名为 `~/.kbcli` 的隐藏文件夹，�
 </TabItem>
 
 <TabItem value="Windows" label="Windows">
+
 1. 进入 `kbcli` 的安装路径，并删除安装文件夹。
-   
+  
   - 如果你通过脚本安装了 `kbcli`，请前往 `C:\Program Files` 并删除 `kbcli-windows-amd64` 文件夹。
   - 如果你自定义了安装路径，请前往指定路径，并删除安装文件夹。
   

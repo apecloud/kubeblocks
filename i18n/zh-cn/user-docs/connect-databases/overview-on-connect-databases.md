@@ -17,6 +17,6 @@ sidebar_label: 简介
   ```
 
 你可以通过客户端界面或 `kbcli` 连接到数据库。如下图所示，首先你需要明确连接数据库的目的是什么。
-- 如果你想试用 KubeBlocks、测试数据库功能或进行低流量基准测试，请参阅[在测试环境中连接数据库](../create-and-connect-databases/connect-to-database-in-testing-environment.md)。
-- 如果你想在生产环境中连接数据库或进行高流量压力测试，请参阅[在生产环境中连接数据库](../create-and-connect-databases/connect-to-database-in-production-environment.md)。
+- 如果你想试用 KubeBlocks、测试数据库功能或进行低流量基准测试，请参阅[在测试环境中连接数据库](./connect-to-database-in-testing-environment.md)。
+- 如果你想在生产环境中连接数据库或进行高流量压力测试，请参阅[在生产环境中连接数据库](./connect-to-database-in-production-environment.md)。
 ![overview](./../../img/create-and-connect-databases-overview.jpg)

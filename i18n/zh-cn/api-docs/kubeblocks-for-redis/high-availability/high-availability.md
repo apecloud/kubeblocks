@@ -24,7 +24,7 @@ Redis Sentinel 是 Redis 官方推荐的主备集群高可用性解决方案，�
     >
     probes:
       roleProbe:
-        failureThreshold: 3
+        failureThreshold: 2
         periodSeconds: 2
         timeoutSeconds: 1
     ```

@@ -108,7 +108,7 @@ kubectl get cluster mycluster -n demo
      - name: broker
        componentDefRef: broker
        replicas: 1
-       resources: # Change the values of resources.
+       resources: # 修改参数值
          requests:
            memory: "2Gi"
            cpu: "1"

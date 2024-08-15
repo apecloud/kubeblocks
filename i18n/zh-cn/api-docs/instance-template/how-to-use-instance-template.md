@@ -16,20 +16,18 @@ KubeBlocks 中支持管理 RisingWave 集群，RisingWave 引擎由 RisingWave �
 
 ## 示例
 
-在 RisingWave 引擎的默认模板中，[环境变量相关配置](https://github.com/apecloud/kubeblocks-addons/blob/main/addons/risingwave/templates/clusterdefinition.yaml#L334)如下：
+在 RisingWave 引擎的默认模板中，[环境变量相关配置](https://github.com/apecloud/kubeblocks-addons/blob/main/addons/risingwave/templates/cmpd-compute.yaml#L26)如下：
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
-kind: ClusterDefinition
+kind: ComponentDefinition
 metadata:
   name: risingwave
 # ...
 spec:
-  componentDefs:
-  - name: compute
-# ...
-    podSpec:
-      containers:
+#...
+  runtime:
+    containers:
       - name: compute
         securityContext:
           allowPrivilegeEscalation: false
@@ -60,7 +58,7 @@ spec:
 # ...
 ```
 
-在 Cluster 资源中添加实例模板后如下：
+在 [Cluster 资源](https://github.com/apecloud/kubeblocks-addons/blob/main/addons-cluster/risingwave/templates/cluster.yaml)中添加实例模板后如下：
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -71,7 +69,7 @@ metadata:
 # ...
 spec:
   componentSpecs:
-  - componentDefRef: compute
+  - componentDef: compute
     name: compute
     replicas: {{ .Values.risingwave.compute.replicas }}
     instances:

@@ -22,17 +22,18 @@ In principle, KubeBlocks instance in-place updates leverage [the Kubernetes Pod 
 * `spec.containers[*].image`
 * `spec.tolerations (only supports adding Toleration)`
 
-Starting from Kubernetes version 1.27, support for in-place updates of CPU and Memory can be further enabled through the PodInPlaceVerticalScaling feature switch, which is enabled by default from version 1.29 onwards. KubeBlocks automatically detects the Kubernetes version and feature switches, and further supports the following capabilities:
-For Kubernetes versions equal to or greater than 1.29, or greater than or equal to 1.27 and less than 1.29 with PodInPlaceVerticalScaling enabled, the following fields' in-place updates are supported:
+Starting from Kubernetes version 1.27, support for in-place updates of CPU and Memory can be further enabled through the `InPlacePodVerticalScaling` feature switch. KubeBlocks also supports the `InPlacePodVerticalScaling` feature switc which further supports the following capabilities:
+
+For Kubernetes versions equal to or greater than 1.27 with InPlacePodVerticalScaling enabled, the following fields' in-place updates are supported:
 
 * `spec.containers[*].resources.requests["cpu"]`
 * `spec.containers[*].resources.requests["memory"]`
 * `spec.containers[*].resources.limits["cpu"]`
 * `spec.containers[*].resources.limits["memory"]`
 
-It is important to note that after successful resource resizing, some applications may need to be restarted to recognize the new resource configuration. In such cases, further configuration of container restartPolicy is required in ClusterDefinition or ComponentDefinition.
+It is important to note that after successful resource resizing, some applications may need to be restarted to recognize the new resource configuration. In such cases, further configuration of container `restartPolicy` is required in ClusterDefinition or ComponentDefinition.
 
-For PVC, KubeBlocks similarly leverages the capabilities of the PVC API, supporting only volume expansion.
+For PVC, KubeBlocks also leverages the capabilities of the PVC API and only supports volume expansion. If the expansion fails for some reason, it supports reverting to the original capacity. However, once a VolumeClaimTemplate in a StatefulSet is declared, it cannot be modified. Currently, the Kuberentes community is [developing this capability](https://github.com/kubernetes/enhancements/pull/4651), but it won't be available until at least Kubernetes version 1.32.
 
 ## From the upper-level API perspective, which fields utilize in-place updates after being updated?
 

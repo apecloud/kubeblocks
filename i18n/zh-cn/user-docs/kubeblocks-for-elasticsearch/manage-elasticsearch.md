@@ -36,7 +36,7 @@ kbcli cluster create --help
 
 :::
 
-1. 查看集群是否已创建。
+2. 查看集群是否已创建。
 
    ```bash
    kbcli cluster list
@@ -45,7 +45,7 @@ kbcli cluster create --help
    elasticsearch   default     elasticsearch        elasticsearch-8.8.2   Delete               Running          Jul 05,2024 16:51 UTC+0800   
    ```
 
-2. 查看集群信息。
+3. 查看集群信息。
 
    ```bash
    kbcli cluster describe elasticsearch

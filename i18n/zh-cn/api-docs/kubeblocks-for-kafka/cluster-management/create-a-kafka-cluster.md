@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 
 # 创建集群
 
-本文档展示如何创建一个 Kafka 集群。
+本文档展示如何通过 `kubectl` 或 YAML 文件创建 Kafka 集群。
 
 ## 开始之前
 

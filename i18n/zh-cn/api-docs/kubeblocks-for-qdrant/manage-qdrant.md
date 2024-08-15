@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 
 # 用 KubeBlocks 管理 Qdrant
 
-生成式人工智能的爆火引发了人们对向量数据库的关注。目前，KubeBlocks 支持 Qdrant 的管理和运维。本文档展示如何使用 KubeBlocks 管理 Qdrant。
+生成式人工智能的爆火引发了人们对向量数据库的关注。目前，KubeBlocks 支持 Qdrant 的管理和运维。
 
 本教程演示了如何通过 `kubectl` 或 YAML 文件创建并管理 Qdrant 集群。您可在 [GitHub 仓库](https://github.com/apecloud/kubeblocks-addons/tree/release-0.9/examples/qdrant)查看相应的 YAML 示例和指南。
 
@@ -139,13 +139,13 @@ Qdrant 通过 6333 和 6334 端口提供 HTTP 和 gRPC 协议供客户端访问�
    curl http://127.0.0.1:6333/collections
    ```
 
-   Refer to [the official Qdrant documents](https://qdrant.tech/documentation/) for the cluster operations.
+   可参考 [Qdrant 官方文档](https://qdrant.tech/documentation/) 执行集群运维操作。
 
 ## 集群扩缩容
 
 ### 水平扩缩容
 
-水平扩展改变 Pod 的数量。例如，您可以将副本从三个扩展到五个。水平扩缩容过程包括数据的备份和恢复。
+水平扩展改变 Pod 的数量。例如，您可以将副本从三个扩展到五个。
 
 从 v0.9.0 开始，除了支持副本（replica）的扩缩容外，KubeBlocks 还支持了实例（instance）的扩缩容。可通过 [水平扩缩容](./../maintenance/scale/horizontal-scale.md) 文档了解更多细节和示例。
 

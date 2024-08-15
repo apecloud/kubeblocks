@@ -89,7 +89,7 @@ componentSpecs:
     - error
     - general
     - slow
-    disableExporter: false # Change this value
+    disableExporter: false # 修改该参数值
 ```
 
 ### 查看监控大盘
@@ -171,7 +171,7 @@ componentSpecs:
     - error
     - general
     - slow
-    disableExporter: true # Change this value
+    disableExporter: true # 修改该参数值
 ```
 
 ### 查看大盘

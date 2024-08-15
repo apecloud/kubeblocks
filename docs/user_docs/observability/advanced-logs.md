@@ -55,7 +55,7 @@ Before enabling the advanced logs function, deploy a Loki node first and then ap
    ```bash
    kbcli addon enable loki
    >
-   NAME                           TYPE   PROVIDER    STATUS     AUTO-INSTALL   AUTO-INSTALLABLE-SELECTOR   
+   NAME                           TYPE   PROVIDER    STATUS     AUTO-INSTALL     
    loki                           Helm   apecloud    Enabled    false   
    ```
 
@@ -135,7 +135,7 @@ After the log collection function is enabled, Agamotto detects two localhost fol
    ```bash
    kbcli addon enable agamotto
    >
-   NAME                           TYPE   PROVIDER    STATUS     AUTO-INSTALL   AUTO-INSTALLABLE-SELECTOR   
+   NAME                           TYPE   PROVIDER    STATUS     AUTO-INSTALL    
    agamotto                       Helm   apecloud    Enabled    false  
    ```
 

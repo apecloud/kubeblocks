@@ -111,7 +111,7 @@ mycluster   postgresql           postgresql-14.8.0   Delete               Runnin
              - ReadWriteOnce
            resources:
              requests:
-               storage: 40Gi # Change the volume storage size.
+               storage: 40Gi # 修改该参数值
      terminationPolicy: Delete
    ```
 

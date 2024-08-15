@@ -24,7 +24,7 @@ This tutorial shows how to create and connect to a Redis cluster.
   ```bash
   kbcli addon list
   >
-  NAME                      TYPE   STATUS     EXTRAS         AUTO-INSTALL   INSTALLABLE-SELECTOR
+  NAME                      TYPE   STATUS     EXTRAS         AUTO-INSTALL   
   ...
   redis                     Helm   Enabled                   true
   ...

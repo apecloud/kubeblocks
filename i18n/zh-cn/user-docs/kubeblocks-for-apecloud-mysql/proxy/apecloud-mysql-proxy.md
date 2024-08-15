@@ -27,7 +27,7 @@ import TabItem from '@theme/TabItem';
    ```
 
    如果已经有 Kubernetes 集群，可以通过 [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 安装 KubeBlocks。
-4. 准备一个名为 mycluster 的 ApeCloud MySQL 三节点集群，用于演示如何为现有集群启用代理功能。详情请参考[创建并连接到 MySQL 集群](./../../kubeblocks-for-mysql/cluster-management/create-and-connect-a-mysql-cluster.md)。
+4. 准备一个名为 mycluster 的 ApeCloud MySQL 三节点集群，用于演示如何为现有集群启用代理功能。详情请参考[创建并连接到 MySQL 集群](./../cluster-management/create-and-connect-a-mysql-cluster.md)。
 
 ## 创建代理集群
 
@@ -235,7 +235,7 @@ VTGate、VTConsensus 和 VTTablet 都支持参数配置。你可以使用 `--com
 
    :::note
 
-   关于参数配置的更多信息，请参考[配置](./../../kubeblocks-for-postgresql/configuration/configuration.md)。
+   关于参数配置的更多信息，请参考[配置](./../configuration/configuration.md)。
 
    :::
 

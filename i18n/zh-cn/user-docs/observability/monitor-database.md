@@ -142,7 +142,7 @@ KubeBlocks 支持 victoria-metrics-agent 引擎，支持用户将数据远程写
    kbcli addon enable victoria-metrics-agent --set "extraArgs.remoteWrite\.aws\.region=<your AMP region>,extraArgs.remoteWrite\.aws\.accessKey=<your accessKey>,extraArgs.remoteWrite\.aws\.secretKey=<your secretKey>,remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}"
    ```
 
-2. 可选）水平扩容 `victoria-metrics-agent`。
+2. （可选）水平扩容 `victoria-metrics-agent`。
 
    当数据库实例不断增多时，单节点 vmagent 会成为瓶颈。此时可以选择通过扩容 vmagent 来解决这个问题。多节点 vmagent 内部会根据哈希策略自动划分数据采集的任务。
 
@@ -150,7 +150,7 @@ KubeBlocks 支持 victoria-metrics-agent 引擎，支持用户将数据远程写
    kbcli addon enable victoria-metrics-agent --replicas <replica count> --set remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}
    ```
 
-3. （可选）禁用 `victoria-metrics-agent`。
+3. （可选）关闭 `victoria-metrics-agent` 引擎。
 
    ```bash
    kbcli addon disable victoria-metrics-agent

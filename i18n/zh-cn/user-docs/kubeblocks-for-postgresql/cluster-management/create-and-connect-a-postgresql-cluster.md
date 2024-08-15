@@ -24,7 +24,7 @@ import TabItem from '@theme/TabItem';
   ```bash
   kbcli addon list
   >
-  NAME                       TYPE   STATUS     EXTRAS         AUTO-INSTALL   INSTALLABLE-SELECTOR
+  NAME                       TYPE   STATUS     EXTRAS         AUTO-INSTALL  
   ...
   postgresql                 Helm   Enabled                   true
   ...
@@ -91,4 +91,4 @@ kbcli cluster create --cluster-definition posrgresql --cluster-version postgresq
 kbcli cluster connect <clustername>  --namespace <name>
 ```
 
-有关详细的数据库连接指南，请参考[连接数据库](./../../create-and-connect-databases/overview-on-connect-databases.md)。
+有关详细的数据库连接指南，请参考[连接数据库](./../../connect-databases/overview-on-connect-databases.md)。

@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 
 # 用 KubeBlocks 管理 Milvus
 
-生成式人工智能的爆火引发了人们对向量数据库的关注。目前，KubeBlocks 支持 Milvus 的管理和运维。本文档展示如何使用 KubeBlocks 管理 Milvus。
+生成式人工智能的爆火引发了人们对向量数据库的关注。目前，KubeBlocks 支持 Milvus 的管理和运维。
 
 Milvus 是高度灵活、可靠且速度极快的云原生开源向量数据库。它为 embedding 相似性搜索和 AI 应用程序提供支持，并努力使每个组织都可以访问向量数据库。 Milvus 可以存储、索引和管理由深度神经网络和其他机器学习 (ML) 模型生成的十亿级别以上的 embedding 向量。
 
@@ -473,7 +473,7 @@ mycluster   milvus               milvus-2.3.2      Delete               Running 
 
 </Tabs>
 
-#停止/启动集群
+## 停止/启动集群
 
 您可以停止/启动集群以释放计算资源。当集群停止时，其计算资源将被释放，也就是说 Kubernetes 的 Pod 将被释放，但其存储资源仍将被保留。如果你想恢复集群资源，可通过快照重新启动集群。
 

@@ -15,10 +15,6 @@ sidebar_position: 3
    - 哈希分片（Hash Sharding）：使用哈希函数将数据的键值映射到不同的分片，每个分片负责一个哈希值范围。
    - 复合分片（Composite Sharding）：结合多种分片策略，例如先根据范围进行分片，然后再根据哈希进行分片，以优化数据的分布和访问效率。
 
-- Pod: A Pod is the smallest deployable and manageable unit in K8s. It consists of one or more closely related containers that share network and storage resources and are scheduled and managed as a single entity. In K8s, Pod's utilization of node resources (CPU, memory) can be managed and controlled by configuring resource requests and limits. 
-  - Resource requests define the minimum amount of resources that a Pod requires at runtime. The K8s scheduler selects nodes that can satisfy the Pod's resource requests, ensuring that the nodes have sufficient available resources to meet the Pod's needs.
-  - Resource limits define the maximum amount of resources that a Pod can use at runtime. They are used to prevent the Pod from consuming excessive resources and protect nodes and other Pods from being affected.
-
 - Pod：Pod 是 K8s 中最小的可部署和可管理单元。它由一个或多个紧密关联的容器组成，这些容器共享网络和存储资源，并作为一个整体进行调度和管理。在 K8s 中，可以通过配置资源请求和限制来管理和控制 Pod 对节点资源（CPU、内存）的使用。
 
    - 资源请求定义了 Pod 在运行时所需的最低资源量。K8s 调度器会选择能够满足 Pod 资源请求的节点，确保这些节点有足够的可用资源来满足 Pod 的需求。

@@ -1,12 +1,12 @@
 ---
-title: Enable in-place update
-description: Enable in-place update
-keywords: [in-place update]
+title: 启用原地更新
+description: 如何启用原地更新
+keywords: [原地更新]
 sidebar_position: 2
-sidebar_label: Enable in-place update
+sidebar_label: 启用原地更新
 ---
 
-# Enable in-place update
+# 启用原地更新
 
 Resources 的原地更新一直以来有比较强的需求，在低于 1.27 版本的 Kubernetes 中，我们可以看到很多 Kubernetes 的发行版中支持了 Resources 的原地更新能力，不同的发行版可能采用了不同的方案去实现这一特性。
 

@@ -36,7 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
-	"github.com/apecloud/kubeblocks/pkg/controller/job"
+	jobutil "github.com/apecloud/kubeblocks/pkg/controller/job"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -111,14 +111,14 @@ func createSwitchoverJob(reqCtx intctrlutil.RequestCtx,
 	if !exists {
 		// check the previous generation switchoverJob whether exist
 		ml := getSwitchoverCmdJobLabel(cluster.Name, synthesizedComp.Name)
-		previousJobs, err := job.GetJobWithLabels(reqCtx.Ctx, cli, cluster, ml)
+		previousJobs, err := jobutil.GetJobWithLabels(reqCtx.Ctx, cli, cluster, ml)
 		if err != nil {
 			return err
 		}
 		if len(previousJobs) > 0 {
 			// delete the previous generation switchoverJob
 			reqCtx.Log.V(1).Info("delete previous generation switchoverJob", "job", previousJobs[0].Name)
-			if err := job.CleanJobWithLabels(reqCtx.Ctx, cli, cluster, ml); err != nil {
+			if err := jobutil.CleanJobWithLabels(reqCtx.Ctx, cli, cluster, ml); err != nil {
 				return err
 			}
 		}
@@ -225,7 +225,7 @@ func renderSwitchoverCmdJob(ctx context.Context,
 		for i := range job.Spec.Template.Spec.Containers {
 			intctrlutil.InjectZeroResourcesLimitsIfEmpty(&job.Spec.Template.Spec.Containers[i])
 		}
-		if err := component.BuildJobTolerations(job, cluster); err != nil {
+		if err := jobutil.BuildJobTolerations(cluster, job); err != nil {
 			return nil, err
 		}
 		return job, nil

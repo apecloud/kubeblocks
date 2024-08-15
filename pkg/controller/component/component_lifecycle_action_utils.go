@@ -264,10 +264,6 @@ func BuildJobTolerations(job *batchv1.Job, cluster *appsv1alpha1.Cluster) error 
 		job.Spec.Template.Spec.Tolerations = append(job.Spec.Template.Spec.Tolerations, cluster.Spec.Tolerations...)
 	}
 
-	// build job tolerations from cluster.spec.SchedulingPolicy.Tolerations
-	if cluster.Spec.SchedulingPolicy != nil && len(cluster.Spec.SchedulingPolicy.Tolerations) > 0 {
-		job.Spec.Template.Spec.Tolerations = append(job.Spec.Template.Spec.Tolerations, cluster.Spec.SchedulingPolicy.Tolerations...)
-	}
 	return nil
 }
 

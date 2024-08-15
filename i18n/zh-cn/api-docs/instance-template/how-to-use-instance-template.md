@@ -203,7 +203,7 @@ KubeBlocks 添加了系统 `Labels`，请勿覆盖这些 `Labels`。
 
 ### Env
 
-实例模板中定义的 `Env` 将覆盖除 KubeBlocks 系统默认 `Env` 外的其他 `Env`。覆盖逻辑与 `Annotaions` 和 `Labels` 类似，即若 `Env Name` 相同，则用实例模板中的 `Value` 或 `ValueFrom`；不同，则添加为新的 `Env`。
+实例模板中定义的 `Env` 将覆盖除 KubeBlocks 系统默认 `Env` 外的其他 `Env`。覆盖逻辑与 `Annotations` 和 `Labels` 类似，即若 `Env Name` 相同，则用实例模板中的 `Value` 或 `ValueFrom`；不同，则添加为新的 `Env`。
 
 ### Volumes
 

@@ -92,13 +92,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	// 3. do update
-	// do nothing if UpdateStrategyType is 'OnDelete'
-	if its.Spec.UpdateStrategy.Type == apps.OnDeleteStatefulSetStrategyType {
-		return kubebuilderx.Continue, nil
-	}
-
-	// handle 'RollingUpdate'
-	partition, maxUnavailable, err := parsePartitionNMaxUnavailable(its.Spec.UpdateStrategy.RollingUpdate, len(oldPodList))
+	partition, maxUnavailable, err := parsePartitionNMaxUnavailable(its.Spec.UpdateStrategy, len(oldPodList))
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
@@ -189,6 +183,9 @@ func buildBlockedCondition(its *workloads.InstanceSet, message string) *metav1.C
 }
 
 func getInstanceSetForUpdatePlan(its *workloads.InstanceSet) *workloads.InstanceSet {
+	if its.Spec.UpdateStrategy.MemberUpdateStrategy != nil {
+		its.Spec.MemberUpdateStrategy = its.Spec.UpdateStrategy.MemberUpdateStrategy
+	}
 	if its.Spec.MemberUpdateStrategy != nil {
 		return its
 	}
@@ -201,10 +198,10 @@ func getInstanceSetForUpdatePlan(its *workloads.InstanceSet) *workloads.Instance
 	return itsForPlan
 }
 
-func parsePartitionNMaxUnavailable(rollingUpdate *apps.RollingUpdateStatefulSetStrategy, replicas int) (int, int, error) {
+func parsePartitionNMaxUnavailable(rollingUpdate workloads.InstanceUpdateStrategy, replicas int) (int, int, error) {
 	partition := replicas
 	maxUnavailable := 1
-	if rollingUpdate == nil {
+	if rollingUpdate.Partition == nil && rollingUpdate.MaxUnavailable == nil {
 		return partition, maxUnavailable, nil
 	}
 	if rollingUpdate.Partition != nil {

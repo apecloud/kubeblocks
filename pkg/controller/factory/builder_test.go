@@ -186,6 +186,8 @@ var _ = Describe("builder", func() {
 			// test member update strategy
 			Expect(its.Spec.MemberUpdateStrategy).ShouldNot(BeNil())
 			Expect(*its.Spec.MemberUpdateStrategy).Should(BeEquivalentTo(workloads.BestEffortParallelUpdateStrategy))
+			Expect(its.Spec.UpdateStrategy.MemberUpdateStrategy).ShouldNot(BeNil())
+			Expect(*its.Spec.UpdateStrategy.MemberUpdateStrategy).Should(BeEquivalentTo(workloads.BestEffortParallelUpdateStrategy))
 		})
 
 		It("builds BackupJob correctly", func() {

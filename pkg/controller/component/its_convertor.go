@@ -144,11 +144,15 @@ func (c *itsUpdateStrategyConvertor) convert(args ...any) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	if getMemberUpdateStrategy(synthesizedComp) != nil {
-		// appsv1.OnDeleteStatefulSetStrategyType is the default value if member update strategy is set.
-		return appsv1.StatefulSetUpdateStrategy{}, nil
+	if memberUpdateStrategy := getMemberUpdateStrategy(synthesizedComp); memberUpdateStrategy != nil {
+		return workloads.InstanceUpdateStrategy{
+			MemberUpdateStrategy: memberUpdateStrategy,
+		}, nil
 	}
-	return nil, nil
+	return workloads.InstanceUpdateStrategy{
+		Partition:      synthesizedComp.InstanceUpdateStrategy.Partition,
+		MaxUnavailable: synthesizedComp.InstanceUpdateStrategy.MaxUnavailable,
+	}, nil
 }
 
 // itsInstancesConvertor converts component instanceTemplate to ITS instanceTemplate

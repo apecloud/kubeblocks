@@ -61,6 +61,7 @@ type SynthesizedComponent struct {
 	Labels                           map[string]string                   `json:"labels,omitempty"`
 	Annotations                      map[string]string                   `json:"annotations,omitempty"`
 	UpdateStrategy                   *v1alpha1.UpdateStrategy            `json:"updateStrategy,omitempty"`
+	InstanceUpdateStrategy           v1alpha1.InstanceUpdateStrategy     `json:"instanceUpdateStrategy,omitempty"`
 	PodManagementPolicy              *appsv1.PodManagementPolicyType     `json:"podManagementPolicy,omitempty"`
 	ParallelPodManagementConcurrency *intstr.IntOrString                 `json:"parallelPodManagementConcurrency,omitempty"`
 	PodUpdatePolicy                  *workloads.PodUpdatePolicyType      `json:"podUpdatePolicy,omitempty"`

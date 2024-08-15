@@ -157,11 +157,9 @@ var _ = Describe("update reconciler test", func() {
 			Expect(ok).Should(BeTrue())
 			partition := int32(3)
 			maxUnavailable := intstr.FromInt32(2)
-			root.Spec.UpdateStrategy = appsv1.StatefulSetUpdateStrategy{
-				RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
-					Partition:      &partition,
-					MaxUnavailable: &maxUnavailable,
-				},
+			root.Spec.UpdateStrategy = workloads.InstanceUpdateStrategy{
+				Partition:      &partition,
+				MaxUnavailable: &maxUnavailable,
 			}
 			// order: bar-hello-0, bar-foo-1, bar-foo-0, bar-3, bar-2, bar-1, bar-0
 			// expected: bar-hello-0, bar-foo-1 being deleted
@@ -175,11 +173,9 @@ var _ = Describe("update reconciler test", func() {
 			Expect(err).Should(BeNil())
 			root, ok = partitionTree.GetRoot().(*workloads.InstanceSet)
 			Expect(ok).Should(BeTrue())
-			root.Spec.UpdateStrategy = appsv1.StatefulSetUpdateStrategy{
-				RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
-					Partition:      &partition,
-					MaxUnavailable: &maxUnavailable,
-				},
+			root.Spec.UpdateStrategy = workloads.InstanceUpdateStrategy{
+				Partition:      &partition,
+				MaxUnavailable: &maxUnavailable,
 			}
 			for _, name := range []string{"bar-hello-0", "bar-foo-1"} {
 				pod := builder.NewPodBuilder(namespace, name).GetObject()
@@ -193,17 +189,6 @@ var _ = Describe("update reconciler test", func() {
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
 			expectUpdatedPods(partitionTree, []string{"bar-foo-0"})
-
-			By("reconcile with UpdateStrategy='OnDelete'")
-			onDeleteTree, err := tree.DeepCopy()
-			Expect(err).Should(BeNil())
-			root, ok = onDeleteTree.GetRoot().(*workloads.InstanceSet)
-			Expect(ok).Should(BeTrue())
-			root.Spec.UpdateStrategy.Type = appsv1.OnDeleteStatefulSetStrategyType
-			res, err = reconciler.Reconcile(onDeleteTree)
-			Expect(err).Should(BeNil())
-			Expect(res).Should(Equal(kubebuilderx.Continue))
-			expectUpdatedPods(onDeleteTree, []string{})
 
 			// order: bar-hello-0, bar-foo-1, bar-foo-0, bar-3, bar-2, bar-1, bar-0
 			// expected: bar-hello-0 being deleted

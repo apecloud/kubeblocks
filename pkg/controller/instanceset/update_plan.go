@@ -97,6 +97,9 @@ func (p *realUpdatePlan) planWalkFunc(vertex graph.Vertex) error {
 			// This change may lead to false alarms, as when all replicas are temporarily unavailable for some reason,
 			// the system will update them without waiting for their roles to be elected and probed. This cloud
 			// potentially hide some uncertain risks.
+			if p.its.Spec.UpdateStrategy.MemberUpdateStrategy != nil {
+				p.its.Spec.MemberUpdateStrategy = p.its.Spec.UpdateStrategy.MemberUpdateStrategy
+			}
 			serialUpdate := p.its.Spec.MemberUpdateStrategy != nil && *p.its.Spec.MemberUpdateStrategy == workloads.SerialUpdateStrategy
 			hasRoleProbed := len(p.its.Status.MembersStatus) > 0
 			if !serialUpdate || hasRoleProbed {
@@ -120,6 +123,10 @@ func (p *realUpdatePlan) build() {
 	// make a root vertex with nil Obj
 	root := &model.ObjectVertex{}
 	p.dag.AddVertex(root)
+
+	if p.its.Spec.UpdateStrategy.MemberUpdateStrategy != nil {
+		p.its.Spec.MemberUpdateStrategy = p.its.Spec.UpdateStrategy.MemberUpdateStrategy
+	}
 
 	if p.its.Spec.MemberUpdateStrategy == nil {
 		return

@@ -32,7 +32,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -264,22 +263,6 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, synthesizeComp *comp
 		}
 	}
 
-	updateUpdateStrategy := func(itsObj, itsProto *workloads.InstanceSet) {
-		var objMaxUnavailable *intstr.IntOrString
-		if itsObj.Spec.UpdateStrategy.RollingUpdate != nil {
-			objMaxUnavailable = itsObj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable
-		}
-		itsObj.Spec.UpdateStrategy = itsProto.Spec.UpdateStrategy
-		if objMaxUnavailable == nil && itsObj.Spec.UpdateStrategy.RollingUpdate != nil {
-			// HACK: This field is alpha-level (since v1.24) and is only honored by servers that enable the
-			// MaxUnavailableStatefulSet feature.
-			// When we get a nil MaxUnavailable from k8s, we consider that the field is not supported by the server,
-			// and set the MaxUnavailable as nil explicitly to avoid the workload been updated unexpectedly.
-			// Ref: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#maximum-unavailable-pods
-			itsObj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = nil
-		}
-	}
-
 	// be compatible with existed cluster
 	updateService := func(itsObj, itsProto *workloads.InstanceSet) *corev1.Service {
 		if itsProto.Spec.Service != nil {
@@ -333,10 +316,7 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, synthesizeComp *comp
 	itsObjCopy.Spec.VolumeClaimTemplates = itsProto.Spec.VolumeClaimTemplates
 	itsObjCopy.Spec.ParallelPodManagementConcurrency = itsProto.Spec.ParallelPodManagementConcurrency
 	itsObjCopy.Spec.PodUpdatePolicy = itsProto.Spec.PodUpdatePolicy
-
-	if itsProto.Spec.UpdateStrategy.Type != "" || itsProto.Spec.UpdateStrategy.RollingUpdate != nil {
-		updateUpdateStrategy(itsObjCopy, itsProto)
-	}
+	itsObjCopy.Spec.UpdateStrategy = itsProto.Spec.UpdateStrategy
 
 	intctrlutil.ResolvePodSpecDefaultFields(oldITS.Spec.Template.Spec, &itsObjCopy.Spec.Template.Spec)
 	delayUpdateInstanceSetSystemFields(oldITS.Spec, &itsObjCopy.Spec)

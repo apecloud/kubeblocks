@@ -288,7 +288,8 @@ func buildSwitchoverEnvs(ctx context.Context,
 	synthesizeComp *component.SynthesizedComponent,
 	switchover *appsv1alpha1.Switchover) ([]corev1.EnvVar, error) {
 	if synthesizeComp == nil || synthesizeComp.LifecycleActions == nil ||
-		synthesizeComp.LifecycleActions.Switchover == nil || switchover == nil {
+		synthesizeComp.LifecycleActions.Switchover == nil ||
+		synthesizeComp.LifecycleActions.Switchover.Exec == nil || switchover == nil {
 		return nil, errors.New("switchover spec not found")
 	}
 

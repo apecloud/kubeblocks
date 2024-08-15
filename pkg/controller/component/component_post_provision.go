@@ -21,6 +21,7 @@ package component
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -37,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // post-provision constants
@@ -283,8 +285,8 @@ func renderPostProvisionCmdJob(ctx context.Context,
 				},
 			},
 		}
-		if len(cluster.Spec.Tolerations) > 0 {
-			job.Spec.Template.Spec.Tolerations = cluster.Spec.Tolerations
+		if err := BuildJobTolerations(job, cluster); err != nil {
+			return nil, err
 		}
 		for i := range job.Spec.Template.Spec.Containers {
 			intctrlutil.InjectZeroResourcesLimitsIfEmpty(&job.Spec.Template.Spec.Containers[i])
@@ -303,6 +305,30 @@ func renderPostProvisionCmdJob(ctx context.Context,
 	}
 
 	return job, nil
+}
+
+// BuildJobTolerations builds the job tolerations.
+func BuildJobTolerations(job *batchv1.Job, cluster *appsv1alpha1.Cluster) error {
+	// build data plane tolerations from config
+	var tolerations []corev1.Toleration
+	if val := viper.GetString(constant.CfgKeyDataPlaneTolerations); val != "" {
+		if err := json.Unmarshal([]byte(val), &tolerations); err != nil {
+			return err
+		}
+	}
+
+	if len(job.Spec.Template.Spec.Tolerations) > 0 {
+		job.Spec.Template.Spec.Tolerations = append(job.Spec.Template.Spec.Tolerations, tolerations...)
+	} else {
+		job.Spec.Template.Spec.Tolerations = tolerations
+	}
+
+	// build job tolerations from legacy cluster.spec.Tolerations
+	if len(cluster.Spec.Tolerations) > 0 {
+		job.Spec.Template.Spec.Tolerations = append(job.Spec.Template.Spec.Tolerations, cluster.Spec.Tolerations...)
+	}
+
+	return nil
 }
 
 // buildPostProvisionEnvs builds the postProvision command job envs.

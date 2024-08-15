@@ -1,12 +1,11 @@
-name: CICD-PUSH
+name: CICD Push
 
 on:
   push:
     branches:
-      - '*'
-      - '*/*'
+      - '**'
     tags-ignore:
-      - '*'
+      - '**'
 
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
@@ -88,7 +87,45 @@ jobs:
           files: docs/
           config: .github/utils/typos.toml
 
-  make-test:
+  push-pre-check:
+    needs: trigger-mode
+    if: contains(needs.trigger-mode.outputs.trigger-mode, '[test]')
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        ops: [ 'manifests', 'mod-vendor', 'generate', 'lint', 'staticcheck' ]
+    steps:
+      - uses: actions/checkout@v4
+      - name: install lib
+        run: |
+          sudo rm /etc/apt/sources.list.d/microsoft-prod.list
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libbtrfs-dev \
+            libdevmapper-dev
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "${{ env.GO_VERSION }}"
+
+      - name: Install golangci-lint
+        if: matrix.ops == 'lint'
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.55.2
+
+      - name: make ${{ matrix.ops }}
+        run: |
+          make ${{ matrix.ops }}
+          FILE_CHANGES=`git diff --name-only ${{ github.sha }}`
+          if [[ ("${{ matrix.ops }}" == 'generate' || "${{ matrix.ops }}" == 'manifests') && -n "$FILE_CHANGES" ]]; then
+              echo $FILE_CHANGES
+              echo "make "${{ matrix.ops }}" causes inconsistent files"
+              exit 1
+          fi
+
+  push-make-test:
     needs: trigger-mode
     runs-on: [self-hosted, gke-runner-go1.21]
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[test]')
@@ -96,28 +133,6 @@ jobs:
       runner-name: ${{ steps.get_runner_name.outputs.runner_name }}
     steps:
       - uses: actions/checkout@v4
-      - name: make manifests check
-        run: |
-          make manifests
-          FILE_CHANGES=`git diff --name-only ${{ github.sha }}`
-          if [[ ! -z "$FILE_CHANGES" ]]; then
-            echo $FILE_CHANGES
-            echo "make manifests causes inconsistent files"
-            exit 1
-          fi
-
-      - name: make mod-vendor
-        run: |
-          make mod-vendor
-
-      - name: make staticcheck
-        run: |
-          make staticcheck
-
-      - name: make lint
-        run: |
-          make lint
-
       - name: make test
         run: |
           make test
@@ -146,7 +161,7 @@ jobs:
           bash .github/utils/utils.sh --type 8
 
   remove-runner:
-    needs: [ trigger-mode, make-test ]
+    needs: [ trigger-mode, push-make-test ]
     runs-on: ubuntu-latest
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[test]') && always() }}
     steps:
@@ -155,7 +170,7 @@ jobs:
         run: |
           bash .github/utils/utils.sh --type 9 \
             --github-token "${{ env.GITHUB_TOKEN }}" \
-            --runner-name ${{ needs.make-test.outputs.runner-name }}
+            --runner-name ${{ needs.push-make-test.outputs.runner-name }}
 
   check-image:
     needs: trigger-mode

@@ -105,6 +105,11 @@ type ComponentSpec struct {
 	// +optional
 	Volumes []corev1.Volume `json:"volumes,omitempty"`
 
+	// Defines VolumeMounts to override.
+	// Add new or override existing volume mounts of the first container in the Pod.
+	// +optional
+	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
+
 	// Overrides Services defined in referenced ComponentDefinition and exposes endpoints that can be accessed
 	// by clients.
 	//

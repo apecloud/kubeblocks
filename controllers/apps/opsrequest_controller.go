@@ -177,6 +177,9 @@ func (r *OpsRequestReconciler) handleOpsRequestByPhase(reqCtx intctrlutil.Reques
 		return r.reconcileStatusDuringRunningOrCanceling(reqCtx, opsRes)
 	case appsv1alpha1.OpsSucceedPhase:
 		return r.handleSucceedOpsRequest(reqCtx, opsRes.OpsRequest)
+	case appsv1alpha1.OpsAbortedPhase:
+		// TODO: handle hscale aborted
+		return r.handleSucceedOpsRequest(reqCtx, opsRes.OpsRequest)
 	default:
 		return r.handleUnsuccessfulCompletionOpsRequest(reqCtx, opsRes)
 	}

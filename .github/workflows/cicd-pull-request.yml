@@ -1,8 +1,11 @@
-name: CICD-PULL-REQUEST
+name: Pull Request
 
 on:
-  pull_request_review:
-    types: [submitted]
+  pull_request:
+    types: [ labeled ]
+    branches:
+      - main
+      - release-*
 
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
@@ -12,7 +15,7 @@ env:
 jobs:
   trigger-mode:
     name: trigger mode
-    if: github.event.review.state == 'approved'
+    if: github.event.action == 'labeled' && (github.event.label.name == 'approved' || github.event.label.name == 'pre-approve')
     runs-on: ubuntu-latest
     outputs:
       trigger-mode: ${{ steps.get_trigger_mode.outputs.trigger_mode }}
@@ -74,6 +77,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: install lib
         run: |
+          sudo rm /etc/apt/sources.list.d/microsoft-prod.list
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             libbtrfs-dev \
@@ -101,7 +105,45 @@ jobs:
               make test TEST_PACKAGES=./${{ matrix.ops }}/...
           fi
 
-  make-test:
+  pr-pre-check:
+    needs: trigger-mode
+    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[test]') && github.event.pull_request.head.repo.full_name != github.repository }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        ops: [ 'manifests', 'mod-vendor', 'generate', 'lint', 'staticcheck' ]
+    steps:
+      - uses: actions/checkout@v4
+      - name: install lib
+        run: |
+          sudo rm /etc/apt/sources.list.d/microsoft-prod.list
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libbtrfs-dev \
+            libdevmapper-dev
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "${{ env.GO_VERSION }}"
+
+      - name: Install golangci-lint
+        if: matrix.ops == 'lint'
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.55.2
+
+      - name: make ${{ matrix.ops }}
+        run: |
+          make ${{ matrix.ops }}
+          FILE_CHANGES=`git diff --name-only ${{ github.sha }}`
+          if [[ ("${{ matrix.ops }}" == 'generate' || "${{ matrix.ops }}" == 'manifests') && -n "$FILE_CHANGES" ]]; then
+              echo $FILE_CHANGES
+              echo "make "${{ matrix.ops }}" causes inconsistent files"
+              exit 1
+          fi
+
+  pr-make-test:
     needs: trigger-mode
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[test]') && github.event.pull_request.head.repo.full_name != github.repository }}
     outputs:
@@ -109,14 +151,6 @@ jobs:
     runs-on: [ self-hosted, gke-runner-go1.21 ]
     steps:
       - uses: actions/checkout@v4
-      - name: make mod-vendor
-        run: |
-          make mod-vendor
-
-      - name: make lint
-        run: |
-          make lint
-
       - name: make test
         run: |
           make test
@@ -145,7 +179,7 @@ jobs:
           bash .github/utils/utils.sh --type 8
 
   remove-runner:
-    needs: [ trigger-mode, make-test ]
+    needs: [ trigger-mode, pr-make-test ]
     runs-on: ubuntu-latest
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[test]') && github.event.pull_request.head.repo.full_name != github.repository && always()  }}
     steps:
@@ -154,7 +188,7 @@ jobs:
         run: |
           bash .github/utils/utils.sh --type 9 \
               --github-token ${{ env.GITHUB_TOKEN }} \
-              --runner-name ${{ needs.make-test.outputs.runner-name }}
+              --runner-name ${{ needs.pr-make-test.outputs.runner-name }}
 
   check-image:
     needs: trigger-mode
@@ -221,8 +255,9 @@ jobs:
 
   pr-check:
     name: make test
-    needs: [ trigger-mode, test-parallel, make-test, check-image, check-tools-image, check-datascript-image, check-dataprotection-image, check-helm ]
-    if: ${{ github.event.review.state == 'approved' && always() }}
+    needs: [ trigger-mode, test-parallel, pr-pre-check, pr-make-test,
+             check-image, check-tools-image, check-datascript-image, check-dataprotection-image, check-helm ]
+    if: ${{ github.event.action == 'labeled' && (github.event.label.name == 'approved' || github.event.label.name == 'pre-approve') && always() }}
     runs-on: ubuntu-latest
     steps:
       - name: test parallel check
@@ -233,10 +268,18 @@ jobs:
               exit 1
           fi
 
+      - name: pr pre check
+        if: github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          if [[ "${{ needs.pr-pre-check.result }}" == "failure" || "${{ needs.pr-pre-check.result }}" == "cancelled" ]]; then
+              echo "make test fail"
+              exit 1
+          fi
+
       - name: make test check
         if: github.event.pull_request.head.repo.full_name != github.repository
         run: |
-          if [[ "${{ needs.make-test.result }}" == "failure" || "${{ needs.make-test.result }}" == "cancelled" ]]; then
+          if [[ "${{ needs.pr-make-test.result }}" == "failure" || "${{ needs.pr-make-test.result }}" == "cancelled" ]]; then
               echo "make test fail"
               exit 1
           fi

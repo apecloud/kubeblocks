@@ -1,4 +1,4 @@
-name: CHERRY-PICK
+name: Cherry Pick
 on:
   issue_comment:
     types: [created]

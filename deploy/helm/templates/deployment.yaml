@@ -47,13 +47,6 @@ spec:
             {{- toYaml .Values.resources | nindent 12 }}
           command:
             - /bin/true
-        - name: datascript
-          image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.datascript.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          resources:
-            {{- toYaml .Values.resources | nindent 12 }}
-          command:
-            - /bin/true
       containers:
         - name: manager
           args:
@@ -120,8 +113,6 @@ spec:
               value: {{ .Values.image.imagePullSecrets | toJson | quote }}
             - name: KUBEBLOCKS_TOOLS_IMAGE
               value: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.tools.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-            - name: KUBEBLOCKS_DATASCRIPT_CLIENTS_IMAGE
-              value: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.datascript.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
             - name: KUBEBLOCKS_SERVICEACCOUNT_NAME
               value: {{ include "kubeblocks.serviceAccountName" . }}
             {{- if .Capabilities.APIVersions.Has "snapshot.storage.k8s.io/v1" }}

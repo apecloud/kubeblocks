@@ -211,16 +211,6 @@ jobs:
       DOCKERFILE_PATH: "./docker/Dockerfile-tools"
     secrets: inherit
 
-  check-datascript-image:
-    needs: trigger-mode
-    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[docker]') }}
-    uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.24
-    with:
-      IMG: "apecloud/kubeblocks-datascript"
-      BUILDX_PLATFORMS: "linux/amd64"
-      DOCKERFILE_PATH: "./docker/Dockerfile-datascript"
-    secrets: inherit
-
   check-dataprotection-image:
     needs: trigger-mode
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[docker]') }}
@@ -313,7 +303,7 @@ jobs:
   push-check:
     name: make-test
     needs: [ trigger-mode, push-pre-check, push-make-test, check-image, check-tools-image,
-             check-datascript-image, check-dataprotection-image, check-helm, apis-doc, check-license-header ]
+             check-dataprotection-image, check-helm, apis-doc, check-license-header ]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
@@ -340,11 +330,6 @@ jobs:
 
           if [[ "${{ needs.check-tools-image.result }}" == "failure" || "${{ needs.check-tools-image.result }}" == "cancelled" ]]; then
               echo "check tools image fail"
-              exit 1
-          fi
-
-          if [[ "${{ needs.check-datascript-image.result }}" == "failure" || "${{ needs.check-datascript-image.result }}" == "cancelled" ]]; then
-              echo "check datascript image fail"
               exit 1
           fi
 

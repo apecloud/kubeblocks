@@ -36,7 +36,6 @@ TOOL_IMG ?= docker.io/apecloud/$(APP_NAME)-tools
 CLI_IMG ?= docker.io/apecloud/kbcli
 CHARTS_IMG ?= docker.io/apecloud/$(APP_NAME)-charts
 CLI_TAG ?= v$(CLI_VERSION)
-DATASCRIPT_IMG ?= docker.io/apecloud/$(APP_NAME)-datascript
 DATAPROTECTION_IMG ?= docker.io/apecloud/$(APP_NAME)-dataprotection
 
 # Update whenever you upgrade dev container image
@@ -156,34 +155,6 @@ ifeq ($(TAG_LATEST), true)
 	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-charts --platform $(BUILDX_PLATFORMS) --tag ${CHARTS_IMG}:latest --push
 else
 	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-charts --platform $(BUILDX_PLATFORMS) --tag ${CHARTS_IMG}:${VERSION} --push
-endif
-endif
-
-.PHONY: build-datascript-image
-build-datascript-image: install-docker-buildx ## Build datascript container image.
-ifneq ($(BUILDX_ENABLED), true)
-	$(DOCKER) build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-datascript --tag ${DATASCRIPT_IMG}:${VERSION} --tag ${DATASCRIPT_IMG}:latest
-else
-ifeq ($(TAG_LATEST), true)
-	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-datascript --platform $(BUILDX_PLATFORMS) --tag ${DATASCRIPT_IMG}:latest
-else
-	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-datascript --platform $(BUILDX_PLATFORMS) --tag ${DATASCRIPT_IMG}:${VERSION}
-endif
-endif
-
-.PHONY: push-datascript-image
-push-datascript-image: install-docker-buildx  ## Push datascript container image.
-ifneq ($(BUILDX_ENABLED), true)
-ifeq ($(TAG_LATEST), true)
-	$(DOCKER) push ${DATASCRIPT_IMG}:latest
-else
-	$(DOCKER) push ${DATASCRIPT_IMG}:${VERSION}
-endif
-else
-ifeq ($(TAG_LATEST), true)
-	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-datascript --platform $(BUILDX_PLATFORMS) --tag ${DATASCRIPT_IMG}:latest --push
-else
-	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-datascript --platform $(BUILDX_PLATFORMS) --tag ${DATASCRIPT_IMG}:${VERSION} --push
 endif
 endif
 

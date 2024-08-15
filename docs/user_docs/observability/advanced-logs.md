@@ -76,7 +76,7 @@ Before enabling the advanced logs function, deploy a Loki node first and then ap
 4. (Optional) Disable the Loki addon.
 
    ```bash
-   kbcli disabled loki
+   kbcli addon disable loki
    ```
 
 By default, Loki saves the log data of the last 3 days, and the data older than 72 hours will be automatically deleted. You can use the following commands to adjust the storage policy. Note that when adjusting the policy, you need to pay attention to the host's disk resources and Loki PVC. Currently, Loki does not support size-based retention.

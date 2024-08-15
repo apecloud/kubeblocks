@@ -94,7 +94,6 @@ componentSpecs:
 
 ### 查看监控大盘
 
-Use the `grafana` addon provided by KubeBlocks to view the dashboard.
 使用 KubeBlocks 提供的 Grafana 引擎查看监控大盘。
 
 1. 获取 Grafana 引擎的用户名和密码。
@@ -126,9 +125,8 @@ Use the `grafana` addon provided by KubeBlocks to view the dashboard.
 
 :::
 
-### （可选）Enable remote write
+### （可选）开启远程写（Remote Write）
 
-KubeBlocks supports the `victoria-metrics-agent` addon to enable you to remotely write the data to your VM. Compared with the native Prometheus, [vmagent](https://docs.victoriametrics.com/vmagent.html) is lighter.
 KubeBlocks 支持 `victoria-metrics-agent` 引擎，支持用户将数据远程写入虚拟机中，相较于 Prometheus 原生应用，[vmagent](https://docs.victoriametrics.com/vmagent.html) 更轻量。
 
 安装 `victoria-metrics-agent` 引擎。

@@ -9,9 +9,7 @@ sidebar_position: 1
 
 亲和性控制了 Pod 在节点上的分配逻辑。合理地将 Kubernetes 的 Pod 分配到不同的节点上，可以提高业务的可用性、资源使用率和稳定性。
 
-可以通过 `kbcli` 或集群的 CR YAML 文件来设置亲和性和容忍度。`kbcli` 仅支持集群级别的配置，而 CR YAML 文件可以支持集群级别和组件级别的配置。
-
-## 选项 1. 使用 kbcli
+可以通过 `kbcli` 件来设置亲和性和容忍度。`kbcli` 仅支持集群级别的配置，如需实现集群级别和组件级别的配置，可使用 CR YAML 文件，具体操作可参考[API 文档](./../../../api-docs/maintenance/resource-scheduling/resource-scheduling.md)。
 
 执行 `kbcli cluster create -h` 命令查看示例，并配置亲和性及容忍度的参数。
 
@@ -57,55 +55,6 @@ Options:
     ......
 .......
 ```
-
-## 选项 2. 使用 YAML 文件
-
-你可以在集群配置文件或组件配置文件中配置 Pod 亲和性和容忍度。
-
-集群级配置是所有组件的默认配置；如果组件中存在 Pod 亲和性配置，组件级配置将生效，并覆盖默认的集群级配置。
-
-```yaml
-spec:
-  affinity:
-    podAntiAffinity: Preferred
-    topologyKeys:
-    - kubernetes.io/hostname
-    nodeLabels:
-      topology.kubernetes.io/zone: us-east-1a
-    tenancy: SharedNode
-  tolerations:
-  - key: EngineType
-    operator: Equal
-    value: mysql
-    effect: NoSchedule
-  componentSpecs:
-  - name: mysql
-    componentDefRef: mysql
-    affinity:
-      podAntiAffinity: Required
-      topologyKeys:
-        - kubernetes.io/hostname
-    ......
-```
-
-**YAML 文件中的参数**
-
-* 亲和性
-  与 Pod 亲和性相关的参数位于集群的 CR YAML 文件的 `spec.affinity` 对象下。
-  
-  Pod 亲和性配置可以应用于集群或组件，组件级配置将覆盖集群级配置。
-
-* 容忍度
-  与容忍度相关的参数位于集群 CR YAML 文件的 `spec.tolerations` 对象下，使用 Kubernetes 的原生语义。有关容忍度参数配置，请参考 Kubernetes 官方文档[污点和容忍度](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/)。
-
-  与亲和性配置类似，容忍度也支持组件级和集群级配置。默认使用集群级配置，组件级别的配置会覆盖集群级别的配置。
-
-| **参数**   | **值**                                    | **描述**  |
-| :--             | :--                                          | :--              |
-| podAntiAffinity | - Required <br/> - Preferred (default)      | 表示当前组件下 Pod 的反亲和性级别。<br/>- Required 表示 Pod 必须均匀分布在由 `topologyKeys` 指定的故障域中。<br/>- Preferred 表示 Pod 最好能够均匀分布在由 `topologyKeys` 指定的故障域中。 |
-| topologyKeys    |                                              | TopologyKey 是节点标签的 key。具有相同 key 值的节点属于相同的拓扑，即相同的故障域。<br/>例如，如果 TopologyKey 是 `kubernetes.io/hostname`，每个节点都是该拓扑的一个域。如果 TopologyKey 是 `topology.kubernetes.io/zone`，每个可用的区域都是该拓扑的一个域。 |
-| nodeLabels      |                                              | NodeLabels 指定 Pod 只能被调度到具有指定节点标签的节点上。|
-| tenancy         | - SharedNode (default) <br/> - DedicatedNode | 表示 Pod 的租户类型：<br/>- SharedNode 表示多个 Pod 共享一个节点。<br/>- DedicatedNode 表示一个节点专用于一个 Pod。 |
 
 ## 示例
 

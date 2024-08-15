@@ -83,7 +83,7 @@ For the importing method, refer to the tutorials of your third-party monitoring 
 
 ### Enable the monitoring function for a database
 
-Check whether the monitoring function of the cluster is enabled. If the monitoring function is enabled, the output shows `monitor: true`.
+Check whether the monitoring function of the cluster is enabled. If the monitoring function is enabled, the output shows `disableExporter: false`.
 
 ```bash
 kubectl get cluster mycluster -o yaml

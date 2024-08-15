@@ -14,7 +14,7 @@ KubeBlocks 日志增强功能使用类似 `kubectl exec` 和 `kubectl logs` 的�
 ## 开始之前
 
 - 容器镜像支持 `tail` 和 `xargs` 命令。
-- 安装 KubeBlocks：你可以通过 [kbcli](../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](../installation/install-with-helm/install-kubeblocks-with-helm.md) 进行安装。
+- [安装 KubeBlocks](../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md)。
 - 在本指南中，我们以 MySQL 引擎为例。其他数据库引擎操作相同。
 
 ## 步骤
@@ -25,7 +25,7 @@ KubeBlocks 日志增强功能使用类似 `kubectl exec` 和 `kubectl logs` 的�
      - 如果你通过执行 `kbcli cluster create` 命令创建集群，请添加 `--enable-all-logs=true` 启用日志增强功能。当此选项为 `true` 时，`ClusterDefinition` 中 `spec.componentDefs.logConfigs` 定义的所有日志类型将自动启用。
 
         ```bash
-        kbcli cluster create mysql --enable-all-logs=true mycluster
+        kbcli cluster create mycluster --cluster-definition apecloud-mysql --enable-all-logs=true
         ```
 
    - 如果在创建集群时未启用该功能，请更新该集群。
@@ -120,6 +120,7 @@ KubeBlocks 日志增强功能使用类似 `kubectl exec` 和 `kubectl logs` 的�
           ```
 
          ***示例***
+
           ```bash
           Status:           
             Cluster Def Generation:  3         

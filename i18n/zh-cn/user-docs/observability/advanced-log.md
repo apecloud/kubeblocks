@@ -28,7 +28,8 @@ KubeBlocks 以引擎的形式统一管理 Agamotto、Loki、Prometheus 等与可
 ## 开始之前
 
 - [安装 kubectl](https://kubernetes.io/docs/tasks/tools/)。
-- 用 [kbcli](../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](../installation/install-with-helm/install-kubeblocks-with-helm.md) 安装 KubeBlocks。
+- [安装 kbcli](./../installation/install-with-kbcli/install-kbcli.md)。
+- [安装 KubeBlocks](../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md)。
 
 ## 启用高级日志功能
 
@@ -75,7 +76,7 @@ Loki 引擎用于存储日志数据，并接受来自前端的搜索请求。详
 4. （可选）禁用 Loki 引擎。
 
     ```bash
-    kbcli disabled loki
+    kbcli addon disable loki
     ```
 
 默认情况下，Loki 保存近 3 天的日志数据，超过 72 小时的数据将被自动删除。你可以使用以下命令来调整存储策略。在调整策略时，请注意主机的磁盘资源和 Loki PVC。目前，Loki 不支持 size-based retention。
@@ -95,6 +96,7 @@ pvc-ed20ec94-9a58-46e4-9c28-b692cba70e79   8Gi        RWO            Delete     
 ```
 
 如果想检查当前 Loki 节点的磁盘使用情况，可以使用 `exec` 命令登录容器，并使用 `du` 命令检查磁盘使用情况。例如：
+
 1. 登录 Loki 容器。
 
     ```bash
@@ -116,6 +118,7 @@ pvc-ed20ec94-9a58-46e4-9c28-b692cba70e79   8Gi        RWO            Delete     
     ```
 
 ### 启用 Agamotto
+
 启用日志收集功能后，Agamotto 会检测两个本地文件夹，即 `/var/log/pods` 和 `/var/log/kubeblocks`。所有符合以下模式的文件都将被采集：
 
 - `/var/log/pods` 目录：用于存储存储容器的标准输出和错误日志。文件模式为 `/var/log/pods/**/**/*.log`。
@@ -135,6 +138,7 @@ pvc-ed20ec94-9a58-46e4-9c28-b692cba70e79   8Gi        RWO            Delete     
     NAME                           TYPE   PROVIDER    STATUS     AUTO-INSTALL   AUTO-INSTALLABLE-SELECTOR   
     agamotto                       Helm   apecloud    Enabled    false  
     ```
+
     检查该 Pod 是否正在运行。
 
     ```bash
@@ -143,6 +147,7 @@ pvc-ed20ec94-9a58-46e4-9c28-b692cba70e79   8Gi        RWO            Delete     
     NAME                                            READY   STATUS    RESTARTS   AGE
     kb-addon-agamotto-kvbr5                         1/1     Running   0          44h
     ```
+
 3. 升级 Agamotto 的日志功能。
 
     ```bash
@@ -150,15 +155,19 @@ pvc-ed20ec94-9a58-46e4-9c28-b692cba70e79   8Gi        RWO            Delete     
     ```
 
 4. 将日志上传到 S3。
-   
+
    默认情况下，日志功能仅恢复当前 Kubernetes 集群中 Loki 服务器上的日志数据，而并不将日志数据上传到远程的 S3 服务器。
-   
+
    执行以下命令（包含 Access Key、Secret Key、region 和 bucket 信息），将日志数据上传到 S3。
+
     ```bash
     kbcli addon enable agamotto --set log.enabled=true,log.s3.enabled=true,log.s3.accessKey=user_ak,log.s3.secretKey=user_sk,log.s3.region=user_region,log.s3.bucket=user_bucket
     ```
+
     远程 S3 的目标存储桶会创建一个以文件名命名的目录，用于存储对应日志的实时数据分区（按照每 5 分钟或每 5 MB 进行分区）。
+
 5. （可选）禁用 Agamotto 引擎。
+
     ```bash
     kbcli addon disable agamotto
     ```
@@ -172,6 +181,7 @@ pvc-ed20ec94-9a58-46e4-9c28-b692cba70e79   8Gi        RWO            Delete     
 :::
 
 1. 检查是否已启用 Loki 和 Grafana。
+
     ```bash
     kbcli dashboard list
     >
@@ -179,11 +189,15 @@ pvc-ed20ec94-9a58-46e4-9c28-b692cba70e79   8Gi        RWO            Delete     
     kubeblocks-grafana   default     13000   Jul 08,2023 15:37 UTC+0800   
     kubeblocks-logs      default     13100   Jul 08,2023 15:36 UTC+0800  
     ```
+
 2. 打开容器日志的仪表盘。
+
     ```bash
     kbcli dashboard open kubeblocks-logs
     ```
+
     或者可以转到 **Explore** 页面，并选择 **Loki** 来搜索日志。
+
     ![Loki on Explore page](../../img/obervability-advanced-logs-loki-grafana.png)
 
 ### 启用 LogCLI
@@ -197,42 +211,60 @@ kbcli 支持 LogCLI 引擎，方便你通过命令行查询日志。
 :::
 
 1. 安装 LogCLI。
+
    1. 设置环境变量。
+
       ```bash
       export PATH="${KBCLI_ROOT:-$HOME/.kbcli}/plugins/bin:$PATH"
       ```
-   2.  将 Apecloud 的 `block-index` 设置为 `krew index`。
+
+   2. 将 ApeCloud 的 `block-index` 设置为 `krew index`。
+
         ```bash
         kbcli plugin index add default https://github.com/apecloud/block-index.git
         ```
+
    3. 查看索引状态。
+
         ```bash
         kbcli plugin index list       
         >       
         INDEX     URL                                                  
         default   https://github.com/apecloud/block-index.git
         ```
+
    4. 安装 LogCLI。
+
         ```bash
         kbcli plugin install default/logcli
         ```
+
    5. 查看插件状态，检查 LogCLI 是否成功安装。
+
         ```bash
         kbcli plugin list | grep logcli
         ```
 
 2. 使用 LogCLI。
+
    1. 设置 LogCLI 的环境变量。
-   例如，将 `LOKI_ADDR` 设置为指向本地主机的 3100 端口。
+
+      例如，将 `LOKI_ADDR` 设置为指向本地主机的 3100 端口。
+
       ```bash
       export LOKI_ADDR=http://localhost:3100
       ```
+
    2. 将 Loki 服务导出到本地主机。
-   注意 `port/namespace` 应与系统中的设置相同。例如：
+
+      注意 `port/namespace` 应与系统中的设置相同。例如：
+
       ```bash
       kubectl port-forward svc/loki-gateway 3100:80 -n kb-system
       ```
+
    3. 使用 LogCLI 工具查询日志数据。
+
       ```bash
       kbcli logcli query '{exporter="OTLP"}'       
       >       
@@ -249,6 +281,7 @@ kbcli 支持 LogCLI 引擎，方便你通过命令行查询日志。
 该 `metrics` 容器实时检测 MySQL 输出的错误日志和慢日志，并将日志转储到主机的 `/var/log/KubeBlocks` 目录中。为了防止占用过多的主机磁盘空间，每个文件的默认大小为 10 MB，并且最多可以保存 2 个文件。
 
 此外，部署在主机上的 Agamotto 组件实时检测 `/var/log/KubeBlocks` 文件夹，并收集其中的日志数据，完成整个日志数据收集过程。
+
 ```bash
 - name: metrics
   image:  {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}

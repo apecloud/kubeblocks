@@ -4,7 +4,7 @@ REPO_OWNER=$2
 PR_NUMBER=$3
 PR_TITLE=$4
 
-if [[ $PR_TITLE == chore* ]];then
+if [[ $PR_TITLE == chore* || $PR_TITLE == docs* ]];then
   echo "PR skip the issue check"
   exit 0
 fi

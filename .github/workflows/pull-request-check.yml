@@ -1,8 +1,11 @@
-name: PULL-REQUEST-CHECK
+name: Pull Request Check
 
 on:
   pull_request_target:
     types: [ edited, opened ]
+    branches:
+      - main
+      - release-*
 
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}

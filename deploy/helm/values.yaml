@@ -20,8 +20,6 @@ image:
   imagePullSecrets: []
   tools:
     repository: apecloud/kubeblocks-tools
-  datascript:
-    repository: apecloud/kubeblocks-datascript
 
 ## @param replicaCount
 ##

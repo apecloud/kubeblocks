@@ -34,11 +34,10 @@ const (
 )
 
 const (
-	KBServiceAccountName     = "KUBEBLOCKS_SERVICEACCOUNT_NAME"
-	KBToolsImage             = "KUBEBLOCKS_TOOLS_IMAGE"
-	KBImagePullPolicy        = "KUBEBLOCKS_IMAGE_PULL_POLICY"
-	KBImagePullSecrets       = "KUBEBLOCKS_IMAGE_PULL_SECRETS"
-	KBDataScriptClientsImage = "KUBEBLOCKS_DATASCRIPT_CLIENTS_IMAGE"
+	KBServiceAccountName = "KUBEBLOCKS_SERVICEACCOUNT_NAME"
+	KBToolsImage         = "KUBEBLOCKS_TOOLS_IMAGE"
+	KBImagePullPolicy    = "KUBEBLOCKS_IMAGE_PULL_POLICY"
+	KBImagePullSecrets   = "KUBEBLOCKS_IMAGE_PULL_SECRETS"
 )
 
 const (

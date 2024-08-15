@@ -2547,7 +2547,7 @@ OpsType
 <td>
 <p>Specifies the type of this operation. Supported types include &ldquo;Start&rdquo;, &ldquo;Stop&rdquo;, &ldquo;Restart&rdquo;, &ldquo;Switchover&rdquo;,
 &ldquo;VerticalScaling&rdquo;, &ldquo;HorizontalScaling&rdquo;, &ldquo;VolumeExpansion&rdquo;, &ldquo;Reconfiguring&rdquo;, &ldquo;Upgrade&rdquo;, &ldquo;Backup&rdquo;, &ldquo;Restore&rdquo;,
-&ldquo;Expose&rdquo;, &ldquo;DataScript&rdquo;, &ldquo;RebuildInstance&rdquo;, &ldquo;Custom&rdquo;.</p>
+&ldquo;Expose&rdquo;, &ldquo;RebuildInstance&rdquo;, &ldquo;Custom&rdquo;.</p>
 <p>Note: This field is immutable once set.</p>
 </td>
 </tr>
@@ -7055,7 +7055,7 @@ and other administrative tasks.</p>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentOps">ComponentOps
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CustomOpsComponent">CustomOpsComponent</a>, <a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.RebuildInstance">RebuildInstance</a>, <a href="#apps.kubeblocks.io/v1alpha1.Reconfigure">Reconfigure</a>, <a href="#apps.kubeblocks.io/v1alpha1.ScriptSpec">ScriptSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">SpecificOpsRequest</a>, <a href="#apps.kubeblocks.io/v1alpha1.Switchover">Switchover</a>, <a href="#apps.kubeblocks.io/v1alpha1.UpgradeComponent">UpgradeComponent</a>, <a href="#apps.kubeblocks.io/v1alpha1.VerticalScaling">VerticalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CustomOpsComponent">CustomOpsComponent</a>, <a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.RebuildInstance">RebuildInstance</a>, <a href="#apps.kubeblocks.io/v1alpha1.Reconfigure">Reconfigure</a>, <a href="#apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">SpecificOpsRequest</a>, <a href="#apps.kubeblocks.io/v1alpha1.Switchover">Switchover</a>, <a href="#apps.kubeblocks.io/v1alpha1.UpgradeComponent">UpgradeComponent</a>, <a href="#apps.kubeblocks.io/v1alpha1.VerticalScaling">VerticalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
 </p>
 <div>
 <p>ComponentOps specifies the Component to be operated on.</p>
@@ -12201,7 +12201,7 @@ OpsType
 <td>
 <p>Specifies the type of this operation. Supported types include &ldquo;Start&rdquo;, &ldquo;Stop&rdquo;, &ldquo;Restart&rdquo;, &ldquo;Switchover&rdquo;,
 &ldquo;VerticalScaling&rdquo;, &ldquo;HorizontalScaling&rdquo;, &ldquo;VolumeExpansion&rdquo;, &ldquo;Reconfiguring&rdquo;, &ldquo;Upgrade&rdquo;, &ldquo;Backup&rdquo;, &ldquo;Restore&rdquo;,
-&ldquo;Expose&rdquo;, &ldquo;DataScript&rdquo;, &ldquo;RebuildInstance&rdquo;, &ldquo;Custom&rdquo;.</p>
+&ldquo;Expose&rdquo;, &ldquo;RebuildInstance&rdquo;, &ldquo;Custom&rdquo;.</p>
 <p>Note: This field is immutable once set.</p>
 </td>
 </tr>
@@ -12454,7 +12454,7 @@ map[string]*github.com/apecloud/kubeblocks/apis/apps/v1alpha1.ReconfiguringStatu
 <p>Describes the detailed status of the OpsRequest.
 Possible condition types include &ldquo;Cancelled&rdquo;, &ldquo;WaitForProgressing&rdquo;, &ldquo;Validated&rdquo;, &ldquo;Succeed&rdquo;, &ldquo;Failed&rdquo;, &ldquo;Restarting&rdquo;,
 &ldquo;VerticalScaling&rdquo;, &ldquo;HorizontalScaling&rdquo;, &ldquo;VolumeExpanding&rdquo;, &ldquo;Reconfigure&rdquo;, &ldquo;Switchover&rdquo;, &ldquo;Stopping&rdquo;, &ldquo;Starting&rdquo;,
-&ldquo;VersionUpgrading&rdquo;, &ldquo;Exposing&rdquo;, &ldquo;ExecuteDataScript&rdquo;, &ldquo;Backup&rdquo;, &ldquo;InstancesRebuilding&rdquo;, &ldquo;CustomOperation&rdquo;.</p>
+&ldquo;VersionUpgrading&rdquo;, &ldquo;Exposing&rdquo;, &ldquo;Backup&rdquo;, &ldquo;InstancesRebuilding&rdquo;, &ldquo;CustomOperation&rdquo;.</p>
 </td>
 </tr>
 </tbody>
@@ -12754,13 +12754,10 @@ If the cluster is not configured for dual-stack, the Service creation fails.</li
 </tr>
 </thead>
 <tbody><tr><td><p>&#34;Backup&#34;</p></td>
-<td><p>DataScriptType the data script operation will execute the data script against the cluster.</p>
-</td>
+<td></td>
 </tr><tr><td><p>&#34;Custom&#34;</p></td>
 <td><p>RebuildInstance rebuilding an instance is very useful when a node is offline or an instance is unrecoverable.</p>
 </td>
-</tr><tr><td><p>&#34;DataScript&#34;</p></td>
-<td></td>
 </tr><tr><td><p>&#34;Expose&#34;</p></td>
 <td><p>StartType the start operation will start the pods which is deleted in stop operation.</p>
 </td>
@@ -15128,226 +15125,6 @@ All topologySpreadConstraints are ANDed.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ScriptFrom">ScriptFrom
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ScriptSpec">ScriptSpec</a>)
-</p>
-<div>
-<p>ScriptFrom specifies the source of the script to be executed, which can be either a ConfigMap or a Secret.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>configMapRef</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#configmapkeyselector-v1-core">
-[]Kubernetes core/v1.ConfigMapKeySelector
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>A list of ConfigMapKeySelector objects, each specifies a ConfigMap and a key containing the script.</p>
-<p>Note: This field cannot be modified once set.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>secretRef</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#secretkeyselector-v1-core">
-[]Kubernetes core/v1.SecretKeySelector
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>A list of SecretKeySelector objects, each specifies a Secret and a key containing the script.</p>
-<p>Note: This field cannot be modified once set.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ScriptSecret">ScriptSecret
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ScriptSpec">ScriptSpec</a>)
-</p>
-<div>
-<p>ScriptSecret represents the secret that is used to execute the script.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies the name of the secret.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>usernameKey</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Used to specify the username part of the secret.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>passwordKey</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Used to specify the password part of the secret.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ScriptSpec">ScriptSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">SpecificOpsRequest</a>)
-</p>
-<div>
-<p>ScriptSpec is a legacy feature for executing engine-specific operations such as creating databases or users.
-It supports limited engines including MySQL, PostgreSQL, Redis, MongoDB.</p>
-<p>ScriptSpec has been replaced by the more versatile OpsDefinition.
-It is recommended to use OpsDefinition instead. ScriptSpec is deprecated and will be removed in a future version.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>ComponentOps</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ComponentOps">
-ComponentOps
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>ComponentOps</code> are embedded into this type.)
-</p>
-<p>Specifies the name of the Component.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>image</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the image to be used to execute scripts.</p>
-<p>By default, the image &ldquo;apecloud/kubeblocks-datascript:latest&rdquo; is used.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>secret</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ScriptSecret">
-ScriptSecret
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the secret to be used to execute the script. If not specified, the default cluster root credential secret is used.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>script</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the content of scripts to be executed.</p>
-<p>All scripts specified in this field will be executed in the order they are provided.</p>
-<p>Note: this field cannot be modified once set.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>scriptFrom</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ScriptFrom">
-ScriptFrom
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the sources of the scripts to be executed.
-Each script can be imported either from a ConfigMap or a Secret.</p>
-<p>All scripts obtained from the sources specified in this field will be executed after
-any scripts provided in the <code>script</code> field.</p>
-<p>Execution order:
-1. Scripts provided in the <code>script</code> field, in the order of the scripts listed.
-2. Scripts imported from ConfigMaps, in the order of the sources listed.
-3. Scripts imported from Secrets, in the order of the sources listed.</p>
-<p>Note: this field cannot be modified once set.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>selector</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#labelselector-v1-meta">
-Kubernetes meta/v1.LabelSelector
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the labels used to select the Pods on which the script should be executed.</p>
-<p>By default, the script is executed on the Pod associated with the service named &ldquo;&#123;clusterName&#125;-&#123;componentName&#125;&rdquo;,
-which typically routes to the Pod with the primary/leader role.</p>
-<p>However, some Components, such as Redis, do not synchronize account information between primary and secondary Pods.
-In these cases, the script must be executed on all replica Pods matching the selector.</p>
-<p>Note: this field cannot be modified once set.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.SecretRef">SecretRef
 </h3>
 <p>
@@ -16886,24 +16663,6 @@ Reconfigure
 <td>
 <em>(Optional)</em>
 <p>Lists Expose objects, each specifying a Component and its services to be exposed.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>scriptSpec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ScriptSpec">
-ScriptSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the image and scripts for executing engine-specific operations such as creating databases or users.
-It supports limited engines including MySQL, PostgreSQL, Redis, MongoDB.</p>
-<p>ScriptSpec has been replaced by the more versatile OpsDefinition.
-It is recommended to use OpsDefinition instead.
-ScriptSpec is deprecated and will be removed in a future version.</p>
 </td>
 </tr>
 <tr>

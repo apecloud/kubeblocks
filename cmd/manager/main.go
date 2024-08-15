@@ -135,7 +135,6 @@ func init() {
 	viper.SetDefault(constant.CfgHostPortConfigMapName, "kubeblocks-host-ports")
 	viper.SetDefault(constant.CfgHostPortIncludeRanges, "1025-65536")
 	viper.SetDefault(constant.CfgHostPortExcludeRanges, "6443,10250,10257,10259,2379-2380,30000-32767")
-	viper.SetDefault(constant.KBDataScriptClientsImage, "apecloud/kubeblocks-datascript:latest")
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 	viper.SetDefault(instanceset.MaxPlainRevisionCount, 1024)
 	viper.SetDefault(instanceset.FeatureGateIgnorePodVerticalScaling, false)

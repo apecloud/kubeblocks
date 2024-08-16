@@ -108,14 +108,10 @@ var _ = Describe("instance_set builder", func() {
 			},
 		}
 		partition, maxUnavailable := int32(3), intstr.FromInt(2)
-		strategy := apps.StatefulSetUpdateStrategy{
-			Type: apps.RollingUpdateStatefulSetStrategyType,
-			RollingUpdate: &apps.RollingUpdateStatefulSetStrategy{
-				Partition:      &partition,
-				MaxUnavailable: &maxUnavailable,
-			},
+		strategy := &workloads.InstanceUpdateStrategy{
+			Partition:      &partition,
+			MaxUnavailable: &maxUnavailable,
 		}
-		strategyType := apps.OnDeleteStatefulSetStrategyType
 		delay := int32(10)
 		roleProbe := workloads.RoleProbe{InitialDelaySeconds: delay}
 		actions := []workloads.Action{
@@ -170,7 +166,6 @@ var _ = Describe("instance_set builder", func() {
 			SetParallelPodManagementConcurrency(parallelPodManagementConcurrency).
 			SetPodUpdatePolicy(podUpdatePolicy).
 			SetUpdateStrategy(strategy).
-			SetUpdateStrategyType(strategyType).
 			SetRoleProbe(&roleProbe).
 			SetCustomHandler(actions).
 			AddCustomHandler(action).
@@ -202,12 +197,10 @@ var _ = Describe("instance_set builder", func() {
 		Expect(its.Spec.PodManagementPolicy).Should(Equal(policy))
 		Expect(its.Spec.ParallelPodManagementConcurrency).Should(Equal(parallelPodManagementConcurrency))
 		Expect(its.Spec.PodUpdatePolicy).Should(Equal(podUpdatePolicy))
-		Expect(its.Spec.UpdateStrategy.Type).Should(Equal(strategyType))
-		Expect(its.Spec.UpdateStrategy.RollingUpdate).ShouldNot(BeNil())
-		Expect(its.Spec.UpdateStrategy.RollingUpdate.Partition).ShouldNot(BeNil())
-		Expect(*its.Spec.UpdateStrategy.RollingUpdate.Partition).Should(Equal(partition))
-		Expect(its.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable).ShouldNot(BeNil())
-		Expect(its.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable).ShouldNot(Equal(maxUnavailable))
+		Expect(its.Spec.UpdateStrategy.Partition).ShouldNot(BeNil())
+		Expect(*its.Spec.UpdateStrategy.Partition).Should(Equal(partition))
+		Expect(its.Spec.UpdateStrategy.MaxUnavailable).ShouldNot(BeNil())
+		Expect(its.Spec.UpdateStrategy.MaxUnavailable).ShouldNot(Equal(maxUnavailable))
 		Expect(its.Spec.RoleProbe).ShouldNot(BeNil())
 		Expect(its.Spec.RoleProbe.InitialDelaySeconds).Should(Equal(delay))
 		Expect(its.Spec.RoleProbe.CustomHandler).Should(HaveLen(2))
@@ -215,6 +208,8 @@ var _ = Describe("instance_set builder", func() {
 		Expect(its.Spec.RoleProbe.CustomHandler[1]).Should(Equal(action))
 		Expect(its.Spec.MemberUpdateStrategy).ShouldNot(BeNil())
 		Expect(*its.Spec.MemberUpdateStrategy).Should(Equal(memberUpdateStrategy))
+		Expect(its.Spec.UpdateStrategy.MemberUpdateStrategy).ShouldNot(BeNil())
+		Expect(*its.Spec.UpdateStrategy.MemberUpdateStrategy).Should(Equal(memberUpdateStrategy))
 		Expect(its.Spec.Service).ShouldNot(BeNil())
 		Expect(its.Spec.Service).Should(BeEquivalentTo(service))
 		Expect(its.Spec.Paused).Should(Equal(paused))

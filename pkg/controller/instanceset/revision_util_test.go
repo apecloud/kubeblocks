@@ -88,7 +88,6 @@ var _ = Describe("revision util test", func() {
                 }
             }
         },
-        "memberUpdateStrategy": "Serial",
         "podManagementPolicy": "Parallel",
         "replicas": 1,
         "roleProbe": {
@@ -904,7 +903,7 @@ var _ = Describe("revision util test", func() {
             }
         },
         "updateStrategy": {
-            "type": "OnDelete"
+            "memberUpdateStrategy": "Serial"
         },
         "volumeClaimTemplates": [
             {

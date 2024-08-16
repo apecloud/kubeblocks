@@ -33,7 +33,7 @@ For Kubernetes versions equal to or greater than 1.27 with InPlacePodVerticalSca
 
 It is important to note that after successful resource resizing, some applications may need to be restarted to recognize the new resource configuration. In such cases, further configuration of container `restartPolicy` is required in ClusterDefinition or ComponentDefinition.
 
-For PVC, KubeBlocks also leverages the capabilities of the PVC API and only supports volume expansion. If the expansion fails for some reason, it supports reverting to the original capacity. However, once a VolumeClaimTemplate in a StatefulSet is declared, it cannot be modified. Currently, the Kuberenetes community is [developing this capability](https://github.com/kubernetes/enhancements/pull/4651), but it won't be available until at least Kubernetes version 1.32.
+For PVC, KubeBlocks also leverages the capabilities of the PVC API and only supports volume expansion. If the expansion fails for some reason, it supports reverting to the original capacity. However, once a VolumeClaimTemplate in a StatefulSet is declared, it cannot be modified. Currently, the Kubernetes community is [developing this capability](https://github.com/kubernetes/enhancements/pull/4651), but it won't be available until at least Kubernetes version 1.32.
 
 ## From the upper-level API perspective, which fields utilize in-place updates after being updated?
 

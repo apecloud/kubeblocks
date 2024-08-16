@@ -54,10 +54,12 @@ var (
 	sharedVolumeMount = corev1.VolumeMount{Name: "kubeblocks", MountPath: kbAgentSharedMountPath}
 )
 
+// TODO Because the implementation of multiple images is required, an update is needed here. About kbAgentContainerName
 func IsKBAgentContainer(c *corev1.Container) bool {
 	return c.Name == kbAgentContainerName || c.Name == kbAgentInitContainerName
 }
 
+// TODO Because the implementation of multiple images is required, an update is needed here. About KbAgentContainerName
 func UpdateKBAgentContainer4HostNetwork(synthesizedComp *SynthesizedComponent) {
 	idx, c := intctrlutil.GetContainerByName(synthesizedComp.PodSpec.Containers, kbAgentContainerName)
 	if c == nil {
@@ -101,47 +103,63 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 		return err
 	}
 
-	ports, err := getAvailablePorts(synthesizedComp.PodSpec.Containers, []int32{int32(kbAgentDefaultPort)})
-	if err != nil {
-		return err
-	}
-
-	port := int(ports[0])
 	container := builder.NewContainerBuilder(kbAgentContainerName).
 		SetImage(viper.GetString(constant.KBToolsImage)).
 		SetImagePullPolicy(corev1.PullIfNotPresent).
 		AddCommands(kbAgentCommand).
-		AddArgs("--port", strconv.Itoa(port)).
 		AddEnv(envVars...).
-		AddPorts(corev1.ContainerPort{
-			ContainerPort: int32(port),
-			Name:          kbAgentPortName,
-			Protocol:      "TCP",
-		}).
-		SetStartupProbe(corev1.Probe{
-			ProbeHandler: corev1.ProbeHandler{
-				TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromInt(port)},
-			}}).
 		GetObject()
 
-	if err = adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp, container); err != nil {
+	actionNames, containers, err := adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp, *container)
+	if err != nil {
+		return err
+	}
+	if containers == nil || len(containers) == 0 {
+		containers = append(containers, container)
+	}
+	allPorts := make([]int32, 0)
+	for i := range containers {
+		allPorts = append(allPorts, int32(kbAgentDefaultPort+i))
+	}
+	ports, err := getAvailablePorts(synthesizedComp.PodSpec.Containers, allPorts)
+	if err != nil {
 		return err
 	}
 
-	// set kb-agent container ports to host network
+	for i := range containers {
+		containers[i].Ports = []corev1.ContainerPort{
+			{
+				ContainerPort: ports[i],
+				Name:          actionNames[i] + "-" + kbAgentPortName,
+				Protocol:      "TCP",
+			},
+		}
+		containers[i].Args = append(containers[i].Args, "--port", strconv.Itoa(int(ports[i])))
+		containers[i].StartupProbe = &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromInt(int(ports[i]))},
+			},
+		}
+	}
+
 	if synthesizedComp.HostNetwork != nil {
 		if synthesizedComp.HostNetwork.ContainerPorts == nil {
 			synthesizedComp.HostNetwork.ContainerPorts = make([]appsv1alpha1.HostNetworkContainerPort, 0)
 		}
-		synthesizedComp.HostNetwork.ContainerPorts = append(
-			synthesizedComp.HostNetwork.ContainerPorts,
-			appsv1alpha1.HostNetworkContainerPort{
-				Container: container.Name,
-				Ports:     []string{kbAgentPortName},
-			})
+		for i, container := range containers {
+			synthesizedComp.HostNetwork.ContainerPorts = append(
+				synthesizedComp.HostNetwork.ContainerPorts,
+				appsv1alpha1.HostNetworkContainerPort{
+					Container: container.Name,
+					// TODO The port name is limited to 15 characters and needs to adjust the method of fetching ports in pod name and kbcli.
+					Ports: []string{actionNames[i] + "-" + kbAgentPortName},
+				})
+		}
 	}
 
-	synthesizedComp.PodSpec.Containers = append(synthesizedComp.PodSpec.Containers, *container)
+	for _, container := range containers {
+		synthesizedComp.PodSpec.Containers = append(synthesizedComp.PodSpec.Containers, *container)
+	}
 	return nil
 }
 
@@ -231,34 +249,41 @@ func buildProbe4KBAgent(probe *appsv1alpha1.Probe, name string) (*proto.Action, 
 	return a, p
 }
 
-func adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp *SynthesizedComponent, container *corev1.Container) error {
-	image, c, err := customExecActionImageNContainer(synthesizedComp)
+func adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp *SynthesizedComponent, container corev1.Container) ([]string, []*corev1.Container, error) {
+	actionNames, images, containers, err := customExecActionImageNContainer(synthesizedComp)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
-	if len(image) == 0 {
-		return nil
+	if len(images) == 0 {
+		return nil, nil, nil
 	}
-
 	// init-container to copy binaries to the shared mount point /kubeblocks
 	initContainer := buildKBAgentInitContainer()
 	synthesizedComp.PodSpec.InitContainers = append(synthesizedComp.PodSpec.InitContainers, *initContainer)
 
-	container.Image = image
-	container.Command[0] = kbAgentCommandOnSharedMount
-	container.VolumeMounts = append(container.VolumeMounts, sharedVolumeMount)
-
-	// TODO: share more container resources
-	if c != nil {
-		container.VolumeMounts = append(container.VolumeMounts, c.VolumeMounts...)
+	cc := make([]*corev1.Container, len(containers))
+	for i, c := range containers {
+		wrapContainer := container.DeepCopy()
+		if c == nil {
+			wrapContainer.Image = images[i]
+		} else {
+			wrapContainer.Image = c.Image
+		}
+		wrapContainer.Name = actionNames[i] + "-" + kbAgentContainerName
+		wrapContainer.Command[0] = kbAgentCommandOnSharedMount
+		wrapContainer.VolumeMounts = append(wrapContainer.VolumeMounts, sharedVolumeMount)
+		// TODO: share more container resources
+		if c != nil {
+			wrapContainer.VolumeMounts = append(wrapContainer.VolumeMounts, c.VolumeMounts...)
+		}
+		cc[i] = wrapContainer
 	}
-
-	return nil
+	return actionNames, cc, nil
 }
 
-func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) (string, *corev1.Container, error) {
+func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) ([]string, []string, []*corev1.Container, error) {
 	if synthesizedComp.LifecycleActions == nil {
-		return "", nil, nil
+		return nil, nil, nil, nil
 	}
 
 	actions := []*appsv1alpha1.Action{
@@ -278,47 +303,60 @@ func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) (str
 		actions = append(actions, &synthesizedComp.LifecycleActions.RoleProbe.Action)
 	}
 
-	var image, container string
+	actionNameMap := map[*appsv1alpha1.Action]string{
+		synthesizedComp.LifecycleActions.PostProvision:     "postprovision",
+		synthesizedComp.LifecycleActions.PreTerminate:      "preterminate",
+		synthesizedComp.LifecycleActions.Switchover:        "switchover",
+		synthesizedComp.LifecycleActions.MemberJoin:        "memberjoin",
+		synthesizedComp.LifecycleActions.MemberLeave:       "memberleave",
+		synthesizedComp.LifecycleActions.Readonly:          "readonly",
+		synthesizedComp.LifecycleActions.Readwrite:         "readwrite",
+		synthesizedComp.LifecycleActions.DataDump:          "datadump",
+		synthesizedComp.LifecycleActions.DataLoad:          "dataload",
+		synthesizedComp.LifecycleActions.Reconfigure:       "reconfigure",
+		synthesizedComp.LifecycleActions.AccountProvision:  "accountprovision",
+		&synthesizedComp.LifecycleActions.RoleProbe.Action: "roleprobe",
+	}
+
+	var images []string
+	var containerNames []string
+	var actionNames []string
 	for _, action := range actions {
 		if action == nil || action.Exec == nil {
 			continue
 		}
-		if action.Exec.Image != "" {
-			if len(image) > 0 && image != action.Exec.Image {
-				return "", nil, fmt.Errorf("only one exec image is allowed in lifecycle actions")
-			}
-			image = action.Exec.Image
+		image := action.Exec.Image
+		containerName := action.Exec.Container
+		if len(image) == 0 && len(containerName) == 0 {
+			continue
 		}
-		if action.Exec.Container != "" {
-			if len(container) > 0 && container != action.Exec.Container {
-				return "", nil, fmt.Errorf("only one exec container is allowed in lifecycle actions")
-			}
-			container = action.Exec.Container
-		}
+		images = append(images, image)
+		containerNames = append(containerNames, containerName)
+		actionNames = append(actionNames, actionNameMap[action])
 	}
 
-	var c *corev1.Container
-	if len(container) > 0 {
-		for i, cc := range synthesizedComp.PodSpec.Containers {
-			if cc.Name == container {
-				c = &synthesizedComp.PodSpec.Containers[i]
-				break
+	containers := make([]*corev1.Container, len(images))
+	for i := 0; i < len(images); i++ {
+		var c *corev1.Container
+		if len(containerNames[i]) > 0 {
+			for j, cc := range synthesizedComp.PodSpec.Containers {
+				if cc.Name == containerNames[i] {
+					c = &synthesizedComp.PodSpec.Containers[j]
+					break
+				}
 			}
-		}
-		if c == nil {
-			return "", nil, fmt.Errorf("exec container %s not found", container)
+			if c == nil {
+				return nil, nil, nil, fmt.Errorf("exec container %s not found", containerNames[i])
+			}
+			if len(images[i]) > 0 && c.Image != images[i] {
+				return nil, nil, nil, fmt.Errorf("exec image and container must be the same")
+			}
+			containers[i] = c
+		} else {
+			containers[i] = nil
 		}
 	}
-	if len(image) > 0 && len(container) > 0 {
-		if c.Image == image {
-			return image, c, nil
-		}
-		return "", nil, fmt.Errorf("exec image and container must be the same")
-	}
-	if len(image) == 0 && len(container) > 0 {
-		image = c.Image
-	}
-	return image, c, nil
+	return actionNames, images, containers, nil
 }
 
 func buildKBAgentInitContainer() *corev1.Container {

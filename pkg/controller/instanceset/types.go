@@ -41,8 +41,8 @@ const (
 	shell2httpServePath          = "/role"
 	defaultRoleProbeDaemonPort   = 7373
 	defaultRoleProbeGRPCPort     = 50101
+	roleProbeDaemonPortName      = "probe-port"
 	roleProbeGRPCPortName        = "probe-grpc-port"
-	httpRoleProbePath            = "/v1.0/checkrole"
 	grpcHealthProbeBinaryPath    = "/bin/grpc_health_probe"
 	grpcHealthProbeArgsFormat    = "-addr=:%d"
 	defaultActionImage           = "busybox:1.35"
@@ -50,8 +50,6 @@ const (
 	passwordCredentialVarName    = "KB_RSM_PASSWORD"
 	servicePortVarName           = "KB_RSM_SERVICE_PORT"
 	actionSvcListVarName         = "KB_RSM_ACTION_SVC_LIST"
-	leaderHostVarName            = "KB_RSM_LEADER_HOST"
-	targetHostVarName            = "KB_RSM_TARGET_HOST"
 	RoleUpdateMechanismVarName   = "KB_RSM_ROLE_UPDATE_MECHANISM"
 	roleProbeTimeoutVarName      = "KB_RSM_ROLE_PROBE_TIMEOUT"
 	readinessProbeEventFieldPath = "spec.containers{" + roleProbeContainerName + "}"

@@ -81,39 +81,6 @@ const (
 
 // Lorry
 const (
-	KBEnvWorkloadType    = "KB_WORKLOAD_TYPE"
-	KBEnvBuiltinHandler  = "KB_BUILTIN_HANDLER"
-	KBEnvActionCommands  = "KB_ACTION_COMMANDS"
-	KBEnvActionHandlers  = "KB_ACTION_HANDLERS"
-	KBEnvCronJobs        = "KB_CRON_JOBS"
-	KBEnvCharacterType   = "KB_SERVICE_CHARACTER_TYPE"
 	KBEnvServiceUser     = "KB_SERVICE_USER"
 	KBEnvServicePassword = "KB_SERVICE_PASSWORD"
-	KBEnvLorryHTTPPort   = "LORRY_HTTP_PORT"
-	KBEnvLorryGRPCPort   = "LORRY_GRPC_PORT"
-	KBEnvLorryLogLevel   = "LORRY_LOG_LEVEL"
-	// KBEnvServiceRoles defines the Roles configured in the cluster definition that are visible to users.
-	KBEnvServiceRoles = "KB_SERVICE_ROLES"
-
-	// KBEnvServicePort defines the port of the DB service
-	KBEnvServicePort = "KB_SERVICE_PORT"
-
-	// KBEnvDataPath defines the data volume path of the DB service.
-	KBEnvDataPath = "KB_DATA_PATH"
-
-	// KBEnvTTL controls the lease expiration time in DCS. If the leader fails to renew its lease within the TTL duration, it will lose the leader role, allowing other replicas to take over.
-	KBEnvTTL = "KB_TTL"
-
-	// KBEnvMaxLag defines maximum replication lag permitted when performing a switchover.
-	KBEnvMaxLag = "KB_MAX_LAG"
-
-	// KBEnvEnableHA Whether to enable high availability, true by default.
-	KBEnvEnableHA = "KB_ENABLE_HA"
-
-	// KBEnvRsmRoleUpdateMechanism defines the method to send events: DirectAPIServerEventUpdate(through lorry service), ReadinessProbeEventUpdate(through kubelet service)
-	KBEnvRsmRoleUpdateMechanism = "KB_RSM_ROLE_UPDATE_MECHANISM"
-	KBEnvRoleProbeTimeout       = "KB_RSM_ROLE_PROBE_TIMEOUT"
-	KBEnvRoleProbePeriod        = "KB_RSM_ROLE_PROBE_PERIOD"
-
-	KBEnvVolumeProtectionSpec = "KB_VOLUME_PROTECTION_SPEC"
 )

@@ -27,7 +27,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -52,11 +51,6 @@ func (r *BackupPolicyTemplateReconciler) Reconcile(ctx context.Context, req reco
 	backupPolicyTemplate := &appsv1alpha1.BackupPolicyTemplate{}
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, backupPolicyTemplate); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
-
-	// infer clusterDefRef from spec.clusterDefRef
-	if backupPolicyTemplate.Spec.ClusterDefRef != "" {
-		backupPolicyTemplate.Labels[constant.ClusterDefLabelKey] = backupPolicyTemplate.Spec.ClusterDefRef
 	}
 
 	for _, backupPolicy := range backupPolicyTemplate.Spec.BackupPolicies {

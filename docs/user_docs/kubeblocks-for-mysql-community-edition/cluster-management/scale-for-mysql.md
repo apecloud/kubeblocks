@@ -18,7 +18,7 @@ After vertical scaling or horizontal scaling is performed, KubeBlocks automatica
 
 ## Vertical scaling
 
-You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, if you need to change the resource class from 1C2G to 2C4G, vertical scaling is what you need.
+You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, you can change the resource class from 1C2G to 2C4G by performing vertical scaling.
 
 ### Before you start
 
@@ -70,7 +70,9 @@ mycluster   default     mysql                mysql-8.0.33   Delete              
 
 ## Horizontal scaling
 
-Horizontal scaling changes the amount of pods. For example, you can apply horizontal scaling to scale pods up from three to five. The scaling process includes the backup and restore of data.
+Horizontal scaling changes the amount of pods. For example, you can scale out replicas from three to five.
+
+From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out instances, refer to [Horizontal Scale](./../../../api_docs/maintenance/scale/horizontal-scale.md) in API docs for more details and examples.
 
 ### Before you start
 
@@ -95,7 +97,7 @@ mycluster   default     mysql                mysql-8.0.33   Delete              
     ```
 
     - `--components` describes the component name ready for horizontal scaling.
-    - `--replicas` describes the replica amount of the specified components.
+    - `--replicas` describes the replica amount of the specified components. Edit the amount based on your demands to scale in or out replicas.
 
 2. Validate the horizontal scaling operation.
 

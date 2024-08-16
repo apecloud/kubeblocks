@@ -241,7 +241,7 @@ var _ = Describe("cluster component transformer test", func() {
 	}
 
 	newTransformerNCtx := func(topology string) (graph.Transformer, *clusterTransformContext, *graph.DAG) {
-		cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, "").
+		cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName).
 			WithRandomName().
 			SetTopology(topology).
 			SetReplicas(1).

@@ -35,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 func ListOwnedWorkloads(ctx context.Context, cli client.Reader, namespace, clusterName, compName string) ([]*workloads.InstanceSet, error) {
@@ -176,4 +177,12 @@ func GetTemplateNameAndOrdinal(workloadName, podName string) (string, int32, err
 		return "", 0, fmt.Errorf("failed to obtain pod ordinal")
 	}
 	return templateName, int32(index), nil
+}
+
+func PodFQDN(namespace, compName, podName string) string {
+	return fmt.Sprintf("%s.%s-headless.%s.svc.%s", podName, compName, namespace, clusterDomain())
+}
+
+func clusterDomain() string {
+	return viper.GetString(constant.KubernetesClusterDomainEnv)
 }

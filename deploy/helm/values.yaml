@@ -20,8 +20,6 @@ image:
   imagePullSecrets: []
   tools:
     repository: apecloud/kubeblocks-tools
-  datascript:
-    repository: apecloud/kubeblocks-datascript
 
 ## @param replicaCount
 ##
@@ -1922,6 +1920,10 @@ featureGates:
   ignoreConfigTemplateDefaultMode:
     enabled: false
   ignorePodVerticalScaling:
+    enabled: false
+  componentReplicasAnnotation:
+    enabled: true
+  inPlacePodVerticalScaling:
     enabled: false
 
 vmagent:

@@ -92,7 +92,6 @@ var _ = Describe("revision util test", func() {
         "podManagementPolicy": "Parallel",
         "replicas": 1,
         "roleProbe": {
-            "builtinHandlerName": "redis",
             "failureThreshold": 2,
             "initialDelaySeconds": 0,
             "periodSeconds": 2,
@@ -586,7 +585,7 @@ var _ = Describe("revision util test", func() {
                     },
                     {
                         "command": [
-                            "lorry",
+                            "role-probe",
                             "--port",
                             "3501",
                             "--grpcport",
@@ -781,12 +780,12 @@ var _ = Describe("revision util test", func() {
                         "ports": [
                             {
                                 "containerPort": 3501,
-                                "name": "lorry-http-port",
+                                "name": "http-port",
                                 "protocol": "TCP"
                             },
                             {
                                 "containerPort": 50001,
-                                "name": "lorry-grpc-port",
+                                "name": "grpc-port",
                                 "protocol": "TCP"
                             }
                         ],
@@ -962,7 +961,7 @@ var _ = Describe("revision util test", func() {
 			Expect(err).Should(Succeed())
 			cr, err := NewRevision(its)
 			Expect(err).Should(Succeed())
-			Expect(cr.Name).Should(Equal("redis-test-redis-59996f5569"))
+			Expect(cr.Name).Should(Equal("redis-test-redis-56666f656d"))
 		})
 	})
 

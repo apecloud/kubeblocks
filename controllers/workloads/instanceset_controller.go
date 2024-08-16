@@ -24,7 +24,6 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -80,7 +79,7 @@ type InstanceSetReconciler struct {
 func (r *InstanceSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithValues("InstanceSet", req.NamespacedName)
 
-	err := kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
+	res, err := kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
 		Prepare(instanceset.NewTreeLoader()).
 		Do(instanceset.NewFixMetaReconciler()).
 		Do(instanceset.NewDeletionReconciler()).
@@ -90,15 +89,10 @@ func (r *InstanceSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		Do(instanceset.NewReplicasAlignmentReconciler()).
 		Do(instanceset.NewUpdateReconciler()).
 		Commit()
-	if re, ok := err.(intctrlutil.DelayedRequeueError); ok {
-		return intctrlutil.RequeueAfter(re.RequeueAfter(), logger, re.Reason())
-	}
-	requeue := false
-	if apierrors.IsConflict(err) {
-		requeue = true
-		err = nil
-	}
-	return ctrl.Result{Requeue: requeue}, err
+
+	// TODO(free6om): handle error based on ErrorCode (after defined)
+
+	return res, err
 }
 
 // SetupWithManager sets up the controller with the Manager.

@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -37,7 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	"github.com/apecloud/kubeblocks/pkg/lorry/util"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
 type PodRoleEventHandler struct{}
@@ -60,13 +61,21 @@ type probeMessage struct {
 const (
 	// roleChangedAnnotKey is used to mark the role change event has been handled.
 	roleChangedAnnotKey = "role.kubeblocks.io/event-handled"
+
+	// TODO(v1.0): remove this later.
+	checkRoleOperation   = "checkRole"
+	legacyEventFieldPath = "spec.containers{kb-checkrole}"
+	lorryEventFieldPath  = "spec.containers{lorry}"
 )
 
 var roleMessageRegex = regexp.MustCompile(`Readiness probe failed: .*({.*})`)
 
 func (h *PodRoleEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
-	filePaths := []string{readinessProbeEventFieldPath, util.LegacyEventFieldPath, util.LorryEventFieldPath}
-	if !slices.Contains(filePaths, event.InvolvedObject.FieldPath) || event.Reason != string(util.CheckRoleOperation) {
+	// HACK: to support kb-agent probe event
+	event = h.transformKBAgentProbeEvent(reqCtx.Log, event)
+
+	filePaths := []string{readinessProbeEventFieldPath, legacyEventFieldPath, lorryEventFieldPath}
+	if !slices.Contains(filePaths, event.InvolvedObject.FieldPath) || event.Reason != checkRoleOperation {
 		return nil
 	}
 	var (
@@ -90,6 +99,32 @@ func (h *PodRoleEventHandler) Handle(cli client.Client, reqCtx intctrlutil.Reque
 	}
 	event.Annotations[roleChangedAnnotKey] = count
 	return cli.Patch(reqCtx.Ctx, event, patch, inDataContextUnspecified())
+}
+
+func (h *PodRoleEventHandler) transformKBAgentProbeEvent(logger logr.Logger, event *corev1.Event) *corev1.Event {
+	if event.ReportingController != "kbagent" || event.Reason != "roleProbe" {
+		return event
+	}
+
+	probeEvent := &proto.ProbeEvent{}
+	if err := json.Unmarshal([]byte(event.Message), probeEvent); err != nil {
+		logger.Error(err, "unmarshal probe event message failed")
+		return event
+	}
+
+	message := &probeMessage{
+		Message: probeEvent.Message,
+		Role:    strings.TrimSpace(string(probeEvent.Output)),
+	}
+	if probeEvent.Code == 0 {
+		message.Event = successEvent
+	}
+	data, _ := json.Marshal(message)
+
+	event.InvolvedObject.FieldPath = lorryEventFieldPath
+	event.Reason = checkRoleOperation
+	event.Message = string(data)
+	return event
 }
 
 // handleRoleChangedEvent handles role changed event and return role.

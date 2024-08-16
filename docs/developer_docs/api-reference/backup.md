@@ -3119,6 +3119,21 @@ string
 <p>Specifies the service account to run the backup workload.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>containerPort</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.ContainerPort">
+ContainerPort
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the container port in the target pod.
+If not specified, the first container and its first port will be used.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupTimeRange">BackupTimeRange
@@ -3319,6 +3334,45 @@ string
 <td>
 <em>(Optional)</em>
 <p>Specifies the map key of the port in the connection credential secret.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.ContainerPort">ContainerPort
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupTarget">BackupTarget</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>containerName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of container with the port.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>portName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the port name.</p>
 </td>
 </tr>
 </tbody>
@@ -3896,6 +3950,21 @@ Kubernetes meta/v1.LabelSelector
 (Members of <code>LabelSelector</code> are embedded into this type.)
 </p>
 <p>labelsSelector is the label selector to filter the target pods.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>fallbackLabelSelector</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#labelselector-v1-meta">
+Kubernetes meta/v1.LabelSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>fallbackLabelSelector is used to filter available pods when the labelSelector fails.
+This only takes effect when the <code>strategy</code> field below is set to <code>Any</code>.</p>
 </td>
 </tr>
 <tr>

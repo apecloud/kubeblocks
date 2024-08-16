@@ -47,13 +47,6 @@ spec:
             {{- toYaml .Values.resources | nindent 12 }}
           command:
             - /bin/true
-        - name: datascript
-          image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.datascript.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          resources:
-            {{- toYaml .Values.resources | nindent 12 }}
-          command:
-            - /bin/true
       containers:
         - name: manager
           args:
@@ -116,10 +109,10 @@ spec:
             {{- end }}
             - name: KUBEBLOCKS_IMAGE_PULL_POLICY
               value: {{ .Values.image.pullPolicy }}
+            - name: KUBEBLOCKS_IMAGE_PULL_SECRETS
+              value: {{ .Values.image.imagePullSecrets | toJson | quote }}
             - name: KUBEBLOCKS_TOOLS_IMAGE
               value: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.tools.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-            - name: KUBEBLOCKS_DATASCRIPT_CLIENTS_IMAGE
-              value: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.datascript.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
             - name: KUBEBLOCKS_SERVICEACCOUNT_NAME
               value: {{ include "kubeblocks.serviceAccountName" . }}
             {{- if .Capabilities.APIVersions.Has "snapshot.storage.k8s.io/v1" }}
@@ -179,6 +172,10 @@ spec:
             - name: IGNORE_POD_VERTICAL_SCALING
               value: "true"
             {{- end }}
+            - name: COMPONENT_REPLICAS_ANNOTATION
+              value: {{ .Values.featureGates.componentReplicasAnnotation.enabled | quote }}
+            - name: IN_PLACE_POD_VERTICAL_SCALING
+              value: {{ .Values.featureGates.inPlacePodVerticalScaling.enabled | quote }}
           {{- with .Values.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}

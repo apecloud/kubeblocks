@@ -23,7 +23,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
@@ -50,8 +49,6 @@ type ClusterDefinitionReconciler struct {
 	Recorder record.EventRecorder
 }
 
-var clusterDefUpdateHandlers = map[string]func(client client.Client, ctx context.Context, clusterDef *appsv1alpha1.ClusterDefinition) error{}
-
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 //
@@ -76,7 +73,7 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	if clusterDef.Status.ObservedGeneration == clusterDef.Generation &&
-		slices.Contains(clusterDef.Status.GetTerminalPhases(), clusterDef.Status.Phase) {
+		slices.Contains([]appsv1alpha1.Phase{appsv1alpha1.AvailablePhase}, clusterDef.Status.Phase) {
 		return intctrlutil.Reconciled()
 	}
 
@@ -107,10 +104,10 @@ func (r *ClusterDefinitionReconciler) deletionHandler(rctx intctrlutil.RequestCt
 	return func() (*ctrl.Result, error) {
 		recordEvent := func() {
 			r.Recorder.Event(clusterDef, corev1.EventTypeWarning, "ExistsReferencedResources",
-				"cannot be deleted because of existing referencing Cluster or ClusterVersion")
+				"cannot be deleted because of existing referencing Cluster")
 		}
 		if res, err := intctrlutil.ValidateReferenceCR(rctx, r.Client, clusterDef, constant.ClusterDefLabelKey,
-			recordEvent, &appsv1alpha1.ClusterList{}, &appsv1alpha1.ClusterVersionList{}); res != nil || err != nil {
+			recordEvent, &appsv1alpha1.ClusterList{}); res != nil || err != nil {
 			return res, err
 		}
 		return nil, r.deleteExternalResources(rctx, clusterDef)
@@ -165,18 +162,6 @@ func (r *ClusterDefinitionReconciler) reconcile(rctx intctrlutil.RequestCtx, clu
 	if err := r.reconcileTopologies(rctx, clusterDef); err != nil {
 		res, err1 := intctrlutil.CheckedRequeueWithError(err, rctx.Log, "")
 		return &res, err1
-	}
-
-	if err := appsconfig.ReconcileConfigSpecsForReferencedCR(r.Client, rctx, clusterDef); err != nil {
-		res, err1 := intctrlutil.RequeueAfter(time.Second, rctx.Log, err.Error())
-		return &res, err1
-	}
-
-	for _, handler := range clusterDefUpdateHandlers {
-		if err := handler(r.Client, rctx.Ctx, clusterDef); err != nil {
-			res, err1 := intctrlutil.CheckedRequeueWithError(err, rctx.Log, "")
-			return &res, err1
-		}
 	}
 	return nil, nil
 }

@@ -41,7 +41,6 @@ const (
 	ConditionTypeStart              = "Starting"
 	ConditionTypeVersionUpgrading   = "VersionUpgrading"
 	ConditionTypeExpose             = "Exposing"
-	ConditionTypeDataScript         = "ExecuteDataScript"
 	ConditionTypeBackup             = "Backup"
 	ConditionTypeInstanceRebuilding = "InstancesRebuilding"
 	ConditionTypeCustomOperation    = "CustomOperation"
@@ -258,7 +257,7 @@ func NewExposingCondition(ops *OpsRequest) *metav1.Condition {
 	}
 }
 
-// NewUpgradingCondition creates a condition that the OpsRequest starts to upgrade the cluster version
+// NewUpgradingCondition creates a condition that the OpsRequest starts to upgrade the version
 func NewUpgradingCondition(ops *OpsRequest) *metav1.Condition {
 	return &metav1.Condition{
 		Type:               ConditionTypeVersionUpgrading,
@@ -301,20 +300,6 @@ func NewReconfigureCondition(ops *OpsRequest) *metav1.Condition {
 		Message: fmt.Sprintf("Start to reconfigure in Cluster: %s, Component: %s",
 			ops.Spec.GetClusterName(),
 			getComponentName(ops.Spec)),
-	}
-}
-
-func NewDataScriptCondition(ops *OpsRequest) *metav1.Condition {
-	return newOpsCondition(ops, ConditionTypeDataScript, "DataScriptStarted", fmt.Sprintf("Start to execute data script in Cluster: %s", ops.Spec.GetClusterName()))
-}
-
-func newOpsCondition(_ *OpsRequest, condType, reason, message string) *metav1.Condition {
-	return &metav1.Condition{
-		Type:               condType,
-		Status:             metav1.ConditionTrue,
-		Reason:             reason,
-		LastTransitionTime: metav1.Now(),
-		Message:            message,
 	}
 }
 

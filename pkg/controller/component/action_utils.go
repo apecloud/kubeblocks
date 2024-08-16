@@ -21,6 +21,7 @@ package component
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -39,6 +40,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/job"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // LifeCycleActionType represents the lifecycle action type.
@@ -216,8 +218,8 @@ func renderActionCmdJob(ctx context.Context, cli client.Reader, actionCtx *Actio
 				},
 			},
 		}
-		if len(actionCtx.cluster.Spec.Tolerations) > 0 {
-			jobObj.Spec.Template.Spec.Tolerations = actionCtx.cluster.Spec.Tolerations
+		if err := BuildJobTolerations(jobObj, actionCtx.cluster); err != nil {
+			return nil, err
 		}
 		for i := range jobObj.Spec.Template.Spec.Containers {
 			intctrlutil.InjectZeroResourcesLimitsIfEmpty(&jobObj.Spec.Template.Spec.Containers[i])
@@ -239,6 +241,34 @@ func renderActionCmdJob(ctx context.Context, cli client.Reader, actionCtx *Actio
 	}
 
 	return renderedJob, nil
+}
+
+// BuildJobTolerations builds the job tolerations.
+func BuildJobTolerations(job *batchv1.Job, cluster *appsv1alpha1.Cluster) error {
+	// build data plane tolerations from config
+	var tolerations []corev1.Toleration
+	if val := viper.GetString(constant.CfgKeyDataPlaneTolerations); val != "" {
+		if err := json.Unmarshal([]byte(val), &tolerations); err != nil {
+			return err
+		}
+	}
+
+	if len(job.Spec.Template.Spec.Tolerations) > 0 {
+		job.Spec.Template.Spec.Tolerations = append(job.Spec.Template.Spec.Tolerations, tolerations...)
+	} else {
+		job.Spec.Template.Spec.Tolerations = tolerations
+	}
+
+	// build job tolerations from legacy cluster.spec.Tolerations
+	if len(cluster.Spec.Tolerations) > 0 {
+		job.Spec.Template.Spec.Tolerations = append(job.Spec.Template.Spec.Tolerations, cluster.Spec.Tolerations...)
+	}
+
+	// build job tolerations from cluster.spec.SchedulingPolicy.Tolerations
+	if cluster.Spec.SchedulingPolicy != nil && len(cluster.Spec.SchedulingPolicy.Tolerations) > 0 {
+		job.Spec.Template.Spec.Tolerations = append(job.Spec.Template.Spec.Tolerations, cluster.Spec.SchedulingPolicy.Tolerations...)
+	}
+	return nil
 }
 
 // buildLifecycleActionEnvs builds the environment variables for lifecycle actions.
@@ -526,13 +556,9 @@ func checkLifeCycleAction(actionCtx *ActionContext) (bool, *appsv1alpha1.Action)
 	var action *appsv1alpha1.Action
 	switch actionCtx.actionType {
 	case PostProvisionAction:
-		if actions := actionCtx.lifecycleActions.PostProvision; actions != nil {
-			action = actions.CustomHandler
-		}
+		action = actionCtx.lifecycleActions.PostProvision
 	case PreTerminateAction:
-		if actions := actionCtx.lifecycleActions.PreTerminate; actions != nil {
-			action = actions.CustomHandler
-		}
+		action = actionCtx.lifecycleActions.PreTerminate
 	default:
 		return false, nil
 	}

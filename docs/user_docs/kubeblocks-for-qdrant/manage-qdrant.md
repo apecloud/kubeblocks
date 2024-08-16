@@ -335,4 +335,4 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
 ## Backup and restore
 
-The backup and restore operations for Qdrant are the same as those of other clusters and you can refer to [the backup and restore documents](./../backup-and-restore/introduction.md) for details. Remember to use `--method` parameter.
+The backup and restore operations for Qdrant are the same as those of other clusters and you can refer to [the backup and restore documents](./../maintenance/backup-and-restore/introduction.md) for details. Remember to use `--method` parameter.

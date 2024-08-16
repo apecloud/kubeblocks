@@ -75,6 +75,35 @@ type SchedulingPolicy struct {
 	TopologySpreadConstraints []corev1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty"`
 }
 
+// InstanceUpdateStrategy indicates the strategy that the InstanceSet
+// controller will use to perform updates. It includes any additional parameters
+// necessary to perform the update for the indicated strategy.
+type InstanceUpdateStrategy struct {
+	// Partition indicates the number of pods that should be updated during a rolling update.
+	// The remaining pods will remain untouched. This is helpful in defining how many pods
+	// should participate in the update process. The update process will follow the order
+	// of pod names in descending lexicographical (dictionary) order. The default value is
+	// Replicas (i.e., update all pods).
+	// +optional
+	Partition *int32 `json:"partition,omitempty"`
+	// The maximum number of pods that can be unavailable during the update.
+	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+	// Absolute number is calculated from percentage by rounding up. This can not be 0.
+	// Defaults to 1. The field applies to all pods. That means if there is any unavailable pod,
+	// it will be counted towards MaxUnavailable.
+	// +optional
+	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
+	// Members(Pods) update strategy.
+	//
+	// - serial: update Members one by one that guarantee minimum component unavailable time.
+	// - bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
+	// - parallel: force parallel
+	//
+	// +kubebuilder:validation:Enum={Serial,BestEffortParallel,Parallel}
+	// +optional
+	MemberUpdateStrategy *MemberUpdateStrategy `json:"memberUpdateStrategy,omitempty"`
+}
+
 // Range represents a range with a start and an end value.
 // It is used to define a continuous segment.
 type Range struct {
@@ -326,10 +355,9 @@ type InstanceSetSpec struct {
 	// Indicates the StatefulSetUpdateStrategy that will be
 	// employed to update Pods in the InstanceSet when a revision is made to
 	// Template.
-	// UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if MemberUpdateStrategy is not nil
 	//
 	// Note: This field will be removed in future version.
-	UpdateStrategy appsv1.StatefulSetUpdateStrategy `json:"updateStrategy,omitempty"`
+	UpdateStrategy *InstanceUpdateStrategy `json:"updateStrategy,omitempty"`
 
 	// A list of roles defined in the system.
 	//
@@ -348,11 +376,13 @@ type InstanceSetSpec struct {
 
 	// Members(Pods) update strategy.
 	//
+	// Deprecated since v0.9.0
 	// - serial: update Members one by one that guarantee minimum component unavailable time.
 	// - bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
 	// - parallel: force parallel
 	//
 	// +kubebuilder:validation:Enum={Serial,BestEffortParallel,Parallel}
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	MemberUpdateStrategy *MemberUpdateStrategy `json:"memberUpdateStrategy,omitempty"`
 

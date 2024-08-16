@@ -311,6 +311,8 @@ var _ = Describe("builder", func() {
 			// test member update strategy
 			Expect(its.Spec.MemberUpdateStrategy).ShouldNot(BeNil())
 			Expect(*its.Spec.MemberUpdateStrategy).Should(BeEquivalentTo(workloads.SerialUpdateStrategy))
+			Expect(its.Spec.UpdateStrategy.MemberUpdateStrategy).ShouldNot(BeNil())
+			Expect(*its.Spec.UpdateStrategy.MemberUpdateStrategy).Should(BeEquivalentTo(workloads.SerialUpdateStrategy))
 
 			By("set workload type to Consensus")
 			clusterDef.Spec.ComponentDefs[0].WorkloadType = appsv1alpha1.Consensus
@@ -333,6 +335,8 @@ var _ = Describe("builder", func() {
 			// test member update strategy
 			Expect(its.Spec.MemberUpdateStrategy).ShouldNot(BeNil())
 			Expect(*its.Spec.MemberUpdateStrategy).Should(BeEquivalentTo(workloads.BestEffortParallelUpdateStrategy))
+			Expect(its.Spec.UpdateStrategy.MemberUpdateStrategy).ShouldNot(BeNil())
+			Expect(*its.Spec.UpdateStrategy.MemberUpdateStrategy).Should(BeEquivalentTo(workloads.BestEffortParallelUpdateStrategy))
 		})
 
 		It("builds BackupJob correctly", func() {

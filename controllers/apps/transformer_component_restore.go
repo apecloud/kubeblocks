@@ -26,7 +26,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
@@ -61,8 +60,8 @@ func (t *componentRestoreTransformer) Transform(ctx graph.TransformContext, dag 
 	cluster := transCtx.Cluster
 	restoreMGR := plan.NewRestoreManager(reqCtx.Ctx, t.Client, cluster, rscheme, nil, synthesizedComp.Replicas, 0)
 
-	needDoPostProvision, _ := component.NeedDoPostProvision(transCtx.Context, transCtx.Client)
-	if err := restoreMGR.DoRestore(synthesizedComp, transCtx.Component, needDoPostProvision); err != nil {
+	postProvisionDone := checkPostProvisionDone(transCtx)
+	if err := restoreMGR.DoRestore(synthesizedComp, transCtx.Component, postProvisionDone); err != nil {
 		return commitError(err)
 	}
 

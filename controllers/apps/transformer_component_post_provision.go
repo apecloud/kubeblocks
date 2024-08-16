@@ -49,7 +49,7 @@ func (t *componentPostProvisionTransformer) Transform(ctx graph.TransformContext
 		return nil
 	}
 
-	if t.checkPostProvisionDone(transCtx, dag) {
+	if checkPostProvisionDone(transCtx) {
 		return nil
 	}
 	err := t.postProvision(transCtx)
@@ -57,16 +57,6 @@ func (t *componentPostProvisionTransformer) Transform(ctx graph.TransformContext
 		return lifecycle.IgnoreNotDefined(err)
 	}
 	return t.markPostProvisionDone(transCtx, dag)
-}
-
-func (t *componentPostProvisionTransformer) checkPostProvisionDone(transCtx *componentTransformContext, dag *graph.DAG) bool {
-	comp := transCtx.Component
-	if comp.Annotations == nil {
-		return false
-	}
-	// TODO: condition
-	_, ok := comp.Annotations[kbCompPostProvisionDoneKey]
-	return ok
 }
 
 func (t *componentPostProvisionTransformer) markPostProvisionDone(transCtx *componentTransformContext, dag *graph.DAG) error {
@@ -107,4 +97,18 @@ func lifecycleAction4Component(transCtx *componentTransformContext) (lifecycle.L
 		return nil, fmt.Errorf("has no pods to running the post-provision action")
 	}
 	return lifecycle.New(transCtx.SynthesizeComponent, nil, pods...)
+}
+
+func checkPostProvisionDone(transCtx *componentTransformContext) bool {
+	synthesizedComp := transCtx.SynthesizeComponent
+	if synthesizedComp == nil || synthesizedComp.LifecycleActions == nil || synthesizedComp.LifecycleActions.PostProvision == nil {
+		return true
+	}
+
+	comp := transCtx.Component
+	if comp.Annotations == nil {
+		return false
+	}
+	_, ok := comp.Annotations[kbCompPostProvisionDoneKey]
+	return ok
 }

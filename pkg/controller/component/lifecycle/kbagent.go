@@ -113,7 +113,7 @@ func (a *kbagent) AccountProvision(ctx context.Context, cli client.Reader, opts 
 }
 
 func (a *kbagent) checkedCallAction(ctx context.Context, cli client.Reader, spec *appsv1alpha1.Action, lfa lifecycleAction, opts *Options) error {
-	if spec == nil {
+	if spec == nil || spec.Exec == nil {
 		return errors.Wrap(ErrActionNotDefined, lfa.name())
 	}
 	if err := a.precondition(ctx, cli, spec); err != nil {

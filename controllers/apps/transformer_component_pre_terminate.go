@@ -44,6 +44,11 @@ func (t *componentPreTerminateTransformer) Transform(ctx graph.TransformContext,
 		return nil
 	}
 
+	synthesizedComp := transCtx.SynthesizeComponent
+	if synthesizedComp == nil || synthesizedComp.LifecycleActions == nil || synthesizedComp.LifecycleActions.PreTerminate == nil {
+		return nil
+	}
+
 	// TODO: force skip the pre-terminate action?
 
 	if t.checkPreTerminateDone(transCtx, dag) {

@@ -44,6 +44,11 @@ func (t *componentPostProvisionTransformer) Transform(ctx graph.TransformContext
 		return nil
 	}
 
+	synthesizedComp := transCtx.SynthesizeComponent
+	if synthesizedComp == nil || synthesizedComp.LifecycleActions == nil || synthesizedComp.LifecycleActions.PostProvision == nil {
+		return nil
+	}
+
 	if t.checkPostProvisionDone(transCtx, dag) {
 		return nil
 	}
@@ -92,7 +97,6 @@ func (t *componentPostProvisionTransformer) postProvision(transCtx *componentTra
 
 func lifecycleAction4Component(transCtx *componentTransformContext) (lifecycle.Lifecycle, error) {
 	synthesizedComp := transCtx.SynthesizeComponent
-
 	pods, err := component.ListOwnedPods(transCtx.Context, transCtx.Client,
 		synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
 	if err != nil {
@@ -102,6 +106,5 @@ func lifecycleAction4Component(transCtx *componentTransformContext) (lifecycle.L
 		// TODO: (good-first-issue) we should handle the case that the component has no pods
 		return nil, fmt.Errorf("has no pods to running the post-provision action")
 	}
-
 	return lifecycle.New(transCtx.SynthesizeComponent, nil, pods...)
 }

@@ -825,6 +825,7 @@ type ClusterComponentSpec struct {
 	// If that fails, it will fall back to the ReCreate, where pod will be recreated.
 	// Default value is "PreferInPlace"
 	//
+	// +kubebuilder:validation:Enum={StrictInPlace,PreferInPlace}
 	// +optional
 	PodUpdatePolicy *workloads.PodUpdatePolicyType `json:"podUpdatePolicy,omitempty"`
 

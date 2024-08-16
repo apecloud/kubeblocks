@@ -54,12 +54,12 @@ var (
 	sharedVolumeMount = corev1.VolumeMount{Name: "kubeblocks", MountPath: kbAgentSharedMountPath}
 )
 
-// TODO Because the implementation of multiple images is required, an update is needed here. About kbAgentContainerName
+// TODO: Because the implementation of multiple images is required, an update is needed here. About kbAgentContainerName
 func IsKBAgentContainer(c *corev1.Container) bool {
 	return c.Name == kbAgentContainerName || c.Name == kbAgentInitContainerName
 }
 
-// TODO Because the implementation of multiple images is required, an update is needed here. About KbAgentContainerName
+// TODO: Because the implementation of multiple images is required, an update is needed here. About KbAgentContainerName
 func UpdateKBAgentContainer4HostNetwork(synthesizedComp *SynthesizedComponent) {
 	idx, c := intctrlutil.GetContainerByName(synthesizedComp.PodSpec.Containers, kbAgentContainerName)
 	if c == nil {
@@ -303,6 +303,7 @@ func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) ([]s
 		actions = append(actions, &synthesizedComp.LifecycleActions.RoleProbe.Action)
 	}
 
+	// TODO: Discussion is needed for the definition of action name
 	actionNameMap := map[*appsv1alpha1.Action]string{
 		synthesizedComp.LifecycleActions.PostProvision:     "postprovision",
 		synthesizedComp.LifecycleActions.PreTerminate:      "preterminate",

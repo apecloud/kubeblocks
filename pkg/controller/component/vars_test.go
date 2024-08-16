@@ -35,7 +35,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("vars", func() {
@@ -130,12 +129,13 @@ var _ = Describe("vars", func() {
 
 		BeforeEach(func() {
 			synthesizedComp = &SynthesizedComponent{
-				Namespace:   testCtx.DefaultNamespace,
-				ClusterName: "test-cluster",
-				ClusterUID:  string(uuid.NewUUID()),
-				Name:        "comp",
-				CompDefName: "compDef",
-				Replicas:    1,
+				Namespace:    testCtx.DefaultNamespace,
+				ClusterName:  "test-cluster",
+				ClusterUID:   string(uuid.NewUUID()),
+				Name:         "comp",
+				FullCompName: "test-cluster-comp",
+				CompDefName:  "compDef",
+				Replicas:     1,
 				PodSpec: &corev1.PodSpec{
 					InitContainers: []corev1.Container{
 						{
@@ -1661,7 +1661,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 					{
-						Name: "instanceNames",
+						Name: "podNames",
 						ValueFrom: &appsv1alpha1.VarSource{
 							ComponentVarRef: &appsv1alpha1.ComponentVarSelector{
 								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
@@ -1669,7 +1669,7 @@ var _ = Describe("vars", func() {
 									Optional: required(),
 								},
 								ComponentVars: appsv1alpha1.ComponentVars{
-									InstanceNames: &appsv1alpha1.VarRequired,
+									PodNames: &appsv1alpha1.VarRequired,
 								},
 							},
 						},
@@ -1688,6 +1688,43 @@ var _ = Describe("vars", func() {
 							},
 						},
 					},
+					{
+						Name: "podNames4EmptyRole",
+						ValueFrom: &appsv1alpha1.VarSource{
+							ComponentVarRef: &appsv1alpha1.ComponentVarSelector{
+								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+									CompDef:  synthesizedComp.CompDefName,
+									Optional: required(),
+								},
+								ComponentVars: appsv1alpha1.ComponentVars{
+									PodNamesForRole: &appsv1alpha1.RoledVar{
+										// empty role
+										Option: &appsv1alpha1.VarRequired,
+									},
+								},
+							},
+						},
+					},
+					{
+						Name: "podFQDNs4Leader",
+						ValueFrom: &appsv1alpha1.VarSource{
+							ComponentVarRef: &appsv1alpha1.ComponentVarSelector{
+								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+									CompDef:  synthesizedComp.CompDefName,
+									Optional: required(),
+								},
+								ComponentVars: appsv1alpha1.ComponentVars{
+									PodFQDNsForRole: &appsv1alpha1.RoledVar{
+										Role:   "leader",
+										Option: &appsv1alpha1.VarRequired,
+									},
+								},
+							},
+						},
+					},
+				}
+				podName := func(suffix string) string {
+					return fmt.Sprintf("%s-%s", constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name), suffix)
 				}
 				reader := &mockReader{
 					cli: testCtx.Cli,
@@ -1702,8 +1739,47 @@ var _ = Describe("vars", func() {
 								Replicas: 3,
 							},
 						},
+						&corev1.Pod{
+							ObjectMeta: metav1.ObjectMeta{
+								Namespace: testCtx.DefaultNamespace,
+								Name:      podName("leader"),
+								Labels: map[string]string{
+									constant.AppManagedByLabelKey:   constant.AppName,
+									constant.AppInstanceLabelKey:    synthesizedComp.ClusterName,
+									constant.KBAppComponentLabelKey: synthesizedComp.Name,
+									constant.RoleLabelKey:           "leader",
+								},
+							},
+							Spec: corev1.PodSpec{},
+						},
+						&corev1.Pod{
+							ObjectMeta: metav1.ObjectMeta{
+								Namespace: testCtx.DefaultNamespace,
+								Name:      podName("follower"),
+								Labels: map[string]string{
+									constant.AppManagedByLabelKey:   constant.AppName,
+									constant.AppInstanceLabelKey:    synthesizedComp.ClusterName,
+									constant.KBAppComponentLabelKey: synthesizedComp.Name,
+									constant.RoleLabelKey:           "follower",
+								},
+							},
+							Spec: corev1.PodSpec{},
+						},
+						&corev1.Pod{
+							ObjectMeta: metav1.ObjectMeta{
+								Namespace: testCtx.DefaultNamespace,
+								Name:      podName("empty"),
+								Labels: map[string]string{
+									constant.AppManagedByLabelKey:   constant.AppName,
+									constant.AppInstanceLabelKey:    synthesizedComp.ClusterName,
+									constant.KBAppComponentLabelKey: synthesizedComp.Name,
+								},
+							},
+							Spec: corev1.PodSpec{},
+						},
 					},
 				}
+				// pod names and FQDNs are calculated from the spec, and names and FQDNs for specific roles are obtained from runtime resources.
 				mockInstanceList := []string{
 					constant.GeneratePodName(synthesizedComp.ClusterName, synthesizedComp.Name, 0),
 					constant.GeneratePodName(synthesizedComp.ClusterName, synthesizedComp.Name, 1),
@@ -1714,18 +1790,17 @@ var _ = Describe("vars", func() {
 				compName := constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name)
 				checkEnvVarWithValue(envVars, "name", compName)
 				checkEnvVarWithValue(envVars, "replicas", fmt.Sprintf("%d", 3))
-				checkEnvVarWithValue(envVars, "instanceNames", strings.Join(mockInstanceList, ","))
-				withClusterDomain := func(name string) string {
-					return fmt.Sprintf("%s.%s", name, viper.GetString(constant.KubernetesClusterDomainEnv))
-				}
+				checkEnvVarWithValue(envVars, "podNames", strings.Join(mockInstanceList, ","))
+				checkEnvVarWithValue(envVars, "podNames4EmptyRole", podName("empty"))
 				fqdnList := func(fn ...func(string) string) []string {
 					l := make([]string, 0)
 					for _, i := range mockInstanceList {
-						l = append(l, withClusterDomain(fmt.Sprintf("%s.%s-headless.%s.svc", i, compName, testCtx.DefaultNamespace)))
+						l = append(l, PodFQDN(synthesizedComp.Namespace, synthesizedComp.FullCompName, i))
 					}
 					return l
 				}
 				checkEnvVarWithValue(envVars, "podFQDNs", strings.Join(fqdnList(), ","))
+				checkEnvVarWithValue(envVars, "podFQDNs4Leader", PodFQDN(synthesizedComp.Namespace, synthesizedComp.FullCompName, podName("leader")))
 			})
 		})
 

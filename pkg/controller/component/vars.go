@@ -1125,10 +1125,10 @@ func resolveComponentVarRef(ctx context.Context, cli client.Reader, synthesizedC
 		resolveFunc = resolveComponentNameRef
 	case selector.Replicas != nil:
 		resolveFunc = resolveComponentReplicasRef
-	case selector.InstanceNames != nil:
-		resolveFunc = resolveComponentInstanceNamesRef
-	case selector.PodFQDNs != nil:
-		resolveFunc = resolveComponentPodFQDNsRef
+	case selector.PodNames != nil || selector.PodFQDNs != nil:
+		resolveFunc = resolveComponentPodsRef
+	case selector.PodNamesForRole != nil || selector.PodFQDNsForRole != nil:
+		resolveFunc = resolveComponentPodsForRoleRef
 	default:
 		return nil, nil, nil
 	}
@@ -1153,26 +1153,9 @@ func resolveComponentReplicasRef(ctx context.Context, cli client.Reader, synthes
 	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector, selector.Replicas, resolveReplicas)
 }
 
-func resolveComponentInstanceNamesRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+func resolveComponentPodsRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	defineKey string, selector appsv1alpha1.ComponentVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
-	resolveInstanceNames := func(obj any) (*corev1.EnvVar, *corev1.EnvVar, error) {
-		comp := obj.(*appsv1alpha1.Component)
-		var templates []instanceset.InstanceTemplate
-		for i := range comp.Spec.Instances {
-			templates = append(templates, &comp.Spec.Instances[i])
-		}
-		instanceNameList, err := instanceset.GenerateAllInstanceNames(comp.Name, comp.Spec.Replicas, templates, comp.Spec.OfflineInstances, workloads.Ordinals{})
-		if err != nil {
-			return nil, nil, err
-		}
-		return &corev1.EnvVar{Name: defineKey, Value: strings.Join(instanceNameList, ",")}, nil, nil
-	}
-	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector, selector.InstanceNames, resolveInstanceNames)
-}
-
-func resolveComponentPodFQDNsRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	defineKey string, selector appsv1alpha1.ComponentVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
-	resolveFQDNList := func(obj any) (*corev1.EnvVar, *corev1.EnvVar, error) {
+	resolvePods := func(obj any) (*corev1.EnvVar, *corev1.EnvVar, error) {
 		comp := obj.(*appsv1alpha1.Component)
 		var templates []instanceset.InstanceTemplate
 		for i := range comp.Spec.Instances {
@@ -1182,12 +1165,66 @@ func resolveComponentPodFQDNsRef(ctx context.Context, cli client.Reader, synthes
 		if err != nil {
 			return nil, nil, err
 		}
-		for i := range names {
-			names[i] = PodFQDN(synthesizedComp.Namespace, comp.Name, names[i])
+		if selector.PodFQDNs != nil {
+			for i := range names {
+				names[i] = PodFQDN(synthesizedComp.Namespace, comp.Name, names[i])
+			}
 		}
 		return &corev1.EnvVar{Name: defineKey, Value: strings.Join(names, ",")}, nil, nil
 	}
-	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector, selector.PodFQDNs, resolveFQDNList)
+	option := selector.PodNames
+	if selector.PodFQDNs != nil {
+		option = selector.PodFQDNs
+	}
+	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector, option, resolvePods)
+}
+
+func resolveComponentPodsForRoleRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+	defineKey string, selector appsv1alpha1.ComponentVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
+	resolvePodsForRole := func(obj any) (*corev1.EnvVar, *corev1.EnvVar, error) {
+		var (
+			namespace   = synthesizedComp.Namespace
+			clusterName = synthesizedComp.ClusterName
+			comp        = obj.(*appsv1alpha1.Component)
+			compName, _ = ShortName(clusterName, comp.Name)
+		)
+		pods, err := ListOwnedPods(ctx, cli, namespace, clusterName, compName)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// support multiple roles, and support empty role (has no role)
+		targetRole := ""
+		if selector.PodNamesForRole != nil {
+			targetRole = selector.PodNamesForRole.Role
+		} else {
+			targetRole = selector.PodFQDNsForRole.Role
+		}
+		targetRoles := strings.Split(targetRole, ",")
+
+		names := make([]string, 0)
+		for _, pod := range pods {
+			role := ""
+			if pod.Labels != nil {
+				role = pod.Labels[constant.RoleLabelKey]
+			}
+			if slices.Index(targetRoles, role) >= 0 {
+				names = append(names, pod.Name)
+			}
+		}
+
+		if selector.PodFQDNsForRole != nil {
+			for i := range names {
+				names[i] = PodFQDN(namespace, comp.Name, names[i])
+			}
+		}
+		return &corev1.EnvVar{Name: defineKey, Value: strings.Join(names, ",")}, nil, nil
+	}
+	v := selector.PodNamesForRole
+	if selector.PodFQDNsForRole != nil {
+		v = selector.PodFQDNsForRole
+	}
+	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector, v.Option, resolvePodsForRole)
 }
 
 func resolveComponentVarRefLow(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,

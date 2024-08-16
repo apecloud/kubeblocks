@@ -87,7 +87,7 @@ func UpdateKBAgentContainer4HostNetwork(synthesizedComp *SynthesizedComponent) {
 
 	// update startup probe
 	if c.StartupProbe != nil && c.StartupProbe.TCPSocket != nil {
-		c.StartupProbe.TCPSocket.Port = intstr.FromInt(httpPort)
+		c.StartupProbe.TCPSocket.Port = intstr.FromInt32(int32(httpPort))
 	}
 
 	synthesizedComp.PodSpec.Containers[idx] = *c
@@ -137,7 +137,7 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 		containers[i].Args = append(containers[i].Args, "--port", strconv.Itoa(int(ports[i])))
 		containers[i].StartupProbe = &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
-				TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromInt(int(ports[i]))},
+				TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromInt32(ports[i])},
 			},
 		}
 	}

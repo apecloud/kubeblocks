@@ -112,11 +112,10 @@ func (a *kbagent) callAction(ctx context.Context, cli client.Reader, spec *appsv
 }
 
 func (a *kbagent) buildActionRequest(ctx context.Context, cli client.Reader, la lifecycleAction, opts *Options) (*proto.ActionRequest, error) {
-	parameters, err := la.parameters(ctx, cli)
+	parameters, err := a.parameters(ctx, cli, la)
 	if err != nil {
 		return nil, err
 	}
-
 	req := &proto.ActionRequest{
 		Action:     la.name(),
 		Parameters: parameters,
@@ -136,6 +135,47 @@ func (a *kbagent) buildActionRequest(ctx context.Context, cli client.Reader, la 
 		}
 	}
 	return req, nil
+}
+
+func (a *kbagent) parameters(ctx context.Context, cli client.Reader, la lifecycleAction) (map[string]string, error) {
+	m, err := a.templateVarsParameters(ctx, cli)
+	if err != nil {
+		return nil, err
+	}
+	sys, err := la.parameters(ctx, cli)
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range sys {
+		// template vars take precedence
+		if _, ok := m[k]; !ok {
+			m[k] = v
+		}
+	}
+	return m, nil
+}
+
+func (a *kbagent) templateVarsParameters(ctx context.Context, cli client.Reader) (map[string]string, error) {
+	templateVars := a.synthesizedComp.TemplateVars
+	if templateVars == nil {
+		// TODO: vars from SynthesizedComponent
+		var err error
+		compDef := &appsv1alpha1.ComponentDefinition{}
+		if err = cli.Get(ctx, client.ObjectKey{Name: a.synthesizedComp.CompDefName}, compDef); err != nil {
+			return nil, err
+		}
+		// TODO: handle the case where delete a component which is in provisioning
+		templateVars, _, err = component.ResolveTemplateNEnvVars(ctx, cli, a.synthesizedComp, compDef.Spec.Vars)
+		if err != nil {
+			return nil, err
+		}
+	}
+	m := map[string]string{}
+	for k, v := range templateVars {
+		m[k] = v.(string)
+	}
+	return m, nil
 }
 
 func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1alpha1.Action, la lifecycleAction, req *proto.ActionRequest) error {

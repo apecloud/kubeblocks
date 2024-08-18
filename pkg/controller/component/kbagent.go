@@ -117,6 +117,7 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 	if len(containers) == 0 {
 		containers = append(containers, container)
 	}
+
 	allPorts := make([]int32, 0)
 	for i := range containers {
 		allPorts = append(allPorts, int32(kbAgentDefaultPort+i))
@@ -125,14 +126,12 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 	if err != nil {
 		return err
 	}
-	if len(ports) != len(containers) || len(actionNames) != len(containers) {
-		return fmt.Errorf("mismatch between the number of containers, ports, and actionname")
-	}
+
 	for i := range containers {
 		containers[i].Ports = []corev1.ContainerPort{
 			{
 				ContainerPort: ports[i],
-				Name:          actionNames[i] + "-" + kbAgentPortName,
+				Name:          containers[i].Name + "-" + kbAgentPortName,
 				Protocol:      "TCP",
 			},
 		}
@@ -256,7 +255,7 @@ func adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp *SynthesizedComp
 	if err != nil {
 		return nil, nil, err
 	}
-	if len(images) == 0 || len(containers) == 0 || len(actionNames) == 0 {
+	if len(images) == 0 {
 		return nil, nil, nil
 	}
 	// init-container to copy binaries to the shared mount point /kubeblocks

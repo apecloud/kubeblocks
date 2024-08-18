@@ -54,13 +54,13 @@ var (
 	sharedVolumeMount = corev1.VolumeMount{Name: "kubeblocks", MountPath: kbAgentSharedMountPath}
 )
 
-// TODO: Because the implementation of multiple images is required, an update is needed here. About kbAgentContainerName
 func IsKBAgentContainer(c *corev1.Container) bool {
+	// TODO: Because the implementation of multiple images is required, an update is needed here. About kbAgentContainerName
 	return c.Name == kbAgentContainerName || c.Name == kbAgentInitContainerName
 }
 
-// TODO: Because the implementation of multiple images is required, an update is needed here. About KbAgentContainerName
 func UpdateKBAgentContainer4HostNetwork(synthesizedComp *SynthesizedComponent) {
+	// TODO: Because the implementation of multiple images is required, an update is needed here. About KbAgentContainerName
 	idx, c := intctrlutil.GetContainerByName(synthesizedComp.PodSpec.Containers, kbAgentContainerName)
 	if c == nil {
 		return
@@ -114,7 +114,7 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 	if err != nil {
 		return err
 	}
-	if containers == nil || len(containers) == 0 {
+	if len(containers) == 0 {
 		containers = append(containers, container)
 	}
 	allPorts := make([]int32, 0)

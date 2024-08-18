@@ -126,7 +126,7 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 		return err
 	}
 	if len(ports) != len(containers) || len(actionNames) != len(containers) {
-		return fmt.Errorf("ports and containers not match")
+		return fmt.Errorf("mismatch between the number of containers, ports, and actionname")
 	}
 	for i := range containers {
 		containers[i].Ports = []corev1.ContainerPort{

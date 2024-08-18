@@ -110,7 +110,7 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 		AddEnv(envVars...).
 		GetObject()
 
-	actionNames, containers, err := adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp, *container)
+	containers, err := adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp, *container)
 	if err != nil {
 		return err
 	}
@@ -127,16 +127,16 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 		return err
 	}
 
-	for i := range containers {
-		containers[i].Ports = []corev1.ContainerPort{
+	for i, container := range containers {
+		container.Ports = []corev1.ContainerPort{
 			{
 				ContainerPort: ports[i],
-				Name:          containers[i].Name + "-" + kbAgentPortName,
+				Name:          container.Name + "-" + kbAgentPortName,
 				Protocol:      "TCP",
 			},
 		}
-		containers[i].Args = append(containers[i].Args, "--port", strconv.Itoa(int(ports[i])))
-		containers[i].StartupProbe = &corev1.Probe{
+		container.Args = append(containers[i].Args, "--port", strconv.Itoa(int(ports[i])))
+		container.StartupProbe = &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromInt32(ports[i])},
 			},
@@ -147,13 +147,13 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 		if synthesizedComp.HostNetwork.ContainerPorts == nil {
 			synthesizedComp.HostNetwork.ContainerPorts = make([]appsv1alpha1.HostNetworkContainerPort, 0)
 		}
-		for i, container := range containers {
+		for _, container := range containers {
 			synthesizedComp.HostNetwork.ContainerPorts = append(
 				synthesizedComp.HostNetwork.ContainerPorts,
 				appsv1alpha1.HostNetworkContainerPort{
 					Container: container.Name,
 					// TODO The port name is limited to 15 characters and needs to adjust the method of fetching ports in pod name and kbcli.
-					Ports: []string{actionNames[i] + "-" + kbAgentPortName},
+					Ports: []string{container.Name + "-" + kbAgentPortName},
 				})
 		}
 	}
@@ -250,13 +250,13 @@ func buildProbe4KBAgent(probe *appsv1alpha1.Probe, name string) (*proto.Action, 
 	return a, p
 }
 
-func adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp *SynthesizedComponent, container corev1.Container) ([]string, []*corev1.Container, error) {
+func adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp *SynthesizedComponent, container corev1.Container) ([]*corev1.Container, error) {
 	actionNames, images, containers, err := customExecActionImageNContainer(synthesizedComp)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	if len(images) == 0 {
-		return nil, nil, nil
+		return nil, nil
 	}
 	// init-container to copy binaries to the shared mount point /kubeblocks
 	initContainer := buildKBAgentInitContainer()
@@ -279,7 +279,7 @@ func adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp *SynthesizedComp
 		}
 		cc[i] = wrapContainer
 	}
-	return actionNames, cc, nil
+	return cc, nil
 }
 
 func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) ([]string, []string, []*corev1.Container, error) {

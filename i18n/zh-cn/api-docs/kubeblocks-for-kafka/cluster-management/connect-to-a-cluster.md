@@ -134,7 +134,7 @@ sidebar_label: 连接
    kubectl get svc 
    ```
 
-   ![gain elb address](./../../../img/connect-to-kafka-cluster-gain-elb-address.png)
+   ![gain elb address](./../../../img/connect-to-a-kafka-cluster-gain-elb-address.png)
 
   :::note
 
@@ -142,7 +142,7 @@ sidebar_label: 连接
 
   :::
 
-3. 使用 ELB 地址进行连接。
+1. 使用 ELB 地址进行连接。
 
     在上例中，ELB 地址为 `a0e01377fa33xxx-xxx.cn-northwest-1.elb.amazonaws.com.cn:9092`。
 

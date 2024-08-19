@@ -132,7 +132,7 @@ func main() {
 		userAgent                    string
 	)
 
-	flag.String(metricsAddrFlagKey.String(), ":8083", "The address the metric endpoint binds to.")
+	flag.String(metricsAddrFlagKey.String(), ":8080", "The address the metric endpoint binds to.")
 	flag.String(probeAddrFlagKey.String(), ":8081", "The address the probe endpoint binds to.")
 	flag.Bool(leaderElectFlagKey.String(), false,
 		"Enable leader election for controller manager. "+
@@ -184,7 +184,7 @@ func main() {
 	viper.OnConfigChange(func(e fsnotify.Event) {
 		setupLog.Info(fmt.Sprintf("config file changed: %s", e.Name))
 	})
-	// viper.WatchConfig()
+	viper.WatchConfig()
 
 	metricsAddr = viper.GetString(metricsAddrFlagKey.viperName())
 	probeAddr = viper.GetString(probeAddrFlagKey.viperName())

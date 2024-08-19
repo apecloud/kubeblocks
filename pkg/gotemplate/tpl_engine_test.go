@@ -21,6 +21,7 @@ package gotemplate
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/golang/mock/gomock"
@@ -81,6 +82,25 @@ my friend name is test2
 			context, err := emptyTplEngine(&pp, nil, tplString)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(context).To(Equal(expectString))
+		})
+	})
+
+	Context("ssh-key-generator", func() {
+		It("Should success with no error", func() {
+			tplString := `
+{{- sshKeyGen | toJson }}
+`
+
+			context, err := emptyTplEngine(&TplValues{
+				"cluster": map[string]string{"name": "cluster"},
+				"name":    "component_name",
+			}, nil, tplString)
+			Expect(err).NotTo(HaveOccurred())
+
+			var sshKey map[string]string
+			Expect(json.Unmarshal([]byte(context), &sshKey)).Should(Succeed())
+			Expect(sshKey).To(HaveKey("private_key"))
+			Expect(sshKey).To(HaveKey("public_key"))
 		})
 	})
 

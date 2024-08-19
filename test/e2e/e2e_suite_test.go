@@ -27,8 +27,8 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	. "github.com/vmware-tanzu/velero/test/e2e"
-	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
+	"github.com/vmware-tanzu/velero/test"
+	. "github.com/vmware-tanzu/velero/test/util/k8s"
 
 	"github.com/onsi/ginkgo/v2/reporters"
 	"go.uber.org/zap/zapcore"
@@ -39,9 +39,9 @@ import (
 
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 	. "github.com/apecloud/kubeblocks/test/e2e"
-	. "github.com/apecloud/kubeblocks/test/e2e/envcheck"
-	. "github.com/apecloud/kubeblocks/test/e2e/installation"
-	. "github.com/apecloud/kubeblocks/test/e2e/testdata/smoketest"
+	"github.com/apecloud/kubeblocks/test/e2e/envcheck"
+	"github.com/apecloud/kubeblocks/test/e2e/installation"
+	"github.com/apecloud/kubeblocks/test/e2e/testdata/smoketest"
 	e2eutil "github.com/apecloud/kubeblocks/test/e2e/util"
 )
 
@@ -84,15 +84,15 @@ func TestE2e(t *testing.T) {
 func GetKubeconfigContext() error {
 	var err error
 	var tcDefault TestClient
-	tcDefault, err = NewTestClient(VeleroCfg.DefaultCluster)
-	VeleroCfg.DefaultClient = &tcDefault
-	VeleroCfg.ClientToInstallVelero = VeleroCfg.DefaultClient
+	tcDefault, err = NewTestClient(test.VeleroCfg.DefaultCluster)
+	test.VeleroCfg.DefaultClient = &tcDefault
+	test.VeleroCfg.ClientToInstallVelero = test.VeleroCfg.DefaultClient
 	if err != nil {
 		return err
 	}
 
-	if VeleroCfg.DefaultCluster != "" {
-		err = KubectlConfigUseContext(context.Background(), VeleroCfg.DefaultCluster)
+	if test.VeleroCfg.DefaultCluster != "" {
+		err = KubectlConfigUseContext(context.Background(), test.VeleroCfg.DefaultCluster)
 		if err != nil {
 			return err
 		}
@@ -127,7 +127,7 @@ var _ = BeforeSuite(func() {
 
 var _ = AfterSuite(func() {
 	By("delete helm release in e2e-test environment")
-	CheckedUninstallHelmRelease()
+	installation.CheckedUninstallHelmRelease()
 	if testEnv != nil {
 		By("removed installed CRDs in e2e-test environment")
 		err := testEnv.Stop()
@@ -143,7 +143,7 @@ var _ = Describe("e2e test", func() {
 		Logger.Info("logger start")
 
 		K8sClient = TC.Kubebuilder
-		CheckNoKubeBlocksCRDs()
+		envcheck.CheckNoKubeBlocksCRDs()
 
 		By("bootstrapping e2e-test environment")
 		var flag = true
@@ -165,11 +165,11 @@ var _ = Describe("e2e test", func() {
 		cfg, err = testEnv.Start()
 		Expect(err).NotTo(HaveOccurred())
 		Expect(cfg).NotTo(BeNil())
-		var _ = Describe("KubeBlocks playground init", PlaygroundInit)
+		var _ = Describe("KubeBlocks playground init", smoketest.PlaygroundInit)
 
-		var _ = Describe("KubeBlocks uninstall", UninstallKubeblocks)
+		var _ = Describe("KubeBlocks uninstall", smoketest.UninstallKubeblocks)
 
-		var _ = Describe("Check healthy Kubernetes cluster status", EnvCheckTest)
+		var _ = Describe("Check healthy Kubernetes cluster status", envcheck.EnvCheckTest)
 	}
 
 	var kubeblocks string
@@ -185,31 +185,31 @@ var _ = Describe("e2e test", func() {
 			log.Println("kubeblocks : " + kubeblocks)
 			Expect(kubeblocks).ShouldNot(BeEmpty())
 			if len(kubeblocks) == 0 {
-				var _ = Describe("KubeBlocks operator installation", InstallationTest)
+				var _ = Describe("KubeBlocks operator installation", installation.InstallationTest)
 			}
 		})
 	}
 
-	var _ = Describe("Configure running e2e information", Config)
+	var _ = Describe("Configure running e2e information", smoketest.Config)
 
-	var _ = Describe("KubeBlocks smoke test run", SmokeTest)
+	var _ = Describe("KubeBlocks smoke test run", smoketest.SmokeTest)
 
-	var _ = Describe("Delete e2e config resources", DeleteConfig)
+	var _ = Describe("Delete e2e config resources", smoketest.DeleteConfig)
 
 	if initEnv == false {
 		if len(kubeblocks) > 0 {
-			var _ = Describe("KubeBlocks operator uninstallation", UninstallationTest)
+			var _ = Describe("KubeBlocks operator uninstallation", installation.UninstallationTest)
 		}
 	}
 
 	if initEnv {
-		var _ = Describe("KubeBlocks playground destroy", PlaygroundDestroy)
-		var _ = Describe("Check environment has been cleaned", EnvGotCleanedTest)
+		var _ = Describe("KubeBlocks playground destroy", smoketest.PlaygroundDestroy)
+		var _ = Describe("Check environment has been cleaned", envcheck.EnvGotCleanedTest)
 	}
 
-	var _ = Describe("show test report", AnalyzeE2eReport)
+	var _ = Describe("show test report", smoketest.AnalyzeE2eReport)
 
 	if initEnv {
-		var _ = Describe("save test report to s3", UploadReport)
+		var _ = Describe("save test report to s3", smoketest.UploadReport)
 	}
 })

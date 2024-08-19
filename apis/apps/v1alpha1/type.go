@@ -26,7 +26,6 @@ import (
 
 const (
 	APIVersion            = "apps.kubeblocks.io/v1alpha1"
-	ClusterVersionKind    = "ClusterVersion"
 	ClusterDefinitionKind = "ClusterDefinition"
 	ClusterKind           = "Cluster"
 	ComponentKind         = "Component"
@@ -91,7 +90,6 @@ type ConfigTemplateExtension struct {
 	// Specifies the name of the referenced configuration template ConfigMap object.
 	//
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	TemplateRef string `json:"templateRef"`
 
@@ -99,7 +97,6 @@ type ConfigTemplateExtension struct {
 	// An empty namespace is equivalent to the "default" namespace.
 	//
 	// +kubebuilder:default="default"
-	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
@@ -307,7 +304,7 @@ const (
 	ConditionTypeSwitchoverPrefix    = "Switchover-"         // ConditionTypeSwitchoverPrefix component status condition of switchover
 )
 
-// Phase represents the current status of the ClusterDefinition and ClusterVersion CR.
+// Phase represents the current status of the ClusterDefinition CR.
 //
 // +enum
 // +kubebuilder:validation:Enum={Available,Unavailable}
@@ -370,7 +367,7 @@ const (
 
 // OpsType defines operation types.
 // +enum
-// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart,Reconfiguring,Start,Stop,Expose,Switchover,DataScript,Backup,Restore,RebuildInstance,Custom}
+// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart,Reconfiguring,Start,Stop,Expose,Switchover,Backup,Restore,RebuildInstance,Custom}
 type OpsType string
 
 const (
@@ -384,7 +381,6 @@ const (
 	StopType              OpsType = "Stop"    // StopType the stop operation will delete all pods in a cluster concurrently.
 	StartType             OpsType = "Start"   // StartType the start operation will start the pods which is deleted in stop operation.
 	ExposeType            OpsType = "Expose"
-	DataScriptType        OpsType = "DataScript" // DataScriptType the data script operation will execute the data script against the cluster.
 	BackupType            OpsType = "Backup"
 	RestoreType           OpsType = "Restore"
 	RebuildInstanceType   OpsType = "RebuildInstance" // RebuildInstance rebuilding an instance is very useful when a node is offline or an instance is unrecoverable.
@@ -450,37 +446,6 @@ const (
 	BestEffortParallelStrategy UpdateStrategy = "BestEffortParallel"
 )
 
-var DefaultLeader = ConsensusMember{
-	Name:       "leader",
-	AccessMode: ReadWrite,
-}
-
-// WorkloadType defines the type of workload for the components of the ClusterDefinition.
-// It can be one of the following: `Stateless`, `Stateful`, `Consensus`, or `Replication`.
-//
-// Deprecated since v0.8.
-//
-// +enum
-// +kubebuilder:validation:Enum={Stateless,Stateful,Consensus,Replication}
-type WorkloadType string
-
-const (
-	// Stateless represents a workload type where components do not maintain state, and instances are interchangeable.
-	Stateless WorkloadType = "Stateless"
-
-	// Stateful represents a workload type where components maintain state, and each instance has a unique identity.
-	Stateful WorkloadType = "Stateful"
-
-	// Consensus represents a workload type involving distributed consensus algorithms for coordinated decision-making.
-	Consensus WorkloadType = "Consensus"
-
-	// Replication represents a workload type that involves replication, typically used for achieving high availability
-	// and fault tolerance.
-	Replication WorkloadType = "Replication"
-)
-
-var WorkloadTypes = []string{"Stateless", "Stateful", "Consensus", "Replication"}
-
 // TerminationPolicyType defines termination policy types.
 //
 // +enum
@@ -499,25 +464,6 @@ const (
 
 	// WipeOut is based on Delete and wipe out all volume snapshots and snapshot data from backup storage location.
 	WipeOut TerminationPolicyType = "WipeOut"
-)
-
-// HScaleDataClonePolicyType defines the data clone policy to be used during horizontal scaling.
-// This policy determines how data is handled when new nodes are added to the cluster.
-// The policy can be set to `None`, `CloneVolume`, or `Snapshot`.
-//
-// +enum
-// +kubebuilder:validation:Enum={None,CloneVolume,Snapshot}
-type HScaleDataClonePolicyType string
-
-const (
-	// HScaleDataClonePolicyNone indicates that no data cloning will occur during horizontal scaling.
-	HScaleDataClonePolicyNone HScaleDataClonePolicyType = "None"
-
-	// HScaleDataClonePolicyCloneVolume indicates that data will be cloned from existing volumes during horizontal scaling.
-	HScaleDataClonePolicyCloneVolume HScaleDataClonePolicyType = "CloneVolume"
-
-	// HScaleDataClonePolicyFromSnapshot indicates that data will be cloned from a snapshot during horizontal scaling.
-	HScaleDataClonePolicyFromSnapshot HScaleDataClonePolicyType = "Snapshot"
 )
 
 // PodAntiAffinity defines the pod anti-affinity strategy.
@@ -615,46 +561,6 @@ type OpsRecorder struct {
 	QueueBySelf bool `json:"queueBySelf,omitempty"`
 }
 
-// ProvisionPolicyType defines the policy for creating accounts.
-//
-// +enum
-// +kubebuilder:validation:Enum={CreateByStmt,ReferToExisting}
-type ProvisionPolicyType string
-
-const (
-	// CreateByStmt will create account w.r.t. deletion and creation statement given by provider.
-	CreateByStmt ProvisionPolicyType = "CreateByStmt"
-
-	// ReferToExisting will not create account, but create a secret by copying data from referred secret file.
-	ReferToExisting ProvisionPolicyType = "ReferToExisting"
-)
-
-// ProvisionScope defines the scope of provision within a component.
-//
-// +enum
-type ProvisionScope string
-
-const (
-	// AllPods indicates that accounts will be created for all pods within the component.
-	AllPods ProvisionScope = "AllPods"
-
-	// AnyPods indicates that accounts will be created only on a single pod within the component.
-	AnyPods ProvisionScope = "AnyPods"
-)
-
-// AccountName defines system account names.
-// +enum
-// +kubebuilder:validation:Enum={kbadmin,kbdataprotection,kbprobe,kbmonitoring,kbreplicator}
-type AccountName string
-
-const (
-	AdminAccount          AccountName = "kbadmin"
-	DataprotectionAccount AccountName = "kbdataprotection"
-	ProbeAccount          AccountName = "kbprobe"
-	MonitorAccount        AccountName = "kbmonitoring"
-	ReplicatorAccount     AccountName = "kbreplicator"
-)
-
 // LetterCase defines the available cases to be used in password generation.
 //
 // +enum
@@ -726,22 +632,6 @@ const (
 	// Noop indicates that KubeBlocks will not perform any high-availability switching for the components. Users are
 	// required to implement their own HA solution or integrate an existing open-source HA solution.
 	Noop SwitchPolicyType = "Noop"
-)
-
-// VolumeType defines the type of volume, specifically distinguishing between volumes used for backup data and those used for logs.
-//
-// +enum
-// +kubebuilder:validation:Enum={data,log}
-type VolumeType string
-
-const (
-	// VolumeTypeData indicates a volume designated for storing backup data. This type of volume is optimized for the
-	// storage and retrieval of data backups, ensuring data persistence and reliability.
-	VolumeTypeData VolumeType = "data"
-
-	// VolumeTypeLog indicates a volume designated for storing logs. This type of volume is optimized for log data,
-	// facilitating efficient log storage, retrieval, and management.
-	VolumeTypeLog VolumeType = "log"
 )
 
 // BaseBackupType the base backup type, keep synchronized with the BaseBackupType of the data protection API.

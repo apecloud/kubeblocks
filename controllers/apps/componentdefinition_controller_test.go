@@ -39,10 +39,13 @@ import (
 var _ = Describe("ComponentDefinition Controller", func() {
 	const (
 		componentDefName = "test-componentdef"
+		adminAccount     = "kbadmin"
+		probeAccount     = "kbprobe"
+		monitorAccount   = "kbmonitoring"
 	)
 
 	var (
-		defaultActionHandler = &appsv1alpha1.LifecycleActionHandler{}
+		defaultActionHandler = &appsv1alpha1.Action{}
 	)
 
 	cleanEnv := func() {
@@ -250,7 +253,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			By("create a ComponentDefinition obj")
 			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
 				SetRuntime(nil).
-				AddSystemAccount(string(appsv1alpha1.AdminAccount), false, "create user").
+				AddSystemAccount(adminAccount, false, "create user").
 				Create(&testCtx).GetObject()
 
 			checkObjectStatus(componentDefObj, appsv1alpha1.UnavailablePhase)
@@ -260,7 +263,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			By("create a ComponentDefinition obj")
 			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
 				SetRuntime(nil).
-				AddSystemAccount(string(appsv1alpha1.AdminAccount), true, "create user").
+				AddSystemAccount(adminAccount, true, "create user").
 				SetLifecycleAction("AccountProvision", defaultActionHandler).
 				Create(&testCtx).GetObject()
 
@@ -271,8 +274,8 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			By("create a ComponentDefinition obj")
 			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
 				SetRuntime(nil).
-				AddSystemAccount(string(appsv1alpha1.AdminAccount), true, "create user").
-				AddSystemAccount(string(appsv1alpha1.AdminAccount), false, "create user").
+				AddSystemAccount(adminAccount, true, "create user").
+				AddSystemAccount(adminAccount, false, "create user").
 				SetLifecycleAction("AccountProvision", defaultActionHandler).
 				Create(&testCtx).GetObject()
 
@@ -283,9 +286,9 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			By("create a ComponentDefinition obj")
 			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
 				SetRuntime(nil).
-				AddSystemAccount(string(appsv1alpha1.AdminAccount), true, "create user").
-				AddSystemAccount(string(appsv1alpha1.ProbeAccount), true, "create user").
-				AddSystemAccount(string(appsv1alpha1.MonitorAccount), false, "create user").
+				AddSystemAccount(adminAccount, true, "create user").
+				AddSystemAccount(probeAccount, true, "create user").
+				AddSystemAccount(monitorAccount, false, "create user").
 				SetLifecycleAction("AccountProvision", defaultActionHandler).
 				Create(&testCtx).GetObject()
 
@@ -296,9 +299,9 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			By("create a ComponentDefinition obj")
 			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
 				SetRuntime(nil).
-				AddSystemAccount(string(appsv1alpha1.AdminAccount), true, "create user").
-				AddSystemAccount(string(appsv1alpha1.ProbeAccount), false, "create user").
-				AddSystemAccount(string(appsv1alpha1.MonitorAccount), false, "create user").
+				AddSystemAccount(adminAccount, true, "create user").
+				AddSystemAccount(probeAccount, false, "create user").
+				AddSystemAccount(monitorAccount, false, "create user").
 				SetLifecycleAction("AccountProvision", defaultActionHandler).
 				Create(&testCtx).GetObject()
 

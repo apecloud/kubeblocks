@@ -19,7 +19,6 @@ on:
           - Dockerfile
           - Dockerfile-charts
           - Dockerfile-dataprotection
-          - Dockerfile-datascript
           - Dockerfile-dev
           - Dockerfile-tools
   release:
@@ -93,17 +92,6 @@ jobs:
       DOCKERFILE_PATH: "./docker/Dockerfile-tools"
     secrets: inherit
 
-  release-datascript-image:
-    if: ${{ inputs.dockerfile == '' || inputs.dockerfile == 'Dockerfile-datascript' }}
-    needs: release-version
-    uses: apecloud/apecloud-cd/.github/workflows/release-image-cache.yml@v0.1.24
-    with:
-      IMG: "apecloud/kubeblocks-datascript"
-      VERSION: "${{ needs.release-version.outputs.release-version }}"
-      APECD_REF: "v0.1.24"
-      DOCKERFILE_PATH: "./docker/Dockerfile-datascript"
-    secrets: inherit
-
   release-dataprotection-image:
     if: ${{ inputs.dockerfile == '' || inputs.dockerfile == 'Dockerfile-dataprotection' }}
     needs: release-version
@@ -142,7 +130,7 @@ jobs:
 
   release-message:
     runs-on: ubuntu-latest
-    needs: [ release-image, release-tools-image, release-datascript-image, release-dataprotection-image ]
+    needs: [ release-image, release-tools-image, release-dataprotection-image ]
     outputs:
       content-result: ${{ steps.release_message.outputs.content_result }}
       release-version: ${{ steps.release_message.outputs.release_version }}
@@ -157,7 +145,7 @@ jobs:
           echo 'artifact_key='${ARTIFACT_KEY} >> $GITHUB_OUTPUT
 
           CONTENT="error"
-          if [[ "${{ needs.release-image.result }}" == "success" && "${{ needs.release-tools-image.result }}" == "success"  && "${{ needs.release-datascript-image.result }}" == "success" && "${{ needs.release-dataprotection-image.result }}" == "success" ]]; then
+          if [[ "${{ needs.release-image.result }}" == "success" && "${{ needs.release-tools-image.result }}" == "success"  && "${{ needs.release-dataprotection-image.result }}" == "success" ]]; then
               CONTENT="success"
               echo "success" > ${ARTIFACT_KEY}
           else

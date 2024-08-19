@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package controllerutil
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -33,6 +34,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 const (
@@ -331,42 +333,17 @@ func GetPortByPortName(containers []corev1.Container, portName string) (int32, e
 	return 0, fmt.Errorf("port %s not found", portName)
 }
 
-func GetLorryGRPCPort(pod *corev1.Pod) (int32, error) {
-	return GetLorryGRPCPortFromContainers(pod.Spec.Containers)
-}
-
-func GetLorryGRPCPortFromContainers(containers []corev1.Container) (int32, error) {
-	return GetPortByPortName(containers, constant.LorryGRPCPortName)
-}
-
-func GetLorryHTTPPort(pod *corev1.Pod) (int32, error) {
-	return GetLorryHTTPPortFromContainers(pod.Spec.Containers)
-}
-
-func GetLorryHTTPPortFromContainers(containers []corev1.Container) (int32, error) {
-	return GetPortByPortName(containers, constant.LorryHTTPPortName)
-}
-
-// GetLorryContainerName gets the lorry container from pod
-func GetLorryContainerName(pod *corev1.Pod) (string, error) {
-	container := GetLorryContainer(pod.Spec.Containers)
-	if container != nil {
-		return container.Name, nil
-	}
-	return "", fmt.Errorf("lorry container not found")
-}
-
-func GetLorryContainer(containers []corev1.Container) *corev1.Container {
-	var container *corev1.Container
-	for i := range containers {
-		container = &containers[i]
-		for _, port := range container.Ports {
-			if port.Name == constant.LorryHTTPPortName {
-				return container
+func GetPortByName(pod corev1.Pod, cname, pname string) (int32, error) {
+	for _, container := range pod.Spec.Containers {
+		if container.Name == cname {
+			for _, port := range container.Ports {
+				if port.Name == pname {
+					return port.ContainerPort, nil
+				}
 			}
 		}
 	}
-	return nil
+	return 0, fmt.Errorf("port %s not found", pname)
 }
 
 // PodIsReadyWithLabel checks if pod is ready for ConsensusSet/ReplicationSet component,
@@ -581,4 +558,17 @@ func isContainerFailedAndTimedOut(pod *corev1.Pod, podConditionType corev1.PodCo
 		return false
 	}
 	return time.Now().After(containerReadyCondition.LastTransitionTime.Add(PodContainerFailedTimeout))
+}
+
+func BuildImagePullSecrets() []corev1.LocalObjectReference {
+	secrets := make([]corev1.LocalObjectReference, 0)
+	secretsVal := viper.GetString(constant.KBImagePullSecrets)
+	if secretsVal == "" {
+		return secrets
+	}
+
+	// we already validate the value of KBImagePullSecrets when start server,
+	// so we can ignore the error here
+	_ = json.Unmarshal([]byte(secretsVal), &secrets)
+	return secrets
 }

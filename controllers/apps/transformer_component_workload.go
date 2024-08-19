@@ -21,6 +21,7 @@ package apps
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -39,12 +40,12 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/component/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	lorry "github.com/apecloud/kubeblocks/pkg/lorry/client"
 )
 
 // componentWorkloadTransformer handles component workload generation
@@ -387,6 +388,10 @@ func checkNRollbackProtoImages(itsObj, itsProto *workloads.InstanceSet) {
 	for i, cc := range [][]corev1.Container{itsObj.Spec.Template.Spec.InitContainers, itsObj.Spec.Template.Spec.Containers} {
 		images[i] = make(map[string]string)
 		for _, c := range cc {
+			// skip the kb-agent container
+			if component.IsKBAgentContainer(&c) {
+				continue
+			}
 			images[i][c.Name] = c.Image
 		}
 	}
@@ -596,25 +601,18 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 		return false
 	}
 
-	tryToSwitchover := func(lorryCli lorry.Client, pod *corev1.Pod) error {
+	tryToSwitchover := func(lfa lifecycle.Lifecycle, pod *corev1.Pod) error {
 		// if pod is not leader/primary, no need to switchover
 		if !isLeader(pod) {
 			return nil
 		}
 		// if HA functionality is not enabled, no need to switchover
-		err := lorryCli.Switchover(r.reqCtx.Ctx, pod.Name, "", false)
-		if err == lorry.NotImplemented {
-			// For the purpose of upgrade compatibility, if the version of Lorry is 0.7 and
-			// the version of KB is upgraded to 0.8 or newer, lorry client will return an NotImplemented error,
-			// in this case, here just return success.
-			r.reqCtx.Log.Info("lorry switchover api is not implemented")
+		err := lfa.Switchover(r.reqCtx.Ctx, r.cli, nil)
+		if err != nil && errors.Is(err, lifecycle.ErrActionNotDefined) {
 			return nil
 		}
 		if err == nil {
 			return fmt.Errorf("switchover succeed, wait role label to be updated")
-		}
-		if strings.Contains(err.Error(), "cluster's ha is disabled") {
-			return nil
 		}
 		return err
 	}
@@ -634,7 +632,7 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 			continue
 		}
 
-		lorryCli, err1 := lorry.NewClient(*pod)
+		lfa, err1 := lifecycle.New(r.synthesizeComp, pod, pods...)
 		if err1 != nil {
 			if err == nil {
 				err = err1
@@ -642,23 +640,13 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 			continue
 		}
 
-		if intctrlutil.IsNil(lorryCli) {
-			// no lorry in the pod
-			continue
-		}
-
 		// switchover if the leaving pod is leader
-		if switchoverErr := tryToSwitchover(lorryCli, pod); switchoverErr != nil {
+		if switchoverErr := tryToSwitchover(lfa, pod); switchoverErr != nil {
 			return switchoverErr
 		}
 
-		if err2 := lorryCli.LeaveMember(r.reqCtx.Ctx); err2 != nil {
-			// For the purpose of upgrade compatibility, if the version of Lorry is 0.7 and
-			// the version of KB is upgraded to 0.8 or newer, lorry client will return an NotImplemented error,
-			// in this case, here just ignore it.
-			if err2 == lorry.NotImplemented {
-				r.reqCtx.Log.Info("lorry leave member api is not implemented")
-			} else if err == nil {
+		if err2 := lfa.MemberLeave(r.reqCtx.Ctx, r.cli, nil); err2 != nil {
+			if !errors.Is(err2, lifecycle.ErrActionNotDefined) && err == nil {
 				err = err2
 			}
 		}

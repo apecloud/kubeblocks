@@ -321,12 +321,12 @@ var _ = Describe("instance util test", func() {
 
 			By("merge pvc")
 			oldPvc := builder.NewPVCBuilder(namespace, name).
-				SetResources(corev1.ResourceRequirements{Requests: map[corev1.ResourceName]resource.Quantity{
+				SetResources(corev1.VolumeResourceRequirements{Requests: map[corev1.ResourceName]resource.Quantity{
 					corev1.ResourceStorage: resource.MustParse("1G"),
 				}}).
 				GetObject()
 			newPvc := builder.NewPVCBuilder(namespace, name).
-				SetResources(corev1.ResourceRequirements{Requests: map[corev1.ResourceName]resource.Quantity{
+				SetResources(corev1.VolumeResourceRequirements{Requests: map[corev1.ResourceName]resource.Quantity{
 					corev1.ResourceStorage: resource.MustParse("2G"),
 				}}).
 				GetObject()
@@ -620,8 +620,8 @@ var _ = Describe("instance util test", func() {
 			offlineInstances := []string{"foo-bar-1", "foo-0", "foo-bar-3"}
 			instanceNameList, err := GenerateAllInstanceNames(parentName, 5, templates, offlineInstances, defaultTemplateOrdinals)
 			errInstanceNameListExpected := []string{"foo-bar-0", "foo-bar-2"}
-			errExpected := fmt.Errorf(fmt.Sprintf("for template '%s', expected %d instance names but generated %d: [%s]",
-				templateBar.Name, *templateBar.Replicas, len(errInstanceNameListExpected), strings.Join(errInstanceNameListExpected, ", ")))
+			errExpected := fmt.Errorf("for template '%s', expected %d instance names but generated %d: [%s]",
+				templateBar.Name, *templateBar.Replicas, len(errInstanceNameListExpected), strings.Join(errInstanceNameListExpected, ", "))
 			Expect(instanceNameList).Should(BeNil())
 			Expect(err).Should(Equal(errExpected))
 		})

@@ -34,10 +34,9 @@ import (
 
 var _ = Describe("Start OpsRequest", func() {
 	var (
-		randomStr             = testCtx.GetRandomStr()
-		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr
-		clusterVersionName    = "clusterversion-for-ops-" + randomStr
-		clusterName           = "cluster-for-ops-" + randomStr
+		randomStr   = testCtx.GetRandomStr()
+		compDefName = "test-compdef-" + randomStr
+		clusterName = "test-luster-" + randomStr
 	)
 
 	cleanEnv := func() {
@@ -47,8 +46,8 @@ var _ = Describe("Start OpsRequest", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
+		// delete cluster(and all dependent sub-resources), cluster definition
+		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 
 		// delete rest resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
@@ -66,10 +65,8 @@ var _ = Describe("Start OpsRequest", func() {
 		It("Test start OpsRequest", func() {
 			By("init operations resources ")
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
-			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
-			testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusComp)
-			testapps.MockInstanceSetComponent(&testCtx, clusterName, statelessComp)
-			testapps.MockInstanceSetComponent(&testCtx, clusterName, statefulComp)
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
 			By("create Start opsRequest")
 			ops := testapps.NewOpsRequestObj("start-ops-"+randomStr, testCtx.DefaultNamespace,
 				clusterName, appsv1alpha1.StartType)
@@ -94,7 +91,7 @@ var _ = Describe("Start OpsRequest", func() {
 				Expect(v.Stop).Should(BeNil())
 			}
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
-			Expect(err == nil).Should(BeTrue())
+			Expect(err).Should(BeNil())
 		})
 	})
 })

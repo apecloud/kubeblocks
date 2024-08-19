@@ -64,9 +64,14 @@ type OpsRequestSpec struct {
 	// +optional
 	Force bool `json:"force,omitempty"`
 
+	// Indicates whether opsRequest should continue to queue when 'force' is set to true.
+	// +kubebuilder:default=false
+	// +optional
+	EnqueueOnForce bool `json:"enqueueOnForce,omitempty"`
+
 	// Specifies the type of this operation. Supported types include "Start", "Stop", "Restart", "Switchover",
 	// "VerticalScaling", "HorizontalScaling", "VolumeExpansion", "Reconfiguring", "Upgrade", "Backup", "Restore",
-	// "Expose", "DataScript", "RebuildInstance", "Custom".
+	// "Expose", "RebuildInstance", "Custom".
 	//
 	// Note: This field is immutable once set.
 	//
@@ -188,16 +193,6 @@ type SpecificOpsRequest struct {
 	//
 	// +optional
 	ExposeList []Expose `json:"expose,omitempty"`
-
-	// Specifies the image and scripts for executing engine-specific operations such as creating databases or users.
-	// It supports limited engines including MySQL, PostgreSQL, Redis, MongoDB.
-	//
-	// ScriptSpec has been replaced by the more versatile OpsDefinition.
-	// It is recommended to use OpsDefinition instead.
-	// ScriptSpec is deprecated and will be removed in a future version.
-	//
-	// +optional
-	ScriptSpec *ScriptSpec `json:"scriptSpec,omitempty"`
 
 	// Specifies the parameters to backup a Cluster.
 	// +optional
@@ -865,68 +860,6 @@ type PointInTimeRefSpec struct {
 	Ref RefNamespaceName `json:"ref,omitempty"`
 }
 
-// ScriptSpec is a legacy feature for executing engine-specific operations such as creating databases or users.
-// It supports limited engines including MySQL, PostgreSQL, Redis, MongoDB.
-//
-// ScriptSpec has been replaced by the more versatile OpsDefinition.
-// It is recommended to use OpsDefinition instead. ScriptSpec is deprecated and will be removed in a future version.
-type ScriptSpec struct {
-	// Specifies the name of the Component.
-	ComponentOps `json:",inline"`
-
-	// Specifies the image to be used to execute scripts.
-	//
-	// By default, the image "apecloud/kubeblocks-datascript:latest" is used.
-	//
-	// +optional
-	Image string `json:"image,omitempty"`
-
-	// Defines the secret to be used to execute the script. If not specified, the default cluster root credential secret is used.
-	// +optional
-	Secret *ScriptSecret `json:"secret,omitempty"`
-
-	// Defines the content of scripts to be executed.
-	//
-	// All scripts specified in this field will be executed in the order they are provided.
-	//
-	// Note: this field cannot be modified once set.
-	//
-	// +optional
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec.script"
-	Script []string `json:"script,omitempty"`
-
-	// Specifies the sources of the scripts to be executed.
-	// Each script can be imported either from a ConfigMap or a Secret.
-	//
-	// All scripts obtained from the sources specified in this field will be executed after
-	// any scripts provided in the `script` field.
-	//
-	// Execution order:
-	// 1. Scripts provided in the `script` field, in the order of the scripts listed.
-	// 2. Scripts imported from ConfigMaps, in the order of the sources listed.
-	// 3. Scripts imported from Secrets, in the order of the sources listed.
-	//
-	// Note: this field cannot be modified once set.
-	//
-	// +optional
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec.scriptFrom"
-	ScriptFrom *ScriptFrom `json:"scriptFrom,omitempty"`
-
-	// Specifies the labels used to select the Pods on which the script should be executed.
-	//
-	// By default, the script is executed on the Pod associated with the service named "{clusterName}-{componentName}",
-	// which typically routes to the Pod with the primary/leader role.
-	//
-	// However, some Components, such as Redis, do not synchronize account information between primary and secondary Pods.
-	// In these cases, the script must be executed on all replica Pods matching the selector.
-	//
-	// Note: this field cannot be modified once set.
-	//
-	// +optional
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec.script.selector"
-	Selector *metav1.LabelSelector `json:"selector,omitempty"`
-}
-
 type Backup struct {
 	// Specifies the name of the Backup custom resource.
 	//
@@ -1017,42 +950,6 @@ type Restore struct {
 	DeferPostReadyUntilClusterRunning bool `json:"deferPostReadyUntilClusterRunning,omitempty"`
 }
 
-// ScriptSecret represents the secret that is used to execute the script.
-type ScriptSecret struct {
-	// Specifies the name of the secret.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	Name string `json:"name"`
-	// Used to specify the username part of the secret.
-	// +kubebuilder:default:="username"
-	// +optional
-	UsernameKey string `json:"usernameKey,omitempty"`
-	// Used to specify the password part of the secret.
-	// +kubebuilder:default:="password"
-	// +optional
-	PasswordKey string `json:"passwordKey,omitempty"`
-}
-
-// ScriptFrom specifies the source of the script to be executed, which can be either a ConfigMap or a Secret.
-type ScriptFrom struct {
-	// A list of ConfigMapKeySelector objects, each specifies a ConfigMap and a key containing the script.
-	//
-	// Note: This field cannot be modified once set.
-	//
-	// +optional
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec.scriptFrom.configMapRef"
-	ConfigMapRef []corev1.ConfigMapKeySelector `json:"configMapRef,omitempty"`
-
-	// A list of SecretKeySelector objects, each specifies a Secret and a key containing the script.
-	//
-	// Note: This field cannot be modified once set.
-	//
-	// +optional
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.scriptSpec.scriptFrom.secretRef"
-	SecretRef []corev1.SecretKeySelector `json:"secretRef,omitempty"`
-}
-
 // OpsRequestStatus represents the observed state of an OpsRequest.
 type OpsRequestStatus struct {
 	// Records the cluster generation after the OpsRequest action has been handled.
@@ -1103,7 +1000,7 @@ type OpsRequestStatus struct {
 	// Describes the detailed status of the OpsRequest.
 	// Possible condition types include "Cancelled", "WaitForProgressing", "Validated", "Succeed", "Failed", "Restarting",
 	// "VerticalScaling", "HorizontalScaling", "VolumeExpanding", "Reconfigure", "Switchover", "Stopping", "Starting",
-	// "VersionUpgrading", "Exposing", "ExecuteDataScript", "Backup", "InstancesRebuilding", "CustomOperation".
+	// "VersionUpgrading", "Exposing", "Backup", "InstancesRebuilding", "CustomOperation".
 	// +optional
 	// +patchMergeKey=type
 	// +patchStrategy=merge
@@ -1242,11 +1139,6 @@ type OpsRequestComponentStatus struct {
 	// Describes the progress details of objects or actions associated with the Component.
 	// +optional
 	ProgressDetails []ProgressStatusDetail `json:"progressDetails,omitempty"`
-
-	// Records the workload type of Component in ClusterDefinition.
-	// Deprecated and should be removed in the future version.
-	// +optional
-	WorkloadType WorkloadType `json:"workloadType,omitempty"`
 
 	// Provides an explanation for the Component being in its current state.
 	// +kubebuilder:validation:MaxLength=1024

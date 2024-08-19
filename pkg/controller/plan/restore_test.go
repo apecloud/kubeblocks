@@ -61,7 +61,7 @@ var _ = Describe("Restore", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResources(&testCtx)
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
@@ -91,19 +91,15 @@ var _ = Describe("Restore", func() {
 
 	Context("Cluster Restore", func() {
 		const (
-			clusterDefName     = "test-clusterdef"
-			clusterVersionName = "test-clusterversion"
-			mysqlCompType      = "replicasets"
-			mysqlCompName      = "mysql"
-			nginxCompType      = "proxy"
-			topologyKey        = "testTopologyKey"
-			labelKey           = "testNodeLabelKey"
-			labelValue         = "testLabelValue"
+			compDefName     = "test-compdef"
+			defaultCompName = "mysql"
+			topologyKey     = "testTopologyKey"
+			labelKey        = "testNodeLabelKey"
+			labelValue      = "testLabelValue"
 		)
 
 		var (
-			clusterDef              *appsv1alpha1.ClusterDefinition
-			clusterVersion          *appsv1alpha1.ClusterVersion
+			compDef                 *appsv1alpha1.ComponentDefinition
 			cluster                 *appsv1alpha1.Cluster
 			synthesizedComponent    *component.SynthesizedComponent
 			compObj                 *appsv1alpha1.Component
@@ -114,21 +110,13 @@ var _ = Describe("Restore", func() {
 		)
 
 		BeforeEach(func() {
-			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.ConsensusMySQLComponent, mysqlCompType).
-				AddComponentDef(testapps.StatelessNginxComponent, nginxCompType).
+			compDef = testapps.NewComponentDefinitionFactory(compDefName).
+				SetDefaultSpec().
 				Create(&testCtx).GetObject()
-			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponentVersion(mysqlCompType).
-				AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-				AddComponentVersion(nginxCompType).
-				AddInitContainerShort("nginx-init", testapps.NginxImage).
-				AddContainerShort("nginx", testapps.NginxImage).
-				Create(&testCtx).GetObject()
+
 			pvcSpec := testapps.NewPVCSpec("1Gi")
-			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-				clusterDef.Name, clusterVersion.Name).
-				AddComponent(mysqlCompName, mysqlCompType).
+			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
+				AddComponent(defaultCompName, compDefName).
 				SetReplicas(3).
 				SetClusterAffinity(&appsv1alpha1.Affinity{
 					PodAntiAffinity: appsv1alpha1.Required,
@@ -142,16 +130,16 @@ var _ = Describe("Restore", func() {
 
 			By("By mocking a pvc")
 			pvc = testapps.NewPersistentVolumeClaimFactory(
-				testCtx.DefaultNamespace, "data-"+clusterName+"-"+mysqlCompName+"-0", clusterName, mysqlCompName, "data").
+				testCtx.DefaultNamespace, "data-"+clusterName+"-"+defaultCompName+"-0", clusterName, defaultCompName, "data").
 				SetStorage("1Gi").
 				Create(&testCtx).GetObject()
 
 			By("By mocking a pod")
 			volume := corev1.Volume{Name: pvc.Name, VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvc.Name}}}
-			_ = testapps.NewPodFactory(testCtx.DefaultNamespace, clusterName+"-"+mysqlCompName+"-0").
+			_ = testapps.NewPodFactory(testCtx.DefaultNamespace, clusterName+"-"+defaultCompName+"-0").
 				AddAppInstanceLabel(clusterName).
-				AddAppComponentLabel(mysqlCompName).
+				AddAppComponentLabel(defaultCompName).
 				AddAppManagedByLabel().
 				AddVolume(volume).
 				AddLabels(constant.ConsensusSetAccessModeLabelKey, string(appsv1alpha1.ReadWrite)).
@@ -164,25 +152,17 @@ var _ = Describe("Restore", func() {
 			fullBackupActionSetName = fullBackupActionSet.Name
 
 			By("By creating backup policyTemplate: ")
-			backupTplLabels := map[string]string{
-				constant.ClusterDefLabelKey: clusterDefName,
-			}
 			_ = testapps.NewBackupPolicyTemplateFactory("backup-policy-template").
-				WithRandomName().SetLabels(backupTplLabels).
-				AddBackupPolicy(mysqlCompName).
-				SetClusterDefRef(clusterDefName).
+				WithRandomName().
+				AddBackupPolicy(compDef.Name).
 				AddBackupMethod(testdp.BackupMethodName, false, fullBackupActionSetName).
 				SetBackupMethodVolumeMounts(testapps.DataVolumeName, "/data")
 
-			clusterCompDefObj := clusterDef.Spec.ComponentDefs[0]
 			synthesizedComponent = &component.SynthesizedComponent{
-				PodSpec:               clusterCompDefObj.PodSpec,
-				LogConfigs:            clusterCompDefObj.LogConfigs,
-				HorizontalScalePolicy: clusterCompDefObj.HorizontalScalePolicy,
-				VolumeClaimTemplates:  cluster.Spec.ComponentSpecs[0].ToVolumeClaimTemplates(),
-				Name:                  mysqlCompName,
-				VolumeTypes:           []appsv1alpha1.VolumeTypeSpec{{Name: testapps.DataVolumeName, Type: appsv1alpha1.VolumeTypeData}},
-				Replicas:              1,
+				PodSpec:              &compDef.Spec.Runtime,
+				VolumeClaimTemplates: cluster.Spec.ComponentSpecs[0].ToVolumeClaimTemplates(),
+				Name:                 defaultCompName,
+				Replicas:             1,
 				Roles: []appsv1alpha1.ReplicaRole{
 					{
 						Name:        "leader",
@@ -208,14 +188,14 @@ var _ = Describe("Restore", func() {
 
 			By("By creating remote pvc: ")
 			remotePVC := testapps.NewPersistentVolumeClaimFactory(
-				testCtx.DefaultNamespace, "remote-pvc", clusterName, mysqlCompName, "log").
+				testCtx.DefaultNamespace, "remote-pvc", clusterName, defaultCompName, "log").
 				SetStorage("1Gi").
 				Create(&testCtx).GetObject()
 
 			By("By creating base backup: ")
 			backupLabels := map[string]string{
 				constant.AppInstanceLabelKey:    sourceCluster,
-				constant.KBAppComponentLabelKey: mysqlCompName,
+				constant.KBAppComponentLabelKey: defaultCompName,
 			}
 			backup = testdp.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 				WithRandomName().SetLabels(backupLabels).
@@ -236,7 +216,7 @@ var _ = Describe("Restore", func() {
 
 		It("Test restore", func() {
 			By("restore from backup")
-			restoreFromBackup := fmt.Sprintf(`{"%s": {"name":"%s"}}`, mysqlCompName, backup.Name)
+			restoreFromBackup := fmt.Sprintf(`{"%s": {"name":"%s"}}`, defaultCompName, backup.Name)
 			Expect(testapps.ChangeObj(&testCtx, cluster, func(tmpCluster *appsv1alpha1.Cluster) {
 				tmpCluster.Annotations = map[string]string{
 					constant.RestoreFromBackupAnnotationKey: restoreFromBackup,
@@ -258,7 +238,7 @@ var _ = Describe("Restore", func() {
 			Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
 				cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
 				cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
-					mysqlCompName: {
+					defaultCompName: {
 						Phase: appsv1alpha1.RunningClusterCompPhase,
 					},
 				}
@@ -287,7 +267,6 @@ var _ = Describe("Restore", func() {
 				g.Expect(tmpCluster.Annotations[constant.RestoreFromBackupAnnotationKey]).Should(BeEmpty())
 			})).Should(Succeed())
 		})
-
 	})
 })
 

@@ -260,7 +260,7 @@ func GetPodNameSetFromInstanceSetCondition(its *workloads.InstanceSet, condition
 // if concurrency is nil, concurrency will be treated as 100%.
 func CalculateConcurrencyReplicas(concurrency *intstr.IntOrString, replicas int) (int, error) {
 	if concurrency == nil {
-		return replicas, nil
+		return integer.IntMax(replicas, 1), nil
 	}
 
 	// 'roundUp=true' will ensure at least 1 pod is reserved if concurrency > "0%" and replicas > 0.

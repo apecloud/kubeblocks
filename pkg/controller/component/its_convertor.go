@@ -278,40 +278,7 @@ func (c *itsRolesConvertor) convert(args ...any) (any, error) {
 
 // itsRoleProbeConvertor converts the ComponentDefinition.Spec.LifecycleActions.RoleProbe into InstanceSet.Spec.RoleProbe.
 func (c *itsRoleProbeConvertor) convert(args ...any) (any, error) {
-	synthesizeComp, err := parseITSConvertorArgs(args...)
-	if err != nil {
-		return nil, err
-	}
-
-	if synthesizeComp.LifecycleActions == nil || synthesizeComp.LifecycleActions.RoleProbe == nil {
-		return nil, nil
-	}
-
-	itsRoleProbe := &workloads.RoleProbe{
-		TimeoutSeconds:      synthesizeComp.LifecycleActions.RoleProbe.TimeoutSeconds,
-		PeriodSeconds:       synthesizeComp.LifecycleActions.RoleProbe.PeriodSeconds,
-		SuccessThreshold:    1,
-		FailureThreshold:    2,
-		RoleUpdateMechanism: workloads.DirectAPIServerEventUpdate,
-	}
-
-	if synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler != nil {
-		builtinHandler := string(*synthesizeComp.LifecycleActions.RoleProbe.BuiltinHandler)
-		itsRoleProbe.BuiltinHandler = &builtinHandler
-		return itsRoleProbe, nil
-	}
-
-	// TODO(xingran): ITS Action does not support args[] yet
-	if synthesizeComp.LifecycleActions.RoleProbe.Exec != nil {
-		itsRoleProbeCmdAction := workloads.Action{
-			Image:   synthesizeComp.LifecycleActions.RoleProbe.Exec.Image,
-			Command: synthesizeComp.LifecycleActions.RoleProbe.Exec.Command,
-			Args:    synthesizeComp.LifecycleActions.RoleProbe.Exec.Args,
-		}
-		itsRoleProbe.CustomHandler = []workloads.Action{itsRoleProbeCmdAction}
-	}
-
-	return itsRoleProbe, nil
+	return nil, nil
 }
 
 func (c *itsCredentialConvertor) convert(args ...any) (any, error) {
@@ -320,47 +287,39 @@ func (c *itsCredentialConvertor) convert(args ...any) (any, error) {
 		return nil, err
 	}
 
-	// use first init account as the default credential
-	var sysInitAccount *appsv1alpha1.SystemAccount
-	for index, sysAccount := range synthesizeComp.SystemAccounts {
-		if sysAccount.InitAccount {
-			sysInitAccount = &synthesizeComp.SystemAccounts[index]
-			break
+	credential := func(sysAccount appsv1alpha1.SystemAccount) *workloads.Credential {
+		secretName := constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, sysAccount.Name)
+		return &workloads.Credential{
+			Username: workloads.CredentialVar{
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: secretName,
+						},
+						Key: constant.AccountNameForSecret,
+					},
+				},
+			},
+			Password: workloads.CredentialVar{
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: secretName,
+						},
+						Key: constant.AccountPasswdForSecret,
+					},
+				},
+			},
 		}
 	}
-	if sysInitAccount == nil && len(synthesizeComp.CompDefName) != 0 {
-		return nil, nil
-	}
 
-	var secretName string
-	if sysInitAccount != nil {
-		secretName = constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, sysInitAccount.Name)
-	} else {
-		secretName = constant.GenerateDefaultConnCredential(synthesizeComp.ClusterName)
+	// use first init account as the default credential
+	for index, sysAccount := range synthesizeComp.SystemAccounts {
+		if sysAccount.InitAccount {
+			return credential(synthesizeComp.SystemAccounts[index]), nil
+		}
 	}
-	credential := &workloads.Credential{
-		Username: workloads.CredentialVar{
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: secretName,
-					},
-					Key: constant.AccountNameForSecret,
-				},
-			},
-		},
-		Password: workloads.CredentialVar{
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: secretName,
-					},
-					Key: constant.AccountPasswdForSecret,
-				},
-			},
-		},
-	}
-	return credential, nil
+	return nil, nil
 }
 
 func (c *itsMembershipReconfigurationConvertor) convert(args ...any) (any, error) {

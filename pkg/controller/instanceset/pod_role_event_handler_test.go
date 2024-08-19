@@ -35,7 +35,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	"github.com/apecloud/kubeblocks/pkg/lorry/util"
 )
 
 var _ = Describe("pod role label event handler test", func() {
@@ -66,7 +65,7 @@ var _ = Describe("pod role label event handler test", func() {
 			message := fmt.Sprintf("Readiness probe failed: error: health rpc failed: rpc error: code = Unknown desc = {\"event\":\"Success\",\"originalRole\":\"\",\"role\":\"%s\"}", role.Name)
 			event := builder.NewEventBuilder(namespace, "foo").
 				SetInvolvedObject(objectRef).
-				SetReason(string(util.CheckRoleOperation)).
+				SetReason(checkRoleOperation).
 				SetMessage(message).
 				GetObject()
 
@@ -115,7 +114,7 @@ var _ = Describe("pod role label event handler test", func() {
 			event = builder.NewEventBuilder(namespace, "foo").
 				SetInvolvedObject(objectRef).
 				SetMessage(message).
-				SetReason(string(util.CheckRoleOperation)).
+				SetReason(checkRoleOperation).
 				GetObject()
 			k8sMock.EXPECT().
 				Patch(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).

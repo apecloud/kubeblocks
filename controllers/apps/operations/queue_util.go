@@ -105,6 +105,13 @@ func enqueueOpsRequestToClusterAnnotation(ctx context.Context, cli client.Client
 		return nil, err
 	}
 
+	inQueue := func() bool {
+		if opsRes.OpsRequest.Force() && !opsRes.OpsRequest.Spec.EnqueueOnForce {
+			return false
+		}
+		return existOtherRunningOps(opsRequestSlice, opsRes.OpsRequest.Spec.Type, opsBehaviour)
+	}
+
 	index, opsRecorder := GetOpsRecorderFromSlice(opsRequestSlice, opsRes.OpsRequest.Name)
 	switch index {
 	case -1:
@@ -121,7 +128,7 @@ func enqueueOpsRequestToClusterAnnotation(ctx context.Context, cli client.Client
 			Type:        opsRes.OpsRequest.Spec.Type,
 			QueueBySelf: opsBehaviour.QueueBySelf,
 			// check if the opsRequest should be in the queue.
-			InQueue: existOtherRunningOps(opsRequestSlice, opsRes.OpsRequest.Spec.Type, opsBehaviour) && !opsRes.OpsRequest.Force(),
+			InQueue: inQueue(),
 		}
 		opsRequestSlice = append(opsRequestSlice, opsRecorder)
 	default:

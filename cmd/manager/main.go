@@ -128,9 +128,6 @@ func init() {
 	viper.SetDefault(constant.EnableRBACManager, true)
 	viper.SetDefault("VOLUMESNAPSHOT_API_BETA", false)
 	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks-tools:latest")
-	viper.SetDefault(constant.KBEnvLorryHTTPPort, 3501)
-	viper.SetDefault(constant.KBEnvLorryGRPCPort, 50001)
-	viper.SetDefault(constant.KBEnvLorryLogLevel, "info")
 	viper.SetDefault("KUBEBLOCKS_SERVICEACCOUNT_NAME", "kubeblocks")
 	viper.SetDefault(constant.ConfigManagerGPRCPortEnv, 9901)
 	viper.SetDefault("CONFIG_MANAGER_LOG_LEVEL", "info")
@@ -138,7 +135,6 @@ func init() {
 	viper.SetDefault(constant.CfgHostPortConfigMapName, "kubeblocks-host-ports")
 	viper.SetDefault(constant.CfgHostPortIncludeRanges, "1025-65536")
 	viper.SetDefault(constant.CfgHostPortExcludeRanges, "6443,10250,10257,10259,2379-2380,30000-32767")
-	viper.SetDefault(constant.KBDataScriptClientsImage, "apecloud/kubeblocks-datascript:latest")
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 	viper.SetDefault(instanceset.MaxPlainRevisionCount, 1024)
 	viper.SetDefault(instanceset.FeatureGateIgnorePodVerticalScaling, false)
@@ -146,6 +142,7 @@ func init() {
 	viper.SetDefault(constant.CfgKBReconcileWorkers, 8)
 	viper.SetDefault(constant.FeatureGateIgnoreConfigTemplateDefaultMode, false)
 	viper.SetDefault(constant.FeatureGateComponentReplicasAnnotation, true)
+	viper.SetDefault(constant.FeatureGateInPlacePodVerticalScaling, false)
 }
 
 type flagName string
@@ -254,6 +251,14 @@ func validateRequiredToParseConfigs() error {
 	if err := validateAffinity(viper.GetString(constant.CfgKeyDataPlaneAffinity)); err != nil {
 		return err
 	}
+
+	if imagePullSecrets := viper.GetString(constant.KBImagePullSecrets); imagePullSecrets != "" {
+		secrets := make([]corev1.LocalObjectReference, 0)
+		if err := json.Unmarshal([]byte(imagePullSecrets), &secrets); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -381,15 +386,6 @@ func main() {
 			Recorder: mgr.GetEventRecorderFor("cluster-definition-controller"),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "ClusterDefinition")
-			os.Exit(1)
-		}
-
-		if err = (&appscontrollers.ClusterVersionReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("cluster-version-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "ClusterVersion")
 			os.Exit(1)
 		}
 

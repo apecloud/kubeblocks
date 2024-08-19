@@ -40,7 +40,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/generics"
-	lorryutil "github.com/apecloud/kubeblocks/pkg/lorry/util"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
@@ -65,6 +64,10 @@ var _ = Describe("Event Controller", func() {
 	const (
 		// roleChangedAnnotKey is used to mark the role change event has been handled.
 		roleChangedAnnotKey = "role.kubeblocks.io/event-handled"
+
+		// TODO(v1.0): remove this later.
+		checkRoleOperation  = "checkRole"
+		lorryEventFieldPath = "spec.containers{lorry}"
 	)
 
 	var (
@@ -81,13 +84,13 @@ var _ = Describe("Event Controller", func() {
 			Namespace:  testCtx.DefaultNamespace,
 			Name:       podName,
 			UID:        podUid,
-			FieldPath:  lorryutil.LorryEventFieldPath,
+			FieldPath:  lorryEventFieldPath,
 		}
 		eventName := strings.Join([]string{podName, seq}, ".")
 		return builder.NewEventBuilder(testCtx.DefaultNamespace, eventName).
 			SetInvolvedObject(objectRef).
 			SetMessage(fmt.Sprintf("{\"event\":\"roleChanged\",\"originalRole\":\"secondary\",\"role\":\"%s\"}", role)).
-			SetReason(string(lorryutil.CheckRoleOperation)).
+			SetReason(checkRoleOperation).
 			SetType(corev1.EventTypeNormal).
 			SetFirstTimestamp(metav1.NewTime(initLastTS)).
 			SetLastTimestamp(metav1.NewTime(initLastTS)).
@@ -118,21 +121,22 @@ var _ = Describe("Event Controller", func() {
 
 	Context("When receiving role changed event", func() {
 		It("should handle it properly", func() {
-			By("create cluster & clusterDef")
-			clusterDefName := "foo"
-			consensusCompName := "consensus"
-			consensusCompDefName := "consensus"
-			clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.ConsensusMySQLComponent, consensusCompDefName).
-				Create(&testCtx).GetObject()
-			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, "",
-				clusterDefObj.Name, "").WithRandomName().
-				AddComponent(consensusCompName, consensusCompDefName).
+			By("create cluster & compdef")
+			compDefName := "test-compdef"
+			clusterName := "test-cluster"
+			defaultCompName := "mysql"
+			compDefObj := testapps.NewComponentDefinitionFactory(compDefName).
+				SetDefaultSpec().
+				Create(&testCtx).
+				GetObject()
+			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
+				WithRandomName().
+				AddComponent(defaultCompName, compDefObj.GetName()).
 				Create(&testCtx).GetObject()
 			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(clusterObj), &appsv1alpha1.Cluster{}, true)).Should(Succeed())
 
-			itsName := fmt.Sprintf("%s-%s", clusterObj.Name, consensusCompName)
-			its := testapps.NewInstanceSetFactory(clusterObj.Namespace, itsName, clusterObj.Name, consensusCompName).
+			itsName := fmt.Sprintf("%s-%s", clusterObj.Name, defaultCompName)
+			its := testapps.NewInstanceSetFactory(clusterObj.Namespace, itsName, clusterObj.Name, defaultCompName).
 				SetReplicas(int32(3)).
 				AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
 				Create(&testCtx).GetObject()
@@ -155,7 +159,7 @@ var _ = Describe("Event Controller", func() {
 			By("create involved pod")
 			var uid types.UID
 			podName := fmt.Sprintf("%s-%d", itsName, 0)
-			pod := createInvolvedPod(podName, clusterObj.Name, consensusCompName, itsName)
+			pod := createInvolvedPod(podName, clusterObj.Name, defaultCompName, itsName)
 			Expect(testCtx.CreateObj(ctx, pod)).Should(Succeed())
 			Eventually(func() error {
 				p := &corev1.Pod{}

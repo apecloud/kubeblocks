@@ -29,16 +29,15 @@ const (
 
 // TODO: deprecated, will be removed later.
 const (
-	KBConnCredentialPlaceHolder = "$(CONN_CREDENTIAL_SECRET_NAME)"
 	KBComponentEnvCMPlaceHolder = "$(COMP_ENV_CM_NAME)"
 	KBToolsImagePlaceHolder     = "$(KUBEBLOCKS_TOOLS_IMAGE)"
 )
 
 const (
-	KBServiceAccountName     = "KUBEBLOCKS_SERVICEACCOUNT_NAME"
-	KBToolsImage             = "KUBEBLOCKS_TOOLS_IMAGE"
-	KBImagePullPolicy        = "KUBEBLOCKS_IMAGE_PULL_POLICY"
-	KBDataScriptClientsImage = "KUBEBLOCKS_DATASCRIPT_CLIENTS_IMAGE"
+	KBServiceAccountName = "KUBEBLOCKS_SERVICEACCOUNT_NAME"
+	KBToolsImage         = "KUBEBLOCKS_TOOLS_IMAGE"
+	KBImagePullPolicy    = "KUBEBLOCKS_IMAGE_PULL_POLICY"
+	KBImagePullSecrets   = "KUBEBLOCKS_IMAGE_PULL_SECRETS"
 )
 
 const (

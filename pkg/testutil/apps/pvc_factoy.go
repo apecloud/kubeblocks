@@ -43,7 +43,6 @@ func NewPersistentVolumeClaimFactory(namespace, name, clusterName, componentName
 					constant.KBAppComponentLabelKey:          componentName,
 					constant.AppManagedByLabelKey:            constant.AppName,
 					constant.VolumeClaimTemplateNameLabelKey: vctName,
-					constant.VolumeTypeLabelKey:              vctName,
 				},
 				Annotations: map[string]string{
 					kube.KubeAnnBindCompleted: "yes",
@@ -63,7 +62,7 @@ func (factory *MockPersistentVolumeClaimFactory) SetStorageClass(storageClassNam
 }
 
 func (factory *MockPersistentVolumeClaimFactory) SetStorage(storageSize string) *MockPersistentVolumeClaimFactory {
-	factory.Get().Spec.Resources = corev1.ResourceRequirements{
+	factory.Get().Spec.Resources = corev1.VolumeResourceRequirements{
 		Requests: corev1.ResourceList{
 			corev1.ResourceStorage: resource.MustParse(storageSize),
 		},

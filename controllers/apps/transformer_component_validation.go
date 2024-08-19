@@ -26,9 +26,11 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
 
-const (
-	defaultMinReplicas         int32 = 0
-	defaultMinReplicas4ScaleIn int32 = 1
+var (
+	defaultReplicasLimit = appsv1alpha1.ReplicasLimit{
+		MinReplicas: 1,
+		MaxReplicas: 16384,
+	}
 )
 
 // componentValidationTransformer validates the consistency between spec & definition.
@@ -86,42 +88,17 @@ func validateEnabledLogConfigs(compDef *appsv1alpha1.ComponentDefinition, enable
 }
 
 func validateCompReplicas(comp *appsv1alpha1.Component, compDef *appsv1alpha1.ComponentDefinition) error {
-	if err := validateCompReplicasGeneral(comp, compDef); err != nil {
-		return err
+	replicasLimit := &defaultReplicasLimit
+	// always respect the replicas limit if set.
+	if compDef.Spec.ReplicasLimit != nil {
+		replicasLimit = compDef.Spec.ReplicasLimit
 	}
-	return validateCompReplicas4Runtime(comp, compDef)
-}
 
-func validateCompReplicasGeneral(comp *appsv1alpha1.Component, compDef *appsv1alpha1.ComponentDefinition) error {
-	if compDef.Spec.ReplicasLimit == nil {
-		return nil
-	}
 	replicas := comp.Spec.Replicas
-	replicasLimit := compDef.Spec.ReplicasLimit
 	if replicas >= replicasLimit.MinReplicas && replicas <= replicasLimit.MaxReplicas {
 		return nil
 	}
 	return replicasOutOfLimitError(replicas, *replicasLimit)
-}
-
-func validateCompReplicas4Runtime(comp *appsv1alpha1.Component, compDef *appsv1alpha1.ComponentDefinition) error {
-	minReplicas := func() int32 {
-		// always respect the replicas limit if it is set.
-		if compDef.Spec.ReplicasLimit != nil {
-			return compDef.Spec.ReplicasLimit.MinReplicas
-		}
-		// HACK: take observedGeneration == 0 as the provisioning.
-		if comp.Status.ObservedGeneration == 0 {
-			return defaultMinReplicas
-		}
-		return min(comp.Spec.Replicas, defaultMinReplicas4ScaleIn)
-	}()
-
-	replicas := comp.Spec.Replicas
-	if replicas < minReplicas {
-		return fmt.Errorf("replicas %d is less than required min replicas %d", replicas, minReplicas)
-	}
-	return nil
 }
 
 func replicasOutOfLimitError(replicas int32, replicasLimit appsv1alpha1.ReplicasLimit) error {

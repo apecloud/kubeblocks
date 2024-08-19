@@ -38,11 +38,6 @@ func NewBackupPolicyTemplateFactory(name string) *MockBackupPolicyTemplateFactor
 	return f
 }
 
-func (f *MockBackupPolicyTemplateFactory) SetClusterDefRef(clusterDefRef string) *MockBackupPolicyTemplateFactory {
-	f.Get().Spec.ClusterDefRef = clusterDefRef
-	return f
-}
-
 func (f *MockBackupPolicyTemplateFactory) getLastBackupPolicy() *appsv1alpha1.BackupPolicy {
 	l := len(f.Get().Spec.BackupPolicies)
 	if l == 0 {
@@ -62,9 +57,9 @@ func (f *MockBackupPolicyTemplateFactory) getLastBackupMethod() *dpv1alpha1.Back
 	return &backupMethods[l-1].BackupMethod
 }
 
-func (f *MockBackupPolicyTemplateFactory) AddBackupPolicy(componentDef string) *MockBackupPolicyTemplateFactory {
+func (f *MockBackupPolicyTemplateFactory) AddBackupPolicy(compDefs ...string) *MockBackupPolicyTemplateFactory {
 	f.Get().Spec.BackupPolicies = append(f.Get().Spec.BackupPolicies, appsv1alpha1.BackupPolicy{
-		ComponentDefRef: componentDef,
+		ComponentDefs: compDefs,
 	})
 	return f
 }
@@ -90,8 +85,7 @@ func (f *MockBackupPolicyTemplateFactory) AddSchedule(method, schedule, retentio
 	return f
 }
 
-func (f *MockBackupPolicyTemplateFactory) AddBackupMethod(name string,
-	snapshotVolumes bool, actionSetName string, mappingEnvWithClusterVersion ...string) *MockBackupPolicyTemplateFactory {
+func (f *MockBackupPolicyTemplateFactory) AddBackupMethod(name string, snapshotVolumes bool, actionSetName string) *MockBackupPolicyTemplateFactory {
 	backupPolicy := f.getLastBackupPolicy()
 	backupMethod := appsv1alpha1.BackupMethod{
 		BackupMethod: dpv1alpha1.BackupMethod{
@@ -100,28 +94,7 @@ func (f *MockBackupPolicyTemplateFactory) AddBackupMethod(name string,
 			ActionSetName:   actionSetName,
 			TargetVolumes:   &dpv1alpha1.TargetVolumeInfo{},
 		}}
-	if len(mappingEnvWithClusterVersion) > 0 {
-		backupMethod.EnvMapping = []appsv1alpha1.EnvMappingVar{
-			{
-				Key: EnvKeyImageTag,
-				ValueFrom: appsv1alpha1.ValueFrom{
-					ClusterVersionRef: []appsv1alpha1.ValueMapping{
-						{
-							Names:        mappingEnvWithClusterVersion,
-							MappingValue: DefaultImageTag,
-						},
-					},
-				},
-			},
-		}
-	}
 	backupPolicy.BackupMethods = append(backupPolicy.BackupMethods, backupMethod)
-	return f
-}
-
-func (f *MockBackupPolicyTemplateFactory) SetComponentDef(compDefs ...string) *MockBackupPolicyTemplateFactory {
-	backupPolicy := f.getLastBackupPolicy()
-	backupPolicy.ComponentDefs = compDefs
 	return f
 }
 

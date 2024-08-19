@@ -72,28 +72,3 @@ cue-helper: test-go-generate build-checks ## Build cue-helper related binaries
 .PHONY: clean-cue-helper
 clean-cue-helper: ## Clean bin/cue-helper.
 	rm -f bin/cue-helper
-
-## lorry cmd
-
-LORRY_LD_FLAGS = "-s -w"
-
-bin/lorry.%: ## Cross build bin/lorry.$(OS).$(ARCH) .
-	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${LORRY_LD_FLAGS} -o $@  ./cmd/lorry/main.go
-
-.PHONY: lorry
-lorry: OS=$(shell $(GO) env GOOS)
-lorry: ARCH=$(shell $(GO) env GOARCH)
-lorry: test-go-generate build-checks ## Build lorry related binaries
-	$(MAKE) bin/lorry.${OS}.${ARCH}
-	mv bin/lorry.${OS}.${ARCH} bin/lorry
-
-.PHONY: lorry-fast
-lorry-fast: OS=$(shell $(GO) env GOOS)
-lorry-fast: ARCH=$(shell $(GO) env GOARCH)
-lorry-fast:
-	$(MAKE) bin/lorry.${OS}.${ARCH}
-	mv bin/lorry.${OS}.${ARCH} bin/lorry
-
-.PHONY: clean-lorry
-clean-lorry: ## Clean bin/lorry.
-	rm -f bin/lorry

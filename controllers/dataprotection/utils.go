@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	appsv1 "k8s.io/api/apps/v1"
 	"reflect"
 	"strings"
 	"sync"
@@ -270,22 +271,44 @@ func getDefaultBackupRepo(ctx context.Context, cli client.Client) (*dpv1alpha1.B
 	return defaultRepo, nil
 }
 
-func deleteRelatedJobs(reqCtx intctrlutil.RequestCtx, cli client.Client, namespace string, labels map[string]string) error {
-	if labels == nil || namespace == "" {
+type objectList interface {
+	*appsv1.StatefulSetList | *batchv1.JobList
+	client.ObjectList
+}
+
+func deleteRelatedObjectList[T objectList](reqCtx intctrlutil.RequestCtx, cli client.Client, list T, namespaces map[string]bool, labels map[string]string) error {
+	if labels == nil || len(namespaces) == 0 {
 		return nil
 	}
-	jobs := &batchv1.JobList{}
-	if err := cli.List(reqCtx.Ctx, jobs,
-		client.MatchingLabels(labels)); err != nil {
-		return client.IgnoreNotFound(err)
+
+	items := reflect.ValueOf(list).Elem().FieldByName("Items")
+	if !items.IsValid() {
+		return fmt.Errorf("ObjectList has no Items field: %s", list.GetObjectKind().GroupVersionKind().String())
 	}
-	for i := range jobs.Items {
-		job := &jobs.Items[i]
-		if err := dputils.RemoveDataProtectionFinalizer(reqCtx.Ctx, cli, job); err != nil {
-			return err
+
+	toBeDeleted := reflect.MakeSlice(items.Type(), 0, 0)
+	for ns := range namespaces {
+		if err := cli.List(reqCtx.Ctx, list, client.InNamespace(ns),
+			client.MatchingLabels(labels)); err != nil {
+			return client.IgnoreNotFound(err)
 		}
-		if err := intctrlutil.BackgroundDeleteObject(cli, reqCtx.Ctx, job); err != nil {
-			return err
+		objs := reflect.ValueOf(list).Elem().FieldByName("Items")
+		if !objs.IsZero() {
+			for i := 0; i < objs.Len(); i++ {
+				toBeDeleted = reflect.Append(toBeDeleted, objs.Index(i))
+			}
+		}
+	}
+
+	if !toBeDeleted.IsZero() {
+		for i := 0; i < toBeDeleted.Len(); i++ {
+			item := toBeDeleted.Index(i).Addr().Interface().(client.Object)
+			if err := dputils.RemoveDataProtectionFinalizer(reqCtx.Ctx, cli, item); err != nil {
+				return err
+			}
+			if err := intctrlutil.BackgroundDeleteObject(cli, reqCtx.Ctx, item); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

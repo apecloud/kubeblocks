@@ -126,10 +126,14 @@ func (r *RestoreReconciler) parseRestoreJob(ctx context.Context, object client.O
 
 func (r *RestoreReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, restore *dpv1alpha1.Restore) error {
 	labels := map[string]string{dprestore.DataProtectionRestoreLabelKey: restore.Name}
-	if err := deleteRelatedJobs(reqCtx, r.Client, restore.Namespace, labels); err != nil {
-		return err
+
+	// use map to avoid duplicate deletion of the same namespace.
+	namespaces := map[string]bool{
+		restore.Namespace:                          true,
+		viper.GetString(constant.CfgKeyCtrlrMgrNS): true,
 	}
-	return deleteRelatedJobs(reqCtx, r.Client, viper.GetString(constant.CfgKeyCtrlrMgrNS), labels)
+
+	return deleteRelatedObjectList(reqCtx, r.Client, &batchv1.JobList{}, namespaces, labels)
 }
 
 func CheckBackupRepoForRestore(reqCtx intctrlutil.RequestCtx, cli client.Client, restore *dpv1alpha1.Restore) (string, error) {

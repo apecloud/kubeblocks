@@ -193,7 +193,7 @@ func (r *Request) buildBackupDataAction(targetPod *corev1.Pod, name string) (act
 			Name: name,
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: r.Namespace,
-				Name:      r.Name,
+				Name:      GenerateBackupStatefulSetName(r.Backup, r.Target.Name, BackupDataJobNamePrefix),
 				Labels:    BuildBackupWorkloadLabels(r.Backup),
 			},
 			Replicas:  pointer.Int32(int32(1)),

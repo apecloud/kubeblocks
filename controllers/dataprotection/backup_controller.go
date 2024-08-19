@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"k8s.io/utils/pointer"
 	"reflect"
 	"strings"
 	"time"
@@ -650,12 +651,20 @@ func (r *BackupReconciler) checkIsCompletedDuringRunning(reqCtx intctrlutil.Requ
 	}
 	patch := client.MergeFrom(backup.DeepCopy())
 	backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
+
 	backup.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
 	_ = dpbackup.SetExpirationByCreationTime(backup)
 	if !backup.Status.StartTimestamp.IsZero() {
 		// round the duration to a multiple of seconds.
 		duration := backup.Status.CompletionTimestamp.Sub(backup.Status.StartTimestamp.Time).Round(time.Second)
 		backup.Status.Duration = &metav1.Duration{Duration: duration}
+	}
+	
+	for i, act := range backup.Status.Actions {
+		act.Phase = dpv1alpha1.ActionPhaseCompleted
+		act.AvailableReplicas = pointer.Int32(int32(0))
+		act.CompletionTimestamp = backup.Status.CompletionTimestamp
+		backup.Status.Actions[i] = act
 	}
 	return true, r.Client.Status().Patch(reqCtx.Ctx, backup, patch)
 }
@@ -694,15 +703,6 @@ func (r *BackupReconciler) updateStatusIfFailed(
 	return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 }
 
-// deleteExternalJobs deletes the external jobs.
-func (r *BackupReconciler) deleteExternalJobs(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
-	labels := dpbackup.BuildBackupWorkloadLabels(backup)
-	if err := deleteRelatedJobs(reqCtx, r.Client, backup.Namespace, labels); err != nil {
-		return err
-	}
-	return deleteRelatedJobs(reqCtx, r.Client, viper.GetString(constant.CfgKeyCtrlrMgrNS), labels)
-}
-
 func (r *BackupReconciler) deleteVolumeSnapshots(reqCtx intctrlutil.RequestCtx,
 	backup *dpv1alpha1.Backup) error {
 	deleter := &dpbackup.Deleter{
@@ -712,34 +712,29 @@ func (r *BackupReconciler) deleteVolumeSnapshots(reqCtx intctrlutil.RequestCtx,
 	return deleter.DeleteVolumeSnapshots(backup)
 }
 
-// deleteExternalStatefulSet deletes the external statefulSet.
-func (r *BackupReconciler) deleteExternalStatefulSet(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
-	key := client.ObjectKey{
-		Namespace: backup.Namespace,
-		Name:      backup.Name,
-	}
-	sts := &appsv1.StatefulSet{}
-	if err := r.Client.Get(reqCtx.Ctx, key, sts); err != nil {
-		return client.IgnoreNotFound(err)
-	}
-
-	patch := client.MergeFrom(sts.DeepCopy())
-	controllerutil.RemoveFinalizer(sts, dptypes.DataProtectionFinalizerName)
-	if err := r.Client.Patch(reqCtx.Ctx, sts, patch); err != nil {
-		return err
-	}
-	reqCtx.Log.V(1).Info("delete statefulSet", "statefulSet", sts)
-	return intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, sts)
-}
-
 // deleteExternalResources deletes the external workloads that execute backup.
-// Currently, it only supports two types of workloads: job.
+// Currently, it only supports two types of workloads: job, statefulSet
 func (r *BackupReconciler) deleteExternalResources(
 	reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
-	if err := r.deleteExternalJobs(reqCtx, backup); err != nil {
+	labels := dpbackup.BuildBackupWorkloadLabels(backup)
+
+	// use map to avoid duplicate deletion of the same namespace.
+	namespaces := map[string]bool{
+		backup.Namespace: true,
+		viper.GetString(constant.CfgKeyCtrlrMgrNS): true,
+	}
+
+	// delete the external jobs.
+	if err := deleteRelatedObjectList(reqCtx, r.Client, &batchv1.JobList{}, namespaces, labels); err != nil {
 		return err
 	}
-	return r.deleteExternalStatefulSet(reqCtx, backup)
+
+	// delete the external statefulSets.
+	if err := deleteRelatedObjectList(reqCtx, r.Client, &appsv1.StatefulSetList{}, namespaces, labels); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // PatchBackupObjectMeta patches backup object metaObject include cluster snapshot.

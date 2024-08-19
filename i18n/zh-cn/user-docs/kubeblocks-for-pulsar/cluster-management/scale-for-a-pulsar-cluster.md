@@ -8,19 +8,15 @@ sidebar_label: 扩缩容
 
 # Pulsar 集群扩缩容
 
+KubeBlocks 支持对 Pulsar 集群进行垂直扩缩容和水平扩缩容。
+
 ## 垂直扩缩容
 
-你可以通过更改资源需求和限制（CPU 和存储）来垂直扩展集群。例如，如果你需要将资源类别从 1C2G 更改为 2C4G，就需要进行垂直扩容。
-
-:::note
-
-在垂直扩容时，所有的 Pod 将按照 Learner -> Follower -> Leader 的顺序重启。重启后，主节点可能会发生变化。
-
-:::
+你可以通过更改资源需求和限制（CPU 和存储）来垂直扩展集群。例如，可通过垂直扩容将资源类别从 1C2G 调整为 2C4G。
 
 ### 开始之前
 
-确保集群处于 `Running` 状态，否则以下操作可能会失败。 
+确保集群处于 `Running` 状态，否则以下操作可能会失败。
 
 ```bash
 kbcli cluster list pulsar
@@ -28,9 +24,7 @@ kbcli cluster list pulsar
 
 ### 步骤
 
-1. 更改配置。共有 3 种方式进行垂直扩容。
-
-   **选项 1.** (**推荐**) 使用 kbcli
+1. 更改配置。
 
    配置参数 `--components`、`--memory` 和 `--cpu`，并执行以下命令。
 
@@ -40,44 +34,7 @@ kbcli cluster list pulsar
 
    - `--components` 表示可进行垂直扩容的组件名称。
    - `--memory` 表示组件请求和限制的内存大小。
-   - `--cpu` 表示组件请求和限制的CPU大小。
-
-   **选项 2.** 创建 OpsRequest
-  
-   将 OpsRequest 应用于指定的集群，根据需求配置参数。
-
-   ```bash
-   kubectl create -f -<< EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: OpsRequest
-   metadata:
-     generateName: pulsar-vscale-
-   spec:
-     clusterRef: pulsar
-     type: VerticalScaling
-     verticalScaling:
-     - componentName: broker
-       requests:
-         memory: "10Gi"
-         cpu: 3
-       limits:
-         memory: "10Gi"
-         cpu: 3
-     - componentName: bookies
-       requests:
-         memory: "10Gi"
-         cpu: 3
-       limits:
-         memory: "10Gi"
-         cpu: 3      
-   EOF
-   ```
-  
-   **选项 3.** 使用 `kubectl` 编辑 Pulsar 集群。
-
-   ```bash
-   kubectl edit cluster pulsar
-   ```
+   - `--cpu` 表示组件请求和限制的 CPU 大小。
 
 2. 验证垂直扩缩容。
 
@@ -104,7 +61,9 @@ kbcli cluster list pulsar
 
 ## 水平扩缩容
 
-水平扩缩容会改变 Pod 的数量。例如，你可以应用水平扩容将 Pod 的数量从三个增加到五个。扩容过程包括数据的备份和恢复。
+水平扩缩容会改变 Pod 的数量。例如，你可以应用水平扩容将 Pod 的数量从三个增加到五个。
+
+从 v0.9.0 开始，KubeBlocks 支持指定实例水平扩缩容，可参考 [API 文档](./../../../api-docs/maintenance/scale/horizontal-scale.md)，查看详细介绍及示例。
 
 ### 开始之前
 
@@ -113,9 +72,7 @@ kbcli cluster list pulsar
 
 ### 步骤
 
-1. 更改配置，共有 3 种方式。
-
-   **选项 1.** (**推荐**) 使用 kbcli
+1. 更改配置。
 
    配置参数 `--components` 和 `--replicas`，并执行以下命令。
 
@@ -125,33 +82,6 @@ kbcli cluster list pulsar
 
    - `--components` 表示准备进行水平扩容的组件名称。
    - `--replicas` 表示指定组件的副本数。
-
-   **选项 2.** 创建 OpsRequest
-
-   可根据需求配置参数，将 OpsRequest 应用于指定的集群。
-
-    ```bash
-    kubectl create -f -<< EOF
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: OpsRequest
-    metadata:
-      generateName: pulsar-horizontalscaling-
-    spec:
-      clusterRef: pulsar
-      type: HorizontalScaling  
-      horizontalScaling:
-      - componentName: broker
-        replicas: 5
-      - componentName: bookies
-        replicas: 5
-    EOF
-    ```
-
-   **选项 3.** 使用 `kubectl` 编辑 Pulsar 集群。
-
-   ```bash
-   kubectl edit cluster pulsar
-   ```
   
 2. 验证水平扩缩容。
 
@@ -167,7 +97,7 @@ kbcli cluster list pulsar
 3. 检查相关资源规格是否已变更。
 
    ```bash
-   kbcli cluster describe mysql-cluster
+   kbcli cluster describe pulsar
    ```
 
 ### 处理快照异常
@@ -178,7 +108,7 @@ kbcli cluster list pulsar
 Status:
   conditions: 
   - lastTransitionTime: "2023-02-08T04:20:26Z"
-    message: VolumeSnapshot/mysql-cluster-mysql-scaling-dbqgp: Failed to set default snapshot
+    message: VolumeSnapshot/pulsar-pulsar-scaling-dbqgp: Failed to set default snapshot
       class with error cannot find default snapshot class
     reason: ApplyResourcesFailed
     status: "False"
@@ -211,9 +141,9 @@ Status:
 2. 删除错误的备份（volumesnapshot 由备份生成）和 volumesnapshot 资源。
 
    ```bash
-   kubectl delete backup -l app.kubernetes.io/instance=mysql-cluster
+   kubectl delete backup -l app.kubernetes.io/instance=pulsar
    
-   kubectl delete volumesnapshot -l app.kubernetes.io/instance=mysql-cluster
+   kubectl delete volumesnapshot -l app.kubernetes.io/instance=pulsar
    ```
 
 ***结果***

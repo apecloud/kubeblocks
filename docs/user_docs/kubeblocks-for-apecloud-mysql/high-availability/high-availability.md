@@ -28,8 +28,8 @@ The faults here are all simulated by deleting a pod. When there are sufficient r
   ```bash
   probes:
     roleProbe:
-      failureThreshold: 3
-      periodSeconds: 2
+      failureThreshold: 2
+      periodSeconds: 1
       timeoutSeconds: 1
   ```
 

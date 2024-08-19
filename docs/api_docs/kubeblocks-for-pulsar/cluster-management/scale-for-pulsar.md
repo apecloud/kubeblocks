@@ -151,6 +151,14 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
 
 - It is recommended to keep 3 nodes without scaling for Zookeeper, and other components can scale horizontally for multiple or single components
 - The scaling of the Bookies node needs to be cautious. The data copy is related to the EnsembleSize, Write Quorum, and Ack Quorum configurations, scaling may cause data loss. Check [Pulsar official document](https://pulsar.apahe.org/docs/3.0.x/administration-zk-bk/#decommission-bookies-cleanly) for detailed information.
+- Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
+
+   ```bash
+   kubectl get cluster mycluster -n demo
+   >
+   NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY     STATUS    AGE
+   mycluster   pulsar               pulsar-3.0.2   Delete                 Running   47m
+   ```
 
 ### Steps
 

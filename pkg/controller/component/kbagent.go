@@ -135,7 +135,7 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 				Protocol:      "TCP",
 			},
 		}
-		container.Args = append(containers[i].Args, "--port", strconv.Itoa(int(ports[i])))
+		container.Args = append(container.Args, "--port", strconv.Itoa(int(ports[i])))
 		container.StartupProbe = &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromInt32(ports[i])},

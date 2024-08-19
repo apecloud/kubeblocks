@@ -12,126 +12,28 @@ sidebar_label: 停止/启动
 
 ## 停止集群
 
-### 选项 1.（推荐）使用 kbcli
+1. 配置集群名称，并执行以下命令来停止该集群。
 
-配置集群名称，并执行以下命令来停止该集群。
+   ```bash
+   kbcli cluster stop pg-cluster
+   ```
 
-```bash
-kbcli cluster stop <name>
-```
+2. 查看集群状态，确认集群是否已停止。
 
-***示例***
-
-```bash
-kbcli cluster stop pg-cluster
-```
-
-### 选项 2. 创建 OpsRequest
-
-执行以下命令来停止集群。
-
-```bash
-kubectl apply -f - <<EOF
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: OpsRequest
-metadata:
-  name: pg-cluster
-  generateName: stop-
-spec:
-  # cluster ref
-  clusterRef: pg-cluster
-  type: Stop
-EOF
-```
-
-### 选项 3. 更改 YAML 文件
-
-将副本数设置为 0，删除 Pod。
-
-```yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: Cluster
-metadata:
-    name: pg-cluster
-spec:
-  clusterDefinitionRef: postgresql
-  clusterVersionRef: postgresql-14.7.0
-  terminationPolicy: WipeOut
-  componentSpecs:
-  - name: pg-replication
-    componentDefRef: postgresql
-    monitor: false  
-    replicas: 0
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        storageClassName: standard
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi
-```
+   ```bash
+   kbcli cluster list
+   ```
 
 ## 启动集群
-  
-### 选项 1. （推荐）使用 kbcli
 
-配置集群名称，并执行以下命令来启动该集群。
+1. 配置集群名称，并执行以下命令来启动该集群。
 
-```bash
-kbcli cluster start <name>
-```
+   ```bash
+   kbcli cluster start pg-cluster
+   ```
 
-***示例***
+2. 查看集群状态，确认集群是否再次启动。
 
-```bash
-kbcli cluster start pg-cluster
-```
-
-### 选项 2. 创建 OpsRequest
-
-执行以下命令，启动集群。
-
-```bash
-kubectl apply -f - <<EOF
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: OpsRequest
-metadata:
-  name: pg-cluster
-  generateName: start-
-spec:
-  # cluster ref
-  clusterRef: pg-cluster
-  type: Start
-EOF 
-```
-
-### 选项 3. 更改 YAML 文件
-
-将副本数改为原始数量，重新启动该集群。
-
-```yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: Cluster
-metadata:
-    name: pg-cluster
-spec:
-  clusterDefinitionRef: postgresql
-  clusterVersionRef: postgresql-14.7.0
-  terminationPolicy: WipeOut
-  componentSpecs:
-  - name: pg-replication
-    componentDefRef: postgresql
-    monitor: false  
-    replicas: 1
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        storageClassName: standard
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi
-```
+   ```bash
+   kbcli cluster list
+   ```

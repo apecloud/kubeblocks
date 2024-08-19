@@ -8,13 +8,13 @@ sidebar_label: Delete protection
 
 # Delete a PostgreSQL Cluster
 
+## Termination policy
+
 :::note
 
 The termination policy determines how a cluster is deleted.
 
 :::
-
-## Termination policy
 
 | **terminationPolicy** | **Deleting Operation**                                                                     |
 |:----------------------|:-------------------------------------------------------------------------------------------|

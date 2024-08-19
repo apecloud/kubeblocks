@@ -58,7 +58,7 @@ There are two ways to apply volume expansion.
    EOF
    ```
 
-2. For alidate the volume expansion operation.
+2. Validate the volume expansion operation.
 
    ```bash
    kubectl get ops -n demo

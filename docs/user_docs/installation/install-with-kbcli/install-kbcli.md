@@ -36,7 +36,7 @@ You can install kbcli with `curl` or `brew`.
 
    If you want to install kbcli with a specified version, follow the steps below.
 
-   1. Check the available versions in [KubeBlocks Release](https://github.com/apecloud/kubeblocks/releases/).
+   1. Check the available versions in [kbcli Release](https://github.com/apecloud/kbcli/releases/).
    2. Specify a version with `-s` and run the command below.
 
       ```bash
@@ -122,7 +122,7 @@ If you need to customize the installation path, use the zip file.
 
 - Option 2: Install using the installation package.
 
-1. Download the kbcli installation zip package from [KubeBlocks Release](https://github.com/apecloud/kubeblocks/releases/).
+1. Download the kbcli installation zip package from [kbcli Release](https://github.com/apecloud/kbcli/releases/).
 2. Extract the file and add it to the environment variables.
     1. Click the Windows icon and select **System Settings**.
     2. Click **Settings** -> **Related Settings** -> **Advanced system settings**.

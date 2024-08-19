@@ -2,7 +2,7 @@
 title: KubeBlocks 简介
 description: KubeBlocks, kbcli, multicloud
 keywords: [kubeblocks, 简介]
-sidebar_position: 1
+sidebar_position: 2
 ---
 
 # KubeBlocks 简介

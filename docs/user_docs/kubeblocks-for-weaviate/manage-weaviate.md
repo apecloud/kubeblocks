@@ -36,7 +36,7 @@ KubeBlocks supports the management of Weaviate.
 
 :::note
 
-View more flags for creating a MySQL cluster to create a cluster with customized specifications.
+View more flags for creating a cluster to create a cluster with customized specifications.
   
 ```bash
 kbcli cluster create --help
@@ -44,7 +44,7 @@ kbcli cluster create --help
 
 :::
 
-2. Check whether the cluster is created.
+1. Check whether the cluster is created.
 
    ```bash
    kbcli cluster list
@@ -53,7 +53,7 @@ kbcli cluster create --help
    weaviate        default     weaviate             weaviate-1.18.0       Delete               Running          Jul 05,2024 17:42 UTC+0800   
    ```
 
-3. Check the cluster information.
+2. Check the cluster information.
 
    ```bash
     kbcli cluster describe weaviate

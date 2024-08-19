@@ -46,6 +46,35 @@ To solve the limitations mentioned above, starting from version 0.9, KubeBlocks 
 
 ## Before you start
 
+This tutorial takes Redis for illustration and here is the original component topology.
+
+```yaml
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: redis
+  namespace: kubeblocks-cloud-ns
+spec:
+  componentSpecs:
+  - name: proxy
+    componentDef: redis-proxy
+    replicas: 10
+    instances:
+    - name: proxy-2c
+      replicas: 3
+      resources:
+        limits:
+          cpu: 2
+          memory: 4Gi
+    resources:
+      limits:
+        cpu: 4
+        memory: 8Gi
+    offlineInstances:
+    - redis-proxy-proxy-2c4g-0
+    - redis-proxy-proxy-2c4g-1     
+```
+
 Check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
 
 ```bash
@@ -99,7 +128,7 @@ EOF
 
 ### Example 3
 
-This example illustrates how to scale in the specified instance. In this exampler, both `replicas` and `instance replicas` will decrease 1 in amount.
+This example illustrates how to scale in the specified instance. In this example, both `replicas` and `instance replicas` will decrease 1 in amount.
 
 <Tabs>
 
@@ -202,7 +231,7 @@ This example illustrates how to apply an OpsRequest to scale out replicas to 16 
 The created instances are as follows:
 
 4C8G: `redis-proxy-7`, `redis-proxy-8`, `redis-proxy-9`
-2C4G: `redis-proxy-8c16g-0`, `redis-proxy-8c16g-1`, `redis-proxy-8c16g-2`
+8C16G: `redis-proxy-8c16g-0`, `redis-proxy-8c16g-1`, `redis-proxy-8c16g-2`
 
 ```yaml
 kubectl apply -f - <<EOF

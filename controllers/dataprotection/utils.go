@@ -23,11 +23,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	appsv1 "k8s.io/api/apps/v1"
 	"reflect"
 	"strings"
 	"sync"
 
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"

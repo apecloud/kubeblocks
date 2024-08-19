@@ -23,7 +23,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"k8s.io/utils/pointer"
 	"reflect"
 	"strings"
 	"time"
@@ -39,6 +38,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/clock"
+	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -651,7 +651,6 @@ func (r *BackupReconciler) checkIsCompletedDuringRunning(reqCtx intctrlutil.Requ
 	}
 	patch := client.MergeFrom(backup.DeepCopy())
 	backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
-
 	backup.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
 	_ = dpbackup.SetExpirationByCreationTime(backup)
 	if !backup.Status.StartTimestamp.IsZero() {
@@ -659,13 +658,14 @@ func (r *BackupReconciler) checkIsCompletedDuringRunning(reqCtx intctrlutil.Requ
 		duration := backup.Status.CompletionTimestamp.Sub(backup.Status.StartTimestamp.Time).Round(time.Second)
 		backup.Status.Duration = &metav1.Duration{Duration: duration}
 	}
-	
+
 	for i, act := range backup.Status.Actions {
 		act.Phase = dpv1alpha1.ActionPhaseCompleted
 		act.AvailableReplicas = pointer.Int32(int32(0))
 		act.CompletionTimestamp = backup.Status.CompletionTimestamp
 		backup.Status.Actions[i] = act
 	}
+
 	return true, r.Client.Status().Patch(reqCtx.Ctx, backup, patch)
 }
 

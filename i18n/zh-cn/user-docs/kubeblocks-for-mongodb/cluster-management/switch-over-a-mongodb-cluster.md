@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 
 # 切换 MongoDB 集群
 
-你可以通过执行 kbcli 或 kubectl 命令来切换 MongoDB 主备版。切换后，KubeBlocks 将修改实例角色。
+数据库 switchover 是指在数据库集群中将主数据库的角色切换到备用数据库的过程，使备用数据库成为新的主数据库实例。通常在主数据库故障、维护或升级时执行 switchover 操作，以确保数据库服务的高可用性和连续性。可使用 kbcli 命令对 MongoDB 集群版执行切换，KubeBlocks 将切换实例角色。
 
 ## 开始之前
 
@@ -25,16 +25,12 @@ import TabItem from '@theme/TabItem';
      roleProbe:
        failureThreshold: 3
        periodSeconds: 2
-       timeoutSeconds: 1
+       timeoutSeconds: 2
    ```
 
 ## 切换集群
 
 将 MongoDB 主备版的从节点切换为主节点，原来的主节点实例将被切换为从节点实例。
-
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
 
 * 不指定主节点实例进行切换。
 
@@ -53,50 +49,6 @@ import TabItem from '@theme/TabItem';
     ```bash
     kbcli cluster promote mycluster --instance='mycluster-mongodb-2' --components='mongodb'
     ```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
-
-`instanceName` 的值决定了切换过程中是否指定了新的主节点实例。
-
-* 不指定主节点实例进行切换。
-
-  ```yaml
-  kubectl apply -f -<<EOF
-  apiVersion: apps.kubeblocks.io/v1alpha1
-  kind: OpsRequest
-  metadata:
-    name: mycluster-switchover-jhkgl
-  spec:
-    clusterRef: mycluster
-    type: Switchover
-    switchover:
-    - componentName: mongodb
-      instanceName: '*'
-  >>
-  ```
-
-* 指定一个新的主节点实例进行切换。
-
-  ```yaml
-  kubectl apply -f -<<EOF
-  apiVersion: apps.kubeblocks.io/v1alpha1
-  kind: OpsRequest
-  metadata:
-    name: mycluster-switchover-jhkgl
-  spec:
-    clusterRef: mycluster
-    type: Switchover
-    switchover:
-    - componentName: mongodb
-      instanceName: 'mycluster-mongodb-2'
-  >>
-  ```
-
-</TabItem>
-
-</Tabs>
 
 ## 验证集群切换
 

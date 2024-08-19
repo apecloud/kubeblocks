@@ -23,7 +23,7 @@ You can initiate a switchover for a MongoDB ReplicaSet. Then KubeBlocks modifies
      roleProbe:
        failureThreshold: 3
        periodSeconds: 2
-       timeoutSeconds: 1
+       timeoutSeconds: 2
    ```
 
 ## Initiate the switchover

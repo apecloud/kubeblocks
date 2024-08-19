@@ -151,7 +151,7 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1alpha1
 	//  - back-off to retry
 	//  - timeout
 	for _, pod := range a.pods {
-		cli, err1 := kbacli.NewClient(*pod)
+		cli, err1 := kbacli.NewClient(*pod, mapActionName(la))
 		if err1 != nil {
 			return err1
 		}
@@ -228,4 +228,22 @@ func (a *kbagent) error2(la lifecycleAction, err error) error {
 	default:
 		return err
 	}
+}
+
+func mapActionName(la lifecycleAction) string {
+	actionNameMap := map[string]string{
+		"postProvision":    "postpr",
+		"preTerminate":     "preter",
+		"switchover":       "switch",
+		"memberJoin":       "mbrin",
+		"memberLeave":      "mbrlv",
+		"readOnly":         "readol",
+		"readWrite":        "readwr",
+		"dataDump":         "datadp",
+		"dataLoad":         "datald",
+		"reconfigure":      "reconf",
+		"accountProvision": "accpr",
+		"roleProbe":        "rolepb",
+	}
+	return actionNameMap[la.name()]
 }

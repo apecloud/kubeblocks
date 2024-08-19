@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -37,10 +38,12 @@ import (
 )
 
 const (
-	kbAgentContainerName     = "kbagent"
+	kbAgentContainerName     = "kba"
 	kbAgentInitContainerName = "init-kbagent"
 	kbAgentCommand           = "/bin/kbagent"
 	kbAgentPortName          = "http"
+	kbAgentPortArg           = "--port"
+	kbAgentTCPProtocol       = "TCP"
 
 	kbAgentSharedMountPath      = "/kubeblocks"
 	kbAgentCommandOnSharedMount = "/kubeblocks/kbagent"
@@ -56,7 +59,7 @@ var (
 
 func IsKBAgentContainer(c *corev1.Container) bool {
 	// TODO: Because the implementation of multiple images is required, an update is needed here. About kbAgentContainerName
-	return c.Name == kbAgentContainerName || c.Name == kbAgentInitContainerName
+	return c.Name == kbAgentContainerName || c.Name == kbAgentInitContainerName || strings.Contains(kbAgentContainerName, c.Name)
 }
 
 func UpdateKBAgentContainer4HostNetwork(synthesizedComp *SynthesizedComponent) {
@@ -79,7 +82,7 @@ func UpdateKBAgentContainer4HostNetwork(synthesizedComp *SynthesizedComponent) {
 
 	// update port in args
 	for i, arg := range c.Args {
-		if arg == "--port" {
+		if arg == kbAgentPortArg {
 			c.Args[i+1] = strconv.Itoa(httpPort)
 			break
 		}
@@ -131,11 +134,11 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 		container.Ports = []corev1.ContainerPort{
 			{
 				ContainerPort: ports[i],
-				Name:          container.Name + "-" + kbAgentPortName,
-				Protocol:      "TCP",
+				Name:          fmt.Sprintf("%s-%s", container.Name, kbAgentPortName),
+				Protocol:      kbAgentTCPProtocol,
 			},
 		}
-		container.Args = append(container.Args, "--port", strconv.Itoa(int(ports[i])))
+		container.Args = append(container.Args, kbAgentPortArg, strconv.Itoa(int(ports[i])))
 		container.StartupProbe = &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromInt32(ports[i])},
@@ -153,7 +156,7 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 				appsv1alpha1.HostNetworkContainerPort{
 					Container: container.Name,
 					// TODO The port name is limited to 15 characters and needs to adjust the method of fetching ports in pod name and kbcli.
-					Ports: []string{container.Name + "-" + kbAgentPortName},
+					Ports: []string{fmt.Sprintf("%s-%s", container.Name, kbAgentPortName)},
 				})
 		}
 	}
@@ -270,7 +273,7 @@ func adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp *SynthesizedComp
 		} else {
 			wrapContainer.Image = c.Image
 		}
-		wrapContainer.Name = actionNames[i] + "-" + kbAgentContainerName
+		wrapContainer.Name = fmt.Sprintf("%s-%s", actionNames[i], kbAgentContainerName)
 		wrapContainer.Command[0] = kbAgentCommandOnSharedMount
 		wrapContainer.VolumeMounts = append(wrapContainer.VolumeMounts, sharedVolumeMount)
 		// TODO: share more container resources
@@ -306,18 +309,18 @@ func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) ([]s
 
 	// TODO: Discussion is needed for the definition of action name
 	actionNameMap := map[*appsv1alpha1.Action]string{
-		synthesizedComp.LifecycleActions.PostProvision:     "postprovision",
-		synthesizedComp.LifecycleActions.PreTerminate:      "preterminate",
-		synthesizedComp.LifecycleActions.Switchover:        "switchover",
-		synthesizedComp.LifecycleActions.MemberJoin:        "memberjoin",
-		synthesizedComp.LifecycleActions.MemberLeave:       "memberleave",
-		synthesizedComp.LifecycleActions.Readonly:          "readonly",
-		synthesizedComp.LifecycleActions.Readwrite:         "readwrite",
-		synthesizedComp.LifecycleActions.DataDump:          "datadump",
-		synthesizedComp.LifecycleActions.DataLoad:          "dataload",
-		synthesizedComp.LifecycleActions.Reconfigure:       "reconfigure",
-		synthesizedComp.LifecycleActions.AccountProvision:  "accountprovision",
-		&synthesizedComp.LifecycleActions.RoleProbe.Action: "roleprobe",
+		synthesizedComp.LifecycleActions.PostProvision:     "postpr",
+		synthesizedComp.LifecycleActions.PreTerminate:      "preter",
+		synthesizedComp.LifecycleActions.Switchover:        "switch",
+		synthesizedComp.LifecycleActions.MemberJoin:        "mbrin",
+		synthesizedComp.LifecycleActions.MemberLeave:       "mbrlv",
+		synthesizedComp.LifecycleActions.Readonly:          "readol",
+		synthesizedComp.LifecycleActions.Readwrite:         "readwr",
+		synthesizedComp.LifecycleActions.DataDump:          "datadp",
+		synthesizedComp.LifecycleActions.DataLoad:          "datald",
+		synthesizedComp.LifecycleActions.Reconfigure:       "reconf",
+		synthesizedComp.LifecycleActions.AccountProvision:  "accpr",
+		&synthesizedComp.LifecycleActions.RoleProbe.Action: "rolepb",
 	}
 
 	var images []string

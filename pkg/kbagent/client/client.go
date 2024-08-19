@@ -34,7 +34,7 @@ import (
 
 // TODO: move to a common package
 const (
-	kbAgentContainerName = "kbagent"
+	kbAgentContainerName = "kba"
 	kbAgentPortName      = "http"
 )
 
@@ -62,12 +62,15 @@ func GetMockClient() Client {
 	return mockClient
 }
 
-func NewClient(pod corev1.Pod) (Client, error) {
+func NewClient(pod corev1.Pod, actionName string) (Client, error) {
 	if mockClient != nil || mockClientError != nil {
 		return mockClient, mockClientError
 	}
 
-	port, err := intctrlutil.GetPortByName(pod, kbAgentContainerName, kbAgentPortName)
+	portName := fmt.Sprintf("%s-%s", actionName, kbAgentContainerName)
+	containerPortName := fmt.Sprintf("%s-%s-%s", actionName, kbAgentContainerName, kbAgentPortName)
+
+	port, err := intctrlutil.GetPortByName(pod, portName, containerPortName)
 	if err != nil {
 		// has no kb-agent defined
 		return nil, nil

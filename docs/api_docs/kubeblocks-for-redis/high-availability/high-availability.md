@@ -25,7 +25,7 @@ In the RedisReplication Cluster provided by KubeBlocks, Sentinel is deployed as 
     >
     probes:
       roleProbe:
-        failureThreshold: 3
+        failureThreshold: 2
         periodSeconds: 2
         timeoutSeconds: 1
     ```

@@ -127,7 +127,7 @@ If there is no data in the dashboard, you can check whether the job is `kubebloc
 
 ### (Optional) Enable remote write
 
-KubeBlocks supports the `victoria-metrics-agent` addon to enable you to remotely write the data to your VM. Compared with the native Prometheus, [vmgent](https://docs.victoriametrics.com/vmagent.html) is lighter.
+KubeBlocks supports the `victoria-metrics-agent` addon to enable you to remotely write the data to your VM. Compared with the native Prometheus, [vmagent](https://docs.victoriametrics.com/vmagent.html) is lighter.
 
 Install the `victoria-metrics-agent` addon.
 

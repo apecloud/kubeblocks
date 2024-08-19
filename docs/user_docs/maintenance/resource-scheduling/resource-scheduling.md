@@ -9,7 +9,7 @@ sidebar_position: 1
 
 Affinity controls the selection logic of pod allocation on nodes. By a reasonable allocation of Kubernetes pods on different nodes, the business availability, resource usage rate, and stability are improved.
 
-Affinity and toleration can be set by `kbcli` or the CR YAML file of the cluster. `kbcli` only supports the cluster-level configuration and the CR YAML file supports both the cluster-level and component-level configurations.
+Affinity and toleration can be set by `kbcli`. `kbcli` only supports the cluster-level configuration. If you want to realize the cluster-level and component-level configurations, you can configure the CR YAML file and refer to the [API docs](./../../../api_docs/maintenance/resource-scheduling/resource-scheduling.md) for details.
 
 
 Run `kbcli cluster create -h` to view the examples and the parameter options of affinity and toleration configurations.

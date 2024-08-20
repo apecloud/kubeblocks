@@ -110,8 +110,18 @@ func sortObjects[T client.Object](objects []T, rolePriorityMap map[string]int, r
 		role := strings.ToLower(objects[i].GetLabels()[constant.RoleLabelKey])
 		return rolePriorityMap[role]
 	}
+
+	// cache the parent names and ordinals to accelerate the parsing process when there is a massive number of Pods.
+	namesCache := make(map[string]string, len(objects))
+	ordinalsCache := make(map[string]int, len(objects))
 	getNameNOrdinalFunc := func(i int) (string, int) {
-		return ParseParentNameAndOrdinal(objects[i].GetName())
+		if name, ok := namesCache[objects[i].GetName()]; ok {
+			return name, ordinalsCache[objects[i].GetName()]
+		}
+		name, ordinal := ParseParentNameAndOrdinal(objects[i].GetName())
+		namesCache[objects[i].GetName()] = name
+		ordinalsCache[objects[i].GetName()] = ordinal
+		return name, ordinal
 	}
 	baseSort(objects, getNameNOrdinalFunc, getRolePriorityFunc, reverse)
 }

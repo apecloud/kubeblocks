@@ -275,10 +275,10 @@ func adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp *SynthesizedComp
 		}
 		wrapContainer.Name = fmt.Sprintf("%s-%s", actionNames[i], kbAgentContainerName)
 		wrapContainer.Command[0] = kbAgentCommandOnSharedMount
-		wrapContainer.VolumeMounts = append(wrapContainer.VolumeMounts, sharedVolumeMount)
+		wrapContainer.VolumeMounts = uniqueVolumeMounts(wrapContainer.VolumeMounts, []corev1.VolumeMount{sharedVolumeMount})
 		// TODO: share more container resources
 		if c != nil {
-			wrapContainer.VolumeMounts = append(wrapContainer.VolumeMounts, c.VolumeMounts...)
+			wrapContainer.VolumeMounts = uniqueVolumeMounts(wrapContainer.VolumeMounts, c.VolumeMounts)
 		}
 		cc[i] = wrapContainer
 	}
@@ -421,4 +421,22 @@ func iterAvailablePort(port int32, set map[int32]bool) (int32, error) {
 			port = minAvailablePort
 		}
 	}
+}
+
+func uniqueVolumeMounts(existingMounts []corev1.VolumeMount, newMounts []corev1.VolumeMount) []corev1.VolumeMount {
+	for _, vm := range newMounts {
+		if !mountPathExists(existingMounts, vm.MountPath) {
+			existingMounts = append(existingMounts, vm)
+		}
+	}
+	return existingMounts
+}
+
+func mountPathExists(volumeMounts []corev1.VolumeMount, mountPath string) bool {
+	for _, vm := range volumeMounts {
+		if vm.MountPath == mountPath {
+			return true
+		}
+	}
+	return false
 }

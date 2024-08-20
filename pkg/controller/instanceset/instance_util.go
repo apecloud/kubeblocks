@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
-	"regexp"
 	"slices"
 	"sort"
 	"strconv"
@@ -66,8 +65,6 @@ type instanceSetExt struct {
 	instanceTemplates []*workloads.InstanceTemplate
 }
 
-var instanceNameRegex = regexp.MustCompile("(.*)-([0-9]+)$")
-
 var (
 	reader *zstd.Decoder
 	writer *zstd.Encoder
@@ -91,13 +88,15 @@ type instance struct {
 func ParseParentNameAndOrdinal(s string) (string, int) {
 	parent := s
 	ordinal := -1
-	subMatches := instanceNameRegex.FindStringSubmatch(s)
-	if len(subMatches) < 3 {
+
+	index := strings.LastIndex(s, "-")
+	if index < 0 {
 		return parent, ordinal
 	}
-	parent = subMatches[1]
-	if i, err := strconv.ParseInt(subMatches[2], 10, 32); err == nil {
+	ordinalStr := s[index+1:]
+	if i, err := strconv.ParseInt(ordinalStr, 10, 32); err == nil {
 		ordinal = int(i)
+		parent = s[:index]
 	}
 	return parent, ordinal
 }

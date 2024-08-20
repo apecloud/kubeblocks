@@ -12549,14 +12549,6 @@ spec:
                               - Required
                               - Optional
                               type: string
-                            instanceNames:
-                              description: |-
-                                Reference to the instanceName list of the component.
-                                and the value will be presented in the following format: instanceName1,instanceName2,...
-                              enum:
-                              - Required
-                              - Optional
-                              type: string
                             multipleClusterObjectOption:
                               description: |-
                                 This option defines the behavior when multiple component objects match the specified @CompDef.
@@ -12621,6 +12613,44 @@ spec:
                               - Required
                               - Optional
                               type: string
+                            podFQDNsForRole:
+                              description: |-
+                                Reference to the pod FQDN list of the component that have a specific role.
+                                The value will be presented in the following format: FQDN1,FQDN2,...
+                              properties:
+                                option:
+                                  description: VarOption defines whether a variable
+                                    is required or optional.
+                                  enum:
+                                  - Required
+                                  - Optional
+                                  type: string
+                                role:
+                                  type: string
+                              type: object
+                            podNames:
+                              description: |-
+                                Reference to the pod name list of the component.
+                                and the value will be presented in the following format: name1,name2,...
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
+                            podNamesForRole:
+                              description: |-
+                                Reference to the pod name list of the component that have a specific role.
+                                The value will be presented in the following format: name1,name2,...
+                              properties:
+                                option:
+                                  description: VarOption defines whether a variable
+                                    is required or optional.
+                                  enum:
+                                  - Required
+                                  - Optional
+                                  type: string
+                                role:
+                                  type: string
+                              type: object
                             replicas:
                               description: Reference to the replicas of the component.
                               enum:

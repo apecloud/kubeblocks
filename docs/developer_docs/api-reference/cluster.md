@@ -8115,7 +8115,7 @@ VarOption
 </tr>
 <tr>
 <td>
-<code>instanceNames</code><br/>
+<code>podNames</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.VarOption">
 VarOption
@@ -8124,8 +8124,8 @@ VarOption
 </td>
 <td>
 <em>(Optional)</em>
-<p>Reference to the instanceName list of the component.
-and the value will be presented in the following format: instanceName1,instanceName2,&hellip;</p>
+<p>Reference to the pod name list of the component.
+and the value will be presented in the following format: name1,name2,&hellip;</p>
 </td>
 </tr>
 <tr>
@@ -8140,6 +8140,36 @@ VarOption
 <td>
 <em>(Optional)</em>
 <p>Reference to the pod FQDN list of the component.
+The value will be presented in the following format: FQDN1,FQDN2,&hellip;</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podNamesForRole</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.RoledVar">
+RoledVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reference to the pod name list of the component that have a specific role.
+The value will be presented in the following format: name1,name2,&hellip;</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podFQDNsForRole</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.RoledVar">
+RoledVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reference to the pod FQDN list of the component that have a specific role.
 The value will be presented in the following format: FQDN1,FQDN2,&hellip;</p>
 </td>
 </tr>
@@ -14927,6 +14957,47 @@ This value is set to 0 by default, indicating that there will be no delay betwee
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.RoledVar">RoledVar
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentVars">ComponentVars</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>role</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>option</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.Rule">Rule
 </h3>
 <p>
@@ -17813,7 +17884,7 @@ string
 <h3 id="apps.kubeblocks.io/v1alpha1.VarOption">VarOption
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterVars">ClusterVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentVars">ComponentVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.CredentialVars">CredentialVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.NamedVar">NamedVar</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVars">ServiceRefVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVars">ServiceVars</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterVars">ClusterVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentVars">ComponentVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.CredentialVars">CredentialVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.NamedVar">NamedVar</a>, <a href="#apps.kubeblocks.io/v1alpha1.RoledVar">RoledVar</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVars">ServiceRefVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVars">ServiceVars</a>)
 </p>
 <div>
 <p>VarOption defines whether a variable is required or optional.</p>

@@ -301,7 +301,6 @@ const (
 	ConditionTypeApplyResources      = "ApplyResources"      // ConditionTypeApplyResources the operator start to apply resources to create or change the cluster
 	ConditionTypeReplicasReady       = "ReplicasReady"       // ConditionTypeReplicasReady all pods of components are ready
 	ConditionTypeReady               = "Ready"               // ConditionTypeReady all components are running
-	ConditionTypeSwitchoverPrefix    = "Switchover-"         // ConditionTypeSwitchoverPrefix component status condition of switchover
 )
 
 // Phase represents the current status of the ClusterDefinition CR.
@@ -914,6 +913,14 @@ type NamedVar struct {
 	Option *VarOption `json:"option,omitempty"`
 }
 
+type RoledVar struct {
+	// +optional
+	Role string `json:"role,omitempty"`
+
+	// +optional
+	Option *VarOption `json:"option,omitempty"`
+}
+
 // ContainerVars defines the vars that can be referenced from a Container.
 type ContainerVars struct {
 	// The name of the container.
@@ -1035,17 +1042,29 @@ type ComponentVars struct {
 	// +optional
 	Replicas *VarOption `json:"replicas,omitempty"`
 
-	// Reference to the instanceName list of the component.
-	// and the value will be presented in the following format: instanceName1,instanceName2,...
+	// Reference to the pod name list of the component.
+	// and the value will be presented in the following format: name1,name2,...
 	//
 	// +optional
-	InstanceNames *VarOption `json:"instanceNames,omitempty"`
+	PodNames *VarOption `json:"podNames,omitempty"`
 
 	// Reference to the pod FQDN list of the component.
 	// The value will be presented in the following format: FQDN1,FQDN2,...
 	//
 	// +optional
 	PodFQDNs *VarOption `json:"podFQDNs,omitempty"`
+
+	// Reference to the pod name list of the component that have a specific role.
+	// The value will be presented in the following format: name1,name2,...
+	//
+	// +optional
+	PodNamesForRole *RoledVar `json:"podNamesForRole,omitempty"`
+
+	// Reference to the pod FQDN list of the component that have a specific role.
+	// The value will be presented in the following format: FQDN1,FQDN2,...
+	//
+	// +optional
+	PodFQDNsForRole *RoledVar `json:"podFQDNsForRole,omitempty"`
 }
 
 // ClusterVarSelector selects a var from a Cluster.

@@ -21,6 +21,8 @@ package workloads
 
 import (
 	"context"
+	"os"
+	"runtime/pprof"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -78,6 +80,25 @@ type InstanceSetReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 func (r *InstanceSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithValues("InstanceSet", req.NamespacedName)
+
+	profFilename := "/Users/free6om/GolandProjects/playground/p10k/reconcile.pprof"
+
+	var f *os.File
+	_, err := os.Stat(profFilename)
+	if os.IsNotExist(err) {
+		f, err = os.Create(profFilename)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	} else if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	err = pprof.StartCPUProfile(f)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	defer pprof.StopCPUProfile()
 
 	res, err := kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
 		Prepare(instanceset.NewTreeLoader()).

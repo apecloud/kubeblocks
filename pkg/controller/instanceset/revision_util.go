@@ -23,10 +23,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/apecloud/kubeblocks/pkg/lru"
+	"github.com/json-iterator/go"
 	"hash"
 	"hash/fnv"
-	"strconv"
-
 	apps "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"strconv"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -46,6 +47,8 @@ const ControllerRevisionHashLabel = "controller.kubernetes.io/hash"
 var Codecs = serializer.NewCodecFactory(model.GetScheme())
 var patchCodec = Codecs.LegacyCodec(workloads.SchemeGroupVersion)
 var controllerKind = apps.SchemeGroupVersion.WithKind("StatefulSet")
+
+var jsonIter = jsoniter.ConfigCompatibleWithStandardLibrary
 
 func NewRevision(its *workloads.InstanceSet) (*apps.ControllerRevision, error) {
 	patch, err := getPatch(its)
@@ -159,6 +162,8 @@ func DeepHashObject(hasher hash.Hash, objectToWrite interface{}) {
 	fmt.Fprintf(hasher, "%v", dump.ForHash(objectToWrite))
 }
 
+var revisionsCache = lru.New(1024)
+
 func GetRevisions(revisions map[string]string) (map[string]string, error) {
 	if revisions == nil {
 		return nil, nil
@@ -166,6 +171,9 @@ func GetRevisions(revisions map[string]string) (map[string]string, error) {
 	revisionsStr, ok := revisions[revisionsZSTDKey]
 	if !ok {
 		return revisions, nil
+	}
+	if revisionsInCache, ok := revisionsCache.Get(revisionsStr); ok {
+		return revisionsInCache.(map[string]string), nil
 	}
 	revisionsData, err := base64.StdEncoding.DecodeString(revisionsStr)
 	if err != nil {
@@ -176,9 +184,11 @@ func GetRevisions(revisions map[string]string) (map[string]string, error) {
 		return nil, err
 	}
 	updateRevisions := make(map[string]string)
-	if err = json.Unmarshal(revisionsJSON, &updateRevisions); err != nil {
+
+	if err = jsonIter.Unmarshal(revisionsJSON, &updateRevisions); err != nil {
 		return nil, err
 	}
+	revisionsCache.Put(revisionsStr, updateRevisions)
 	return updateRevisions, nil
 }
 
@@ -187,7 +197,7 @@ func buildRevisions(updateRevisions map[string]string) (map[string]string, error
 	if len(updateRevisions) <= maxPlainRevisionCount {
 		return updateRevisions, nil
 	}
-	revisionsJSON, err := json.Marshal(updateRevisions)
+	revisionsJSON, err := jsonIter.Marshal(updateRevisions)
 	if err != nil {
 		return nil, err
 	}

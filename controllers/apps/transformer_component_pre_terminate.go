@@ -20,9 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"fmt"
 	"time"
 
+	"k8s.io/apimachinery/pkg/types"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/component/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -44,8 +48,17 @@ func (t *componentPreTerminateTransformer) Transform(ctx graph.TransformContext,
 		return nil
 	}
 
-	synthesizedComp := transCtx.SynthesizeComponent
-	if synthesizedComp == nil || synthesizedComp.LifecycleActions == nil || synthesizedComp.LifecycleActions.PreTerminate == nil {
+	if len(comp.Spec.CompDef) == 0 {
+		return nil
+	}
+	compDefKey := types.NamespacedName{
+		Name: comp.Spec.CompDef,
+	}
+	compDef := &appsv1alpha1.ComponentDefinition{}
+	if err := transCtx.Client.Get(transCtx.Context, compDefKey, compDef); err != nil {
+		return err
+	}
+	if compDef.Spec.LifecycleActions == nil || compDef.Spec.LifecycleActions.PreTerminate == nil {
 		return nil
 	}
 
@@ -54,7 +67,7 @@ func (t *componentPreTerminateTransformer) Transform(ctx graph.TransformContext,
 	if t.checkPreTerminateDone(transCtx, dag) {
 		return nil
 	}
-	err := t.preTerminate(transCtx)
+	err := t.preTerminate(transCtx, compDef)
 	if err != nil {
 		return lifecycle.IgnoreNotDefined(err)
 	}
@@ -89,10 +102,37 @@ func (t *componentPreTerminateTransformer) markPreTerminateDone(transCtx *compon
 	return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting for pre-terminate annotation to be set")
 }
 
-func (t *componentPreTerminateTransformer) preTerminate(transCtx *componentTransformContext) error {
-	lfa, err := lifecycleAction4Component(transCtx)
+func (t *componentPreTerminateTransformer) preTerminate(transCtx *componentTransformContext, compDef *appsv1alpha1.ComponentDefinition) error {
+	lfa, err := t.lifecycleAction4Component(transCtx, compDef)
 	if err != nil {
 		return err
 	}
 	return lfa.PreTerminate(transCtx.Context, transCtx.Client, nil)
+}
+
+func (t *componentPreTerminateTransformer) lifecycleAction4Component(transCtx *componentTransformContext, compDef *appsv1alpha1.ComponentDefinition) (lifecycle.Lifecycle, error) {
+	var (
+		comp        = transCtx.Component
+		namespace   = comp.Namespace
+		clusterName string
+		compName    string
+		err         error
+	)
+	clusterName, err = component.GetClusterName(comp)
+	if err != nil {
+		return nil, err
+	}
+	compName, err = component.ShortName(clusterName, comp.Name)
+	if err != nil {
+		return nil, err
+	}
+	pods, err1 := component.ListOwnedPods(transCtx.Context, transCtx.Client, namespace, clusterName, compName)
+	if err1 != nil {
+		return nil, err1
+	}
+	if len(pods) == 0 {
+		// TODO: (good-first-issue) we should handle the case that the component has no pods
+		return nil, fmt.Errorf("has no pods to running the pre-terminate action")
+	}
+	return lifecycle.NewWithCompDef(namespace, clusterName, compName, compDef, nil, pods...)
 }

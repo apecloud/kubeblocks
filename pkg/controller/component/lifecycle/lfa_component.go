@@ -32,8 +32,10 @@ import (
 )
 
 type postProvision struct {
-	synthesizedComp *component.SynthesizedComponent
-	action          *appsv1alpha1.Action
+	namespace   string
+	clusterName string
+	compName    string
+	action      *appsv1alpha1.Action
 }
 
 var _ lifecycleAction = &postProvision{}
@@ -43,12 +45,14 @@ func (a *postProvision) name() string {
 }
 
 func (a *postProvision) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {
-	return hackParameters4Comp(ctx, cli, a.synthesizedComp, false)
+	return hackParameters4Comp(ctx, cli, a.namespace, a.clusterName, a.compName, false)
 }
 
 type preTerminate struct {
-	synthesizedComp *component.SynthesizedComponent
-	action          *appsv1alpha1.Action
+	namespace   string
+	clusterName string
+	compName    string
+	action      *appsv1alpha1.Action
 }
 
 var _ lifecycleAction = &preTerminate{}
@@ -58,7 +62,7 @@ func (a *preTerminate) name() string {
 }
 
 func (a *preTerminate) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {
-	return hackParameters4Comp(ctx, cli, a.synthesizedComp, true)
+	return hackParameters4Comp(ctx, cli, a.namespace, a.clusterName, a.compName, true)
 }
 
 ////////// hack for legacy Addons //////////
@@ -92,7 +96,7 @@ func (a *preTerminate) parameters(ctx context.Context, cli client.Reader) (map[s
 //   Contrast this with a cluster deletion scenario where data rebalancing is not required as the entire cluster
 //   is being cleaned up.
 
-func hackParameters4Comp(ctx context.Context, cli client.Reader, synthesizedComp *component.SynthesizedComponent, terminate bool) (map[string]string, error) {
+func hackParameters4Comp(ctx context.Context, cli client.Reader, namespace, clusterName, compName string, terminate bool) (map[string]string, error) {
 	const (
 		clusterPodNameList     = "KB_CLUSTER_POD_NAME_LIST"
 		clusterPodIPList       = "KB_CLUSTER_POD_IP_LIST"
@@ -108,19 +112,12 @@ func hackParameters4Comp(ctx context.Context, cli client.Reader, synthesizedComp
 		scalingInComp          = "KB_CLUSTER_COMPONENT_IS_SCALING_IN"
 	)
 
-	var (
-		namespace   = synthesizedComp.Namespace
-		clusterName = synthesizedComp.ClusterName
-		compName    = synthesizedComp.Name
-	)
-
-	m := map[string]string{}
-
 	compList := &appsv1alpha1.ComponentList{}
 	if err := cli.List(ctx, compList, client.InNamespace(namespace), client.MatchingLabels{constant.AppInstanceLabelKey: clusterName}); err != nil {
 		return nil, err
 	}
 
+	m := map[string]string{}
 	if err := func() error {
 		cl := make([][]string, 0)
 		ccl := make([][]string, 0)

@@ -78,14 +78,14 @@ func (t *componentPostProvisionTransformer) markPostProvisionDone(transCtx *comp
 }
 
 func (t *componentPostProvisionTransformer) postProvision(transCtx *componentTransformContext) error {
-	lfa, err := lifecycleAction4Component(transCtx)
+	lfa, err := t.lifecycleAction4Component(transCtx)
 	if err != nil {
 		return err
 	}
 	return lfa.PostProvision(transCtx.Context, transCtx.Client, nil)
 }
 
-func lifecycleAction4Component(transCtx *componentTransformContext) (lifecycle.Lifecycle, error) {
+func (t *componentPostProvisionTransformer) lifecycleAction4Component(transCtx *componentTransformContext) (lifecycle.Lifecycle, error) {
 	synthesizedComp := transCtx.SynthesizeComponent
 	pods, err := component.ListOwnedPods(transCtx.Context, transCtx.Client,
 		synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)

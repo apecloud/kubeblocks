@@ -309,18 +309,20 @@ func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) ([]s
 
 	// TODO: Discussion is needed for the definition of action name
 	actionNameMap := map[*appsv1alpha1.Action]string{
-		synthesizedComp.LifecycleActions.PostProvision:     "postpr",
-		synthesizedComp.LifecycleActions.PreTerminate:      "preter",
-		synthesizedComp.LifecycleActions.Switchover:        "switch",
-		synthesizedComp.LifecycleActions.MemberJoin:        "mbrin",
-		synthesizedComp.LifecycleActions.MemberLeave:       "mbrlv",
-		synthesizedComp.LifecycleActions.Readonly:          "readol",
-		synthesizedComp.LifecycleActions.Readwrite:         "readwr",
-		synthesizedComp.LifecycleActions.DataDump:          "datadp",
-		synthesizedComp.LifecycleActions.DataLoad:          "datald",
-		synthesizedComp.LifecycleActions.Reconfigure:       "reconf",
-		synthesizedComp.LifecycleActions.AccountProvision:  "accpr",
-		&synthesizedComp.LifecycleActions.RoleProbe.Action: "rolepb",
+		synthesizedComp.LifecycleActions.PostProvision:    "postpr",
+		synthesizedComp.LifecycleActions.PreTerminate:     "preter",
+		synthesizedComp.LifecycleActions.Switchover:       "switch",
+		synthesizedComp.LifecycleActions.MemberJoin:       "mbrin",
+		synthesizedComp.LifecycleActions.MemberLeave:      "mbrlv",
+		synthesizedComp.LifecycleActions.Readonly:         "readol",
+		synthesizedComp.LifecycleActions.Readwrite:        "readwr",
+		synthesizedComp.LifecycleActions.DataDump:         "datadp",
+		synthesizedComp.LifecycleActions.DataLoad:         "datald",
+		synthesizedComp.LifecycleActions.Reconfigure:      "reconf",
+		synthesizedComp.LifecycleActions.AccountProvision: "accpr",
+	}
+	if synthesizedComp.LifecycleActions.RoleProbe != nil && synthesizedComp.LifecycleActions.RoleProbe.Exec != nil {
+		actionNameMap[&synthesizedComp.LifecycleActions.RoleProbe.Action] = "rolepb"
 	}
 
 	var images []string

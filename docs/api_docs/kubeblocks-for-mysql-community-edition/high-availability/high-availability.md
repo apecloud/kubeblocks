@@ -63,7 +63,7 @@ The faults here are all simulated by deleting pods. When there are sufficient re
 
    ***How the automatic recovery works***
 
-   After the primary pod is deleted, the MySQL Replication Cluster elects a new primary pod. In this example, `mycluster-mysql-0` is elected as the new primary pod. KubeBlocks detects that the primary pod has changed, and sends a notification to update the access link. The original exception node automatically rebuilds and recovers to the normal Replication Cluster state. It normally takes 30 seconds from exception to recovery.
+   After the primary pod is deleted, the MySQL Replication Cluster elects a new primary pod. In this example, `mycluster-mysql-1` is elected as the new primary pod. KubeBlocks detects that the primary pod has changed, and sends a notification to update the access link. The original exception node automatically rebuilds and recovers to the normal Replication Cluster state. It normally takes 30 seconds from exception to recovery.
 
 ### Secondary pod exception
 

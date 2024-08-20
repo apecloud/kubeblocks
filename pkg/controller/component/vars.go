@@ -36,6 +36,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -155,7 +156,7 @@ func buildLegacyImplicitEnvVars(synthesizedComp *SynthesizedComponent, legacy bo
 
 func resolveBuiltinNObjectRefVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	definedVars []appsv1alpha1.EnvVar) ([]corev1.EnvVar, []corev1.EnvVar, error) {
-	vars := builtinTemplateVars(synthesizedComp)
+	vars := builtinTemplateVars(synthesizedComp, definedVars)
 	vars1, vars2, err := resolveClusterObjectRefVars(ctx, cli, synthesizedComp, definedVars)
 	if err != nil {
 		return nil, nil, err
@@ -167,17 +168,29 @@ func resolveBuiltinNObjectRefVars(ctx context.Context, cli client.Reader, synthe
 	return vars, vars2, nil
 }
 
-func builtinTemplateVars(synthesizedComp *SynthesizedComponent) []corev1.EnvVar {
+func builtinTemplateVars(synthesizedComp *SynthesizedComponent, definedVars []appsv1alpha1.EnvVar) []corev1.EnvVar {
 	if synthesizedComp != nil {
-		return []corev1.EnvVar{
-			{Name: constant.KBEnvNamespace, Value: synthesizedComp.Namespace},
-			{Name: constant.KBEnvClusterName, Value: synthesizedComp.ClusterName},
-			{Name: constant.KBEnvClusterUID, Value: synthesizedComp.ClusterUID},
-			{Name: constant.KBEnvClusterCompName, Value: constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name)},
-			{Name: constant.KBEnvCompName, Value: synthesizedComp.Name},
-			{Name: constant.KBEnvCompReplicas, Value: strconv.Itoa(int(synthesizedComp.Replicas))},
-			{Name: constant.KBEnvClusterUIDPostfix8Deprecated, Value: clusterUIDPostfix(synthesizedComp)},
+		// keep those vars to be compatible with legacy.
+		defined := sets.New[string]()
+		for _, v := range definedVars {
+			defined.Insert(v.Name)
 		}
+
+		vars := make([]corev1.EnvVar, 0)
+		for _, e := range [][]string{
+			{constant.KBEnvNamespace, synthesizedComp.Namespace},
+			{constant.KBEnvClusterName, synthesizedComp.ClusterName},
+			{constant.KBEnvClusterUID, synthesizedComp.ClusterUID},
+			{constant.KBEnvClusterCompName, constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name)},
+			{constant.KBEnvCompName, synthesizedComp.Name},
+			{constant.KBEnvCompReplicas, strconv.Itoa(int(synthesizedComp.Replicas))},
+			{constant.KBEnvClusterUIDPostfix8Deprecated, clusterUIDPostfix(synthesizedComp)},
+		} {
+			if !defined.Has(e[0]) {
+				vars = append(vars, corev1.EnvVar{Name: e[0], Value: e[1]})
+			}
+		}
+		return vars
 	}
 	return []corev1.EnvVar{}
 }
@@ -495,6 +508,8 @@ func resolveClusterObjectVarRef(ctx context.Context, cli client.Reader, synthesi
 		return resolveServiceRefVarRef(ctx, cli, synthesizedComp, defineKey, *source.ServiceRefVarRef)
 	case source.ComponentVarRef != nil:
 		return resolveComponentVarRef(ctx, cli, synthesizedComp, defineKey, *source.ComponentVarRef)
+	case source.ClusterVarRef != nil:
+		return resolveClusterVarRef(ctx, cli, synthesizedComp, defineKey, *source.ClusterVarRef)
 	}
 	return nil, nil, nil
 }
@@ -616,6 +631,8 @@ func resolveServiceVarRef(ctx context.Context, cli client.Reader, synthesizedCom
 	defineKey string, selector appsv1alpha1.ServiceVarSelector) ([]corev1.EnvVar, []corev1.EnvVar, error) {
 	var resolveFunc func(context.Context, client.Reader, *SynthesizedComponent, string, appsv1alpha1.ServiceVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error)
 	switch {
+	case selector.ServiceType != nil:
+		resolveFunc = resolveServiceTypeRef
 	case selector.Host != nil && selector.LoadBalancer != nil:
 		resolveFunc = resolveServiceHostOrLoadBalancerRefAdaptive
 	case selector.Host != nil:
@@ -633,6 +650,25 @@ func resolveServiceVarRef(ctx context.Context, cli client.Reader, synthesizedCom
 type resolvedServiceObj struct {
 	service     *corev1.Service
 	podServices []*corev1.Service
+}
+
+func resolveServiceTypeRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+	defineKey string, selector appsv1alpha1.ServiceVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
+	resolveServiceType := func(obj any) (*corev1.EnvVar, *corev1.EnvVar, error) {
+		robj := obj.(*resolvedServiceObj)
+		services := []*corev1.Service{robj.service}
+		if robj.podServices != nil {
+			services = robj.podServices
+		}
+
+		serviceType := ""
+		if len(services) > 0 {
+			// all services' type should be the same
+			serviceType = string(services[0].Spec.Type)
+		}
+		return &corev1.EnvVar{Name: defineKey, Value: serviceType}, nil, nil
+	}
+	return resolveServiceVarRefLow(ctx, cli, synthesizedComp, selector, selector.ServiceType, resolveServiceType)
 }
 
 func resolveServiceHostRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
@@ -1242,6 +1278,20 @@ func resolveComponentVarRefLow(ctx context.Context, cli client.Reader, synthesiz
 		return resolveReferentObjects(synthesizedComp, selector.ClusterObjectReference, getter)
 	}
 	return resolveClusterObjectVars("Component", selector.ClusterObjectReference, option, resolveObjs, resolveVar)
+}
+
+func resolveClusterVarRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+	defineKey string, selector appsv1alpha1.ClusterVarSelector) ([]corev1.EnvVar, []corev1.EnvVar, error) {
+	switch {
+	case selector.Namespace != nil:
+		return []corev1.EnvVar{{Name: defineKey, Value: synthesizedComp.Namespace}}, nil, nil
+	case selector.ClusterName != nil:
+		return []corev1.EnvVar{{Name: defineKey, Value: synthesizedComp.ClusterName}}, nil, nil
+	case selector.ClusterUID != nil:
+		return []corev1.EnvVar{{Name: defineKey, Value: synthesizedComp.ClusterUID}}, nil, nil
+	default:
+		return nil, nil, nil
+	}
 }
 
 func resolveReferentObjects(synthesizedComp *SynthesizedComponent,

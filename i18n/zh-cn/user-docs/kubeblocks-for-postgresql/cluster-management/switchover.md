@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 
 # 切换 PostgreSQL 集群
 
-你可以通过执行 kbcli 或 kubectl 命令切换 PostgreSQL 主备版。切换后，KubeBlocks 将修改实例角色。
+你可以通过执行 kbcli 命令切换 PostgreSQL 主备版。切换后，KubeBlocks 将修改实例角色。
 
 ## 开始之前
 
@@ -23,18 +23,14 @@ import TabItem from '@theme/TabItem';
    >
    probes:
      roleProbe:
-       failureThreshold: 3
-       periodSeconds: 2
+       failureThreshold: 2
+       periodSeconds: 1
        timeoutSeconds: 1
    ```
 
 ## 切换集群
 
 将 PostgreSQL 主备版的从节点切换为主节点，原来的主节点实例将被切换为从节点实例。
-
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
 
 * 不指定主节点实例进行切换。
 
@@ -53,50 +49,6 @@ import TabItem from '@theme/TabItem';
     ```bash
     kbcli cluster promote mycluster --instance='mycluster-postgresql-2' --components='postgresql'
     ```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
-
-`instanceName` 的值决定了切换过程中是否指定了新的主节点实例。
-
-* 不指定主节点实例进行切换。
-
-  ```yaml
-  kubectl apply -f -<<EOF
-  apiVersion: apps.kubeblocks.io/v1alpha1
-  kind: OpsRequest
-  metadata:
-    name: mycluster-switchover-jhkgl
-  spec:
-    clusterRef: mycluster
-    type: Switchover
-    switchover:
-    - componentName: postgresql
-      instanceName: '*'
-  >>
-  ```
-
-* 指定一个新的主节点实例进行切换。
-
-  ```yaml
-  kubectl apply -f -<<EOF
-  apiVersion: apps.kubeblocks.io/v1alpha1
-  kind: OpsRequest
-  metadata:
-    name: mycluster-switchover-jhkgl
-  spec:
-    clusterRef: mycluster
-    type: Switchover
-    switchover:
-    - componentName: postgresql
-      instanceName: 'mycluster-postgresql-2'
-  >>
-  ```
-
-</TabItem>
-
-</Tabs>
 
 ## 验证集群切换
 

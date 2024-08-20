@@ -177,10 +177,10 @@ var _ = Describe("vars", func() {
 			Expect(err).Should(Succeed())
 
 			By("check default template vars")
-			checkTemplateVars(templateVars, builtinTemplateVars(synthesizedComp))
+			checkTemplateVars(templateVars, builtinTemplateVars(synthesizedComp, nil))
 
 			By("check default env vars")
-			targetEnvVars := builtinTemplateVars(synthesizedComp)
+			targetEnvVars := builtinTemplateVars(synthesizedComp, nil)
 			targetEnvVars = append(targetEnvVars, buildDefaultEnvVars(synthesizedComp, false)...)
 			checkEnvVars(envVars, targetEnvVars)
 		})
@@ -589,6 +589,20 @@ var _ = Describe("vars", func() {
 
 				vars := []appsv1alpha1.EnvVar{
 					{
+						Name: "service-type",
+						ValueFrom: &appsv1alpha1.VarSource{
+							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
+								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+									Name:     "service",
+									Optional: required(),
+								},
+								ServiceVars: appsv1alpha1.ServiceVars{
+									ServiceType: &appsv1alpha1.VarRequired,
+								},
+							},
+						},
+					},
+					{
 						Name: "service-host",
 						ValueFrom: &appsv1alpha1.VarSource{
 							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
@@ -644,6 +658,7 @@ var _ = Describe("vars", func() {
 							Name:      svcName,
 						},
 						Spec: corev1.ServiceSpec{
+							Type: corev1.ServiceTypeClusterIP,
 							Ports: []corev1.ServicePort{
 								{
 									Name: "default",
@@ -668,9 +683,11 @@ var _ = Describe("vars", func() {
 				}...)
 				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
+				Expect(templateVars).Should(HaveKeyWithValue("service-type", string(corev1.ServiceTypeClusterIP)))
 				Expect(templateVars).Should(HaveKeyWithValue("service-host", svcName))
 				Expect(templateVars).Should(HaveKeyWithValue("service-port", strconv.Itoa(svcPort)))
 				Expect(templateVars).Should(HaveKeyWithValue("service-port-wo-name", strconv.Itoa(svcPort+1)))
+				checkEnvVarWithValue(envVars, "service-type", string(corev1.ServiceTypeClusterIP))
 				checkEnvVarWithValue(envVars, "service-host", svcName)
 				checkEnvVarWithValue(envVars, "service-port", strconv.Itoa(svcPort))
 				checkEnvVarWithValue(envVars, "service-port-wo-name", strconv.Itoa(svcPort+1))
@@ -830,6 +847,20 @@ var _ = Describe("vars", func() {
 
 				vars := []appsv1alpha1.EnvVar{
 					{
+						Name: "pod-service-type",
+						ValueFrom: &appsv1alpha1.VarSource{
+							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
+								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+									Name:     "pod-service",
+									Optional: required(),
+								},
+								ServiceVars: appsv1alpha1.ServiceVars{
+									ServiceType: &appsv1alpha1.VarRequired,
+								},
+							},
+						},
+					},
+					{
 						Name: "pod-service-endpoint",
 						ValueFrom: &appsv1alpha1.VarSource{
 							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
@@ -899,6 +930,7 @@ var _ = Describe("vars", func() {
 				}...)
 				_, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
+				checkEnvVarWithValue(envVars, "pod-service-type", string(corev1.ServiceTypeNodePort))
 				checkEnvVarWithValue(envVars, "pod-service-endpoint", strings.Join([]string{svcName0, svcName1}, ","))
 				checkEnvVarWithValue(envVars, "pod-service-port", strings.Join([]string{fmt.Sprintf("%s:300001", svcName0), fmt.Sprintf("%s:300002", svcName1)}, ","))
 			})
@@ -1801,6 +1833,51 @@ var _ = Describe("vars", func() {
 				}
 				checkEnvVarWithValue(envVars, "podFQDNs", strings.Join(fqdnList(), ","))
 				checkEnvVarWithValue(envVars, "podFQDNs4Leader", PodFQDN(synthesizedComp.Namespace, synthesizedComp.FullCompName, podName("leader")))
+			})
+		})
+
+		Context("cluster vars", func() {
+			It("ok", func() {
+				vars := []appsv1alpha1.EnvVar{
+					{
+						Name: "namespace",
+						ValueFrom: &appsv1alpha1.VarSource{
+							ClusterVarRef: &appsv1alpha1.ClusterVarSelector{
+								ClusterVars: appsv1alpha1.ClusterVars{
+									Namespace: &appsv1alpha1.VarRequired,
+								},
+							},
+						},
+					},
+					{
+						Name: "name",
+						ValueFrom: &appsv1alpha1.VarSource{
+							ClusterVarRef: &appsv1alpha1.ClusterVarSelector{
+								ClusterVars: appsv1alpha1.ClusterVars{
+									ClusterName: &appsv1alpha1.VarRequired,
+								},
+							},
+						},
+					},
+					{
+						Name: "uid",
+						ValueFrom: &appsv1alpha1.VarSource{
+							ClusterVarRef: &appsv1alpha1.ClusterVarSelector{
+								ClusterVars: appsv1alpha1.ClusterVars{
+									ClusterUID: &appsv1alpha1.VarRequired,
+								},
+							},
+						},
+					},
+				}
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, nil, synthesizedComp, vars)
+				Expect(err).Should(Succeed())
+				Expect(templateVars).Should(HaveKeyWithValue("namespace", synthesizedComp.Namespace))
+				Expect(templateVars).Should(HaveKeyWithValue("name", synthesizedComp.ClusterName))
+				Expect(templateVars).Should(HaveKeyWithValue("uid", synthesizedComp.ClusterUID))
+				checkEnvVarWithValue(envVars, "namespace", synthesizedComp.Namespace)
+				checkEnvVarWithValue(envVars, "name", synthesizedComp.ClusterName)
+				checkEnvVarWithValue(envVars, "uid", synthesizedComp.ClusterUID)
 			})
 		})
 

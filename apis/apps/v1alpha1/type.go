@@ -814,24 +814,6 @@ type Service struct {
 	RoleSelector string `json:"roleSelector,omitempty"`
 }
 
-// List of all the built-in variables provided by KubeBlocks.
-// These variables are automatically available when building environment variables for Pods and Actions, as well as
-// rendering templates for config and script. Users can directly use these variables without explicit declaration.
-//
-// Note: Dynamic variables have values that may change at runtime, so exercise caution when using them.
-//
-// TODO: resources.
-// ----------------------------------------------------------------------------
-// | Object    | Attribute | Variable             | Template | Env  | Dynamic |
-// ----------------------------------------------------------------------------
-// | Namespace |           | KB_NAMESPACE         |          |      |         |
-// | Cluster   | Name      | KB_CLUSTER_NAME      |          |      |         |
-// |           | UID       | KB_CLUSTER_UID       |          |      |         |
-// |           | Component | KB_CLUSTER_COMP_NAME |          |      |         |
-// | Component | Name      | KB_COMP_NAME         |          |      |         |
-// |           | Replicas  | KB_COMP_REPLICAS     |          |      |    ✓    |
-// ----------------------------------------------------------------------------
-
 // EnvVar represents a variable present in the env of Pod/Action or the template of config/script.
 type EnvVar struct {
 	// Name of the variable. Must be a C_IDENTIFIER.
@@ -907,6 +889,10 @@ type VarSource struct {
 	// Selects a defined var of a Component.
 	// +optional
 	ComponentVarRef *ComponentVarSelector `json:"componentVarRef,omitempty"`
+
+	// Selects a defined var of a Cluster.
+	// +optional
+	ClusterVarRef *ClusterVarSelector `json:"clusterVarRef,omitempty"`
 }
 
 // VarOption defines whether a variable is required or optional.
@@ -956,6 +942,11 @@ type HostNetworkVars struct {
 
 // ServiceVars defines the vars that can be referenced from a Service.
 type ServiceVars struct {
+	// ServiceType references the type of the service.
+	//
+	// +optional
+	ServiceType *VarOption `json:"serviceType,omitempty"`
+
 	// +optional
 	Host *VarOption `json:"host,omitempty"`
 
@@ -1074,6 +1065,28 @@ type ComponentVars struct {
 	//
 	// +optional
 	PodFQDNsForRole *RoledVar `json:"podFQDNsForRole,omitempty"`
+}
+
+// ClusterVarSelector selects a var from a Cluster.
+type ClusterVarSelector struct {
+	ClusterVars `json:",inline"`
+}
+
+type ClusterVars struct {
+	// Reference to the namespace of the Cluster object.
+	//
+	// +optional
+	Namespace *VarOption `json:"namespace,omitempty"`
+
+	// Reference to the name of the Cluster object.
+	//
+	// +optional
+	ClusterName *VarOption `json:"clusterName,omitempty"`
+
+	// Reference to the UID of the Cluster object.
+	//
+	// +optional
+	ClusterUID *VarOption `json:"clusterUID,omitempty"`
 }
 
 // ClusterObjectReference defines information to let you locate the referenced object inside the same Cluster.

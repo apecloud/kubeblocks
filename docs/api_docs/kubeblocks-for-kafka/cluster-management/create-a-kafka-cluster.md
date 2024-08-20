@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 
 # Create a Kafka cluster
 
-This document shows how to create a Kafka cluster.
+This document shows how to create a Kafka cluster by `kubectl` or a YAML file.
 
 ## Before you start
 

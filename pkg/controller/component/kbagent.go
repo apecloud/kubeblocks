@@ -258,7 +258,7 @@ func adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp *SynthesizedComp
 	if err != nil {
 		return nil, err
 	}
-	if len(images) == 0 {
+	if len(actionNames) == 0 {
 		return nil, nil
 	}
 	// init-container to copy binaries to the shared mount point /kubeblocks

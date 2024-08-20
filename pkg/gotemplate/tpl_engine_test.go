@@ -21,12 +21,12 @@ package gotemplate
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
-	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/golang/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -88,7 +88,9 @@ my friend name is test2
 	Context("ssh-key-generator", func() {
 		It("Should success with no error", func() {
 			tplString := `
-{{- sshKeyGen | toJson }}
+{{- $key := sshKeyGen }}
+PRIVATE_KEY="{{ $key.PrivateKey }}"
+PUBLIC_KEY="{{ $key.PublicKey }}"
 `
 
 			context, err := emptyTplEngine(&TplValues{
@@ -97,10 +99,8 @@ my friend name is test2
 			}, nil, tplString)
 			Expect(err).NotTo(HaveOccurred())
 
-			var sshKey map[string]string
-			Expect(json.Unmarshal([]byte(context), &sshKey)).Should(Succeed())
-			Expect(sshKey).To(HaveKey("private_key"))
-			Expect(sshKey).To(HaveKey("public_key"))
+			Expect(context).To(ContainSubstring("PRIVATE_KEY"))
+			Expect(context).To(ContainSubstring("PUBLIC_KEY"))
 		})
 	})
 

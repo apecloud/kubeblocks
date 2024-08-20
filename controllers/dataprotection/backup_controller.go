@@ -35,6 +35,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/clock"
@@ -659,11 +660,11 @@ func (r *BackupReconciler) checkIsCompletedDuringRunning(reqCtx intctrlutil.Requ
 		backup.Status.Duration = &metav1.Duration{Duration: duration}
 	}
 
-	for i, act := range backup.Status.Actions {
+	for i := range backup.Status.Actions {
+		act := &backup.Status.Actions[i]
 		act.Phase = dpv1alpha1.ActionPhaseCompleted
 		act.AvailableReplicas = pointer.Int32(int32(0))
 		act.CompletionTimestamp = backup.Status.CompletionTimestamp
-		backup.Status.Actions[i] = act
 	}
 
 	return true, r.Client.Status().Patch(reqCtx.Ctx, backup, patch)
@@ -719,9 +720,9 @@ func (r *BackupReconciler) deleteExternalResources(
 	labels := dpbackup.BuildBackupWorkloadLabels(backup)
 
 	// use map to avoid duplicate deletion of the same namespace.
-	namespaces := map[string]bool{
-		backup.Namespace: true,
-		viper.GetString(constant.CfgKeyCtrlrMgrNS): true,
+	namespaces := map[string]sets.Empty{
+		backup.Namespace: {},
+		viper.GetString(constant.CfgKeyCtrlrMgrNS): {},
 	}
 
 	// delete the external jobs.
@@ -730,11 +731,7 @@ func (r *BackupReconciler) deleteExternalResources(
 	}
 
 	// delete the external statefulSets.
-	if err := deleteRelatedObjectList(reqCtx, r.Client, &appsv1.StatefulSetList{}, namespaces, labels); err != nil {
-		return err
-	}
-
-	return nil
+	return deleteRelatedObjectList(reqCtx, r.Client, &appsv1.StatefulSetList{}, namespaces, labels)
 }
 
 // PatchBackupObjectMeta patches backup object metaObject include cluster snapshot.

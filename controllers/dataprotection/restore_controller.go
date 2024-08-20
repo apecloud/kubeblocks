@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -128,9 +129,9 @@ func (r *RestoreReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 	labels := map[string]string{dprestore.DataProtectionRestoreLabelKey: restore.Name}
 
 	// use map to avoid duplicate deletion of the same namespace.
-	namespaces := map[string]bool{
-		restore.Namespace:                          true,
-		viper.GetString(constant.CfgKeyCtrlrMgrNS): true,
+	namespaces := map[string]sets.Empty{
+		restore.Namespace:                          {},
+		viper.GetString(constant.CfgKeyCtrlrMgrNS): {},
 	}
 
 	return deleteRelatedObjectList(reqCtx, r.Client, &batchv1.JobList{}, namespaces, labels)

@@ -34,6 +34,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -276,17 +277,11 @@ type objectList interface {
 	client.ObjectList
 }
 
-func deleteRelatedObjectList[T objectList](reqCtx intctrlutil.RequestCtx, cli client.Client, list T, namespaces map[string]bool, labels map[string]string) error {
+func deleteRelatedObjectList[T objectList](reqCtx intctrlutil.RequestCtx, cli client.Client, list T, namespaces map[string]sets.Empty, labels map[string]string) error {
 	if labels == nil || len(namespaces) == 0 {
 		return nil
 	}
 
-	items := reflect.ValueOf(list).Elem().FieldByName("Items")
-	if !items.IsValid() {
-		return fmt.Errorf("ObjectList has no Items field: %s", list.GetObjectKind().GroupVersionKind().String())
-	}
-
-	toBeDeleted := reflect.MakeSlice(items.Type(), 0, 0)
 	for ns := range namespaces {
 		if err := cli.List(reqCtx.Ctx, list, client.InNamespace(ns),
 			client.MatchingLabels(labels)); err != nil {
@@ -295,22 +290,17 @@ func deleteRelatedObjectList[T objectList](reqCtx intctrlutil.RequestCtx, cli cl
 		objs := reflect.ValueOf(list).Elem().FieldByName("Items")
 		if !objs.IsZero() {
 			for i := 0; i < objs.Len(); i++ {
-				toBeDeleted = reflect.Append(toBeDeleted, objs.Index(i))
+				obj := objs.Index(i).Addr().Interface().(client.Object)
+				if err := dputils.RemoveDataProtectionFinalizer(reqCtx.Ctx, cli, obj); err != nil {
+					return err
+				}
+				if err := intctrlutil.BackgroundDeleteObject(cli, reqCtx.Ctx, obj); err != nil {
+					return err
+				}
 			}
 		}
 	}
 
-	if !toBeDeleted.IsZero() {
-		for i := 0; i < toBeDeleted.Len(); i++ {
-			item := toBeDeleted.Index(i).Addr().Interface().(client.Object)
-			if err := dputils.RemoveDataProtectionFinalizer(reqCtx.Ctx, cli, item); err != nil {
-				return err
-			}
-			if err := intctrlutil.BackgroundDeleteObject(cli, reqCtx.Ctx, item); err != nil {
-				return err
-			}
-		}
-	}
 	return nil
 }
 

@@ -160,7 +160,7 @@ func (r *RestoreManager) BuildContinuousRestoreManager(reqCtx intctrlutil.Reques
 		return err
 	}
 
-	if baseBackupRequired := continuousBackupSet.ActionSet.Spec.Restore.BaseBackupRequired; baseBackupRequired != nil && !*baseBackupRequired {
+	if baseBackupRequired := continuousBackupSet.ActionSet.Spec.Restore.BaseBackupRequired; boolptr.IsSetToFalse(baseBackupRequired) {
 		r.SetBackupSets(continuousBackupSet)
 		return nil
 	}

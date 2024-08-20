@@ -12,13 +12,7 @@ KubeBlocks 支持对 Kafka 集群进行垂直扩缩容和水平扩缩容。
 
 ## 垂直扩缩容
 
-你可以通过更改资源需求和限制（CPU 和存储）来垂直扩展集群。例如，如果你需要将资源类别从 1C2G 更改为 2C4G，就需要进行垂直扩容。
-
-:::note
-
-在垂直扩容时，所有的 Pod 将按照 Learner -> Follower -> Leader 的顺序重启。重启后，主节点可能会发生变化。
-
-:::
+你可以通过更改资源需求和限制（CPU 和存储）来垂直扩展集群。例如，可通过垂直扩容将资源类别从 1C2G 调整为 2C4G。
 
 ### 开始之前
 
@@ -33,9 +27,7 @@ ivy85   default     kafka                kafka-3.3.2   Delete               Runn
 
 ### 步骤
 
-1. 更改配置。共有 3 种方式进行垂直扩容。
-
-   **选项 1.** (**推荐**) 使用 kbcli
+1. 更改配置。
 
    配置参数 `--components`、`--memory` 和 `--cpu`，并执行以下命令。
 
@@ -47,68 +39,7 @@ ivy85   default     kafka                kafka-3.3.2   Delete               Runn
      - broker：在组合模式下表示所有节点；在分离模式下表示所有 broker 节点。
      - controller：表示在分离模式下的所有对应节点。
    - `--memory` 表示组件内存的请求和限制大小。
-   - `--cpu` 表示组件 CPU 的请求和限制大小。 
-
-   **选项 2.** 创建 OpsRequest
-  
-   将 OpsRequest 应用于指定的集群，根据需求配置参数。
-
-   ```bash
-   kubectl apply -f - <<EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: OpsRequest
-   metadata:
-     name: ops-vertical-scaling
-   spec:
-     clusterRef: ivy85
-     type: VerticalScaling 
-     verticalScaling:
-     - componentName: broker
-       requests:
-         memory: "2Gi"
-         cpu: "1000m"
-       limits:
-         memory: "4Gi"
-         cpu: "2000m"
-   EOF
-   ```
-  
-   **选项 3.** 修改集群的 YAML 文件
-
-   修改 YAML 文件中 `spec.componentSpecs.resources` 的配置。`spec.componentSpecs.resources` 控制资源需求和相关限制，更改配置将触发垂直扩容。
-
-   ***示例***
-
-   ```yaml
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: ivy85
-     namespace: default
-   spec:
-     clusterDefinitionRef: kafka
-     clusterVersionRef: kafka-3.3.2
-     componentSpecs:
-     - name: broker
-       componentDefRef: broker
-       replicas: 1
-       resources: # 修改资源值
-         requests:
-           memory: "2Gi"
-           cpu: "1000m"
-         limits:
-           memory: "4Gi"
-           cpu: "2000m"
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 1Gi
-     terminationPolicy: Halt
-   ```
+   - `--cpu` 表示组件 CPU 的请求和限制大小。
   
 2. 验证垂直扩容。
 
@@ -119,7 +50,7 @@ ivy85   default     kafka                kafka-3.3.2   Delete               Runn
     ivy85                 default          kafka                kafka-3.3.2            Delete                    VerticalScaling        Jan 29,2023 14:29 UTC+0800
     ```
 
-   - STATUS=VerticalScaling 表示正在进行垂直扩容。
+   - STATUS=Updating 表示正在进行垂直扩容。
    - STATUS=Running 表示垂直扩容已完成。
    - STATUS=Abnormal 表示垂直扩容异常。原因可能是正常实例的数量少于总实例数，或者 Leader 实例正常运行而其他实例异常。
      > 你可以手动检查是否由于资源不足而导致报错。如果 Kubernetes 集群支持 AutoScaling，系统在资源充足的情况下会执行自动恢复。或者你也可以创建足够的资源，并使用 `kubectl describe` 命令进行故障排除。
@@ -138,7 +69,9 @@ ivy85   default     kafka                kafka-3.3.2   Delete               Runn
 
 ## 水平扩缩容
 
-水平扩缩容会改变 Pod 的数量。例如，你可以应用水平扩容将 Pod 的数量从三个增加到五个。扩容过程包括数据的备份和恢复。
+水平扩缩容会改变 Pod 的数量。例如，你可以应用水平扩容将 Pod 的数量从三个增加到五个。
+
+从 v0.9.0 开始，KubeBlocks 支持指定实例水平扩缩容，可参考 [API 文档](./../../../api-docs/maintenance/scale/horizontal-scale.md)，查看详细介绍及示例。
 
 ### 开始之前
 
@@ -155,9 +88,7 @@ ivy85   default     kafka                kafka-3.3.2   Delete               Runn
 
 ### 步骤
 
-1. 更改配置，共有 3 种方式。
-
-   **选项 1.** (**推荐**) 使用 kbcli
+1. 更改配置。
 
    配置参数 `--components` 和 `--replicas`，并执行以下命令。
 
@@ -166,64 +97,12 @@ ivy85   default     kafka                kafka-3.3.2   Delete               Runn
    --components="broker" --replicas=3
    ```
 
- 
    - `--components` - 的值可以是 `broker` 或 `controller`。
      - broker：在组合模式下表示所有节点；在分离模式下表示所有 broker 节点。
      - controller：表示在分离模式下的所有对应节点。
    - `--memory` 表示组件请求和限制的内存大小。
    - `--cpu` 表示组件请求和限制的 CPU 大小。
-
-   **选项 2.** 创建 OpsRequest
-
-   将 OpsRequest 应用于指定的集群，根据需求配置参数。
-
-   ```bash
-   kubectl apply -f - <<EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: OpsRequest
-   metadata:
-     name: ops-horizontal-scaling
-   spec:
-     clusterRef: ivy85
-     type: HorizontalScaling
-     horizontalScaling:
-     - componentName: broker
-       replicas: 3
-   EOF
-   ```
-
-   **选项 3.** 修改集群的 YAML 文件
-
-   修改 YAML 文件中 `spec.componentSpecs.replicas` 的配置。`spec.componentSpecs.replicas` 控制 Pod 的数量，更改配置将触发水平扩缩容。
-
-   ***示例***
-
-   ```yaml
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-    apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: ivy85
-     namespace: default
-   spec:
-     clusterDefinitionRef: kafka
-     clusterVersionRef: kafka-3.3.2 
-     componentSpecs:
-     - name: broker
-       componentDefRef: broker
-       replicas: 1 # 更改 Pod 数
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 1Gi
-    terminationPolicy: Halt
-   ```
+   - `--replicas` 表示指定组件的副本数。
 
 2. 验证水平扩容。
 
@@ -233,7 +112,7 @@ ivy85   default     kafka                kafka-3.3.2   Delete               Runn
    kbcli cluster list ivy85
    ```
 
-   - STATUS=HorizontalScaling 表示正在进行水平扩容。
+   - STATUS=Updating 表示正在进行水平扩容。
    - STATUS=Running 表示水平扩容已完成。
 
 3. 检查相关资源规格是否已变更。

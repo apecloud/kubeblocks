@@ -30,7 +30,7 @@ KubeBlocks supports the management of Elasticsearch.
 
 :::note
 
-View more flags for creating a MySQL cluster to create a cluster with customized specifications.
+View more flags for creating a cluster to create a cluster with customized specifications.
   
 ```bash
 kbcli cluster create --help

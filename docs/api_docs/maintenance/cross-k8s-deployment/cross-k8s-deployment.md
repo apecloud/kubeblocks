@@ -8,10 +8,10 @@ sidebar_label: Deploy a Cluster across Multiple Kubernetes Clusters by KubeBlock
 
 # Deploy a Cluster across Multiple Kubernetes Clusters by KubeBlocks
 
-KubeBlocks supports managing multiple Kubernetes clusters to provide new options for instance disaster recovery and K8s cluster management. KubeBlocks introduces control plane and data plane to support cross-K8s management.
+KubeBlocks supports managing multiple Kubernetes clusters to provide new options for instance disaster recovery and K8s cluster management. KubeBlocks introduces the control plane and data plane to support cross-K8s management.
 
-* Control plane: An independent K8s cluster in which the KubeBlocks operator runs. And most of the objects defined by KubeBlocks, such as definition, cluster, backup, ops, are stored in this cluster. Users interact with the API of this cluster to manage multiple cluster instances.
-* Data plane: A K8s cluster used to run the actual workloads. There can be one or more clusters in the data plane. These clusters host resources such as pods, persistent volume claims (PVC), services, service accounts (SA), config maps (CM), secrets, jobs, etc., related to the instances. But in KubeBlocks v0.9.0, the KubeBlocks operator does not run in the data plane.
+* Control plane: An independent K8s cluster in which the KubeBlocks operator runs. Most of the objects defined by KubeBlocks, such as definition, cluster, backup, and ops, are stored in this cluster. Users interact with the API of this cluster to manage multiple cluster instances.
+* Data plane: A K8s cluster that is used to run the actual workloads. There can be one or more clusters in the data plane. These clusters host resources such as pods, persistent volume claims (PVC), services, service accounts (SA), config maps (CM), secrets, jobs, etc., related to the instances. But in KubeBlocks v0.9.0, the KubeBlocks operator does not run in the data plane.
 
 In terms of actual physical deployment, the control plane can be deployed in a single availability zone (AZ) for simplicity and flexibility. It can also be deployed in multiple different AZs to provide higher availability guarantees. Alternatively, it can be deployed by reusing a data plane, which offers a lower-cost approach to running the control plane.
 
@@ -182,7 +182,7 @@ Here takes MetalLB as an example for providing LoadBalancer Services.
    kubectl wait --namespace metallb-system --for=condition=ready pod --selector=app=metallb --timeout=90s
    ```
 
-4. Apply the YAML file belw in three data plane K8s clusters. Replace `spec.addresses` as the LB network address of the corresponding clusters.
+4. Apply the YAML file below in three data plane K8s clusters. Replace `spec.addresses` as the LB network address of the corresponding clusters.
 
    ```yaml
    apiVersion: metallb.io/v1beta1
@@ -215,7 +215,7 @@ Since different network configurations have different requirements, the followin
 
 #### Cloud
 
-This example illustrates create an etcd cluster on Alibaba Cloud. For the configurations of other cloud providers, you can refer to the official docs.
+This example illustrates creating an etcd cluster on Alibaba Cloud. For the configurations of other cloud providers, you can refer to the official docs.
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -257,7 +257,7 @@ spec:
           podService: true
 ```
 
-The example below illstrates how to deploy clusters cross cloud providers.
+The example below illustrates how to deploy clusters across cloud providers.
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -344,26 +344,3 @@ spec:
             service.cilium.io/global: "true" # cilium clustermesh global service
           podService: true
 ```
-
-### Switchover
-
-#### Replica failure
-
-TBD
-
-#### Cluster failure
-
-When a Kubernetes cluster becomes unavailable due to a failure, the instance itself will perform service switching in the data plane through its own high availability mechanism. The switchover of client traffic depends on the selected North-South traffic solution (TBD).
-
-On the control plane, since Kubeblocks cannot independently determine the availability of a K8s cluster, user intervention is required to provide information and explicitly mark a cluster as unavailable. During this period, the management and status display of both new and existing instances may be affected (depending on the specific type of failure).
-
-Once the faulty cluster is marked as such in KubeBlocks, the status of existing instances will be updated normally, and new instances that do not involve the faulty cluster can operate normally. 
-
-:::note
-
-This does not involve the recovery of faulty replicas.
-
-:::
-
-TBD
-

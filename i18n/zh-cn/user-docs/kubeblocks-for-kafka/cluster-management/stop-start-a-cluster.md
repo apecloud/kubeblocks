@@ -28,8 +28,14 @@ sidebar_label: 停止/启动
 
 ## 启动集群
   
-配置集群名称，并执行以下命令来启动该集群。
+1. 配置集群名称，并执行以下命令来启动该集群。
 
-```bash
-kbcli cluster start kafka
-```
+   ```bash
+   kbcli cluster start kafka
+   ```
+
+2. 查看集群状态，确认集群是否已启动。
+
+   ```bash
+   kbcli cluster list
+   ```

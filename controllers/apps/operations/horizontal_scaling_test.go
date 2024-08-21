@@ -528,7 +528,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			})
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsFailedPhase))
 			conditions := opsRes.OpsRequest.Status.Conditions
-			Expect(conditions[len(conditions)-1].Message).Should(ContainSubstring(fmt.Sprintf(`instance "%s" cannot be taken offline as it has been created by another running opsRequest`, offlineInsName)))
+			Expect(conditions[len(conditions)-1].Message).Should(ContainSubstring(fmt.Sprintf(`instance "%s" cannot be deleted as it has been created by another running opsRequest`, offlineInsName)))
 
 			By("create a opsRequest to delete 1 replicas which is created by another running opsRequest and expect it to fail")
 			_ = createOpsAndToCreatingPhase(reqCtx, opsRes, appsv1alpha1.HorizontalScaling{
@@ -536,7 +536,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			})
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsFailedPhase))
 			conditions = opsRes.OpsRequest.Status.Conditions
-			Expect(conditions[len(conditions)-1].Message).Should(ContainSubstring(`cannot be taken offline as it has been created by another running opsRequest`))
+			Expect(conditions[len(conditions)-1].Message).Should(ContainSubstring(`cannot be deleted as it has been created by another running opsRequest`))
 
 			By("create a opsRequest with `replicas` field and expect to abort the running ops")
 			// if existing an overwrite replicas operation for a component or instanceTemplate, need to abort.

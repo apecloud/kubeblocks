@@ -181,6 +181,10 @@ spec:
             - name: IGNORE_POD_VERTICAL_SCALING
               value: "true"
             {{- end }}
+            {{- if .Values.featureGates.abortHorizontalScalePendingProgress.enabled }}
+            - name: ABORT_HORIZONTAL_SCALE_OPS_PENDING_PROGRESS
+              value: "true"
+            {{- end }}
             - name: COMPONENT_REPLICAS_ANNOTATION
               value: {{ .Values.featureGates.componentReplicasAnnotation.enabled | quote }}
           {{- with .Values.securityContext }}

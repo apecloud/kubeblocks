@@ -1925,6 +1925,8 @@ featureGates:
     enabled: false
   componentReplicasAnnotation:
     enabled: true
+  abortHorizontalScalePendingProgress:
+    enabled: false
 
 vmagent:
 

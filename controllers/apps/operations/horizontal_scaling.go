@@ -21,7 +21,9 @@ package operations
 
 import (
 	"fmt"
+	"reflect"
 	"slices"
+	"strings"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,9 +34,15 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+)
+
+const (
+	createPodOperation = "Create"
+	deletePodOperation = "Delete"
 )
 
 type horizontalScalingOpsHandler struct{}
@@ -270,19 +278,24 @@ func (hs horizontalScalingOpsHandler) checkIntersectionWithEarlierOps(opsRes *Op
 		}
 		return hs.getCreateAndDeletePodSet(opsRes, lastCompSnapshot, *compSpec, hScaling, hScaling.ComponentName)
 	}
-	createdPodSetForEarlier, _, err := getCreatedOrDeletedPodSet(earlierOps, earlierOpsHScaling)
+	createdPodSetForEarlier, deletedPodSetForEarlier, err := getCreatedOrDeletedPodSet(earlierOps, earlierOpsHScaling)
 	if err != nil {
 		return err
 	}
-	_, deletedPodSetForCurrent, err := getCreatedOrDeletedPodSet(opsRes.OpsRequest, currOpsHScaling)
+	createdPodSetForCurrent, deletedPodSetForCurrent, err := getCreatedOrDeletedPodSet(opsRes.OpsRequest, currOpsHScaling)
 	if err != nil {
 		return err
 	}
 	for deletedPod := range deletedPodSetForCurrent {
 		if _, ok := createdPodSetForEarlier[deletedPod]; ok {
-			errMsg := fmt.Sprintf(`instance "%s" cannot be taken offline as it has been created by another running opsRequest "%s"`,
-				deletedPod, earlierOps.Name)
-			return intctrlutil.NewFatalError(errMsg)
+			return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" cannot be deleted as it has been created by another running opsRequest "%s"`,
+				deletedPod, earlierOps.Name))
+		}
+	}
+	for createdPod := range createdPodSetForCurrent {
+		if _, ok := deletedPodSetForEarlier[createdPod]; ok {
+			return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" cannot be created as it has been deleted by another running opsRequest "%s"`,
+				createdPod, earlierOps.Name))
 		}
 	}
 	return nil
@@ -446,4 +459,153 @@ func (hs horizontalScalingOpsHandler) getCompExpectedOfflineInstances(
 		compOfflineInstances = handleOfflineInstances(compOfflineInstances, horizontalScaling.ScaleOut.OfflineInstancesToOnline, make([]string, 0))
 	}
 	return compOfflineInstances
+}
+
+// HandleAbortForHScale handling the aborted horizontal scaling.
+func HandleAbortForHScale(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
+	var (
+		needUpdateCluster bool
+		err               error
+		ops               = opsRes.OpsRequest
+		opsDeepCopy       = ops.DeepCopy()
+	)
+	if ops.Annotations[constant.RetryAbortedHScaleAnnoKey] == "true" {
+		if needUpdateCluster, err = handleClusterCompSpecForAbortedHScale(opsRes, appsv1alpha1.AbortedProgressStatus,
+			appsv1alpha1.PendingProgressStatus, true); needUpdateCluster {
+			ops.Status.Phase = appsv1alpha1.OpsRunningPhase
+			// enqueue the opsRequest
+			opsRequestSlice, err := opsutil.GetOpsRequestSliceFromCluster(opsRes.Cluster)
+			if err != nil {
+				return err
+			}
+			if opsRequestSlice == nil {
+				opsRequestSlice = make([]appsv1alpha1.OpsRecorder, 0)
+			}
+			if index, _ := GetOpsRecorderFromSlice(opsRequestSlice, opsRes.OpsRequest.Name); index == -1 {
+				opsRequestSlice = append(opsRequestSlice, appsv1alpha1.OpsRecorder{
+					Name: opsRes.OpsRequest.Name,
+					Type: opsRes.OpsRequest.Spec.Type,
+				})
+				opsutil.SetOpsRequestToCluster(opsRes.Cluster, opsRequestSlice)
+			}
+		}
+		reqCtx.Log.Info(fmt.Sprintf("retry to run the aborted horizontal scaling opsRequest, update cluster's replicas: %t", needUpdateCluster))
+	} else {
+		needUpdateCluster, err = handleClusterCompSpecForAbortedHScale(opsRes, appsv1alpha1.PendingProgressStatus,
+			appsv1alpha1.AbortedProgressStatus, false)
+		reqCtx.Log.Info(fmt.Sprintf("abort the horizontal scaling opsRequest, update cluster's replicas: %t", needUpdateCluster))
+	}
+	if err != nil {
+		return err
+	}
+	if needUpdateCluster {
+		if err = cli.Update(reqCtx.Ctx, opsRes.Cluster); err != nil {
+			return err
+		}
+	}
+	if !reflect.DeepEqual(opsDeepCopy.Status, ops.Status) {
+		if err = cli.Status().Patch(reqCtx.Ctx, ops, client.MergeFrom(opsDeepCopy)); err != nil {
+			return err
+		}
+	}
+	if ops.Annotations[constant.RetryAbortedHScaleAnnoKey] == "true" {
+		ops.Annotations[constant.RetryAbortedHScaleAnnoKey] = "done"
+	}
+	if !reflect.DeepEqual(opsDeepCopy.Annotations, ops.Annotations) {
+		return cli.Patch(reqCtx.Ctx, ops, client.MergeFrom(opsDeepCopy))
+	}
+	return nil
+}
+
+func handleClusterCompSpecForAbortedHScale(opsRes *OpsResource, expectProgressStatus, toProgressStatus appsv1alpha1.ProgressStatus, reverse bool) (bool, error) {
+	needUpdateCluster := false
+	// update component and instance template replicas
+	updateCompReplicas := func(compSpec *appsv1alpha1.ClusterComponentSpec, tplName string, operation func(replicas int32) int32) {
+		compSpec.Replicas = operation(compSpec.Replicas)
+		if tplName != "" {
+			for k := range compSpec.Instances {
+				instanceTPL := &compSpec.Instances[k]
+				if instanceTPL.Name == tplName {
+					instanceTPL.Replicas = pointer.Int32(operation(instanceTPL.GetReplicas()))
+				}
+			}
+		}
+	}
+	// offline the required instances
+	offlineInstance := func(compSpec *appsv1alpha1.ClusterComponentSpec, tplName, podName string) {
+		compSpec.OfflineInstances = append(compSpec.OfflineInstances, podName)
+		updateCompReplicas(compSpec, tplName, func(replicas int32) int32 {
+			return replicas - int32(1)
+		})
+	}
+	isCreateOperation := func(progressGroup, compName string) bool {
+		return (progressGroup == fmt.Sprintf("%s/%s", compName, createPodOperation) && !reverse) ||
+			(progressGroup == fmt.Sprintf("%s/%s", compName, deletePodOperation) && reverse)
+	}
+	needReCreatedPodMap := map[string]*appsv1alpha1.ProgressStatusDetail{}
+	clusterCompMap := map[string]*appsv1alpha1.ClusterComponentSpec{}
+	for i, comp := range opsRes.Cluster.Spec.ComponentSpecs {
+		clusterCompMap[comp.Name] = &opsRes.Cluster.Spec.ComponentSpecs[i]
+	}
+	for compName := range opsRes.OpsRequest.Status.Components {
+		compSpec, ok := clusterCompMap[compName]
+		if !ok {
+			continue
+		}
+		compStatus := opsRes.OpsRequest.Status.Components[compName]
+		for j := range compStatus.ProgressDetails {
+			pd := &compStatus.ProgressDetails[j]
+			if pd.Status != expectProgressStatus {
+				continue
+			}
+			currExpectPodSet, err := intctrlcomp.GenerateAllPodNamesToSet(compSpec.Replicas, compSpec.Instances,
+				compSpec.OfflineInstances, opsRes.Cluster.Name, compName)
+			if err != nil {
+				return false, err
+			}
+			podName := strings.Replace(pd.ObjectKey, constant.PodKind+"/", "", 1)
+			tplName := appsv1alpha1.GetInstanceTemplateName(opsRes.Cluster.Name, compSpec.Name, podName)
+			if isCreateOperation(pd.Group, compName) {
+				if _, ok = currExpectPodSet[podName]; ok {
+					// offline the pods that have not been created yet during scaling out.
+					offlineInstance(compSpec, tplName, podName)
+					needUpdateCluster = true
+					pd.Status = toProgressStatus
+				}
+				continue
+			}
+			// if the pods that have not been deleted during scaling in, only add the replicas. and need to check
+			// the pod if it can be re-created.
+			if _, ok = currExpectPodSet[podName]; !ok {
+				needReCreatedPodMap[podName] = pd
+				updateCompReplicas(compSpec, tplName, func(replicas int32) int32 {
+					return replicas + int32(1)
+				})
+			}
+		}
+		if len(needReCreatedPodMap) > 0 {
+			var currOfflineInstances []string
+			for _, podName := range compSpec.OfflineInstances {
+				if _, ok = needReCreatedPodMap[podName]; !ok {
+					currOfflineInstances = append(currOfflineInstances, podName)
+				}
+			}
+			compSpec.OfflineInstances = currOfflineInstances
+			expectPodSetAfterAborted, err := intctrlcomp.GenerateAllPodNamesToSet(compSpec.Replicas, compSpec.Instances,
+				compSpec.OfflineInstances, opsRes.Cluster.Name, compName)
+			if err != nil {
+				return false, err
+			}
+			for podName := range needReCreatedPodMap {
+				// check if the pod can be re-created, if not, replicas-1.
+				if tplName, ok := expectPodSetAfterAborted[podName]; !ok {
+					offlineInstance(compSpec, tplName, podName)
+				} else {
+					needUpdateCluster = true
+					needReCreatedPodMap[podName].Status = toProgressStatus
+				}
+			}
+		}
+	}
+	return needUpdateCluster, nil
 }

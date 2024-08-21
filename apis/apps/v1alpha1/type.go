@@ -576,7 +576,7 @@ const (
 
 // ProgressStatus defines the status of the opsRequest progress.
 // +enum
-// +kubebuilder:validation:Enum={Processing,Pending,Failed,Succeed}
+// +kubebuilder:validation:Enum={Processing,Pending,Failed,Succeed,Aborted}
 type ProgressStatus string
 
 const (
@@ -584,6 +584,7 @@ const (
 	ProcessingProgressStatus ProgressStatus = "Processing"
 	FailedProgressStatus     ProgressStatus = "Failed"
 	SucceedProgressStatus    ProgressStatus = "Succeed"
+	AbortedProgressStatus    ProgressStatus = "Aborted"
 )
 
 // ActionTaskStatus defines the status of the task.

@@ -146,6 +146,7 @@ func init() {
 	viper.SetDefault(constant.CfgKBReconcileWorkers, 8)
 	viper.SetDefault(constant.FeatureGateIgnoreConfigTemplateDefaultMode, false)
 	viper.SetDefault(constant.FeatureGateComponentReplicasAnnotation, true)
+	viper.SetDefault(constant.FeatureAbortHorizontalScalePendingProgress, false)
 }
 
 type flagName string

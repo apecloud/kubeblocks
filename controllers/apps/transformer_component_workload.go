@@ -658,7 +658,7 @@ func (r *componentWorkloadOps) deletePVCs4ScaleIn(itsObj *workloads.InstanceSet)
 			}
 			pvc := corev1.PersistentVolumeClaim{}
 			if err := r.cli.Get(r.reqCtx.Ctx, pvcKey, &pvc, inDataContext4C()); err != nil {
-				return err
+				return client.IgnoreNotFound(err)
 			}
 			// Since there are no order guarantee between updating ITS and deleting PVCs, if there is any error occurred
 			// after updating ITS and before deleting PVCs, the PVCs intended to scale-in will be leaked.

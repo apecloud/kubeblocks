@@ -329,6 +329,7 @@ const (
 
 const (
 	FeatureGateIgnoreConfigTemplateDefaultMode = "IGNORE_CONFIG_TEMPLATE_DEFAULT_MODE"
+	FeatureAbortHorizontalScalePendingProgress = "ABORT_HORIZONTAL_SCALE_OPS_PENDING_PROGRESS"
 )
 
 const InvalidContainerPort int32 = 0

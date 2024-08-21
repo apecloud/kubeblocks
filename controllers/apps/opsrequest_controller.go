@@ -82,6 +82,7 @@ func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		r.handleDeletion,
 		r.addClusterLabelAndSetOwnerReference,
 		r.handleCancelSignal,
+		r.handleAbortedSignal,
 		r.handleOpsRequestByPhase,
 	)
 }
@@ -215,6 +216,18 @@ func (r *OpsRequestReconciler) handleCancelSignal(reqCtx intctrlutil.RequestCtx,
 		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 	}
 	return intctrlutil.ResultToP(intctrlutil.Reconciled())
+}
+
+func (r *OpsRequestReconciler) handleAbortedSignal(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error) {
+	if opsRes.OpsRequest.Status.Phase != appsv1alpha1.OpsAbortedPhase {
+		return nil, nil
+	}
+	if opsRes.OpsRequest.Spec.Type == appsv1alpha1.HorizontalScalingType && viper.GetBool(constant.FeatureAbortHorizontalScalePendingProgress) {
+		if err := operations.HandleAbortForHScale(reqCtx, r.Client, opsRes); err != nil {
+			return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
+		}
+	}
+	return nil, nil
 }
 
 // handleSucceedOpsRequest the opsRequest will be deleted after one hour when status.phase is Succeed

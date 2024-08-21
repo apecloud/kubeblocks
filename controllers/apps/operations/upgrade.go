@@ -52,7 +52,7 @@ func init() {
 
 // ActionStartedCondition the started condition when handle the upgrade request.
 func (u upgradeOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (*metav1.Condition, error) {
-	return appsv1alpha1.NewHorizontalScalingCondition(opsRes.OpsRequest), nil
+	return appsv1alpha1.NewUpgradingCondition(opsRes.OpsRequest), nil
 }
 
 // Action modifies Cluster.spec.clusterVersionRef with opsRequest.spec.upgrade.clusterVersionRef

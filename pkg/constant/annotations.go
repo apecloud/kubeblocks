@@ -56,7 +56,13 @@ const (
 const (
 	KBAppMultiClusterPlacementKey   = "apps.kubeblocks.io/multi-cluster-placement"
 	MultiClusterServicePlacementKey = "apps.kubeblocks.io/multi-cluster-service-placement"
+)
 
+// annotations for opsRequest
+const (
 	OpsDependentOnSuccessfulOpsAnnoKey = "ops.kubeblocks.io/dependent-on-successful-ops" // OpsDependentOnSuccessfulOpsAnnoKey wait for the dependent ops to succeed before executing the current ops. If it fails, this ops will also fail.
 	RelatedOpsAnnotationKey            = "ops.kubeblocks.io/related-ops"
+
+	// RetryAbortedHScaleAnnoKey retries the horizontal scaling ops which is aborted.
+	RetryAbortedHScaleAnnoKey = "ops.kubeblocks.io/retry-horizontal-scaling"
 )

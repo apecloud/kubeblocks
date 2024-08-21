@@ -143,6 +143,7 @@ func init() {
 	viper.SetDefault(constant.FeatureGateIgnoreConfigTemplateDefaultMode, false)
 	viper.SetDefault(constant.FeatureGateComponentReplicasAnnotation, true)
 	viper.SetDefault(constant.FeatureGateInPlacePodVerticalScaling, false)
+	viper.SetDefault(constant.FeatureAbortHorizontalScalePendingProgress, false)
 }
 
 type flagName string

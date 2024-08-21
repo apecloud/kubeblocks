@@ -1925,6 +1925,8 @@ featureGates:
     enabled: true
   inPlacePodVerticalScaling:
     enabled: false
+  abortHorizontalScalePendingProgress:
+    enabled: false
 
 vmagent:
 

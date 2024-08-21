@@ -168,6 +168,10 @@ spec:
             - name: IGNORE_CONFIG_TEMPLATE_DEFAULT_MODE
               value: "true"
             {{- end }}
+            {{- if .Values.featureGates.abortHorizontalScalePendingProgress.enabled }}
+            - name: ABORT_HORIZONTAL_SCALE_OPS_PENDING_PROGRESS
+              value: "true"
+            {{- end }}
             {{- if .Values.featureGates.ignorePodVerticalScaling.enabled }}
             - name: IGNORE_POD_VERTICAL_SCALING
               value: "true"

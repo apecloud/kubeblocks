@@ -44,4 +44,7 @@ const (
 	// FeatureGateInPlacePodVerticalScaling specifies to enable in-place pod vertical scaling
 	// NOTE: This feature depends on the InPlacePodVerticalScaling feature of the K8s cluster in which the KubeBlocks runs.
 	FeatureGateInPlacePodVerticalScaling = "IN_PLACE_POD_VERTICAL_SCALING"
+
+	// FeatureAbortHorizontalScalePendingProgress specifies to abort the pending progress for the horizontal scaling opsRequest.
+	FeatureAbortHorizontalScalePendingProgress = "ABORT_HORIZONTAL_SCALE_OPS_PENDING_PROGRESS"
 )

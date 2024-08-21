@@ -449,7 +449,7 @@ func handleScaleOutProgressWithInstanceSet(
 	notReadyPodSet := instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceReady)
 	notAvailablePodSet := instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceAvailable)
 	failurePodSet := instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceFailure)
-	pgRes.opsMessageKey = "Create"
+	pgRes.opsMessageKey = createPodOperation
 	memberStatusMap := map[string]sets.Empty{}
 	if needToCheckRole(pgRes) {
 		for _, v := range its.Status.MembersStatus {
@@ -490,7 +490,7 @@ func handleScaleInProgressWithInstanceSet(
 	compStatus *appsv1alpha1.OpsRequestComponentStatus) (completedCount int32, err error) {
 	currPodRevisionMap, _ := instanceset.GetRevisions(its.Status.CurrentRevisions)
 	notReadyPodSet := instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceReady)
-	pgRes.opsMessageKey = "Delete"
+	pgRes.opsMessageKey = deletePodOperation
 	for podName := range pgRes.deletedPodSet {
 		objectKey := getProgressObjectKey(constant.PodKind, podName)
 		if _, ok := currPodRevisionMap[podName]; !ok {

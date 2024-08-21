@@ -25,6 +25,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -527,7 +528,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			})
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsFailedPhase))
 			conditions := opsRes.OpsRequest.Status.Conditions
-			Expect(conditions[len(conditions)-1].Message).Should(ContainSubstring(fmt.Sprintf(`instance "%s" cannot be taken offline as it has been created by another running opsRequest`, offlineInsName)))
+			Expect(conditions[len(conditions)-1].Message).Should(ContainSubstring(fmt.Sprintf(`instance "%s" cannot be deleted as it has been created by another running opsRequest`, offlineInsName)))
 
 			By("create a opsRequest to delete 1 replicas which is created by another running opsRequest and expect it to fail")
 			_ = createOpsAndToCreatingPhase(reqCtx, opsRes, appsv1alpha1.HorizontalScaling{
@@ -535,7 +536,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			})
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsFailedPhase))
 			conditions = opsRes.OpsRequest.Status.Conditions
-			Expect(conditions[len(conditions)-1].Message).Should(ContainSubstring(`cannot be taken offline as it has been created by another running opsRequest`))
+			Expect(conditions[len(conditions)-1].Message).Should(ContainSubstring(`cannot be deleted as it has been created by another running opsRequest`))
 
 			By("create a opsRequest with `replicas` field and expect to abort the running ops")
 			// if existing an overwrite replicas operation for a component or instanceTemplate, need to abort.
@@ -552,6 +553,97 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			})
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops3))).Should(Equal(appsv1alpha1.OpsAbortedPhase))
 			Expect(opsRes.Cluster.Spec.GetComponentByName(defaultCompName).Replicas).Should(BeEquivalentTo(4))
+		})
+
+		testAbortHorizontalScaling := func(isScalingOut bool) {
+			checkProgressStatus := func(opsRes *OpsResource, expectCompReplicas int, expectPodStatus map[string]appsv1alpha1.ProgressStatus) {
+				Expect(opsRes.Cluster.Spec.GetComponentByName(defaultCompName).Replicas).Should(BeEquivalentTo(expectCompReplicas))
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
+				progressDetails := opsRes.OpsRequest.Status.Components[defaultCompName].ProgressDetails
+				for podName, status := range expectPodStatus {
+					Expect(findStatusProgressDetail(progressDetails, getProgressObjectKey(constant.PodKind, podName)).Status).
+						Should(Equal(status))
+				}
+			}
+			targetReplicas := 1
+			abortReplicas := 2
+			if isScalingOut {
+				targetReplicas = 5
+				abortReplicas = 4
+			}
+			By("init operations resources with CLusterDefinition/ClusterVersion/Hybrid components Cluster/consensus Pods")
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			its := testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
+			pods := testapps.MockInstanceSetPods(&testCtx, its, opsRes.Cluster, defaultCompName)
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx, Log: logf.FromContext(testCtx.Ctx).WithValues("horizontal-scale", testCtx.DefaultNamespace)}
+			if isScalingOut {
+				By("create a opsRequest to add 2 replicas with `scaleOut` field")
+				createOpsAndToCreatingPhase(reqCtx, opsRes, appsv1alpha1.HorizontalScaling{
+					ScaleOut: &appsv1alpha1.ScaleOut{ReplicaChanger: appsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(2)}},
+				})
+			} else {
+				By("create a opsRequest to delete 2 replicas with `scaleIn` field")
+				createOpsAndToCreatingPhase(reqCtx, opsRes, appsv1alpha1.HorizontalScaling{
+					ScaleIn: &appsv1alpha1.ScaleIn{ReplicaChanger: appsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(2)}},
+				})
+			}
+			Expect(opsRes.Cluster.Spec.GetComponentByName(defaultCompName).Replicas).Should(BeEquivalentTo(targetReplicas))
+
+			By("mock progress detail")
+			pod1Name := pods[2].Name
+			pod2Name := pods[1].Name
+			if isScalingOut {
+				pod1Name = fmt.Sprintf("%s-%s-3", clusterName, defaultCompName)
+				pod2Name = fmt.Sprintf("%s-%s-4", clusterName, defaultCompName)
+				createPods("", 3)
+			} else {
+				deletePods(pods[2])
+			}
+			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
+			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			checkProgressStatus(opsRes, targetReplicas, map[string]appsv1alpha1.ProgressStatus{
+				pod1Name: appsv1alpha1.SucceedProgressStatus,
+				pod2Name: appsv1alpha1.PendingProgressStatus,
+			})
+
+			By("abort the opsRequest")
+			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.OpsRequest, func() {
+				opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsAbortedPhase
+			})).Should(Succeed())
+
+			By("handle abort for the horizontal scaling ops")
+			Expect(HandleAbortForHScale(reqCtx, k8sClient, opsRes)).ShouldNot(HaveOccurred())
+
+			By(fmt.Sprintf("abort the pending pod to created, and expect the pending progress status to aborted and component replicas to %d", abortReplicas))
+			checkProgressStatus(opsRes, abortReplicas, map[string]appsv1alpha1.ProgressStatus{
+				pod2Name: appsv1alpha1.AbortedProgressStatus,
+			})
+
+			By("reconcile again to test idempotent")
+			Expect(HandleAbortForHScale(reqCtx, k8sClient, opsRes)).ShouldNot(HaveOccurred())
+			Expect(opsRes.Cluster.Spec.GetComponentByName(defaultCompName).Replicas).Should(BeEquivalentTo(abortReplicas))
+
+			By("retry the aborted horizontal scaling opsRequest")
+			Expect(testapps.ChangeObj(&testCtx, opsRes.OpsRequest, func(request *appsv1alpha1.OpsRequest) {
+				request.Annotations = map[string]string{
+					constant.RetryAbortedHScaleAnnoKey: "true",
+				}
+				opsRes.OpsRequest = request
+			})).Should(Succeed())
+			Expect(HandleAbortForHScale(reqCtx, k8sClient, opsRes)).ShouldNot(HaveOccurred())
+			checkProgressStatus(opsRes, targetReplicas, map[string]appsv1alpha1.ProgressStatus{
+				pod2Name: appsv1alpha1.PendingProgressStatus,
+			})
+			Expect(opsRes.OpsRequest.Annotations[constant.RetryAbortedHScaleAnnoKey]).Should(Equal("done"))
+			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsRunningPhase))
+		}
+
+		It("abort the horizontal scaling during scaling out", func() {
+			testAbortHorizontalScaling(true)
+		})
+
+		It("test abort the horizontal scaling during scaling in", func() {
+			testAbortHorizontalScaling(false)
 		})
 	})
 })

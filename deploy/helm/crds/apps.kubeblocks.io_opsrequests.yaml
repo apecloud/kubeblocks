@@ -4983,6 +4983,7 @@ spec:
                             - Pending
                             - Failed
                             - Succeed
+                            - Aborted
                             type: string
                         required:
                         - status

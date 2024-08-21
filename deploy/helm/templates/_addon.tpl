@@ -99,10 +99,10 @@ spec:
     {{- include "kubeblocks.addonChartLocationURL" ( dict "name" .name "version" .version "values" .Values) | indent 4 }}
     chartsImage: {{ .Values.addonChartsImage.registry | default $addonImageRegistry }}/{{ .Values.addonChartsImage.repository }}:{{ .Values.addonChartsImage.tag | default .Chart.AppVersion }}
     chartsPathInImage: {{ .Values.addonChartsImage.chartsPath }}
+    {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
     installOptions:
-      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
       version: {{ .version }}
-      {{- end }}
+    {{- end }}
     {{- if and (eq .name "pulsar") (eq $cloudProvider "huaweiCloud") }}
     installValues:
       setValues:

@@ -128,5 +128,6 @@ func (s *actionService) handleExecActionNonBlocking(ctx context.Context, req *pr
 	if *err != nil {
 		return nil, *err
 	}
+	delete(s.runningActions, req.Action)
 	return *gather(running.stdoutChan), nil
 }

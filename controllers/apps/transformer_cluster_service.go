@@ -330,6 +330,9 @@ func createOrUpdateService(ctx graph.TransformContext, dag *graph.DAG, graphCli 
 func resolveServiceDefaultFields(obj, objCopy *corev1.ServiceSpec) {
 	// TODO: how about the order changed?
 	for i, port := range objCopy.Ports {
+		if i == len(obj.Ports) {
+			break
+		}
 		// if the service type is NodePort or LoadBalancer, and the nodeport is not set, we should use the nodeport of the exist service
 		if (objCopy.Type == corev1.ServiceTypeNodePort || objCopy.Type == corev1.ServiceTypeLoadBalancer) && port.NodePort == 0 && obj.Ports[i].NodePort != 0 {
 			objCopy.Ports[i].NodePort = obj.Ports[i].NodePort

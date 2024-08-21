@@ -19,11 +19,7 @@ spec:
   helm:
     {{- include "kubeblocks.addonChartLocationURL" ( dict "name" "snapshot-controller" "version" "1.7.2" "values" .Values) | indent 4 }}
     {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
-
-    installOptions:
-     {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
-      version: 1.7.2
-     {{- end }}
+    {{- include "kubeblocks.addonHelmInstallOptions" (dict "version" "1.7.2" "values" .Values) | indent 4 }}
 
     installValues:
       configMapRefs:

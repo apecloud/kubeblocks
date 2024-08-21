@@ -74,6 +74,13 @@ Parameters:
 {{- end -}}
 {{- end -}}
 
+{{- define "kubeblocks.addonHelmInstallOptions" }}
+{{- if hasPrefix "oci://" .values.addonChartLocationBase }}
+installOptions:
+  version: {{ .version }}
+{{- end }}
+{{- end }}
+
 {{- define "kubeblocks.buildAddon" }}
 {{- $addonImageRegistry := include "kubeblocks.imageRegistry" . }}
 {{- $cloudProvider := (include "kubeblocks.cloudProvider" .) }}
@@ -99,10 +106,7 @@ spec:
     {{- include "kubeblocks.addonChartLocationURL" ( dict "name" .name "version" .version "values" .Values) | indent 4 }}
     chartsImage: {{ .Values.addonChartsImage.registry | default $addonImageRegistry }}/{{ .Values.addonChartsImage.repository }}:{{ .Values.addonChartsImage.tag | default .Chart.AppVersion }}
     chartsPathInImage: {{ .Values.addonChartsImage.chartsPath }}
-    {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
-    installOptions:
-      version: {{ .version }}
-    {{- end }}
+    {{- include "kubeblocks.addonHelmInstallOptions" ( dict "version" .version "values" .Values) | indent 4 }}
     {{- if and (eq .name "pulsar") (eq $cloudProvider "huaweiCloud") }}
     installValues:
       setValues:

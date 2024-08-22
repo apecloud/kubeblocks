@@ -80,7 +80,7 @@ func (r *AddonReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		Log:      log.FromContext(ctx).WithValues("addon", req.NamespacedName),
 		Recorder: r.Recorder,
 	}
-
+	//test
 	buildStageCtx := func() stageCtx {
 		return stageCtx{
 			reqCtx:     &reqCtx,

@@ -35,7 +35,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("vars", func() {
@@ -130,12 +129,13 @@ var _ = Describe("vars", func() {
 
 		BeforeEach(func() {
 			synthesizedComp = &SynthesizedComponent{
-				Namespace:   testCtx.DefaultNamespace,
-				ClusterName: "test-cluster",
-				ClusterUID:  string(uuid.NewUUID()),
-				Name:        "comp",
-				CompDefName: "compDef",
-				Replicas:    1,
+				Namespace:    testCtx.DefaultNamespace,
+				ClusterName:  "test-cluster",
+				ClusterUID:   string(uuid.NewUUID()),
+				Name:         "comp",
+				FullCompName: "test-cluster-comp",
+				CompDefName:  "compDef",
+				Replicas:     1,
 				PodSpec: &corev1.PodSpec{
 					InitContainers: []corev1.Container{
 						{
@@ -177,10 +177,10 @@ var _ = Describe("vars", func() {
 			Expect(err).Should(Succeed())
 
 			By("check default template vars")
-			checkTemplateVars(templateVars, builtinTemplateVars(synthesizedComp))
+			checkTemplateVars(templateVars, builtinTemplateVars(synthesizedComp, nil))
 
 			By("check default env vars")
-			targetEnvVars := builtinTemplateVars(synthesizedComp)
+			targetEnvVars := builtinTemplateVars(synthesizedComp, nil)
 			targetEnvVars = append(targetEnvVars, buildDefaultEnvVars(synthesizedComp, false)...)
 			checkEnvVars(envVars, targetEnvVars)
 		})
@@ -589,6 +589,20 @@ var _ = Describe("vars", func() {
 
 				vars := []appsv1alpha1.EnvVar{
 					{
+						Name: "service-type",
+						ValueFrom: &appsv1alpha1.VarSource{
+							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
+								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+									Name:     "service",
+									Optional: required(),
+								},
+								ServiceVars: appsv1alpha1.ServiceVars{
+									ServiceType: &appsv1alpha1.VarRequired,
+								},
+							},
+						},
+					},
+					{
 						Name: "service-host",
 						ValueFrom: &appsv1alpha1.VarSource{
 							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
@@ -644,6 +658,7 @@ var _ = Describe("vars", func() {
 							Name:      svcName,
 						},
 						Spec: corev1.ServiceSpec{
+							Type: corev1.ServiceTypeClusterIP,
 							Ports: []corev1.ServicePort{
 								{
 									Name: "default",
@@ -668,9 +683,11 @@ var _ = Describe("vars", func() {
 				}...)
 				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
+				Expect(templateVars).Should(HaveKeyWithValue("service-type", string(corev1.ServiceTypeClusterIP)))
 				Expect(templateVars).Should(HaveKeyWithValue("service-host", svcName))
 				Expect(templateVars).Should(HaveKeyWithValue("service-port", strconv.Itoa(svcPort)))
 				Expect(templateVars).Should(HaveKeyWithValue("service-port-wo-name", strconv.Itoa(svcPort+1)))
+				checkEnvVarWithValue(envVars, "service-type", string(corev1.ServiceTypeClusterIP))
 				checkEnvVarWithValue(envVars, "service-host", svcName)
 				checkEnvVarWithValue(envVars, "service-port", strconv.Itoa(svcPort))
 				checkEnvVarWithValue(envVars, "service-port-wo-name", strconv.Itoa(svcPort+1))
@@ -830,6 +847,20 @@ var _ = Describe("vars", func() {
 
 				vars := []appsv1alpha1.EnvVar{
 					{
+						Name: "pod-service-type",
+						ValueFrom: &appsv1alpha1.VarSource{
+							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
+								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+									Name:     "pod-service",
+									Optional: required(),
+								},
+								ServiceVars: appsv1alpha1.ServiceVars{
+									ServiceType: &appsv1alpha1.VarRequired,
+								},
+							},
+						},
+					},
+					{
 						Name: "pod-service-endpoint",
 						ValueFrom: &appsv1alpha1.VarSource{
 							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
@@ -899,6 +930,7 @@ var _ = Describe("vars", func() {
 				}...)
 				_, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
+				checkEnvVarWithValue(envVars, "pod-service-type", string(corev1.ServiceTypeNodePort))
 				checkEnvVarWithValue(envVars, "pod-service-endpoint", strings.Join([]string{svcName0, svcName1}, ","))
 				checkEnvVarWithValue(envVars, "pod-service-port", strings.Join([]string{fmt.Sprintf("%s:300001", svcName0), fmt.Sprintf("%s:300002", svcName1)}, ","))
 			})
@@ -1661,7 +1693,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 					{
-						Name: "instanceNames",
+						Name: "podNames",
 						ValueFrom: &appsv1alpha1.VarSource{
 							ComponentVarRef: &appsv1alpha1.ComponentVarSelector{
 								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
@@ -1669,7 +1701,7 @@ var _ = Describe("vars", func() {
 									Optional: required(),
 								},
 								ComponentVars: appsv1alpha1.ComponentVars{
-									InstanceNames: &appsv1alpha1.VarRequired,
+									PodNames: &appsv1alpha1.VarRequired,
 								},
 							},
 						},
@@ -1688,6 +1720,43 @@ var _ = Describe("vars", func() {
 							},
 						},
 					},
+					{
+						Name: "podNames4EmptyRole",
+						ValueFrom: &appsv1alpha1.VarSource{
+							ComponentVarRef: &appsv1alpha1.ComponentVarSelector{
+								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+									CompDef:  synthesizedComp.CompDefName,
+									Optional: required(),
+								},
+								ComponentVars: appsv1alpha1.ComponentVars{
+									PodNamesForRole: &appsv1alpha1.RoledVar{
+										// empty role
+										Option: &appsv1alpha1.VarRequired,
+									},
+								},
+							},
+						},
+					},
+					{
+						Name: "podFQDNs4Leader",
+						ValueFrom: &appsv1alpha1.VarSource{
+							ComponentVarRef: &appsv1alpha1.ComponentVarSelector{
+								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+									CompDef:  synthesizedComp.CompDefName,
+									Optional: required(),
+								},
+								ComponentVars: appsv1alpha1.ComponentVars{
+									PodFQDNsForRole: &appsv1alpha1.RoledVar{
+										Role:   "leader",
+										Option: &appsv1alpha1.VarRequired,
+									},
+								},
+							},
+						},
+					},
+				}
+				podName := func(suffix string) string {
+					return fmt.Sprintf("%s-%s", constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name), suffix)
 				}
 				reader := &mockReader{
 					cli: testCtx.Cli,
@@ -1702,8 +1771,47 @@ var _ = Describe("vars", func() {
 								Replicas: 3,
 							},
 						},
+						&corev1.Pod{
+							ObjectMeta: metav1.ObjectMeta{
+								Namespace: testCtx.DefaultNamespace,
+								Name:      podName("leader"),
+								Labels: map[string]string{
+									constant.AppManagedByLabelKey:   constant.AppName,
+									constant.AppInstanceLabelKey:    synthesizedComp.ClusterName,
+									constant.KBAppComponentLabelKey: synthesizedComp.Name,
+									constant.RoleLabelKey:           "leader",
+								},
+							},
+							Spec: corev1.PodSpec{},
+						},
+						&corev1.Pod{
+							ObjectMeta: metav1.ObjectMeta{
+								Namespace: testCtx.DefaultNamespace,
+								Name:      podName("follower"),
+								Labels: map[string]string{
+									constant.AppManagedByLabelKey:   constant.AppName,
+									constant.AppInstanceLabelKey:    synthesizedComp.ClusterName,
+									constant.KBAppComponentLabelKey: synthesizedComp.Name,
+									constant.RoleLabelKey:           "follower",
+								},
+							},
+							Spec: corev1.PodSpec{},
+						},
+						&corev1.Pod{
+							ObjectMeta: metav1.ObjectMeta{
+								Namespace: testCtx.DefaultNamespace,
+								Name:      podName("empty"),
+								Labels: map[string]string{
+									constant.AppManagedByLabelKey:   constant.AppName,
+									constant.AppInstanceLabelKey:    synthesizedComp.ClusterName,
+									constant.KBAppComponentLabelKey: synthesizedComp.Name,
+								},
+							},
+							Spec: corev1.PodSpec{},
+						},
 					},
 				}
+				// pod names and FQDNs are calculated from the spec, and names and FQDNs for specific roles are obtained from runtime resources.
 				mockInstanceList := []string{
 					constant.GeneratePodName(synthesizedComp.ClusterName, synthesizedComp.Name, 0),
 					constant.GeneratePodName(synthesizedComp.ClusterName, synthesizedComp.Name, 1),
@@ -1714,18 +1822,62 @@ var _ = Describe("vars", func() {
 				compName := constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name)
 				checkEnvVarWithValue(envVars, "name", compName)
 				checkEnvVarWithValue(envVars, "replicas", fmt.Sprintf("%d", 3))
-				checkEnvVarWithValue(envVars, "instanceNames", strings.Join(mockInstanceList, ","))
-				withClusterDomain := func(name string) string {
-					return fmt.Sprintf("%s.%s", name, viper.GetString(constant.KubernetesClusterDomainEnv))
-				}
+				checkEnvVarWithValue(envVars, "podNames", strings.Join(mockInstanceList, ","))
+				checkEnvVarWithValue(envVars, "podNames4EmptyRole", podName("empty"))
 				fqdnList := func(fn ...func(string) string) []string {
 					l := make([]string, 0)
 					for _, i := range mockInstanceList {
-						l = append(l, withClusterDomain(fmt.Sprintf("%s.%s-headless.%s.svc", i, compName, testCtx.DefaultNamespace)))
+						l = append(l, PodFQDN(synthesizedComp.Namespace, synthesizedComp.FullCompName, i))
 					}
 					return l
 				}
 				checkEnvVarWithValue(envVars, "podFQDNs", strings.Join(fqdnList(), ","))
+				checkEnvVarWithValue(envVars, "podFQDNs4Leader", PodFQDN(synthesizedComp.Namespace, synthesizedComp.FullCompName, podName("leader")))
+			})
+		})
+
+		Context("cluster vars", func() {
+			It("ok", func() {
+				vars := []appsv1alpha1.EnvVar{
+					{
+						Name: "namespace",
+						ValueFrom: &appsv1alpha1.VarSource{
+							ClusterVarRef: &appsv1alpha1.ClusterVarSelector{
+								ClusterVars: appsv1alpha1.ClusterVars{
+									Namespace: &appsv1alpha1.VarRequired,
+								},
+							},
+						},
+					},
+					{
+						Name: "name",
+						ValueFrom: &appsv1alpha1.VarSource{
+							ClusterVarRef: &appsv1alpha1.ClusterVarSelector{
+								ClusterVars: appsv1alpha1.ClusterVars{
+									ClusterName: &appsv1alpha1.VarRequired,
+								},
+							},
+						},
+					},
+					{
+						Name: "uid",
+						ValueFrom: &appsv1alpha1.VarSource{
+							ClusterVarRef: &appsv1alpha1.ClusterVarSelector{
+								ClusterVars: appsv1alpha1.ClusterVars{
+									ClusterUID: &appsv1alpha1.VarRequired,
+								},
+							},
+						},
+					},
+				}
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, nil, synthesizedComp, vars)
+				Expect(err).Should(Succeed())
+				Expect(templateVars).Should(HaveKeyWithValue("namespace", synthesizedComp.Namespace))
+				Expect(templateVars).Should(HaveKeyWithValue("name", synthesizedComp.ClusterName))
+				Expect(templateVars).Should(HaveKeyWithValue("uid", synthesizedComp.ClusterUID))
+				checkEnvVarWithValue(envVars, "namespace", synthesizedComp.Namespace)
+				checkEnvVarWithValue(envVars, "name", synthesizedComp.ClusterName)
+				checkEnvVarWithValue(envVars, "uid", synthesizedComp.ClusterUID)
 			})
 		})
 

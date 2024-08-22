@@ -12511,6 +12511,29 @@ spec:
                       description: Source for the variable's value. Cannot be used
                         if value is not empty.
                       properties:
+                        clusterVarRef:
+                          description: Selects a defined var of a Cluster.
+                          properties:
+                            clusterName:
+                              description: Reference to the name of the Cluster object.
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
+                            clusterUID:
+                              description: Reference to the UID of the Cluster object.
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
+                            namespace:
+                              description: Reference to the namespace of the Cluster
+                                object.
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
+                          type: object
                         componentVarRef:
                           description: Selects a defined var of a Component.
                           properties:
@@ -12522,14 +12545,6 @@ spec:
                             componentName:
                               description: Reference to the name of the Component
                                 object.
-                              enum:
-                              - Required
-                              - Optional
-                              type: string
-                            instanceNames:
-                              description: |-
-                                Reference to the instanceName list of the component.
-                                and the value will be presented in the following format: instanceName1,instanceName2,...
                               enum:
                               - Required
                               - Optional
@@ -12598,6 +12613,44 @@ spec:
                               - Required
                               - Optional
                               type: string
+                            podFQDNsForRole:
+                              description: |-
+                                Reference to the pod FQDN list of the component that have a specific role.
+                                The value will be presented in the following format: FQDN1,FQDN2,...
+                              properties:
+                                option:
+                                  description: VarOption defines whether a variable
+                                    is required or optional.
+                                  enum:
+                                  - Required
+                                  - Optional
+                                  type: string
+                                role:
+                                  type: string
+                              type: object
+                            podNames:
+                              description: |-
+                                Reference to the pod name list of the component.
+                                and the value will be presented in the following format: name1,name2,...
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
+                            podNamesForRole:
+                              description: |-
+                                Reference to the pod name list of the component that have a specific role.
+                                The value will be presented in the following format: name1,name2,...
+                              properties:
+                                option:
+                                  description: VarOption defines whether a variable
+                                    is required or optional.
+                                  enum:
+                                  - Required
+                                  - Optional
+                                  type: string
+                                role:
+                                  type: string
+                              type: object
                             replicas:
                               description: Reference to the replicas of the component.
                               enum:
@@ -13012,6 +13065,13 @@ spec:
                                   - Optional
                                   type: string
                               type: object
+                            serviceType:
+                              description: ServiceType references the type of the
+                                service.
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
                           type: object
                       type: object
                   required:

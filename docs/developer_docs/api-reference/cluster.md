@@ -10048,7 +10048,23 @@ string
 <em>(Optional)</em>
 <p>Specifies the container image to be used for running the Action.</p>
 <p>When specified, a dedicated container will be created using this image to execute the Action.
-This field is mutually exclusive with the <code>container</code> field; only one of them should be provided.</p>
+All actions with same image will share the same container.</p>
+<p>This field cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>env</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents a list of environment variables that will be injected into the container.
+These variables enable the container to adapt its behavior based on the environment it&rsquo;s running in.</p>
 <p>This field cannot be updated.</p>
 </td>
 </tr>
@@ -10082,22 +10098,6 @@ If the shell is required, it must be explicitly invoked in the command.</p>
 </tr>
 <tr>
 <td>
-<code>env</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
-[]Kubernetes core/v1.EnvVar
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Represents a list of environment variables that will be injected into the container.
-These variables enable the container to adapt its behavior based on the environment it&rsquo;s running in.</p>
-<p>This field cannot be updated.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>targetPodSelector</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.TargetPodSelector">
@@ -10110,8 +10110,10 @@ TargetPodSelector
 <p>Defines the criteria used to select the target Pod(s) for executing the Action.
 This is useful when there is no default target replica identified.
 It allows for precise control over which Pod(s) the Action should run in.</p>
+<p>If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+to be removed or added; or a random pod if the Action is triggered at the component level, such as
+post-provision or pre-terminate of the component.</p>
 <p>This field cannot be updated.</p>
-<p>Note: This field is reserved for future use and is not currently active.</p>
 </td>
 </tr>
 <tr>
@@ -10131,7 +10133,6 @@ The impact of this field depends on the <code>targetPodSelector</code> value:</p
 will be selected for the Action.</li>
 </ul>
 <p>This field cannot be updated.</p>
-<p>Note: This field is reserved for future use and is not currently active.</p>
 </td>
 </tr>
 <tr>
@@ -10143,12 +10144,14 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the name of the container within the target Pod where the action will be executed.</p>
-<p>This name must correspond to one of the containers defined in <code>componentDefinition.spec.runtime</code>.
-If this field is not specified, the default behavior is to use the first container listed in
-<code>componentDefinition.spec.runtime</code>.</p>
+<p>Specifies the name of the container within the same pod whose resources will be shared with the action.
+This allows the action to utilize the specified container&rsquo;s resources without executing within it.</p>
+<p>The name must match one of the containers defined in <code>componentDefinition.spec.runtime</code>.</p>
+<p>The resources that can be shared are included:</p>
+<ul>
+<li>volume mounts</li>
+</ul>
 <p>This field cannot be updated.</p>
-<p>Note: This field is reserved for future use and is not currently active.</p>
 </td>
 </tr>
 </tbody>

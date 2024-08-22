@@ -457,18 +457,20 @@ spec:
                             type: array
                           container:
                             description: |-
-                              Defines the name of the container within the target Pod where the action will be executed.
+                              Specifies the name of the container within the same pod whose resources will be shared with the action.
+                              This allows the action to utilize the specified container's resources without executing within it.
 
 
-                              This name must correspond to one of the containers defined in `componentDefinition.spec.runtime`.
-                              If this field is not specified, the default behavior is to use the first container listed in
-                              `componentDefinition.spec.runtime`.
+                              The name must match one of the containers defined in `componentDefinition.spec.runtime`.
+
+
+                              The resources that can be shared are included:
+
+
+                              - volume mounts
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           env:
                             description: |-
@@ -596,7 +598,7 @@ spec:
 
 
                               When specified, a dedicated container will be created using this image to execute the Action.
-                              This field is mutually exclusive with the `container` field; only one of them should be provided.
+                              All actions with same image will share the same container.
 
 
                               This field cannot be updated.
@@ -613,9 +615,6 @@ spec:
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           targetPodSelector:
                             description: |-
@@ -624,10 +623,12 @@ spec:
                               It allows for precise control over which Pod(s) the Action should run in.
 
 
+                              If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+                              to be removed or added; or a random pod if the Action is triggered at the component level, such as
+                              post-provision or pre-terminate of the component.
+
+
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             enum:
                             - Any
                             - All
@@ -743,18 +744,20 @@ spec:
                             type: array
                           container:
                             description: |-
-                              Defines the name of the container within the target Pod where the action will be executed.
+                              Specifies the name of the container within the same pod whose resources will be shared with the action.
+                              This allows the action to utilize the specified container's resources without executing within it.
 
 
-                              This name must correspond to one of the containers defined in `componentDefinition.spec.runtime`.
-                              If this field is not specified, the default behavior is to use the first container listed in
-                              `componentDefinition.spec.runtime`.
+                              The name must match one of the containers defined in `componentDefinition.spec.runtime`.
+
+
+                              The resources that can be shared are included:
+
+
+                              - volume mounts
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           env:
                             description: |-
@@ -882,7 +885,7 @@ spec:
 
 
                               When specified, a dedicated container will be created using this image to execute the Action.
-                              This field is mutually exclusive with the `container` field; only one of them should be provided.
+                              All actions with same image will share the same container.
 
 
                               This field cannot be updated.
@@ -899,9 +902,6 @@ spec:
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           targetPodSelector:
                             description: |-
@@ -910,10 +910,12 @@ spec:
                               It allows for precise control over which Pod(s) the Action should run in.
 
 
+                              If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+                              to be removed or added; or a random pod if the Action is triggered at the component level, such as
+                              post-provision or pre-terminate of the component.
+
+
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             enum:
                             - Any
                             - All
@@ -1028,18 +1030,20 @@ spec:
                             type: array
                           container:
                             description: |-
-                              Defines the name of the container within the target Pod where the action will be executed.
+                              Specifies the name of the container within the same pod whose resources will be shared with the action.
+                              This allows the action to utilize the specified container's resources without executing within it.
 
 
-                              This name must correspond to one of the containers defined in `componentDefinition.spec.runtime`.
-                              If this field is not specified, the default behavior is to use the first container listed in
-                              `componentDefinition.spec.runtime`.
+                              The name must match one of the containers defined in `componentDefinition.spec.runtime`.
+
+
+                              The resources that can be shared are included:
+
+
+                              - volume mounts
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           env:
                             description: |-
@@ -1167,7 +1171,7 @@ spec:
 
 
                               When specified, a dedicated container will be created using this image to execute the Action.
-                              This field is mutually exclusive with the `container` field; only one of them should be provided.
+                              All actions with same image will share the same container.
 
 
                               This field cannot be updated.
@@ -1184,9 +1188,6 @@ spec:
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           targetPodSelector:
                             description: |-
@@ -1195,10 +1196,12 @@ spec:
                               It allows for precise control over which Pod(s) the Action should run in.
 
 
+                              If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+                              to be removed or added; or a random pod if the Action is triggered at the component level, such as
+                              post-provision or pre-terminate of the component.
+
+
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             enum:
                             - Any
                             - All
@@ -1312,18 +1315,20 @@ spec:
                             type: array
                           container:
                             description: |-
-                              Defines the name of the container within the target Pod where the action will be executed.
+                              Specifies the name of the container within the same pod whose resources will be shared with the action.
+                              This allows the action to utilize the specified container's resources without executing within it.
 
 
-                              This name must correspond to one of the containers defined in `componentDefinition.spec.runtime`.
-                              If this field is not specified, the default behavior is to use the first container listed in
-                              `componentDefinition.spec.runtime`.
+                              The name must match one of the containers defined in `componentDefinition.spec.runtime`.
+
+
+                              The resources that can be shared are included:
+
+
+                              - volume mounts
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           env:
                             description: |-
@@ -1451,7 +1456,7 @@ spec:
 
 
                               When specified, a dedicated container will be created using this image to execute the Action.
-                              This field is mutually exclusive with the `container` field; only one of them should be provided.
+                              All actions with same image will share the same container.
 
 
                               This field cannot be updated.
@@ -1468,9 +1473,6 @@ spec:
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           targetPodSelector:
                             description: |-
@@ -1479,10 +1481,12 @@ spec:
                               It allows for precise control over which Pod(s) the Action should run in.
 
 
+                              If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+                              to be removed or added; or a random pod if the Action is triggered at the component level, such as
+                              post-provision or pre-terminate of the component.
+
+
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             enum:
                             - Any
                             - All
@@ -1598,18 +1602,20 @@ spec:
                             type: array
                           container:
                             description: |-
-                              Defines the name of the container within the target Pod where the action will be executed.
+                              Specifies the name of the container within the same pod whose resources will be shared with the action.
+                              This allows the action to utilize the specified container's resources without executing within it.
 
 
-                              This name must correspond to one of the containers defined in `componentDefinition.spec.runtime`.
-                              If this field is not specified, the default behavior is to use the first container listed in
-                              `componentDefinition.spec.runtime`.
+                              The name must match one of the containers defined in `componentDefinition.spec.runtime`.
+
+
+                              The resources that can be shared are included:
+
+
+                              - volume mounts
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           env:
                             description: |-
@@ -1737,7 +1743,7 @@ spec:
 
 
                               When specified, a dedicated container will be created using this image to execute the Action.
-                              This field is mutually exclusive with the `container` field; only one of them should be provided.
+                              All actions with same image will share the same container.
 
 
                               This field cannot be updated.
@@ -1754,9 +1760,6 @@ spec:
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           targetPodSelector:
                             description: |-
@@ -1765,10 +1768,12 @@ spec:
                               It allows for precise control over which Pod(s) the Action should run in.
 
 
+                              If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+                              to be removed or added; or a random pod if the Action is triggered at the component level, such as
+                              post-provision or pre-terminate of the component.
+
+
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             enum:
                             - Any
                             - All
@@ -1877,18 +1882,20 @@ spec:
                             type: array
                           container:
                             description: |-
-                              Defines the name of the container within the target Pod where the action will be executed.
+                              Specifies the name of the container within the same pod whose resources will be shared with the action.
+                              This allows the action to utilize the specified container's resources without executing within it.
 
 
-                              This name must correspond to one of the containers defined in `componentDefinition.spec.runtime`.
-                              If this field is not specified, the default behavior is to use the first container listed in
-                              `componentDefinition.spec.runtime`.
+                              The name must match one of the containers defined in `componentDefinition.spec.runtime`.
+
+
+                              The resources that can be shared are included:
+
+
+                              - volume mounts
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           env:
                             description: |-
@@ -2016,7 +2023,7 @@ spec:
 
 
                               When specified, a dedicated container will be created using this image to execute the Action.
-                              This field is mutually exclusive with the `container` field; only one of them should be provided.
+                              All actions with same image will share the same container.
 
 
                               This field cannot be updated.
@@ -2033,9 +2040,6 @@ spec:
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           targetPodSelector:
                             description: |-
@@ -2044,10 +2048,12 @@ spec:
                               It allows for precise control over which Pod(s) the Action should run in.
 
 
+                              If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+                              to be removed or added; or a random pod if the Action is triggered at the component level, such as
+                              post-provision or pre-terminate of the component.
+
+
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             enum:
                             - Any
                             - All
@@ -2156,18 +2162,20 @@ spec:
                             type: array
                           container:
                             description: |-
-                              Defines the name of the container within the target Pod where the action will be executed.
+                              Specifies the name of the container within the same pod whose resources will be shared with the action.
+                              This allows the action to utilize the specified container's resources without executing within it.
 
 
-                              This name must correspond to one of the containers defined in `componentDefinition.spec.runtime`.
-                              If this field is not specified, the default behavior is to use the first container listed in
-                              `componentDefinition.spec.runtime`.
+                              The name must match one of the containers defined in `componentDefinition.spec.runtime`.
+
+
+                              The resources that can be shared are included:
+
+
+                              - volume mounts
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           env:
                             description: |-
@@ -2295,7 +2303,7 @@ spec:
 
 
                               When specified, a dedicated container will be created using this image to execute the Action.
-                              This field is mutually exclusive with the `container` field; only one of them should be provided.
+                              All actions with same image will share the same container.
 
 
                               This field cannot be updated.
@@ -2312,9 +2320,6 @@ spec:
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           targetPodSelector:
                             description: |-
@@ -2323,10 +2328,12 @@ spec:
                               It allows for precise control over which Pod(s) the Action should run in.
 
 
+                              If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+                              to be removed or added; or a random pod if the Action is triggered at the component level, such as
+                              post-provision or pre-terminate of the component.
+
+
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             enum:
                             - Any
                             - All
@@ -2441,18 +2448,20 @@ spec:
                             type: array
                           container:
                             description: |-
-                              Defines the name of the container within the target Pod where the action will be executed.
+                              Specifies the name of the container within the same pod whose resources will be shared with the action.
+                              This allows the action to utilize the specified container's resources without executing within it.
 
 
-                              This name must correspond to one of the containers defined in `componentDefinition.spec.runtime`.
-                              If this field is not specified, the default behavior is to use the first container listed in
-                              `componentDefinition.spec.runtime`.
+                              The name must match one of the containers defined in `componentDefinition.spec.runtime`.
+
+
+                              The resources that can be shared are included:
+
+
+                              - volume mounts
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           env:
                             description: |-
@@ -2580,7 +2589,7 @@ spec:
 
 
                               When specified, a dedicated container will be created using this image to execute the Action.
-                              This field is mutually exclusive with the `container` field; only one of them should be provided.
+                              All actions with same image will share the same container.
 
 
                               This field cannot be updated.
@@ -2597,9 +2606,6 @@ spec:
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           targetPodSelector:
                             description: |-
@@ -2608,10 +2614,12 @@ spec:
                               It allows for precise control over which Pod(s) the Action should run in.
 
 
+                              If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+                              to be removed or added; or a random pod if the Action is triggered at the component level, such as
+                              post-provision or pre-terminate of the component.
+
+
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             enum:
                             - Any
                             - All
@@ -2728,18 +2736,20 @@ spec:
                             type: array
                           container:
                             description: |-
-                              Defines the name of the container within the target Pod where the action will be executed.
+                              Specifies the name of the container within the same pod whose resources will be shared with the action.
+                              This allows the action to utilize the specified container's resources without executing within it.
 
 
-                              This name must correspond to one of the containers defined in `componentDefinition.spec.runtime`.
-                              If this field is not specified, the default behavior is to use the first container listed in
-                              `componentDefinition.spec.runtime`.
+                              The name must match one of the containers defined in `componentDefinition.spec.runtime`.
+
+
+                              The resources that can be shared are included:
+
+
+                              - volume mounts
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           env:
                             description: |-
@@ -2867,7 +2877,7 @@ spec:
 
 
                               When specified, a dedicated container will be created using this image to execute the Action.
-                              This field is mutually exclusive with the `container` field; only one of them should be provided.
+                              All actions with same image will share the same container.
 
 
                               This field cannot be updated.
@@ -2884,9 +2894,6 @@ spec:
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           targetPodSelector:
                             description: |-
@@ -2895,10 +2902,12 @@ spec:
                               It allows for precise control over which Pod(s) the Action should run in.
 
 
+                              If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+                              to be removed or added; or a random pod if the Action is triggered at the component level, such as
+                              post-provision or pre-terminate of the component.
+
+
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             enum:
                             - Any
                             - All
@@ -3002,18 +3011,20 @@ spec:
                             type: array
                           container:
                             description: |-
-                              Defines the name of the container within the target Pod where the action will be executed.
+                              Specifies the name of the container within the same pod whose resources will be shared with the action.
+                              This allows the action to utilize the specified container's resources without executing within it.
 
 
-                              This name must correspond to one of the containers defined in `componentDefinition.spec.runtime`.
-                              If this field is not specified, the default behavior is to use the first container listed in
-                              `componentDefinition.spec.runtime`.
+                              The name must match one of the containers defined in `componentDefinition.spec.runtime`.
+
+
+                              The resources that can be shared are included:
+
+
+                              - volume mounts
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           env:
                             description: |-
@@ -3141,7 +3152,7 @@ spec:
 
 
                               When specified, a dedicated container will be created using this image to execute the Action.
-                              This field is mutually exclusive with the `container` field; only one of them should be provided.
+                              All actions with same image will share the same container.
 
 
                               This field cannot be updated.
@@ -3158,9 +3169,6 @@ spec:
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           targetPodSelector:
                             description: |-
@@ -3169,10 +3177,12 @@ spec:
                               It allows for precise control over which Pod(s) the Action should run in.
 
 
+                              If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+                              to be removed or added; or a random pod if the Action is triggered at the component level, such as
+                              post-provision or pre-terminate of the component.
+
+
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             enum:
                             - Any
                             - All
@@ -3298,18 +3308,20 @@ spec:
                             type: array
                           container:
                             description: |-
-                              Defines the name of the container within the target Pod where the action will be executed.
+                              Specifies the name of the container within the same pod whose resources will be shared with the action.
+                              This allows the action to utilize the specified container's resources without executing within it.
 
 
-                              This name must correspond to one of the containers defined in `componentDefinition.spec.runtime`.
-                              If this field is not specified, the default behavior is to use the first container listed in
-                              `componentDefinition.spec.runtime`.
+                              The name must match one of the containers defined in `componentDefinition.spec.runtime`.
+
+
+                              The resources that can be shared are included:
+
+
+                              - volume mounts
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           env:
                             description: |-
@@ -3437,7 +3449,7 @@ spec:
 
 
                               When specified, a dedicated container will be created using this image to execute the Action.
-                              This field is mutually exclusive with the `container` field; only one of them should be provided.
+                              All actions with same image will share the same container.
 
 
                               This field cannot be updated.
@@ -3454,9 +3466,6 @@ spec:
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           targetPodSelector:
                             description: |-
@@ -3465,10 +3474,12 @@ spec:
                               It allows for precise control over which Pod(s) the Action should run in.
 
 
+                              If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+                              to be removed or added; or a random pod if the Action is triggered at the component level, such as
+                              post-provision or pre-terminate of the component.
+
+
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             enum:
                             - Any
                             - All
@@ -3603,18 +3614,20 @@ spec:
                             type: array
                           container:
                             description: |-
-                              Defines the name of the container within the target Pod where the action will be executed.
+                              Specifies the name of the container within the same pod whose resources will be shared with the action.
+                              This allows the action to utilize the specified container's resources without executing within it.
 
 
-                              This name must correspond to one of the containers defined in `componentDefinition.spec.runtime`.
-                              If this field is not specified, the default behavior is to use the first container listed in
-                              `componentDefinition.spec.runtime`.
+                              The name must match one of the containers defined in `componentDefinition.spec.runtime`.
+
+
+                              The resources that can be shared are included:
+
+
+                              - volume mounts
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           env:
                             description: |-
@@ -3742,7 +3755,7 @@ spec:
 
 
                               When specified, a dedicated container will be created using this image to execute the Action.
-                              This field is mutually exclusive with the `container` field; only one of them should be provided.
+                              All actions with same image will share the same container.
 
 
                               This field cannot be updated.
@@ -3759,9 +3772,6 @@ spec:
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           targetPodSelector:
                             description: |-
@@ -3770,10 +3780,12 @@ spec:
                               It allows for precise control over which Pod(s) the Action should run in.
 
 
+                              If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+                              to be removed or added; or a random pod if the Action is triggered at the component level, such as
+                              post-provision or pre-terminate of the component.
+
+
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             enum:
                             - Any
                             - All

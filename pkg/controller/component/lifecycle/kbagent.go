@@ -226,7 +226,7 @@ func (a *kbagent) buildActionRequest(ctx context.Context, cli client.Reader, lfa
 }
 
 func (a *kbagent) parameters(ctx context.Context, cli client.Reader, lfa lifecycleAction) (map[string]string, error) {
-	m, err := a.templateVarsParameters(ctx, cli)
+	m, err := a.templateVarsParameters()
 	if err != nil {
 		return nil, err
 	}
@@ -244,23 +244,9 @@ func (a *kbagent) parameters(ctx context.Context, cli client.Reader, lfa lifecyc
 	return m, nil
 }
 
-func (a *kbagent) templateVarsParameters(ctx context.Context, cli client.Reader) (map[string]string, error) {
-	templateVars := a.synthesizedComp.TemplateVars
-	if templateVars == nil {
-		// TODO: vars from SynthesizedComponent
-		var err error
-		compDef := &appsv1alpha1.ComponentDefinition{}
-		if err = cli.Get(ctx, client.ObjectKey{Name: a.synthesizedComp.CompDefName}, compDef); err != nil {
-			return nil, err
-		}
-		// TODO: handle the case where delete a component which is in provisioning
-		templateVars, _, err = component.ResolveTemplateNEnvVars(ctx, cli, a.synthesizedComp, compDef.Spec.Vars)
-		if err != nil {
-			return nil, err
-		}
-	}
+func (a *kbagent) templateVarsParameters() (map[string]string, error) {
 	m := map[string]string{}
-	for k, v := range templateVars {
+	for k, v := range a.synthesizedComp.TemplateVars {
 		m[k] = v.(string)
 	}
 	return m, nil

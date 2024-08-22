@@ -111,32 +111,52 @@ func (t *componentPreTerminateTransformer) preTerminate(transCtx *componentTrans
 }
 
 func (t *componentPreTerminateTransformer) lifecycleAction4Component(transCtx *componentTransformContext, compDef *appsv1alpha1.ComponentDefinition) (lifecycle.Lifecycle, error) {
-	var (
-		comp        = transCtx.Component
-		namespace   = comp.Namespace
-		clusterName string
-		compName    string
-		err         error
-	)
-	clusterName, err = component.GetClusterName(comp)
-	if err != nil {
-		return nil, err
-	}
-	clusterUID, err := component.GetClusterUID(comp)
-	if err != nil {
-		return nil, err
-	}
-	compName, err = component.ShortName(clusterName, comp.Name)
-	if err != nil {
-		return nil, err
-	}
-	pods, err1 := component.ListOwnedPods(transCtx.Context, transCtx.Client, namespace, clusterName, compName)
+	synthesizedComp, err1 := t.synthesizedComponent(transCtx, compDef)
 	if err1 != nil {
 		return nil, err1
+	}
+	pods, err2 := component.ListOwnedPods(transCtx.Context, transCtx.Client,
+		synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
+	if err2 != nil {
+		return nil, err2
 	}
 	if len(pods) == 0 {
 		// TODO: (good-first-issue) we should handle the case that the component has no pods
 		return nil, fmt.Errorf("has no pods to running the pre-terminate action")
 	}
-	return lifecycle.NewWithCompDef(namespace, clusterName, clusterUID, compName, compDef, nil, pods...)
+	return lifecycle.New(synthesizedComp, nil, pods...)
+}
+
+func (t *componentPreTerminateTransformer) synthesizedComponent(transCtx *componentTransformContext, compDef *appsv1alpha1.ComponentDefinition) (*component.SynthesizedComponent, error) {
+	var (
+		ctx  = transCtx.Context
+		cli  = transCtx.Client
+		comp = transCtx.Component
+	)
+
+	clusterName, err := component.GetClusterName(comp)
+	if err != nil {
+		return nil, newRequeueError(requeueDuration, err.Error())
+	}
+	cluster := &appsv1alpha1.Cluster{}
+	err = cli.Get(ctx, types.NamespacedName{Name: clusterName, Namespace: comp.Namespace}, cluster)
+	if err != nil {
+		return nil, newRequeueError(requeueDuration, err.Error())
+	}
+
+	reqCtx := intctrlutil.RequestCtx{
+		Ctx:      ctx,
+		Log:      transCtx.Logger,
+		Recorder: transCtx.EventRecorder,
+	}
+	synthesizedComp, err := component.BuildSynthesizedComponent(reqCtx, cli, cluster, compDef, comp)
+	if err != nil {
+		return nil, newRequeueError(requeueDuration,
+			fmt.Sprintf("build synthesized component failed at pre-terminate transformer: %s", err.Error()))
+	}
+	synthesizedComp.TemplateVars, _, err = component.ResolveTemplateNEnvVars(ctx, cli, synthesizedComp, compDef.Spec.Vars)
+	if err != nil {
+		return nil, err
+	}
+	return synthesizedComp, nil
 }

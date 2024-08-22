@@ -78,28 +78,3 @@ func New(synthesizedComp *component.SynthesizedComponent, pod *corev1.Pod, pods 
 		pod:             pod,
 	}, nil
 }
-
-func NewWithCompDef(namespace, clusterName, clusterUID, compName string,
-	compDef *appsv1alpha1.ComponentDefinition, pod *corev1.Pod, pods ...*corev1.Pod) (Lifecycle, error) {
-	if pod == nil && len(pods) == 0 {
-		return nil, fmt.Errorf("either pod or pods must be provided to call lifecycle actions")
-	}
-	if pod == nil {
-		pod = pods[0]
-	}
-	if len(pods) == 0 {
-		pods = []*corev1.Pod{pod}
-	}
-	return &kbagent{
-		synthesizedComp: &component.SynthesizedComponent{
-			Namespace:        namespace,
-			ClusterName:      clusterName,
-			ClusterUID:       clusterUID,
-			Name:             compName,
-			Roles:            compDef.Spec.Roles,
-			LifecycleActions: compDef.Spec.LifecycleActions,
-		},
-		pods: pods,
-		pod:  pod,
-	}, nil
-}

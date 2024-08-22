@@ -122,6 +122,10 @@ func (t *componentPreTerminateTransformer) lifecycleAction4Component(transCtx *c
 	if err != nil {
 		return nil, err
 	}
+	clusterUID, err := component.GetClusterUID(comp)
+	if err != nil {
+		return nil, err
+	}
 	compName, err = component.ShortName(clusterName, comp.Name)
 	if err != nil {
 		return nil, err
@@ -134,5 +138,5 @@ func (t *componentPreTerminateTransformer) lifecycleAction4Component(transCtx *c
 		// TODO: (good-first-issue) we should handle the case that the component has no pods
 		return nil, fmt.Errorf("has no pods to running the pre-terminate action")
 	}
-	return lifecycle.NewWithCompDef(namespace, clusterName, compName, compDef, nil, pods...)
+	return lifecycle.NewWithCompDef(namespace, clusterName, clusterUID, compName, compDef, nil, pods...)
 }

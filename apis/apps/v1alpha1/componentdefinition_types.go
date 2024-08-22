@@ -701,27 +701,12 @@ type ExecAction struct {
 	// Specifies the container image to be used for running the Action.
 	//
 	// When specified, a dedicated container will be created using this image to execute the Action.
-	// This field is mutually exclusive with the `container` field; only one of them should be provided.
+	// All actions with same image will share the same container.
 	//
 	// This field cannot be updated.
 	//
 	// +optional
 	Image string `json:"image,omitempty"`
-
-	// Specifies the command to be executed inside the container.
-	// The working directory for this command is the container's root directory('/').
-	// Commands are executed directly without a shell environment, meaning shell-specific syntax ('|', etc.) is not supported.
-	// If the shell is required, it must be explicitly invoked in the command.
-	//
-	// A successful execution is indicated by an exit status of 0; any non-zero status signifies a failure.
-	//
-	// +optional
-	Command []string `json:"command,omitempty" protobuf:"bytes,1,rep,name=command"`
-
-	// Args represents the arguments that are passed to the `command` for execution.
-	//
-	// +optional
-	Args []string `json:"args,omitempty"`
 
 	// Represents a list of environment variables that will be injected into the container.
 	// These variables enable the container to adapt its behavior based on the environment it's running in.
@@ -733,13 +718,30 @@ type ExecAction struct {
 	// +patchStrategy=merge
 	Env []corev1.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 
+	// Specifies the command to be executed inside the container.
+	// The working directory for this command is the container's root directory('/').
+	// Commands are executed directly without a shell environment, meaning shell-specific syntax ('|', etc.) is not supported.
+	// If the shell is required, it must be explicitly invoked in the command.
+	//
+	// A successful execution is indicated by an exit status of 0; any non-zero status signifies a failure.
+	//
+	// +optional
+	Command []string `json:"command,omitempty"`
+
+	// Args represents the arguments that are passed to the `command` for execution.
+	//
+	// +optional
+	Args []string `json:"args,omitempty"`
+
 	// Defines the criteria used to select the target Pod(s) for executing the Action.
 	// This is useful when there is no default target replica identified.
 	// It allows for precise control over which Pod(s) the Action should run in.
 	//
-	// This field cannot be updated.
+	// If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+	// to be removed or added; or a random pod if the Action is triggered at the component level, such as
+	// post-provision or pre-terminate of the component.
 	//
-	// Note: This field is reserved for future use and is not currently active.
+	// This field cannot be updated.
 	//
 	// +optional
 	TargetPodSelector TargetPodSelector `json:"targetPodSelector,omitempty"`
@@ -753,20 +755,19 @@ type ExecAction struct {
 	//
 	// This field cannot be updated.
 	//
-	// Note: This field is reserved for future use and is not currently active.
-	//
 	// +optional
 	MatchingKey string `json:"matchingKey,omitempty"`
 
-	// Defines the name of the container within the target Pod where the action will be executed.
+	// Specifies the name of the container within the same pod whose resources will be shared with the action.
+	// This allows the action to utilize the specified container's resources without executing within it.
 	//
-	// This name must correspond to one of the containers defined in `componentDefinition.spec.runtime`.
-	// If this field is not specified, the default behavior is to use the first container listed in
-	// `componentDefinition.spec.runtime`.
+	// The name must match one of the containers defined in `componentDefinition.spec.runtime`.
+	//
+	// The resources that can be shared are included:
+	//
+	// - volume mounts
 	//
 	// This field cannot be updated.
-	//
-	// Note: This field is reserved for future use and is not currently active.
 	//
 	// +optional
 	Container string `json:"container,omitempty"`

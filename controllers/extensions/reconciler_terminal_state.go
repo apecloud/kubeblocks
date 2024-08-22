@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package extensions
 
 import (
-	"fmt"
-
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -51,7 +49,6 @@ func (r *terminalStateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *k
 func (r *terminalStateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
 	r.reqCtx.Log.V(1).Info("terminalStateReconciler", "phase", addon.Status.Phase)
-	fmt.Println("terminalStateReconciler, phase: ", addon.Status.Phase)
 
 	helmInstallJob, err1 := r.reconciler.GetInstallJob(r.reqCtx.Ctx, "install", tree)
 	helmUninstallJob, err2 := r.reconciler.GetInstallJob(r.reqCtx.Ctx, "uninstall", tree)

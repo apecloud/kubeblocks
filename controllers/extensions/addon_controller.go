@@ -21,7 +21,6 @@ package extensions
 
 import (
 	"context"
-	"fmt"
 	"runtime"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -157,23 +156,17 @@ func (r *AddonReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx,
 		}
 		job := &batchv1.Job{}
 		if err := r.Get(reqCtx.Ctx, key, job); err != nil {
-			fmt.Println("not found: ", jobName)
 			return client.IgnoreNotFound(err)
 		}
 		if !job.DeletionTimestamp.IsZero() {
-			fmt.Println("DeletionTimestamp.IsZero: ", jobName)
-			fmt.Println(job.DeletionTimestamp)
 			return nil
 		}
 		if err := r.Delete(reqCtx.Ctx, job); err != nil {
-			fmt.Println("can not found when delete: ", jobName)
 			return client.IgnoreNotFound(err)
 		}
-		fmt.Println("succee delete: ", jobName)
 		return nil
 	}
 	for _, j := range []string{getInstallJobName(addon), getUninstallJobName(addon)} {
-		fmt.Println("job name: ", j)
 		if err := deleteJobIfExist(j); err != nil {
 			return nil, err
 		}

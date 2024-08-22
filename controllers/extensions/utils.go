@@ -253,7 +253,6 @@ func (r *AddonReconciler) PatchPhase(addon *extensionsv1alpha1.Addon, stageCtx s
 func (r *helmTypeInstallReconciler) Reconcile(tree *kubebuilderx.ObjectTree) {
 	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
 	r.reqCtx.Log.V(1).Info("helmTypeInstallStage", "phase", addon.Status.Phase)
-	fmt.Println("helmTypeInstallReconciler, phase: ", addon.Status.Phase)
 	mgrNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
 
 	key := client.ObjectKey{
@@ -423,7 +422,6 @@ func (r *helmTypeInstallReconciler) Reconcile(tree *kubebuilderx.ObjectTree) {
 func (r *helmTypeUninstallReconciler) Reconcile(tree *kubebuilderx.ObjectTree) {
 	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
 	r.reqCtx.Log.V(1).Info("helmTypeUninstallReconciler", "phase", addon.Status.Phase)
-	fmt.Println("helmTypeUninstallReconciler, phase: ", addon.Status.Phase)
 	key := client.ObjectKey{
 		Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
 		Name:      getUninstallJobName(addon),
@@ -433,7 +431,6 @@ func (r *helmTypeUninstallReconciler) Reconcile(tree *kubebuilderx.ObjectTree) {
 		r.setRequeueWithErr(err, "")
 		return
 	} else if err == nil {
-		fmt.Println("get helmTypeUninstallJob!!!!!!!!!!!!!!!")
 		if helmUninstallJob.Status.Succeeded > 0 {
 			r.reqCtx.Log.V(1).Info("helm uninstall job succeed", "job", key)
 			// TODO:

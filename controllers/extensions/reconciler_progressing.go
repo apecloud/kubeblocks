@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package extensions
 
 import (
-	"fmt"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
@@ -57,7 +55,6 @@ func (r *progressingReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebu
 
 	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
 	r.reqCtx.Log.V(1).Info("progressingReconciler", "phase", addon.Status.Phase)
-	fmt.Println("progressingReconciler, phase: ", addon.Status.Phase)
 
 	helmInstallJob, err1 := r.reconciler.GetInstallJob(r.reqCtx.Ctx, "install", tree)
 	helmUninstallJob, err2 := r.reconciler.GetInstallJob(r.reqCtx.Ctx, "uninstall", tree)

@@ -55,7 +55,6 @@ func (r *genIDProceedReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *ku
 func (r *genIDProceedReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
 	r.reqCtx.Log.V(1).Info("genIDProceedCheckReconciler", "phase", addon.Status.Phase)
-	fmt.Println("genIDProceedCheckReconciler, phase: ", addon.Status.Phase)
 
 	helmInstallJob, err1 := r.reconciler.GetInstallJob(r.reqCtx.Ctx, "install", tree)
 	helmUninstallJob, err2 := r.reconciler.GetInstallJob(r.reqCtx.Ctx, "uninstall", tree)
@@ -91,11 +90,8 @@ func (r *genIDProceedReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubeb
 			}
 		}
 
-		fmt.Println("Failed: ", addon.Status.Phase)
-
 		if addon.Generation == addon.Status.ObservedGeneration {
 			r.setReconciled()
-			fmt.Println("aaaaaa")
 			return kubebuilderx.RetryAfter(time.Second), nil
 		}
 	} else if (err1 == nil && helmInstallJob.Status.Succeeded > 0) || (err2 == nil && helmUninstallJob.Status.Succeeded > 0) {
@@ -106,15 +102,8 @@ func (r *genIDProceedReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubeb
 			err := r.reconciler.PatchPhase(addon, r.stageCtx, "Disabled", AddonDisabled)
 			return kubebuilderx.Continue, err
 		}
-		if helmInstallJob.Status.Succeeded > 0 {
-			fmt.Println("helmInstallJob.Status.Succeeded")
-		}
-		if helmUninstallJob.Status.Succeeded > 0 {
-			fmt.Println("helmUninstallJob.Status.Succeeded")
-		}
 		if (!helmInstallJob.DeletionTimestamp.IsZero() && helmInstallJob.Status.Succeeded > 0) ||
 			(!helmUninstallJob.DeletionTimestamp.IsZero() && helmUninstallJob.Status.Succeeded > 0) {
-			fmt.Println("!Job.DeletionTimestamp.IsZero(), DeletionTimestamp: ", helmInstallJob.DeletionTimestamp)
 			return kubebuilderx.Continue, nil
 		}
 
@@ -125,10 +114,9 @@ func (r *genIDProceedReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubeb
 				return kubebuilderx.Continue, err
 			}
 			r.setReconciled()
-			fmt.Println("setReconciled")
 			return kubebuilderx.Continue, nil
 		}
-	} 
+	}
 
 	return kubebuilderx.Continue, nil
 }

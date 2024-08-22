@@ -66,27 +66,25 @@ var _ = Describe("lifecycle", func() {
 			PodSpec: &corev1.PodSpec{
 				Containers: []corev1.Container{
 					{
-						Name:  "test-kbagent",
-						Image: "test-kbagent-image",
+						Name: "test-kbagent",
 					},
 				},
 			},
 			LifecycleActions: &appsv1alpha1.ComponentLifecycleActions{
 				PostProvision: &appsv1alpha1.Action{
 					Exec: &appsv1alpha1.ExecAction{
-						Command: []string{"echo", "hello"},
+						Command: []string{"echo", "post-provision"},
 					},
 					TimeoutSeconds: 5,
 					RetryPolicy: &appsv1alpha1.RetryPolicy{
 						MaxRetries:    5,
 						RetryInterval: 10,
 					},
-					PreCondition: &[]appsv1alpha1.PreConditionType{appsv1alpha1.ComponentReadyPreConditionType}[0],
 				},
 				RoleProbe: &appsv1alpha1.Probe{
 					Action: appsv1alpha1.Action{
 						Exec: &appsv1alpha1.ExecAction{
-							Command: []string{"echo", "hello"},
+							Command: []string{"echo", "role-probe"},
 						},
 						TimeoutSeconds: 5,
 					},
@@ -105,6 +103,8 @@ var _ = Describe("lifecycle", func() {
 
 	AfterEach(func() {
 		cleanEnv()
+
+		kbacli.UnsetMockClient()
 	})
 
 	Context("new", func() {
@@ -157,21 +157,28 @@ var _ = Describe("lifecycle", func() {
 			Expect(err).Should(BeNil())
 			Expect(lifecycle).ShouldNot(BeNil())
 
+			action := synthesizedComp.LifecycleActions.PostProvision
 			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
 				recorder.CallAction(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
 					Expect(req.Action).Should(Equal("postProvision"))
-					Expect(req.Parameters).Should(BeNil())
-					Expect(req.NonBlocking).Should(BeNil())
+					Expect(req.Parameters).ShouldNot(BeNil()) // legacy parameters for post-provision action
+					Expect(req.NonBlocking).ShouldNot(BeNil())
+					Expect(*req.NonBlocking).Should(BeTrue())
 					Expect(req.TimeoutSeconds).ShouldNot(BeNil())
-					Expect(*req.TimeoutSeconds).Should(Equal(synthesizedComp.LifecycleActions.PostProvision.TimeoutSeconds))
+					Expect(*req.TimeoutSeconds).Should(Equal(action.TimeoutSeconds))
 					Expect(req.RetryPolicy).ShouldNot(BeNil())
-					Expect(req.RetryPolicy.MaxRetries).Should(Equal(synthesizedComp.LifecycleActions.PostProvision.RetryPolicy.MaxRetries))
-					Expect(req.RetryPolicy.RetryInterval).Should(Equal(synthesizedComp.LifecycleActions.PostProvision.RetryPolicy.RetryInterval))
+					Expect(req.RetryPolicy.MaxRetries).Should(Equal(action.RetryPolicy.MaxRetries))
+					Expect(req.RetryPolicy.RetryInterval).Should(Equal(action.RetryPolicy.RetryInterval))
 					return proto.ActionResponse{}, nil
 				}).AnyTimes()
 			})
 
-			err = lifecycle.PostProvision(ctx, k8sClient, nil)
+			opts := &Options{
+				NonBlocking:    &[]bool{true}[0],
+				TimeoutSeconds: &action.TimeoutSeconds,
+				RetryPolicy:    action.RetryPolicy,
+			}
+			err = lifecycle.PostProvision(ctx, k8sClient, opts)
 			Expect(err).Should(BeNil())
 		})
 

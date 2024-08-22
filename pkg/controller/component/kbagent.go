@@ -155,7 +155,7 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 				synthesizedComp.HostNetwork.ContainerPorts,
 				appsv1alpha1.HostNetworkContainerPort{
 					Container: container.Name,
-					// TODO The port name is limited to 15 characters and needs to adjust the method of fetching ports in pod name and kbcli.
+					// TODO The port name is limited to 15 characters and needs to adjust the method of fetching ports in pod name and kb-agent client.
 					Ports: []string{fmt.Sprintf("%s-%s", container.Name, kbAgentPortName)},
 				})
 		}

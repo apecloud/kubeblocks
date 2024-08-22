@@ -23,11 +23,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
-
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/maps"
+	"strings"
 
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
@@ -125,9 +124,9 @@ func (s *actionService) handleExecActionNonBlocking(ctx context.Context, req *pr
 	if err == nil {
 		return nil, ErrInProgress
 	}
+	delete(s.runningActions, req.Action)
 	if *err != nil {
 		return nil, *err
 	}
-	delete(s.runningActions, req.Action)
 	return *gather(running.stdoutChan), nil
 }

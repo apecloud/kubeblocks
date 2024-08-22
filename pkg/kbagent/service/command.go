@@ -22,16 +22,14 @@ package service
 import (
 	"bytes"
 	"context"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/util"
+	"github.com/pkg/errors"
 	"io"
 	"os"
 	"os/exec"
 	"sync"
 	"time"
-
-	"github.com/pkg/errors"
-
-	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
-	"github.com/apecloud/kubeblocks/pkg/kbagent/util"
 )
 
 const (
@@ -90,6 +88,12 @@ func runCommandNonBlocking(ctx context.Context, action *proto.ExecAction, parame
 
 func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[string]string, timeout *int32,
 	stdinReader io.Reader, stdoutWriter, stderrWriter io.Writer) (chan error, error) {
+	var timeOutCancel context.CancelFunc
+	if timeout != nil && *timeout > 0 {
+		timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(*timeout)*time.Second)
+		ctx = timeoutCtx
+		timeOutCancel = cancel
+	}
 	mergedArgs := func() []string {
 		args := make([]string, 0)
 		if len(action.Commands) > 1 {
@@ -144,12 +148,8 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 
 	errChan := make(chan error)
 	go func() {
+		defer timeOutCancel()
 		defer close(errChan)
-		if timeout != nil && *timeout > 0 {
-			timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(*timeout)*time.Second)
-			defer cancel()
-			ctx = timeoutCtx
-		}
 		if err := cmd.Start(); err != nil {
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 				errChan <- ErrTimeout

@@ -97,7 +97,7 @@ var _ = Describe("lifecycle", func() {
 		}
 
 		pods = []*corev1.Pod{
-			&corev1.Pod{},
+			{},
 		}
 	})
 

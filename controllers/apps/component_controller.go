@@ -148,7 +148,9 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	plan, errBuild := planBuilder.
 		AddTransformer(
-			// handle component deletion and pre-terminate
+			// handle component pre-terminate
+			&componentPreTerminateTransformer{},
+			// handle component deletion
 			&componentDeletionTransformer{},
 			// handle finalizers and referenced definition labels
 			&componentMetaTransformer{},
@@ -164,8 +166,6 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentServiceTransformer{},
 			// handle component system accounts
 			&componentAccountTransformer{},
-			// provision component system accounts
-			&componentAccountProvisionTransformer{},
 			// handle tls volume and cert
 			&componentTLSTransformer{Client: r.Client},
 			// rerender parameters after v-scale and h-scale
@@ -174,6 +174,8 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentCustomVolumesTransformer{},
 			// resolve and build vars for template and Env
 			&componentVarsTransformer{},
+			// provision component system accounts, depend on vars
+			&componentAccountProvisionTransformer{},
 			// render component configurations
 			&componentConfigurationTransformer{Client: r.Client},
 			// handle restore before workloads transform

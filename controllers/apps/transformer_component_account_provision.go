@@ -220,12 +220,7 @@ func (t *componentAccountProvisionTransformer) provisionAccount(transCtx *compon
 		return nil
 	}
 
-	vars := map[string]string{
-		"$(USERNAME)": string(username),
-		"$(PASSWD)":   string(password),
-	}
-	stmt := component.ReplaceNamedVars(vars, account.Statement, -1, true)
-	err = lfa.AccountProvision(transCtx.Context, transCtx.Client, nil, string(username), string(password), stmt)
+	err = lfa.AccountProvision(transCtx.Context, transCtx.Client, nil, account.Statement, string(username), string(password))
 	return lifecycle.IgnoreNotDefined(err)
 }
 

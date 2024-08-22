@@ -36,33 +36,33 @@ type enabledWithDefaultValuesReconciler struct {
 
 func (r *enabledWithDefaultValuesReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
-		return kubebuilderx.ResultUnsatisfied
+		return kubebuilderx.ConditionUnsatisfied
 	}
 	if res, _ := r.reqCtx.Ctx.Value(resultValueKey).(*ctrl.Result); res != nil {
-		return kubebuilderx.ResultUnsatisfied
+		return kubebuilderx.ConditionUnsatisfied
 	}
 	if err, _ := r.reqCtx.Ctx.Value(errorValueKey).(error); err != nil {
-		return kubebuilderx.ResultUnsatisfied
+		return kubebuilderx.ConditionUnsatisfied
 	}
 
-	return kubebuilderx.ResultSatisfied
+	return kubebuilderx.ConditionSatisfied
 }
 
-func (r *enabledWithDefaultValuesReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
+func (r *enabledWithDefaultValuesReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
 	r.reqCtx.Log.V(1).Info("enabledWithDefaultValuesReconciler", "phase", addon.Status.Phase)
 	fmt.Println("enabledWithDefaultValuesReconciler, phase: ", addon.Status.Phase)
 	if addon.Spec.InstallSpec.HasSetValues() || addon.Spec.InstallSpec.IsDisabled() {
 		r.reqCtx.Log.V(1).Info("has specified addon.spec.installSpec")
 		// fmt.Println("enabledWithDefaultValuesReconciler, has specified addon.spec.installSpec")
-		return tree, nil
+		return kubebuilderx.Continue, nil
 	}
 	if v, ok := addon.Annotations[AddonDefaultIsEmpty]; ok && v == trueVal {
-		return tree, nil
+		return kubebuilderx.Continue, nil
 	}
 	enabledAddonWithDefaultValues(r.reqCtx.Ctx, &r.stageCtx, addon, AddonSetDefaultValues, "Addon enabled with default values")
 
-	return tree, nil
+	return kubebuilderx.Continue, nil
 }
 
 func NewEnabledWithDefaultValuesReconciler(reqCtx intctrlutil.RequestCtx, buildStageCtx func() stageCtx) kubebuilderx.Reconciler {

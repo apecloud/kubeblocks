@@ -39,19 +39,19 @@ type fetchNDeletionCheckReconciler struct {
 
 func (r *fetchNDeletionCheckReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil {
-		return kubebuilderx.ResultUnsatisfied
+		return kubebuilderx.ConditionUnsatisfied
 	}
 	if res, _ := r.reqCtx.Ctx.Value(resultValueKey).(*ctrl.Result); res != nil {
-		return kubebuilderx.ResultUnsatisfied
+		return kubebuilderx.ConditionUnsatisfied
 	}
 	if err, _ := r.reqCtx.Ctx.Value(errorValueKey).(error); err != nil {
-		return kubebuilderx.ResultUnsatisfied
+		return kubebuilderx.ConditionUnsatisfied
 	}
 
-	return kubebuilderx.ResultSatisfied
+	return kubebuilderx.ConditionSatisfied
 }
 
-func (r *fetchNDeletionCheckReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
+func (r *fetchNDeletionCheckReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
 	r.reqCtx.Log.V(1).Info("get addon", "generation", addon.Generation, "observedGeneration", addon.Status.ObservedGeneration)
 	fmt.Println("fetchNDeletionCheckReconciler, phase: ", addon.Status.Phase)
@@ -66,7 +66,7 @@ func (r *fetchNDeletionCheckReconciler) Reconcile(tree *kubebuilderx.ObjectTree)
 		if res, err := intctrlutil.ValidateReferenceCR(*r.reqCtx, r.reconciler.Client, addon, constant.ClusterDefLabelKey,
 			recordEvent, &appsv1alpha1.ClusterList{}); res != nil || err != nil {
 			r.updateResultNErr(res, err)
-			return tree, err
+			return kubebuilderx.Continue, err
 		}
 	}
 	res, err := intctrlutil.HandleCRDeletion(*r.reqCtx, r.reconciler, addon, addonFinalizerName, func() (*ctrl.Result, error) {
@@ -75,11 +75,11 @@ func (r *fetchNDeletionCheckReconciler) Reconcile(tree *kubebuilderx.ObjectTree)
 	})
 	if res != nil || err != nil {
 		r.updateResultNErr(res, err)
-		return tree, err
+		return kubebuilderx.Continue, err
 	}
 	r.reqCtx.Log.V(1).Info("start normal reconcile")
 	// fmt.Println("fetchNDeletionCheckReconciler, start normal reconcile")
-	return tree, nil
+	return kubebuilderx.Continue, nil
 }
 
 func NewfetchNDeletionCheckReconciler(reqCtx intctrlutil.RequestCtx, buildStageCtx func() stageCtx) kubebuilderx.Reconciler {

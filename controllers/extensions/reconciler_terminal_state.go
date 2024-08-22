@@ -36,19 +36,19 @@ type terminalStateReconciler struct {
 
 func (r *terminalStateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
-		return kubebuilderx.ResultUnsatisfied
+		return kubebuilderx.ConditionUnsatisfied
 	}
 	if res, _ := r.reqCtx.Ctx.Value(resultValueKey).(*ctrl.Result); res != nil {
-		return kubebuilderx.ResultUnsatisfied
+		return kubebuilderx.ConditionUnsatisfied
 	}
 	if err, _ := r.reqCtx.Ctx.Value(errorValueKey).(error); err != nil {
-		return kubebuilderx.ResultUnsatisfied
+		return kubebuilderx.ConditionUnsatisfied
 	}
 
-	return kubebuilderx.ResultSatisfied
+	return kubebuilderx.ConditionSatisfied
 }
 
-func (r *terminalStateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
+func (r *terminalStateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
 	r.reqCtx.Log.V(1).Info("terminalStateReconciler", "phase", addon.Status.Phase)
 	fmt.Println("terminalStateReconciler, phase: ", addon.Status.Phase)
@@ -58,27 +58,27 @@ func (r *terminalStateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kub
 
 	if apierrors.IsNotFound(err1) && apierrors.IsNotFound(err2) {
 		if err := r.reconciler.PatchPhase(addon, r.stageCtx, extensionsv1alpha1.AddonDisabled, AddonDisabled); err != nil {
-			return tree, err
+			return kubebuilderx.Continue, err
 		}
-		return tree, nil
+		return kubebuilderx.Continue, nil
 	}
 
 	if err1 == nil && helmInstallJob.Status.Active > 0 {
 		if addon.Status.Phase == extensionsv1alpha1.AddonEnabling {
 			if err := r.reconciler.PatchPhase(addon, r.stageCtx, extensionsv1alpha1.AddonEnabled, AddonEnabled); err != nil {
-				return tree, err
+				return kubebuilderx.Continue, err
 			}
 		}
 	}
 	if err2 == nil && helmUninstallJob.Status.Active > 0 {
 		if addon.Status.Phase == extensionsv1alpha1.AddonDisabling {
 			if err := r.reconciler.PatchPhase(addon, r.stageCtx, extensionsv1alpha1.AddonDisabled, AddonDisabled); err != nil {
-				return tree, err
+				return kubebuilderx.Continue, err
 			}
 		}
 	}
 
-	return tree, nil
+	return kubebuilderx.Continue, nil
 }
 
 func NewTerminalStateReconciler(reqCtx intctrlutil.RequestCtx, buildStageCtx func() stageCtx) kubebuilderx.Reconciler {

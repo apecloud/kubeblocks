@@ -36,34 +36,34 @@ type autoInstallCheckReconciler struct {
 
 func (r *autoInstallCheckReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
-		return kubebuilderx.ResultUnsatisfied
+		return kubebuilderx.ConditionUnsatisfied
 	}
 	if res, _ := r.reqCtx.Ctx.Value(resultValueKey).(*ctrl.Result); res != nil {
-		return kubebuilderx.ResultUnsatisfied
+		return kubebuilderx.ConditionUnsatisfied
 	}
 	if err, _ := r.reqCtx.Ctx.Value(errorValueKey).(error); err != nil {
-		return kubebuilderx.ResultUnsatisfied
+		return kubebuilderx.ConditionUnsatisfied
 	}
 
-	return kubebuilderx.ResultSatisfied
+	return kubebuilderx.ConditionSatisfied
 }
 
-func (r *autoInstallCheckReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
+func (r *autoInstallCheckReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
 	r.reqCtx.Log.V(1).Info("autoInstallCheckReconciler", "phase", addon.Status.Phase)
 	fmt.Println("autoInstallCheckReconciler, phase: ", addon.Status.Phase)
 	if addon.Spec.Installable == nil || !addon.Spec.Installable.AutoInstall {
-		return tree, nil
+		return kubebuilderx.Continue, nil
 	}
 	// proceed if has specified addon.spec.installSpec
 	if addon.Spec.InstallSpec != nil {
 		r.reqCtx.Log.V(1).Info("has specified addon.spec.installSpec")
 		// fmt.Println("has specified addon.spec.installSpec")
-		return tree, nil
+		return kubebuilderx.Continue, nil
 	}
 	enabledAddonWithDefaultValues(r.reqCtx.Ctx, &r.stageCtx, addon, AddonAutoInstall, "Addon enabled auto-install")
 
-	return tree, nil
+	return kubebuilderx.Continue, nil
 }
 
 func NewAutoInstallCheckReconciler(reqCtx intctrlutil.RequestCtx, buildStageCtx func() stageCtx) kubebuilderx.Reconciler {

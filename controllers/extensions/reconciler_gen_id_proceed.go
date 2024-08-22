@@ -21,6 +21,7 @@ package extensions
 
 import (
 	"fmt"
+	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -39,19 +40,19 @@ type genIDProceedReconciler struct {
 
 func (r *genIDProceedReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
-		return kubebuilderx.ResultUnsatisfied
+		return kubebuilderx.ConditionUnsatisfied
 	}
 	if res, _ := r.reqCtx.Ctx.Value(resultValueKey).(*ctrl.Result); res != nil {
-		return kubebuilderx.ResultUnsatisfied
+		return kubebuilderx.ConditionUnsatisfied
 	}
 	if err, _ := r.reqCtx.Ctx.Value(errorValueKey).(error); err != nil {
-		return kubebuilderx.ResultUnsatisfied
+		return kubebuilderx.ConditionUnsatisfied
 	}
 
-	return kubebuilderx.ResultSatisfied
+	return kubebuilderx.ConditionSatisfied
 }
 
-func (r *genIDProceedReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
+func (r *genIDProceedReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
 	r.reqCtx.Log.V(1).Info("genIDProceedCheckReconciler", "phase", addon.Status.Phase)
 	fmt.Println("genIDProceedCheckReconciler, phase: ", addon.Status.Phase)
@@ -60,15 +61,50 @@ func (r *genIDProceedReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kube
 	helmUninstallJob, err2 := r.reconciler.GetInstallJob(r.reqCtx.Ctx, "uninstall", tree)
 
 	if apierrors.IsNotFound(err1) && apierrors.IsNotFound(err2) {
-		return tree, nil
+		return kubebuilderx.Continue, nil
 	}
-	if (err1 == nil && helmInstallJob.Status.Succeeded > 0) || (err2 == nil && helmUninstallJob.Status.Succeeded > 0) {
+	if (err1 == nil && helmInstallJob.Status.Failed > 0) || (err2 == nil && helmUninstallJob.Status.Failed > 0) {
+		if helmInstallJob.Status.Failed > 0 && addon.Status.Phase == "Enabling" {
+			setAddonErrorConditions(r.reqCtx.Ctx, &r.stageCtx, addon, true, true, InstallationFailed,
+				fmt.Sprintf("Installation failed, do inspect error from jobs.batch %s", helmInstallJob.Name))
+			if viper.GetInt(maxConcurrentReconcilesKey) > 1 {
+				if err := logFailedJobPodToCondError(r.reqCtx.Ctx, &r.stageCtx, addon, helmInstallJob.Name, InstallationFailedLogs); err != nil {
+					r.setRequeueWithErr(err, "")
+					return kubebuilderx.Continue, err
+				}
+			}
+		}
+		if helmUninstallJob.Status.Failed > 0 && addon.Status.Phase == "Disabling" {
+			if viper.GetInt(maxConcurrentReconcilesKey) > 1 {
+				if err := logFailedJobPodToCondError(r.reqCtx.Ctx, &r.stageCtx, addon, helmUninstallJob.Name, UninstallationFailedLogs); err != nil {
+					r.setRequeueWithErr(err, "")
+					return kubebuilderx.Continue, err
+				}
+			}
+			if err := r.reconciler.Delete(r.reqCtx.Ctx, helmUninstallJob); client.IgnoreNotFound(err) != nil {
+				r.setRequeueWithErr(err, "")
+				return kubebuilderx.Continue, err
+			}
+			if err := r.reconciler.cleanupJobPods(*r.reqCtx); err != nil {
+				r.setRequeueWithErr(err, "")
+				return kubebuilderx.Continue, err
+			}
+		}
+
+		fmt.Println("Failed: ", addon.Status.Phase)
+
+		if addon.Generation == addon.Status.ObservedGeneration {
+			r.setReconciled()
+			fmt.Println("aaaaaa")
+			return kubebuilderx.RetryAfter(time.Second), nil
+		}
+	} else if (err1 == nil && helmInstallJob.Status.Succeeded > 0) || (err2 == nil && helmUninstallJob.Status.Succeeded > 0) {
 		if addon.Status.Phase == "Enabling" && helmInstallJob.Status.Succeeded > 0 {
 			err := r.reconciler.PatchPhase(addon, r.stageCtx, "Enabled", AddonEnabled)
-			return tree, err
+			return kubebuilderx.Continue, err
 		} else if addon.Status.Phase == "Disabling" && helmUninstallJob.Status.Succeeded > 0 {
 			err := r.reconciler.PatchPhase(addon, r.stageCtx, "Disabled", AddonDisabled)
-			return tree, err
+			return kubebuilderx.Continue, err
 		}
 		if helmInstallJob.Status.Succeeded > 0 {
 			fmt.Println("helmInstallJob.Status.Succeeded")
@@ -79,57 +115,22 @@ func (r *genIDProceedReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kube
 		if (!helmInstallJob.DeletionTimestamp.IsZero() && helmInstallJob.Status.Succeeded > 0) ||
 			(!helmUninstallJob.DeletionTimestamp.IsZero() && helmUninstallJob.Status.Succeeded > 0) {
 			fmt.Println("!Job.DeletionTimestamp.IsZero(), DeletionTimestamp: ", helmInstallJob.DeletionTimestamp)
-			return tree, nil
+			return kubebuilderx.Continue, nil
 		}
 
 		if addon.Generation == addon.Status.ObservedGeneration {
 			res, err := r.reconciler.deleteExternalResources(*r.reqCtx, addon)
 			if res != nil || err != nil {
 				r.updateResultNErr(res, err)
-				return tree, err
+				return kubebuilderx.Continue, err
 			}
 			r.setReconciled()
 			fmt.Println("setReconciled")
-			return tree, nil
+			return kubebuilderx.Continue, nil
 		}
-	} else if helmInstallJob.Status.Failed > 0 || helmUninstallJob.Status.Failed > 0 {
-		if helmInstallJob.Status.Failed > 0 && addon.Status.Phase == "Enabling" {
-			setAddonErrorConditions(r.reqCtx.Ctx, &r.stageCtx, addon, true, true, InstallationFailed,
-				fmt.Sprintf("Installation failed, do inspect error from jobs.batch %s", helmInstallJob.Name))
-			if viper.GetInt(maxConcurrentReconcilesKey) > 1 {
-				if err := logFailedJobPodToCondError(r.reqCtx.Ctx, &r.stageCtx, addon, helmInstallJob.Name, InstallationFailedLogs); err != nil {
-					r.setRequeueWithErr(err, "")
-					return tree, err
-				}
-			}
-		}
-		if helmUninstallJob.Status.Failed > 0 && addon.Status.Phase == "Disabling" {
-			if viper.GetInt(maxConcurrentReconcilesKey) > 1 {
-				if err := logFailedJobPodToCondError(r.reqCtx.Ctx, &r.stageCtx, addon, helmUninstallJob.Name, UninstallationFailedLogs); err != nil {
-					r.setRequeueWithErr(err, "")
-					return tree, err
-				}
-			}
-			if err := r.reconciler.Delete(r.reqCtx.Ctx, helmUninstallJob); client.IgnoreNotFound(err) != nil {
-				r.setRequeueWithErr(err, "")
-				return tree, err
-			}
-			if err := r.reconciler.cleanupJobPods(*r.reqCtx); err != nil {
-				r.setRequeueWithErr(err, "")
-				return tree, err
-			}
+	} 
 
-		}
-
-		fmt.Println("Failed: ", addon.Status.Phase)
-
-		if addon.Generation == addon.Status.ObservedGeneration {
-			r.setReconciled()
-			return tree, nil
-		}
-	}
-
-	return tree, nil
+	return kubebuilderx.Continue, nil
 }
 
 func NewGenIDProceedCheckReconciler(reqCtx intctrlutil.RequestCtx, buildStageCtx func() stageCtx) kubebuilderx.Reconciler {

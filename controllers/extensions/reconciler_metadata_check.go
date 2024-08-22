@@ -36,28 +36,28 @@ type metadataCheckReconciler struct {
 
 func (r *metadataCheckReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
-		return kubebuilderx.ResultUnsatisfied
+		return kubebuilderx.ConditionUnsatisfied
 	}
 	if res, _ := r.reqCtx.Ctx.Value(resultValueKey).(*ctrl.Result); res != nil {
-		return kubebuilderx.ResultUnsatisfied
+		return kubebuilderx.ConditionUnsatisfied
 	}
 	if err, _ := r.reqCtx.Ctx.Value(errorValueKey).(error); err != nil {
-		return kubebuilderx.ResultUnsatisfied
+		return kubebuilderx.ConditionUnsatisfied
 	}
 
-	return kubebuilderx.ResultSatisfied
+	return kubebuilderx.ConditionSatisfied
 }
 
-func (r *metadataCheckReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
+func (r *metadataCheckReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
 	r.reqCtx.Log.V(1).Info("metadataCheckReconciler", "phase", addon.Status.Phase)
 	fmt.Println("metadataCheckReconciler, phase: ", addon.Status.Phase)
 	setAddonProviderAndVersion(addon)
 	if err := r.reconciler.Client.Update(r.reqCtx.Ctx, addon); err != nil {
 		r.setRequeueWithErr(err, "")
-		return tree, nil
+		return kubebuilderx.Continue, nil
 	}
-	return tree, nil
+	return kubebuilderx.Continue, nil
 }
 
 func NewMetadataCheckReconciler(reqCtx intctrlutil.RequestCtx, buildStageCtx func() stageCtx) kubebuilderx.Reconciler {

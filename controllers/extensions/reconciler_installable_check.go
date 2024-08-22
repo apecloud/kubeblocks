@@ -42,19 +42,19 @@ type installableCheckReconciler struct {
 
 func (r *installableCheckReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
-		return kubebuilderx.ResultUnsatisfied
+		return kubebuilderx.ConditionUnsatisfied
 	}
 	if res, _ := r.reqCtx.Ctx.Value(resultValueKey).(*ctrl.Result); res != nil {
-		return kubebuilderx.ResultUnsatisfied
+		return kubebuilderx.ConditionUnsatisfied
 	}
 	if err, _ := r.reqCtx.Ctx.Value(errorValueKey).(error); err != nil {
-		return kubebuilderx.ResultUnsatisfied
+		return kubebuilderx.ConditionUnsatisfied
 	}
 
-	return kubebuilderx.ResultSatisfied
+	return kubebuilderx.ConditionSatisfied
 }
 
-func (r *installableCheckReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
+func (r *installableCheckReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	addon := tree.GetRoot().(*extensionsv1alpha1.Addon)
 	// XValidation was introduced as an alpha feature in Kubernetes v1.23 and requires additional enablement.
 	// It became more stable after Kubernetes 1.25. Users may encounter error in Kubernetes versions prior to 1.25.
@@ -62,7 +62,7 @@ func (r *installableCheckReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*
 	if err := checkAddonSpec(addon); err != nil {
 		setAddonErrorConditions(r.reqCtx.Ctx, &r.stageCtx, addon, true, true, AddonCheckError, err.Error())
 		r.setReconciled()
-		return tree, nil
+		return kubebuilderx.Continue, nil
 	}
 
 	r.reqCtx.Log.V(1).Info("installableCheckReconciler", "phase", addon.Status.Phase)
@@ -72,33 +72,33 @@ func (r *installableCheckReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*
 	if err != nil {
 		res, err := intctrlutil.CheckedRequeueWithError(err, r.reqCtx.Log, "")
 		r.updateResultNErr(&res, err)
-		return tree, nil
+		return kubebuilderx.Continue, nil
 	}
 	if !check {
 		r.setReconciled()
-		return tree, nil
+		return kubebuilderx.Continue, nil
 	}
 
 	if addon.Spec.Installable == nil {
-		return tree, nil
+		return kubebuilderx.Continue, nil
 	}
 	// proceed if has specified addon.spec.installSpec
 	if addon.Spec.InstallSpec != nil {
-		return tree, nil
+		return kubebuilderx.Continue, nil
 	}
 	if addon.Annotations != nil && addon.Annotations[SkipInstallableCheck] == trueVal {
 		r.reconciler.Event(addon, corev1.EventTypeWarning, InstallableCheckSkipped,
 			"Installable check skipped.")
-		return tree, nil
+		return kubebuilderx.Continue, nil
 	}
 
 	helmInstallJob, err1 := r.reconciler.GetInstallJob(r.reqCtx.Ctx, "install", tree)
 	_, err2 := r.reconciler.GetInstallJob(r.reqCtx.Ctx, "uninstall", tree)
 	if apierrors.IsNotFound(err1) && apierrors.IsNotFound(err2) {
-		return tree, nil
+		return kubebuilderx.Continue, nil
 	}
 	if err1 == nil && helmInstallJob.Status.Active > 0 {
-		return tree, nil
+		return kubebuilderx.Continue, nil
 	}
 
 	for _, s := range addon.Spec.Installable.Selectors {
@@ -119,15 +119,15 @@ func (r *installableCheckReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*
 
 		if err := r.reconciler.Status().Patch(r.reqCtx.Ctx, addon, patch); err != nil {
 			r.setRequeueWithErr(err, "")
-			return tree, nil
+			return kubebuilderx.Continue, nil
 		}
 		r.reconciler.Event(addon, corev1.EventTypeWarning, InstallableRequirementUnmatched,
 			fmt.Sprintf("Does not meet installable requirements for key %v", s))
 		r.setReconciled()
-		return tree, nil
+		return kubebuilderx.Continue, nil
 	}
 
-	return tree, nil
+	return kubebuilderx.Continue, nil
 }
 
 func NewInstallableCheckReconciler(reqCtx intctrlutil.RequestCtx, buildStageCtx func() stageCtx) kubebuilderx.Reconciler {

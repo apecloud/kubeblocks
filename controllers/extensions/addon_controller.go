@@ -80,7 +80,7 @@ func (r *AddonReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		Log:      log.FromContext(ctx).WithValues("addon", req.NamespacedName),
 		Recorder: r.Recorder,
 	}
-	//test
+
 	buildStageCtx := func() stageCtx {
 		return stageCtx{
 			reqCtx:     &reqCtx,
@@ -89,7 +89,7 @@ func (r *AddonReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}
 
 	logger := log.FromContext(ctx).WithValues("addon", req.NamespacedName)
-	err := kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
+	res, err := kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
 		Prepare(NewTreeLoader()).
 		Do(NewfetchNDeletionCheckReconciler(reqCtx, buildStageCtx)).
 		Do(NewGenIDProceedCheckReconciler(reqCtx, buildStageCtx)).
@@ -101,16 +101,7 @@ func (r *AddonReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		Do(NewTerminalStateReconciler(reqCtx, buildStageCtx)).
 		Commit()
 
-	res, ok := reqCtx.Ctx.Value(resultValueKey).(*ctrl.Result)
-	if ok && res != nil {
-		err, ok := reqCtx.Ctx.Value(errorValueKey).(error)
-		if ok {
-			return *res, err
-		}
-		return *res, nil
-	}
-
-	return ctrl.Result{}, err
+	return res, err
 }
 
 // SetupWithManager sets up the controller with the Manager.

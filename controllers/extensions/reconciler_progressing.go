@@ -39,19 +39,19 @@ type progressingReconciler struct {
 
 func (r *progressingReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
-		return kubebuilderx.ResultUnsatisfied
+		return kubebuilderx.ConditionUnsatisfied
 	}
 	if res, _ := r.reqCtx.Ctx.Value(resultValueKey).(*ctrl.Result); res != nil {
-		return kubebuilderx.ResultUnsatisfied
+		return kubebuilderx.ConditionUnsatisfied
 	}
 	if err, _ := r.reqCtx.Ctx.Value(errorValueKey).(error); err != nil {
-		return kubebuilderx.ResultUnsatisfied
+		return kubebuilderx.ConditionUnsatisfied
 	}
 
-	return kubebuilderx.ResultSatisfied
+	return kubebuilderx.ConditionSatisfied
 }
 
-func (r *progressingReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubebuilderx.ObjectTree, error) {
+func (r *progressingReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	r.enablingReconciler.stageCtx = r.stageCtx
 	r.disablingStage.stageCtx = r.stageCtx
 
@@ -66,16 +66,16 @@ func (r *progressingReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubeb
 	if !addon.Spec.InstallSpec.GetEnabled() {
 		r.reqCtx.Log.V(1).Info("progress to disabling stage handler")
 		if apierrors.IsNotFound(err1) && apierrors.IsNotFound(err2) {
-			return tree, nil
+			return kubebuilderx.Continue, nil
 		}
 		if err2 != nil && helmUninstallJob.Status.Active == 0 && addon.Status.Phase != extensionsv1alpha1.AddonDisabling {
 			if err := r.reconciler.PatchPhase(addon, r.stageCtx, extensionsv1alpha1.AddonDisabling, DisablingAddon); err != nil {
-				return tree, err
+				return kubebuilderx.Continue, err
 			}
-			return tree, nil
+			return kubebuilderx.Continue, nil
 		}
 		r.disablingStage.Reconcile(tree)
-		return tree, nil
+		return kubebuilderx.Continue, nil
 	}
 	// handling enabling state
 	if err1 != nil && helmInstallJob.Status.Active == 0 && addon.Status.Phase != extensionsv1alpha1.AddonEnabling {
@@ -84,19 +84,19 @@ func (r *progressingReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (*kubeb
 			if helmInstallJob.GetDeletionTimestamp().IsZero() {
 				if err := r.reconciler.Delete(r.reqCtx.Ctx, helmInstallJob); err != nil {
 					r.setRequeueWithErr(err, "")
-					return tree, err
+					return kubebuilderx.Continue, err
 				}
 			}
 		}
 		if err := r.reconciler.PatchPhase(addon, r.stageCtx, extensionsv1alpha1.AddonEnabling, EnablingAddon); err != nil {
-			return tree, err
+			return kubebuilderx.Continue, err
 		}
-		return tree, nil
+		return kubebuilderx.Continue, nil
 	}
 	r.reqCtx.Log.V(1).Info("progress to enabling stage handler")
 	r.enablingReconciler.Reconcile(tree)
 
-	return tree, nil
+	return kubebuilderx.Continue, nil
 }
 
 func NewProgressingReconciler(reqCtx intctrlutil.RequestCtx, buildStageCtx func() stageCtx) kubebuilderx.Reconciler {

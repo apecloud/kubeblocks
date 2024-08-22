@@ -6854,28 +6854,6 @@ Action
 at which the action should trigger: <code>Immediately</code>, <code>RuntimeReady</code>, <code>ComponentReady</code>, and <code>ClusterReady</code>.
 with <code>ComponentReady</code> being the default.</p>
 <p>The PostProvision Action is intended to run only once.</p>
-<p>The container executing this action has access to following environment variables:</p>
-<ul>
-<li><p>KB_CLUSTER_POD_IP_LIST: Comma-separated list of the cluster&rsquo;s pod IP addresses (e.g., &ldquo;podIp1,podIp2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_POD_NAME_LIST: Comma-separated list of the cluster&rsquo;s pod names (e.g., &ldquo;pod1,pod2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_POD_HOST_NAME_LIST: Comma-separated list of host names, each corresponding to a pod in
-KB_CLUSTER_POD_NAME_LIST (e.g., &ldquo;hostName1,hostName2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_POD_HOST_IP_LIST: Comma-separated list of host IP addresses, each corresponding to a pod in
-KB_CLUSTER_POD_NAME_LIST (e.g., &ldquo;hostIp1,hostIp2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_COMPONENT_POD_NAME_LIST: Comma-separated list of all pod names within the component
-(e.g., &ldquo;pod1,pod2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_COMPONENT_POD_IP_LIST: Comma-separated list of pod IP addresses,
-matching the order of pods in KB_CLUSTER_COMPONENT_POD_NAME_LIST (e.g., &ldquo;podIp1,podIp2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_COMPONENT_POD_HOST_NAME_LIST: Comma-separated list of host names for each pod,
-matching the order of pods in KB_CLUSTER_COMPONENT_POD_NAME_LIST (e.g., &ldquo;hostName1,hostName2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_COMPONENT_POD_HOST_IP_LIST: Comma-separated list of host IP addresses for each pod,
-matching the order of pods in KB_CLUSTER_COMPONENT_POD_NAME_LIST (e.g., &ldquo;hostIp1,hostIp2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_COMPONENT_LIST: Comma-separated list of all cluster components (e.g., &ldquo;comp1,comp2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_COMPONENT_DELETING_LIST: Comma-separated list of components that are currently being deleted
-(e.g., &ldquo;comp1,comp2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_COMPONENT_UNDELETED_LIST: Comma-separated list of components that are not being deleted
-(e.g., &ldquo;comp1,comp2&rdquo;).</p></li>
-</ul>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
 </tr>
@@ -6895,33 +6873,6 @@ Action
 <p>This action is executed immediately when a scale-down operation for the Component is initiated.
 The actual termination and cleanup of the Component and its associated resources will not proceed
 until the PreTerminate action has completed successfully.</p>
-<p>The container executing this action has access to following environment variables:</p>
-<ul>
-<li><p>KB_CLUSTER_POD_IP_LIST: Comma-separated list of the cluster&rsquo;s pod IP addresses (e.g., &ldquo;podIp1,podIp2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_POD_NAME_LIST: Comma-separated list of the cluster&rsquo;s pod names (e.g., &ldquo;pod1,pod2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_POD_HOST_NAME_LIST: Comma-separated list of host names, each corresponding to a pod in
-KB_CLUSTER_POD_NAME_LIST (e.g., &ldquo;hostName1,hostName2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_POD_HOST_IP_LIST: Comma-separated list of host IP addresses, each corresponding to a pod in
-KB_CLUSTER_POD_NAME_LIST (e.g., &ldquo;hostIp1,hostIp2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_COMPONENT_POD_NAME_LIST: Comma-separated list of all pod names within the component
-(e.g., &ldquo;pod1,pod2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_COMPONENT_POD_IP_LIST: Comma-separated list of pod IP addresses,
-matching the order of pods in KB_CLUSTER_COMPONENT_POD_NAME_LIST (e.g., &ldquo;podIp1,podIp2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_COMPONENT_POD_HOST_NAME_LIST: Comma-separated list of host names for each pod,
-matching the order of pods in KB_CLUSTER_COMPONENT_POD_NAME_LIST (e.g., &ldquo;hostName1,hostName2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_COMPONENT_POD_HOST_IP_LIST: Comma-separated list of host IP addresses for each pod,
-matching the order of pods in KB_CLUSTER_COMPONENT_POD_NAME_LIST (e.g., &ldquo;hostIp1,hostIp2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_COMPONENT_LIST: Comma-separated list of all cluster components (e.g., &ldquo;comp1,comp2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_COMPONENT_DELETING_LIST: Comma-separated list of components that are currently being deleted
-(e.g., &ldquo;comp1,comp2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_COMPONENT_UNDELETED_LIST: Comma-separated list of components that are not being deleted
-(e.g., &ldquo;comp1,comp2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_COMPONENT_IS_SCALING_IN: Indicates whether the component is currently scaling in.
-If this variable is present and set to &ldquo;true&rdquo;, it denotes that the component is undergoing a scale-in operation.
-During scale-in, data rebalancing is necessary to maintain cluster integrity.
-Contrast this with a cluster deletion scenario where data rebalancing is not required as the entire cluster
-is being cleaned up.</p></li>
-</ul>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
 </tr>
@@ -6972,11 +6923,8 @@ Action
 This approach aims to minimize downtime and maintain availability in systems with a leader-follower topology,
 during events such as planned maintenance or when performing stop, shutdown, restart, or upgrade operations
 involving the current leader node.</p>
-<p>The container executing this action has access to following environment variables:</p>
+<p>The container executing this action has access to following variables:</p>
 <ul>
-<li>KB_LEADER_POD_IP: The IP address of the current leader&rsquo;s pod prior to the switchover.</li>
-<li>KB_LEADER_POD_NAME: The name of the current leader&rsquo;s pod prior to the switchover.</li>
-<li>KB_LEADER_POD_FQDN: The FQDN of the current leader&rsquo;s pod prior to the switchover.</li>
 <li>KB_SWITCHOVER_CANDIDATE_NAME: The name of the pod for the new leader candidate, which may not be specified (empty).</li>
 <li>KB_SWITCHOVER_CANDIDATE_FQDN: The FQDN of the new leader candidate&rsquo;s pod, which may not be specified (empty).</li>
 </ul>
@@ -7179,6 +7127,11 @@ Action
 <p>Use Case:
 This action is designed to create system accounts that are utilized for replication, monitoring, backup,
 and other administrative tasks.</p>
+<p>The container executing this action has access to following variables:</p>
+<ul>
+<li>KB_ACCOUNT_NAME: The name of the system account to be created.</li>
+<li>KB_ACCOUNT_STATEMENT: The statement used to create the system account.</li>
+</ul>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
 </tr>

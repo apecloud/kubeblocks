@@ -607,7 +607,7 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 			return nil
 		}
 		// if HA functionality is not enabled, no need to switchover
-		err := lfa.Switchover(r.reqCtx.Ctx, r.cli, nil)
+		err := lfa.Switchover(r.reqCtx.Ctx, r.cli, nil, "")
 		if err != nil && errors.Is(err, lifecycle.ErrActionNotDefined) {
 			return nil
 		}

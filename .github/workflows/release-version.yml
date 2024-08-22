@@ -181,20 +181,20 @@ jobs:
           echo 'RELEASE_COMMIT='${RELEASE_COMMIT} >> $GITHUB_ENV
 
       - name: push addons version changes to new branch
-        if: ${{ (steps.update_apis_doc.outputs.file_changes || steps.upgrade_addon_version.outputs.file_changes) && github.ref_name == 'main' }}
+        if: ${{ (steps.update_apis_doc.outputs.file_changes || steps.upgrade_addon_version.outputs.file_changes) && (github.ref_name == 'main' || github.ref_name == 'release-0.9') }}
         uses: ad-m/github-push-action@master
         with:
           github_token: ${{ env.GITHUB_TOKEN }}
           branch: support/auto-update-${{ env.RELEASE_COMMIT }}
 
       - name: auto create pr head new branch
-        if: ${{ (steps.update_apis_doc.outputs.file_changes || steps.upgrade_addon_version.outputs.file_changes) && github.ref_name == 'main' }}
+        if: ${{ (steps.update_apis_doc.outputs.file_changes || steps.upgrade_addon_version.outputs.file_changes) && (github.ref_name == 'main' || github.ref_name == 'release-0.9') }}
         run: |
           gh pr create --head "support/auto-update-${{ env.RELEASE_COMMIT }}" --title "chore: auto upgrade addons version or update apis doc" --body ""
 
       - name: push addons version changes
         uses: ad-m/github-push-action@master
-        if: ${{ (steps.update_apis_doc.outputs.file_changes || steps.upgrade_addon_version.outputs.file_changes) && github.ref_name != 'main' }}
+        if: ${{ (steps.update_apis_doc.outputs.file_changes || steps.upgrade_addon_version.outputs.file_changes) && github.ref_name != 'main' && github.ref_name != 'release-0.9' }}
         with:
           github_token: ${{ env.GITHUB_TOKEN }}
           branch: ${{ github.ref }}

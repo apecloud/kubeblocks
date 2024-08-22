@@ -22,14 +22,15 @@ package service
 import (
 	"bytes"
 	"context"
-	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
-	"github.com/apecloud/kubeblocks/pkg/kbagent/util"
-	"github.com/pkg/errors"
 	"io"
 	"os"
 	"os/exec"
 	"sync"
 	"time"
+
+	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/util"
+	"github.com/pkg/errors"
 )
 
 const (

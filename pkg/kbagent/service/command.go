@@ -148,7 +148,9 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 
 	errChan := make(chan error)
 	go func() {
-		defer timeOutCancel()
+		if timeOutCancel != nil {
+			defer timeOutCancel()
+		}
 		defer close(errChan)
 		if err := cmd.Start(); err != nil {
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {

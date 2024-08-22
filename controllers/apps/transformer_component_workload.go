@@ -517,18 +517,109 @@ func (r *componentWorkloadOps) postScaleOut(itsObj *workloads.InstanceSet) error
 }
 
 func (r *componentWorkloadOps) scaleIn(itsObj *workloads.InstanceSet) error {
+	// if there is another scale-in on the cluster being processing, skip it.
+	shouldSkip, err := r.shouldRejectScaleIn(itsObj)
+	if err != nil {
+		return err
+	}
+	if shouldSkip {
+		return fmt.Errorf("another scale-in is being processing, retry later")
+	}
+
+	err = r.recordClusterScaleInMetaInCM(itsObj)
+	if err != nil {
+		return err
+	}
+
 	// if scale in to 0, do not delete pvcs
 	if r.synthesizeComp.Replicas == 0 {
 		r.reqCtx.Log.Info("scale in to 0, keep all PVCs")
-		return nil
+		return r.deleteClusterScaleInMetaInCM(itsObj)
 	}
+
 	// TODO: check the component definition to determine whether we need to call leave member before deleting replicas.
-	err := r.leaveMember4ScaleIn()
+	err = r.leaveMember4ScaleIn()
 	if err != nil {
 		r.reqCtx.Log.Info(fmt.Sprintf("leave member at scaling-in error, retry later: %s", err.Error()))
 		return err
 	}
-	return r.deletePVCs4ScaleIn(itsObj)
+	err = r.deletePVCs4ScaleIn(itsObj)
+	if err != nil {
+		return err
+	}
+
+	// todo: make sure the value is clear before updating ITS. Otherwise, perhaps no scale in will be executed any more.
+	return r.deleteClusterScaleInMetaInCM(itsObj)
+}
+
+func (r *componentWorkloadOps) shouldRejectScaleIn(itsObj *workloads.InstanceSet) (bool, error) {
+	cmData, err := lifecycle.GetConfigMapData(r.cli, lifecycle.MemberLeaveCMNamespace, lifecycle.MemberLeaveCMName)
+	if err != nil {
+		return true, err
+	}
+
+	clusterHash, err := lifecycle.HashAnyToString(r.cluster)
+	if err != nil {
+		return true, err
+	}
+
+	isProcessing, exists := cmData[clusterHash]
+	if !exists || isProcessing == "" {
+		// if means this cluster is not being scaling-in.
+		return false, nil
+	}
+
+	// from here, it means this cluster is being scaling-in.
+	itsHash, err := lifecycle.HashAnyToString(itsObj)
+	if err != nil {
+		return true, err
+	}
+	if isProcessing != itsHash {
+		// it means another scale-in is being processed in this cluster.
+		return true, nil
+	}
+	// it means the same scale-in process re-entry this function.
+	return false, nil
+}
+
+func (r *componentWorkloadOps) recordClusterScaleInMetaInCM(itsObj *workloads.InstanceSet) error {
+	cmData, err := lifecycle.GetConfigMapData(r.cli, lifecycle.MemberLeaveCMNamespace, lifecycle.MemberLeaveCMName)
+	if err != nil {
+		return err
+	}
+
+	clusterHash, err := lifecycle.HashAnyToString(r.cluster)
+	if err != nil {
+		return err
+	}
+	itsHash, err := lifecycle.HashAnyToString(itsObj)
+	if err != nil {
+		return err
+	}
+
+	cmData[clusterHash] = itsHash
+	return lifecycle.SetConfigMapData(r.cli, lifecycle.MemberLeaveCMNamespace, lifecycle.MemberLeaveCMName, cmData)
+}
+
+func (r *componentWorkloadOps) deleteClusterScaleInMetaInCM(itsObj *workloads.InstanceSet) error {
+	cmData, err := lifecycle.GetConfigMapData(r.cli, lifecycle.MemberLeaveCMNamespace, lifecycle.MemberLeaveCMName)
+	if err != nil {
+		return err
+	}
+
+	// 1.delete the scale-in ID on this cluster.
+	// 2.delete the retry pod name on this cluster.
+	// they all have the same prefix (cluster hash).
+	clusterHash, err := lifecycle.HashAnyToString(r.cluster)
+	if err != nil {
+		return err
+	}
+	for key, _ := range cmData {
+		if strings.HasPrefix(key, clusterHash) {
+			delete(cmData, key)
+		}
+	}
+	return lifecycle.SetConfigMapData(r.cli, lifecycle.MemberLeaveCMNamespace, lifecycle.MemberLeaveCMName, cmData)
 }
 
 func (r *componentWorkloadOps) scaleOut(itsObj *workloads.InstanceSet) error {
@@ -626,6 +717,10 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 		}
 		podsToMemberLeave = append(podsToMemberLeave, pod)
 	}
+
+	agentParams := make(map[string]any)
+	agentParams[lifecycle.RetryMemberLeaveByAnotherPodParamCli] = r.cli
+
 	for _, pod := range podsToMemberLeave {
 		if !(isLeader(pod) || // if the pod is leader, it needs to call switchover
 			(r.synthesizeComp.LifecycleActions != nil && r.synthesizeComp.LifecycleActions.MemberLeave != nil)) { // if the memberLeave action is defined, it needs to call it

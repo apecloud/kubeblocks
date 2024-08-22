@@ -32,8 +32,10 @@ type switchover struct {
 
 var _ lifecycleAction = &switchover{}
 
+const SwitchoverName = "switchover"
+
 func (a *switchover) name() string {
-	return "switchover"
+	return SwitchoverName
 }
 
 func (a *switchover) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {

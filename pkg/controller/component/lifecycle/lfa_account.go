@@ -31,8 +31,10 @@ type accountProvision struct {
 
 var _ lifecycleAction = &accountProvision{}
 
+const AccountProvisionName = "accountProvision"
+
 func (a *accountProvision) name() string {
-	return "accountProvision"
+	return AccountProvisionName
 }
 
 func (a *accountProvision) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {

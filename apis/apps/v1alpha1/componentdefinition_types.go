@@ -758,6 +758,21 @@ type ExecAction struct {
 	// +optional
 	MatchingKey string `json:"matchingKey,omitempty"`
 
+	// Defines whether to retry the action call on another pod when an error occurs during the action call on the pods selected by the targetPodSelector.
+	// If error occurs during the retry, it won't retry recursively.
+	// This field is invalid when the pod selector is set to "All" or "Role."
+	// The specific pod chosen for retry depends on the actions:
+	//
+	// - With the "member leave" action, the selected pod will remain the same as long as the cluster remains unchanged,
+	//   ensuring that the action is not executed simultaneously by multiple different pods.
+	//
+	// This field cannot be updated.
+	//
+	// Note: This field is reserved for future use and is not currently active.
+	//
+	// +optional
+	RetryByAnotherPod bool `json:"RetryByAnotherPod,omitempty"`
+
 	// Defines the name of the container within the target Pod where the action will be executed.
 	//
 	// This name must correspond to one of the containers defined in `componentDefinition.spec.runtime`.

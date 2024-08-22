@@ -29,8 +29,10 @@ type dataDump struct{}
 
 var _ lifecycleAction = &dataDump{}
 
+const DataDumpName = "dataDump"
+
 func (a *dataDump) name() string {
-	return "dataDump"
+	return DataDumpName
 }
 
 func (a *dataDump) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {
@@ -41,8 +43,10 @@ type dataLoad struct{}
 
 var _ lifecycleAction = &dataLoad{}
 
+const DataLoadName = "dataLoad"
+
 func (a *dataLoad) name() string {
-	return "dataLoad"
+	return DataLoadName
 }
 
 func (a *dataLoad) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {

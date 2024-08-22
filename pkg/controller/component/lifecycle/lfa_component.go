@@ -33,8 +33,10 @@ type postProvision struct {
 
 var _ lifecycleAction = &postProvision{}
 
+const PostProvisionName = "postProvision"
+
 func (a *postProvision) name() string {
-	return "postProvision"
+	return PostProvisionName
 }
 
 func (a *postProvision) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {
@@ -49,8 +51,10 @@ type preTerminate struct {
 
 var _ lifecycleAction = &preTerminate{}
 
+const PreTerminate = "preTerminate"
+
 func (a *preTerminate) name() string {
-	return "preTerminate"
+	return PreTerminate
 }
 
 func (a *preTerminate) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {

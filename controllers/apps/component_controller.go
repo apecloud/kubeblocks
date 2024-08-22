@@ -21,6 +21,7 @@ package apps
 
 import (
 	"context"
+	"github.com/apecloud/kubeblocks/pkg/controller/component/lifecycle"
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -204,6 +205,12 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ComponentReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager) error {
+	// todo should this code move to other places?
+	err := lifecycle.InitConfigMapForMemberLeave(context.Background(), r.Client)
+	if err != nil {
+		return err
+	}
+
 	retryDurationMS := viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS)
 	if retryDurationMS != 0 {
 		requeueDuration = time.Millisecond * time.Duration(retryDurationMS)

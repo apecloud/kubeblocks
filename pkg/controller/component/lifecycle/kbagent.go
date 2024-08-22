@@ -46,6 +46,19 @@ type kbagent struct {
 	lifecycleActions *appsv1alpha1.ComponentLifecycleActions
 	pods             []*corev1.Pod
 	pod              *corev1.Pod
+
+	// Used to pass parameters between functions related to an action,
+	// by using this map, functions don't need to modify their api when
+	// requiring new outside vars.
+	params map[string]any
+}
+
+func (a *kbagent) SetParams(params map[string]any) {
+	a.params = params
+}
+
+func (a *kbagent) GetParams() map[string]any {
+	return a.params
 }
 
 var _ Lifecycle = &kbagent{}
@@ -150,20 +163,37 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1alpha1
 	// TODO: impl
 	//  - back-off to retry
 	//  - timeout
-	for _, pod := range a.pods {
-		cli, err1 := kbacli.NewClient(*pod)
-		if err1 != nil {
-			return err1
+
+	for _, pod := range pods {
+		var cliErr, actionErr error
+		cli, cliErr := kbacli.NewClient(*pod)
+		if cli == nil && cliErr == nil {
+			cliErr = fmt.Errorf("callActionWithSelector: pod %s cli is nil", pod.Name)
 		}
-		if cli == nil {
-			continue // not defined, for test only
+
+		if cliErr == nil {
+			_, actionErr = cli.CallAction(ctx, *req)
 		}
-		_, err2 := cli.CallAction(ctx, *req)
-		if err2 != nil {
-			return a.error2(la, err2)
+
+		if (cliErr != nil || actionErr != nil) && satisfyRetryCondition(spec.Exec.RetryByAnotherPod, spec.Exec.TargetPodSelector) {
+			retryErr := a.retryActionByAnotherPod(ctx, cliErr, actionErr, la, req)
+			if retryErr != nil {
+				return retryErr
+			}
 		}
+		return errorLogic(cliErr, actionErr)
 	}
 	return nil
+}
+
+func satisfyRetryCondition(retryByAnotherPod bool, targetPodSelector appsv1alpha1.TargetPodSelector) bool {
+	if retryByAnotherPod {
+		if len(targetPodSelector) == 0 ||
+			targetPodSelector == appsv1alpha1.AnyReplica {
+			return true
+		}
+	}
+	return false
 }
 
 func (a *kbagent) selectTargetPods(spec *appsv1alpha1.Action) ([]*corev1.Pod, error) {
@@ -228,4 +258,40 @@ func (a *kbagent) error2(la lifecycleAction, err error) error {
 	default:
 		return err
 	}
+}
+
+func (a *kbagent) retryActionByAnotherPod(ctx context.Context, cliErr, actionErr error, la lifecycleAction, req *proto.ActionRequest) error {
+	switch la.name() {
+	case MemberLeaveName:
+		// todo set retryByAnotherPod of member true
+		// member leave only retry when error occurs during client initialization
+		if cliErr != nil {
+			params := a.GetParams()
+			cli, ok := params[RetryMemberLeaveByAnotherPodParamCli].(*client.Client)
+			if !ok {
+				return fmt.Errorf("params %s not found", RetryMemberLeaveByAnotherPodParamCli)
+			}
+			return retryMemberLeaveByAnotherPod(ctx, a.pods, a.pod, req, cli)
+		}
+		return actionErr
+	//case MemberJoinName:
+	//case AccountProvisionName:
+	//case DataDumpName:
+	//case DataLoadName:
+	//case PostProvisionName:
+	//case PreTerminate:
+	//case SwitchoverName:
+	default:
+		return fmt.Errorf("retryActionByAnotherPod: action %s not supported", la.name())
+	}
+}
+
+func errorLogic(cliErr, actionErr error) error {
+	if cliErr != nil {
+		return cliErr
+	}
+	if actionErr != nil {
+		return actionErr
+	}
+	return nil
 }

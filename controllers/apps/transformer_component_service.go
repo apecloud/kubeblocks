@@ -28,6 +28,8 @@ import (
 
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -82,7 +84,7 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 			return err
 		}
 		for _, svc := range services {
-			if err = t.createOrUpdateService(ctx, dag, graphCli, &service, svc, transCtx.ComponentOrig); err != nil {
+			if err = t.createService(ctx, dag, graphCli, &service, svc); err != nil {
 				return err
 			}
 			delete(runningServices, svc.Name)
@@ -251,8 +253,8 @@ func (t *componentServiceTransformer) skipDefaultHeadlessSvc(synthesizeComp *com
 	return svcName == defaultHeadlessSvcName
 }
 
-func (t *componentServiceTransformer) createOrUpdateService(ctx graph.TransformContext, dag *graph.DAG,
-	graphCli model.GraphClient, compService *appsv1alpha1.ComponentService, service *corev1.Service, owner client.Object) error {
+func (t *componentServiceTransformer) createService(ctx graph.TransformContext, dag *graph.DAG,
+	graphCli model.GraphClient, compService *appsv1alpha1.ComponentService, service *corev1.Service) error {
 	var (
 		kind       string
 		podService = t.isPodService(compService)
@@ -267,21 +269,33 @@ func (t *componentServiceTransformer) createOrUpdateService(ctx graph.TransformC
 	}
 
 	if podService && kind == multiClusterServicePlacementInUnique {
-		return t.createOrUpdateServiceInUnique(ctx, dag, graphCli, service, owner)
+		// create service in unique, by hacking the pod placement strategy.
+		ordinal := func() int {
+			subs := strings.Split(service.GetName(), "-")
+			o, _ := strconv.Atoi(subs[len(subs)-1])
+			return o
+		}
+		multicluster.Assign(ctx.GetContext(), service, ordinal)
 	}
-	return createOrUpdateService(ctx, dag, graphCli, service, owner)
-}
 
-func (t *componentServiceTransformer) createOrUpdateServiceInUnique(ctx graph.TransformContext, dag *graph.DAG,
-	graphCli model.GraphClient, service *corev1.Service, owner client.Object) error {
-	// hack the pod placement strategy.
-	ordinal := func() int {
-		subs := strings.Split(service.GetName(), "-")
-		o, _ := strconv.Atoi(subs[len(subs)-1])
-		return o
+	createServiceOnce := func(service *corev1.Service) error {
+		key := types.NamespacedName{
+			Namespace: service.Namespace,
+			Name:      service.Name,
+		}
+		obj := &corev1.Service{}
+		if err := ctx.GetClient().Get(ctx.GetContext(), key, obj, inDataContext4C()); err != nil {
+			if apierrors.IsNotFound(err) {
+				graphCli.Create(dag, service, inDataContext4G())
+				return nil
+			}
+			return err
+		}
+		// do not update component service if exists due to this field is immutable.
+		return nil
 	}
-	multicluster.Assign(ctx.GetContext(), service, ordinal)
-	return createOrUpdateService(ctx, dag, graphCli, service, owner)
+
+	return createServiceOnce(service)
 }
 
 func generatePodNames(synthesizeComp *component.SynthesizedComponent) ([]string, error) {

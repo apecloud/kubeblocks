@@ -187,18 +187,16 @@ var _ = Describe(" component service transformer test", func() {
 			// check services to delete
 			graphCli := transCtx.Client.(model.GraphClient)
 			objs := graphCli.FindAll(dag, &corev1.Service{})
-			Expect(len(objs)).Should(Equal(int(replicas)))
+
+			// first service should not be updated or deleted
+			Expect(len(objs)).Should(Equal(int(replicas) - 1))
 			slices.SortFunc(objs, func(a, b client.Object) bool {
 				return a.GetName() < b.GetName()
 			})
-			for i := int32(0); i < replicas; i++ {
-				svc := objs[i].(*corev1.Service)
+			for i := int32(1); i < replicas; i++ {
+				svc := objs[i-1].(*corev1.Service)
 				Expect(svc.Name).Should(Equal(podServiceName(i)))
-				if i < transCtx.SynthesizeComponent.Replicas {
-					Expect(graphCli.IsAction(dag, svc, model.ActionUpdatePtr())).Should(BeTrue())
-				} else {
-					Expect(graphCli.IsAction(dag, svc, model.ActionDeletePtr())).Should(BeTrue())
-				}
+				Expect(graphCli.IsAction(dag, svc, model.ActionDeletePtr())).Should(BeTrue())
 			}
 		})
 	})

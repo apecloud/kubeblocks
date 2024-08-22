@@ -71,7 +71,7 @@ func (t *clusterServiceTransformer) Transform(ctx graph.TransformContext, dag *g
 		if err != nil {
 			return err
 		}
-		if err = createOrUpdateService(ctx, dag, graphCli, service, nil); err != nil {
+		if err = createOrUpdateService(ctx, dag, graphCli, service); err != nil {
 			return err
 		}
 		delete(services, service.Name)
@@ -288,7 +288,7 @@ func (t *clusterServiceTransformer) listOwnedClusterServices(transCtx *clusterTr
 	return services, nil
 }
 
-func createOrUpdateService(ctx graph.TransformContext, dag *graph.DAG, graphCli model.GraphClient, service *corev1.Service, owner client.Object) error {
+func createOrUpdateService(ctx graph.TransformContext, dag *graph.DAG, graphCli model.GraphClient, service *corev1.Service) error {
 	key := types.NamespacedName{
 		Namespace: service.Namespace,
 		Name:      service.Name,
@@ -300,11 +300,6 @@ func createOrUpdateService(ctx graph.TransformContext, dag *graph.DAG, graphCli 
 			return nil
 		}
 		return err
-	}
-
-	// don't update service not owned by the owner, to keep compatible with existed cluster
-	if owner != nil && !model.IsOwnerOf(owner, obj) {
-		return nil
 	}
 
 	objCopy := obj.DeepCopy()
@@ -319,21 +314,28 @@ func createOrUpdateService(ctx graph.TransformContext, dag *graph.DAG, graphCli 
 }
 
 func resolveServiceDefaultFields(obj, objCopy *corev1.ServiceSpec) {
-	// TODO: how about the order changed?
+	var exist *corev1.ServicePort
 	for i, port := range objCopy.Ports {
-		if i == len(obj.Ports) {
-			break
+		for _, oldPort := range obj.Ports {
+			// assume that port.Name is user specified, if which is not changed, we need to keep the old NodePort and TargetPort if they are not set
+			if port.Name != "" && port.Name == oldPort.Name {
+				exist = &oldPort
+				break
+			}
 		}
-		// if the service type is NodePort or LoadBalancer, and the nodeport is not set, we should use the nodeport of the exist service
-		if (objCopy.Type == corev1.ServiceTypeNodePort || objCopy.Type == corev1.ServiceTypeLoadBalancer) && port.NodePort == 0 && obj.Ports[i].NodePort != 0 {
-			objCopy.Ports[i].NodePort = obj.Ports[i].NodePort
-		}
-		if port.TargetPort.IntVal != 0 {
+		if exist == nil {
 			continue
 		}
-		port.TargetPort = obj.Ports[i].TargetPort
-		if reflect.DeepEqual(port, obj.Ports[i]) {
-			objCopy.Ports[i].TargetPort = obj.Ports[i].TargetPort
+		// if the service type is NodePort or LoadBalancer, and the nodeport is not set, we should use the nodeport of the exist service
+		if shouldAllocateNodePorts(objCopy) && port.NodePort == 0 && exist.NodePort != 0 {
+			objCopy.Ports[i].NodePort = exist.NodePort
+			port.NodePort = exist.NodePort
+		}
+		if port.TargetPort.IntVal == 0 && port.TargetPort.StrVal == "" {
+			port.TargetPort = exist.TargetPort
+		}
+		if reflect.DeepEqual(port, *exist) {
+			objCopy.Ports[i].TargetPort = exist.TargetPort
 		}
 	}
 	if len(objCopy.ClusterIP) == 0 {
@@ -360,6 +362,19 @@ func resolveServiceDefaultFields(obj, objCopy *corev1.ServiceSpec) {
 	if objCopy.ExternalTrafficPolicy == "" && obj.ExternalTrafficPolicy != "" {
 		objCopy.ExternalTrafficPolicy = obj.ExternalTrafficPolicy
 	}
+}
+
+func shouldAllocateNodePorts(svc *corev1.ServiceSpec) bool {
+	if svc.Type == corev1.ServiceTypeNodePort {
+		return true
+	}
+	if svc.Type == corev1.ServiceTypeLoadBalancer {
+		if svc.AllocateLoadBalancerNodePorts != nil {
+			return *svc.AllocateLoadBalancerNodePorts
+		}
+		return true
+	}
+	return false
 }
 
 // func checkLegacyServiceExist(ctx graph.TransformContext, serviceName, namespace string) (bool, error) {

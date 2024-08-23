@@ -107,7 +107,7 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 		return err
 	}
 
-	container := builder.NewContainerBuilder(kbAgentContainerName).
+	defaultContainer := builder.NewContainerBuilder(kbAgentContainerName).
 		SetImage(viper.GetString(constant.KBToolsImage)).
 		SetImagePullPolicy(corev1.PullIfNotPresent).
 		AddCommands(kbAgentCommand).
@@ -115,14 +115,13 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 		AddEnv(envVars...).
 		GetObject()
 
-	containers, err := adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp, *container)
+	noImageNContainer, containers, err := adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp, *defaultContainer)
 	if err != nil {
 		return err
 	}
-	if len(containers) == 0 {
-		containers = append(containers, container)
+	if noImageNContainer {
+		containers = append(containers, defaultContainer)
 	}
-
 	allPorts := make([]int32, 0)
 	for i := range containers {
 		allPorts = append(allPorts, int32(kbAgentDefaultPort+i))
@@ -291,13 +290,13 @@ func buildProbe4KBAgent(probe *appsv1alpha1.Probe, name string) (*proto.Action, 
 	return a, p
 }
 
-func adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp *SynthesizedComponent, container corev1.Container) ([]*corev1.Container, error) {
-	actionNames, images, containers, err := customExecActionImageNContainer(synthesizedComp)
+func adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp *SynthesizedComponent, defaultContainer corev1.Container) (bool, []*corev1.Container, error) {
+	noImageNContainer, actionNames, images, containers, err := customExecActionImageNContainer(synthesizedComp)
 	if err != nil {
-		return nil, err
+		return noImageNContainer, nil, err
 	}
 	if len(actionNames) == 0 {
-		return nil, nil
+		return noImageNContainer, nil, nil
 	}
 	// init-container to copy binaries to the shared mount point /kubeblocks
 	initContainer := buildKBAgentInitContainer()
@@ -305,7 +304,7 @@ func adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp *SynthesizedComp
 
 	cc := make([]*corev1.Container, len(containers))
 	for i, c := range containers {
-		wrapContainer := container.DeepCopy()
+		wrapContainer := defaultContainer.DeepCopy()
 		if c == nil {
 			wrapContainer.Image = images[i]
 		} else {
@@ -320,12 +319,12 @@ func adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp *SynthesizedComp
 		}
 		cc[i] = wrapContainer
 	}
-	return cc, nil
+	return noImageNContainer, cc, nil
 }
 
-func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) ([]string, []string, []*corev1.Container, error) {
+func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) (bool, []string, []string, []*corev1.Container, error) {
 	if synthesizedComp.LifecycleActions == nil {
-		return nil, nil, nil, nil
+		return false, nil, nil, nil, nil
 	}
 
 	actions := []*appsv1alpha1.Action{
@@ -366,6 +365,7 @@ func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) ([]s
 	var images []string
 	var containerNames []string
 	var actionNames []string
+	noImageNContainer := false
 	for _, action := range actions {
 		if action == nil || action.Exec == nil {
 			continue
@@ -373,6 +373,7 @@ func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) ([]s
 		image := action.Exec.Image
 		containerName := action.Exec.Container
 		if len(image) == 0 && len(containerName) == 0 {
+			noImageNContainer = true
 			continue
 		}
 		images = append(images, image)
@@ -391,17 +392,17 @@ func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) ([]s
 				}
 			}
 			if c == nil {
-				return nil, nil, nil, fmt.Errorf("exec container %s not found", containerNames[i])
+				return false, nil, nil, nil, fmt.Errorf("exec container %s not found", containerNames[i])
 			}
 			if len(images[i]) > 0 && c.Image != images[i] {
-				return nil, nil, nil, fmt.Errorf("exec image and container must be the same")
+				return false, nil, nil, nil, fmt.Errorf("exec image and container must be the same")
 			}
 			containers[i] = c
 		} else {
 			containers[i] = nil
 		}
 	}
-	return actionNames, images, containers, nil
+	return noImageNContainer, actionNames, images, containers, nil
 }
 
 func buildKBAgentInitContainer() *corev1.Container {

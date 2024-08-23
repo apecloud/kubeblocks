@@ -34,6 +34,8 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
+// RegistryNamespaceConfig maps registry namespaces.
+//
 // Quote from https://docs.docker.com/reference/cli/docker/image/tag/
 // > While the OCI Distribution Specification supports more than two slash-separated components,
 // > most registries only support two slash-separated components.
@@ -66,10 +68,12 @@ func init() {
 	ReloadRegistryConfig()
 }
 
-// TODO: this is needed in componnet controller test, is there a better way?
 func ReloadRegistryConfig() {
+	// TODO: this is needed in componnet controller test, is there a better way?
 	registriesConfig = RegistriesConfig{}
-	viper.UnmarshalKey(constant.CfgRegistries, &registriesConfig)
+	if err := viper.UnmarshalKey(constant.CfgRegistries, &registriesConfig); err != nil {
+		panic(err)
+	}
 
 	// TODO: validate
 	for _, registry := range registriesConfig.Registries {
@@ -85,8 +89,8 @@ func ReloadRegistryConfig() {
 	}
 }
 
-// For a detailed explaination of an image's format, see:
-// https://kubernetes.io/docs/concepts/containers/images/
+// For a detailed explanation of an image's format, see:
+// https://pkg.go.dev/github.com/distribution/reference
 
 // if registry is omitted, the default (docker hub) will be added.
 // if namespace is omiited when using docker hub, the default namespace (library) will be added.

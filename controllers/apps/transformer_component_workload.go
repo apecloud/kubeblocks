@@ -145,6 +145,10 @@ func (t *componentWorkloadTransformer) reconcileWorkload(synthesizedComp *compon
 		protoITS.Spec.Template.Labels = intctrlutil.MergeMetadataMaps(runningITS.Spec.Template.Labels, synthesizedComp.UserDefinedLabels)
 	}
 
+	if runningITS == nil {
+		//
+	}
+
 	buildInstanceSetPlacementAnnotation(comp, protoITS)
 
 	// build configuration template annotations to workload

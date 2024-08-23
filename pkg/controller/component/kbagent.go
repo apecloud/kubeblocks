@@ -310,7 +310,7 @@ func adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp *SynthesizedComp
 		} else {
 			wrapContainer.Image = c.Image
 		}
-		wrapContainer.Name = fmt.Sprintf("%s-%s", actionNames[i], kbAgentContainerName)
+		wrapContainer.Name = fmt.Sprintf("%s-%s", kbAgentContainerName, actionNames[i])
 		wrapContainer.Command[0] = kbAgentCommandOnSharedMount
 		wrapContainer.VolumeMounts = uniqueVolumeMounts(wrapContainer.VolumeMounts, []corev1.VolumeMount{sharedVolumeMount})
 		// TODO: share more container resources

@@ -86,12 +86,8 @@ func (s *probeService) Start() error {
 	return nil
 }
 
-func (s *probeService) Decode(payload []byte) (interface{}, error) {
-	return nil, ErrNotImplemented
-}
-
-func (s *probeService) HandleRequest(ctx context.Context, req interface{}) ([]byte, error) {
-	return nil, ErrNotImplemented
+func (s *probeService) HandleRequest(ctx context.Context, payload []byte) ([]byte, error) {
+	return nil, proto.ErrNotImplemented
 }
 
 type probeRunner struct {
@@ -139,7 +135,7 @@ func (r *probeRunner) runLoop(probe *proto.Probe) {
 }
 
 func (r *probeRunner) runOnce(probe *proto.Probe) ([]byte, error) {
-	return r.actionService.HandleRequest(context.Background(), &proto.ActionRequest{Action: probe.Action})
+	return r.actionService.handleRequest(context.Background(), &proto.ActionRequest{Action: probe.Action})
 }
 
 func (r *probeRunner) report(probe *proto.Probe, output []byte, err error) {

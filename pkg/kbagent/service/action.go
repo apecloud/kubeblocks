@@ -80,18 +80,37 @@ func (s *actionService) Start() error {
 	return nil
 }
 
-func (s *actionService) Decode(payload []byte) (interface{}, error) {
+func (s *actionService) HandleRequest(ctx context.Context, payload []byte) ([]byte, error) {
+	req, err := s.decode(payload)
+	if err != nil {
+		return s.encode(nil, err), nil
+	}
+	return s.encode(s.handleRequest(ctx, req)), nil
+}
+
+func (s *actionService) decode(payload []byte) (*proto.ActionRequest, error) {
 	req := &proto.ActionRequest{}
 	if err := json.Unmarshal(payload, req); err != nil {
-		return nil, err
+		return nil, errors.Wrapf(proto.ErrBadRequest, "unmarshal action request error: %s", err.Error())
 	}
 	return req, nil
 }
 
-func (s *actionService) HandleRequest(ctx context.Context, i interface{}) ([]byte, error) {
-	req := i.(*proto.ActionRequest)
+func (s *actionService) encode(out []byte, err error) []byte {
+	rsp := &proto.ActionResponse{}
+	if err == nil {
+		rsp.Output = out
+	} else {
+		rsp.Error = proto.Error2Type(err)
+		rsp.Message = err.Error()
+	}
+	data, _ := json.Marshal(rsp)
+	return data
+}
+
+func (s *actionService) handleRequest(ctx context.Context, req *proto.ActionRequest) ([]byte, error) {
 	if _, ok := s.actions[req.Action]; !ok {
-		return nil, errors.Wrapf(ErrNotDefined, "%s is not defined", req.Action)
+		return nil, errors.Wrapf(proto.ErrNotDefined, "%s is not defined", req.Action)
 	}
 	return s.handleActionRequest(ctx, req)
 }
@@ -101,7 +120,7 @@ func (s *actionService) handleActionRequest(ctx context.Context, req *proto.Acti
 	if action.Exec != nil {
 		return s.handleExecAction(ctx, req, action)
 	}
-	return nil, errors.Wrap(ErrNotImplemented, "only exec action is supported")
+	return nil, errors.Wrap(proto.ErrNotImplemented, "only exec action is supported")
 }
 
 func (s *actionService) handleExecAction(ctx context.Context, req *proto.ActionRequest, action *proto.Action) ([]byte, error) {
@@ -130,7 +149,7 @@ func (s *actionService) handleExecActionNonBlocking(ctx context.Context, req *pr
 	}
 	err := gather(running.errChan)
 	if err == nil {
-		return nil, ErrInProgress
+		return nil, proto.ErrInProgress
 	}
 	delete(s.runningActions, req.Action)
 	if *err != nil {

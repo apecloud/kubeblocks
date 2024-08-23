@@ -57,9 +57,6 @@ func (c *httpClient) CallAction(ctx context.Context, req proto.ActionRequest) (p
 	if err != nil {
 		return proto.ActionResponse{}, err
 	}
-	if payload == nil {
-		return proto.ActionResponse{}, nil
-	}
 	return c.decode(payload)
 }
 
@@ -76,18 +73,10 @@ func (c *httpClient) request(ctx context.Context, method, url string, body io.Re
 	defer rsp.Body.Close()
 
 	switch rsp.StatusCode {
-	case http.StatusOK, http.StatusUnavailableForLegalReasons:
+	case http.StatusOK, http.StatusNotImplemented, http.StatusInternalServerError:
 		return rsp.Body, nil
-	case http.StatusNoContent:
-		return nil, nil
-	case http.StatusNotImplemented, http.StatusInternalServerError:
-		fallthrough
 	default:
-		msg, err := io.ReadAll(rsp.Body)
-		if err != nil {
-			return nil, err
-		}
-		return nil, fmt.Errorf("%s", string(msg))
+		return nil, fmt.Errorf("http error: %s", rsp.Status)
 	}
 }
 

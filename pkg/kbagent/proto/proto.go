@@ -47,7 +47,9 @@ type ActionRequest struct {
 }
 
 type ActionResponse struct {
-	Output []byte `json:"output,omitempty"`
+	Error   string `json:"error,omitempty"`
+	Message string `json:"message,omitempty"`
+	Output  []byte `json:"output,omitempty"`
 }
 
 type Probe struct {

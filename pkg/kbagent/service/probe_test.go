@@ -85,13 +85,9 @@ var _ = Describe("probe", func() {
 			Expect(err).Should(BeNil())
 			Expect(service).ShouldNot(BeNil())
 
-			_, err = service.Decode([]byte{})
-			Expect(err).ShouldNot(BeNil())
-			Expect(errors.Is(err, ErrNotImplemented)).Should(BeTrue())
-
 			_, err = service.HandleRequest(ctx, nil)
 			Expect(err).ShouldNot(BeNil())
-			Expect(errors.Is(err, ErrNotImplemented)).Should(BeTrue())
+			Expect(errors.Is(err, proto.ErrNotImplemented)).Should(BeTrue())
 		})
 
 		It("initial delay seconds", func() {
@@ -108,6 +104,6 @@ var _ = Describe("probe", func() {
 			Expect(r.ticker).Should(BeNil())
 		})
 
-		// TODO: more cases
+		// TODO: more test cases
 	})
 })

@@ -28,9 +28,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/util"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -47,12 +48,16 @@ func gather[T interface{}](ch chan T) *T {
 }
 
 func runCommand(ctx context.Context, action *proto.ExecAction, parameters map[string]string, timeout *int32) ([]byte, error) {
-	stdoutChan, _, errChan, err := runCommandNonBlocking(ctx, action, parameters, timeout)
+	stdoutChan, stderrChan, errChan, err := runCommandNonBlocking(ctx, action, parameters, timeout)
 	if err != nil {
 		return nil, err
 	}
 	err = <-errChan
 	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			err = errors.Wrap(ErrFailed, string(<-stderrChan))
+		}
 		return nil, err
 	}
 	return <-stdoutChan, nil
@@ -89,12 +94,16 @@ func runCommandNonBlocking(ctx context.Context, action *proto.ExecAction, parame
 
 func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[string]string, timeout *int32,
 	stdinReader io.Reader, stdoutWriter, stderrWriter io.Writer) (chan error, error) {
-	var timeOutCancel context.CancelFunc
+	var timeoutCancel context.CancelFunc
 	if timeout != nil && *timeout > 0 {
-		timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(*timeout)*time.Second)
-		ctx = timeoutCtx
-		timeOutCancel = cancel
+		ctx, timeoutCancel = context.WithTimeout(ctx, time.Duration(*timeout)*time.Second)
 	}
+	cancelTimeout := func() {
+		if timeoutCancel != nil {
+			timeoutCancel()
+		}
+	}
+
 	mergedArgs := func() []string {
 		args := make([]string, 0)
 		if len(action.Commands) > 1 {
@@ -105,13 +114,10 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 	}()
 
 	mergedEnv := func() []string {
-		// env order: parameters (action specific variables) | os env (defined by vars) | user-defined env in action
+		// order: parameters (action specific variables) | os env
 		env := util.EnvM2L(parameters)
-		if len(env) > 0 || len(action.Env) > 0 {
+		if len(env) > 0 {
 			env = append(env, os.Environ()...)
-		}
-		if len(action.Env) > 0 {
-			env = append(env, action.Env...)
 		}
 		return env
 	}()
@@ -129,6 +135,7 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 		var stdinErr error
 		stdin, stdinErr = cmd.StdinPipe()
 		if stdinErr != nil {
+			cancelTimeout()
 			return nil, errors.Wrapf(ErrInternalError, "failed to create stdin pipe: %v", stdinErr)
 		}
 	}
@@ -136,6 +143,7 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 		var stdoutErr error
 		stdout, stdoutErr = cmd.StdoutPipe()
 		if stdoutErr != nil {
+			cancelTimeout()
 			return nil, errors.Wrapf(ErrInternalError, "failed to create stdout pipe: %v", stdoutErr)
 		}
 	}
@@ -143,16 +151,16 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 		var stderrErr error
 		stderr, stderrErr = cmd.StderrPipe()
 		if stderrErr != nil {
+			cancelTimeout()
 			return nil, errors.Wrapf(ErrInternalError, "failed to create stderr pipe: %v", stderrErr)
 		}
 	}
 
 	errChan := make(chan error)
 	go func() {
-		if timeOutCancel != nil {
-			defer timeOutCancel()
-		}
+		defer cancelTimeout()
 		defer close(errChan)
+
 		if err := cmd.Start(); err != nil {
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 				errChan <- ErrTimeout
@@ -164,6 +172,8 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 
 		var wg sync.WaitGroup
 		wg.Add(3)
+
+		var ioCopyError error
 		go func() {
 			defer wg.Done()
 			if stdinReader != nil {
@@ -173,7 +183,7 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 					if errors.Is(copyErr, os.ErrClosed) {
 						return
 					}
-					errChan <- errors.Wrapf(ErrFailed, "failed to copy from input reader to stdin: %v", copyErr)
+					ioCopyError = errors.Wrapf(ErrFailed, "failed to copy from input reader to stdin: %v", copyErr)
 				}
 			}
 		}()
@@ -185,7 +195,7 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 					if errors.Is(copyErr, os.ErrClosed) {
 						return
 					}
-					errChan <- errors.Wrapf(ErrFailed, "failed to copy stdout to output writer: %v", copyErr)
+					ioCopyError = errors.Wrapf(ErrFailed, "failed to copy stdout to output writer: %v", copyErr)
 				}
 			}
 		}()
@@ -197,24 +207,27 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 					if errors.Is(copyErr, os.ErrClosed) {
 						return
 					}
-					errChan <- errors.Wrapf(ErrFailed, "failed to copy stderr to error writer: %v", copyErr)
+					ioCopyError = errors.Wrapf(ErrFailed, "failed to copy stderr to error writer: %v", copyErr)
 				}
 			}
 		}()
 
+		// wait for the command to finish and the pipes to be closed
 		execErr := cmd.Wait()
-		wg.Wait()
 		if execErr != nil {
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 				execErr = ErrTimeout
-			} else {
-				var exitErr *exec.ExitError
-				if errors.As(execErr, &exitErr) && stderrWriter == nil {
-					execErr = errors.Wrap(ErrFailed, string(exitErr.Stderr))
-				}
 			}
 		}
-		errChan <- execErr
+
+		// and then wait for the io copy goroutines to finish
+		wg.Wait()
+
+		if execErr != nil {
+			errChan <- execErr
+		} else {
+			errChan <- ioCopyError
+		}
 	}()
 	return errChan, nil
 }

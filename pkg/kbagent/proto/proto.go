@@ -31,7 +31,6 @@ type Action struct {
 type ExecAction struct {
 	Commands []string `json:"command,omitempty"`
 	Args     []string `json:"args,omitempty"`
-	Env      []string `json:"env,omitempty"`
 }
 
 type RetryPolicy struct {

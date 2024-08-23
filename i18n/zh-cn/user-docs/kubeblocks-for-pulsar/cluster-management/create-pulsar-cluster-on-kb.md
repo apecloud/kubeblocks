@@ -24,6 +24,37 @@ KubeBlocks 可以通过良好的抽象快速集成新引擎，并支持 Pulsar �
 | recovery (可选)    | 至少 1 个；如果 bookie 未启用 autoRecovery 功能，则至少需要 3 个 |
 |   proxy (可选)     |         至少 1 个；生产环境需要 3 个           |
 
+### 开始之前
+
+* [安装 kbcli](./../../installation/install-with-kbcli/install-kbcli.md)。
+* [安装 KubeBlocks](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md)。
+* 确保 Pulsar 引擎已启用。如果未启用，可参考[该文档](./../../overview/database-engines-supported.md#使用引擎)启用引擎。
+  
+  ```bash
+  kbcli addon list
+  >
+  NAME                      TYPE   STATUS     EXTRAS         AUTO-INSTALL
+  ...
+  pulsar                    Helm   Enabled                   true
+  ...
+  ```
+
+* 查看可用于创建集群的数据库类型和版本。
+
+  ```bash
+  kbcli clusterdefinition list
+
+  kbcli clusterversion list
+  ```
+
+* 为了保持隔离，本文档中创建一个名为 `demo` 的独立命名空间。
+
+  ```bash
+  kubectl create namespace demo
+  >
+  namespace/demo created
+  ```
+
 ## 创建 Pulsar 集群
 
 1. 在本地创建 `helm` 使用的 Pulsar 集群模板文件 `values-production.yaml`。

@@ -9,4 +9,3 @@ sidebar_position: 1
 
 * [集群管理](./../kubeblocks-for-mongodb/cluster-management/create-and-connect-to-a-mongodb-cluster.md)
 * [配置](./../kubeblocks-for-mongodb/configuration/configure-cluster-parameters.md)
-* [迁移](./../kubeblocks-for-mongodb/migration/full-feature-and-limit-list.md)

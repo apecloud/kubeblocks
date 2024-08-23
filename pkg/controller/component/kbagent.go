@@ -27,6 +27,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -110,6 +111,7 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 		SetImage(viper.GetString(constant.KBToolsImage)).
 		SetImagePullPolicy(corev1.PullIfNotPresent).
 		AddCommands(kbAgentCommand).
+		AddEnv(mergedActionEnv4KBAgent(synthesizedComp)...).
 		AddEnv(envVars...).
 		GetObject()
 
@@ -165,6 +167,43 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 		synthesizedComp.PodSpec.Containers = append(synthesizedComp.PodSpec.Containers, *container)
 	}
 	return nil
+}
+
+func mergedActionEnv4KBAgent(synthesizedComp *SynthesizedComponent) []corev1.EnvVar {
+	env := make([]corev1.EnvVar, 0)
+	envSet := sets.New[string]()
+
+	checkedAppend := func(action *appsv1alpha1.Action) {
+		if action != nil && action.Exec != nil {
+			for _, e := range action.Exec.Env {
+				if !envSet.Has(e.Name) {
+					env = append(env, e)
+					envSet.Insert(e.Name)
+				}
+			}
+		}
+	}
+
+	for _, action := range []*appsv1alpha1.Action{
+		synthesizedComp.LifecycleActions.PostProvision,
+		synthesizedComp.LifecycleActions.PreTerminate,
+		synthesizedComp.LifecycleActions.Switchover,
+		synthesizedComp.LifecycleActions.MemberJoin,
+		synthesizedComp.LifecycleActions.MemberLeave,
+		synthesizedComp.LifecycleActions.Readonly,
+		synthesizedComp.LifecycleActions.Readwrite,
+		synthesizedComp.LifecycleActions.DataDump,
+		synthesizedComp.LifecycleActions.DataLoad,
+		synthesizedComp.LifecycleActions.Reconfigure,
+		synthesizedComp.LifecycleActions.AccountProvision,
+	} {
+		checkedAppend(action)
+	}
+	if synthesizedComp.LifecycleActions.RoleProbe != nil {
+		checkedAppend(&synthesizedComp.LifecycleActions.RoleProbe.Action)
+	}
+
+	return env
 }
 
 func buildKBAgentStartupEnvs(synthesizedComp *SynthesizedComponent) ([]corev1.EnvVar, error) {
@@ -224,7 +263,6 @@ func buildAction4KBAgent(action *appsv1alpha1.Action, name string) *proto.Action
 		Exec: &proto.ExecAction{
 			Commands: action.Exec.Command,
 			Args:     action.Exec.Args,
-			// Env:      action.Exec.Env,
 		},
 		TimeoutSeconds: action.TimeoutSeconds,
 	}

@@ -280,7 +280,7 @@ Therefore, although a new root account and password are created when restoring a
 
 ## Reference
 
-- For more details on the backup and restore function of KubeBlocks, refer to [Backup and Restore](./../../user_docs/backup-and-restore/introduction.md).
+- For more details on the backup and restore function of KubeBlocks, refer to [Backup and Restore](./../../user_docs/maintenance/backup-and-restore/introduction.md).
 
 ## Appendix
 

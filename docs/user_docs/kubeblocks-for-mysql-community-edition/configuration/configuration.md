@@ -46,7 +46,7 @@ You can also view the details of this configuration file and parameters.
   kbcli cluster explain-config mycluster --param=innodb_buffer_pool_size --config-specs=mysql-replication-config
   ```
 
-  `--config-specs` is required to specify a configuration template since ApeCloud MySQL currently supports multiple templates. You can run `kbcli cluster describe-config mycluster` to view the all template names.
+  `--config-specs` is required to specify a configuration template since MySQL currently supports multiple templates. You can run `kbcli cluster describe-config mycluster` to view the all template names.
 
   <details>
 

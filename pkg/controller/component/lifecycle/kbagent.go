@@ -26,11 +26,14 @@ import (
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/service"
@@ -42,83 +45,167 @@ type lifecycleAction interface {
 }
 
 type kbagent struct {
-	synthesizedComp  *component.SynthesizedComponent
-	lifecycleActions *appsv1alpha1.ComponentLifecycleActions
-	pods             []*corev1.Pod
-	pod              *corev1.Pod
+	synthesizedComp *component.SynthesizedComponent
+	pods            []*corev1.Pod
+	pod             *corev1.Pod
 }
 
 var _ Lifecycle = &kbagent{}
 
 func (a *kbagent) PostProvision(ctx context.Context, cli client.Reader, opts *Options) error {
-	la := &postProvision{}
-	return a.checkedCallAction(ctx, cli, a.lifecycleActions.PostProvision, la, opts)
+	lfa := &postProvision{
+		namespace:   a.synthesizedComp.Namespace,
+		clusterName: a.synthesizedComp.ClusterName,
+		compName:    a.synthesizedComp.Name,
+		action:      a.synthesizedComp.LifecycleActions.PostProvision,
+	}
+	return a.checkedCallAction(ctx, cli, lfa.action, lfa, opts)
 }
 
 func (a *kbagent) PreTerminate(ctx context.Context, cli client.Reader, opts *Options) error {
-	la := &preTerminate{}
-	return a.checkedCallAction(ctx, cli, a.lifecycleActions.PreTerminate, la, opts)
+	lfa := &preTerminate{
+		namespace:   a.synthesizedComp.Namespace,
+		clusterName: a.synthesizedComp.ClusterName,
+		compName:    a.synthesizedComp.Name,
+		action:      a.synthesizedComp.LifecycleActions.PreTerminate,
+	}
+	return a.checkedCallAction(ctx, cli, lfa.action, lfa, opts)
 }
 
-func (a *kbagent) Switchover(ctx context.Context, cli client.Reader, opts *Options) error {
-	la := &switchover{}
-	return a.checkedCallAction(ctx, cli, a.lifecycleActions.Switchover, la, opts)
+func (a *kbagent) Switchover(ctx context.Context, cli client.Reader, opts *Options, candidate string) error {
+	lfa := &switchover{
+		namespace:   a.synthesizedComp.Namespace,
+		clusterName: a.synthesizedComp.ClusterName,
+		compName:    a.synthesizedComp.Name,
+		roles:       a.synthesizedComp.Roles,
+		candidate:   candidate,
+	}
+	return a.checkedCallAction(ctx, cli, a.synthesizedComp.LifecycleActions.Switchover, lfa, opts)
 }
 
 func (a *kbagent) MemberJoin(ctx context.Context, cli client.Reader, opts *Options) error {
-	la := &memberJoin{
-		synthesizedComp: a.synthesizedComp,
-		pod:             a.pod,
+	lfa := &memberJoin{
+		namespace:   a.synthesizedComp.Namespace,
+		clusterName: a.synthesizedComp.ClusterName,
+		compName:    a.synthesizedComp.Name,
+		pod:         a.pod,
 	}
-	return a.checkedCallAction(ctx, cli, a.lifecycleActions.MemberJoin, la, opts)
+	return a.checkedCallAction(ctx, cli, a.synthesizedComp.LifecycleActions.MemberJoin, lfa, opts)
 }
 
 func (a *kbagent) MemberLeave(ctx context.Context, cli client.Reader, opts *Options) error {
-	la := &memberLeave{
-		synthesizedComp: a.synthesizedComp,
-		pod:             a.pod,
+	lfa := &memberLeave{
+		namespace:   a.synthesizedComp.Namespace,
+		clusterName: a.synthesizedComp.ClusterName,
+		compName:    a.synthesizedComp.Name,
+		pod:         a.pod,
 	}
-	return a.checkedCallAction(ctx, cli, a.lifecycleActions.MemberLeave, la, opts)
+	return a.checkedCallAction(ctx, cli, a.synthesizedComp.LifecycleActions.MemberLeave, lfa, opts)
 }
 
 func (a *kbagent) DataDump(ctx context.Context, cli client.Reader, opts *Options) error {
-	la := &dataDump{}
-	return a.checkedCallAction(ctx, cli, a.lifecycleActions.DataDump, la, opts)
+	lfa := &dataDump{}
+	return a.checkedCallAction(ctx, cli, a.synthesizedComp.LifecycleActions.DataDump, lfa, opts)
 }
 
 func (a *kbagent) DataLoad(ctx context.Context, cli client.Reader, opts *Options) error {
-	la := &dataLoad{}
-	return a.checkedCallAction(ctx, cli, a.lifecycleActions.DataLoad, la, opts)
+	lfa := &dataLoad{}
+	return a.checkedCallAction(ctx, cli, a.synthesizedComp.LifecycleActions.DataLoad, lfa, opts)
 }
 
-func (a *kbagent) AccountProvision(ctx context.Context, cli client.Reader, opts *Options, args ...any) error {
-	la := &accountProvision{args: args}
-	return a.checkedCallAction(ctx, cli, a.lifecycleActions.AccountProvision, la, opts)
-}
-
-func (a *kbagent) checkedCallAction(ctx context.Context, cli client.Reader, action *appsv1alpha1.Action, la lifecycleAction, opts *Options) error {
-	if action == nil {
-		return errors.Wrap(ErrActionNotDefined, la.name())
+func (a *kbagent) AccountProvision(ctx context.Context, cli client.Reader, opts *Options, statement, user, password string) error {
+	lfa := &accountProvision{
+		statement: statement,
+		user:      user,
+		password:  password,
 	}
-	return a.callAction(ctx, cli, action, la, opts)
+	return a.checkedCallAction(ctx, cli, a.synthesizedComp.LifecycleActions.AccountProvision, lfa, opts)
 }
 
-func (a *kbagent) callAction(ctx context.Context, cli client.Reader, spec *appsv1alpha1.Action, la lifecycleAction, opts *Options) error {
-	req, err1 := a.buildActionRequest(ctx, cli, la, opts)
+func (a *kbagent) checkedCallAction(ctx context.Context, cli client.Reader, spec *appsv1alpha1.Action, lfa lifecycleAction, opts *Options) error {
+	if spec == nil || spec.Exec == nil {
+		return errors.Wrap(ErrActionNotDefined, lfa.name())
+	}
+	if err := a.precondition(ctx, cli, spec); err != nil {
+		return err
+	}
+	// TODO: exactly once
+	return a.callAction(ctx, cli, spec, lfa, opts)
+}
+
+func (a *kbagent) precondition(ctx context.Context, cli client.Reader, spec *appsv1alpha1.Action) error {
+	if spec.PreCondition == nil {
+		return nil
+	}
+	switch *spec.PreCondition {
+	case appsv1alpha1.ImmediatelyPreConditionType:
+		return nil
+	case appsv1alpha1.RuntimeReadyPreConditionType:
+		return a.runtimeReadyCheck(ctx, cli)
+	case appsv1alpha1.ComponentReadyPreConditionType:
+		return a.compReadyCheck(ctx, cli)
+	case appsv1alpha1.ClusterReadyPreConditionType:
+		return a.clusterReadyCheck(ctx, cli)
+	default:
+		return fmt.Errorf("unknown precondition type %s", *spec.PreCondition)
+	}
+}
+
+func (a *kbagent) clusterReadyCheck(ctx context.Context, cli client.Reader) error {
+	ready := func(object client.Object) bool {
+		cluster := object.(*appsv1alpha1.Cluster)
+		return cluster.Status.Phase == appsv1alpha1.RunningClusterPhase
+	}
+	return a.readyCheck(ctx, cli, a.synthesizedComp.ClusterName, "cluster", &appsv1alpha1.Cluster{}, ready)
+}
+
+func (a *kbagent) compReadyCheck(ctx context.Context, cli client.Reader) error {
+	ready := func(object client.Object) bool {
+		comp := object.(*appsv1alpha1.Component)
+		return comp.Status.Phase == appsv1alpha1.RunningClusterCompPhase
+	}
+	compName := constant.GenerateClusterComponentName(a.synthesizedComp.ClusterName, a.synthesizedComp.Name)
+	return a.readyCheck(ctx, cli, compName, "component", &appsv1alpha1.Component{}, ready)
+}
+
+func (a *kbagent) runtimeReadyCheck(ctx context.Context, cli client.Reader) error {
+	name := constant.GenerateWorkloadNamePattern(a.synthesizedComp.ClusterName, a.synthesizedComp.Name)
+	ready := func(object client.Object) bool {
+		its := object.(*workloads.InstanceSet)
+		return instanceset.IsInstancesReady(its)
+	}
+	return a.readyCheck(ctx, cli, name, "runtime", &workloads.InstanceSet{}, ready)
+}
+
+func (a *kbagent) readyCheck(ctx context.Context, cli client.Reader, name, kind string, obj client.Object, ready func(object client.Object) bool) error {
+	key := types.NamespacedName{
+		Namespace: a.synthesizedComp.Namespace,
+		Name:      name,
+	}
+	if err := cli.Get(ctx, key, obj); err != nil {
+		return errors.Wrap(err, fmt.Sprintf("precondition check error for %s ready", kind))
+	}
+	if !ready(obj) {
+		return fmt.Errorf("precondition check error, %s is not ready", kind)
+	}
+	return nil
+}
+
+func (a *kbagent) callAction(ctx context.Context, cli client.Reader, spec *appsv1alpha1.Action, lfa lifecycleAction, opts *Options) error {
+	req, err1 := a.buildActionRequest(ctx, cli, lfa, opts)
 	if err1 != nil {
 		return err1
 	}
-	return a.callActionWithSelector(ctx, spec, la, req)
+	return a.callActionWithSelector(ctx, spec, lfa, req)
 }
 
-func (a *kbagent) buildActionRequest(ctx context.Context, cli client.Reader, la lifecycleAction, opts *Options) (*proto.ActionRequest, error) {
-	parameters, err := la.parameters(ctx, cli)
+func (a *kbagent) buildActionRequest(ctx context.Context, cli client.Reader, lfa lifecycleAction, opts *Options) (*proto.ActionRequest, error) {
+	parameters, err := a.parameters(ctx, cli, lfa)
 	if err != nil {
 		return nil, err
 	}
-
 	req := &proto.ActionRequest{
-		Action:     la.name(),
+		Action:     lfa.name(),
 		Parameters: parameters,
 	}
 	if opts != nil {
@@ -138,20 +225,47 @@ func (a *kbagent) buildActionRequest(ctx context.Context, cli client.Reader, la 
 	return req, nil
 }
 
-func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1alpha1.Action, la lifecycleAction, req *proto.ActionRequest) error {
+func (a *kbagent) parameters(ctx context.Context, cli client.Reader, lfa lifecycleAction) (map[string]string, error) {
+	m, err := a.templateVarsParameters()
+	if err != nil {
+		return nil, err
+	}
+	sys, err := lfa.parameters(ctx, cli)
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range sys {
+		// template vars take precedence
+		if _, ok := m[k]; !ok {
+			m[k] = v
+		}
+	}
+	return m, nil
+}
+
+func (a *kbagent) templateVarsParameters() (map[string]string, error) {
+	m := map[string]string{}
+	for k, v := range a.synthesizedComp.TemplateVars {
+		m[k] = v.(string)
+	}
+	return m, nil
+}
+
+func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1alpha1.Action, lfa lifecycleAction, req *proto.ActionRequest) error {
 	pods, err := a.selectTargetPods(spec)
 	if err != nil {
 		return err
 	}
 	if len(pods) == 0 {
-		return fmt.Errorf("no available pod to call action %s", la.name())
+		return fmt.Errorf("no available pod to call action %s", lfa.name())
 	}
 
 	// TODO: impl
 	//  - back-off to retry
 	//  - timeout
 	for _, pod := range a.pods {
-		cli, err1 := kbacli.NewClient(*pod, mapActionName(la))
+		cli, err1 := kbacli.NewClient(*pod, mapActionName(lfa))
 		if err1 != nil {
 			return err1
 		}
@@ -160,7 +274,7 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1alpha1
 		}
 		_, err2 := cli.CallAction(ctx, *req)
 		if err2 != nil {
-			return a.error2(la, err2)
+			return a.error2(lfa, err2)
 		}
 	}
 	return nil
@@ -207,24 +321,24 @@ func (a *kbagent) selectTargetPods(spec *appsv1alpha1.Action) ([]*corev1.Pod, er
 	}
 }
 
-func (a *kbagent) error2(la lifecycleAction, err error) error {
+func (a *kbagent) error2(lfa lifecycleAction, err error) error {
 	switch {
 	case err == nil:
 		return nil
 	case errors.Is(err, service.ErrNotDefined):
-		return errors.Wrap(ErrActionNotDefined, la.name())
+		return errors.Wrap(ErrActionNotDefined, lfa.name())
 	case errors.Is(err, service.ErrNotImplemented):
-		return errors.Wrap(ErrActionNotImplemented, la.name())
+		return errors.Wrap(ErrActionNotImplemented, lfa.name())
 	case errors.Is(err, service.ErrInProgress):
-		return errors.Wrap(ErrActionInProgress, la.name())
+		return errors.Wrap(ErrActionInProgress, lfa.name())
 	case errors.Is(err, service.ErrBusy):
-		return errors.Wrap(ErrActionBusy, la.name())
+		return errors.Wrap(ErrActionBusy, lfa.name())
 	case errors.Is(err, service.ErrTimeout):
-		return errors.Wrap(ErrActionTimeout, la.name())
+		return errors.Wrap(ErrActionTimeout, lfa.name())
 	case errors.Is(err, service.ErrFailed):
-		return errors.Wrap(ErrActionFailed, la.name())
+		return errors.Wrap(ErrActionFailed, lfa.name())
 	case errors.Is(err, service.ErrInternalError):
-		return errors.Wrap(ErrActionInternalError, la.name())
+		return errors.Wrap(ErrActionInternalError, lfa.name())
 	default:
 		return err
 	}

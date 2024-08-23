@@ -12,17 +12,11 @@ KubeBlocks 支持对 Redis 集群进行垂直扩缩容和水平扩缩容。
 
 ## 垂直扩缩容
 
-你可以通过更改资源需求和限制（CPU 和存储）来垂直扩展集群。例如，如果你需要将资源类别从 1C2G 更改为 2C4G，就需要进行垂直扩容。
-
-:::note
-
-垂直扩缩容将触发 Pod 并行重启。重启后，主节点可能会发生变化。
-
-:::
+你可以通过更改资源需求和限制（CPU 和存储）来垂直扩展集群。例如，可通过垂直扩容将资源类别从 1C2G 调整为 2C4G。
 
 ### 开始之前
 
-确保集群处于 `Running` 状态，否则以下操作可能会失败。 
+确保集群处于 `Running` 状态，否则以下操作可能会失败。
 
 ```bash
 kbcli cluster list <name>
@@ -39,13 +33,9 @@ redis-cluster        default          redis                     redis-7.0.6     
 
 ### 步骤
 
-1. 更改配置，共有 3 种方式。
-
-   **选项 1.** （**推荐**）使用 kbcli
+1. 更改配置。
 
    配置参数 `--components`、`--memory` 和 `--cpu`，并执行以下命令。
-
-   ***示例***
 
    ```bash
    kbcli cluster vscale redis-cluster \
@@ -56,77 +46,10 @@ redis-cluster        default          redis                     redis-7.0.6     
    - `--components` 表示可进行垂直扩容的组件名称。
    - `--memory` 表示组件请求和限制的内存大小。
    - `--cpu` 表示组件请求和限制的CPU大小。
-  
-   **选项 2.** 创建 OpsRequest
-  
-   可根据需求修改参数，将 OpsRequest 应用于指定的集群。
-
-   ```bash
-   kubectl apply -f - <<EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: OpsRequest
-   metadata:
-     name: ops-vertical-scaling
-   spec:
-     clusterRef: redis-cluster
-     type: VerticalScaling 
-     verticalScaling:
-     - componentName: redis
-       requests:
-         memory: "2Gi"
-         cpu: "1"
-       limits:
-         memory: "4Gi"
-         cpu: "2"
-   EOF
-   ```
-  
-   **选项 3.** 修改集群的 YAML 文件
-
-   修改 YAML 文件中 `spec.components.resources` 的配置。`spec.components.resources` 控制资源需求和相关限制，更改配置将触发垂直扩容。
-
-   ***示例***
-
-   ```YAML
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: redis-cluster
-     namespace: default
-   spec:
-     clusterDefinitionRef: redis
-     clusterVersionRef: redis-7.0.6
-     componentSpecs:
-     - name: redis
-       componentDefRef: redis
-       replicas: 1
-       resources: # 修改资源值
-         requests:
-           memory: "2Gi"
-           cpu: "1"
-         limits:
-           memory: "4Gi"
-           cpu: "2"
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 1Gi
-     terminationPolicy: Delete
-   ```
 
 2. 验证垂直扩容。
 
    执行以下命令检查集群状态，验证垂直扩缩容。
-
-   ```bash
-   kbcli cluster list <name>
-   ```
-
-   ***示例***
 
    ```bash
    kbcli cluster list redis-cluster
@@ -147,6 +70,7 @@ redis-cluster        default          redis                     redis-7.0.6     
     :::
 
 3. 检查资源规格是否已变更。
+
     ```bash
     kbcli cluster describe redis-cluster
     ```
@@ -155,15 +79,11 @@ redis-cluster        default          redis                     redis-7.0.6     
 
 水平扩缩容会改变 Pod 的数量。例如，你可以应用水平扩容将 Pod 的数量从三个增加到五个。扩容过程包括数据的备份和恢复。
 
+从 v0.9.0 开始，KubeBlocks 支持指定实例水平扩缩容，可参考 [API 文档](./../../../api-docs/maintenance/scale/horizontal-scale.md)，查看详细介绍及示例。
+
 ### 开始之前
 
 确保集群处于 `Running` 状态，否则以下操作可能会失败。
-
-```bash
-kbcli cluster list <name>
-```
-
-***示例***
 
 ```bash
 kbcli cluster list redis-cluster
@@ -174,9 +94,7 @@ redis-cluster        default          redis                     redis-7.0.6     
 
 ### 步骤
 
-1. 更改配置，共有 3 种方式。
-
-   **选项 1.** (**推荐**) 使用 kbcli
+1. 更改配置。
 
    配置参数 `--components` 和 `--replicas`，并执行以下命令。
 
@@ -190,73 +108,18 @@ redis-cluster        default          redis                     redis-7.0.6     
    - `--components` 表示准备进行水平扩容的组件名称。
    - `--replicas` 表示指定组件的副本数。
 
-   **选项 2.** 创建 OpsRequest
-
-   可根据需求配置参数，将 OpsRequest 应用于指定的集群。
-
-   ```bash
-   kubectl apply -f - <<EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: OpsRequest
-   metadata:
-     name: ops-horizontal-scaling
-   spec:
-     clusterRef: redis-cluster
-     type: HorizontalScaling
-     horizontalScaling:
-     - componentName: redis
-       replicas: 2
-   EOF
-   ```
-
-   **选项 3.** 修改集群的 YAML 文件
-
-   修改 YAML 文件中 `spec.componentSpecs.replicas` 的配置。`spec.componentSpecs.replicas` 控制 Pod 的数量，更改配置将触发水平扩容。
-
-   ***示例***
-
-   ```yaml
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: redis-cluster
-     namespace: default
-   spec:
-     clusterDefinitionRef: redis
-     clusterVersionRef: redis-7.0.6
-     componentSpecs:
-     - name: redis
-       componentDefRef: redis
-       replicas: 2 # 修改 Pod 数
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-           - ReadWriteOnce
-           resources:
-             requests:
-               storage: 1Gi
-    terminationPolicy: Delete
-   ```
-
 2. 验证水平扩容。
 
    检查集群状态，确定水平扩容的情况。
 
    ```bash
-   kbcli cluster list <name>
-   ```
-
-   ***示例***
-
-   ```bash
    kbcli cluster list redis-cluster
    >
-   NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS                   CREATED-TIME
-   redis-cluster        default          redis                     redis-7.0.6              Delete                    HorizontalScaling        Apr 10,2023 16:58 UTC+0800
+   NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS          CREATED-TIME
+   redis-cluster        default          redis                     redis-7.0.6              Delete                    Updating        Apr 10,2023 16:58 UTC+0800
    ```
 
-   - STATUS=HorizontalScaling 表示正在进行水平扩容。
+   - STATUS=Updating 表示正在进行水平扩容。
    - STATUS=Running 表示水平扩容已完成。
 
 ### 处理快照异常

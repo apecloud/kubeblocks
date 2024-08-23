@@ -32,7 +32,7 @@ You can initiate a switchover for a MySQL Replication Cluster. Then KubeBlocks s
 
 You can switch over a secondary of a MySQL Replication to the primary role, and the former primary instance to a secondary one.
 
-* Initiate a switchover with a specified new leader instance.
+* Initiate a switchover with a specified new primary instance.
 
     ```bash
     kbcli cluster promote mycluster --instance='mycluster-mysql-1'

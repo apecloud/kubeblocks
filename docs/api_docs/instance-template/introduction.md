@@ -14,7 +14,7 @@ An *instance* serves as the fundamental unit in KubeBlocks, comprising a Pod alo
 
 Starting from version 0.9, we're able to establish multiple instance templates for a particular component within a cluster. These instance templates include several fields such as Name, Replicas, Annotations, Labels, Env, Tolerations, NodeSelector, etc. These fields will ultimately override the corresponding ones in the default template (originating from ClusterDefinition and ComponentDefinition) to generate the final template for rendering the instance.
 
-## Why do we the instance template
+## Why do we introduce the instance template
 
 In KubeBlocks, a *Cluster* is composed of several *Components*, where each *Component* ultimately oversees multiple *Pods* and auxiliary objects.
 

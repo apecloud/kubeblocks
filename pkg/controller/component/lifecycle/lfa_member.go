@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 )
 
@@ -36,8 +37,10 @@ const (
 )
 
 type memberJoin struct {
-	synthesizedComp *component.SynthesizedComponent
-	pod             *corev1.Pod
+	namespace   string
+	clusterName string
+	compName    string
+	pod         *corev1.Pod
 }
 
 var _ lifecycleAction = &memberJoin{}
@@ -47,19 +50,22 @@ func (a *memberJoin) name() string {
 }
 
 func (a *memberJoin) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {
-	// The container executing this action has access to following environment variables:
+	// The container executing this action has access to following variables:
 	//
 	// - KB_JOIN_MEMBER_POD_FQDN: The pod FQDN of the replica being added to the group.
 	// - KB_JOIN_MEMBER_POD_NAME: The pod name of the replica being added to the group.
+	compName := constant.GenerateClusterComponentName(a.clusterName, a.compName)
 	return map[string]string{
-		joinMemberPodFQDNVar: component.PodFQDN(a.synthesizedComp.Namespace, a.synthesizedComp.FullCompName, a.pod.Name),
+		joinMemberPodFQDNVar: component.PodFQDN(a.namespace, compName, a.pod.Name),
 		joinMemberPodNameVar: a.pod.Name,
 	}, nil
 }
 
 type memberLeave struct {
-	synthesizedComp *component.SynthesizedComponent
-	pod             *corev1.Pod
+	namespace   string
+	clusterName string
+	compName    string
+	pod         *corev1.Pod
 }
 
 var _ lifecycleAction = &memberLeave{}
@@ -69,12 +75,13 @@ func (a *memberLeave) name() string {
 }
 
 func (a *memberLeave) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {
-	// The container executing this action has access to following environment variables:
+	// The container executing this action has access to following variables:
 	//
 	// - KB_LEAVE_MEMBER_POD_FQDN: The pod name of the replica being removed from the group.
 	// - KB_LEAVE_MEMBER_POD_NAME: The pod name of the replica being removed from the group.
+	compName := constant.GenerateClusterComponentName(a.clusterName, a.compName)
 	return map[string]string{
-		leaveMemberPodFQDNVar: component.PodFQDN(a.synthesizedComp.Namespace, a.synthesizedComp.FullCompName, a.pod.Name),
+		leaveMemberPodFQDNVar: component.PodFQDN(a.namespace, compName, a.pod.Name),
 		leaveMemberPodNameVar: a.pod.Name,
 	}, nil
 }

@@ -2372,7 +2372,7 @@ var _ = Describe("Component Controller", func() {
 		})
 	})
 
-	FContext("with registry replace enabled", func() {
+	Context("with registry replace enabled", func() {
 		registry := "foo.bar"
 		setRegistryConfig := func() {
 			viper.Set(constant.CfgRegistries, intctrlutil.RegistriesConfig{

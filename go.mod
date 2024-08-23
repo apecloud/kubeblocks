@@ -13,6 +13,7 @@ require (
 	github.com/bhmj/jsonslice v1.1.2
 	github.com/clbanning/mxj/v2 v2.5.7
 	github.com/containers/common v0.55.4
+	github.com/distribution/reference v0.6.0
 	github.com/docker/docker v25.0.6+incompatible
 	github.com/evanphx/json-patch v5.6.0+incompatible
 	github.com/fasthttp/router v1.4.20
@@ -102,7 +103,6 @@ require (
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.4 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/distribution/reference v0.6.0 // indirect
 	github.com/docker/cli v25.0.1+incompatible // indirect
 	github.com/docker/distribution v2.8.3+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.8.0 // indirect

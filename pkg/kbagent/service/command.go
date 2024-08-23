@@ -173,6 +173,7 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 		var wg sync.WaitGroup
 		wg.Add(3)
 
+		var ioCopyError error
 		go func() {
 			defer wg.Done()
 			if stdinReader != nil {
@@ -182,7 +183,7 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 					if errors.Is(copyErr, os.ErrClosed) {
 						return
 					}
-					errChan <- errors.Wrapf(ErrFailed, "failed to copy from input reader to stdin: %v", copyErr)
+					ioCopyError = errors.Wrapf(ErrFailed, "failed to copy from input reader to stdin: %v", copyErr)
 				}
 			}
 		}()
@@ -194,7 +195,7 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 					if errors.Is(copyErr, os.ErrClosed) {
 						return
 					}
-					errChan <- errors.Wrapf(ErrFailed, "failed to copy stdout to output writer: %v", copyErr)
+					ioCopyError = errors.Wrapf(ErrFailed, "failed to copy stdout to output writer: %v", copyErr)
 				}
 			}
 		}()
@@ -206,20 +207,27 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 					if errors.Is(copyErr, os.ErrClosed) {
 						return
 					}
-					errChan <- errors.Wrapf(ErrFailed, "failed to copy stderr to error writer: %v", copyErr)
+					ioCopyError = errors.Wrapf(ErrFailed, "failed to copy stderr to error writer: %v", copyErr)
 				}
 			}
 		}()
 
-		wg.Wait()
-
+		// wait for the command to finish and the pipes to be closed
 		execErr := cmd.Wait()
 		if execErr != nil {
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 				execErr = ErrTimeout
 			}
 		}
-		errChan <- execErr
+
+		// and then wait for the io copy goroutines to finish
+		wg.Wait()
+
+		if execErr != nil {
+			errChan <- execErr
+		} else {
+			errChan <- ioCopyError
+		}
 	}()
 	return errChan, nil
 }

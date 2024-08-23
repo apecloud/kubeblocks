@@ -114,7 +114,7 @@ var _ = Describe("command", func() {
 
 		It("timeout", func() {
 			action := &proto.ExecAction{
-				Commands: []string{"/bin/bash", "-c", "sleep 3"},
+				Commands: []string{"/bin/bash", "-c", "sleep 60"},
 			}
 			timeout := int32(1)
 			execErrorChan, err := runCommandX(ctx, action, nil, &timeout, nil, nil, nil)
@@ -123,6 +123,36 @@ var _ = Describe("command", func() {
 			err = waitError(execErrorChan)
 			Expect(err).ShouldNot(BeNil())
 			Expect(errors.Is(err, ErrTimeout)).Should(BeTrue())
+		})
+
+		It("timeout and stdout", func() {
+			action := &proto.ExecAction{
+				Commands: []string{"/bin/bash", "-c", "sleep 60 && echo -n timeout"},
+			}
+			stdoutBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
+			timeout := int32(1)
+			execErrorChan, err := runCommandX(ctx, action, nil, &timeout, nil, stdoutBuf, nil)
+			Expect(err).Should(BeNil())
+
+			err = waitError(execErrorChan)
+			Expect(err).ShouldNot(BeNil())
+			Expect(errors.Is(err, ErrTimeout)).Should(BeTrue())
+			Expect(stdoutBuf.String()).Should(HaveLen(0))
+		})
+
+		It("stdout and timeout", func() {
+			action := &proto.ExecAction{
+				Commands: []string{"/bin/bash", "-c", "echo -n timeout && sleep 60"},
+			}
+			stdoutBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
+			timeout := int32(1)
+			execErrorChan, err := runCommandX(ctx, action, nil, &timeout, nil, stdoutBuf, nil)
+			Expect(err).Should(BeNil())
+
+			err = waitError(execErrorChan)
+			Expect(err).ShouldNot(BeNil())
+			Expect(errors.Is(err, ErrTimeout)).Should(BeTrue())
+			Expect(stdoutBuf.String()).Should(Equal("timeout"))
 		})
 
 		It("fail", func() {
@@ -201,7 +231,7 @@ var _ = Describe("command", func() {
 
 		It("timeout", func() {
 			action := &proto.ExecAction{
-				Commands: []string{"/bin/bash", "-c", "sleep 3"},
+				Commands: []string{"/bin/bash", "-c", "sleep 60"},
 			}
 			timeout := int32(1)
 			stdoutChan, stderrChan, errChan, err := runCommandNonBlocking(ctx, action, nil, &timeout)
@@ -250,7 +280,7 @@ var _ = Describe("command", func() {
 
 		It("timeout", func() {
 			action := &proto.ExecAction{
-				Commands: []string{"/bin/bash", "-c", "sleep 3"},
+				Commands: []string{"/bin/bash", "-c", "sleep 60"},
 			}
 			timeout := int32(1)
 			output, err := runCommand(ctx, action, nil, &timeout)

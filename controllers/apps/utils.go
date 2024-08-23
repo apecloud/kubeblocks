@@ -22,13 +22,14 @@ package apps
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // default reconcile requeue after duration
@@ -83,4 +84,68 @@ func clientOption(v *model.ObjectVertex) *multicluster.ClientOption {
 		panic(fmt.Sprintf("unknown client option: %T", v.ClientOpt))
 	}
 	return multicluster.InControlContext()
+}
+
+func resolveServiceDefaultFields(obj, objCopy *corev1.ServiceSpec) {
+	var exist *corev1.ServicePort
+	for i, port := range objCopy.Ports {
+		for _, oldPort := range obj.Ports {
+			// assume that port.Name is user specified, if which is not changed, we need to keep the old NodePort and TargetPort if they are not set
+			if port.Name != "" && port.Name == oldPort.Name {
+				exist = &oldPort
+				break
+			}
+		}
+		if exist == nil {
+			continue
+		}
+		// if the service type is NodePort or LoadBalancer, and the nodeport is not set, we should use the nodeport of the exist service
+		if shouldAllocateNodePorts(objCopy) && port.NodePort == 0 && exist.NodePort != 0 {
+			objCopy.Ports[i].NodePort = exist.NodePort
+			port.NodePort = exist.NodePort
+		}
+		if port.TargetPort.IntVal == 0 && port.TargetPort.StrVal == "" {
+			port.TargetPort = exist.TargetPort
+		}
+		if reflect.DeepEqual(port, *exist) {
+			objCopy.Ports[i].TargetPort = exist.TargetPort
+		}
+	}
+	if len(objCopy.ClusterIP) == 0 {
+		objCopy.ClusterIP = obj.ClusterIP
+	}
+	if len(objCopy.ClusterIPs) == 0 {
+		objCopy.ClusterIPs = obj.ClusterIPs
+	}
+	if len(objCopy.Type) == 0 {
+		objCopy.Type = obj.Type
+	}
+	if len(objCopy.SessionAffinity) == 0 {
+		objCopy.SessionAffinity = obj.SessionAffinity
+	}
+	if len(objCopy.IPFamilies) == 0 || (len(objCopy.IPFamilies) == 1 && *objCopy.IPFamilyPolicy != corev1.IPFamilyPolicySingleStack) {
+		objCopy.IPFamilies = obj.IPFamilies
+	}
+	if objCopy.IPFamilyPolicy == nil {
+		objCopy.IPFamilyPolicy = obj.IPFamilyPolicy
+	}
+	if objCopy.InternalTrafficPolicy == nil {
+		objCopy.InternalTrafficPolicy = obj.InternalTrafficPolicy
+	}
+	if objCopy.ExternalTrafficPolicy == "" && obj.ExternalTrafficPolicy != "" {
+		objCopy.ExternalTrafficPolicy = obj.ExternalTrafficPolicy
+	}
+}
+
+func shouldAllocateNodePorts(svc *corev1.ServiceSpec) bool {
+	if svc.Type == corev1.ServiceTypeNodePort {
+		return true
+	}
+	if svc.Type == corev1.ServiceTypeLoadBalancer {
+		if svc.AllocateLoadBalancerNodePorts != nil {
+			return *svc.AllocateLoadBalancerNodePorts
+		}
+		return true
+	}
+	return false
 }

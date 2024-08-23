@@ -22,6 +22,7 @@ package apps
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -84,7 +85,7 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 			return err
 		}
 		for _, svc := range services {
-			if err = t.createService(ctx, dag, graphCli, &service, svc); err != nil {
+			if err = t.createOrUpdateService(ctx, dag, graphCli, &service, svc); err != nil {
 				return err
 			}
 			delete(runningServices, svc.Name)
@@ -253,7 +254,7 @@ func (t *componentServiceTransformer) skipDefaultHeadlessSvc(synthesizeComp *com
 	return svcName == defaultHeadlessSvcName
 }
 
-func (t *componentServiceTransformer) createService(ctx graph.TransformContext, dag *graph.DAG,
+func (t *componentServiceTransformer) createOrUpdateService(ctx graph.TransformContext, dag *graph.DAG,
 	graphCli model.GraphClient, compService *appsv1alpha1.ComponentService, service *corev1.Service) error {
 	var (
 		kind       string
@@ -269,7 +270,7 @@ func (t *componentServiceTransformer) createService(ctx graph.TransformContext, 
 	}
 
 	if podService && kind == multiClusterServicePlacementInUnique {
-		// create service in unique, by hacking the pod placement strategy.
+		// create or update service in unique, by hacking the pod placement strategy.
 		ordinal := func() int {
 			subs := strings.Split(service.GetName(), "-")
 			o, _ := strconv.Atoi(subs[len(subs)-1])
@@ -278,7 +279,7 @@ func (t *componentServiceTransformer) createService(ctx graph.TransformContext, 
 		multicluster.Assign(ctx.GetContext(), service, ordinal)
 	}
 
-	createServiceOnce := func(service *corev1.Service) error {
+	createOrUpdateService := func(service *corev1.Service) error {
 		key := types.NamespacedName{
 			Namespace: service.Namespace,
 			Name:      service.Name,
@@ -291,11 +292,42 @@ func (t *componentServiceTransformer) createService(ctx graph.TransformContext, 
 			}
 			return err
 		}
-		// do not update component service if exists due to this field is immutable.
+		objCopy := obj.DeepCopy()
+		objCopy.Spec = service.Spec
+
+		// if skip immutable check, update the service directly
+		if skipImmutableCheckForComponentService(obj) {
+			resolveServiceDefaultFields(&obj.Spec, &objCopy.Spec)
+			if !reflect.DeepEqual(obj, objCopy) {
+				graphCli.Update(dag, obj, objCopy, inDataContext4G())
+			}
+			return nil
+		}
+		// otherwise only support to update the params associated with appsv1alpha1.ClusterComponentService and futher change
+		overrideMutableParams := func(obj, objCopy *corev1.Service) {
+			objCopy.Spec.Type = obj.Spec.Type
+			objCopy.Name = obj.Name
+			objCopy.Spec.Selector = obj.Spec.Selector
+			objCopy.Annotations = obj.Annotations
+		}
+		overrideMutableParams(obj, objCopy)
+		if reflect.DeepEqual(obj, objCopy) {
+			overrideMutableParams(service, objCopy)
+			if !reflect.DeepEqual(obj, objCopy) {
+				graphCli.Update(dag, obj, objCopy, inDataContext4G())
+			}
+		}
 		return nil
 	}
+	return createOrUpdateService(service)
+}
 
-	return createServiceOnce(service)
+func skipImmutableCheckForComponentService(svc *corev1.Service) bool {
+	if svc.Annotations == nil {
+		return false
+	}
+	skip, ok := svc.Annotations[constant.SkipImmutableCheckAnnotationKey]
+	return ok && strings.ToLower(skip) == "true"
 }
 
 func generatePodNames(synthesizeComp *component.SynthesizedComponent) ([]string, error) {

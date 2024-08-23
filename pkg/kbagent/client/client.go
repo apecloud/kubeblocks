@@ -67,8 +67,8 @@ func NewClient(pod corev1.Pod, actionName string) (Client, error) {
 		return mockClient, mockClientError
 	}
 
-	portName := fmt.Sprintf("%s-%s", actionName, kbAgentContainerName)
-	containerPortName := fmt.Sprintf("%s-%s-%s", actionName, kbAgentContainerName, kbAgentPortName)
+	portName := fmt.Sprintf("%s-%s", kbAgentContainerName, actionName)
+	containerPortName := fmt.Sprintf("%s-%s-%s", kbAgentContainerName, actionName, kbAgentPortName)
 
 	port, err := intctrlutil.GetPortByName(pod, portName, containerPortName)
 	if err != nil {

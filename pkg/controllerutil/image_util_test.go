@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = FDescribe("image util test", func() {
+var _ = Describe("image util test", func() {
 	imageList := [][]string{
 		[]string{"busybox", "docker.io", "library", "busybox", ""},
 		[]string{"apecloud/busybox:1.28", "docker.io", "apecloud", "busybox", ":1.28"},
@@ -19,7 +19,7 @@ var _ = FDescribe("image util test", func() {
 
 	AfterEach(func() {
 		// reset config
-		registriesConf = registriesConfig{}
+		registriesConfig = RegistriesConfig{}
 	})
 
 	It("parses image", func() {
@@ -32,27 +32,38 @@ var _ = FDescribe("image util test", func() {
 			Expect(repository).To(Equal(image[3]))
 			Expect(remainder).To(Equal(image[4]))
 		}
+
+		_, _, _, _, err := parseImageName("/invalid")
+		Expect(err).To(HaveOccurred())
 	})
 
 	It("only expands image when config does not exist", func() {
 		for _, image := range imageList {
 			newImage, err := ReplaceImageRegistry(image[0])
 			Expect(err).NotTo(HaveOccurred())
-			Expect(newImage).To(Equal(fmt.Sprintf("%v/%v/%v%v", image[1], image[2], image[3], image[4])))
+			if image[2] == "" {
+				Expect(newImage).To(Equal(fmt.Sprintf("%v/%v%v", image[1], image[3], image[4])))
+			} else {
+				Expect(newImage).To(Equal(fmt.Sprintf("%v/%v/%v%v", image[1], image[2], image[3], image[4])))
+			}
 		}
 	})
 
 	It("replaces image when default config exists", func() {
-		registriesConf = registriesConfig{
+		registriesConfig = RegistriesConfig{
 			DefaultRegistry: "foo.bar",
 		}
 		for _, image := range imageList {
 			newImage, err := ReplaceImageRegistry(image[0])
 			Expect(err).NotTo(HaveOccurred())
-			Expect(newImage).To(Equal(fmt.Sprintf("%v/%v/%v%v", "foo.bar", image[2], image[3], image[4])))
+			if image[2] == "" {
+				Expect(newImage).To(Equal(fmt.Sprintf("%v/%v%v", "foo.bar", image[3], image[4])))
+			} else {
+				Expect(newImage).To(Equal(fmt.Sprintf("%v/%v/%v%v", "foo.bar", image[2], image[3], image[4])))
+			}
 		}
 
-		registriesConf = registriesConfig{
+		registriesConfig = RegistriesConfig{
 			DefaultRegistry:  "foo.bar",
 			DefaultNamespace: "test",
 		}
@@ -60,6 +71,38 @@ var _ = FDescribe("image util test", func() {
 			newImage, err := ReplaceImageRegistry(image[0])
 			Expect(err).NotTo(HaveOccurred())
 			Expect(newImage).To(Equal(fmt.Sprintf("%v/%v/%v%v", "foo.bar", "test", image[3], image[4])))
+		}
+	})
+
+	It("replaces image when single registry config exists", func() {
+		registriesConfig = RegistriesConfig{
+			DefaultRegistry: "foo.bar",
+			Registries: []RegistryConfig{
+				{
+					From: "docker.io",
+					To:   "bar.io",
+					Namespaces: []RegistryNamespaceConfig{
+						{From: "library", To: "foo"},
+					},
+				},
+				{
+					From: "foo.io",
+					Namespaces: []RegistryNamespaceConfig{
+						{From: "a/b", To: "foo"},
+					},
+				},
+			},
+		}
+		expectedImage := []string{
+			"bar.io/foo/busybox",
+			"bar.io/apecloud/busybox:1.28",
+			"foo.bar/foo/busybox",
+			"foo.bar/pause:latest@sha256:1ff6c18fbef2045af6b9c16bf034cc421a29027b800e4f9b68ae9b1cb3e9ae07",
+		}
+		for i, image := range imageList {
+			newImage, err := ReplaceImageRegistry(image[0])
+			Expect(err).NotTo(HaveOccurred())
+			Expect(newImage).To(Equal(expectedImage[i]))
 		}
 	})
 })

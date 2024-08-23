@@ -24,30 +24,36 @@ import (
 // not present, Docker uses `library` as the default namespace.
 //
 // So if there are more than two components, specify them both, or they won't be matched.
-type registryNamespaceConfig struct {
+type RegistryNamespaceConfig struct {
 	From string
 	To   string
 }
 
-type registryConfig struct {
+type RegistryConfig struct {
 	From       string
 	To         string
-	Namespaces []registryNamespaceConfig
+	Namespaces []RegistryNamespaceConfig
 }
 
-type registriesConfig struct {
+type RegistriesConfig struct {
 	DefaultRegistry  string
 	DefaultNamespace string
-	Registries       []registryConfig
+	Registries       []RegistryConfig
 }
 
-var registriesConf = registriesConfig{}
+var registriesConfig = RegistriesConfig{}
 
 func init() {
-	viper.UnmarshalKey(constant.CfgRegistries, &registriesConf)
+	ReloadRegistryConfig()
+}
+
+// TODO: this is needed in componnet controller test, is there a better way?
+func ReloadRegistryConfig() {
+	registriesConfig = RegistriesConfig{}
+	viper.UnmarshalKey(constant.CfgRegistries, &registriesConfig)
 
 	// TODO: validate
-	for _, registry := range registriesConf.Registries {
+	for _, registry := range registriesConfig.Registries {
 		if len(registry.From) == 0 {
 			panic("from can't be empty")
 		}
@@ -101,23 +107,23 @@ func ReplaceImageRegistry(image string) (string, error) {
 	}
 
 	chooseRegistry := func() string {
-		if registriesConf.DefaultRegistry != "" {
-			return registriesConf.DefaultRegistry
+		if registriesConfig.DefaultRegistry != "" {
+			return registriesConfig.DefaultRegistry
 		} else {
 			return registry
 		}
 	}
 
 	chooseNamespace := func() string {
-		if registriesConf.DefaultNamespace != "" {
-			return registriesConf.DefaultNamespace
+		if registriesConfig.DefaultNamespace != "" {
+			return registriesConfig.DefaultNamespace
 		} else {
 			return namespace
 		}
 	}
 
 	var dstRegistry, dstNamespace string
-	for _, registryMapping := range registriesConf.Registries {
+	for _, registryMapping := range registriesConfig.Registries {
 		if registryMapping.From == registry {
 			if len(registryMapping.To) != 0 {
 				dstRegistry = registryMapping.To
@@ -146,5 +152,8 @@ func ReplaceImageRegistry(image string) (string, error) {
 		dstNamespace = chooseNamespace()
 	}
 
+	if dstNamespace == "" {
+		return fmt.Sprintf("%v/%v%v", dstRegistry, repository, remainder), nil
+	}
 	return fmt.Sprintf("%v/%v/%v%v", dstRegistry, dstNamespace, repository, remainder), nil
 }

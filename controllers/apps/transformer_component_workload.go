@@ -145,8 +145,15 @@ func (t *componentWorkloadTransformer) reconcileWorkload(synthesizedComp *compon
 		protoITS.Spec.Template.Labels = intctrlutil.MergeMetadataMaps(runningITS.Spec.Template.Labels, synthesizedComp.UserDefinedLabels)
 	}
 
-	if runningITS == nil {
-		//
+	// if runningITS already exists, the image changes in protoITS will be
+	// rollback to the original image in `checkNRollbackProtoImages`.
+	// So changing registry configs won't affect existing clusters.
+	for i, container := range protoITS.Spec.Template.Spec.Containers {
+		newImage, err := intctrlutil.ReplaceImageRegistry(container.Image)
+		if err != nil {
+			return err
+		}
+		protoITS.Spec.Template.Spec.Containers[i].Image = newImage
 	}
 
 	buildInstanceSetPlacementAnnotation(comp, protoITS)

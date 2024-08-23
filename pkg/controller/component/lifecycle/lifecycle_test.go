@@ -23,19 +23,67 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"github.com/golang/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/service"
 )
+
+type mockReader struct {
+	cli  client.Reader
+	objs []client.Object
+}
+
+func (r *mockReader) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	for _, o := range r.objs {
+		// ignore the GVK check
+		if client.ObjectKeyFromObject(o) == key {
+			reflect.ValueOf(obj).Elem().Set(reflect.ValueOf(o).Elem())
+			return nil
+		}
+	}
+	return r.cli.Get(ctx, key, obj, opts...)
+}
+
+func (r *mockReader) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+	items := reflect.ValueOf(list).Elem().FieldByName("Items")
+	if !items.IsValid() {
+		return fmt.Errorf("ObjectList has no Items field: %s", list.GetObjectKind().GroupVersionKind().String())
+	}
+	objects := reflect.MakeSlice(items.Type(), 0, 0)
+
+	listOpts := &client.ListOptions{}
+	for _, opt := range opts {
+		opt.ApplyToList(listOpts)
+	}
+	for i, o := range r.objs {
+		// ignore the GVK check
+		if listOpts.LabelSelector != nil {
+			if listOpts.LabelSelector.Matches(labels.Set(o.GetLabels())) {
+				objects = reflect.Append(objects, reflect.ValueOf(r.objs[i]).Elem())
+			}
+		}
+	}
+	if objects.Len() != 0 {
+		items.Set(objects)
+		return nil
+	}
+	return r.cli.List(ctx, list, opts...)
+}
 
 var mockKBAgentClient = func(mock func(*kbacli.MockClientMockRecorder)) {
 	cli := kbacli.NewMockClient(gomock.NewController(GinkgoT()))
@@ -63,6 +111,9 @@ var _ = Describe("lifecycle", func() {
 		cleanEnv()
 
 		synthesizedComp = &component.SynthesizedComponent{
+			Namespace:   "default",
+			ClusterName: "test-cluster",
+			Name:        "kbagent",
 			PodSpec: &corev1.PodSpec{
 				Containers: []corev1.Container{
 					{
@@ -73,7 +124,7 @@ var _ = Describe("lifecycle", func() {
 			LifecycleActions: &appsv1alpha1.ComponentLifecycleActions{
 				PostProvision: &appsv1alpha1.Action{
 					Exec: &appsv1alpha1.ExecAction{
-						Command: []string{"echo", "post-provision"},
+						Command: []string{"/bin/bash", "-c", "echo -n post-provision"},
 					},
 					TimeoutSeconds: 5,
 					RetryPolicy: &appsv1alpha1.RetryPolicy{
@@ -84,7 +135,7 @@ var _ = Describe("lifecycle", func() {
 				RoleProbe: &appsv1alpha1.Probe{
 					Action: appsv1alpha1.Action{
 						Exec: &appsv1alpha1.ExecAction{
-							Command: []string{"echo", "role-probe"},
+							Command: []string{"/bin/bash", "-c", "echo -n role-probe"},
 						},
 						TimeoutSeconds: 5,
 					},
@@ -182,6 +233,21 @@ var _ = Describe("lifecycle", func() {
 			Expect(err).Should(BeNil())
 		})
 
+		It("succeed", func() {
+			lifecycle, err := New(synthesizedComp, nil, pods...)
+			Expect(err).Should(BeNil())
+			Expect(lifecycle).ShouldNot(BeNil())
+
+			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.CallAction(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+					return proto.ActionResponse{}, nil
+				}).AnyTimes()
+			})
+
+			err = lifecycle.PostProvision(ctx, k8sClient, nil)
+			Expect(err).Should(BeNil())
+		})
+
 		It("succeed and stdout", func() {
 			lifecycle, err := New(synthesizedComp, nil, pods...)
 			Expect(err).Should(BeNil())
@@ -190,14 +256,14 @@ var _ = Describe("lifecycle", func() {
 			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
 				recorder.CallAction(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
 					return proto.ActionResponse{
-						Output: []byte("post-provision"),
+						Output: []byte("role-probe"),
 					}, nil
 				}).AnyTimes()
 			})
 
-			err = lifecycle.PostProvision(ctx, k8sClient, nil)
-			Expect(err).Should(BeNil())
-			// TODO: rsp
+			output, err1 := lifecycle.RoleProbe(ctx, k8sClient, nil)
+			Expect(err1).Should(BeNil())
+			Expect(output).Should(Equal([]byte("role-probe")))
 		})
 
 		It("fail - error code", func() {
@@ -249,27 +315,288 @@ var _ = Describe("lifecycle", func() {
 			}
 		})
 
-		It("fail - stdout & stderr", func() {
+		It("fail - error msg", func() {
+			// TODO: pass error message from kb-agent
 		})
 
 		It("parameters", func() {
+			lifecycle, err := New(synthesizedComp, nil, pods...)
+			Expect(err).Should(BeNil())
+			Expect(lifecycle).ShouldNot(BeNil())
+
+			reader := &mockReader{
+				cli: k8sClient,
+				objs: []client.Object{
+					&appsv1alpha1.Component{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: synthesizedComp.Namespace,
+							Name:      constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name),
+							Labels: map[string]string{
+								constant.AppInstanceLabelKey: synthesizedComp.ClusterName,
+							},
+						},
+					},
+					&appsv1alpha1.Component{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: synthesizedComp.Namespace,
+							Name:      constant.GenerateClusterComponentName(synthesizedComp.ClusterName, "another"),
+							Labels: map[string]string{
+								constant.AppInstanceLabelKey: synthesizedComp.ClusterName,
+							},
+						},
+					},
+				},
+			}
+
+			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.CallAction(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+					Expect(req.Action).Should(Equal("postProvision"))
+					Expect(req.Parameters).ShouldNot(BeNil()) // legacy parameters for post-provision action
+					Expect(req.Parameters[hackedAllCompList]).Should(Equal(strings.Join([]string{synthesizedComp.Name, "another"}, ",")))
+					return proto.ActionResponse{}, nil
+				}).AnyTimes()
+			})
+
+			err = lifecycle.PostProvision(ctx, reader, nil)
+			Expect(err).Should(BeNil())
 		})
 
 		It("template vars", func() {
+			key := "TEMPLATE_VAR1"
+			val := "template-vars1"
+			synthesizedComp.TemplateVars = map[string]any{key: val}
+
+			lifecycle, err := New(synthesizedComp, nil, pods...)
+			Expect(err).Should(BeNil())
+			Expect(lifecycle).ShouldNot(BeNil())
+
+			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.CallAction(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+					Expect(req.Action).Should(Equal("roleProbe"))
+					Expect(req.Parameters).ShouldNot(BeNil())
+					Expect(req.Parameters[key]).Should(Equal(val))
+					return proto.ActionResponse{
+						Output: []byte(req.Parameters[key]),
+					}, nil
+				}).AnyTimes()
+			})
+
+			output, err1 := lifecycle.RoleProbe(ctx, k8sClient, nil)
+			Expect(err1).Should(BeNil())
+			Expect(output).Should(Equal([]byte(val)))
 		})
 
 		It("precondition", func() {
+			clusterReady := appsv1alpha1.ClusterReadyPreConditionType
+			synthesizedComp.LifecycleActions.PostProvision.PreCondition = &clusterReady
+
+			lifecycle, err := New(synthesizedComp, nil, pods...)
+			Expect(err).Should(BeNil())
+			Expect(lifecycle).ShouldNot(BeNil())
+
+			reader := &mockReader{
+				cli: k8sClient,
+				objs: []client.Object{
+					&appsv1alpha1.Cluster{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: synthesizedComp.Namespace,
+							Name:      synthesizedComp.ClusterName,
+						},
+						Status: appsv1alpha1.ClusterStatus{
+							Phase: appsv1alpha1.RunningClusterPhase,
+						},
+					},
+				},
+			}
+
+			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.CallAction(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+					return proto.ActionResponse{}, nil
+				}).AnyTimes()
+			})
+
+			err = lifecycle.PostProvision(ctx, reader, nil)
+			Expect(err).Should(BeNil())
 		})
 
-		It("pod selector", func() {
+		It("precondition - fail", func() {
+			clusterReady := appsv1alpha1.ClusterReadyPreConditionType
+			synthesizedComp.LifecycleActions.PostProvision.PreCondition = &clusterReady
+
+			lifecycle, err := New(synthesizedComp, nil, pods...)
+			Expect(err).Should(BeNil())
+			Expect(lifecycle).ShouldNot(BeNil())
+
+			reader := &mockReader{
+				cli: k8sClient,
+				objs: []client.Object{
+					&appsv1alpha1.Cluster{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: synthesizedComp.Namespace,
+							Name:      synthesizedComp.ClusterName,
+						},
+						Status: appsv1alpha1.ClusterStatus{
+							Phase: appsv1alpha1.FailedClusterPhase,
+						},
+					},
+				},
+			}
+
+			err = lifecycle.PostProvision(ctx, reader, nil)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring("precondition check error"))
+		})
+
+		It("pod selector - any", func() {
+			synthesizedComp.LifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1alpha1.AnyReplica
+			pods = []*corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: synthesizedComp.Namespace,
+						Name:      "pod-0",
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name: "kbagent",
+								Ports: []corev1.ContainerPort{
+									{
+										Name: "http",
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: synthesizedComp.Namespace,
+						Name:      "pod-1",
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name: "kbagent",
+								Ports: []corev1.ContainerPort{
+									{
+										Name: "http",
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			lifecycle, err := New(synthesizedComp, nil, pods...)
+			Expect(err).Should(BeNil())
+			Expect(lifecycle).ShouldNot(BeNil())
+
+			err = lifecycle.PostProvision(ctx, k8sClient, nil)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(Or(ContainSubstring("pod pod-0 has no ip"), ContainSubstring("pod pod-1 has no ip")))
+		})
+
+		It("pod selector - all", func() {
+			// TODO: impl
+		})
+
+		It("pod selector - role", func() {
+			synthesizedComp.LifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1alpha1.RoleSelector
+			synthesizedComp.LifecycleActions.PostProvision.Exec.MatchingKey = "leader"
+			pods = []*corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: synthesizedComp.Namespace,
+						Name:      "pod-0",
+						Labels: map[string]string{
+							constant.RoleLabelKey: "follower",
+						},
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name: "kbagent",
+								Ports: []corev1.ContainerPort{
+									{
+										Name: "http",
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: synthesizedComp.Namespace,
+						Name:      "pod-1",
+						Labels: map[string]string{
+							constant.RoleLabelKey: "leader",
+						},
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name: "kbagent",
+								Ports: []corev1.ContainerPort{
+									{
+										Name: "http",
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			lifecycle, err := New(synthesizedComp, nil, pods...)
+			Expect(err).Should(BeNil())
+			Expect(lifecycle).ShouldNot(BeNil())
+
+			err = lifecycle.PostProvision(ctx, k8sClient, nil)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring("pod pod-1 has no ip"))
+		})
+
+		It("pod selector - has no matched", func() {
+			synthesizedComp.LifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1alpha1.RoleSelector
+			synthesizedComp.LifecycleActions.PostProvision.Exec.MatchingKey = "leader"
+			pods = []*corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: synthesizedComp.Namespace,
+						Name:      "pod-0",
+						Labels: map[string]string{
+							constant.RoleLabelKey: "follower",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: synthesizedComp.Namespace,
+						Name:      "pod-1",
+						Labels: map[string]string{
+							constant.RoleLabelKey: "follower",
+						},
+					},
+				},
+			}
+
+			lifecycle, err := New(synthesizedComp, nil, pods...)
+			Expect(err).Should(BeNil())
+			Expect(lifecycle).ShouldNot(BeNil())
+
+			err = lifecycle.PostProvision(ctx, k8sClient, nil)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring("no available pod to call action"))
 		})
 
 		It("non-blocking", func() {
+			// TODO: impl
 		})
 
 		It("timeout", func() {
+			// TODO: impl
 		})
-
-		// TODO: back-off to other pods
 	})
 })

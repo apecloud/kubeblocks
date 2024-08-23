@@ -31,6 +31,10 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
+const (
+	hackedAllCompList = "KB_CLUSTER_COMPONENT_LIST" // declare it here for test
+)
+
 type postProvision struct {
 	namespace   string
 	clusterName string
@@ -106,7 +110,7 @@ func hackParameters4Comp(ctx context.Context, cli client.Reader, namespace, clus
 		compPodIPList          = "KB_CLUSTER_COMPONENT_POD_IP_LIST"
 		compPodHostNameList    = "KB_CLUSTER_COMPONENT_POD_HOST_NAME_LIST"
 		compPodHostIPList      = "KB_CLUSTER_COMPONENT_POD_HOST_IP_LIST"
-		allCompList            = "KB_CLUSTER_COMPONENT_LIST"
+		allCompList            = hackedAllCompList
 		deletingCompList       = "KB_CLUSTER_COMPONENT_DELETING_LIST"
 		undeletedCompList      = "KB_CLUSTER_COMPONENT_UNDELETED_LIST"
 		scalingInComp          = "KB_CLUSTER_COMPONENT_IS_SCALING_IN"

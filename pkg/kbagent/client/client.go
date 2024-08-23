@@ -67,13 +67,16 @@ func NewClient(pod corev1.Pod, actionName string) (Client, error) {
 		return mockClient, mockClientError
 	}
 
-	portName := fmt.Sprintf("%s-%s", kbAgentContainerName, actionName)
+	containerName := fmt.Sprintf("%s-%s", kbAgentContainerName, actionName)
 	containerPortName := fmt.Sprintf("%s-%s-%s", kbAgentContainerName, actionName, kbAgentPortName)
 
-	port, err := intctrlutil.GetPortByName(pod, portName, containerPortName)
+	port, err := intctrlutil.GetPortByName(pod, containerName, containerPortName)
 	if err != nil {
+		port, err = intctrlutil.GetPortByName(pod, kbAgentContainerName, fmt.Sprintf("%s-%s", kbAgentContainerName, kbAgentPortName))
 		// has no kb-agent defined
-		return nil, nil
+		if err != nil {
+			return nil, nil
+		}
 	}
 
 	ip := pod.Status.PodIP

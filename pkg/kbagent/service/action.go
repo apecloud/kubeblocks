@@ -26,10 +26,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/maps"
+
+	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
 const (
@@ -39,10 +40,10 @@ const (
 
 func newActionService(logger logr.Logger, actions []proto.Action) (*actionService, error) {
 	sa := &actionService{
-		logger:            logger,
-		actions:           make(map[string]*proto.Action),
-		runningActions:    map[string]*runningAction{},
-		runningActionLock: sync.Mutex{},
+		logger:         logger,
+		actions:        make(map[string]*proto.Action),
+		mutex:          sync.Mutex{},
+		runningActions: map[string]*runningAction{},
 	}
 	for i, action := range actions {
 		sa.actions[action.Name] = &actions[i]
@@ -52,10 +53,11 @@ func newActionService(logger logr.Logger, actions []proto.Action) (*actionServic
 }
 
 type actionService struct {
-	logger            logr.Logger
-	actions           map[string]*proto.Action
-	runningActions    map[string]*runningAction
-	runningActionLock sync.Mutex
+	logger  logr.Logger
+	actions map[string]*proto.Action
+
+	mutex          sync.Mutex
+	runningActions map[string]*runningAction
 }
 
 type runningAction struct {
@@ -110,8 +112,9 @@ func (s *actionService) handleExecAction(ctx context.Context, req *proto.ActionR
 }
 
 func (s *actionService) handleExecActionNonBlocking(ctx context.Context, req *proto.ActionRequest, action *proto.Action) ([]byte, error) {
-	s.runningActionLock.Lock()
-	defer s.runningActionLock.Unlock()
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
 	running, ok := s.runningActions[req.Action]
 	if !ok {
 		stdoutChan, stderrChan, errChan, err := runCommandNonBlocking(ctx, action.Exec, req.Parameters, req.TimeoutSeconds)

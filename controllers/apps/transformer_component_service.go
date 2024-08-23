@@ -85,7 +85,7 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 			return err
 		}
 		for _, svc := range services {
-			if err = t.createOrUpdateService(ctx, dag, graphCli, &service, svc); err != nil {
+			if err = t.createOrUpdateService(ctx, dag, graphCli, &service, svc, transCtx.ComponentOrig); err != nil {
 				return err
 			}
 			delete(runningServices, svc.Name)
@@ -255,7 +255,7 @@ func (t *componentServiceTransformer) skipDefaultHeadlessSvc(synthesizeComp *com
 }
 
 func (t *componentServiceTransformer) createOrUpdateService(ctx graph.TransformContext, dag *graph.DAG,
-	graphCli model.GraphClient, compService *appsv1alpha1.ComponentService, service *corev1.Service) error {
+	graphCli model.GraphClient, compService *appsv1alpha1.ComponentService, service *corev1.Service, owner client.Object) error {
 	var (
 		kind       string
 		podService = t.isPodService(compService)
@@ -292,6 +292,12 @@ func (t *componentServiceTransformer) createOrUpdateService(ctx graph.TransformC
 			}
 			return err
 		}
+
+		// don't update service not owned by the owner, to keep compatible with existed cluster
+		if !model.IsOwnerOf(owner, obj) {
+			return nil
+		}
+
 		objCopy := obj.DeepCopy()
 		objCopy.Spec = service.Spec
 
@@ -303,7 +309,7 @@ func (t *componentServiceTransformer) createOrUpdateService(ctx graph.TransformC
 			}
 			return nil
 		}
-		// otherwise only support to update the params associated with appsv1alpha1.ClusterComponentService and futher change
+		// otherwise only support to update the params associated with appsv1alpha1.ClusterComponentService and further change
 		overrideMutableParams := func(obj, objCopy *corev1.Service) {
 			objCopy.Spec.Type = obj.Spec.Type
 			objCopy.Name = obj.Name

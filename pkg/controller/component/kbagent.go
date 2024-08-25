@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -45,6 +46,8 @@ const (
 	kbAgentPortName          = "http"
 	kbAgentPortArg           = "--port"
 	kbAgentTCPProtocol       = "TCP"
+	kbAgentEyeContainerName  = "kba-eye"
+	eyeEnvName               = "KB_AGENT_EYE"
 
 	kbAgentSharedMountPath      = "/kubeblocks"
 	kbAgentCommandOnSharedMount = "/kubeblocks/kbagent"
@@ -120,18 +123,35 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 		return err
 	}
 	if noImageNContainer {
-		containers = append(containers, defaultContainer)
+		containers[kbAgentContainerName] = defaultContainer
 	}
-	allPorts := make([]int32, 0)
-	for i := range containers {
-		allPorts = append(allPorts, int32(kbAgentDefaultPort+i))
+
+	discovery := make(map[string]string)
+	containerSet := make(map[string]*corev1.Container)
+	for actionName, container := range containers {
+		savedContainer, ok := containerSet[container.Image]
+		if ok {
+			discovery[actionName] = savedContainer.Name
+		} else {
+			containerSet[container.Image] = container
+			discovery[actionName] = container.Name
+		}
+	}
+
+	eye, err := buildKBAgentEyeContainer(discovery)
+	containerSet[kbAgentEyeContainerName] = eye
+
+	allPorts := make([]int32, len(containerSet))
+	for i := range allPorts {
+		allPorts[i] = int32(kbAgentDefaultPort + i)
 	}
 	ports, err := getAvailablePorts(synthesizedComp.PodSpec.Containers, allPorts)
 	if err != nil {
 		return err
 	}
 
-	for i, container := range containers {
+	i := 0
+	for _, container := range containerSet {
 		container.Ports = []corev1.ContainerPort{
 			{
 				ContainerPort: ports[i],
@@ -145,6 +165,7 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 				TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromInt32(ports[i])},
 			},
 		}
+		i += 1
 	}
 
 	if synthesizedComp.HostNetwork != nil {
@@ -290,7 +311,7 @@ func buildProbe4KBAgent(probe *appsv1alpha1.Probe, name string) (*proto.Action, 
 	return a, p
 }
 
-func adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp *SynthesizedComponent, defaultContainer corev1.Container) (bool, []*corev1.Container, error) {
+func adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp *SynthesizedComponent, defaultContainer corev1.Container) (bool, map[string]*corev1.Container, error) {
 	noImageNContainer, actionNames, images, containers, err := customExecActionImageNContainer(synthesizedComp)
 	if err != nil {
 		return noImageNContainer, nil, err
@@ -302,7 +323,7 @@ func adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp *SynthesizedComp
 	initContainer := buildKBAgentInitContainer()
 	synthesizedComp.PodSpec.InitContainers = append(synthesizedComp.PodSpec.InitContainers, *initContainer)
 
-	cc := make([]*corev1.Container, len(containers))
+	cc := make(map[string]*corev1.Container, len(containers))
 	for i, c := range containers {
 		wrapContainer := defaultContainer.DeepCopy()
 		if c == nil {
@@ -310,14 +331,14 @@ func adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp *SynthesizedComp
 		} else {
 			wrapContainer.Image = c.Image
 		}
-		wrapContainer.Name = fmt.Sprintf("%s-%s", kbAgentContainerName, actionNames[i])
+		wrapContainer.Name = fmt.Sprintf("%s-%d", kbAgentContainerName, i)
 		wrapContainer.Command[0] = kbAgentCommandOnSharedMount
 		wrapContainer.VolumeMounts = uniqueVolumeMounts(wrapContainer.VolumeMounts, []corev1.VolumeMount{sharedVolumeMount})
 		// TODO: share more container resources
 		if c != nil {
 			wrapContainer.VolumeMounts = uniqueVolumeMounts(wrapContainer.VolumeMounts, c.VolumeMounts)
 		}
-		cc[i] = wrapContainer
+		cc[actionNames[i]] = wrapContainer
 	}
 	return noImageNContainer, cc, nil
 }
@@ -478,4 +499,23 @@ func mountPathExists(volumeMounts []corev1.VolumeMount, mountPath string) bool {
 		}
 	}
 	return false
+}
+
+func buildKBAgentEyeContainer(discovery map[string]string) (*corev1.Container, error) {
+	var env corev1.EnvVar
+	dd, err := json.Marshal(discovery)
+	if err != nil {
+		return nil, err
+	}
+	env = corev1.EnvVar{
+		Name:  eyeEnvName,
+		Value: string(dd),
+	}
+
+	return builder.NewContainerBuilder("kba-eye").
+		SetImage(viper.GetString(constant.KBToolsImage)).
+		SetImagePullPolicy(corev1.PullIfNotPresent).
+		AddCommands(kbAgentCommand).
+		AddEnv(env).
+		GetObject(), nil
 }

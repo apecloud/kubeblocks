@@ -178,7 +178,7 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 		if synthesizedComp.HostNetwork.ContainerPorts == nil {
 			synthesizedComp.HostNetwork.ContainerPorts = make([]appsv1alpha1.HostNetworkContainerPort, 0)
 		}
-		for _, container := range containers {
+		for _, container := range containerSet {
 			synthesizedComp.HostNetwork.ContainerPorts = append(
 				synthesizedComp.HostNetwork.ContainerPorts,
 				appsv1alpha1.HostNetworkContainerPort{
@@ -189,7 +189,7 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 		}
 	}
 
-	for _, container := range containers {
+	for _, container := range containerSet {
 		synthesizedComp.PodSpec.Containers = append(synthesizedComp.PodSpec.Containers, *container)
 	}
 	return nil

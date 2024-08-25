@@ -54,10 +54,10 @@ func (c *httpClient) CallAction(ctx context.Context, req proto.ActionRequest) (p
 	}
 
 	payload, err := c.request(ctx, fasthttp.MethodPost, url, bytes.NewReader(data))
-	defer payload.Close()
 	if err != nil {
 		return proto.ActionResponse{}, err
 	}
+	defer payload.Close()
 	return c.decode(payload)
 }
 

@@ -54,13 +54,14 @@ func (c *httpClient) CallAction(ctx context.Context, req proto.ActionRequest) (p
 	}
 
 	payload, err := c.request(ctx, fasthttp.MethodPost, url, bytes.NewReader(data))
+	defer payload.Close()
 	if err != nil {
 		return proto.ActionResponse{}, err
 	}
 	return c.decode(payload)
 }
 
-func (c *httpClient) request(ctx context.Context, method, url string, body io.Reader) (io.Reader, error) {
+func (c *httpClient) request(ctx context.Context, method, url string, body io.Reader) (io.ReadCloser, error) {
 	req, err := http.NewRequestWithContext(ctx, method, url, body)
 	if err != nil {
 		return nil, err
@@ -70,7 +71,6 @@ func (c *httpClient) request(ctx context.Context, method, url string, body io.Re
 	if err != nil {
 		return nil, err
 	}
-	defer rsp.Body.Close()
 
 	switch rsp.StatusCode {
 	case http.StatusOK, http.StatusNotImplemented, http.StatusInternalServerError:

@@ -28,7 +28,7 @@ var (
 	ErrActionNotImplemented = errors.New("action is not implemented")
 	ErrActionInProgress     = errors.New("action is in progress")
 	ErrActionBusy           = errors.New("action is busy")
-	ErrActionTimeout        = errors.New("action timeout")
+	ErrActionTimedOut       = errors.New("action timed-out")
 	ErrActionFailed         = errors.New("action failed")
 	ErrActionCanceled       = errors.New("action canceled")
 	ErrActionInternalError  = errors.New("action internal error")

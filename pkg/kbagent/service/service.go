@@ -21,21 +21,10 @@ package service
 
 import (
 	"context"
-	"errors"
 
 	"github.com/go-logr/logr"
 
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
-)
-
-var (
-	ErrNotDefined     = errors.New("NotDefined")
-	ErrNotImplemented = errors.New("NotImplemented")
-	ErrInProgress     = errors.New("InProgress")
-	ErrBusy           = errors.New("busy")
-	ErrTimeout        = errors.New("timeout")
-	ErrFailed         = errors.New("failed")
-	ErrInternalError  = errors.New("InternalError")
 )
 
 type Service interface {
@@ -44,9 +33,7 @@ type Service interface {
 
 	Start() error
 
-	Decode([]byte) (interface{}, error)
-
-	HandleRequest(ctx context.Context, req interface{}) ([]byte, error)
+	HandleRequest(ctx context.Context, payload []byte) ([]byte, error)
 }
 
 func New(logger logr.Logger, actions []proto.Action, probes []proto.Probe) ([]Service, error) {

@@ -36,7 +36,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
-	"github.com/apecloud/kubeblocks/pkg/kbagent/service"
 )
 
 type lifecycleAction interface {
@@ -272,9 +271,12 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1alpha1
 		if cli == nil {
 			continue // not defined, for test only
 		}
-		_, err2 := cli.CallAction(ctx, *req)
+		rsp, err2 := cli.CallAction(ctx, *req)
 		if err2 != nil {
-			return a.error2(lfa, err2)
+			return err2
+		}
+		if len(rsp.Error) > 0 {
+			return a.formatError(lfa, rsp)
 		}
 	}
 	return nil
@@ -321,26 +323,32 @@ func (a *kbagent) selectTargetPods(spec *appsv1alpha1.Action) ([]*corev1.Pod, er
 	}
 }
 
-func (a *kbagent) error2(lfa lifecycleAction, err error) error {
+func (a *kbagent) formatError(lfa lifecycleAction, rsp proto.ActionResponse) error {
+	wrapError := func(err error) error {
+		return errors.Wrapf(err, "action: %s, error: %s", lfa.name(), rsp.Message)
+	}
+	err := proto.Type2Error(rsp.Error)
 	switch {
 	case err == nil:
 		return nil
-	case errors.Is(err, service.ErrNotDefined):
-		return errors.Wrap(ErrActionNotDefined, lfa.name())
-	case errors.Is(err, service.ErrNotImplemented):
-		return errors.Wrap(ErrActionNotImplemented, lfa.name())
-	case errors.Is(err, service.ErrInProgress):
-		return errors.Wrap(ErrActionInProgress, lfa.name())
-	case errors.Is(err, service.ErrBusy):
-		return errors.Wrap(ErrActionBusy, lfa.name())
-	case errors.Is(err, service.ErrTimeout):
-		return errors.Wrap(ErrActionTimeout, lfa.name())
-	case errors.Is(err, service.ErrFailed):
-		return errors.Wrap(ErrActionFailed, lfa.name())
-	case errors.Is(err, service.ErrInternalError):
-		return errors.Wrap(ErrActionInternalError, lfa.name())
+	case errors.Is(err, proto.ErrNotDefined):
+		return wrapError(ErrActionNotDefined)
+	case errors.Is(err, proto.ErrNotImplemented):
+		return wrapError(ErrActionNotImplemented)
+	case errors.Is(err, proto.ErrBadRequest):
+		return wrapError(ErrActionInternalError)
+	case errors.Is(err, proto.ErrInProgress):
+		return wrapError(ErrActionInProgress)
+	case errors.Is(err, proto.ErrBusy):
+		return wrapError(ErrActionBusy)
+	case errors.Is(err, proto.ErrTimedOut):
+		return wrapError(ErrActionTimedOut)
+	case errors.Is(err, proto.ErrFailed):
+		return wrapError(ErrActionFailed)
+	case errors.Is(err, proto.ErrInternalError):
+		return wrapError(ErrActionInternalError)
 	default:
-		return err
+		return wrapError(err)
 	}
 }
 

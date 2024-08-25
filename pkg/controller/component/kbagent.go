@@ -139,6 +139,9 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 	}
 
 	eye, err := buildKBAgentEyeContainer(discovery)
+	if err != nil {
+		return err
+	}
 	containerSet[kbAgentEyeContainerName] = eye
 
 	allPorts := make([]int32, len(containerSet))

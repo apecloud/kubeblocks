@@ -23,12 +23,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
-	"strings"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"strconv"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -40,13 +38,13 @@ import (
 )
 
 const (
-	kbAgentContainerName     = "kba"
+	kbAgentContainerName     = "kbagent"
 	kbAgentInitContainerName = "init-kbagent"
 	kbAgentCommand           = "/bin/kbagent"
 	kbAgentPortName          = "http"
 	kbAgentPortArg           = "--port"
 	kbAgentTCPProtocol       = "TCP"
-	kbAgentEyeContainerName  = "kba-eye"
+	kbAgentEyeContainerName  = "kbagent-eye"
 	eyeEnvName               = "KB_AGENT_EYE"
 
 	kbAgentSharedMountPath      = "/kubeblocks"
@@ -63,7 +61,7 @@ var (
 
 func IsKBAgentContainer(c *corev1.Container) bool {
 	// TODO: Because the implementation of multiple images is required, an update is needed here. About kbAgentContainerName
-	return c.Name == kbAgentContainerName || c.Name == kbAgentInitContainerName || strings.Contains(kbAgentContainerName, c.Name)
+	return c.Name == kbAgentContainerName || c.Name == kbAgentInitContainerName
 }
 
 func UpdateKBAgentContainer4HostNetwork(synthesizedComp *SynthesizedComponent) {
@@ -183,8 +181,7 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 				synthesizedComp.HostNetwork.ContainerPorts,
 				appsv1alpha1.HostNetworkContainerPort{
 					Container: container.Name,
-					// TODO The port name is limited to 15 characters and needs to adjust the method of fetching ports in pod name and kb-agent client.
-					Ports: []string{fmt.Sprintf("%s-%s", container.Name, kbAgentPortName)},
+					Ports:     []string{fmt.Sprintf("%s-%s", container.Name, kbAgentPortName)},
 				})
 		}
 	}
@@ -371,22 +368,21 @@ func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) (boo
 		actions = append(actions, &synthesizedComp.LifecycleActions.RoleProbe.Action)
 	}
 
-	// TODO: Discussion is needed for the definition of action name
 	actionNameMap := map[*appsv1alpha1.Action]string{
-		synthesizedComp.LifecycleActions.PostProvision:    "postpr",
-		synthesizedComp.LifecycleActions.PreTerminate:     "preter",
-		synthesizedComp.LifecycleActions.Switchover:       "switch",
-		synthesizedComp.LifecycleActions.MemberJoin:       "mbrin",
-		synthesizedComp.LifecycleActions.MemberLeave:      "mbrlv",
-		synthesizedComp.LifecycleActions.Readonly:         "readol",
-		synthesizedComp.LifecycleActions.Readwrite:        "readwr",
-		synthesizedComp.LifecycleActions.DataDump:         "datadp",
-		synthesizedComp.LifecycleActions.DataLoad:         "datald",
-		synthesizedComp.LifecycleActions.Reconfigure:      "reconf",
-		synthesizedComp.LifecycleActions.AccountProvision: "accpr",
+		synthesizedComp.LifecycleActions.PostProvision:    "postProvision",
+		synthesizedComp.LifecycleActions.PreTerminate:     "preTerminate",
+		synthesizedComp.LifecycleActions.Switchover:       "switchover",
+		synthesizedComp.LifecycleActions.MemberJoin:       "memberJoin",
+		synthesizedComp.LifecycleActions.MemberLeave:      "memberLeave",
+		synthesizedComp.LifecycleActions.Readonly:         "readOnly",
+		synthesizedComp.LifecycleActions.Readwrite:        "readWrite",
+		synthesizedComp.LifecycleActions.DataDump:         "dataDump",
+		synthesizedComp.LifecycleActions.DataLoad:         "dataLoad",
+		synthesizedComp.LifecycleActions.Reconfigure:      "reconfigure",
+		synthesizedComp.LifecycleActions.AccountProvision: "accountProvision",
 	}
 	if synthesizedComp.LifecycleActions.RoleProbe != nil && synthesizedComp.LifecycleActions.RoleProbe.Exec != nil {
-		actionNameMap[&synthesizedComp.LifecycleActions.RoleProbe.Action] = "rolepb"
+		actionNameMap[&synthesizedComp.LifecycleActions.RoleProbe.Action] = "roleProbe"
 	}
 
 	var images []string
@@ -518,7 +514,7 @@ func buildKBAgentEyeContainer(discovery map[string]string) (*corev1.Container, e
 		Value: string(dd),
 	}
 
-	return builder.NewContainerBuilder("kba-eye").
+	return builder.NewContainerBuilder(kbAgentEyeContainerName).
 		SetImage(viper.GetString(constant.KBToolsImage)).
 		SetImagePullPolicy(corev1.PullIfNotPresent).
 		AddCommands(kbAgentCommand).

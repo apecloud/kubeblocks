@@ -264,7 +264,24 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1alpha1
 	//  - back-off to retry
 	//  - timeout
 	for _, pod := range a.pods {
-		cli, err1 := kbacli.NewClient(*pod, mapActionName(lfa))
+		// get eye client
+		eyeCli, err := kbacli.NewClient(*pod, "kbagent-eye")
+		if err != nil {
+			return err
+		}
+		containerNameReq := &proto.ActionRequest{
+			Action: "eye",
+			Parameters: map[string]string{
+				"name": lfa.name(),
+			},
+		}
+		containerNameRsp, err := eyeCli.CallAction(ctx, *containerNameReq)
+		if err != nil {
+			return err
+		}
+		// get action container
+		containerName := string(containerNameRsp.Output)
+		cli, err1 := kbacli.NewClient(*pod, containerName)
 		if err1 != nil {
 			return err1
 		}
@@ -350,22 +367,4 @@ func (a *kbagent) formatError(lfa lifecycleAction, rsp proto.ActionResponse) err
 	default:
 		return wrapError(err)
 	}
-}
-
-func mapActionName(la lifecycleAction) string {
-	actionNameMap := map[string]string{
-		"postProvision":    "postpr",
-		"preTerminate":     "preter",
-		"switchover":       "switch",
-		"memberJoin":       "mbrin",
-		"memberLeave":      "mbrlv",
-		"readOnly":         "readol",
-		"readWrite":        "readwr",
-		"dataDump":         "datadp",
-		"dataLoad":         "datald",
-		"reconfigure":      "reconf",
-		"accountProvision": "accpr",
-		"roleProbe":        "rolepb",
-	}
-	return actionNameMap[la.name()]
 }

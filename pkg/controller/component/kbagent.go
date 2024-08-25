@@ -123,6 +123,9 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 		return err
 	}
 	if noImageNContainer {
+		if len(containers) == 0 {
+			containers = make(map[string]*corev1.Container)
+		}
 		containers[kbAgentContainerName] = defaultContainer
 	}
 

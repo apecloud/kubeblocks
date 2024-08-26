@@ -1017,6 +1017,22 @@ an existed ServiceAccount in this field.</p>
 </tr>
 <tr>
 <td>
+<code>instanceUpdateStrategy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.InstanceUpdateStrategy">
+InstanceUpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates the InstanceUpdateStrategy that will be
+employed to update Pods in the InstanceSet when a revision is made to
+Template.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>parallelPodManagementConcurrency</code><br/>
 <em>
 <a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
@@ -5427,6 +5443,22 @@ Existing usage should be updated to the current preferred approach to avoid comp
 </tr>
 <tr>
 <td>
+<code>instanceUpdateStrategy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.InstanceUpdateStrategy">
+InstanceUpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates the InstanceUpdateStrategy that will be
+employed to update Pods in the InstanceSet when a revision is made to
+Template.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>parallelPodManagementConcurrency</code><br/>
 <em>
 <a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
@@ -9688,6 +9720,22 @@ an existed ServiceAccount in this field.</p>
 </tr>
 <tr>
 <td>
+<code>instanceUpdateStrategy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.InstanceUpdateStrategy">
+InstanceUpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates the InstanceUpdateStrategy that will be
+employed to update Pods in the InstanceSet when a revision is made to
+Template.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>parallelPodManagementConcurrency</code><br/>
 <em>
 <a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
@@ -13572,6 +13620,59 @@ Add new or override existing volume mounts of the first container in the Pod.</p
 <em>(Optional)</em>
 <p>Defines VolumeClaimTemplates to override.
 Add new or override existing volume claim templates.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.InstanceUpdateStrategy">InstanceUpdateStrategy
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>)
+</p>
+<div>
+<p>InstanceUpdateStrategy indicates the strategy that the InstanceSet
+controller will use to perform updates.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>partition</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Partition indicates the number of pods that should be updated during a rolling update.
+The remaining pods will remain untouched. This is helpful in defining how many pods
+should participate in the update process. The update process will follow the order
+of pod names in descending lexicographical (dictionary) order. The default value is
+ComponentSpec.Replicas (i.e., update all pods).</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>maxUnavailable</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The maximum number of pods that can be unavailable during the update.
+Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+Absolute number is calculated from percentage by rounding up. This can not be 0.
+Defaults to 1. The field applies to all pods. That means if there is any unavailable pod,
+it will be counted towards MaxUnavailable.</p>
 </td>
 </tr>
 </tbody>
@@ -24250,16 +24351,15 @@ Default value is &ldquo;PreferInPlace&rdquo;</li>
 <td>
 <code>updateStrategy</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#statefulsetupdatestrategy-v1-apps">
-Kubernetes apps/v1.StatefulSetUpdateStrategy
+<a href="#workloads.kubeblocks.io/v1alpha1.InstanceUpdateStrategy">
+InstanceUpdateStrategy
 </a>
 </em>
 </td>
 <td>
 <p>Indicates the StatefulSetUpdateStrategy that will be
 employed to update Pods in the InstanceSet when a revision is made to
-Template.
-UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if MemberUpdateStrategy is not nil</p>
+Template.</p>
 <p>Note: This field will be removed in future version.</p>
 </td>
 </tr>
@@ -24317,11 +24417,10 @@ MemberUpdateStrategy
 <td>
 <em>(Optional)</em>
 <p>Members(Pods) update strategy.</p>
-<ul>
-<li>serial: update Members one by one that guarantee minimum component unavailable time.</li>
-<li>bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.</li>
-<li>parallel: force parallel</li>
-</ul>
+<p>Deprecated since v0.9.0
+- serial: update Members one by one that guarantee minimum component unavailable time.
+- bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
+- parallel: force parallel</p>
 </td>
 </tr>
 <tr>
@@ -24798,16 +24897,15 @@ Default value is &ldquo;PreferInPlace&rdquo;</li>
 <td>
 <code>updateStrategy</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#statefulsetupdatestrategy-v1-apps">
-Kubernetes apps/v1.StatefulSetUpdateStrategy
+<a href="#workloads.kubeblocks.io/v1alpha1.InstanceUpdateStrategy">
+InstanceUpdateStrategy
 </a>
 </em>
 </td>
 <td>
 <p>Indicates the StatefulSetUpdateStrategy that will be
 employed to update Pods in the InstanceSet when a revision is made to
-Template.
-UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if MemberUpdateStrategy is not nil</p>
+Template.</p>
 <p>Note: This field will be removed in future version.</p>
 </td>
 </tr>
@@ -24865,11 +24963,10 @@ MemberUpdateStrategy
 <td>
 <em>(Optional)</em>
 <p>Members(Pods) update strategy.</p>
-<ul>
-<li>serial: update Members one by one that guarantee minimum component unavailable time.</li>
-<li>bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.</li>
-<li>parallel: force parallel</li>
-</ul>
+<p>Deprecated since v0.9.0
+- serial: update Members one by one that guarantee minimum component unavailable time.
+- bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
+- parallel: force parallel</p>
 </td>
 </tr>
 <tr>
@@ -25407,6 +25504,79 @@ indicated by UpdateRevisions.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="workloads.kubeblocks.io/v1alpha1.InstanceUpdateStrategy">InstanceUpdateStrategy
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.InstanceSetSpec">InstanceSetSpec</a>)
+</p>
+<div>
+<p>InstanceUpdateStrategy indicates the strategy that the InstanceSet
+controller will use to perform updates. It includes any additional parameters
+necessary to perform the update for the indicated strategy.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>partition</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Partition indicates the number of pods that should be updated during a rolling update.
+The remaining pods will remain untouched. This is helpful in defining how many pods
+should participate in the update process. The update process will follow the order
+of pod names in descending lexicographical (dictionary) order. The default value is
+Replicas (i.e., update all pods).</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>maxUnavailable</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The maximum number of pods that can be unavailable during the update.
+Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+Absolute number is calculated from percentage by rounding up. This can not be 0.
+Defaults to 1. The field applies to all pods. That means if there is any unavailable pod,
+it will be counted towards MaxUnavailable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memberUpdateStrategy</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.MemberUpdateStrategy">
+MemberUpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Members(Pods) update strategy.</p>
+<ul>
+<li>serial: update Members one by one that guarantee minimum component unavailable time.</li>
+<li>bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.</li>
+<li>parallel: force parallel</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="workloads.kubeblocks.io/v1alpha1.MemberStatus">MemberStatus
 </h3>
 <p>
@@ -25452,7 +25622,7 @@ ReplicaRole
 <h3 id="workloads.kubeblocks.io/v1alpha1.MemberUpdateStrategy">MemberUpdateStrategy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RSMSpec">RSMSpec</a>, <a href="#workloads.kubeblocks.io/v1alpha1.InstanceSetSpec">InstanceSetSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RSMSpec">RSMSpec</a>, <a href="#workloads.kubeblocks.io/v1alpha1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1alpha1.InstanceUpdateStrategy">InstanceUpdateStrategy</a>)
 </p>
 <div>
 <p>MemberUpdateStrategy defines Cluster Component update strategy.</p>

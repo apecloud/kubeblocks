@@ -274,7 +274,7 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1alpha1
 		return nil, err
 	}
 	if len(pods) == 0 {
-		return nil, fmt.Errorf("no available pod to call action %s", lfa.name())
+		return nil, fmt.Errorf("no available pod to execute action %s", lfa.name())
 	}
 
 	// TODO: impl
@@ -284,18 +284,18 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1alpha1
 	for _, pod := range pods {
 		host, port, err := a.serverEndpoint(pod)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrapf(err, "pod %s is unavailable to execute action %s", pod.Name, lfa.name())
 		}
 		cli, err := kbacli.NewClient(host, port)
 		if err != nil {
-			return nil, err
+			return nil, err // mock client error
 		}
 		if cli == nil {
 			continue // not kb-agent container and port defined, for test only
 		}
 		rsp, err := cli.Action(ctx, *req)
 		if err != nil {
-			return nil, err // http error
+			return nil, errors.Wrapf(err, "http error occurred when executing action %s at pod %s", lfa.name(), pod.Name)
 		}
 		if len(rsp.Error) > 0 {
 			return nil, a.formatError(lfa, rsp)

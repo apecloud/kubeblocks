@@ -623,7 +623,7 @@ var _ = Describe("lifecycle", func() {
 
 			err = lifecycle.PostProvision(ctx, k8sClient, nil)
 			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("no available pod to call action"))
+			Expect(err.Error()).Should(ContainSubstring("no available pod to execute action"))
 		})
 
 		It("non-blocking", func() {

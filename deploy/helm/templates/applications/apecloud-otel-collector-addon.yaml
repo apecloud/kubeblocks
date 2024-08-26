@@ -25,11 +25,8 @@ spec:
           key: values-kubeblocks-override.yaml
 
     valuesMapping:
-      valueMap:
-
       jsonMap:
         tolerations: tolerations
-
       resources:
         cpu:
           requests: resources.requests.cpu

@@ -273,28 +273,44 @@ var _ = Describe("lifecycle", func() {
 			unknownErr := fmt.Errorf("%s", "unknown error")
 			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
 				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
-					return proto.ActionResponse{}, proto.ErrNotDefined
+					return proto.ActionResponse{
+						Error: proto.Error2Type(proto.ErrNotDefined),
+					}, nil
 				}).MaxTimes(1)
 				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
-					return proto.ActionResponse{}, proto.ErrNotImplemented
+					return proto.ActionResponse{
+						Error: proto.Error2Type(proto.ErrNotImplemented),
+					}, nil
 				}).MaxTimes(1)
 				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
-					return proto.ActionResponse{}, proto.ErrBadRequest
+					return proto.ActionResponse{
+						Error: proto.Error2Type(proto.ErrBadRequest),
+					}, nil
 				}).MaxTimes(1)
 				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
-					return proto.ActionResponse{}, proto.ErrInProgress
+					return proto.ActionResponse{
+						Error: proto.Error2Type(proto.ErrInProgress),
+					}, nil
 				}).MaxTimes(1)
 				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
-					return proto.ActionResponse{}, proto.ErrBusy
+					return proto.ActionResponse{
+						Error: proto.Error2Type(proto.ErrBusy),
+					}, nil
 				}).MaxTimes(1)
 				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
-					return proto.ActionResponse{}, proto.ErrTimedOut
+					return proto.ActionResponse{
+						Error: proto.Error2Type(proto.ErrTimedOut),
+					}, nil
 				}).MaxTimes(1)
 				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
-					return proto.ActionResponse{}, proto.ErrFailed
+					return proto.ActionResponse{
+						Error: proto.Error2Type(proto.ErrFailed),
+					}, nil
 				}).MaxTimes(1)
 				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
-					return proto.ActionResponse{}, proto.ErrInternalError
+					return proto.ActionResponse{
+						Error: proto.Error2Type(proto.ErrInternalError),
+					}, nil
 				}).MaxTimes(1)
 				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
 					return proto.ActionResponse{}, unknownErr
@@ -319,7 +335,23 @@ var _ = Describe("lifecycle", func() {
 		})
 
 		It("fail - error msg", func() {
-			// TODO: pass error message from kb-agent
+			lifecycle, err := New(synthesizedComp, nil, pods...)
+			Expect(err).Should(BeNil())
+			Expect(lifecycle).ShouldNot(BeNil())
+
+			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+					return proto.ActionResponse{
+						Error:   proto.Error2Type(proto.ErrFailed),
+						Message: "command not found",
+					}, nil
+				}).AnyTimes()
+			})
+
+			err = lifecycle.PostProvision(ctx, k8sClient, nil)
+			Expect(err).ShouldNot(BeNil())
+			Expect(errors.Is(err, ErrActionFailed)).Should(BeTrue())
+			Expect(err.Error()).Should(ContainSubstring("command not found"))
 		})
 
 		It("parameters", func() {

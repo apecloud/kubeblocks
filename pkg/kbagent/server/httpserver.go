@@ -21,11 +21,9 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
-	"strings"
 	"time"
 
 	fasthttprouter "github.com/fasthttp/router"
@@ -150,12 +148,8 @@ func (s *server) router() fasthttp.RequestHandler {
 }
 
 func (s *server) registerService(router *fasthttprouter.Router, svc service.Service) {
-	router.Handle(fasthttp.MethodPost, s.serviceURI(svc), s.dispatcher(svc))
-	s.logger.Info("register service to server", "service", svc.Kind(), "method", fasthttp.MethodPost, "uri", s.serviceURI(svc))
-}
-
-func (s *server) serviceURI(svc service.Service) string {
-	return fmt.Sprintf("/%s/%s", svc.Version(), strings.ToLower(svc.Kind()))
+	router.Handle(fasthttp.MethodPost, svc.URI(), s.dispatcher(svc))
+	s.logger.Info("register service to server", "service", svc.Kind(), "method", fasthttp.MethodPost, "uri", svc.URI())
 }
 
 func (s *server) dispatcher(svc service.Service) func(*fasthttp.RequestCtx) {
@@ -163,73 +157,22 @@ func (s *server) dispatcher(svc service.Service) func(*fasthttp.RequestCtx) {
 		ctx := context.Background()
 		body := reqCtx.PostBody()
 
-		req, err := svc.Decode(body)
-		if err != nil {
-			msg := newErrorResponse("ERR_MALFORMED_REQUEST", fmt.Sprintf("unmarshal HTTP body failed: %v", err))
-			respond(reqCtx, withError(fasthttp.StatusBadRequest, msg))
-			return
-		}
-
-		rsp, err := svc.HandleRequest(ctx, req)
+		output, err := svc.HandleRequest(ctx, body)
 		statusCode := fasthttp.StatusOK
 		if err != nil {
-			if errors.Is(err, service.ErrNotImplemented) {
-				statusCode = fasthttp.StatusNotImplemented
-			} else {
-				statusCode = fasthttp.StatusInternalServerError
-			}
-
-			s.logger.Info("service call failed", "service", svc.Kind(), "error", err.Error())
-
-			msg := newErrorResponse("ERR_SERVICE_FAILED", fmt.Sprintf("service call failed: %s", err.Error()))
-			respond(reqCtx, withError(statusCode, msg))
-			return
+			statusCode = fasthttp.StatusInternalServerError
 		}
-
-		if rsp == nil {
-			respond(reqCtx, withEmpty())
-		} else {
-			respond(reqCtx, withJSON(statusCode, rsp))
-		}
+		respond(reqCtx, statusCode, output, err)
 	}
 }
 
-type errorResponse struct {
-	ErrorCode string `json:"errorCode"`
-	Message   string `json:"message"`
-}
-
-func newErrorResponse(errorCode, message string) errorResponse {
-	return errorResponse{
-		ErrorCode: errorCode,
-		Message:   message,
-	}
-}
-
-type option = func(ctx *fasthttp.RequestCtx)
-
-func withJSON(code int, obj []byte) option {
-	return func(ctx *fasthttp.RequestCtx) {
-		ctx.Response.SetStatusCode(code)
-		ctx.Response.SetBody(obj)
-		ctx.Response.Header.SetContentType(jsonContentTypeHeader)
-	}
-}
-
-func withError(code int, resp errorResponse) option {
-	b, _ := json.Marshal(&resp)
-	return withJSON(code, b)
-}
-
-func withEmpty() option {
-	return func(ctx *fasthttp.RequestCtx) {
-		ctx.Response.SetBody(nil)
-		ctx.Response.SetStatusCode(fasthttp.StatusNoContent)
-	}
-}
-
-func respond(ctx *fasthttp.RequestCtx, options ...option) {
-	for _, option := range options {
-		option(ctx)
+func respond(ctx *fasthttp.RequestCtx, code int, body []byte, err error) {
+	ctx.Response.Header.SetContentType(jsonContentTypeHeader)
+	ctx.Response.SetStatusCode(code)
+	switch {
+	case err != nil:
+		ctx.Response.SetBodyString(err.Error())
+	case body != nil:
+		ctx.Response.SetBody(body)
 	}
 }

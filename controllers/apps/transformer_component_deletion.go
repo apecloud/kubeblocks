@@ -53,11 +53,6 @@ func (t *componentDeletionTransformer) Transform(ctx graph.TransformContext, dag
 		return nil
 	}
 
-	reqCtx := intctrlutil.RequestCtx{
-		Ctx:      transCtx.Context,
-		Log:      transCtx.Logger,
-		Recorder: transCtx.EventRecorder,
-	}
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	comp := transCtx.Component
 	cluster, err := t.getCluster(transCtx, comp)
@@ -72,20 +67,7 @@ func (t *componentDeletionTransformer) Transform(ctx graph.TransformContext, dag
 		return newRequeueError(time.Second*1, "updating component status to deleting")
 	}
 
-	// step2: do the pre-terminate action if needed
-	if err := component.ReconcileCompPreTerminate(reqCtx, transCtx.Client, graphCli, cluster, comp, dag); err != nil {
-		reqCtx.Log.Info("failed to reconcile component pre-terminate action", "component", comp.Name, "error", err)
-		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeExpectedInProcess) {
-			// waiting for the preTerminate action to be done, and watch the action finish event to trigger the next reconcile
-			return nil
-		}
-		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeRequeue) {
-			return newRequeueError(time.Second*1, "request to requeue the component pre-terminate action")
-		}
-		return err
-	}
-
-	// step3: delete the sub-resources
+	// step2: delete the sub-resources
 	compShortName, err := component.ShortName(cluster.Name, comp.Name)
 	if err != nil {
 		return err

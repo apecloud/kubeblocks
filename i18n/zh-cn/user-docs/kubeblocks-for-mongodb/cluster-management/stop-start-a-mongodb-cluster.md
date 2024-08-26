@@ -15,21 +15,27 @@ sidebar_label: 停止/启动
 ***步骤：***
 
 1. 配置集群名称，并执行以下命令来停止该集群。
-   
+
     ```bash
     kbcli cluster stop mongodb-cluster
     ```
 
 2. 检查集群的状态，查看其是否已停止。
-   
+
     ```bash
     kbcli cluster list
     ```
 
 ## 启动集群
   
-配置集群名称，并执行以下命令来启动该集群。
+1. 配置集群名称，并执行以下命令来启动该集群。
 
-```bash
-kbcli cluster start mongodb-cluster
-```
+   ```bash
+   kbcli cluster start mongodb-cluster
+   ```
+
+2. 查看集群状态，确认集群是否再次启动。
+
+   ```bash
+   kbcli cluster list
+   ```

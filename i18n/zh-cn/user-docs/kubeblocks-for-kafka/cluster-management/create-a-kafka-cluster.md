@@ -16,13 +16,13 @@ import TabItem from '@theme/TabItem';
 ## 开始之前
 
 * [安装 kbcli](./../../installation/install-with-kbcli/install-kbcli.md)。
-* 安装 KubeBlocks：你可以使用 [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](../../installation/install-with-helm/install-kubeblocks-with-helm.md) 进行安装。
-* 确保 `kbcli addon list` 已启用。
+* [安装 KubeBlocks](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md)。
+* 确保 Kafka 引擎 已启用。如果引擎未启用，可参考[该文档](./../../overview/database-engines-supported.md#使用引擎)，启用引擎。
 
   ```bash
   kbcli addon list
   >
-  NAME                           TYPE   STATUS     EXTRAS         AUTO-INSTALL   INSTALLABLE-SELECTOR
+  NAME                           TYPE   STATUS     EXTRAS         AUTO-INSTALL  
   ...
   kafka                        Helm   Enabled                   true
   ...
@@ -37,14 +37,23 @@ import TabItem from '@theme/TabItem';
 :::
 ## 创建 Kafka 集群
 
-<Tabs>
-<TabItem value="kbcli" label="kbcli" default>
-
-使用 `kbcli cluster create` 命令创建集群。你还可以使用 `--set` 参数自定义集群资源。
+使用 `kbcli cluster create` 命令创建集群。您还可以使用 `--set` 参数自定义集群资源。
 
 ```bash
 kbcli cluster create kafka
 ```
+
+:::note
+
+您也可以通过使用 `--help` 查看命令相关选项。
+
+```bash
+
+kbcli cluster create kafka --help
+
+```
+
+:::
 
 下表详细描述了各类自定义参数。请务必设置 `--termination-policy`。此外，强烈建议你打开监视器并启用所有日志。
 
@@ -71,97 +80,3 @@ kbcli cluster create kafka
 | --monitor-enable=false                                                    | 表示是否启用 Kafka 的监视器。                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | --monitor-replicas=1                                                      | 表示 Kafka 监视器的副本数。                                                                                                                                                                                                                                                                                                                                                                                                            |
 | --sasl-enable=false                                                       | 表示是否启用 SASL/PLAIN 进行 Kafka 身份验证。 <br /> -server: admin/kubeblocks <br /> -client: client/kubeblocks  <br /> 内置的 jaas 文件存储在 /tools/client-ssl.properties 中。                                                                                                                                                                                                                                                              |
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl" default>
-
-* 创建组合模式的 Kafka 集群。
-
-    ```bash
-    # 创建组合模式的 Kafka 集群  
-    kubectl apply -f - <<EOF
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: Cluster
-    metadata:
-      name: kafka-combined
-      namespace: default
-    spec:
-      affinity:
-        podAntiAffinity: Preferred
-        tenancy: SharedNode
-        topologyKeys:
-        - kubernetes.io/hostname
-      clusterDefinitionRef: kafka
-      clusterVersionRef: kafka-3.3.2
-      componentSpecs:
-      - componentDefRef: kafka-server
-        monitor: false
-        name: broker
-        noCreatePDB: false
-        replicas: 1
-        resources:
-          limits:
-            cpu: "0.5"
-            memory: 0.5Gi
-          requests:
-            cpu: "0.5"
-            memory: 0.5Gi
-        serviceAccountName: kb-kafka-sa
-      terminationPolicy: Delete
-    EOF
-    ```
-
-* 创建分离模式的 Kafka 集群。
-
-    ```bash
-    # 创建分离模式的 Kafka 集群 
-    kubectl apply -f - <<EOF
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: Cluster
-    metadata:
-      name: kafka-separated
-      namespace: default
-    spec:
-      affinity:
-        podAntiAffinity: Preferred
-        tenancy: SharedNode
-        topologyKeys:
-        - kubernetes.io/hostname
-      clusterDefinitionRef: kafka
-      clusterVersionRef: kafka-3.3.2
-      componentSpecs:
-      - componentDefRef: controller
-        monitor: false
-        name: controller
-        noCreatePDB: false
-        replicas: 1
-        resources:
-          limits:
-            cpu: "0.5"
-            memory: 0.5Gi
-          requests:
-            cpu: "0.5"
-            memory: 0.5Gi
-        serviceAccountName: kb-kafka-sa
-        tls: false
-      - componentDefRef: kafka-broker
-        monitor: false
-        name: broker
-        noCreatePDB: false
-        replicas: 1
-        resources:
-          limits:
-            cpu: "0.5"
-            memory: 0.5Gi
-          requests:
-            cpu: "0.5"
-            memory: 0.5Gi
-        serviceAccountName: kb-kafka-sa
-        tls: false
-      terminationPolicy: Delete
-    EOF
-    ```
-
-</TabItem>
-
-</Tabs>

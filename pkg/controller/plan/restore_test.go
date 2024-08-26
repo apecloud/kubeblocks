@@ -224,7 +224,7 @@ var _ = Describe("Restore", func() {
 			})).Should(Succeed())
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).Should(Succeed())
 			restoreMGR := NewRestoreManager(ctx, k8sClient, cluster, scheme.Scheme, nil, 3, 0)
-			err := restoreMGR.DoRestore(synthesizedComponent, compObj, false)
+			err := restoreMGR.DoRestore(synthesizedComponent, compObj, true)
 			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).Should(BeTrue())
 
 			By("mock restore of prepareData stage to Completed")
@@ -249,7 +249,7 @@ var _ = Describe("Restore", func() {
 
 			By("wait for postReady restore created and mock it to Completed")
 			restoreMGR.Cluster = cluster
-			_ = restoreMGR.DoRestore(synthesizedComponent, compObj, false)
+			_ = restoreMGR.DoRestore(synthesizedComponent, compObj, true)
 
 			// check if restore CR of postReady stage is created.
 			restoreMeta = restoreMGR.GetRestoreObjectMeta(synthesizedComponent, dpv1alpha1.PostReady, "")
@@ -262,7 +262,7 @@ var _ = Describe("Restore", func() {
 			})()).ShouldNot(HaveOccurred())
 
 			By("clean up annotations after cluster running")
-			_ = restoreMGR.DoRestore(synthesizedComponent, compObj, false)
+			_ = restoreMGR.DoRestore(synthesizedComponent, compObj, true)
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 				g.Expect(tmpCluster.Annotations[constant.RestoreFromBackupAnnotationKey]).Should(BeEmpty())
 			})).Should(Succeed())

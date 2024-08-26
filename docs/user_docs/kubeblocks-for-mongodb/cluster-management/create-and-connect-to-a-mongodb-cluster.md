@@ -21,7 +21,7 @@ This tutorial shows how to create and connect to a MongoDB cluster.
   ```bash
   kbcli addon list
   >
-  NAME                           TYPE   STATUS     EXTRAS         AUTO-INSTALL   INSTALLABLE-SELECTOR
+  NAME                           TYPE   STATUS     EXTRAS         AUTO-INSTALL   
   ...
   mongodb                        Helm   Enabled                   true
   ...
@@ -59,7 +59,7 @@ Create a ReplicatSet.
 kbcli cluster create <clustername> --cluster-definition mongodb --set replicas=2 
 ```
 
-If you only have one node for deploying a ReplicaSet, set the `availability-policy` as `none` when creating a ReplicaSet.
+If you only have one node for deploying a ReplicaSet, set the `topology-keys` as `null` when creating a ReplicaSet.
 
 ```bash
 kbcli cluster create <clustername> --cluster-definition mongodb --set replicas=2 --topology-keys null
@@ -76,7 +76,7 @@ kbcli cluster create <clustername> --cluster-definition mongodb --version mongod
 :::note
 
 * In the production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
-* View more flags for creating a MongoDB cluster to create a cluster with customized specifications.
+* View more flags for creating a cluster to create a cluster with customized specifications.
 
   ```bash
   kbcli cluster create --help

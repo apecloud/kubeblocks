@@ -28,53 +28,14 @@ import TabItem from '@theme/TabItem';
 
 执行以下命令查看终止策略。
 
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
 ```bash
 kbcli cluster list kafka
 ```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
-
-```bash
-kubectl -n default get cluster kafka
->
-NAME    CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS     AGE
-kafka      kafka                                kafka-3.3.2    Delete                               Running    19m
-```
-
-</TabItem>
-
-</Tabs>
 
 ## 步骤
 
 执行以下命令，删除集群。
 
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
 ```bash
 kbcli cluster delete kafka
 ```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
-
-如果想删除集群和所有相关资源，可以将终止策略修改为 `WipeOut`，然后再删除该集群。
-
-```bash
-kubectl patch -n demo cluster kafka -p '{"spec":{"terminationPolicy":"WipeOut"}}' --type="merge"
-
-kubectl delete -n demo cluster kafka
-```
-
-</TabItem>
-
-</Tabs>

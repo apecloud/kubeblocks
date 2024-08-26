@@ -36,7 +36,7 @@ kbcli 目前支持 macOS、Windows 和 Linux 系统。
 
       如果想安装 kbcli 的指定版本，请按照以下步骤进行操作：
       
-      1. 在 [KubeBlocks Release 页面](https://github.com/apecloud/kubeblocks/releases/)中查看可用版本。
+      1. 在 [kbcli Release 页面](https://github.com/apecloud/kbcli/releases/)中查看可用版本。
       2. 使用 `-s` 指定版本，并执行以下命令。
         
           ```bash
@@ -122,7 +122,7 @@ kbcli 目前支持 macOS、Windows 和 Linux 系统。
   
 - 选项 2：使用安装包安装
 
-1. 在 [KubeBlocks Release 页面](https://github.com/apecloud/kubeblocks/releases/)下载 kbcli 安装包。
+1. 在 [kbcli Release 页面](https://github.com/apecloud/kbcli/releases/)下载 kbcli 安装包。
 2. 解压文件并将其添加到环境变量中。
    1. 单击 Windows 图标，选择**系统设置**。
    2. 点击**设置** -> **相关设置** -> **高级系统设置**。

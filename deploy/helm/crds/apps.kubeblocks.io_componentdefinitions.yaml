@@ -420,6 +420,14 @@ spec:
                       and other administrative tasks.
 
 
+                      The container executing this action has access to following variables:
+
+
+                      - KB_ACCOUNT_NAME: The name of the system account to be created.
+                      - KB_ACCOUNT_PASSWORD: The password for the system account.  // TODO: how to pass the password securely?
+                      - KB_ACCOUNT_STATEMENT: The statement used to create the system account.
+
+
                       Note: This field is immutable once it has been set.
                     properties:
                       exec:
@@ -449,18 +457,20 @@ spec:
                             type: array
                           container:
                             description: |-
-                              Defines the name of the container within the target Pod where the action will be executed.
+                              Specifies the name of the container within the same pod whose resources will be shared with the action.
+                              This allows the action to utilize the specified container's resources without executing within it.
 
 
-                              This name must correspond to one of the containers defined in `componentDefinition.spec.runtime`.
-                              If this field is not specified, the default behavior is to use the first container listed in
-                              `componentDefinition.spec.runtime`.
+                              The name must match one of the containers defined in `componentDefinition.spec.runtime`.
+
+
+                              The resources that can be shared are included:
+
+
+                              - volume mounts
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           env:
                             description: |-
@@ -588,7 +598,7 @@ spec:
 
 
                               When specified, a dedicated container will be created using this image to execute the Action.
-                              This field is mutually exclusive with the `container` field; only one of them should be provided.
+                              All actions with same image will share the same container.
 
 
                               This field cannot be updated.
@@ -605,9 +615,6 @@ spec:
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           targetPodSelector:
                             description: |-
@@ -616,10 +623,12 @@ spec:
                               It allows for precise control over which Pod(s) the Action should run in.
 
 
+                              If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+                              to be removed or added; or a random pod if the Action is triggered at the component level, such as
+                              post-provision or pre-terminate of the component.
+
+
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             enum:
                             - Any
                             - All
@@ -686,24 +695,9 @@ spec:
                         format: int32
                         type: integer
                     type: object
-                  dataDump:
+                  availableProbe:
                     description: |-
-                      Defines the procedure for exporting the data from a replica.
-
-
-                      Use Case:
-                      This action is intended for initializing a newly created replica with data. It involves exporting data
-                      from an existing replica and importing it into the new, empty replica. This is essential for synchronizing
-                      the state of replicas across the system.
-
-
-                      Applicability:
-                      Some database engines or associated sidecar applications (e.g., Patroni) may already provide this functionality.
-                      In such cases, this action may not be required.
-
-
-                      The output should be a valid data dump streamed to stdout. It must exclude any irrelevant information to ensure
-                      that only the necessary data is exported for import into the new replica.
+                      Defines the procedure which is invoked regularly to assess the availability of component.
 
 
                       Note: This field is immutable once it has been set.
@@ -735,18 +729,20 @@ spec:
                             type: array
                           container:
                             description: |-
-                              Defines the name of the container within the target Pod where the action will be executed.
+                              Specifies the name of the container within the same pod whose resources will be shared with the action.
+                              This allows the action to utilize the specified container's resources without executing within it.
 
 
-                              This name must correspond to one of the containers defined in `componentDefinition.spec.runtime`.
-                              If this field is not specified, the default behavior is to use the first container listed in
-                              `componentDefinition.spec.runtime`.
+                              The name must match one of the containers defined in `componentDefinition.spec.runtime`.
+
+
+                              The resources that can be shared are included:
+
+
+                              - volume mounts
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           env:
                             description: |-
@@ -874,7 +870,7 @@ spec:
 
 
                               When specified, a dedicated container will be created using this image to execute the Action.
-                              This field is mutually exclusive with the `container` field; only one of them should be provided.
+                              All actions with same image will share the same container.
 
 
                               This field cannot be updated.
@@ -891,9 +887,6 @@ spec:
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           targetPodSelector:
                             description: |-
@@ -902,10 +895,323 @@ spec:
                               It allows for precise control over which Pod(s) the Action should run in.
 
 
+                              If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+                              to be removed or added; or a random pod if the Action is triggered at the component level, such as
+                              post-provision or pre-terminate of the component.
+
+
                               This field cannot be updated.
+                            enum:
+                            - Any
+                            - All
+                            - Role
+                            - Ordinal
+                            type: string
+                        type: object
+                      failureThreshold:
+                        description: |-
+                          Minimum consecutive failures for the probe to be considered failed after having succeeded.
+                          Defaults to 3. Minimum value is 1.
+                        format: int32
+                        type: integer
+                      initialDelaySeconds:
+                        description: |-
+                          Specifies the number of seconds to wait after the container has started before the RoleProbe
+                          begins to detect the container's role.
+                        format: int32
+                        type: integer
+                      periodSeconds:
+                        description: |-
+                          Specifies the frequency at which the probe is conducted. This value is expressed in seconds.
+                          Default to 10 seconds. Minimum value is 1.
+                        format: int32
+                        type: integer
+                      preCondition:
+                        description: |-
+                          Specifies the state that the cluster must reach before the Action is executed.
+                          Currently, this is only applicable to the `postProvision` action.
 
 
-                              Note: This field is reserved for future use and is not currently active.
+                          The conditions are as follows:
+
+
+                          - `Immediately`: Executed right after the Component object is created.
+                            The readiness of the Component and its resources is not guaranteed at this stage.
+                          - `RuntimeReady`: The Action is triggered after the Component object has been created and all associated
+                            runtime resources (e.g. Pods) are in a ready state.
+                          - `ComponentReady`: The Action is triggered after the Component itself is in a ready state.
+                            This process does not affect the readiness state of the Component or the Cluster.
+                          - `ClusterReady`: The Action is executed after the Cluster is in a ready state.
+                            This execution does not alter the Component or the Cluster's state of readiness.
+
+
+                          This field cannot be updated.
+                        type: string
+                      retryPolicy:
+                        description: |-
+                          Defines the strategy to be taken when retrying the Action after a failure.
+
+
+                          It specifies the conditions under which the Action should be retried and the limits to apply,
+                          such as the maximum number of retries and backoff strategy.
+
+
+                          This field cannot be updated.
+                        properties:
+                          maxRetries:
+                            default: 0
+                            description: |-
+                              Defines the maximum number of retry attempts that should be made for a given Action.
+                              This value is set to 0 by default, indicating that no retries will be made.
+                            type: integer
+                          retryInterval:
+                            default: 0
+                            description: |-
+                              Indicates the duration of time to wait between each retry attempt.
+                              This value is set to 0 by default, indicating that there will be no delay between retry attempts.
+                            format: int64
+                            type: integer
+                        type: object
+                      successThreshold:
+                        description: |-
+                          Minimum consecutive successes for the probe to be considered successful after having failed.
+                          Defaults to 1. Minimum value is 1.
+                        format: int32
+                        type: integer
+                      timeoutSeconds:
+                        default: 0
+                        description: |-
+                          Specifies the maximum duration in seconds that the Action is allowed to run.
+
+
+                          If the Action does not complete within this time frame, it will be terminated.
+
+
+                          This field cannot be updated.
+                        format: int32
+                        type: integer
+                    type: object
+                  dataDump:
+                    description: |-
+                      Defines the procedure for exporting the data from a replica.
+
+
+                      Use Case:
+                      This action is intended for initializing a newly created replica with data. It involves exporting data
+                      from an existing replica and importing it into the new, empty replica. This is essential for synchronizing
+                      the state of replicas across the system.
+
+
+                      Applicability:
+                      Some database engines or associated sidecar applications (e.g., Patroni) may already provide this functionality.
+                      In such cases, this action may not be required.
+
+
+                      The output should be a valid data dump streamed to stdout. It must exclude any irrelevant information to ensure
+                      that only the necessary data is exported for import into the new replica.
+
+
+                      Note: This field is immutable once it has been set.
+                    properties:
+                      exec:
+                        description: |-
+                          Defines the command to run.
+
+
+                          This field cannot be updated.
+                        properties:
+                          args:
+                            description: Args represents the arguments that are passed
+                              to the `command` for execution.
+                            items:
+                              type: string
+                            type: array
+                          command:
+                            description: |-
+                              Specifies the command to be executed inside the container.
+                              The working directory for this command is the container's root directory('/').
+                              Commands are executed directly without a shell environment, meaning shell-specific syntax ('|', etc.) is not supported.
+                              If the shell is required, it must be explicitly invoked in the command.
+
+
+                              A successful execution is indicated by an exit status of 0; any non-zero status signifies a failure.
+                            items:
+                              type: string
+                            type: array
+                          container:
+                            description: |-
+                              Specifies the name of the container within the same pod whose resources will be shared with the action.
+                              This allows the action to utilize the specified container's resources without executing within it.
+
+
+                              The name must match one of the containers defined in `componentDefinition.spec.runtime`.
+
+
+                              The resources that can be shared are included:
+
+
+                              - volume mounts
+
+
+                              This field cannot be updated.
+                            type: string
+                          env:
+                            description: |-
+                              Represents a list of environment variables that will be injected into the container.
+                              These variables enable the container to adapt its behavior based on the environment it's running in.
+
+
+                              This field cannot be updated.
+                            items:
+                              description: EnvVar represents an environment variable
+                                present in a Container.
+                              properties:
+                                name:
+                                  description: Name of the environment variable. Must
+                                    be a C_IDENTIFIER.
+                                  type: string
+                                value:
+                                  description: |-
+                                    Variable references $(VAR_NAME) are expanded
+                                    using the previously defined environment variables in the container and
+                                    any service environment variables. If a variable cannot be resolved,
+                                    the reference in the input string will be unchanged. Double $$ are reduced
+                                    to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
+                                    "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
+                                    Escaped references will never be expanded, regardless of whether the variable
+                                    exists or not.
+                                    Defaults to "".
+                                  type: string
+                                valueFrom:
+                                  description: Source for the environment variable's
+                                    value. Cannot be used if value is not empty.
+                                  properties:
+                                    configMapKeyRef:
+                                      description: Selects a key of a ConfigMap.
+                                      properties:
+                                        key:
+                                          description: The key to select.
+                                          type: string
+                                        name:
+                                          description: |-
+                                            Name of the referent.
+                                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                            TODO: Add other useful fields. apiVersion, kind, uid?
+                                          type: string
+                                        optional:
+                                          description: Specify whether the ConfigMap
+                                            or its key must be defined
+                                          type: boolean
+                                      required:
+                                      - key
+                                      type: object
+                                      x-kubernetes-map-type: atomic
+                                    fieldRef:
+                                      description: |-
+                                        Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`,
+                                        spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
+                                      properties:
+                                        apiVersion:
+                                          description: Version of the schema the FieldPath
+                                            is written in terms of, defaults to "v1".
+                                          type: string
+                                        fieldPath:
+                                          description: Path of the field to select
+                                            in the specified API version.
+                                          type: string
+                                      required:
+                                      - fieldPath
+                                      type: object
+                                      x-kubernetes-map-type: atomic
+                                    resourceFieldRef:
+                                      description: |-
+                                        Selects a resource of the container: only resources limits and requests
+                                        (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.
+                                      properties:
+                                        containerName:
+                                          description: 'Container name: required for
+                                            volumes, optional for env vars'
+                                          type: string
+                                        divisor:
+                                          anyOf:
+                                          - type: integer
+                                          - type: string
+                                          description: Specifies the output format
+                                            of the exposed resources, defaults to
+                                            "1"
+                                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                          x-kubernetes-int-or-string: true
+                                        resource:
+                                          description: 'Required: resource to select'
+                                          type: string
+                                      required:
+                                      - resource
+                                      type: object
+                                      x-kubernetes-map-type: atomic
+                                    secretKeyRef:
+                                      description: Selects a key of a secret in the
+                                        pod's namespace
+                                      properties:
+                                        key:
+                                          description: The key of the secret to select
+                                            from.  Must be a valid secret key.
+                                          type: string
+                                        name:
+                                          description: |-
+                                            Name of the referent.
+                                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                            TODO: Add other useful fields. apiVersion, kind, uid?
+                                          type: string
+                                        optional:
+                                          description: Specify whether the Secret
+                                            or its key must be defined
+                                          type: boolean
+                                      required:
+                                      - key
+                                      type: object
+                                      x-kubernetes-map-type: atomic
+                                  type: object
+                              required:
+                              - name
+                              type: object
+                            type: array
+                          image:
+                            description: |-
+                              Specifies the container image to be used for running the Action.
+
+
+                              When specified, a dedicated container will be created using this image to execute the Action.
+                              All actions with same image will share the same container.
+
+
+                              This field cannot be updated.
+                            type: string
+                          matchingKey:
+                            description: |-
+                              Used in conjunction with the `targetPodSelector` field to refine the selection of target pod(s) for Action execution.
+                              The impact of this field depends on the `targetPodSelector` value:
+
+
+                              - When `targetPodSelector` is set to `Any` or `All`, this field will be ignored.
+                              - When `targetPodSelector` is set to `Role`, only those replicas whose role matches the `matchingKey`
+                                will be selected for the Action.
+
+
+                              This field cannot be updated.
+                            type: string
+                          targetPodSelector:
+                            description: |-
+                              Defines the criteria used to select the target Pod(s) for executing the Action.
+                              This is useful when there is no default target replica identified.
+                              It allows for precise control over which Pod(s) the Action should run in.
+
+
+                              If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+                              to be removed or added; or a random pod if the Action is triggered at the component level, such as
+                              post-provision or pre-terminate of the component.
+
+
+                              This field cannot be updated.
                             enum:
                             - Any
                             - All
@@ -1020,18 +1326,20 @@ spec:
                             type: array
                           container:
                             description: |-
-                              Defines the name of the container within the target Pod where the action will be executed.
+                              Specifies the name of the container within the same pod whose resources will be shared with the action.
+                              This allows the action to utilize the specified container's resources without executing within it.
 
 
-                              This name must correspond to one of the containers defined in `componentDefinition.spec.runtime`.
-                              If this field is not specified, the default behavior is to use the first container listed in
-                              `componentDefinition.spec.runtime`.
+                              The name must match one of the containers defined in `componentDefinition.spec.runtime`.
+
+
+                              The resources that can be shared are included:
+
+
+                              - volume mounts
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           env:
                             description: |-
@@ -1159,7 +1467,7 @@ spec:
 
 
                               When specified, a dedicated container will be created using this image to execute the Action.
-                              This field is mutually exclusive with the `container` field; only one of them should be provided.
+                              All actions with same image will share the same container.
 
 
                               This field cannot be updated.
@@ -1176,9 +1484,6 @@ spec:
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           targetPodSelector:
                             description: |-
@@ -1187,10 +1492,12 @@ spec:
                               It allows for precise control over which Pod(s) the Action should run in.
 
 
+                              If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+                              to be removed or added; or a random pod if the Action is triggered at the component level, such as
+                              post-provision or pre-terminate of the component.
+
+
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             enum:
                             - Any
                             - All
@@ -1304,18 +1611,20 @@ spec:
                             type: array
                           container:
                             description: |-
-                              Defines the name of the container within the target Pod where the action will be executed.
+                              Specifies the name of the container within the same pod whose resources will be shared with the action.
+                              This allows the action to utilize the specified container's resources without executing within it.
 
 
-                              This name must correspond to one of the containers defined in `componentDefinition.spec.runtime`.
-                              If this field is not specified, the default behavior is to use the first container listed in
-                              `componentDefinition.spec.runtime`.
+                              The name must match one of the containers defined in `componentDefinition.spec.runtime`.
+
+
+                              The resources that can be shared are included:
+
+
+                              - volume mounts
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           env:
                             description: |-
@@ -1443,7 +1752,7 @@ spec:
 
 
                               When specified, a dedicated container will be created using this image to execute the Action.
-                              This field is mutually exclusive with the `container` field; only one of them should be provided.
+                              All actions with same image will share the same container.
 
 
                               This field cannot be updated.
@@ -1460,9 +1769,6 @@ spec:
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           targetPodSelector:
                             description: |-
@@ -1471,10 +1777,12 @@ spec:
                               It allows for precise control over which Pod(s) the Action should run in.
 
 
+                              If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+                              to be removed or added; or a random pod if the Action is triggered at the component level, such as
+                              post-provision or pre-terminate of the component.
+
+
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             enum:
                             - Any
                             - All
@@ -1590,18 +1898,20 @@ spec:
                             type: array
                           container:
                             description: |-
-                              Defines the name of the container within the target Pod where the action will be executed.
+                              Specifies the name of the container within the same pod whose resources will be shared with the action.
+                              This allows the action to utilize the specified container's resources without executing within it.
 
 
-                              This name must correspond to one of the containers defined in `componentDefinition.spec.runtime`.
-                              If this field is not specified, the default behavior is to use the first container listed in
-                              `componentDefinition.spec.runtime`.
+                              The name must match one of the containers defined in `componentDefinition.spec.runtime`.
+
+
+                              The resources that can be shared are included:
+
+
+                              - volume mounts
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           env:
                             description: |-
@@ -1729,7 +2039,7 @@ spec:
 
 
                               When specified, a dedicated container will be created using this image to execute the Action.
-                              This field is mutually exclusive with the `container` field; only one of them should be provided.
+                              All actions with same image will share the same container.
 
 
                               This field cannot be updated.
@@ -1746,9 +2056,6 @@ spec:
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           targetPodSelector:
                             description: |-
@@ -1757,10 +2064,12 @@ spec:
                               It allows for precise control over which Pod(s) the Action should run in.
 
 
+                              If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+                              to be removed or added; or a random pod if the Action is triggered at the component level, such as
+                              post-provision or pre-terminate of the component.
+
+
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             enum:
                             - Any
                             - All
@@ -1840,34 +2149,6 @@ spec:
                       The PostProvision Action is intended to run only once.
 
 
-                      The container executing this action has access to following environment variables:
-
-
-                      - KB_CLUSTER_POD_IP_LIST: Comma-separated list of the cluster's pod IP addresses (e.g., "podIp1,podIp2").
-                      - KB_CLUSTER_POD_NAME_LIST: Comma-separated list of the cluster's pod names (e.g., "pod1,pod2").
-                      - KB_CLUSTER_POD_HOST_NAME_LIST: Comma-separated list of host names, each corresponding to a pod in
-                        KB_CLUSTER_POD_NAME_LIST (e.g., "hostName1,hostName2").
-                      - KB_CLUSTER_POD_HOST_IP_LIST: Comma-separated list of host IP addresses, each corresponding to a pod in
-                        KB_CLUSTER_POD_NAME_LIST (e.g., "hostIp1,hostIp2").
-
-
-                      - KB_CLUSTER_COMPONENT_POD_NAME_LIST: Comma-separated list of all pod names within the component
-                        (e.g., "pod1,pod2").
-                      - KB_CLUSTER_COMPONENT_POD_IP_LIST: Comma-separated list of pod IP addresses,
-                        matching the order of pods in KB_CLUSTER_COMPONENT_POD_NAME_LIST (e.g., "podIp1,podIp2").
-                      - KB_CLUSTER_COMPONENT_POD_HOST_NAME_LIST: Comma-separated list of host names for each pod,
-                        matching the order of pods in KB_CLUSTER_COMPONENT_POD_NAME_LIST (e.g., "hostName1,hostName2").
-                      - KB_CLUSTER_COMPONENT_POD_HOST_IP_LIST: Comma-separated list of host IP addresses for each pod,
-                        matching the order of pods in KB_CLUSTER_COMPONENT_POD_NAME_LIST (e.g., "hostIp1,hostIp2").
-
-
-                      - KB_CLUSTER_COMPONENT_LIST: Comma-separated list of all cluster components (e.g., "comp1,comp2").
-                      - KB_CLUSTER_COMPONENT_DELETING_LIST: Comma-separated list of components that are currently being deleted
-                        (e.g., "comp1,comp2").
-                      - KB_CLUSTER_COMPONENT_UNDELETED_LIST: Comma-separated list of components that are not being deleted
-                        (e.g., "comp1,comp2").
-
-
                       Note: This field is immutable once it has been set.
                     properties:
                       exec:
@@ -1897,18 +2178,20 @@ spec:
                             type: array
                           container:
                             description: |-
-                              Defines the name of the container within the target Pod where the action will be executed.
+                              Specifies the name of the container within the same pod whose resources will be shared with the action.
+                              This allows the action to utilize the specified container's resources without executing within it.
 
 
-                              This name must correspond to one of the containers defined in `componentDefinition.spec.runtime`.
-                              If this field is not specified, the default behavior is to use the first container listed in
-                              `componentDefinition.spec.runtime`.
+                              The name must match one of the containers defined in `componentDefinition.spec.runtime`.
+
+
+                              The resources that can be shared are included:
+
+
+                              - volume mounts
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           env:
                             description: |-
@@ -2036,7 +2319,7 @@ spec:
 
 
                               When specified, a dedicated container will be created using this image to execute the Action.
-                              This field is mutually exclusive with the `container` field; only one of them should be provided.
+                              All actions with same image will share the same container.
 
 
                               This field cannot be updated.
@@ -2053,9 +2336,6 @@ spec:
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           targetPodSelector:
                             description: |-
@@ -2064,10 +2344,12 @@ spec:
                               It allows for precise control over which Pod(s) the Action should run in.
 
 
+                              If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+                              to be removed or added; or a random pod if the Action is triggered at the component level, such as
+                              post-provision or pre-terminate of the component.
+
+
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             enum:
                             - Any
                             - All
@@ -2147,41 +2429,6 @@ spec:
                       until the PreTerminate action has completed successfully.
 
 
-                      The container executing this action has access to following environment variables:
-
-
-                      - KB_CLUSTER_POD_IP_LIST: Comma-separated list of the cluster's pod IP addresses (e.g., "podIp1,podIp2").
-                      - KB_CLUSTER_POD_NAME_LIST: Comma-separated list of the cluster's pod names (e.g., "pod1,pod2").
-                      - KB_CLUSTER_POD_HOST_NAME_LIST: Comma-separated list of host names, each corresponding to a pod in
-                        KB_CLUSTER_POD_NAME_LIST (e.g., "hostName1,hostName2").
-                      - KB_CLUSTER_POD_HOST_IP_LIST: Comma-separated list of host IP addresses, each corresponding to a pod in
-                        KB_CLUSTER_POD_NAME_LIST (e.g., "hostIp1,hostIp2").
-
-
-                      - KB_CLUSTER_COMPONENT_POD_NAME_LIST: Comma-separated list of all pod names within the component
-                        (e.g., "pod1,pod2").
-                      - KB_CLUSTER_COMPONENT_POD_IP_LIST: Comma-separated list of pod IP addresses,
-                        matching the order of pods in KB_CLUSTER_COMPONENT_POD_NAME_LIST (e.g., "podIp1,podIp2").
-                      - KB_CLUSTER_COMPONENT_POD_HOST_NAME_LIST: Comma-separated list of host names for each pod,
-                        matching the order of pods in KB_CLUSTER_COMPONENT_POD_NAME_LIST (e.g., "hostName1,hostName2").
-                      - KB_CLUSTER_COMPONENT_POD_HOST_IP_LIST: Comma-separated list of host IP addresses for each pod,
-                        matching the order of pods in KB_CLUSTER_COMPONENT_POD_NAME_LIST (e.g., "hostIp1,hostIp2").
-
-
-                      - KB_CLUSTER_COMPONENT_LIST: Comma-separated list of all cluster components (e.g., "comp1,comp2").
-                      - KB_CLUSTER_COMPONENT_DELETING_LIST: Comma-separated list of components that are currently being deleted
-                        (e.g., "comp1,comp2").
-                      - KB_CLUSTER_COMPONENT_UNDELETED_LIST: Comma-separated list of components that are not being deleted
-                        (e.g., "comp1,comp2").
-
-
-                      - KB_CLUSTER_COMPONENT_IS_SCALING_IN: Indicates whether the component is currently scaling in.
-                        If this variable is present and set to "true", it denotes that the component is undergoing a scale-in operation.
-                        During scale-in, data rebalancing is necessary to maintain cluster integrity.
-                        Contrast this with a cluster deletion scenario where data rebalancing is not required as the entire cluster
-                        is being cleaned up.
-
-
                       Note: This field is immutable once it has been set.
                     properties:
                       exec:
@@ -2211,18 +2458,20 @@ spec:
                             type: array
                           container:
                             description: |-
-                              Defines the name of the container within the target Pod where the action will be executed.
+                              Specifies the name of the container within the same pod whose resources will be shared with the action.
+                              This allows the action to utilize the specified container's resources without executing within it.
 
 
-                              This name must correspond to one of the containers defined in `componentDefinition.spec.runtime`.
-                              If this field is not specified, the default behavior is to use the first container listed in
-                              `componentDefinition.spec.runtime`.
+                              The name must match one of the containers defined in `componentDefinition.spec.runtime`.
+
+
+                              The resources that can be shared are included:
+
+
+                              - volume mounts
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           env:
                             description: |-
@@ -2350,7 +2599,7 @@ spec:
 
 
                               When specified, a dedicated container will be created using this image to execute the Action.
-                              This field is mutually exclusive with the `container` field; only one of them should be provided.
+                              All actions with same image will share the same container.
 
 
                               This field cannot be updated.
@@ -2367,9 +2616,6 @@ spec:
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           targetPodSelector:
                             description: |-
@@ -2378,10 +2624,12 @@ spec:
                               It allows for precise control over which Pod(s) the Action should run in.
 
 
+                              If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+                              to be removed or added; or a random pod if the Action is triggered at the component level, such as
+                              post-provision or pre-terminate of the component.
+
+
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             enum:
                             - Any
                             - All
@@ -2496,18 +2744,20 @@ spec:
                             type: array
                           container:
                             description: |-
-                              Defines the name of the container within the target Pod where the action will be executed.
+                              Specifies the name of the container within the same pod whose resources will be shared with the action.
+                              This allows the action to utilize the specified container's resources without executing within it.
 
 
-                              This name must correspond to one of the containers defined in `componentDefinition.spec.runtime`.
-                              If this field is not specified, the default behavior is to use the first container listed in
-                              `componentDefinition.spec.runtime`.
+                              The name must match one of the containers defined in `componentDefinition.spec.runtime`.
+
+
+                              The resources that can be shared are included:
+
+
+                              - volume mounts
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           env:
                             description: |-
@@ -2635,7 +2885,7 @@ spec:
 
 
                               When specified, a dedicated container will be created using this image to execute the Action.
-                              This field is mutually exclusive with the `container` field; only one of them should be provided.
+                              All actions with same image will share the same container.
 
 
                               This field cannot be updated.
@@ -2652,9 +2902,6 @@ spec:
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           targetPodSelector:
                             description: |-
@@ -2663,10 +2910,12 @@ spec:
                               It allows for precise control over which Pod(s) the Action should run in.
 
 
+                              If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+                              to be removed or added; or a random pod if the Action is triggered at the component level, such as
+                              post-provision or pre-terminate of the component.
+
+
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             enum:
                             - Any
                             - All
@@ -2783,18 +3032,20 @@ spec:
                             type: array
                           container:
                             description: |-
-                              Defines the name of the container within the target Pod where the action will be executed.
+                              Specifies the name of the container within the same pod whose resources will be shared with the action.
+                              This allows the action to utilize the specified container's resources without executing within it.
 
 
-                              This name must correspond to one of the containers defined in `componentDefinition.spec.runtime`.
-                              If this field is not specified, the default behavior is to use the first container listed in
-                              `componentDefinition.spec.runtime`.
+                              The name must match one of the containers defined in `componentDefinition.spec.runtime`.
+
+
+                              The resources that can be shared are included:
+
+
+                              - volume mounts
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           env:
                             description: |-
@@ -2922,7 +3173,7 @@ spec:
 
 
                               When specified, a dedicated container will be created using this image to execute the Action.
-                              This field is mutually exclusive with the `container` field; only one of them should be provided.
+                              All actions with same image will share the same container.
 
 
                               This field cannot be updated.
@@ -2939,9 +3190,6 @@ spec:
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           targetPodSelector:
                             description: |-
@@ -2950,10 +3198,12 @@ spec:
                               It allows for precise control over which Pod(s) the Action should run in.
 
 
+                              If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+                              to be removed or added; or a random pod if the Action is triggered at the component level, such as
+                              post-provision or pre-terminate of the component.
+
+
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             enum:
                             - Any
                             - All
@@ -3057,18 +3307,20 @@ spec:
                             type: array
                           container:
                             description: |-
-                              Defines the name of the container within the target Pod where the action will be executed.
+                              Specifies the name of the container within the same pod whose resources will be shared with the action.
+                              This allows the action to utilize the specified container's resources without executing within it.
 
 
-                              This name must correspond to one of the containers defined in `componentDefinition.spec.runtime`.
-                              If this field is not specified, the default behavior is to use the first container listed in
-                              `componentDefinition.spec.runtime`.
+                              The name must match one of the containers defined in `componentDefinition.spec.runtime`.
+
+
+                              The resources that can be shared are included:
+
+
+                              - volume mounts
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           env:
                             description: |-
@@ -3196,7 +3448,7 @@ spec:
 
 
                               When specified, a dedicated container will be created using this image to execute the Action.
-                              This field is mutually exclusive with the `container` field; only one of them should be provided.
+                              All actions with same image will share the same container.
 
 
                               This field cannot be updated.
@@ -3213,9 +3465,6 @@ spec:
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           targetPodSelector:
                             description: |-
@@ -3224,10 +3473,12 @@ spec:
                               It allows for precise control over which Pod(s) the Action should run in.
 
 
+                              If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+                              to be removed or added; or a random pod if the Action is triggered at the component level, such as
+                              post-provision or pre-terminate of the component.
+
+
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             enum:
                             - Any
                             - All
@@ -3353,18 +3604,20 @@ spec:
                             type: array
                           container:
                             description: |-
-                              Defines the name of the container within the target Pod where the action will be executed.
+                              Specifies the name of the container within the same pod whose resources will be shared with the action.
+                              This allows the action to utilize the specified container's resources without executing within it.
 
 
-                              This name must correspond to one of the containers defined in `componentDefinition.spec.runtime`.
-                              If this field is not specified, the default behavior is to use the first container listed in
-                              `componentDefinition.spec.runtime`.
+                              The name must match one of the containers defined in `componentDefinition.spec.runtime`.
+
+
+                              The resources that can be shared are included:
+
+
+                              - volume mounts
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           env:
                             description: |-
@@ -3492,7 +3745,7 @@ spec:
 
 
                               When specified, a dedicated container will be created using this image to execute the Action.
-                              This field is mutually exclusive with the `container` field; only one of them should be provided.
+                              All actions with same image will share the same container.
 
 
                               This field cannot be updated.
@@ -3509,9 +3762,6 @@ spec:
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           targetPodSelector:
                             description: |-
@@ -3520,10 +3770,12 @@ spec:
                               It allows for precise control over which Pod(s) the Action should run in.
 
 
+                              If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+                              to be removed or added; or a random pod if the Action is triggered at the component level, such as
+                              post-provision or pre-terminate of the component.
+
+
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             enum:
                             - Any
                             - All
@@ -3622,12 +3874,9 @@ spec:
                       involving the current leader node.
 
 
-                      The container executing this action has access to following environment variables:
+                      The container executing this action has access to following variables:
 
 
-                      - KB_LEADER_POD_IP: The IP address of the current leader's pod prior to the switchover.
-                      - KB_LEADER_POD_NAME: The name of the current leader's pod prior to the switchover.
-                      - KB_LEADER_POD_FQDN: The FQDN of the current leader's pod prior to the switchover.
                       - KB_SWITCHOVER_CANDIDATE_NAME: The name of the pod for the new leader candidate, which may not be specified (empty).
                       - KB_SWITCHOVER_CANDIDATE_FQDN: The FQDN of the new leader candidate's pod, which may not be specified (empty).
 
@@ -3661,18 +3910,20 @@ spec:
                             type: array
                           container:
                             description: |-
-                              Defines the name of the container within the target Pod where the action will be executed.
+                              Specifies the name of the container within the same pod whose resources will be shared with the action.
+                              This allows the action to utilize the specified container's resources without executing within it.
 
 
-                              This name must correspond to one of the containers defined in `componentDefinition.spec.runtime`.
-                              If this field is not specified, the default behavior is to use the first container listed in
-                              `componentDefinition.spec.runtime`.
+                              The name must match one of the containers defined in `componentDefinition.spec.runtime`.
+
+
+                              The resources that can be shared are included:
+
+
+                              - volume mounts
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           env:
                             description: |-
@@ -3800,7 +4051,7 @@ spec:
 
 
                               When specified, a dedicated container will be created using this image to execute the Action.
-                              This field is mutually exclusive with the `container` field; only one of them should be provided.
+                              All actions with same image will share the same container.
 
 
                               This field cannot be updated.
@@ -3817,9 +4068,6 @@ spec:
 
 
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             type: string
                           targetPodSelector:
                             description: |-
@@ -3828,10 +4076,12 @@ spec:
                               It allows for precise control over which Pod(s) the Action should run in.
 
 
+                              If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+                              to be removed or added; or a random pod if the Action is triggered at the component level, such as
+                              post-provision or pre-terminate of the component.
+
+
                               This field cannot be updated.
-
-
-                              Note: This field is reserved for future use and is not currently active.
                             enum:
                             - Any
                             - All
@@ -12511,6 +12761,29 @@ spec:
                       description: Source for the variable's value. Cannot be used
                         if value is not empty.
                       properties:
+                        clusterVarRef:
+                          description: Selects a defined var of a Cluster.
+                          properties:
+                            clusterName:
+                              description: Reference to the name of the Cluster object.
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
+                            clusterUID:
+                              description: Reference to the UID of the Cluster object.
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
+                            namespace:
+                              description: Reference to the namespace of the Cluster
+                                object.
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
+                          type: object
                         componentVarRef:
                           description: Selects a defined var of a Component.
                           properties:
@@ -12522,14 +12795,6 @@ spec:
                             componentName:
                               description: Reference to the name of the Component
                                 object.
-                              enum:
-                              - Required
-                              - Optional
-                              type: string
-                            instanceNames:
-                              description: |-
-                                Reference to the instanceName list of the component.
-                                and the value will be presented in the following format: instanceName1,instanceName2,...
                               enum:
                               - Required
                               - Optional
@@ -12598,6 +12863,44 @@ spec:
                               - Required
                               - Optional
                               type: string
+                            podFQDNsForRole:
+                              description: |-
+                                Reference to the pod FQDN list of the component that have a specific role.
+                                The value will be presented in the following format: FQDN1,FQDN2,...
+                              properties:
+                                option:
+                                  description: VarOption defines whether a variable
+                                    is required or optional.
+                                  enum:
+                                  - Required
+                                  - Optional
+                                  type: string
+                                role:
+                                  type: string
+                              type: object
+                            podNames:
+                              description: |-
+                                Reference to the pod name list of the component.
+                                and the value will be presented in the following format: name1,name2,...
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
+                            podNamesForRole:
+                              description: |-
+                                Reference to the pod name list of the component that have a specific role.
+                                The value will be presented in the following format: name1,name2,...
+                              properties:
+                                option:
+                                  description: VarOption defines whether a variable
+                                    is required or optional.
+                                  enum:
+                                  - Required
+                                  - Optional
+                                  type: string
+                                role:
+                                  type: string
+                              type: object
                             replicas:
                               description: Reference to the replicas of the component.
                               enum:
@@ -13012,6 +13315,13 @@ spec:
                                   - Optional
                                   type: string
                               type: object
+                            serviceType:
+                              description: ServiceType references the type of the
+                                service.
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
                           type: object
                       type: object
                   required:

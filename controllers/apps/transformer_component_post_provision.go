@@ -20,52 +20,95 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/component/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-// componentPostProvisionTransformer handles component postProvision lifecycle action.
+const (
+	kbCompPostProvisionDoneKey = "kubeblocks.io/post-provision-done"
+)
+
 type componentPostProvisionTransformer struct{}
 
 var _ graph.Transformer = &componentPostProvisionTransformer{}
 
 func (t *componentPostProvisionTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
-	reqCtx := intctrlutil.RequestCtx{
-		Ctx:      transCtx.Context,
-		Log:      transCtx.Logger,
-		Recorder: transCtx.EventRecorder,
-	}
-	graphCli, _ := transCtx.Client.(model.GraphClient)
-	comp := transCtx.Component
-	cluster := transCtx.Cluster
-	compOrig := transCtx.ComponentOrig
-	synthesizeComp := transCtx.SynthesizeComponent
-	runningWorkload := transCtx.RunningWorkload
-
-	if model.IsObjectDeleting(compOrig) {
+	if model.IsObjectDeleting(transCtx.ComponentOrig) {
 		return nil
 	}
 
-	actionCtx, err := component.NewActionContext(cluster, comp, runningWorkload,
-		synthesizeComp.LifecycleActions, synthesizeComp.ScriptTemplates, component.PostProvisionAction)
+	synthesizedComp := transCtx.SynthesizeComponent
+	if synthesizedComp == nil || synthesizedComp.LifecycleActions == nil || synthesizedComp.LifecycleActions.PostProvision == nil {
+		return nil
+	}
+
+	if checkPostProvisionDone(transCtx) {
+		return nil
+	}
+	err := t.postProvision(transCtx)
+	if err != nil {
+		return lifecycle.IgnoreNotDefined(err)
+	}
+	return t.markPostProvisionDone(transCtx, dag)
+}
+
+func (t *componentPostProvisionTransformer) markPostProvisionDone(transCtx *componentTransformContext, dag *graph.DAG) error {
+	comp := transCtx.Component
+	if comp.Annotations == nil {
+		comp.Annotations = make(map[string]string)
+	}
+	_, ok := comp.Annotations[kbCompPostProvisionDoneKey]
+	if ok {
+		return nil
+	}
+	compObj := comp.DeepCopy()
+	timeStr := time.Now().Format(time.RFC3339Nano)
+	comp.Annotations[kbCompPostProvisionDoneKey] = timeStr
+
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	graphCli.Update(dag, compObj, comp, &model.ReplaceIfExistingOption{})
+	return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting for post-provision annotation to be set")
+}
+
+func (t *componentPostProvisionTransformer) postProvision(transCtx *componentTransformContext) error {
+	lfa, err := t.lifecycleAction4Component(transCtx)
 	if err != nil {
 		return err
 	}
+	return lfa.PostProvision(transCtx.Context, transCtx.Client, nil)
+}
 
-	if err := component.ReconcileCompPostProvision(reqCtx.Ctx, transCtx.Client, graphCli, actionCtx, dag); err != nil {
-		reqCtx.Log.Info("Failed to reconcile component postProvision action", "component", comp.Name, "error", err)
-		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeExpectedInProcess) {
-			return nil
-		}
-		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeRequeue) {
-			return newRequeueError(time.Second*1, "request to requeue the component postProvision action")
-		}
-		return err
+func (t *componentPostProvisionTransformer) lifecycleAction4Component(transCtx *componentTransformContext) (lifecycle.Lifecycle, error) {
+	synthesizedComp := transCtx.SynthesizeComponent
+	pods, err := component.ListOwnedPods(transCtx.Context, transCtx.Client,
+		synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
+	if err != nil {
+		return nil, err
 	}
-	return nil
+	if len(pods) == 0 {
+		// TODO: (good-first-issue) we should handle the case that the component has no pods
+		return nil, fmt.Errorf("has no pods to running the post-provision action")
+	}
+	return lifecycle.New(transCtx.SynthesizeComponent, nil, pods...)
+}
+
+func checkPostProvisionDone(transCtx *componentTransformContext) bool {
+	synthesizedComp := transCtx.SynthesizeComponent
+	if synthesizedComp == nil || synthesizedComp.LifecycleActions == nil || synthesizedComp.LifecycleActions.PostProvision == nil {
+		return true
+	}
+
+	comp := transCtx.Component
+	if comp.Annotations == nil {
+		return false
+	}
+	_, ok := comp.Annotations[kbCompPostProvisionDoneKey]
+	return ok
 }

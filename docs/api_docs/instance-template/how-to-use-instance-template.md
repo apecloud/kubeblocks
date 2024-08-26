@@ -16,20 +16,18 @@ In the official image of RisingWave, this information can be injected via enviro
 
 ## An example
 
-In the default template of RisingWave addon, the environment variables are configured as follows:
+In the default template of RisingWave addon, [the environment variables](https://github.com/apecloud/kubeblocks-addons/blob/main/addons/risingwave/templates/cmpd-compute.yaml#L26) are configured as follows:
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
-kind: ClusterDefinition
+kind: ComponentDefinition
 metadata:
   name: risingwave
 # ...
 spec:
-  componentDefs:
-  - name: compute
-# ...
-    podSpec:
-      containers:
+#...
+  runtime:
+    containers:
       - name: compute
         securityContext:
           allowPrivilegeEscalation: false
@@ -60,7 +58,7 @@ spec:
 # ...
 ```
 
-After adding an instance template to the cluster resources:
+After adding an instance template to the [cluster resources](https://github.com/apecloud/kubeblocks-addons/blob/main/addons-cluster/risingwave/templates/cluster.yaml):
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -71,7 +69,7 @@ metadata:
 # ...
 spec:
   componentSpecs:
-  - componentDefRef: compute
+  - componentDef: compute
     name: compute
     replicas: {{ .Values.risingwave.compute.replicas }}
     instances:

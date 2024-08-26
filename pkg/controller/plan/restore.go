@@ -82,7 +82,7 @@ func NewRestoreManager(ctx context.Context,
 	}
 }
 
-func (r *RestoreManager) DoRestore(comp *component.SynthesizedComponent, compObj *appsv1alpha1.Component, needDoPostProvision bool) error {
+func (r *RestoreManager) DoRestore(comp *component.SynthesizedComponent, compObj *appsv1alpha1.Component, postProvisionDone bool) error {
 	backupObj, err := r.initFromAnnotation(comp, compObj)
 	if err != nil {
 		return err
@@ -100,7 +100,7 @@ func (r *RestoreManager) DoRestore(comp *component.SynthesizedComponent, compObj
 		return nil
 	}
 	// wait for the post-provision action to complete.
-	if needDoPostProvision {
+	if !postProvisionDone {
 		return nil
 	}
 	if r.doReadyRestoreAfterClusterRunning && r.Cluster.Status.Phase != appsv1alpha1.RunningClusterPhase {

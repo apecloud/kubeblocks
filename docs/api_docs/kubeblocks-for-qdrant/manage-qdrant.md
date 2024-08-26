@@ -99,7 +99,7 @@ EOF
 | `spec.affinity.topologyKeys`          | It represents the key of node labels used to define the topology domain for Pod anti-affinity and Pod spread constraints.   |
 | `spec.tolerations`                    | It is an array that specifies tolerations attached to the cluster's Pods, allowing them to be scheduled onto nodes with matching taints.  |
 | `spec.componentSpecs`                 | It is the list of components that define the cluster components. This field allows customized configuration of each component within a cluster.   |
-| `spec.componentSpecs.componentDefRef` | It is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition apecloud-mysql -o json \| jq '.spec.componentDefs[].name'`.   |
+| `spec.componentSpecs.componentDefRef` | It is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition qdrant -o json \| jq '.spec.componentDefs[].name'`.   |
 | `spec.componentSpecs.name`            | It specifies the name of the component.     |
 | `spec.componentSpecs.disableExporter` | It defines whether the monitoring function is enabled. |
 | `spec.componentSpecs.replicas`        | It specifies the number of replicas of the component.  |
@@ -117,7 +117,7 @@ Run the following command to see the created Qdrant cluster object:
 kubectl get cluster mycluster -n demo -o yaml
 ```
 
-## Connect to a vector database cluster
+## Connect to a Qdrant cluster
 
 Qdrant provides both HTTP and gRPC protocols for client access on ports 6333 and 6334 respectively. You can also port forward the service to connect to a database from your local machine.
 
@@ -135,7 +135,7 @@ Qdrant provides both HTTP and gRPC protocols for client access on ports 6333 and
 
    Refer to [the official Qdrant documents](https://qdrant.tech/documentation/) for the cluster operations.
 
-## Scaling
+## Scale
 
 ### Scale horizontally
 
@@ -151,7 +151,7 @@ Check whether the cluster STATUS is `Running`. Otherwise, the following operatio
 kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY     STATUS    AGE
-mycluster   qdrant               qdrant-1.5.0   Delete                 Running   47m
+mycluster   qdrant               qdrant-1.8.1   Delete                 Running   47m
 ```
 
 #### Steps
@@ -236,7 +236,7 @@ There are two ways to apply horizontal scaling.
      namespace: demo
    spec:
      clusterDefinitionRef: qdrant
-     clusterVersionRef: qdrant-1.5.0
+     clusterVersionRef: qdrant-1.8.1
      componentSpecs:
      - name: qdrant
        componentDefRef: qdrant
@@ -323,7 +323,7 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY     STATUS    AGE
-mycluster   qdrant               qdrant-1.5.0   Delete                 Running   47m
+mycluster   qdrant               qdrant-1.8.1   Delete                 Running   47m
 ```
 
 #### Steps
@@ -388,7 +388,7 @@ There are two ways to apply vertical scaling.
      namespace: demo
    spec:
      clusterDefinitionRef: qdrant
-     clusterVersionRef: qdrant-1.5.0
+     clusterVersionRef: qdrant-1.8.1
      componentSpecs:
      - name: qdrant
        componentDefRef: qdrant
@@ -420,7 +420,7 @@ There are two ways to apply vertical scaling.
 </TabItem>
 </Tabs>
 
-## Volume Expanding
+## Volume Expansion
 
 ### Before you start
 
@@ -430,7 +430,7 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    AGE
-mycluster   qdrant               qdrant-1.5.0      Delete               Running   4m29s
+mycluster   qdrant               qdrant-1.8.1      Delete               Running   4m29s
 ```
 
 ### Steps
@@ -480,7 +480,7 @@ There are two ways to apply volume expansion.
 
 </TabItem>
 
-<TabItem value="Edit cluster YAML file" label="Edit cluster YAML fil">
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
 1. Change the value of `spec.componentSpecs.volumeClaimTemplates.spec.resources` in the cluster YAML file.
 
@@ -495,7 +495,7 @@ There are two ways to apply volume expansion.
      namespace: demo
    spec:
      clusterDefinitionRef: qdrant
-     clusterVersionRef: qdrant-1.5.0
+     clusterVersionRef: qdrant-1.8.1
      componentSpecs:
      - name: qdrant
        componentDefRef: qdrant

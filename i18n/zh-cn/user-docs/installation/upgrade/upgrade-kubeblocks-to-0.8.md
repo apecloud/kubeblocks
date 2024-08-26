@@ -1,14 +1,13 @@
 ---
 title: 升级到 KubeBlocks v0.8
-description: 升级 KubeBlocks v0.8, 操作, 注意事项
+description: 如何升级到 KubeBlocks v0.8
 keywords: [升级, 0.8]
-sidebar_position: 1
+sidebar_position: 2
 sidebar_label: 升级到 KubeBlocks v0.8
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
-
 
 # 升级到 KubeBlocks v0.8
 

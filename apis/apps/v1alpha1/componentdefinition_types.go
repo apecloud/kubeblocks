@@ -701,27 +701,12 @@ type ExecAction struct {
 	// Specifies the container image to be used for running the Action.
 	//
 	// When specified, a dedicated container will be created using this image to execute the Action.
-	// This field is mutually exclusive with the `container` field; only one of them should be provided.
+	// All actions with same image will share the same container.
 	//
 	// This field cannot be updated.
 	//
 	// +optional
 	Image string `json:"image,omitempty"`
-
-	// Specifies the command to be executed inside the container.
-	// The working directory for this command is the container's root directory('/').
-	// Commands are executed directly without a shell environment, meaning shell-specific syntax ('|', etc.) is not supported.
-	// If the shell is required, it must be explicitly invoked in the command.
-	//
-	// A successful execution is indicated by an exit status of 0; any non-zero status signifies a failure.
-	//
-	// +optional
-	Command []string `json:"command,omitempty" protobuf:"bytes,1,rep,name=command"`
-
-	// Args represents the arguments that are passed to the `command` for execution.
-	//
-	// +optional
-	Args []string `json:"args,omitempty"`
 
 	// Represents a list of environment variables that will be injected into the container.
 	// These variables enable the container to adapt its behavior based on the environment it's running in.
@@ -733,13 +718,30 @@ type ExecAction struct {
 	// +patchStrategy=merge
 	Env []corev1.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 
+	// Specifies the command to be executed inside the container.
+	// The working directory for this command is the container's root directory('/').
+	// Commands are executed directly without a shell environment, meaning shell-specific syntax ('|', etc.) is not supported.
+	// If the shell is required, it must be explicitly invoked in the command.
+	//
+	// A successful execution is indicated by an exit status of 0; any non-zero status signifies a failure.
+	//
+	// +optional
+	Command []string `json:"command,omitempty"`
+
+	// Args represents the arguments that are passed to the `command` for execution.
+	//
+	// +optional
+	Args []string `json:"args,omitempty"`
+
 	// Defines the criteria used to select the target Pod(s) for executing the Action.
 	// This is useful when there is no default target replica identified.
 	// It allows for precise control over which Pod(s) the Action should run in.
 	//
-	// This field cannot be updated.
+	// If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+	// to be removed or added; or a random pod if the Action is triggered at the component level, such as
+	// post-provision or pre-terminate of the component.
 	//
-	// Note: This field is reserved for future use and is not currently active.
+	// This field cannot be updated.
 	//
 	// +optional
 	TargetPodSelector TargetPodSelector `json:"targetPodSelector,omitempty"`
@@ -753,20 +755,19 @@ type ExecAction struct {
 	//
 	// This field cannot be updated.
 	//
-	// Note: This field is reserved for future use and is not currently active.
-	//
 	// +optional
 	MatchingKey string `json:"matchingKey,omitempty"`
 
-	// Defines the name of the container within the target Pod where the action will be executed.
+	// Specifies the name of the container within the same pod whose resources will be shared with the action.
+	// This allows the action to utilize the specified container's resources without executing within it.
 	//
-	// This name must correspond to one of the containers defined in `componentDefinition.spec.runtime`.
-	// If this field is not specified, the default behavior is to use the first container listed in
-	// `componentDefinition.spec.runtime`.
+	// The name must match one of the containers defined in `componentDefinition.spec.runtime`.
+	//
+	// The resources that can be shared are included:
+	//
+	// - volume mounts
 	//
 	// This field cannot be updated.
-	//
-	// Note: This field is reserved for future use and is not currently active.
 	//
 	// +optional
 	Container string `json:"container,omitempty"`
@@ -929,30 +930,6 @@ type ComponentLifecycleActions struct {
 	//
 	// The PostProvision Action is intended to run only once.
 	//
-	// The container executing this action has access to following environment variables:
-	//
-	// - KB_CLUSTER_POD_IP_LIST: Comma-separated list of the cluster's pod IP addresses (e.g., "podIp1,podIp2").
-	// - KB_CLUSTER_POD_NAME_LIST: Comma-separated list of the cluster's pod names (e.g., "pod1,pod2").
-	// - KB_CLUSTER_POD_HOST_NAME_LIST: Comma-separated list of host names, each corresponding to a pod in
-	//   KB_CLUSTER_POD_NAME_LIST (e.g., "hostName1,hostName2").
-	// - KB_CLUSTER_POD_HOST_IP_LIST: Comma-separated list of host IP addresses, each corresponding to a pod in
-	//   KB_CLUSTER_POD_NAME_LIST (e.g., "hostIp1,hostIp2").
-	//
-	// - KB_CLUSTER_COMPONENT_POD_NAME_LIST: Comma-separated list of all pod names within the component
-	//   (e.g., "pod1,pod2").
-	// - KB_CLUSTER_COMPONENT_POD_IP_LIST: Comma-separated list of pod IP addresses,
-	//   matching the order of pods in KB_CLUSTER_COMPONENT_POD_NAME_LIST (e.g., "podIp1,podIp2").
-	// - KB_CLUSTER_COMPONENT_POD_HOST_NAME_LIST: Comma-separated list of host names for each pod,
-	//   matching the order of pods in KB_CLUSTER_COMPONENT_POD_NAME_LIST (e.g., "hostName1,hostName2").
-	// - KB_CLUSTER_COMPONENT_POD_HOST_IP_LIST: Comma-separated list of host IP addresses for each pod,
-	//   matching the order of pods in KB_CLUSTER_COMPONENT_POD_NAME_LIST (e.g., "hostIp1,hostIp2").
-	//
-	// - KB_CLUSTER_COMPONENT_LIST: Comma-separated list of all cluster components (e.g., "comp1,comp2").
-	// - KB_CLUSTER_COMPONENT_DELETING_LIST: Comma-separated list of components that are currently being deleted
-	//   (e.g., "comp1,comp2").
-	// - KB_CLUSTER_COMPONENT_UNDELETED_LIST: Comma-separated list of components that are not being deleted
-	//   (e.g., "comp1,comp2").
-	//
 	// Note: This field is immutable once it has been set.
 	//
 	// +optional
@@ -965,36 +942,6 @@ type ComponentLifecycleActions struct {
 	// This action is executed immediately when a scale-down operation for the Component is initiated.
 	// The actual termination and cleanup of the Component and its associated resources will not proceed
 	// until the PreTerminate action has completed successfully.
-	//
-	// The container executing this action has access to following environment variables:
-	//
-	// - KB_CLUSTER_POD_IP_LIST: Comma-separated list of the cluster's pod IP addresses (e.g., "podIp1,podIp2").
-	// - KB_CLUSTER_POD_NAME_LIST: Comma-separated list of the cluster's pod names (e.g., "pod1,pod2").
-	// - KB_CLUSTER_POD_HOST_NAME_LIST: Comma-separated list of host names, each corresponding to a pod in
-	//   KB_CLUSTER_POD_NAME_LIST (e.g., "hostName1,hostName2").
-	// - KB_CLUSTER_POD_HOST_IP_LIST: Comma-separated list of host IP addresses, each corresponding to a pod in
-	//   KB_CLUSTER_POD_NAME_LIST (e.g., "hostIp1,hostIp2").
-	//
-	// - KB_CLUSTER_COMPONENT_POD_NAME_LIST: Comma-separated list of all pod names within the component
-	//   (e.g., "pod1,pod2").
-	// - KB_CLUSTER_COMPONENT_POD_IP_LIST: Comma-separated list of pod IP addresses,
-	//   matching the order of pods in KB_CLUSTER_COMPONENT_POD_NAME_LIST (e.g., "podIp1,podIp2").
-	// - KB_CLUSTER_COMPONENT_POD_HOST_NAME_LIST: Comma-separated list of host names for each pod,
-	//   matching the order of pods in KB_CLUSTER_COMPONENT_POD_NAME_LIST (e.g., "hostName1,hostName2").
-	// - KB_CLUSTER_COMPONENT_POD_HOST_IP_LIST: Comma-separated list of host IP addresses for each pod,
-	//   matching the order of pods in KB_CLUSTER_COMPONENT_POD_NAME_LIST (e.g., "hostIp1,hostIp2").
-	//
-	// - KB_CLUSTER_COMPONENT_LIST: Comma-separated list of all cluster components (e.g., "comp1,comp2").
-	// - KB_CLUSTER_COMPONENT_DELETING_LIST: Comma-separated list of components that are currently being deleted
-	//   (e.g., "comp1,comp2").
-	// - KB_CLUSTER_COMPONENT_UNDELETED_LIST: Comma-separated list of components that are not being deleted
-	//   (e.g., "comp1,comp2").
-	//
-	// - KB_CLUSTER_COMPONENT_IS_SCALING_IN: Indicates whether the component is currently scaling in.
-	//   If this variable is present and set to "true", it denotes that the component is undergoing a scale-in operation.
-	//   During scale-in, data rebalancing is necessary to maintain cluster integrity.
-	//   Contrast this with a cluster deletion scenario where data rebalancing is not required as the entire cluster
-	//   is being cleaned up.
 	//
 	// Note: This field is immutable once it has been set.
 	//
@@ -1040,11 +987,8 @@ type ComponentLifecycleActions struct {
 	// during events such as planned maintenance or when performing stop, shutdown, restart, or upgrade operations
 	// involving the current leader node.
 	//
-	// The container executing this action has access to following environment variables:
+	// The container executing this action has access to following variables:
 	//
-	// - KB_LEADER_POD_IP: The IP address of the current leader's pod prior to the switchover.
-	// - KB_LEADER_POD_NAME: The name of the current leader's pod prior to the switchover.
-	// - KB_LEADER_POD_FQDN: The FQDN of the current leader's pod prior to the switchover.
 	// - KB_SWITCHOVER_CANDIDATE_NAME: The name of the pod for the new leader candidate, which may not be specified (empty).
 	// - KB_SWITCHOVER_CANDIDATE_FQDN: The FQDN of the new leader candidate's pod, which may not be specified (empty).
 	//
@@ -1206,6 +1150,12 @@ type ComponentLifecycleActions struct {
 	// Use Case:
 	// This action is designed to create system accounts that are utilized for replication, monitoring, backup,
 	// and other administrative tasks.
+	//
+	// The container executing this action has access to following variables:
+	//
+	// - KB_ACCOUNT_NAME: The name of the system account to be created.
+	// - KB_ACCOUNT_PASSWORD: The password for the system account.  // TODO: how to pass the password securely?
+	// - KB_ACCOUNT_STATEMENT: The statement used to create the system account.
 	//
 	// Note: This field is immutable once it has been set.
 	//

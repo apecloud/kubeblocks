@@ -25,8 +25,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const (
+	accountName      = "KB_ACCOUNT_NAME"
+	accountPassword  = "KB_ACCOUNT_PASSWORD"
+	accountStatement = "KB_ACCOUNT_STATEMENT"
+)
+
 type accountProvision struct {
-	args any
+	statement string
+	user      string
+	password  string
 }
 
 var _ lifecycleAction = &accountProvision{}
@@ -36,5 +44,14 @@ func (a *accountProvision) name() string {
 }
 
 func (a *accountProvision) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {
-	return nil, nil
+	// The container executing this action has access to following variables:
+	//
+	// - KB_ACCOUNT_NAME: The name of the system account to be created.
+	// - KB_ACCOUNT_PASSWORD: The password for the system account.
+	// - KB_ACCOUNT_STATEMENT: The statement used to create the system account.
+	return map[string]string{
+		accountName:      a.user,
+		accountPassword:  a.password,
+		accountStatement: a.statement,
+	}, nil
 }

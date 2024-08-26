@@ -30,6 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	kbagent "github.com/apecloud/kubeblocks/pkg/kbagent"
 )
 
 var _ = Describe("kb-agent", func() {
@@ -55,7 +56,7 @@ var _ = Describe("kb-agent", func() {
 
 	kbAgentContainer := func() *corev1.Container {
 		for _, c := range synthesizedComp.PodSpec.Containers {
-			if c.Name == kbAgentContainerName {
+			if c.Name == kbagent.ContainerName {
 				return &c
 			}
 		}
@@ -64,7 +65,7 @@ var _ = Describe("kb-agent", func() {
 
 	kbAgentInitContainer := func() *corev1.Container {
 		for _, c := range synthesizedComp.PodSpec.InitContainers {
-			if c.Name == kbAgentInitContainerName {
+			if c.Name == kbagent.InitContainerName {
 				return &c
 			}
 		}

@@ -56,7 +56,7 @@ func runCommand(ctx context.Context, action *proto.ExecAction, parameters map[st
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
-			err = errors.Wrap(ErrFailed, string(<-stderrChan))
+			err = errors.Wrap(proto.ErrFailed, string(<-stderrChan))
 		}
 		return nil, err
 	}
@@ -136,7 +136,7 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 		stdin, stdinErr = cmd.StdinPipe()
 		if stdinErr != nil {
 			cancelTimeout()
-			return nil, errors.Wrapf(ErrInternalError, "failed to create stdin pipe: %v", stdinErr)
+			return nil, errors.Wrapf(proto.ErrInternalError, "failed to create stdin pipe: %v", stdinErr)
 		}
 	}
 	if stdoutWriter != nil {
@@ -144,7 +144,7 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 		stdout, stdoutErr = cmd.StdoutPipe()
 		if stdoutErr != nil {
 			cancelTimeout()
-			return nil, errors.Wrapf(ErrInternalError, "failed to create stdout pipe: %v", stdoutErr)
+			return nil, errors.Wrapf(proto.ErrInternalError, "failed to create stdout pipe: %v", stdoutErr)
 		}
 	}
 	if stderrWriter != nil {
@@ -152,7 +152,7 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 		stderr, stderrErr = cmd.StderrPipe()
 		if stderrErr != nil {
 			cancelTimeout()
-			return nil, errors.Wrapf(ErrInternalError, "failed to create stderr pipe: %v", stderrErr)
+			return nil, errors.Wrapf(proto.ErrInternalError, "failed to create stderr pipe: %v", stderrErr)
 		}
 	}
 
@@ -163,9 +163,9 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 
 		if err := cmd.Start(); err != nil {
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-				errChan <- ErrTimeout
+				errChan <- proto.ErrTimedOut
 			} else {
-				errChan <- errors.Wrapf(ErrFailed, "failed to start command: %v", err)
+				errChan <- errors.Wrapf(proto.ErrFailed, "failed to start command: %v", err)
 			}
 			return
 		}
@@ -183,7 +183,7 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 					if errors.Is(copyErr, os.ErrClosed) {
 						return
 					}
-					ioCopyError = errors.Wrapf(ErrFailed, "failed to copy from input reader to stdin: %v", copyErr)
+					ioCopyError = errors.Wrapf(proto.ErrFailed, "failed to copy from input reader to stdin: %v", copyErr)
 				}
 			}
 		}()
@@ -195,7 +195,7 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 					if errors.Is(copyErr, os.ErrClosed) {
 						return
 					}
-					ioCopyError = errors.Wrapf(ErrFailed, "failed to copy stdout to output writer: %v", copyErr)
+					ioCopyError = errors.Wrapf(proto.ErrFailed, "failed to copy stdout to output writer: %v", copyErr)
 				}
 			}
 		}()
@@ -207,7 +207,7 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 					if errors.Is(copyErr, os.ErrClosed) {
 						return
 					}
-					ioCopyError = errors.Wrapf(ErrFailed, "failed to copy stderr to error writer: %v", copyErr)
+					ioCopyError = errors.Wrapf(proto.ErrFailed, "failed to copy stderr to error writer: %v", copyErr)
 				}
 			}
 		}()
@@ -216,7 +216,7 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 		execErr := cmd.Wait()
 		if execErr != nil {
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-				execErr = ErrTimeout
+				execErr = proto.ErrTimedOut
 			}
 		}
 

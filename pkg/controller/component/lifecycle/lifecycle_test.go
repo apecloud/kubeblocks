@@ -40,7 +40,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
-	"github.com/apecloud/kubeblocks/pkg/kbagent/service"
 )
 
 type mockReader struct {
@@ -210,7 +209,7 @@ var _ = Describe("lifecycle", func() {
 
 			action := synthesizedComp.LifecycleActions.PostProvision
 			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
-				recorder.CallAction(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
 					Expect(req.Action).Should(Equal("postProvision"))
 					Expect(req.Parameters).ShouldNot(BeNil()) // legacy parameters for post-provision action
 					Expect(req.NonBlocking).ShouldNot(BeNil())
@@ -239,7 +238,7 @@ var _ = Describe("lifecycle", func() {
 			Expect(lifecycle).ShouldNot(BeNil())
 
 			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
-				recorder.CallAction(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
 					return proto.ActionResponse{}, nil
 				}).AnyTimes()
 			})
@@ -254,7 +253,7 @@ var _ = Describe("lifecycle", func() {
 			Expect(lifecycle).ShouldNot(BeNil())
 
 			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
-				recorder.CallAction(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
 					return proto.ActionResponse{
 						Output: []byte("role-probe"),
 					}, nil
@@ -273,28 +272,31 @@ var _ = Describe("lifecycle", func() {
 
 			unknownErr := fmt.Errorf("%s", "unknown error")
 			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
-				recorder.CallAction(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
-					return proto.ActionResponse{}, service.ErrNotDefined
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+					return proto.ActionResponse{}, proto.ErrNotDefined
 				}).MaxTimes(1)
-				recorder.CallAction(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
-					return proto.ActionResponse{}, service.ErrNotImplemented
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+					return proto.ActionResponse{}, proto.ErrNotImplemented
 				}).MaxTimes(1)
-				recorder.CallAction(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
-					return proto.ActionResponse{}, service.ErrInProgress
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+					return proto.ActionResponse{}, proto.ErrBadRequest
 				}).MaxTimes(1)
-				recorder.CallAction(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
-					return proto.ActionResponse{}, service.ErrBusy
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+					return proto.ActionResponse{}, proto.ErrInProgress
 				}).MaxTimes(1)
-				recorder.CallAction(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
-					return proto.ActionResponse{}, service.ErrTimeout
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+					return proto.ActionResponse{}, proto.ErrBusy
 				}).MaxTimes(1)
-				recorder.CallAction(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
-					return proto.ActionResponse{}, service.ErrFailed
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+					return proto.ActionResponse{}, proto.ErrTimedOut
 				}).MaxTimes(1)
-				recorder.CallAction(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
-					return proto.ActionResponse{}, service.ErrInternalError
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+					return proto.ActionResponse{}, proto.ErrFailed
 				}).MaxTimes(1)
-				recorder.CallAction(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+					return proto.ActionResponse{}, proto.ErrInternalError
+				}).MaxTimes(1)
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
 					return proto.ActionResponse{}, unknownErr
 				}).MaxTimes(1)
 			})
@@ -302,9 +304,10 @@ var _ = Describe("lifecycle", func() {
 			for _, expected := range []error{
 				ErrActionNotDefined,
 				ErrActionNotImplemented,
+				ErrActionInternalError,
 				ErrActionInProgress,
 				ErrActionBusy,
-				ErrActionTimeout,
+				ErrActionTimedOut,
 				ErrActionFailed,
 				ErrActionInternalError,
 				unknownErr,
@@ -349,7 +352,7 @@ var _ = Describe("lifecycle", func() {
 			}
 
 			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
-				recorder.CallAction(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
 					Expect(req.Action).Should(Equal("postProvision"))
 					Expect(req.Parameters).ShouldNot(BeNil()) // legacy parameters for post-provision action
 					Expect(req.Parameters[hackedAllCompList]).Should(Equal(strings.Join([]string{synthesizedComp.Name, "another"}, ",")))
@@ -371,7 +374,7 @@ var _ = Describe("lifecycle", func() {
 			Expect(lifecycle).ShouldNot(BeNil())
 
 			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
-				recorder.CallAction(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
 					Expect(req.Action).Should(Equal("roleProbe"))
 					Expect(req.Parameters).ShouldNot(BeNil())
 					Expect(req.Parameters[key]).Should(Equal(val))
@@ -410,7 +413,7 @@ var _ = Describe("lifecycle", func() {
 			}
 
 			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
-				recorder.CallAction(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
 					return proto.ActionResponse{}, nil
 				}).AnyTimes()
 			})

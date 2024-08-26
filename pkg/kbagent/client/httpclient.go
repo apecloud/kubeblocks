@@ -27,14 +27,11 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/valyala/fasthttp"
-
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
 const (
-	urlTemplate      = "http://%s:%d/%s"
-	actionServiceURI = "/v1.0/action"
+	urlTemplate = "http://%s:%d%s"
 )
 
 type httpClient struct {
@@ -45,25 +42,25 @@ type httpClient struct {
 
 var _ Client = &httpClient{}
 
-func (c *httpClient) CallAction(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
-	url := fmt.Sprintf(urlTemplate, c.host, c.port, actionServiceURI)
+func (c *httpClient) Action(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+	rsp := proto.ActionResponse{}
 
 	data, err := json.Marshal(req)
 	if err != nil {
-		return proto.ActionResponse{}, err
+		return rsp, err
 	}
 
-	payload, err := c.request(ctx, fasthttp.MethodPost, url, bytes.NewReader(data))
+	url := fmt.Sprintf(urlTemplate, c.host, c.port, proto.ServiceAction.URI)
+	payload, err := c.request(ctx, http.MethodPost, url, bytes.NewReader(data))
 	if err != nil {
-		return proto.ActionResponse{}, err
+		return rsp, err
 	}
-	if payload == nil {
-		return proto.ActionResponse{}, nil
-	}
-	return c.decode(payload)
+
+	defer payload.Close()
+	return decode(payload, &rsp)
 }
 
-func (c *httpClient) request(ctx context.Context, method, url string, body io.Reader) (io.Reader, error) {
+func (c *httpClient) request(ctx context.Context, method, url string, body io.Reader) (io.ReadCloser, error) {
 	req, err := http.NewRequestWithContext(ctx, method, url, body)
 	if err != nil {
 		return nil, err
@@ -71,35 +68,25 @@ func (c *httpClient) request(ctx context.Context, method, url string, body io.Re
 
 	rsp, err := c.client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, err // http error
 	}
-	defer rsp.Body.Close()
 
 	switch rsp.StatusCode {
-	case http.StatusOK, http.StatusUnavailableForLegalReasons:
+	case http.StatusOK, http.StatusInternalServerError:
 		return rsp.Body, nil
-	case http.StatusNoContent:
-		return nil, nil
-	case http.StatusNotImplemented, http.StatusInternalServerError:
-		fallthrough
 	default:
-		msg, err := io.ReadAll(rsp.Body)
-		if err != nil {
-			return nil, err
-		}
-		return nil, fmt.Errorf("%s", string(msg))
+		return nil, fmt.Errorf("unexpected http status code: %s", rsp.Status)
 	}
 }
 
-func (c *httpClient) decode(body io.Reader) (proto.ActionResponse, error) {
-	rsp := proto.ActionResponse{}
+func decode[T any](body io.Reader, rsp *T) (T, error) {
 	data, err := io.ReadAll(body)
 	if err != nil {
-		return rsp, err
+		return *rsp, err
 	}
 	err = json.Unmarshal(data, &rsp)
 	if err != nil {
-		return rsp, err
+		return *rsp, err
 	}
-	return rsp, nil
+	return *rsp, nil
 }

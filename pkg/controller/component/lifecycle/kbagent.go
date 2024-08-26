@@ -34,9 +34,10 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	kbagt "github.com/apecloud/kubeblocks/pkg/kbagent"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
-	"github.com/apecloud/kubeblocks/pkg/kbagent/service"
 )
 
 type lifecycleAction interface {
@@ -281,16 +282,23 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1alpha1
 	//  - timeout
 	var output []byte
 	for _, pod := range pods {
-		cli, err1 := kbacli.NewClient(*pod)
-		if err1 != nil {
-			return nil, err1
+		host, port, err := a.serverEndpoint(pod)
+		if err != nil {
+			return nil, err
+		}
+		cli, err := kbacli.NewClient(host, port)
+		if err != nil {
+			return nil, err
 		}
 		if cli == nil {
-			continue // not defined, for test only
+			continue // not kb-agent container and port defined, for test only
 		}
-		rsp, err2 := cli.CallAction(ctx, *req)
-		if err2 != nil {
-			return nil, a.error2(lfa, err2)
+		rsp, err := cli.Action(ctx, *req)
+		if err != nil {
+			return nil, err // http error
+		}
+		if len(rsp.Error) > 0 {
+			return nil, a.formatError(lfa, rsp)
 		}
 		// take first non-nil output
 		if output == nil && rsp.Output != nil {
@@ -341,25 +349,44 @@ func (a *kbagent) selectTargetPods(spec *appsv1alpha1.Action) ([]*corev1.Pod, er
 	}
 }
 
-func (a *kbagent) error2(lfa lifecycleAction, err error) error {
+func (a *kbagent) serverEndpoint(pod *corev1.Pod) (string, int32, error) {
+	port, err := intctrlutil.GetPortByName(*pod, kbagt.ContainerName, kbagt.DefaultPortName)
+	if err != nil {
+		// has no kb-agent defined
+		return "", 0, nil
+	}
+	host := pod.Status.PodIP
+	if host == "" {
+		return "", 0, fmt.Errorf("pod %v has no ip", pod.Name)
+	}
+	return host, port, nil
+}
+
+func (a *kbagent) formatError(lfa lifecycleAction, rsp proto.ActionResponse) error {
+	wrapError := func(err error) error {
+		return errors.Wrapf(err, "action: %s, error: %s", lfa.name(), rsp.Message)
+	}
+	err := proto.Type2Error(rsp.Error)
 	switch {
 	case err == nil:
 		return nil
-	case errors.Is(err, service.ErrNotDefined):
-		return errors.Wrap(ErrActionNotDefined, lfa.name())
-	case errors.Is(err, service.ErrNotImplemented):
-		return errors.Wrap(ErrActionNotImplemented, lfa.name())
-	case errors.Is(err, service.ErrInProgress):
-		return errors.Wrap(ErrActionInProgress, lfa.name())
-	case errors.Is(err, service.ErrBusy):
-		return errors.Wrap(ErrActionBusy, lfa.name())
-	case errors.Is(err, service.ErrTimeout):
-		return errors.Wrap(ErrActionTimeout, lfa.name())
-	case errors.Is(err, service.ErrFailed):
-		return errors.Wrap(ErrActionFailed, lfa.name())
-	case errors.Is(err, service.ErrInternalError):
-		return errors.Wrap(ErrActionInternalError, lfa.name())
+	case errors.Is(err, proto.ErrNotDefined):
+		return wrapError(ErrActionNotDefined)
+	case errors.Is(err, proto.ErrNotImplemented):
+		return wrapError(ErrActionNotImplemented)
+	case errors.Is(err, proto.ErrBadRequest):
+		return wrapError(ErrActionInternalError)
+	case errors.Is(err, proto.ErrInProgress):
+		return wrapError(ErrActionInProgress)
+	case errors.Is(err, proto.ErrBusy):
+		return wrapError(ErrActionBusy)
+	case errors.Is(err, proto.ErrTimedOut):
+		return wrapError(ErrActionTimedOut)
+	case errors.Is(err, proto.ErrFailed):
+		return wrapError(ErrActionFailed)
+	case errors.Is(err, proto.ErrInternalError):
+		return wrapError(ErrActionInternalError)
 	default:
-		return err
+		return wrapError(err)
 	}
 }

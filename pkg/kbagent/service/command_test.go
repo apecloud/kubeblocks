@@ -122,7 +122,7 @@ var _ = Describe("command", func() {
 
 			err = waitError(execErrorChan)
 			Expect(err).ShouldNot(BeNil())
-			Expect(errors.Is(err, ErrTimeout)).Should(BeTrue())
+			Expect(errors.Is(err, proto.ErrTimedOut)).Should(BeTrue())
 		})
 
 		It("timeout and stdout", func() {
@@ -136,7 +136,7 @@ var _ = Describe("command", func() {
 
 			err = waitError(execErrorChan)
 			Expect(err).ShouldNot(BeNil())
-			Expect(errors.Is(err, ErrTimeout)).Should(BeTrue())
+			Expect(errors.Is(err, proto.ErrTimedOut)).Should(BeTrue())
 			Expect(stdoutBuf.String()).Should(HaveLen(0))
 		})
 
@@ -151,7 +151,7 @@ var _ = Describe("command", func() {
 
 			err = waitError(execErrorChan)
 			Expect(err).ShouldNot(BeNil())
-			Expect(errors.Is(err, ErrTimeout)).Should(BeTrue())
+			Expect(errors.Is(err, proto.ErrTimedOut)).Should(BeTrue())
 			Expect(stdoutBuf.String()).Should(Equal("timeout"))
 		})
 
@@ -239,7 +239,7 @@ var _ = Describe("command", func() {
 
 			execErr := <-errChan
 			Expect(execErr).ShouldNot(BeNil())
-			Expect(errors.Is(execErr, ErrTimeout)).Should(BeTrue())
+			Expect(errors.Is(execErr, proto.ErrTimedOut)).Should(BeTrue())
 			Expect(<-stdoutChan).Should(HaveLen(0))
 			Expect(<-stderrChan).Should(HaveLen(0))
 		})
@@ -273,7 +273,7 @@ var _ = Describe("command", func() {
 			}
 			output, err := runCommand(ctx, action, nil, nil)
 			Expect(err).ShouldNot(BeNil())
-			Expect(errors.Is(err, ErrFailed)).Should(BeTrue())
+			Expect(errors.Is(err, proto.ErrFailed)).Should(BeTrue())
 			Expect(err.Error()).Should(ContainSubstring("command not found"))
 			Expect(output).Should(BeNil())
 		})
@@ -285,7 +285,7 @@ var _ = Describe("command", func() {
 			timeout := int32(1)
 			output, err := runCommand(ctx, action, nil, &timeout)
 			Expect(err).ShouldNot(BeNil())
-			Expect(errors.Is(err, ErrTimeout)).Should(BeTrue())
+			Expect(errors.Is(err, proto.ErrTimedOut)).Should(BeTrue())
 			Expect(output).Should(BeNil())
 		})
 	})

@@ -30,7 +30,6 @@ var (
 	ErrActionBusy           = errors.New("action is busy")
 	ErrActionTimedOut       = errors.New("action timed-out")
 	ErrActionFailed         = errors.New("action failed")
-	ErrActionCanceled       = errors.New("action canceled")
 	ErrActionInternalError  = errors.New("action internal error")
 )
 

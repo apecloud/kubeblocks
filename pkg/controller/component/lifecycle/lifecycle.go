@@ -41,7 +41,7 @@ type Lifecycle interface {
 
 	PreTerminate(ctx context.Context, cli client.Reader, opts *Options) error
 
-	// RoleProbe(ctx context.Context, cli client.Reader, opts *Options) ([]byte, error)
+	RoleProbe(ctx context.Context, cli client.Reader, opts *Options) ([]byte, error)
 
 	Switchover(ctx context.Context, cli client.Reader, opts *Options, candidate string) error
 

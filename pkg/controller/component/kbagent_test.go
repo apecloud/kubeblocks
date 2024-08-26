@@ -21,6 +21,7 @@ package component
 
 import (
 	"fmt"
+	"reflect"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -151,7 +152,7 @@ var _ = Describe("kb-agent", func() {
 			Expect(c.Env).Should(HaveLen(2))
 		})
 
-		PIt("action env", func() {
+		It("action env", func() {
 			env := []corev1.EnvVar{
 				{
 					Name:  "NOW",
@@ -174,8 +175,8 @@ var _ = Describe("kb-agent", func() {
 			c := kbAgentContainer()
 			Expect(c).ShouldNot(BeNil())
 			Expect(c.Env).Should(HaveLen(4))
-			Expect(c.Env[0]).Should(Equal(env[0]))
-			Expect(c.Env[1]).Should(Equal(env[2]))
+			Expect(reflect.DeepEqual(c.Env[0], env[0])).Should(BeTrue())
+			Expect(reflect.DeepEqual(c.Env[1], env[1])).Should(BeTrue())
 		})
 
 		It("custom image", func() {

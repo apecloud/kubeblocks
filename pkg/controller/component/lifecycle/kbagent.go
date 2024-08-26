@@ -34,6 +34,8 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	kbagt "github.com/apecloud/kubeblocks/pkg/kbagent"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
@@ -264,16 +266,20 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1alpha1
 	//  - back-off to retry
 	//  - timeout
 	for _, pod := range pods {
-		cli, err1 := kbacli.NewClient(*pod)
-		if err1 != nil {
-			return err1
+		host, port, err := a.serverEndpoint(pod)
+		if err != nil {
+			return err
+		}
+		cli, err := kbacli.NewClient(host, port)
+		if err != nil {
+			return err
 		}
 		if cli == nil {
-			continue // not defined, for test only
+			continue // not kb-agent container and port defined, for test only
 		}
-		rsp, err2 := cli.CallAction(ctx, *req)
-		if err2 != nil {
-			return err2
+		rsp, err := cli.Action(ctx, *req)
+		if err != nil {
+			return err // http error
 		}
 		if len(rsp.Error) > 0 {
 			return a.formatError(lfa, rsp)
@@ -321,6 +327,19 @@ func (a *kbagent) selectTargetPods(spec *appsv1alpha1.Action) ([]*corev1.Pod, er
 	default:
 		return nil, fmt.Errorf("unknown pod selector: %s", spec.Exec.TargetPodSelector)
 	}
+}
+
+func (a *kbagent) serverEndpoint(pod *corev1.Pod) (string, int32, error) {
+	port, err := intctrlutil.GetPortByName(*pod, kbagt.ContainerName, kbagt.DefaultPortName)
+	if err != nil {
+		// has no kb-agent defined
+		return "", 0, nil
+	}
+	host := pod.Status.PodIP
+	if host == "" {
+		return "", 0, fmt.Errorf("pod %v has no ip", pod.Name)
+	}
+	return host, port, nil
 }
 
 func (a *kbagent) formatError(lfa lifecycleAction, rsp proto.ActionResponse) error {

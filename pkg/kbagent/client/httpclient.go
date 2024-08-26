@@ -27,14 +27,11 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/valyala/fasthttp"
-
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
 const (
-	urlTemplate      = "http://%s:%d/%s"
-	actionServiceURI = "/v1.0/action"
+	urlTemplate = "http://%s:%d%s"
 )
 
 type httpClient struct {
@@ -45,20 +42,22 @@ type httpClient struct {
 
 var _ Client = &httpClient{}
 
-func (c *httpClient) CallAction(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
-	url := fmt.Sprintf(urlTemplate, c.host, c.port, actionServiceURI)
+func (c *httpClient) Action(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+	rsp := proto.ActionResponse{}
 
 	data, err := json.Marshal(req)
 	if err != nil {
-		return proto.ActionResponse{}, err
+		return rsp, err
 	}
 
-	payload, err := c.request(ctx, fasthttp.MethodPost, url, bytes.NewReader(data))
+	url := fmt.Sprintf(urlTemplate, c.host, c.port, proto.ServiceAction.URI)
+	payload, err := c.request(ctx, http.MethodPost, url, bytes.NewReader(data))
 	if err != nil {
-		return proto.ActionResponse{}, err
+		return rsp, err
 	}
+
 	defer payload.Close()
-	return c.decode(payload)
+	return decode(payload, &rsp)
 }
 
 func (c *httpClient) request(ctx context.Context, method, url string, body io.Reader) (io.ReadCloser, error) {
@@ -69,26 +68,25 @@ func (c *httpClient) request(ctx context.Context, method, url string, body io.Re
 
 	rsp, err := c.client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, err // http error
 	}
 
 	switch rsp.StatusCode {
-	case http.StatusOK, http.StatusNotImplemented, http.StatusInternalServerError:
+	case http.StatusOK, http.StatusInternalServerError:
 		return rsp.Body, nil
 	default:
-		return nil, fmt.Errorf("http error: %s", rsp.Status)
+		return nil, fmt.Errorf("unexpected http status code: %s", rsp.Status)
 	}
 }
 
-func (c *httpClient) decode(body io.Reader) (proto.ActionResponse, error) {
-	rsp := proto.ActionResponse{}
+func decode[T any](body io.Reader, rsp *T) (T, error) {
 	data, err := io.ReadAll(body)
 	if err != nil {
-		return rsp, err
+		return *rsp, err
 	}
 	err = json.Unmarshal(data, &rsp)
 	if err != nil {
-		return rsp, err
+		return *rsp, err
 	}
-	return rsp, nil
+	return *rsp, nil
 }

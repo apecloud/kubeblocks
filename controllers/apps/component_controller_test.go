@@ -86,7 +86,7 @@ var mockKBAgentClient = func(mock func(*kbagent.MockClientMockRecorder)) {
 
 var mockKBAgentClientDefault = func() {
 	mockKBAgentClient(func(recorder *kbagent.MockClientMockRecorder) {
-		recorder.CallAction(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+		recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
 			return kbagentproto.ActionResponse{}, nil
 		}).AnyTimes()
 	})
@@ -94,7 +94,7 @@ var mockKBAgentClientDefault = func() {
 
 var mockKBAgentClient4HScale = func(clusterKey types.NamespacedName, compName string, replicas int) {
 	mockKBAgentClient(func(recorder *kbagent.MockClientMockRecorder) {
-		recorder.CallAction(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+		recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
 			rsp := kbagentproto.ActionResponse{}
 			if req.Action != "memberLeave" {
 				return rsp, nil

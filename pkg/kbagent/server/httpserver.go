@@ -24,14 +24,12 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"strings"
 	"time"
 
 	fasthttprouter "github.com/fasthttp/router"
 	"github.com/go-logr/logr"
 	"github.com/valyala/fasthttp"
 
-	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/service"
 )
 
@@ -150,12 +148,8 @@ func (s *server) router() fasthttp.RequestHandler {
 }
 
 func (s *server) registerService(router *fasthttprouter.Router, svc service.Service) {
-	router.Handle(fasthttp.MethodPost, s.serviceURI(svc), s.dispatcher(svc))
-	s.logger.Info("register service to server", "service", svc.Kind(), "method", fasthttp.MethodPost, "uri", s.serviceURI(svc))
-}
-
-func (s *server) serviceURI(svc service.Service) string {
-	return fmt.Sprintf("/%s/%s", svc.Version(), strings.ToLower(svc.Kind()))
+	router.Handle(fasthttp.MethodPost, svc.URI(), s.dispatcher(svc))
+	s.logger.Info("register service to server", "service", svc.Kind(), "method", fasthttp.MethodPost, "uri", svc.URI())
 }
 
 func (s *server) dispatcher(svc service.Service) func(*fasthttp.RequestCtx) {
@@ -166,20 +160,19 @@ func (s *server) dispatcher(svc service.Service) func(*fasthttp.RequestCtx) {
 		output, err := svc.HandleRequest(ctx, body)
 		statusCode := fasthttp.StatusOK
 		if err != nil {
-			if errors.Is(err, proto.ErrNotImplemented) {
-				statusCode = fasthttp.StatusNotImplemented
-			} else {
-				statusCode = fasthttp.StatusInternalServerError
-			}
+			statusCode = fasthttp.StatusInternalServerError
 		}
-		respond(reqCtx, statusCode, output)
+		respond(reqCtx, statusCode, output, err)
 	}
 }
 
-func respond(ctx *fasthttp.RequestCtx, code int, body []byte) {
+func respond(ctx *fasthttp.RequestCtx, code int, body []byte, err error) {
 	ctx.Response.Header.SetContentType(jsonContentTypeHeader)
 	ctx.Response.SetStatusCode(code)
-	if body != nil {
+	switch {
+	case err != nil:
+		ctx.Response.SetBodyString(err.Error())
+	case body != nil:
 		ctx.Response.SetBody(body)
 	}
 }

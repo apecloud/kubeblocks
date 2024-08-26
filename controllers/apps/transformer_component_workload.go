@@ -155,6 +155,13 @@ func (t *componentWorkloadTransformer) reconcileWorkload(synthesizedComp *compon
 		}
 		protoITS.Spec.Template.Spec.Containers[i].Image = newImage
 	}
+	for i, container := range protoITS.Spec.Template.Spec.InitContainers {
+		newImage, err := intctrlutil.ReplaceImageRegistry(container.Image)
+		if err != nil {
+			return err
+		}
+		protoITS.Spec.Template.Spec.InitContainers[i].Image = newImage
+	}
 
 	buildInstanceSetPlacementAnnotation(comp, protoITS)
 

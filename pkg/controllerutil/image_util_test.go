@@ -28,10 +28,10 @@ import (
 
 var _ = Describe("image util test", func() {
 	imageList := [][]string{
-		[]string{"busybox", "docker.io", "library", "busybox", ""},
-		[]string{"apecloud/busybox:1.28", "docker.io", "apecloud", "busybox", ":1.28"},
-		[]string{"foo.io/a/b/busybox", "foo.io", "a/b", "busybox", ""},
-		[]string{
+		{"busybox", "docker.io", "library", "busybox", ""},
+		{"apecloud/busybox:1.28", "docker.io", "apecloud", "busybox", ":1.28"},
+		{"foo.io/a/b/busybox", "foo.io", "a/b", "busybox", ""},
+		{
 			"registry.k8s.io/pause:latest@sha256:1ff6c18fbef2045af6b9c16bf034cc421a29027b800e4f9b68ae9b1cb3e9ae07",
 			"registry.k8s.io", "", "pause", ":latest@sha256:1ff6c18fbef2045af6b9c16bf034cc421a29027b800e4f9b68ae9b1cb3e9ae07"},
 	}

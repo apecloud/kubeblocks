@@ -122,23 +122,7 @@ type LegacyRenderedTemplateSpec struct {
 	ConfigTemplateExtension `json:",inline"`
 }
 
-type ComponentParameters struct {
-	// Specifies the config file name.
-	//
-	// It must be a string of maximum 63 characters, and can only include lowercase alphanumeric characters,
-	// hyphens, and periods.
-	// The name must start and end with an alphanumeric character.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	Name string `json:"name"`
-
-	// Specifies the user-defined configuration parameters.
-	//
-	// +optional
-	Parameters map[string]*string `json:"parameters,omitempty"`
-}
+type ComponentParameters map[string]*string
 
 type ComponentConfigDescription struct {
 	// Defines the unique identifier of the config file name.
@@ -151,12 +135,6 @@ type ComponentConfigDescription struct {
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
-
-	// Specifies the name of the ParametersDefinition to associate the configuration file.
-	// The ParametersDefinition object defines the format of the configuration file and all parameters type.
-	//
-	// +optional
-	ParametersDef string `json:"parametersDefName,omitempty"`
 
 	// Specifies whether the configuration needs to be re-rendered after v-scale or h-scale operations to reflect changes.
 	//

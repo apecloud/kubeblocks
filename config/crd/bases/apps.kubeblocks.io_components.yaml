@@ -11186,33 +11186,11 @@ spec:
                   The default Concurrency is 100%.
                 x-kubernetes-int-or-string: true
               parameters:
+                additionalProperties:
+                  type: string
                 description: Specifies the user-defined configuration template or
                   parameters.
-                items:
-                  properties:
-                    name:
-                      description: |-
-                        Specifies the config file name.
-
-
-                        It must be a string of maximum 63 characters, and can only include lowercase alphanumeric characters,
-                        hyphens, and periods.
-                        The name must start and end with an alphanumeric character.
-                      maxLength: 63
-                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                      type: string
-                    parameters:
-                      additionalProperties:
-                        type: string
-                      description: Specifies the user-defined configuration parameters.
-                      type: object
-                  required:
-                  - name
-                  type: object
-                type: array
-                x-kubernetes-list-map-keys:
-                - name
-                x-kubernetes-list-type: map
+                type: object
               podUpdatePolicy:
                 description: |-
                   PodUpdatePolicy indicates how pods should be updated

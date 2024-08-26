@@ -301,12 +301,8 @@ type ComponentSpec struct {
 
 	// Specifies the user-defined configuration template or parameters.
 	//
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
 	// +optional
-	ComponentParameters []ComponentParameters `json:"parameters,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+	ComponentParameters ComponentParameters `json:"parameters,omitempty"`
 }
 
 // ComponentStatus represents the observed state of a Component within the Cluster.

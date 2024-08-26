@@ -175,11 +175,6 @@ spec:
                                 maxLength: 63
                                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                                 type: string
-                              parametersDefName:
-                                description: |-
-                                  Specifies the name of the ParametersDefinition to associate the configuration file.
-                                  The ParametersDefinition object defines the format of the configuration file and all parameters type.
-                                type: string
                               reRenderResourceTypes:
                                 description: |-
                                   Specifies whether the configuration needs to be re-rendered after v-scale or h-scale operations to reflect changes.

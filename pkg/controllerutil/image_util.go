@@ -75,7 +75,6 @@ func ReloadRegistryConfig() {
 		panic(err)
 	}
 
-	// TODO: validate
 	for _, registry := range registriesConfig.Registries {
 		if len(registry.From) == 0 {
 			panic("from can't be empty")

@@ -19,20 +19,21 @@ spec:
     {{- include "kubeblocks.addonChartsImage" . | indent 4 }}
     {{- include "kubeblocks.addonHelmInstallOptions" (dict "version" "4.5.0" "values" .Values) | indent 4 }}
 
+    {{- $cloudProvider := (include "kubeblocks.cloudProvider" .) }}
+    {{- if eq $cloudProvider "huaweiCloud" }}
     installValues:
-      {{- $cloudProvider := (include "kubeblocks.cloudProvider" .) }}
-      {{- if eq $cloudProvider "huaweiCloud" }}
       setValues:
         - kubeletDir=/mnt/paas/kubernetes/kubelet
-      {{- else if eq $cloudProvider "gcp" }}
+    {{- else if eq $cloudProvider "gcp" }}
       # In GKE, the system-node-critical and system-cluster-critical priority classes
       # can't be used for non-system pods, but csi-driver-nfs uses "system-cluster-critical"
       # by default, so override them here.
+    installValues:
       setValues:
         - controller.priorityClassName=""
         - node.priorityClassName=""
         - externalSnapshotter.priorityClassName=""
-      {{- end }}
+     {{- end }}
 
     valuesMapping:
       valueMap:

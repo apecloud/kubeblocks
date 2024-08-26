@@ -47,8 +47,12 @@ type ActionRequest struct {
 }
 
 type ActionResponse struct {
-	Output []byte `json:"output,omitempty"`
+	Error   string `json:"error,omitempty"`
+	Message string `json:"message,omitempty"`
+	Output  []byte `json:"output,omitempty"`
 }
+
+// TODO: define the event spec for probe or async action
 
 type Probe struct {
 	Action              string `json:"action"`

@@ -33,11 +33,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
-const (
-	actionServiceName    = "Action"
-	actionServiceVersion = "v1.0"
-)
-
 func newActionService(logger logr.Logger, actions []proto.Action) (*actionService, error) {
 	sa := &actionService{
 		logger:         logger,
@@ -69,46 +64,61 @@ type runningAction struct {
 var _ Service = &actionService{}
 
 func (s *actionService) Kind() string {
-	return actionServiceName
+	return proto.ServiceAction.Kind
 }
 
-func (s *actionService) Version() string {
-	return actionServiceVersion
+func (s *actionService) URI() string {
+	return proto.ServiceAction.URI
 }
 
 func (s *actionService) Start() error {
 	return nil
 }
 
-func (s *actionService) Decode(payload []byte) (interface{}, error) {
+func (s *actionService) HandleRequest(ctx context.Context, payload []byte) ([]byte, error) {
+	req, err := s.decode(payload)
+	if err != nil {
+		return s.encode(nil, err), nil
+	}
+	return s.encode(s.handleRequest(ctx, req)), nil
+}
+
+func (s *actionService) decode(payload []byte) (*proto.ActionRequest, error) {
 	req := &proto.ActionRequest{}
 	if err := json.Unmarshal(payload, req); err != nil {
-		return nil, err
+		return nil, errors.Wrapf(proto.ErrBadRequest, "unmarshal action request error: %s", err.Error())
 	}
 	return req, nil
 }
 
-func (s *actionService) HandleRequest(ctx context.Context, i interface{}) ([]byte, error) {
-	req := i.(*proto.ActionRequest)
-	if _, ok := s.actions[req.Action]; !ok {
-		return nil, errors.Wrapf(ErrNotDefined, "%s is not defined", req.Action)
+func (s *actionService) encode(out []byte, err error) []byte {
+	rsp := &proto.ActionResponse{}
+	if err == nil {
+		rsp.Output = out
+	} else {
+		rsp.Error = proto.Error2Type(err)
+		rsp.Message = err.Error()
 	}
-	return s.handleActionRequest(ctx, req)
+	data, _ := json.Marshal(rsp)
+	return data
 }
 
-func (s *actionService) handleActionRequest(ctx context.Context, req *proto.ActionRequest) ([]byte, error) {
-	action := s.actions[req.Action]
-	if action.Exec != nil {
-		return s.handleExecAction(ctx, req, action)
+func (s *actionService) handleRequest(ctx context.Context, req *proto.ActionRequest) ([]byte, error) {
+	if _, ok := s.actions[req.Action]; !ok {
+		return nil, errors.Wrapf(proto.ErrNotDefined, "%s is not defined", req.Action)
 	}
-	return nil, errors.Wrap(ErrNotImplemented, "only exec action is supported")
+	action := s.actions[req.Action]
+	if action.Exec == nil {
+		return nil, errors.Wrap(proto.ErrNotImplemented, "only exec action is supported")
+	}
+	return s.handleExecAction(ctx, req, action)
 }
 
 func (s *actionService) handleExecAction(ctx context.Context, req *proto.ActionRequest, action *proto.Action) ([]byte, error) {
-	if req.NonBlocking != nil && *req.NonBlocking {
-		return s.handleExecActionNonBlocking(ctx, req, action)
+	if req.NonBlocking == nil || !*req.NonBlocking {
+		return runCommand(ctx, action.Exec, req.Parameters, req.TimeoutSeconds)
 	}
-	return runCommand(ctx, action.Exec, req.Parameters, req.TimeoutSeconds)
+	return s.handleExecActionNonBlocking(ctx, req, action)
 }
 
 func (s *actionService) handleExecActionNonBlocking(ctx context.Context, req *proto.ActionRequest, action *proto.Action) ([]byte, error) {
@@ -130,7 +140,7 @@ func (s *actionService) handleExecActionNonBlocking(ctx context.Context, req *pr
 	}
 	err := gather(running.errChan)
 	if err == nil {
-		return nil, ErrInProgress
+		return nil, proto.ErrInProgress
 	}
 	delete(s.runningActions, req.Action)
 	if *err != nil {

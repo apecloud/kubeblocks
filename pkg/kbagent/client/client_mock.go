@@ -56,17 +56,17 @@ func (m *MockClient) EXPECT() *MockClientMockRecorder {
 	return m.recorder
 }
 
-// CallAction mocks base method.
-func (m *MockClient) CallAction(arg0 context.Context, arg1 proto.ActionRequest) (proto.ActionResponse, error) {
+// Action mocks base method.
+func (m *MockClient) Action(arg0 context.Context, arg1 proto.ActionRequest) (proto.ActionResponse, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CallAction", arg0, arg1)
+	ret := m.ctrl.Call(m, "Action", arg0, arg1)
 	ret0, _ := ret[0].(proto.ActionResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// CallAction indicates an expected call of CallAction.
-func (mr *MockClientMockRecorder) CallAction(arg0, arg1 interface{}) *gomock.Call {
+// Action indicates an expected call of Action.
+func (mr *MockClientMockRecorder) Action(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CallAction", reflect.TypeOf((*MockClient)(nil).CallAction), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Action", reflect.TypeOf((*MockClient)(nil).Action), arg0, arg1)
 }

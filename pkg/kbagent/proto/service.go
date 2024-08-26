@@ -17,33 +17,23 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package service
+package proto
 
-import (
-	"context"
+type Service struct {
+	Kind    string
+	Version string
+	URI     string
+}
 
-	"github.com/go-logr/logr"
-
-	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
+var (
+	ServiceAction = &Service{
+		Kind:    "Action",
+		Version: "v1.0",
+		URI:     "/v1.0/action",
+	}
+	ServiceProbe = &Service{
+		Kind:    "Probe",
+		Version: "v1.0",
+		URI:     "/v1.0/probe",
+	}
 )
-
-type Service interface {
-	Kind() string
-	URI() string
-
-	Start() error
-
-	HandleRequest(ctx context.Context, payload []byte) ([]byte, error)
-}
-
-func New(logger logr.Logger, actions []proto.Action, probes []proto.Probe) ([]Service, error) {
-	sa, err := newActionService(logger, actions)
-	if err != nil {
-		return nil, err
-	}
-	sp, err := newProbeService(logger, sa, probes)
-	if err != nil {
-		return nil, err
-	}
-	return []Service{sa, sp}, nil
-}

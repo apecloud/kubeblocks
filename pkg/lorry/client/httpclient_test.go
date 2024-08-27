@@ -447,7 +447,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 		})
 
 		It("success if leave once", func() {
-			mockDBManager.EXPECT().GetCurrentMemberName().Return(podName).Times(2)
+			mockDBManager.EXPECT().GetCurrentMemberName().Return(podName).Times(1)
 			mockDBManager.EXPECT().LeaveMemberFromCluster(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 			mockDCSStore.EXPECT().GetCluster().Return(cluster, nil)
 			mockDCSStore.EXPECT().UpdateHaConfig().Return(nil).Times(2)
@@ -456,7 +456,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 		})
 
 		It("success if leave twice", func() {
-			mockDBManager.EXPECT().GetCurrentMemberName().Return(podName).Times(4)
+			mockDBManager.EXPECT().GetCurrentMemberName().Return(podName).Times(2)
 			mockDBManager.EXPECT().LeaveMemberFromCluster(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
 			mockDCSStore.EXPECT().GetCluster().Return(cluster, nil).Times(2)
 			mockDCSStore.EXPECT().UpdateHaConfig().Return(nil).Times(3)
@@ -469,7 +469,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 		})
 
 		It("not implemented", func() {
-			mockDBManager.EXPECT().GetCurrentMemberName().Return(podName).Times(2)
+			mockDBManager.EXPECT().GetCurrentMemberName().Return(podName).Times(1)
 			mockDBManager.EXPECT().LeaveMemberFromCluster(gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf(msg))
 			mockDCSStore.EXPECT().GetCluster().Return(cluster, nil)
 			mockDCSStore.EXPECT().UpdateHaConfig().Return(nil)

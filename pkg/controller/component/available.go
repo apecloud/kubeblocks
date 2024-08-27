@@ -22,6 +22,7 @@ package component
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,21 +31,21 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
 const (
-	kbAgentEventFieldPath = "spec.containers{kbagent}"
-	kbAgentAvailableProbe = "availableProbe"
+	availableProbe = "availableProbe"
 )
 
 type AvailableProbeEventHandler struct{}
 
 func (h *AvailableProbeEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
-	if event.ReportingController != "kbagent" ||
-		event.Reason != kbAgentAvailableProbe ||
-		event.InvolvedObject.FieldPath != kbAgentEventFieldPath {
+	if event.ReportingController != proto.ProbeEventReportingController ||
+		event.Reason != availableProbe ||
+		event.InvolvedObject.FieldPath != proto.ProbeEventFieldPath {
 		return nil
 	}
 
@@ -55,9 +56,30 @@ func (h *AvailableProbeEventHandler) Handle(cli client.Client, reqCtx intctrluti
 
 	// TODO: event about uncertainly results
 
+	podName := types.NamespacedName{
+		Namespace: event.InvolvedObject.Namespace,
+		Name:      event.InvolvedObject.Name,
+	}
+	pod := &corev1.Pod{}
+	if err := cli.Get(reqCtx.Ctx, podName, pod, inDataContextUnspecified()); err != nil {
+		return err
+	}
+	if pod.UID != event.InvolvedObject.UID {
+		return nil // ignore it
+	}
+
+	if pod.Labels == nil {
+		return fmt.Errorf("pod %s/%s has no labels", pod.Namespace, pod.Name)
+	}
+	clusterName := pod.Labels[constant.AppInstanceLabelKey]
+	compName := pod.Labels[constant.KBAppComponentLabelKey]
+	if len(clusterName) == 0 || len(compName) == 0 {
+		return fmt.Errorf("pod %s/%s has no cluster or component labels", pod.Namespace, pod.Name)
+	}
+
 	compKey := types.NamespacedName{
 		Namespace: event.InvolvedObject.Namespace,
-		Name:      event.InvolvedObject.Name, // TODO: comp name
+		Name:      constant.GenerateClusterComponentName(clusterName, compName),
 	}
 	comp := &appsv1alpha1.Component{}
 	if err := cli.Get(reqCtx.Ctx, compKey, comp); err != nil {

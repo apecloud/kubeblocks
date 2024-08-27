@@ -37,6 +37,10 @@ func inDataContext() *multicluster.ClientOption {
 	return multicluster.InDataContext()
 }
 
+func inDataContextUnspecified() *multicluster.ClientOption {
+	return multicluster.InDataContextUnspecified()
+}
+
 func IsHostNetworkEnabled(synthesizedComp *SynthesizedComponent) bool {
 	if !hasHostNetworkCapability(synthesizedComp, nil) {
 		return false

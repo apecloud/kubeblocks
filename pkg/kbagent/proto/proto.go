@@ -69,3 +69,9 @@ type ProbeEvent struct {
 	Output  []byte `json:"output,omitempty"`
 	Message string `json:"message,omitempty"`
 }
+
+const (
+	ProbeEventFieldPath           = "spec.containers{kbagent}"
+	ProbeEventReportingController = "kbagent"
+	ProbeEventSourceComponent     = "kbagent"
+)

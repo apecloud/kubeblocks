@@ -174,13 +174,13 @@ func (r *probeRunner) sendEvent(probe string, code int32, output []byte, message
 	prefixLen := min(len(output), 32)
 	r.logger.Info("send probe event", "code", code, "output", string(output[:prefixLen]), "message", message)
 
-	eventMsg := &proto.ProbeEvent{
+	event := &proto.ProbeEvent{
 		Probe:   probe,
 		Code:    code,
 		Message: message,
 		Output:  output,
 	}
-	msg, err := json.Marshal(&eventMsg)
+	msg, err := json.Marshal(&event)
 	if err != nil {
 		r.logger.Error(err, "failed to marshal probe event")
 		return

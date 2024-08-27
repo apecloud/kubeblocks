@@ -4316,6 +4316,18 @@ JobActionSpec
 <p>Specifies the actions that should be executed after the data has been prepared and is ready for restoration.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>baseBackupRequired</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Determines if a base backup is required during restoration.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.RestoreActionStatus">RestoreActionStatus

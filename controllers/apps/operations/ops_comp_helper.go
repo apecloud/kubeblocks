@@ -22,12 +22,14 @@ package operations
 import (
 	"context"
 	"fmt"
+
 	"reflect"
 	"slices"
 	"time"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -161,7 +163,7 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 		completedProgressCount int32
 		requeueTimeAfterFailed time.Duration
 		err                    error
-		clusterDef             *appsv1alpha1.ClusterDefinition
+		clusterDef             *appsv1.ClusterDefinition
 	)
 	if opsRes.Cluster.Spec.ClusterDefRef != "" {
 		if clusterDef, err = getClusterDefByName(reqCtx.Ctx, cli, opsRes.Cluster.Spec.ClusterDefRef); err != nil {

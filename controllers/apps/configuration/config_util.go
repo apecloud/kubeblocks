@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
@@ -160,7 +161,7 @@ func batchDeleteConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx
 		labels := client.MatchingLabels{
 			core.GenerateTPLUniqLabelKeyWithConfig(configSpec.Name): configSpec.TemplateRef,
 		}
-		if ok, err := validateConfigMapOwners(cli, ctx, labels, validator, &appsv1alpha1.ClusterDefinitionList{}, &appsv1alpha1.ComponentDefinitionList{}); err != nil {
+		if ok, err := validateConfigMapOwners(cli, ctx, labels, validator, &appsv1.ClusterDefinitionList{}, &appsv1alpha1.ComponentDefinitionList{}); err != nil {
 			return err
 		} else if !ok {
 			continue

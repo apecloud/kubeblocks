@@ -30,7 +30,6 @@ type AppsV1alpha1Interface interface {
 	RESTClient() rest.Interface
 	BackupPolicyTemplatesGetter
 	ClustersGetter
-	ClusterDefinitionsGetter
 	ComponentsGetter
 	ComponentDefinitionsGetter
 	ComponentVersionsGetter
@@ -51,10 +50,6 @@ func (c *AppsV1alpha1Client) BackupPolicyTemplates() BackupPolicyTemplateInterfa
 
 func (c *AppsV1alpha1Client) Clusters(namespace string) ClusterInterface {
 	return newClusters(c, namespace)
-}
-
-func (c *AppsV1alpha1Client) ClusterDefinitions() ClusterDefinitionInterface {
-	return newClusterDefinitions(c)
 }
 
 func (c *AppsV1alpha1Client) Components(namespace string) ComponentInterface {

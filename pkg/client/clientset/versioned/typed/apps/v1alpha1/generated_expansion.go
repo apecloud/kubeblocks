@@ -22,8 +22,6 @@ type BackupPolicyTemplateExpansion interface{}
 
 type ClusterExpansion interface{}
 
-type ClusterDefinitionExpansion interface{}
-
 type ComponentExpansion interface{}
 
 type ComponentDefinitionExpansion interface{}

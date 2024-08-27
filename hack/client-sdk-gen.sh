@@ -30,9 +30,9 @@ CODE_GENERATOR_PATH=$(go list -f '{{.Dir}}' -m k8s.io/code-generator)
 chmod u+x ${CODE_GENERATOR_PATH}/*.sh
 
 GENERATORS="client,informer,lister"
-OUTPUT_PACKAGE="github.com/apecloud/kubeblocks/pkg/client"
 APIS_PACKAGE="github.com/apecloud/kubeblocks/apis"
-GROUP_VERSIONS="apps:v1alpha1 dataprotection:v1alpha1 extensions:v1alpha1 workloads:v1alpha1 apps:v1beta1"
+OUTPUT_PACKAGE="github.com/apecloud/kubeblocks/pkg/client"
+GROUP_VERSIONS="apps:v1alpha1 apps:v1beta1 apps:v1 dataprotection:v1alpha1 extensions:v1alpha1 workloads:v1alpha1"
 OUTPUT_BASE="${SCRIPT_ROOT}/hack"
 
 
@@ -41,10 +41,9 @@ bash ${CODE_GENERATOR_PATH}/generate-groups.sh \
   "${OUTPUT_PACKAGE}" \
   "${APIS_PACKAGE}" \
   "${GROUP_VERSIONS}" \
-  --go-header-file "${SCRIPT_ROOT}/hack/boilerplate_apache2.go.txt" \
-  --output-base "${OUTPUT_BASE}"
+  --output-base "${OUTPUT_BASE}" \
+  --go-header-file "${SCRIPT_ROOT}/hack/boilerplate_apache2.go.txt"
 
 rm -rf "${SCRIPT_ROOT}/pkg/client"
 mv "${OUTPUT_BASE}/${OUTPUT_PACKAGE}" "${SCRIPT_ROOT}/pkg/client"
 rm -rf "${OUTPUT_BASE}/github.com"
-

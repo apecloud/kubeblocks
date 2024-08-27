@@ -21,6 +21,7 @@ package externalversions
 import (
 	"fmt"
 
+	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	v1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	v1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -56,13 +57,15 @@ func (f *genericInformer) Lister() cache.GenericLister {
 // TODO extend this to unknown resources with a client pool
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
-	// Group=apps.kubeblocks.io, Version=v1alpha1
+	// Group=apps.kubeblocks.io, Version=v1
+	case v1.SchemeGroupVersion.WithResource("clusterdefinitions"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1().ClusterDefinitions().Informer()}, nil
+
+		// Group=apps.kubeblocks.io, Version=v1alpha1
 	case v1alpha1.SchemeGroupVersion.WithResource("backuppolicytemplates"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().BackupPolicyTemplates().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("clusters"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().Clusters().Informer()}, nil
-	case v1alpha1.SchemeGroupVersion.WithResource("clusterdefinitions"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().ClusterDefinitions().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("components"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().Components().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("componentdefinitions"):

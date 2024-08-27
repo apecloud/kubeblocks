@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
@@ -58,8 +59,8 @@ type handleStatusProgressWithComponent func(reqCtx intctrlutil.RequestCtx,
 type handleReconfigureOpsStatus func(cmStatus *appsv1alpha1.ConfigurationItemStatus) error
 
 // getClusterDefByName gets the ClusterDefinition object by the name.
-func getClusterDefByName(ctx context.Context, cli client.Client, clusterDefName string) (*appsv1alpha1.ClusterDefinition, error) {
-	clusterDef := &appsv1alpha1.ClusterDefinition{}
+func getClusterDefByName(ctx context.Context, cli client.Client, clusterDefName string) (*appsv1.ClusterDefinition, error) {
+	clusterDef := &appsv1.ClusterDefinition{}
 	if err := cli.Get(ctx, client.ObjectKey{Name: clusterDefName}, clusterDef); err != nil {
 		return nil, err
 	}

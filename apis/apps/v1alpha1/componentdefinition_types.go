@@ -617,6 +617,58 @@ type SystemAccount struct {
 	SecretRef *ProvisionSecretRef `json:"secretRef,omitempty"`
 }
 
+// PasswordConfig helps provide to customize complexity of password generation pattern.
+type PasswordConfig struct {
+	// The length of the password.
+	//
+	// +kubebuilder:validation:Maximum=32
+	// +kubebuilder:validation:Minimum=8
+	// +kubebuilder:default=16
+	// +optional
+	Length int32 `json:"length,omitempty"`
+
+	// The number of digits in the password.
+	//
+	// +kubebuilder:validation:Maximum=8
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=4
+	// +optional
+	NumDigits int32 `json:"numDigits,omitempty"`
+
+	// The number of symbols in the password.
+	//
+	// +kubebuilder:validation:Maximum=8
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=0
+	// +optional
+	NumSymbols int32 `json:"numSymbols,omitempty"`
+
+	// The case of the letters in the password.
+	//
+	// +kubebuilder:default=MixedCases
+	// +optional
+	LetterCase LetterCase `json:"letterCase,omitempty"`
+
+	// Seed to generate the account's password.
+	// Cannot be updated.
+	//
+	// +optional
+	Seed string `json:"seed,omitempty"`
+}
+
+// ProvisionSecretRef represents the reference to a secret.
+type ProvisionSecretRef struct {
+	// The unique identifier of the secret.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// The namespace where the secret is located.
+	//
+	// +kubebuilder:validation:Required
+	Namespace string `json:"namespace"`
+}
+
 type Exporter struct {
 	// Specifies the name of the built-in metrics exporter container.
 	//
@@ -682,6 +734,61 @@ type ReplicaRole struct {
 	// +kubebuilder:default=false
 	// +optional
 	Votable bool `json:"votable,omitempty"`
+}
+
+// ServiceRefDeclaration represents a reference to a service that can be either provided by a KubeBlocks Cluster
+// or an external service.
+// It acts as a placeholder for the actual service reference, which is determined later when a Cluster is created.
+//
+// The purpose of ServiceRefDeclaration is to declare a service dependency without specifying the concrete details
+// of the service.
+// It allows for flexibility and abstraction in defining service references within a Component.
+// By using ServiceRefDeclaration, you can define service dependencies in a declarative manner, enabling loose coupling
+// and easier management of service references across different components and clusters.
+//
+// Upon Cluster creation, the ServiceRefDeclaration is bound to an actual service through the ServiceRef field,
+// effectively resolving and connecting to the specified service.
+type ServiceRefDeclaration struct {
+	// Specifies the name of the ServiceRefDeclaration.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Defines a list of constraints and requirements for services that can be bound to this ServiceRefDeclaration
+	// upon Cluster creation.
+	// Each ServiceRefDeclarationSpec defines a ServiceKind and ServiceVersion,
+	// outlining the acceptable service types and versions that are compatible.
+	//
+	// This flexibility allows a ServiceRefDeclaration to be fulfilled by any one of the provided specs.
+	// For example, if it requires an OLTP database, specs for both MySQL and PostgreSQL are listed,
+	// either MySQL or PostgreSQL services can be used when binding.
+	//
+	// +kubebuilder:validation:Required
+	ServiceRefDeclarationSpecs []ServiceRefDeclarationSpec `json:"serviceRefDeclarationSpecs"`
+
+	// Specifies whether the service reference can be optional.
+	//
+	// For an optional service-ref, the component can still be created even if the service-ref is not provided.
+	//
+	// +optional
+	Optional *bool `json:"optional,omitempty"`
+}
+
+type ServiceRefDeclarationSpec struct {
+	// Specifies the type or nature of the service. This should be a well-known application cluster type, such as
+	// {mysql, redis, mongodb}.
+	// The field is case-insensitive and supports abbreviations for some well-known databases.
+	// For instance, both `zk` and `zookeeper` are considered as a ZooKeeper cluster, while `pg`, `postgres`, `postgresql`
+	// are all recognized as a PostgreSQL cluster.
+	//
+	// +kubebuilder:validation:Required
+	ServiceKind string `json:"serviceKind"`
+
+	// Defines the service version of the service reference. This is a regular expression that matches a version number pattern.
+	// For instance, `^8.0.8$`, `8.0.\d{1,2}$`, `^[v\-]*?(\d{1,2}\.){0,3}\d{1,2}$` are all valid patterns.
+	//
+	// +kubebuilder:validation:Required
+	ServiceVersion string `json:"serviceVersion"`
 }
 
 // TargetPodSelector defines how to select pod(s) to execute an Action.

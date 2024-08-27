@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
@@ -85,7 +86,7 @@ func (r *ConfigConstraintReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		}
 		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, configConstraint,
 			cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(configConstraint.GetName()),
-			recordEvent, &appsv1alpha1.ClusterDefinitionList{}, &appsv1alpha1.ComponentDefinitionList{}); res != nil || err != nil {
+			recordEvent, &appsv1.ClusterDefinitionList{}, &appsv1alpha1.ComponentDefinitionList{}); res != nil || err != nil {
 			return res, err
 		}
 		return nil, nil

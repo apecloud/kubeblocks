@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -40,7 +41,7 @@ var _ = Describe("clusterDeletionTransformer", func() {
 		transCtx   *clusterTransformContext
 		reader     client.Reader
 		dag        *graph.DAG
-		clusterDef *appsv1alpha1.ClusterDefinition
+		clusterDef *appsv1.ClusterDefinition
 		cluster    *appsv1alpha1.Cluster
 	)
 
@@ -52,19 +53,19 @@ var _ = Describe("clusterDeletionTransformer", func() {
 
 	BeforeEach(func() {
 		clusterDef = testapps.NewClusterDefFactory("test-clusterdef").
-			AddClusterTopology(appsv1alpha1.ClusterTopology{
+			AddClusterTopology(appsv1.ClusterTopology{
 				Name: "default",
-				Components: []appsv1alpha1.ClusterTopologyComponent{
+				Components: []appsv1.ClusterTopologyComponent{
 					{Name: "comp1", CompDef: "compdef1"},
 					{Name: "comp2", CompDef: "compdef2"},
 					{Name: "comp3", CompDef: "compdef3"},
 				},
-				Orders: &appsv1alpha1.ClusterTopologyOrders{
+				Orders: &appsv1.ClusterTopologyOrders{
 					Terminate: []string{"comp1", "comp2", "comp3"},
 				},
 			}).
 			GetObject()
-		clusterDef.Status.Phase = appsv1alpha1.AvailablePhase
+		clusterDef.Status.Phase = appsv1.AvailablePhase
 
 		cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, "test-cluster", clusterDef.Name).
 			SetTopology(clusterDef.Spec.Topologies[0].Name).

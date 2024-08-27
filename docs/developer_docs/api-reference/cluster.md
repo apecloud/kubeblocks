@@ -9,6 +9,9 @@ sidebar_label: Cluster
 <p>Packages:</p>
 <ul>
 <li>
+<a href="#apps.kubeblocks.io%2fv1">apps.kubeblocks.io/v1</a>
+</li>
+<li>
 <a href="#apps.kubeblocks.io%2fv1alpha1">apps.kubeblocks.io/v1alpha1</a>
 </li>
 <li>
@@ -18,14 +21,426 @@ sidebar_label: Cluster
 <a href="#workloads.kubeblocks.io%2fv1alpha1">workloads.kubeblocks.io/v1alpha1</a>
 </li>
 </ul>
+<h2 id="apps.kubeblocks.io/v1">apps.kubeblocks.io/v1</h2>
+<div>
+</div>
+Resource Types:
+<ul><li>
+<a href="#apps.kubeblocks.io/v1.ClusterDefinition">ClusterDefinition</a>
+</li></ul>
+<h3 id="apps.kubeblocks.io/v1.ClusterDefinition">ClusterDefinition
+</h3>
+<div>
+<p>ClusterDefinition defines the topology for databases or storage systems,
+offering a variety of topological configurations to meet diverse deployment needs and scenarios.</p>
+<p>It includes a list of Components, each linked to a ComponentDefinition, which enhances reusability and reduce redundancy.
+For example, widely used components such as etcd and Zookeeper can be defined once and reused across multiple ClusterDefinitions,
+simplifying the setup of new systems.</p>
+<p>Additionally, ClusterDefinition also specifies the sequence of startup, upgrade, and shutdown for Components,
+ensuring a controlled and predictable management of component lifecycles.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>apiVersion</code><br/>
+string</td>
+<td>
+<code>apps.kubeblocks.io/v1</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+string
+</td>
+<td><code>ClusterDefinition</code></td>
+</tr>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterDefinitionSpec">
+ClusterDefinitionSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>topologies</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterTopology">
+[]ClusterTopology
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Topologies defines all possible topologies within the cluster.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterDefinitionStatus">
+ClusterDefinitionStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ClusterDefinitionSpec">ClusterDefinitionSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterDefinition">ClusterDefinition</a>)
+</p>
+<div>
+<p>ClusterDefinitionSpec defines the desired state of ClusterDefinition.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>topologies</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterTopology">
+[]ClusterTopology
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Topologies defines all possible topologies within the cluster.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ClusterDefinitionStatus">ClusterDefinitionStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterDefinition">ClusterDefinition</a>)
+</p>
+<div>
+<p>ClusterDefinitionStatus defines the observed state of ClusterDefinition</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>observedGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents the most recent generation observed for this ClusterDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>phase</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Phase">
+Phase
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the current phase of the ClusterDefinition. Valid values are <code>empty</code>, <code>Available</code>, <code>Unavailable</code>.
+When <code>Available</code>, the ClusterDefinition is ready and can be referenced by related objects.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>message</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides additional information about the current phase.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>topologies</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Topologies this ClusterDefinition supported.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ClusterTopology">ClusterTopology
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterDefinitionSpec">ClusterDefinitionSpec</a>)
+</p>
+<div>
+<p>ClusterTopology represents the definition for a specific cluster topology.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name is the unique identifier for the cluster topology.
+Cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>components</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterTopologyComponent">
+[]ClusterTopologyComponent
+</a>
+</em>
+</td>
+<td>
+<p>Components specifies the components in the topology.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>orders</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterTopologyOrders">
+ClusterTopologyOrders
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the sequence in which components within a cluster topology are
+started, stopped, and upgraded.
+This ordering is crucial for maintaining the correct dependencies and operational flow across components.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>default</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Default indicates whether this topology serves as the default configuration.
+When set to true, this topology is automatically used unless another is explicitly specified.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ClusterTopologyComponent">ClusterTopologyComponent
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterTopology">ClusterTopology</a>)
+</p>
+<div>
+<p>ClusterTopologyComponent defines a Component within a ClusterTopology.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Defines the unique identifier of the component within the cluster topology.
+It follows IANA Service naming rules and is used as part of the Service&rsquo;s DNS name.
+The name must start with a lowercase letter, can contain lowercase letters, numbers,
+and hyphens, and must end with a lowercase letter or number.</p>
+<p>Cannot be updated once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>compDef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name or prefix of the ComponentDefinition custom resource(CR) that
+defines the Component&rsquo;s characteristics and behavior.</p>
+<p>When a prefix is used, the system selects the ComponentDefinition CR with the latest version that matches the prefix.
+This approach allows:</p>
+<ol>
+<li>Precise selection by providing the exact name of a ComponentDefinition CR.</li>
+<li>Flexible and automatic selection of the most up-to-date ComponentDefinition CR by specifying a prefix.</li>
+</ol>
+<p>Once set, this field cannot be updated.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ClusterTopologyOrders">ClusterTopologyOrders
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterTopology">ClusterTopology</a>)
+</p>
+<div>
+<p>ClusterTopologyOrders manages the lifecycle of components within a cluster by defining their provisioning,
+terminating, and updating sequences.
+It organizes components into stages or groups, where each group indicates a set of components
+that can be managed concurrently.
+These groups are processed sequentially, allowing precise control based on component dependencies and requirements.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>provision</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the order for creating and initializing components.
+This is designed for components that depend on one another. Components without dependencies can be grouped together.</p>
+<p>Components that can be provisioned independently or have no dependencies can be listed together in the same stage,
+separated by commas.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>terminate</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Outlines the order for stopping and deleting components.
+This sequence is designed for components that require a graceful shutdown or have interdependencies.</p>
+<p>Components that can be terminated independently or have no dependencies can be listed together in the same stage,
+separated by commas.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>update</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Update determines the order for updating components&rsquo; specifications, such as image upgrades or resource scaling.
+This sequence is designed for components that have dependencies or require specific update procedures.</p>
+<p>Components that can be updated independently or have no dependencies can be listed together in the same stage,
+separated by commas.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.Phase">Phase
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterDefinitionStatus">ClusterDefinitionStatus</a>)
+</p>
+<div>
+<p>Phase represents the status of a CR.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Available&#34;</p></td>
+<td><p>AvailablePhase indicates that a CR is in an available state.</p>
+</td>
+</tr><tr><td><p>&#34;Unavailable&#34;</p></td>
+<td><p>UnavailablePhase indicates that a CR is in an unavailable state.</p>
+</td>
+</tr></tbody>
+</table>
+<hr/>
 <h2 id="apps.kubeblocks.io/v1alpha1">apps.kubeblocks.io/v1alpha1</h2>
 <div>
 </div>
 Resource Types:
 <ul><li>
 <a href="#apps.kubeblocks.io/v1alpha1.Cluster">Cluster</a>
-</li><li>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterDefinition">ClusterDefinition</a>
 </li><li>
 <a href="#apps.kubeblocks.io/v1alpha1.Component">Component</a>
 </li><li>
@@ -441,98 +856,6 @@ Existing usage should be updated to the current preferred approach to avoid comp
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterStatus">
 ClusterStatus
-</a>
-</em>
-</td>
-<td>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ClusterDefinition">ClusterDefinition
-</h3>
-<div>
-<p>ClusterDefinition defines the topology for databases or storage systems,
-offering a variety of topological configurations to meet diverse deployment needs and scenarios.</p>
-<p>It includes a list of Components, each linked to a ComponentDefinition, which enhances reusability and reduce redundancy.
-For example, widely used components such as etcd and Zookeeper can be defined once and reused across multiple ClusterDefinitions,
-simplifying the setup of new systems.</p>
-<p>Additionally, ClusterDefinition also specifies the sequence of startup, upgrade, and shutdown for Components,
-ensuring a controlled and predictable management of component lifecycles.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>apiVersion</code><br/>
-string</td>
-<td>
-<code>apps.kubeblocks.io/v1alpha1</code>
-</td>
-</tr>
-<tr>
-<td>
-<code>kind</code><br/>
-string
-</td>
-<td><code>ClusterDefinition</code></td>
-</tr>
-<tr>
-<td>
-<code>metadata</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
-Kubernetes meta/v1.ObjectMeta
-</a>
-</em>
-</td>
-<td>
-Refer to the Kubernetes API documentation for the fields of the
-<code>metadata</code> field.
-</td>
-</tr>
-<tr>
-<td>
-<code>spec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterDefinitionSpec">
-ClusterDefinitionSpec
-</a>
-</em>
-</td>
-<td>
-<br/>
-<br/>
-<table>
-<tr>
-<td>
-<code>topologies</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterTopology">
-[]ClusterTopology
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Topologies defines all possible topologies within the cluster.</p>
-</td>
-</tr>
-</table>
-</td>
-</tr>
-<tr>
-<td>
-<code>status</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterDefinitionStatus">
-ClusterDefinitionStatus
 </a>
 </em>
 </td>
@@ -4749,118 +5072,6 @@ Kubernetes core/v1.PersistentVolumeMode
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ClusterDefinitionSpec">ClusterDefinitionSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterDefinition">ClusterDefinition</a>)
-</p>
-<div>
-<p>ClusterDefinitionSpec defines the desired state of ClusterDefinition.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>topologies</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterTopology">
-[]ClusterTopology
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Topologies defines all possible topologies within the cluster.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ClusterDefinitionStatus">ClusterDefinitionStatus
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterDefinition">ClusterDefinition</a>)
-</p>
-<div>
-<p>ClusterDefinitionStatus defines the observed state of ClusterDefinition</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>observedGeneration</code><br/>
-<em>
-int64
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Represents the most recent generation observed for this ClusterDefinition.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>phase</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.Phase">
-Phase
-</a>
-</em>
-</td>
-<td>
-<p>Specifies the current phase of the ClusterDefinition. Valid values are <code>empty</code>, <code>Available</code>, <code>Unavailable</code>.
-When <code>Available</code>, the ClusterDefinition is ready and can be referenced by related objects.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>message</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Provides additional information about the current phase.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>topologies</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Topologies this ClusterDefinition supported.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serviceRefs</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The service references declared by this ClusterDefinition.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterNetwork">ClusterNetwork
 </h3>
 <p>
@@ -5626,197 +5837,6 @@ SwitchPolicyType
 <td>
 <em>(Optional)</em>
 <p>Type specifies the type of switch policy to be applied.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ClusterTopology">ClusterTopology
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterDefinitionSpec">ClusterDefinitionSpec</a>)
-</p>
-<div>
-<p>ClusterTopology represents the definition for a specific cluster topology.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Name is the unique identifier for the cluster topology.
-Cannot be updated.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>components</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterTopologyComponent">
-[]ClusterTopologyComponent
-</a>
-</em>
-</td>
-<td>
-<p>Components specifies the components in the topology.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>orders</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterTopologyOrders">
-ClusterTopologyOrders
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the sequence in which components within a cluster topology are
-started, stopped, and upgraded.
-This ordering is crucial for maintaining the correct dependencies and operational flow across components.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>default</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Default indicates whether this topology serves as the default configuration.
-When set to true, this topology is automatically used unless another is explicitly specified.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ClusterTopologyComponent">ClusterTopologyComponent
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterTopology">ClusterTopology</a>)
-</p>
-<div>
-<p>ClusterTopologyComponent defines a Component within a ClusterTopology.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Defines the unique identifier of the component within the cluster topology.
-It follows IANA Service naming rules and is used as part of the Service&rsquo;s DNS name.
-The name must start with a lowercase letter, can contain lowercase letters, numbers,
-and hyphens, and must end with a lowercase letter or number.</p>
-<p>Cannot be updated once set.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>compDef</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies the name or prefix of the ComponentDefinition custom resource(CR) that
-defines the Component&rsquo;s characteristics and behavior.</p>
-<p>When a prefix is used, the system selects the ComponentDefinition CR with the latest version that matches the prefix.
-This approach allows:</p>
-<ol>
-<li>Precise selection by providing the exact name of a ComponentDefinition CR.</li>
-<li>Flexible and automatic selection of the most up-to-date ComponentDefinition CR by specifying a prefix.</li>
-</ol>
-<p>Once set, this field cannot be updated.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ClusterTopologyOrders">ClusterTopologyOrders
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterTopology">ClusterTopology</a>)
-</p>
-<div>
-<p>ClusterTopologyOrders manages the lifecycle of components within a cluster by defining their provisioning,
-terminating, and updating sequences.
-It organizes components into stages or groups, where each group indicates a set of components
-that can be managed concurrently.
-These groups are processed sequentially, allowing precise control based on component dependencies and requirements.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>provision</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the order for creating and initializing components.
-This is designed for components that depend on one another. Components without dependencies can be grouped together.</p>
-<p>Components that can be provisioned independently or have no dependencies can be listed together in the same stage,
-separated by commas.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>terminate</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Outlines the order for stopping and deleting components.
-This sequence is designed for components that require a graceful shutdown or have interdependencies.</p>
-<p>Components that can be terminated independently or have no dependencies can be listed together in the same stage,
-separated by commas.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>update</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Update determines the order for updating components&rsquo; specifications, such as image upgrades or resource scaling.
-This sequence is designed for components that have dependencies or require specific update procedures.</p>
-<p>Components that can be updated independently or have no dependencies can be listed together in the same stage,
-separated by commas.</p>
 </td>
 </tr>
 </tbody>
@@ -13459,7 +13479,7 @@ Kubernetes core/v1.PersistentVolumeMode
 <h3 id="apps.kubeblocks.io/v1alpha1.Phase">Phase
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterDefinitionStatus">ClusterDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionStatus">ComponentDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentVersionStatus">ComponentVersionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.OpsDefinitionStatus">OpsDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceDescriptorStatus">ServiceDescriptorStatus</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionStatus">ComponentDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentVersionStatus">ComponentVersionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.OpsDefinitionStatus">OpsDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceDescriptorStatus">ServiceDescriptorStatus</a>)
 </p>
 <div>
 <p>Phase represents the current status of the ClusterDefinition CR.</p>

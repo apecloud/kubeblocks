@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
@@ -56,7 +57,7 @@ type ResourceFetcher[T any] struct {
 	ClusterComObj   *appsv1alpha1.ClusterComponentSpec
 
 	// Deprecated: this API will be removed from version 0.9.0
-	ClusterDefObj *appsv1alpha1.ClusterDefinition
+	ClusterDefObj *appsv1.ClusterDefinition
 
 	ConfigMapObj        *corev1.ConfigMap
 	ConfigurationObj    *appsv1alpha1.Configuration
@@ -129,7 +130,7 @@ func (r *ResourceFetcher[T]) ClusterDef() *T {
 		Name:      r.ClusterObj.Spec.ClusterDefRef,
 	}
 	return r.Wrap(func() error {
-		r.ClusterDefObj = &appsv1alpha1.ClusterDefinition{}
+		r.ClusterDefObj = &appsv1.ClusterDefinition{}
 		return r.Client.Get(r.Context, clusterDefKey, r.ClusterDefObj)
 	})
 }

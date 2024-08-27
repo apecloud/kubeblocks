@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -88,14 +89,14 @@ var _ = Describe("cluster component transformer test", func() {
 	)
 
 	var (
-		clusterDef *appsv1alpha1.ClusterDefinition
+		clusterDef *appsv1.ClusterDefinition
 	)
 
 	BeforeEach(func() {
 		clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-			AddClusterTopology(appsv1alpha1.ClusterTopology{
+			AddClusterTopology(appsv1.ClusterTopology{
 				Name: clusterTopologyDefault,
-				Components: []appsv1alpha1.ClusterTopologyComponent{
+				Components: []appsv1.ClusterTopologyComponent{
 					{
 						Name:    comp1aName,
 						CompDef: compDefName,
@@ -113,7 +114,7 @@ var _ = Describe("cluster component transformer test", func() {
 						CompDef: compDefName,
 					},
 				},
-				Orders: &appsv1alpha1.ClusterTopologyOrders{
+				Orders: &appsv1.ClusterTopologyOrders{
 					Provision: []string{
 						fmt.Sprintf("%s,%s", comp1aName, comp1bName),
 						fmt.Sprintf("%s,%s", comp2aName, comp2bName),
@@ -128,9 +129,9 @@ var _ = Describe("cluster component transformer test", func() {
 					},
 				},
 			}).
-			AddClusterTopology(appsv1alpha1.ClusterTopology{
+			AddClusterTopology(appsv1.ClusterTopology{
 				Name: clusterTopologyNoOrders,
-				Components: []appsv1alpha1.ClusterTopologyComponent{
+				Components: []appsv1.ClusterTopologyComponent{
 					{
 						Name:    comp1aName,
 						CompDef: compDefName,
@@ -149,9 +150,9 @@ var _ = Describe("cluster component transformer test", func() {
 					},
 				},
 			}).
-			AddClusterTopology(appsv1alpha1.ClusterTopology{
+			AddClusterTopology(appsv1.ClusterTopology{
 				Name: clusterTopologyProvisionNUpdateOOD,
-				Components: []appsv1alpha1.ClusterTopologyComponent{
+				Components: []appsv1.ClusterTopologyComponent{
 					{
 						Name:    comp1aName,
 						CompDef: compDefName,
@@ -169,7 +170,7 @@ var _ = Describe("cluster component transformer test", func() {
 						CompDef: compDefName,
 					},
 				},
-				Orders: &appsv1alpha1.ClusterTopologyOrders{
+				Orders: &appsv1.ClusterTopologyOrders{
 					Provision: []string{
 						fmt.Sprintf("%s,%s", comp1aName, comp1bName),
 						fmt.Sprintf("%s,%s", comp2aName, comp2bName),
@@ -180,9 +181,9 @@ var _ = Describe("cluster component transformer test", func() {
 					},
 				},
 			}).
-			AddClusterTopology(appsv1alpha1.ClusterTopology{
+			AddClusterTopology(appsv1.ClusterTopology{
 				Name: clusterTopology4Stop,
-				Components: []appsv1alpha1.ClusterTopologyComponent{
+				Components: []appsv1.ClusterTopologyComponent{
 					{
 						Name:    comp1aName,
 						CompDef: compDefName,
@@ -196,7 +197,7 @@ var _ = Describe("cluster component transformer test", func() {
 						CompDef: compDefName,
 					},
 				},
-				Orders: &appsv1alpha1.ClusterTopologyOrders{
+				Orders: &appsv1.ClusterTopologyOrders{
 					Update: []string{comp1aName, comp2aName, comp3aName},
 				},
 			}).
@@ -211,7 +212,7 @@ var _ = Describe("cluster component transformer test", func() {
 		return d
 	}
 
-	buildCompSpecs := func(clusterDef *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster) []*appsv1alpha1.ClusterComponentSpec {
+	buildCompSpecs := func(clusterDef *appsv1.ClusterDefinition, cluster *appsv1alpha1.Cluster) []*appsv1alpha1.ClusterComponentSpec {
 		apiTransformer := ClusterAPINormalizationTransformer{}
 		compSpecs, err := apiTransformer.buildCompSpecs4Topology(clusterDef, cluster)
 		Expect(err).Should(BeNil())

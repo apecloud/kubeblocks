@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -59,16 +60,16 @@ var _ = Describe("Cluster Controller", func() {
 	)
 
 	var (
-		clusterDefObj   *appsv1alpha1.ClusterDefinition
+		clusterDefObj   *appsv1.ClusterDefinition
 		compDefObj      *appsv1alpha1.ComponentDefinition
 		compVersionObj  *appsv1alpha1.ComponentVersion
 		clusterObj      *appsv1alpha1.Cluster
 		clusterKey      types.NamespacedName
 		allSettings     map[string]interface{}
-		defaultTopology = appsv1alpha1.ClusterTopology{
+		defaultTopology = appsv1.ClusterTopology{
 			Name:    "default",
 			Default: true,
-			Components: []appsv1alpha1.ClusterTopologyComponent{
+			Components: []appsv1.ClusterTopologyComponent{
 				{
 					Name:    defaultCompName,
 					CompDef: compDefName, // prefix
@@ -191,9 +192,9 @@ var _ = Describe("Cluster Controller", func() {
 				g.Expect(compVersion.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
 			})).Should(Succeed())
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
-			func(g Gomega, clusterDef *appsv1alpha1.ClusterDefinition) {
+			func(g Gomega, clusterDef *appsv1.ClusterDefinition) {
 				g.Expect(clusterDef.Status.ObservedGeneration).Should(Equal(clusterDef.Generation))
-				g.Expect(clusterDef.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
+				g.Expect(clusterDef.Status.Phase).Should(Equal(appsv1.AvailablePhase))
 			})).Should(Succeed())
 	}
 

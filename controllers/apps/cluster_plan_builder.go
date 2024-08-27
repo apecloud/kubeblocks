@@ -37,6 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -62,7 +63,7 @@ type clusterTransformContext struct {
 	logr.Logger
 	Cluster       *appsv1alpha1.Cluster
 	OrigCluster   *appsv1alpha1.Cluster
-	ClusterDef    *appsv1alpha1.ClusterDefinition
+	ClusterDef    *kbappsv1.ClusterDefinition
 	ComponentDefs map[string]*appsv1alpha1.ComponentDefinition
 	// ComponentSpecs includes all cluster component specs generated from ComponentSpecs and ShardingSpecs
 	ComponentSpecs []*appsv1alpha1.ClusterComponentSpec
@@ -114,12 +115,13 @@ func (c *clusterTransformContext) GetLogger() logr.Logger {
 
 func init() {
 	model.AddScheme(appsv1alpha1.AddToScheme)
+	model.AddScheme(appsv1beta1.AddToScheme)
+	model.AddScheme(kbappsv1.AddToScheme)
 	model.AddScheme(dpv1alpha1.AddToScheme)
 	model.AddScheme(snapshotv1.AddToScheme)
 	model.AddScheme(snapshotv1beta1.AddToScheme)
 	model.AddScheme(extensionsv1alpha1.AddToScheme)
 	model.AddScheme(workloadsv1alpha1.AddToScheme)
-	model.AddScheme(appsv1beta1.AddToScheme)
 }
 
 // PlanBuilder implementation

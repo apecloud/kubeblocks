@@ -26,6 +26,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -105,7 +106,7 @@ type progressResource struct {
 	// checks if the component is a sharding component
 	isShardingComponent bool
 	clusterComponent    *appsv1alpha1.ClusterComponentSpec
-	clusterDef          *appsv1alpha1.ClusterDefinition
+	clusterDef          *appsv1.ClusterDefinition
 	componentDef        *appsv1alpha1.ComponentDefinition
 	// record which pods need to updated during this operation.
 	// key is podName, value is instance template name.

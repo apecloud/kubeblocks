@@ -28,8 +28,6 @@ type Interface interface {
 	BackupPolicyTemplates() BackupPolicyTemplateInformer
 	// Clusters returns a ClusterInformer.
 	Clusters() ClusterInformer
-	// ClusterDefinitions returns a ClusterDefinitionInformer.
-	ClusterDefinitions() ClusterDefinitionInformer
 	// Components returns a ComponentInformer.
 	Components() ComponentInformer
 	// ComponentDefinitions returns a ComponentDefinitionInformer.
@@ -65,11 +63,6 @@ func (v *version) BackupPolicyTemplates() BackupPolicyTemplateInformer {
 // Clusters returns a ClusterInformer.
 func (v *version) Clusters() ClusterInformer {
 	return &clusterInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
-}
-
-// ClusterDefinitions returns a ClusterDefinitionInformer.
-func (v *version) ClusterDefinitions() ClusterDefinitionInformer {
-	return &clusterDefinitionInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // Components returns a ComponentInformer.

@@ -24,10 +24,6 @@ spec:
       jsonPath: .status.topologies
       name: Topologies
       type: string
-    - description: service references
-      jsonPath: .status.serviceRefs
-      name: ServiceRefs
-      type: string
     - description: status phase
       jsonPath: .status.phase
       name: STATUS
@@ -35,7 +31,7 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: AGE
       type: date
-    name: v1alpha1
+    name: v1
     schema:
       openAPIV3Schema:
         description: |-
@@ -197,9 +193,6 @@ spec:
                 enum:
                 - Available
                 - Unavailable
-                type: string
-              serviceRefs:
-                description: The service references declared by this ClusterDefinition.
                 type: string
               topologies:
                 description: Topologies this ClusterDefinition supported.

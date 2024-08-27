@@ -34,6 +34,27 @@ const (
 	defaultInstanceTemplateReplicas = 1
 )
 
+type LogConfig struct {
+	// Specifies a descriptive label for the log type, such as 'slow' for a MySQL slow log file.
+	// It provides a clear identification of the log's purpose and content.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=128
+	Name string `json:"name"`
+
+	// Specifies the paths or patterns identifying where the log files are stored.
+	// This field allows the system to locate and manage log files effectively.
+	//
+	// Examples:
+	//
+	// - /home/postgres/pgdata/pgroot/data/log/postgresql-*
+	// - /data/mysql/log/mysqld-error.log
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=4096
+	FilePathPattern string `json:"filePathPattern"`
+}
+
 type ComponentTemplateSpec struct {
 	// Specifies the name of the configuration template.
 	//

@@ -121,7 +121,6 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluste
 }
 
 func getOrBuildComponentDefinition(ctx context.Context, cli client.Reader,
-	clusterDef *appsv1alpha1.ClusterDefinition,
 	cluster *appsv1alpha1.Cluster,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.ComponentDefinition, error) {
 	if len(cluster.Spec.ClusterDefRef) > 0 && len(clusterCompSpec.ComponentDefRef) > 0 && len(clusterCompSpec.ComponentDef) == 0 {
@@ -137,29 +136,7 @@ func getOrBuildComponentDefinition(ctx context.Context, cli client.Reader,
 	return nil, fmt.Errorf("the component definition is not provided")
 }
 
-func getClusterReferencedResources(ctx context.Context, cli client.Reader,
-	cluster *appsv1alpha1.Cluster) (*appsv1alpha1.ClusterDefinition, error) {
-	var (
-		clusterDef *appsv1alpha1.ClusterDefinition
-	)
-	if len(cluster.Spec.ClusterDefRef) > 0 {
-		clusterDef = &appsv1alpha1.ClusterDefinition{}
-		if err := cli.Get(ctx, types.NamespacedName{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
-			return nil, err
-		}
-	}
-	if clusterDef == nil {
-		if len(cluster.Spec.ClusterDefRef) == 0 {
-			return nil, fmt.Errorf("cluster definition is needed for generated component")
-		} else {
-			return nil, fmt.Errorf("referenced cluster definition is not found: %s", cluster.Spec.ClusterDefRef)
-		}
-	}
-	return clusterDef, nil
-}
-
-func getClusterCompSpec4Component(ctx context.Context, cli client.Reader,
-	clusterDef *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster,
+func getClusterCompSpec4Component(ctx context.Context, cli client.Reader, cluster *appsv1alpha1.Cluster,
 	comp *appsv1alpha1.Component) (*appsv1alpha1.ClusterComponentSpec, error) {
 	compName, err := ShortName(cluster.Name, comp.Name)
 	if err != nil {

@@ -36,10 +36,6 @@ func (c *FakeAppsV1alpha1) Clusters(namespace string) v1alpha1.ClusterInterface 
 	return &FakeClusters{c, namespace}
 }
 
-func (c *FakeAppsV1alpha1) ClusterDefinitions() v1alpha1.ClusterDefinitionInterface {
-	return &FakeClusterDefinitions{c}
-}
-
 func (c *FakeAppsV1alpha1) Components(namespace string) v1alpha1.ComponentInterface {
 	return &FakeComponents{c, namespace}
 }

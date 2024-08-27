@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -88,7 +89,7 @@ var VolumeSnapshotClassSignature = func(_ snapshotv1.VolumeSnapshotClass, _ *sna
 
 var ClusterSignature = func(_ appsv1alpha1.Cluster, _ *appsv1alpha1.Cluster, _ appsv1alpha1.ClusterList, _ *appsv1alpha1.ClusterList) {
 }
-var ClusterDefinitionSignature = func(_ appsv1alpha1.ClusterDefinition, _ *appsv1alpha1.ClusterDefinition, _ appsv1alpha1.ClusterDefinitionList, _ *appsv1alpha1.ClusterDefinitionList) {
+var ClusterDefinitionSignature = func(_ appsv1.ClusterDefinition, _ *appsv1.ClusterDefinition, _ appsv1.ClusterDefinitionList, _ *appsv1.ClusterDefinitionList) {
 }
 var ComponentSignature = func(appsv1alpha1.Component, *appsv1alpha1.Component, appsv1alpha1.ComponentList, *appsv1alpha1.ComponentList) {
 }

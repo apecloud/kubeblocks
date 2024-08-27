@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	//+kubebuilder:scaffold:imports
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	experimentalv1alpha1 "github.com/apecloud/kubeblocks/apis/experimental/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -103,6 +104,7 @@ var _ = BeforeSuite(func() {
 
 	model.AddScheme(experimentalv1alpha1.AddToScheme)
 	model.AddScheme(appsv1alpha1.AddToScheme)
+	model.AddScheme(appsv1.AddToScheme)
 	model.AddScheme(workloads.AddToScheme)
 
 	//+kubebuilder:scaffold:scheme

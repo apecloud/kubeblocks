@@ -558,6 +558,16 @@ func (r *componentWorkloadOps) scaleOut(itsObj *workloads.InstanceSet) error {
 	}
 }
 
+func getHealthyLorryClient(pods []*corev1.Pod) (lorry.Client, error) {
+	for _, pod := range pods {
+		lorryCli, err := lorry.NewClient(*pod)
+		if err == nil {
+			return lorryCli, nil
+		}
+	}
+	return nil, fmt.Errorf("no health lorry client found")
+}
+
 func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 	labels := constant.GetComponentWellKnownLabels(r.synthesizeComp.ClusterName, r.synthesizeComp.Name)
 	pods, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.synthesizeComp.Namespace, labels, inDataContext4C())
@@ -613,12 +623,17 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 		podsToMemberLeave = append(podsToMemberLeave, pod)
 	}
 	for _, pod := range podsToMemberLeave {
+		// try the pod to leave first
 		lorryCli, err1 := lorry.NewClient(*pod)
 		if err1 != nil {
-			if err == nil {
-				err = err1
+			// try another pod
+			lorryCli, err1 = getHealthyLorryClient(pods)
+			if err1 != nil {
+				if err == nil {
+					err = err1
+				}
+				continue
 			}
-			continue
 		}
 
 		if intctrlutil.IsNil(lorryCli) {
@@ -631,7 +646,7 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 			return switchoverErr
 		}
 
-		if err2 := lorryCli.LeaveMember(r.reqCtx.Ctx); err2 != nil {
+		if err2 := lorryCli.LeaveMember(r.reqCtx.Ctx, pod.Name); err2 != nil {
 			// For the purpose of upgrade compatibility, if the version of Lorry is 0.7 and
 			// the version of KB is upgraded to 0.8 or newer, lorry client will return an NotImplemented error,
 			// in this case, here just ignore it.

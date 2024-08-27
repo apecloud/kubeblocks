@@ -100,7 +100,7 @@ var mockLorryClientDefault = func() {
 var mockLorryClient4HScale = func(clusterKey types.NamespacedName, compName string, replicas int) {
 	mockLorryClient(func(recorder *lorry.MockClientMockRecorder) {
 		recorder.JoinMember(gomock.Any()).Return(nil).AnyTimes()
-		recorder.LeaveMember(gomock.Any()).DoAndReturn(func(ctx context.Context) error {
+		recorder.LeaveMember(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context) error {
 			var podList corev1.PodList
 			labels := client.MatchingLabels{
 				constant.AppInstanceLabelKey:    clusterKey.Name,

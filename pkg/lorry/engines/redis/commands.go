@@ -46,8 +46,8 @@ func NewCommands() engines.ClusterCommands {
 			// Display Username and Password in kbcli
 			models.CLI: func(info *engines.ConnectionInfo) string {
 				return fmt.Sprintf(`# redis client connection example
-redis-cli -h %s -p %s --user %s --pass %s
-`, info.Host, info.Port, info.User, info.Password)
+redis-cli -h %s -p %s -a %s
+`, info.Host, info.Port, info.Password)
 			},
 		},
 	}
@@ -59,8 +59,7 @@ func (r Commands) ConnectCommand(connectInfo *engines.AuthInfo) []string {
 	}
 
 	if connectInfo != nil {
-		redisCmd = append(redisCmd, "--user", engines.AddSingleQuote(connectInfo.UserName))
-		redisCmd = append(redisCmd, "--pass", engines.AddSingleQuote(connectInfo.UserPasswd))
+		redisCmd = append(redisCmd, "-a", engines.AddSingleQuote(connectInfo.UserPasswd))
 	}
 	return []string{"sh", "-c", strings.Join(redisCmd, " ")}
 }
@@ -78,9 +77,8 @@ func (r Commands) ExecuteCommand(scripts []string) ([]string, []corev1.EnvVar, e
 	args := []string{}
 	cmd = append(cmd, "/bin/sh", "-c")
 	for _, script := range scripts {
-		args = append(args, fmt.Sprintf("%s -h %s -p 6379 --user %s --pass %s %s", r.info.Client,
+		args = append(args, fmt.Sprintf("%s -h %s -p 6379 -a %s %s", r.info.Client,
 			fmt.Sprintf("$%s", engines.EnvVarMap[engines.HOST]),
-			fmt.Sprintf("$%s", engines.EnvVarMap[engines.USER]),
 			fmt.Sprintf("$%s", engines.EnvVarMap[engines.PASSWORD]), script))
 	}
 	cmd = append(cmd, strings.Join(args, " && "))

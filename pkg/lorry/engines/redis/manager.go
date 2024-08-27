@@ -33,7 +33,6 @@ import (
 )
 
 var (
-	redisUser   = "default"
 	redisPasswd = ""
 )
 
@@ -56,10 +55,6 @@ var _ engines.DBManager = &Manager{}
 func NewManager(properties engines.Properties) (engines.DBManager, error) {
 	logger := ctrl.Log.WithName("Redis")
 
-	if viper.IsSet(constant.KBEnvServiceUser) {
-		redisUser = viper.GetString(constant.KBEnvServiceUser)
-	}
-
 	if viper.IsSet(constant.KBEnvServicePassword) {
 		redisPasswd = viper.GetString(constant.KBEnvServicePassword)
 	}
@@ -77,7 +72,6 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 
 	defaultSettings := &Settings{
 		Password: redisPasswd,
-		Username: redisUser,
 	}
 	mgr.client, mgr.clientSettings, err = ParseClientFromProperties(properties, defaultSettings)
 	if err != nil {

@@ -8054,7 +8054,7 @@ VarOption
 </tr>
 <tr>
 <td>
-<code>componentShortName</code><br/>
+<code>shortName</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.VarOption">
 VarOption

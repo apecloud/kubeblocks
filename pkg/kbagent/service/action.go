@@ -33,11 +33,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
-const (
-	actionServiceName    = "Action"
-	actionServiceVersion = "v1.0"
-)
-
 func newActionService(logger logr.Logger, actions []proto.Action) (*actionService, error) {
 	sa := &actionService{
 		logger:         logger,
@@ -69,11 +64,11 @@ type runningAction struct {
 var _ Service = &actionService{}
 
 func (s *actionService) Kind() string {
-	return actionServiceName
+	return proto.ServiceAction.Kind
 }
 
-func (s *actionService) Version() string {
-	return actionServiceVersion
+func (s *actionService) URI() string {
+	return proto.ServiceAction.URI
 }
 
 func (s *actionService) Start() error {
@@ -112,22 +107,18 @@ func (s *actionService) handleRequest(ctx context.Context, req *proto.ActionRequ
 	if _, ok := s.actions[req.Action]; !ok {
 		return nil, errors.Wrapf(proto.ErrNotDefined, "%s is not defined", req.Action)
 	}
-	return s.handleActionRequest(ctx, req)
-}
-
-func (s *actionService) handleActionRequest(ctx context.Context, req *proto.ActionRequest) ([]byte, error) {
 	action := s.actions[req.Action]
-	if action.Exec != nil {
-		return s.handleExecAction(ctx, req, action)
+	if action.Exec == nil {
+		return nil, errors.Wrap(proto.ErrNotImplemented, "only exec action is supported")
 	}
-	return nil, errors.Wrap(proto.ErrNotImplemented, "only exec action is supported")
+	return s.handleExecAction(ctx, req, action)
 }
 
 func (s *actionService) handleExecAction(ctx context.Context, req *proto.ActionRequest, action *proto.Action) ([]byte, error) {
-	if req.NonBlocking != nil && *req.NonBlocking {
-		return s.handleExecActionNonBlocking(ctx, req, action)
+	if req.NonBlocking == nil || !*req.NonBlocking {
+		return runCommand(ctx, action.Exec, req.Parameters, req.TimeoutSeconds)
 	}
-	return runCommand(ctx, action.Exec, req.Parameters, req.TimeoutSeconds)
+	return s.handleExecActionNonBlocking(ctx, req, action)
 }
 
 func (s *actionService) handleExecActionNonBlocking(ctx context.Context, req *proto.ActionRequest, action *proto.Action) ([]byte, error) {

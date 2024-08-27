@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/pkg/errors"
 	"golang.org/x/exp/maps"
 
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
@@ -35,8 +36,6 @@ import (
 )
 
 const (
-	probeServiceName          = "Probe"
-	probeServiceVersion       = "v1.0"
 	defaultProbePeriodSeconds = 60
 )
 
@@ -67,11 +66,11 @@ type probeService struct {
 var _ Service = &probeService{}
 
 func (s *probeService) Kind() string {
-	return probeServiceName
+	return proto.ServiceProbe.Kind
 }
 
-func (s *probeService) Version() string {
-	return probeServiceVersion
+func (s *probeService) URI() string {
+	return proto.ServiceProbe.URI
 }
 
 func (s *probeService) Start() error {
@@ -87,7 +86,7 @@ func (s *probeService) Start() error {
 }
 
 func (s *probeService) HandleRequest(ctx context.Context, payload []byte) ([]byte, error) {
-	return nil, proto.ErrNotImplemented
+	return nil, errors.Wrapf(proto.ErrNotImplemented, "service %s does not support request handling", s.Kind())
 }
 
 type probeRunner struct {

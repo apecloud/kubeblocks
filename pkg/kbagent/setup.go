@@ -31,11 +31,17 @@ import (
 )
 
 const (
+	ContainerName     = "kbagent"
+	InitContainerName = "init-kbagent"
+	EyeContainerName  = "kbagent-eye"
+	DefaultPortName   = "http"
+
 	actionEnvName = "KB_AGENT_ACTION"
 	probeEnvName  = "KB_AGENT_PROBE"
+	EyeEnvName    = "KB_AGENT_EYE"
 )
 
-func BuildStartupEnvs(actions []proto.Action, probes []proto.Probe) ([]corev1.EnvVar, error) {
+func BuildStartupEnv(actions []proto.Action, probes []proto.Probe) ([]corev1.EnvVar, error) {
 	da, dp, err := serializeActionNProbe(actions, probes)
 	if err != nil {
 		return nil, err

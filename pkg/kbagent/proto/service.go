@@ -17,25 +17,23 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package lifecycle
+package proto
 
-import (
-	"errors"
-)
+type Service struct {
+	Kind    string
+	Version string
+	URI     string
+}
 
 var (
-	ErrActionNotDefined     = errors.New("action is not defined")
-	ErrActionNotImplemented = errors.New("action is not implemented")
-	ErrActionInProgress     = errors.New("action is in progress")
-	ErrActionBusy           = errors.New("action is busy")
-	ErrActionTimedOut       = errors.New("action timed-out")
-	ErrActionFailed         = errors.New("action failed")
-	ErrActionInternalError  = errors.New("action internal error")
-)
-
-func IgnoreNotDefined(err error) error {
-	if err == ErrActionNotDefined {
-		return nil
+	ServiceAction = &Service{
+		Kind:    "Action",
+		Version: "v1.0",
+		URI:     "/v1.0/action",
 	}
-	return err
-}
+	ServiceProbe = &Service{
+		Kind:    "Probe",
+		Version: "v1.0",
+		URI:     "/v1.0/probe",
+	}
+)

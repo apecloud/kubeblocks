@@ -29,7 +29,7 @@ import (
 
 type Service interface {
 	Kind() string
-	Version() string
+	URI() string
 
 	Start() error
 

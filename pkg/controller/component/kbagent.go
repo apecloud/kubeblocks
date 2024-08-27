@@ -38,15 +38,7 @@ import (
 )
 
 const (
-	kbAgentContainerName     = "kbagent"
-	kbAgentInitContainerName = "init-kbagent"
-	kbAgentCommand           = "/bin/kbagent"
-	kbAgentPortName          = "http"
-	kbAgentPortArg           = "--port"
-	kbAgentTCPProtocol       = "TCP"
-	kbAgentEyeContainerName  = "kbagent-eye"
-	eyeEnvName               = "KB_AGENT_EYE"
-
+	kbAgentCommand              = "/bin/kbagent"
 	kbAgentSharedMountPath      = "/kubeblocks"
 	kbAgentCommandOnSharedMount = "/kubeblocks/kbagent"
 
@@ -61,19 +53,19 @@ var (
 
 func IsKBAgentContainer(c *corev1.Container) bool {
 	// TODO: Because the implementation of multiple images is required, an update is needed here. About kbAgentContainerName
-	return c.Name == kbAgentContainerName || c.Name == kbAgentInitContainerName
+	return c.Name == kbagent.ContainerName || c.Name == kbagent.InitContainerName
 }
 
 func UpdateKBAgentContainer4HostNetwork(synthesizedComp *SynthesizedComponent) {
 	// TODO: Because the implementation of multiple images is required, an update is needed here. About KbAgentContainerName
-	idx, c := intctrlutil.GetContainerByName(synthesizedComp.PodSpec.Containers, kbAgentContainerName)
+	idx, c := intctrlutil.GetContainerByName(synthesizedComp.PodSpec.Containers, kbagent.ContainerName)
 	if c == nil {
 		return
 	}
 
 	httpPort := 0
 	for _, port := range c.Ports {
-		if port.Name == kbAgentPortName {
+		if port.Name == kbagent.DefaultPortName {
 			httpPort = int(port.ContainerPort)
 			break
 		}
@@ -84,7 +76,7 @@ func UpdateKBAgentContainer4HostNetwork(synthesizedComp *SynthesizedComponent) {
 
 	// update port in args
 	for i, arg := range c.Args {
-		if arg == kbAgentPortArg {
+		if arg == "--port" {
 			c.Args[i+1] = strconv.Itoa(httpPort)
 			break
 		}
@@ -108,7 +100,7 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 		return err
 	}
 
-	defaultContainer := builder.NewContainerBuilder(kbAgentContainerName).
+	defaultContainer := builder.NewContainerBuilder(kbagent.ContainerName).
 		SetImage(viper.GetString(constant.KBToolsImage)).
 		SetImagePullPolicy(corev1.PullIfNotPresent).
 		AddCommands(kbAgentCommand).
@@ -124,7 +116,7 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 		if len(containers) == 0 {
 			containers = make(map[string]*corev1.Container)
 		}
-		containers[kbAgentContainerName] = defaultContainer
+		containers[kbagent.ContainerName] = defaultContainer
 	}
 
 	discovery := make(map[string]string)
@@ -143,7 +135,7 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 	if err != nil {
 		return err
 	}
-	containerSet[kbAgentEyeContainerName] = eye
+	containerSet[kbagent.EyeContainerName] = eye
 
 	allPorts := make([]int32, len(containerSet))
 	for i := range allPorts {
@@ -159,11 +151,11 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 		container.Ports = []corev1.ContainerPort{
 			{
 				ContainerPort: ports[i],
-				Name:          fmt.Sprintf("%s-%s", container.Name, kbAgentPortName),
-				Protocol:      kbAgentTCPProtocol,
+				Name:          fmt.Sprintf("%s-%s", container.Name, kbagent.DefaultPortName),
+				Protocol:      "TCP",
 			},
 		}
-		container.Args = append(container.Args, kbAgentPortArg, strconv.Itoa(int(ports[i])))
+		container.Args = append(container.Args, "--port", strconv.Itoa(int(ports[i])))
 		container.StartupProbe = &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromInt32(ports[i])},
@@ -181,7 +173,7 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 				synthesizedComp.HostNetwork.ContainerPorts,
 				appsv1alpha1.HostNetworkContainerPort{
 					Container: container.Name,
-					Ports:     []string{fmt.Sprintf("%s-%s", container.Name, kbAgentPortName)},
+					Ports:     []string{fmt.Sprintf("%s-%s", container.Name, kbagent.DefaultPortName)},
 				})
 		}
 	}
@@ -274,7 +266,7 @@ func buildKBAgentStartupEnvs(synthesizedComp *SynthesizedComponent) ([]corev1.En
 		probes = append(probes, *p)
 	}
 
-	return kbagent.BuildStartupEnvs(actions, probes)
+	return kbagent.BuildStartupEnv(actions, probes)
 }
 
 func buildAction4KBAgent(action *appsv1alpha1.Action, name string) *proto.Action {
@@ -334,7 +326,7 @@ func adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp *SynthesizedComp
 		} else {
 			wrapContainer.Image = c.Image
 		}
-		wrapContainer.Name = fmt.Sprintf("%s-%d", kbAgentContainerName, i)
+		wrapContainer.Name = fmt.Sprintf("%s-%d", kbagent.ContainerName, i)
 		wrapContainer.Command[0] = kbAgentCommandOnSharedMount
 		wrapContainer.VolumeMounts = uniqueVolumeMounts(wrapContainer.VolumeMounts, []corev1.VolumeMount{sharedVolumeMount})
 		// TODO: share more container resources
@@ -429,7 +421,7 @@ func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) (boo
 }
 
 func buildKBAgentInitContainer() *corev1.Container {
-	return builder.NewContainerBuilder(kbAgentInitContainerName).
+	return builder.NewContainerBuilder(kbagent.InitContainerName).
 		SetImage(viper.GetString(constant.KBToolsImage)).
 		SetImagePullPolicy(corev1.PullIfNotPresent).
 		AddCommands([]string{"cp", "-r", kbAgentCommand, "/bin/curl", kbAgentSharedMountPath + "/"}...).
@@ -510,11 +502,11 @@ func buildKBAgentEyeContainer(discovery map[string]string) (*corev1.Container, e
 		return nil, err
 	}
 	env = corev1.EnvVar{
-		Name:  eyeEnvName,
+		Name:  kbagent.EyeEnvName,
 		Value: string(dd),
 	}
 
-	return builder.NewContainerBuilder(kbAgentEyeContainerName).
+	return builder.NewContainerBuilder(kbagent.EyeContainerName).
 		SetImage(viper.GetString(constant.KBToolsImage)).
 		SetImagePullPolicy(corev1.PullIfNotPresent).
 		AddCommands(kbAgentCommand).

@@ -67,8 +67,7 @@ var _ = Describe("probe", func() {
 			service, err := newProbeService(logr.New(nil), actionSvc, probes)
 			Expect(err).Should(BeNil())
 			Expect(service).ShouldNot(BeNil())
-			Expect(service.Kind()).Should(Equal(probeServiceName))
-			Expect(service.Version()).Should(Equal(probeServiceVersion))
+			Expect(service.Kind()).Should(Equal(proto.ServiceProbe.Kind))
 		})
 
 		It("start", func() {

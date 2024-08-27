@@ -52,6 +52,8 @@ type ActionResponse struct {
 	Output  []byte `json:"output,omitempty"`
 }
 
+// TODO: define the event spec for probe or async action
+
 type Probe struct {
 	Action              string `json:"action"`
 	InitialDelaySeconds int32  `json:"initialDelaySeconds,omitempty"`

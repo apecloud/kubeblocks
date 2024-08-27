@@ -1040,7 +1040,7 @@ type ComponentVars struct {
 	// Reference to the short name of the Component object.
 	//
 	// +optional
-	ComponentShortName *VarOption `json:"componentShortName,omitempty"`
+	ShortName *VarOption `json:"shortName,omitempty"`
 
 	// Reference to the replicas of the component.
 	//

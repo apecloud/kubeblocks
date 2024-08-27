@@ -1687,7 +1687,7 @@ var _ = Describe("vars", func() {
 									Optional: required(),
 								},
 								ComponentVars: appsv1alpha1.ComponentVars{
-									ComponentShortName: &appsv1alpha1.VarRequired,
+									ShortName: &appsv1alpha1.VarRequired,
 								},
 							},
 						},

@@ -21,16 +21,6 @@ spec:
     template:
       name: redis
       componentDef: redis-cluster-7
-      affinity:
-        podAntiAffinity: Preferred
-        topologyKeys:
-        - kubernetes.io/hostname
-        tenancy: SharedNode
-      tolerations:
-      - key: kb-data
-        operator: Equal
-        value: 'true'
-        effect: NoSchedule
       disableExporter: true
       enabledLogs:
       - running
@@ -45,7 +35,7 @@ spec:
           memory: 1.1Gi
       # Specifies the version of the Component service. This field is used to determine the version of the service that is created for the Component. \
       # The serviceVersion is used to determine the version of the Redis Sharding Cluster kernel. If the serviceVersion is not specified, the default value is the ServiceVersion defined in ComponentDefinition.
-      serviceVersion: 7.0.6
+      serviceVersion: 7.2.4
       # Specifies to use the NodePort, need to delete the services specs if you want to use container network
       services:
       - name: redis-advertised

@@ -18,18 +18,6 @@ spec:
   - name: postgresql
     # References the name of a ComponentDefinition. The ComponentDefinition specifies the behavior and characteristics of the Component. If both `componentDefRef` and `componentDef` are provided, the `componentDef` will take precedence over `componentDefRef`.
     componentDef: postgresql-12
-    # Specifies a group of affinity scheduling rules for the Component. It allows users to control how the Component's Pods are scheduled onto nodes in the cluster.
-    affinity:
-      podAntiAffinity: Preferred
-      topologyKeys:
-      - kubernetes.io/hostname
-      tenancy: SharedNode
-    # Allows the Component to be scheduled onto nodes with matching taints. 
-    tolerations:
-    - key: kb-data
-      operator: Equal
-      value: 'true'
-      effect: NoSchedule
     # Specifies which types of logs should be collected for the Cluster. 
     enabledLogs:
     - running

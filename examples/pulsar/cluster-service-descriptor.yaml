@@ -17,23 +17,6 @@ spec:
   # - `Delete`: Extends the `Halt` policy by also removing PVCs, leading to a thorough cleanup while removing all persistent data.
   # - `WipeOut`: An aggressive policy that deletes all Cluster resources, including volume snapshots and backups in external storage. This results in complete data removal and should be used cautiously, primarily in non-production environments to avoid irreversible data loss.
   terminationPolicy: Delete
-  # Defines a set of node affinity scheduling rules for the Cluster's Pods. This field helps control the placement of Pods on nodes within the cluster.
-  affinity:
-   # Specifies the anti-affinity level of Pods within a Component. It determines how pods should be spread across nodes to improve availability and performance.
-    podAntiAffinity: Preferred
-    # Represents the key of node labels used to define the topology domain for Pod anti-affinity and Pod spread constraints. 
-    topologyKeys:
-    - kubernetes.io/hostname
-    # Determines the level of resource isolation between Pods. It can have the following values: `SharedNode` and `DedicatedNode`. 
-    # - SharedNode: Allow that multiple Pods may share the same node, which is the default behavior of K8s. 
-    # - DedicatedNode: Each Pod runs on a dedicated node, ensuring that no two Pods share the same node. 
-    tenancy: SharedNode
-  # An array that specifies tolerations attached to the Cluster's Pods, allowing them to be scheduled onto nodes with matching taints.
-  tolerations:
-    - key: kb-data
-      operator: Equal
-      value: "true"
-      effect: NoSchedule
   services:
   - name: proxy
     serviceName: proxy

@@ -22,18 +22,6 @@ spec:
     # Specifies the name of the Component. The name must be defined in the ClusterDefinition.Spec.topologies[x].components.
     # This name is also part of the Service DNS name and must comply with the IANA service naming rule. When ClusterComponentSpec is referenced as a template, the name is optional. Otherwise, it is required.
     - name: redis
-      # Specifies a group of affinity scheduling rules for the Component. It allows users to control how the Component's Pods are scheduled onto nodes in the cluster.
-      affinity:
-        podAntiAffinity: Preferred
-        topologyKeys:
-          - kubernetes.io/hostname
-        tenancy: SharedNode
-      # Allows the Component to be scheduled onto nodes with matching taints.
-      tolerations:
-        - key: kb-data
-          operator: Equal
-          value: 'true'
-          effect: NoSchedule
       # Determines whether the metrics exporter needs to be published to the service endpoint.
       disableExporter: true
       # Specifies which types of logs should be collected for the Cluster.
@@ -62,16 +50,6 @@ spec:
                 storage: 20Gi
     - name: redis-sentinel
       disableExporter: false
-      affinity:
-        podAntiAffinity: Preferred
-        topologyKeys:
-          - kubernetes.io/hostname
-        tenancy: SharedNode
-      tolerations:
-        - key: kb-data
-          operator: Equal
-          value: 'true'
-          effect: NoSchedule
       serviceAccountName: kb-redis-cluster
       replicas: 3
       resources:

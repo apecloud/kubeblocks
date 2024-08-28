@@ -1,10 +1,8 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: mongo-cluster-restore
+  name: mysql-cluster
   namespace: default
-  annotations:
-    kubeblocks.io/restore-from-backup: '{"mongodb":{"connectionPassword":"<backup-connection-password>","name":"mongo-cluster-backup","namespace":"default","volumeRestorePolicy":"Parallel"}}'
 spec:
   # Specifies the behavior when a Cluster is deleted.
   # - `DoNotTerminate`: Prevents deletion of the Cluster. This policy ensures that all resources remain intact.
@@ -16,20 +14,18 @@ spec:
   # Note: `shardingSpecs` and `componentSpecs` cannot both be empty; at least one must be defined to configure a cluster.
   # ClusterComponentSpec defines the specifications for a Component in a Cluster.
   componentSpecs:
-  - name: mongodb
-    componentDef: mongodb
-    enabledLogs:
-    - running
+  - name: mysql
+    componentDef: mysql-8.0.33-orc
     disableExporter: true
-    serviceAccountName: kb-mongo-cluster
-    replicas: 3
+    replicas: 1
+    serviceAccountName: kb-mysql-cluster
     resources:
       limits:
-        cpu: '1'
-        memory: 1Gi
+        cpu: '0.5'
+        memory: 0.5Gi
       requests:
-        cpu: '1'
-        memory: 1Gi
+        cpu: '0.5'
+        memory: 0.5Gi
     volumeClaimTemplates:
     - name: data
       spec:
@@ -37,4 +33,43 @@ spec:
         - ReadWriteOnce
         resources:
           requests:
-            storage: 30Gi
+            storage: 20Gi
+    serviceRefs:
+        - name: orchestrator
+          namespace: default
+          clusterServiceSelector:
+            cluster: orchestratorm-cluster
+            service:
+              component: orchestrator
+              service: orchestrator
+              port: http
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: orchestratorm-cluster
+  namespace: default
+  annotations:
+    "kubeblocks.io/extra-env": '{"ORC_TOPOLOGY_PASSWORD":"orchestrator","ORC_META_PASSWORD":"orchestrator","ORC_META_DATABASE":"orchestrator"}'
+spec:
+  terminationPolicy: Delete
+  componentSpecs:
+    - name: orchestrator
+      componentDef: orchestrator-raft
+      disableExporter: true
+      replicas: 3
+      resources:
+        requests:
+          cpu: '0.5'
+          memory: 0.5Gi
+        limits:
+          cpu: '0.5'
+          memory: 0.5Gi
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi

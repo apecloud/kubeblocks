@@ -24,10 +24,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/apecloud/kubeblocks/pkg/constant"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 

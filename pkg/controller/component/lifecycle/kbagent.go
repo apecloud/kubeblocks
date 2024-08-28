@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"strconv"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -282,7 +283,7 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1alpha1
 	//  - timeout
 	var output []byte
 	for _, pod := range pods {
-		host, port, err := a.serverEndpoint(pod)
+		host, port, err := a.serverEndpoint(pod, req.Action)
 		if err != nil {
 			return nil, errors.Wrapf(err, "pod %s is unavailable to execute action %s", pod.Name, lfa.name())
 		}
@@ -349,16 +350,27 @@ func (a *kbagent) selectTargetPods(spec *appsv1alpha1.Action) ([]*corev1.Pod, er
 	}
 }
 
-func (a *kbagent) serverEndpoint(pod *corev1.Pod) (string, int32, error) {
-	port, err := intctrlutil.GetPortByName(*pod, kbagt.ContainerName, kbagt.DefaultPortName)
-	if err != nil {
-		// has no kb-agent defined
-		return "", 0, nil
-	}
+func (a *kbagent) serverEndpoint(pod *corev1.Pod, actionName string) (string, int32, error) {
 	host := pod.Status.PodIP
 	if host == "" {
 		return "", 0, fmt.Errorf("pod %v has no ip", pod.Name)
 	}
+	eyePort, err := intctrlutil.GetPortByName(*pod, kbagt.EyeContainerName, fmt.Sprintf("%s-%s", kbagt.EyeContainerName, kbagt.DefaultPortName))
+	if err != nil {
+		return "", 0, nil
+	}
+	eyeCli, err := kbacli.NewClient(pod.Status.PodIP, eyePort)
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to create eye client: %v", err)
+	}
+	portResp, err := eyeCli.Action(context.Background(), proto.ActionRequest{Action: "eye", Parameters: map[string]string{
+		"actionName": actionName,
+	}})
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to get port from eye container: %v", err)
+	}
+	portInt, _ := strconv.Atoi(string(portResp.Output))
+	port := int32(portInt)
 	return host, port, nil
 }
 

@@ -132,7 +132,7 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 		}
 	}
 
-	eye, err := buildKBAgentEyeContainer(discovery)
+	eye, err := buildKBAgentEyeContainer(discovery, envVars)
 	if err != nil {
 		return err
 	}
@@ -496,7 +496,7 @@ func mountPathExists(volumeMounts []corev1.VolumeMount, mountPath string) bool {
 	return false
 }
 
-func buildKBAgentEyeContainer(discovery map[string]string) (*corev1.Container, error) {
+func buildKBAgentEyeContainer(discovery map[string]string, envVar []corev1.EnvVar) (*corev1.Container, error) {
 	var env corev1.EnvVar
 	dd, err := json.Marshal(discovery)
 	if err != nil {
@@ -511,6 +511,7 @@ func buildKBAgentEyeContainer(discovery map[string]string) (*corev1.Container, e
 		SetImage(viper.GetString(constant.KBToolsImage)).
 		SetImagePullPolicy(corev1.PullIfNotPresent).
 		AddCommands(kbAgentCommand).
+		AddEnv(envVar...).
 		AddEnv(env).
 		GetObject(), nil
 }

@@ -33,7 +33,7 @@ import (
 const (
 	ContainerName     = "kbagent"
 	InitContainerName = "init-kbagent"
-	EyeContainerName  = "kbagent-eye"
+	EyeContainerName  = "kba-eye"
 	DefaultPortName   = "http"
 
 	actionEnvName = "KB_AGENT_ACTION"

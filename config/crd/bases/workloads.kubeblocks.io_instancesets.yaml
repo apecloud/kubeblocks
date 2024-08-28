@@ -11,7 +11,6 @@ spec:
   names:
     categories:
     - kubeblocks
-    - all
     kind: InstanceSet
     listKind: InstanceSetList
     plural: instancesets

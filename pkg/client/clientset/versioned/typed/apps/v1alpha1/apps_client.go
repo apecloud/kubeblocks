@@ -32,7 +32,6 @@ type AppsV1alpha1Interface interface {
 	ClustersGetter
 	ComponentsGetter
 	ComponentDefinitionsGetter
-	ComponentVersionsGetter
 	ConfigConstraintsGetter
 	OpsDefinitionsGetter
 	OpsRequestsGetter
@@ -58,10 +57,6 @@ func (c *AppsV1alpha1Client) Components(namespace string) ComponentInterface {
 
 func (c *AppsV1alpha1Client) ComponentDefinitions() ComponentDefinitionInterface {
 	return newComponentDefinitions(c)
-}
-
-func (c *AppsV1alpha1Client) ComponentVersions() ComponentVersionInterface {
-	return newComponentVersions(c)
 }
 
 func (c *AppsV1alpha1Client) ConfigConstraints() ConfigConstraintInterface {

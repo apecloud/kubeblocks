@@ -21,3 +21,7 @@ package v1
 // ClusterDefinitionListerExpansion allows custom methods to be added to
 // ClusterDefinitionLister.
 type ClusterDefinitionListerExpansion interface{}
+
+// ComponentVersionListerExpansion allows custom methods to be added to
+// ComponentVersionLister.
+type ComponentVersionListerExpansion interface{}

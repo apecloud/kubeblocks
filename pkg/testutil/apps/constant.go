@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
@@ -269,15 +270,15 @@ var (
 		},
 	}
 
-	defaultComponentVerSpec = func(compDef string) appsv1alpha1.ComponentVersionSpec {
-		return appsv1alpha1.ComponentVersionSpec{
-			CompatibilityRules: []appsv1alpha1.ComponentVersionCompatibilityRule{
+	defaultComponentVerSpec = func(compDef string) appsv1.ComponentVersionSpec {
+		return appsv1.ComponentVersionSpec{
+			CompatibilityRules: []appsv1.ComponentVersionCompatibilityRule{
 				{
 					CompDefs: []string{compDef},
 					Releases: []string{"8.0.30-r1"},
 				},
 			},
-			Releases: []appsv1alpha1.ComponentVersionRelease{
+			Releases: []appsv1.ComponentVersionRelease{
 				{
 					Name:           "8.0.30-r1",
 					Changes:        "init release",

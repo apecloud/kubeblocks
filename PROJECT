@@ -193,8 +193,8 @@ resources:
   domain: kubeblocks.io
   group: apps
   kind: ComponentVersion
-  path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
-  version: v1alpha1
+  path: github.com/apecloud/kubeblocks/apis/apps/v1
+  version: v1
 - api:
     crdVersion: v1
   domain: kubeblocks.io

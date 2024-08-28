@@ -44,10 +44,6 @@ func (c *FakeAppsV1alpha1) ComponentDefinitions() v1alpha1.ComponentDefinitionIn
 	return &FakeComponentDefinitions{c}
 }
 
-func (c *FakeAppsV1alpha1) ComponentVersions() v1alpha1.ComponentVersionInterface {
-	return &FakeComponentVersions{c}
-}
-
 func (c *FakeAppsV1alpha1) ConfigConstraints() v1alpha1.ConfigConstraintInterface {
 	return &FakeConfigConstraints{c}
 }

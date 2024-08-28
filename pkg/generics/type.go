@@ -95,7 +95,7 @@ var ComponentSignature = func(appsv1alpha1.Component, *appsv1alpha1.Component, a
 }
 var ComponentDefinitionSignature = func(appsv1alpha1.ComponentDefinition, *appsv1alpha1.ComponentDefinition, appsv1alpha1.ComponentDefinitionList, *appsv1alpha1.ComponentDefinitionList) {
 }
-var ComponentVersionSignature = func(appsv1alpha1.ComponentVersion, *appsv1alpha1.ComponentVersion, appsv1alpha1.ComponentVersionList, *appsv1alpha1.ComponentVersionList) {
+var ComponentVersionSignature = func(appsv1.ComponentVersion, *appsv1.ComponentVersion, appsv1.ComponentVersionList, *appsv1.ComponentVersionList) {
 }
 var OpsDefinitionSignature = func(_ appsv1alpha1.OpsDefinition, _ *appsv1alpha1.OpsDefinition, _ appsv1alpha1.OpsDefinitionList, _ *appsv1alpha1.OpsDefinitionList) {
 }

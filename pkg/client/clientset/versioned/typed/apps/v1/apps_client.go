@@ -29,6 +29,7 @@ import (
 type AppsV1Interface interface {
 	RESTClient() rest.Interface
 	ClusterDefinitionsGetter
+	ComponentVersionsGetter
 }
 
 // AppsV1Client is used to interact with features provided by the apps.kubeblocks.io group.
@@ -38,6 +39,10 @@ type AppsV1Client struct {
 
 func (c *AppsV1Client) ClusterDefinitions() ClusterDefinitionInterface {
 	return newClusterDefinitions(c)
+}
+
+func (c *AppsV1Client) ComponentVersions() ComponentVersionInterface {
+	return newComponentVersions(c)
 }
 
 // NewForConfig creates a new AppsV1Client for the given config.

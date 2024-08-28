@@ -14,11 +14,44 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:openapi-gen=true
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:storageversion
+// +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cmpv
+// +kubebuilder:printcolumn:name="Versions",type="string",JSONPath=".status.serviceVersions",description="service versions"
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.phase",description="status phase"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
+
+// ComponentVersion is the Schema for the componentversions API
+type ComponentVersion struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec   ComponentVersionSpec   `json:"spec,omitempty"`
+	Status ComponentVersionStatus `json:"status,omitempty"`
+}
+
+// +kubebuilder:object:root=true
+
+// ComponentVersionList contains a list of ComponentVersion
+type ComponentVersionList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []ComponentVersion `json:"items"`
+}
+
+func init() {
+	SchemeBuilder.Register(&ComponentVersion{}, &ComponentVersionList{})
+}
 
 // ComponentVersionSpec defines the desired state of ComponentVersion
 type ComponentVersionSpec struct {
@@ -35,6 +68,26 @@ type ComponentVersionSpec struct {
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=128
 	Releases []ComponentVersionRelease `json:"releases"`
+}
+
+// ComponentVersionStatus defines the observed state of ComponentVersion
+type ComponentVersionStatus struct {
+	// ObservedGeneration is the most recent generation observed for this ComponentVersion.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// Phase valid values are ``, `Available`, 'Unavailable`.
+	// Available is ComponentVersion become available, and can be used for co-related objects.
+	// +optional
+	Phase Phase `json:"phase,omitempty"`
+
+	// Extra message for current phase.
+	// +optional
+	Message string `json:"message,omitempty"`
+
+	// ServiceVersions represent the supported service versions of this ComponentVersion.
+	// +optional
+	ServiceVersions string `json:"serviceVersions,omitempty"`
 }
 
 // ComponentVersionCompatibilityRule defines the compatibility between a set of component definitions and a set of releases.
@@ -92,56 +145,4 @@ type ComponentVersionRelease struct {
 	// +kubebuilder:validation:XValidation:rule="self.all(key, size(key) <= 32)",message="Container name may not exceed maximum length of 32 characters"
 	// +kubebuilder:validation:XValidation:rule="self.all(key, size(self[key]) <= 256)",message="Image name may not exceed maximum length of 256 characters"
 	Images map[string]string `json:"images"`
-}
-
-// ComponentVersionStatus defines the observed state of ComponentVersion
-type ComponentVersionStatus struct {
-	// ObservedGeneration is the most recent generation observed for this ComponentVersion.
-	// +optional
-	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
-
-	// Phase valid values are ``, `Available`, 'Unavailable`.
-	// Available is ComponentVersion become available, and can be used for co-related objects.
-	// +optional
-	Phase Phase `json:"phase,omitempty"`
-
-	// Extra message for current phase.
-	// +optional
-	Message string `json:"message,omitempty"`
-
-	// ServiceVersions represent the supported service versions of this ComponentVersion.
-	// +optional
-	ServiceVersions string `json:"serviceVersions,omitempty"`
-}
-
-// +genclient
-// +genclient:nonNamespaced
-// +k8s:openapi-gen=true
-// +kubebuilder:object:root=true
-// +kubebuilder:subresource:status
-// +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cmpv
-// +kubebuilder:printcolumn:name="Versions",type="string",JSONPath=".status.serviceVersions",description="service versions"
-// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.phase",description="status phase"
-// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
-
-// ComponentVersion is the Schema for the componentversions API
-type ComponentVersion struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	Spec   ComponentVersionSpec   `json:"spec,omitempty"`
-	Status ComponentVersionStatus `json:"status,omitempty"`
-}
-
-// +kubebuilder:object:root=true
-
-// ComponentVersionList contains a list of ComponentVersion
-type ComponentVersionList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ComponentVersion `json:"items"`
-}
-
-func init() {
-	SchemeBuilder.Register(&ComponentVersion{}, &ComponentVersionList{})
 }

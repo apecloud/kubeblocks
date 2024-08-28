@@ -27,6 +27,8 @@ sidebar_label: Cluster
 Resource Types:
 <ul><li>
 <a href="#apps.kubeblocks.io/v1.ClusterDefinition">ClusterDefinition</a>
+</li><li>
+<a href="#apps.kubeblocks.io/v1.ComponentVersion">ComponentVersion</a>
 </li></ul>
 <h3 id="apps.kubeblocks.io/v1.ClusterDefinition">ClusterDefinition
 </h3>
@@ -112,6 +114,104 @@ ClusterDefinitionSpec
 <em>
 <a href="#apps.kubeblocks.io/v1.ClusterDefinitionStatus">
 ClusterDefinitionStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ComponentVersion">ComponentVersion
+</h3>
+<div>
+<p>ComponentVersion is the Schema for the componentversions API</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>apiVersion</code><br/>
+string</td>
+<td>
+<code>apps.kubeblocks.io/v1</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+string
+</td>
+<td><code>ComponentVersion</code></td>
+</tr>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentVersionSpec">
+ComponentVersionSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>compatibilityRules</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentVersionCompatibilityRule">
+[]ComponentVersionCompatibilityRule
+</a>
+</em>
+</td>
+<td>
+<p>CompatibilityRules defines compatibility rules between sets of component definitions and releases.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>releases</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentVersionRelease">
+[]ComponentVersionRelease
+</a>
+</em>
+</td>
+<td>
+<p>Releases represents different releases of component instances within this ComponentVersion.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentVersionStatus">
+ComponentVersionStatus
 </a>
 </em>
 </td>
@@ -411,10 +511,236 @@ separated by commas.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.ComponentVersionCompatibilityRule">ComponentVersionCompatibilityRule
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentVersionSpec">ComponentVersionSpec</a>)
+</p>
+<div>
+<p>ComponentVersionCompatibilityRule defines the compatibility between a set of component definitions and a set of releases.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>compDefs</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<p>CompDefs specifies names for the component definitions associated with this ComponentVersion.
+Each name in the list can represent an exact name, or a name prefix.</p>
+<p>For example:</p>
+<ul>
+<li>&ldquo;mysql-8.0.30-v1alpha1&rdquo;: Matches the exact name &ldquo;mysql-8.0.30-v1alpha1&rdquo;</li>
+<li>&ldquo;mysql-8.0.30&rdquo;: Matches all names starting with &ldquo;mysql-8.0.30&rdquo;</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>releases</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<p>Releases is a list of identifiers for the releases.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ComponentVersionRelease">ComponentVersionRelease
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentVersionSpec">ComponentVersionSpec</a>)
+</p>
+<div>
+<p>ComponentVersionRelease represents a release of component instances within a ComponentVersion.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name is a unique identifier for this release.
+Cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>changes</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Changes provides information about the changes made in this release.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>ServiceVersion defines the version of the well-known service that the component provides.
+The version should follow the syntax and semantics of the &ldquo;Semantic Versioning&rdquo; specification (<a href="http://semver.org/">http://semver.org/</a>).
+If the release is used, it will serve as the service version for component instances, overriding the one defined in the component definition.
+Cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>images</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<p>Images define the new images for different containers within the release.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ComponentVersionSpec">ComponentVersionSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentVersion">ComponentVersion</a>)
+</p>
+<div>
+<p>ComponentVersionSpec defines the desired state of ComponentVersion</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>compatibilityRules</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentVersionCompatibilityRule">
+[]ComponentVersionCompatibilityRule
+</a>
+</em>
+</td>
+<td>
+<p>CompatibilityRules defines compatibility rules between sets of component definitions and releases.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>releases</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentVersionRelease">
+[]ComponentVersionRelease
+</a>
+</em>
+</td>
+<td>
+<p>Releases represents different releases of component instances within this ComponentVersion.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ComponentVersionStatus">ComponentVersionStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentVersion">ComponentVersion</a>)
+</p>
+<div>
+<p>ComponentVersionStatus defines the observed state of ComponentVersion</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>observedGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ObservedGeneration is the most recent generation observed for this ComponentVersion.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>phase</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Phase">
+Phase
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Phase valid values are `<code>,</code>Available<code>, 'Unavailable</code>.
+Available is ComponentVersion become available, and can be used for co-related objects.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>message</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Extra message for current phase.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceVersions</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServiceVersions represent the supported service versions of this ComponentVersion.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.Phase">Phase
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterDefinitionStatus">ClusterDefinitionStatus</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterDefinitionStatus">ClusterDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1.ComponentVersionStatus">ComponentVersionStatus</a>)
 </p>
 <div>
 <p>Phase represents the status of a CR.</p>
@@ -445,8 +771,6 @@ Resource Types:
 <a href="#apps.kubeblocks.io/v1alpha1.Component">Component</a>
 </li><li>
 <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinition">ComponentDefinition</a>
-</li><li>
-<a href="#apps.kubeblocks.io/v1alpha1.ComponentVersion">ComponentVersion</a>
 </li><li>
 <a href="#apps.kubeblocks.io/v1alpha1.ConfigConstraint">ConfigConstraint</a>
 </li><li>
@@ -2043,104 +2367,6 @@ This ensures the Pod&rsquo;s stability and readiness to serve requests.</p>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionStatus">
 ComponentDefinitionStatus
-</a>
-</em>
-</td>
-<td>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ComponentVersion">ComponentVersion
-</h3>
-<div>
-<p>ComponentVersion is the Schema for the componentversions API</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>apiVersion</code><br/>
-string</td>
-<td>
-<code>apps.kubeblocks.io/v1alpha1</code>
-</td>
-</tr>
-<tr>
-<td>
-<code>kind</code><br/>
-string
-</td>
-<td><code>ComponentVersion</code></td>
-</tr>
-<tr>
-<td>
-<code>metadata</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
-Kubernetes meta/v1.ObjectMeta
-</a>
-</em>
-</td>
-<td>
-Refer to the Kubernetes API documentation for the fields of the
-<code>metadata</code> field.
-</td>
-</tr>
-<tr>
-<td>
-<code>spec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ComponentVersionSpec">
-ComponentVersionSpec
-</a>
-</em>
-</td>
-<td>
-<br/>
-<br/>
-<table>
-<tr>
-<td>
-<code>compatibilityRules</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ComponentVersionCompatibilityRule">
-[]ComponentVersionCompatibilityRule
-</a>
-</em>
-</td>
-<td>
-<p>CompatibilityRules defines compatibility rules between sets of component definitions and releases.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>releases</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ComponentVersionRelease">
-[]ComponentVersionRelease
-</a>
-</em>
-</td>
-<td>
-<p>Releases represents different releases of component instances within this ComponentVersion.</p>
-</td>
-</tr>
-</table>
-</td>
-</tr>
-<tr>
-<td>
-<code>status</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ComponentVersionStatus">
-ComponentVersionStatus
 </a>
 </em>
 </td>
@@ -8148,232 +8374,6 @@ The value will be presented in the following format: FQDN1,FQDN2,&hellip;</p>
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ComponentVersionCompatibilityRule">ComponentVersionCompatibilityRule
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentVersionSpec">ComponentVersionSpec</a>)
-</p>
-<div>
-<p>ComponentVersionCompatibilityRule defines the compatibility between a set of component definitions and a set of releases.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>compDefs</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<p>CompDefs specifies names for the component definitions associated with this ComponentVersion.
-Each name in the list can represent an exact name, or a name prefix.</p>
-<p>For example:</p>
-<ul>
-<li>&ldquo;mysql-8.0.30-v1alpha1&rdquo;: Matches the exact name &ldquo;mysql-8.0.30-v1alpha1&rdquo;</li>
-<li>&ldquo;mysql-8.0.30&rdquo;: Matches all names starting with &ldquo;mysql-8.0.30&rdquo;</li>
-</ul>
-</td>
-</tr>
-<tr>
-<td>
-<code>releases</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<p>Releases is a list of identifiers for the releases.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ComponentVersionRelease">ComponentVersionRelease
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentVersionSpec">ComponentVersionSpec</a>)
-</p>
-<div>
-<p>ComponentVersionRelease represents a release of component instances within a ComponentVersion.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Name is a unique identifier for this release.
-Cannot be updated.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>changes</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Changes provides information about the changes made in this release.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serviceVersion</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>ServiceVersion defines the version of the well-known service that the component provides.
-The version should follow the syntax and semantics of the &ldquo;Semantic Versioning&rdquo; specification (<a href="http://semver.org/">http://semver.org/</a>).
-If the release is used, it will serve as the service version for component instances, overriding the one defined in the component definition.
-Cannot be updated.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>images</code><br/>
-<em>
-map[string]string
-</em>
-</td>
-<td>
-<p>Images define the new images for different containers within the release.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ComponentVersionSpec">ComponentVersionSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentVersion">ComponentVersion</a>)
-</p>
-<div>
-<p>ComponentVersionSpec defines the desired state of ComponentVersion</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>compatibilityRules</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ComponentVersionCompatibilityRule">
-[]ComponentVersionCompatibilityRule
-</a>
-</em>
-</td>
-<td>
-<p>CompatibilityRules defines compatibility rules between sets of component definitions and releases.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>releases</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ComponentVersionRelease">
-[]ComponentVersionRelease
-</a>
-</em>
-</td>
-<td>
-<p>Releases represents different releases of component instances within this ComponentVersion.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ComponentVersionStatus">ComponentVersionStatus
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentVersion">ComponentVersion</a>)
-</p>
-<div>
-<p>ComponentVersionStatus defines the observed state of ComponentVersion</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>observedGeneration</code><br/>
-<em>
-int64
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ObservedGeneration is the most recent generation observed for this ComponentVersion.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>phase</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.Phase">
-Phase
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Phase valid values are `<code>,</code>Available<code>, 'Unavailable</code>.
-Available is ComponentVersion become available, and can be used for co-related objects.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>message</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Extra message for current phase.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serviceVersions</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ServiceVersions represent the supported service versions of this ComponentVersion.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentVolume">ComponentVolume
 </h3>
 <p>
@@ -13479,7 +13479,7 @@ Kubernetes core/v1.PersistentVolumeMode
 <h3 id="apps.kubeblocks.io/v1alpha1.Phase">Phase
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionStatus">ComponentDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentVersionStatus">ComponentVersionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.OpsDefinitionStatus">OpsDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceDescriptorStatus">ServiceDescriptorStatus</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionStatus">ComponentDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.OpsDefinitionStatus">OpsDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceDescriptorStatus">ServiceDescriptorStatus</a>)
 </p>
 <div>
 <p>Phase represents the current status of the ClusterDefinition CR.</p>

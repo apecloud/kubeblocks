@@ -32,8 +32,6 @@ type Interface interface {
 	Components() ComponentInformer
 	// ComponentDefinitions returns a ComponentDefinitionInformer.
 	ComponentDefinitions() ComponentDefinitionInformer
-	// ComponentVersions returns a ComponentVersionInformer.
-	ComponentVersions() ComponentVersionInformer
 	// ConfigConstraints returns a ConfigConstraintInformer.
 	ConfigConstraints() ConfigConstraintInformer
 	// OpsDefinitions returns a OpsDefinitionInformer.
@@ -73,11 +71,6 @@ func (v *version) Components() ComponentInformer {
 // ComponentDefinitions returns a ComponentDefinitionInformer.
 func (v *version) ComponentDefinitions() ComponentDefinitionInformer {
 	return &componentDefinitionInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
-}
-
-// ComponentVersions returns a ComponentVersionInformer.
-func (v *version) ComponentVersions() ComponentVersionInformer {
-	return &componentVersionInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // ConfigConstraints returns a ConfigConstraintInformer.

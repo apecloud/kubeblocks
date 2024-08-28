@@ -32,6 +32,10 @@ func (c *FakeAppsV1) ClusterDefinitions() v1.ClusterDefinitionInterface {
 	return &FakeClusterDefinitions{c}
 }
 
+func (c *FakeAppsV1) ComponentVersions() v1.ComponentVersionInterface {
+	return &FakeComponentVersions{c}
+}
+
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeAppsV1) RESTClient() rest.Interface {

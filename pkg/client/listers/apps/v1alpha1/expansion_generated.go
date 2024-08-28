@@ -42,10 +42,6 @@ type ComponentNamespaceListerExpansion interface{}
 // ComponentDefinitionLister.
 type ComponentDefinitionListerExpansion interface{}
 
-// ComponentVersionListerExpansion allows custom methods to be added to
-// ComponentVersionLister.
-type ComponentVersionListerExpansion interface{}
-
 // ConfigConstraintListerExpansion allows custom methods to be added to
 // ConfigConstraintLister.
 type ConfigConstraintListerExpansion interface{}

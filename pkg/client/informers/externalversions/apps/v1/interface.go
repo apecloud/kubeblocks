@@ -26,6 +26,8 @@ import (
 type Interface interface {
 	// ClusterDefinitions returns a ClusterDefinitionInformer.
 	ClusterDefinitions() ClusterDefinitionInformer
+	// ComponentVersions returns a ComponentVersionInformer.
+	ComponentVersions() ComponentVersionInformer
 }
 
 type version struct {
@@ -42,4 +44,9 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 // ClusterDefinitions returns a ClusterDefinitionInformer.
 func (v *version) ClusterDefinitions() ClusterDefinitionInformer {
 	return &clusterDefinitionInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// ComponentVersions returns a ComponentVersionInformer.
+func (v *version) ComponentVersions() ComponentVersionInformer {
+	return &componentVersionInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }

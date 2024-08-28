@@ -27,6 +27,7 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -103,8 +104,8 @@ var _ = Describe("Upgrade OpsRequest", func() {
 		}).Create(&testCtx).GetObject()
 		if createCompVersion {
 			compVersion := testapps.NewComponentVersionFactory(testapps.CompVersionName).
-				SetSpec(appsv1alpha1.ComponentVersionSpec{
-					CompatibilityRules: []appsv1alpha1.ComponentVersionCompatibilityRule{
+				SetSpec(appsv1.ComponentVersionSpec{
+					CompatibilityRules: []appsv1.ComponentVersionCompatibilityRule{
 						{
 							// use prefix
 							CompDefs: []string{compDef1.Name},
@@ -116,7 +117,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 							Releases: []string{release2, release3}, // sv: v2
 						},
 					},
-					Releases: []appsv1alpha1.ComponentVersionRelease{
+					Releases: []appsv1.ComponentVersionRelease{
 						{
 							Name:           release0,
 							Changes:        "init release",
@@ -162,7 +163,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 				Create(&testCtx).
 				GetObject()
 			// label the componentDef info to the ComponentVersion
-			Expect(testapps.ChangeObj(&testCtx, compVersion, func(version *appsv1alpha1.ComponentVersion) {
+			Expect(testapps.ChangeObj(&testCtx, compVersion, func(version *appsv1.ComponentVersion) {
 				if version.Labels == nil {
 					version.Labels = map[string]string{}
 				}
@@ -172,7 +173,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 
 			// mock ComponentVersion to Available
 			Expect(testapps.ChangeObjStatus(&testCtx, compVersion, func() {
-				compVersion.Status.Phase = appsv1alpha1.AvailablePhase
+				compVersion.Status.Phase = appsv1.AvailablePhase
 				compVersion.Status.ObservedGeneration = compVersion.Generation
 			})).Should(Succeed())
 		}

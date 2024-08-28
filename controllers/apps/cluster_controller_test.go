@@ -62,7 +62,7 @@ var _ = Describe("Cluster Controller", func() {
 	var (
 		clusterDefObj   *appsv1.ClusterDefinition
 		compDefObj      *appsv1alpha1.ComponentDefinition
-		compVersionObj  *appsv1alpha1.ComponentVersion
+		compVersionObj  *appsv1.ComponentVersion
 		clusterObj      *appsv1alpha1.Cluster
 		clusterKey      types.NamespacedName
 		allSettings     map[string]interface{}
@@ -142,14 +142,14 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Create a componentVersion obj")
 		compVersionObj = testapps.NewComponentVersionFactory(compVersionName).
-			SetSpec(appsv1alpha1.ComponentVersionSpec{
-				CompatibilityRules: []appsv1alpha1.ComponentVersionCompatibilityRule{
+			SetSpec(appsv1.ComponentVersionSpec{
+				CompatibilityRules: []appsv1.ComponentVersionCompatibilityRule{
 					{
 						CompDefs: []string{compDefName}, // prefix
 						Releases: []string{"v0.1.0", "v0.2.0"},
 					},
 				},
-				Releases: []appsv1alpha1.ComponentVersionRelease{
+				Releases: []appsv1.ComponentVersionRelease{
 					{
 						Name:           "v0.1.0",
 						Changes:        "init release",
@@ -187,9 +187,9 @@ var _ = Describe("Cluster Controller", func() {
 				g.Expect(compDef.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
 			})).Should(Succeed())
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(compVersionObj),
-			func(g Gomega, compVersion *appsv1alpha1.ComponentVersion) {
+			func(g Gomega, compVersion *appsv1.ComponentVersion) {
 				g.Expect(compVersion.Status.ObservedGeneration).Should(Equal(compVersion.Generation))
-				g.Expect(compVersion.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
+				g.Expect(compVersion.Status.Phase).Should(Equal(appsv1.AvailablePhase))
 			})).Should(Succeed())
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
 			func(g Gomega, clusterDef *appsv1.ClusterDefinition) {

@@ -26,8 +26,6 @@ type ComponentExpansion interface{}
 
 type ComponentDefinitionExpansion interface{}
 
-type ComponentVersionExpansion interface{}
-
 type ConfigConstraintExpansion interface{}
 
 type OpsDefinitionExpansion interface{}

@@ -24,7 +24,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"os"
+	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -35,8 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	ctlruntime "sigs.k8s.io/controller-runtime"
-
-	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 const (
@@ -44,7 +44,12 @@ const (
 	sendEventRetryInterval = 10 * time.Second
 )
 
-type eventInfo struct {
+var (
+	baseInfo eventBaseInfo
+	once     sync.Once
+)
+
+type eventBaseInfo struct {
 	namespace string
 	podName   string
 	podUID    string
@@ -53,70 +58,71 @@ type eventInfo struct {
 
 func SendEventWithMessage(logger *logr.Logger, reason string, message string) {
 	go func() {
-		eventInfo := eventInfo{
-			namespace: os.Getenv(constant.KBEnvNamespace),
-			podName:   os.Getenv(constant.KBEnvPodName),
-			podUID:    os.Getenv(constant.KBEnvPodUID),
-			nodeName:  os.Getenv(constant.KBEnvNodeName),
-		}
-		// hash reason and message as event name
-		suffix := hashReasonNMessage(reason, message)
-		eventName := fmt.Sprintf("%s.%s", os.Getenv(constant.KBEnvPodName), suffix)
-		err := sendOrUpdateEvent(eventInfo, reason, message, eventName)
+		once.Do(func() {
+			baseInfo = eventBaseInfo{
+				namespace: os.Getenv(constant.KBEnvNamespace),
+				podName:   os.Getenv(constant.KBEnvPodName),
+				podUID:    os.Getenv(constant.KBEnvPodUID),
+				nodeName:  os.Getenv(constant.KBEnvNodeName),
+			}
+		})
+		err := sendOrUpdateEvent(reason, message)
 		if logger != nil && err != nil {
 			logger.Error(err, "send or update event failed")
 		}
 	}()
 }
 
-func sendOrUpdateEvent(eventInfo eventInfo, reason string, message string, eventName string) error {
+func sendOrUpdateEvent(reason string, message string) error {
+	suffix := hashReasonNMessage(reason, message)
+	eventName := fmt.Sprintf("%s.%s.%s", baseInfo.podName, baseInfo.podUID, suffix)
 	clientSet, err := getK8sClientSet()
 	if err != nil {
 		return fmt.Errorf("error getting k8s clientset: %v", err)
 	}
-	event, err := clientSet.CoreV1().Events(eventInfo.namespace).Get(context.TODO(), eventName, metav1.GetOptions{})
+	event, err := clientSet.CoreV1().Events(baseInfo.namespace).Get(context.TODO(), eventName, metav1.GetOptions{})
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			return fmt.Errorf("error getting event: %v", err)
 		}
-		event = createEvent(eventInfo, reason, message, eventName)
-		return sendEvent(clientSet, event, eventInfo.namespace)
+		event = createEvent(reason, message, eventName)
+		return sendEvent(clientSet, event)
 	}
-	return updateEvent(clientSet, event, eventInfo.namespace)
+	return updateEvent(clientSet, event)
 }
 
-func createEvent(eventInfo eventInfo, reason string, message string, eventName string) *corev1.Event {
+func createEvent(reason string, message string, eventName string) *corev1.Event {
 	return &corev1.Event{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      eventName,
-			Namespace: eventInfo.namespace,
+			Namespace: baseInfo.namespace,
 		},
 		InvolvedObject: corev1.ObjectReference{
 			Kind:      "Pod",
-			Namespace: eventInfo.namespace,
-			Name:      eventInfo.podName,
-			UID:       types.UID(eventInfo.podUID),
+			Namespace: baseInfo.namespace,
+			Name:      baseInfo.podName,
+			UID:       types.UID(baseInfo.podUID),
 			FieldPath: "spec.containers{kbagent}",
 		},
 		Reason:  reason,
 		Message: message,
 		Source: corev1.EventSource{
 			Component: "kbagent",
-			Host:      eventInfo.nodeName,
+			Host:      baseInfo.nodeName,
 		},
 		FirstTimestamp:      metav1.Now(),
 		LastTimestamp:       metav1.Now(),
 		EventTime:           metav1.NowMicro(),
 		ReportingController: "kbagent",
-		ReportingInstance:   eventInfo.podName,
+		ReportingInstance:   baseInfo.podName,
 		Action:              reason,
 		Type:                "Normal",
 	}
 }
 
-func sendEvent(clientSet *kubernetes.Clientset, event *corev1.Event, namespace string) error {
+func sendEvent(clientSet *kubernetes.Clientset, event *corev1.Event) error {
 	for i := 0; i < sendEventMaxAttempts; i++ {
-		_, err := clientSet.CoreV1().Events(namespace).Create(context.Background(), event, metav1.CreateOptions{})
+		_, err := clientSet.CoreV1().Events(baseInfo.namespace).Create(context.Background(), event, metav1.CreateOptions{})
 		if err == nil {
 			return nil
 		}
@@ -125,11 +131,11 @@ func sendEvent(clientSet *kubernetes.Clientset, event *corev1.Event, namespace s
 	return fmt.Errorf("failed to send event after %d attempts", sendEventMaxAttempts)
 }
 
-func updateEvent(clientSet *kubernetes.Clientset, event *corev1.Event, namespace string) error {
+func updateEvent(clientSet *kubernetes.Clientset, event *corev1.Event) error {
 	event.Count += 1
 	event.LastTimestamp = metav1.Now()
 
-	_, err := clientSet.CoreV1().Events(namespace).Update(context.TODO(), event, metav1.UpdateOptions{})
+	_, err := clientSet.CoreV1().Events(baseInfo.namespace).Update(context.Background(), event, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("error updating event: %v", err)
 	}

@@ -28,8 +28,8 @@ import (
 	fakeappsv1beta1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/apps/v1beta1/fake"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/dataprotection/v1alpha1"
 	fakedataprotectionv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/dataprotection/v1alpha1/fake"
-	extensionsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/extensions/v1alpha1"
-	fakeextensionsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/extensions/v1alpha1/fake"
+	extensionsv1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/extensions/v1"
+	fakeextensionsv1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/extensions/v1/fake"
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/workloads/v1alpha1"
 	fakeworkloadsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/workloads/v1alpha1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -109,9 +109,9 @@ func (c *Clientset) DataprotectionV1alpha1() dataprotectionv1alpha1.Dataprotecti
 	return &fakedataprotectionv1alpha1.FakeDataprotectionV1alpha1{Fake: &c.Fake}
 }
 
-// ExtensionsV1alpha1 retrieves the ExtensionsV1alpha1Client
-func (c *Clientset) ExtensionsV1alpha1() extensionsv1alpha1.ExtensionsV1alpha1Interface {
-	return &fakeextensionsv1alpha1.FakeExtensionsV1alpha1{Fake: &c.Fake}
+// ExtensionsV1 retrieves the ExtensionsV1Client
+func (c *Clientset) ExtensionsV1() extensionsv1.ExtensionsV1Interface {
+	return &fakeextensionsv1.FakeExtensionsV1{Fake: &c.Fake}
 }
 
 // WorkloadsV1alpha1 retrieves the WorkloadsV1alpha1Client

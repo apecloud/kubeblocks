@@ -38,7 +38,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
+	extensionsv1 "github.com/apecloud/kubeblocks/apis/extensions/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 
 	// +kubebuilder:scaffold:imports
@@ -95,7 +95,7 @@ var _ = BeforeSuite(func() {
 	err = batchv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = extensionsv1alpha1.AddToScheme(scheme.Scheme)
+	err = extensionsv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = appsv1alpha1.AddToScheme(scheme.Scheme)

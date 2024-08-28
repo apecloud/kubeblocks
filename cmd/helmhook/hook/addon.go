@@ -25,7 +25,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	errors "sigs.k8s.io/controller-runtime/pkg/client"
 
-	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
+	extensionsv1 "github.com/apecloud/kubeblocks/apis/extensions/v1"
 	"github.com/apecloud/kubeblocks/pkg/client/clientset/versioned"
 )
 
@@ -72,7 +72,7 @@ func (p *Addon) Handle(ctx *UpgradeContext) (err error) {
 	return nil
 }
 
-func patchDisableUpdateAddon(ctx context.Context, client *versioned.Clientset, addon extensionsv1alpha1.Addon) error {
+func patchDisableUpdateAddon(ctx context.Context, client *versioned.Clientset, addon extensionsv1.Addon) error {
 	annotations := addon.GetAnnotations()
 	if annotations == nil {
 		annotations = make(map[string]string)

@@ -25,13 +25,14 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 
-	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
+	extensionsv1 "github.com/apecloud/kubeblocks/apis/extensions/v1"
 	. "github.com/apecloud/kubeblocks/test/e2e"
 	e2eutil "github.com/apecloud/kubeblocks/test/e2e/util"
 	"github.com/apecloud/kubeblocks/test/testutils"
@@ -74,7 +75,7 @@ func SmokeTest() {
 			}
 			if len(objects.Items) > 0 {
 				for _, obj := range objects.Items {
-					addon := extensionsv1alpha1.Addon{}
+					addon := extensionsv1.Addon{}
 					if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &addon); err != nil {
 						log.Println(err)
 					}
@@ -83,7 +84,7 @@ func SmokeTest() {
 					}
 					// addon is enabled, then check its status
 					if addon.Spec.InstallSpec.GetEnabled() {
-						if addon.Status.Phase != extensionsv1alpha1.AddonEnabled {
+						if addon.Status.Phase != extensionsv1.AddonEnabled {
 							log.Printf("Addon %s is not enabled yet", addon.Name)
 						}
 					}

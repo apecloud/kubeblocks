@@ -43,7 +43,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
+	extensionsv1 "github.com/apecloud/kubeblocks/apis/extensions/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	"github.com/apecloud/kubeblocks/pkg/testutil"
@@ -98,7 +98,7 @@ var _ = Describe("Addon controller", func() {
 	})
 
 	Context("Addon controller test", func() {
-		var addon *extensionsv1alpha1.Addon
+		var addon *extensionsv1.Addon
 		var key types.NamespacedName
 		var clusterKey types.NamespacedName
 		BeforeEach(func() {
@@ -188,9 +188,9 @@ var _ = Describe("Addon controller", func() {
 			Eventually(func(g Gomega) {
 				_, err := doReconcile()
 				g.Expect(err).To(Not(HaveOccurred()))
-				addon = &extensionsv1alpha1.Addon{}
+				addon = &extensionsv1.Addon{}
 				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
-				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonEnabled))
+				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1.AddonEnabled))
 				g.Expect(addon.Status.ObservedGeneration).Should(BeEquivalentTo(expectedObservedGeneration))
 				checkedJobDeletion(g, jobKey)
 			}).Should(Succeed())
@@ -207,9 +207,9 @@ var _ = Describe("Addon controller", func() {
 			Eventually(func(g Gomega) {
 				_, err := doReconcile()
 				g.Expect(err).To(Not(HaveOccurred()))
-				addon = &extensionsv1alpha1.Addon{}
+				addon = &extensionsv1.Addon{}
 				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
-				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonFailed))
+				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1.AddonFailed))
 				g.Expect(addon.Status.ObservedGeneration).Should(BeEquivalentTo(expectedObservedGeneration))
 			}).Should(Succeed())
 		}
@@ -232,13 +232,13 @@ var _ = Describe("Addon controller", func() {
 			}).Should(Succeed())
 		}
 
-		createAddonSpecWithRequiredAttributes := func(modifiers func(newOjb *extensionsv1alpha1.Addon)) {
+		createAddonSpecWithRequiredAttributes := func(modifiers func(newOjb *extensionsv1.Addon)) {
 			if modifiers != nil {
 				addon = testapps.CreateCustomizedObj(&testCtx, "addon/addon.yaml",
-					&extensionsv1alpha1.Addon{}, modifiers)
+					&extensionsv1.Addon{}, modifiers)
 			} else {
 				addon = testapps.CreateCustomizedObj(&testCtx, "addon/addon.yaml",
-					&extensionsv1alpha1.Addon{})
+					&extensionsv1.Addon{})
 			}
 			key = types.NamespacedName{
 				Name: addon.Name,
@@ -246,11 +246,11 @@ var _ = Describe("Addon controller", func() {
 			Expect(addon.Spec.DefaultInstallValues).ShouldNot(BeEmpty())
 		}
 
-		addonStatusPhaseCheck := func(genID int, expectPhase extensionsv1alpha1.AddonPhase, handler func()) {
+		addonStatusPhaseCheck := func(genID int, expectPhase extensionsv1.AddonPhase, handler func()) {
 			Eventually(func(g Gomega) {
 				_, err := doReconcile()
 				Expect(err).To(Not(HaveOccurred()))
-				addon = &extensionsv1alpha1.Addon{}
+				addon = &extensionsv1.Addon{}
 				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
 				g.Expect(addon.Generation).Should(BeEquivalentTo(genID))
 				g.Expect(addon.Spec.InstallSpec).ShouldNot(BeNil())
@@ -266,7 +266,7 @@ var _ = Describe("Addon controller", func() {
 			Eventually(func(g Gomega) {
 				_, err := doReconcile()
 				Expect(err).To(Not(HaveOccurred()))
-				addon = &extensionsv1alpha1.Addon{}
+				addon = &extensionsv1.Addon{}
 				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
 				g.Expect(addon.Generation).Should(BeEquivalentTo(genID))
 				g.Expect(addon.Status.ObservedGeneration).Should(BeEquivalentTo(genID))
@@ -275,7 +275,7 @@ var _ = Describe("Addon controller", func() {
 		}
 
 		enablingPhaseCheck := func(genID int) {
-			addonStatusPhaseCheck(genID, extensionsv1alpha1.AddonEnabling, func() {
+			addonStatusPhaseCheck(genID, extensionsv1.AddonEnabling, func() {
 				By("By fake active install job")
 				jobKey := client.ObjectKey{
 					Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
@@ -288,32 +288,32 @@ var _ = Describe("Addon controller", func() {
 		}
 
 		disablingPhaseCheck := func(genID int) {
-			addonStatusPhaseCheck(genID, extensionsv1alpha1.AddonDisabling, nil)
+			addonStatusPhaseCheck(genID, extensionsv1.AddonDisabling, nil)
 		}
 
 		checkAddonDeleted := func(g Gomega) {
-			addon = &extensionsv1alpha1.Addon{}
+			addon = &extensionsv1.Addon{}
 			err := testCtx.Cli.Get(ctx, key, addon)
 			g.Expect(err).To(HaveOccurred())
 			g.Expect(apierrors.IsNotFound(err)).Should(BeTrue())
 		}
 
 		checkAddonNotDeleted := func(g Gomega) {
-			addon = &extensionsv1alpha1.Addon{}
+			addon = &extensionsv1.Addon{}
 			err := testCtx.Cli.Get(ctx, key, addon)
 			g.Expect(err).To(Not(HaveOccurred()))
 		}
 
 		disableAddon := func(genID int) {
-			addon = &extensionsv1alpha1.Addon{}
+			addon = &extensionsv1.Addon{}
 			Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
 			addon.Spec.InstallSpec.Enabled = false
 			Expect(testCtx.Cli.Update(ctx, addon)).Should(Succeed())
 			disablingPhaseCheck(genID)
 		}
 
-		disableAddonFailedCheck := func(genID, obGenID int, expectPhase extensionsv1alpha1.AddonPhase) {
-			addon = &extensionsv1alpha1.Addon{}
+		disableAddonFailedCheck := func(genID, obGenID int, expectPhase extensionsv1.AddonPhase) {
+			addon = &extensionsv1.Addon{}
 			Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
 			addon.Spec.InstallSpec.Enabled = false
 			Expect(testCtx.Cli.Update(ctx, addon)).Should(Succeed())
@@ -321,7 +321,7 @@ var _ = Describe("Addon controller", func() {
 			Eventually(func(g Gomega) {
 				_, err := doReconcile()
 				Expect(err).To(Not(HaveOccurred()))
-				addon = &extensionsv1alpha1.Addon{}
+				addon = &extensionsv1.Addon{}
 				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
 				g.Expect(addon.Generation).Should(BeEquivalentTo(genID))
 				g.Expect(addon.Spec.InstallSpec).ShouldNot(BeNil())
@@ -409,10 +409,10 @@ var _ = Describe("Addon controller", func() {
 
 		It("should successfully reconcile a custom resource for Addon with spec.type=Helm", func() {
 			By("By create an addon")
-			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
-				newOjb.Spec.Type = extensionsv1alpha1.HelmType
-				newOjb.Spec.Helm = &extensionsv1alpha1.HelmTypeInstallSpec{
-					InstallOptions: extensionsv1alpha1.HelmInstallOptions{
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1.Addon) {
+				newOjb.Spec.Type = extensionsv1.HelmType
+				newOjb.Spec.Helm = &extensionsv1.HelmTypeInstallSpec{
+					InstallOptions: extensionsv1.HelmInstallOptions{
 						"--debug": "true",
 					},
 					ChartLocationURL: "file:///test-charts.tgz",
@@ -423,10 +423,10 @@ var _ = Describe("Addon controller", func() {
 			By("By checking status.observedGeneration and status.phase=disabled")
 			Eventually(func(g Gomega) {
 				doReconcileOnce(g)
-				addon = &extensionsv1alpha1.Addon{}
+				addon = &extensionsv1.Addon{}
 				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
 				g.Expect(addon.Status.ObservedGeneration).Should(BeEquivalentTo(1))
-				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonDisabled))
+				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1.AddonDisabled))
 			}).Should(Succeed())
 
 			By("By enabling addon with default install")
@@ -469,10 +469,10 @@ var _ = Describe("Addon controller", func() {
 			Eventually(func(g Gomega) {
 				_, err := doReconcile()
 				g.Expect(err).To(Not(HaveOccurred()))
-				addon = &extensionsv1alpha1.Addon{}
+				addon = &extensionsv1.Addon{}
 				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
 				g.Expect(addon.Status.ObservedGeneration).Should(BeEquivalentTo(3))
-				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonDisabled))
+				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1.AddonDisabled))
 				checkedJobDeletion(g, uninstallJobKey)
 			}).Should(Succeed())
 
@@ -486,7 +486,7 @@ var _ = Describe("Addon controller", func() {
 
 		createAutoInstallAddon := func() {
 			By("By create an addon with auto-install")
-			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1.Addon) {
 				newOjb.Spec.Installable.AutoInstall = true
 			})
 
@@ -533,7 +533,7 @@ var _ = Describe("Addon controller", func() {
 
 		It("should successfully reconcile a custom resource for Addon deletion while enabling", func() {
 			By("By create an addon with auto-install")
-			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1.Addon) {
 				newOjb.Spec.Installable.AutoInstall = true
 			})
 
@@ -608,7 +608,7 @@ var _ = Describe("Addon controller", func() {
 			viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, "{\"beta.kubernetes.io/arch\":\"amd64\"}")
 
 			By("By create an addon with auto-install")
-			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1.Addon) {
 				newOjb.Spec.Installable.AutoInstall = true
 			})
 
@@ -634,16 +634,16 @@ var _ = Describe("Addon controller", func() {
 
 		It("should successfully reconcile a custom resource for Addon with no matching installable selector", func() {
 			By("By create an addon with no matching installable selector")
-			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1.Addon) {
 				newOjb.Spec.Installable.Selectors[0].Values = []string{"some-others"}
 			})
 
 			By("By checking status.observedGeneration and status.phase=disabled")
 			Eventually(func(g Gomega) {
 				doReconcileOnce(g)
-				addon = &extensionsv1alpha1.Addon{}
+				addon = &extensionsv1.Addon{}
 				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
-				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonDisabled))
+				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1.AddonDisabled))
 				g.Expect(addon.Status.Conditions).ShouldNot(BeEmpty())
 				g.Expect(addon.Status.ObservedGeneration).Should(BeEquivalentTo(1))
 			}).Should(Succeed())
@@ -657,18 +657,18 @@ var _ = Describe("Addon controller", func() {
 			// if k8s version > 1.23, it has kubebuilder X-Validation, no need to check again
 			if CheckKubernetesVersion() {
 				By("By create an addon with spec.helm = nil")
-				createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+				createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1.Addon) {
 					newOjb.Spec.Installable.AutoInstall = true
-					newOjb.Spec.Type = extensionsv1alpha1.HelmType
+					newOjb.Spec.Type = extensionsv1.HelmType
 					newOjb.Spec.Helm = nil
 				})
 
 				By("By check addon status")
 				Eventually(func(g Gomega) {
 					doReconcileOnce(g)
-					addon = &extensionsv1alpha1.Addon{}
+					addon = &extensionsv1.Addon{}
 					g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
-					g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonFailed))
+					g.Expect(addon.Status.Phase).Should(Equal(extensionsv1.AddonFailed))
 					g.Expect(addon.Spec.InstallSpec).Should(BeNil())
 					g.Expect(addon.Status.ObservedGeneration).Should(BeEquivalentTo(1))
 				}).Should(Succeed())
@@ -687,18 +687,18 @@ var _ = Describe("Addon controller", func() {
 				})
 
 			By("By addon enabled via auto-install")
-			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1.Addon) {
 				newOjb.Spec.Installable.AutoInstall = true
 				for k := range cm.Data {
 					newOjb.Spec.Helm.InstallValues.ConfigMapRefs = append(newOjb.Spec.Helm.InstallValues.ConfigMapRefs,
-						extensionsv1alpha1.DataObjectKeySelector{
+						extensionsv1.DataObjectKeySelector{
 							Name: cm.Name,
 							Key:  k,
 						})
 				}
 				for k := range secret.Data {
 					newOjb.Spec.Helm.InstallValues.SecretRefs = append(newOjb.Spec.Helm.InstallValues.SecretRefs,
-						extensionsv1alpha1.DataObjectKeySelector{
+						extensionsv1.DataObjectKeySelector{
 							Name: secret.Name,
 							Key:  k,
 						})
@@ -718,15 +718,15 @@ var _ = Describe("Addon controller", func() {
 				})
 
 			By("By addon enabled via auto-install")
-			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1.Addon) {
 				newOjb.Spec.Installable.AutoInstall = true
 				newOjb.Spec.Helm.InstallValues.ConfigMapRefs = append(newOjb.Spec.Helm.InstallValues.ConfigMapRefs,
-					extensionsv1alpha1.DataObjectKeySelector{
+					extensionsv1.DataObjectKeySelector{
 						Name: cm.Name,
 						Key:  "unknown",
 					})
 			})
-			addonStatusPhaseCheck(2, extensionsv1alpha1.AddonFailed, nil)
+			addonStatusPhaseCheck(2, extensionsv1.AddonFailed, nil)
 		})
 
 		It("should failed reconcile a custom resource for Addon with missing secret ref values", func() {
@@ -736,15 +736,15 @@ var _ = Describe("Addon controller", func() {
 					newSecret.Namespace = viper.GetString(constant.CfgKeyCtrlrMgrNS)
 				})
 			By("By addon enabled via auto-install")
-			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1.Addon) {
 				newOjb.Spec.Installable.AutoInstall = true
 				newOjb.Spec.Helm.InstallValues.SecretRefs = append(newOjb.Spec.Helm.InstallValues.SecretRefs,
-					extensionsv1alpha1.DataObjectKeySelector{
+					extensionsv1.DataObjectKeySelector{
 						Name: secret.Name,
 						Key:  "unknown",
 					})
 			})
-			addonStatusPhaseCheck(2, extensionsv1alpha1.AddonFailed, nil)
+			addonStatusPhaseCheck(2, extensionsv1.AddonFailed, nil)
 		})
 
 		It("should set status to failed when install an Addon with annotations mismatching", func() {
@@ -756,7 +756,7 @@ var _ = Describe("Addon controller", func() {
 			createTestDeployment()
 
 			By("By create an addon with annotation of KubeBlocks Version")
-			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1.Addon) {
 				newOjb.Spec.Installable.AutoInstall = true
 				newOjb.Annotations = map[string]string{
 					KBVersionValidate: ">=0.99.0",
@@ -767,9 +767,9 @@ var _ = Describe("Addon controller", func() {
 			Eventually(func(g Gomega) {
 				_, err := doReconcile()
 				g.Expect(err).To(Not(HaveOccurred()))
-				addon := &extensionsv1alpha1.Addon{}
+				addon := &extensionsv1.Addon{}
 				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
-				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonFailed))
+				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1.AddonFailed))
 				g.Expect(addon.Status.Conditions).Should(HaveLen(1))
 				g.Expect(addon.Status.Conditions[0].Reason).Should(BeEquivalentTo(InstallableRequirementUnmatched))
 			}).Should(Succeed())
@@ -785,17 +785,17 @@ var _ = Describe("Addon controller", func() {
 			createTestDeployment()
 
 			By("By create an addon")
-			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
-				newOjb.Spec.Type = extensionsv1alpha1.HelmType
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1.Addon) {
+				newOjb.Spec.Type = extensionsv1.HelmType
 			})
 
 			By("By checking status.observedGeneration and status.phase=disabled")
 			Eventually(func(g Gomega) {
 				doReconcileOnce(g)
-				addon = &extensionsv1alpha1.Addon{}
+				addon = &extensionsv1.Addon{}
 				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
 				g.Expect(addon.Status.ObservedGeneration).Should(BeEquivalentTo(1))
-				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonDisabled))
+				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1.AddonDisabled))
 			}).Should(Succeed())
 
 			By("By set the constraint in annotations of an addon")
@@ -809,23 +809,23 @@ var _ = Describe("Addon controller", func() {
 
 			By("By failed to enable an addon with disabled status and the constraint is not met")
 			Eventually(func(g Gomega) {
-				addon := &extensionsv1alpha1.Addon{}
+				addon := &extensionsv1.Addon{}
 				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
 				doReconcileOnce(g)
-				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonFailed))
+				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1.AddonFailed))
 				g.Expect(addon.Status.Conditions).Should(HaveLen(2))
 				g.Expect(addon.Status.Conditions[1].Reason).Should(BeEquivalentTo(InstallableRequirementUnmatched))
 			}).Should(Succeed())
 
 			By("remove the constraint in annotations of an addon")
-			addon := &extensionsv1alpha1.Addon{}
+			addon := &extensionsv1.Addon{}
 			Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
 			addon.Annotations = map[string]string{}
 			Expect(testCtx.Cli.Update(ctx, addon)).Should(Succeed())
 
 			By("By enable an addon with status failed")
 			Eventually(func(g Gomega) {
-				addon := &extensionsv1alpha1.Addon{}
+				addon := &extensionsv1.Addon{}
 				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
 				enablingPhaseCheck(2)
 			}).Should(Succeed())
@@ -895,7 +895,7 @@ var _ = Describe("Addon controller", func() {
 
 			By("By disabling enabled addon")
 			fakeHelmRelease()
-			disableAddonFailedCheck(3, 2, extensionsv1alpha1.AddonEnabled)
+			disableAddonFailedCheck(3, 2, extensionsv1.AddonEnabled)
 
 			By("By deleting cluster")
 			Expect(testCtx.Cli.Delete(ctx, cluster)).To(Not(HaveOccurred()))
@@ -906,7 +906,7 @@ var _ = Describe("Addon controller", func() {
 
 		It("should have provider and version in spec for Addon with provider and version in label initially", func() {
 			By("By create an addon with auto-install and labels contains provider and version information")
-			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1.Addon) {
 				newOjb.Labels = map[string]string{
 					AddonProvider: "apecloud",
 					AddonVersion:  "0.9.0",
@@ -918,7 +918,7 @@ var _ = Describe("Addon controller", func() {
 			Eventually(func(g Gomega) {
 				_, err := doReconcile()
 				g.Expect(err).To(Not(HaveOccurred()))
-				addon = &extensionsv1alpha1.Addon{}
+				addon = &extensionsv1.Addon{}
 				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
 				g.Expect(addon.Spec.Provider).Should(Equal("apecloud"))
 				g.Expect(addon.Spec.Version).Should(Equal("0.9.0"))
@@ -927,7 +927,7 @@ var _ = Describe("Addon controller", func() {
 
 		It("should have provider and version in spec for Addon after creating, before enabled", func() {
 			By("By create an addon with auto-install and labels contains provider and version information")
-			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1.Addon) {
 				newOjb.Labels = map[string]string{
 					AddonProvider: "apecloud",
 					AddonVersion:  "0.9.0",
@@ -939,7 +939,7 @@ var _ = Describe("Addon controller", func() {
 			Eventually(func(g Gomega) {
 				_, err := doReconcile()
 				g.Expect(err).To(Not(HaveOccurred()))
-				addon = &extensionsv1alpha1.Addon{}
+				addon = &extensionsv1.Addon{}
 				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
 				g.Expect(addon.Spec.Provider).Should(Equal("apecloud"))
 				g.Expect(addon.Spec.Version).Should(Equal("0.9.0"))
@@ -948,7 +948,7 @@ var _ = Describe("Addon controller", func() {
 
 		It("should have provider and version in labels for Addon with provider and version in spec after creating, before enabled", func() {
 			By("By create an addon with auto-install and labels contains provider and version information")
-			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1.Addon) {
 				newOjb.Spec.Provider = "apecloud"
 				newOjb.Spec.Version = "0.9.0"
 				newOjb.Spec.Installable.AutoInstall = true
@@ -958,11 +958,11 @@ var _ = Describe("Addon controller", func() {
 			Eventually(func(g Gomega) {
 				_, err := doReconcile()
 				g.Expect(err).To(Not(HaveOccurred()))
-				addon = &extensionsv1alpha1.Addon{}
+				addon = &extensionsv1.Addon{}
 				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
 				g.Expect(addon.Labels).Should(HaveKeyWithValue(AddonProvider, "apecloud"))
 				g.Expect(addon.Labels).Should(HaveKeyWithValue(AddonVersion, "0.9.0"))
-				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonEnabling))
+				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1.AddonEnabling))
 			}).Should(Succeed())
 		})
 	})
@@ -984,7 +984,7 @@ var _ = Describe("Addon controller", func() {
 
 			testEventRecorder := func(recorder record.EventRecorder) {
 				reconciler.Recorder = recorder
-				addon := &extensionsv1alpha1.Addon{}
+				addon := &extensionsv1.Addon{}
 				reconciler.Event(addon, corev1.EventTypeNormal, "reason", "message")
 				reconciler.Eventf(addon, corev1.EventTypeNormal, "reason", "%s", "message")
 				reconciler.AnnotatedEventf(addon, map[string]string{

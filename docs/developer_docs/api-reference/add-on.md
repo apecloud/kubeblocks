@@ -9,17 +9,17 @@ sidebar_label: Add-On
 <p>Packages:</p>
 <ul>
 <li>
-<a href="#extensions.kubeblocks.io%2fv1alpha1">extensions.kubeblocks.io/v1alpha1</a>
+<a href="#extensions.kubeblocks.io%2fv1">extensions.kubeblocks.io/v1</a>
 </li>
 </ul>
-<h2 id="extensions.kubeblocks.io/v1alpha1">extensions.kubeblocks.io/v1alpha1</h2>
+<h2 id="extensions.kubeblocks.io/v1">extensions.kubeblocks.io/v1</h2>
 <div>
 </div>
 Resource Types:
 <ul><li>
-<a href="#extensions.kubeblocks.io/v1alpha1.Addon">Addon</a>
+<a href="#extensions.kubeblocks.io/v1.Addon">Addon</a>
 </li></ul>
-<h3 id="extensions.kubeblocks.io/v1alpha1.Addon">Addon
+<h3 id="extensions.kubeblocks.io/v1.Addon">Addon
 </h3>
 <div>
 <p>Addon is the Schema for the add-ons API.</p>
@@ -37,7 +37,7 @@ Resource Types:
 <code>apiVersion</code><br/>
 string</td>
 <td>
-<code>extensions.kubeblocks.io/v1alpha1</code>
+<code>extensions.kubeblocks.io/v1</code>
 </td>
 </tr>
 <tr>
@@ -65,7 +65,7 @@ Refer to the Kubernetes API documentation for the fields of the
 <td>
 <code>spec</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.AddonSpec">
+<a href="#extensions.kubeblocks.io/v1.AddonSpec">
 AddonSpec
 </a>
 </em>
@@ -90,7 +90,7 @@ string
 <td>
 <code>type</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.AddonType">
+<a href="#extensions.kubeblocks.io/v1.AddonType">
 AddonType
 </a>
 </em>
@@ -127,7 +127,7 @@ string
 <td>
 <code>helm</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.HelmTypeInstallSpec">
+<a href="#extensions.kubeblocks.io/v1.HelmTypeInstallSpec">
 HelmTypeInstallSpec
 </a>
 </em>
@@ -142,7 +142,7 @@ when the type is set to &lsquo;helm&rsquo;.</p>
 <td>
 <code>defaultInstallValues</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.AddonDefaultInstallSpecItem">
+<a href="#extensions.kubeblocks.io/v1.AddonDefaultInstallSpecItem">
 []AddonDefaultInstallSpecItem
 </a>
 </em>
@@ -155,7 +155,7 @@ when the type is set to &lsquo;helm&rsquo;.</p>
 <td>
 <code>install</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.AddonInstallSpec">
+<a href="#extensions.kubeblocks.io/v1.AddonInstallSpec">
 AddonInstallSpec
 </a>
 </em>
@@ -169,7 +169,7 @@ AddonInstallSpec
 <td>
 <code>installable</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.InstallableSpec">
+<a href="#extensions.kubeblocks.io/v1.InstallableSpec">
 InstallableSpec
 </a>
 </em>
@@ -184,7 +184,7 @@ the selector and auto-install settings.</p>
 <td>
 <code>cliPlugins</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.CliPlugin">
+<a href="#extensions.kubeblocks.io/v1.CliPlugin">
 []CliPlugin
 </a>
 </em>
@@ -201,7 +201,7 @@ the selector and auto-install settings.</p>
 <td>
 <code>status</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.AddonStatus">
+<a href="#extensions.kubeblocks.io/v1.AddonStatus">
 AddonStatus
 </a>
 </em>
@@ -211,10 +211,10 @@ AddonStatus
 </tr>
 </tbody>
 </table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.AddonDefaultInstallSpecItem">AddonDefaultInstallSpecItem
+<h3 id="extensions.kubeblocks.io/v1.AddonDefaultInstallSpecItem">AddonDefaultInstallSpecItem
 </h3>
 <p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.AddonSpec">AddonSpec</a>)
+(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1.AddonSpec">AddonSpec</a>)
 </p>
 <div>
 </div>
@@ -230,7 +230,7 @@ AddonStatus
 <td>
 <code>AddonInstallSpec</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.AddonInstallSpec">
+<a href="#extensions.kubeblocks.io/v1.AddonInstallSpec">
 AddonInstallSpec
 </a>
 </em>
@@ -245,7 +245,7 @@ AddonInstallSpec
 <td>
 <code>selectors</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.SelectorRequirement">
+<a href="#extensions.kubeblocks.io/v1.SelectorRequirement">
 []SelectorRequirement
 </a>
 </em>
@@ -258,10 +258,10 @@ all selectors must evaluate to true.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.AddonInstallExtraItem">AddonInstallExtraItem
+<h3 id="extensions.kubeblocks.io/v1.AddonInstallExtraItem">AddonInstallExtraItem
 </h3>
 <p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.AddonInstallSpec">AddonInstallSpec</a>)
+(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1.AddonInstallSpec">AddonInstallSpec</a>)
 </p>
 <div>
 </div>
@@ -277,7 +277,7 @@ all selectors must evaluate to true.</p>
 <td>
 <code>AddonInstallSpecItem</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.AddonInstallSpecItem">
+<a href="#extensions.kubeblocks.io/v1.AddonInstallSpecItem">
 AddonInstallSpecItem
 </a>
 </em>
@@ -301,10 +301,10 @@ string
 </tr>
 </tbody>
 </table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.AddonInstallSpec">AddonInstallSpec
+<h3 id="extensions.kubeblocks.io/v1.AddonInstallSpec">AddonInstallSpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.AddonDefaultInstallSpecItem">AddonDefaultInstallSpecItem</a>, <a href="#extensions.kubeblocks.io/v1alpha1.AddonSpec">AddonSpec</a>)
+(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1.AddonDefaultInstallSpecItem">AddonDefaultInstallSpecItem</a>, <a href="#extensions.kubeblocks.io/v1.AddonSpec">AddonSpec</a>)
 </p>
 <div>
 </div>
@@ -320,7 +320,7 @@ string
 <td>
 <code>AddonInstallSpecItem</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.AddonInstallSpecItem">
+<a href="#extensions.kubeblocks.io/v1.AddonInstallSpecItem">
 AddonInstallSpecItem
 </a>
 </em>
@@ -347,7 +347,7 @@ bool
 <td>
 <code>extras</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.AddonInstallExtraItem">
+<a href="#extensions.kubeblocks.io/v1.AddonInstallExtraItem">
 []AddonInstallExtraItem
 </a>
 </em>
@@ -359,10 +359,10 @@ bool
 </tr>
 </tbody>
 </table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.AddonInstallSpecItem">AddonInstallSpecItem
+<h3 id="extensions.kubeblocks.io/v1.AddonInstallSpecItem">AddonInstallSpecItem
 </h3>
 <p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.AddonInstallExtraItem">AddonInstallExtraItem</a>, <a href="#extensions.kubeblocks.io/v1alpha1.AddonInstallSpec">AddonInstallSpec</a>)
+(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1.AddonInstallExtraItem">AddonInstallExtraItem</a>, <a href="#extensions.kubeblocks.io/v1.AddonInstallSpec">AddonInstallSpec</a>)
 </p>
 <div>
 </div>
@@ -426,7 +426,7 @@ string
 <td>
 <code>resources</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.ResourceRequirements">
+<a href="#extensions.kubeblocks.io/v1.ResourceRequirements">
 ResourceRequirements
 </a>
 </em>
@@ -438,10 +438,10 @@ ResourceRequirements
 </tr>
 </tbody>
 </table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.AddonPhase">AddonPhase
+<h3 id="extensions.kubeblocks.io/v1.AddonPhase">AddonPhase
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.AddonStatus">AddonStatus</a>)
+(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1.AddonStatus">AddonStatus</a>)
 </p>
 <div>
 <p>AddonPhase defines addon phases.</p>
@@ -465,10 +465,10 @@ ResourceRequirements
 <td></td>
 </tr></tbody>
 </table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.AddonSelectorKey">AddonSelectorKey
+<h3 id="extensions.kubeblocks.io/v1.AddonSelectorKey">AddonSelectorKey
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.SelectorRequirement">SelectorRequirement</a>)
+(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1.SelectorRequirement">SelectorRequirement</a>)
 </p>
 <div>
 <p>AddonSelectorKey are selector requirement key types.</p>
@@ -488,10 +488,10 @@ ResourceRequirements
 <td></td>
 </tr></tbody>
 </table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.AddonSpec">AddonSpec
+<h3 id="extensions.kubeblocks.io/v1.AddonSpec">AddonSpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.Addon">Addon</a>)
+(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1.Addon">Addon</a>)
 </p>
 <div>
 <p>AddonSpec defines the desired state of an add-on.</p>
@@ -520,7 +520,7 @@ string
 <td>
 <code>type</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.AddonType">
+<a href="#extensions.kubeblocks.io/v1.AddonType">
 AddonType
 </a>
 </em>
@@ -557,7 +557,7 @@ string
 <td>
 <code>helm</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.HelmTypeInstallSpec">
+<a href="#extensions.kubeblocks.io/v1.HelmTypeInstallSpec">
 HelmTypeInstallSpec
 </a>
 </em>
@@ -572,7 +572,7 @@ when the type is set to &lsquo;helm&rsquo;.</p>
 <td>
 <code>defaultInstallValues</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.AddonDefaultInstallSpecItem">
+<a href="#extensions.kubeblocks.io/v1.AddonDefaultInstallSpecItem">
 []AddonDefaultInstallSpecItem
 </a>
 </em>
@@ -585,7 +585,7 @@ when the type is set to &lsquo;helm&rsquo;.</p>
 <td>
 <code>install</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.AddonInstallSpec">
+<a href="#extensions.kubeblocks.io/v1.AddonInstallSpec">
 AddonInstallSpec
 </a>
 </em>
@@ -599,7 +599,7 @@ AddonInstallSpec
 <td>
 <code>installable</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.InstallableSpec">
+<a href="#extensions.kubeblocks.io/v1.InstallableSpec">
 InstallableSpec
 </a>
 </em>
@@ -614,7 +614,7 @@ the selector and auto-install settings.</p>
 <td>
 <code>cliPlugins</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.CliPlugin">
+<a href="#extensions.kubeblocks.io/v1.CliPlugin">
 []CliPlugin
 </a>
 </em>
@@ -626,10 +626,10 @@ the selector and auto-install settings.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.AddonStatus">AddonStatus
+<h3 id="extensions.kubeblocks.io/v1.AddonStatus">AddonStatus
 </h3>
 <p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.Addon">Addon</a>)
+(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1.Addon">Addon</a>)
 </p>
 <div>
 <p>AddonStatus defines the observed state of an add-on.</p>
@@ -646,7 +646,7 @@ the selector and auto-install settings.</p>
 <td>
 <code>phase</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.AddonPhase">
+<a href="#extensions.kubeblocks.io/v1.AddonPhase">
 AddonPhase
 </a>
 </em>
@@ -685,10 +685,10 @@ to the add-on&rsquo;s generation, which is updated on mutation by the API Server
 </tr>
 </tbody>
 </table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.AddonType">AddonType
+<h3 id="extensions.kubeblocks.io/v1.AddonType">AddonType
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.AddonSpec">AddonSpec</a>)
+(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1.AddonSpec">AddonSpec</a>)
 </p>
 <div>
 <p>AddonType defines the addon types.</p>
@@ -704,10 +704,10 @@ to the add-on&rsquo;s generation, which is updated on mutation by the API Server
 <td></td>
 </tr></tbody>
 </table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.CliPlugin">CliPlugin
+<h3 id="extensions.kubeblocks.io/v1.CliPlugin">CliPlugin
 </h3>
 <p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.AddonSpec">AddonSpec</a>)
+(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1.AddonSpec">AddonSpec</a>)
 </p>
 <div>
 </div>
@@ -755,10 +755,10 @@ string
 </tr>
 </tbody>
 </table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.DataObjectKeySelector">DataObjectKeySelector
+<h3 id="extensions.kubeblocks.io/v1.DataObjectKeySelector">DataObjectKeySelector
 </h3>
 <p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.HelmInstallValues">HelmInstallValues</a>)
+(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1.HelmInstallValues">HelmInstallValues</a>)
 </p>
 <div>
 </div>
@@ -794,17 +794,17 @@ string
 </tr>
 </tbody>
 </table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.HelmInstallOptions">HelmInstallOptions
+<h3 id="extensions.kubeblocks.io/v1.HelmInstallOptions">HelmInstallOptions
 (<code>map[string]string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.HelmTypeInstallSpec">HelmTypeInstallSpec</a>)
+(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1.HelmTypeInstallSpec">HelmTypeInstallSpec</a>)
 </p>
 <div>
 </div>
-<h3 id="extensions.kubeblocks.io/v1alpha1.HelmInstallValues">HelmInstallValues
+<h3 id="extensions.kubeblocks.io/v1.HelmInstallValues">HelmInstallValues
 </h3>
 <p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.HelmTypeInstallSpec">HelmTypeInstallSpec</a>)
+(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1.HelmTypeInstallSpec">HelmTypeInstallSpec</a>)
 </p>
 <div>
 </div>
@@ -832,7 +832,7 @@ string
 <td>
 <code>configMapRefs</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.DataObjectKeySelector">
+<a href="#extensions.kubeblocks.io/v1.DataObjectKeySelector">
 []DataObjectKeySelector
 </a>
 </em>
@@ -848,7 +848,7 @@ extension to specify a content type.</p>
 <td>
 <code>secretRefs</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.DataObjectKeySelector">
+<a href="#extensions.kubeblocks.io/v1.DataObjectKeySelector">
 []DataObjectKeySelector
 </a>
 </em>
@@ -886,10 +886,10 @@ extension to specify a content type.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.HelmJSONValueMapType">HelmJSONValueMapType
+<h3 id="extensions.kubeblocks.io/v1.HelmJSONValueMapType">HelmJSONValueMapType
 </h3>
 <p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.HelmValuesMappingItem">HelmValuesMappingItem</a>)
+(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1.HelmValuesMappingItem">HelmValuesMappingItem</a>)
 </p>
 <div>
 </div>
@@ -915,10 +915,10 @@ string
 </tr>
 </tbody>
 </table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.HelmTypeInstallSpec">HelmTypeInstallSpec
+<h3 id="extensions.kubeblocks.io/v1.HelmTypeInstallSpec">HelmTypeInstallSpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.AddonSpec">AddonSpec</a>)
+(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1.AddonSpec">AddonSpec</a>)
 </p>
 <div>
 <p>HelmTypeInstallSpec defines the Helm installation spec.</p>
@@ -946,7 +946,7 @@ string
 <td>
 <code>installOptions</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.HelmInstallOptions">
+<a href="#extensions.kubeblocks.io/v1.HelmInstallOptions">
 HelmInstallOptions
 </a>
 </em>
@@ -960,7 +960,7 @@ HelmInstallOptions
 <td>
 <code>installValues</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.HelmInstallValues">
+<a href="#extensions.kubeblocks.io/v1.HelmInstallValues">
 HelmInstallValues
 </a>
 </em>
@@ -974,7 +974,7 @@ HelmInstallValues
 <td>
 <code>valuesMapping</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.HelmValuesMapping">
+<a href="#extensions.kubeblocks.io/v1.HelmValuesMapping">
 HelmValuesMapping
 </a>
 </em>
@@ -1011,10 +1011,10 @@ Helm charts from the image to the shared volume. The default path is &ldquo;/cha
 </tr>
 </tbody>
 </table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.HelmValueMapType">HelmValueMapType
+<h3 id="extensions.kubeblocks.io/v1.HelmValueMapType">HelmValueMapType
 </h3>
 <p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.HelmValuesMappingItem">HelmValuesMappingItem</a>)
+(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1.HelmValuesMappingItem">HelmValuesMappingItem</a>)
 </p>
 <div>
 </div>
@@ -1064,10 +1064,10 @@ string
 </tr>
 </tbody>
 </table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.HelmValuesMapping">HelmValuesMapping
+<h3 id="extensions.kubeblocks.io/v1.HelmValuesMapping">HelmValuesMapping
 </h3>
 <p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.HelmTypeInstallSpec">HelmTypeInstallSpec</a>)
+(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1.HelmTypeInstallSpec">HelmTypeInstallSpec</a>)
 </p>
 <div>
 </div>
@@ -1083,7 +1083,7 @@ string
 <td>
 <code>HelmValuesMappingItem</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.HelmValuesMappingItem">
+<a href="#extensions.kubeblocks.io/v1.HelmValuesMappingItem">
 HelmValuesMappingItem
 </a>
 </em>
@@ -1098,7 +1098,7 @@ HelmValuesMappingItem
 <td>
 <code>extras</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.HelmValuesMappingExtraItem">
+<a href="#extensions.kubeblocks.io/v1.HelmValuesMappingExtraItem">
 []HelmValuesMappingExtraItem
 </a>
 </em>
@@ -1110,10 +1110,10 @@ HelmValuesMappingItem
 </tr>
 </tbody>
 </table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.HelmValuesMappingExtraItem">HelmValuesMappingExtraItem
+<h3 id="extensions.kubeblocks.io/v1.HelmValuesMappingExtraItem">HelmValuesMappingExtraItem
 </h3>
 <p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.HelmValuesMapping">HelmValuesMapping</a>)
+(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1.HelmValuesMapping">HelmValuesMapping</a>)
 </p>
 <div>
 </div>
@@ -1129,7 +1129,7 @@ HelmValuesMappingItem
 <td>
 <code>HelmValuesMappingItem</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.HelmValuesMappingItem">
+<a href="#extensions.kubeblocks.io/v1.HelmValuesMappingItem">
 HelmValuesMappingItem
 </a>
 </em>
@@ -1153,10 +1153,10 @@ string
 </tr>
 </tbody>
 </table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.HelmValuesMappingItem">HelmValuesMappingItem
+<h3 id="extensions.kubeblocks.io/v1.HelmValuesMappingItem">HelmValuesMappingItem
 </h3>
 <p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.HelmValuesMapping">HelmValuesMapping</a>, <a href="#extensions.kubeblocks.io/v1alpha1.HelmValuesMappingExtraItem">HelmValuesMappingExtraItem</a>)
+(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1.HelmValuesMapping">HelmValuesMapping</a>, <a href="#extensions.kubeblocks.io/v1.HelmValuesMappingExtraItem">HelmValuesMappingExtraItem</a>)
 </p>
 <div>
 </div>
@@ -1172,7 +1172,7 @@ string
 <td>
 <code>valueMap</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.HelmValueMapType">
+<a href="#extensions.kubeblocks.io/v1.HelmValueMapType">
 HelmValueMapType
 </a>
 </em>
@@ -1193,7 +1193,7 @@ Enum values explained:</p>
 <td>
 <code>jsonMap</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.HelmJSONValueMapType">
+<a href="#extensions.kubeblocks.io/v1.HelmJSONValueMapType">
 HelmJSONValueMapType
 </a>
 </em>
@@ -1211,7 +1211,7 @@ Enum values explained:</p>
 <td>
 <code>resources</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.ResourceMappingItem">
+<a href="#extensions.kubeblocks.io/v1.ResourceMappingItem">
 ResourceMappingItem
 </a>
 </em>
@@ -1223,10 +1223,10 @@ ResourceMappingItem
 </tr>
 </tbody>
 </table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.InstallableSpec">InstallableSpec
+<h3 id="extensions.kubeblocks.io/v1.InstallableSpec">InstallableSpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.AddonSpec">AddonSpec</a>)
+(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1.AddonSpec">AddonSpec</a>)
 </p>
 <div>
 </div>
@@ -1242,7 +1242,7 @@ ResourceMappingItem
 <td>
 <code>selectors</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.SelectorRequirement">
+<a href="#extensions.kubeblocks.io/v1.SelectorRequirement">
 []SelectorRequirement
 </a>
 </em>
@@ -1266,10 +1266,10 @@ bool
 </tr>
 </tbody>
 </table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.LineSelectorOperator">LineSelectorOperator
+<h3 id="extensions.kubeblocks.io/v1.LineSelectorOperator">LineSelectorOperator
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.SelectorRequirement">SelectorRequirement</a>)
+(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1.SelectorRequirement">SelectorRequirement</a>)
 </p>
 <div>
 <p>LineSelectorOperator defines line selector operators.</p>
@@ -1291,10 +1291,10 @@ bool
 <td></td>
 </tr></tbody>
 </table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.ResourceMappingItem">ResourceMappingItem
+<h3 id="extensions.kubeblocks.io/v1.ResourceMappingItem">ResourceMappingItem
 </h3>
 <p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.HelmValuesMappingItem">HelmValuesMappingItem</a>)
+(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1.HelmValuesMappingItem">HelmValuesMappingItem</a>)
 </p>
 <div>
 </div>
@@ -1322,7 +1322,7 @@ string
 <td>
 <code>cpu</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.ResourceReqLimItem">
+<a href="#extensions.kubeblocks.io/v1.ResourceReqLimItem">
 ResourceReqLimItem
 </a>
 </em>
@@ -1336,7 +1336,7 @@ ResourceReqLimItem
 <td>
 <code>memory</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.ResourceReqLimItem">
+<a href="#extensions.kubeblocks.io/v1.ResourceReqLimItem">
 ResourceReqLimItem
 </a>
 </em>
@@ -1348,10 +1348,10 @@ ResourceReqLimItem
 </tr>
 </tbody>
 </table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.ResourceReqLimItem">ResourceReqLimItem
+<h3 id="extensions.kubeblocks.io/v1.ResourceReqLimItem">ResourceReqLimItem
 </h3>
 <p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.ResourceMappingItem">ResourceMappingItem</a>)
+(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1.ResourceMappingItem">ResourceMappingItem</a>)
 </p>
 <div>
 </div>
@@ -1389,10 +1389,10 @@ string
 </tr>
 </tbody>
 </table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.ResourceRequirements">ResourceRequirements
+<h3 id="extensions.kubeblocks.io/v1.ResourceRequirements">ResourceRequirements
 </h3>
 <p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.AddonInstallSpecItem">AddonInstallSpecItem</a>)
+(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1.AddonInstallSpecItem">AddonInstallSpecItem</a>)
 </p>
 <div>
 </div>
@@ -1438,10 +1438,10 @@ More info: <a href="https://kubernetes.io/docs/concepts/configuration/manage-res
 </tr>
 </tbody>
 </table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.SelectorRequirement">SelectorRequirement
+<h3 id="extensions.kubeblocks.io/v1.SelectorRequirement">SelectorRequirement
 </h3>
 <p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.AddonDefaultInstallSpecItem">AddonDefaultInstallSpecItem</a>, <a href="#extensions.kubeblocks.io/v1alpha1.InstallableSpec">InstallableSpec</a>)
+(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1.AddonDefaultInstallSpecItem">AddonDefaultInstallSpecItem</a>, <a href="#extensions.kubeblocks.io/v1.InstallableSpec">InstallableSpec</a>)
 </p>
 <div>
 </div>
@@ -1457,7 +1457,7 @@ More info: <a href="https://kubernetes.io/docs/concepts/configuration/manage-res
 <td>
 <code>key</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.AddonSelectorKey">
+<a href="#extensions.kubeblocks.io/v1.AddonSelectorKey">
 AddonSelectorKey
 </a>
 </em>
@@ -1475,7 +1475,7 @@ AddonSelectorKey
 <td>
 <code>operator</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.LineSelectorOperator">
+<a href="#extensions.kubeblocks.io/v1.LineSelectorOperator">
 LineSelectorOperator
 </a>
 </em>

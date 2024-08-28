@@ -32,7 +32,7 @@ chmod u+x ${CODE_GENERATOR_PATH}/*.sh
 GENERATORS="client,informer,lister"
 APIS_PACKAGE="github.com/apecloud/kubeblocks/apis"
 OUTPUT_PACKAGE="github.com/apecloud/kubeblocks/pkg/client"
-GROUP_VERSIONS="apps:v1alpha1 apps:v1beta1 apps:v1 dataprotection:v1alpha1 extensions:v1alpha1 workloads:v1alpha1"
+GROUP_VERSIONS="apps:v1alpha1 apps:v1beta1 apps:v1 dataprotection:v1alpha1 extensions:v1 workloads:v1alpha1"
 OUTPUT_BASE="${SCRIPT_ROOT}/hack"
 
 

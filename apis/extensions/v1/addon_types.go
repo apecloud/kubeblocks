@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1
 
 import (
 	"fmt"
@@ -477,6 +477,7 @@ type ResourceRequirements struct {
 // +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:storageversion
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster
 // +kubebuilder:printcolumn:name="TYPE",type="string",JSONPath=".spec.type",description="addon types"
 // +kubebuilder:printcolumn:name="VERSION",type="string",JSONPath=".spec.version",description="addon version"

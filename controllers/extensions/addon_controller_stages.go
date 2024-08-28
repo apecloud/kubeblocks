@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	extensionsv1 "github.com/apecloud/kubeblocks/apis/extensions/v1"
 	"strings"
 	"time"
 
@@ -41,7 +42,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -102,12 +102,12 @@ func (r *stageCtx) doReturn() (*ctrl.Result, error) {
 	return res, err
 }
 
-func (r *stageCtx) process(processor func(*extensionsv1alpha1.Addon)) {
+func (r *stageCtx) process(processor func(*extensionsv1.Addon)) {
 	res, _ := r.doReturn()
 	if res != nil {
 		return
 	}
-	addon := r.reqCtx.Ctx.Value(operandValueKey).(*extensionsv1alpha1.Addon)
+	addon := r.reqCtx.Ctx.Value(operandValueKey).(*extensionsv1.Addon)
 	processor(addon)
 }
 
@@ -170,7 +170,7 @@ type terminalStateStage struct {
 }
 
 func (r *fetchNDeletionCheckStage) Handle(ctx context.Context) {
-	addon := &extensionsv1alpha1.Addon{}
+	addon := &extensionsv1.Addon{}
 	if err := r.reconciler.Client.Get(ctx, r.reqCtx.Req.NamespacedName, addon); err != nil {
 		res, err := intctrlutil.CheckedRequeueWithError(err, r.reqCtx.Log, "")
 		r.updateResultNErr(&res, err)
@@ -204,10 +204,10 @@ func (r *fetchNDeletionCheckStage) Handle(ctx context.Context) {
 }
 
 func (r *genIDProceedCheckStage) Handle(ctx context.Context) {
-	r.process(func(addon *extensionsv1alpha1.Addon) {
+	r.process(func(addon *extensionsv1.Addon) {
 		r.reqCtx.Log.V(1).Info("genIDProceedCheckStage", "phase", addon.Status.Phase)
 		switch addon.Status.Phase {
-		case extensionsv1alpha1.AddonEnabled, extensionsv1alpha1.AddonDisabled:
+		case extensionsv1.AddonEnabled, extensionsv1.AddonDisabled:
 			if addon.Generation == addon.Status.ObservedGeneration {
 				res, err := r.reconciler.deleteExternalResources(*r.reqCtx, addon)
 				if res != nil || err != nil {
@@ -217,7 +217,7 @@ func (r *genIDProceedCheckStage) Handle(ctx context.Context) {
 				r.setReconciled()
 				return
 			}
-		case extensionsv1alpha1.AddonFailed:
+		case extensionsv1.AddonFailed:
 			if addon.Generation == addon.Status.ObservedGeneration {
 				r.setReconciled()
 				return
@@ -228,7 +228,7 @@ func (r *genIDProceedCheckStage) Handle(ctx context.Context) {
 }
 
 func (r *metadataCheckStage) Handle(ctx context.Context) {
-	r.process(func(addon *extensionsv1alpha1.Addon) {
+	r.process(func(addon *extensionsv1.Addon) {
 		r.reqCtx.Log.V(1).Info("metadataCheckStage", "phase", addon.Status.Phase)
 		setAddonProviderAndVersion(ctx, &r.stageCtx, addon)
 		if err := r.reconciler.Client.Update(ctx, addon); err != nil {
@@ -241,9 +241,9 @@ func (r *metadataCheckStage) Handle(ctx context.Context) {
 
 func (r *deletionStage) Handle(ctx context.Context) {
 	r.disablingStage.stageCtx = r.stageCtx
-	r.process(func(addon *extensionsv1alpha1.Addon) {
+	r.process(func(addon *extensionsv1.Addon) {
 		r.reqCtx.Log.V(1).Info("deletionStage", "phase", addon.Status.Phase)
-		patchPhase := func(phase extensionsv1alpha1.AddonPhase, reason string) {
+		patchPhase := func(phase extensionsv1.AddonPhase, reason string) {
 			r.reqCtx.Log.V(1).Info("patching status", "phase", phase)
 			patch := client.MergeFrom(addon.DeepCopy())
 			addon.Status.Phase = phase
@@ -258,26 +258,26 @@ func (r *deletionStage) Handle(ctx context.Context) {
 			r.setReconciled()
 		}
 		switch addon.Status.Phase {
-		case extensionsv1alpha1.AddonEnabling:
+		case extensionsv1.AddonEnabling:
 			// delete running jobs
 			res, err := r.reconciler.deleteExternalResources(*r.reqCtx, addon)
 			if err != nil {
 				r.updateResultNErr(res, err)
 				return
 			}
-			patchPhase(extensionsv1alpha1.AddonDisabling, DisablingAddon)
+			patchPhase(extensionsv1.AddonDisabling, DisablingAddon)
 			return
-		case extensionsv1alpha1.AddonEnabled:
-			patchPhase(extensionsv1alpha1.AddonDisabling, DisablingAddon)
+		case extensionsv1.AddonEnabled:
+			patchPhase(extensionsv1.AddonDisabling, DisablingAddon)
 			return
-		case extensionsv1alpha1.AddonDisabling:
+		case extensionsv1.AddonDisabling:
 			r.disablingStage.Handle(ctx)
 			res, err := r.disablingStage.doReturn()
 
 			if res != nil || err != nil {
 				return
 			}
-			patchPhase(extensionsv1alpha1.AddonDisabled, AddonDisabled)
+			patchPhase(extensionsv1.AddonDisabled, AddonDisabled)
 			return
 		default:
 			r.reqCtx.Log.V(1).Info("delete external resources", "phase", addon.Status.Phase)
@@ -293,7 +293,7 @@ func (r *deletionStage) Handle(ctx context.Context) {
 }
 
 func (r *installableCheckStage) Handle(ctx context.Context) {
-	r.process(func(addon *extensionsv1alpha1.Addon) {
+	r.process(func(addon *extensionsv1.Addon) {
 		// XValidation was introduced as an alpha feature in Kubernetes v1.23 and requires additional enablement.
 		// It became more stable after Kubernetes 1.25. Users may encounter error in Kubernetes versions prior to 1.25.
 		// additional check to the addon YAML to ensure support for Kubernetes versions prior to 1.25
@@ -330,7 +330,7 @@ func (r *installableCheckStage) Handle(ctx context.Context) {
 			return
 		}
 		switch addon.Status.Phase {
-		case extensionsv1alpha1.AddonEnabling, extensionsv1alpha1.AddonDisabling:
+		case extensionsv1.AddonEnabling, extensionsv1.AddonDisabling:
 			return
 		}
 		for _, s := range addon.Spec.Installable.Selectors {
@@ -339,9 +339,9 @@ func (r *installableCheckStage) Handle(ctx context.Context) {
 			}
 			patch := client.MergeFrom(addon.DeepCopy())
 			addon.Status.ObservedGeneration = addon.Generation
-			addon.Status.Phase = extensionsv1alpha1.AddonDisabled
+			addon.Status.Phase = extensionsv1.AddonDisabled
 			meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-				Type:               extensionsv1alpha1.ConditionTypeChecked,
+				Type:               extensionsv1.ConditionTypeChecked,
 				Status:             metav1.ConditionFalse,
 				ObservedGeneration: addon.Generation,
 				Reason:             InstallableRequirementUnmatched,
@@ -363,7 +363,7 @@ func (r *installableCheckStage) Handle(ctx context.Context) {
 }
 
 func (r *autoInstallCheckStage) Handle(ctx context.Context) {
-	r.process(func(addon *extensionsv1alpha1.Addon) {
+	r.process(func(addon *extensionsv1.Addon) {
 		r.reqCtx.Log.V(1).Info("autoInstallCheckStage", "phase", addon.Status.Phase)
 		if addon.Spec.Installable == nil || !addon.Spec.Installable.AutoInstall {
 			return
@@ -379,7 +379,7 @@ func (r *autoInstallCheckStage) Handle(ctx context.Context) {
 }
 
 func (r *enabledWithDefaultValuesStage) Handle(ctx context.Context) {
-	r.process(func(addon *extensionsv1alpha1.Addon) {
+	r.process(func(addon *extensionsv1.Addon) {
 		r.reqCtx.Log.V(1).Info("enabledWithDefaultValuesStage", "phase", addon.Status.Phase)
 		if addon.Spec.InstallSpec.HasSetValues() || addon.Spec.InstallSpec.IsDisabled() {
 			r.reqCtx.Log.V(1).Info("has specified addon.spec.installSpec")
@@ -396,9 +396,9 @@ func (r *enabledWithDefaultValuesStage) Handle(ctx context.Context) {
 func (r *progressingHandler) Handle(ctx context.Context) {
 	r.enablingStage.stageCtx = r.stageCtx
 	r.disablingStage.stageCtx = r.stageCtx
-	r.process(func(addon *extensionsv1alpha1.Addon) {
+	r.process(func(addon *extensionsv1.Addon) {
 		r.reqCtx.Log.V(1).Info("progressingHandler", "phase", addon.Status.Phase)
-		patchPhase := func(phase extensionsv1alpha1.AddonPhase, reason string) {
+		patchPhase := func(phase extensionsv1.AddonPhase, reason string) {
 			r.reqCtx.Log.V(1).Info("patching status", "phase", phase)
 			patch := client.MergeFrom(addon.DeepCopy())
 			addon.Status.Phase = phase
@@ -419,16 +419,16 @@ func (r *progressingHandler) Handle(ctx context.Context) {
 			if addon.Status.Phase == "" {
 				return
 			}
-			if addon.Status.Phase != extensionsv1alpha1.AddonDisabling {
-				patchPhase(extensionsv1alpha1.AddonDisabling, DisablingAddon)
+			if addon.Status.Phase != extensionsv1.AddonDisabling {
+				patchPhase(extensionsv1.AddonDisabling, DisablingAddon)
 				return
 			}
 			r.disablingStage.Handle(ctx)
 			return
 		}
 		// handling enabling state
-		if addon.Status.Phase != extensionsv1alpha1.AddonEnabling {
-			if addon.Status.Phase == extensionsv1alpha1.AddonFailed {
+		if addon.Status.Phase != extensionsv1.AddonEnabling {
+			if addon.Status.Phase == extensionsv1.AddonFailed {
 				// clean up existing failed installation job
 				mgrNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
 				key := client.ObjectKey{
@@ -446,7 +446,7 @@ func (r *progressingHandler) Handle(ctx context.Context) {
 					}
 				}
 			}
-			patchPhase(extensionsv1alpha1.AddonEnabling, EnablingAddon)
+			patchPhase(extensionsv1.AddonEnabling, EnablingAddon)
 			return
 		}
 		r.reqCtx.Log.V(1).Info("progress to enabling stage handler")
@@ -455,24 +455,24 @@ func (r *progressingHandler) Handle(ctx context.Context) {
 	r.next.Handle(ctx)
 }
 
-func getInstallJobName(addon *extensionsv1alpha1.Addon) string {
+func getInstallJobName(addon *extensionsv1.Addon) string {
 	return fmt.Sprintf("install-%s-addon", addon.Name)
 }
 
-func getUninstallJobName(addon *extensionsv1alpha1.Addon) string {
+func getUninstallJobName(addon *extensionsv1.Addon) string {
 	return fmt.Sprintf("uninstall-%s-addon", addon.Name)
 }
 
-func getHelmReleaseName(addon *extensionsv1alpha1.Addon) string {
+func getHelmReleaseName(addon *extensionsv1.Addon) string {
 	return fmt.Sprintf("kb-addon-%s", addon.Name)
 }
 
-func useLocalCharts(addon *extensionsv1alpha1.Addon) bool {
+func useLocalCharts(addon *extensionsv1.Addon) bool {
 	return addon.Spec.Helm != nil && strings.HasPrefix(addon.Spec.Helm.ChartLocationURL, "file://")
 }
 
 // buildLocalChartsPath builds the local charts path if the chartLocationURL starts with "file://"
-func buildLocalChartsPath(addon *extensionsv1alpha1.Addon) (string, error) {
+func buildLocalChartsPath(addon *extensionsv1.Addon) (string, error) {
 	if !useLocalCharts(addon) {
 		return "$(CHART)", nil
 	}
@@ -484,7 +484,7 @@ func buildLocalChartsPath(addon *extensionsv1alpha1.Addon) (string, error) {
 }
 
 // setSharedVolume sets shared volume to copy helm charts from charts image
-func setSharedVolume(addon *extensionsv1alpha1.Addon, helmJobPodSpec *corev1.PodSpec) {
+func setSharedVolume(addon *extensionsv1.Addon, helmJobPodSpec *corev1.PodSpec) {
 	if !useLocalCharts(addon) {
 		return
 	}
@@ -503,7 +503,7 @@ func setSharedVolume(addon *extensionsv1alpha1.Addon, helmJobPodSpec *corev1.Pod
 }
 
 // setInitContainer sets init containers to copy dependent charts to shared volume
-func setInitContainer(addon *extensionsv1alpha1.Addon, helmJobPodSpec *corev1.PodSpec) {
+func setInitContainer(addon *extensionsv1.Addon, helmJobPodSpec *corev1.PodSpec) {
 	if !useLocalCharts(addon) {
 		return
 	}
@@ -528,7 +528,7 @@ func setInitContainer(addon *extensionsv1alpha1.Addon, helmJobPodSpec *corev1.Po
 }
 
 func (r *helmTypeInstallStage) Handle(ctx context.Context) {
-	r.process(func(addon *extensionsv1alpha1.Addon) {
+	r.process(func(addon *extensionsv1.Addon) {
 		r.reqCtx.Log.V(1).Info("helmTypeInstallStage", "phase", addon.Status.Phase)
 		mgrNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
 
@@ -699,7 +699,7 @@ func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 }
 
 func (r *helmTypeUninstallStage) Handle(ctx context.Context) {
-	r.process(func(addon *extensionsv1alpha1.Addon) {
+	r.process(func(addon *extensionsv1.Addon) {
 		r.reqCtx.Log.V(1).Info("helmTypeUninstallStage", "phase", addon.Status.Phase, "next", r.next.ID())
 		key := client.ObjectKey{
 			Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
@@ -812,10 +812,10 @@ func (r *helmTypeUninstallStage) Handle(ctx context.Context) {
 
 func (r *enablingStage) Handle(ctx context.Context) {
 	r.helmTypeInstallStage.stageCtx = r.stageCtx
-	r.process(func(addon *extensionsv1alpha1.Addon) {
+	r.process(func(addon *extensionsv1.Addon) {
 		r.reqCtx.Log.V(1).Info("enablingStage", "phase", addon.Status.Phase)
 		switch addon.Spec.Type {
-		case extensionsv1alpha1.HelmType:
+		case extensionsv1.HelmType:
 			r.helmTypeInstallStage.Handle(ctx)
 		default:
 		}
@@ -825,10 +825,10 @@ func (r *enablingStage) Handle(ctx context.Context) {
 
 func (r *disablingStage) Handle(ctx context.Context) {
 	r.helmTypeUninstallStage.stageCtx = r.stageCtx
-	r.process(func(addon *extensionsv1alpha1.Addon) {
+	r.process(func(addon *extensionsv1.Addon) {
 		r.reqCtx.Log.V(1).Info("disablingStage", "phase", addon.Status.Phase, "type", addon.Spec.Type)
 		switch addon.Spec.Type {
-		case extensionsv1alpha1.HelmType:
+		case extensionsv1.HelmType:
 			r.helmTypeUninstallStage.Handle(ctx)
 		default:
 		}
@@ -837,16 +837,16 @@ func (r *disablingStage) Handle(ctx context.Context) {
 }
 
 func (r *terminalStateStage) Handle(ctx context.Context) {
-	r.process(func(addon *extensionsv1alpha1.Addon) {
+	r.process(func(addon *extensionsv1.Addon) {
 		r.reqCtx.Log.V(1).Info("terminalStateStage", "phase", addon.Status.Phase)
-		patchPhaseNCondition := func(phase extensionsv1alpha1.AddonPhase, reason string) {
+		patchPhaseNCondition := func(phase extensionsv1.AddonPhase, reason string) {
 			r.reqCtx.Log.V(1).Info("patching status", "phase", phase)
 			patch := client.MergeFrom(addon.DeepCopy())
 			addon.Status.Phase = phase
 			addon.Status.ObservedGeneration = addon.Generation
 
 			meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-				Type:               extensionsv1alpha1.ConditionTypeSucceed,
+				Type:               extensionsv1.ConditionTypeSucceed,
 				Status:             metav1.ConditionTrue,
 				ObservedGeneration: addon.Generation,
 				Reason:             reason,
@@ -864,11 +864,11 @@ func (r *terminalStateStage) Handle(ctx context.Context) {
 
 		// transit to enabled or disable phase
 		switch addon.Status.Phase {
-		case "", extensionsv1alpha1.AddonDisabling:
-			patchPhaseNCondition(extensionsv1alpha1.AddonDisabled, AddonDisabled)
+		case "", extensionsv1.AddonDisabling:
+			patchPhaseNCondition(extensionsv1.AddonDisabled, AddonDisabled)
 			return
-		case extensionsv1alpha1.AddonEnabling:
-			patchPhaseNCondition(extensionsv1alpha1.AddonEnabled, AddonEnabled)
+		case extensionsv1.AddonEnabling:
+			patchPhaseNCondition(extensionsv1.AddonEnabled, AddonEnabled)
 			return
 		}
 	})
@@ -880,7 +880,7 @@ func (r *terminalStateStage) Handle(ctx context.Context) {
 // helm install/upgrade args
 func attachVolumeMount(
 	podSpec *corev1.PodSpec,
-	selector extensionsv1alpha1.DataObjectKeySelector,
+	selector extensionsv1.DataObjectKeySelector,
 	objName, suff string,
 	volumeSrcBuilder func() corev1.VolumeSource,
 ) {
@@ -901,7 +901,7 @@ func attachVolumeMount(
 }
 
 // createHelmJobProto creates a job.batch prototyped object
-func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
+func createHelmJobProto(addon *extensionsv1.Addon) (*batchv1.Job, error) {
 	ttl := time.Minute * 5
 	if jobTTL := viper.GetString(constant.CfgKeyAddonJobTTL); jobTTL != "" {
 		var err error
@@ -1016,8 +1016,8 @@ func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
 }
 
 func enabledAddonWithDefaultValues(ctx context.Context, stageCtx *stageCtx,
-	addon *extensionsv1alpha1.Addon, reason, message string) {
-	setInstallSpec := func(di *extensionsv1alpha1.AddonDefaultInstallSpecItem) {
+	addon *extensionsv1.Addon, reason, message string) {
+	setInstallSpec := func(di *extensionsv1.AddonDefaultInstallSpecItem) {
 		addon.Spec.InstallSpec = di.AddonInstallSpec.DeepCopy()
 		addon.Spec.InstallSpec.Enabled = true
 		if addon.Annotations == nil {
@@ -1051,17 +1051,17 @@ func enabledAddonWithDefaultValues(ctx context.Context, stageCtx *stageCtx,
 
 func setAddonErrorConditions(ctx context.Context,
 	stageCtx *stageCtx,
-	addon *extensionsv1alpha1.Addon,
+	addon *extensionsv1.Addon,
 	setFailedStatus, recordEvent bool,
 	reason, message string,
 	eventMessage ...string) {
 	patch := client.MergeFrom(addon.DeepCopy())
 	addon.Status.ObservedGeneration = addon.Generation
 	if setFailedStatus {
-		addon.Status.Phase = extensionsv1alpha1.AddonFailed
+		addon.Status.Phase = extensionsv1.AddonFailed
 	}
 	meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-		Type:               extensionsv1alpha1.ConditionTypeChecked,
+		Type:               extensionsv1.ConditionTypeChecked,
 		Status:             metav1.ConditionFalse,
 		ObservedGeneration: addon.Generation,
 		Reason:             reason,
@@ -1083,11 +1083,11 @@ func setAddonErrorConditions(ctx context.Context,
 	}
 }
 
-func getJobMainContainerName(addon *extensionsv1alpha1.Addon) string {
+func getJobMainContainerName(addon *extensionsv1.Addon) string {
 	return strings.ToLower(string(addon.Spec.Type))
 }
 
-func logFailedJobPodToCondError(ctx context.Context, stageCtx *stageCtx, addon *extensionsv1alpha1.Addon,
+func logFailedJobPodToCondError(ctx context.Context, stageCtx *stageCtx, addon *extensionsv1.Addon,
 	jobName, reason string) error {
 	podList := &corev1.PodList{}
 	if err := stageCtx.reconciler.List(ctx, podList,
@@ -1128,7 +1128,7 @@ podsloop:
 	return nil
 }
 
-func findDataKey[V string | []byte](data map[string]V, refObj extensionsv1alpha1.DataObjectKeySelector) bool {
+func findDataKey[V string | []byte](data map[string]V, refObj extensionsv1.DataObjectKeySelector) bool {
 	for k := range data {
 		if k != refObj.Key {
 			continue
@@ -1175,14 +1175,14 @@ func getKubeBlocksVersion(ctx context.Context, r *AddonReconciler) (string, erro
 }
 
 // this function checks if we try to install or enable an addon directly
-func enableOrInstall(addon *extensionsv1alpha1.Addon) bool {
+func enableOrInstall(addon *extensionsv1.Addon) bool {
 	return addon.Status.Phase == "" && addon.Spec.InstallSpec == nil ||
-		addon.Status.Phase == extensionsv1alpha1.AddonFailed && addon.Spec.InstallSpec != nil && addon.Spec.InstallSpec.Enabled ||
-		addon.Status.Phase == extensionsv1alpha1.AddonDisabled && addon.Spec.InstallSpec != nil && addon.Spec.InstallSpec.Enabled
+		addon.Status.Phase == extensionsv1.AddonFailed && addon.Spec.InstallSpec != nil && addon.Spec.InstallSpec.Enabled ||
+		addon.Status.Phase == extensionsv1.AddonDisabled && addon.Spec.InstallSpec != nil && addon.Spec.InstallSpec.Enabled
 }
 
 // check the annotations constraint when install or enable an addon
-func checkAnnotationsConstraint(ctx context.Context, reconciler *AddonReconciler, addon *extensionsv1alpha1.Addon) (bool, error) {
+func checkAnnotationsConstraint(ctx context.Context, reconciler *AddonReconciler, addon *extensionsv1.Addon) (bool, error) {
 	if addon.Annotations == nil || len(addon.Annotations[KBVersionValidate]) == 0 {
 		// there is no constraint
 		return true, nil
@@ -1197,11 +1197,11 @@ func checkAnnotationsConstraint(ctx context.Context, reconciler *AddonReconciler
 			// kb version is mismatch, set the event and modify the status of the addon
 			reconciler.Event(addon, corev1.EventTypeWarning, "Kubeblocks Version Mismatch",
 				fmt.Sprintf("The version of kubeblocks needs to be %s, current is %s", addon.Annotations[KBVersionValidate], kbVersion))
-			if addon.Status.Phase != extensionsv1alpha1.AddonFailed || meta.FindStatusCondition(addon.Status.Conditions, extensionsv1alpha1.ConditionTypeFailed) == nil {
+			if addon.Status.Phase != extensionsv1.AddonFailed || meta.FindStatusCondition(addon.Status.Conditions, extensionsv1.ConditionTypeFailed) == nil {
 				patch := client.MergeFrom(addon.DeepCopy())
-				addon.Status.Phase = extensionsv1alpha1.AddonFailed
+				addon.Status.Phase = extensionsv1.AddonFailed
 				meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-					Type:               extensionsv1alpha1.ConditionTypeFailed,
+					Type:               extensionsv1.ConditionTypeFailed,
 					Status:             metav1.ConditionFalse,
 					Reason:             InstallableRequirementUnmatched,
 					LastTransitionTime: metav1.Now(),
@@ -1250,8 +1250,8 @@ func validateVersion(annotations, kbVersion string) (bool, error) {
 	return validate, nil
 }
 
-func checkAddonSpec(addon *extensionsv1alpha1.Addon) error {
-	if addon.Spec.Type == extensionsv1alpha1.HelmType {
+func checkAddonSpec(addon *extensionsv1.Addon) error {
+	if addon.Spec.Type == extensionsv1.HelmType {
 		if addon.Spec.Helm == nil {
 			return fmt.Errorf("invalid Helm configuration: either 'Helm' is not specified")
 		}
@@ -1259,7 +1259,7 @@ func checkAddonSpec(addon *extensionsv1alpha1.Addon) error {
 	return nil
 }
 
-func setAddonProviderAndVersion(ctx context.Context, stageCtx *stageCtx, addon *extensionsv1alpha1.Addon) {
+func setAddonProviderAndVersion(ctx context.Context, stageCtx *stageCtx, addon *extensionsv1.Addon) {
 	// if not set provider and version in spec, set it from labels
 	if addon.Labels == nil {
 		addon.Labels = map[string]string{}

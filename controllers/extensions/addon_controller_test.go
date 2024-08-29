@@ -604,7 +604,7 @@ var _ = Describe("Addon controller", func() {
 			modifiers := func(newObj *extensionsv1alpha1.Addon) {
 				newObj.Spec.Installable.AutoInstall = true
 				newObj.Name = "addon-test-123"
-				newObj.SetLabels(map[string]string{constant.AppVersionLabelKey: "1.0.0"})
+				newObj.SetLabels(map[string]string{AddonVersion: "1.0.0"})
 			}
 
 			dependAddon = testapps.CreateCustomizedObj(&testCtx, "addon/addon.yaml", &extensionsv1alpha1.Addon{}, modifiers)

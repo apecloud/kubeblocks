@@ -1272,7 +1272,7 @@ func checkAddonDependency(addon *extensionsv1alpha1.Addon, cli client.Client) er
 	for _, dependency := range addon.Spec.AddonDependencies {
 		versions := dependency.Version
 		if len(versions) == 0 {
-			currentVersion, ok := addon.Labels[constant.AppVersionLabelKey]
+			currentVersion, ok := addon.Labels[AddonVersion]
 			if !ok {
 				return fmt.Errorf("dependent addon version is nil and current addon does not have a version label")
 			}
@@ -1289,7 +1289,7 @@ func checkAddonDependency(addon *extensionsv1alpha1.Addon, cli client.Client) er
 				return err
 			}
 			// Check if the version matches
-			if val, ok := dependentAddon.Labels[constant.AppVersionLabelKey]; ok && val == version {
+			if val, ok := dependentAddon.Labels[AddonVersion]; ok && val == version {
 				found = true
 				break
 			}

@@ -194,6 +194,20 @@ the selector and auto-install settings.</p>
 <p>Specifies the CLI plugin installation specifications.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>addonDependencies</code><br/>
+<em>
+<a href="#extensions.kubeblocks.io/v1alpha1.AddonDependency">
+[]AddonDependency
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specify all addons that this addon depends on.</p>
+</td>
+</tr>
 </table>
 </td>
 </tr>
@@ -624,6 +638,20 @@ the selector and auto-install settings.</p>
 <p>Specifies the CLI plugin installation specifications.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>addonDependencies</code><br/>
+<em>
+<a href="#extensions.kubeblocks.io/v1alpha1.AddonDependency">
+[]AddonDependency
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specify all addons that this addon depends on.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="extensions.kubeblocks.io/v1alpha1.AddonStatus">AddonStatus
@@ -751,6 +779,57 @@ string
 <td>
 <em>(Optional)</em>
 <p>Provides a brief description of the plugin.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Helm&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="extensions.kubeblocks.io/v1alpha1.AddonDependency">AddonDependency
+</h3>
+<p>
+(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.AddonSpec">AddonSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name of the dependent addon.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+string[]
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>All matching versions of the dependent addon. Default to the current addon version</p>
 </td>
 </tr>
 </tbody>

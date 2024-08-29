@@ -62,6 +62,22 @@ spec:
           spec:
             description: AddonSpec defines the desired state of an add-on.
             properties:
+              addonDependencies:
+                description: Specifies all addons that this addon depends on.
+                items:
+                  properties:
+                    name:
+                      description: Specifies the name of the dependent addon.
+                      type: string
+                    version:
+                      description: All matching versions of the dependent addon. If empty, defaults to the same version as the current addon.
+                      items:
+                        type: string
+                      type: array
+                  required:
+                  - name
+                  type: object
+                type: array
               cliPlugins:
                 description: Specifies the CLI plugin installation specifications.
                 items:

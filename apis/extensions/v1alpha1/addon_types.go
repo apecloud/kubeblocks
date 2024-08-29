@@ -80,6 +80,10 @@ type AddonSpec struct {
 	//
 	// +optional
 	CliPlugins []CliPlugin `json:"cliPlugins,omitempty"`
+
+	// Specify all addons that this addon depends on.
+	// +optional
+	AddonDependencies []AddonDependency `json:"addonDependencies,omitempty"`
 }
 
 // AddonStatus defines the observed state of an add-on.
@@ -317,6 +321,18 @@ type CliPlugin struct {
 	//
 	// +optional
 	Description string `json:"description,omitempty"`
+}
+
+type AddonDependency struct {
+	// The name of the dependent addon.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// All matching versions of the dependent addon. If empty, defaults to the same version as the current addon.
+	//
+	// +optional
+	Version []string `json:"version"`
 }
 
 func (r *ResourceMappingItem) HasStorageMapping() bool {

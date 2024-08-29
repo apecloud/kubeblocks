@@ -99,6 +99,7 @@ var _ = Describe("Addon controller", func() {
 
 	Context("Addon controller test", func() {
 		var addon *extensionsv1alpha1.Addon
+		var depend_addon *extensionsv1alpha1.Addon
 		var key types.NamespacedName
 		var clusterKey types.NamespacedName
 		BeforeEach(func() {
@@ -575,6 +576,52 @@ var _ = Describe("Addon controller", func() {
 				checkAddonDeleted(g)
 				checkedJobDeletion(g, jobKey)
 			}).Should(Succeed())
+		})
+
+		It("should successfully reconcile a custom resource for Addon install with dependency addon", func() {
+			By("By create addon with not installed dependent addon")
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+				newOjb.Spec.Installable.AutoInstall = true
+				newOjb.Spec.AddonDependencies = []extensionsv1alpha1.AddonDependency{
+					{
+						Name:    "addon-test-123",
+						Version: []string{"1.0.0"},
+					},
+				}
+			})
+
+			By("By enable addon should failed")
+			Eventually(func(g Gomega) {
+				doReconcileOnce(g)
+				addon = &extensionsv1alpha1.Addon{}
+				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
+				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonFailed))
+				g.Expect(addon.Spec.InstallSpec).Should(BeNil())
+				g.Expect(addon.Status.ObservedGeneration).Should(BeEquivalentTo(1))
+			}).Should(Succeed())
+
+			By("By install dependent addon")
+			modifiers := func(newObj *extensionsv1alpha1.Addon) {
+				newObj.Spec.Installable.AutoInstall = true
+				newObj.Name = "addon-test-123"
+				newObj.SetLabels(map[string]string{constant.AppVersionLabelKey: "1.0.0"})
+			}
+
+			depend_addon = testapps.CreateCustomizedObj(&testCtx, "addon/addon.yaml", &extensionsv1alpha1.Addon{}, modifiers)
+			Expect(depend_addon.Spec.DefaultInstallValues).ShouldNot(BeEmpty())
+
+			By("By enable addon when the dependent addon is installed")
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+				newOjb.Spec.Installable.AutoInstall = true
+				newOjb.Spec.AddonDependencies = []extensionsv1alpha1.AddonDependency{
+					{
+						Name:    "addon-test-123",
+						Version: []string{"1.0.0"},
+					},
+				}
+			})
+			enablingPhaseCheck(2)
+			fakeInstallationFailedJob(2)
 		})
 
 		It("should successfully reconcile a custom resource for Addon with autoInstall=true with status.phase=Failed", func() {

@@ -40,7 +40,8 @@ Resource Types:
 <tr><td><code>defaultInstallValues</code><br/><em><a href="#extensions.kubeblocks.io/v1alpha1.AddonDefaultInstallSpecItem">[]AddonDefaultInstallSpecItem</a></em></td><td><p>Default installation parameters.</p><br /></td></tr>
 <tr><td><code>install</code><br/><em><a href="#extensions.kubeblocks.io/v1alpha1.AddonInstallSpec">AddonInstallSpec</a></em></td><td><em>(Optional)</em><p>Installation parameters.</p><br /></td></tr>
 <tr><td><code>installable</code><br/><em><a href="#extensions.kubeblocks.io/v1alpha1.InstallableSpec">InstallableSpec</a></em></td><td><em>(Optional)</em><p>Addon installable spec. It provides selector and auto-install settings.</p><br /></td></tr>
-<tr><td><code>cliPlugins</code><br/><em><a href="#extensions.kubeblocks.io/v1alpha1.CliPlugin">[]CliPlugin</a></em></td><td><em>(Optional)</em><p>Plugin installation spec.</p><br /></td></tr></table></td></tr>
+<tr><td><code>cliPlugins</code><br/><em><a href="#extensions.kubeblocks.io/v1alpha1.CliPlugin">[]CliPlugin</a></em></td><td><em>(Optional)</em><p>Plugin installation spec.</p><br /></td></tr>
+<tr><td><code>addonDependencies</code><br/><em><a href="#extensions.kubeblocks.io/v1alpha1.AddonDependency">[]AddonDependency</a></em></td><td><em>(Optional)</em><p>Addon Dependency spec.</p><br /></td></tr></table></td></tr></table></td></tr>
 <tr><td><code>status</code><br/><em><a href="#extensions.kubeblocks.io/v1alpha1.AddonStatus">AddonStatus</a></em></td><td></td></tr>
 </tbody>
 </table>
@@ -183,6 +184,7 @@ Resource Types:
 <tr><td><code>install</code><br/><em><a href="#extensions.kubeblocks.io/v1alpha1.AddonInstallSpec">AddonInstallSpec</a></em></td><td><em>(Optional)</em><p>Installation parameters.</p><br /></td></tr>
 <tr><td><code>installable</code><br/><em><a href="#extensions.kubeblocks.io/v1alpha1.InstallableSpec">InstallableSpec</a></em></td><td><em>(Optional)</em><p>Addon installable spec. It provides selector and auto-install settings.</p><br /></td></tr>
 <tr><td><code>cliPlugins</code><br/><em><a href="#extensions.kubeblocks.io/v1alpha1.CliPlugin">[]CliPlugin</a></em></td><td><em>(Optional)</em><p>Plugin installation spec.</p><br /></td></tr>
+<tr><td><code>addonDependencies</code><br/><em><a href="#extensions.kubeblocks.io/v1alpha1.AddonDependency">[]AddonDependency</a></em></td><td><em>(Optional)</em><p>Addon Dependency spec.</p><br /></td></tr>
 </tbody>
 </table>
 <h3 id="extensions.kubeblocks.io/v1alpha1.AddonStatus">AddonStatus</h3>
@@ -240,6 +242,24 @@ Resource Types:
 <tr><td><code>name</code><br/><em>string</em></td><td><p>Name of the plugin.</p><br /></td></tr>
 <tr><td><code>indexRepository</code><br/><em>string</em></td><td><p>The index repository of the plugin.</p><br /></td></tr>
 <tr><td><code>description</code><br/><em>string</em></td><td><em>(Optional)</em><p>The description of the plugin.</p><br /></td></tr>
+</tbody>
+</table>
+<h3 id="extensions.kubeblocks.io/v1alpha1.AddonDependency">AddonDependency</h3>
+<p>
+(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.AddonSpec">AddonSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr><td><code>name</code><br/><em>string</em></td><td><p>Name of the dependent addon.</p><br /></td></tr>
+<tr><td><code>version</code><br/><em>string[]</em></td><td><em>(Optional)</em><p>All matching versions of the dependent addon. Default to the current addon version</p><br /></td></tr>
 </tbody>
 </table>
 <h3 id="extensions.kubeblocks.io/v1alpha1.DataObjectKeySelector">DataObjectKeySelector</h3>

@@ -303,6 +303,12 @@ func (r *installableCheckStage) Handle(ctx context.Context) {
 			return
 		}
 
+		if err := checkAddonDependency(addon, r.reconciler.Client); err != nil {
+			setAddonErrorConditions(ctx, &r.stageCtx, addon, true, true, AddonCheckDependencyError, err.Error())
+			r.setReconciled()
+			return
+		}
+
 		r.reqCtx.Log.V(1).Info("installableCheckStage", "phase", addon.Status.Phase)
 
 		// check the annotations constraint about Kubeblocks Version
@@ -1254,6 +1260,32 @@ func checkAddonSpec(addon *extensionsv1alpha1.Addon) error {
 	if addon.Spec.Type == extensionsv1alpha1.HelmType {
 		if addon.Spec.Helm == nil {
 			return fmt.Errorf("invalid Helm configuration: either 'Helm' is not specified")
+		}
+	}
+	return nil
+}
+
+func checkAddonDependency(addon *extensionsv1alpha1.Addon, cli client.Client) error {
+	for _, dependency := range addon.Spec.AddonDependencies {
+		// Loop through the versions and check if at least one version exists
+		found := false
+		for _, version := range dependency.Version {
+			// If the Addon with the given name is not found, move to the next version
+			dependentAddon := &extensionsv1alpha1.Addon{}
+			if err := cli.Get(context.TODO(), client.ObjectKey{Name: dependency.Name, Namespace: addon.Namespace}, dependentAddon); err != nil {
+				if apierrors.IsNotFound(err) {
+					continue
+				}
+				return err
+			}
+			// Check if the version matches
+			if val, ok := dependentAddon.Labels[constant.AppVersionLabelKey]; ok && val == version {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("dependency %s with any of the specified versions %v not found", dependency.Name, dependency.Version)
 		}
 	}
 	return nil

@@ -99,7 +99,7 @@ var _ = Describe("Addon controller", func() {
 
 	Context("Addon controller test", func() {
 		var addon *extensionsv1alpha1.Addon
-		var depend_addon *extensionsv1alpha1.Addon
+		var dependAddon *extensionsv1alpha1.Addon
 		var key types.NamespacedName
 		var clusterKey types.NamespacedName
 		BeforeEach(func() {
@@ -607,8 +607,8 @@ var _ = Describe("Addon controller", func() {
 				newObj.SetLabels(map[string]string{constant.AppVersionLabelKey: "1.0.0"})
 			}
 
-			depend_addon = testapps.CreateCustomizedObj(&testCtx, "addon/addon.yaml", &extensionsv1alpha1.Addon{}, modifiers)
-			Expect(depend_addon.Spec.DefaultInstallValues).ShouldNot(BeEmpty())
+			dependAddon = testapps.CreateCustomizedObj(&testCtx, "addon/addon.yaml", &extensionsv1alpha1.Addon{}, modifiers)
+			Expect(dependAddon.Spec.DefaultInstallValues).ShouldNot(BeEmpty())
 
 			By("By enable addon when the dependent addon is installed")
 			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {

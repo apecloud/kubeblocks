@@ -501,7 +501,7 @@ func addActionNContainerBinding(discovery map[string]string, defaultContainer *c
 		return nil, err
 	}
 	env := corev1.EnvVar{
-		Name:  kbagent.finderEnvName,
+		Name:  kbagent.FinderEnvName,
 		Value: string(dm),
 	}
 	defaultContainer.Env = append(defaultContainer.Env, env)

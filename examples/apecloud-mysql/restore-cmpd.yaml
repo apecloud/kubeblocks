@@ -3,6 +3,8 @@ kind: Cluster
 metadata:
   name: acmysql-cluster-restore
   namespace: default
+  labels: 
+    auditLogEnabled: "false"
   annotations:
     kubeblocks.io/restore-from-backup: '{"mysql":{"connectionPassword":"<backup-connection-password>","name":"acmysql-cluster-backup","namespace":"default","volumeRestorePolicy":"Parallel"}}'
 spec:
@@ -18,18 +20,6 @@ spec:
   - name: mysql
     # References the name of a ComponentDefinition. The ComponentDefinition specifies the behavior and characteristics of the Component. If both `componentDefRef` and `componentDef` are provided, the `componentDef` will take precedence over `componentDefRef`.
     componentDef: apecloud-mysql
-    # Specifies a group of affinity scheduling rules for the Component. It allows users to control how the Component's Pods are scheduled onto nodes in the cluster.
-    affinity:
-      podAntiAffinity: Preferred
-      topologyKeys:
-      - kubernetes.io/hostname
-      tenancy: SharedNode
-    # Allows the Component to be scheduled onto nodes with matching taints. 
-    tolerations:
-    - key: kb-data
-      operator: Equal
-      value: 'true'
-      effect: NoSchedule
     # Specifies which types of logs should be collected for the Cluster. 
     enabledLogs:
     - error

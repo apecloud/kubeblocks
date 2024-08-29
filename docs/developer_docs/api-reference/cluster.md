@@ -8300,6 +8300,20 @@ VarOption
 </tr>
 <tr>
 <td>
+<code>shortName</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reference to the short name of the Component object.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>replicas</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.VarOption">

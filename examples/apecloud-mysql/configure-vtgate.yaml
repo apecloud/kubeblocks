@@ -11,7 +11,7 @@ spec:
   # Specifies a component and its configuration updates. This field is deprecated and replaced by `reconfigures`.
   reconfigure:
     # Specifies the name of the Component.
-    componentName: vtgate
+    componentName: wescale
    # Contains a list of ConfigurationItem objects, specifying the Component's configuration template name, upgrade policy, and parameter key-value pairs to be updated.
     configurations:
       # Sets the parameters to be updated. It should contain at least one item.

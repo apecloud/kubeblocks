@@ -1266,10 +1266,20 @@ func checkAddonSpec(addon *extensionsv1alpha1.Addon) error {
 }
 
 func checkAddonDependency(addon *extensionsv1alpha1.Addon, cli client.Client) error {
+	if len(addon.Spec.AddonDependencies) == 0 {
+		return nil
+	}
 	for _, dependency := range addon.Spec.AddonDependencies {
-		// Loop through the versions and check if at least one version exists
+		versions := dependency.Version
+		if len(versions) == 0 {
+			currentVersion, ok := addon.Labels[constant.AppVersionLabelKey]
+			if !ok {
+				return fmt.Errorf("dependent addon version is nil and current addon does not have a version label")
+			}
+			versions = []string{currentVersion}
+		}
 		found := false
-		for _, version := range dependency.Version {
+		for _, version := range versions {
 			// If the Addon with the given name is not found, move to the next version
 			dependentAddon := &extensionsv1alpha1.Addon{}
 			if err := cli.Get(context.TODO(), client.ObjectKey{Name: dependency.Name, Namespace: addon.Namespace}, dependentAddon); err != nil {

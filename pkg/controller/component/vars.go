@@ -1157,7 +1157,7 @@ func resolveComponentVarRef(ctx context.Context, cli client.Reader, synthesizedC
 	defineKey string, selector appsv1alpha1.ComponentVarSelector) ([]corev1.EnvVar, []corev1.EnvVar, error) {
 	var resolveFunc func(context.Context, client.Reader, *SynthesizedComponent, string, appsv1alpha1.ComponentVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error)
 	switch {
-	case selector.ComponentName != nil:
+	case selector.ComponentName != nil || selector.ShortName != nil:
 		resolveFunc = resolveComponentNameRef
 	case selector.Replicas != nil:
 		resolveFunc = resolveComponentReplicasRef
@@ -1175,7 +1175,11 @@ func resolveComponentNameRef(ctx context.Context, cli client.Reader, synthesized
 	defineKey string, selector appsv1alpha1.ComponentVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
 	resolveComponentName := func(obj any) (*corev1.EnvVar, *corev1.EnvVar, error) {
 		comp := obj.(*appsv1alpha1.Component)
-		return &corev1.EnvVar{Name: defineKey, Value: comp.Name}, nil, nil
+		name := comp.Name
+		if selector.ShortName != nil {
+			name = synthesizedComp.Name
+		}
+		return &corev1.EnvVar{Name: defineKey, Value: name}, nil, nil
 	}
 	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector, selector.ComponentName, resolveComponentName)
 }

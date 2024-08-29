@@ -1679,6 +1679,20 @@ var _ = Describe("vars", func() {
 						},
 					},
 					{
+						Name: "shortName",
+						ValueFrom: &appsv1alpha1.VarSource{
+							ComponentVarRef: &appsv1alpha1.ComponentVarSelector{
+								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+									CompDef:  synthesizedComp.CompDefName,
+									Optional: required(),
+								},
+								ComponentVars: appsv1alpha1.ComponentVars{
+									ShortName: &appsv1alpha1.VarRequired,
+								},
+							},
+						},
+					},
+					{
 						Name: "replicas",
 						ValueFrom: &appsv1alpha1.VarSource{
 							ComponentVarRef: &appsv1alpha1.ComponentVarSelector{
@@ -1821,6 +1835,7 @@ var _ = Describe("vars", func() {
 				Expect(err).Should(Succeed())
 				compName := constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name)
 				checkEnvVarWithValue(envVars, "name", compName)
+				checkEnvVarWithValue(envVars, "shortName", synthesizedComp.Name)
 				checkEnvVarWithValue(envVars, "replicas", fmt.Sprintf("%d", 3))
 				checkEnvVarWithValue(envVars, "podNames", strings.Join(mockInstanceList, ","))
 				checkEnvVarWithValue(envVars, "podNames4EmptyRole", podName("empty"))

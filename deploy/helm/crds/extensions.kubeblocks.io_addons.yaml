@@ -63,14 +63,15 @@ spec:
             description: AddonSpec defines the desired state of an add-on.
             properties:
               addonDependencies:
-                description: Specifies all addons that this addon depends on.
+                description: Specify all addons that this addon depends on.
                 items:
                   properties:
                     name:
-                      description: Specifies the name of the dependent addon.
+                      description: The name of the dependent addon.
                       type: string
                     version:
-                      description: All matching versions of the dependent addon. If empty, defaults to the same version as the current addon.
+                      description: All matching versions of the dependent addon. If
+                        empty, defaults to the same version as the current addon.
                       items:
                         type: string
                       type: array

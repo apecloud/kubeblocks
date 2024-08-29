@@ -272,6 +272,46 @@ all selectors must evaluate to true.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="extensions.kubeblocks.io/v1alpha1.AddonDependency">AddonDependency
+</h3>
+<p>
+(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.AddonSpec">AddonSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The name of the dependent addon.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>All matching versions of the dependent addon. If empty, defaults to the same version as the current addon.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="extensions.kubeblocks.io/v1alpha1.AddonInstallExtraItem">AddonInstallExtraItem
 </h3>
 <p>
@@ -779,46 +819,6 @@ string
 <td>
 <em>(Optional)</em>
 <p>Provides a brief description of the plugin.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.AddonDependency">AddonDependency
-</h3>
-<p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.AddonSpec">AddonSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Name of the dependent addon.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>version</code><br/>
-<em>
-string[]
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>All matching versions of the dependent addon. Default to the current addon version</p>
 </td>
 </tr>
 </tbody>

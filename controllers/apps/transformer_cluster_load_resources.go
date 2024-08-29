@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -96,9 +97,9 @@ func (t *clusterLoadRefResourcesTransformer) checkNUpdateClusterTopology(transCt
 }
 
 func loadNCheckClusterDefinition(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) error {
-	var cd *appsv1alpha1.ClusterDefinition
+	var cd *appsv1.ClusterDefinition
 	if len(cluster.Spec.ClusterDefRef) > 0 {
-		cd = &appsv1alpha1.ClusterDefinition{}
+		cd = &appsv1.ClusterDefinition{}
 		key := types.NamespacedName{Name: cluster.Spec.ClusterDefRef}
 		if err := transCtx.Client.Get(transCtx.Context, key, cd); err != nil {
 			return err
@@ -109,13 +110,13 @@ func loadNCheckClusterDefinition(transCtx *clusterTransformContext, cluster *app
 		if cd.Generation != cd.Status.ObservedGeneration {
 			return fmt.Errorf("the referenced ClusterDefinition is not up to date: %s", cd.Name)
 		}
-		if cd.Status.Phase != appsv1alpha1.AvailablePhase {
+		if cd.Status.Phase != appsv1.AvailablePhase {
 			return fmt.Errorf("the referenced ClusterDefinition is unavailable: %s", cd.Name)
 		}
 	}
 
 	if cd == nil {
-		cd = &appsv1alpha1.ClusterDefinition{}
+		cd = &appsv1.ClusterDefinition{}
 	}
 	transCtx.ClusterDef = cd
 	return nil

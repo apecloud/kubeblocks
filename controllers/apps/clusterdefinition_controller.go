@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsconfig "github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -62,7 +63,7 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		Recorder: r.Recorder,
 	}
 
-	clusterDef := &appsv1alpha1.ClusterDefinition{}
+	clusterDef := &appsv1.ClusterDefinition{}
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, clusterDef); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
@@ -73,7 +74,7 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	if clusterDef.Status.ObservedGeneration == clusterDef.Generation &&
-		slices.Contains([]appsv1alpha1.Phase{appsv1alpha1.AvailablePhase}, clusterDef.Status.Phase) {
+		clusterDef.Status.Phase == appsv1.AvailablePhase {
 		return intctrlutil.Reconciled()
 	}
 
@@ -100,7 +101,7 @@ func (r *ClusterDefinitionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *ClusterDefinitionReconciler) deletionHandler(rctx intctrlutil.RequestCtx, clusterDef *appsv1alpha1.ClusterDefinition) func() (*ctrl.Result, error) {
+func (r *ClusterDefinitionReconciler) deletionHandler(rctx intctrlutil.RequestCtx, clusterDef *appsv1.ClusterDefinition) func() (*ctrl.Result, error) {
 	return func() (*ctrl.Result, error) {
 		recordEvent := func() {
 			r.Recorder.Event(clusterDef, corev1.EventTypeWarning, "ExistsReferencedResources",
@@ -114,7 +115,7 @@ func (r *ClusterDefinitionReconciler) deletionHandler(rctx intctrlutil.RequestCt
 	}
 }
 
-func (r *ClusterDefinitionReconciler) deleteExternalResources(rctx intctrlutil.RequestCtx, clusterDef *appsv1alpha1.ClusterDefinition) error {
+func (r *ClusterDefinitionReconciler) deleteExternalResources(rctx intctrlutil.RequestCtx, clusterDef *appsv1.ClusterDefinition) error {
 	// delete any external resources associated with the cronJob
 	//
 	// Ensure that delete implementation is idempotent and safe to invoke
@@ -122,30 +123,29 @@ func (r *ClusterDefinitionReconciler) deleteExternalResources(rctx intctrlutil.R
 	return appsconfig.DeleteConfigMapFinalizer(r.Client, rctx, clusterDef)
 }
 
-func (r *ClusterDefinitionReconciler) available(rctx intctrlutil.RequestCtx, clusterDef *appsv1alpha1.ClusterDefinition) error {
-	return r.status(rctx, clusterDef, appsv1alpha1.AvailablePhase, "")
+func (r *ClusterDefinitionReconciler) available(rctx intctrlutil.RequestCtx, clusterDef *appsv1.ClusterDefinition) error {
+	return r.status(rctx, clusterDef, appsv1.AvailablePhase, "")
 }
 
-func (r *ClusterDefinitionReconciler) unavailable(rctx intctrlutil.RequestCtx, clusterDef *appsv1alpha1.ClusterDefinition, err error) error {
+func (r *ClusterDefinitionReconciler) unavailable(rctx intctrlutil.RequestCtx, clusterDef *appsv1.ClusterDefinition, err error) error {
 	message := ""
 	if err != nil {
 		message = err.Error()
 	}
-	return r.status(rctx, clusterDef, appsv1alpha1.UnavailablePhase, message)
+	return r.status(rctx, clusterDef, appsv1.UnavailablePhase, message)
 }
 
 func (r *ClusterDefinitionReconciler) status(rctx intctrlutil.RequestCtx,
-	clusterDef *appsv1alpha1.ClusterDefinition, phase appsv1alpha1.Phase, message string) error {
+	clusterDef *appsv1.ClusterDefinition, phase appsv1.Phase, message string) error {
 	patch := client.MergeFrom(clusterDef.DeepCopy())
 	clusterDef.Status.ObservedGeneration = clusterDef.Generation
 	clusterDef.Status.Phase = phase
 	clusterDef.Status.Message = message
 	clusterDef.Status.Topologies = r.supportedTopologies(clusterDef)
-	clusterDef.Status.ServiceRefs = r.referredServiceRefs(clusterDef)
 	return r.Client.Status().Patch(rctx.Ctx, clusterDef, patch)
 }
 
-func (r *ClusterDefinitionReconciler) supportedTopologies(clusterDef *appsv1alpha1.ClusterDefinition) string {
+func (r *ClusterDefinitionReconciler) supportedTopologies(clusterDef *appsv1.ClusterDefinition) string {
 	topologies := make([]string, 0)
 	for _, topology := range clusterDef.Spec.Topologies {
 		topologies = append(topologies, topology.Name)
@@ -154,11 +154,7 @@ func (r *ClusterDefinitionReconciler) supportedTopologies(clusterDef *appsv1alph
 	return strings.Join(topologies, ",") // TODO(API): topologies length
 }
 
-func (r *ClusterDefinitionReconciler) referredServiceRefs(clusterDef *appsv1alpha1.ClusterDefinition) string {
-	return "" // TODO(API): referred service refs
-}
-
-func (r *ClusterDefinitionReconciler) reconcile(rctx intctrlutil.RequestCtx, clusterDef *appsv1alpha1.ClusterDefinition) (*ctrl.Result, error) {
+func (r *ClusterDefinitionReconciler) reconcile(rctx intctrlutil.RequestCtx, clusterDef *appsv1.ClusterDefinition) (*ctrl.Result, error) {
 	if err := r.reconcileTopologies(rctx, clusterDef); err != nil {
 		res, err1 := intctrlutil.CheckedRequeueWithError(err, rctx.Log, "")
 		return &res, err1
@@ -166,7 +162,7 @@ func (r *ClusterDefinitionReconciler) reconcile(rctx intctrlutil.RequestCtx, clu
 	return nil, nil
 }
 
-func (r *ClusterDefinitionReconciler) reconcileTopologies(rctx intctrlutil.RequestCtx, clusterDef *appsv1alpha1.ClusterDefinition) error {
+func (r *ClusterDefinitionReconciler) reconcileTopologies(rctx intctrlutil.RequestCtx, clusterDef *appsv1.ClusterDefinition) error {
 	if !checkUniqueItemWithValue(clusterDef.Spec.Topologies, "Name", nil) {
 		return fmt.Errorf("duplicate topology names")
 	}
@@ -181,7 +177,7 @@ func (r *ClusterDefinitionReconciler) reconcileTopologies(rctx intctrlutil.Reque
 	return nil
 }
 
-func (r *ClusterDefinitionReconciler) validateTopology(rctx intctrlutil.RequestCtx, topology appsv1alpha1.ClusterTopology) error {
+func (r *ClusterDefinitionReconciler) validateTopology(rctx intctrlutil.RequestCtx, topology appsv1.ClusterTopology) error {
 	if !checkUniqueItemWithValue(topology.Components, "Name", nil) {
 		return fmt.Errorf("duplicate topology component names")
 	}
@@ -202,7 +198,7 @@ func (r *ClusterDefinitionReconciler) validateTopology(rctx intctrlutil.RequestC
 	return nil
 }
 
-func (r *ClusterDefinitionReconciler) validateTopologyOrders(topology appsv1alpha1.ClusterTopology) error {
+func (r *ClusterDefinitionReconciler) validateTopologyOrders(topology appsv1.ClusterTopology) error {
 	comps := make([]string, 0)
 	for _, comp := range topology.Components {
 		comps = append(comps, comp.Name)
@@ -231,7 +227,7 @@ func (r *ClusterDefinitionReconciler) validateTopologyOrders(topology appsv1alph
 }
 
 func (r *ClusterDefinitionReconciler) loadTopologyCompDefs(ctx context.Context,
-	topology appsv1alpha1.ClusterTopology) (map[string][]*appsv1alpha1.ComponentDefinition, error) {
+	topology appsv1.ClusterTopology) (map[string][]*appsv1alpha1.ComponentDefinition, error) {
 	compDefList := &appsv1alpha1.ComponentDefinitionList{}
 	if err := r.Client.List(ctx, compDefList); err != nil {
 		return nil, err
@@ -256,7 +252,7 @@ func (r *ClusterDefinitionReconciler) loadTopologyCompDefs(ctx context.Context,
 }
 
 func (r *ClusterDefinitionReconciler) validateTopologyComponent(compDefs map[string][]*appsv1alpha1.ComponentDefinition,
-	comp appsv1alpha1.ClusterTopologyComponent) error {
+	comp appsv1.ClusterTopologyComponent) error {
 	defs, ok := compDefs[comp.Name]
 	if !ok || len(defs) == 0 {
 		return fmt.Errorf("there is no matched definitions found for the topology component %s", comp.Name)
@@ -265,7 +261,7 @@ func (r *ClusterDefinitionReconciler) validateTopologyComponent(compDefs map[str
 }
 
 // defaultClusterTopology returns the default cluster topology in specified cluster definition.
-func defaultClusterTopology(clusterDef *appsv1alpha1.ClusterDefinition) *appsv1alpha1.ClusterTopology {
+func defaultClusterTopology(clusterDef *appsv1.ClusterDefinition) *appsv1.ClusterTopology {
 	for i, topology := range clusterDef.Spec.Topologies {
 		if topology.Default {
 			return &clusterDef.Spec.Topologies[i]
@@ -275,7 +271,7 @@ func defaultClusterTopology(clusterDef *appsv1alpha1.ClusterDefinition) *appsv1a
 }
 
 // referredClusterTopology returns the cluster topology which has name @name.
-func referredClusterTopology(clusterDef *appsv1alpha1.ClusterDefinition, name string) *appsv1alpha1.ClusterTopology {
+func referredClusterTopology(clusterDef *appsv1.ClusterDefinition, name string) *appsv1.ClusterTopology {
 	if len(name) == 0 {
 		return defaultClusterTopology(clusterDef)
 	}

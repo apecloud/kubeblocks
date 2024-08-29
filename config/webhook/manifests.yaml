@@ -10,6 +10,26 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /mutate-apps-kubeblocks-io-v1-clusterdefinition
+  failurePolicy: Fail
+  name: mclusterdefinition.kb.io
+  rules:
+  - apiGroups:
+    - apps.kubeblocks.io
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - clusterdefinitions
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
       path: /mutate-apps-kubeblocks-io-v1-servicedescriptor
   failurePolicy: Fail
   name: mservicedescriptor.kb.io
@@ -23,6 +43,26 @@ webhooks:
     - UPDATE
     resources:
     - servicedescriptors
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-apps-kubeblocks-io-v1alpha1-clusterdefinition
+  failurePolicy: Fail
+  name: mclusterdefinition.kb.io
+  rules:
+  - apiGroups:
+    - apps.kubeblocks.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - clusterdefinitions
   sideEffects: None
 - admissionReviewVersions:
   - v1
@@ -56,6 +96,26 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /validate-apps-kubeblocks-io-v1-clusterdefinition
+  failurePolicy: Fail
+  name: vclusterdefinition.kb.io
+  rules:
+  - apiGroups:
+    - apps.kubeblocks.io
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - clusterdefinitions
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
       path: /validate-apps-kubeblocks-io-v1-servicedescriptor
   failurePolicy: Fail
   name: vservicedescriptor.kb.io
@@ -69,6 +129,26 @@ webhooks:
     - UPDATE
     resources:
     - servicedescriptors
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-apps-kubeblocks-io-v1alpha1-clusterdefinition
+  failurePolicy: Fail
+  name: vclusterdefinition.kb.io
+  rules:
+  - apiGroups:
+    - apps.kubeblocks.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - clusterdefinitions
   sideEffects: None
 - admissionReviewVersions:
   - v1

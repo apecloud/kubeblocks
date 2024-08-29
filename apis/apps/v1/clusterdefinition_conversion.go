@@ -17,26 +17,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package apps
+package v1
 
-import (
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-)
-
-type MockClusterDefFactory struct {
-	BaseFactory[appsv1.ClusterDefinition, *appsv1.ClusterDefinition, MockClusterDefFactory]
-}
-
-func NewClusterDefFactory(name string) *MockClusterDefFactory {
-	f := &MockClusterDefFactory{}
-	f.Init("", name,
-		&appsv1.ClusterDefinition{
-			Spec: appsv1.ClusterDefinitionSpec{},
-		}, f)
-	return f
-}
-
-func (factory *MockClusterDefFactory) AddClusterTopology(topology appsv1.ClusterTopology) *MockClusterDefFactory {
-	factory.Get().Spec.Topologies = append(factory.Get().Spec.Topologies, topology)
-	return factory
-}
+func (r *ClusterDefinition) Hub() {}

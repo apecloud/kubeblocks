@@ -27,6 +27,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -39,7 +40,7 @@ var _ = Describe("ClusterDefinition Controller", func() {
 	)
 
 	var (
-		clusterDefObj *appsv1alpha1.ClusterDefinition
+		clusterDefObj *appsv1.ClusterDefinition
 	)
 
 	cleanEnv := func() {
@@ -72,21 +73,21 @@ var _ = Describe("ClusterDefinition Controller", func() {
 
 	Context("cluster topology", func() {
 		var (
-			singleCompTopology = appsv1alpha1.ClusterTopology{
+			singleCompTopology = appsv1.ClusterTopology{
 				Name:    "topo1",
 				Default: true,
-				Components: []appsv1alpha1.ClusterTopologyComponent{
+				Components: []appsv1.ClusterTopologyComponent{
 					{
 						Name:    "server",
 						CompDef: compDefinitionName,
 					},
 				},
-				Orders: &appsv1alpha1.ClusterTopologyOrders{},
+				Orders: &appsv1.ClusterTopologyOrders{},
 			}
-			multipleCompsTopology = appsv1alpha1.ClusterTopology{
+			multipleCompsTopology = appsv1.ClusterTopology{
 				Name:    "topo2",
 				Default: false,
-				Components: []appsv1alpha1.ClusterTopologyComponent{
+				Components: []appsv1.ClusterTopologyComponent{
 					{
 						Name:    "proxy",
 						CompDef: compDefinitionName,
@@ -100,7 +101,7 @@ var _ = Describe("ClusterDefinition Controller", func() {
 						CompDef: compDefinitionName,
 					},
 				},
-				Orders: &appsv1alpha1.ClusterTopologyOrders{
+				Orders: &appsv1.ClusterTopologyOrders{
 					Provision: []string{"storage", "server", "proxy"},
 					Update:    []string{"storage", "server", "proxy"},
 				},
@@ -126,9 +127,9 @@ var _ = Describe("ClusterDefinition Controller", func() {
 				AddClusterTopology(multipleCompsTopology).
 				Create(&testCtx).
 				GetObject()
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(g Gomega, cd *appsv1alpha1.ClusterDefinition) {
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(g Gomega, cd *appsv1.ClusterDefinition) {
 				g.Expect(cd.Status.ObservedGeneration).Should(Equal(cd.Generation))
-				g.Expect(cd.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
+				g.Expect(cd.Status.Phase).Should(Equal(appsv1.AvailablePhase))
 			})).Should(Succeed())
 		})
 
@@ -137,43 +138,43 @@ var _ = Describe("ClusterDefinition Controller", func() {
 		})
 
 		It("ok", func() {
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(g Gomega, cd *appsv1alpha1.ClusterDefinition) {
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(g Gomega, cd *appsv1.ClusterDefinition) {
 				g.Expect(cd.Status.ObservedGeneration).Should(Equal(cd.Generation))
-				g.Expect(cd.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
+				g.Expect(cd.Status.Phase).Should(Equal(appsv1.AvailablePhase))
 			})).Should(Succeed())
 		})
 
 		It("duplicate topology", func() {
 			By("update cd to add a topology with same name")
-			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(cd *appsv1alpha1.ClusterDefinition) {
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(cd *appsv1.ClusterDefinition) {
 				cd.Spec.Topologies = append(cd.Spec.Topologies, singleCompTopology)
 			})()).Should(Succeed())
 
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(g Gomega, cd *appsv1alpha1.ClusterDefinition) {
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(g Gomega, cd *appsv1.ClusterDefinition) {
 				g.Expect(cd.Status.ObservedGeneration).Should(Equal(cd.Generation))
-				g.Expect(cd.Status.Phase).Should(Equal(appsv1alpha1.UnavailablePhase))
+				g.Expect(cd.Status.Phase).Should(Equal(appsv1.UnavailablePhase))
 				g.Expect(cd.Status.Message).Should(ContainSubstring("duplicate topology"))
 			})).Should(Succeed())
 		})
 
 		It("multiple default topologies", func() {
 			By("update cd to set all topologies as default")
-			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(cd *appsv1alpha1.ClusterDefinition) {
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(cd *appsv1.ClusterDefinition) {
 				for i := range cd.Spec.Topologies {
 					cd.Spec.Topologies[i].Default = true
 				}
 			})()).Should(Succeed())
 
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(g Gomega, cd *appsv1alpha1.ClusterDefinition) {
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(g Gomega, cd *appsv1.ClusterDefinition) {
 				g.Expect(cd.Status.ObservedGeneration).Should(Equal(cd.Generation))
-				g.Expect(cd.Status.Phase).Should(Equal(appsv1alpha1.UnavailablePhase))
+				g.Expect(cd.Status.Phase).Should(Equal(appsv1.UnavailablePhase))
 				g.Expect(cd.Status.Message).Should(ContainSubstring("multiple default topologies"))
 			})).Should(Succeed())
 		})
 
 		It("duplicate topology component", func() {
 			By("update cd to set all component names as same")
-			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(cd *appsv1alpha1.ClusterDefinition) {
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(cd *appsv1.ClusterDefinition) {
 				compName := cd.Spec.Topologies[0].Components[0].Name
 				for i, topology := range cd.Spec.Topologies {
 					for j := range topology.Components {
@@ -182,16 +183,16 @@ var _ = Describe("ClusterDefinition Controller", func() {
 				}
 			})()).Should(Succeed())
 
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(g Gomega, cd *appsv1alpha1.ClusterDefinition) {
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(g Gomega, cd *appsv1.ClusterDefinition) {
 				g.Expect(cd.Status.ObservedGeneration).Should(Equal(cd.Generation))
-				g.Expect(cd.Status.Phase).Should(Equal(appsv1alpha1.UnavailablePhase))
+				g.Expect(cd.Status.Phase).Should(Equal(appsv1.UnavailablePhase))
 				g.Expect(cd.Status.Message).Should(ContainSubstring("duplicate topology component"))
 			})).Should(Succeed())
 		})
 
 		It("different components in topology orders", func() {
 			By("update cd to add/remove components in orders")
-			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(cd *appsv1alpha1.ClusterDefinition) {
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(cd *appsv1.ClusterDefinition) {
 				for i := range cd.Spec.Topologies {
 					update := func(orders []string) []string {
 						if len(orders) == 0 {
@@ -211,22 +212,22 @@ var _ = Describe("ClusterDefinition Controller", func() {
 				}
 			})()).Should(Succeed())
 
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(g Gomega, cd *appsv1alpha1.ClusterDefinition) {
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(g Gomega, cd *appsv1.ClusterDefinition) {
 				g.Expect(cd.Status.ObservedGeneration).Should(Equal(cd.Generation))
-				g.Expect(cd.Status.Phase).Should(Equal(appsv1alpha1.UnavailablePhase))
+				g.Expect(cd.Status.Phase).Should(Equal(appsv1.UnavailablePhase))
 				g.Expect(cd.Status.Message).Should(MatchRegexp("the components in provision|terminate|update orders are different from those in definition"))
 			})).Should(Succeed())
 		})
 
 		It("topology component has no matched definitions", func() {
 			By("update cd to set a non-exist compdef for the first topology and component")
-			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(cd *appsv1alpha1.ClusterDefinition) {
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(cd *appsv1.ClusterDefinition) {
 				cd.Spec.Topologies[0].Components[0].CompDef = "compdef-non-exist"
 			})()).Should(Succeed())
 
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(g Gomega, cd *appsv1alpha1.ClusterDefinition) {
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(g Gomega, cd *appsv1.ClusterDefinition) {
 				g.Expect(cd.Status.ObservedGeneration).Should(Equal(cd.Generation))
-				g.Expect(cd.Status.Phase).Should(Equal(appsv1alpha1.UnavailablePhase))
+				g.Expect(cd.Status.Phase).Should(Equal(appsv1.UnavailablePhase))
 				g.Expect(cd.Status.Message).Should(ContainSubstring("there is no matched definitions found for the topology component"))
 			})).Should(Succeed())
 		})

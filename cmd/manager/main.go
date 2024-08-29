@@ -524,6 +524,14 @@ func main() {
 	}
 
 	if os.Getenv("ENABLE_WEBHOOKS") == "true" {
+		if err = (&appsv1alpha1.ClusterDefinition{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "ClusterDefinition")
+			os.Exit(1)
+		}
+		if err = (&appsv1.ClusterDefinition{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "ClusterDefinition")
+			os.Exit(1)
+		}
 		if err = (&appsv1alpha1.ServiceDescriptor{}).SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "ServiceDescriptor")
 			os.Exit(1)

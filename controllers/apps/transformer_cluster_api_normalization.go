@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -106,16 +107,16 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs(transCtx *clusterTra
 	return nil, nil
 }
 
-func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Topology(clusterDef *appsv1alpha1.ClusterDefinition,
+func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Topology(clusterDef *appsv1.ClusterDefinition,
 	cluster *appsv1alpha1.Cluster) ([]*appsv1alpha1.ClusterComponentSpec, error) {
-	newCompSpec := func(comp appsv1alpha1.ClusterTopologyComponent) *appsv1alpha1.ClusterComponentSpec {
+	newCompSpec := func(comp appsv1.ClusterTopologyComponent) *appsv1alpha1.ClusterComponentSpec {
 		return &appsv1alpha1.ClusterComponentSpec{
 			Name:         comp.Name,
 			ComponentDef: comp.CompDef,
 		}
 	}
 
-	mergeCompSpec := func(comp appsv1alpha1.ClusterTopologyComponent, compSpec *appsv1alpha1.ClusterComponentSpec) *appsv1alpha1.ClusterComponentSpec {
+	mergeCompSpec := func(comp appsv1.ClusterTopologyComponent, compSpec *appsv1alpha1.ClusterComponentSpec) *appsv1alpha1.ClusterComponentSpec {
 		if len(compSpec.ComponentDef) == 0 {
 			compSpec.ComponentDef = comp.CompDef
 		}

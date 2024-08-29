@@ -25,7 +25,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
-// ConvertTo converts this Demo to the Hub version (v2).
+// ConvertTo converts this ServiceDescriptor to the Hub version (v1).
 func (r *ServiceDescriptor) ConvertTo(dstRaw conversion.Hub) error {
 	dst := dstRaw.(*appsv1.ServiceDescriptor)
 
@@ -55,6 +55,7 @@ func (r *ServiceDescriptor) ConvertTo(dstRaw conversion.Hub) error {
 	return nil
 }
 
+// ConvertFrom converts from the Hub version (v1) to this version.
 func (r *ServiceDescriptor) ConvertFrom(srcRaw conversion.Hub) error {
 	src := srcRaw.(*appsv1.ServiceDescriptor)
 

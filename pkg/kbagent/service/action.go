@@ -111,7 +111,7 @@ func (s *actionService) handleRequest(ctx context.Context, req *proto.ActionRequ
 	}
 	action := s.actions[req.Action]
 	if action.Name == "find" {
-		return s.handleFindAction(ctx, req, action)
+		return s.handleFindAction(req)
 	}
 	if action.Exec == nil {
 		return nil, errors.Wrap(proto.ErrNotImplemented, "only exec action is supported")
@@ -154,7 +154,7 @@ func (s *actionService) handleExecActionNonBlocking(ctx context.Context, req *pr
 	return *gather(running.stdoutChan), nil
 }
 
-func (s *actionService) handleFindAction(ctx context.Context, req *proto.ActionRequest, action *proto.Action) ([]byte, error) {
+func (s *actionService) handleFindAction(req *proto.ActionRequest) ([]byte, error) {
 	eyeEnv := make(map[string]string)
 	eyeEnvStr := viper.GetString("KB_AGENT_FINDER")
 	err := json.Unmarshal([]byte(eyeEnvStr), &eyeEnv)

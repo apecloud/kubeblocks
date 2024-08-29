@@ -26,6 +26,8 @@ import (
 	"strings"
 	"sync"
 
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/maps"
@@ -108,6 +110,9 @@ func (s *actionService) handleRequest(ctx context.Context, req *proto.ActionRequ
 		return nil, errors.Wrapf(proto.ErrNotDefined, "%s is not defined", req.Action)
 	}
 	action := s.actions[req.Action]
+	if action.Name == "find" {
+		return s.handleFindAction(req)
+	}
 	if action.Exec == nil {
 		return nil, errors.Wrap(proto.ErrNotImplemented, "only exec action is supported")
 	}
@@ -147,4 +152,22 @@ func (s *actionService) handleExecActionNonBlocking(ctx context.Context, req *pr
 		return nil, *err
 	}
 	return *gather(running.stdoutChan), nil
+}
+
+func (s *actionService) handleFindAction(req *proto.ActionRequest) ([]byte, error) {
+	eyeEnv := make(map[string]string)
+	eyeEnvStr := viper.GetString("KB_AGENT_FINDER")
+	err := json.Unmarshal([]byte(eyeEnvStr), &eyeEnv)
+	if err != nil {
+		return nil, errors.Wrap(err, "unmarshal eye env error")
+	}
+	parameters := req.Parameters
+	if len(parameters) == 0 {
+		return nil, errors.Wrap(proto.ErrBadRequest, "missing parameters")
+	}
+	res, ok := eyeEnv[parameters["actionName"]]
+	if !ok {
+		return nil, errors.Wrapf(proto.ErrNotDefined, "%s is not found", parameters["actionName"])
+	}
+	return []byte(res), nil
 }

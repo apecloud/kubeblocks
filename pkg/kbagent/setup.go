@@ -37,6 +37,7 @@ const (
 
 	actionEnvName = "KB_AGENT_ACTION"
 	probeEnvName  = "KB_AGENT_PROBE"
+	FinderEnvName = "KB_AGENT_FINDER"
 )
 
 func BuildStartupEnv(actions []proto.Action, probes []proto.Probe) ([]corev1.EnvVar, error) {

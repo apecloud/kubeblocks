@@ -153,6 +153,23 @@ resources:
   kind: ServiceDescriptor
   path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
   version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: kubeblocks.io
+  group: apps
+  kind: ServiceDescriptor
+  path: github.com/apecloud/kubeblocks/apis/apps/v1
+  version: v1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
 - api:
     crdVersion: v1
     namespaced: true

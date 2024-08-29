@@ -1,27 +1,66 @@
 /*
 Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package v1alpha1
+package v1
 
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ServiceDescriptorSpec defines the desired state of ServiceDescriptor.
+// +genclient
+// +k8s:openapi-gen=true
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:storageversion
+// +kubebuilder:resource:categories={kubeblocks},shortName=sd
+// +kubebuilder:printcolumn:name="SERVICE_KIND",type="string",JSONPath=".spec.serviceKind",description="service kind"
+// +kubebuilder:printcolumn:name="SERVICE_VERSION",type="string",JSONPath=".spec.serviceVersion",description="service version"
+// +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
+// +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
+
+// ServiceDescriptor describes a service provided by external sources.
+// It contains the necessary details such as the service's address and connection credentials.
+// To enable a Cluster to access this service, the ServiceDescriptor's name should be specified
+// in the Cluster configuration under `clusterComponent.serviceRefs[*].serviceDescriptor`.
+type ServiceDescriptor struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec   ServiceDescriptorSpec   `json:"spec,omitempty"`
+	Status ServiceDescriptorStatus `json:"status,omitempty"`
+}
+
+// +kubebuilder:object:root=true
+
+// ServiceDescriptorList contains a list of ServiceDescriptor.
+type ServiceDescriptorList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []ServiceDescriptor `json:"items"`
+}
+
+func init() {
+	SchemeBuilder.Register(&ServiceDescriptor{}, &ServiceDescriptorList{})
+}
+
+// ServiceDescriptorSpec defines the desired state of ServiceDescriptor
 type ServiceDescriptorSpec struct {
 	// Describes the type of database service provided by the external service.
 	// For example, "mysql", "redis", "mongodb".
@@ -70,6 +109,24 @@ type ServiceDescriptorSpec struct {
 	Auth *ConnectionCredentialAuth `json:"auth,omitempty"`
 }
 
+// ServiceDescriptorStatus defines the observed state of ServiceDescriptor
+type ServiceDescriptorStatus struct {
+	// Represents the generation number that has been processed by the controller.
+	//
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// Indicates the current lifecycle phase of the ServiceDescriptor. This can be either 'Available' or 'Unavailable'.
+	//
+	// +optional
+	Phase Phase `json:"phase,omitempty"`
+
+	// Provides a human-readable explanation detailing the reason for the current phase of the ServiceConnectionCredential.
+	//
+	// +optional
+	Message string `json:"message,omitempty"`
+}
+
 // ConnectionCredentialAuth specifies the authentication credentials required for accessing an external service.
 type ConnectionCredentialAuth struct {
 	// Specifies the username for the external service.
@@ -109,57 +166,4 @@ type CredentialVar struct {
 	//
 	// +optional
 	ValueFrom *corev1.EnvVarSource `json:"valueFrom,omitempty" protobuf:"bytes,3,opt,name=valueFrom"`
-}
-
-// ServiceDescriptorStatus defines the observed state of ServiceDescriptor
-type ServiceDescriptorStatus struct {
-	// Indicates the current lifecycle phase of the ServiceDescriptor. This can be either 'Available' or 'Unavailable'.
-	//
-	// +optional
-	Phase Phase `json:"phase,omitempty"`
-
-	// Provides a human-readable explanation detailing the reason for the current phase of the ServiceConnectionCredential.
-	//
-	// +optional
-	Message string `json:"message,omitempty"`
-
-	// Represents the generation number that has been processed by the controller.
-	//
-	// +optional
-	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
-}
-
-// +genclient
-// +k8s:openapi-gen=true
-// +kubebuilder:object:root=true
-// +kubebuilder:subresource:status
-// +kubebuilder:resource:categories={kubeblocks,all},shortName=sd
-// +kubebuilder:printcolumn:name="SERVICE_KIND",type="string",JSONPath=".spec.serviceKind",description="service kind"
-// +kubebuilder:printcolumn:name="SERVICE_VERSION",type="string",JSONPath=".spec.serviceVersion",description="service version"
-// +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
-// +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
-
-// ServiceDescriptor describes a service provided by external sources.
-// It contains the necessary details such as the service's address and connection credentials.
-// To enable a Cluster to access this service, the ServiceDescriptor's name should be specified
-// in the Cluster configuration under `clusterComponent.serviceRefs[*].serviceDescriptor`.
-type ServiceDescriptor struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	Spec   ServiceDescriptorSpec   `json:"spec,omitempty"`
-	Status ServiceDescriptorStatus `json:"status,omitempty"`
-}
-
-// +kubebuilder:object:root=true
-
-// ServiceDescriptorList contains a list of ServiceDescriptor.
-type ServiceDescriptorList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ServiceDescriptor `json:"items"`
-}
-
-func init() {
-	SchemeBuilder.Register(&ServiceDescriptor{}, &ServiceDescriptorList{})
 }

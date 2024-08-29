@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -78,17 +79,17 @@ var _ = Describe("Component", func() {
 				version = "mock-version"
 			)
 			By("generate serviceReference")
-			serviceDescriptor := &appsv1alpha1.ServiceDescriptor{
+			serviceDescriptor := &appsv1.ServiceDescriptor{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: ns,
 				},
-				Spec: appsv1alpha1.ServiceDescriptorSpec{
+				Spec: appsv1.ServiceDescriptorSpec{
 					ServiceKind:    kind,
 					ServiceVersion: version,
 				},
 			}
-			serviceReferenceMap := map[string]*appsv1alpha1.ServiceDescriptor{
+			serviceReferenceMap := map[string]*appsv1.ServiceDescriptor{
 				testapps.NginxImage: serviceDescriptor,
 			}
 			By("call build")

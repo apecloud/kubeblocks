@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
@@ -1573,29 +1574,29 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				synthesizedComp.ServiceReferences = map[string]*appsv1alpha1.ServiceDescriptor{
+				synthesizedComp.ServiceReferences = map[string]*appsv1.ServiceDescriptor{
 					"serviceref": {
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: testCtx.DefaultNamespace,
 							Name:      "serviceref",
 						},
-						Spec: appsv1alpha1.ServiceDescriptorSpec{
+						Spec: appsv1.ServiceDescriptorSpec{
 							ServiceKind:    "",
 							ServiceVersion: "",
-							Endpoint: &appsv1alpha1.CredentialVar{
+							Endpoint: &appsv1.CredentialVar{
 								Value: "endpoint",
 							},
-							Host: &appsv1alpha1.CredentialVar{
+							Host: &appsv1.CredentialVar{
 								Value: "host",
 							},
-							Port: &appsv1alpha1.CredentialVar{
+							Port: &appsv1.CredentialVar{
 								Value: "port",
 							},
-							Auth: &appsv1alpha1.ConnectionCredentialAuth{
-								Username: &appsv1alpha1.CredentialVar{
+							Auth: &appsv1.ConnectionCredentialAuth{
+								Username: &appsv1.CredentialVar{
 									Value: "username",
 								},
-								Password: &appsv1alpha1.CredentialVar{
+								Password: &appsv1.CredentialVar{
 									Value: "password",
 								},
 							},

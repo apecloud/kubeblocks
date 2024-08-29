@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
@@ -932,7 +933,7 @@ func resolveServiceRefVarRef(ctx context.Context, cli client.Reader, synthesized
 func resolveServiceRefEndpointRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	defineKey string, selector appsv1alpha1.ServiceRefVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
 	resolveEndpoint := func(obj any) (*corev1.EnvVar, *corev1.EnvVar, error) {
-		sd := obj.(*appsv1alpha1.ServiceDescriptor)
+		sd := obj.(*appsv1.ServiceDescriptor)
 		if sd.Spec.Endpoint == nil {
 			return nil, nil, nil
 		}
@@ -947,7 +948,7 @@ func resolveServiceRefEndpointRef(ctx context.Context, cli client.Reader, synthe
 func resolveServiceRefHostRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	defineKey string, selector appsv1alpha1.ServiceRefVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
 	resolveHost := func(obj any) (*corev1.EnvVar, *corev1.EnvVar, error) {
-		sd := obj.(*appsv1alpha1.ServiceDescriptor)
+		sd := obj.(*appsv1.ServiceDescriptor)
 		if sd.Spec.Host == nil {
 			return nil, nil, nil
 		}
@@ -962,7 +963,7 @@ func resolveServiceRefHostRef(ctx context.Context, cli client.Reader, synthesize
 func resolveServiceRefPortRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	defineKey string, selector appsv1alpha1.ServiceRefVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
 	resolvePort := func(obj any) (*corev1.EnvVar, *corev1.EnvVar, error) {
-		sd := obj.(*appsv1alpha1.ServiceDescriptor)
+		sd := obj.(*appsv1.ServiceDescriptor)
 		if sd.Spec.Port == nil {
 			return nil, nil, nil
 		}
@@ -977,7 +978,7 @@ func resolveServiceRefPortRef(ctx context.Context, cli client.Reader, synthesize
 func resolveServiceRefUsernameRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	defineKey string, selector appsv1alpha1.ServiceRefVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
 	resolveUsername := func(obj any) (*corev1.EnvVar, *corev1.EnvVar, error) {
-		sd := obj.(*appsv1alpha1.ServiceDescriptor)
+		sd := obj.(*appsv1.ServiceDescriptor)
 		if sd.Spec.Auth == nil || sd.Spec.Auth.Username == nil {
 			return nil, nil, nil
 		}
@@ -994,7 +995,7 @@ func resolveServiceRefUsernameRef(ctx context.Context, cli client.Reader, synthe
 func resolveServiceRefPasswordRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	defineKey string, selector appsv1alpha1.ServiceRefVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
 	resolvePassword := func(obj any) (*corev1.EnvVar, *corev1.EnvVar, error) {
-		sd := obj.(*appsv1alpha1.ServiceDescriptor)
+		sd := obj.(*appsv1.ServiceDescriptor)
 		if sd.Spec.Auth == nil || sd.Spec.Auth.Password == nil {
 			return nil, nil, nil
 		}

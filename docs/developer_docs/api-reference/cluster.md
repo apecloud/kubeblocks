@@ -9,6 +9,9 @@ sidebar_label: Cluster
 <p>Packages:</p>
 <ul>
 <li>
+<a href="#apps.kubeblocks.io%2fv1">apps.kubeblocks.io/v1</a>
+</li>
+<li>
 <a href="#apps.kubeblocks.io%2fv1alpha1">apps.kubeblocks.io/v1alpha1</a>
 </li>
 <li>
@@ -18,6 +21,470 @@ sidebar_label: Cluster
 <a href="#workloads.kubeblocks.io%2fv1alpha1">workloads.kubeblocks.io/v1alpha1</a>
 </li>
 </ul>
+<h2 id="apps.kubeblocks.io/v1">apps.kubeblocks.io/v1</h2>
+<div>
+</div>
+Resource Types:
+<ul><li>
+<a href="#apps.kubeblocks.io/v1.ServiceDescriptor">ServiceDescriptor</a>
+</li></ul>
+<h3 id="apps.kubeblocks.io/v1.ServiceDescriptor">ServiceDescriptor
+</h3>
+<div>
+<p>ServiceDescriptor describes a service provided by external sources.
+It contains the necessary details such as the service&rsquo;s address and connection credentials.
+To enable a Cluster to access this service, the ServiceDescriptor&rsquo;s name should be specified
+in the Cluster configuration under <code>clusterComponent.serviceRefs[*].serviceDescriptor</code>.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>apiVersion</code><br/>
+string</td>
+<td>
+<code>apps.kubeblocks.io/v1</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+string
+</td>
+<td><code>ServiceDescriptor</code></td>
+</tr>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ServiceDescriptorSpec">
+ServiceDescriptorSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>serviceKind</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Describes the type of database service provided by the external service.
+For example, &ldquo;mysql&rdquo;, &ldquo;redis&rdquo;, &ldquo;mongodb&rdquo;.
+This field categorizes databases by their functionality, protocol and compatibility, facilitating appropriate
+service integration based on their unique capabilities.</p>
+<p>This field is case-insensitive.</p>
+<p>It also supports abbreviations for some well-known databases:
+- &ldquo;pg&rdquo;, &ldquo;pgsql&rdquo;, &ldquo;postgres&rdquo;, &ldquo;postgresql&rdquo;: PostgreSQL service
+- &ldquo;zk&rdquo;, &ldquo;zookeeper&rdquo;: ZooKeeper service
+- &ldquo;es&rdquo;, &ldquo;elasticsearch&rdquo;: Elasticsearch service
+- &ldquo;mongo&rdquo;, &ldquo;mongodb&rdquo;: MongoDB service
+- &ldquo;ch&rdquo;, &ldquo;clickhouse&rdquo;: ClickHouse service</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Describes the version of the service provided by the external service.
+This is crucial for ensuring compatibility between different components of the system,
+as different versions of a service may have varying features.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>endpoint</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.CredentialVar">
+CredentialVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the endpoint of the external service.</p>
+<p>If the service is exposed via a cluster, the endpoint will be provided in the format of <code>host:port</code>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>host</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.CredentialVar">
+CredentialVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the service or IP address of the external service.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>port</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.CredentialVar">
+CredentialVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the port of the external service.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>auth</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ConnectionCredentialAuth">
+ConnectionCredentialAuth
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the authentication credentials required for accessing an external service.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ServiceDescriptorStatus">
+ServiceDescriptorStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ConnectionCredentialAuth">ConnectionCredentialAuth
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ServiceDescriptorSpec">ServiceDescriptorSpec</a>)
+</p>
+<div>
+<p>ConnectionCredentialAuth specifies the authentication credentials required for accessing an external service.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>username</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.CredentialVar">
+CredentialVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the username for the external service.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>password</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.CredentialVar">
+CredentialVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the password for the external service.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.CredentialVar">CredentialVar
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ConnectionCredentialAuth">ConnectionCredentialAuth</a>, <a href="#apps.kubeblocks.io/v1.ServiceDescriptorSpec">ServiceDescriptorSpec</a>)
+</p>
+<div>
+<p>CredentialVar represents a variable that retrieves its value either directly from a specified expression
+or from a source defined in <code>valueFrom</code>.
+Only one of these options may be used at a time.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>value</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Holds a direct string or an expression that can be evaluated to a string.</p>
+<p>It can include variables denoted by $(VAR_NAME).
+These variables are expanded to the value of the environment variables defined in the container.
+If a variable cannot be resolved, it remains unchanged in the output.</p>
+<p>To escape variable expansion and retain the literal value, use double $ characters.</p>
+<p>For example:</p>
+<ul>
+<li>&rdquo;$(VAR_NAME)&rdquo; will be expanded to the value of the environment variable VAR_NAME.</li>
+<li>&rdquo;$$(VAR_NAME)&rdquo; will result in &ldquo;$(VAR_NAME)&rdquo; in the output, without any variable expansion.</li>
+</ul>
+<p>Default value is an empty string.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>valueFrom</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvarsource-v1-core">
+Kubernetes core/v1.EnvVarSource
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the source for the variable&rsquo;s value.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.Phase">Phase
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ServiceDescriptorStatus">ServiceDescriptorStatus</a>)
+</p>
+<div>
+<p>Phase represents the status of a CR.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Available&#34;</p></td>
+<td><p>AvailablePhase indicates that a CR is in an available state.</p>
+</td>
+</tr><tr><td><p>&#34;Unavailable&#34;</p></td>
+<td><p>UnavailablePhase indicates that a CR is in an unavailable state.</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ServiceDescriptorSpec">ServiceDescriptorSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ServiceDescriptor">ServiceDescriptor</a>)
+</p>
+<div>
+<p>ServiceDescriptorSpec defines the desired state of ServiceDescriptor</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>serviceKind</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Describes the type of database service provided by the external service.
+For example, &ldquo;mysql&rdquo;, &ldquo;redis&rdquo;, &ldquo;mongodb&rdquo;.
+This field categorizes databases by their functionality, protocol and compatibility, facilitating appropriate
+service integration based on their unique capabilities.</p>
+<p>This field is case-insensitive.</p>
+<p>It also supports abbreviations for some well-known databases:
+- &ldquo;pg&rdquo;, &ldquo;pgsql&rdquo;, &ldquo;postgres&rdquo;, &ldquo;postgresql&rdquo;: PostgreSQL service
+- &ldquo;zk&rdquo;, &ldquo;zookeeper&rdquo;: ZooKeeper service
+- &ldquo;es&rdquo;, &ldquo;elasticsearch&rdquo;: Elasticsearch service
+- &ldquo;mongo&rdquo;, &ldquo;mongodb&rdquo;: MongoDB service
+- &ldquo;ch&rdquo;, &ldquo;clickhouse&rdquo;: ClickHouse service</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Describes the version of the service provided by the external service.
+This is crucial for ensuring compatibility between different components of the system,
+as different versions of a service may have varying features.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>endpoint</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.CredentialVar">
+CredentialVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the endpoint of the external service.</p>
+<p>If the service is exposed via a cluster, the endpoint will be provided in the format of <code>host:port</code>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>host</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.CredentialVar">
+CredentialVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the service or IP address of the external service.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>port</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.CredentialVar">
+CredentialVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the port of the external service.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>auth</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ConnectionCredentialAuth">
+ConnectionCredentialAuth
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the authentication credentials required for accessing an external service.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ServiceDescriptorStatus">ServiceDescriptorStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ServiceDescriptor">ServiceDescriptor</a>)
+</p>
+<div>
+<p>ServiceDescriptorStatus defines the observed state of ServiceDescriptor</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>observedGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents the generation number that has been processed by the controller.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>phase</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Phase">
+Phase
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates the current lifecycle phase of the ServiceDescriptor. This can be either &lsquo;Available&rsquo; or &lsquo;Unavailable&rsquo;.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>message</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides a human-readable explanation detailing the reason for the current phase of the ServiceConnectionCredential.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<hr/>
 <h2 id="apps.kubeblocks.io/v1alpha1">apps.kubeblocks.io/v1alpha1</h2>
 <div>
 </div>

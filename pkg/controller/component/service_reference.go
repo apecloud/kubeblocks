@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 func resolveServiceReferences(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent) error {
@@ -36,7 +36,7 @@ func resolveServiceReferences(ctx context.Context, cli client.Reader, synthesize
 			continue
 		}
 		// Only support referencing endpoint and port in configuration
-		credentialVars := []*appsv1alpha1.CredentialVar{
+		credentialVars := []*appsv1.CredentialVar{
 			serviceDescriptor.Spec.Endpoint,
 			serviceDescriptor.Spec.Host,
 			serviceDescriptor.Spec.Port,
@@ -51,7 +51,7 @@ func resolveServiceReferences(ctx context.Context, cli client.Reader, synthesize
 // resolveServiceRefCredentialVars resolves the credentialVar.ValueFrom to the real value
 // TODO: currently, we set the valueFrom to the value, which need to be refactored
 func resolveServiceRefCredentialVars(ctx context.Context, cli client.Reader,
-	namespace string, credentialVars ...*appsv1alpha1.CredentialVar) error {
+	namespace string, credentialVars ...*appsv1.CredentialVar) error {
 	for _, credentialVar := range credentialVars {
 		// TODO: replace the build-in placeholder with the real value
 		if credentialVar == nil || credentialVar.Value != "" {
@@ -71,7 +71,7 @@ func resolveServiceRefCredentialVars(ctx context.Context, cli client.Reader,
 }
 
 func resolveSecretRefCredentialVar(ctx context.Context, cli client.Reader,
-	namespace string, credentialVar *appsv1alpha1.CredentialVar) error {
+	namespace string, credentialVar *appsv1.CredentialVar) error {
 	if credentialVar.ValueFrom == nil || credentialVar.ValueFrom.SecretKeyRef == nil {
 		return nil
 	}
@@ -93,7 +93,7 @@ func resolveSecretRefCredentialVar(ctx context.Context, cli client.Reader,
 }
 
 func resolveConfigMapRefCredentialVar(ctx context.Context, cli client.Reader,
-	namespace string, credentialVar *appsv1alpha1.CredentialVar) error {
+	namespace string, credentialVar *appsv1.CredentialVar) error {
 	if credentialVar.ValueFrom == nil || credentialVar.ValueFrom.ConfigMapKeyRef == nil {
 		return nil
 	}

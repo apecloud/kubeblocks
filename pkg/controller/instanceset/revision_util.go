@@ -23,10 +23,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/apecloud/kubeblocks/pkg/lru"
-	"github.com/json-iterator/go"
 	"hash"
 	"hash/fnv"
+	"strconv"
+
+	jsoniter "github.com/json-iterator/go"
 	apps "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,10 +35,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"strconv"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/lru"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 

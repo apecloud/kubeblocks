@@ -783,17 +783,6 @@ string
 </tr>
 </tbody>
 </table>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;Helm&#34;</p></td>
-<td></td>
-</tr></tbody>
-</table>
 <h3 id="extensions.kubeblocks.io/v1alpha1.AddonDependency">AddonDependency
 </h3>
 <p>

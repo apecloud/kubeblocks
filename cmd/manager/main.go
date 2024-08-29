@@ -54,7 +54,6 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	experimentalv1alpha1 "github.com/apecloud/kubeblocks/apis/experimental/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	"github.com/apecloud/kubeblocks/apis/workloads/legacy"
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	appscontrollers "github.com/apecloud/kubeblocks/controllers/apps"
@@ -109,7 +108,6 @@ func init() {
 	utilruntime.Must(snapshotv1beta1.AddToScheme(scheme))
 	utilruntime.Must(extensionsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(workloadsv1alpha1.AddToScheme(scheme))
-	utilruntime.Must(storagev1alpha1.AddToScheme(scheme))
 	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
 	utilruntime.Must(legacy.AddToScheme(scheme))
 	utilruntime.Must(apiextv1.AddToScheme(scheme))

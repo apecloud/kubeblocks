@@ -28,8 +28,6 @@ import (
 	fakedataprotectionv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/dataprotection/v1alpha1/fake"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/extensions/v1alpha1"
 	fakeextensionsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/extensions/v1alpha1/fake"
-	storagev1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/storage/v1alpha1"
-	fakestoragev1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/storage/v1alpha1/fake"
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/workloads/v1alpha1"
 	fakeworkloadsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/workloads/v1alpha1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -107,11 +105,6 @@ func (c *Clientset) DataprotectionV1alpha1() dataprotectionv1alpha1.Dataprotecti
 // ExtensionsV1alpha1 retrieves the ExtensionsV1alpha1Client
 func (c *Clientset) ExtensionsV1alpha1() extensionsv1alpha1.ExtensionsV1alpha1Interface {
 	return &fakeextensionsv1alpha1.FakeExtensionsV1alpha1{Fake: &c.Fake}
-}
-
-// StorageV1alpha1 retrieves the StorageV1alpha1Client
-func (c *Clientset) StorageV1alpha1() storagev1alpha1.StorageV1alpha1Interface {
-	return &fakestoragev1alpha1.FakeStorageV1alpha1{Fake: &c.Fake}
 }
 
 // WorkloadsV1alpha1 retrieves the WorkloadsV1alpha1Client

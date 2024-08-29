@@ -27,7 +27,6 @@ import (
 	"github.com/go-logr/logr"
 	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -47,12 +46,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-)
-
-const (
-	defaultWeight int = iota
-	workloadWeight
-	clusterWeight
 )
 
 // clusterTransformContext a graph.TransformContext implementation for Cluster reconciliation
@@ -185,24 +178,7 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 // Plan implementation
 
 func (p *clusterPlan) Execute() error {
-	less := func(v1, v2 graph.Vertex) bool {
-		getWeight := func(v graph.Vertex) int {
-			lifecycleVertex, ok := v.(*model.ObjectVertex)
-			if !ok {
-				return defaultWeight
-			}
-			switch lifecycleVertex.Obj.(type) {
-			case *appsv1alpha1.Cluster:
-				return clusterWeight
-			case *appsv1.StatefulSet, *appsv1.Deployment:
-				return workloadWeight
-			default:
-				return defaultWeight
-			}
-		}
-		return getWeight(v1) <= getWeight(v2)
-	}
-	err := p.dag.WalkReverseTopoOrder(p.walkFunc, less)
+	err := p.dag.WalkReverseTopoOrder(p.walkFunc, nil)
 	if err != nil {
 		if hErr := p.handlePlanExecutionError(err); hErr != nil {
 			return hErr

@@ -22,12 +22,10 @@ package lifecycle
 import (
 	"context"
 	"fmt"
-	"math/rand"
-	"strconv"
-
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"math/rand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -355,22 +353,27 @@ func (a *kbagent) serverEndpoint(pod *corev1.Pod, actionName string) (string, in
 	if host == "" {
 		return "", 0, fmt.Errorf("pod %v has no ip", pod.Name)
 	}
-	eyePort, err := intctrlutil.GetPortByName(*pod, kbagt.EyeContainerName, fmt.Sprintf("%s-%s", kbagt.EyeContainerName, kbagt.DefaultPortName))
+	kbaPort, err := intctrlutil.GetPortByName(*pod, kbagt.ContainerName, fmt.Sprintf("%s-%s", kbagt.ContainerName, kbagt.DefaultPortName))
 	if err != nil {
-		return "", 0, nil
+		return "", 0, fmt.Errorf("failed to get kbagent port: %v", err)
 	}
-	eyeCli, err := kbacli.NewClient(pod.Status.PodIP, eyePort)
+	kba, err := kbacli.NewClient(pod.Status.PodIP, kbaPort)
 	if err != nil {
-		return "", 0, fmt.Errorf("failed to create eye client: %v", err)
+		return "", 0, fmt.Errorf("failed to create finder client: %v", err)
 	}
-	portResp, err := eyeCli.Action(context.Background(), proto.ActionRequest{Action: "eye", Parameters: map[string]string{
+	portResp, err := kba.Action(context.Background(), proto.ActionRequest{Action: kbagt.FinderEnvName, Parameters: map[string]string{
 		"actionName": actionName,
 	}})
 	if err != nil {
-		return "", 0, fmt.Errorf("failed to get port from eye container: %v", err)
+		return "", 0, fmt.Errorf("failed to get action port response from kbagent container: %v", err)
 	}
-	portInt, _ := strconv.Atoi(string(portResp.Output))
-	port := int32(portInt)
+	if portResp.Output == nil || len(portResp.Output) == 0 {
+		return "", 0, fmt.Errorf("failed to get action port from response: %v", err)
+	}
+	port, err := intctrlutil.GetPortByName(*pod, string(portResp.Output), fmt.Sprintf("%s-%s", string(portResp.Output), kbagt.DefaultPortName))
+	if err != nil {
+		return "", 0, nil
+	}
 	return host, port, nil
 }
 

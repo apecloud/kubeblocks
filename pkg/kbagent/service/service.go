@@ -38,7 +38,7 @@ type Service interface {
 
 func New(logger logr.Logger, actions []proto.Action, probes []proto.Probe) ([]Service, error) {
 	actions = append(actions, proto.Action{
-		Name: "eye",
+		Name: "find",
 	})
 	sa, err := newActionService(logger, actions)
 	if err != nil {

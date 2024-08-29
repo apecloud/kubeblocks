@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -53,12 +54,11 @@ var (
 )
 
 func IsKBAgentContainer(c *corev1.Container) bool {
-	// TODO: Because the implementation of multiple images is required, an update is needed here. About kbAgentContainerName
-	return c.Name == kbagent.ContainerName || c.Name == kbagent.InitContainerName
+	return c.Name == kbagent.ContainerName || c.Name == kbagent.InitContainerName || strings.Contains(c.Name, kbagent.ContainerName+"-")
 }
 
 func UpdateKBAgentContainer4HostNetwork(synthesizedComp *SynthesizedComponent) {
-	// TODO: Because the implementation of multiple images is required, an update is needed here. About KbAgentContainerName
+	// TODO need update
 	idx, c := intctrlutil.GetContainerByName(synthesizedComp.PodSpec.Containers, kbagent.ContainerName)
 	if c == nil {
 		return
@@ -109,34 +109,29 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 		AddEnv(envVars...).
 		GetObject()
 
-	noImageNContainer, containers, err := adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp, *defaultContainer)
+	containers, defaultActionNames, err := adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp, *defaultContainer)
 	if err != nil {
 		return err
 	}
-	if noImageNContainer {
-		if len(containers) == 0 {
-			containers = make(map[string]*corev1.Container)
-		}
-		containers[kbagent.ContainerName] = defaultContainer
+	for _, defaultActionName := range defaultActionNames {
+		containers[defaultActionName] = defaultContainer
 	}
 
 	discovery := make(map[string]string)
 	containerSet := make(map[string]*corev1.Container)
 	for actionName, container := range containers {
 		savedContainer, ok := containerSet[container.Image]
-		if ok {
+		if ok && savedContainer != nil {
 			discovery[actionName] = savedContainer.Name
 		} else {
 			containerSet[container.Image] = container
 			discovery[actionName] = container.Name
 		}
 	}
-
-	eye, err := buildKBAgentEyeContainer(discovery, envVars)
+	containerSet[defaultContainer.Image], err = addActionNContainerBinding(discovery, defaultContainer)
 	if err != nil {
 		return err
 	}
-	containerSet[kbagent.EyeContainerName] = eye
 
 	allPorts := make([]int32, len(containerSet))
 	for i := range allPorts {
@@ -307,23 +302,24 @@ func buildProbe4KBAgent(probe *appsv1alpha1.Probe, name string) (*proto.Action, 
 	return a, p
 }
 
-func adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp *SynthesizedComponent, defaultContainer corev1.Container) (bool, map[string]*corev1.Container, error) {
-	noImageNContainer, actionNames, images, containers, err := customExecActionImageNContainer(synthesizedComp)
+func adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp *SynthesizedComponent, defaultContainer corev1.Container) (map[string]*corev1.Container, []string, error) {
+	// 这里的 actionName，包含的仅仅是自定义的 actionNames，比如 memberJoin，并没有包含memberLeave 和 switchOver
+	customImages, customContainers, customActionNames, defaultActionNames, err := customExecActionImageNContainer(synthesizedComp)
 	if err != nil {
-		return noImageNContainer, nil, err
+		return nil, nil, err
 	}
-	if len(actionNames) == 0 {
-		return noImageNContainer, nil, nil
+	if len(customActionNames) == 0 {
+		return nil, nil, nil
 	}
 	// init-container to copy binaries to the shared mount point /kubeblocks
 	initContainer := buildKBAgentInitContainer()
 	synthesizedComp.PodSpec.InitContainers = append(synthesizedComp.PodSpec.InitContainers, *initContainer)
 
-	cc := make(map[string]*corev1.Container, len(containers))
-	for i, c := range containers {
+	cc := make(map[string]*corev1.Container, len(customContainers))
+	for i, c := range customContainers {
 		wrapContainer := defaultContainer.DeepCopy()
 		if c == nil {
-			wrapContainer.Image = images[i]
+			wrapContainer.Image = customImages[i]
 		} else {
 			wrapContainer.Image = c.Image
 		}
@@ -334,14 +330,14 @@ func adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp *SynthesizedComp
 		if c != nil {
 			wrapContainer.VolumeMounts = uniqueVolumeMounts(wrapContainer.VolumeMounts, c.VolumeMounts)
 		}
-		cc[actionNames[i]] = wrapContainer
+		cc[customActionNames[i]] = wrapContainer
 	}
-	return noImageNContainer, cc, nil
+	return cc, defaultActionNames, nil
 }
 
-func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) (bool, []string, []string, []*corev1.Container, error) {
+func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) ([]string, []*corev1.Container, []string, []string, error) {
 	if synthesizedComp.LifecycleActions == nil {
-		return false, nil, nil, nil, nil
+		return nil, nil, nil, nil, nil
 	}
 
 	actions := []*appsv1alpha1.Action{
@@ -381,7 +377,7 @@ func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) (boo
 	var images []string
 	var containerNames []string
 	var actionNames []string
-	noImageNContainer := false
+	var defaultActionName []string
 	for _, action := range actions {
 		if action == nil || action.Exec == nil {
 			continue
@@ -389,7 +385,7 @@ func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) (boo
 		image := action.Exec.Image
 		containerName := action.Exec.Container
 		if len(image) == 0 && len(containerName) == 0 {
-			noImageNContainer = true
+			defaultActionName = append(defaultActionName, actionNameMap[action])
 			continue
 		}
 		images = append(images, image)
@@ -408,17 +404,17 @@ func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) (boo
 				}
 			}
 			if c == nil {
-				return false, nil, nil, nil, fmt.Errorf("exec container %s not found", containerNames[i])
+				return nil, nil, nil, nil, fmt.Errorf("exec container %s not found", containerNames[i])
 			}
 			if len(images[i]) > 0 && c.Image != images[i] {
-				return false, nil, nil, nil, fmt.Errorf("exec image and container must be the same")
+				return nil, nil, nil, nil, fmt.Errorf("exec image and container must be the same")
 			}
 			containers[i] = c
 		} else {
 			containers[i] = nil
 		}
 	}
-	return noImageNContainer, actionNames, images, containers, nil
+	return images, containers, actionNames, defaultActionName, nil
 }
 
 func buildKBAgentInitContainer() *corev1.Container {
@@ -496,22 +492,18 @@ func mountPathExists(volumeMounts []corev1.VolumeMount, mountPath string) bool {
 	return false
 }
 
-func buildKBAgentEyeContainer(discovery map[string]string, envVar []corev1.EnvVar) (*corev1.Container, error) {
-	var env corev1.EnvVar
-	dd, err := json.Marshal(discovery)
+func addActionNContainerBinding(discovery map[string]string, defaultContainer *corev1.Container) (*corev1.Container, error) {
+	if len(discovery) == 0 {
+		return defaultContainer, nil
+	}
+	dm, err := json.Marshal(discovery)
 	if err != nil {
 		return nil, err
 	}
-	env = corev1.EnvVar{
-		Name:  kbagent.EyeEnvName,
-		Value: string(dd),
+	env := corev1.EnvVar{
+		Name:  kbagent.finderEnvName,
+		Value: string(dm),
 	}
-
-	return builder.NewContainerBuilder(kbagent.EyeContainerName).
-		SetImage(viper.GetString(constant.KBToolsImage)).
-		SetImagePullPolicy(corev1.PullIfNotPresent).
-		AddCommands(kbAgentCommand).
-		AddEnv(envVar...).
-		AddEnv(env).
-		GetObject(), nil
+	defaultContainer.Env = append(defaultContainer.Env, env)
+	return defaultContainer, nil
 }

@@ -33,12 +33,11 @@ import (
 const (
 	ContainerName     = "kbagent"
 	InitContainerName = "init-kbagent"
-	EyeContainerName  = "kba-eye"
 	DefaultPortName   = "http"
 
 	actionEnvName = "KB_AGENT_ACTION"
 	probeEnvName  = "KB_AGENT_PROBE"
-	EyeEnvName    = "KB_AGENT_EYE"
+	FinderEnvName = "KB_AGENT_FINDER"
 )
 
 func BuildStartupEnv(actions []proto.Action, probes []proto.Probe) ([]corev1.EnvVar, error) {

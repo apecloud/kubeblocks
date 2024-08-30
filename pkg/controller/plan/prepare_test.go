@@ -119,7 +119,7 @@ var _ = Describe("Prepare Test", func() {
 				ClusterName:   synthesizeComp.ClusterName,
 				ComponentName: synthesizeComp.Name,
 			}
-			err = RenderConfigNScriptFiles(resCtx, cluster, comp, synthesizeComp, synthesizeComp.PodSpec, nil)
+			err = BuildReloadActionContainer(resCtx, cluster, comp, synthesizeComp, synthesizeComp.PodSpec, nil)
 			Expect(err).Should(Succeed())
 			Expect(configuration.CheckEnvFrom(&synthesizeComp.PodSpec.Containers[0], cfgcore.GenerateEnvFromName(cfgcore.GetComponentCfgName(cluster.Name, synthesizeComp.Name, configSpecName)))).Should(BeFalse())
 		})

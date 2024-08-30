@@ -47,12 +47,12 @@ type ReconcileCtx struct {
 	Cache []client.Object
 }
 
-type pipeline struct {
+type reloadActionBuilderHelper struct {
 	// configuration *appsv1alpha1.Configuration
 	renderWrapper renderWrapper
 
 	ctx ReconcileCtx
-	ResourceFetcher[pipeline]
+	ResourceFetcher[reloadActionBuilderHelper]
 }
 
 type updatePipeline struct {
@@ -71,8 +71,8 @@ type updatePipeline struct {
 	ResourceFetcher[updatePipeline]
 }
 
-func NewCreatePipeline(ctx ReconcileCtx) *pipeline {
-	p := &pipeline{ctx: ctx}
+func NewReloadActionBuilderHelper(ctx ReconcileCtx) *reloadActionBuilderHelper {
+	p := &reloadActionBuilderHelper{ctx: ctx}
 	return p.Init(ctx.ResourceCtx, p)
 }
 
@@ -87,7 +87,7 @@ func NewReconcilePipeline(ctx ReconcileCtx, item appsv1alpha1.ConfigTemplateItem
 	return p.Init(ctx.ResourceCtx, p)
 }
 
-func (p *pipeline) Prepare() *pipeline {
+func (p *reloadActionBuilderHelper) Prepare() *reloadActionBuilderHelper {
 	buildTemplate := func() (err error) {
 		ctx := p.ctx
 		templateBuilder := newTemplateBuilder(p.ClusterName, p.Namespace, p.Context, p.Client)
@@ -100,14 +100,14 @@ func (p *pipeline) Prepare() *pipeline {
 	return p.Wrap(buildTemplate)
 }
 
-func (p *pipeline) RenderScriptTemplate() *pipeline {
+func (p *reloadActionBuilderHelper) RenderScriptTemplate() *reloadActionBuilderHelper {
 	return p.Wrap(func() error {
 		ctx := p.ctx
 		return p.renderWrapper.renderScriptTemplate(ctx.Cluster, ctx.SynthesizedComponent, ctx.Cache)
 	})
 }
 
-func (p *pipeline) UpdateConfiguration() *pipeline {
+func (p *reloadActionBuilderHelper) UpdateConfiguration() *reloadActionBuilderHelper {
 	buildConfiguration := func() (err error) {
 		expectedConfiguration := p.createConfiguration()
 		if intctrlutil.SetControllerReference(p.ctx.Component, expectedConfiguration) != nil {
@@ -129,29 +129,29 @@ func (p *pipeline) UpdateConfiguration() *pipeline {
 	return p.Wrap(buildConfiguration)
 }
 
-func (p *pipeline) CreateConfigTemplate() *pipeline {
+func (p *reloadActionBuilderHelper) CreateConfigTemplate() *reloadActionBuilderHelper {
 	return p.Wrap(func() error {
 		ctx := p.ctx
 		return p.renderWrapper.renderConfigTemplate(ctx.Cluster, ctx.SynthesizedComponent, ctx.Cache, p.ConfigurationObj)
 	})
 }
 
-func (p *pipeline) UpdateConfigurationStatus() *pipeline {
-	return p.Wrap(func() error {
-		if p.ConfigurationObj == nil {
-			return nil
-		}
-
-		existing := p.ConfigurationObj
-		reversion := fromConfiguration(existing)
-		patch := client.MergeFrom(existing)
-		updated := existing.DeepCopy()
-		for _, item := range existing.Spec.ConfigItemDetails {
-			CheckAndUpdateItemStatus(updated, item, reversion)
-		}
-		return p.ResourceFetcher.Client.Status().Patch(p.Context, updated, patch)
-	})
-}
+// func (p *reloadActionBuilderHelper) UpdateConfigurationStatus() *reloadActionBuilderHelper {
+// 	return p.Wrap(func() error {
+// 		if p.ConfigurationObj == nil {
+// 			return nil
+// 		}
+//
+// 		existing := p.ConfigurationObj
+// 		reversion := fromConfiguration(existing)
+// 		patch := client.MergeFrom(existing)
+// 		updated := existing.DeepCopy()
+// 		for _, item := range existing.Spec.ConfigItemDetails {
+// 			CheckAndUpdateItemStatus(updated, item, reversion)
+// 		}
+// 		return p.ResourceFetcher.Client.Status().Patch(p.Context, updated, patch)
+// 	})
+// }
 
 func CheckAndUpdateItemStatus(updated *appsv1alpha1.ComponentConfiguration, item appsv1alpha1.ConfigTemplateItemDetail, reversion string) {
 	foundStatus := func(name string) *appsv1alpha1.ConfigTemplateItemDetailStatus {
@@ -178,7 +178,7 @@ func CheckAndUpdateItemStatus(updated *appsv1alpha1.ComponentConfiguration, item
 	}
 }
 
-func (p *pipeline) UpdatePodVolumes() *pipeline {
+func (p *reloadActionBuilderHelper) UpdatePodVolumes() *reloadActionBuilderHelper {
 	return p.Wrap(func() error {
 		return intctrlutil.CreateOrUpdatePodVolumes(p.ctx.PodSpec,
 			p.renderWrapper.volumes,
@@ -186,13 +186,13 @@ func (p *pipeline) UpdatePodVolumes() *pipeline {
 	})
 }
 
-func (p *pipeline) BuildConfigManagerSidecar() *pipeline {
+func (p *reloadActionBuilderHelper) BuildConfigManagerSidecar() *reloadActionBuilderHelper {
 	return p.Wrap(func() error {
 		return buildConfigManagerWithComponent(p.ctx.PodSpec, p.ctx.SynthesizedComponent.ConfigTemplates, p.Context, p.Client, p.ctx.Cluster, p.ctx.SynthesizedComponent)
 	})
 }
 
-func (p *pipeline) UpdateConfigRelatedObject() *pipeline {
+func (p *reloadActionBuilderHelper) UpdateConfigRelatedObject() *reloadActionBuilderHelper {
 	updateMeta := func() error {
 		if err := injectTemplateEnvFrom(p.ctx.Cluster, p.ctx.SynthesizedComponent, p.ctx.PodSpec, p.Client, p.Context, p.renderWrapper.renderedObjs); err != nil {
 			return err
@@ -203,7 +203,7 @@ func (p *pipeline) UpdateConfigRelatedObject() *pipeline {
 	return p.Wrap(updateMeta)
 }
 
-func (p *pipeline) createConfiguration() *appsv1alpha1.ComponentConfiguration {
+func (p *reloadActionBuilderHelper) createConfiguration() *appsv1alpha1.ComponentConfiguration {
 	builder := builder.NewConfigurationBuilder(p.Namespace,
 		core.GenerateComponentConfigurationName(p.ClusterName, p.ComponentName),
 	)
@@ -216,7 +216,7 @@ func (p *pipeline) createConfiguration() *appsv1alpha1.ComponentConfiguration {
 		GetObject()
 }
 
-func (p *pipeline) updateConfiguration(expected *appsv1alpha1.ComponentConfiguration, existing *appsv1alpha1.ComponentConfiguration) error {
+func (p *reloadActionBuilderHelper) updateConfiguration(expected *appsv1alpha1.ComponentConfiguration, existing *appsv1alpha1.ComponentConfiguration) error {
 	fromMap := func(items []appsv1alpha1.ConfigTemplateItemDetail) *cfgutil.Sets {
 		sets := cfgutil.NewSet()
 		for _, item := range items {

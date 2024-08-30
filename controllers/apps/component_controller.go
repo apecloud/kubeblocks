@@ -170,13 +170,13 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			// handle tls volume and cert
 			&componentTLSTransformer{Client: r.Client},
 			// rerender parameters after v-scale and h-scale
-			&componentRelatedParametersTransformer{Client: r.Client},
+			&componentConfigurationTransformer{Client: r.Client},
 			// resolve and build vars for template and Env
 			&componentVarsTransformer{},
 			// provision component system accounts, depend on vars
 			&componentAccountProvisionTransformer{},
 			// render component configurations
-			&componentConfigurationTransformer{Client: r.Client},
+			&componentParametersReloadActionTransformer{Client: r.Client},
 			// handle restore before workloads transform
 			&componentRestoreTransformer{Client: r.Client},
 			// handle upgrade from the legacy RSM API to the InstanceSet API

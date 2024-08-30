@@ -27,18 +27,18 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 )
 
-type configOperator struct {
+type reloadActionContainerBuilder struct {
 	ReconcileCtx
 }
 
-func NewConfigReconcileTask(resourceCtx *ResourceCtx,
+func NewReloadActionBuilderTask(resourceCtx *ResourceCtx,
 	cluster *appsv1.Cluster,
 	component *appsv1.Component,
 	synthesizedComponent *component.SynthesizedComponent,
 	podSpec *corev1.PodSpec,
 	localObjs []client.Object,
-) *configOperator {
-	return &configOperator{
+) *reloadActionContainerBuilder {
+	return &reloadActionContainerBuilder{
 		ReconcileCtx{
 			ResourceCtx:          resourceCtx,
 			Cluster:              cluster,
@@ -50,29 +50,27 @@ func NewConfigReconcileTask(resourceCtx *ResourceCtx,
 	}
 }
 
-func (c *configOperator) Reconcile() error {
-	var synthesizedComponent = c.SynthesizedComponent
-
-	if len(synthesizedComponent.ConfigTemplates) == 0 && len(synthesizedComponent.ScriptTemplates) == 0 {
-		return c.UpdateConfiguration()
+func (c *reloadActionContainerBuilder) Do() error {
+	if len(c.SynthesizedComponent.ConfigTemplates) == 0 && len(c.SynthesizedComponent.ScriptTemplates) == 0 {
+		return nil
 	}
 
-	return NewCreatePipeline(c.ReconcileCtx).
+	return NewReloadActionBuilderHelper(c.ReconcileCtx).
 		Prepare().
-		RenderScriptTemplate().      // render scriptTemplate into ConfigMap
-		UpdateConfiguration().       // create or update Configuration
-		Configuration().             // fetch the latest Configuration
-		CreateConfigTemplate().      // render configTemplate into ConfigMap (only for the first time)
-		UpdatePodVolumes().          // update podSpec.Volumes
+		RenderScriptTemplate(). // render scriptTemplate into ConfigMap
+		// UpdateConfiguration(). // create or update Configuration
+		Configuration(). // fetch the latest Configuration
+		// CreateConfigTemplate(). // render configTemplate into ConfigMap (only for the first time)
+		UpdatePodVolumes(). // update podSpec.Volumes
 		BuildConfigManagerSidecar(). // build configManager sidecar and update podSpec.Containers and podSpec.InitContainers
-		UpdateConfigRelatedObject(). // handle InjectEnvTo, and create or update ConfigMaps
-		UpdateConfigurationStatus(). // update ConfigurationItemStatus revision and phase etc.
+		// UpdateConfigRelatedObject(). // handle InjectEnvTo, and create or update ConfigMaps
+		// UpdateConfigurationStatus(). // update ConfigurationItemStatus revision and phase etc.
 		Complete()
 }
 
-func (c *configOperator) UpdateConfiguration() error {
-	return NewCreatePipeline(c.ReconcileCtx).
-		UpdateConfiguration().
-		UpdateConfigRelatedObject().
-		Complete()
-}
+// func (c *reloadActionContainerBuilder) UpdateConfiguration() error {
+// 	return NewReloadActionBuilderHelper(c.ReconcileCtx).
+// 		UpdateConfiguration().
+// 		UpdateConfigRelatedObject().
+// 		Complete()
+// }

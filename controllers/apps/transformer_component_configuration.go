@@ -20,73 +20,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/pkg/common"
-	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 )
 
-// componentConfigurationTransformer handles component configuration render
 type componentConfigurationTransformer struct {
 	client.Client
 }
 
-var _ graph.Transformer = &componentConfigurationTransformer{}
+var _ = componentConfigurationTransformer{}
 
-func (t *componentConfigurationTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (c *componentConfigurationTransformer) Transform(ctx graph.TransformContext, _ *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
+	synthesizedComp := transCtx.SynthesizeComponent
 
-	comp := transCtx.Component
-	cluster := transCtx.Cluster
-	compOrig := transCtx.ComponentOrig
-	synthesizeComp := transCtx.SynthesizeComponent
-
-	if model.IsObjectDeleting(compOrig) {
-		return nil
-	}
-	if common.IsCompactMode(compOrig.Annotations) {
-		transCtx.V(1).Info("Component is in compact mode, no need to create configuration related objects",
-			"component", client.ObjectKeyFromObject(transCtx.ComponentOrig))
-		return nil
+	config := appsv1alpha1.ComponentConfiguration{}
+	configKey := client.ObjectKey{Namespace: synthesizedComp.Namespace,
+		Name: cfgcore.GenerateComponentConfigurationName(synthesizedComp.ClusterName, synthesizedComp.Name)}
+	if err := c.Get(ctx.GetContext(), configKey, &config); err != nil {
+		return client.IgnoreNotFound(err)
 	}
 
-	// get dependOnObjs which will be used in configuration render
-	var dependOnObjs []client.Object
-	for _, vertex := range dag.Vertices() {
-		v, _ := vertex.(*model.ObjectVertex)
-		if cm, ok := v.Obj.(*corev1.ConfigMap); ok {
-			dependOnObjs = append(dependOnObjs, cm)
-			continue
-		}
-		if secret, ok := v.Obj.(*corev1.Secret); ok {
-			dependOnObjs = append(dependOnObjs, secret)
-			continue
-		}
-	}
-
-	// refactor(sophon): Split into two transformers
-	// 1. build configuration cr, manager the configuration life cycle
-	// 2. build config-manager sidecar
-
-	// configuration render
-	if err := plan.RenderConfigNScriptFiles(
-		&configctrl.ResourceCtx{
-			Context:       transCtx.Context,
-			Client:        t.Client,
-			Namespace:     comp.GetNamespace(),
-			ClusterName:   synthesizeComp.ClusterName,
-			ComponentName: synthesizeComp.Name,
-		},
-		cluster,
-		comp,
-		synthesizeComp,
-		synthesizeComp.PodSpec,
-		dependOnObjs); err != nil {
+	configNew := config.DeepCopy()
+	updated, err := configuration.UpdateConfigPayload(&configNew.Spec, synthesizedComp)
+	if err != nil {
 		return err
 	}
-	return nil
+	if !updated {
+		return nil
+	}
+	return c.Patch(ctx.GetContext(), configNew, client.MergeFrom(config.DeepCopy()))
 }

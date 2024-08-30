@@ -50,8 +50,8 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 	var configurationObj *appsv1alpha1.ComponentConfiguration
 	var k8sMockClient *testutil.K8sClientMockHelper
 
-	createConfigReconcileTask := func() *configOperator {
-		task := NewConfigReconcileTask(&ResourceCtx{
+	createConfigReconcileTask := func() *reloadActionContainerBuilder {
+		task := NewReloadActionBuilderTask(&ResourceCtx{
 			Client:        k8sMockClient.Client(),
 			Context:       ctx,
 			Namespace:     testCtx.DefaultNamespace,
@@ -140,7 +140,7 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 			//	return nil
 			// })
 
-			Expect(createConfigReconcileTask().Reconcile()).Should(Succeed())
+			Expect(createConfigReconcileTask().Do()).Should(Succeed())
 		})
 
 		It("EmptyConfigSpecTest", func() {
@@ -156,7 +156,7 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 
 			synthesizedComponent.ConfigTemplates = nil
 			synthesizedComponent.ScriptTemplates = nil
-			Expect(createConfigReconcileTask().Reconcile()).Should(Succeed())
+			Expect(createConfigReconcileTask().Do()).Should(Succeed())
 		})
 
 	})

@@ -28,19 +28,19 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
 )
 
-// RenderConfigNScriptFiles generates volumes for PodTemplate, volumeMount for container, rendered configTemplate and scriptTemplate,
+// BuildReloadActionContainer generates volumes for PodTemplate, volumeMount for container, rendered configTemplate and scriptTemplate,
 // and generates configManager sidecar for the reconfigure operation.
-func RenderConfigNScriptFiles(resourceCtx *configuration.ResourceCtx,
+func BuildReloadActionContainer(resourceCtx *configuration.ResourceCtx,
 	cluster *appsv1.Cluster,
 	component *appsv1.Component,
 	synthesizedComponent *component.SynthesizedComponent,
 	podSpec *corev1.PodSpec,
 	localObjs []client.Object) error {
-	return configuration.NewConfigReconcileTask(
+	return configuration.NewReloadActionBuilderTask(
 		resourceCtx,
 		cluster,
 		component,
 		synthesizedComponent,
 		podSpec,
-		localObjs).Reconcile()
+		localObjs).Do()
 }

@@ -20,9 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
-	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -42,30 +39,14 @@ func (r *deletionReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebu
 
 func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	// delete secondary objects first
-	// retain all pvcs
-	// TODO(free6om): respect PVCManagementPolicy
-	allObjects := tree.GetSecondaryObjects()
-	objects := filterByType[*corev1.PersistentVolumeClaim](allObjects)
-	if len(objects) > 0 {
-		return kubebuilderx.Continue, tree.Delete(objects...)
+	if len(tree.GetSecondaryObjects()) > 0 {
+		tree.DeleteSecondaryObjects()
+		return kubebuilderx.Continue, nil
 	}
 
 	// delete root object
 	tree.DeleteRoot()
 	return kubebuilderx.Continue, nil
-}
-
-func filterByType[T client.Object](snapshot model.ObjectSnapshot) []client.Object {
-	var objects []client.Object
-	for _, object := range snapshot {
-		switch object.(type) {
-		case T:
-			continue
-		default:
-			objects = append(objects, object)
-		}
-	}
-	return objects
 }
 
 func NewDeletionReconciler() kubebuilderx.Reconciler {

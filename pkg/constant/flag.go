@@ -36,4 +36,11 @@ const (
 
 	// FeatureGateComponentReplicasAnnotation tells whether to add and update the annotation "component-replicas" to all pods of a Component
 	FeatureGateComponentReplicasAnnotation = "COMPONENT_REPLICAS_ANNOTATION"
+
+	// FeatureGateInPlacePodVerticalScaling specifies to enable in-place pod vertical scaling
+	// NOTE: This feature depends on the InPlacePodVerticalScaling feature of the K8s cluster in which the KubeBlocks runs.
+	FeatureGateInPlacePodVerticalScaling = "IN_PLACE_POD_VERTICAL_SCALING"
+
+	// FeatureGateNoRSMEnv specifies not to create the '$(instanceset.name)-rsm-env' ConfigMap object.
+	FeatureGateNoRSMEnv = "NO_RSM_ENV"
 )

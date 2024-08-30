@@ -1925,6 +1925,10 @@ featureGates:
     enabled: false
   componentReplicasAnnotation:
     enabled: true
+  inPlacePodVerticalScaling:
+    enabled: false
+  noRSMEnv:
+    enabled: false
 
 vmagent:
 

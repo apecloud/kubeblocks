@@ -199,7 +199,8 @@ Choose a policy based on the desired level of resource cleanup and data preserva
 <ul>
 <li><code>DoNotTerminate</code>: Prevents deletion of the Cluster. This policy ensures that all resources remain intact.</li>
 <li><code>Halt</code>: Deletes Cluster resources like Pods and Services but retains Persistent Volume Claims (PVCs),
-allowing for data preservation while stopping other operations.</li>
+allowing for data preservation while stopping other operations.
+Warning: Halt policy is deprecated in 0.9.1 and will have same meaning as DoNotTerminate.</li>
 <li><code>Delete</code>: Extends the <code>Halt</code> policy by also removing PVCs, leading to a thorough cleanup while
 removing all persistent data.</li>
 <li><code>WipeOut</code>: An aggressive policy that deletes all Cluster resources, including volume snapshots and
@@ -6716,7 +6717,8 @@ Choose a policy based on the desired level of resource cleanup and data preserva
 <ul>
 <li><code>DoNotTerminate</code>: Prevents deletion of the Cluster. This policy ensures that all resources remain intact.</li>
 <li><code>Halt</code>: Deletes Cluster resources like Pods and Services but retains Persistent Volume Claims (PVCs),
-allowing for data preservation while stopping other operations.</li>
+allowing for data preservation while stopping other operations.
+Warning: Halt policy is deprecated in 0.9.1 and will have same meaning as DoNotTerminate.</li>
 <li><code>Delete</code>: Extends the <code>Halt</code> policy by also removing PVCs, leading to a thorough cleanup while
 removing all persistent data.</li>
 <li><code>WipeOut</code>: An aggressive policy that deletes all Cluster resources, including volume snapshots and

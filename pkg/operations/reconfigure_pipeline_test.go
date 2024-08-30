@@ -56,7 +56,7 @@ var _ = Describe("Reconfigure util test", func() {
 		componentName = "mysql"
 	)
 
-	mockCfgTplObj := func(tpl appsv1.ComponentConfigSpec) (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint, *appsv1alpha1.Configuration) {
+	mockCfgTplObj := func(tpl appsv1.ComponentConfigSpec) (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint, *appsv1alpha1.ComponentConfiguration) {
 		By("By assure an cm obj")
 
 		cfgCM := testapps.NewCustomizedObj("operations_config/config-template.yaml",

@@ -58,7 +58,7 @@ type pipeline struct {
 	configPatch       *cfgcore.ConfigPatchInfo
 	isFileUpdated     bool
 
-	updatedObject    *appsv1alpha1.Configuration
+	updatedObject    *appsv1alpha1.ComponentConfiguration
 	configConstraint *appsv1beta1.ConfigConstraint
 	configSpec       *appsv1.ComponentConfigSpec
 
@@ -175,7 +175,7 @@ func (p *pipeline) doMergeImpl(parameters opsv1alpha1.ConfigurationItem) error {
 	return p.createUpdatePatch(item, configSpec)
 }
 
-func (p *pipeline) createUpdatePatch(item *appsv1alpha1.ConfigurationItemDetail, configSpec *appsv1.ComponentConfigSpec) error {
+func (p *pipeline) createUpdatePatch(item *appsv1alpha1.ConfigTemplateItemDetail, configSpec *appsv1.ComponentConfigSpec) error {
 	if p.configConstraint == nil {
 		return nil
 	}

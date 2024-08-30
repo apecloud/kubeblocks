@@ -42,6 +42,14 @@ type ComponentListerExpansion interface{}
 // ComponentNamespaceLister.
 type ComponentNamespaceListerExpansion interface{}
 
+// ComponentConfigurationListerExpansion allows custom methods to be added to
+// ComponentConfigurationLister.
+type ComponentConfigurationListerExpansion interface{}
+
+// ComponentConfigurationNamespaceListerExpansion allows custom methods to be added to
+// ComponentConfigurationNamespaceLister.
+type ComponentConfigurationNamespaceListerExpansion interface{}
+
 // ComponentDefinitionListerExpansion allows custom methods to be added to
 // ComponentDefinitionLister.
 type ComponentDefinitionListerExpansion interface{}

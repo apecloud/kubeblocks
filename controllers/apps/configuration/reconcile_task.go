@@ -39,19 +39,19 @@ import (
 type Task struct {
 	configctrl.ResourceFetcher[Task]
 
-	Status *appsv1alpha1.ConfigurationItemDetailStatus
+	Status *appsv1alpha1.ConfigTemplateItemDetailStatus
 	Name   string
 
 	Do func(fetcher *Task, component *component.SynthesizedComponent, revision string) error
 }
 
 type TaskContext struct {
-	configuration *appsv1alpha1.Configuration
+	configuration *appsv1alpha1.ComponentConfiguration
 	ctx           context.Context
 	fetcher       *Task
 }
 
-func NewTask(item appsv1alpha1.ConfigurationItemDetail, status *appsv1alpha1.ConfigurationItemDetailStatus) Task {
+func NewTask(item appsv1alpha1.ConfigTemplateItemDetail, status *appsv1alpha1.ConfigTemplateItemDetailStatus) Task {
 	return Task{
 		Name: item.Name,
 		Do: func(fetcher *Task, synComponent *component.SynthesizedComponent, revision string) error {
@@ -84,7 +84,7 @@ func NewTask(item appsv1alpha1.ConfigurationItemDetail, status *appsv1alpha1.Con
 	}
 }
 
-func syncSecretStatus(status *appsv1alpha1.ConfigurationItemDetailStatus) error {
+func syncSecretStatus(status *appsv1alpha1.ConfigTemplateItemDetailStatus) error {
 	status.Phase = appsv1alpha1.CFinishedPhase
 	if status.LastDoneRevision == "" {
 		status.LastDoneRevision = status.UpdateRevision
@@ -93,8 +93,8 @@ func syncSecretStatus(status *appsv1alpha1.ConfigurationItemDetailStatus) error 
 }
 
 func syncImpl(fetcher *Task,
-	item appsv1alpha1.ConfigurationItemDetail,
-	status *appsv1alpha1.ConfigurationItemDetailStatus,
+	item appsv1alpha1.ConfigTemplateItemDetail,
+	status *appsv1alpha1.ConfigTemplateItemDetailStatus,
 	synthesizedComponent *component.SynthesizedComponent,
 	revision string,
 	configSpec *appsv1.ComponentConfigSpec) (err error) {
@@ -125,7 +125,7 @@ func syncImpl(fetcher *Task,
 	return err
 }
 
-func syncStatus(configMap *corev1.ConfigMap, status *appsv1alpha1.ConfigurationItemDetailStatus) (err error) {
+func syncStatus(configMap *corev1.ConfigMap, status *appsv1alpha1.ConfigTemplateItemDetailStatus) (err error) {
 	annotations := configMap.GetAnnotations()
 	// status.CurrentRevision = GetCurrentRevision(annotations)
 	revisions := RetrieveRevision(annotations)
@@ -141,13 +141,13 @@ func syncStatus(configMap *corev1.ConfigMap, status *appsv1alpha1.ConfigurationI
 	return
 }
 
-func updateLastDoneRevision(revision ConfigurationRevision, status *appsv1alpha1.ConfigurationItemDetailStatus) {
+func updateLastDoneRevision(revision ConfigurationRevision, status *appsv1alpha1.ConfigTemplateItemDetailStatus) {
 	if revision.Phase == appsv1alpha1.CFinishedPhase {
 		status.LastDoneRevision = strconv.FormatInt(revision.Revision, 10)
 	}
 }
 
-func updateRevision(revision ConfigurationRevision, status *appsv1alpha1.ConfigurationItemDetailStatus) {
+func updateRevision(revision ConfigurationRevision, status *appsv1alpha1.ConfigTemplateItemDetailStatus) {
 	if revision.StrRevision == status.UpdateRevision {
 		status.Phase = revision.Phase
 		status.ReconcileDetail = &appsv1alpha1.ReconcileDetail{

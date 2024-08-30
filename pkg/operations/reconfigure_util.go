@@ -208,7 +208,7 @@ func formatConfigPatchToMessage(configPatch *core.ConfigPatchInfo, execStatus *c
 		configPatch.DeleteConfig)
 }
 
-func updateFileContent(item *appsv1alpha1.ConfigurationItemDetail, key string, content string) {
+func updateFileContent(item *appsv1alpha1.ConfigTemplateItemDetail, key string, content string) {
 	params, ok := item.ConfigFileParams[key]
 	if !ok {
 		item.ConfigFileParams[key] = appsv1alpha1.ParametersInFile{
@@ -222,7 +222,7 @@ func updateFileContent(item *appsv1alpha1.ConfigurationItemDetail, key string, c
 	}
 }
 
-func updateParameters(item *appsv1alpha1.ConfigurationItemDetail, key string, parameters []opsv1alpha1.ParameterPair, filter validate.ValidatorOptions) {
+func updateParameters(item *appsv1alpha1.ConfigTemplateItemDetail, key string, parameters []opsv1alpha1.ParameterPair, filter validate.ValidatorOptions) {
 	updatedParams := make(map[string]*string, len(parameters))
 	for _, parameter := range parameters {
 		if filter(parameter.Key) {

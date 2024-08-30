@@ -95,7 +95,7 @@ spec:
 
                   configs:
                     - name: broker-config
-                      templateRef: {{ include "pulsar.name" . }}3-broker-config-tpl
+                      templateRef: {{ include "pulsar.name" . }}-broker-config-tpl
                       namespace: {{ .Release.Namespace }}
                       constraintRef: pulsar3-brokers-cc
                       volumeName: pulsar-config
@@ -105,6 +105,28 @@ spec:
                         - init-pulsar-client-config
                   ```
                 type: boolean
+              deletedPolicy:
+                description: Specifies the policy when parameter be removed.
+                properties:
+                  defaultValue:
+                    description: |-
+                      Specifies the value to use if DeletedMethod is RestoreToDefault.
+                      Example: pg
+                      SET configuration_parameter TO DEFAULT;
+                    type: string
+                  deletedMethod:
+                    description: |-
+                      Specifies the method to handle the deletion of a parameter.
+                      If set to "RestoreToDefault", the parameter will be restored to its default value,
+                      which requires engine support, such as pg.
+                      If set to "Reset", the parameter will be re-rendered through the configuration template.
+                    enum:
+                    - RestoreToDefault
+                    - Reset
+                    type: string
+                required:
+                - deletedMethod
+                type: object
               dynamicParameters:
                 description: |-
                   List dynamic parameters.

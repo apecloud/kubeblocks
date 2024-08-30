@@ -93,7 +93,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		return cfgCM, cfgTpl
 	}
 
-	assureConfigInstanceObj := func(clusterName, componentName, ns string, compDef *appsv1.ComponentDefinition) (*appsv1alpha1.Configuration, *corev1.ConfigMap) {
+	assureConfigInstanceObj := func(clusterName, componentName, ns string, compDef *appsv1.ComponentDefinition) (*appsv1alpha1.ComponentConfiguration, *corev1.ConfigMap) {
 		if len(compDef.Spec.Configs) == 0 {
 			return nil, nil
 		}
@@ -111,7 +111,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		By("update configuration status")
 		revision := "1"
 		Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(configuration.GetObject()),
-			func(config *appsv1alpha1.Configuration) {
+			func(config *appsv1alpha1.ComponentConfiguration) {
 				revision = cast.ToString(config.GetGeneration())
 				for _, item := range config.Spec.ConfigItemDetails {
 					configutil.CheckAndUpdateItemStatus(config, item, revision)
@@ -143,7 +143,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		return configuration.GetObject(), cmObj
 	}
 
-	assureMockReconfigureData := func(policyName string) (*OpsResource, *appsv1alpha1.Configuration, *corev1.ConfigMap) {
+	assureMockReconfigureData := func(policyName string) (*OpsResource, *appsv1alpha1.ComponentConfiguration, *corev1.ConfigMap) {
 		By("init operations resources ")
 		opsRes, compDef, clusterObject := initOperationsResources(compDefName, clusterName)
 
@@ -230,9 +230,9 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsRunningPhase))
 
 			By("mock configuration.status.phase to Finished")
-			var item *appsv1alpha1.ConfigurationItemDetail
+			var item *appsv1alpha1.ConfigTemplateItemDetail
 			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(configuration),
-				func(config *appsv1alpha1.Configuration) {
+				func(config *appsv1alpha1.ComponentConfiguration) {
 					item = config.Spec.GetConfigurationItem("mysql-test")
 					for i := 0; i < len(config.Status.ConfigurationItemStatus); i++ {
 						config.Status.ConfigurationItemStatus[i].Phase = appsv1alpha1.CFinishedPhase

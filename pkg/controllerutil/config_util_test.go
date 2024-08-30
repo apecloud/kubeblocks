@@ -89,7 +89,7 @@ func TestFromUpdatedConfig(t *testing.T) {
 func TestIsRerender(t *testing.T) {
 	type args struct {
 		cm   *corev1.ConfigMap
-		item v1alpha1.ConfigurationItemDetail
+		item v1alpha1.ConfigTemplateItemDetail
 	}
 	tests := []struct {
 		name string
@@ -100,7 +100,7 @@ func TestIsRerender(t *testing.T) {
 		name: "test",
 		args: args{
 			cm: nil,
-			item: v1alpha1.ConfigurationItemDetail{
+			item: v1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
 			},
 		},
@@ -109,7 +109,7 @@ func TestIsRerender(t *testing.T) {
 		name: "test",
 		args: args{
 			cm: builder.NewConfigMapBuilder("default", "test").GetObject(),
-			item: v1alpha1.ConfigurationItemDetail{
+			item: v1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
 			},
 		},
@@ -119,7 +119,7 @@ func TestIsRerender(t *testing.T) {
 		args: args{
 			cm: builder.NewConfigMapBuilder("default", "test").
 				GetObject(),
-			item: v1alpha1.ConfigurationItemDetail{
+			item: v1alpha1.ConfigTemplateItemDetail{
 				Name:    "test",
 				Version: "v1",
 			},
@@ -131,7 +131,7 @@ func TestIsRerender(t *testing.T) {
 			cm: builder.NewConfigMapBuilder("default", "test").
 				AddAnnotations(constant.CMConfigurationTemplateVersion, "v1").
 				GetObject(),
-			item: v1alpha1.ConfigurationItemDetail{
+			item: v1alpha1.ConfigTemplateItemDetail{
 				Name:    "test",
 				Version: "v2",
 			},
@@ -143,7 +143,7 @@ func TestIsRerender(t *testing.T) {
 			cm: builder.NewConfigMapBuilder("default", "test").
 				AddAnnotations(constant.CMConfigurationTemplateVersion, "v1").
 				GetObject(),
-			item: v1alpha1.ConfigurationItemDetail{
+			item: v1alpha1.ConfigTemplateItemDetail{
 				Name:    "test",
 				Version: "v1",
 			},
@@ -155,7 +155,7 @@ func TestIsRerender(t *testing.T) {
 			cm: builder.NewConfigMapBuilder("default", "test").
 				AddAnnotations(constant.ConfigAppliedVersionAnnotationKey, "").
 				GetObject(),
-			item: v1alpha1.ConfigurationItemDetail{
+			item: v1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
 				ImportTemplateRef: &v1alpha1.ConfigTemplateExtension{
 					TemplateRef: "contig-test-template",
@@ -179,7 +179,7 @@ func TestIsRerender(t *testing.T) {
 }
 `).
 				GetObject(),
-			item: v1alpha1.ConfigurationItemDetail{
+			item: v1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
 				ImportTemplateRef: &v1alpha1.ConfigTemplateExtension{
 					TemplateRef: "contig-test-template",
@@ -195,7 +195,7 @@ func TestIsRerender(t *testing.T) {
 			cm: builder.NewConfigMapBuilder("default", "test").
 				AddAnnotations(constant.ConfigAppliedVersionAnnotationKey, "").
 				GetObject(),
-			item: v1alpha1.ConfigurationItemDetail{
+			item: v1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
 				Payload: v1alpha1.Payload{
 					Data: map[string]any{
@@ -211,7 +211,7 @@ func TestIsRerender(t *testing.T) {
 			cm: builder.NewConfigMapBuilder("default", "test").
 				AddAnnotations(constant.ConfigAppliedVersionAnnotationKey, ` {"payload":{"key":"value"}} `).
 				GetObject(),
-			item: v1alpha1.ConfigurationItemDetail{
+			item: v1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
 				Payload: v1alpha1.Payload{
 					Data: map[string]any{
@@ -234,8 +234,8 @@ func TestIsRerender(t *testing.T) {
 func TestGetConfigSpecReconcilePhase(t *testing.T) {
 	type args struct {
 		cm     *corev1.ConfigMap
-		item   v1alpha1.ConfigurationItemDetail
-		status *v1alpha1.ConfigurationItemDetailStatus
+		item   v1alpha1.ConfigTemplateItemDetail
+		status *v1alpha1.ConfigTemplateItemDetailStatus
 	}
 	tests := []struct {
 		name string
@@ -245,7 +245,7 @@ func TestGetConfigSpecReconcilePhase(t *testing.T) {
 		name: "test",
 		args: args{
 			cm: nil,
-			item: v1alpha1.ConfigurationItemDetail{
+			item: v1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
 			},
 		},
@@ -254,10 +254,10 @@ func TestGetConfigSpecReconcilePhase(t *testing.T) {
 		name: "test",
 		args: args{
 			cm: builder.NewConfigMapBuilder("default", "test").GetObject(),
-			item: v1alpha1.ConfigurationItemDetail{
+			item: v1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
 			},
-			status: &v1alpha1.ConfigurationItemDetailStatus{
+			status: &v1alpha1.ConfigTemplateItemDetailStatus{
 				Phase: v1alpha1.CInitPhase,
 			},
 		},
@@ -268,10 +268,10 @@ func TestGetConfigSpecReconcilePhase(t *testing.T) {
 			cm: builder.NewConfigMapBuilder("default", "test").
 				AddAnnotations(constant.ConfigAppliedVersionAnnotationKey, `{"name":"test"}`).
 				GetObject(),
-			item: v1alpha1.ConfigurationItemDetail{
+			item: v1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
 			},
-			status: &v1alpha1.ConfigurationItemDetailStatus{
+			status: &v1alpha1.ConfigTemplateItemDetailStatus{
 				Phase: v1alpha1.CUpgradingPhase,
 			},
 		},
@@ -403,7 +403,7 @@ var _ = Describe("config_util", func() {
 
 func TestCheckAndPatchPayload(t *testing.T) {
 	type args struct {
-		item      *v1alpha1.ConfigurationItemDetail
+		item      *v1alpha1.ConfigTemplateItemDetail
 		payloadID string
 		payload   interface{}
 	}
@@ -415,7 +415,7 @@ func TestCheckAndPatchPayload(t *testing.T) {
 	}{{
 		name: "test",
 		args: args{
-			item:      &v1alpha1.ConfigurationItemDetail{},
+			item:      &v1alpha1.ConfigTemplateItemDetail{},
 			payloadID: constant.BinaryVersionPayload,
 			payload:   "md5-12912uy1232o9y2",
 		},
@@ -430,7 +430,7 @@ func TestCheckAndPatchPayload(t *testing.T) {
 	}, {
 		name: "test-delete-payload",
 		args: args{
-			item: &v1alpha1.ConfigurationItemDetail{
+			item: &v1alpha1.ConfigTemplateItemDetail{
 				Payload: v1alpha1.Payload{
 					Data: map[string]any{
 						constant.BinaryVersionPayload: "md5-12912uy1232o9y2",
@@ -444,7 +444,7 @@ func TestCheckAndPatchPayload(t *testing.T) {
 	}, {
 		name: "test-update-payload",
 		args: args{
-			item: &v1alpha1.ConfigurationItemDetail{
+			item: &v1alpha1.ConfigTemplateItemDetail{
 				Payload: v1alpha1.Payload{
 					Data: map[string]any{
 						constant.BinaryVersionPayload: "md5-12912uy1232o9y2",

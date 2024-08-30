@@ -44,6 +44,10 @@ func (c *FakeAppsV1alpha1) Components(namespace string) v1alpha1.ComponentInterf
 	return &FakeComponents{c, namespace}
 }
 
+func (c *FakeAppsV1alpha1) ComponentConfigurations(namespace string) v1alpha1.ComponentConfigurationInterface {
+	return &FakeComponentConfigurations{c, namespace}
+}
+
 func (c *FakeAppsV1alpha1) ComponentDefinitions() v1alpha1.ComponentDefinitionInterface {
 	return &FakeComponentDefinitions{c}
 }

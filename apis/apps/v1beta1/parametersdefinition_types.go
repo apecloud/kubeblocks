@@ -113,7 +113,7 @@ type ParametersDefinitionSpec struct {
 	//
 	// configs:
 	//   - name: broker-config
-	//     templateRef: {{ include "pulsar.name" . }}3-broker-config-tpl
+	//     templateRef: {{ include "pulsar.name" . }}-broker-config-tpl
 	//     namespace: {{ .Release.Namespace }}
 	//     constraintRef: pulsar3-brokers-cc
 	//     volumeName: pulsar-config
@@ -129,7 +129,7 @@ type ParametersDefinitionSpec struct {
 	// Specifies the policy when parameter be removed.
 	//
 	// +optional
-	// DeletedPolicy *ParameterDeletedPolicy `json:"deletedPolicy,omitempty"`
+	ParameterDeletedPolicy *ParameterDeletedPolicy `json:"deletedPolicy,omitempty"`
 
 	// Indicates whether to consolidate dynamic reload and restart actions into a single restart.
 	//
@@ -180,11 +180,14 @@ type ParametersDefinitionSpec struct {
 type ParameterDeletedPolicy struct {
 
 	// Specifies the method to handle the deletion of a parameter.
+	// If set to "RestoreToDefault", the parameter will be restored to its default value,
+	// which requires engine support, such as pg.
+	// If set to "Reset", the parameter will be re-rendered through the configuration template.
 	//
 	// +kubebuilder:validation:Required
 	DeletedMethod ParameterDeletedMethod `json:"deletedMethod"`
 
-	// Specifies the value to use if DeletedMethod is PDPResetDefault.
+	// Specifies the value to use if DeletedMethod is RestoreToDefault.
 	// Example: pg
 	// SET configuration_parameter TO DEFAULT;
 	//

@@ -79,7 +79,7 @@ func GetUncachedObjects() []client.Object {
 		&corev1.ConfigMap{},
 		&corev1.Secret{},
 		&appsv1.Cluster{},
-		&appsv1alpha1.Configuration{},
+		&appsv1alpha1.ComponentConfiguration{},
 	}
 }
 

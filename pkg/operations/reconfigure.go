@@ -291,7 +291,7 @@ func needReconfigure(request *opsv1alpha1.OpsRequest, status *opsv1alpha1.Reconf
 
 func syncStatus(reconfiguringStatus *opsv1alpha1.ReconfiguringStatus,
 	opsRes *OpsResource,
-	status *appsv1alpha1.ConfigurationItemDetailStatus,
+	status *appsv1alpha1.ConfigTemplateItemDetailStatus,
 	phase appsv1alpha1.ConfigurationPhase) error {
 	err := updateReconfigureStatusByCM(reconfiguringStatus, status.Name,
 		handleReconfigureStatusProgress(status.ReconcileDetail, &opsRes.OpsRequest.Status, phase))
@@ -301,8 +301,8 @@ func syncStatus(reconfiguringStatus *opsv1alpha1.ReconfiguringStatus,
 }
 
 func reconfiguringPhase(resource *configctrl.Fetcher,
-	detail appsv1alpha1.ConfigurationItemDetail,
-	status *appsv1alpha1.ConfigurationItemDetailStatus) appsv1alpha1.ConfigurationPhase {
+	detail appsv1alpha1.ConfigTemplateItemDetail,
+	status *appsv1alpha1.ConfigTemplateItemDetailStatus) appsv1alpha1.ConfigurationPhase {
 	if status.ReconcileDetail == nil || status.ReconcileDetail.CurrentRevision != status.UpdateRevision {
 		return appsv1alpha1.CPendingPhase
 	}

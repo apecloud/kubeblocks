@@ -25,17 +25,17 @@ import (
 )
 
 type ConfigurationBuilder struct {
-	BaseBuilder[appsv1alpha1.Configuration, *appsv1alpha1.Configuration, ConfigurationBuilder]
+	BaseBuilder[appsv1alpha1.ComponentConfiguration, *appsv1alpha1.ComponentConfiguration, ConfigurationBuilder]
 }
 
 func NewConfigurationBuilder(namespace, name string) *ConfigurationBuilder {
 	builder := &ConfigurationBuilder{}
-	builder.init(namespace, name, &appsv1alpha1.Configuration{}, builder)
+	builder.init(namespace, name, &appsv1alpha1.ComponentConfiguration{}, builder)
 	return builder
 }
 
 func (c *ConfigurationBuilder) ClusterRef(clusterName string) *ConfigurationBuilder {
-	c.get().Spec.ClusterRef = clusterName
+	c.get().Spec.ClusterName = clusterName
 	return c
 }
 
@@ -46,7 +46,7 @@ func (c *ConfigurationBuilder) Component(component string) *ConfigurationBuilder
 
 func (c *ConfigurationBuilder) AddConfigurationItem(configSpec appsv1.ComponentConfigSpec) *ConfigurationBuilder {
 	c.get().Spec.ConfigItemDetails = append(c.get().Spec.ConfigItemDetails,
-		appsv1alpha1.ConfigurationItemDetail{
+		appsv1alpha1.ConfigTemplateItemDetail{
 			Name:       configSpec.Name,
 			ConfigSpec: ToV1alpha1ConfigSpec(configSpec.DeepCopy()),
 		})

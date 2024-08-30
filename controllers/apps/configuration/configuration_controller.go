@@ -75,7 +75,7 @@ func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		Recorder: r.Recorder,
 	}
 
-	config := &appsv1alpha1.Configuration{}
+	config := &appsv1alpha1.ComponentConfiguration{}
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, config); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "cannot find configuration")
 	}
@@ -100,7 +100,7 @@ func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		Context:       ctx,
 		Client:        r.Client,
 		Namespace:     config.Namespace,
-		ClusterName:   config.Spec.ClusterRef,
+		ClusterName:   config.Spec.ClusterName,
 		ComponentName: config.Spec.ComponentName,
 	}, fetcherTask).Cluster().
 		ComponentAndComponentDef().
@@ -126,7 +126,7 @@ func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	return intctrlutil.Reconciled()
 }
 
-func (r *ConfigurationReconciler) failWithInvalidComponent(configuration *appsv1alpha1.Configuration, reqCtx intctrlutil.RequestCtx) (ctrl.Result, error) {
+func (r *ConfigurationReconciler) failWithInvalidComponent(configuration *appsv1alpha1.ComponentConfiguration, reqCtx intctrlutil.RequestCtx) (ctrl.Result, error) {
 	msg := fmt.Sprintf("not found cluster component or cluster definition component: [%s]", configuration.Spec.ComponentName)
 	reqCtx.Log.Error(fmt.Errorf("%s", msg), "")
 	patch := client.MergeFrom(configuration.DeepCopy())
@@ -137,7 +137,7 @@ func (r *ConfigurationReconciler) failWithInvalidComponent(configuration *appsv1
 	return intctrlutil.Reconciled()
 }
 
-func isAllReady(configuration *appsv1alpha1.Configuration) bool {
+func isAllReady(configuration *appsv1alpha1.ComponentConfiguration) bool {
 	for _, item := range configuration.Spec.ConfigItemDetails {
 		itemStatus := configuration.Status.GetItemStatus(item.Name)
 		if itemStatus != nil && !isFinishStatus(itemStatus.Phase) {
@@ -190,20 +190,20 @@ func (r *ConfigurationReconciler) runTasks(taskCtx TaskContext, tasks []Task) (e
 // SetupWithManager sets up the controller with the Manager.
 func (r *ConfigurationReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager) error {
 	b := intctrlutil.NewNamespacedControllerManagedBy(mgr).
-		For(&appsv1alpha1.Configuration{}).
+		For(&appsv1alpha1.ComponentConfiguration{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: int(math.Ceil(viper.GetFloat64(constant.CfgKBReconcileWorkers) / 2)),
 		}).
 		Owns(&corev1.ConfigMap{})
 
 	if multiClusterMgr != nil {
-		multiClusterMgr.Own(b, &corev1.ConfigMap{}, &appsv1alpha1.Configuration{})
+		multiClusterMgr.Own(b, &corev1.ConfigMap{}, &appsv1alpha1.ComponentConfiguration{})
 	}
 
 	return b.Complete(r)
 }
 
-func fromItemStatus(ctx intctrlutil.RequestCtx, status *appsv1alpha1.ConfigurationStatus, item appsv1alpha1.ConfigurationItemDetail) *appsv1alpha1.ConfigurationItemDetailStatus {
+func fromItemStatus(ctx intctrlutil.RequestCtx, status *appsv1alpha1.ComponentConfigurationStatus, item appsv1alpha1.ConfigTemplateItemDetail) *appsv1alpha1.ConfigTemplateItemDetailStatus {
 	if item.ConfigSpec == nil {
 		ctx.Log.V(1).WithName(item.Name).Info(fmt.Sprintf("configuration is creating and pass: %s", item.Name))
 		return nil

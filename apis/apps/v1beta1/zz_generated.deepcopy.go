@@ -365,6 +365,11 @@ func (in *ParametersDefinitionSpec) DeepCopyInto(out *ParametersDefinitionSpec) 
 		*out = new(bool)
 		**out = **in
 	}
+	if in.ParameterDeletedPolicy != nil {
+		in, out := &in.ParameterDeletedPolicy, &out.ParameterDeletedPolicy
+		*out = new(ParameterDeletedPolicy)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.MergeReloadAndRestart != nil {
 		in, out := &in.MergeReloadAndRestart, &out.MergeReloadAndRestart
 		*out = new(bool)

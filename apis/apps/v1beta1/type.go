@@ -121,11 +121,10 @@ const (
 
 // ParameterDeletedMethod defines how to handle parameter remove
 // +enum
-// +kubebuilder:validation:Enum={Ignore,ForceRestart, Reset}
+// +kubebuilder:validation:Enum={RestoreToDefault, Reset}
 type ParameterDeletedMethod string
 
 const (
-	PDPIgnore       ParameterDeletedMethod = "Ignore"
-	PDPRestart      ParameterDeletedMethod = "ForceRestart"
-	PDPResetDefault ParameterDeletedMethod = "Reset"
+	PDPDefault ParameterDeletedMethod = "RestoreToDefault"
+	PDPReset   ParameterDeletedMethod = "Reset"
 )

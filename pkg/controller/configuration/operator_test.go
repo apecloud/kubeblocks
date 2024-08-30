@@ -47,7 +47,7 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 	var configMapObj *corev1.ConfigMap
 	var scriptsObj *corev1.ConfigMap
 	var configConstraint *appsv1beta1.ConfigConstraint
-	var configurationObj *appsv1alpha1.Configuration
+	var configurationObj *appsv1alpha1.ComponentConfiguration
 	var k8sMockClient *testutil.K8sClientMockHelper
 
 	createConfigReconcileTask := func() *configOperator {
@@ -124,7 +124,7 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 			k8sMockClient.MockCreateMethod(testutil.WithCreateReturned(testutil.WithCreatedSucceedResult(), testutil.WithAnyTimes()))
 			k8sMockClient.MockPatchMethod(testutil.WithPatchReturned(func(obj client.Object, patch client.Patch) error {
 				switch v := obj.(type) {
-				case *appsv1alpha1.Configuration:
+				case *appsv1alpha1.ComponentConfiguration:
 					if client.ObjectKeyFromObject(obj) == client.ObjectKeyFromObject(configurationObj) {
 						configurationObj.Spec = *v.Spec.DeepCopy()
 						configurationObj.Status = *v.Status.DeepCopy()

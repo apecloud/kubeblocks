@@ -38,7 +38,7 @@ func (c *componentRelatedParametersTransformer) Transform(ctx graph.TransformCon
 	transCtx, _ := ctx.(*componentTransformContext)
 	synthesizedComp := transCtx.SynthesizeComponent
 
-	config := appsv1alpha1.Configuration{}
+	config := appsv1alpha1.ComponentConfiguration{}
 	configKey := client.ObjectKey{Namespace: synthesizedComp.Namespace,
 		Name: cfgcore.GenerateComponentConfigurationName(synthesizedComp.ClusterName, synthesizedComp.Name)}
 	if err := c.Get(ctx.GetContext(), configKey, &config); err != nil {

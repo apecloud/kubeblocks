@@ -50,7 +50,7 @@ var _ = Describe("Configuration Controller", func() {
 			}
 			checkCfgStatus := func(phase appsv1alpha1.ConfigurationPhase) func() bool {
 				return func() bool {
-					cfg := &appsv1alpha1.Configuration{}
+					cfg := &appsv1alpha1.ComponentConfiguration{}
 					Expect(k8sClient.Get(ctx, cfgKey, cfg)).Should(Succeed())
 					itemStatus := cfg.Status.GetItemStatus(configSpecName)
 					return itemStatus != nil && itemStatus.Phase == phase
@@ -70,7 +70,7 @@ var _ = Describe("Configuration Controller", func() {
 			Eventually(checkCfgStatus(appsv1alpha1.CFinishedPhase)).Should(BeTrue())
 
 			By("reconfiguring parameters.")
-			Eventually(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *appsv1alpha1.Configuration) {
+			Eventually(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *appsv1alpha1.ComponentConfiguration) {
 				cfg.Spec.GetConfigurationItem(configSpecName).ConfigFileParams = map[string]appsv1alpha1.ParametersInFile{
 					"my.cnf": {
 						Parameters: map[string]*string{
@@ -82,7 +82,7 @@ var _ = Describe("Configuration Controller", func() {
 			})).Should(Succeed())
 
 			Eventually(func(g Gomega) {
-				cfg := &appsv1alpha1.Configuration{}
+				cfg := &appsv1alpha1.ComponentConfiguration{}
 				g.Expect(k8sClient.Get(ctx, cfgKey, cfg)).Should(Succeed())
 				itemStatus := cfg.Status.GetItemStatus(configSpecName)
 				g.Expect(itemStatus).ShouldNot(BeNil())
@@ -108,7 +108,7 @@ var _ = Describe("Configuration Controller", func() {
 			}, synthesizedComp, clusterObj, componentObj)).Should(Succeed())
 
 			Eventually(func(g Gomega) {
-				cfg := &appsv1alpha1.Configuration{}
+				cfg := &appsv1alpha1.ComponentConfiguration{}
 				g.Expect(k8sClient.Get(ctx, cfgKey, cfg)).Should(Succeed())
 				g.Expect(cfg.Status.Message).Should(ContainSubstring("not found cluster component"))
 			}, time.Second*60, time.Second*1).Should(Succeed())

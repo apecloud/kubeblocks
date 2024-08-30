@@ -14,7 +14,6 @@ resources:
 - bases/workloads.kubeblocks.io_instancesets.yaml
 - bases/dataprotection.kubeblocks.io_backuprepos.yaml
 - bases/dataprotection.kubeblocks.io_restores.yaml
-- bases/apps.kubeblocks.io_configurations.yaml
 - bases/apps.kubeblocks.io_servicedescriptors.yaml
 - bases/apps.kubeblocks.io_componentdefinitions.yaml
 - bases/apps.kubeblocks.io_components.yaml
@@ -23,7 +22,8 @@ resources:
 - bases/experimental.kubeblocks.io_nodecountscalers.yaml
 - bases/operations.kubeblocks.io_opsrequests.yaml
 - bases/operations.kubeblocks.io_opsdefinitions.yaml
-- bases/apps.kubeblocks.io_parametersdescriptions.yaml
+- bases/apps.kubeblocks.io_parametersdefinitions.yaml
+- bases/apps.kubeblocks.io_componentconfigurations.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:
@@ -53,6 +53,7 @@ patchesStrategicMerge:
 #- patches/webhook_in_componentversions.yaml
 #- patches/webhook_in_nodecountscalers.yaml
 #- patches/webhook_in_parametersdefinitions.yaml
+#- patches/webhook_in_componentconfigurations.yaml
 #+kubebuilder:scaffold:crdkustomizewebhookpatch
 
 # [CERTMANAGER] To enable cert-manager, uncomment all the sections with [CERTMANAGER] prefix.
@@ -81,6 +82,7 @@ patchesStrategicMerge:
 #- patches/cainjection_in_componentversions.yaml
 #- patches/cainjection_in_nodecountscalers.yaml
 #- patches/cainjection_in_parametersdefinitions.yaml
+#- patches/cainjection_in_componentconfigurations.yaml
 #+kubebuilder:scaffold:crdkustomizecainjectionpatch
 
 # the following config is for teaching kustomize how to do kustomization for CRDs.

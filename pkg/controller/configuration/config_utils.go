@@ -269,7 +269,7 @@ func findPortByPortName(container corev1.Container) (int32, bool) {
 }
 
 // UpdateConfigPayload updates the configuration payload
-func UpdateConfigPayload(config *appsv1alpha1.ConfigurationSpec, component *component.SynthesizedComponent) (bool, error) {
+func UpdateConfigPayload(config *appsv1alpha1.ComponentConfigurationSpec, component *component.SynthesizedComponent) (bool, error) {
 	updated := false
 	for i := range config.ConfigItemDetails {
 		configSpec := &config.ConfigItemDetails[i]

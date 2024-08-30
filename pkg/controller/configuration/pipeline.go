@@ -59,7 +59,7 @@ type updatePipeline struct {
 	reconcile     bool
 	renderWrapper renderWrapper
 
-	item       appsv1alpha1.ConfigurationItemDetail
+	item       appsv1alpha1.ConfigTemplateItemDetail
 	itemStatus *appsv1alpha1.ConfigurationItemDetailStatus
 	configSpec *appsv1.ComponentConfigSpec
 	// replace of ConfigMapObj
@@ -76,7 +76,7 @@ func NewCreatePipeline(ctx ReconcileCtx) *pipeline {
 	return p.Init(ctx.ResourceCtx, p)
 }
 
-func NewReconcilePipeline(ctx ReconcileCtx, item appsv1alpha1.ConfigurationItemDetail, itemStatus *appsv1alpha1.ConfigurationItemDetailStatus, configSpec *appsv1.ComponentConfigSpec) *updatePipeline {
+func NewReconcilePipeline(ctx ReconcileCtx, item appsv1alpha1.ConfigTemplateItemDetail, itemStatus *appsv1alpha1.ConfigTemplateItemDetailStatus, configSpec *appsv1.ComponentConfigSpec) *updatePipeline {
 	p := &updatePipeline{
 		reconcile:  true,
 		item:       item,
@@ -115,7 +115,7 @@ func (p *pipeline) UpdateConfiguration() *pipeline {
 		}
 		_, _ = UpdateConfigPayload(&expectedConfiguration.Spec, p.ctx.SynthesizedComponent)
 
-		existingConfiguration := appsv1alpha1.Configuration{}
+		existingConfiguration := appsv1alpha1.ComponentConfiguration{}
 		err = p.ResourceFetcher.Client.Get(p.Context, client.ObjectKeyFromObject(expectedConfiguration), &existingConfiguration)
 		switch {
 		case err == nil:
@@ -153,8 +153,8 @@ func (p *pipeline) UpdateConfigurationStatus() *pipeline {
 	})
 }
 
-func CheckAndUpdateItemStatus(updated *appsv1alpha1.Configuration, item appsv1alpha1.ConfigurationItemDetail, reversion string) {
-	foundStatus := func(name string) *appsv1alpha1.ConfigurationItemDetailStatus {
+func CheckAndUpdateItemStatus(updated *appsv1alpha1.ComponentConfiguration, item appsv1alpha1.ConfigTemplateItemDetail, reversion string) {
+	foundStatus := func(name string) *appsv1alpha1.ConfigTemplateItemDetailStatus {
 		for i := range updated.Status.ConfigurationItemStatus {
 			status := &updated.Status.ConfigurationItemStatus[i]
 			if status.Name == name {
@@ -170,7 +170,7 @@ func CheckAndUpdateItemStatus(updated *appsv1alpha1.Configuration, item appsv1al
 	}
 	if status == nil {
 		updated.Status.ConfigurationItemStatus = append(updated.Status.ConfigurationItemStatus,
-			appsv1alpha1.ConfigurationItemDetailStatus{
+			appsv1alpha1.ConfigTemplateItemDetailStatus{
 				Name:           item.Name,
 				Phase:          appsv1alpha1.CInitPhase,
 				UpdateRevision: reversion,
@@ -203,7 +203,7 @@ func (p *pipeline) UpdateConfigRelatedObject() *pipeline {
 	return p.Wrap(updateMeta)
 }
 
-func (p *pipeline) createConfiguration() *appsv1alpha1.Configuration {
+func (p *pipeline) createConfiguration() *appsv1alpha1.ComponentConfiguration {
 	builder := builder.NewConfigurationBuilder(p.Namespace,
 		core.GenerateComponentConfigurationName(p.ClusterName, p.ComponentName),
 	)
@@ -216,8 +216,8 @@ func (p *pipeline) createConfiguration() *appsv1alpha1.Configuration {
 		GetObject()
 }
 
-func (p *pipeline) updateConfiguration(expected *appsv1alpha1.Configuration, existing *appsv1alpha1.Configuration) error {
-	fromMap := func(items []appsv1alpha1.ConfigurationItemDetail) *cfgutil.Sets {
+func (p *pipeline) updateConfiguration(expected *appsv1alpha1.ComponentConfiguration, existing *appsv1alpha1.ComponentConfiguration) error {
+	fromMap := func(items []appsv1alpha1.ConfigTemplateItemDetail) *cfgutil.Sets {
 		sets := cfgutil.NewSet()
 		for _, item := range items {
 			sets.Add(item.Name)
@@ -225,7 +225,7 @@ func (p *pipeline) updateConfiguration(expected *appsv1alpha1.Configuration, exi
 		return sets
 	}
 
-	updateConfigSpec := func(item appsv1alpha1.ConfigurationItemDetail) appsv1alpha1.ConfigurationItemDetail {
+	updateConfigSpec := func(item appsv1alpha1.ConfigTemplateItemDetail) appsv1alpha1.ConfigTemplateItemDetail {
 		if newItem := expected.Spec.GetConfigurationItem(item.Name); newItem != nil {
 			item.ConfigSpec = newItem.ConfigSpec
 		}
@@ -238,7 +238,7 @@ func (p *pipeline) updateConfiguration(expected *appsv1alpha1.Configuration, exi
 	addSets := cfgutil.Difference(newSets, oldSets)
 	delSets := cfgutil.Difference(oldSets, newSets)
 
-	newConfigItems := make([]appsv1alpha1.ConfigurationItemDetail, 0)
+	newConfigItems := make([]appsv1alpha1.ConfigTemplateItemDetail, 0)
 	for _, item := range existing.Spec.ConfigItemDetails {
 		if !delSets.InArray(item.Name) {
 			newConfigItems = append(newConfigItems, updateConfigSpec(item))
@@ -306,7 +306,7 @@ func (p *updatePipeline) RerenderTemplate() *updatePipeline {
 }
 
 func (p *updatePipeline) ApplyParameters() *updatePipeline {
-	patchMerge := func(p *updatePipeline, spec appsv1.ComponentConfigSpec, cm *corev1.ConfigMap, item appsv1alpha1.ConfigurationItemDetail) error {
+	patchMerge := func(p *updatePipeline, spec appsv1.ComponentConfigSpec, cm *corev1.ConfigMap, item appsv1alpha1.ConfigTemplateItemDetail) error {
 		if p.isDone() || len(item.ConfigFileParams) == 0 {
 			return nil
 		}

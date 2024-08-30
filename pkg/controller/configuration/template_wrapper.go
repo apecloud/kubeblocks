@@ -103,10 +103,10 @@ func (wrapper *renderWrapper) checkRerenderTemplateSpec(cfgCMName string, localO
 }
 
 func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1.Cluster,
-	component *component.SynthesizedComponent, localObjs []client.Object, configuration *appsv1alpha1.Configuration) error {
+	component *component.SynthesizedComponent, localObjs []client.Object, configuration *appsv1alpha1.ComponentConfiguration) error {
 	revision := fromConfiguration(configuration)
 	for _, configSpec := range component.ConfigTemplates {
-		var item *appsv1alpha1.ConfigurationItemDetail
+		var item *appsv1alpha1.ConfigTemplateItemDetail
 		cmName := core.GetComponentCfgName(cluster.Name, component.Name, configSpec.Name)
 		origCMObj, err := wrapper.checkRerenderTemplateSpec(cmName, localObjs)
 		if err != nil {
@@ -140,14 +140,14 @@ func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1.Cluster,
 	return nil
 }
 
-func fromConfiguration(configuration *appsv1alpha1.Configuration) string {
+func fromConfiguration(configuration *appsv1alpha1.ComponentConfiguration) string {
 	if configuration == nil {
 		return ""
 	}
 	return strconv.FormatInt(configuration.GetGeneration(), 10)
 }
 
-func updateConfigMetaForCM(newCMObj *corev1.ConfigMap, item *appsv1alpha1.ConfigurationItemDetail, revision string) (err error) {
+func updateConfigMetaForCM(newCMObj *corev1.ConfigMap, item *appsv1alpha1.ConfigTemplateItemDetail, revision string) (err error) {
 	if item == nil {
 		return
 	}
@@ -164,12 +164,12 @@ func updateConfigMetaForCM(newCMObj *corev1.ConfigMap, item *appsv1alpha1.Config
 	hash, _ := cfgutil.ComputeHash(newCMObj.Data)
 	annotations[constant.CMInsCurrentConfigurationHashLabelKey] = hash
 	annotations[constant.ConfigurationRevision] = revision
-	annotations[constant.CMConfigurationTemplateVersion] = item.Version
+	// annotations[constant.CMConfigurationTemplateVersion] = item.Version
 	newCMObj.Annotations = annotations
 	return
 }
 
-func applyUpdatedParameters(item *appsv1alpha1.ConfigurationItemDetail, cm *corev1.ConfigMap, configSpec appsv1.ComponentConfigSpec, cli client.Client, ctx context.Context) (err error) {
+func applyUpdatedParameters(item *appsv1alpha1.ConfigTemplateItemDetail, cm *corev1.ConfigMap, configSpec appsv1.ComponentConfigSpec, cli client.Client, ctx context.Context) (err error) {
 	var newData map[string]string
 	var configConstraint *appsv1beta1.ConfigConstraint
 
@@ -193,7 +193,7 @@ func applyUpdatedParameters(item *appsv1alpha1.ConfigurationItemDetail, cm *core
 func (wrapper *renderWrapper) rerenderConfigTemplate(cluster *appsv1.Cluster,
 	component *component.SynthesizedComponent,
 	configSpec appsv1.ComponentConfigSpec,
-	item *appsv1alpha1.ConfigurationItemDetail,
+	item *appsv1alpha1.ConfigTemplateItemDetail,
 ) (*corev1.ConfigMap, error) {
 	cmName := core.GetComponentCfgName(cluster.Name, component.Name, configSpec.Name)
 	newCMObj, err := generateConfigMapFromTpl(cluster,
@@ -211,13 +211,13 @@ func (wrapper *renderWrapper) rerenderConfigTemplate(cluster *appsv1.Cluster,
 		return nil, err
 	}
 	// render user specified template
-	if item != nil && item.ImportTemplateRef != nil {
+	if item != nil && item.UserConfigTemplates != nil {
 		newData, err := mergerConfigTemplate(
 			&appsv1.LegacyRenderedTemplateSpec{
 				ConfigTemplateExtension: appsv1.ConfigTemplateExtension{
-					TemplateRef: item.ImportTemplateRef.TemplateRef,
-					Namespace:   item.ImportTemplateRef.Namespace,
-					Policy:      appsv1.MergedPolicy(item.ImportTemplateRef.Policy),
+					TemplateRef: item.UserConfigTemplates.TemplateRef,
+					Namespace:   item.UserConfigTemplates.Namespace,
+					Policy:      appsv1.MergedPolicy(item.UserConfigTemplates.Policy),
 				},
 			},
 			wrapper.templateBuilder,
@@ -261,7 +261,7 @@ func (wrapper *renderWrapper) renderScriptTemplate(cluster *appsv1.Cluster, comp
 	return nil
 }
 
-func (wrapper *renderWrapper) addRenderedObject(templateSpec appsv1.ComponentTemplateSpec, cm *corev1.ConfigMap, configuration *appsv1alpha1.Configuration, asVolume bool) (err error) {
+func (wrapper *renderWrapper) addRenderedObject(templateSpec appsv1.ComponentTemplateSpec, cm *corev1.ConfigMap, configuration *appsv1alpha1.ComponentConfiguration, asVolume bool) (err error) {
 	// The owner of the configmap object is a cluster,
 	// in order to manage the life cycle of configmap
 	if configuration != nil {

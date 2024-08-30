@@ -126,7 +126,7 @@ var AddonSignature = func(_ extensionsv1alpha1.Addon, _ *extensionsv1alpha1.Addo
 var StorageProviderSignature = func(_ dpv1alpha1.StorageProvider, _ *dpv1alpha1.StorageProvider, _ dpv1alpha1.StorageProviderList, _ *dpv1alpha1.StorageProviderList) {
 }
 
-var ConfigurationSignature = func(_ appsv1alpha1.Configuration, _ *appsv1alpha1.Configuration, _ appsv1alpha1.ConfigurationList, _ *appsv1alpha1.ConfigurationList) {
+var ConfigurationSignature = func(_ appsv1alpha1.ComponentConfiguration, _ *appsv1alpha1.ComponentConfiguration, _ appsv1alpha1.ComponentConfigurationList, _ *appsv1alpha1.ComponentConfigurationList) {
 }
 
 func ToGVK(object client.Object) schema.GroupVersionKind {

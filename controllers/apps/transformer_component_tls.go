@@ -103,7 +103,7 @@ func checkAndTriggerReRender(ctx context.Context, synthesizedComp component.Synt
 	if ((tls == nil || !tls.Enable) && tlsEnabledInCM) ||
 		(tls != nil && tls.Enable && !tlsEnabledInCM) {
 		// tls config changed
-		conf := &appsv1alpha1.Configuration{}
+		conf := &appsv1alpha1.ComponentConfiguration{}
 		confKey := types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: cfgcore.GenerateComponentConfigurationName(synthesizedComp.ClusterName, synthesizedComp.Name)}
 		if err := cli.Get(ctx, confKey, conf); err != nil {
 			return client.IgnoreNotFound(err)

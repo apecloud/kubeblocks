@@ -229,7 +229,7 @@ func (r *ComponentReconciler) setupWithManager(mgr ctrl.Manager) error {
 		Owns(&dpv1alpha1.Restore{}).
 		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
 		Owns(&batchv1.Job{}).
-		Watches(&appsv1alpha1.Configuration{}, handler.EnqueueRequestsFromMapFunc(r.configurationEventHandler))
+		Watches(&appsv1alpha1.ComponentConfiguration{}, handler.EnqueueRequestsFromMapFunc(r.configurationEventHandler))
 
 	if viper.GetBool(constant.EnableRBACManager) {
 		b.Owns(&rbacv1.ClusterRoleBinding{}).
@@ -253,7 +253,7 @@ func (r *ComponentReconciler) setupWithMultiClusterManager(mgr ctrl.Manager, mul
 		Owns(&workloads.InstanceSet{}).
 		Owns(&dpv1alpha1.Backup{}).
 		Owns(&dpv1alpha1.Restore{}).
-		Watches(&appsv1alpha1.Configuration{}, handler.EnqueueRequestsFromMapFunc(r.configurationEventHandler))
+		Watches(&appsv1alpha1.ComponentConfiguration{}, handler.EnqueueRequestsFromMapFunc(r.configurationEventHandler))
 
 	eventHandler := handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)
 	multiClusterMgr.Watch(b, &corev1.Service{}, eventHandler).
@@ -291,7 +291,7 @@ func (r *ComponentReconciler) filterComponentResources(ctx context.Context, obj 
 }
 
 func (r *ComponentReconciler) configurationEventHandler(_ context.Context, obj client.Object) []reconcile.Request {
-	cr, ok := obj.(*appsv1alpha1.Configuration)
+	cr, ok := obj.(*appsv1alpha1.ComponentConfiguration)
 	if !ok {
 		return []reconcile.Request{}
 	}
@@ -299,7 +299,7 @@ func (r *ComponentReconciler) configurationEventHandler(_ context.Context, obj c
 		{
 			NamespacedName: types.NamespacedName{
 				Namespace: obj.GetNamespace(),
-				Name:      constant.GenerateClusterComponentName(cr.Spec.ClusterRef, cr.Spec.ComponentName),
+				Name:      constant.GenerateClusterComponentName(cr.Spec.ClusterName, cr.Spec.ComponentName),
 			},
 		},
 	}

@@ -26,7 +26,7 @@ import (
 
 type Cache struct {
 	capacity int
-	m        sync.Mutex
+	m        sync.RWMutex
 	list     *list.List
 	items    map[string]*list.Element
 }
@@ -40,13 +40,13 @@ func New(capacity int) *Cache {
 	return &Cache{
 		capacity: capacity,
 		list:     list.New(),
-		items:    make(map[string]*list.Element),
+		items:    make(map[string]*list.Element, capacity),
 	}
 }
 
 func (c *Cache) Get(key string) (any, bool) {
-	c.m.Lock()
-	defer c.m.Unlock()
+	c.m.RLock()
+	defer c.m.RUnlock()
 
 	if elem, ok := c.items[key]; ok {
 		c.list.MoveToFront(elem)

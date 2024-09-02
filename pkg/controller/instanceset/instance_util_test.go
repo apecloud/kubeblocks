@@ -22,9 +22,11 @@ package instanceset
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gmeasure"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -1339,6 +1341,23 @@ var _ = Describe("instance util test", func() {
 				},
 			}
 			Expect(affinity2).Should(Equal(expectMergedAffinity))
+		})
+	})
+
+	Context("ParseParentNameAndOrdinal", func() {
+		It("Benchmark", Serial, Label("measurement"), func() {
+			experiment := gmeasure.NewExperiment("ParseParentNameAndOrdinal Benchmark")
+			AddReportEntry(experiment.Name, experiment)
+
+			experiment.Sample(func(idx int) {
+				experiment.MeasureDuration("ParseParentNameAndOrdinal", func() {
+					_, _ = ParseParentNameAndOrdinal("foo-bar-666")
+				})
+			}, gmeasure.SamplingConfig{N: 100, Duration: time.Second})
+
+			parsingStats := experiment.GetStats("ParseParentNameAndOrdinal")
+			medianDuration := parsingStats.DurationFor(gmeasure.StatMedian)
+			Expect(medianDuration).To(BeNumerically("<", time.Millisecond))
 		})
 	})
 })

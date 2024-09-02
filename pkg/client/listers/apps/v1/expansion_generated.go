@@ -18,9 +18,33 @@ limitations under the License.
 
 package v1
 
+// ClusterListerExpansion allows custom methods to be added to
+// ClusterLister.
+type ClusterListerExpansion interface{}
+
+// ClusterNamespaceListerExpansion allows custom methods to be added to
+// ClusterNamespaceLister.
+type ClusterNamespaceListerExpansion interface{}
+
 // ClusterDefinitionListerExpansion allows custom methods to be added to
 // ClusterDefinitionLister.
 type ClusterDefinitionListerExpansion interface{}
+
+// ComponentListerExpansion allows custom methods to be added to
+// ComponentLister.
+type ComponentListerExpansion interface{}
+
+// ComponentNamespaceListerExpansion allows custom methods to be added to
+// ComponentNamespaceLister.
+type ComponentNamespaceListerExpansion interface{}
+
+// ComponentDefinitionListerExpansion allows custom methods to be added to
+// ComponentDefinitionLister.
+type ComponentDefinitionListerExpansion interface{}
+
+// ComponentVersionListerExpansion allows custom methods to be added to
+// ComponentVersionLister.
+type ComponentVersionListerExpansion interface{}
 
 // ServiceDescriptorListerExpansion allows custom methods to be added to
 // ServiceDescriptorLister.

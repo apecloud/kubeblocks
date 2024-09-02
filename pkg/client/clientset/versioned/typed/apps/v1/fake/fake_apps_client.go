@@ -28,8 +28,24 @@ type FakeAppsV1 struct {
 	*testing.Fake
 }
 
+func (c *FakeAppsV1) Clusters(namespace string) v1.ClusterInterface {
+	return &FakeClusters{c, namespace}
+}
+
 func (c *FakeAppsV1) ClusterDefinitions() v1.ClusterDefinitionInterface {
 	return &FakeClusterDefinitions{c}
+}
+
+func (c *FakeAppsV1) Components(namespace string) v1.ComponentInterface {
+	return &FakeComponents{c, namespace}
+}
+
+func (c *FakeAppsV1) ComponentDefinitions() v1.ComponentDefinitionInterface {
+	return &FakeComponentDefinitions{c}
+}
+
+func (c *FakeAppsV1) ComponentVersions() v1.ComponentVersionInterface {
+	return &FakeComponentVersions{c}
 }
 
 func (c *FakeAppsV1) ServiceDescriptors(namespace string) v1.ServiceDescriptorInterface {

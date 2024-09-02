@@ -1488,18 +1488,18 @@ func init() {
 	SchemeBuilder.Register(&Cluster{}, &ClusterList{})
 }
 
-func (r Cluster) IsDeleting() bool {
+func (r *Cluster) IsDeleting() bool {
 	if r.GetDeletionTimestamp().IsZero() {
 		return false
 	}
 	return r.Spec.TerminationPolicy != DoNotTerminate
 }
 
-func (r Cluster) IsUpdating() bool {
+func (r *Cluster) IsUpdating() bool {
 	return r.Status.ObservedGeneration != r.Generation
 }
 
-func (r Cluster) IsStatusUpdating() bool {
+func (r *Cluster) IsStatusUpdating() bool {
 	return !r.IsDeleting() && !r.IsUpdating()
 }
 

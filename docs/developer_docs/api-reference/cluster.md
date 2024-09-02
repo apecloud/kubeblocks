@@ -26,10 +26,122 @@ sidebar_label: Cluster
 </div>
 Resource Types:
 <ul><li>
+<a href="#apps.kubeblocks.io/v1.Cluster">Cluster</a>
+</li><li>
 <a href="#apps.kubeblocks.io/v1.ClusterDefinition">ClusterDefinition</a>
+</li><li>
+<a href="#apps.kubeblocks.io/v1.Component">Component</a>
+</li><li>
+<a href="#apps.kubeblocks.io/v1.ComponentDefinition">ComponentDefinition</a>
+</li><li>
+<a href="#apps.kubeblocks.io/v1.ComponentVersion">ComponentVersion</a>
 </li><li>
 <a href="#apps.kubeblocks.io/v1.ServiceDescriptor">ServiceDescriptor</a>
 </li></ul>
+<h3 id="apps.kubeblocks.io/v1.Cluster">Cluster
+</h3>
+<div>
+<p>Cluster offers a unified management interface for a wide variety of database and storage systems:</p>
+<ul>
+<li>Relational databases: MySQL, PostgreSQL, MariaDB</li>
+<li>NoSQL databases: Redis, MongoDB</li>
+<li>KV stores: ZooKeeper, etcd</li>
+<li>Analytics systems: ElasticSearch, OpenSearch, ClickHouse, Doris, StarRocks, Solr</li>
+<li>Message queues: Kafka, Pulsar</li>
+<li>Distributed SQL: TiDB, OceanBase</li>
+<li>Vector databases: Qdrant, Milvus, Weaviate</li>
+<li>Object storage: Minio</li>
+</ul>
+<p>KubeBlocks utilizes an abstraction layer to encapsulate the characteristics of these diverse systems.
+A Cluster is composed of multiple Components, each defined by vendors or KubeBlocks Addon developers via ComponentDefinition,
+arranged in Directed Acyclic Graph (DAG) topologies.
+The topologies, defined in a ClusterDefinition, coordinate reconciliation across Cluster&rsquo;s lifecycle phases:
+Creating, Running, Updating, Stopping, Stopped, Deleting.
+Lifecycle management ensures that each Component operates in harmony, executing appropriate actions at each lifecycle stage.</p>
+<p>For sharded-nothing architecture, the Cluster supports managing multiple shards,
+each shard managed by a separate Component, supporting dynamic resharding.</p>
+<p>The Cluster object is aimed to maintain the overall integrity and availability of a database cluster,
+serves as the central control point, abstracting the complexity of multiple-component management,
+and providing a unified interface for cluster-wide operations.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>apiVersion</code><br/>
+string</td>
+<td>
+<code>apps.kubeblocks.io/v1</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+string
+</td>
+<td><code>Cluster</code></td>
+</tr>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterSpec">
+ClusterSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>foo</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Foo is an example field of Cluster. Edit cluster_types.go to remove/update</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterStatus">
+ClusterStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.ClusterDefinition">ClusterDefinition
 </h3>
 <div>
@@ -114,6 +226,285 @@ ClusterDefinitionSpec
 <em>
 <a href="#apps.kubeblocks.io/v1.ClusterDefinitionStatus">
 ClusterDefinitionStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.Component">Component
+</h3>
+<div>
+<p>Component is a fundamental building block of a Cluster object.
+For example, a Redis Cluster can include Components like &lsquo;redis&rsquo;, &lsquo;sentinel&rsquo;, and potentially a proxy like &lsquo;twemproxy&rsquo;.</p>
+<p>The Component object is responsible for managing the lifecycle of all replicas within a Cluster component,
+It supports a wide range of operations including provisioning, stopping, restarting, termination, upgrading,
+configuration changes, vertical and horizontal scaling, failover, switchover, cross-node migration,
+scheduling configuration, exposing Services, managing system accounts, enabling/disabling exporter,
+and configuring log collection.</p>
+<p>Component is an internal sub-object derived from the user-submitted Cluster object.
+It is designed primarily to be used by the KubeBlocks controllers,
+users are discouraged from modifying Component objects directly and should use them only for monitoring Component statuses.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>apiVersion</code><br/>
+string</td>
+<td>
+<code>apps.kubeblocks.io/v1</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+string
+</td>
+<td><code>Component</code></td>
+</tr>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentSpec">
+ComponentSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>foo</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Foo is an example field of Component. Edit component_types.go to remove/update</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentStatus">
+ComponentStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ComponentDefinition">ComponentDefinition
+</h3>
+<div>
+<p>ComponentDefinition serves as a reusable blueprint for creating Components,
+encapsulating essential static settings such as Component description,
+Pod templates, configuration file templates, scripts, parameter lists,
+injected environment variables and their sources, and event handlers.
+ComponentDefinition works in conjunction with dynamic settings from the ClusterComponentSpec,
+to instantiate Components during Cluster creation.</p>
+<p>Key aspects that can be defined in a ComponentDefinition include:</p>
+<ul>
+<li>PodSpec template: Specifies the PodSpec template used by the Component.</li>
+<li>Configuration templates: Specify the configuration file templates required by the Component.</li>
+<li>Scripts: Provide the necessary scripts for Component management and operations.</li>
+<li>Storage volumes: Specify the storage volumes and their configurations for the Component.</li>
+<li>Pod roles: Outlines various roles of Pods within the Component along with their capabilities.</li>
+<li>Exposed Kubernetes Services: Specify the Services that need to be exposed by the Component.</li>
+<li>System accounts: Define the system accounts required for the Component.</li>
+<li>Monitoring and logging: Configure the exporter and logging settings for the Component.</li>
+</ul>
+<p>ComponentDefinitions also enable defining reactive behaviors of the Component in response to events,
+such as member join/leave, Component addition/deletion, role changes, switch over, and more.
+This allows for automatic event handling, thus encapsulating complex behaviors within the Component.</p>
+<p>Referencing a ComponentDefinition when creating individual Components ensures inheritance of predefined configurations,
+promoting reusability and consistency across different deployments and cluster topologies.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>apiVersion</code><br/>
+string</td>
+<td>
+<code>apps.kubeblocks.io/v1</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+string
+</td>
+<td><code>ComponentDefinition</code></td>
+</tr>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">
+ComponentDefinitionSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>foo</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Foo is an example field of ComponentDefinition. Edit componentdefinition_types.go to remove/update</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentDefinitionStatus">
+ComponentDefinitionStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ComponentVersion">ComponentVersion
+</h3>
+<div>
+<p>ComponentVersion is the Schema for the componentversions API</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>apiVersion</code><br/>
+string</td>
+<td>
+<code>apps.kubeblocks.io/v1</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+string
+</td>
+<td><code>ComponentVersion</code></td>
+</tr>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentVersionSpec">
+ComponentVersionSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>foo</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Foo is an example field of ComponentVersion. Edit componentversion_types.go to remove/update</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentVersionStatus">
+ComponentVersionStatus
 </a>
 </em>
 </td>
@@ -388,6 +779,43 @@ string
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.ClusterSpec">ClusterSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.Cluster">Cluster</a>)
+</p>
+<div>
+<p>ClusterSpec defines the desired state of Cluster</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>foo</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Foo is an example field of Cluster. Edit cluster_types.go to remove/update</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ClusterStatus">ClusterStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.Cluster">Cluster</a>)
+</p>
+<div>
+<p>ClusterStatus defines the observed state of Cluster</p>
+</div>
 <h3 id="apps.kubeblocks.io/v1.ClusterTopology">ClusterTopology
 </h3>
 <p>
@@ -579,6 +1007,117 @@ separated by commas.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinition">ComponentDefinition</a>)
+</p>
+<div>
+<p>ComponentDefinitionSpec defines the desired state of ComponentDefinition</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>foo</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Foo is an example field of ComponentDefinition. Edit componentdefinition_types.go to remove/update</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ComponentDefinitionStatus">ComponentDefinitionStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinition">ComponentDefinition</a>)
+</p>
+<div>
+<p>ComponentDefinitionStatus defines the observed state of ComponentDefinition</p>
+</div>
+<h3 id="apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.Component">Component</a>)
+</p>
+<div>
+<p>ComponentSpec defines the desired state of Component</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>foo</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Foo is an example field of Component. Edit component_types.go to remove/update</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ComponentStatus">ComponentStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.Component">Component</a>)
+</p>
+<div>
+<p>ComponentStatus defines the observed state of Component</p>
+</div>
+<h3 id="apps.kubeblocks.io/v1.ComponentVersionSpec">ComponentVersionSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentVersion">ComponentVersion</a>)
+</p>
+<div>
+<p>ComponentVersionSpec defines the desired state of ComponentVersion</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>foo</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Foo is an example field of ComponentVersion. Edit componentversion_types.go to remove/update</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ComponentVersionStatus">ComponentVersionStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentVersion">ComponentVersion</a>)
+</p>
+<div>
+<p>ComponentVersionStatus defines the observed state of ComponentVersion</p>
+</div>
 <h3 id="apps.kubeblocks.io/v1.ConnectionCredentialAuth">ConnectionCredentialAuth
 </h3>
 <p>

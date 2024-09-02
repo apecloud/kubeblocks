@@ -24,8 +24,16 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
+	// Clusters returns a ClusterInformer.
+	Clusters() ClusterInformer
 	// ClusterDefinitions returns a ClusterDefinitionInformer.
 	ClusterDefinitions() ClusterDefinitionInformer
+	// Components returns a ComponentInformer.
+	Components() ComponentInformer
+	// ComponentDefinitions returns a ComponentDefinitionInformer.
+	ComponentDefinitions() ComponentDefinitionInformer
+	// ComponentVersions returns a ComponentVersionInformer.
+	ComponentVersions() ComponentVersionInformer
 	// ServiceDescriptors returns a ServiceDescriptorInformer.
 	ServiceDescriptors() ServiceDescriptorInformer
 }
@@ -41,9 +49,29 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
+// Clusters returns a ClusterInformer.
+func (v *version) Clusters() ClusterInformer {
+	return &clusterInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
 // ClusterDefinitions returns a ClusterDefinitionInformer.
 func (v *version) ClusterDefinitions() ClusterDefinitionInformer {
 	return &clusterDefinitionInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// Components returns a ComponentInformer.
+func (v *version) Components() ComponentInformer {
+	return &componentInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// ComponentDefinitions returns a ComponentDefinitionInformer.
+func (v *version) ComponentDefinitions() ComponentDefinitionInformer {
+	return &componentDefinitionInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// ComponentVersions returns a ComponentVersionInformer.
+func (v *version) ComponentVersions() ComponentVersionInformer {
+	return &componentVersionInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // ServiceDescriptors returns a ServiceDescriptorInformer.

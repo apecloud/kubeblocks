@@ -11,7 +11,6 @@ spec:
   names:
     categories:
     - kubeblocks
-    - all
     kind: Component
     listKind: ComponentList
     plural: components
@@ -20,6 +19,74 @@ spec:
     singular: component
   scope: Namespaced
   versions:
+  - additionalPrinterColumns:
+    - description: component definition
+      jsonPath: .spec.compDef
+      name: DEFINITION
+      type: string
+    - description: service version
+      jsonPath: .spec.serviceVersion
+      name: SERVICE-VERSION
+      type: string
+    - description: status phase
+      jsonPath: .status.phase
+      name: STATUS
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          Component is a fundamental building block of a Cluster object.
+          For example, a Redis Cluster can include Components like 'redis', 'sentinel', and potentially a proxy like 'twemproxy'.
+
+
+          The Component object is responsible for managing the lifecycle of all replicas within a Cluster component,
+          It supports a wide range of operations including provisioning, stopping, restarting, termination, upgrading,
+          configuration changes, vertical and horizontal scaling, failover, switchover, cross-node migration,
+          scheduling configuration, exposing Services, managing system accounts, enabling/disabling exporter,
+          and configuring log collection.
+
+
+          Component is an internal sub-object derived from the user-submitted Cluster object.
+          It is designed primarily to be used by the KubeBlocks controllers,
+          users are discouraged from modifying Component objects directly and should use them only for monitoring Component statuses.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ComponentSpec defines the desired state of Component
+            properties:
+              foo:
+                description: Foo is an example field of Component. Edit component_types.go
+                  to remove/update
+                type: string
+            type: object
+          status:
+            description: ComponentStatus defines the observed state of Component
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
   - additionalPrinterColumns:
     - description: component definition
       jsonPath: .spec.compDef
@@ -7654,6 +7721,6 @@ spec:
             type: object
         type: object
     served: true
-    storage: true
+    storage: false
     subresources:
       status: {}

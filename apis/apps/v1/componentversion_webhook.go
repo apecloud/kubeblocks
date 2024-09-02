@@ -25,9 +25,9 @@ import (
 )
 
 // log is for logging in this package.
-var clusterdefinitionlog = logf.Log.WithName("clusterdefinition-resource")
+var componentversionlog = logf.Log.WithName("componentversion-resource")
 
-func (r *ClusterDefinition) SetupWebhookWithManager(mgr ctrl.Manager) error {
+func (r *ComponentVersion) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
 		Complete()

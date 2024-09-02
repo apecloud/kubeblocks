@@ -25,9 +25,9 @@ import (
 )
 
 // log is for logging in this package.
-var clusterdefinitionlog = logf.Log.WithName("clusterdefinition-resource")
+var clusterlog = logf.Log.WithName("cluster-resource")
 
-func (r *ClusterDefinition) SetupWebhookWithManager(mgr ctrl.Manager) error {
+func (r *Cluster) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
 		Complete()

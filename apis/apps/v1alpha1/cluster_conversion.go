@@ -17,20 +17,18 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package v1
+package v1alpha1
 
 import (
-	ctrl "sigs.k8s.io/controller-runtime"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/conversion"
 )
 
-// log is for logging in this package.
-var clusterdefinitionlog = logf.Log.WithName("clusterdefinition-resource")
-
-func (r *ClusterDefinition) SetupWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).
-		For(r).
-		Complete()
+// ConvertTo converts this Cluster to the Hub version (v1).
+func (r *Cluster) ConvertTo(dstRaw conversion.Hub) error {
+	return nil
 }
 
-// TODO(user): EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
+// ConvertFrom converts from the Hub version (v1) to this version.
+func (r *Cluster) ConvertFrom(srcRaw conversion.Hub) error {
+	return nil
+}

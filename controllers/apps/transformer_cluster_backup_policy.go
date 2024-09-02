@@ -468,6 +468,15 @@ func (r *clusterBackupPolicyTransformer) doEnvMapping(comp *appsv1alpha1.Cluster
 				Value: cm.MappingValue,
 			})
 		}
+		for _, sv := range v.ValueFrom.ServiceVersion {
+			if !slices.Contains(sv.Names, comp.ServiceVersion) {
+				continue
+			}
+			env = append(env, corev1.EnvVar{
+				Name:  v.Key,
+				Value: sv.MappingValue,
+			})
+		}
 	}
 	return env
 }

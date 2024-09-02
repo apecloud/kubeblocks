@@ -72,6 +72,11 @@ func (f *MockComponentDefinitionFactory) SetDefaultSpec() *MockComponentDefiniti
 	return f
 }
 
+func (f *MockComponentDefinitionFactory) SetBackupPolicyTemplateName(backupPolicyTemplateName string) *MockComponentDefinitionFactory {
+	f.Get().Spec.BackupPolicyTemplateName = backupPolicyTemplateName
+	return f
+}
+
 // SetRuntime adds a new container to runtime, or updates it to @container if it's already existed.
 // If @container is nil, the default MySQL container (defaultMySQLContainer) will be used.
 func (f *MockComponentDefinitionFactory) SetRuntime(container *corev1.Container) *MockComponentDefinitionFactory {

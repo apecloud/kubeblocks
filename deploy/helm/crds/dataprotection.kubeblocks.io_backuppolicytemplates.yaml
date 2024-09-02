@@ -1,0 +1,451 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+  labels:
+    app.kubernetes.io/name: kubeblocks
+  name: backuppolicytemplates.dataprotection.kubeblocks.io
+spec:
+  group: dataprotection.kubeblocks.io
+  names:
+    categories:
+    - kubeblocks
+    kind: BackupPolicyTemplate
+    listKind: BackupPolicyTemplateList
+    plural: backuppolicytemplates
+    shortNames:
+    - bpt
+    singular: backuppolicytemplate
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - description: service kind of the backupPolicyTemplate.
+      jsonPath: .spec.serviceKind
+      name: SERVICE-KIND
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          BackupPolicyTemplate should be provided by addon developers.
+          It is responsible for generating BackupPolicies for the addon that requires backup operations,
+          also determining the suitable backup methods and strategies.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: Defines the desired state of the BackupPolicyTemplate.
+            properties:
+              backoffLimit:
+                default: 2
+                description: Specifies the maximum number of retry attempts for a
+                  backup before it is considered a failure.
+                format: int32
+                maximum: 10
+                minimum: 0
+                type: integer
+              backupMethods:
+                description: Defines an array of BackupMethods to be used.
+                items:
+                  properties:
+                    actionSetName:
+                      description: |-
+                        Refers to the ActionSet object that defines the backup actions.
+                        For volume snapshot backup, the actionSet is not required, the controller
+                        will use the CSI volume snapshotter to create the snapshot.
+                      type: string
+                    env:
+                      description: Specifies the environment variables for the backup
+                        workload.
+                      items:
+                        properties:
+                          value:
+                            description: Specifies the environment variable value.
+                            type: string
+                          valueFrom:
+                            description: |-
+                              Specifies the source used to derive the value of the environment variable,
+                              which typically represents the tool image required for backup operation.
+                            properties:
+                              versionMapping:
+                                description: Determine the appropriate version of
+                                  the backup tool image from service version.
+                                items:
+                                  properties:
+                                    mappedValue:
+                                      description: Specifies the appropriate version
+                                        of the backup tool image.
+                                      type: string
+                                    serviceVersions:
+                                      description: |-
+                                        Represents an array of names of ComponentDefinition that can be mapped to the appropriate version of the backup tool image.
+                                        Each name in the list can represent an exact name, a name prefix, or a regular expression pattern.
+
+
+                                        For example:
+
+
+                                        - "8.0.33": Matches the exact name "8.0.33"
+                                        - "8.0": Matches all names starting with "8.0"
+                                        - "^8.0.\d{1,2}$": Matches all names starting with "8.0." followed by one or two digits.
+                                      items:
+                                        type: string
+                                      type: array
+                                  required:
+                                  - mappedValue
+                                  - serviceVersions
+                                  type: object
+                                type: array
+                            type: object
+                        required:
+                        - value
+                        type: object
+                      type: array
+                    name:
+                      description: The name of backup method.
+                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                      type: string
+                    runtimeSettings:
+                      description: Specifies runtime settings for the backup workload
+                        container.
+                      properties:
+                        resources:
+                          description: |-
+                            Specifies the resource required by container.
+                            More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/
+                          properties:
+                            claims:
+                              description: |-
+                                Claims lists the names of resources, defined in spec.resourceClaims,
+                                that are used by this container.
+
+
+                                This is an alpha field and requires enabling the
+                                DynamicResourceAllocation feature gate.
+
+
+                                This field is immutable. It can only be set for containers.
+                              items:
+                                description: ResourceClaim references one entry in
+                                  PodSpec.ResourceClaims.
+                                properties:
+                                  name:
+                                    description: |-
+                                      Name must match the name of one entry in pod.spec.resourceClaims of
+                                      the Pod where this field is used. It makes that resource available
+                                      inside a container.
+                                    type: string
+                                required:
+                                - name
+                                type: object
+                              type: array
+                              x-kubernetes-list-map-keys:
+                              - name
+                              x-kubernetes-list-type: map
+                            limits:
+                              additionalProperties:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                x-kubernetes-int-or-string: true
+                              description: |-
+                                Limits describes the maximum amount of compute resources allowed.
+                                More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                              type: object
+                            requests:
+                              additionalProperties:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                x-kubernetes-int-or-string: true
+                              description: |-
+                                Requests describes the minimum amount of compute resources required.
+                                If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                                otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                                More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                              type: object
+                          type: object
+                      type: object
+                    snapshotVolumes:
+                      default: false
+                      description: |-
+                        Specifies whether to take snapshots of persistent volumes. If true,
+                        the ActionSetName is not required, the controller will use the CSI volume
+                        snapshotter to create the snapshot.
+                      type: boolean
+                    target:
+                      description: |-
+                        If set, specifies the method for selecting the replica to be backed up using the criteria defined here.
+                        If this field is not set, the selection method specified in `backupPolicy.target` is used.
+
+
+                        This field provides a way to override the global `backupPolicy.target` setting for specific BackupMethod.
+                      properties:
+                        account:
+                          description: |-
+                            If `backupPolicy.componentDefs` is set, this field is required to specify the system account name.
+                            This account must match one listed in `componentDefinition.spec.systemAccounts[*].name`.
+                            The corresponding secret created by this account is used to connect to the database.
+                          type: string
+                        containerPort:
+                          description: |-
+                            Specifies the container port in the target pod.
+                            If not specified, the first container and its first port will be used.
+                          properties:
+                            containerName:
+                              description: Specifies the name of container with the
+                                port.
+                              type: string
+                            portName:
+                              description: Specifies the port name.
+                              type: string
+                          type: object
+                        fallbackRole:
+                          description: |-
+                            Specifies the fallback role to select one replica for backup, this only takes effect when the
+                            `strategy` field below is set to `Any`.
+                          type: string
+                        role:
+                          description: |-
+                            Specifies the role to select one or more replicas for backup.
+
+
+                            - If no replica with the specified role exists, the backup task will fail.
+                              Special case: If there is only one replica in the cluster, it will be used for backup,
+                              even if its role differs from the specified one.
+                              For example, if you specify backing up on a secondary replica, but the cluster is single-node
+                              with only one primary replica, the primary will be used for backup.
+                              Future versions will address this special case using role priorities.
+                            - If multiple replicas satisfy the specified role, the choice (`Any` or `All`) will be made according to
+                              the `strategy` field below.
+                          type: string
+                        strategy:
+                          description: |-
+                            Specifies the PodSelectionStrategy to use when multiple pods are
+                            selected for the backup target.
+                            Valid values are:
+
+
+                            - Any: Selects any one pod that matches the labelsSelector.
+                            - All: Selects all pods that match the labelsSelector.
+                          enum:
+                          - Any
+                          - All
+                          type: string
+                      required:
+                      - role
+                      type: object
+                    targetVolumes:
+                      description: Specifies which volumes from the target should
+                        be mounted in the backup workload.
+                      properties:
+                        volumeMounts:
+                          description: Specifies the mount for the volumes specified
+                            in `volumes` section.
+                          items:
+                            description: VolumeMount describes a mounting of a Volume
+                              within a container.
+                            properties:
+                              mountPath:
+                                description: |-
+                                  Path within the container at which the volume should be mounted.  Must
+                                  not contain ':'.
+                                type: string
+                              mountPropagation:
+                                description: |-
+                                  mountPropagation determines how mounts are propagated from the host
+                                  to container and the other way around.
+                                  When not set, MountPropagationNone is used.
+                                  This field is beta in 1.10.
+                                type: string
+                              name:
+                                description: This must match the Name of a Volume.
+                                type: string
+                              readOnly:
+                                description: |-
+                                  Mounted read-only if true, read-write otherwise (false or unspecified).
+                                  Defaults to false.
+                                type: boolean
+                              subPath:
+                                description: |-
+                                  Path within the volume from which the container's volume should be mounted.
+                                  Defaults to "" (volume's root).
+                                type: string
+                              subPathExpr:
+                                description: |-
+                                  Expanded path within the volume from which the container's volume should be mounted.
+                                  Behaves similarly to SubPath but environment variable references $(VAR_NAME) are expanded using the container's environment.
+                                  Defaults to "" (volume's root).
+                                  SubPathExpr and SubPath are mutually exclusive.
+                                type: string
+                            required:
+                            - mountPath
+                            - name
+                            type: object
+                          type: array
+                        volumes:
+                          description: |-
+                            Specifies the list of volumes of targeted application that should be mounted
+                            on the backup workload.
+                          items:
+                            type: string
+                          type: array
+                      type: object
+                  required:
+                  - name
+                  type: object
+                type: array
+              schedules:
+                description: |-
+                  Defines the execution plans for backup tasks, specifying when and how backups should occur,
+                  and the retention period of backup files.
+                items:
+                  properties:
+                    backupMethod:
+                      description: Specifies the backup method name that is defined
+                        in backupPolicy.
+                      type: string
+                    cronExpression:
+                      description: |-
+                        Specifies the cron expression for the schedule. The timezone is in UTC.
+                        see https://en.wikipedia.org/wiki/Cron.
+                      type: string
+                    enabled:
+                      description: Specifies whether the backup schedule is enabled
+                        or not.
+                      type: boolean
+                    retentionPeriod:
+                      default: 7d
+                      description: "Determines the duration for which the backup should
+                        be kept.\nKubeBlocks will remove all backups that are older
+                        than the RetentionPeriod.\nFor example, RetentionPeriod of
+                        `30d` will keep only the backups of last 30 days.\nSample
+                        duration format:\n\n\n- years: \t2y\n- months: \t6mo\n- days:
+                        \t\t30d\n- hours: \t12h\n- minutes: \t30m\n\n\nYou can also
+                        combine the above durations. For example: 30d12h30m"
+                      type: string
+                  required:
+                  - backupMethod
+                  - cronExpression
+                  type: object
+                type: array
+              serviceKind:
+                description: |-
+                  Defines the type of well-known service protocol that the BackupPolicyTemplate provides, and it is optional.
+                  Some examples of well-known service protocols include:
+
+
+                  - "MySQL": Indicates that the Component provides a MySQL database service.
+                  - "PostgreSQL": Indicates that the Component offers a PostgreSQL database service.
+                  - "Redis": Signifies that the Component functions as a Redis key-value store.
+                  - "ETCD": Denotes that the Component serves as an ETCD distributed key-value store
+                maxLength: 32
+                type: string
+              target:
+                description: |-
+                  Defines the selection criteria of instance to be backed up, and the connection credential to be used
+                  during the backup process.
+                properties:
+                  account:
+                    description: |-
+                      If `backupPolicy.componentDefs` is set, this field is required to specify the system account name.
+                      This account must match one listed in `componentDefinition.spec.systemAccounts[*].name`.
+                      The corresponding secret created by this account is used to connect to the database.
+                    type: string
+                  containerPort:
+                    description: |-
+                      Specifies the container port in the target pod.
+                      If not specified, the first container and its first port will be used.
+                    properties:
+                      containerName:
+                        description: Specifies the name of container with the port.
+                        type: string
+                      portName:
+                        description: Specifies the port name.
+                        type: string
+                    type: object
+                  fallbackRole:
+                    description: |-
+                      Specifies the fallback role to select one replica for backup, this only takes effect when the
+                      `strategy` field below is set to `Any`.
+                    type: string
+                  role:
+                    description: |-
+                      Specifies the role to select one or more replicas for backup.
+
+
+                      - If no replica with the specified role exists, the backup task will fail.
+                        Special case: If there is only one replica in the cluster, it will be used for backup,
+                        even if its role differs from the specified one.
+                        For example, if you specify backing up on a secondary replica, but the cluster is single-node
+                        with only one primary replica, the primary will be used for backup.
+                        Future versions will address this special case using role priorities.
+                      - If multiple replicas satisfy the specified role, the choice (`Any` or `All`) will be made according to
+                        the `strategy` field below.
+                    type: string
+                  strategy:
+                    description: |-
+                      Specifies the PodSelectionStrategy to use when multiple pods are
+                      selected for the backup target.
+                      Valid values are:
+
+
+                      - Any: Selects any one pod that matches the labelsSelector.
+                      - All: Selects all pods that match the labelsSelector.
+                    enum:
+                    - Any
+                    - All
+                    type: string
+                required:
+                - role
+                type: object
+            required:
+            - backupMethods
+            type: object
+          status:
+            description: Populated by the system, it represents the current information
+              about the BackupPolicyTemplate.
+            properties:
+              message:
+                description: Provides additional information about the current phase.
+                type: string
+              observedGeneration:
+                description: Represents the most recent generation observed for this
+                  BackupPolicyTemplate.
+                format: int64
+                type: integer
+              phase:
+                description: |-
+                  Specifies the current phase of the ClusterDefinition. Valid values are `empty`, `Available`, `Unavailable`.
+                  When `Available`, the BackupPolicyTemplate is ready and can be referenced by related objects.
+                enum:
+                - Available
+                - Unavailable
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

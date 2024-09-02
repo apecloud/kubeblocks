@@ -14,24 +14,26 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apps
+package dataprotection
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
 )
 
 var _ = Describe("", func() {
 	var (
 		BackupPolicyTemplateName = "test-bpt"
 		BackupMethod             = "test-bm"
-		ActionSetName            = "test-as"
 		VsBackupMethodName       = "test-vs-bm"
 		ttl                      = "7d"
 	)
@@ -55,13 +57,10 @@ var _ = Describe("", func() {
 		cleanEnv()
 	})
 
-	Context("create a backuppolicytemplate", func() {
-		It("should be available", func() {
-			compDef1 := "compDef1"
-			compDef2 := "compDef2"
-			bpt := testapps.NewBackupPolicyTemplateFactory(BackupPolicyTemplateName).
-				AddBackupPolicy(compDef1, compDef2).
-				AddBackupMethod(BackupMethod, false, ActionSetName).
+	Context("create a BackupPolicyTemplate", func() {
+		It("test BackupPolicyTemplate", func() {
+			bpt := testdp.NewBackupPolicyTemplateFactory(BackupPolicyTemplateName).
+				AddBackupMethod(BackupMethod, false, testdp.ActionSetName).
 				SetBackupMethodVolumeMounts("data", "/data").
 				AddBackupMethod(VsBackupMethodName, true, "").
 				SetBackupMethodVolumeMounts("data", "/data").
@@ -69,9 +68,20 @@ var _ = Describe("", func() {
 				AddSchedule(VsBackupMethodName, "0 0 * * *", ttl, true).
 				Create(&testCtx).GetObject()
 			key := client.ObjectKeyFromObject(bpt)
-			Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, pobj *v1alpha1.BackupPolicyTemplate) {
-				g.Expect(pobj.GetLabels()[compDef1]).To(Equal(compDef1))
-				g.Expect(pobj.GetLabels()[compDef2]).To(Equal(compDef2))
+
+			By("should be unavailable")
+			Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, pobj *dpv1alpha1.BackupPolicyTemplate) {
+				g.Expect(pobj.Status.ObservedGeneration).To(Equal(bpt.Generation))
+				g.Expect(pobj.Status.Phase).To(Equal(dpv1alpha1.UnavailablePhase))
+				g.Expect(pobj.Status.Message).To(ContainSubstring(fmt.Sprintf(`ActionSet "%s" not found`, testdp.ActionSetName)))
+			})).Should(Succeed())
+
+			By("should be available")
+			testdp.NewFakeActionSet(&testCtx)
+			Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, pobj *dpv1alpha1.BackupPolicyTemplate) {
+				g.Expect(pobj.Status.ObservedGeneration).To(Equal(bpt.Generation))
+				g.Expect(pobj.Status.Phase).To(Equal(dpv1alpha1.AvailablePhase))
+				g.Expect(pobj.Status.Message).To(BeEmpty())
 			})).Should(Succeed())
 		})
 	})

@@ -99,6 +99,11 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	Provider string `json:"provider,omitempty"`
 
+	// Specifies a BackupPolicyTemplate name if data protection functionality is supported.
+	// Which will automatically create the corresponding backupPolicy.
+	// +optional
+	BackupPolicyTemplateName string `json:"backupPolicyTemplateName,omitempty"`
+
 	// Provides a brief and concise explanation of the Component's purpose, functionality, and any relevant details.
 	// It serves as a quick reference for users to understand the Component's role and characteristics.
 	//

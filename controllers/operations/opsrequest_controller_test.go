@@ -250,10 +250,12 @@ var _ = Describe("OpsRequest Controller", func() {
 		BeforeEach(func() {
 			testk8s.MockEnableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
 
+			bpt := testdp.CreateBackupPolicyTpl(&testCtx)
 			By("Create a componentDefinition obj")
 			compDefObj = testapps.NewComponentDefinitionFactory(compDefName).
 				AddAnnotations(constant.HorizontalScaleBackupPolicyTemplateKey, testdp.BackupPolicyTPLName).
 				SetDefaultSpec().
+				SetBackupPolicyTemplateName(bpt.Name).
 				Create(&testCtx).
 				GetObject()
 
@@ -311,7 +313,6 @@ var _ = Describe("OpsRequest Controller", func() {
 		}
 
 		createMysqlCluster := func(replicas int32) {
-			testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.GetName())
 
 			By("set component to horizontal with snapshot policy")
 			testk8s.MockEnableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)

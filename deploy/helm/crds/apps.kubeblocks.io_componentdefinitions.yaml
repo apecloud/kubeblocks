@@ -100,6 +100,11 @@ spec:
 
                   This field is immutable.
                 type: object
+              backupPolicyTemplateName:
+                description: |-
+                  Specifies a BackupPolicyTemplate name if data protection functionality is supported.
+                  Which will automatically create the corresponding backupPolicy.
+                type: string
               configs:
                 description: |-
                   Specifies the configuration file templates and volume mount parameters used by the Component.

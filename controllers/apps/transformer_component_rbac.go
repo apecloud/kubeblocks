@@ -21,7 +21,6 @@ package apps
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -31,7 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -40,7 +38,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -102,17 +99,8 @@ func isLifecycleActionsEnabled(compDef *appsv1.ComponentDefinition) bool {
 	return compDef.Spec.LifecycleActions != nil
 }
 
-func isDataProtectionEnabled(backupTpl *appsv1alpha1.BackupPolicyTemplate, cluster *appsv1.Cluster, comp *appsv1.Component) bool {
-	if backupTpl != nil && len(comp.Spec.CompDef) > 0 {
-		for _, policy := range backupTpl.Spec.BackupPolicies {
-			for _, compDef := range policy.ComponentDefs {
-				if strings.HasPrefix(comp.Spec.CompDef, compDef) {
-					return true
-				}
-			}
-		}
-	}
-	return false
+func isDataProtectionEnabled(compDef *appsv1.ComponentDefinition) bool {
+	return compDef.Spec.BackupPolicyTemplateName != "" || compDef.Annotations[constant.HorizontalScaleBackupPolicyTemplateKey] != ""
 }
 
 func isServiceAccountExist(transCtx *componentTransformContext, serviceAccountName string) bool {
@@ -172,23 +160,6 @@ func isRoleBindingExist(transCtx *componentTransformContext, serviceAccountName 
 	}
 	return true
 }
-
-func getDefaultBackupPolicyTemplate(transCtx *componentTransformContext, clusterDefName string) (*appsv1alpha1.BackupPolicyTemplate, error) {
-	backupPolicyTPLs := &appsv1alpha1.BackupPolicyTemplateList{}
-	if err := transCtx.Client.List(transCtx.Context, backupPolicyTPLs, client.MatchingLabels{constant.ClusterDefLabelKey: clusterDefName}); err != nil {
-		return nil, err
-	}
-	if len(backupPolicyTPLs.Items) == 0 {
-		return nil, nil
-	}
-	for _, item := range backupPolicyTPLs.Items {
-		if item.Annotations[dptypes.DefaultBackupPolicyTemplateAnnotationKey] == trueVal {
-			return &item, nil
-		}
-	}
-	return &backupPolicyTPLs.Items[0], nil
-}
-
 // buildServiceAccount builds the service account for the component.
 func buildServiceAccount(transCtx *componentTransformContext) (*corev1.ServiceAccount, error) {
 	var (
@@ -197,15 +168,8 @@ func buildServiceAccount(transCtx *componentTransformContext) (*corev1.ServiceAc
 		compDef         = transCtx.CompDef
 		synthesizedComp = transCtx.SynthesizeComponent
 	)
-
-	// TODO(component): dependency on cluster definition
-	backupPolicyTPL, err := getDefaultBackupPolicyTemplate(transCtx, cluster.Spec.ClusterDef)
-	if err != nil {
-		return nil, err
-	}
-
 	serviceAccountName := comp.Spec.ServiceAccountName
-	dataProtectionEnable := isDataProtectionEnabled(backupPolicyTPL, cluster, comp)
+	dataProtectionEnable := isDataProtectionEnabled( cluster, comp)
 	if serviceAccountName == "" {
 		// If lifecycle actions and data protection are disabled at the same tme, then do not create a service account.
 		if !isLifecycleActionsEnabled(compDef) && !dataProtectionEnable {

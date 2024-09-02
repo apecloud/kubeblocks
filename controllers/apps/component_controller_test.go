@@ -139,12 +139,13 @@ var _ = Describe("Component Controller", func() {
 	}
 
 	// test function helpers
-	createAllDefinitionObjects := func() {
+	createAllDefinitionObjects := func(bptName string) {
 		By("Create a componentDefinition obj")
 		compDefObj = testapps.NewComponentDefinitionFactory(compDefName).
 			WithRandomName().
 			AddAnnotations(constant.SkipImmutableCheckAnnotationKey, "true").
 			SetDefaultSpec().
+			SetBackupPolicyTemplateName(bptName).
 			Create(&testCtx).
 			GetObject()
 
@@ -1674,8 +1675,8 @@ var _ = Describe("Component Controller", func() {
 
 	Context("provisioning", func() {
 		BeforeEach(func() {
-			createAllDefinitionObjects()
-			testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.GetName())
+			bpt := testdp.CreateBackupPolicyTpl(&testCtx)
+			createAllDefinitionObjects(bpt.Name)
 		})
 
 		AfterEach(func() {
@@ -1752,8 +1753,8 @@ var _ = Describe("Component Controller", func() {
 
 	Context("h-scaling", func() {
 		BeforeEach(func() {
-			createAllDefinitionObjects()
-			testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.GetName())
+			bpt := testdp.CreateBackupPolicyTpl(&testCtx)
+			createAllDefinitionObjects(bpt.Name)
 		})
 
 		AfterEach(func() {
@@ -1852,8 +1853,8 @@ var _ = Describe("Component Controller", func() {
 		)
 
 		BeforeEach(func() {
-			createAllDefinitionObjects()
-			testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.GetName())
+			bpt := testdp.CreateBackupPolicyTpl(&testCtx)
+			createAllDefinitionObjects(bpt.Name)
 			mockStorageClass = testk8s.CreateMockStorageClass(&testCtx, testk8s.DefaultStorageClassName)
 		})
 
@@ -1879,8 +1880,8 @@ var _ = Describe("Component Controller", func() {
 
 	Context("restore", func() {
 		BeforeEach(func() {
-			createAllDefinitionObjects()
-			testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.GetName())
+			bpt := testdp.CreateBackupPolicyTpl(&testCtx)
+			createAllDefinitionObjects(bpt.Name)
 		})
 
 		AfterEach(func() {
@@ -1895,7 +1896,7 @@ var _ = Describe("Component Controller", func() {
 	Context("start & stop", func() {
 		BeforeEach(func() {
 			cleanEnv()
-			createAllDefinitionObjects()
+			createAllDefinitionObjects("")
 		})
 
 		startComp := func() {
@@ -2022,7 +2023,7 @@ var _ = Describe("Component Controller", func() {
 	Context("reconcile with definition and version", func() {
 		BeforeEach(func() {
 			cleanEnv()
-			createAllDefinitionObjects()
+			createAllDefinitionObjects("")
 		})
 
 		testImageUnchangedAfterNewReleasePublished := func(release kbappsv1.ComponentVersionRelease) {

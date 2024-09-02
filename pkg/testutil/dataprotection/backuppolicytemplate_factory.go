@@ -17,84 +17,73 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package apps
+package dataprotection
 
 import (
 	corev1 "k8s.io/api/core/v1"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
 type MockBackupPolicyTemplateFactory struct {
-	BaseFactory[appsv1alpha1.BackupPolicyTemplate, *appsv1alpha1.BackupPolicyTemplate, MockBackupPolicyTemplateFactory]
+	testapps.BaseFactory[dpv1alpha1.BackupPolicyTemplate, *dpv1alpha1.BackupPolicyTemplate, MockBackupPolicyTemplateFactory]
 }
 
 func NewBackupPolicyTemplateFactory(name string) *MockBackupPolicyTemplateFactory {
 	f := &MockBackupPolicyTemplateFactory{}
 	f.Init("", name,
-		&appsv1alpha1.BackupPolicyTemplate{},
+		&dpv1alpha1.BackupPolicyTemplate{},
 		f)
 	return f
 }
 
-func (f *MockBackupPolicyTemplateFactory) getLastBackupPolicy() *appsv1alpha1.BackupPolicy {
+/*func (f *MockBackupPolicyTemplateFactory) getLastBackupPolicy() *dpv1alpha1.BackupPolicy {
 	l := len(f.Get().Spec.BackupPolicies)
 	if l == 0 {
 		return nil
 	}
 	backupPolicies := f.Get().Spec.BackupPolicies
 	return &backupPolicies[l-1]
-}
+}*/
 
-func (f *MockBackupPolicyTemplateFactory) getLastBackupMethod() *dpv1alpha1.BackupMethod {
-	backupPolicy := f.getLastBackupPolicy()
-	l := len(backupPolicy.BackupMethods)
+func (f *MockBackupPolicyTemplateFactory) getLastBackupMethod() *dpv1alpha1.BackupMethodTPL {
+	l := len(f.Get().Spec.BackupMethods)
 	if l == 0 {
 		return nil
 	}
-	backupMethods := backupPolicy.BackupMethods
-	return &backupMethods[l-1].BackupMethod
+	backupMethods := f.Get().Spec.BackupMethods
+	return &backupMethods[l-1]
 }
 
-func (f *MockBackupPolicyTemplateFactory) AddBackupPolicy(compDefs ...string) *MockBackupPolicyTemplateFactory {
-	f.Get().Spec.BackupPolicies = append(f.Get().Spec.BackupPolicies, appsv1alpha1.BackupPolicy{
-		ComponentDefs: compDefs,
-	})
-	return f
-}
-
-func (f *MockBackupPolicyTemplateFactory) setBackupPolicyField(setField func(backupPolicy *appsv1alpha1.BackupPolicy)) {
+/*func (f *MockBackupPolicyTemplateFactory) setBackupPolicyField(setField func(backupPolicy *dpv1alpha1.BackupPolicy)) {
 	backupPolicy := f.getLastBackupPolicy()
 	if backupPolicy == nil {
 		// ignore
 		return
 	}
 	setField(backupPolicy)
-}
+}*/
 
 func (f *MockBackupPolicyTemplateFactory) AddSchedule(method, schedule, retentionPeriod string, enable bool) *MockBackupPolicyTemplateFactory {
-	schedulePolicy := appsv1alpha1.SchedulePolicy{
+	schedulePolicy := dpv1alpha1.SchedulePolicy{
 		Enabled:         &enable,
 		CronExpression:  schedule,
 		BackupMethod:    method,
 		RetentionPeriod: dpv1alpha1.RetentionPeriod(retentionPeriod),
 	}
-	backupPolicy := f.getLastBackupPolicy()
-	backupPolicy.Schedules = append(backupPolicy.Schedules, schedulePolicy)
+	f.Get().Spec.Schedules = append(f.Get().Spec.Schedules, schedulePolicy)
 	return f
 }
 
 func (f *MockBackupPolicyTemplateFactory) AddBackupMethod(name string, snapshotVolumes bool, actionSetName string) *MockBackupPolicyTemplateFactory {
-	backupPolicy := f.getLastBackupPolicy()
-	backupMethod := appsv1alpha1.BackupMethod{
-		BackupMethod: dpv1alpha1.BackupMethod{
-			Name:            name,
-			SnapshotVolumes: &snapshotVolumes,
-			ActionSetName:   actionSetName,
-			TargetVolumes:   &dpv1alpha1.TargetVolumeInfo{},
-		}}
-	backupPolicy.BackupMethods = append(backupPolicy.BackupMethods, backupMethod)
+	backupMethod := dpv1alpha1.BackupMethodTPL{
+		Name:            name,
+		SnapshotVolumes: &snapshotVolumes,
+		ActionSetName:   actionSetName,
+		TargetVolumes:   &dpv1alpha1.TargetVolumeInfo{},
+	}
+	f.Get().Spec.BackupMethods = append(f.Get().Spec.BackupMethods, backupMethod)
 	return f
 }
 
@@ -106,7 +95,7 @@ func (f *MockBackupPolicyTemplateFactory) SetBackupMethodVolumes(names []string)
 
 func (f *MockBackupPolicyTemplateFactory) SetBackupMethodVolumeMounts(keyAndValues ...string) *MockBackupPolicyTemplateFactory {
 	var volumeMounts []corev1.VolumeMount
-	for k, v := range WithMap(keyAndValues...) {
+	for k, v := range testapps.WithMap(keyAndValues...) {
 		volumeMounts = append(volumeMounts, corev1.VolumeMount{
 			Name:      k,
 			MountPath: v,
@@ -118,9 +107,7 @@ func (f *MockBackupPolicyTemplateFactory) SetBackupMethodVolumeMounts(keyAndValu
 }
 
 func (f *MockBackupPolicyTemplateFactory) SetTargetRole(role string) *MockBackupPolicyTemplateFactory {
-	f.setBackupPolicyField(func(backupPolicy *appsv1alpha1.BackupPolicy) {
-		backupPolicy.Target.Role = role
-	})
+	f.Get().Spec.Target.Role = role
 	return f
 }
 

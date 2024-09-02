@@ -109,23 +109,19 @@ func fakeActionSet(testCtx *testutil.TestContext, clusterDefName string) *dpv1al
 	return actionSet
 }
 
-func CreateBackupPolicyTpl(testCtx *testutil.TestContext, compDef string) {
+func CreateBackupPolicyTpl(testCtx *testutil.TestContext) *dpv1alpha1.BackupPolicyTemplate {
 	By("create actionSet")
 	fakeActionSet(testCtx, "")
 
 	By("Creating a BackupPolicyTemplate")
-	bpt := testapps.NewBackupPolicyTemplateFactory(BackupPolicyTPLName).
-		AddLabels(compDef, compDef)
-
 	ttl := "7d"
-	bpt = bpt.AddBackupPolicy(compDef).
-		AddBackupMethod(BackupMethodName, false, ActionSetName).
+	return NewBackupPolicyTemplateFactory(BackupPolicyTPLName).AddBackupMethod(BackupMethodName, false, ActionSetName).
 		SetBackupMethodVolumeMounts("data", "/data").
 		AddBackupMethod(VSBackupMethodName, true, "").
 		SetBackupMethodVolumes([]string{"data"}).
 		AddSchedule(BackupMethodName, "0 0 * * *", ttl, true).
-		AddSchedule(VSBackupMethodName, "0 0 * * *", ttl, true)
-	bpt.Create(testCtx)
+		AddSchedule(VSBackupMethodName, "0 0 * * *", ttl, true).
+		Create(testCtx).Get()
 }
 
 func CheckRestoreAndSetCompleted(testCtx *testutil.TestContext, clusterKey types.NamespacedName, compName string, scaleOutReplicas int) {

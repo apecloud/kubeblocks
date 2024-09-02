@@ -19,31 +19,37 @@ rules:
   - get
   - list
 - apiGroups:
-  - apps.kubeblocks.io
+  - apps
   resources:
-  - backuppolicytemplates
+  - statefulsets
   verbs:
   - create
   - delete
+  - deletecollection
   - get
   - list
   - patch
   - update
   - watch
 - apiGroups:
-  - apps.kubeblocks.io
+  - apps
   resources:
-  - backuppolicytemplates/finalizers
+  - statefulsets/finalizers
   verbs:
   - update
 - apiGroups:
-  - apps.kubeblocks.io
+  - apps
   resources:
-  - backuppolicytemplates/status
+  - statefulsets/status
   verbs:
   - get
-  - patch
-  - update
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
+  - backuppolicytemplates
+  verbs:
+  - get
+  - list
 - apiGroups:
   - apps.kubeblocks.io
   resources:
@@ -546,6 +552,32 @@ rules:
   - dataprotection.kubeblocks.io
   resources:
   - backuppolicies/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
+  - backuppolicytemplates
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
+  - backuppolicytemplates/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
+  - backuppolicytemplates/status
   verbs:
   - get
   - patch

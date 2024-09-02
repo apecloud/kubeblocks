@@ -144,17 +144,20 @@ func (c *itsUpdateStrategyConvertor) convert(args ...any) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	if memberUpdateStrategy := getMemberUpdateStrategy(synthesizedComp); memberUpdateStrategy != nil {
-		return &workloads.InstanceUpdateStrategy{
-			MemberUpdateStrategy: memberUpdateStrategy,
-		}, nil
-	}
-	if synthesizedComp.InstanceUpdateStrategy == nil {
+	memberUpdateStrategy := getMemberUpdateStrategy(synthesizedComp)
+	if memberUpdateStrategy == nil && synthesizedComp.InstanceUpdateStrategy == nil {
 		return nil, nil
 	}
+	var partition *int32
+	var maxUnavailable *intstr.IntOrString
+	if synthesizedComp.InstanceUpdateStrategy != nil {
+		partition = synthesizedComp.InstanceUpdateStrategy.Partition
+		maxUnavailable = synthesizedComp.InstanceUpdateStrategy.MaxUnavailable
+	}
 	return &workloads.InstanceUpdateStrategy{
-		Partition:      synthesizedComp.InstanceUpdateStrategy.Partition,
-		MaxUnavailable: synthesizedComp.InstanceUpdateStrategy.MaxUnavailable,
+		Partition:            partition,
+		MaxUnavailable:       maxUnavailable,
+		MemberUpdateStrategy: memberUpdateStrategy,
 	}, nil
 }
 

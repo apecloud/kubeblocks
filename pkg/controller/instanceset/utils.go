@@ -90,6 +90,14 @@ func getRoleName(pod *corev1.Pod) string {
 	return strings.ToLower(pod.Labels[constant.RoleLabelKey])
 }
 
+// getExpectUpdatedReplicas gets the expected UpdatedReplicas when IsInstancesReady returns true
+func isUpdatedReplicasExpected(its *workloads.InstanceSet) bool {
+	if its.Spec.UpdateStrategy == nil || its.Spec.UpdateStrategy.Partition == nil {
+		return its.Status.UpdatedReplicas == *its.Spec.Replicas
+	}
+	return its.Status.UpdatedReplicas == *its.Spec.Replicas || its.Status.UpdatedReplicas == *its.Spec.UpdateStrategy.Partition
+}
+
 // IsInstancesReady gives Instance level 'ready' state when all instances are available
 func IsInstancesReady(its *workloads.InstanceSet) bool {
 	if its == nil {
@@ -110,7 +118,7 @@ func IsInstancesReady(its *workloads.InstanceSet) bool {
 	replicas := *its.Spec.Replicas
 	if its.Status.Replicas != replicas ||
 		its.Status.ReadyReplicas != replicas ||
-		its.Status.UpdatedReplicas != replicas {
+		!isUpdatedReplicasExpected(its) {
 		return false
 	}
 	// check availableReplicas only if minReadySeconds is set

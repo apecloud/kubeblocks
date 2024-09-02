@@ -83,6 +83,9 @@ func getHeadlessSvcName(itsName string) string {
 }
 
 func buildEnvConfigMap(its workloads.InstanceSet, labels map[string]string) (*corev1.ConfigMap, error) {
+	if viper.GetBool(constant.FeatureGateNoRSMEnv) {
+		return nil, nil
+	}
 	envData, err := buildEnvConfigData(its)
 	if err != nil {
 		return nil, err
@@ -433,10 +436,6 @@ func buildEnvConfigData(its workloads.InstanceSet) (map[string]string, error) {
 	uid := string(its.UID)
 	strReplicas := strconv.Itoa(int(*its.Spec.Replicas))
 	generateReplicaEnv := func(prefix string, podNames []string) {
-		// avoid to build too many envs
-		// TODO(free6om): don't hard code
-		maxEnv := 128
-		podNames = podNames[:min(len(podNames), maxEnv)]
 		for _, podName := range podNames {
 			_, ordinal := ParseParentNameAndOrdinal(podName)
 			hostNameTplKey := prefix + strconv.Itoa(ordinal) + "_HOSTNAME"

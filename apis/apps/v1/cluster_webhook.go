@@ -21,11 +21,10 @@ package v1
 
 import (
 	ctrl "sigs.k8s.io/controller-runtime"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // log is for logging in this package.
-var clusterlog = logf.Log.WithName("cluster-resource")
+// var clusterlog = logf.Log.WithName("cluster-resource")
 
 func (r *Cluster) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).

@@ -21,11 +21,10 @@ package v1
 
 import (
 	ctrl "sigs.k8s.io/controller-runtime"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // log is for logging in this package.
-var componentlog = logf.Log.WithName("component-resource")
+// var componentlog = logf.Log.WithName("component-resource")
 
 func (r *Component) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).

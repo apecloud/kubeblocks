@@ -48,6 +48,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -136,7 +137,7 @@ var _ = Describe("Component Controller", func() {
 
 	var (
 		compDefObj  *appsv1alpha1.ComponentDefinition
-		compVerObj  *appsv1alpha1.ComponentVersion
+		compVerObj  *kbappsv1.ComponentVersion
 		clusterObj  *appsv1alpha1.Cluster
 		clusterKey  types.NamespacedName
 		compObj     *appsv1alpha1.Component
@@ -2297,7 +2298,7 @@ var _ = Describe("Component Controller", func() {
 			createAllDefinitionObjects()
 		})
 
-		testImageUnchangedAfterNewReleasePublished := func(release appsv1alpha1.ComponentVersionRelease) {
+		testImageUnchangedAfterNewReleasePublished := func(release kbappsv1.ComponentVersionRelease) {
 			prevRelease := compVerObj.Spec.Releases[0]
 
 			By("check new release")
@@ -2324,7 +2325,7 @@ var _ = Describe("Component Controller", func() {
 
 			By("publish a new release")
 			compVerKey := client.ObjectKeyFromObject(compVerObj)
-			Expect(testapps.GetAndChangeObj(&testCtx, compVerKey, func(compVer *appsv1alpha1.ComponentVersion) {
+			Expect(testapps.GetAndChangeObj(&testCtx, compVerKey, func(compVer *kbappsv1.ComponentVersion) {
 				compVer.Spec.Releases = append(compVer.Spec.Releases, release)
 				compVer.Spec.CompatibilityRules[0].Releases = append(compVer.Spec.CompatibilityRules[0].Releases, release.Name)
 			})()).Should(Succeed())
@@ -2350,7 +2351,7 @@ var _ = Describe("Component Controller", func() {
 		}
 
 		It("publish new release with different service version", func() {
-			release := appsv1alpha1.ComponentVersionRelease{
+			release := kbappsv1.ComponentVersionRelease{
 				Name:           "8.0.30-r2",
 				ServiceVersion: "8.0.31", // different service version
 				Images: map[string]string{
@@ -2361,7 +2362,7 @@ var _ = Describe("Component Controller", func() {
 		})
 
 		It("publish new release with same service version", func() {
-			release := appsv1alpha1.ComponentVersionRelease{
+			release := kbappsv1.ComponentVersionRelease{
 				Name:           "8.0.30-r2",
 				ServiceVersion: "8.0.30", // same service version
 				Images: map[string]string{

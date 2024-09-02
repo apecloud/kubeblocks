@@ -21,11 +21,10 @@ package v1
 
 import (
 	ctrl "sigs.k8s.io/controller-runtime"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // log is for logging in this package.
-var servicedescriptorlog = logf.Log.WithName("servicedescriptor-resource")
+// var servicedescriptorlog = logf.Log.WithName("servicedescriptor-resource")
 
 func (r *ServiceDescriptor) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).

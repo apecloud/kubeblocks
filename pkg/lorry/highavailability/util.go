@@ -34,7 +34,7 @@ const (
 func IsHAAvailable(characterType, workloadType string) bool {
 	switch models.EngineType(strings.ToLower(characterType)) {
 	case models.MongoDB:
-		return true
+		return false
 	case models.MySQL:
 		return false
 	case models.WeSQL:

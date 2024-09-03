@@ -205,7 +205,7 @@ func (t *ClusterAPINormalizationTransformer) buildCompAnnotationsInheritedFromCl
 
 func (t *ClusterAPINormalizationTransformer) resolveCompDefinitions(transCtx *clusterTransformContext) error {
 	if transCtx.ComponentDefs == nil {
-		transCtx.ComponentDefs = make(map[string]*appsv1alpha1.ComponentDefinition)
+		transCtx.ComponentDefs = make(map[string]*appsv1.ComponentDefinition)
 	}
 	for i, compSpec := range transCtx.ComponentSpecs {
 		compDef, serviceVersion, err := t.resolveCompDefinitionNServiceVersion(transCtx, compSpec)
@@ -221,7 +221,7 @@ func (t *ClusterAPINormalizationTransformer) resolveCompDefinitions(transCtx *cl
 }
 
 func (t *ClusterAPINormalizationTransformer) resolveCompDefinitionNServiceVersion(transCtx *clusterTransformContext,
-	compSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.ComponentDefinition, string, error) {
+	compSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1.ComponentDefinition, string, error) {
 	if withClusterLegacyDefinition(transCtx.Cluster) || withClusterSimplifiedAPI(transCtx.Cluster) {
 		return nil, "", fmt.Errorf("legacy cluster definition or simplified API are not supported")
 	}
@@ -229,13 +229,13 @@ func (t *ClusterAPINormalizationTransformer) resolveCompDefinitionNServiceVersio
 }
 
 func (t *ClusterAPINormalizationTransformer) resolveCompDefinitionNServiceVersionWithUpgrade(transCtx *clusterTransformContext,
-	compSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.ComponentDefinition, string, error) {
+	compSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1.ComponentDefinition, string, error) {
 	var (
 		ctx     = transCtx.Context
 		cli     = transCtx.Client
 		cluster = transCtx.Cluster
 	)
-	comp := &appsv1alpha1.Component{}
+	comp := &appsv1.Component{}
 	err := cli.Get(ctx, types.NamespacedName{Namespace: cluster.Namespace, Name: component.FullName(cluster.Name, compSpec.Name)}, comp)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, "", err
@@ -247,7 +247,7 @@ func (t *ClusterAPINormalizationTransformer) resolveCompDefinitionNServiceVersio
 	return resolveCompDefinitionNServiceVersion(ctx, cli, comp.Spec.CompDef, comp.Spec.ServiceVersion)
 }
 
-func (t *ClusterAPINormalizationTransformer) checkCompUpgrade(compSpec *appsv1alpha1.ClusterComponentSpec, comp *appsv1alpha1.Component) bool {
+func (t *ClusterAPINormalizationTransformer) checkCompUpgrade(compSpec *appsv1alpha1.ClusterComponentSpec, comp *appsv1.Component) bool {
 	return compSpec.ServiceVersion != comp.Spec.ServiceVersion || compSpec.ComponentDef != comp.Spec.CompDef
 }
 

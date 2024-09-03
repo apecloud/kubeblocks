@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -187,7 +188,7 @@ func renderSwitchoverCmdJob(ctx context.Context,
 		return nil, errors.New("serviceable and writable pod not found")
 	}
 
-	renderJob := func(switchoverSpec *appsv1alpha1.Action, switchoverEnvs []corev1.EnvVar) (*batchv1.Job, error) {
+	renderJob := func(switchoverSpec *appsv1.Action, switchoverEnvs []corev1.EnvVar) (*batchv1.Job, error) {
 		if switchoverSpec == nil {
 			return nil, errors.New("switchover exec action not found")
 		}

@@ -93,12 +93,12 @@ func (r *ComponentVersionReconciler) Reconcile(ctx context.Context, req ctrl.Req
 func (r *ComponentVersionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1.ComponentVersion{}).
-		Watches(&appsv1alpha1.ComponentDefinition{}, handler.EnqueueRequestsFromMapFunc(r.compatibleCompVersion)).
+		Watches(&appsv1.ComponentDefinition{}, handler.EnqueueRequestsFromMapFunc(r.compatibleCompVersion)).
 		Complete(r)
 }
 
 func (r *ComponentVersionReconciler) compatibleCompVersion(ctx context.Context, obj client.Object) []reconcile.Request {
-	compDef, ok := obj.(*appsv1alpha1.ComponentDefinition)
+	compDef, ok := obj.(*appsv1.ComponentDefinition)
 	if !ok {
 		return nil
 	}
@@ -119,7 +119,7 @@ func (r *ComponentVersionReconciler) compatibleCompVersion(ctx context.Context, 
 	return requests
 }
 
-func (r *ComponentVersionReconciler) isCompatibleWith(compDef appsv1alpha1.ComponentDefinition, compVer appsv1.ComponentVersion) bool {
+func (r *ComponentVersionReconciler) isCompatibleWith(compDef appsv1.ComponentDefinition, compVer appsv1.ComponentVersion) bool {
 	for _, rule := range compVer.Spec.CompatibilityRules {
 		for _, name := range rule.CompDefs {
 			if strings.HasPrefix(compDef.Name, name) {
@@ -138,7 +138,7 @@ func (r *ComponentVersionReconciler) reconcile(rctx intctrlutil.RequestCtx,
 	}
 
 	// if compVersion.Status.ObservedGeneration == compVersion.Generation &&
-	//	slices.Contains([]appsv1alpha1.Phase{appsv1alpha1.AvailablePhase}, compVersion.Status.Phase) {
+	//	slices.Contains([]appsv1.Phase{appsv1.AvailablePhase}, compVersion.Status.Phase) {
 	//	return intctrlutil.Reconciled()
 	// }
 
@@ -171,8 +171,8 @@ func (r *ComponentVersionReconciler) reconcile(rctx intctrlutil.RequestCtx,
 }
 
 func (r *ComponentVersionReconciler) buildReleaseToCompDefinitionMapping(cli client.Client, rctx intctrlutil.RequestCtx,
-	compVersion *appsv1.ComponentVersion) (map[string]map[string]*appsv1alpha1.ComponentDefinition, error) {
-	compDefs := make(map[string][]*appsv1alpha1.ComponentDefinition)
+	compVersion *appsv1.ComponentVersion) (map[string]map[string]*appsv1.ComponentDefinition, error) {
+	compDefs := make(map[string][]*appsv1.ComponentDefinition)
 	for _, rule := range compVersion.Spec.CompatibilityRules {
 		for _, compDef := range rule.CompDefs {
 			if _, ok := compDefs[compDef]; ok {
@@ -185,11 +185,11 @@ func (r *ComponentVersionReconciler) buildReleaseToCompDefinitionMapping(cli cli
 			}
 		}
 	}
-	releaseToCompDefinitions := make(map[string]map[string]*appsv1alpha1.ComponentDefinition)
+	releaseToCompDefinitions := make(map[string]map[string]*appsv1.ComponentDefinition)
 	for _, rule := range compVersion.Spec.CompatibilityRules {
 		for _, release := range rule.Releases {
 			if _, ok := releaseToCompDefinitions[release]; !ok {
-				releaseToCompDefinitions[release] = map[string]*appsv1alpha1.ComponentDefinition{}
+				releaseToCompDefinitions[release] = map[string]*appsv1.ComponentDefinition{}
 			}
 			for _, compDefName := range rule.CompDefs {
 				for i, compDef := range compDefs[compDefName] {
@@ -252,7 +252,7 @@ func (r *ComponentVersionReconciler) supportedServiceVersions(compVersion *appsv
 }
 
 func (r *ComponentVersionReconciler) updateSupportedCompDefLabels(cli client.Client, rctx intctrlutil.RequestCtx,
-	compVersion *appsv1.ComponentVersion, releaseToCompDefinitions map[string]map[string]*appsv1alpha1.ComponentDefinition) error {
+	compVersion *appsv1.ComponentVersion, releaseToCompDefinitions map[string]map[string]*appsv1.ComponentDefinition) error {
 	if compVersion.Annotations == nil {
 		compVersion.Annotations = make(map[string]string)
 	}
@@ -284,7 +284,7 @@ func (r *ComponentVersionReconciler) updateSupportedCompDefLabels(cli client.Cli
 }
 
 func (r *ComponentVersionReconciler) validate(compVersion *appsv1.ComponentVersion,
-	releaseToCompDefinitions map[string]map[string]*appsv1alpha1.ComponentDefinition) error {
+	releaseToCompDefinitions map[string]map[string]*appsv1.ComponentDefinition) error {
 	for _, release := range compVersion.Spec.Releases {
 		if err := r.validateRelease(release, releaseToCompDefinitions); err != nil {
 			return err
@@ -294,9 +294,9 @@ func (r *ComponentVersionReconciler) validate(compVersion *appsv1.ComponentVersi
 }
 
 func (r *ComponentVersionReconciler) validateRelease(release appsv1.ComponentVersionRelease,
-	releaseToCompDefinitions map[string]map[string]*appsv1alpha1.ComponentDefinition) error {
+	releaseToCompDefinitions map[string]map[string]*appsv1.ComponentDefinition) error {
 	cmpds, ok := releaseToCompDefinitions[release.Name]
-	notNil := func(cmpd *appsv1alpha1.ComponentDefinition) bool {
+	notNil := func(cmpd *appsv1.ComponentDefinition) bool {
 		return cmpd != nil
 	}
 	if !ok || generics.CountFunc(maps.Values(cmpds), notNil) == 0 {
@@ -315,8 +315,8 @@ func (r *ComponentVersionReconciler) validateServiceVersion(release appsv1.Compo
 	return validateServiceVersion(release.ServiceVersion)
 }
 
-func (r *ComponentVersionReconciler) validateImages(release appsv1.ComponentVersionRelease, cmpds map[string]*appsv1alpha1.ComponentDefinition) error {
-	validateContainer := func(cmpd appsv1alpha1.ComponentDefinition, name string) error {
+func (r *ComponentVersionReconciler) validateImages(release appsv1.ComponentVersionRelease, cmpds map[string]*appsv1.ComponentDefinition) error {
+	validateContainer := func(cmpd appsv1.ComponentDefinition, name string) error {
 		cmp := func(c corev1.Container) bool {
 			return c.Name == name
 		}
@@ -342,16 +342,16 @@ func (r *ComponentVersionReconciler) validateImages(release appsv1.ComponentVers
 }
 
 // resolveCompDefinitionNServiceVersion resolves and returns the specific component definition object and the service version supported.
-func resolveCompDefinitionNServiceVersion(ctx context.Context, cli client.Reader, compDefName, serviceVersion string) (*appsv1alpha1.ComponentDefinition, string, error) {
+func resolveCompDefinitionNServiceVersion(ctx context.Context, cli client.Reader, compDefName, serviceVersion string) (*appsv1.ComponentDefinition, string, error) {
 	var (
-		compDef *appsv1alpha1.ComponentDefinition
+		compDef *appsv1.ComponentDefinition
 	)
 	compDefs, err := listCompDefinitionsWithPrefix(ctx, cli, compDefName)
 	if err != nil {
 		return compDef, serviceVersion, err
 	}
 
-	// mapping from <service version> to <[]*appsv1alpha1.ComponentDefinition>
+	// mapping from <service version> to <[]*appsv1.ComponentDefinition>
 	serviceVersionToCompDefs, err := serviceVersionToCompDefinitions(ctx, cli, compDefs, serviceVersion)
 	if err != nil {
 		return compDef, serviceVersion, err
@@ -381,17 +381,17 @@ func resolveCompDefinitionNServiceVersion(ctx context.Context, cli client.Reader
 }
 
 func serviceVersionToCompDefinitions(ctx context.Context, cli client.Reader,
-	compDefs []*appsv1alpha1.ComponentDefinition, serviceVersion string) (map[string]map[string]*appsv1alpha1.ComponentDefinition, error) {
-	result := make(map[string]map[string]*appsv1alpha1.ComponentDefinition)
+	compDefs []*appsv1.ComponentDefinition, serviceVersion string) (map[string]map[string]*appsv1.ComponentDefinition, error) {
+	result := make(map[string]map[string]*appsv1.ComponentDefinition)
 
-	insert := func(version string, compDef *appsv1alpha1.ComponentDefinition) {
+	insert := func(version string, compDef *appsv1.ComponentDefinition) {
 		if _, ok := result[version]; !ok {
-			result[version] = make(map[string]*appsv1alpha1.ComponentDefinition)
+			result[version] = make(map[string]*appsv1.ComponentDefinition)
 		}
 		result[version][compDef.Name] = compDef
 	}
 
-	checkedInsert := func(version string, compDef *appsv1alpha1.ComponentDefinition) error {
+	checkedInsert := func(version string, compDef *appsv1.ComponentDefinition) error {
 		match, err := component.CompareServiceVersion(serviceVersion, version)
 		if err == nil && match {
 			insert(version, compDef)
@@ -424,7 +424,7 @@ func serviceVersionToCompDefinitions(ctx context.Context, cli client.Reader,
 }
 
 // compatibleServiceVersions4Definition returns all service versions that are compatible with specified component definition.
-func compatibleServiceVersions4Definition(compDef *appsv1alpha1.ComponentDefinition, compVersion *appsv1.ComponentVersion) sets.Set[string] {
+func compatibleServiceVersions4Definition(compDef *appsv1.ComponentDefinition, compVersion *appsv1.ComponentVersion) sets.Set[string] {
 	prefixMatch := func(prefix string) bool {
 		return strings.HasPrefix(compDef.Name, prefix)
 	}

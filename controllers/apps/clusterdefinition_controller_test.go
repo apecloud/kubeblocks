@@ -28,7 +28,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
@@ -116,9 +115,9 @@ var _ = Describe("ClusterDefinition Controller", func() {
 				AddServiceRef("service-2", "service-2", "v2").
 				Create(&testCtx).
 				GetObject()
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(compDefObj), func(g Gomega, compDef *appsv1alpha1.ComponentDefinition) {
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(compDefObj), func(g Gomega, compDef *appsv1.ComponentDefinition) {
 				g.Expect(compDef.Status.ObservedGeneration).Should(Equal(compDef.Generation))
-				g.Expect(compDef.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
+				g.Expect(compDef.Status.Phase).Should(Equal(appsv1.AvailablePhase))
 			})).Should(Succeed())
 
 			By("Create a ClusterDefinition obj")

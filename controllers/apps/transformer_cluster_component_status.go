@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -63,7 +64,7 @@ func (t *clusterComponentStatusTransformer) reconcileComponentsStatus(transCtx *
 			Namespace: cluster.Namespace,
 			Name:      component.FullName(cluster.Name, compSpec.Name),
 		}
-		comp := &appsv1alpha1.Component{}
+		comp := &appsv1.Component{}
 		if err := transCtx.Client.Get(transCtx.Context, compKey, comp); err != nil {
 			if apierrors.IsNotFound(err) {
 				continue
@@ -77,7 +78,7 @@ func (t *clusterComponentStatusTransformer) reconcileComponentsStatus(transCtx *
 
 // buildClusterCompStatus builds cluster component status from specified component object.
 func (t *clusterComponentStatusTransformer) buildClusterCompStatus(transCtx *clusterTransformContext,
-	comp *appsv1alpha1.Component, compName string) appsv1alpha1.ClusterComponentStatus {
+	comp *appsv1.Component, compName string) appsv1alpha1.ClusterComponentStatus {
 	var (
 		cluster = transCtx.Cluster
 		status  = cluster.Status.Components[compName]
@@ -99,9 +100,9 @@ func (t *clusterComponentStatusTransformer) buildClusterCompStatus(transCtx *clu
 }
 
 // updateClusterComponentStatus sets the cluster component phase and messages conditionally.
-func (t *clusterComponentStatusTransformer) updateClusterComponentStatus(comp *appsv1alpha1.Component,
+func (t *clusterComponentStatusTransformer) updateClusterComponentStatus(comp *appsv1.Component,
 	status *appsv1alpha1.ClusterComponentStatus) {
-	if status.Phase != comp.Status.Phase {
+	if string(status.Phase) != string(comp.Status.Phase) {
 		status.Phase = comp.Status.Phase
 		if status.Message == nil {
 			status.Message = comp.Status.Message
@@ -122,11 +123,11 @@ func (t *clusterComponentStatusTransformer) updateClusterComponentStatus(comp *a
 	}
 }
 
-func (t *clusterComponentStatusTransformer) isClusterComponentPodsReady(phase appsv1alpha1.ClusterComponentPhase) bool {
-	podsReadyPhases := []appsv1alpha1.ClusterComponentPhase{
-		appsv1alpha1.RunningClusterCompPhase,
-		appsv1alpha1.StoppingClusterCompPhase,
-		appsv1alpha1.StoppedClusterCompPhase,
+func (t *clusterComponentStatusTransformer) isClusterComponentPodsReady(phase appsv1.ClusterComponentPhase) bool {
+	podsReadyPhases := []appsv1.ClusterComponentPhase{
+		appsv1.RunningClusterCompPhase,
+		appsv1.StoppingClusterCompPhase,
+		appsv1.StoppedClusterCompPhase,
 	}
 	return slices.Contains(podsReadyPhases, phase)
 }

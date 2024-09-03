@@ -46,7 +46,7 @@ var _ = Describe("Component", func() {
 		)
 
 		var (
-			compDef *appsv1alpha1.ComponentDefinition
+			compDef *appsv1.ComponentDefinition
 			cluster *appsv1alpha1.Cluster
 		)
 
@@ -61,7 +61,7 @@ var _ = Describe("Component", func() {
 
 		})
 
-		compObj := func() *appsv1alpha1.Component {
+		compObj := func() *appsv1.Component {
 			comp, err := BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
 			Expect(err).Should(Succeed())
 			return comp
@@ -207,7 +207,7 @@ func TestGetConfigSpecByName(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want *appsv1alpha1.ComponentConfigSpec
+		want *appsv1.ComponentConfigSpec
 	}{{
 		name: "test",
 		args: args{
@@ -219,8 +219,8 @@ func TestGetConfigSpecByName(t *testing.T) {
 		name: "test",
 		args: args{
 			component: &SynthesizedComponent{
-				ConfigTemplates: []appsv1alpha1.ComponentConfigSpec{{
-					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+				ConfigTemplates: []appsv1.ComponentConfigSpec{{
+					ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
 						Name: "test",
 					}}},
 			},
@@ -231,15 +231,15 @@ func TestGetConfigSpecByName(t *testing.T) {
 		name: "test",
 		args: args{
 			component: &SynthesizedComponent{
-				ConfigTemplates: []appsv1alpha1.ComponentConfigSpec{{
-					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+				ConfigTemplates: []appsv1.ComponentConfigSpec{{
+					ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
 						Name: "for-test",
 					}}},
 			},
 			configSpec: "for-test",
 		},
-		want: &appsv1alpha1.ComponentConfigSpec{
-			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+		want: &appsv1.ComponentConfigSpec{
+			ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
 				Name: "for-test",
 			}},
 	}}

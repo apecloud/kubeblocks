@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -39,7 +40,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 
 	var noneCommand = []string{"/bin/true"}
 	var clusterObj *appsv1alpha1.Cluster
-	var compDefObj *appsv1alpha1.ComponentDefinition
+	var compDefObj *appsv1.ComponentDefinition
 	var clusterComponent *component.SynthesizedComponent
 
 	BeforeEach(func() {

@@ -27,11 +27,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 type MockComponentDefinitionFactory struct {
-	BaseFactory[appsv1alpha1.ComponentDefinition, *appsv1alpha1.ComponentDefinition, MockComponentDefinitionFactory]
+	BaseFactory[kbappsv1.ComponentDefinition, *kbappsv1.ComponentDefinition, MockComponentDefinitionFactory]
 }
 
 func NewComponentDefinitionFactory(name string) *MockComponentDefinitionFactory {
@@ -41,8 +41,8 @@ func NewComponentDefinitionFactory(name string) *MockComponentDefinitionFactory 
 func NewComponentDefinitionFactoryExt(name, provider, description, serviceKind, serviceVersion string) *MockComponentDefinitionFactory {
 	f := &MockComponentDefinitionFactory{}
 	f.Init("", name,
-		&appsv1alpha1.ComponentDefinition{
-			Spec: appsv1alpha1.ComponentDefinitionSpec{
+		&kbappsv1.ComponentDefinition{
+			Spec: kbappsv1.ComponentDefinitionSpec{
 				Provider:       provider,
 				Description:    description,
 				ServiceKind:    serviceKind,
@@ -111,34 +111,34 @@ func (f *MockComponentDefinitionFactory) AddVolumeMounts(containerName string, v
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) AddVar(v appsv1alpha1.EnvVar) *MockComponentDefinitionFactory {
+func (f *MockComponentDefinitionFactory) AddVar(v kbappsv1.EnvVar) *MockComponentDefinitionFactory {
 	if f.Get().Spec.Vars == nil {
-		f.Get().Spec.Vars = make([]appsv1alpha1.EnvVar, 0)
+		f.Get().Spec.Vars = make([]kbappsv1.EnvVar, 0)
 	}
 	f.Get().Spec.Vars = append(f.Get().Spec.Vars, v)
 	return f
 }
 
 func (f *MockComponentDefinitionFactory) AddVolume(name string, snapshot bool, watermark int) *MockComponentDefinitionFactory {
-	vol := appsv1alpha1.ComponentVolume{
+	vol := kbappsv1.ComponentVolume{
 		Name:          name,
 		NeedSnapshot:  snapshot,
 		HighWatermark: watermark,
 	}
 	if f.Get().Spec.Volumes == nil {
-		f.Get().Spec.Volumes = make([]appsv1alpha1.ComponentVolume, 0)
+		f.Get().Spec.Volumes = make([]kbappsv1.ComponentVolume, 0)
 	}
 	f.Get().Spec.Volumes = append(f.Get().Spec.Volumes, vol)
 	return f
 }
 
 func (f *MockComponentDefinitionFactory) AddHostNetworkContainerPort(container string, ports []string) *MockComponentDefinitionFactory {
-	containerPort := appsv1alpha1.HostNetworkContainerPort{
+	containerPort := kbappsv1.HostNetworkContainerPort{
 		Container: container,
 		Ports:     ports,
 	}
 	if f.Get().Spec.HostNetwork == nil {
-		f.Get().Spec.HostNetwork = &appsv1alpha1.HostNetwork{}
+		f.Get().Spec.HostNetwork = &kbappsv1.HostNetwork{}
 	}
 	f.Get().Spec.HostNetwork.ContainerPorts = append(f.Get().Spec.HostNetwork.ContainerPorts, containerPort)
 	return f
@@ -154,8 +154,8 @@ func (f *MockComponentDefinitionFactory) AddService(name, serviceName string, po
 }
 
 func (f *MockComponentDefinitionFactory) AddServiceExt(name, serviceName string, serviceSpec corev1.ServiceSpec, roleSelector string) *MockComponentDefinitionFactory {
-	svc := appsv1alpha1.ComponentService{
-		Service: appsv1alpha1.Service{
+	svc := kbappsv1.ComponentService{
+		Service: kbappsv1.Service{
 			Name:         name,
 			ServiceName:  serviceName,
 			Spec:         serviceSpec,
@@ -163,7 +163,7 @@ func (f *MockComponentDefinitionFactory) AddServiceExt(name, serviceName string,
 		},
 	}
 	if f.Get().Spec.Services == nil {
-		f.Get().Spec.Services = make([]appsv1alpha1.ComponentService, 0)
+		f.Get().Spec.Services = make([]kbappsv1.ComponentService, 0)
 	}
 	f.Get().Spec.Services = append(f.Get().Spec.Services, svc)
 	return f
@@ -171,8 +171,8 @@ func (f *MockComponentDefinitionFactory) AddServiceExt(name, serviceName string,
 
 func (f *MockComponentDefinitionFactory) AddConfigTemplate(name, configTemplateRef, configConstraintRef,
 	namespace, volumeName string, injectEnvTo ...string) *MockComponentDefinitionFactory {
-	config := appsv1alpha1.ComponentConfigSpec{
-		ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+	config := kbappsv1.ComponentConfigSpec{
+		ComponentTemplateSpec: kbappsv1.ComponentTemplateSpec{
 			Name:        name,
 			TemplateRef: configTemplateRef,
 			Namespace:   namespace,
@@ -182,44 +182,44 @@ func (f *MockComponentDefinitionFactory) AddConfigTemplate(name, configTemplateR
 		InjectEnvTo:         injectEnvTo,
 	}
 	if f.Get().Spec.Configs == nil {
-		f.Get().Spec.Configs = make([]appsv1alpha1.ComponentConfigSpec, 0)
+		f.Get().Spec.Configs = make([]kbappsv1.ComponentConfigSpec, 0)
 	}
 	f.Get().Spec.Configs = append(f.Get().Spec.Configs, config)
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) AddConfigs(configs []appsv1alpha1.ComponentConfigSpec) *MockComponentDefinitionFactory {
+func (f *MockComponentDefinitionFactory) AddConfigs(configs []kbappsv1.ComponentConfigSpec) *MockComponentDefinitionFactory {
 	if f.Get().Spec.Configs == nil {
-		f.Get().Spec.Configs = make([]appsv1alpha1.ComponentConfigSpec, 0)
+		f.Get().Spec.Configs = make([]kbappsv1.ComponentConfigSpec, 0)
 	}
 	f.Get().Spec.Configs = append(f.Get().Spec.Configs, configs...)
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) AddScripts(scripts []appsv1alpha1.ComponentTemplateSpec) *MockComponentDefinitionFactory {
+func (f *MockComponentDefinitionFactory) AddScripts(scripts []kbappsv1.ComponentTemplateSpec) *MockComponentDefinitionFactory {
 	if f.Get().Spec.Scripts == nil {
-		f.Get().Spec.Scripts = make([]appsv1alpha1.ComponentTemplateSpec, 0)
+		f.Get().Spec.Scripts = make([]kbappsv1.ComponentTemplateSpec, 0)
 	}
 	f.Get().Spec.Scripts = append(f.Get().Spec.Scripts, scripts...)
 	return f
 }
 
 func (f *MockComponentDefinitionFactory) AddLogConfig(name, filePathPattern string) *MockComponentDefinitionFactory {
-	logConfig := appsv1alpha1.LogConfig{
+	logConfig := kbappsv1.LogConfig{
 		FilePathPattern: filePathPattern,
 		Name:            name,
 	}
 	if f.Get().Spec.LogConfigs == nil {
-		f.Get().Spec.LogConfigs = make([]appsv1alpha1.LogConfig, 0)
+		f.Get().Spec.LogConfigs = make([]kbappsv1.LogConfig, 0)
 	}
 	f.Get().Spec.LogConfigs = append(f.Get().Spec.LogConfigs, logConfig)
 	return f
 }
 
 // func (f *MockComponentDefinitionFactory) SetMonitor(builtIn bool, scrapePort intstr.IntOrString, scrapePath string) *MockComponentDefinitionFactory {
-// 	f.Get().Spec.Monitor = &appsv1alpha1.MonitorConfig{
+// 	f.Get().Spec.Monitor = &kbappsv1.MonitorConfig{
 // 		BuiltIn: builtIn,
-// 		Exporter: &appsv1alpha1.ExporterConfig{
+// 		Exporter: &kbappsv1.ExporterConfig{
 // 			ScrapePort: scrapePort,
 // 			ScrapePath: scrapePath,
 // 		},
@@ -229,7 +229,7 @@ func (f *MockComponentDefinitionFactory) AddLogConfig(name, filePathPattern stri
 
 func (f *MockComponentDefinitionFactory) AddScriptTemplate(name, configTemplateRef, namespace, volumeName string,
 	mode *int32) *MockComponentDefinitionFactory {
-	script := appsv1alpha1.ComponentTemplateSpec{
+	script := kbappsv1.ComponentTemplateSpec{
 		Name:        name,
 		TemplateRef: configTemplateRef,
 		Namespace:   namespace,
@@ -237,7 +237,7 @@ func (f *MockComponentDefinitionFactory) AddScriptTemplate(name, configTemplateR
 		DefaultMode: mode,
 	}
 	if f.Get().Spec.Scripts == nil {
-		f.Get().Spec.Scripts = make([]appsv1alpha1.ComponentTemplateSpec, 0)
+		f.Get().Spec.Scripts = make([]kbappsv1.ComponentTemplateSpec, 0)
 	}
 	f.Get().Spec.Scripts = append(f.Get().Spec.Scripts, script)
 	return f
@@ -254,7 +254,7 @@ func (f *MockComponentDefinitionFactory) SetLabels(labels map[string]string) *Mo
 }
 
 func (f *MockComponentDefinitionFactory) SetReplicasLimit(minReplicas, maxReplicas int32) *MockComponentDefinitionFactory {
-	f.Get().Spec.ReplicasLimit = &appsv1alpha1.ReplicasLimit{
+	f.Get().Spec.ReplicasLimit = &kbappsv1.ReplicasLimit{
 		MinReplicas: minReplicas,
 		MaxReplicas: maxReplicas,
 	}
@@ -262,19 +262,19 @@ func (f *MockComponentDefinitionFactory) SetReplicasLimit(minReplicas, maxReplic
 }
 
 func (f *MockComponentDefinitionFactory) AddSystemAccount(accountName string, initAccount bool, statement string) *MockComponentDefinitionFactory {
-	account := appsv1alpha1.SystemAccount{
+	account := kbappsv1.SystemAccount{
 		Name:        accountName,
 		InitAccount: initAccount,
 		Statement:   statement,
 	}
 	if f.Get().Spec.SystemAccounts == nil {
-		f.Get().Spec.SystemAccounts = make([]appsv1alpha1.SystemAccount, 0)
+		f.Get().Spec.SystemAccounts = make([]kbappsv1.SystemAccount, 0)
 	}
 	f.Get().Spec.SystemAccounts = append(f.Get().Spec.SystemAccounts, account)
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) SetUpdateStrategy(strategy *appsv1alpha1.UpdateStrategy) *MockComponentDefinitionFactory {
+func (f *MockComponentDefinitionFactory) SetUpdateStrategy(strategy *kbappsv1.UpdateStrategy) *MockComponentDefinitionFactory {
 	f.Get().Spec.UpdateStrategy = strategy
 	return f
 }
@@ -285,13 +285,13 @@ func (f *MockComponentDefinitionFactory) SetPodManagementPolicy(policy *appsv1.P
 }
 
 func (f *MockComponentDefinitionFactory) AddRole(name string, serviceable, writable bool) *MockComponentDefinitionFactory {
-	role := appsv1alpha1.ReplicaRole{
+	role := kbappsv1.ReplicaRole{
 		Name:        name,
 		Serviceable: serviceable,
 		Writable:    writable,
 	}
 	if f.Get().Spec.Roles == nil {
-		f.Get().Spec.Roles = make([]appsv1alpha1.ReplicaRole, 0)
+		f.Get().Spec.Roles = make([]kbappsv1.ReplicaRole, 0)
 	}
 	f.Get().Spec.Roles = append(f.Get().Spec.Roles, role)
 	return f
@@ -299,7 +299,7 @@ func (f *MockComponentDefinitionFactory) AddRole(name string, serviceable, writa
 
 func (f *MockComponentDefinitionFactory) SetLifecycleAction(name string, val interface{}) *MockComponentDefinitionFactory {
 	if f.Get().Spec.LifecycleActions == nil {
-		f.Get().Spec.LifecycleActions = &appsv1alpha1.ComponentLifecycleActions{}
+		f.Get().Spec.LifecycleActions = &kbappsv1.ComponentLifecycleActions{}
 	}
 	obj := f.Get().Spec.LifecycleActions
 	t := reflect.TypeOf(obj).Elem()
@@ -322,9 +322,9 @@ func (f *MockComponentDefinitionFactory) SetLifecycleAction(name string, val int
 }
 
 func (f *MockComponentDefinitionFactory) AddServiceRef(name, serviceKind, serviceVersion string) *MockComponentDefinitionFactory {
-	serviceRef := appsv1alpha1.ServiceRefDeclaration{
+	serviceRef := kbappsv1.ServiceRefDeclaration{
 		Name: name,
-		ServiceRefDeclarationSpecs: []appsv1alpha1.ServiceRefDeclarationSpec{
+		ServiceRefDeclarationSpecs: []kbappsv1.ServiceRefDeclarationSpec{
 			{
 				ServiceKind:    serviceKind,
 				ServiceVersion: serviceVersion,
@@ -332,7 +332,7 @@ func (f *MockComponentDefinitionFactory) AddServiceRef(name, serviceKind, servic
 		},
 	}
 	if f.Get().Spec.ServiceRefDeclarations == nil {
-		f.Get().Spec.ServiceRefDeclarations = make([]appsv1alpha1.ServiceRefDeclaration, 0)
+		f.Get().Spec.ServiceRefDeclarations = make([]kbappsv1.ServiceRefDeclaration, 0)
 	}
 	f.Get().Spec.ServiceRefDeclarations = append(f.Get().Spec.ServiceRefDeclarations, serviceRef)
 	return f

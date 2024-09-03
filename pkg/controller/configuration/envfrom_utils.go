@@ -27,6 +27,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
@@ -42,18 +43,18 @@ func injectTemplateEnvFrom(cluster *appsv1alpha1.Cluster, component *component.S
 	var err error
 	var cm *corev1.ConfigMap
 
-	injectConfigmap := func(envMap map[string]string, configSpec appsv1alpha1.ComponentConfigSpec, cmName string) error {
+	injectConfigmap := func(envMap map[string]string, configSpec appsv1.ComponentConfigSpec, cmName string) error {
 		envConfigMap, err := createEnvFromConfigmap(cluster, component.Name, configSpec, client.ObjectKeyFromObject(cm), envMap, ctx, cli)
 		if err != nil {
 			return core.WrapError(err, "failed to generate env configmap[%s]", cmName)
 		}
-		injectEnvFrom(podSpec.Containers, configSpec.ContainersInjectedTo(), envConfigMap.Name)
-		injectEnvFrom(podSpec.InitContainers, configSpec.ContainersInjectedTo(), envConfigMap.Name)
+		injectEnvFrom(podSpec.Containers, containersInjectedTo(configSpec), envConfigMap.Name)
+		injectEnvFrom(podSpec.InitContainers, containersInjectedTo(configSpec), envConfigMap.Name)
 		return nil
 	}
 
 	for _, template := range component.ConfigTemplates {
-		if !template.InjectEnvEnabled() || template.ConfigConstraintRef == "" {
+		if !InjectEnvEnabled(template) || template.ConfigConstraintRef == "" {
 			continue
 		}
 		cmName := core.GetComponentCfgName(cluster.Name, component.Name, template.Name)
@@ -78,7 +79,7 @@ func injectTemplateEnvFrom(cluster *appsv1alpha1.Cluster, component *component.S
 	return nil
 }
 
-func getConfigConstraint(template appsv1alpha1.ComponentConfigSpec, cli client.Client, ctx context.Context) (*appsv1beta1.ConfigConstraintSpec, error) {
+func getConfigConstraint(template appsv1.ComponentConfigSpec, cli client.Client, ctx context.Context) (*appsv1beta1.ConfigConstraintSpec, error) {
 	ccKey := client.ObjectKey{
 		Namespace: "",
 		Name:      template.ConfigConstraintRef,
@@ -127,7 +128,7 @@ func fetchConfigmap(localObjs []client.Object, cmName, namespace string, cli cli
 	return cmObj, nil
 }
 
-func createEnvFromConfigmap(cluster *appsv1alpha1.Cluster, componentName string, template appsv1alpha1.ComponentConfigSpec, originKey client.ObjectKey, envMap map[string]string, ctx context.Context, cli client.Client) (*corev1.ConfigMap, error) {
+func createEnvFromConfigmap(cluster *appsv1alpha1.Cluster, componentName string, template appsv1.ComponentConfigSpec, originKey client.ObjectKey, envMap map[string]string, ctx context.Context, cli client.Client) (*corev1.ConfigMap, error) {
 	cmKey := client.ObjectKey{
 		Name:      core.GenerateEnvFromName(originKey.Name),
 		Namespace: originKey.Namespace,
@@ -188,7 +189,7 @@ func fromFileContent(format *appsv1beta1.FileFormatConfig, configContext string)
 	return envMap, nil
 }
 
-func fromConfigSpec(configSpec appsv1alpha1.ComponentConfigSpec, cm *corev1.ConfigMap) []string {
+func fromConfigSpec(configSpec appsv1.ComponentConfigSpec, cm *corev1.ConfigMap) []string {
 	keys := configSpec.Keys
 	if len(keys) == 0 {
 		keys = cfgutil.ToSet(cm.Data).AsSlice()
@@ -196,8 +197,8 @@ func fromConfigSpec(configSpec appsv1alpha1.ComponentConfigSpec, cm *corev1.Conf
 	return keys
 }
 
-func SyncEnvConfigmap(configSpec appsv1alpha1.ComponentConfigSpec, cmObj *corev1.ConfigMap, cc *appsv1beta1.ConfigConstraintSpec, cli client.Client, ctx context.Context) error {
-	if !configSpec.InjectEnvEnabled() || cc == nil || cc.FileFormatConfig == nil {
+func SyncEnvConfigmap(configSpec appsv1.ComponentConfigSpec, cmObj *corev1.ConfigMap, cc *appsv1beta1.ConfigConstraintSpec, cli client.Client, ctx context.Context) error {
+	if !InjectEnvEnabled(configSpec) || cc == nil || cc.FileFormatConfig == nil {
 		return nil
 	}
 	envMap, err := fromConfigmapFiles(fromConfigSpec(configSpec, cmObj), cmObj, cc.FileFormatConfig)
@@ -227,4 +228,15 @@ func updateEnvFromConfigmap(origObj client.ObjectKey, envMap map[string]string, 
 		return err
 	}
 	return nil
+}
+
+func InjectEnvEnabled(spec appsv1.ComponentConfigSpec) bool {
+	return len(spec.AsEnvFrom) > 0 || len(spec.InjectEnvTo) > 0
+}
+
+func containersInjectedTo(spec appsv1.ComponentConfigSpec) []string {
+	if len(spec.InjectEnvTo) != 0 {
+		return spec.InjectEnvTo
+	}
+	return spec.AsEnvFrom
 }

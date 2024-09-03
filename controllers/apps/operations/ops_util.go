@@ -22,6 +22,7 @@ package operations
 import (
 	"context"
 	"fmt"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"time"
 
 	"golang.org/x/exp/slices"
@@ -58,8 +59,8 @@ type handleStatusProgressWithComponent func(reqCtx intctrlutil.RequestCtx,
 type handleReconfigureOpsStatus func(cmStatus *appsv1alpha1.ConfigurationItemStatus) error
 
 // getClusterDefByName gets the ClusterDefinition object by the name.
-func getClusterDefByName(ctx context.Context, cli client.Client, clusterDefName string) (*appsv1alpha1.ClusterDefinition, error) {
-	clusterDef := &appsv1alpha1.ClusterDefinition{}
+func getClusterDefByName(ctx context.Context, cli client.Client, clusterDefName string) (*appsv1.ClusterDefinition, error) {
+	clusterDef := &appsv1.ClusterDefinition{}
 	if err := cli.Get(ctx, client.ObjectKey{Name: clusterDefName}, clusterDef); err != nil {
 		return nil, err
 	}

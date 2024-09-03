@@ -22,6 +22,7 @@ package component
 import (
 	"context"
 	"fmt"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"maps"
 	"reflect"
 	"strconv"
@@ -129,7 +130,7 @@ func listObjWithLabelsInNamespace[T generics.Object, PT generics.PObject[T], L g
 // GenerateAllPodNames generate all pod names for a component.
 func GenerateAllPodNames(
 	compReplicas int32,
-	instances []appsv1alpha1.InstanceTemplate,
+	instances []appsv1.InstanceTemplate,
 	offlineInstances []string,
 	clusterName,
 	fullCompName string) ([]string, error) {
@@ -145,7 +146,7 @@ func GenerateAllPodNames(
 // and return a set which key is the pod name and value is a template name.
 func GenerateAllPodNamesToSet(
 	compReplicas int32,
-	instances []appsv1alpha1.InstanceTemplate,
+	instances []appsv1.InstanceTemplate,
 	offlineInstances []string,
 	clusterName,
 	fullCompName string) (map[string]string, error) {

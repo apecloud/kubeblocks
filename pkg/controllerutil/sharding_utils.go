@@ -27,6 +27,7 @@ import (
 	"github.com/pkg/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -97,8 +98,8 @@ func listNCheckShardingComponents(ctx context.Context, cli client.Reader,
 }
 
 func ListShardingComponents(ctx context.Context, cli client.Reader,
-	cluster *appsv1alpha1.Cluster, shardingName string) ([]appsv1alpha1.Component, error) {
-	compList := &appsv1alpha1.ComponentList{}
+	cluster *appsv1alpha1.Cluster, shardingName string) ([]appsv1.Component, error) {
+	compList := &appsv1.ComponentList{}
 	ml := client.MatchingLabels{
 		constant.AppInstanceLabelKey:       cluster.Name,
 		constant.KBAppShardingNameLabelKey: shardingName,

@@ -38,6 +38,7 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -100,7 +101,7 @@ var _ = Describe("OpsRequest Controller", func() {
 	})
 
 	var (
-		compDefObj *appsv1alpha1.ComponentDefinition
+		compDefObj *appsv1.ComponentDefinition
 		clusterObj *appsv1alpha1.Cluster
 		clusterKey types.NamespacedName
 	)
@@ -277,7 +278,7 @@ var _ = Describe("OpsRequest Controller", func() {
 				Namespace: clusterKey.Namespace,
 				Name:      component.FullName(clusterKey.Name, mysqlCompName),
 			}
-			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
+			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1.Component) {
 				g.Expect(comp.Generation).Should(Equal(comp.Status.ObservedGeneration))
 			})).Should(Succeed())
 
@@ -314,7 +315,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			testk8s.MockEnableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
 
 			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compDefObj),
-				func(compDef *appsv1alpha1.ComponentDefinition) {
+				func(compDef *appsv1.ComponentDefinition) {
 					if compDef.Annotations == nil {
 						compDef.Annotations = map[string]string{}
 					}

@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
@@ -72,7 +73,7 @@ max_connections=666
 	var (
 		mockClient          *testutil.K8sClientMockHelper
 		templateBuilder     *configTemplateBuilder
-		configSpec          appsv1alpha1.ComponentConfigSpec
+		configSpec          appsv1.ComponentConfigSpec
 		configConstraintObj *appsv1beta1.ConfigConstraint
 
 		baseCMObject    *corev1.ConfigMap
@@ -101,8 +102,8 @@ max_connections=666
 		updatedCMObject.SetName(updatedCMName)
 		updatedCMObject.SetNamespace("default")
 
-		configSpec = appsv1alpha1.ComponentConfigSpec{
-			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+		configSpec = appsv1.ComponentConfigSpec{
+			ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
 				Name:        testConfigSpecName,
 				TemplateRef: baseCMObject.GetName(),
 				Namespace:   "default",

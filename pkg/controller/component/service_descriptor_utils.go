@@ -31,13 +31,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 )
 
 func buildServiceReferences(ctx context.Context, cli client.Reader,
-	synthesizedComp *SynthesizedComponent, compDef *appsv1alpha1.ComponentDefinition, comp *appsv1alpha1.Component) error {
+	synthesizedComp *SynthesizedComponent, compDef *appsv1.ComponentDefinition, comp *appsv1.Component) error {
 	if err := buildServiceReferencesWithoutResolve(ctx, cli, synthesizedComp, compDef, comp); err != nil {
 		return err
 	}
@@ -45,12 +44,12 @@ func buildServiceReferences(ctx context.Context, cli client.Reader,
 }
 
 func buildServiceReferencesWithoutResolve(ctx context.Context, cli client.Reader,
-	synthesizedComp *SynthesizedComponent, compDef *appsv1alpha1.ComponentDefinition, comp *appsv1alpha1.Component) error {
+	synthesizedComp *SynthesizedComponent, compDef *appsv1.ComponentDefinition, comp *appsv1.Component) error {
 	if compDef == nil || comp == nil || len(compDef.Spec.ServiceRefDeclarations) == 0 {
 		return nil
 	}
 
-	serviceRefs := map[string]*appsv1alpha1.ServiceRef{}
+	serviceRefs := map[string]*appsv1.ServiceRef{}
 	for i, serviceRef := range comp.Spec.ServiceRefs {
 		serviceRefs[serviceRef.Name] = &comp.Spec.ServiceRefs[i]
 	}
@@ -91,7 +90,7 @@ func buildServiceReferencesWithoutResolve(ctx context.Context, cli client.Reader
 }
 
 func handleServiceRefFromCluster(ctx context.Context, cli client.Reader, namespace string,
-	serviceRef appsv1alpha1.ServiceRef, serviceRefDecl appsv1alpha1.ServiceRefDeclaration, legacy bool) (*appsv1.ServiceDescriptor, error) {
+	serviceRef appsv1.ServiceRef, serviceRefDecl appsv1.ServiceRefDeclaration, legacy bool) (*appsv1.ServiceDescriptor, error) {
 	resolver := referencedVars
 	if legacy {
 		resolver = referencedVars4Legacy
@@ -113,7 +112,7 @@ func handleServiceRefFromCluster(ctx context.Context, cli client.Reader, namespa
 	return b.GetObject(), nil
 }
 
-func referencedVars(ctx context.Context, cli client.Reader, namespace string, serviceRef appsv1alpha1.ServiceRef) ([]*appsv1.CredentialVar, error) {
+func referencedVars(ctx context.Context, cli client.Reader, namespace string, serviceRef appsv1.ServiceRef) ([]*appsv1.CredentialVar, error) {
 	var (
 		vars = []*appsv1.CredentialVar{nil, nil, nil, nil, nil}
 		err  error
@@ -130,7 +129,7 @@ func referencedVars(ctx context.Context, cli client.Reader, namespace string, se
 }
 
 func referencedServiceVars(ctx context.Context, cli client.Reader, namespace string,
-	serviceRef appsv1alpha1.ServiceRef) (*appsv1.CredentialVar, *appsv1.CredentialVar, *appsv1.CredentialVar, error) {
+	serviceRef appsv1.ServiceRef) (*appsv1.CredentialVar, *appsv1.CredentialVar, *appsv1.CredentialVar, error) {
 	var (
 		selector   = serviceRef.ClusterServiceSelector
 		host, port *appsv1.CredentialVar
@@ -177,7 +176,7 @@ func referencedServiceVars(ctx context.Context, cli client.Reader, namespace str
 }
 
 func referencedCredentialVars(ctx context.Context, cli client.Reader, namespace string,
-	serviceRef appsv1alpha1.ServiceRef) (*appsv1.CredentialVar, *appsv1.CredentialVar, error) {
+	serviceRef appsv1.ServiceRef) (*appsv1.CredentialVar, *appsv1.CredentialVar, error) {
 	var (
 		selector = serviceRef.ClusterServiceSelector
 		vars     = []*appsv1.CredentialVar{nil, nil}
@@ -220,7 +219,7 @@ func referencedCredentialVars(ctx context.Context, cli client.Reader, namespace 
 	return vars[0], vars[1], nil
 }
 
-func referencedVars4Legacy(ctx context.Context, cli client.Reader, namespace string, serviceRef appsv1alpha1.ServiceRef) ([]*appsv1.CredentialVar, error) {
+func referencedVars4Legacy(ctx context.Context, cli client.Reader, namespace string, serviceRef appsv1.ServiceRef) ([]*appsv1.CredentialVar, error) {
 	secret := &corev1.Secret{}
 	secretKey := types.NamespacedName{
 		Namespace: func() string {
@@ -265,9 +264,9 @@ func referencedVars4Legacy(ctx context.Context, cli client.Reader, namespace str
 
 // handleServiceRefFromServiceDescriptor handles the service reference is provided by external ServiceDescriptor object.
 func handleServiceRefFromServiceDescriptor(ctx context.Context, cli client.Reader, namespace string,
-	serviceRef appsv1alpha1.ServiceRef, serviceRefDecl appsv1alpha1.ServiceRefDeclaration) (*appsv1.ServiceDescriptor, error) {
+	serviceRef appsv1.ServiceRef, serviceRefDecl appsv1.ServiceRefDeclaration) (*appsv1.ServiceDescriptor, error) {
 	// verify service kind and version
-	verifyServiceKindAndVersion := func(serviceDescriptor appsv1.ServiceDescriptor, _ ...appsv1alpha1.ServiceRefDeclarationSpec) bool {
+	verifyServiceKindAndVersion := func(serviceDescriptor appsv1.ServiceDescriptor, _ ...appsv1.ServiceRefDeclarationSpec) bool {
 		for _, serviceRefDeclSpec := range serviceRefDecl.ServiceRefDeclarationSpecs {
 			if getWellKnownServiceKindAliasMapping(serviceRefDeclSpec.ServiceKind) != getWellKnownServiceKindAliasMapping(serviceDescriptor.Spec.ServiceKind) {
 				continue

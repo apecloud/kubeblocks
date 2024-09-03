@@ -23,6 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 )
@@ -33,7 +34,7 @@ type configOperator struct {
 
 func NewConfigReconcileTask(resourceCtx *ResourceCtx,
 	cluster *appsv1alpha1.Cluster,
-	component *appsv1alpha1.Component,
+	component *appsv1.Component,
 	synthesizedComponent *component.SynthesizedComponent,
 	podSpec *corev1.PodSpec,
 	localObjs []client.Object,
@@ -59,11 +60,11 @@ func (c *configOperator) Reconcile() error {
 
 	return NewCreatePipeline(c.ReconcileCtx).
 		Prepare().
-		RenderScriptTemplate().      // render scriptTemplate into ConfigMap
-		UpdateConfiguration().       // create or update Configuration
-		Configuration().             // fetch the latest Configuration
-		CreateConfigTemplate().      // render configTemplate into ConfigMap (only for the first time)
-		UpdatePodVolumes().          // update podSpec.Volumes
+		RenderScriptTemplate(). // render scriptTemplate into ConfigMap
+		UpdateConfiguration(). // create or update Configuration
+		Configuration(). // fetch the latest Configuration
+		CreateConfigTemplate(). // render configTemplate into ConfigMap (only for the first time)
+		UpdatePodVolumes(). // update podSpec.Volumes
 		BuildConfigManagerSidecar(). // build configManager sidecar and update podSpec.Containers and podSpec.InitContainers
 		UpdateConfigRelatedObject(). // handle InjectEnvTo, and create or update ConfigMaps
 		UpdateConfigurationStatus(). // update ConfigurationItemStatus revision and phase etc.

@@ -57,7 +57,7 @@ type clusterTransformContext struct {
 	Cluster       *appsv1alpha1.Cluster
 	OrigCluster   *appsv1alpha1.Cluster
 	ClusterDef    *appsv1.ClusterDefinition
-	ComponentDefs map[string]*appsv1alpha1.ComponentDefinition
+	ComponentDefs map[string]*appsv1.ComponentDefinition
 	// ComponentSpecs includes all cluster component specs generated from ComponentSpecs and ShardingSpecs
 	ComponentSpecs []*appsv1alpha1.ClusterComponentSpec
 	// ShardingComponentSpecs includes all sharding component specs generated from ShardingSpecs

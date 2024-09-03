@@ -300,13 +300,408 @@ ComponentSpec
 <table>
 <tr>
 <td>
-<code>foo</code><br/>
+<code>compDef</code><br/>
 <em>
 string
 </em>
 </td>
 <td>
-<p>Foo is an example field of Component. Edit component_types.go to remove/update</p>
+<p>Specifies the name of the referenced ComponentDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServiceVersion specifies the version of the Service expected to be provisioned by this Component.
+The version should follow the syntax and semantics of the &ldquo;Semantic Versioning&rdquo; specification (<a href="http://semver.org/">http://semver.org/</a>).</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceRefs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ServiceRef">
+[]ServiceRef
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines a list of ServiceRef for a Component, enabling access to both external services and
+Services provided by other Clusters.</p>
+<p>Types of services:</p>
+<ul>
+<li>External services: Not managed by KubeBlocks or managed by a different KubeBlocks operator;
+Require a ServiceDescriptor for connection details.</li>
+<li>Services provided by a Cluster: Managed by the same KubeBlocks operator;
+identified using Cluster, Component and Service names.</li>
+</ul>
+<p>ServiceRefs with identical <code>serviceRef.name</code> in the same Cluster are considered the same.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">serviceRefs:
+  - name: &quot;redis-sentinel&quot;
+    serviceDescriptor:
+      name: &quot;external-redis-sentinel&quot;
+  - name: &quot;postgres-cluster&quot;
+    clusterServiceSelector:
+      cluster: &quot;my-postgres-cluster&quot;
+      service:
+        component: &quot;postgresql&quot;
+</code></pre>
+<p>The example above includes ServiceRefs to an external Redis Sentinel service and a PostgreSQL Cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies Labels to override or add for underlying Pods.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>annotations</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies Annotations to override or add for underlying Pods.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>env</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>List of environment variables to add.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>resources</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcerequirements-v1-core">
+Kubernetes core/v1.ResourceRequirements
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the resources required by the Component.
+It allows defining the CPU, memory requirements and limits for the Component&rsquo;s containers.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeClaimTemplates</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterComponentVolumeClaimTemplate">
+[]ClusterComponentVolumeClaimTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a list of PersistentVolumeClaim templates that define the storage requirements for the Component.
+Each template specifies the desired characteristics of a persistent volume, such as storage class,
+size, and access modes.
+These templates are used to dynamically provision persistent volumes for the Component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumes</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volume-v1-core">
+[]Kubernetes core/v1.Volume
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>List of volumes to override.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>services</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentService">
+[]ComponentService
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Overrides Services defined in referenced ComponentDefinition and exposes endpoints that can be accessed
+by clients.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>systemAccounts</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentSystemAccount">
+[]ComponentSystemAccount
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Overrides system accounts defined in referenced ComponentDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>replicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>Specifies the desired number of replicas in the Component for enhancing availability and durability, or load balancing.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>configs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterComponentConfig">
+[]ClusterComponentConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the configuration content of a config template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>enabledLogs</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies which types of logs should be collected for the Cluster.
+The log types are defined in the <code>componentDefinition.spec.logConfigs</code> field with the LogConfig entries.</p>
+<p>The elements in the <code>enabledLogs</code> array correspond to the names of the LogConfig entries.
+For example, if the <code>componentDefinition.spec.logConfigs</code> defines LogConfig entries with
+names &ldquo;slow_query_log&rdquo; and &ldquo;error_log&rdquo;,
+you can enable the collection of these logs by including their names in the <code>enabledLogs</code> array:</p>
+<pre><code class="language-yaml">enabledLogs:
+- slow_query_log
+- error_log
+</code></pre>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceAccountName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the name of the ServiceAccount required by the running Component.
+This ServiceAccount is used to grant necessary permissions for the Component&rsquo;s Pods to interact
+with other Kubernetes resources, such as modifying Pod labels or sending events.</p>
+<p>Defaults:
+If not specified, KubeBlocks automatically assigns a default ServiceAccount named &ldquo;kb-&#123;cluster.name&#125;&rdquo;,
+bound to a default role defined during KubeBlocks installation.</p>
+<p>Future Changes:
+Future versions might change the default ServiceAccount creation strategy to one per Component,
+potentially revising the naming to &ldquo;kb-&#123;cluster.name&#125;-&#123;component.name&#125;&rdquo;.</p>
+<p>Users can override the automatic ServiceAccount assignment by explicitly setting the name of
+an existed ServiceAccount in this field.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>parallelPodManagementConcurrency</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
+or when scaling down. It only used when <code>PodManagementPolicy</code> is set to <code>Parallel</code>.
+The default Concurrency is 100%.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podUpdatePolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PodUpdatePolicyType">
+PodUpdatePolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PodUpdatePolicy indicates how pods should be updated</p>
+<ul>
+<li><code>StrictInPlace</code> indicates that only allows in-place upgrades.
+Any attempt to modify other fields will be rejected.</li>
+<li><code>PreferInPlace</code> indicates that we will first attempt an in-place upgrade of the Pod.
+If that fails, it will fall back to the ReCreate, where pod will be recreated.
+Default value is &ldquo;PreferInPlace&rdquo;</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>schedulingPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.SchedulingPolicy">
+SchedulingPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the scheduling policy for the Component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>tlsConfig</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.TLSConfig">
+TLSConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the TLS configuration for the Component, including:</p>
+<ul>
+<li>A boolean flag that indicates whether the Component should use Transport Layer Security (TLS) for secure communication.</li>
+<li>An optional field that specifies the configuration for the TLS certificates issuer when TLS is enabled.
+It allows defining the issuer name and the reference to the secret containing the TLS certificates and key.
+The secret should contain the CA certificate, TLS certificate, and private key in the specified keys.</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>instances</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.InstanceTemplate">
+[]InstanceTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Allows for the customization of configuration values for each instance within a Component.
+An Instance represent a single replica (Pod and associated K8s resources like PVCs, Services, and ConfigMaps).
+While instances typically share a common configuration as defined in the ClusterComponentSpec,
+they can require unique settings in various scenarios:</p>
+<p>For example:
+- A database Component might require different resource allocations for primary and secondary instances,
+  with primaries needing more resources.
+- During a rolling upgrade, a Component may first update the image for one or a few instances,
+and then update the remaining instances after verifying that the updated instances are functioning correctly.</p>
+<p>InstanceTemplate allows for specifying these unique configurations per instance.
+Each instance&rsquo;s name is constructed using the pattern: $(component.name)-$(template.name)-$(ordinal),
+starting with an ordinal of 0.
+It is crucial to maintain unique names for each InstanceTemplate to avoid conflicts.</p>
+<p>The sum of replicas across all InstanceTemplates should not exceed the total number of Replicas specified for the Component.
+Any remaining replicas will be generated using the default template and will follow the default naming rules.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>offlineInstances</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the names of instances to be transitioned to offline status.</p>
+<p>Marking an instance as offline results in the following:</p>
+<ol>
+<li>The associated Pod is stopped, and its PersistentVolumeClaim (PVC) is retained for potential
+future reuse or data recovery, but it is no longer actively used.</li>
+<li>The ordinal number assigned to this instance is preserved, ensuring it remains unique
+and avoiding conflicts with new instances.</li>
+</ol>
+<p>Setting instances to offline allows for a controlled scale-in process, preserving their data and maintaining
+ordinal consistency within the Cluster.
+Note that offline instances and their associated resources, such as PVCs, are not automatically deleted.
+The administrator must manually manage the cleanup and removal of these resources when they are no longer needed.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>runtimeClassName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines runtimeClassName for all Pods managed by this Component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>disableExporter</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Determines whether metrics exporter information is annotated on the Component&rsquo;s headless Service.</p>
+<p>If set to true, the following annotations will not be patched into the Service:</p>
+<ul>
+<li>&ldquo;monitor.kubeblocks.io/path&rdquo;</li>
+<li>&ldquo;monitor.kubeblocks.io/port&rdquo;</li>
+<li>&ldquo;monitor.kubeblocks.io/scheme&rdquo;</li>
+</ul>
+<p>These annotations allow the Prometheus installed by KubeBlocks to discover and scrape metrics from the exporter.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>stop</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Stop the Component.
+If set, all the computing resources will be released.</p>
 </td>
 </tr>
 </table>
@@ -404,13 +799,571 @@ ComponentDefinitionSpec
 <table>
 <tr>
 <td>
-<code>foo</code><br/>
+<code>provider</code><br/>
 <em>
 string
 </em>
 </td>
 <td>
-<p>Foo is an example field of ComponentDefinition. Edit componentdefinition_types.go to remove/update</p>
+<em>(Optional)</em>
+<p>Specifies the name of the Component provider, typically the vendor or developer name.
+It identifies the entity responsible for creating and maintaining the Component.</p>
+<p>When specifying the provider name, consider the following guidelines:</p>
+<ul>
+<li>Keep the name concise and relevant to the Component.</li>
+<li>Use a consistent naming convention across Components from the same provider.</li>
+<li>Avoid using trademarked or copyrighted names without proper permission.</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>description</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides a brief and concise explanation of the Component&rsquo;s purpose, functionality, and any relevant details.
+It serves as a quick reference for users to understand the Component&rsquo;s role and characteristics.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceKind</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the type of well-known service protocol that the Component provides.
+It specifies the standard or widely recognized protocol used by the Component to offer its Services.</p>
+<p>The <code>serviceKind</code> field allows users to quickly identify the type of Service provided by the Component
+based on common protocols or service types. This information helps in understanding the compatibility,
+interoperability, and usage of the Component within a system.</p>
+<p>Some examples of well-known service protocols include:</p>
+<ul>
+<li>&ldquo;MySQL&rdquo;: Indicates that the Component provides a MySQL database service.</li>
+<li>&ldquo;PostgreSQL&rdquo;: Indicates that the Component offers a PostgreSQL database service.</li>
+<li>&ldquo;Redis&rdquo;: Signifies that the Component functions as a Redis key-value store.</li>
+<li>&ldquo;ETCD&rdquo;: Denotes that the Component serves as an ETCD distributed key-value store.</li>
+</ul>
+<p>The <code>serviceKind</code> value is case-insensitive, allowing for flexibility in specifying the protocol name.</p>
+<p>When specifying the <code>serviceKind</code>, consider the following guidelines:</p>
+<ul>
+<li>Use well-established and widely recognized protocol names or service types.</li>
+<li>Ensure that the <code>serviceKind</code> accurately represents the primary service type offered by the Component.</li>
+<li>If the Component provides multiple services, choose the most prominent or commonly used protocol.</li>
+<li>Limit the <code>serviceKind</code> to a maximum of 32 characters for conciseness and readability.</li>
+</ul>
+<p>Note: The <code>serviceKind</code> field is optional and can be left empty if the Component does not fit into a well-known
+service category or if the protocol is not widely recognized. It is primarily used to convey information about
+the Component&rsquo;s service type to users and facilitate discovery and integration.</p>
+<p>The <code>serviceKind</code> field is immutable and cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the version of the Service provided by the Component.
+It follows the syntax and semantics of the &ldquo;Semantic Versioning&rdquo; specification (<a href="http://semver.org/">http://semver.org/</a>).</p>
+<p>The Semantic Versioning specification defines a version number format of X.Y.Z (MAJOR.MINOR.PATCH), where:</p>
+<ul>
+<li>X represents the major version and indicates incompatible API changes.</li>
+<li>Y represents the minor version and indicates added functionality in a backward-compatible manner.</li>
+<li>Z represents the patch version and indicates backward-compatible bug fixes.</li>
+</ul>
+<p>Additional labels for pre-release and build metadata are available as extensions to the X.Y.Z format:</p>
+<ul>
+<li>Use pre-release labels (e.g., -alpha, -beta) for versions that are not yet stable or ready for production use.</li>
+<li>Use build metadata (e.g., +build.1) for additional version information if needed.</li>
+</ul>
+<p>Examples of valid ServiceVersion values:</p>
+<ul>
+<li>&ldquo;1.0.0&rdquo;</li>
+<li>&ldquo;2.3.1&rdquo;</li>
+<li>&ldquo;3.0.0-alpha.1&rdquo;</li>
+<li>&ldquo;4.5.2+build.1&rdquo;</li>
+</ul>
+<p>The <code>serviceVersion</code> field is immutable and cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies static labels that will be patched to all Kubernetes resources created for the Component.</p>
+<p>Note: If a label key in the <code>labels</code> field conflicts with any system labels or user-specified labels,
+it will be silently ignored to avoid overriding higher-priority labels.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>annotations</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies static annotations that will be patched to all Kubernetes resources created for the Component.</p>
+<p>Note: If an annotation key in the <code>annotations</code> field conflicts with any system annotations
+or user-specified annotations, it will be silently ignored to avoid overriding higher-priority annotations.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>runtime</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podspec-v1-core">
+Kubernetes core/v1.PodSpec
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the PodSpec template used in the Component.
+It includes the following elements:</p>
+<ul>
+<li>Init containers</li>
+<li>Containers
+<ul>
+<li>Image</li>
+<li>Commands</li>
+<li>Args</li>
+<li>Envs</li>
+<li>Mounts</li>
+<li>Ports</li>
+<li>Security context</li>
+<li>Probes</li>
+<li>Lifecycle</li>
+</ul></li>
+<li>Volumes</li>
+</ul>
+<p>This field is intended to define static settings that remain consistent across all instantiated Components.
+Dynamic settings such as CPU and memory resource limits, as well as scheduling settings (affinity,
+toleration, priority), may vary among different instantiated Components.
+They should be specified in the <code>cluster.spec.componentSpecs</code> (ClusterComponentSpec).</p>
+<p>Specific instances of a Component may override settings defined here, such as using a different container image
+or modifying environment variable values.
+These instance-specific overrides can be specified in <code>cluster.spec.componentSpecs[*].instances</code>.</p>
+<p>This field is immutable and cannot be updated once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>vars</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.EnvVar">
+[]EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines variables which are determined after Cluster instantiation and reflect
+dynamic or runtime attributes of instantiated Clusters.
+These variables serve as placeholders for setting environment variables in Pods and Actions,
+or for rendering configuration and script templates before actual values are finalized.</p>
+<p>These variables are placed in front of the environment variables declared in the Pod if used as
+environment variables.</p>
+<p>Variable values can be sourced from:</p>
+<ul>
+<li>ConfigMap: Select and extract a value from a specific key within a ConfigMap.</li>
+<li>Secret: Select and extract a value from a specific key within a Secret.</li>
+<li>HostNetwork: Retrieves values (including ports) from host-network resources.</li>
+<li>Service: Retrieves values (including address, port, NodePort) from a selected Service.
+Intended to obtain the address of a ComponentService within the same Cluster.</li>
+<li>Credential: Retrieves account name and password from a SystemAccount variable.</li>
+<li>ServiceRef: Retrieves address, port, account name and password from a selected ServiceRefDeclaration.
+Designed to obtain the address bound to a ServiceRef, such as a ClusterService or
+ComponentService of another cluster or an external service.</li>
+<li>Component: Retrieves values from a selected Component, including replicas and instance name list.</li>
+</ul>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumes</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentVolume">
+[]ComponentVolume
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the volumes used by the Component and some static attributes of the volumes.
+After defining the volumes here, user can reference them in the
+<code>cluster.spec.componentSpecs[*].volumeClaimTemplates</code> field to configure dynamic properties such as
+volume capacity and storage class.</p>
+<p>This field allows you to specify the following:</p>
+<ul>
+<li>Snapshot behavior: Determines whether a snapshot of the volume should be taken when performing
+a snapshot backup of the Component.</li>
+<li>Disk high watermark: Sets the high watermark for the volume&rsquo;s disk usage.
+When the disk usage reaches the specified threshold, it triggers an alert or action.</li>
+</ul>
+<p>By configuring these volume behaviors, you can control how the volumes are managed and monitored within the Component.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>hostNetwork</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.HostNetwork">
+HostNetwork
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the host network configuration for the Component.</p>
+<p>When <code>hostNetwork</code> option is enabled, the Pods share the host&rsquo;s network namespace and can directly access
+the host&rsquo;s network interfaces.
+This means that if multiple Pods need to use the same port, they cannot run on the same host simultaneously
+due to port conflicts.</p>
+<p>The DNSPolicy field in the Pod spec determines how containers within the Pod perform DNS resolution.
+When using hostNetwork, the operator will set the DNSPolicy to &lsquo;ClusterFirstWithHostNet&rsquo;.
+With this policy, DNS queries will first go through the K8s cluster&rsquo;s DNS service.
+If the query fails, it will fall back to the host&rsquo;s DNS settings.</p>
+<p>If set, the DNS policy will be automatically set to &ldquo;ClusterFirstWithHostNet&rdquo;.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>services</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentService">
+[]ComponentService
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines additional Services to expose the Component&rsquo;s endpoints.</p>
+<p>A default headless Service, named <code>&#123;cluster.name&#125;-&#123;component.name&#125;-headless</code>, is automatically created
+for internal Cluster communication.</p>
+<p>This field enables customization of additional Services to expose the Component&rsquo;s endpoints to
+other Components within the same or different Clusters, and to external applications.
+Each Service entry in this list can include properties such as ports, type, and selectors.</p>
+<ul>
+<li>For intra-Cluster access, Components can reference Services using variables declared in
+<code>componentDefinition.spec.vars[*].valueFrom.serviceVarRef</code>.</li>
+<li>For inter-Cluster access, reference Services use variables declared in
+<code>componentDefinition.spec.vars[*].valueFrom.serviceRefVarRef</code>,
+and bind Services at Cluster creation time with <code>clusterComponentSpec.ServiceRef[*].clusterServiceSelector</code>.</li>
+</ul>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>configs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentConfigSpec">
+[]ComponentConfigSpec
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the configuration file templates and volume mount parameters used by the Component.
+It also includes descriptions of the parameters in the ConfigMaps, such as value range limitations.</p>
+<p>This field specifies a list of templates that will be rendered into Component containers&rsquo; configuration files.
+Each template is represented as a ConfigMap and may contain multiple configuration files,
+with each file being a key in the ConfigMap.</p>
+<p>The rendered configuration files will be mounted into the Component&rsquo;s containers
+according to the specified volume mount parameters.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>logConfigs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.LogConfig">
+[]LogConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the types of logs generated by instances of the Component and their corresponding file paths.
+These logs can be collected for further analysis and monitoring.</p>
+<p>The <code>logConfigs</code> field is an optional list of LogConfig objects, where each object represents
+a specific log type and its configuration.
+It allows you to specify multiple log types and their respective file paths for the Component.</p>
+<p>Examples:</p>
+<pre><code class="language-yaml"> logConfigs:
+ - filePathPattern: /data/mysql/log/mysqld-error.log
+   name: error
+ - filePathPattern: /data/mysql/log/mysqld.log
+   name: general
+ - filePathPattern: /data/mysql/log/mysqld-slowquery.log
+   name: slow
+</code></pre>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>scripts</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentTemplateSpec">
+[]ComponentTemplateSpec
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies groups of scripts, each provided via a ConfigMap, to be mounted as volumes in the container.
+These scripts can be executed during container startup or via specific actions.</p>
+<p>Each script group is encapsulated in a ComponentTemplateSpec that includes:</p>
+<ul>
+<li>The ConfigMap containing the scripts.</li>
+<li>The mount point where the scripts will be mounted inside the container.</li>
+</ul>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>systemAccounts</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.SystemAccount">
+[]SystemAccount
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>An array of <code>SystemAccount</code> objects that define the system accounts needed
+for the management operations of the Component.</p>
+<p>Each <code>SystemAccount</code> includes:</p>
+<ul>
+<li>Account name.</li>
+<li>The SQL statement template: Used to create the system account.</li>
+<li>Password Source: Either generated based on certain rules or retrieved from a Secret.</li>
+</ul>
+<p>Use cases for system accounts typically involve tasks like system initialization, backups, monitoring,
+health checks, replication, and other system-level operations.</p>
+<p>System accounts are distinct from user accounts, although both are database accounts.</p>
+<ul>
+<li><strong>System Accounts</strong>: Created during Cluster setup by the KubeBlocks operator,
+these accounts have higher privileges for system management and are fully managed
+through a declarative API by the operator.</li>
+<li><strong>User Accounts</strong>: Managed by users or administrator.
+User account permissions should follow the principle of least privilege,
+granting only the necessary access rights to complete their required tasks.</li>
+</ul>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>replicasLimit</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ReplicasLimit">
+ReplicasLimit
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the upper limit of the number of replicas supported by the Component.</p>
+<p>It defines the maximum number of replicas that can be created for the Component.
+This field allows you to set a limit on the scalability of the Component, preventing it from exceeding a certain number of replicas.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>roles</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ReplicaRole">
+[]ReplicaRole
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Enumerate all possible roles assigned to each replica of the Component, influencing its behavior.</p>
+<p>A replica can have zero to multiple roles.
+KubeBlocks operator determines the roles of each replica by invoking the <code>lifecycleActions.roleProbe</code> method.
+This action returns a list of roles for each replica, and the returned roles must be predefined in the <code>roles</code> field.</p>
+<p>The roles assigned to a replica can influence various aspects of the Component&rsquo;s behavior, such as:</p>
+<ul>
+<li>Service selection: The Component&rsquo;s exposed Services may target replicas based on their roles using <code>roleSelector</code>.</li>
+<li>Update order: The roles can determine the order in which replicas are updated during a Component update.
+For instance, replicas with a &ldquo;follower&rdquo; role can be updated first, while the replica with the &ldquo;leader&rdquo;
+role is updated last. This helps minimize the number of leader changes during the update process.</li>
+</ul>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>minReadySeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p><code>minReadySeconds</code> is the minimum duration in seconds that a new Pod should remain in the ready
+state without any of its containers crashing to be considered available.
+This ensures the Pod&rsquo;s stability and readiness to serve requests.</p>
+<p>A default value of 0 seconds means the Pod is considered available as soon as it enters the ready state.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updateStrategy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.UpdateStrategy">
+UpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the concurrency strategy for updating multiple instances of the Component.
+Available strategies:</p>
+<ul>
+<li><code>Serial</code>: Updates replicas one at a time, ensuring minimal downtime by waiting for each replica to become ready
+before updating the next.</li>
+<li><code>Parallel</code>: Updates all replicas simultaneously, optimizing for speed but potentially reducing availability
+during the update.</li>
+<li><code>BestEffortParallel</code>: Updates replicas concurrently with a limit on simultaneous updates to ensure a minimum
+number of operational replicas for maintaining quorum.
+ For example, in a 5-replica component, updating a maximum of 2 replicas simultaneously keeps
+at least 3 operational for quorum.</li>
+</ul>
+<p>This field is immutable and defaults to &lsquo;Serial&rsquo;.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podManagementPolicy</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podmanagementpolicytype-v1-apps">
+Kubernetes apps/v1.PodManagementPolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>InstanceSet controls the creation of pods during initial scale up, replacement of pods on nodes, and scaling down.</p>
+<ul>
+<li><code>OrderedReady</code>: Creates pods in increasing order (pod-0, then pod-1, etc). The controller waits until each pod
+is ready before continuing. Pods are removed in reverse order when scaling down.</li>
+<li><code>Parallel</code>: Creates pods in parallel to match the desired scale without waiting. All pods are deleted at once
+when scaling down.</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>policyRules</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#policyrule-v1-rbac">
+[]Kubernetes rbac/v1.PolicyRule
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the namespaced policy rules required by the Component.</p>
+<p>The <code>policyRules</code> field is an array of <code>rbacv1.PolicyRule</code> objects that define the policy rules
+needed by the Component to operate within a namespace.
+These policy rules determine the permissions and verbs the Component is allowed to perform on
+Kubernetes resources within the namespace.</p>
+<p>The purpose of this field is to automatically generate the necessary RBAC roles
+for the Component based on the specified policy rules.
+This ensures that the Pods in the Component has appropriate permissions to function.</p>
+<p>Note: This field is currently non-functional and is reserved for future implementation.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>lifecycleActions</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">
+ComponentLifecycleActions
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines a set of hooks and procedures that customize the behavior of a Component throughout its lifecycle.
+Actions are triggered at specific lifecycle stages:</p>
+<ul>
+<li><code>postProvision</code>: Defines the hook to be executed after the creation of a Component,
+with <code>preCondition</code> specifying when the action should be fired relative to the Component&rsquo;s lifecycle stages:
+<code>Immediately</code>, <code>RuntimeReady</code>, <code>ComponentReady</code>, and <code>ClusterReady</code>.</li>
+<li><code>preTerminate</code>: Defines the hook to be executed before terminating a Component.</li>
+<li><code>roleProbe</code>: Defines the procedure which is invoked regularly to assess the role of replicas.</li>
+<li><code>switchover</code>: Defines the procedure for a controlled transition of leadership from the current leader to a new replica.
+This approach aims to minimize downtime and maintain availability in systems with a leader-follower topology,
+such as before planned maintenance or upgrades on the current leader node.</li>
+<li><code>memberJoin</code>: Defines the procedure to add a new replica to the replication group.</li>
+<li><code>memberLeave</code>: Defines the method to remove a replica from the replication group.</li>
+<li><code>readOnly</code>: Defines the procedure to switch a replica into the read-only state.</li>
+<li><code>readWrite</code>: transition a replica from the read-only state back to the read-write state.</li>
+<li><code>dataDump</code>: Defines the procedure to export the data from a replica.</li>
+<li><code>dataLoad</code>: Defines the procedure to import data into a replica.</li>
+<li><code>reconfigure</code>: Defines the procedure that update a replica with new configuration file.</li>
+<li><code>accountProvision</code>: Defines the procedure to generate a new database account.</li>
+</ul>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceRefDeclarations</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ServiceRefDeclaration">
+[]ServiceRefDeclaration
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Lists external service dependencies of the Component, including services from other Clusters or outside the K8s environment.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>exporter</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Exporter">
+Exporter
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the built-in metrics exporter container.</p>
 </td>
 </tr>
 </table>
@@ -694,6 +1647,377 @@ ServiceDescriptorStatus
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.Action">Action
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1.Probe">Probe</a>)
+</p>
+<div>
+<p>Action defines a customizable hook or procedure tailored for different database engines,
+designed to be invoked at predetermined points within the lifecycle of a Component instance.
+It provides a modular and extensible way to customize a Component&rsquo;s behavior through the execution of defined actions.</p>
+<p>Available Action triggers include:</p>
+<ul>
+<li><code>postProvision</code>: Defines the hook to be executed after the creation of a Component,
+with <code>preCondition</code> specifying when the action should be fired relative to the Component&rsquo;s lifecycle stages:
+<code>Immediately</code>, <code>RuntimeReady</code>, <code>ComponentReady</code>, and <code>ClusterReady</code>.</li>
+<li><code>preTerminate</code>: Defines the hook to be executed before terminating a Component.</li>
+<li><code>roleProbe</code>: Defines the procedure which is invoked regularly to assess the role of replicas.</li>
+<li><code>switchover</code>: Defines the procedure for a controlled transition of leadership from the current leader to a new replica.
+This approach aims to minimize downtime and maintain availability in systems with a leader-follower topology,
+such as during planned maintenance or upgrades on the current leader node.</li>
+<li><code>memberJoin</code>: Defines the procedure to add a new replica to the replication group.</li>
+<li><code>memberLeave</code>: Defines the method to remove a replica from the replication group.</li>
+<li><code>readOnly</code>: Defines the procedure to switch a replica into the read-only state.</li>
+<li><code>readWrite</code>: Defines the procedure to transition a replica from the read-only state back to the read-write state.</li>
+<li><code>dataDump</code>: Defines the procedure to export the data from a replica.</li>
+<li><code>dataLoad</code>: Defines the procedure to import data into a replica.</li>
+<li><code>reconfigure</code>: Defines the procedure that update a replica with new configuration.</li>
+<li><code>accountProvision</code>: Defines the procedure to generate a new database account.</li>
+</ul>
+<p>Actions can be executed in different ways:</p>
+<ul>
+<li>ExecAction: Executes a command inside a container.
+A set of predefined environment variables are available and can be leveraged within the <code>exec.command</code>
+to access context information such as details about pods, components, the overall cluster state,
+or database connection credentials.
+These variables provide a dynamic and context-aware mechanism for script execution.</li>
+<li>HTTPAction: Performs an HTTP request.
+HTTPAction is to be implemented in future version.</li>
+<li>GRPCAction: In future version, Actions will support initiating gRPC calls.
+This allows developers to implement Actions using plugins written in programming language like Go,
+providing greater flexibility and extensibility.</li>
+</ul>
+<p>An action is considered successful on returning 0, or HTTP 200 for status HTTP(s) Actions.
+Any other return value or HTTP status codes indicate failure,
+and the action may be retried based on the configured retry policy.</p>
+<ul>
+<li>If an action exceeds the specified timeout duration, it will be terminated, and the action is considered failed.</li>
+<li>If an action produces any data as output, it should be written to stdout,
+or included in the HTTP response payload for HTTP(s) actions.</li>
+<li>If an action encounters any errors, error messages should be written to stderr,
+or detailed in the HTTP response with the appropriate non-200 status code.</li>
+</ul>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>exec</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ExecAction">
+ExecAction
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the command to run.</p>
+<p>This field cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>timeoutSeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the maximum duration in seconds that the Action is allowed to run.</p>
+<p>If the Action does not complete within this time frame, it will be terminated.</p>
+<p>This field cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>retryPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.RetryPolicy">
+RetryPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the strategy to be taken when retrying the Action after a failure.</p>
+<p>It specifies the conditions under which the Action should be retried and the limits to apply,
+such as the maximum number of retries and backoff strategy.</p>
+<p>This field cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>preCondition</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PreConditionType">
+PreConditionType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the state that the cluster must reach before the Action is executed.
+Currently, this is only applicable to the <code>postProvision</code> action.</p>
+<p>The conditions are as follows:</p>
+<ul>
+<li><code>Immediately</code>: Executed right after the Component object is created.
+The readiness of the Component and its resources is not guaranteed at this stage.</li>
+<li><code>RuntimeReady</code>: The Action is triggered after the Component object has been created and all associated
+runtime resources (e.g. Pods) are in a ready state.</li>
+<li><code>ComponentReady</code>: The Action is triggered after the Component itself is in a ready state.
+This process does not affect the readiness state of the Component or the Cluster.</li>
+<li><code>ClusterReady</code>: The Action is executed after the Cluster is in a ready state.
+This execution does not alter the Component or the Cluster&rsquo;s state of readiness.</li>
+</ul>
+<p>This field cannot be updated.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
+</p>
+<div>
+<p>ClusterComponentConfig represents a config with its source bound.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The name of the config.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ClusterComponentConfigSource</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterComponentConfigSource">
+ClusterComponentConfigSource
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ClusterComponentConfigSource</code> are embedded into this type.)
+</p>
+<p>The source of the config.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ClusterComponentConfigSource">ClusterComponentConfigSource
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig</a>)
+</p>
+<div>
+<p>ClusterComponentConfigSource represents the source of a config.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>configMap</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#configmapvolumesource-v1-core">
+Kubernetes core/v1.ConfigMapVolumeSource
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ConfigMap source for the config.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ClusterComponentPhase">ClusterComponentPhase
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentStatus">ComponentStatus</a>)
+</p>
+<div>
+<p>ClusterComponentPhase defines the phase of a cluster component as represented in cluster.status.components.phase field.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Abnormal&#34;</p></td>
+<td><p>AbnormalClusterCompPhase indicates the component has more than zero replicas, but there are some failed pods.
+The component is functioning, but it is in a fragile state.</p>
+</td>
+</tr><tr><td><p>&#34;Creating&#34;</p></td>
+<td><p>CreatingClusterCompPhase indicates the component is being created.</p>
+</td>
+</tr><tr><td><p>&#34;Deleting&#34;</p></td>
+<td><p>DeletingClusterCompPhase indicates the component is currently being deleted.</p>
+</td>
+</tr><tr><td><p>&#34;Failed&#34;</p></td>
+<td><p>FailedClusterCompPhase indicates the component has more than zero replicas, but there are some failed pods.
+The component is not functioning.</p>
+</td>
+</tr><tr><td><p>&#34;Running&#34;</p></td>
+<td><p>RunningClusterCompPhase indicates the component has more than zero replicas, and all pods are up-to-date and
+in a &lsquo;Running&rsquo; state.</p>
+</td>
+</tr><tr><td><p>&#34;Stopped&#34;</p></td>
+<td><p>StoppedClusterCompPhase indicates the component has zero replicas, and all pods have been deleted.</p>
+</td>
+</tr><tr><td><p>&#34;Stopping&#34;</p></td>
+<td><p>StoppingClusterCompPhase indicates the component has zero replicas, and there are pods that are terminating.</p>
+</td>
+</tr><tr><td><p>&#34;Updating&#34;</p></td>
+<td><p>UpdatingClusterCompPhase indicates the component has more than zero replicas, and there are no failed pods,
+it is currently being updated.</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ClusterComponentVolumeClaimTemplate">ClusterComponentVolumeClaimTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Refers to the name of a volumeMount defined in either:</p>
+<ul>
+<li><code>componentDefinition.spec.runtime.containers[*].volumeMounts</code></li>
+<li><code>clusterDefinition.spec.componentDefs[*].podSpec.containers[*].volumeMounts</code> (deprecated)</li>
+</ul>
+<p>The value of <code>name</code> must match the <code>name</code> field of a volumeMount specified in the corresponding <code>volumeMounts</code> array.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PersistentVolumeClaimSpec">
+PersistentVolumeClaimSpec
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the desired characteristics of a PersistentVolumeClaim that will be created for the volume
+with the mount name specified in the <code>name</code> field.</p>
+<p>When a Pod is created for this ClusterComponent, a new PVC will be created based on the specification
+defined in the <code>spec</code> field. The PVC will be associated with the volume mount specified by the <code>name</code> field.</p>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>accessModes</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#persistentvolumeaccessmode-v1-core">
+[]Kubernetes core/v1.PersistentVolumeAccessMode
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Contains the desired access modes the volume should have.
+More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1">https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1</a>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>resources</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volumeresourcerequirements-v1-core">
+Kubernetes core/v1.VolumeResourceRequirements
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents the minimum resources the volume should have.
+If the RecoverVolumeExpansionFailure feature is enabled, users are allowed to specify resource requirements that
+are lower than the previous value but must still be higher than the capacity recorded in the status field of the claim.
+More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources">https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources</a>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>storageClassName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The name of the StorageClass required by the claim.
+More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1">https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1</a>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeMode</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#persistentvolumemode-v1-core">
+Kubernetes core/v1.PersistentVolumeMode
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines what type of volume is required by the claim, either Block or Filesystem.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.ClusterDefinitionSpec">ClusterDefinitionSpec
 </h3>
 <p>
@@ -790,6 +2114,76 @@ string
 <td>
 <em>(Optional)</em>
 <p>Topologies this ClusterDefinition supported.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ClusterObjectReference">ClusterObjectReference
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentVarSelector">ComponentVarSelector</a>, <a href="#apps.kubeblocks.io/v1.CredentialVarSelector">CredentialVarSelector</a>, <a href="#apps.kubeblocks.io/v1.HostNetworkVarSelector">HostNetworkVarSelector</a>, <a href="#apps.kubeblocks.io/v1.ServiceRefVarSelector">ServiceRefVarSelector</a>, <a href="#apps.kubeblocks.io/v1.ServiceVarSelector">ServiceVarSelector</a>)
+</p>
+<div>
+<p>ClusterObjectReference defines information to let you locate the referenced object inside the same Cluster.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>compDef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>CompDef specifies the definition used by the component that the referent object resident in.
+If not specified, the component itself will be used.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Name of the referent object.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>optional</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specify whether the object must be defined.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>multipleClusterObjectOption</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.MultipleClusterObjectOption">
+MultipleClusterObjectOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>This option defines the behavior when multiple component objects match the specified @CompDef.
+If not provided, an error will be raised when handling multiple matches.</p>
 </td>
 </tr>
 </tbody>
@@ -1022,13 +2416,13 @@ separated by commas.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec
+<h3 id="apps.kubeblocks.io/v1.ClusterVarSelector">ClusterVarSelector
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinition">ComponentDefinition</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.VarSource">VarSource</a>)
 </p>
 <div>
-<p>ComponentDefinitionSpec defines the desired state of ComponentDefinition</p>
+<p>ClusterVarSelector selects a var from a Cluster.</p>
 </div>
 <table>
 <thead>
@@ -1040,13 +2434,802 @@ separated by commas.</p>
 <tbody>
 <tr>
 <td>
-<code>foo</code><br/>
+<code>ClusterVars</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterVars">
+ClusterVars
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ClusterVars</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ClusterVars">ClusterVars
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterVarSelector">ClusterVarSelector</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>namespace</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reference to the namespace of the Cluster object.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>clusterName</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reference to the name of the Cluster object.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>clusterUID</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reference to the UID of the Cluster object.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ComponentConfigSpec">ComponentConfigSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ComponentTemplateSpec</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentTemplateSpec">
+ComponentTemplateSpec
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ComponentTemplateSpec</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>keys</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the configuration files within the ConfigMap that support dynamic updates.</p>
+<p>A configuration template (provided in the form of a ConfigMap) may contain templates for multiple
+configuration files.
+Each configuration file corresponds to a key in the ConfigMap.
+Some of these configuration files may support dynamic modification and reloading without requiring
+a pod restart.</p>
+<p>If empty or omitted, all configuration files in the ConfigMap are assumed to support dynamic updates,
+and ConfigConstraint applies to all keys.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>legacyRenderedConfigSpec</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.LegacyRenderedTemplateSpec">
+LegacyRenderedTemplateSpec
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the secondary rendered config spec for pod-specific customization.</p>
+<p>The template is rendered inside the pod (by the &ldquo;config-manager&rdquo; sidecar container) and merged with the main
+template&rsquo;s render result to generate the final configuration file.</p>
+<p>This field is intended to handle scenarios where different pods within the same Component have
+varying configurations. It allows for pod-specific customization of the configuration.</p>
+<p>Note: This field will be deprecated in future versions, and the functionality will be moved to
+<code>cluster.spec.componentSpecs[*].instances[*]</code>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>constraintRef</code><br/>
 <em>
 string
 </em>
 </td>
 <td>
-<p>Foo is an example field of ComponentDefinition. Edit componentdefinition_types.go to remove/update</p>
+<em>(Optional)</em>
+<p>Specifies the name of the referenced configuration constraints object.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>asEnvFrom</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the containers to inject the ConfigMap parameters as environment variables.</p>
+<p>This is useful when application images accept parameters through environment variables and
+generate the final configuration file in the startup script based on these variables.</p>
+<p>This field allows users to specify a list of container names, and KubeBlocks will inject the environment
+variables converted from the ConfigMap into these designated containers. This provides a flexible way to
+pass the configuration items from the ConfigMap to the container without modifying the image.</p>
+<p>Deprecated: <code>asEnvFrom</code> has been deprecated since 0.9.0 and will be removed in 0.10.0.
+Use <code>injectEnvTo</code> instead.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>injectEnvTo</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the containers to inject the ConfigMap parameters as environment variables.</p>
+<p>This is useful when application images accept parameters through environment variables and
+generate the final configuration file in the startup script based on these variables.</p>
+<p>This field allows users to specify a list of container names, and KubeBlocks will inject the environment
+variables converted from the ConfigMap into these designated containers. This provides a flexible way to
+pass the configuration items from the ConfigMap to the container without modifying the image.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>reRenderResourceTypes</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.RerenderResourceType">
+[]RerenderResourceType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether the configuration needs to be re-rendered after v-scale or h-scale operations to reflect changes.</p>
+<p>In some scenarios, the configuration may need to be updated to reflect the changes in resource allocation
+or cluster topology. Examples:</p>
+<ul>
+<li>Redis: adjust maxmemory after v-scale operation.</li>
+<li>MySQL: increase max connections after v-scale operation.</li>
+<li>Zookeeper: update zoo.cfg with new node addresses after h-scale operation.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinition">ComponentDefinition</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>provider</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the name of the Component provider, typically the vendor or developer name.
+It identifies the entity responsible for creating and maintaining the Component.</p>
+<p>When specifying the provider name, consider the following guidelines:</p>
+<ul>
+<li>Keep the name concise and relevant to the Component.</li>
+<li>Use a consistent naming convention across Components from the same provider.</li>
+<li>Avoid using trademarked or copyrighted names without proper permission.</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>description</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides a brief and concise explanation of the Component&rsquo;s purpose, functionality, and any relevant details.
+It serves as a quick reference for users to understand the Component&rsquo;s role and characteristics.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceKind</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the type of well-known service protocol that the Component provides.
+It specifies the standard or widely recognized protocol used by the Component to offer its Services.</p>
+<p>The <code>serviceKind</code> field allows users to quickly identify the type of Service provided by the Component
+based on common protocols or service types. This information helps in understanding the compatibility,
+interoperability, and usage of the Component within a system.</p>
+<p>Some examples of well-known service protocols include:</p>
+<ul>
+<li>&ldquo;MySQL&rdquo;: Indicates that the Component provides a MySQL database service.</li>
+<li>&ldquo;PostgreSQL&rdquo;: Indicates that the Component offers a PostgreSQL database service.</li>
+<li>&ldquo;Redis&rdquo;: Signifies that the Component functions as a Redis key-value store.</li>
+<li>&ldquo;ETCD&rdquo;: Denotes that the Component serves as an ETCD distributed key-value store.</li>
+</ul>
+<p>The <code>serviceKind</code> value is case-insensitive, allowing for flexibility in specifying the protocol name.</p>
+<p>When specifying the <code>serviceKind</code>, consider the following guidelines:</p>
+<ul>
+<li>Use well-established and widely recognized protocol names or service types.</li>
+<li>Ensure that the <code>serviceKind</code> accurately represents the primary service type offered by the Component.</li>
+<li>If the Component provides multiple services, choose the most prominent or commonly used protocol.</li>
+<li>Limit the <code>serviceKind</code> to a maximum of 32 characters for conciseness and readability.</li>
+</ul>
+<p>Note: The <code>serviceKind</code> field is optional and can be left empty if the Component does not fit into a well-known
+service category or if the protocol is not widely recognized. It is primarily used to convey information about
+the Component&rsquo;s service type to users and facilitate discovery and integration.</p>
+<p>The <code>serviceKind</code> field is immutable and cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the version of the Service provided by the Component.
+It follows the syntax and semantics of the &ldquo;Semantic Versioning&rdquo; specification (<a href="http://semver.org/">http://semver.org/</a>).</p>
+<p>The Semantic Versioning specification defines a version number format of X.Y.Z (MAJOR.MINOR.PATCH), where:</p>
+<ul>
+<li>X represents the major version and indicates incompatible API changes.</li>
+<li>Y represents the minor version and indicates added functionality in a backward-compatible manner.</li>
+<li>Z represents the patch version and indicates backward-compatible bug fixes.</li>
+</ul>
+<p>Additional labels for pre-release and build metadata are available as extensions to the X.Y.Z format:</p>
+<ul>
+<li>Use pre-release labels (e.g., -alpha, -beta) for versions that are not yet stable or ready for production use.</li>
+<li>Use build metadata (e.g., +build.1) for additional version information if needed.</li>
+</ul>
+<p>Examples of valid ServiceVersion values:</p>
+<ul>
+<li>&ldquo;1.0.0&rdquo;</li>
+<li>&ldquo;2.3.1&rdquo;</li>
+<li>&ldquo;3.0.0-alpha.1&rdquo;</li>
+<li>&ldquo;4.5.2+build.1&rdquo;</li>
+</ul>
+<p>The <code>serviceVersion</code> field is immutable and cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies static labels that will be patched to all Kubernetes resources created for the Component.</p>
+<p>Note: If a label key in the <code>labels</code> field conflicts with any system labels or user-specified labels,
+it will be silently ignored to avoid overriding higher-priority labels.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>annotations</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies static annotations that will be patched to all Kubernetes resources created for the Component.</p>
+<p>Note: If an annotation key in the <code>annotations</code> field conflicts with any system annotations
+or user-specified annotations, it will be silently ignored to avoid overriding higher-priority annotations.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>runtime</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podspec-v1-core">
+Kubernetes core/v1.PodSpec
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the PodSpec template used in the Component.
+It includes the following elements:</p>
+<ul>
+<li>Init containers</li>
+<li>Containers
+<ul>
+<li>Image</li>
+<li>Commands</li>
+<li>Args</li>
+<li>Envs</li>
+<li>Mounts</li>
+<li>Ports</li>
+<li>Security context</li>
+<li>Probes</li>
+<li>Lifecycle</li>
+</ul></li>
+<li>Volumes</li>
+</ul>
+<p>This field is intended to define static settings that remain consistent across all instantiated Components.
+Dynamic settings such as CPU and memory resource limits, as well as scheduling settings (affinity,
+toleration, priority), may vary among different instantiated Components.
+They should be specified in the <code>cluster.spec.componentSpecs</code> (ClusterComponentSpec).</p>
+<p>Specific instances of a Component may override settings defined here, such as using a different container image
+or modifying environment variable values.
+These instance-specific overrides can be specified in <code>cluster.spec.componentSpecs[*].instances</code>.</p>
+<p>This field is immutable and cannot be updated once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>vars</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.EnvVar">
+[]EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines variables which are determined after Cluster instantiation and reflect
+dynamic or runtime attributes of instantiated Clusters.
+These variables serve as placeholders for setting environment variables in Pods and Actions,
+or for rendering configuration and script templates before actual values are finalized.</p>
+<p>These variables are placed in front of the environment variables declared in the Pod if used as
+environment variables.</p>
+<p>Variable values can be sourced from:</p>
+<ul>
+<li>ConfigMap: Select and extract a value from a specific key within a ConfigMap.</li>
+<li>Secret: Select and extract a value from a specific key within a Secret.</li>
+<li>HostNetwork: Retrieves values (including ports) from host-network resources.</li>
+<li>Service: Retrieves values (including address, port, NodePort) from a selected Service.
+Intended to obtain the address of a ComponentService within the same Cluster.</li>
+<li>Credential: Retrieves account name and password from a SystemAccount variable.</li>
+<li>ServiceRef: Retrieves address, port, account name and password from a selected ServiceRefDeclaration.
+Designed to obtain the address bound to a ServiceRef, such as a ClusterService or
+ComponentService of another cluster or an external service.</li>
+<li>Component: Retrieves values from a selected Component, including replicas and instance name list.</li>
+</ul>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumes</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentVolume">
+[]ComponentVolume
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the volumes used by the Component and some static attributes of the volumes.
+After defining the volumes here, user can reference them in the
+<code>cluster.spec.componentSpecs[*].volumeClaimTemplates</code> field to configure dynamic properties such as
+volume capacity and storage class.</p>
+<p>This field allows you to specify the following:</p>
+<ul>
+<li>Snapshot behavior: Determines whether a snapshot of the volume should be taken when performing
+a snapshot backup of the Component.</li>
+<li>Disk high watermark: Sets the high watermark for the volume&rsquo;s disk usage.
+When the disk usage reaches the specified threshold, it triggers an alert or action.</li>
+</ul>
+<p>By configuring these volume behaviors, you can control how the volumes are managed and monitored within the Component.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>hostNetwork</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.HostNetwork">
+HostNetwork
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the host network configuration for the Component.</p>
+<p>When <code>hostNetwork</code> option is enabled, the Pods share the host&rsquo;s network namespace and can directly access
+the host&rsquo;s network interfaces.
+This means that if multiple Pods need to use the same port, they cannot run on the same host simultaneously
+due to port conflicts.</p>
+<p>The DNSPolicy field in the Pod spec determines how containers within the Pod perform DNS resolution.
+When using hostNetwork, the operator will set the DNSPolicy to &lsquo;ClusterFirstWithHostNet&rsquo;.
+With this policy, DNS queries will first go through the K8s cluster&rsquo;s DNS service.
+If the query fails, it will fall back to the host&rsquo;s DNS settings.</p>
+<p>If set, the DNS policy will be automatically set to &ldquo;ClusterFirstWithHostNet&rdquo;.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>services</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentService">
+[]ComponentService
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines additional Services to expose the Component&rsquo;s endpoints.</p>
+<p>A default headless Service, named <code>&#123;cluster.name&#125;-&#123;component.name&#125;-headless</code>, is automatically created
+for internal Cluster communication.</p>
+<p>This field enables customization of additional Services to expose the Component&rsquo;s endpoints to
+other Components within the same or different Clusters, and to external applications.
+Each Service entry in this list can include properties such as ports, type, and selectors.</p>
+<ul>
+<li>For intra-Cluster access, Components can reference Services using variables declared in
+<code>componentDefinition.spec.vars[*].valueFrom.serviceVarRef</code>.</li>
+<li>For inter-Cluster access, reference Services use variables declared in
+<code>componentDefinition.spec.vars[*].valueFrom.serviceRefVarRef</code>,
+and bind Services at Cluster creation time with <code>clusterComponentSpec.ServiceRef[*].clusterServiceSelector</code>.</li>
+</ul>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>configs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentConfigSpec">
+[]ComponentConfigSpec
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the configuration file templates and volume mount parameters used by the Component.
+It also includes descriptions of the parameters in the ConfigMaps, such as value range limitations.</p>
+<p>This field specifies a list of templates that will be rendered into Component containers&rsquo; configuration files.
+Each template is represented as a ConfigMap and may contain multiple configuration files,
+with each file being a key in the ConfigMap.</p>
+<p>The rendered configuration files will be mounted into the Component&rsquo;s containers
+according to the specified volume mount parameters.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>logConfigs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.LogConfig">
+[]LogConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the types of logs generated by instances of the Component and their corresponding file paths.
+These logs can be collected for further analysis and monitoring.</p>
+<p>The <code>logConfigs</code> field is an optional list of LogConfig objects, where each object represents
+a specific log type and its configuration.
+It allows you to specify multiple log types and their respective file paths for the Component.</p>
+<p>Examples:</p>
+<pre><code class="language-yaml"> logConfigs:
+ - filePathPattern: /data/mysql/log/mysqld-error.log
+   name: error
+ - filePathPattern: /data/mysql/log/mysqld.log
+   name: general
+ - filePathPattern: /data/mysql/log/mysqld-slowquery.log
+   name: slow
+</code></pre>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>scripts</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentTemplateSpec">
+[]ComponentTemplateSpec
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies groups of scripts, each provided via a ConfigMap, to be mounted as volumes in the container.
+These scripts can be executed during container startup or via specific actions.</p>
+<p>Each script group is encapsulated in a ComponentTemplateSpec that includes:</p>
+<ul>
+<li>The ConfigMap containing the scripts.</li>
+<li>The mount point where the scripts will be mounted inside the container.</li>
+</ul>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>systemAccounts</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.SystemAccount">
+[]SystemAccount
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>An array of <code>SystemAccount</code> objects that define the system accounts needed
+for the management operations of the Component.</p>
+<p>Each <code>SystemAccount</code> includes:</p>
+<ul>
+<li>Account name.</li>
+<li>The SQL statement template: Used to create the system account.</li>
+<li>Password Source: Either generated based on certain rules or retrieved from a Secret.</li>
+</ul>
+<p>Use cases for system accounts typically involve tasks like system initialization, backups, monitoring,
+health checks, replication, and other system-level operations.</p>
+<p>System accounts are distinct from user accounts, although both are database accounts.</p>
+<ul>
+<li><strong>System Accounts</strong>: Created during Cluster setup by the KubeBlocks operator,
+these accounts have higher privileges for system management and are fully managed
+through a declarative API by the operator.</li>
+<li><strong>User Accounts</strong>: Managed by users or administrator.
+User account permissions should follow the principle of least privilege,
+granting only the necessary access rights to complete their required tasks.</li>
+</ul>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>replicasLimit</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ReplicasLimit">
+ReplicasLimit
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the upper limit of the number of replicas supported by the Component.</p>
+<p>It defines the maximum number of replicas that can be created for the Component.
+This field allows you to set a limit on the scalability of the Component, preventing it from exceeding a certain number of replicas.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>roles</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ReplicaRole">
+[]ReplicaRole
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Enumerate all possible roles assigned to each replica of the Component, influencing its behavior.</p>
+<p>A replica can have zero to multiple roles.
+KubeBlocks operator determines the roles of each replica by invoking the <code>lifecycleActions.roleProbe</code> method.
+This action returns a list of roles for each replica, and the returned roles must be predefined in the <code>roles</code> field.</p>
+<p>The roles assigned to a replica can influence various aspects of the Component&rsquo;s behavior, such as:</p>
+<ul>
+<li>Service selection: The Component&rsquo;s exposed Services may target replicas based on their roles using <code>roleSelector</code>.</li>
+<li>Update order: The roles can determine the order in which replicas are updated during a Component update.
+For instance, replicas with a &ldquo;follower&rdquo; role can be updated first, while the replica with the &ldquo;leader&rdquo;
+role is updated last. This helps minimize the number of leader changes during the update process.</li>
+</ul>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>minReadySeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p><code>minReadySeconds</code> is the minimum duration in seconds that a new Pod should remain in the ready
+state without any of its containers crashing to be considered available.
+This ensures the Pod&rsquo;s stability and readiness to serve requests.</p>
+<p>A default value of 0 seconds means the Pod is considered available as soon as it enters the ready state.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updateStrategy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.UpdateStrategy">
+UpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the concurrency strategy for updating multiple instances of the Component.
+Available strategies:</p>
+<ul>
+<li><code>Serial</code>: Updates replicas one at a time, ensuring minimal downtime by waiting for each replica to become ready
+before updating the next.</li>
+<li><code>Parallel</code>: Updates all replicas simultaneously, optimizing for speed but potentially reducing availability
+during the update.</li>
+<li><code>BestEffortParallel</code>: Updates replicas concurrently with a limit on simultaneous updates to ensure a minimum
+number of operational replicas for maintaining quorum.
+ For example, in a 5-replica component, updating a maximum of 2 replicas simultaneously keeps
+at least 3 operational for quorum.</li>
+</ul>
+<p>This field is immutable and defaults to &lsquo;Serial&rsquo;.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podManagementPolicy</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podmanagementpolicytype-v1-apps">
+Kubernetes apps/v1.PodManagementPolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>InstanceSet controls the creation of pods during initial scale up, replacement of pods on nodes, and scaling down.</p>
+<ul>
+<li><code>OrderedReady</code>: Creates pods in increasing order (pod-0, then pod-1, etc). The controller waits until each pod
+is ready before continuing. Pods are removed in reverse order when scaling down.</li>
+<li><code>Parallel</code>: Creates pods in parallel to match the desired scale without waiting. All pods are deleted at once
+when scaling down.</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>policyRules</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#policyrule-v1-rbac">
+[]Kubernetes rbac/v1.PolicyRule
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the namespaced policy rules required by the Component.</p>
+<p>The <code>policyRules</code> field is an array of <code>rbacv1.PolicyRule</code> objects that define the policy rules
+needed by the Component to operate within a namespace.
+These policy rules determine the permissions and verbs the Component is allowed to perform on
+Kubernetes resources within the namespace.</p>
+<p>The purpose of this field is to automatically generate the necessary RBAC roles
+for the Component based on the specified policy rules.
+This ensures that the Pods in the Component has appropriate permissions to function.</p>
+<p>Note: This field is currently non-functional and is reserved for future implementation.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>lifecycleActions</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">
+ComponentLifecycleActions
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines a set of hooks and procedures that customize the behavior of a Component throughout its lifecycle.
+Actions are triggered at specific lifecycle stages:</p>
+<ul>
+<li><code>postProvision</code>: Defines the hook to be executed after the creation of a Component,
+with <code>preCondition</code> specifying when the action should be fired relative to the Component&rsquo;s lifecycle stages:
+<code>Immediately</code>, <code>RuntimeReady</code>, <code>ComponentReady</code>, and <code>ClusterReady</code>.</li>
+<li><code>preTerminate</code>: Defines the hook to be executed before terminating a Component.</li>
+<li><code>roleProbe</code>: Defines the procedure which is invoked regularly to assess the role of replicas.</li>
+<li><code>switchover</code>: Defines the procedure for a controlled transition of leadership from the current leader to a new replica.
+This approach aims to minimize downtime and maintain availability in systems with a leader-follower topology,
+such as before planned maintenance or upgrades on the current leader node.</li>
+<li><code>memberJoin</code>: Defines the procedure to add a new replica to the replication group.</li>
+<li><code>memberLeave</code>: Defines the method to remove a replica from the replication group.</li>
+<li><code>readOnly</code>: Defines the procedure to switch a replica into the read-only state.</li>
+<li><code>readWrite</code>: transition a replica from the read-only state back to the read-write state.</li>
+<li><code>dataDump</code>: Defines the procedure to export the data from a replica.</li>
+<li><code>dataLoad</code>: Defines the procedure to import data into a replica.</li>
+<li><code>reconfigure</code>: Defines the procedure that update a replica with new configuration file.</li>
+<li><code>accountProvision</code>: Defines the procedure to generate a new database account.</li>
+</ul>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceRefDeclarations</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ServiceRefDeclaration">
+[]ServiceRefDeclaration
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Lists external service dependencies of the Component, including services from other Clusters or outside the K8s environment.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>exporter</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Exporter">
+Exporter
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the built-in metrics exporter container.</p>
 </td>
 </tr>
 </tbody>
@@ -1057,8 +3240,458 @@ string
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinition">ComponentDefinition</a>)
 </p>
 <div>
-<p>ComponentDefinitionStatus defines the observed state of ComponentDefinition</p>
+<p>ComponentDefinitionStatus defines the observed state of ComponentDefinition.</p>
 </div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>observedGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Refers to the most recent generation that has been observed for the ComponentDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>phase</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Phase">
+Phase
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents the current status of the ComponentDefinition. Valid values include `<code>,</code>Available<code>, and</code>Unavailable<code>.
+When the status is</code>Available`, the ComponentDefinition is ready and can be utilized by related objects.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>message</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides additional information about the current phase.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+</p>
+<div>
+<p>ComponentLifecycleActions defines a collection of Actions for customizing the behavior of a Component.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>postProvision</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the hook to be executed after a component&rsquo;s creation.</p>
+<p>By setting <code>postProvision.customHandler.preCondition</code>, you can determine the specific lifecycle stage
+at which the action should trigger: <code>Immediately</code>, <code>RuntimeReady</code>, <code>ComponentReady</code>, and <code>ClusterReady</code>.
+with <code>ComponentReady</code> being the default.</p>
+<p>The PostProvision Action is intended to run only once.</p>
+<p>Note: This field is immutable once it has been set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>preTerminate</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the hook to be executed prior to terminating a component.</p>
+<p>The PreTerminate Action is intended to run only once.</p>
+<p>This action is executed immediately when a scale-down operation for the Component is initiated.
+The actual termination and cleanup of the Component and its associated resources will not proceed
+until the PreTerminate action has completed successfully.</p>
+<p>Note: This field is immutable once it has been set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>roleProbe</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Probe">
+Probe
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the procedure which is invoked regularly to assess the role of replicas.</p>
+<p>This action is periodically triggered at the specified interval to determine the role of each replica.
+Upon successful execution, the action&rsquo;s output designates the role of the replica,
+which should match one of the predefined role names within <code>componentDefinition.spec.roles</code>.
+The output is then compared with the previous successful execution result.
+If a role change is detected, an event is generated to inform the controller,
+which initiates an update of the replica&rsquo;s role.</p>
+<p>Defining a RoleProbe Action for a Component is required if roles are defined for the Component.
+It ensures replicas are correctly labeled with their respective roles.
+Without this, services that rely on roleSelectors might improperly direct traffic to wrong replicas.</p>
+<p>The container executing this action has access to following variables:</p>
+<ul>
+<li>KB_POD_FQDN: The FQDN of the Pod whose role is being assessed.</li>
+</ul>
+<p>Expected output of this action:
+- On Success: The determined role of the replica, which must align with one of the roles specified
+  in the component definition.
+- On Failure: An error message, if applicable, indicating why the action failed.</p>
+<p>Note: This field is immutable once it has been set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>switchover</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the procedure for a controlled transition of leadership from the current leader to a new replica.
+This approach aims to minimize downtime and maintain availability in systems with a leader-follower topology,
+during events such as planned maintenance or when performing stop, shutdown, restart, or upgrade operations
+involving the current leader node.</p>
+<p>The container executing this action has access to following variables:</p>
+<ul>
+<li>KB_SWITCHOVER_CANDIDATE_NAME: The name of the pod for the new leader candidate, which may not be specified (empty).</li>
+<li>KB_SWITCHOVER_CANDIDATE_FQDN: The FQDN of the new leader candidate&rsquo;s pod, which may not be specified (empty).</li>
+</ul>
+<p>Note: This field is immutable once it has been set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memberJoin</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the procedure to add a new replica to the replication group.</p>
+<p>This action is initiated after a replica pod becomes ready.</p>
+<p>The role of the replica (e.g., primary, secondary) will be determined and assigned as part of the action command
+implementation, or automatically by the database kernel or a sidecar utility like Patroni that implements
+a consensus algorithm.</p>
+<p>The container executing this action has access to following variables:</p>
+<ul>
+<li>KB_JOIN_MEMBER_POD_FQDN: The pod FQDN of the replica being added to the group.</li>
+<li>KB_JOIN_MEMBER_POD_NAME: The pod name of the replica being added to the group.</li>
+</ul>
+<p>Expected action output:
+- On Failure: An error message detailing the reason for any failure encountered
+during the addition of the new member.</p>
+<p>For example, to add a new OBServer to an OceanBase Cluster in &lsquo;zone1&rsquo;, the following command may be used:</p>
+<pre><code class="language-yaml">command:
+- bash
+- -c
+- |
+   CLIENT=&quot;mysql -u $SERVICE_USER -p$SERVICE_PASSWORD -P $SERVICE_PORT -h $SERVICE_HOST -e&quot;
+	  $CLIENT &quot;ALTER SYSTEM ADD SERVER '$KB_POD_FQDN:$SERVICE_PORT' ZONE 'zone1'&quot;
+</code></pre>
+<p>Note: This field is immutable once it has been set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memberLeave</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the procedure to remove a replica from the replication group.</p>
+<p>This action is initiated before remove a replica from the group.
+The operator will wait for MemberLeave to complete successfully before releasing the replica and cleaning up
+related Kubernetes resources.</p>
+<p>The process typically includes updating configurations and informing other group members about the removal.
+Data migration is generally not part of this action and should be handled separately if needed.</p>
+<p>The container executing this action has access to following variables:</p>
+<ul>
+<li>KB_LEAVE_MEMBER_POD_FQDN: The pod name of the replica being removed from the group.</li>
+<li>KB_LEAVE_MEMBER_POD_NAME: The pod name of the replica being removed from the group.</li>
+</ul>
+<p>Expected action output:
+- On Failure: An error message, if applicable, indicating why the action failed.</p>
+<p>For example, to remove an OBServer from an OceanBase Cluster in &lsquo;zone1&rsquo;, the following command can be executed:</p>
+<pre><code class="language-yaml">command:
+- bash
+- -c
+- |
+   CLIENT=&quot;mysql -u $SERVICE_USER -p$SERVICE_PASSWORD -P $SERVICE_PORT -h $SERVICE_HOST -e&quot;
+	  $CLIENT &quot;ALTER SYSTEM DELETE SERVER '$KB_POD_FQDN:$SERVICE_PORT' ZONE 'zone1'&quot;
+</code></pre>
+<p>Note: This field is immutable once it has been set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>readonly</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the procedure to switch a replica into the read-only state.</p>
+<p>Use Case:
+This action is invoked when the database&rsquo;s volume capacity nears its upper limit and space is about to be exhausted.</p>
+<p>The container executing this action has access to following environment variables:</p>
+<ul>
+<li>KB_POD_FQDN: The FQDN of the replica pod whose role is being checked.</li>
+</ul>
+<p>Expected action output:
+- On Failure: An error message, if applicable, indicating why the action failed.</p>
+<p>Note: This field is immutable once it has been set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>readwrite</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the procedure to transition a replica from the read-only state back to the read-write state.</p>
+<p>Use Case:
+This action is used to bring back a replica that was previously in a read-only state,
+which restricted write operations, to its normal operational state where it can handle
+both read and write operations.</p>
+<p>The container executing this action has access to following environment variables:</p>
+<ul>
+<li>KB_POD_FQDN: The FQDN of the replica pod whose role is being checked.</li>
+</ul>
+<p>Expected action output:
+- On Failure: An error message, if applicable, indicating why the action failed.</p>
+<p>Note: This field is immutable once it has been set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dataDump</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the procedure for exporting the data from a replica.</p>
+<p>Use Case:
+This action is intended for initializing a newly created replica with data. It involves exporting data
+from an existing replica and importing it into the new, empty replica. This is essential for synchronizing
+the state of replicas across the system.</p>
+<p>Applicability:
+Some database engines or associated sidecar applications (e.g., Patroni) may already provide this functionality.
+In such cases, this action may not be required.</p>
+<p>The output should be a valid data dump streamed to stdout. It must exclude any irrelevant information to ensure
+that only the necessary data is exported for import into the new replica.</p>
+<p>Note: This field is immutable once it has been set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dataLoad</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the procedure for importing data into a replica.</p>
+<p>Use Case:
+This action is intended for initializing a newly created replica with data. It involves exporting data
+from an existing replica and importing it into the new, empty replica. This is essential for synchronizing
+the state of replicas across the system.</p>
+<p>Some database engines or associated sidecar applications (e.g., Patroni) may already provide this functionality.
+In such cases, this action may not be required.</p>
+<p>Data should be received through stdin. If any error occurs during the process,
+the action must be able to guarantee idempotence to allow for retries from the beginning.</p>
+<p>Note: This field is immutable once it has been set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>reconfigure</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the procedure that update a replica with new configuration.</p>
+<p>Note: This field is immutable once it has been set.</p>
+<p>This Action is reserved for future versions.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>accountProvision</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the procedure to generate a new database account.</p>
+<p>Use Case:
+This action is designed to create system accounts that are utilized for replication, monitoring, backup,
+and other administrative tasks.</p>
+<p>The container executing this action has access to following variables:</p>
+<ul>
+<li>KB_ACCOUNT_NAME: The name of the system account to be created.</li>
+<li>KB_ACCOUNT_STATEMENT: The statement used to create the system account.</li>
+</ul>
+<p>Note: This field is immutable once it has been set.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ComponentService">ComponentService
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
+</p>
+<div>
+<p>ComponentService defines a service that would be exposed as an inter-component service within a Cluster.
+A Service defined in the ComponentService is expected to be accessed by other Components within the same Cluster.</p>
+<p>When a Component needs to use a ComponentService provided by another Component within the same Cluster,
+it can declare a variable in the <code>componentDefinition.spec.vars</code> section and bind it to the specific exposed address
+of the ComponentService using the <code>serviceVarRef</code> field.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>Service</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Service">
+Service
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>Service</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podService</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates whether to create a corresponding Service for each Pod of the selected Component.
+When set to true, a set of Services will be automatically generated for each Pod,
+and the <code>roleSelector</code> field will be ignored.</p>
+<p>The names of the generated Services will follow the same suffix naming pattern: <code>$(serviceName)-$(podOrdinal)</code>.
+The total number of generated Services will be equal to the number of replicas specified for the Component.</p>
+<p>Example usage:</p>
+<pre><code class="language-yaml">name: my-service
+serviceName: my-service
+podService: true
+disableAutoProvision: true
+spec:
+  type: NodePort
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+</code></pre>
+<p>In this example, if the Component has 3 replicas, three Services will be generated:
+- my-service-0: Points to the first Pod (podOrdinal: 0)
+- my-service-1: Points to the second Pod (podOrdinal: 1)
+- my-service-2: Points to the third Pod (podOrdinal: 2)</p>
+<p>Each generated Service will have the specified spec configuration and will target its respective Pod.</p>
+<p>This feature is useful when you need to expose each Pod of a Component individually, allowing external access
+to specific instances of the Component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>disableAutoProvision</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates whether the automatic provisioning of the service should be disabled.</p>
+<p>If set to true, the service will not be automatically created at the component provisioning.
+Instead, you can enable the creation of this service by specifying it explicitly in the cluster API.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec
 </h3>
 <p>
@@ -1077,13 +3710,408 @@ string
 <tbody>
 <tr>
 <td>
-<code>foo</code><br/>
+<code>compDef</code><br/>
 <em>
 string
 </em>
 </td>
 <td>
-<p>Foo is an example field of Component. Edit component_types.go to remove/update</p>
+<p>Specifies the name of the referenced ComponentDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServiceVersion specifies the version of the Service expected to be provisioned by this Component.
+The version should follow the syntax and semantics of the &ldquo;Semantic Versioning&rdquo; specification (<a href="http://semver.org/">http://semver.org/</a>).</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceRefs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ServiceRef">
+[]ServiceRef
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines a list of ServiceRef for a Component, enabling access to both external services and
+Services provided by other Clusters.</p>
+<p>Types of services:</p>
+<ul>
+<li>External services: Not managed by KubeBlocks or managed by a different KubeBlocks operator;
+Require a ServiceDescriptor for connection details.</li>
+<li>Services provided by a Cluster: Managed by the same KubeBlocks operator;
+identified using Cluster, Component and Service names.</li>
+</ul>
+<p>ServiceRefs with identical <code>serviceRef.name</code> in the same Cluster are considered the same.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">serviceRefs:
+  - name: &quot;redis-sentinel&quot;
+    serviceDescriptor:
+      name: &quot;external-redis-sentinel&quot;
+  - name: &quot;postgres-cluster&quot;
+    clusterServiceSelector:
+      cluster: &quot;my-postgres-cluster&quot;
+      service:
+        component: &quot;postgresql&quot;
+</code></pre>
+<p>The example above includes ServiceRefs to an external Redis Sentinel service and a PostgreSQL Cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies Labels to override or add for underlying Pods.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>annotations</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies Annotations to override or add for underlying Pods.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>env</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>List of environment variables to add.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>resources</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcerequirements-v1-core">
+Kubernetes core/v1.ResourceRequirements
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the resources required by the Component.
+It allows defining the CPU, memory requirements and limits for the Component&rsquo;s containers.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeClaimTemplates</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterComponentVolumeClaimTemplate">
+[]ClusterComponentVolumeClaimTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a list of PersistentVolumeClaim templates that define the storage requirements for the Component.
+Each template specifies the desired characteristics of a persistent volume, such as storage class,
+size, and access modes.
+These templates are used to dynamically provision persistent volumes for the Component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumes</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volume-v1-core">
+[]Kubernetes core/v1.Volume
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>List of volumes to override.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>services</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentService">
+[]ComponentService
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Overrides Services defined in referenced ComponentDefinition and exposes endpoints that can be accessed
+by clients.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>systemAccounts</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentSystemAccount">
+[]ComponentSystemAccount
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Overrides system accounts defined in referenced ComponentDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>replicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>Specifies the desired number of replicas in the Component for enhancing availability and durability, or load balancing.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>configs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterComponentConfig">
+[]ClusterComponentConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the configuration content of a config template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>enabledLogs</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies which types of logs should be collected for the Cluster.
+The log types are defined in the <code>componentDefinition.spec.logConfigs</code> field with the LogConfig entries.</p>
+<p>The elements in the <code>enabledLogs</code> array correspond to the names of the LogConfig entries.
+For example, if the <code>componentDefinition.spec.logConfigs</code> defines LogConfig entries with
+names &ldquo;slow_query_log&rdquo; and &ldquo;error_log&rdquo;,
+you can enable the collection of these logs by including their names in the <code>enabledLogs</code> array:</p>
+<pre><code class="language-yaml">enabledLogs:
+- slow_query_log
+- error_log
+</code></pre>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceAccountName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the name of the ServiceAccount required by the running Component.
+This ServiceAccount is used to grant necessary permissions for the Component&rsquo;s Pods to interact
+with other Kubernetes resources, such as modifying Pod labels or sending events.</p>
+<p>Defaults:
+If not specified, KubeBlocks automatically assigns a default ServiceAccount named &ldquo;kb-&#123;cluster.name&#125;&rdquo;,
+bound to a default role defined during KubeBlocks installation.</p>
+<p>Future Changes:
+Future versions might change the default ServiceAccount creation strategy to one per Component,
+potentially revising the naming to &ldquo;kb-&#123;cluster.name&#125;-&#123;component.name&#125;&rdquo;.</p>
+<p>Users can override the automatic ServiceAccount assignment by explicitly setting the name of
+an existed ServiceAccount in this field.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>parallelPodManagementConcurrency</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
+or when scaling down. It only used when <code>PodManagementPolicy</code> is set to <code>Parallel</code>.
+The default Concurrency is 100%.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podUpdatePolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PodUpdatePolicyType">
+PodUpdatePolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PodUpdatePolicy indicates how pods should be updated</p>
+<ul>
+<li><code>StrictInPlace</code> indicates that only allows in-place upgrades.
+Any attempt to modify other fields will be rejected.</li>
+<li><code>PreferInPlace</code> indicates that we will first attempt an in-place upgrade of the Pod.
+If that fails, it will fall back to the ReCreate, where pod will be recreated.
+Default value is &ldquo;PreferInPlace&rdquo;</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>schedulingPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.SchedulingPolicy">
+SchedulingPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the scheduling policy for the Component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>tlsConfig</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.TLSConfig">
+TLSConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the TLS configuration for the Component, including:</p>
+<ul>
+<li>A boolean flag that indicates whether the Component should use Transport Layer Security (TLS) for secure communication.</li>
+<li>An optional field that specifies the configuration for the TLS certificates issuer when TLS is enabled.
+It allows defining the issuer name and the reference to the secret containing the TLS certificates and key.
+The secret should contain the CA certificate, TLS certificate, and private key in the specified keys.</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>instances</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.InstanceTemplate">
+[]InstanceTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Allows for the customization of configuration values for each instance within a Component.
+An Instance represent a single replica (Pod and associated K8s resources like PVCs, Services, and ConfigMaps).
+While instances typically share a common configuration as defined in the ClusterComponentSpec,
+they can require unique settings in various scenarios:</p>
+<p>For example:
+- A database Component might require different resource allocations for primary and secondary instances,
+  with primaries needing more resources.
+- During a rolling upgrade, a Component may first update the image for one or a few instances,
+and then update the remaining instances after verifying that the updated instances are functioning correctly.</p>
+<p>InstanceTemplate allows for specifying these unique configurations per instance.
+Each instance&rsquo;s name is constructed using the pattern: $(component.name)-$(template.name)-$(ordinal),
+starting with an ordinal of 0.
+It is crucial to maintain unique names for each InstanceTemplate to avoid conflicts.</p>
+<p>The sum of replicas across all InstanceTemplates should not exceed the total number of Replicas specified for the Component.
+Any remaining replicas will be generated using the default template and will follow the default naming rules.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>offlineInstances</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the names of instances to be transitioned to offline status.</p>
+<p>Marking an instance as offline results in the following:</p>
+<ol>
+<li>The associated Pod is stopped, and its PersistentVolumeClaim (PVC) is retained for potential
+future reuse or data recovery, but it is no longer actively used.</li>
+<li>The ordinal number assigned to this instance is preserved, ensuring it remains unique
+and avoiding conflicts with new instances.</li>
+</ol>
+<p>Setting instances to offline allows for a controlled scale-in process, preserving their data and maintaining
+ordinal consistency within the Cluster.
+Note that offline instances and their associated resources, such as PVCs, are not automatically deleted.
+The administrator must manually manage the cleanup and removal of these resources when they are no longer needed.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>runtimeClassName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines runtimeClassName for all Pods managed by this Component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>disableExporter</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Determines whether metrics exporter information is annotated on the Component&rsquo;s headless Service.</p>
+<p>If set to true, the following annotations will not be patched into the Service:</p>
+<ul>
+<li>&ldquo;monitor.kubeblocks.io/path&rdquo;</li>
+<li>&ldquo;monitor.kubeblocks.io/port&rdquo;</li>
+<li>&ldquo;monitor.kubeblocks.io/scheme&rdquo;</li>
+</ul>
+<p>These annotations allow the Prometheus installed by KubeBlocks to discover and scrape metrics from the exporter.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>stop</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Stop the Component.
+If set, all the computing resources will be released.</p>
 </td>
 </tr>
 </tbody>
@@ -1094,8 +4122,403 @@ string
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.Component">Component</a>)
 </p>
 <div>
-<p>ComponentStatus defines the observed state of Component</p>
+<p>ComponentStatus represents the observed state of a Component within the Cluster.</p>
 </div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>observedGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the most recent generation observed for this Component object.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>conditions</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#condition-v1-meta">
+[]Kubernetes meta/v1.Condition
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents a list of detailed status of the Component object.
+Each condition in the list provides real-time information about certain aspect of the Component object.</p>
+<p>This field is crucial for administrators and developers to monitor and respond to changes within the Component.
+It provides a history of state transitions and a snapshot of the current state that can be used for
+automated logic or direct inspection.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>phase</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterComponentPhase">
+ClusterComponentPhase
+</a>
+</em>
+</td>
+<td>
+<p>Indicates the current phase of the Component, with each phase indicating specific conditions:</p>
+<ul>
+<li>Creating: The initial phase for new Components, transitioning from &lsquo;empty&rsquo;(&ldquo;&rdquo;).</li>
+<li>Running: All Pods in a Running state.</li>
+<li>Updating: The Component is currently being updated, with no failed Pods present.</li>
+<li>Abnormal: Some Pods have failed, indicating a potentially unstable state.
+However, the cluster remains available as long as a quorum of members is functioning.</li>
+<li>Failed: A significant number of Pods or critical Pods have failed
+The cluster may be non-functional or may offer only limited services (e.g, read-only).</li>
+<li>Stopping: All Pods are being terminated, with current replica count at zero.</li>
+<li>Stopped: All associated Pods have been successfully deleted.</li>
+<li>Deleting: The Component is being deleted.</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>message</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A map that stores detailed message about the Component.
+Each entry in the map provides insights into specific elements of the Component, such as Pods or workloads.</p>
+<p>Keys in this map are formatted as <code>ObjectKind/Name</code>, where <code>ObjectKind</code> could be a type like Pod,
+and <code>Name</code> is the specific name of the object.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ComponentSystemAccount">ComponentSystemAccount
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The name of the system account.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>passwordConfig</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PasswordConfig">
+PasswordConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the policy for generating the account&rsquo;s password.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>secretRef</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ProvisionSecretRef">
+ProvisionSecretRef
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Refers to the secret from which data will be copied to create the new account.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ComponentTemplateSpec">ComponentTemplateSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentConfigSpec">ComponentConfigSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the configuration template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>templateRef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the name of the referenced configuration template ConfigMap object.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>namespace</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the namespace of the referenced configuration template ConfigMap object.
+An empty namespace is equivalent to the &ldquo;default&rdquo; namespace.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Refers to the volume name of PodTemplate. The configuration file produced through the configuration
+template will be mounted to the corresponding volume. Must be a DNS_LABEL name.
+The volume name must be defined in podSpec.containers[*].volumeMounts.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>defaultMode</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The operator attempts to set default file permissions for scripts (0555) and configurations (0444).
+However, certain database engines may require different file permissions.
+You can specify the desired file permissions here.</p>
+<p>Must be specified as an octal value between 0000 and 0777 (inclusive),
+or as a decimal value between 0 and 511 (inclusive).
+YAML supports both octal and decimal values for file permissions.</p>
+<p>Please note that this setting only affects the permissions of the files themselves.
+Directories within the specified path are not impacted by this setting.
+It&rsquo;s important to be aware that this setting might conflict with other options
+that influence the file mode, such as fsGroup.
+In such cases, the resulting file mode may have additional bits set.
+Refers to documents of k8s.ConfigMapVolumeSource.defaultMode for more information.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ComponentVarSelector">ComponentVarSelector
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.VarSource">VarSource</a>)
+</p>
+<div>
+<p>ComponentVarSelector selects a var from a Component.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ClusterObjectReference</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterObjectReference">
+ClusterObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ClusterObjectReference</code> are embedded into this type.)
+</p>
+<p>The Component to select from.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ComponentVars</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentVars">
+ComponentVars
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ComponentVars</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ComponentVars">ComponentVars
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentVarSelector">ComponentVarSelector</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>componentName</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reference to the name of the Component object.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>shortName</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reference to the short name of the Component object.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>replicas</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reference to the replicas of the component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podNames</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reference to the pod name list of the component.
+and the value will be presented in the following format: name1,name2,&hellip;</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podFQDNs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reference to the pod FQDN list of the component.
+The value will be presented in the following format: FQDN1,FQDN2,&hellip;</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podNamesForRole</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.RoledVar">
+RoledVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reference to the pod name list of the component that have a specific role.
+The value will be presented in the following format: name1,name2,&hellip;</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podFQDNsForRole</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.RoledVar">
+RoledVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reference to the pod FQDN list of the component that have a specific role.
+The value will be presented in the following format: FQDN1,FQDN2,&hellip;</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.ComponentVersionCompatibilityRule">ComponentVersionCompatibilityRule
 </h3>
 <p>
@@ -1322,6 +4745,123 @@ string
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.ComponentVolume">ComponentVolume
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the volume.
+It must be a DNS_LABEL and unique within the pod.
+More info can be found at: <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names">https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names</a>
+Note: This field cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>needSnapshot</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether the creation of a snapshot of this volume is necessary when performing a backup of the Component.</p>
+<p>Note: This field cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>highWatermark</code><br/>
+<em>
+int
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Sets the critical threshold for volume space utilization as a percentage (0-100).</p>
+<p>Exceeding this percentage triggers the system to switch the volume to read-only mode as specified in
+<code>componentDefinition.spec.lifecycleActions.readOnly</code>.
+This precaution helps prevent space depletion while maintaining read-only access.
+If the space utilization later falls below this threshold, the system reverts the volume to read-write mode
+as defined in <code>componentDefinition.spec.lifecycleActions.readWrite</code>, restoring full functionality.</p>
+<p>Note: This field cannot be updated.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ConfigTemplateExtension">ConfigTemplateExtension
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.LegacyRenderedTemplateSpec">LegacyRenderedTemplateSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>templateRef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the referenced configuration template ConfigMap object.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>namespace</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the namespace of the referenced configuration template ConfigMap object.
+An empty namespace is equivalent to the &ldquo;default&rdquo; namespace.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>policy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.MergedPolicy">
+MergedPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the strategy for merging externally imported templates into component templates.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.ConnectionCredentialAuth">ConnectionCredentialAuth
 </h3>
 <p>
@@ -1364,6 +4904,49 @@ CredentialVar
 <td>
 <em>(Optional)</em>
 <p>Specifies the password for the external service.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ContainerVars">ContainerVars
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.HostNetworkVars">HostNetworkVars</a>)
+</p>
+<div>
+<p>ContainerVars defines the vars that can be referenced from a Container.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The name of the container.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>port</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.NamedVar">
+NamedVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Container port to reference.</p>
 </td>
 </tr>
 </tbody>
@@ -1424,10 +5007,1315 @@ Kubernetes core/v1.EnvVarSource
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.CredentialVarSelector">CredentialVarSelector
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.VarSource">VarSource</a>)
+</p>
+<div>
+<p>CredentialVarSelector selects a var from a Credential (SystemAccount).</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ClusterObjectReference</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterObjectReference">
+ClusterObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ClusterObjectReference</code> are embedded into this type.)
+</p>
+<p>The Credential (SystemAccount) to select from.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>CredentialVars</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.CredentialVars">
+CredentialVars
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>CredentialVars</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.CredentialVars">CredentialVars
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.CredentialVarSelector">CredentialVarSelector</a>, <a href="#apps.kubeblocks.io/v1.ServiceRefVars">ServiceRefVars</a>)
+</p>
+<div>
+<p>CredentialVars defines the vars that can be referenced from a Credential (SystemAccount).
+!!!!! CredentialVars will only be used as environment variables for Pods &amp; Actions, and will not be used to render the templates.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>username</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>password</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.EnvVar">EnvVar
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+</p>
+<div>
+<p>EnvVar represents a variable present in the env of Pod/Action or the template of config/script.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name of the variable. Must be a C_IDENTIFIER.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>value</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Variable references <code>$(VAR_NAME)</code> are expanded using the previously defined variables in the current context.</p>
+<p>If a variable cannot be resolved, the reference in the input string will be unchanged.
+Double <code>$$</code> are reduced to a single <code>$</code>, which allows for escaping the <code>$(VAR_NAME)</code> syntax: i.e.</p>
+<ul>
+<li><code>$$(VAR_NAME)</code> will produce the string literal <code>$(VAR_NAME)</code>.</li>
+</ul>
+<p>Escaped references will never be expanded, regardless of whether the variable exists or not.
+Defaults to &ldquo;&rdquo;.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>valueFrom</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.VarSource">
+VarSource
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Source for the variable&rsquo;s value. Cannot be used if value is not empty.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>expression</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A Go template expression that will be applied to the resolved value of the var.</p>
+<p>The expression will only be evaluated if the var is successfully resolved to a non-credential value.</p>
+<p>The resolved value can be accessed by its name within the expression, system vars and other user-defined
+non-credential vars can be used within the expression in the same way.
+Notice that, when accessing vars by its name, you should replace all the &ldquo;-&rdquo; in the name with &ldquo;_&rdquo;, because of
+that &ldquo;-&rdquo; is not a valid identifier in Go.</p>
+<p>All expressions are evaluated in the order the vars are defined. If a var depends on any vars that also
+have expressions defined, be careful about the evaluation order as it may use intermediate values.</p>
+<p>The result of evaluation will be used as the final value of the var. If the expression fails to evaluate,
+the resolving of var will also be considered failed.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ExecAction">ExecAction
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.Action">Action</a>)
+</p>
+<div>
+<p>ExecAction describes an Action that executes a command inside a container.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>image</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the container image to be used for running the Action.</p>
+<p>When specified, a dedicated container will be created using this image to execute the Action.
+All actions with same image will share the same container.</p>
+<p>This field cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>env</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents a list of environment variables that will be injected into the container.
+These variables enable the container to adapt its behavior based on the environment it&rsquo;s running in.</p>
+<p>This field cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>command</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the command to be executed inside the container.
+The working directory for this command is the container&rsquo;s root directory(&lsquo;/&rsquo;).
+Commands are executed directly without a shell environment, meaning shell-specific syntax (&lsquo;|&rsquo;, etc.) is not supported.
+If the shell is required, it must be explicitly invoked in the command.</p>
+<p>A successful execution is indicated by an exit status of 0; any non-zero status signifies a failure.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>args</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Args represents the arguments that are passed to the <code>command</code> for execution.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>targetPodSelector</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.TargetPodSelector">
+TargetPodSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the criteria used to select the target Pod(s) for executing the Action.
+This is useful when there is no default target replica identified.
+It allows for precise control over which Pod(s) the Action should run in.</p>
+<p>If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+to be removed or added; or a random pod if the Action is triggered at the component level, such as
+post-provision or pre-terminate of the component.</p>
+<p>This field cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>matchingKey</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Used in conjunction with the <code>targetPodSelector</code> field to refine the selection of target pod(s) for Action execution.
+The impact of this field depends on the <code>targetPodSelector</code> value:</p>
+<ul>
+<li>When <code>targetPodSelector</code> is set to <code>Any</code> or <code>All</code>, this field will be ignored.</li>
+<li>When <code>targetPodSelector</code> is set to <code>Role</code>, only those replicas whose role matches the <code>matchingKey</code>
+will be selected for the Action.</li>
+</ul>
+<p>This field cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>container</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the name of the container within the same pod whose resources will be shared with the action.
+This allows the action to utilize the specified container&rsquo;s resources without executing within it.</p>
+<p>The name must match one of the containers defined in <code>componentDefinition.spec.runtime</code>.</p>
+<p>The resources that can be shared are included:</p>
+<ul>
+<li>volume mounts</li>
+</ul>
+<p>This field cannot be updated.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.Exporter">Exporter
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>containerName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the name of the built-in metrics exporter container.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>scrapePath</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the http/https url path to scrape for metrics.
+If empty, Prometheus uses the default value (e.g. <code>/metrics</code>).</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>scrapePort</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the port name to scrape for metrics.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>scrapeScheme</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PrometheusScheme">
+PrometheusScheme
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the schema to use for scraping.
+<code>http</code> and <code>https</code> are the expected values unless you rewrite the <code>__scheme__</code> label via relabeling.
+If empty, Prometheus uses the default value <code>http</code>.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.HostNetwork">HostNetwork
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>containerPorts</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.HostNetworkContainerPort">
+[]HostNetworkContainerPort
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The list of container ports that are required by the component.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.HostNetworkContainerPort">HostNetworkContainerPort
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.HostNetwork">HostNetwork</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>container</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Container specifies the target container within the Pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ports</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<p>Ports are named container ports within the specified container.
+These container ports must be defined in the container for proper port allocation.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.HostNetworkVarSelector">HostNetworkVarSelector
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.VarSource">VarSource</a>)
+</p>
+<div>
+<p>HostNetworkVarSelector selects a var from host-network resources.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ClusterObjectReference</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterObjectReference">
+ClusterObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ClusterObjectReference</code> are embedded into this type.)
+</p>
+<p>The component to select from.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>HostNetworkVars</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.HostNetworkVars">
+HostNetworkVars
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>HostNetworkVars</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.HostNetworkVars">HostNetworkVars
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.HostNetworkVarSelector">HostNetworkVarSelector</a>)
+</p>
+<div>
+<p>HostNetworkVars defines the vars that can be referenced from host-network resources.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>container</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ContainerVars">
+ContainerVars
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
+</p>
+<div>
+<p>InstanceTemplate allows customization of individual replica configurations in a Component.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name specifies the unique name of the instance Pod created using this InstanceTemplate.
+This name is constructed by concatenating the Component&rsquo;s name, the template&rsquo;s name, and the instance&rsquo;s ordinal
+using the pattern: $(cluster.name)-$(component.name)-$(template.name)-$(ordinal). Ordinals start from 0.
+The specified name overrides any default naming conventions or patterns.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>replicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the number of instances (Pods) to create from this InstanceTemplate.
+This field allows setting how many replicated instances of the Component,
+with the specific overrides in the InstanceTemplate, are created.
+The default value is 1. A value of 0 disables instance creation.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>annotations</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a map of key-value pairs to be merged into the Pod&rsquo;s existing annotations.
+Existing keys will have their values overwritten, while new keys will be added to the annotations.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a map of key-value pairs that will be merged into the Pod&rsquo;s existing labels.
+Values for existing keys will be overwritten, and new keys will be added.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>image</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies an override for the first container&rsquo;s image in the Pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>schedulingPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.SchedulingPolicy">
+SchedulingPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the scheduling policy for the Component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>resources</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcerequirements-v1-core">
+Kubernetes core/v1.ResourceRequirements
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies an override for the resource requirements of the first container in the Pod.
+This field allows for customizing resource allocation (CPU, memory, etc.) for the container.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>env</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines Env to override.
+Add new or override existing envs.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumes</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volume-v1-core">
+[]Kubernetes core/v1.Volume
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines Volumes to override.
+Add new or override existing volumes.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeMounts</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volumemount-v1-core">
+[]Kubernetes core/v1.VolumeMount
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines VolumeMounts to override.
+Add new or override existing volume mounts of the first container in the Pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeClaimTemplates</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterComponentVolumeClaimTemplate">
+[]ClusterComponentVolumeClaimTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines VolumeClaimTemplates to override.
+Add new or override existing volume claim templates.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.Issuer">Issuer
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.TLSConfig">TLSConfig</a>)
+</p>
+<div>
+<p>Issuer defines the TLS certificates issuer for the Cluster.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.IssuerName">
+IssuerName
+</a>
+</em>
+</td>
+<td>
+<p>The issuer for TLS certificates.
+It only allows two enum values: <code>KubeBlocks</code> and <code>UserProvided</code>.</p>
+<ul>
+<li><code>KubeBlocks</code> indicates that the self-signed TLS certificates generated by the KubeBlocks Operator will be used.</li>
+<li><code>UserProvided</code> means that the user is responsible for providing their own CA, Cert, and Key.
+In this case, the user-provided CA certificate, server certificate, and private key will be used
+for TLS communication.</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>secretRef</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.TLSSecretRef">
+TLSSecretRef
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>SecretRef is the reference to the secret that contains user-provided certificates.
+It is required when the issuer is set to <code>UserProvided</code>.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.IssuerName">IssuerName
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.Issuer">Issuer</a>)
+</p>
+<div>
+<p>IssuerName defines the name of the TLS certificates issuer.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;KubeBlocks&#34;</p></td>
+<td><p>IssuerKubeBlocks represents certificates that are signed by the KubeBlocks Operator.</p>
+</td>
+</tr><tr><td><p>&#34;UserProvided&#34;</p></td>
+<td><p>IssuerUserProvided indicates that the user has provided their own CA-signed certificates.</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.LegacyRenderedTemplateSpec">LegacyRenderedTemplateSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentConfigSpec">ComponentConfigSpec</a>)
+</p>
+<div>
+<p>LegacyRenderedTemplateSpec describes the configuration extension for the lazy rendered template.
+Deprecated: LegacyRenderedTemplateSpec has been deprecated since 0.9.0 and will be removed in 0.10.0</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ConfigTemplateExtension</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ConfigTemplateExtension">
+ConfigTemplateExtension
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ConfigTemplateExtension</code> are embedded into this type.)
+</p>
+<p>Extends the configuration template.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.LetterCase">LetterCase
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.PasswordConfig">PasswordConfig</a>)
+</p>
+<div>
+<p>LetterCase defines the available cases to be used in password generation.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;LowerCases&#34;</p></td>
+<td><p>LowerCases represents the use of lower case letters only.</p>
+</td>
+</tr><tr><td><p>&#34;MixedCases&#34;</p></td>
+<td><p>MixedCases represents the use of a mix of both lower and upper case letters.</p>
+</td>
+</tr><tr><td><p>&#34;UpperCases&#34;</p></td>
+<td><p>UpperCases represents the use of upper case letters only.</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.LogConfig">LogConfig
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies a descriptive label for the log type, such as &lsquo;slow&rsquo; for a MySQL slow log file.
+It provides a clear identification of the log&rsquo;s purpose and content.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>filePathPattern</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the paths or patterns identifying where the log files are stored.
+This field allows the system to locate and manage log files effectively.</p>
+<p>Examples:</p>
+<ul>
+<li>/home/postgres/pgdata/pgroot/data/log/postgresql-*</li>
+<li>/data/mysql/log/mysqld-error.log</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.MergedPolicy">MergedPolicy
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ConfigTemplateExtension">ConfigTemplateExtension</a>)
+</p>
+<div>
+<p>MergedPolicy defines how to merge external imported templates into component templates.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;none&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;add&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;patch&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;replace&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.MultipleClusterObjectCombinedOption">MultipleClusterObjectCombinedOption
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.MultipleClusterObjectOption">MultipleClusterObjectOption</a>)
+</p>
+<div>
+<p>MultipleClusterObjectCombinedOption defines options for handling combined variables.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>newVarSuffix</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>If set, the existing variable will be kept, and a new variable will be defined with the specified suffix
+in pattern: $(var.name)_$(suffix).
+The new variable will be auto-created and placed behind the existing one.
+If not set, the existing variable will be reused with the value format defined below.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>valueFormat</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.MultipleClusterObjectValueFormat">
+MultipleClusterObjectValueFormat
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The format of the value that the operator will use to compose values from multiple components.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>flattenFormat</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.MultipleClusterObjectValueFormatFlatten">
+MultipleClusterObjectValueFormatFlatten
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The flatten format, default is: $(comp-name-1):value,$(comp-name-2):value.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.MultipleClusterObjectOption">MultipleClusterObjectOption
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterObjectReference">ClusterObjectReference</a>)
+</p>
+<div>
+<p>MultipleClusterObjectOption defines the options for handling multiple cluster objects matched.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>strategy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.MultipleClusterObjectStrategy">
+MultipleClusterObjectStrategy
+</a>
+</em>
+</td>
+<td>
+<p>Define the strategy for handling multiple cluster objects.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>combinedOption</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.MultipleClusterObjectCombinedOption">
+MultipleClusterObjectCombinedOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Define the options for handling combined variables.
+Valid only when the strategy is set to &ldquo;combined&rdquo;.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.MultipleClusterObjectStrategy">MultipleClusterObjectStrategy
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.MultipleClusterObjectOption">MultipleClusterObjectOption</a>)
+</p>
+<div>
+<p>MultipleClusterObjectStrategy defines the strategy for handling multiple cluster objects.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;combined&#34;</p></td>
+<td><p>MultipleClusterObjectStrategyCombined - the values from all matched components will be combined into a single
+variable using the specified option.</p>
+</td>
+</tr><tr><td><p>&#34;individual&#34;</p></td>
+<td><p>MultipleClusterObjectStrategyIndividual - each matched component will have its individual variable with its name
+as the suffix.
+This is required when referencing credential variables that cannot be passed by values.</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.MultipleClusterObjectValueFormat">MultipleClusterObjectValueFormat
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.MultipleClusterObjectCombinedOption">MultipleClusterObjectCombinedOption</a>)
+</p>
+<div>
+<p>MultipleClusterObjectValueFormat defines the format details for the value.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Flatten&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.MultipleClusterObjectValueFormatFlatten">MultipleClusterObjectValueFormatFlatten
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.MultipleClusterObjectCombinedOption">MultipleClusterObjectCombinedOption</a>)
+</p>
+<div>
+<p>MultipleClusterObjectValueFormatFlatten defines the flatten format for the value.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>delimiter</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Pair delimiter.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>keyValueDelimiter</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Key-value delimiter.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.NamedVar">NamedVar
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ContainerVars">ContainerVars</a>, <a href="#apps.kubeblocks.io/v1.ServiceVars">ServiceVars</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>option</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.PasswordConfig">PasswordConfig
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentSystemAccount">ComponentSystemAccount</a>, <a href="#apps.kubeblocks.io/v1.SystemAccount">SystemAccount</a>)
+</p>
+<div>
+<p>PasswordConfig helps provide to customize complexity of password generation pattern.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>length</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The length of the password.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>numDigits</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The number of digits in the password.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>numSymbols</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The number of symbols in the password.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>letterCase</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.LetterCase">
+LetterCase
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The case of the letters in the password.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>seed</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Seed to generate the account&rsquo;s password.
+Cannot be updated.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.PersistentVolumeClaimSpec">PersistentVolumeClaimSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentVolumeClaimTemplate">ClusterComponentVolumeClaimTemplate</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>accessModes</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#persistentvolumeaccessmode-v1-core">
+[]Kubernetes core/v1.PersistentVolumeAccessMode
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Contains the desired access modes the volume should have.
+More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1">https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1</a>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>resources</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volumeresourcerequirements-v1-core">
+Kubernetes core/v1.VolumeResourceRequirements
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents the minimum resources the volume should have.
+If the RecoverVolumeExpansionFailure feature is enabled, users are allowed to specify resource requirements that
+are lower than the previous value but must still be higher than the capacity recorded in the status field of the claim.
+More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources">https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources</a>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>storageClassName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The name of the StorageClass required by the claim.
+More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1">https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1</a>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeMode</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#persistentvolumemode-v1-core">
+Kubernetes core/v1.PersistentVolumeMode
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines what type of volume is required by the claim, either Block or Filesystem.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.Phase">Phase
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterDefinitionStatus">ClusterDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1.ComponentVersionStatus">ComponentVersionStatus</a>, <a href="#apps.kubeblocks.io/v1.ServiceDescriptorStatus">ServiceDescriptorStatus</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterDefinitionStatus">ClusterDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1.ComponentDefinitionStatus">ComponentDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1.ComponentVersionStatus">ComponentVersionStatus</a>, <a href="#apps.kubeblocks.io/v1.ServiceDescriptorStatus">ServiceDescriptorStatus</a>)
 </p>
 <div>
 <p>Phase represents the status of a CR.</p>
@@ -1446,6 +6334,1020 @@ Kubernetes core/v1.EnvVarSource
 <td><p>UnavailablePhase indicates that a CR is in an unavailable state.</p>
 </td>
 </tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.PodUpdatePolicyType">PodUpdatePolicyType
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;PreferInPlace&#34;</p></td>
+<td><p>PreferInPlacePodUpdatePolicyType indicates that we will first attempt an in-place upgrade of the Pod.
+If that fails, it will fall back to the ReCreate, where pod will be recreated.</p>
+</td>
+</tr><tr><td><p>&#34;StrictInPlace&#34;</p></td>
+<td><p>StrictInPlacePodUpdatePolicyType indicates that only allows in-place upgrades.
+Any attempt to modify other fields will be rejected.</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.PreConditionType">PreConditionType
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.Action">Action</a>)
+</p>
+<div>
+<p>PreConditionType defines the preCondition type of the action execution.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;ClusterReady&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;ComponentReady&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Immediately&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;RuntimeReady&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.Probe">Probe
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>Action</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>Action</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>initialDelaySeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the number of seconds to wait after the container has started before the RoleProbe
+begins to detect the container&rsquo;s role.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>periodSeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the frequency at which the probe is conducted. This value is expressed in seconds.
+Default to 10 seconds. Minimum value is 1.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>successThreshold</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Minimum consecutive successes for the probe to be considered successful after having failed.
+Defaults to 1. Minimum value is 1.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>failureThreshold</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Minimum consecutive failures for the probe to be considered failed after having succeeded.
+Defaults to 3. Minimum value is 1.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.PrometheusScheme">PrometheusScheme
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.Exporter">Exporter</a>)
+</p>
+<div>
+<p>PrometheusScheme defines the protocol of prometheus scrape metrics.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;http&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;https&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ProvisionSecretRef">ProvisionSecretRef
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentSystemAccount">ComponentSystemAccount</a>, <a href="#apps.kubeblocks.io/v1.SystemAccount">SystemAccount</a>)
+</p>
+<div>
+<p>ProvisionSecretRef represents the reference to a secret.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The unique identifier of the secret.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>namespace</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The namespace where the secret is located.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ReplicaRole">ReplicaRole
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+</p>
+<div>
+<p>ReplicaRole represents a role that can be assumed by a component instance.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Defines the role&rsquo;s identifier. It is used to set the &ldquo;apps.kubeblocks.io/role&rdquo; label value
+on the corresponding object.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceable</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates whether a replica assigned this role is capable of providing services.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>writable</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Determines if a replica in this role has the authority to perform write operations.
+A writable replica can modify data, handle update operations.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>votable</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether a replica with this role has voting rights.
+In distributed systems, this typically means the replica can participate in consensus decisions,
+configuration changes, or other processes that require a quorum.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ReplicasLimit">ReplicasLimit
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+</p>
+<div>
+<p>ReplicasLimit defines the valid range of number of replicas supported.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>minReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>The minimum limit of replicas.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>maxReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>The maximum limit of replicas.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.RerenderResourceType">RerenderResourceType
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentConfigSpec">ComponentConfigSpec</a>)
+</p>
+<div>
+<p>RerenderResourceType defines the resource requirements for a component.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;hscale&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;vscale&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.RetryPolicy">RetryPolicy
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.Action">Action</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>maxRetries</code><br/>
+<em>
+int
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the maximum number of retry attempts that should be made for a given Action.
+This value is set to 0 by default, indicating that no retries will be made.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>retryInterval</code><br/>
+<em>
+time.Duration
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates the duration of time to wait between each retry attempt.
+This value is set to 0 by default, indicating that there will be no delay between retry attempts.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.RoledVar">RoledVar
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentVars">ComponentVars</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>role</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>option</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.SchedulingPolicy">SchedulingPolicy
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>schedulerName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>If specified, the Pod will be dispatched by specified scheduler.
+If not specified, the Pod will be dispatched by default scheduler.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>nodeSelector</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>NodeSelector is a selector which must be true for the Pod to fit on a node.
+Selector which must match a node&rsquo;s labels for the Pod to be scheduled on that node.
+More info: <a href="https://kubernetes.io/docs/concepts/configuration/assign-pod-node/">https://kubernetes.io/docs/concepts/configuration/assign-pod-node/</a></p>
+</td>
+</tr>
+<tr>
+<td>
+<code>nodeName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>NodeName is a request to schedule this Pod onto a specific node. If it is non-empty,
+the scheduler simply schedules this Pod onto that node, assuming that it fits resource
+requirements.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>affinity</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#affinity-v1-core">
+Kubernetes core/v1.Affinity
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a group of affinity scheduling rules of the Cluster, including NodeAffinity, PodAffinity, and PodAntiAffinity.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>tolerations</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#toleration-v1-core">
+[]Kubernetes core/v1.Toleration
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Allows Pods to be scheduled onto nodes with matching taints.
+Each toleration in the array allows the Pod to tolerate node taints based on
+specified <code>key</code>, <code>value</code>, <code>effect</code>, and <code>operator</code>.</p>
+<ul>
+<li>The <code>key</code>, <code>value</code>, and <code>effect</code> identify the taint that the toleration matches.</li>
+<li>The <code>operator</code> determines how the toleration matches the taint.</li>
+</ul>
+<p>Pods with matching tolerations are allowed to be scheduled on tainted nodes, typically reserved for specific purposes.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>topologySpreadConstraints</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#topologyspreadconstraint-v1-core">
+[]Kubernetes core/v1.TopologySpreadConstraint
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>TopologySpreadConstraints describes how a group of Pods ought to spread across topology
+domains. Scheduler will schedule Pods in a way which abides by the constraints.
+All topologySpreadConstraints are ANDed.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.Service">Service
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentService">ComponentService</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name defines the name of the service.
+otherwise, it indicates the name of the service.
+Others can refer to this service by its name. (e.g., connection credential)
+Cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServiceName defines the name of the underlying service object.
+If not specified, the default service name with different patterns will be used:</p>
+<ul>
+<li>CLUSTER_NAME: for cluster-level services</li>
+<li>CLUSTER_NAME-COMPONENT_NAME: for component-level services</li>
+</ul>
+<p>Only one default service name is allowed.
+Cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>annotations</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>If ServiceType is LoadBalancer, cloud provider related parameters can be put here
+More info: <a href="https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer">https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer</a>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#servicespec-v1-core">
+Kubernetes core/v1.ServiceSpec
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Spec defines the behavior of a service.
+<a href="https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status">https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status</a></p>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>ports</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#serviceport-v1-core">
+[]Kubernetes core/v1.ServicePort
+</a>
+</em>
+</td>
+<td>
+<p>The list of ports that are exposed by this service.
+More info: <a href="https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies">https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies</a></p>
+</td>
+</tr>
+<tr>
+<td>
+<code>selector</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Route service traffic to pods with label keys and values matching this
+selector. If empty or not present, the service is assumed to have an
+external process managing its endpoints, which Kubernetes will not
+modify. Only applies to types ClusterIP, NodePort, and LoadBalancer.
+Ignored if type is ExternalName.
+More info: <a href="https://kubernetes.io/docs/concepts/services-networking/service/">https://kubernetes.io/docs/concepts/services-networking/service/</a></p>
+</td>
+</tr>
+<tr>
+<td>
+<code>clusterIP</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>clusterIP is the IP address of the service and is usually assigned
+randomly. If an address is specified manually, is in-range (as per
+system configuration), and is not in use, it will be allocated to the
+service; otherwise creation of the service will fail. This field may not
+be changed through updates unless the type field is also being changed
+to ExternalName (which requires this field to be blank) or the type
+field is being changed from ExternalName (in which case this field may
+optionally be specified, as describe above).  Valid values are &ldquo;None&rdquo;,
+empty string (&ldquo;&rdquo;), or a valid IP address. Setting this to &ldquo;None&rdquo; makes a
+&ldquo;headless service&rdquo; (no virtual IP), which is useful when direct endpoint
+connections are preferred and proxying is not required.  Only applies to
+types ClusterIP, NodePort, and LoadBalancer. If this field is specified
+when creating a Service of type ExternalName, creation will fail. This
+field will be wiped when updating a Service to type ExternalName.
+More info: <a href="https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies">https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies</a></p>
+</td>
+</tr>
+<tr>
+<td>
+<code>clusterIPs</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ClusterIPs is a list of IP addresses assigned to this service, and are
+usually assigned randomly.  If an address is specified manually, is
+in-range (as per system configuration), and is not in use, it will be
+allocated to the service; otherwise creation of the service will fail.
+This field may not be changed through updates unless the type field is
+also being changed to ExternalName (which requires this field to be
+empty) or the type field is being changed from ExternalName (in which
+case this field may optionally be specified, as describe above).  Valid
+values are &ldquo;None&rdquo;, empty string (&ldquo;&rdquo;), or a valid IP address.  Setting
+this to &ldquo;None&rdquo; makes a &ldquo;headless service&rdquo; (no virtual IP), which is
+useful when direct endpoint connections are preferred and proxying is
+not required.  Only applies to types ClusterIP, NodePort, and
+LoadBalancer. If this field is specified when creating a Service of type
+ExternalName, creation will fail. This field will be wiped when updating
+a Service to type ExternalName.  If this field is not specified, it will
+be initialized from the clusterIP field.  If this field is specified,
+clients must ensure that clusterIPs[0] and clusterIP have the same
+value.</p>
+<p>This field may hold a maximum of two entries (dual-stack IPs, in either order).
+These IPs must correspond to the values of the ipFamilies field. Both
+clusterIPs and ipFamilies are governed by the ipFamilyPolicy field.
+More info: <a href="https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies">https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies</a></p>
+</td>
+</tr>
+<tr>
+<td>
+<code>type</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#servicetype-v1-core">
+Kubernetes core/v1.ServiceType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>type determines how the Service is exposed. Defaults to ClusterIP. Valid
+options are ExternalName, ClusterIP, NodePort, and LoadBalancer.
+&ldquo;ClusterIP&rdquo; allocates a cluster-internal IP address for load-balancing
+to endpoints. Endpoints are determined by the selector or if that is not
+specified, by manual construction of an Endpoints object or
+EndpointSlice objects. If clusterIP is &ldquo;None&rdquo;, no virtual IP is
+allocated and the endpoints are published as a set of endpoints rather
+than a virtual IP.
+&ldquo;NodePort&rdquo; builds on ClusterIP and allocates a port on every node which
+routes to the same endpoints as the clusterIP.
+&ldquo;LoadBalancer&rdquo; builds on NodePort and creates an external load-balancer
+(if supported in the current cloud) which routes to the same endpoints
+as the clusterIP.
+&ldquo;ExternalName&rdquo; aliases this service to the specified externalName.
+Several other fields do not apply to ExternalName services.
+More info: <a href="https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types">https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types</a></p>
+</td>
+</tr>
+<tr>
+<td>
+<code>externalIPs</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>externalIPs is a list of IP addresses for which nodes in the cluster
+will also accept traffic for this service.  These IPs are not managed by
+Kubernetes.  The user is responsible for ensuring that traffic arrives
+at a node with this IP.  A common example is external load-balancers
+that are not part of the Kubernetes system.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>sessionAffinity</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#serviceaffinity-v1-core">
+Kubernetes core/v1.ServiceAffinity
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Supports &ldquo;ClientIP&rdquo; and &ldquo;None&rdquo;. Used to maintain session affinity.
+Enable client IP based session affinity.
+Must be ClientIP or None.
+Defaults to None.
+More info: <a href="https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies">https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies</a></p>
+</td>
+</tr>
+<tr>
+<td>
+<code>loadBalancerIP</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Only applies to Service Type: LoadBalancer.
+This feature depends on whether the underlying cloud-provider supports specifying
+the loadBalancerIP when a load balancer is created.
+This field will be ignored if the cloud-provider does not support the feature.
+Deprecated: This field was under-specified and its meaning varies across implementations.
+Using it is non-portable and it may not support dual-stack.
+Users are encouraged to use implementation-specific annotations when available.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>loadBalancerSourceRanges</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>If specified and supported by the platform, this will restrict traffic through the cloud-provider
+load-balancer will be restricted to the specified client IPs. This field will be ignored if the
+cloud-provider does not support the feature.&rdquo;
+More info: <a href="https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/">https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/</a></p>
+</td>
+</tr>
+<tr>
+<td>
+<code>externalName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>externalName is the external reference that discovery mechanisms will
+return as an alias for this service (e.g. a DNS CNAME record). No
+proxying will be involved.  Must be a lowercase RFC-1123 hostname
+(<a href="https://tools.ietf.org/html/rfc1123">https://tools.ietf.org/html/rfc1123</a>) and requires <code>type</code> to be &ldquo;ExternalName&rdquo;.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>externalTrafficPolicy</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#serviceexternaltrafficpolicy-v1-core">
+Kubernetes core/v1.ServiceExternalTrafficPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>externalTrafficPolicy describes how nodes distribute service traffic they
+receive on one of the Service&rsquo;s &ldquo;externally-facing&rdquo; addresses (NodePorts,
+ExternalIPs, and LoadBalancer IPs). If set to &ldquo;Local&rdquo;, the proxy will configure
+the service in a way that assumes that external load balancers will take care
+of balancing the service traffic between nodes, and so each node will deliver
+traffic only to the node-local endpoints of the service, without masquerading
+the client source IP. (Traffic mistakenly sent to a node with no endpoints will
+be dropped.) The default value, &ldquo;Cluster&rdquo;, uses the standard behavior of
+routing to all endpoints evenly (possibly modified by topology and other
+features). Note that traffic sent to an External IP or LoadBalancer IP from
+within the cluster will always get &ldquo;Cluster&rdquo; semantics, but clients sending to
+a NodePort from within the cluster may need to take traffic policy into account
+when picking a node.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>healthCheckNodePort</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>healthCheckNodePort specifies the healthcheck nodePort for the service.
+This only applies when type is set to LoadBalancer and
+externalTrafficPolicy is set to Local. If a value is specified, is
+in-range, and is not in use, it will be used.  If not specified, a value
+will be automatically allocated.  External systems (e.g. load-balancers)
+can use this port to determine if a given node holds endpoints for this
+service or not.  If this field is specified when creating a Service
+which does not need it, creation will fail. This field will be wiped
+when updating a Service to no longer need it (e.g. changing type).
+This field cannot be updated once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>publishNotReadyAddresses</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>publishNotReadyAddresses indicates that any agent which deals with endpoints for this
+Service should disregard any indications of ready/not-ready.
+The primary use case for setting this field is for a StatefulSet&rsquo;s Headless Service to
+propagate SRV DNS records for its Pods for the purpose of peer discovery.
+The Kubernetes controllers that generate Endpoints and EndpointSlice resources for
+Services interpret this to mean that all endpoints are considered &ldquo;ready&rdquo; even if the
+Pods themselves are not. Agents which consume only Kubernetes generated endpoints
+through the Endpoints or EndpointSlice resources can safely assume this behavior.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>sessionAffinityConfig</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#sessionaffinityconfig-v1-core">
+Kubernetes core/v1.SessionAffinityConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>sessionAffinityConfig contains the configurations of session affinity.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ipFamilies</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#ipfamily-v1-core">
+[]Kubernetes core/v1.IPFamily
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>IPFamilies is a list of IP families (e.g. IPv4, IPv6) assigned to this
+service. This field is usually assigned automatically based on cluster
+configuration and the ipFamilyPolicy field. If this field is specified
+manually, the requested family is available in the cluster,
+and ipFamilyPolicy allows it, it will be used; otherwise creation of
+the service will fail. This field is conditionally mutable: it allows
+for adding or removing a secondary IP family, but it does not allow
+changing the primary IP family of the Service. Valid values are &ldquo;IPv4&rdquo;
+and &ldquo;IPv6&rdquo;.  This field only applies to Services of types ClusterIP,
+NodePort, and LoadBalancer, and does apply to &ldquo;headless&rdquo; services.
+This field will be wiped when updating a Service to type ExternalName.</p>
+<p>This field may hold a maximum of two entries (dual-stack families, in
+either order).  These families must correspond to the values of the
+clusterIPs field, if specified. Both clusterIPs and ipFamilies are
+governed by the ipFamilyPolicy field.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ipFamilyPolicy</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#ipfamilypolicy-v1-core">
+Kubernetes core/v1.IPFamilyPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>IPFamilyPolicy represents the dual-stack-ness requested or required by
+this Service. If there is no value provided, then this field will be set
+to SingleStack. Services can be &ldquo;SingleStack&rdquo; (a single IP family),
+&ldquo;PreferDualStack&rdquo; (two IP families on dual-stack configured clusters or
+a single IP family on single-stack clusters), or &ldquo;RequireDualStack&rdquo;
+(two IP families on dual-stack configured clusters, otherwise fail). The
+ipFamilies and clusterIPs fields depend on the value of this field. This
+field will be wiped when updating a service to type ExternalName.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>allocateLoadBalancerNodePorts</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>allocateLoadBalancerNodePorts defines if NodePorts will be automatically
+allocated for services with type LoadBalancer.  Default is &ldquo;true&rdquo;. It
+may be set to &ldquo;false&rdquo; if the cluster load-balancer does not rely on
+NodePorts.  If the caller requests specific NodePorts (by specifying a
+value), those requests will be respected, regardless of this field.
+This field may only be set for services with type LoadBalancer and will
+be cleared if the type is changed to any other type.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>loadBalancerClass</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>loadBalancerClass is the class of the load balancer implementation this Service belongs to.
+If specified, the value of this field must be a label-style identifier, with an optional prefix,
+e.g. &ldquo;internal-vip&rdquo; or &ldquo;example.com/internal-vip&rdquo;. Unprefixed names are reserved for end-users.
+This field can only be set when the Service type is &lsquo;LoadBalancer&rsquo;. If not set, the default load
+balancer implementation is used, today this is typically done through the cloud provider integration,
+but should apply for any default implementation. If set, it is assumed that a load balancer
+implementation is watching for Services with a matching class. Any default load balancer
+implementation (e.g. cloud providers) should ignore Services that set this field.
+This field can only be set when creating or updating a Service to type &lsquo;LoadBalancer&rsquo;.
+Once set, it can not be changed. This field will be wiped when a service is updated to a non &lsquo;LoadBalancer&rsquo; type.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>internalTrafficPolicy</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#serviceinternaltrafficpolicy-v1-core">
+Kubernetes core/v1.ServiceInternalTrafficPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>InternalTrafficPolicy describes how nodes distribute service traffic they
+receive on the ClusterIP. If set to &ldquo;Local&rdquo;, the proxy will assume that pods
+only want to talk to endpoints of the service on the same node as the pod,
+dropping the traffic if there are no local endpoints. The default value,
+&ldquo;Cluster&rdquo;, uses the standard behavior of routing to all endpoints evenly
+(possibly modified by topology and other features).</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>roleSelector</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Extends the above <code>serviceSpec.selector</code> by allowing you to specify defined role as selector for the service.
+When <code>roleSelector</code> is set, it adds a label selector &ldquo;kubeblocks.io/role: &#123;roleSelector&#125;&rdquo;
+to the <code>serviceSpec.selector</code>.
+Example usage:</p>
+<pre><code>  roleSelector: &quot;leader&quot;
+</code></pre>
+<p>In this example, setting <code>roleSelector</code> to &ldquo;leader&rdquo; will add a label selector
+&ldquo;kubeblocks.io/role: leader&rdquo; to the <code>serviceSpec.selector</code>.
+This means that the service will select and route traffic to Pods with the label
+&ldquo;kubeblocks.io/role&rdquo; set to &ldquo;leader&rdquo;.</p>
+<p>Note that if <code>podService</code> sets to true, RoleSelector will be ignored.
+The <code>podService</code> flag takes precedence over <code>roleSelector</code> and generates a service for each Pod.</p>
+</td>
+</tr>
+</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.ServiceDescriptorSpec">ServiceDescriptorSpec
 </h3>
@@ -1608,6 +7510,1031 @@ string
 <td>
 <em>(Optional)</em>
 <p>Provides a human-readable explanation detailing the reason for the current phase of the ServiceConnectionCredential.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ServiceRef">ServiceRef
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the identifier of the service reference declaration.
+It corresponds to the serviceRefDeclaration name defined in either:</p>
+<ul>
+<li><code>componentDefinition.spec.serviceRefDeclarations[*].name</code></li>
+<li><code>clusterDefinition.spec.componentDefs[*].serviceRefDeclarations[*].name</code> (deprecated)</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>namespace</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the namespace of the referenced Cluster or the namespace of the referenced ServiceDescriptor object.
+If not provided, the referenced Cluster and ServiceDescriptor will be searched in the namespace of the current
+Cluster by default.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>cluster</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the name of the KubeBlocks Cluster being referenced.
+This is used when services from another KubeBlocks Cluster are consumed.</p>
+<p>By default, the referenced KubeBlocks Cluster&rsquo;s <code>clusterDefinition.spec.connectionCredential</code>
+will be utilized to bind to the current Component. This credential should include:
+<code>endpoint</code>, <code>port</code>, <code>username</code>, and <code>password</code>.</p>
+<p>Note:</p>
+<ul>
+<li>The <code>ServiceKind</code> and <code>ServiceVersion</code> specified in the service reference within the
+ClusterDefinition are not validated when using this approach.</li>
+<li>If both <code>cluster</code> and <code>serviceDescriptor</code> are present, <code>cluster</code> will take precedence.</li>
+</ul>
+<p>Deprecated since v0.9 since <code>clusterDefinition.spec.connectionCredential</code> is deprecated,
+use <code>clusterServiceSelector</code> instead.
+This field is maintained for backward compatibility and its use is discouraged.
+Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>clusterServiceSelector</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ServiceRefClusterSelector">
+ServiceRefClusterSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>References a service provided by another KubeBlocks Cluster.
+It specifies the ClusterService and the account credentials needed for access.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceDescriptor</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the name of the ServiceDescriptor object that describes a service provided by external sources.</p>
+<p>When referencing a service provided by external sources, a ServiceDescriptor object is required to establish
+the service binding.
+The <code>serviceDescriptor.spec.serviceKind</code> and <code>serviceDescriptor.spec.serviceVersion</code> should match the serviceKind
+and serviceVersion declared in the definition.</p>
+<p>If both <code>cluster</code> and <code>serviceDescriptor</code> are specified, the <code>cluster</code> takes precedence.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ServiceRefClusterSelector">ServiceRefClusterSelector
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ServiceRef">ServiceRef</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>cluster</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The name of the Cluster being referenced.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>service</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ServiceRefServiceSelector">
+ServiceRefServiceSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Identifies a ClusterService from the list of Services defined in <code>cluster.spec.services</code> of the referenced Cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>credential</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ServiceRefCredentialSelector">
+ServiceRefCredentialSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the SystemAccount to authenticate and establish a connection with the referenced Cluster.
+The SystemAccount should be defined in <code>componentDefinition.spec.systemAccounts</code>
+of the Component providing the service in the referenced Cluster.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ServiceRefCredentialSelector">ServiceRefCredentialSelector
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ServiceRefClusterSelector">ServiceRefClusterSelector</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>component</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The name of the Component where the credential resides in.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The name of the credential (SystemAccount) to reference.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ServiceRefDeclaration">ServiceRefDeclaration
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+</p>
+<div>
+<p>ServiceRefDeclaration represents a reference to a service that can be either provided by a KubeBlocks Cluster
+or an external service.
+It acts as a placeholder for the actual service reference, which is determined later when a Cluster is created.</p>
+<p>The purpose of ServiceRefDeclaration is to declare a service dependency without specifying the concrete details
+of the service.
+It allows for flexibility and abstraction in defining service references within a Component.
+By using ServiceRefDeclaration, you can define service dependencies in a declarative manner, enabling loose coupling
+and easier management of service references across different components and clusters.</p>
+<p>Upon Cluster creation, the ServiceRefDeclaration is bound to an actual service through the ServiceRef field,
+effectively resolving and connecting to the specified service.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the ServiceRefDeclaration.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceRefDeclarationSpecs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ServiceRefDeclarationSpec">
+[]ServiceRefDeclarationSpec
+</a>
+</em>
+</td>
+<td>
+<p>Defines a list of constraints and requirements for services that can be bound to this ServiceRefDeclaration
+upon Cluster creation.
+Each ServiceRefDeclarationSpec defines a ServiceKind and ServiceVersion,
+outlining the acceptable service types and versions that are compatible.</p>
+<p>This flexibility allows a ServiceRefDeclaration to be fulfilled by any one of the provided specs.
+For example, if it requires an OLTP database, specs for both MySQL and PostgreSQL are listed,
+either MySQL or PostgreSQL services can be used when binding.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>optional</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether the service reference can be optional.</p>
+<p>For an optional service-ref, the component can still be created even if the service-ref is not provided.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ServiceRefDeclarationSpec">ServiceRefDeclarationSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ServiceRefDeclaration">ServiceRefDeclaration</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>serviceKind</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the type or nature of the service. This should be a well-known application cluster type, such as
+&#123;mysql, redis, mongodb&#125;.
+The field is case-insensitive and supports abbreviations for some well-known databases.
+For instance, both <code>zk</code> and <code>zookeeper</code> are considered as a ZooKeeper cluster, while <code>pg</code>, <code>postgres</code>, <code>postgresql</code>
+are all recognized as a PostgreSQL cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Defines the service version of the service reference. This is a regular expression that matches a version number pattern.
+For instance, <code>^8.0.8$</code>, <code>8.0.\d&#123;1,2&#125;$</code>, <code>^[v\-]*?(\d&#123;1,2&#125;\.)&#123;0,3&#125;\d&#123;1,2&#125;$</code> are all valid patterns.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ServiceRefServiceSelector">ServiceRefServiceSelector
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ServiceRefClusterSelector">ServiceRefClusterSelector</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>component</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The name of the Component where the Service resides in.</p>
+<p>It is required when referencing a Component&rsquo;s Service.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>service</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The name of the Service to be referenced.</p>
+<p>Leave it empty to reference the default Service. Set it to &ldquo;headless&rdquo; to reference the default headless Service.</p>
+<p>If the referenced Service is of pod-service type (a Service per Pod), there will be multiple Service objects matched,
+and the resolved value will be presented in the following format: service1.name,service2.name&hellip;</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>port</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The port name of the Service to be referenced.</p>
+<p>If there is a non-zero node-port exist for the matched Service port, the node-port will be selected first.</p>
+<p>If the referenced Service is of pod-service type (a Service per Pod), there will be multiple Service objects matched,
+and the resolved value will be presented in the following format: service1.name:port1,service2.name:port2&hellip;</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ServiceRefVarSelector">ServiceRefVarSelector
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.VarSource">VarSource</a>)
+</p>
+<div>
+<p>ServiceRefVarSelector selects a var from a ServiceRefDeclaration.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ClusterObjectReference</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterObjectReference">
+ClusterObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ClusterObjectReference</code> are embedded into this type.)
+</p>
+<p>The ServiceRefDeclaration to select from.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ServiceRefVars</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ServiceRefVars">
+ServiceRefVars
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ServiceRefVars</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ServiceRefVars">ServiceRefVars
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ServiceRefVarSelector">ServiceRefVarSelector</a>)
+</p>
+<div>
+<p>ServiceRefVars defines the vars that can be referenced from a ServiceRef.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>endpoint</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>host</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>port</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>CredentialVars</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.CredentialVars">
+CredentialVars
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>CredentialVars</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ServiceVarSelector">ServiceVarSelector
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.VarSource">VarSource</a>)
+</p>
+<div>
+<p>ServiceVarSelector selects a var from a Service.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ClusterObjectReference</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterObjectReference">
+ClusterObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ClusterObjectReference</code> are embedded into this type.)
+</p>
+<p>The Service to select from.
+It can be referenced from the default headless service by setting the name to &ldquo;headless&rdquo;.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ServiceVars</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ServiceVars">
+ServiceVars
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ServiceVars</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ServiceVars">ServiceVars
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ServiceVarSelector">ServiceVarSelector</a>)
+</p>
+<div>
+<p>ServiceVars defines the vars that can be referenced from a Service.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>serviceType</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServiceType references the type of the service.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>host</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>loadBalancer</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>LoadBalancer represents the LoadBalancer ingress point of the service.</p>
+<p>If multiple ingress points are available, the first one will be used automatically, choosing between IP and Hostname.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>port</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.NamedVar">
+NamedVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Port references a port or node-port defined in the service.</p>
+<p>If the referenced service is a pod-service, there will be multiple service objects matched,
+and the value will be presented in the following format: service1.name:port1,service2.name:port2&hellip;</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.SystemAccount">SystemAccount
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the unique identifier for the account. This name is used by other entities to reference the account.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>initAccount</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates if this account is a system initialization account (e.g., MySQL root).</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>statement</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the statement used to create the account with the necessary privileges.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>passwordGenerationPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PasswordConfig">
+PasswordConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the policy for generating the account&rsquo;s password.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>secretRef</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ProvisionSecretRef">
+ProvisionSecretRef
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Refers to the secret from which data will be copied to create the new account.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.TLSConfig">TLSConfig
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>enable</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A boolean flag that indicates whether the Component should use Transport Layer Security (TLS)
+for secure communication.
+When set to true, the Component will be configured to use TLS encryption for its network connections.
+This ensures that the data transmitted between the Component and its clients or other Components is encrypted
+and protected from unauthorized access.
+If TLS is enabled, the Component may require additional configuration,
+such as specifying TLS certificates and keys, to properly set up the secure communication channel.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>issuer</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Issuer">
+Issuer
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the configuration for the TLS certificates issuer.
+It allows defining the issuer name and the reference to the secret containing the TLS certificates and key.
+The secret should contain the CA certificate, TLS certificate, and private key in the specified keys.
+Required when TLS is enabled.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.TLSSecretRef">TLSSecretRef
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.Issuer">Issuer</a>)
+</p>
+<div>
+<p>TLSSecretRef defines Secret contains Tls certs</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name of the Secret that contains user-provided certificates.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ca</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Key of CA cert in Secret</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>cert</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Key of Cert in Secret</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>key</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Key of TLS private key in Secret</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.TargetPodSelector">TargetPodSelector
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ExecAction">ExecAction</a>)
+</p>
+<div>
+<p>TargetPodSelector defines how to select pod(s) to execute an Action.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;All&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Any&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Ordinal&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Role&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.UpdateStrategy">UpdateStrategy
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+</p>
+<div>
+<p>UpdateStrategy defines the update strategy for cluster components. This strategy determines how updates are applied
+across the cluster.
+The available strategies are <code>Serial</code>, <code>BestEffortParallel</code>, and <code>Parallel</code>.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;BestEffortParallel&#34;</p></td>
+<td><p>BestEffortParallelStrategy indicates that the replicas are updated in parallel, with the operator making
+a best-effort attempt to update as many replicas as possible concurrently
+while maintaining the component&rsquo;s availability.
+Unlike the <code>Parallel</code> strategy, the <code>BestEffortParallel</code> strategy aims to ensure that a minimum number
+of replicas remain available during the update process to maintain the component&rsquo;s quorum and functionality.</p>
+<p>For example, consider a component with 5 replicas. To maintain the component&rsquo;s availability and quorum,
+the operator may allow a maximum of 2 replicas to be simultaneously updated. This ensures that at least
+3 replicas (a quorum) remain available and functional during the update process.</p>
+<p>The <code>BestEffortParallel</code> strategy strikes a balance between update speed and component availability.</p>
+</td>
+</tr><tr><td><p>&#34;Parallel&#34;</p></td>
+<td><p>ParallelStrategy indicates that updates are applied simultaneously to all Pods of a Component.
+The replicas are updated in parallel, with the operator updating all replicas concurrently.
+This strategy provides the fastest update time but may lead to a period of reduced availability or
+capacity during the update process.</p>
+</td>
+</tr><tr><td><p>&#34;Serial&#34;</p></td>
+<td><p>SerialStrategy indicates that updates are applied one at a time in a sequential manner.
+The operator waits for each replica to be updated and ready before proceeding to the next one.
+This ensures that only one replica is unavailable at a time during the update process.</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.VarOption">VarOption
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterVars">ClusterVars</a>, <a href="#apps.kubeblocks.io/v1.ComponentVars">ComponentVars</a>, <a href="#apps.kubeblocks.io/v1.CredentialVars">CredentialVars</a>, <a href="#apps.kubeblocks.io/v1.NamedVar">NamedVar</a>, <a href="#apps.kubeblocks.io/v1.RoledVar">RoledVar</a>, <a href="#apps.kubeblocks.io/v1.ServiceRefVars">ServiceRefVars</a>, <a href="#apps.kubeblocks.io/v1.ServiceVars">ServiceVars</a>)
+</p>
+<div>
+<p>VarOption defines whether a variable is required or optional.</p>
+</div>
+<h3 id="apps.kubeblocks.io/v1.VarSource">VarSource
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.EnvVar">EnvVar</a>)
+</p>
+<div>
+<p>VarSource represents a source for the value of an EnvVar.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>configMapKeyRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#configmapkeyselector-v1-core">
+Kubernetes core/v1.ConfigMapKeySelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Selects a key of a ConfigMap.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>secretKeyRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#secretkeyselector-v1-core">
+Kubernetes core/v1.SecretKeySelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Selects a key of a Secret.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>hostNetworkVarRef</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.HostNetworkVarSelector">
+HostNetworkVarSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Selects a defined var of host-network resources.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceVarRef</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ServiceVarSelector">
+ServiceVarSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Selects a defined var of a Service.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>credentialVarRef</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.CredentialVarSelector">
+CredentialVarSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Selects a defined var of a Credential (SystemAccount).</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceRefVarRef</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ServiceRefVarSelector">
+ServiceRefVarSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Selects a defined var of a ServiceRef.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>componentVarRef</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentVarSelector">
+ComponentVarSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Selects a defined var of a Component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>clusterVarRef</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterVarSelector">
+ClusterVarSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Selects a defined var of a Cluster.</p>
 </td>
 </tr>
 </tbody>

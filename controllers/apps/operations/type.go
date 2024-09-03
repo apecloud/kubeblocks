@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -105,8 +106,8 @@ type progressResource struct {
 	// checks if the component is a sharding component
 	isShardingComponent bool
 	clusterComponent    *appsv1alpha1.ClusterComponentSpec
-	clusterDef          *appsv1alpha1.ClusterDefinition
-	componentDef        *appsv1alpha1.ComponentDefinition
+	clusterDef          *appsv1.ClusterDefinition
+	componentDef        *appsv1.ComponentDefinition
 	// record which pods need to updated during this operation.
 	// key is podName, value is instance template name.
 	updatedPodSet map[string]string

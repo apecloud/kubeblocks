@@ -32,6 +32,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -99,10 +100,10 @@ var _ = Describe("Restore", func() {
 		)
 
 		var (
-			compDef                 *appsv1alpha1.ComponentDefinition
+			compDef                 *appsv1.ComponentDefinition
 			cluster                 *appsv1alpha1.Cluster
 			synthesizedComponent    *component.SynthesizedComponent
-			compObj                 *appsv1alpha1.Component
+			compObj                 *appsv1.Component
 			pvc                     *corev1.PersistentVolumeClaim
 			backup                  *dpv1alpha1.Backup
 			fullBackupActionSet     *dpv1alpha1.ActionSet
@@ -163,7 +164,7 @@ var _ = Describe("Restore", func() {
 				VolumeClaimTemplates: cluster.Spec.ComponentSpecs[0].ToVolumeClaimTemplates(),
 				Name:                 defaultCompName,
 				Replicas:             1,
-				Roles: []appsv1alpha1.ReplicaRole{
+				Roles: []appsv1.ReplicaRole{
 					{
 						Name:        "leader",
 						Serviceable: true,
@@ -244,7 +245,7 @@ var _ = Describe("Restore", func() {
 				}
 			})).Should(Succeed())
 			Expect(testapps.ChangeObjStatus(&testCtx, compObj, func() {
-				compObj.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+				compObj.Status.Phase = appsv1.RunningClusterCompPhase
 			})).Should(Succeed())
 
 			By("wait for postReady restore created and mock it to Completed")

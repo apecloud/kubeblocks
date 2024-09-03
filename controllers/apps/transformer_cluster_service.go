@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -246,7 +247,7 @@ func (t *clusterServiceTransformer) builtinSelector(cluster *appsv1alpha1.Cluste
 	return selectors
 }
 
-func (t *clusterServiceTransformer) checkComponent(transCtx *clusterTransformContext, clusterService *appsv1alpha1.ClusterService) (*appsv1alpha1.ComponentDefinition, error) {
+func (t *clusterServiceTransformer) checkComponent(transCtx *clusterTransformContext, clusterService *appsv1alpha1.ClusterService) (*appsv1.ComponentDefinition, error) {
 	compName := clusterService.ComponentSelector
 	for _, compSpec := range transCtx.ComponentSpecs {
 		if compSpec.Name == compName {
@@ -260,7 +261,7 @@ func (t *clusterServiceTransformer) checkComponent(transCtx *clusterTransformCon
 	return nil, fmt.Errorf("the component of service selector is not exist, service: %s, component: %s", clusterService.Name, compName)
 }
 
-func (t *clusterServiceTransformer) checkComponentRoles(compDef *appsv1alpha1.ComponentDefinition, clusterService *appsv1alpha1.ClusterService) error {
+func (t *clusterServiceTransformer) checkComponentRoles(compDef *appsv1.ComponentDefinition, clusterService *appsv1alpha1.ClusterService) error {
 	definedRoles := make(map[string]bool)
 	for _, role := range compDef.Spec.Roles {
 		definedRoles[strings.ToLower(role.Name)] = true

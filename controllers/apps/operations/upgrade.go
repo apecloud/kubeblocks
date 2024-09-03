@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -99,7 +100,7 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 	upgradeSpec := opsRes.OpsRequest.Spec.Upgrade
 	var (
 		compOpsHelper   componentOpsHelper
-		componentDefMap map[string]*appsv1alpha1.ComponentDefinition
+		componentDefMap map[string]*appsv1.ComponentDefinition
 		err             error
 	)
 	if u.existClusterVersion(opsRes.OpsRequest) {
@@ -168,8 +169,8 @@ func (u upgradeOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, 
 // that is updated with the corresponding images of the ComponentDefinition and service version.
 func (u upgradeOpsHandler) getComponentDefMapWithUpdatedImages(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
-	opsRes *OpsResource) (map[string]*appsv1alpha1.ComponentDefinition, error) {
-	compDefMap := map[string]*appsv1alpha1.ComponentDefinition{}
+	opsRes *OpsResource) (map[string]*appsv1.ComponentDefinition, error) {
+	compDefMap := map[string]*appsv1.ComponentDefinition{}
 	for _, v := range opsRes.OpsRequest.Spec.Upgrade.Components {
 		compSpec := getComponentSpecOrShardingTemplate(opsRes.Cluster, v.ComponentName)
 		if compSpec == nil {

@@ -31,7 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -39,7 +38,7 @@ import (
 
 var _ = Describe("ComponentVersion Controller", func() {
 	var (
-		// compDefinitionObjs []*appsv1alpha1.ComponentDefinition
+		// compDefinitionObjs []*appsv1.ComponentDefinition
 		compVersionObj *appsv1.ComponentVersion
 
 		compDefNames    = []string{testapps.CompDefName("v1.0"), testapps.CompDefName("v1.1"), testapps.CompDefName("v2.0"), testapps.CompDefName("v3.0")}
@@ -72,9 +71,9 @@ var _ = Describe("ComponentVersion Controller", func() {
 		cleanEnv()
 	})
 
-	createCompDefinitionObjs := func() []*appsv1alpha1.ComponentDefinition {
+	createCompDefinitionObjs := func() []*appsv1.ComponentDefinition {
 		By("create default ComponentDefinition objs")
-		objs := make([]*appsv1alpha1.ComponentDefinition, 0)
+		objs := make([]*appsv1.ComponentDefinition, 0)
 		for _, name := range compDefNames {
 			f := testapps.NewComponentDefinitionFactory(name).
 				SetServiceVersion(testapps.ServiceVersion("v0")) // use v0 as init service version
@@ -86,7 +85,7 @@ var _ = Describe("ComponentVersion Controller", func() {
 		}
 		for _, obj := range objs {
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(obj),
-				func(g Gomega, compDef *appsv1alpha1.ComponentDefinition) {
+				func(g Gomega, compDef *appsv1.ComponentDefinition) {
 					g.Expect(compDef.Status.ObservedGeneration).Should(Equal(compDef.Generation))
 				})).Should(Succeed())
 		}
@@ -174,7 +173,7 @@ var _ = Describe("ComponentVersion Controller", func() {
 		return obj
 	}
 
-	updateNCheckCompDefinitionImages := func(compDef *appsv1alpha1.ComponentDefinition, serviceVersion string, r0, r1 string) {
+	updateNCheckCompDefinitionImages := func(compDef *appsv1.ComponentDefinition, serviceVersion string, r0, r1 string) {
 		Expect(compDef.Spec.Runtime.Containers[0].Image).Should(Equal(testapps.AppImage(compDef.Spec.Runtime.Containers[0].Name, testapps.ReleaseID(""))))
 		Expect(compDef.Spec.Runtime.Containers[1].Image).Should(Equal(testapps.AppImage(compDef.Spec.Runtime.Containers[1].Name, testapps.ReleaseID(""))))
 		Expect(component.UpdateCompDefinitionImages4ServiceVersion(testCtx.Ctx, testCtx.Cli, compDef, serviceVersion)).Should(Succeed())
@@ -210,8 +209,8 @@ var _ = Describe("ComponentVersion Controller", func() {
 		It("release has no supported component definitions", func() {
 			By("delete v3.0 component definition, let release r5 has no available component definitions")
 			compDefKey := types.NamespacedName{Name: testapps.CompDefName("v3.0")}
-			testapps.DeleteObject(&testCtx, compDefKey, &appsv1alpha1.ComponentDefinition{})
-			Eventually(testapps.CheckObjExists(&testCtx, compDefKey, &appsv1alpha1.ComponentDefinition{}, false)).Should(Succeed())
+			testapps.DeleteObject(&testCtx, compDefKey, &appsv1.ComponentDefinition{})
+			Eventually(testapps.CheckObjExists(&testCtx, compDefKey, &appsv1.ComponentDefinition{}, false)).Should(Succeed())
 
 			By("checking the object unavailable")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(compVersionObj),
@@ -264,8 +263,8 @@ var _ = Describe("ComponentVersion Controller", func() {
 					continue
 				}
 				compDefKey := types.NamespacedName{Name: name}
-				testapps.DeleteObject(&testCtx, compDefKey, &appsv1alpha1.ComponentDefinition{})
-				Eventually(testapps.CheckObjExists(&testCtx, compDefKey, &appsv1alpha1.ComponentDefinition{}, false)).Should(Succeed())
+				testapps.DeleteObject(&testCtx, compDefKey, &appsv1.ComponentDefinition{})
+				Eventually(testapps.CheckObjExists(&testCtx, compDefKey, &appsv1.ComponentDefinition{}, false)).Should(Succeed())
 			}
 
 			By("checking the object available")
@@ -513,7 +512,7 @@ var _ = Describe("ComponentVersion Controller", func() {
 				Create(&testCtx).
 				GetObject()
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(compDefObj),
-				func(g Gomega, compDef *appsv1alpha1.ComponentDefinition) {
+				func(g Gomega, compDef *appsv1.ComponentDefinition) {
 					g.Expect(compDef.Status.ObservedGeneration).Should(Equal(compDef.Generation))
 				})).Should(Succeed())
 
@@ -555,7 +554,7 @@ var _ = Describe("ComponentVersion Controller", func() {
 			compDefs := createCompDefinitionObjs()
 			for _, compDef := range compDefs {
 				compDefKey := client.ObjectKeyFromObject(compDef)
-				Eventually(testapps.GetAndChangeObj(&testCtx, compDefKey, func(compDef *appsv1alpha1.ComponentDefinition) {
+				Eventually(testapps.GetAndChangeObj(&testCtx, compDefKey, func(compDef *appsv1.ComponentDefinition) {
 					compDef.Spec.ServiceVersion = ""
 				})).Should(Succeed())
 			}

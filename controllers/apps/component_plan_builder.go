@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -46,9 +47,9 @@ type componentTransformContext struct {
 	record.EventRecorder
 	logr.Logger
 	Cluster             *appsv1alpha1.Cluster
-	CompDef             *appsv1alpha1.ComponentDefinition
-	Component           *appsv1alpha1.Component
-	ComponentOrig       *appsv1alpha1.Component
+	CompDef             *appsv1.ComponentDefinition
+	Component           *appsv1.Component
+	ComponentOrig       *appsv1.Component
 	SynthesizeComponent *component.SynthesizedComponent
 	RunningWorkload     client.Object
 	ProtoWorkload       client.Object

@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -156,7 +157,7 @@ func handleCompsInOrder(transCtx *clusterTransformContext, dag *graph.DAG,
 }
 
 func checkAllCompsUpToDate(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) (bool, error) {
-	compList := &appsv1alpha1.ComponentList{}
+	compList := &appsv1.ComponentList{}
 	labels := constant.GetClusterWellKnownLabels(cluster.Name)
 	if err := transCtx.Client.List(transCtx.Context, compList, client.InNamespace(cluster.Namespace), client.MatchingLabels(labels)); err != nil {
 		return false, err
@@ -177,12 +178,12 @@ func checkAllCompsUpToDate(transCtx *clusterTransformContext, cluster *appsv1alp
 }
 
 // getRunningCompObject gets the component object from cache snapshot
-func getRunningCompObject(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster, compName string) (*appsv1alpha1.Component, error) {
+func getRunningCompObject(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster, compName string) (*appsv1.Component, error) {
 	compKey := types.NamespacedName{
 		Namespace: cluster.Namespace,
 		Name:      component.FullName(cluster.Name, compName),
 	}
-	comp := &appsv1alpha1.Component{}
+	comp := &appsv1.Component{}
 	if err := transCtx.Client.Get(transCtx.Context, compKey, comp); err != nil {
 		return nil, err
 	}
@@ -192,7 +193,7 @@ func getRunningCompObject(transCtx *clusterTransformContext, cluster *appsv1alph
 // copyAndMergeComponent merges two component objects for updating:
 // 1. new a component object targetCompObj by copying from oldCompObj
 // 2. merge all fields can be updated from newCompObj into targetCompObj
-func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component) *appsv1alpha1.Component {
+func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Component {
 	compObjCopy := oldCompObj.DeepCopy()
 	compProto := newCompObj
 
@@ -220,8 +221,7 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component) *apps
 	compObjCopy.Spec.ServiceAccountName = compProto.Spec.ServiceAccountName
 	compObjCopy.Spec.ParallelPodManagementConcurrency = compProto.Spec.ParallelPodManagementConcurrency
 	compObjCopy.Spec.PodUpdatePolicy = compProto.Spec.PodUpdatePolicy
-	compObjCopy.Spec.Affinity = compProto.Spec.Affinity
-	compObjCopy.Spec.Tolerations = compProto.Spec.Tolerations
+	compObjCopy.Spec.SchedulingPolicy = compProto.Spec.SchedulingPolicy
 	compObjCopy.Spec.TLSConfig = compProto.Spec.TLSConfig
 	compObjCopy.Spec.Instances = compProto.Spec.Instances
 	compObjCopy.Spec.OfflineInstances = compProto.Spec.OfflineInstances
@@ -306,10 +306,10 @@ func newParallelHandler(compSpecs map[string]*appsv1alpha1.ClusterComponentSpec,
 
 func newOrderedHandler(compSpecs map[string]*appsv1alpha1.ClusterComponentSpec,
 	labels, annotations map[string]map[string]string, orders []string, op int) compConditionalHandler {
-	upworking := func(comp *appsv1alpha1.Component) bool {
-		target := appsv1alpha1.RunningClusterCompPhase
+	upworking := func(comp *appsv1.Component) bool {
+		target := appsv1.RunningClusterCompPhase
 		if comp.Spec.Stop != nil && *comp.Spec.Stop {
-			target = appsv1alpha1.StoppedClusterCompPhase
+			target = appsv1.StoppedClusterCompPhase
 		}
 		return comp.Status.Phase == target
 	}
@@ -441,7 +441,7 @@ func (c *compNotExistPrecondition) match(transCtx *clusterTransformContext, dag 
 
 type compPhasePrecondition struct {
 	orders           []string
-	phaseExpectation func(component2 *appsv1alpha1.Component) bool
+	phaseExpectation func(component2 *appsv1.Component) bool
 }
 
 func (c *compPhasePrecondition) match(transCtx *clusterTransformContext, dag *graph.DAG, compName string) (bool, error) {
@@ -455,7 +455,7 @@ func (c *compPhasePrecondition) match(transCtx *clusterTransformContext, dag *gr
 		return false
 	}
 	for _, predecessor := range predecessors(c.orders, compName) {
-		comp := &appsv1alpha1.Component{}
+		comp := &appsv1.Component{}
 		compKey := types.NamespacedName{
 			Namespace: transCtx.Cluster.Namespace,
 			Name:      component.FullName(transCtx.Cluster.Name, predecessor),

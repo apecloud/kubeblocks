@@ -30,7 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/apis/workloads/legacy"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -163,7 +163,7 @@ func legacyCRDExists(ctx context.Context, cli model.GraphClient) (bool, error) {
 	return false, err
 }
 
-func buildRevision(synthesizeComp *component.SynthesizedComponent, componentDef *appsv1alpha1.ComponentDefinition) (string, error) {
+func buildRevision(synthesizeComp *component.SynthesizedComponent, componentDef *kbappsv1.ComponentDefinition) (string, error) {
 	buildPodSpecVolumeMounts(synthesizeComp)
 	its, err := factory.BuildInstanceSet(synthesizeComp, componentDef)
 	if err != nil {

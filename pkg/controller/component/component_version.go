@@ -30,11 +30,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 // CompatibleCompVersions4Definition returns all component versions that are compatible with specified component definition.
-func CompatibleCompVersions4Definition(ctx context.Context, cli client.Reader, compDef *appsv1alpha1.ComponentDefinition) ([]*appsv1.ComponentVersion, error) {
+func CompatibleCompVersions4Definition(ctx context.Context, cli client.Reader, compDef *appsv1.ComponentDefinition) ([]*appsv1.ComponentVersion, error) {
 	compVersionList := &appsv1.ComponentVersionList{}
 	labels := client.MatchingLabels{
 		compDef.Name: compDef.Name,
@@ -87,7 +86,7 @@ func CompareServiceVersion(required, provided string) (bool, error) {
 
 // UpdateCompDefinitionImages4ServiceVersion resolves and updates images for the component definition.
 func UpdateCompDefinitionImages4ServiceVersion(ctx context.Context, cli client.Reader,
-	compDef *appsv1alpha1.ComponentDefinition, serviceVersion string) error {
+	compDef *appsv1.ComponentDefinition, serviceVersion string) error {
 	compVersions, err := CompatibleCompVersions4Definition(ctx, cli, compDef)
 	if err != nil {
 		return err
@@ -98,7 +97,7 @@ func UpdateCompDefinitionImages4ServiceVersion(ctx context.Context, cli client.R
 	return resolveImagesWithCompVersions(compDef, compVersions, serviceVersion)
 }
 
-func resolveImagesWithCompVersions(compDef *appsv1alpha1.ComponentDefinition,
+func resolveImagesWithCompVersions(compDef *appsv1.ComponentDefinition,
 	compVersions []*appsv1.ComponentVersion, serviceVersion string) error {
 	appsInDef := covertImagesFromCompDefinition(compDef)
 	appsByUser, err := findMatchedImagesFromCompVersions(compVersions, serviceVersion)
@@ -135,7 +134,7 @@ func resolveImagesWithCompVersions(compDef *appsv1alpha1.ComponentDefinition,
 	return nil
 }
 
-func covertImagesFromCompDefinition(compDef *appsv1alpha1.ComponentDefinition) map[string]appNameVersionImage {
+func covertImagesFromCompDefinition(compDef *appsv1.ComponentDefinition) map[string]appNameVersionImage {
 	apps := make(map[string]appNameVersionImage)
 	checkNAdd := func(c *corev1.Container) {
 		if len(c.Image) > 0 {

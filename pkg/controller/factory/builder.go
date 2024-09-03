@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -46,7 +47,7 @@ import (
 )
 
 // BuildInstanceSet builds an InstanceSet object from SynthesizedComponent.
-func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, componentDef *appsv1alpha1.ComponentDefinition) (*workloads.InstanceSet, error) {
+func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, componentDef *appsv1.ComponentDefinition) (*workloads.InstanceSet, error) {
 	var (
 		compDefName = synthesizedComp.CompDefName
 		namespace   = synthesizedComp.Namespace
@@ -133,7 +134,7 @@ func vctToPVC(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeC
 }
 
 // getMonitorAnnotations returns the annotations for the monitor.
-func getMonitorAnnotations(synthesizedComp *component.SynthesizedComponent, componentDef *appsv1alpha1.ComponentDefinition) map[string]string {
+func getMonitorAnnotations(synthesizedComp *component.SynthesizedComponent, componentDef *appsv1.ComponentDefinition) map[string]string {
 	if synthesizedComp.DisableExporter == nil || *synthesizedComp.DisableExporter || componentDef == nil {
 		return nil
 	}
@@ -211,7 +212,7 @@ func GetRestorePassword(synthesizedComp *component.SynthesizedComponent) string 
 }
 
 // GetRestoreSystemAccountPassword gets restore password if exists during recovery.
-func GetRestoreSystemAccountPassword(synthesizedComp *component.SynthesizedComponent, account appsv1alpha1.SystemAccount) string {
+func GetRestoreSystemAccountPassword(synthesizedComp *component.SynthesizedComponent, account appsv1.SystemAccount) string {
 	valueString := synthesizedComp.Annotations[constant.RestoreFromBackupAnnotationKey]
 	if len(valueString) == 0 {
 		return ""
@@ -293,7 +294,7 @@ func BuildConfigMapWithTemplate(cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent,
 	configs map[string]string,
 	cmName string,
-	configTemplateSpec appsv1alpha1.ComponentTemplateSpec) *corev1.ConfigMap {
+	configTemplateSpec appsv1.ComponentTemplateSpec) *corev1.ConfigMap {
 	wellKnownLabels := constant.GetKBWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
 	wellKnownLabels[constant.AppComponentLabelKey] = component.CompDefName
 	return builder.NewConfigMapBuilder(cluster.Namespace, cmName).

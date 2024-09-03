@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -42,7 +43,7 @@ var _ = Describe("", func() {
 		randomStr   = testCtx.GetRandomStr()
 		compDefName = "test-compdef-" + randomStr
 		clusterName = "test-cluster-" + randomStr
-		compDefObj  *appsv1alpha1.ComponentDefinition
+		compDefObj  *appsv1.ComponentDefinition
 		clusterObj  *appsv1alpha1.Cluster
 	)
 

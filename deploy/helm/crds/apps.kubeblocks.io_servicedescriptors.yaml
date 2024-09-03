@@ -11,6 +11,7 @@ spec:
   names:
     categories:
     - kubeblocks
+    - all
     kind: ServiceDescriptor
     listKind: ServiceDescriptorList
     plural: servicedescriptors

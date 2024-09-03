@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
@@ -69,9 +70,9 @@ var _ = Describe("Prepare Test", func() {
 	)
 
 	var (
-		compDefObj     *appsv1alpha1.ComponentDefinition
+		compDefObj     *appsv1.ComponentDefinition
 		cluster        *appsv1alpha1.Cluster
-		comp           *appsv1alpha1.Component
+		comp           *appsv1.Component
 		configSpecName string
 	)
 

@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -44,7 +45,7 @@ const (
 	replicas     = 3
 )
 
-func InitConsensusMysql(testCtx *testutil.TestContext, clusterName, compDefName, compName string) (*appsv1alpha1.ComponentDefinition, *appsv1alpha1.Cluster) {
+func InitConsensusMysql(testCtx *testutil.TestContext, clusterName, compDefName, compName string) (*appsv1.ComponentDefinition, *appsv1alpha1.Cluster) {
 	compDef := createCompDef(testCtx, compDefName)
 	cluster := CreateDefaultMysqlCluster(testCtx, clusterName, compDef.GetName(), compName)
 	return compDef, cluster
@@ -65,7 +66,7 @@ func CreateDefaultMysqlCluster(testCtx *testutil.TestContext, clusterName, compD
 		GetObject()
 }
 
-func createCompDef(testCtx *testutil.TestContext, compDefName string) *appsv1alpha1.ComponentDefinition {
+func createCompDef(testCtx *testutil.TestContext, compDefName string) *appsv1.ComponentDefinition {
 	return NewComponentDefinitionFactory(compDefName).SetDefaultSpec().Create(testCtx).GetObject()
 }
 

@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"reflect"
 	"strings"
 
@@ -120,20 +121,20 @@ var _ = Describe("lifecycle", func() {
 					},
 				},
 			},
-			LifecycleActions: &appsv1alpha1.ComponentLifecycleActions{
-				PostProvision: &appsv1alpha1.Action{
-					Exec: &appsv1alpha1.ExecAction{
+			LifecycleActions: &appsv1.ComponentLifecycleActions{
+				PostProvision: &appsv1.Action{
+					Exec: &appsv1.ExecAction{
 						Command: []string{"/bin/bash", "-c", "echo -n post-provision"},
 					},
 					TimeoutSeconds: 5,
-					RetryPolicy: &appsv1alpha1.RetryPolicy{
+					RetryPolicy: &appsv1.RetryPolicy{
 						MaxRetries:    5,
 						RetryInterval: 10,
 					},
 				},
-				RoleProbe: &appsv1alpha1.Probe{
-					Action: appsv1alpha1.Action{
-						Exec: &appsv1alpha1.ExecAction{
+				RoleProbe: &appsv1.Probe{
+					Action: appsv1.Action{
+						Exec: &appsv1.ExecAction{
 							Command: []string{"/bin/bash", "-c", "echo -n role-probe"},
 						},
 						TimeoutSeconds: 5,
@@ -422,7 +423,7 @@ var _ = Describe("lifecycle", func() {
 		})
 
 		It("precondition", func() {
-			clusterReady := appsv1alpha1.ClusterReadyPreConditionType
+			clusterReady := appsv1.ClusterReadyPreConditionType
 			synthesizedComp.LifecycleActions.PostProvision.PreCondition = &clusterReady
 
 			lifecycle, err := New(synthesizedComp, nil, pods...)
@@ -455,7 +456,7 @@ var _ = Describe("lifecycle", func() {
 		})
 
 		It("precondition - fail", func() {
-			clusterReady := appsv1alpha1.ClusterReadyPreConditionType
+			clusterReady := appsv1.ClusterReadyPreConditionType
 			synthesizedComp.LifecycleActions.PostProvision.PreCondition = &clusterReady
 
 			lifecycle, err := New(synthesizedComp, nil, pods...)
@@ -483,7 +484,7 @@ var _ = Describe("lifecycle", func() {
 		})
 
 		It("pod selector - any", func() {
-			synthesizedComp.LifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1alpha1.AnyReplica
+			synthesizedComp.LifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.AnyReplica
 			pods = []*corev1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -537,7 +538,7 @@ var _ = Describe("lifecycle", func() {
 		})
 
 		It("pod selector - role", func() {
-			synthesizedComp.LifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1alpha1.RoleSelector
+			synthesizedComp.LifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.RoleSelector
 			synthesizedComp.LifecycleActions.PostProvision.Exec.MatchingKey = "leader"
 			pods = []*corev1.Pod{
 				{
@@ -594,7 +595,7 @@ var _ = Describe("lifecycle", func() {
 		})
 
 		It("pod selector - has no matched", func() {
-			synthesizedComp.LifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1alpha1.RoleSelector
+			synthesizedComp.LifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.RoleSelector
 			synthesizedComp.LifecycleActions.PostProvision.Exec.MatchingKey = "leader"
 			pods = []*corev1.Pod{
 				{

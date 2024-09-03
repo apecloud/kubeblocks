@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -82,7 +83,7 @@ func NewRestoreManager(ctx context.Context,
 	}
 }
 
-func (r *RestoreManager) DoRestore(comp *component.SynthesizedComponent, compObj *appsv1alpha1.Component, postProvisionDone bool) error {
+func (r *RestoreManager) DoRestore(comp *component.SynthesizedComponent, compObj *appsv1.Component, postProvisionDone bool) error {
 	backupObj, err := r.initFromAnnotation(comp, compObj)
 	if err != nil {
 		return err
@@ -96,7 +97,7 @@ func (r *RestoreManager) DoRestore(comp *component.SynthesizedComponent, compObj
 	if err = r.DoPrepareData(comp, compObj, backupObj); err != nil {
 		return err
 	}
-	if compObj.Status.Phase != appsv1alpha1.RunningClusterCompPhase {
+	if compObj.Status.Phase != appsv1.RunningClusterCompPhase {
 		return nil
 	}
 	// wait for the post-provision action to complete.
@@ -118,12 +119,18 @@ func (r *RestoreManager) DoRestore(comp *component.SynthesizedComponent, compObj
 }
 
 func (r *RestoreManager) DoPrepareData(comp *component.SynthesizedComponent,
-	compObj *appsv1alpha1.Component,
+	compObj *appsv1.Component,
 	backupObj *dpv1alpha1.Backup) error {
+	replicas := func(t appsv1.InstanceTemplate) int32 {
+		if t.Replicas != nil {
+			return *t.Replicas
+		}
+		return 1 // default replica
+	}
 	var restores []*dpv1alpha1.Restore
 	var templateReplicas int32
 	for _, v := range comp.Instances {
-		r.replicas = v.GetReplicas()
+		r.replicas = replicas(v)
 		templateReplicas += r.replicas
 		restore, err := r.BuildPrepareDataRestore(comp, backupObj, v.Name)
 		if err != nil {
@@ -233,7 +240,7 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 }
 
 func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
-	compObj *appsv1alpha1.Component,
+	compObj *appsv1.Component,
 	backupObj *dpv1alpha1.Backup) error {
 	jobActionLabels := constant.GetComponentWellKnownLabels(r.Cluster.Name, comp.Name)
 	if len(comp.Roles) > 0 {
@@ -330,7 +337,7 @@ func (r *RestoreManager) GetRestoreObjectMeta(comp *component.SynthesizedCompone
 	}
 }
 
-func (r *RestoreManager) initFromAnnotation(synthesizedComponent *component.SynthesizedComponent, compObj *appsv1alpha1.Component) (*dpv1alpha1.Backup, error) {
+func (r *RestoreManager) initFromAnnotation(synthesizedComponent *component.SynthesizedComponent, compObj *appsv1.Component) (*dpv1alpha1.Backup, error) {
 	valueString := r.Cluster.Annotations[constant.RestoreFromBackupAnnotationKey]
 	if len(valueString) == 0 {
 		return nil, nil
@@ -363,7 +370,7 @@ func (r *RestoreManager) initFromAnnotation(synthesizedComponent *component.Synt
 }
 
 // createRestoreAndWait create the restore CR and wait for completion.
-func (r *RestoreManager) createRestoreAndWait(compObj *appsv1alpha1.Component, restores ...*dpv1alpha1.Restore) error {
+func (r *RestoreManager) createRestoreAndWait(compObj *appsv1.Component, restores ...*dpv1alpha1.Restore) error {
 	if len(restores) == 0 {
 		return nil
 	}

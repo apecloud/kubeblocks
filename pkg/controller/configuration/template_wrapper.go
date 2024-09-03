@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
@@ -48,18 +49,18 @@ type templateRenderValidator = func(map[string]string) error
 type renderWrapper struct {
 	templateBuilder *configTemplateBuilder
 
-	volumes             map[string]appsv1alpha1.ComponentTemplateSpec
+	volumes             map[string]appsv1.ComponentTemplateSpec
 	templateAnnotations map[string]string
 	renderedObjs        []client.Object
 
 	ctx       context.Context
 	cli       client.Client
 	cluster   *appsv1alpha1.Cluster
-	component *appsv1alpha1.Component
+	component *appsv1.Component
 }
 
 func newTemplateRenderWrapper(ctx context.Context, cli client.Client, templateBuilder *configTemplateBuilder,
-	cluster *appsv1alpha1.Cluster, component *appsv1alpha1.Component) renderWrapper {
+	cluster *appsv1alpha1.Cluster, component *appsv1.Component) renderWrapper {
 	return renderWrapper{
 		ctx:       ctx,
 		cli:       cli,
@@ -68,7 +69,7 @@ func newTemplateRenderWrapper(ctx context.Context, cli client.Client, templateBu
 
 		templateBuilder:     templateBuilder,
 		templateAnnotations: make(map[string]string),
-		volumes:             make(map[string]appsv1alpha1.ComponentTemplateSpec),
+		volumes:             make(map[string]appsv1.ComponentTemplateSpec),
 	}
 }
 
@@ -166,7 +167,7 @@ func updateConfigMetaForCM(newCMObj *corev1.ConfigMap, item *appsv1alpha1.Config
 	return
 }
 
-func applyUpdatedParameters(item *appsv1alpha1.ConfigurationItemDetail, cm *corev1.ConfigMap, configSpec appsv1alpha1.ComponentConfigSpec, cli client.Client, ctx context.Context) (err error) {
+func applyUpdatedParameters(item *appsv1alpha1.ConfigurationItemDetail, cm *corev1.ConfigMap, configSpec appsv1.ComponentConfigSpec, cli client.Client, ctx context.Context) (err error) {
 	var newData map[string]string
 	var configConstraint *appsv1beta1.ConfigConstraint
 
@@ -189,7 +190,7 @@ func applyUpdatedParameters(item *appsv1alpha1.ConfigurationItemDetail, cm *core
 
 func (wrapper *renderWrapper) rerenderConfigTemplate(cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent,
-	configSpec appsv1alpha1.ComponentConfigSpec,
+	configSpec appsv1.ComponentConfigSpec,
 	item *appsv1alpha1.ConfigurationItemDetail,
 ) (*corev1.ConfigMap, error) {
 	cmName := core.GetComponentCfgName(cluster.Name, component.Name, configSpec.Name)
@@ -251,7 +252,7 @@ func (wrapper *renderWrapper) renderScriptTemplate(cluster *appsv1alpha1.Cluster
 	return nil
 }
 
-func (wrapper *renderWrapper) addRenderedObject(templateSpec appsv1alpha1.ComponentTemplateSpec, cm *corev1.ConfigMap, configuration *appsv1alpha1.Configuration) (err error) {
+func (wrapper *renderWrapper) addRenderedObject(templateSpec appsv1.ComponentTemplateSpec, cm *corev1.ConfigMap, configuration *appsv1alpha1.Configuration) (err error) {
 	// The owner of the configmap object is a cluster,
 	// in order to manage the life cycle of configmap
 	if configuration != nil {
@@ -268,7 +269,7 @@ func (wrapper *renderWrapper) addRenderedObject(templateSpec appsv1alpha1.Compon
 	return nil
 }
 
-func (wrapper *renderWrapper) addVolumeMountMeta(templateSpec appsv1alpha1.ComponentTemplateSpec, object client.Object, rendered bool) {
+func (wrapper *renderWrapper) addVolumeMountMeta(templateSpec appsv1.ComponentTemplateSpec, object client.Object, rendered bool) {
 	wrapper.volumes[object.GetName()] = templateSpec
 	if rendered {
 		wrapper.renderedObjs = append(wrapper.renderedObjs, object)
@@ -310,7 +311,7 @@ func findMatchedLocalObject(localObjs []client.Object, objKey client.ObjectKey, 
 	return nil
 }
 
-func UpdateCMConfigSpecLabels(cm *corev1.ConfigMap, configSpec appsv1alpha1.ComponentConfigSpec) {
+func UpdateCMConfigSpecLabels(cm *corev1.ConfigMap, configSpec appsv1.ComponentConfigSpec) {
 	if cm.Labels == nil {
 		cm.Labels = make(map[string]string)
 	}
@@ -332,7 +333,7 @@ func generateConfigMapFromTpl(cluster *appsv1alpha1.Cluster,
 	tplBuilder *configTemplateBuilder,
 	cmName string,
 	configConstraintName string,
-	templateSpec appsv1alpha1.ComponentTemplateSpec,
+	templateSpec appsv1.ComponentTemplateSpec,
 	ctx context.Context,
 	cli client.Client, dataValidator templateRenderValidator) (*corev1.ConfigMap, error) {
 	// Render config template by TplEngine
@@ -355,7 +356,7 @@ func generateConfigMapFromTpl(cluster *appsv1alpha1.Cluster,
 // renderConfigMapTemplate renders config file using template engine
 func renderConfigMapTemplate(
 	templateBuilder *configTemplateBuilder,
-	templateSpec appsv1alpha1.ComponentTemplateSpec,
+	templateSpec appsv1.ComponentTemplateSpec,
 	ctx context.Context,
 	cli client.Client) (map[string]string, error) {
 	cmObj := &corev1.ConfigMap{}
@@ -393,7 +394,7 @@ func fetchConfigConstraint(ccName string, ctx context.Context, cli client.Client
 // validateRenderedData validates config file against constraint
 func validateRenderedData(
 	renderedData map[string]string,
-	configSpec appsv1alpha1.ComponentConfigSpec,
+	configSpec appsv1.ComponentConfigSpec,
 	ctx context.Context,
 	cli client.Client) error {
 	if configSpec.ConfigConstraintRef == "" {
@@ -406,7 +407,7 @@ func validateRenderedData(
 	return validateRawData(renderedData, configSpec, &configConstraint.Spec)
 }
 
-func validateRawData(renderedData map[string]string, configSpec appsv1alpha1.ComponentConfigSpec, cc *appsv1beta1.ConfigConstraintSpec) error {
+func validateRawData(renderedData map[string]string, configSpec appsv1.ComponentConfigSpec, cc *appsv1beta1.ConfigConstraintSpec) error {
 	configChecker := validate.NewConfigValidator(cc, validate.WithKeySelector(configSpec.Keys))
 	// NOTE: It is necessary to verify the correctness of the data
 	if err := configChecker.Validate(renderedData); err != nil {

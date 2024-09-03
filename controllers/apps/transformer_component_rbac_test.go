@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -49,8 +50,8 @@ var _ = Describe("object rbac transformer test.", func() {
 	var graphCli model.GraphClient
 	var transformer graph.Transformer
 	var cluster *appsv1alpha1.Cluster
-	var compDefObj *appsv1alpha1.ComponentDefinition
-	var compObj *appsv1alpha1.Component
+	var compDefObj *appsv1.ComponentDefinition
+	var compObj *appsv1.Component
 	var saKey types.NamespacedName
 	var allSettings map[string]interface{}
 

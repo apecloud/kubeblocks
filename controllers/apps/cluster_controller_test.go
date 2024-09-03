@@ -61,7 +61,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	var (
 		clusterDefObj   *appsv1.ClusterDefinition
-		compDefObj      *appsv1alpha1.ComponentDefinition
+		compDefObj      *appsv1.ComponentDefinition
 		compVersionObj  *appsv1.ComponentVersion
 		clusterObj      *appsv1alpha1.Cluster
 		clusterKey      types.NamespacedName
@@ -182,9 +182,9 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Wait objects available")
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(compDefObj),
-			func(g Gomega, compDef *appsv1alpha1.ComponentDefinition) {
+			func(g Gomega, compDef *appsv1.ComponentDefinition) {
 				g.Expect(compDef.Status.ObservedGeneration).Should(Equal(compDef.Generation))
-				g.Expect(compDef.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
+				g.Expect(compDef.Status.Phase).Should(Equal(appsv1.AvailablePhase))
 			})).Should(Succeed())
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(compVersionObj),
 			func(g Gomega, compVersion *appsv1.ComponentVersion) {
@@ -271,7 +271,7 @@ var _ = Describe("Cluster Controller", func() {
 			Namespace: clusterObj.Namespace,
 			Name:      constant.GenerateClusterComponentName(clusterObj.Name, compName),
 		}
-		Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1alpha1.Component{}, true)).Should(Succeed())
+		Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1.Component{}, true)).Should(Succeed())
 	}
 
 	createClusterObjWithTopology := func(topology, compName string, processor func(*testapps.MockClusterFactory)) {
@@ -288,7 +288,7 @@ var _ = Describe("Cluster Controller", func() {
 			Namespace: clusterObj.Namespace,
 			Name:      constant.GenerateClusterComponentName(clusterObj.Name, compName),
 		}
-		Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1alpha1.Component{}, true)).Should(Succeed())
+		Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1.Component{}, true)).Should(Succeed())
 	}
 
 	createClusterObjWithSharding := func(compTplName, compDefName string, processor func(*testapps.MockClusterFactory)) {
@@ -334,7 +334,7 @@ var _ = Describe("Cluster Controller", func() {
 			Namespace: clusterObj.Namespace,
 			Name:      constant.GenerateClusterComponentName(clusterObj.Name, compName),
 		}
-		compObj := &appsv1alpha1.Component{}
+		compObj := &appsv1.Component{}
 		Eventually(testapps.CheckObjExists(&testCtx, compKey, compObj, true)).Should(Succeed())
 
 		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
@@ -355,7 +355,7 @@ var _ = Describe("Cluster Controller", func() {
 			Namespace: clusterObj.Namespace,
 			Name:      constant.GenerateClusterComponentName(clusterObj.Name, compName),
 		}
-		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
+		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1.Component) {
 			g.Expect(comp.Generation).Should(BeEquivalentTo(1))
 			for k, v := range constant.GetComponentWellKnownLabels(clusterObj.Name, compName) {
 				g.Expect(comp.Labels).Should(HaveKeyWithValue(k, v))
@@ -391,7 +391,7 @@ var _ = Describe("Cluster Controller", func() {
 			Namespace: clusterObj.Namespace,
 			Name:      constant.GenerateClusterComponentName(clusterObj.Name, compName),
 		}
-		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
+		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1.Component) {
 			g.Expect(comp.Spec.CompDef).Should(Equal(expectedCompDef))
 			g.Expect(comp.Spec.ServiceVersion).Should(Equal(expectedServiceVersion))
 		})).Should(Succeed())
@@ -442,8 +442,8 @@ var _ = Describe("Cluster Controller", func() {
 			Namespace: clusterObj.Namespace,
 			Name:      constant.GenerateClusterComponentName(clusterObj.Name, otherCompName),
 		}
-		Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1alpha1.Component{}, false)).Should(Succeed())
-		Eventually(testapps.CheckObjExists(&testCtx, multiCompKey, &appsv1alpha1.Component{}, true)).Should(Succeed())
+		Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1.Component{}, false)).Should(Succeed())
+		Eventually(testapps.CheckObjExists(&testCtx, multiCompKey, &appsv1.Component{}, true)).Should(Succeed())
 		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, true)).Should(Succeed())
 	}
 
@@ -562,9 +562,7 @@ var _ = Describe("Cluster Controller", func() {
 			Namespace: clusterObj.Namespace,
 			Name:      component.FullName(clusterObj.Name, compName),
 		}
-		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
-			g.Expect(comp.Spec.Affinity).Should(BeNil())
-			g.Expect(comp.Spec.Tolerations).Should(HaveLen(0))
+		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1.Component) {
 			g.Expect(comp.Spec.SchedulingPolicy).ShouldNot(BeNil())
 			g.Expect(comp.Spec.SchedulingPolicy.Affinity).Should(BeEquivalentTo(schedulingPolicy.Affinity))
 			g.Expect(comp.Spec.SchedulingPolicy.Tolerations).Should(HaveLen(2))
@@ -635,9 +633,7 @@ var _ = Describe("Cluster Controller", func() {
 			Namespace: clusterObj.Namespace,
 			Name:      component.FullName(clusterObj.Name, compName),
 		}
-		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
-			g.Expect(comp.Spec.Affinity).Should(BeNil())
-			g.Expect(comp.Spec.Tolerations).Should(HaveLen(0))
+		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1.Component) {
 			g.Expect(comp.Spec.SchedulingPolicy).ShouldNot(BeNil())
 			g.Expect(comp.Spec.SchedulingPolicy.Affinity).Should(BeEquivalentTo(schedulingPolicy.Affinity))
 			g.Expect(comp.Spec.SchedulingPolicy.Tolerations).Should(HaveLen(2))
@@ -855,11 +851,11 @@ var _ = Describe("Cluster Controller", func() {
 			Namespace: clusterKey.Namespace,
 			Name:      clusterKey.Name + "-" + compName,
 		}
-		Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1alpha1.Component{}, true)).Should(Succeed())
+		Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1.Component{}, true)).Should(Succeed())
 
 		By("set finalizer for component to prevent it from deletion")
 		finalizer := "test/finalizer"
-		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *appsv1alpha1.Component) {
+		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *appsv1.Component) {
 			comp.Finalizers = append(comp.Finalizers, finalizer)
 		})()).ShouldNot(HaveOccurred())
 
@@ -870,12 +866,12 @@ var _ = Describe("Cluster Controller", func() {
 		Consistently(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, true)).Should(Succeed())
 
 		By("remove finalizer of component to get it deleted")
-		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *appsv1alpha1.Component) {
+		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *appsv1.Component) {
 			comp.Finalizers = nil
 		})()).ShouldNot(HaveOccurred())
 
 		By("wait for the cluster and component to terminate")
-		Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1alpha1.Component{}, false)).Should(Succeed())
+		Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1.Component{}, false)).Should(Succeed())
 		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, false)).Should(Succeed())
 	}
 
@@ -1348,7 +1344,7 @@ var _ = Describe("Cluster Controller", func() {
 				g.Expect(cluster.Spec.ComponentSpecs[0].ComponentDef).Should(Equal(compDefObj.Name))
 				g.Expect(cluster.Spec.ComponentSpecs[0].ServiceVersion).Should(Equal(latestServiceVersion))
 			})).Should(Succeed())
-			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
+			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1.Component) {
 				g.Expect(comp.Spec.CompDef).Should(Equal(compDefObj.Name))
 				g.Expect(comp.Spec.ServiceVersion).Should(Equal(latestServiceVersion))
 			})).Should(Succeed())
@@ -1366,9 +1362,9 @@ var _ = Describe("Cluster Controller", func() {
 				AddEnv(compDefObj.Spec.Runtime.Containers[0].Name, corev1.EnvVar{Name: "key", Value: "value"}).
 				Create(&testCtx).
 				GetObject()
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(newCompDefObj), func(g Gomega, compDef *appsv1alpha1.ComponentDefinition) {
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(newCompDefObj), func(g Gomega, compDef *appsv1.ComponentDefinition) {
 				g.Expect(compDef.Status.ObservedGeneration).Should(Equal(compDef.Generation))
-				g.Expect(compDef.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
+				g.Expect(compDef.Status.Phase).Should(Equal(appsv1.AvailablePhase))
 			})).Should(Succeed())
 
 			By("check cluster and component objects stay in original version before upgrading")
@@ -1380,7 +1376,7 @@ var _ = Describe("Cluster Controller", func() {
 				g.Expect(cluster.Spec.ComponentSpecs[0].ComponentDef).Should(Equal(compDefObj.Name))
 				g.Expect(cluster.Spec.ComponentSpecs[0].ServiceVersion).Should(Equal(defaultServiceVersion))
 			})).Should(Succeed())
-			Consistently(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
+			Consistently(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1.Component) {
 				g.Expect(comp.Spec.CompDef).Should(Equal(compDefObj.Name))
 				g.Expect(comp.Spec.ServiceVersion).Should(Equal(defaultServiceVersion))
 			})).Should(Succeed())
@@ -1395,7 +1391,7 @@ var _ = Describe("Cluster Controller", func() {
 				g.Expect(cluster.Spec.ComponentSpecs[0].ComponentDef).Should(Equal(newCompDefObj.Name))
 				g.Expect(cluster.Spec.ComponentSpecs[0].ServiceVersion).Should(Equal(defaultServiceVersion))
 			})).Should(Succeed())
-			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
+			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1.Component) {
 				g.Expect(comp.Spec.CompDef).Should(Equal(newCompDefObj.Name))
 				g.Expect(comp.Spec.ServiceVersion).Should(Equal(defaultServiceVersion))
 			})).Should(Succeed())

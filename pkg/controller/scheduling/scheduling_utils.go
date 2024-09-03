@@ -28,12 +28,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-func BuildSchedulingPolicy(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.SchedulingPolicy, error) {
+func BuildSchedulingPolicy(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1.SchedulingPolicy, error) {
 	if cluster.Spec.SchedulingPolicy != nil || (compSpec != nil && compSpec.SchedulingPolicy != nil) {
 		return buildSchedulingPolicy(cluster, compSpec)
 	}
@@ -41,11 +42,11 @@ func BuildSchedulingPolicy(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1
 }
 
 func BuildSchedulingPolicy4Component(clusterName, compName string, affinity *appsv1alpha1.Affinity,
-	tolerations []corev1.Toleration) (*appsv1alpha1.SchedulingPolicy, error) {
+	tolerations []corev1.Toleration) (*appsv1.SchedulingPolicy, error) {
 	return buildSchedulingPolicy4LegacyComponent(clusterName, compName, affinity, tolerations)
 }
 
-func buildSchedulingPolicy(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.SchedulingPolicy, error) {
+func buildSchedulingPolicy(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1.SchedulingPolicy, error) {
 	schedulingPolicy := cluster.Spec.SchedulingPolicy
 	if compSpec != nil && compSpec.SchedulingPolicy != nil {
 		schedulingPolicy = compSpec.SchedulingPolicy
@@ -81,10 +82,24 @@ func buildSchedulingPolicy(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1
 	if err := mergeGlobalTolerations(); err != nil {
 		return nil, err
 	}
-	return schedulingPolicy, nil
+	return toV1SchedulingPolicy(schedulingPolicy), nil
 }
 
-func buildSchedulingPolicy4Legacy(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.SchedulingPolicy, error) {
+func toV1SchedulingPolicy(schedulingPolicy *appsv1alpha1.SchedulingPolicy) *appsv1.SchedulingPolicy {
+	if schedulingPolicy != nil {
+		return &appsv1.SchedulingPolicy{
+			SchedulerName:             schedulingPolicy.SchedulerName,
+			NodeSelector:              schedulingPolicy.NodeSelector,
+			NodeName:                  schedulingPolicy.NodeName,
+			Affinity:                  schedulingPolicy.Affinity,
+			Tolerations:               schedulingPolicy.Tolerations,
+			TopologySpreadConstraints: schedulingPolicy.TopologySpreadConstraints,
+		}
+	}
+	return nil
+}
+
+func buildSchedulingPolicy4Legacy(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1.SchedulingPolicy, error) {
 	affinity := buildAffinity4Legacy(cluster, compSpec)
 	tolerations, err := buildTolerations4Legacy(cluster, compSpec)
 	if err != nil {
@@ -94,12 +109,12 @@ func buildSchedulingPolicy4Legacy(cluster *appsv1alpha1.Cluster, compSpec *appsv
 }
 
 func buildSchedulingPolicy4LegacyComponent(clusterName, compName string, affinity *appsv1alpha1.Affinity,
-	tolerations []corev1.Toleration) (*appsv1alpha1.SchedulingPolicy, error) {
+	tolerations []corev1.Toleration) (*appsv1.SchedulingPolicy, error) {
 	podAffinity, err := buildPodAffinity4Legacy(clusterName, compName, affinity)
 	if err != nil {
 		return nil, err
 	}
-	return &appsv1alpha1.SchedulingPolicy{
+	return &appsv1.SchedulingPolicy{
 		Affinity:                  podAffinity,
 		Tolerations:               tolerations,
 		TopologySpreadConstraints: buildPodTopologySpreadConstraints4Legacy(clusterName, compName, affinity),

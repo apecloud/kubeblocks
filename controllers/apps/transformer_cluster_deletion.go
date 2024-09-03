@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -153,7 +154,7 @@ func kindsForDoNotTerminate() ([]client.ObjectList, []client.ObjectList) {
 func kindsForHalt() ([]client.ObjectList, []client.ObjectList) {
 	namespacedKinds, nonNamespacedKinds := kindsForDoNotTerminate()
 	namespacedKindsPlus := []client.ObjectList{
-		&appsv1alpha1.ComponentList{},
+		&kbappsv1.ComponentList{},
 		&appsv1alpha1.OpsRequestList{},
 		&appsv1.StatefulSetList{},           // be compatible with 0.6 workloads.
 		&policyv1.PodDisruptionBudgetList{}, // be compatible with 0.6 workloads.

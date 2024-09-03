@@ -19,9 +19,10 @@ package builder
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 )
 
@@ -32,10 +33,10 @@ var _ = Describe("monitor_service builder", func() {
 			ns   = "default"
 		)
 
-		exporter := appsv1alpha1.Exporter{
+		exporter := appsv1.Exporter{
 			ScrapePath:   "metrics",
 			ScrapePort:   "http-metrics",
-			ScrapeScheme: appsv1alpha1.HTTPSProtocol,
+			ScrapeScheme: appsv1.HTTPSProtocol,
 		}
 
 		ncs := NewMonitorServiceBuilder(ns, name).

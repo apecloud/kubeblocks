@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -49,22 +50,22 @@ func ShortName(clusterName, compName string) (string, error) {
 	return name, nil
 }
 
-func GetClusterName(comp *appsv1alpha1.Component) (string, error) {
+func GetClusterName(comp *appsv1.Component) (string, error) {
 	return getCompLabelValue(comp, constant.AppInstanceLabelKey)
 }
 
-func GetClusterUID(comp *appsv1alpha1.Component) (string, error) {
+func GetClusterUID(comp *appsv1.Component) (string, error) {
 	return getCompLabelValue(comp, constant.KBAppClusterUIDLabelKey)
 }
 
 // IsGenerated checks if the component is generated from legacy cluster definitions.
-func IsGenerated(comp *appsv1alpha1.Component) bool {
+func IsGenerated(comp *appsv1.Component) bool {
 	return len(comp.Spec.CompDef) == 0
 }
 
 // BuildComponent builds a new Component object from cluster component spec and definition.
 func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.ClusterComponentSpec,
-	labels, annotations map[string]string) (*appsv1alpha1.Component, error) {
+	labels, annotations map[string]string) (*appsv1.Component, error) {
 	compName := FullName(cluster.Name, compSpec.Name)
 	compDefName := func() string {
 		if strings.HasPrefix(compSpec.ComponentDef, constant.KBGeneratedVirtualCompDefPrefix) {
@@ -121,14 +122,13 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluste
 }
 
 func getOrBuildComponentDefinition(ctx context.Context, cli client.Reader,
-	clusterDef *appsv1alpha1.ClusterDefinition,
 	cluster *appsv1alpha1.Cluster,
-	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1alpha1.ComponentDefinition, error) {
+	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*appsv1.ComponentDefinition, error) {
 	if len(cluster.Spec.ClusterDefRef) > 0 && len(clusterCompSpec.ComponentDefRef) > 0 && len(clusterCompSpec.ComponentDef) == 0 {
 		return nil, fmt.Errorf("legacy cluster component definition is not supported any more")
 	}
 	if len(clusterCompSpec.ComponentDef) > 0 {
-		compDef := &appsv1alpha1.ComponentDefinition{}
+		compDef := &appsv1.ComponentDefinition{}
 		if err := cli.Get(ctx, types.NamespacedName{Name: clusterCompSpec.ComponentDef}, compDef); err != nil {
 			return nil, err
 		}
@@ -137,30 +137,7 @@ func getOrBuildComponentDefinition(ctx context.Context, cli client.Reader,
 	return nil, fmt.Errorf("the component definition is not provided")
 }
 
-func getClusterReferencedResources(ctx context.Context, cli client.Reader,
-	cluster *appsv1alpha1.Cluster) (*appsv1alpha1.ClusterDefinition, error) {
-	var (
-		clusterDef *appsv1alpha1.ClusterDefinition
-	)
-	if len(cluster.Spec.ClusterDefRef) > 0 {
-		clusterDef = &appsv1alpha1.ClusterDefinition{}
-		if err := cli.Get(ctx, types.NamespacedName{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
-			return nil, err
-		}
-	}
-	if clusterDef == nil {
-		if len(cluster.Spec.ClusterDefRef) == 0 {
-			return nil, fmt.Errorf("cluster definition is needed for generated component")
-		} else {
-			return nil, fmt.Errorf("referenced cluster definition is not found: %s", cluster.Spec.ClusterDefRef)
-		}
-	}
-	return clusterDef, nil
-}
-
-func getClusterCompSpec4Component(ctx context.Context, cli client.Reader,
-	clusterDef *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster,
-	comp *appsv1alpha1.Component) (*appsv1alpha1.ClusterComponentSpec, error) {
+func getClusterCompSpec4Component(ctx context.Context, cli client.Reader, cluster *appsv1alpha1.Cluster, comp *appsv1.Component) (*appsv1alpha1.ClusterComponentSpec, error) {
 	compName, err := ShortName(cluster.Name, comp.Name)
 	if err != nil {
 		return nil, err
@@ -175,7 +152,7 @@ func getClusterCompSpec4Component(ctx context.Context, cli client.Reader,
 	return nil, fmt.Errorf("cluster component spec is not found for component: %s", comp.Name)
 }
 
-func getCompLabelValue(comp *appsv1alpha1.Component, label string) (string, error) {
+func getCompLabelValue(comp *appsv1.Component, label string) (string, error) {
 	if comp.Labels == nil {
 		return "", fmt.Errorf("required label %s is not provided, component: %s", label, comp.GetName())
 	}
@@ -187,23 +164,23 @@ func getCompLabelValue(comp *appsv1alpha1.Component, label string) (string, erro
 }
 
 // GetCompDefByName gets the component definition by component definition name.
-func GetCompDefByName(ctx context.Context, cli client.Reader, compDefName string) (*appsv1alpha1.ComponentDefinition, error) {
-	compDef := &appsv1alpha1.ComponentDefinition{}
+func GetCompDefByName(ctx context.Context, cli client.Reader, compDefName string) (*appsv1.ComponentDefinition, error) {
+	compDef := &appsv1.ComponentDefinition{}
 	if err := cli.Get(ctx, client.ObjectKey{Name: compDefName}, compDef); err != nil {
 		return nil, err
 	}
 	return compDef, nil
 }
 
-func GetComponentByName(ctx context.Context, cli client.Reader, namespace, fullCompName string) (*appsv1alpha1.Component, error) {
-	comp := &appsv1alpha1.Component{}
+func GetComponentByName(ctx context.Context, cli client.Reader, namespace, fullCompName string) (*appsv1.Component, error) {
+	comp := &appsv1.Component{}
 	if err := cli.Get(ctx, client.ObjectKey{Name: fullCompName, Namespace: namespace}, comp); err != nil {
 		return nil, err
 	}
 	return comp, nil
 }
 
-func GetCompNCompDefByName(ctx context.Context, cli client.Reader, namespace, fullCompName string) (*appsv1alpha1.Component, *appsv1alpha1.ComponentDefinition, error) {
+func GetCompNCompDefByName(ctx context.Context, cli client.Reader, namespace, fullCompName string) (*appsv1.Component, *appsv1.ComponentDefinition, error) {
 	comp, err := GetComponentByName(ctx, cli, namespace, fullCompName)
 	if err != nil {
 		return nil, nil, err
@@ -216,8 +193,8 @@ func GetCompNCompDefByName(ctx context.Context, cli client.Reader, namespace, fu
 }
 
 // ListClusterComponents lists the components of the cluster.
-func ListClusterComponents(ctx context.Context, cli client.Reader, cluster *appsv1alpha1.Cluster) ([]appsv1alpha1.Component, error) {
-	compList := &appsv1alpha1.ComponentList{}
+func ListClusterComponents(ctx context.Context, cli client.Reader, cluster *appsv1alpha1.Cluster) ([]appsv1.Component, error) {
+	compList := &appsv1.ComponentList{}
 	if err := cli.List(ctx, compList, client.InNamespace(cluster.Namespace), client.MatchingLabels{constant.AppInstanceLabelKey: cluster.Name}); err != nil {
 		return nil, err
 	}
@@ -241,7 +218,7 @@ func GetClusterComponentShortNameSet(ctx context.Context, cli client.Reader, clu
 	return compSet, nil
 }
 
-func GetExporter(componentDef appsv1alpha1.ComponentDefinitionSpec) *common.Exporter {
+func GetExporter(componentDef appsv1.ComponentDefinitionSpec) *common.Exporter {
 	if componentDef.Exporter != nil {
 		return &common.Exporter{Exporter: *componentDef.Exporter}
 	}

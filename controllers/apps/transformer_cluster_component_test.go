@@ -219,7 +219,7 @@ var _ = Describe("cluster component transformer test", func() {
 		return compSpecs
 	}
 
-	mockCompObj := func(transCtx *clusterTransformContext, compName string, setters ...func(*appsv1alpha1.Component)) *appsv1alpha1.Component {
+	mockCompObj := func(transCtx *clusterTransformContext, compName string, setters ...func(*appsv1.Component)) *appsv1.Component {
 		var compSpec *appsv1alpha1.ClusterComponentSpec
 		for i, spec := range transCtx.ComponentSpecs {
 			if spec.Name == compName {
@@ -269,10 +269,10 @@ var _ = Describe("cluster component transformer test", func() {
 
 			// check the components
 			graphCli := transCtx.Client.(model.GraphClient)
-			objs := graphCli.FindAll(dag, &appsv1alpha1.Component{})
+			objs := graphCli.FindAll(dag, &appsv1.Component{})
 			Expect(len(objs)).Should(Equal(4))
 			for _, obj := range objs {
-				comp := obj.(*appsv1alpha1.Component)
+				comp := obj.(*appsv1.Component)
 				Expect(graphCli.IsAction(dag, comp, model.ActionCreatePtr())).Should(BeTrue())
 			}
 		})
@@ -285,10 +285,10 @@ var _ = Describe("cluster component transformer test", func() {
 
 			// check the first two components
 			graphCli := transCtx.Client.(model.GraphClient)
-			objs := graphCli.FindAll(dag, &appsv1alpha1.Component{})
+			objs := graphCli.FindAll(dag, &appsv1.Component{})
 			Expect(len(objs)).Should(Equal(2))
 			for _, obj := range objs {
-				comp := obj.(*appsv1alpha1.Component)
+				comp := obj.(*appsv1.Component)
 				Expect(component.ShortName(transCtx.Cluster.Name, comp.Name)).Should(Or(Equal(comp1aName), Equal(comp1bName)))
 				Expect(graphCli.IsAction(dag, comp, model.ActionCreatePtr())).Should(BeTrue())
 			}
@@ -300,11 +300,11 @@ var _ = Describe("cluster component transformer test", func() {
 			// mock first two components status as running and creating
 			reader := &mockReader{
 				objs: []client.Object{
-					mockCompObj(transCtx, comp1aName, func(comp *appsv1alpha1.Component) {
-						comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
+						comp.Status.Phase = appsv1.RunningClusterCompPhase
 					}),
-					mockCompObj(transCtx, comp1bName, func(comp *appsv1alpha1.Component) {
-						comp.Status.Phase = appsv1alpha1.CreatingClusterCompPhase
+					mockCompObj(transCtx, comp1bName, func(comp *appsv1.Component) {
+						comp.Status.Phase = appsv1.CreatingClusterCompPhase
 					}),
 				},
 			}
@@ -316,7 +316,7 @@ var _ = Describe("cluster component transformer test", func() {
 
 			// should have no components to update
 			graphCli := transCtx.Client.(model.GraphClient)
-			objs := graphCli.FindAll(dag, &appsv1alpha1.Component{})
+			objs := graphCli.FindAll(dag, &appsv1.Component{})
 			Expect(len(objs)).Should(Equal(0))
 		})
 
@@ -326,8 +326,8 @@ var _ = Describe("cluster component transformer test", func() {
 			// mock one of first two components status as running
 			reader := &mockReader{
 				objs: []client.Object{
-					mockCompObj(transCtx, comp1aName, func(comp *appsv1alpha1.Component) {
-						comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
+						comp.Status.Phase = appsv1.RunningClusterCompPhase
 					}),
 				},
 			}
@@ -339,9 +339,9 @@ var _ = Describe("cluster component transformer test", func() {
 
 			// should have one component to create
 			graphCli := transCtx.Client.(model.GraphClient)
-			objs := graphCli.FindAll(dag, &appsv1alpha1.Component{})
+			objs := graphCli.FindAll(dag, &appsv1.Component{})
 			Expect(len(objs)).Should(Equal(1))
-			comp := objs[0].(*appsv1alpha1.Component)
+			comp := objs[0].(*appsv1.Component)
 			Expect(component.ShortName(transCtx.Cluster.Name, comp.Name)).Should(Equal(comp1bName))
 			Expect(graphCli.IsAction(dag, comp, model.ActionCreatePtr())).Should(BeTrue())
 		})
@@ -352,11 +352,11 @@ var _ = Describe("cluster component transformer test", func() {
 			// mock first two components status as running
 			reader := &mockReader{
 				objs: []client.Object{
-					mockCompObj(transCtx, comp1aName, func(comp *appsv1alpha1.Component) {
-						comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
+						comp.Status.Phase = appsv1.RunningClusterCompPhase
 					}),
-					mockCompObj(transCtx, comp1bName, func(comp *appsv1alpha1.Component) {
-						comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+					mockCompObj(transCtx, comp1bName, func(comp *appsv1.Component) {
+						comp.Status.Phase = appsv1.RunningClusterCompPhase
 					}),
 				},
 			}
@@ -367,10 +367,10 @@ var _ = Describe("cluster component transformer test", func() {
 
 			// check the last two components
 			graphCli := transCtx.Client.(model.GraphClient)
-			objs := graphCli.FindAll(dag, &appsv1alpha1.Component{})
+			objs := graphCli.FindAll(dag, &appsv1.Component{})
 			Expect(len(objs)).Should(Equal(2))
 			for _, obj := range objs {
-				comp := obj.(*appsv1alpha1.Component)
+				comp := obj.(*appsv1.Component)
 				Expect(component.ShortName(transCtx.Cluster.Name, comp.Name)).Should(Or(Equal(comp2aName), Equal(comp2bName)))
 				Expect(graphCli.IsAction(dag, comp, model.ActionCreatePtr())).Should(BeTrue())
 			}
@@ -382,12 +382,12 @@ var _ = Describe("cluster component transformer test", func() {
 			// mock first two components
 			reader := &mockReader{
 				objs: []client.Object{
-					mockCompObj(transCtx, comp1aName, func(comp *appsv1alpha1.Component) {
+					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
 						comp.Spec.Replicas = 2 // to update
-						comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningClusterCompPhase
 					}),
-					mockCompObj(transCtx, comp1bName, func(comp *appsv1alpha1.Component) {
-						comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+					mockCompObj(transCtx, comp1bName, func(comp *appsv1.Component) {
+						comp.Status.Phase = appsv1.RunningClusterCompPhase
 					}),
 				},
 			}
@@ -399,9 +399,9 @@ var _ = Describe("cluster component transformer test", func() {
 
 			// check the first component
 			graphCli := transCtx.Client.(model.GraphClient)
-			objs := graphCli.FindAll(dag, &appsv1alpha1.Component{})
+			objs := graphCli.FindAll(dag, &appsv1.Component{})
 			Expect(len(objs)).Should(Equal(1))
-			comp := objs[0].(*appsv1alpha1.Component)
+			comp := objs[0].(*appsv1.Component)
 			Expect(component.ShortName(transCtx.Cluster.Name, comp.Name)).Should(Equal(comp1aName))
 			Expect(graphCli.IsAction(dag, comp, model.ActionUpdatePtr())).Should(BeTrue())
 		})
@@ -412,18 +412,18 @@ var _ = Describe("cluster component transformer test", func() {
 			// mock components
 			reader := &mockReader{
 				objs: []client.Object{
-					mockCompObj(transCtx, comp1aName, func(comp *appsv1alpha1.Component) {
-						comp.Status.Phase = appsv1alpha1.CreatingClusterCompPhase // not ready
+					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
+						comp.Status.Phase = appsv1.CreatingClusterCompPhase // not ready
 					}),
-					mockCompObj(transCtx, comp1bName, func(comp *appsv1alpha1.Component) {
-						comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+					mockCompObj(transCtx, comp1bName, func(comp *appsv1.Component) {
+						comp.Status.Phase = appsv1.RunningClusterCompPhase
 					}),
-					mockCompObj(transCtx, comp2aName, func(comp *appsv1alpha1.Component) {
+					mockCompObj(transCtx, comp2aName, func(comp *appsv1.Component) {
 						comp.Spec.Replicas = 2 // to update
-						comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningClusterCompPhase
 					}),
-					mockCompObj(transCtx, comp2bName, func(comp *appsv1alpha1.Component) {
-						comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+					mockCompObj(transCtx, comp2bName, func(comp *appsv1.Component) {
+						comp.Status.Phase = appsv1.RunningClusterCompPhase
 					}),
 				},
 			}
@@ -436,7 +436,7 @@ var _ = Describe("cluster component transformer test", func() {
 
 			// should have no components to update
 			graphCli := transCtx.Client.(model.GraphClient)
-			objs := graphCli.FindAll(dag, &appsv1alpha1.Component{})
+			objs := graphCli.FindAll(dag, &appsv1.Component{})
 			Expect(len(objs)).Should(Equal(0))
 		})
 
@@ -446,19 +446,19 @@ var _ = Describe("cluster component transformer test", func() {
 			// mock components
 			reader := &mockReader{
 				objs: []client.Object{
-					mockCompObj(transCtx, comp1aName, func(comp *appsv1alpha1.Component) {
+					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
 						comp.Spec.Replicas = 2 // to update
-						comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningClusterCompPhase
 					}),
-					mockCompObj(transCtx, comp1bName, func(comp *appsv1alpha1.Component) {
-						comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+					mockCompObj(transCtx, comp1bName, func(comp *appsv1.Component) {
+						comp.Status.Phase = appsv1.RunningClusterCompPhase
 					}),
-					mockCompObj(transCtx, comp2aName, func(comp *appsv1alpha1.Component) {
+					mockCompObj(transCtx, comp2aName, func(comp *appsv1.Component) {
 						comp.Spec.Replicas = 2 // to update
-						comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningClusterCompPhase
 					}),
-					mockCompObj(transCtx, comp2bName, func(comp *appsv1alpha1.Component) {
-						comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+					mockCompObj(transCtx, comp2bName, func(comp *appsv1.Component) {
+						comp.Status.Phase = appsv1.RunningClusterCompPhase
 					}),
 				},
 			}
@@ -471,9 +471,9 @@ var _ = Describe("cluster component transformer test", func() {
 
 			// should have one component to update
 			graphCli := transCtx.Client.(model.GraphClient)
-			objs := graphCli.FindAll(dag, &appsv1alpha1.Component{})
+			objs := graphCli.FindAll(dag, &appsv1.Component{})
 			Expect(len(objs)).Should(Equal(1))
-			comp := objs[0].(*appsv1alpha1.Component)
+			comp := objs[0].(*appsv1.Component)
 			Expect(component.ShortName(transCtx.Cluster.Name, comp.Name)).Should(Equal(comp1aName))
 			Expect(graphCli.IsAction(dag, comp, model.ActionUpdatePtr())).Should(BeTrue())
 		})
@@ -484,18 +484,18 @@ var _ = Describe("cluster component transformer test", func() {
 			// mock components
 			reader := &mockReader{
 				objs: []client.Object{
-					mockCompObj(transCtx, comp1aName, func(comp *appsv1alpha1.Component) {
-						comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
+						comp.Status.Phase = appsv1.RunningClusterCompPhase
 					}),
-					mockCompObj(transCtx, comp1bName, func(comp *appsv1alpha1.Component) {
-						comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+					mockCompObj(transCtx, comp1bName, func(comp *appsv1.Component) {
+						comp.Status.Phase = appsv1.RunningClusterCompPhase
 					}),
-					mockCompObj(transCtx, comp2aName, func(comp *appsv1alpha1.Component) {
+					mockCompObj(transCtx, comp2aName, func(comp *appsv1.Component) {
 						comp.Spec.Replicas = 2 // to update
-						comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningClusterCompPhase
 					}),
-					mockCompObj(transCtx, comp2bName, func(comp *appsv1alpha1.Component) {
-						comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+					mockCompObj(transCtx, comp2bName, func(comp *appsv1.Component) {
+						comp.Status.Phase = appsv1.RunningClusterCompPhase
 					}),
 				},
 			}
@@ -506,9 +506,9 @@ var _ = Describe("cluster component transformer test", func() {
 			Expect(err).Should(BeNil())
 
 			graphCli := transCtx.Client.(model.GraphClient)
-			objs := graphCli.FindAll(dag, &appsv1alpha1.Component{})
+			objs := graphCli.FindAll(dag, &appsv1.Component{})
 			Expect(len(objs)).Should(Equal(1))
-			comp := objs[0].(*appsv1alpha1.Component)
+			comp := objs[0].(*appsv1.Component)
 			Expect(component.ShortName(transCtx.Cluster.Name, comp.Name)).Should(Equal(comp2aName))
 			Expect(graphCli.IsAction(dag, comp, model.ActionUpdatePtr())).Should(BeTrue())
 		})
@@ -519,14 +519,14 @@ var _ = Describe("cluster component transformer test", func() {
 			// mock to stop all components
 			reader := &mockReader{
 				objs: []client.Object{
-					mockCompObj(transCtx, comp1aName, func(comp *appsv1alpha1.Component) {
-						comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
+						comp.Status.Phase = appsv1.RunningClusterCompPhase
 					}),
-					mockCompObj(transCtx, comp2aName, func(comp *appsv1alpha1.Component) {
-						comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+					mockCompObj(transCtx, comp2aName, func(comp *appsv1.Component) {
+						comp.Status.Phase = appsv1.RunningClusterCompPhase
 					}),
-					mockCompObj(transCtx, comp3aName, func(comp *appsv1alpha1.Component) {
-						comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+					mockCompObj(transCtx, comp3aName, func(comp *appsv1.Component) {
+						comp.Status.Phase = appsv1.RunningClusterCompPhase
 					}),
 				},
 			}
@@ -542,9 +542,9 @@ var _ = Describe("cluster component transformer test", func() {
 
 			// should have the first component to update only
 			graphCli := transCtx.Client.(model.GraphClient)
-			objs := graphCli.FindAll(dag, &appsv1alpha1.Component{})
+			objs := graphCli.FindAll(dag, &appsv1.Component{})
 			Expect(len(objs)).Should(Equal(1))
-			comp := objs[0].(*appsv1alpha1.Component)
+			comp := objs[0].(*appsv1.Component)
 			Expect(component.ShortName(transCtx.Cluster.Name, comp.Name)).Should(Equal(comp1aName))
 			Expect(graphCli.IsAction(dag, comp, model.ActionUpdatePtr())).Should(BeTrue())
 			Expect(comp.Spec.Stop).ShouldNot(BeNil())
@@ -557,15 +557,15 @@ var _ = Describe("cluster component transformer test", func() {
 			// mock to stop all components and the first component has been stopped
 			reader := &mockReader{
 				objs: []client.Object{
-					mockCompObj(transCtx, comp1aName, func(comp *appsv1alpha1.Component) {
+					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
 						comp.Spec.Stop = &[]bool{true}[0]
-						comp.Status.Phase = appsv1alpha1.StoppedClusterCompPhase
+						comp.Status.Phase = appsv1.StoppedClusterCompPhase
 					}),
-					mockCompObj(transCtx, comp2aName, func(comp *appsv1alpha1.Component) {
-						comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+					mockCompObj(transCtx, comp2aName, func(comp *appsv1.Component) {
+						comp.Status.Phase = appsv1.RunningClusterCompPhase
 					}),
-					mockCompObj(transCtx, comp3aName, func(comp *appsv1alpha1.Component) {
-						comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+					mockCompObj(transCtx, comp3aName, func(comp *appsv1.Component) {
+						comp.Status.Phase = appsv1.RunningClusterCompPhase
 					}),
 				},
 			}
@@ -581,9 +581,9 @@ var _ = Describe("cluster component transformer test", func() {
 
 			// should have the second component to update only
 			graphCli := transCtx.Client.(model.GraphClient)
-			objs := graphCli.FindAll(dag, &appsv1alpha1.Component{})
+			objs := graphCli.FindAll(dag, &appsv1.Component{})
 			Expect(len(objs)).Should(Equal(1))
-			comp := objs[0].(*appsv1alpha1.Component)
+			comp := objs[0].(*appsv1.Component)
 			Expect(component.ShortName(transCtx.Cluster.Name, comp.Name)).Should(Equal(comp2aName))
 			Expect(graphCli.IsAction(dag, comp, model.ActionUpdatePtr())).Should(BeTrue())
 			Expect(comp.Spec.Stop).ShouldNot(BeNil())
@@ -596,11 +596,11 @@ var _ = Describe("cluster component transformer test", func() {
 			// mock first two components status as running
 			reader := &mockReader{
 				objs: []client.Object{
-					mockCompObj(transCtx, comp1aName, func(comp *appsv1alpha1.Component) {
-						comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
+						comp.Status.Phase = appsv1.RunningClusterCompPhase
 					}),
-					mockCompObj(transCtx, comp1bName, func(comp *appsv1alpha1.Component) {
-						comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+					mockCompObj(transCtx, comp1bName, func(comp *appsv1.Component) {
+						comp.Status.Phase = appsv1.RunningClusterCompPhase
 					}),
 				},
 			}
@@ -613,21 +613,21 @@ var _ = Describe("cluster component transformer test", func() {
 
 			// check the last two components under provisioning
 			graphCli := transCtx.Client.(model.GraphClient)
-			objs := graphCli.FindAll(dag, &appsv1alpha1.Component{})
+			objs := graphCli.FindAll(dag, &appsv1.Component{})
 			Expect(len(objs)).Should(Equal(2))
 			for _, obj := range objs {
-				comp := obj.(*appsv1alpha1.Component)
+				comp := obj.(*appsv1.Component)
 				Expect(component.ShortName(transCtx.Cluster.Name, comp.Name)).Should(Or(Equal(comp2aName), Equal(comp2bName)))
 				Expect(graphCli.IsAction(dag, comp, model.ActionCreatePtr())).Should(BeTrue())
 			}
 
 			// mock last two components status as running
 			reader.objs = append(reader.objs, []client.Object{
-				mockCompObj(transCtx, comp2aName, func(comp *appsv1alpha1.Component) {
-					comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+				mockCompObj(transCtx, comp2aName, func(comp *appsv1.Component) {
+					comp.Status.Phase = appsv1.RunningClusterCompPhase
 				}),
-				mockCompObj(transCtx, comp2bName, func(comp *appsv1alpha1.Component) {
-					comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+				mockCompObj(transCtx, comp2bName, func(comp *appsv1.Component) {
+					comp.Status.Phase = appsv1.RunningClusterCompPhase
 				}),
 			}...)
 

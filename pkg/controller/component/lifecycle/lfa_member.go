@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -56,7 +57,7 @@ type switchover struct {
 	namespace   string
 	clusterName string
 	compName    string
-	roles       []appsv1alpha1.ReplicaRole
+	roles       []appsv1.ReplicaRole
 	candidate   string
 }
 

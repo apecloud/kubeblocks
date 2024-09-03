@@ -227,20 +227,20 @@ func (r *ClusterDefinitionReconciler) validateTopologyOrders(topology appsv1.Clu
 }
 
 func (r *ClusterDefinitionReconciler) loadTopologyCompDefs(ctx context.Context,
-	topology appsv1.ClusterTopology) (map[string][]*appsv1alpha1.ComponentDefinition, error) {
-	compDefList := &appsv1alpha1.ComponentDefinitionList{}
+	topology appsv1.ClusterTopology) (map[string][]*appsv1.ComponentDefinition, error) {
+	compDefList := &appsv1.ComponentDefinitionList{}
 	if err := r.Client.List(ctx, compDefList); err != nil {
 		return nil, err
 	}
 
-	compDefs := map[string]*appsv1alpha1.ComponentDefinition{}
+	compDefs := map[string]*appsv1.ComponentDefinition{}
 	for i, item := range compDefList.Items {
 		compDefs[item.Name] = &compDefList.Items[i]
 	}
 
-	result := make(map[string][]*appsv1alpha1.ComponentDefinition)
+	result := make(map[string][]*appsv1.ComponentDefinition)
 	for _, comp := range topology.Components {
-		defs := make([]*appsv1alpha1.ComponentDefinition, 0)
+		defs := make([]*appsv1.ComponentDefinition, 0)
 		for compDefName := range compDefs {
 			if strings.HasPrefix(compDefName, comp.CompDef) {
 				defs = append(defs, compDefs[compDefName])
@@ -251,7 +251,7 @@ func (r *ClusterDefinitionReconciler) loadTopologyCompDefs(ctx context.Context,
 	return result, nil
 }
 
-func (r *ClusterDefinitionReconciler) validateTopologyComponent(compDefs map[string][]*appsv1alpha1.ComponentDefinition,
+func (r *ClusterDefinitionReconciler) validateTopologyComponent(compDefs map[string][]*appsv1.ComponentDefinition,
 	comp appsv1.ClusterTopologyComponent) error {
 	defs, ok := compDefs[comp.Name]
 	if !ok || len(defs) == 0 {

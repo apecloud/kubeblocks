@@ -28,6 +28,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -161,7 +162,7 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 		completedProgressCount int32
 		requeueTimeAfterFailed time.Duration
 		err                    error
-		clusterDef             *appsv1alpha1.ClusterDefinition
+		clusterDef             *appsv1.ClusterDefinition
 	)
 	if opsRes.Cluster.Spec.ClusterDefRef != "" {
 		if clusterDef, err = getClusterDefByName(reqCtx.Ctx, cli, opsRes.Cluster.Spec.ClusterDefRef); err != nil {
@@ -177,9 +178,9 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 	var progressResources []progressResource
 	setProgressResource := func(compSpec *appsv1alpha1.ClusterComponentSpec, compOps ComponentOpsInterface,
 		fullComponentName string, isShardingComponent bool) error {
-		var componentDefinition *appsv1alpha1.ComponentDefinition
+		var componentDefinition *appsv1.ComponentDefinition
 		if compSpec.ComponentDef != "" {
-			componentDefinition = &appsv1alpha1.ComponentDefinition{}
+			componentDefinition = &appsv1.ComponentDefinition{}
 			if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: compSpec.ComponentDef}, componentDefinition); err != nil {
 				return err
 			}
@@ -258,7 +259,7 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 			if err != nil {
 				return opsRequestPhase, 0, err
 			}
-			componentPhase = compObj.Status.Phase
+			componentPhase = appsv1alpha1.ClusterComponentPhase(compObj.Status.Phase)
 		}
 		// conditions whether ops is running:
 		//  1. completedProgressCount is not equal to expectProgressCount when the ops do not need to wait component phase to a terminal phase.

@@ -29,7 +29,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	kbagent "github.com/apecloud/kubeblocks/pkg/kbagent"
 )
 
@@ -83,21 +83,21 @@ var _ = Describe("kb-agent", func() {
 						},
 					},
 				},
-				LifecycleActions: &appsv1alpha1.ComponentLifecycleActions{
-					PostProvision: &appsv1alpha1.Action{
-						Exec: &appsv1alpha1.ExecAction{
+				LifecycleActions: &appsv1.ComponentLifecycleActions{
+					PostProvision: &appsv1.Action{
+						Exec: &appsv1.ExecAction{
 							Command: []string{"echo", "hello"},
 						},
 						TimeoutSeconds: 5,
-						RetryPolicy: &appsv1alpha1.RetryPolicy{
+						RetryPolicy: &appsv1.RetryPolicy{
 							MaxRetries:    5,
 							RetryInterval: 10,
 						},
-						PreCondition: &[]appsv1alpha1.PreConditionType{appsv1alpha1.ComponentReadyPreConditionType}[0],
+						PreCondition: &[]appsv1.PreConditionType{appsv1.ComponentReadyPreConditionType}[0],
 					},
-					RoleProbe: &appsv1alpha1.Probe{
-						Action: appsv1alpha1.Action{
-							Exec: &appsv1alpha1.ExecAction{
+					RoleProbe: &appsv1.Probe{
+						Action: appsv1.Action{
+							Exec: &appsv1.ExecAction{
 								Command: []string{"echo", "hello"},
 							},
 							TimeoutSeconds: 5,

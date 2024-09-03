@@ -91,7 +91,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 		})).Should(Succeed())
 	}
 
-	initOpsResWithComponentDef := func(createCompVersion bool) (*appsv1alpha1.ComponentDefinition, *appsv1alpha1.ComponentDefinition, *OpsResource) {
+	initOpsResWithComponentDef := func(createCompVersion bool) (*appsv1.ComponentDefinition, *appsv1.ComponentDefinition, *OpsResource) {
 		compDef1 := testapps.NewComponentDefinitionFactory(testapps.CompDefName("cmpd-1")).
 			SetServiceVersion(testapps.ServiceVersion(serviceVer0)).
 			SetRuntime(&corev1.Container{

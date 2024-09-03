@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
@@ -90,7 +91,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		return cfgCM, cfgTpl
 	}
 
-	assureConfigInstanceObj := func(clusterName, componentName, ns string, compDef *appsv1alpha1.ComponentDefinition) (*appsv1alpha1.Configuration, *corev1.ConfigMap) {
+	assureConfigInstanceObj := func(clusterName, componentName, ns string, compDef *appsv1.ComponentDefinition) (*appsv1alpha1.Configuration, *corev1.ConfigMap) {
 		if len(compDef.Spec.Configs) == 0 {
 			return nil, nil
 		}
@@ -158,8 +159,8 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 
 		By("update clusterdefinition tpl")
 		patch := client.MergeFrom(compDef.DeepCopy())
-		compDef.Spec.Configs = []appsv1alpha1.ComponentConfigSpec{{
-			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+		compDef.Spec.Configs = []appsv1.ComponentConfigSpec{{
+			ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
 				Name:        "mysql-test",
 				TemplateRef: cmObj.Name,
 				VolumeName:  "mysql-config",

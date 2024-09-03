@@ -146,6 +146,11 @@ type ValueFrom struct {
 	//
 	// +optional
 	ComponentDef []ValueMapping `json:"componentDef,omitempty"`
+
+	// Determine the appropriate version of the backup tool image from ServiceVersion.
+	//
+	// +optional
+	ServiceVersion []ValueMapping `json:"serviceVersion,omitempty"`
 }
 
 type ValueMapping struct {

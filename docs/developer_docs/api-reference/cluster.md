@@ -22074,6 +22074,20 @@ use the latest available version in ComponentVersion.</p>
 <p>Determine the appropriate version of the backup tool image from ComponentDefinition.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>serviceVersion</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ValueMapping">
+[]ValueMapping
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Determine the appropriate version of the backup tool image from ServiceVersion.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ValueMapping">ValueMapping

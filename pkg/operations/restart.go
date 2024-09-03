@@ -21,10 +21,8 @@ package operations
 
 import (
 	"fmt"
-	"reflect"
 	"time"
 
-	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -73,22 +71,20 @@ func (r restartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		return err
 	}
 	r.compOpsHelper = newComponentOpsHelper(opsRes.OpsRequest.Spec.RestartList)
-	componentKindList := []client.ObjectList{
-		&appv1.StatefulSetList{},
-		&workloads.InstanceSetList{},
+	orderedComps, err := r.getComponentOrders(reqCtx, cli, opsRes)
+	if err != nil {
+		return err
 	}
-	for _, objectList := range componentKindList {
-		if err := r.restartComponent(reqCtx, cli, opsRes, objectList); err != nil {
-			return err
-		}
+	if len(orderedComps) > 0 {
+		return r.restartComponents(reqCtx, cli, opsRes, orderedComps[:1], false)
 	}
-	return nil
+	return r.restartComponents(reqCtx, cli, opsRes, opsRes.OpsRequest.Spec.RestartList, false)
 }
 
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for restart opsRequest.
 func (r restartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
-	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.RestartList)
+	r.compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.RestartList)
 	handleRestartProgress := func(reqCtx intctrlutil.RequestCtx,
 		cli client.Client,
 		opsRes *OpsResource,
@@ -96,7 +92,16 @@ func (r restartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		compStatus *opsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
 		return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus, r.podApplyCompOps)
 	}
-	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes,
+	orderedComps, err := r.getComponentOrders(reqCtx, cli, opsRes)
+	if err != nil {
+		return "", 0, err
+	}
+	if len(orderedComps) > 1 {
+		if err := r.restartComponents(reqCtx, cli, opsRes, orderedComps, true); err != nil {
+			return "", 0, err
+		}
+	}
+	return r.compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes,
 		"restart", handleRestartProgress)
 }
 
@@ -114,32 +119,92 @@ func (r restartOpsHandler) podApplyCompOps(
 	return !pod.CreationTimestamp.Before(&ops.Status.StartTimestamp)
 }
 
-// restartStatefulSet restarts statefulSet workload
-func (r restartOpsHandler) restartComponent(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, objList client.ObjectList) error {
-	if err := cli.List(reqCtx.Ctx, objList,
-		client.InNamespace(opsRes.Cluster.Namespace),
-		client.MatchingLabels{constant.AppInstanceLabelKey: opsRes.Cluster.Name}); err != nil {
-		return err
+func (r restartOpsHandler) getComponentOrders(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) ([]opsv1alpha1.ComponentOps, error) {
+	cd := &appsv1.ClusterDefinition{}
+	if opsRes.Cluster.Spec.ClusterDefRef == "" || opsRes.Cluster.Spec.Topology == "" {
+		return nil, nil
 	}
-
-	items := reflect.ValueOf(objList).Elem().FieldByName("Items")
-	l := items.Len()
-	for i := 0; i < l; i++ {
-		// get the underlying object
-		object := items.Index(i).Addr().Interface().(client.Object)
-		template := items.Index(i).FieldByName("Spec").FieldByName("Template").Addr().Interface().(*corev1.PodTemplateSpec)
-		if r.isRestarted(opsRes, object, template) {
+	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: opsRes.Cluster.Spec.ClusterDefRef}, cd); err != nil {
+		return nil, err
+	}
+	// components that require sequential restart
+	var orderedComps []opsv1alpha1.ComponentOps
+	for _, topology := range cd.Spec.Topologies {
+		if topology.Name != opsRes.Cluster.Spec.Topology {
 			continue
 		}
-		if err := cli.Update(reqCtx.Ctx, object); err != nil {
+		if topology.Orders != nil && len(topology.Orders.Update) > 0 {
+			// when using clusterDef and topology, "update orders" includes all components
+			for _, compName := range topology.Orders.Update {
+				// get the ordered components to restart
+				if compOps, ok := r.compOpsHelper.componentOpsSet[compName]; ok {
+					orderedComps = append(orderedComps, compOps.(opsv1alpha1.ComponentOps))
+				}
+			}
+		}
+		break
+	}
+	return orderedComps, nil
+}
+
+func (r restartOpsHandler) restartComponents(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, comOpsList []opsv1alpha1.ComponentOps, inOrder bool) error {
+	for index, compOps := range comOpsList {
+		if !r.matchToRestart(opsRes.OpsRequest, comOpsList, index, inOrder) {
+			continue
+		}
+		matchingLabels := client.MatchingLabels{constant.AppInstanceLabelKey: opsRes.Cluster.Name}
+		if opsRes.Cluster.Spec.GetShardingByName(compOps.ComponentName) != nil {
+			matchingLabels[constant.KBAppShardingNameLabelKey] = compOps.ComponentName
+		} else {
+			matchingLabels[constant.KBAppComponentLabelKey] = compOps.ComponentName
+		}
+		instanceSetList := &workloads.InstanceSetList{}
+		if err := cli.List(reqCtx.Ctx, instanceSetList,
+			client.InNamespace(opsRes.Cluster.Namespace), matchingLabels); err != nil {
 			return err
+		}
+		if len(instanceSetList.Items) == 0 {
+			return fmt.Errorf(`the instanceSet workloads are not exists for the component "%s"`, compOps.ComponentName)
+		}
+		for i := range instanceSetList.Items {
+			instanceSet := &instanceSetList.Items[i]
+			if r.isRestarted(opsRes, instanceSet, &instanceSet.Spec.Template, compOps.ComponentName) {
+				continue
+			}
+			if err := cli.Update(reqCtx.Ctx, instanceSet); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
+func (r restartOpsHandler) matchToRestart(opsRequest *opsv1alpha1.OpsRequest, comOpsList []opsv1alpha1.ComponentOps, index int, inOrder bool) bool {
+	if !inOrder {
+		return true
+	}
+	if index == 0 {
+		// already restart in "Action" step.
+		return false
+	}
+	compHasRestartCompleted := func(compName string) bool {
+		progressDetails := opsRequest.Status.Components[compName].ProgressDetails
+		for _, v := range progressDetails {
+			if !isCompletedProgressStatus(v.Status) {
+				return false
+			}
+		}
+		return true
+	}
+	lastOrderCompName := comOpsList[index-1].ComponentName
+	if !compHasRestartCompleted(lastOrderCompName) {
+		return false
+	}
+	return !compHasRestartCompleted(comOpsList[index].ComponentName)
+}
+
 // isRestarted checks whether the component has been restarted
-func (r restartOpsHandler) isRestarted(opsRes *OpsResource, object client.Object, podTemplate *corev1.PodTemplateSpec) bool {
+func (r restartOpsHandler) isRestarted(opsRes *OpsResource, object client.Object, podTemplate *corev1.PodTemplateSpec, componentName string) bool {
 	cName := object.GetLabels()[constant.KBAppComponentLabelKey]
 	shardingName := object.GetLabels()[constant.KBAppShardingNameLabelKey]
 	if shardingName != "" {
@@ -156,8 +221,8 @@ func (r restartOpsHandler) isRestarted(opsRes *OpsResource, object client.Object
 	}
 	hasRestarted := true
 	startTimestamp := opsRes.OpsRequest.Status.StartTimestamp
-	stsRestartTimeStamp := podTemplate.Annotations[constant.RestartAnnotationKey]
-	if res, _ := time.Parse(time.RFC3339, stsRestartTimeStamp); startTimestamp.After(res) {
+	workloadRestartTimeStamp := podTemplate.Annotations[constant.RestartAnnotationKey]
+	if res, _ := time.Parse(time.RFC3339, workloadRestartTimeStamp); startTimestamp.After(res) {
 		podTemplate.Annotations[constant.RestartAnnotationKey] = startTimestamp.Format(time.RFC3339)
 		hasRestarted = false
 	}

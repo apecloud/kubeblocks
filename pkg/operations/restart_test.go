@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"time"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -29,6 +31,8 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
@@ -37,9 +41,10 @@ import (
 var _ = Describe("Restart OpsRequest", func() {
 
 	var (
-		randomStr   = testCtx.GetRandomStr()
-		compDefName = "test-compdef-" + randomStr
-		clusterName = "test-cluster-" + randomStr
+		randomStr      = testCtx.GetRandomStr()
+		compDefName    = "test-compdef-" + randomStr
+		clusterName    = "test-cluster-" + randomStr
+		clusterDefName = "test-clusterdef-" + randomStr
 	)
 
 	cleanEnv := func() {
@@ -57,6 +62,7 @@ var _ = Describe("Restart OpsRequest", func() {
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
 		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.InstanceSetSignature, true, inNS, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -71,17 +77,17 @@ var _ = Describe("Restart OpsRequest", func() {
 		)
 
 		BeforeEach(func() {
-			By("init operations resources ")
-			opsRes, _, cluster = initOperationsResources(compDefName, clusterName)
 			reqCtx = intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 		})
 
 		It("Test restart OpsRequest", func() {
+			By("init operations resources ")
+			opsRes, _, cluster = initOperationsResources(compDefName, clusterName)
 			By("create Restart opsRequest")
 			opsRes.OpsRequest = createRestartOpsObj(clusterName, "restart-ops-"+randomStr)
 			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingClusterCompPhase, defaultCompName)
 
-			By("mock restart OpsRequest is Running")
+			By("mock restart OpsRequest to Creating")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
@@ -91,10 +97,74 @@ var _ = Describe("Restart OpsRequest", func() {
 			_ = rHandler.Action(reqCtx, k8sClient, opsRes)
 
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+		})
+
+		ExpectCompRestarted := func(opsRequest *appsv1alpha1.OpsRequest, compName string, expectRestarted bool) {
+			instanceSetName := constant.GenerateWorkloadNamePattern(clusterName, compName)
+			Expect(testapps.CheckObj(&testCtx, client.ObjectKey{Name: instanceSetName, Namespace: testCtx.DefaultNamespace},
+				func(g Gomega, pobj *workloads.InstanceSet) {
+					startTimestamp := opsRes.OpsRequest.Status.StartTimestamp
+					workloadRestartTimeStamp := pobj.Spec.Template.Annotations[constant.RestartAnnotationKey]
+					res, _ := time.Parse(time.RFC3339, workloadRestartTimeStamp)
+					g.Expect(!startTimestamp.After(res)).Should(Equal(expectRestarted))
+				}))
+		}
+
+		It("Test restart OpsRequest with existing update orders", func() {
+			By("init operations resources")
+			opsRes, _, cluster = initOperationsResourcesWithTopology(clusterDefName, compDefName, clusterName)
+
+			By("create Restart opsRequest")
+			opsRes.OpsRequest = createRestartOpsObj(clusterName, "restart-ops-"+randomStr,
+				defaultCompName, secondaryCompName, thirdCompName)
+			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase,
+				defaultCompName, secondaryCompName, thirdCompName)
+
+			By("mock restart OpsRequest to Creating")
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
+
+			By("test restart Action")
+			rHandler := restartOpsHandler{}
+			_ = rHandler.Action(reqCtx, k8sClient, opsRes)
+			ExpectCompRestarted(opsRes.OpsRequest, defaultCompName, true)
+			ExpectCompRestarted(opsRes.OpsRequest, secondaryCompName, false)
+			ExpectCompRestarted(opsRes.OpsRequest, thirdCompName, false)
+
+			By("test reconcile Action")
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			ExpectCompRestarted(opsRes.OpsRequest, defaultCompName, true)
+			ExpectCompRestarted(opsRes.OpsRequest, secondaryCompName, false)
+			ExpectCompRestarted(opsRes.OpsRequest, thirdCompName, false)
+
+			By("mock restart secondary component completed")
+			setCompProgress := func(compName string, status appsv1alpha1.ProgressStatus) {
+				workloadName := constant.GenerateWorkloadNamePattern(clusterName, compName)
+				opsRes.OpsRequest.Status.Components[compName] = appsv1alpha1.OpsRequestComponentStatus{
+					ProgressDetails: []appsv1alpha1.ProgressStatusDetail{
+						{ObjectKey: getProgressObjectKey(constant.PodKind, workloadName+"-0"), Status: status},
+						{ObjectKey: getProgressObjectKey(constant.PodKind, workloadName+"-1"), Status: status},
+						{ObjectKey: getProgressObjectKey(constant.PodKind, workloadName+"-2"), Status: status},
+					},
+				}
+			}
+			setCompProgress(secondaryCompName, appsv1alpha1.SucceedProgressStatus)
+			setCompProgress(thirdCompName, appsv1alpha1.PendingProgressStatus)
+
+			By("test reconcile Action and expect to restart third component")
+			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err == nil).Should(BeTrue())
+			ExpectCompRestarted(opsRes.OpsRequest, defaultCompName, true)
+			ExpectCompRestarted(opsRes.OpsRequest, secondaryCompName, true)
+			ExpectCompRestarted(opsRes.OpsRequest, thirdCompName, false)
 		})
 
 		It("expect failed when cluster is stopped", func() {
+			By("init operations resources ")
+			opsRes, _, cluster = initOperationsResources(compDefName, clusterName)
 			By("mock cluster is stopped")
 			Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
 				cluster.Status.Phase = appsv1.StoppedClusterPhase
@@ -113,11 +183,19 @@ var _ = Describe("Restart OpsRequest", func() {
 	})
 })
 
-func createRestartOpsObj(clusterName, restartOpsName string) *opsv1alpha1.OpsRequest {
-	ops := testops.NewOpsRequestObj(restartOpsName, testCtx.DefaultNamespace,
+func createRestartOpsObj(clusterName, restartOpsName string, compNames ...string) *opsv1alpha1.OpsRequest {
+	ops := testapps.NewOpsRequestObj(restartOpsName, testCtx.DefaultNamespace,
 		clusterName, opsv1alpha1.RestartType)
-	ops.Spec.RestartList = []opsv1alpha1.ComponentOps{
-		{ComponentName: defaultCompName},
+	if len(compNames) == 0 {
+		ops.Spec.RestartList = []opsv1alpha1.ComponentOps{
+			{ComponentName: defaultCompName},
+		}
+	} else {
+		for _, compName := range compNames {
+			ops.Spec.RestartList = append(ops.Spec.RestartList, opsv1alpha1.ComponentOps{
+				ComponentName: compName,
+			})
+		}
 	}
 	opsRequest := testops.CreateOpsRequest(ctx, testCtx, ops)
 	opsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase

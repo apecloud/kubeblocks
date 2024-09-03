@@ -25,7 +25,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 )
@@ -50,7 +49,7 @@ type mergeContext struct {
 }
 
 func (m *mergeContext) renderTemplate() (map[string]string, error) {
-	templateSpec := appsv1alpha1.ComponentTemplateSpec{
+	templateSpec := appsv1.ComponentTemplateSpec{
 		// Name:        m.template.Name,
 		Namespace:   m.template.Namespace,
 		TemplateRef: m.template.TemplateRef,
@@ -134,13 +133,13 @@ func NewTemplateMerger(template appsv1.ConfigTemplateExtension, ctx context.Cont
 	switch template.Policy {
 	default:
 		return nil, core.MakeError("unknown template policy: %s", template.Policy)
-	case appsv1alpha1.NoneMergePolicy:
+	case appsv1.NoneMergePolicy:
 		merger = &noneOp{templateData}
-	case appsv1alpha1.PatchPolicy:
+	case appsv1.PatchPolicy:
 		merger = &configPatcher{templateData}
-	case appsv1alpha1.OnlyAddPolicy:
+	case appsv1.OnlyAddPolicy:
 		merger = &configOnlyAddMerger{templateData}
-	case appsv1alpha1.ReplacePolicy:
+	case appsv1.ReplacePolicy:
 		merger = &configReplaceMerger{templateData}
 	}
 	return merger, nil

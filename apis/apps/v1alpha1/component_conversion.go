@@ -32,14 +32,13 @@ func (r *Component) ConvertTo(dstRaw conversion.Hub) error {
 	dst.ObjectMeta = r.ObjectMeta
 
 	// spec
-	dst.Spec.CompatibilityRules = r.compatibilityRulesTo(r.Spec.CompatibilityRules)
-	dst.Spec.Releases = r.releasesTo(r.Spec.Releases)
+	// TODO(v1.0)
 
 	// status
 	dst.Status.ObservedGeneration = r.Status.ObservedGeneration
-	dst.Status.Phase = appsv1.Phase(r.Status.Phase)
+	dst.Status.Conditions = r.Status.Conditions
+	dst.Status.Phase = appsv1.ClusterComponentPhase(r.Status.Phase)
 	dst.Status.Message = r.Status.Message
-	dst.Status.ServiceVersions = r.Status.ServiceVersions
 
 	return nil
 }
@@ -52,14 +51,13 @@ func (r *Component) ConvertFrom(srcRaw conversion.Hub) error {
 	r.ObjectMeta = src.ObjectMeta
 
 	// spec
-	r.Spec.CompatibilityRules = r.compatibilityRulesFrom(src.Spec.CompatibilityRules)
-	r.Spec.Releases = r.releasesFrom(src.Spec.Releases)
+	// TODO(v1.0)
 
 	// status
 	r.Status.ObservedGeneration = src.Status.ObservedGeneration
-	r.Status.Phase = Phase(src.Status.Phase)
+	r.Status.Conditions = src.Status.Conditions
+	r.Status.Phase = ClusterComponentPhase(src.Status.Phase)
 	r.Status.Message = src.Status.Message
-	r.Status.ServiceVersions = src.Status.ServiceVersions
 
 	return nil
 }

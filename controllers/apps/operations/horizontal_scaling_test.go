@@ -423,19 +423,19 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 		})
 
 		It("h-scale new instance templates and scale in all old replicas", func() {
-			templateFoo := appsv1alpha1.InstanceTemplate{
+			templateFoo := appsv1.InstanceTemplate{
 				Name:     insTplName,
 				Replicas: func() *int32 { r := int32(3); return &r }(),
 			}
-			templateBar := appsv1alpha1.InstanceTemplate{
+			templateBar := appsv1.InstanceTemplate{
 				Name:     "bar",
 				Replicas: func() *int32 { r := int32(3); return &r }(),
 			}
-			instances := []appsv1alpha1.InstanceTemplate{templateFoo, templateBar}
+			instances := []appsv1.InstanceTemplate{templateFoo, templateBar}
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 			opsRes, pods := commonHScaleConsensusCompTest(reqCtx, nil, appsv1alpha1.HorizontalScaling{
 				ScaleOut: &appsv1alpha1.ScaleOut{
-					NewInstances: []appsv1alpha1.InstanceTemplate{templateFoo, templateBar},
+					NewInstances: []appsv1.InstanceTemplate{templateFoo, templateBar},
 				},
 				ScaleIn: &appsv1alpha1.ScaleIn{
 					ReplicaChanger: appsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(3)},

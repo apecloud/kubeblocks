@@ -22,7 +22,6 @@ package apps
 import (
 	"fmt"
 
-	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -122,14 +121,14 @@ func (t *clusterComponentStatusTransformer) updateClusterComponentStatus(comp *a
 	// }
 }
 
-func (t *clusterComponentStatusTransformer) isClusterComponentPodsReady(phase appsv1.ClusterComponentPhase) bool {
-	podsReadyPhases := []appsv1.ClusterComponentPhase{
-		appsv1.RunningClusterCompPhase,
-		appsv1.StoppingClusterCompPhase,
-		appsv1.StoppedClusterCompPhase,
-	}
-	return slices.Contains(podsReadyPhases, phase)
-}
+// func (t *clusterComponentStatusTransformer) isClusterComponentPodsReady(phase appsv1.ClusterComponentPhase) bool {
+//	podsReadyPhases := []appsv1.ClusterComponentPhase{
+//		appsv1.RunningClusterCompPhase,
+//		appsv1.StoppingClusterCompPhase,
+//		appsv1.StoppedClusterCompPhase,
+//	}
+//	return slices.Contains(podsReadyPhases, phase)
+// }
 
 func clusterComponentPhaseTransitionMsg(phase appsv1.ClusterComponentPhase) string {
 	if len(phase) == 0 {

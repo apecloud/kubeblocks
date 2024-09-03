@@ -135,14 +135,8 @@ func withClusterLegacyDefinition(cluster *appsv1.Cluster) bool {
 }
 
 func withClusterSimplifiedAPI(cluster *appsv1.Cluster) bool {
-	return cluster.Spec.Replicas != nil ||
-		!cluster.Spec.Resources.CPU.IsZero() ||
-		!cluster.Spec.Resources.Memory.IsZero() ||
-		!cluster.Spec.Storage.Size.IsZero() ||
-		// cluster.Spec.Monitor.MonitoringInterval != nil ||
-		cluster.Spec.Network != nil ||
-		len(cluster.Spec.Tenancy) > 0 ||
-		len(cluster.Spec.AvailabilityPolicy) > 0
+	// TODO(v1.0): remove this
+	return false
 }
 
 func clusterCompCnt(cluster *appsv1.Cluster) int {

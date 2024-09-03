@@ -21,10 +21,10 @@ package operations
 
 import (
 	"fmt"
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/operations/custom"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"

@@ -259,7 +259,7 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 			if err != nil {
 				return opsRequestPhase, 0, err
 			}
-			componentPhase = appsv1.ClusterComponentPhase(compObj.Status.Phase)
+			componentPhase = compObj.Status.Phase
 		}
 		// conditions whether ops is running:
 		//  1. completedProgressCount is not equal to expectProgressCount when the ops do not need to wait component phase to a terminal phase.

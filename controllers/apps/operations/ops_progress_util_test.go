@@ -75,7 +75,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 
 	initClusterForOps := func(opsRes *OpsResource) {
 		Expect(opsutil.UpdateClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())
-		opsRes.Cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
+		opsRes.Cluster.Status.Phase = appsv1.RunningClusterPhase
 	}
 
 	testProgressDetailsWithStatefulPodUpdating := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, pods []*corev1.Pod) {
@@ -180,7 +180,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: defaultCompName},
 				Replicas:     pointer.Int32(4),
 			})
-			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase, defaultCompName) // appsv1alpha1.HorizontalScalingPhase
+			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingClusterCompPhase, defaultCompName) // appsv1.HorizontalScalingPhase
 			initClusterForOps(opsRes)
 
 			By("mock HorizontalScaling OpsRequest phase is running")

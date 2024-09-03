@@ -386,7 +386,7 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 	// Rules:
 	// 1. length of offlineInstancesToOnline or onlineInstancesToOffline can't greater than the configured replicaChanges for the component.
 	// 2. replicaChanges for component must greater than or equal to the sum of replicaChanges configured in instance templates.
-	validateHScaleOperation := func(replicaChanger ReplicaChanger, newInstances []InstanceTemplate, offlineOrOnlineInsNames []string, isScaleIn bool) error {
+	validateHScaleOperation := func(replicaChanger ReplicaChanger, newInstances []appsv1.InstanceTemplate, offlineOrOnlineInsNames []string, isScaleIn bool) error {
 		msgPrefix := "ScaleIn:"
 		hScaleInstanceFieldName := "onlineInstancesToOffline"
 		if !isScaleIn {

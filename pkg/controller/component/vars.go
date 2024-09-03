@@ -1199,7 +1199,10 @@ func resolveComponentPodsRef(ctx context.Context, cli client.Reader, synthesized
 		comp := obj.(*appsv1.Component)
 		var templates []instanceset.InstanceTemplate
 		for i := range comp.Spec.Instances {
-			templates = append(templates, &comp.Spec.Instances[i])
+			templates = append(templates, &workloads.InstanceTemplate{
+				Name:     comp.Spec.Instances[i].Name,
+				Replicas: comp.Spec.Instances[i].Replicas,
+			})
 		}
 		names, err := instanceset.GenerateAllInstanceNames(comp.Name, comp.Spec.Replicas, templates, comp.Spec.OfflineInstances, workloads.Ordinals{})
 		if err != nil {

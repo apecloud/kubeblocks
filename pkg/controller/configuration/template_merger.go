@@ -146,7 +146,7 @@ func NewTemplateMerger(template appsv1.ConfigTemplateExtension, ctx context.Cont
 	return merger, nil
 }
 
-func mergerConfigTemplate(template *appsv1alpha1.LegacyRenderedTemplateSpec,
+func mergerConfigTemplate(template *appsv1.LegacyRenderedTemplateSpec,
 	builder *configTemplateBuilder,
 	configSpec appsv1.ComponentConfigSpec,
 	baseData map[string]string,

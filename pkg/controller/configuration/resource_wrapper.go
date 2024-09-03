@@ -51,10 +51,10 @@ type ResourceFetcher[T any] struct {
 	obj *T
 	*ResourceCtx
 
-	ClusterObj      *appsv1alpha1.Cluster
+	ClusterObj      *appsv1.Cluster
 	ComponentObj    *appsv1.Component
 	ComponentDefObj *appsv1.ComponentDefinition
-	ClusterComObj   *appsv1alpha1.ClusterComponentSpec
+	ClusterComObj   *appsv1.ClusterComponentSpec
 
 	// Deprecated: this API will be removed from version 0.9.0
 	ClusterDefObj *appsv1.ClusterDefinition
@@ -85,7 +85,7 @@ func (r *ResourceFetcher[T]) Cluster() *T {
 		Name:      r.ClusterName,
 	}
 	return r.Wrap(func() error {
-		r.ClusterObj = &appsv1alpha1.Cluster{}
+		r.ClusterObj = &appsv1.Cluster{}
 		return r.Client.Get(r.Context, clusterKey, r.ClusterObj)
 	})
 }

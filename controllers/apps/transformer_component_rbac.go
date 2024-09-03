@@ -109,7 +109,7 @@ func isLifecycleActionsEnabled(compDef *appsv1.ComponentDefinition) bool {
 	return compDef.Spec.LifecycleActions != nil
 }
 
-func isDataProtectionEnabled(backupTpl *appsv1alpha1.BackupPolicyTemplate, cluster *appsv1alpha1.Cluster, comp *appsv1.Component) bool {
+func isDataProtectionEnabled(backupTpl *appsv1alpha1.BackupPolicyTemplate, cluster *appsv1.Cluster, comp *appsv1.Component) bool {
 	if backupTpl != nil && len(comp.Spec.CompDef) > 0 {
 		for _, policy := range backupTpl.Spec.BackupPolicies {
 			for _, compDef := range policy.ComponentDefs {
@@ -284,7 +284,7 @@ func buildServiceAccount(transCtx *componentTransformContext) (*corev1.ServiceAc
 	return saObj, volumeProtectionEnable, nil
 }
 
-func buildRoleBinding(cluster *appsv1alpha1.Cluster, comp *appsv1.Component, serviceAccountName string) (*rbacv1.RoleBinding, error) {
+func buildRoleBinding(cluster *appsv1.Cluster, comp *appsv1.Component, serviceAccountName string) (*rbacv1.RoleBinding, error) {
 	roleBinding := factory.BuildRoleBinding(cluster, serviceAccountName)
 	if err := setCompOwnershipNFinalizer(comp, roleBinding); err != nil {
 		return nil, err

@@ -55,7 +55,7 @@ const (
 type componentStatusTransformer struct {
 	client.Client
 
-	cluster        *appsv1alpha1.Cluster
+	cluster        *appsv1.Cluster
 	comp           *appsv1.Component
 	synthesizeComp *component.SynthesizedComponent
 	dag            *graph.DAG

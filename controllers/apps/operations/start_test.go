@@ -25,6 +25,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -76,7 +77,7 @@ var _ = Describe("Start OpsRequest", func() {
 			Expect(opsutil.UpdateClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())
 			// mock cluster phase to stopped
 			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
-				opsRes.Cluster.Status.Phase = appsv1alpha1.StoppedClusterPhase
+				opsRes.Cluster.Status.Phase = appsv1.StoppedClusterPhase
 			})).ShouldNot(HaveOccurred())
 
 			// set ops phase to Pending

@@ -63,7 +63,7 @@ func createConfigObjects(cli client.Client, ctx context.Context, objs []client.O
 // buildConfigManagerWithComponent build the configmgr sidecar container and update it
 // into PodSpec if configuration reload option is on
 func buildConfigManagerWithComponent(podSpec *corev1.PodSpec, configSpecs []appsv1.ComponentConfigSpec,
-	ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent) error {
+	ctx context.Context, cli client.Client, cluster *appsv1.Cluster, synthesizedComp *component.SynthesizedComponent) error {
 	var err error
 	var buildParams *cfgcm.CfgManagerBuildParams
 
@@ -204,7 +204,7 @@ func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1.
 	return volumeDirs, usingConfigSpecs
 }
 
-func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *appsv1alpha1.Cluster, comp *component.SynthesizedComponent, configSpecBuildParams []cfgcm.ConfigSpecMeta, volumeDirs []corev1.VolumeMount, podSpec *corev1.PodSpec) (*cfgcm.CfgManagerBuildParams, error) {
+func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *appsv1.Cluster, comp *component.SynthesizedComponent, configSpecBuildParams []cfgcm.ConfigSpecMeta, volumeDirs []corev1.VolumeMount, podSpec *corev1.PodSpec) (*cfgcm.CfgManagerBuildParams, error) {
 	cfgManagerParams := &cfgcm.CfgManagerBuildParams{
 		ManagerName:               constant.ConfigSidecarName,
 		ComponentName:             comp.Name,

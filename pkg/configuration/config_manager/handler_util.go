@@ -29,7 +29,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 )
@@ -49,7 +48,7 @@ type CfgManagerBuildParams struct {
 
 	// add volume to pod
 	ScriptVolume           []corev1.Volume
-	Cluster                *appsv1alpha1.Cluster
+	Cluster                *appsv1.Cluster
 	ConfigSpecsBuildParams []ConfigSpecMeta
 
 	// init tools container

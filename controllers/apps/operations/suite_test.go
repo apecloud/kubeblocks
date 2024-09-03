@@ -147,7 +147,7 @@ var _ = AfterSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 })
 
-func initOperationsResources(compDefName, clusterName string) (*OpsResource, *appsv1.ComponentDefinition, *appsv1alpha1.Cluster) {
+func initOperationsResources(compDefName, clusterName string) (*OpsResource, *appsv1.ComponentDefinition, *appsv1.Cluster) {
 	compDef := testapps.NewComponentDefinitionFactory(compDefName).
 		SetDefaultSpec().
 		Create(&testCtx).
@@ -168,10 +168,10 @@ func initOperationsResources(compDefName, clusterName string) (*OpsResource, *ap
 
 	By("mock cluster is Running and the status operations")
 	Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
-		clusterObject.Status.Phase = appsv1alpha1.RunningClusterPhase
-		clusterObject.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
+		clusterObject.Status.Phase = appsv1.RunningClusterPhase
+		clusterObject.Status.Components = map[string]appsv1.ClusterComponentStatus{
 			defaultCompName: {
-				Phase: appsv1alpha1.RunningClusterCompPhase,
+				Phase: appsv1.RunningClusterCompPhase,
 			},
 		}
 	})).Should(Succeed())
@@ -190,7 +190,7 @@ func initInstanceSetPods(ctx context.Context, cli client.Client, opsRes *OpsReso
 	return pods
 }
 
-func mockComponentIsOperating(cluster *appsv1alpha1.Cluster, expectPhase appsv1alpha1.ClusterComponentPhase, compNames ...string) {
+func mockComponentIsOperating(cluster *appsv1.Cluster, expectPhase appsv1.ClusterComponentPhase, compNames ...string) {
 	Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
 		for _, v := range compNames {
 			compStatus := cluster.Status.Components[v]

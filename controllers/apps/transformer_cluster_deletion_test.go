@@ -42,7 +42,7 @@ var _ = Describe("clusterDeletionTransformer", func() {
 		reader     client.Reader
 		dag        *graph.DAG
 		clusterDef *appsv1.ClusterDefinition
-		cluster    *appsv1alpha1.Cluster
+		cluster    *appsv1.Cluster
 	)
 
 	newDag := func(graphCli model.GraphClient) *graph.DAG {

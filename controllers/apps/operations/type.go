@@ -20,13 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -50,11 +50,11 @@ type OpsHandler interface {
 }
 
 type OpsBehaviour struct {
-	FromClusterPhases []appsv1alpha1.ClusterPhase
+	FromClusterPhases []appsv1.ClusterPhase
 
 	// ToClusterPhase indicates that the cluster will enter this phase during the operation.
 	// All opsRequest with ToClusterPhase are mutually exclusive.
-	ToClusterPhase appsv1alpha1.ClusterPhase
+	ToClusterPhase appsv1.ClusterPhase
 
 	// CancelFunc this function defines the cancel action and does not patch/update the opsRequest by client-go in here.
 	// only update the opsRequest object, then opsRequest controller will update uniformly.
@@ -87,9 +87,9 @@ type reconfigureParams struct {
 type OpsResource struct {
 	OpsDef         *appsv1alpha1.OpsDefinition
 	OpsRequest     *appsv1alpha1.OpsRequest
-	Cluster        *appsv1alpha1.Cluster
+	Cluster        *appsv1.Cluster
 	Recorder       record.EventRecorder
-	ToClusterPhase appsv1alpha1.ClusterPhase
+	ToClusterPhase appsv1.ClusterPhase
 }
 
 type OpsManager struct {
@@ -105,7 +105,7 @@ type progressResource struct {
 	fullComponentName string
 	// checks if the component is a sharding component
 	isShardingComponent bool
-	clusterComponent    *appsv1alpha1.ClusterComponentSpec
+	clusterComponent    *appsv1.ClusterComponentSpec
 	clusterDef          *appsv1.ClusterDefinition
 	componentDef        *appsv1.ComponentDefinition
 	// record which pods need to updated during this operation.

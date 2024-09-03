@@ -22,7 +22,6 @@ package component
 import (
 	"context"
 	"fmt"
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"maps"
 	"reflect"
 	"strconv"
@@ -31,7 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
@@ -75,7 +74,7 @@ func ListOwnedServices(ctx context.Context, cli client.Reader, namespace, cluste
 }
 
 // GetMinReadySeconds gets the underlying workload's minReadySeconds of the component.
-func GetMinReadySeconds(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, compName string) (minReadySeconds int32, err error) {
+func GetMinReadySeconds(ctx context.Context, cli client.Client, cluster appsv1.Cluster, compName string) (minReadySeconds int32, err error) {
 	var its []*workloads.InstanceSet
 	its, err = listWorkloads(ctx, cli, cluster.Namespace, cluster.Name, compName)
 	if err != nil {
@@ -137,7 +136,10 @@ func GenerateAllPodNames(
 	workloadName := constant.GenerateWorkloadNamePattern(clusterName, fullCompName)
 	var templates []instanceset.InstanceTemplate
 	for i := range instances {
-		templates = append(templates, &instances[i])
+		templates = append(templates, &workloads.InstanceTemplate{
+			Name:     instances[i].Name,
+			Replicas: instances[i].Replicas,
+		})
 	}
 	return instanceset.GenerateAllInstanceNames(workloadName, compReplicas, templates, offlineInstances, workloads.Ordinals{})
 }
@@ -157,7 +159,7 @@ func GenerateAllPodNamesToSet(
 	// key: podName, value: templateName
 	podSet := map[string]string{}
 	for _, insName := range instanceNames {
-		podSet[insName] = appsv1alpha1.GetInstanceTemplateName(clusterName, fullCompName, insName)
+		podSet[insName] = appsv1.GetInstanceTemplateName(clusterName, fullCompName, insName)
 	}
 	return podSet, nil
 }

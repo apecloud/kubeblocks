@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/component/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -139,7 +138,7 @@ func (t *componentPreTerminateTransformer) synthesizedComponent(transCtx *compon
 	if err != nil {
 		return nil, newRequeueError(requeueDuration, err.Error())
 	}
-	cluster := &appsv1alpha1.Cluster{}
+	cluster := &appsv1.Cluster{}
 	err = cli.Get(ctx, types.NamespacedName{Name: clusterName, Namespace: comp.Namespace}, cluster)
 	if err != nil {
 		return nil, newRequeueError(requeueDuration, err.Error())

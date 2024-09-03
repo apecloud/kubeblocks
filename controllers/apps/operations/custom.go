@@ -126,7 +126,7 @@ func (c CustomOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, c
 
 func (c CustomOpsHandler) listComponents(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
+	cluster *appsv1.Cluster,
 	componentName string) ([]appsv1.Component, error) {
 	if cluster.Spec.GetComponentByName(componentName) != nil {
 		comp, err := component.GetComponentByName(reqCtx.Ctx, cli, cluster.Namespace,

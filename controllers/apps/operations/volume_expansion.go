@@ -1,4 +1,5 @@
 /*
+/*
 Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
@@ -32,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
@@ -74,9 +76,9 @@ func (ve volumeExpansionOpsHandler) ActionStartedCondition(reqCtx intctrlutil.Re
 
 // Action modifies Cluster.spec.components[*].VolumeClaimTemplates[*].spec.resources
 func (ve volumeExpansionOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	applyVolumeExpansion := func(compSpec *appsv1alpha1.ClusterComponentSpec, obj ComponentOpsInterface) error {
+	applyVolumeExpansion := func(compSpec *appsv1.ClusterComponentSpec, obj ComponentOpsInterface) error {
 		setVolumeStorage := func(volumeExpansionVCTs []appsv1alpha1.OpsRequestVolumeClaimTemplate,
-			targetVCTs []appsv1alpha1.ClusterComponentVolumeClaimTemplate) {
+			targetVCTs []appsv1.ClusterComponentVolumeClaimTemplate) {
 			for _, v := range volumeExpansionVCTs {
 				for i, vct := range targetVCTs {
 					if vct.Name != v.Name {
@@ -119,7 +121,7 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 		succeedProgressCount   int
 		completedProgressCount int
 	)
-	getTemplateReplicas := func(templates []appsv1alpha1.InstanceTemplate) int32 {
+	getTemplateReplicas := func(templates []appsv1.InstanceTemplate) int32 {
 		var replicaCount int32
 		for _, v := range templates {
 			replicaCount += v.GetReplicas()
@@ -133,7 +135,7 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.VolumeExpansionList)
 	storageMap := ve.getRequestStorageMap(opsRequest)
 	var veHelpers []volumeExpansionHelper
-	setVeHelpers := func(compSpec appsv1alpha1.ClusterComponentSpec, compOps ComponentOpsInterface, fullComponentName string) {
+	setVeHelpers := func(compSpec appsv1.ClusterComponentSpec, compOps ComponentOpsInterface, fullComponentName string) {
 		volumeExpansion := compOps.(appsv1alpha1.VolumeExpansion)
 		if len(volumeExpansion.VolumeClaimTemplates) > 0 {
 			expectReplicas := compSpec.Replicas - getTemplateReplicas(compSpec.Instances)
@@ -234,9 +236,9 @@ func (ve volumeExpansionOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.Req
 	opsRequest := opsRes.OpsRequest
 	compOpsHelper := newComponentOpsHelper(opsRequest.Spec.VolumeExpansionList)
 	storageMap := ve.getRequestStorageMap(opsRequest)
-	compOpsHelper.saveLastConfigurations(opsRes, func(compSpec appsv1alpha1.ClusterComponentSpec, comOps ComponentOpsInterface) appsv1alpha1.LastComponentConfiguration {
-		getLastVCTs := func(vcts []appsv1alpha1.ClusterComponentVolumeClaimTemplate, templateName string) []appsv1alpha1.ClusterComponentVolumeClaimTemplate {
-			lastVCTs := make([]appsv1alpha1.ClusterComponentVolumeClaimTemplate, 0)
+	compOpsHelper.saveLastConfigurations(opsRes, func(compSpec appsv1.ClusterComponentSpec, comOps ComponentOpsInterface) appsv1alpha1.LastComponentConfiguration {
+		getLastVCTs := func(vcts []appsv1.ClusterComponentVolumeClaimTemplate, templateName string) []appsv1.ClusterComponentVolumeClaimTemplate {
+			lastVCTs := make([]appsv1.ClusterComponentVolumeClaimTemplate, 0)
 			for _, vct := range vcts {
 				key := getComponentVCTKey(comOps.GetComponentName(), comOps.GetComponentName(), templateName)
 				if _, ok := storageMap[key]; !ok {
@@ -248,13 +250,13 @@ func (ve volumeExpansionOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.Req
 		}
 		volumeExpansion := comOps.(appsv1alpha1.VolumeExpansion)
 		// save the last vcts of the instances
-		var instanceTemplates []appsv1alpha1.InstanceTemplate
+		var instanceTemplates []appsv1.InstanceTemplate
 		for _, v := range volumeExpansion.Instances {
 			for _, ins := range compSpec.Instances {
 				if ins.Name != v.Name {
 					continue
 				}
-				instanceTemplates = append(instanceTemplates, appsv1alpha1.InstanceTemplate{
+				instanceTemplates = append(instanceTemplates, appsv1.InstanceTemplate{
 					VolumeClaimTemplates: getLastVCTs(ins.VolumeClaimTemplates, ins.Name),
 				})
 			}

@@ -44,7 +44,7 @@ var _ = Describe("", func() {
 		compDefName = "test-compdef-" + randomStr
 		clusterName = "test-cluster-" + randomStr
 		compDefObj  *appsv1.ComponentDefinition
-		clusterObj  *appsv1alpha1.Cluster
+		clusterObj  *appsv1.Cluster
 	)
 
 	defaultRole := func(index int32) string {
@@ -153,10 +153,10 @@ var _ = Describe("", func() {
 			}
 			By("mock cluster is Running and the status operations")
 			Expect(testapps.ChangeObjStatus(&testCtx, clusterObj, func() {
-				clusterObj.Status.Phase = appsv1alpha1.RunningClusterPhase
-				clusterObj.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
+				clusterObj.Status.Phase = appsv1.RunningClusterPhase
+				clusterObj.Status.Components = map[string]appsv1.ClusterComponentStatus{
 					defaultCompName: {
-						Phase: appsv1alpha1.RunningClusterCompPhase,
+						Phase: appsv1.RunningClusterCompPhase,
 					},
 				}
 			})).Should(Succeed())

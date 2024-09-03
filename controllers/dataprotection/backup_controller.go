@@ -46,7 +46,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -625,13 +625,13 @@ func (r *BackupReconciler) checkIsCompletedDuringRunning(reqCtx intctrlutil.Requ
 	// check if target cluster exits
 	clusterName := backup.Labels[constant.AppInstanceLabelKey]
 	if clusterName != "" {
-		cluster := &appsv1alpha1.Cluster{}
+		cluster := &kbappsv1.Cluster{}
 		backupTargetExists, err = intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client,
 			client.ObjectKey{Name: clusterName, Namespace: backup.Namespace}, cluster)
 		if err != nil {
 			return false, err
 		}
-		backupTargetIsStoppedOrDeleting = cluster.IsDeleting() || cluster.Status.Phase == appsv1alpha1.StoppedClusterPhase
+		backupTargetIsStoppedOrDeleting = cluster.IsDeleting() || cluster.Status.Phase == kbappsv1.StoppedClusterPhase
 	}
 	// if backup target exists, and it is not deleting or stopped, check if the schedule is enabled.
 	if backupTargetExists && !backupTargetIsStoppedOrDeleting {
@@ -824,7 +824,7 @@ func updateBackupStatusByActionStatus(backupStatus *dpv1alpha1.BackupStatus) {
 	}
 }
 
-func setEncryptedSystemAccountsAnnotation(request *dpbackup.Request, cluster *appsv1alpha1.Cluster) error {
+func setEncryptedSystemAccountsAnnotation(request *dpbackup.Request, cluster *kbappsv1.Cluster) error {
 	usernameKey := constant.AccountNameForSecret
 	passwordKey := constant.AccountPasswdForSecret
 	isSystemAccountSecret := func(secret *corev1.Secret) bool {
@@ -868,9 +868,9 @@ func setEncryptedSystemAccountsAnnotation(request *dpbackup.Request, cluster *ap
 }
 
 // getClusterObjectString gets the cluster object and convert it to string.
-func getClusterObjectString(cluster *appsv1alpha1.Cluster) (*string, error) {
+func getClusterObjectString(cluster *kbappsv1.Cluster) (*string, error) {
 	// maintain only the cluster's spec and name/namespace.
-	newCluster := &appsv1alpha1.Cluster{
+	newCluster := &kbappsv1.Cluster{
 		Spec: cluster.Spec,
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: cluster.Namespace,
@@ -888,7 +888,7 @@ func getClusterObjectString(cluster *appsv1alpha1.Cluster) (*string, error) {
 }
 
 // setClusterSnapshotAnnotation sets the snapshot of cluster to the backup's annotations.
-func setClusterSnapshotAnnotation(request *dpbackup.Request, cluster *appsv1alpha1.Cluster) error {
+func setClusterSnapshotAnnotation(request *dpbackup.Request, cluster *kbappsv1.Cluster) error {
 	if request.Backup.Annotations == nil {
 		request.Backup.Annotations = map[string]string{}
 	}

@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -99,10 +100,10 @@ type reconfigureParams struct {
 	Client client.Client
 	Ctx    intctrlutil.RequestCtx
 
-	Cluster *appsv1alpha1.Cluster
+	Cluster *appsv1.Cluster
 
 	// Associated component for cluster.
-	ClusterComponent *appsv1alpha1.ClusterComponentSpec
+	ClusterComponent *appsv1.ClusterComponentSpec
 
 	// Associated component for component and component definition.
 	SynthesizedComponent *component.SynthesizedComponent

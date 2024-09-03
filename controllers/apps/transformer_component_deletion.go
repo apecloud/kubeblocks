@@ -90,17 +90,17 @@ func (t *componentDeletionTransformer) handleCompDeleteWhenScaleIn(transCtx *com
 
 // handleCompDeleteWhenClusterDelete handles the component deletion when the cluster is being deleted, the sub-resources owned by the component depends on the cluster's TerminationPolicy.
 func (t *componentDeletionTransformer) handleCompDeleteWhenClusterDelete(transCtx *componentTransformContext, graphCli model.GraphClient,
-	dag *graph.DAG, cluster *appsv1alpha1.Cluster, comp *appsv1.Component, matchLabels map[string]string) error {
+	dag *graph.DAG, cluster *appsv1.Cluster, comp *appsv1.Component, matchLabels map[string]string) error {
 	var (
 		toPreserveKinds, toDeleteKinds []client.ObjectList
 	)
 	switch cluster.Spec.TerminationPolicy {
-	case appsv1alpha1.Halt:
+	case appsv1.Halt:
 		toPreserveKinds = compOwnedPreserveKinds()
 		toDeleteKinds = kindsForCompHalt()
-	case appsv1alpha1.Delete:
+	case appsv1.Delete:
 		toDeleteKinds = kindsForCompDelete()
-	case appsv1alpha1.WipeOut:
+	case appsv1.WipeOut:
 		toDeleteKinds = kindsForCompWipeOut()
 	}
 
@@ -159,12 +159,12 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 	return graph.ErrPrematureStop
 }
 
-func (t *componentDeletionTransformer) getCluster(transCtx *componentTransformContext, comp *appsv1.Component) (*appsv1alpha1.Cluster, error) {
+func (t *componentDeletionTransformer) getCluster(transCtx *componentTransformContext, comp *appsv1.Component) (*appsv1.Cluster, error) {
 	clusterName, err := component.GetClusterName(comp)
 	if err != nil {
 		return nil, err
 	}
-	cluster := &appsv1alpha1.Cluster{}
+	cluster := &appsv1.Cluster{}
 	err = transCtx.Client.Get(transCtx.Context, types.NamespacedName{Name: clusterName, Namespace: comp.Namespace}, cluster)
 	if err != nil {
 		return nil, errors.New(fmt.Sprintf("failed to get cluster %s: %v", clusterName, err))

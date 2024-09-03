@@ -38,7 +38,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
@@ -202,7 +201,7 @@ func buildCMForConfig(manager *CfgManagerBuildParams, cmKey client.ObjectKey, co
 
 func createOrUpdateConfigMap(configInfo []ConfigSpecInfo, manager *CfgManagerBuildParams, cli client.Client, ctx context.Context) error {
 	createConfigCM := func(configKey client.ObjectKey, config string) error {
-		scheme, err := appsv1alpha1.SchemeBuilder.Build()
+		scheme, err := appsv1.SchemeBuilder.Build()
 		if err != nil {
 			return err
 		}
@@ -351,7 +350,7 @@ func buildLazyRenderedConfigVolume(cmName string, manager *CfgManagerBuildParams
 	manager.ConfigLazyRenderedVolumes[configSpec.VolumeName] = manager.Volumes[n]
 }
 
-func checkOrCreateConfigMap(referenceCM client.ObjectKey, scriptCMKey client.ObjectKey, cli client.Client, ctx context.Context, cluster *appsv1alpha1.Cluster, fn func(cm *corev1.ConfigMap) error) error {
+func checkOrCreateConfigMap(referenceCM client.ObjectKey, scriptCMKey client.ObjectKey, cli client.Client, ctx context.Context, cluster *appsv1.Cluster, fn func(cm *corev1.ConfigMap) error) error {
 	var (
 		err   error
 		op    controllerutil.OperationResult
@@ -390,7 +389,7 @@ func checkOrCreateConfigMap(referenceCM client.ObjectKey, scriptCMKey client.Obj
 func createScripts(refCM *corev1.ConfigMap, key client.ObjectKey, owner client.Object, fn func(cm *corev1.ConfigMap) error) (*corev1.ConfigMap, error) {
 	expected := &corev1.ConfigMap{}
 
-	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
+	scheme, _ := appsv1.SchemeBuilder.Build()
 	expected.Data = refCM.Data
 	if fn != nil {
 		if err := fn(expected); err != nil {

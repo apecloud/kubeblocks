@@ -101,7 +101,7 @@ var _ = Describe("Restore", func() {
 
 		var (
 			compDef                 *appsv1.ComponentDefinition
-			cluster                 *appsv1alpha1.Cluster
+			cluster                 *appsv1.Cluster
 			synthesizedComponent    *component.SynthesizedComponent
 			compObj                 *appsv1.Component
 			pvc                     *corev1.PersistentVolumeClaim
@@ -119,13 +119,6 @@ var _ = Describe("Restore", func() {
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 				AddComponent(defaultCompName, compDefName).
 				SetReplicas(3).
-				SetClusterAffinity(&appsv1alpha1.Affinity{
-					PodAntiAffinity: appsv1alpha1.Required,
-					TopologyKeys:    []string{topologyKey},
-					NodeLabels: map[string]string{
-						labelKey: labelValue,
-					},
-				}).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				Create(&testCtx).GetObject()
 
@@ -218,7 +211,7 @@ var _ = Describe("Restore", func() {
 		It("Test restore", func() {
 			By("restore from backup")
 			restoreFromBackup := fmt.Sprintf(`{"%s": {"name":"%s"}}`, defaultCompName, backup.Name)
-			Expect(testapps.ChangeObj(&testCtx, cluster, func(tmpCluster *appsv1alpha1.Cluster) {
+			Expect(testapps.ChangeObj(&testCtx, cluster, func(tmpCluster *appsv1.Cluster) {
 				tmpCluster.Annotations = map[string]string{
 					constant.RestoreFromBackupAnnotationKey: restoreFromBackup,
 				}
@@ -237,10 +230,10 @@ var _ = Describe("Restore", func() {
 
 			By("mock component and cluster phase to Running")
 			Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
-				cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
-				cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
+				cluster.Status.Phase = appsv1.RunningClusterPhase
+				cluster.Status.Components = map[string]appsv1.ClusterComponentStatus{
 					defaultCompName: {
-						Phase: appsv1alpha1.RunningClusterCompPhase,
+						Phase: appsv1.RunningClusterCompPhase,
 					},
 				}
 			})).Should(Succeed())
@@ -264,7 +257,7 @@ var _ = Describe("Restore", func() {
 
 			By("clean up annotations after cluster running")
 			_ = restoreMGR.DoRestore(synthesizedComponent, compObj, true)
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1.Cluster) {
 				g.Expect(tmpCluster.Annotations[constant.RestoreFromBackupAnnotationKey]).Should(BeEmpty())
 			})).Should(Succeed())
 		})

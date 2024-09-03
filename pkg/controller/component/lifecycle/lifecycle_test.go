@@ -23,7 +23,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"reflect"
 	"strings"
 
@@ -36,7 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
@@ -363,7 +362,7 @@ var _ = Describe("lifecycle", func() {
 			reader := &mockReader{
 				cli: k8sClient,
 				objs: []client.Object{
-					&appsv1alpha1.Component{
+					&appsv1.Component{
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: synthesizedComp.Namespace,
 							Name:      constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name),
@@ -372,7 +371,7 @@ var _ = Describe("lifecycle", func() {
 							},
 						},
 					},
-					&appsv1alpha1.Component{
+					&appsv1.Component{
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: synthesizedComp.Namespace,
 							Name:      constant.GenerateClusterComponentName(synthesizedComp.ClusterName, "another"),
@@ -433,13 +432,13 @@ var _ = Describe("lifecycle", func() {
 			reader := &mockReader{
 				cli: k8sClient,
 				objs: []client.Object{
-					&appsv1alpha1.Cluster{
+					&appsv1.Cluster{
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: synthesizedComp.Namespace,
 							Name:      synthesizedComp.ClusterName,
 						},
-						Status: appsv1alpha1.ClusterStatus{
-							Phase: appsv1alpha1.RunningClusterPhase,
+						Status: appsv1.ClusterStatus{
+							Phase: appsv1.RunningClusterPhase,
 						},
 					},
 				},
@@ -466,13 +465,13 @@ var _ = Describe("lifecycle", func() {
 			reader := &mockReader{
 				cli: k8sClient,
 				objs: []client.Object{
-					&appsv1alpha1.Cluster{
+					&appsv1.Cluster{
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: synthesizedComp.Namespace,
 							Name:      synthesizedComp.ClusterName,
 						},
-						Status: appsv1alpha1.ClusterStatus{
-							Phase: appsv1alpha1.FailedClusterPhase,
+						Status: appsv1.ClusterStatus{
+							Phase: appsv1.FailedClusterPhase,
 						},
 					},
 				},

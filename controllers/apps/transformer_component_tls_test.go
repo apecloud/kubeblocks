@@ -32,7 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -129,9 +128,9 @@ var _ = Describe("TLS self-signed cert function", func() {
 			})
 
 			It("should create the cluster when secret referenced exist", func() {
-				tlsIssuer := &appsv1alpha1.Issuer{
-					Name: appsv1alpha1.IssuerUserProvided,
-					SecretRef: &appsv1alpha1.TLSSecretRef{
+				tlsIssuer := &appsv1.Issuer{
+					Name: appsv1.IssuerUserProvided,
+					SecretRef: &appsv1.TLSSecretRef{
 						Name: userProvidedTLSSecretObj.Name,
 						CA:   "ca.crt",
 						Cert: "tls.crt",
@@ -167,7 +166,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 				clusterKey := client.ObjectKeyFromObject(clusterObj)
 				Eventually(k8sClient.Get(ctx, clusterKey, clusterObj)).Should(Succeed())
 				Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
-				Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
+				Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1.CreatingClusterPhase))
 
 				itsList := testk8s.ListAndCheckInstanceSet(&testCtx, clusterKey)
 				its := itsList.Items[0]
@@ -192,7 +191,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterObj), clusterObj)).Should(Succeed())
 				patch := client.MergeFrom(clusterObj.DeepCopy())
 				clusterObj.Spec.ComponentSpecs[0].TLS = true
-				clusterObj.Spec.ComponentSpecs[0].Issuer = &appsv1alpha1.Issuer{Name: appsv1alpha1.IssuerKubeBlocks}
+				clusterObj.Spec.ComponentSpecs[0].Issuer = &appsv1.Issuer{Name: appsv1.IssuerKubeBlocks}
 				Expect(k8sClient.Patch(ctx, clusterObj, patch)).Should(Succeed())
 				Eventually(hasTLSSettings).Should(BeTrue())
 
@@ -207,12 +206,12 @@ var _ = Describe("TLS self-signed cert function", func() {
 				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterObj), clusterObj)).Should(Succeed())
 				patch = client.MergeFrom(clusterObj.DeepCopy())
 				clusterObj.Spec.ComponentSpecs[0].TLS = true
-				clusterObj.Spec.ComponentSpecs[0].Issuer = &appsv1alpha1.Issuer{Name: appsv1alpha1.IssuerKubeBlocks}
+				clusterObj.Spec.ComponentSpecs[0].Issuer = &appsv1.Issuer{Name: appsv1.IssuerKubeBlocks}
 				Expect(k8sClient.Patch(ctx, clusterObj, patch)).Should(Succeed())
 				Eventually(hasTLSSettings).Should(BeTrue())
 
-				testapps.DeleteObject(&testCtx, clusterKey, &appsv1alpha1.Cluster{})
-				Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, false)).Should(Succeed())
+				testapps.DeleteObject(&testCtx, clusterKey, &appsv1.Cluster{})
+				Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1.Cluster{}, false)).Should(Succeed())
 			})
 		})
 

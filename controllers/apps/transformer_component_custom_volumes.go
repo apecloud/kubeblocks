@@ -25,7 +25,7 @@ import (
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -67,7 +67,7 @@ func newSourceFromResource(name string, source any) corev1.Volume {
 	return volume
 }
 
-func doBuildCustomVolumes(podSpec *corev1.PodSpec, cluster *appsv1alpha1.Cluster, componentName string, namespace string) error {
+func doBuildCustomVolumes(podSpec *corev1.PodSpec, cluster *appsv1.Cluster, componentName string, namespace string) error {
 	comp := cluster.Spec.GetComponentByName(componentName)
 	if comp == nil || comp.UserResourceRefs == nil {
 		return nil
@@ -85,7 +85,7 @@ func doBuildCustomVolumes(podSpec *corev1.PodSpec, cluster *appsv1alpha1.Cluster
 	return nil
 }
 
-func buildVolumeMountForContainers(podSpec *corev1.PodSpec, resourceRefs appsv1alpha1.UserResourceRefs) {
+func buildVolumeMountForContainers(podSpec *corev1.PodSpec, resourceRefs appsv1.UserResourceRefs) {
 	for _, configMap := range resourceRefs.ConfigMapRefs {
 		newVolumeMount(podSpec, configMap.ResourceMeta)
 	}
@@ -94,7 +94,7 @@ func buildVolumeMountForContainers(podSpec *corev1.PodSpec, resourceRefs appsv1a
 	}
 }
 
-func newVolumeMount(podSpec *corev1.PodSpec, res appsv1alpha1.ResourceMeta) {
+func newVolumeMount(podSpec *corev1.PodSpec, res appsv1.ResourceMeta) {
 	for i := range podSpec.Containers {
 		container := &podSpec.Containers[i]
 		if !slices.Contains(res.AsVolumeFrom, container.Name) {

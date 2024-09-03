@@ -26,7 +26,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 func TestGetInstanceName(t *testing.T) {
@@ -36,7 +35,7 @@ func TestGetInstanceName(t *testing.T) {
 	require.Equal(t, "mytest-envfrom", GenerateEnvFromName("mytest"))
 	require.Equal(t, "mytest-mysql", GenerateComponentConfigurationName("mytest", "mysql"))
 	require.Equal(t, "config.kubeblocks.io/revision-reconcile-phase-100", GenerateRevisionPhaseKey("100"))
-	require.Equal(t, "mycluster-mysql-config", GetInstanceCMName(&appsv1alpha1.Cluster{
+	require.Equal(t, "mycluster-mysql-config", GetInstanceCMName(&appsv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "mycluster",
 		}},

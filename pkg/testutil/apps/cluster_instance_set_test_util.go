@@ -34,7 +34,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/testutil"
@@ -45,13 +44,13 @@ const (
 	replicas     = 3
 )
 
-func InitConsensusMysql(testCtx *testutil.TestContext, clusterName, compDefName, compName string) (*appsv1.ComponentDefinition, *appsv1alpha1.Cluster) {
+func InitConsensusMysql(testCtx *testutil.TestContext, clusterName, compDefName, compName string) (*appsv1.ComponentDefinition, *appsv1.Cluster) {
 	compDef := createCompDef(testCtx, compDefName)
 	cluster := CreateDefaultMysqlCluster(testCtx, clusterName, compDef.GetName(), compName)
 	return compDef, cluster
 }
 
-func CreateDefaultMysqlCluster(testCtx *testutil.TestContext, clusterName, compDefName, compName string, pvcSize ...string) *appsv1alpha1.Cluster {
+func CreateDefaultMysqlCluster(testCtx *testutil.TestContext, clusterName, compDefName, compName string, pvcSize ...string) *appsv1.Cluster {
 	size := "2Gi"
 	if len(pvcSize) > 0 {
 		size = pvcSize[0]
@@ -88,7 +87,7 @@ func MockInstanceSetComponent(
 func MockInstanceSetPods(
 	testCtx *testutil.TestContext,
 	its *workloads.InstanceSet,
-	cluster *appsv1alpha1.Cluster,
+	cluster *appsv1.Cluster,
 	compName string) []*corev1.Pod {
 	getReplicas := func() int {
 		if its == nil || its.Spec.Replicas == nil {
@@ -250,7 +249,7 @@ func generateInstanceNames(parentName, templateName string,
 	return instanceNameList
 }
 
-func generatePodNames(cluster *appsv1alpha1.Cluster, compName string) []string {
+func generatePodNames(cluster *appsv1.Cluster, compName string) []string {
 	podNames := make([]string, 0)
 	insTPLReplicasCnt := int32(0)
 	workloadName := constant.GenerateWorkloadNamePattern(cluster.Name, compName)
@@ -279,7 +278,7 @@ func podIsReady(pod *corev1.Pod) bool {
 	return false
 }
 
-func MockInstanceSetStatus(testCtx testutil.TestContext, cluster *appsv1alpha1.Cluster, fullCompName string) {
+func MockInstanceSetStatus(testCtx testutil.TestContext, cluster *appsv1.Cluster, fullCompName string) {
 	currentPodNames := generatePodNames(cluster, fullCompName)
 	updateRevisions := map[string]string{}
 	for _, podName := range currentPodNames {

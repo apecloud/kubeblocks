@@ -36,7 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -62,7 +62,7 @@ func getGVKName(object client.Object, scheme *runtime.Scheme) (*gvkNObjKey, erro
 	}, nil
 }
 
-func getAppInstanceML(cluster appsv1alpha1.Cluster) client.MatchingLabels {
+func getAppInstanceML(cluster appsv1.Cluster) client.MatchingLabels {
 	return client.MatchingLabels{
 		constant.AppInstanceLabelKey: cluster.Name,
 	}
@@ -151,7 +151,7 @@ func isResourceEqual(a, b corev1.ResourceList) bool {
 	return true
 }
 
-func isVolumeClaimTemplatesEqual(a, b []appsv1alpha1.ClusterComponentVolumeClaimTemplate) bool {
+func isVolumeClaimTemplatesEqual(a, b []appsv1.ClusterComponentVolumeClaimTemplate) bool {
 	if len(a) != len(b) {
 		return false
 	}
@@ -246,7 +246,7 @@ func removeOwnerRefOfType(obj client.Object, gvk schema.GroupVersionKind) {
 // isOwnedByComp is used to judge if the obj is owned by Component.
 func isOwnedByComp(obj client.Object) bool {
 	for _, ref := range obj.GetOwnerReferences() {
-		if ref.Kind == appsv1alpha1.ComponentKind && ref.Controller != nil && *ref.Controller {
+		if ref.Kind == appsv1.ComponentKind && ref.Controller != nil && *ref.Controller {
 			return true
 		}
 	}

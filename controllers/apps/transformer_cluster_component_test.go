@@ -32,7 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -206,13 +205,13 @@ var _ = Describe("cluster component transformer test", func() {
 
 	AfterEach(func() {})
 
-	newDAG := func(graphCli model.GraphClient, cluster *appsv1alpha1.Cluster) *graph.DAG {
+	newDAG := func(graphCli model.GraphClient, cluster *appsv1.Cluster) *graph.DAG {
 		d := graph.NewDAG()
 		graphCli.Root(d, cluster, cluster, model.ActionStatusPtr())
 		return d
 	}
 
-	buildCompSpecs := func(clusterDef *appsv1.ClusterDefinition, cluster *appsv1alpha1.Cluster) []*appsv1alpha1.ClusterComponentSpec {
+	buildCompSpecs := func(clusterDef *appsv1.ClusterDefinition, cluster *appsv1.Cluster) []*appsv1.ClusterComponentSpec {
 		apiTransformer := ClusterAPINormalizationTransformer{}
 		compSpecs, err := apiTransformer.buildCompSpecs4Topology(clusterDef, cluster)
 		Expect(err).Should(BeNil())
@@ -220,7 +219,7 @@ var _ = Describe("cluster component transformer test", func() {
 	}
 
 	mockCompObj := func(transCtx *clusterTransformContext, compName string, setters ...func(*appsv1.Component)) *appsv1.Component {
-		var compSpec *appsv1alpha1.ClusterComponentSpec
+		var compSpec *appsv1.ClusterComponentSpec
 		for i, spec := range transCtx.ComponentSpecs {
 			if spec.Name == compName {
 				compSpec = transCtx.ComponentSpecs[i]

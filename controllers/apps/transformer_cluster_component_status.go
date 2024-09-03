@@ -25,11 +25,9 @@ import (
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -56,7 +54,7 @@ func (t *clusterComponentStatusTransformer) Transform(ctx graph.TransformContext
 func (t *clusterComponentStatusTransformer) reconcileComponentsStatus(transCtx *clusterTransformContext) error {
 	cluster := transCtx.Cluster
 	if cluster.Status.Components == nil {
-		cluster.Status.Components = make(map[string]appsv1alpha1.ClusterComponentStatus)
+		cluster.Status.Components = make(map[string]appsv1.ClusterComponentStatus)
 	}
 	// We cannot use cluster.status.components here because of simplified API generated component is not in it.
 	for _, compSpec := range transCtx.ComponentSpecs {
@@ -78,7 +76,7 @@ func (t *clusterComponentStatusTransformer) reconcileComponentsStatus(transCtx *
 
 // buildClusterCompStatus builds cluster component status from specified component object.
 func (t *clusterComponentStatusTransformer) buildClusterCompStatus(transCtx *clusterTransformContext,
-	comp *appsv1.Component, compName string) appsv1alpha1.ClusterComponentStatus {
+	comp *appsv1.Component, compName string) appsv1.ClusterComponentStatus {
 	var (
 		cluster = transCtx.Cluster
 		status  = cluster.Status.Components[compName]
@@ -101,7 +99,7 @@ func (t *clusterComponentStatusTransformer) buildClusterCompStatus(transCtx *clu
 
 // updateClusterComponentStatus sets the cluster component phase and messages conditionally.
 func (t *clusterComponentStatusTransformer) updateClusterComponentStatus(comp *appsv1.Component,
-	status *appsv1alpha1.ClusterComponentStatus) {
+	status *appsv1.ClusterComponentStatus) {
 	if string(status.Phase) != string(comp.Status.Phase) {
 		status.Phase = comp.Status.Phase
 		if status.Message == nil {
@@ -112,15 +110,16 @@ func (t *clusterComponentStatusTransformer) updateClusterComponentStatus(comp *a
 			}
 		}
 	}
-	// if ready flag not changed, don't update the ready time
-	ready := t.isClusterComponentPodsReady(comp.Status.Phase)
-	if status.PodsReady == nil || *status.PodsReady != ready {
-		status.PodsReady = &ready
-		if ready {
-			now := metav1.Now()
-			status.PodsReadyTime = &now
-		}
-	}
+	// TODO(v1.0): status
+	//// if ready flag not changed, don't update the ready time
+	// ready := t.isClusterComponentPodsReady(comp.Status.Phase)
+	// if status.PodsReady == nil || *status.PodsReady != ready {
+	//	status.PodsReady = &ready
+	//	if ready {
+	//		now := metav1.Now()
+	//		status.PodsReadyTime = &now
+	//	}
+	// }
 }
 
 func (t *clusterComponentStatusTransformer) isClusterComponentPodsReady(phase appsv1.ClusterComponentPhase) bool {
@@ -132,7 +131,7 @@ func (t *clusterComponentStatusTransformer) isClusterComponentPodsReady(phase ap
 	return slices.Contains(podsReadyPhases, phase)
 }
 
-func clusterComponentPhaseTransitionMsg(phase appsv1alpha1.ClusterComponentPhase) string {
+func clusterComponentPhaseTransitionMsg(phase appsv1.ClusterComponentPhase) string {
 	if len(phase) == 0 {
 		return ""
 	}

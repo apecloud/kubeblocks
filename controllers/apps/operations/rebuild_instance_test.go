@@ -21,6 +21,7 @@ package operations
 
 import (
 	"fmt"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -171,7 +172,7 @@ var _ = Describe("OpsUtil functions", func() {
 
 			By("fake cluster phase to Abnormal and component phase to Running")
 			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
-				opsRes.Cluster.Status.Phase = appsv1alpha1.AbnormalClusterPhase
+				opsRes.Cluster.Status.Phase = appsv1.AbnormalClusterPhase
 			})).Should(Succeed())
 			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsCreatingPhase
 
@@ -184,7 +185,7 @@ var _ = Describe("OpsUtil functions", func() {
 			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsCreatingPhase
 			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
 				compStatus := opsRes.Cluster.Status.Components[defaultCompName]
-				compStatus.Phase = appsv1alpha1.AbnormalClusterCompPhase
+				compStatus.Phase = appsv1.AbnormalClusterCompPhase
 				opsRes.Cluster.Status.Components[defaultCompName] = compStatus
 			})).Should(Succeed())
 
@@ -398,8 +399,8 @@ var _ = Describe("OpsUtil functions", func() {
 			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsCreatingPhase
 			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
 				compStatus := opsRes.Cluster.Status.Components[defaultCompName]
-				compStatus.Phase = appsv1alpha1.AbnormalClusterCompPhase
-				opsRes.Cluster.Status.Phase = appsv1alpha1.AbnormalClusterPhase
+				compStatus.Phase = appsv1.AbnormalClusterCompPhase
+				opsRes.Cluster.Status.Phase = appsv1.AbnormalClusterPhase
 				opsRes.Cluster.Status.Components[defaultCompName] = compStatus
 			})).Should(Succeed())
 

@@ -33,7 +33,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsconfig "github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -97,7 +96,7 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 // SetupWithManager sets up the controller with the Manager.
 func (r *ClusterDefinitionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
-		For(&appsv1alpha1.ClusterDefinition{}).
+		For(&appsv1.ClusterDefinition{}).
 		Complete(r)
 }
 
@@ -108,7 +107,7 @@ func (r *ClusterDefinitionReconciler) deletionHandler(rctx intctrlutil.RequestCt
 				"cannot be deleted because of existing referencing Cluster")
 		}
 		if res, err := intctrlutil.ValidateReferenceCR(rctx, r.Client, clusterDef, constant.ClusterDefLabelKey,
-			recordEvent, &appsv1alpha1.ClusterList{}); res != nil || err != nil {
+			recordEvent, &appsv1.ClusterList{}); res != nil || err != nil {
 			return res, err
 		}
 		return nil, r.deleteExternalResources(rctx, clusterDef)

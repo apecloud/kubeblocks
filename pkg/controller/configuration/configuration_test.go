@@ -29,7 +29,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -59,7 +58,7 @@ func allFieldsCompDefObj(create bool) *appsv1.ComponentDefinition {
 	return compDef
 }
 
-func newAllFieldsClusterObj(compDef *appsv1.ComponentDefinition, create bool) (*appsv1alpha1.Cluster, *appsv1.ComponentDefinition, types.NamespacedName) {
+func newAllFieldsClusterObj(compDef *appsv1.ComponentDefinition, create bool) (*appsv1.Cluster, *appsv1.ComponentDefinition, types.NamespacedName) {
 	// setup Cluster obj requires default ComponentDefinition object
 	if compDef == nil {
 		compDef = allFieldsCompDefObj(create)
@@ -79,7 +78,7 @@ func newAllFieldsClusterObj(compDef *appsv1.ComponentDefinition, create bool) (*
 	return clusterObj, compDef, key
 }
 
-func newAllFieldsSynthesizedComponent(compDef *appsv1.ComponentDefinition, cluster *appsv1alpha1.Cluster) *component.SynthesizedComponent {
+func newAllFieldsSynthesizedComponent(compDef *appsv1.ComponentDefinition, cluster *appsv1.Cluster) *component.SynthesizedComponent {
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx: testCtx.Ctx,
 		Log: logger,
@@ -99,7 +98,7 @@ func newAllFieldsSynthesizedComponent(compDef *appsv1.ComponentDefinition, clust
 	return synthesizeComp
 }
 
-func newAllFieldsComponent(cluster *appsv1alpha1.Cluster) *appsv1.Component {
+func newAllFieldsComponent(cluster *appsv1.Cluster) *appsv1.Component {
 	comp, _ := component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
 	return comp
 }

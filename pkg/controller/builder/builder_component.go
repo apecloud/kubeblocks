@@ -23,8 +23,6 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 type ComponentBuilder struct {
@@ -135,8 +133,8 @@ func (builder *ComponentBuilder) SetVolumes(volumes []corev1.Volume) *ComponentB
 	return builder
 }
 
-func (builder *ComponentBuilder) SetServices(services []appsv1alpha1.ClusterComponentService) *ComponentBuilder {
-	toCompService := func(svc appsv1alpha1.ClusterComponentService) appsv1.ComponentService {
+func (builder *ComponentBuilder) SetServices(services []appsv1.ClusterComponentService) *ComponentBuilder {
+	toCompService := func(svc appsv1.ClusterComponentService) appsv1.ComponentService {
 		return appsv1.ComponentService{
 			Service: appsv1.Service{
 				Name:        svc.Name,

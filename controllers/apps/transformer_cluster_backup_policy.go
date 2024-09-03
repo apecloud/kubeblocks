@@ -30,6 +30,7 @@ import (
 	"k8s.io/gengo/examples/set-gen/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -60,7 +61,7 @@ type clusterBackupPolicyTransformer struct {
 }
 
 type componentItem struct {
-	compSpec *appsv1alpha1.ClusterComponentSpec
+	compSpec *appsv1.ClusterComponentSpec
 	// shardingSpec.Name or componentSpec.Name
 	componentName string
 	isSharding    bool
@@ -169,7 +170,7 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 					graphCli.Patch(dag, oldBackupSchedule, newBackupSchedule)
 				}
 				graphCli.DependOn(dag, backupPolicy, newBackupSchedule)
-				comps := graphCli.FindAll(dag, &appsv1alpha1.Component{})
+				comps := graphCli.FindAll(dag, &appsv1.Component{})
 				graphCli.DependOn(dag, backupPolicy, comps...)
 				backupScheduleNames[newBackupSchedule.Name] = struct{}{}
 			}
@@ -443,7 +444,7 @@ func (r *clusterBackupPolicyTransformer) syncBackupMethods(backupPolicy *dpv1alp
 	backupPolicy.Spec.BackupMethods = backupMethods
 }
 
-func (r *clusterBackupPolicyTransformer) doEnvMapping(comp *appsv1alpha1.ClusterComponentSpec, envMapping []appsv1alpha1.EnvMappingVar) []corev1.EnvVar {
+func (r *clusterBackupPolicyTransformer) doEnvMapping(comp *appsv1.ClusterComponentSpec, envMapping []appsv1alpha1.EnvMappingVar) []corev1.EnvVar {
 	var env []corev1.EnvVar
 	for _, v := range envMapping {
 		for _, cm := range v.ValueFrom.ComponentDef {
@@ -637,7 +638,7 @@ func (r *clusterBackupPolicyTransformer) mergeClusterBackup(
 }
 
 func (r *clusterBackupPolicyTransformer) getClusterComponentItems() []componentItem {
-	matchedCompDef := func(compSpec appsv1alpha1.ClusterComponentSpec) bool {
+	matchedCompDef := func(compSpec appsv1.ClusterComponentSpec) bool {
 		// TODO: support to create bp when using cluster topology and componentDef is empty
 		if len(compSpec.ComponentDef) > 0 {
 			for _, compDef := range r.backupPolicy.ComponentDefs {
@@ -707,7 +708,7 @@ func (r *clusterBackupPolicyTransformer) buildLabels(compItem componentItem, pol
 	return labels
 }
 
-func (r *clusterBackupPolicyTransformer) compDefName(comp *appsv1alpha1.ClusterComponentSpec,
+func (r *clusterBackupPolicyTransformer) compDefName(comp *appsv1.ClusterComponentSpec,
 	policy *dpv1alpha1.BackupPolicy) string {
 	switch {
 	case comp != nil:
@@ -719,7 +720,7 @@ func (r *clusterBackupPolicyTransformer) compDefName(comp *appsv1alpha1.ClusterC
 	}
 }
 
-func (r *clusterBackupPolicyTransformer) compDefNameFromSpec(comp *appsv1alpha1.ClusterComponentSpec) string {
+func (r *clusterBackupPolicyTransformer) compDefNameFromSpec(comp *appsv1.ClusterComponentSpec) string {
 	return comp.ComponentDef
 }
 
@@ -766,7 +767,7 @@ func generateBackupScheduleName(clusterName, componentName, identifier string) s
 	return fmt.Sprintf("%s-%s-backup-schedule-%s", clusterName, componentName, identifier)
 }
 
-func buildBackupPathPrefix(cluster *appsv1alpha1.Cluster, compName string) string {
+func buildBackupPathPrefix(cluster *appsv1.Cluster, compName string) string {
 	return fmt.Sprintf("/%s-%s/%s", cluster.Name, cluster.UID, compName)
 }
 

@@ -29,7 +29,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	experimental "github.com/apecloud/kubeblocks/apis/experimental/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -49,7 +49,7 @@ func (t *treeLoader) Load(ctx context.Context, reader client.Reader, req ctrl.Re
 	}
 	scaler, _ := root.(*experimental.NodeCountScaler)
 	key := types.NamespacedName{Namespace: scaler.Namespace, Name: scaler.Spec.TargetClusterName}
-	cluster := &appsv1alpha1.Cluster{}
+	cluster := &appsv1.Cluster{}
 	if err = reader.Get(ctx, key, cluster); err != nil {
 		return nil, err
 	}

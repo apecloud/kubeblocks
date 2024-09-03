@@ -30,7 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -117,7 +116,7 @@ max_connections=666
 			"default", nil, nil)
 		templateBuilder.injectBuiltInObjectsAndFunctions(
 			&corev1.PodSpec{}, &component.SynthesizedComponent{}, nil,
-			&appsv1alpha1.Cluster{
+			&appsv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testClusterName,
 					Namespace: "default",
@@ -137,12 +136,12 @@ max_connections=666
 
 	Context("with patch Merge", func() {
 		It("mergerConfigTemplate patch policy", func() {
-			importedTemplate := &appsv1alpha1.LegacyRenderedTemplateSpec{
-				ConfigTemplateExtension: appsv1alpha1.ConfigTemplateExtension{
+			importedTemplate := &appsv1.LegacyRenderedTemplateSpec{
+				ConfigTemplateExtension: appsv1.ConfigTemplateExtension{
 					Namespace: "default",
 					// Name:        configSpec.Name,
 					TemplateRef: updatedCMObject.GetName(),
-					Policy:      appsv1alpha1.PatchPolicy,
+					Policy:      appsv1.PatchPolicy,
 				},
 			}
 
@@ -167,11 +166,11 @@ max_connections=666
 
 	Context("with replace Merge", func() {
 		It("test mergerConfigTemplate replace policy", func() {
-			importedTemplate := &appsv1alpha1.LegacyRenderedTemplateSpec{
-				ConfigTemplateExtension: appsv1alpha1.ConfigTemplateExtension{
+			importedTemplate := &appsv1.LegacyRenderedTemplateSpec{
+				ConfigTemplateExtension: appsv1.ConfigTemplateExtension{
 					Namespace:   "default",
 					TemplateRef: updatedCMObject.GetName(),
-					Policy:      appsv1alpha1.ReplacePolicy,
+					Policy:      appsv1.ReplacePolicy,
 				},
 			}
 
@@ -194,11 +193,11 @@ max_connections=666
 
 	Context("with only add Merge", func() {
 		It("test mergerConfigTemplate add policy", func() {
-			importedTemplate := &appsv1alpha1.LegacyRenderedTemplateSpec{
-				ConfigTemplateExtension: appsv1alpha1.ConfigTemplateExtension{
+			importedTemplate := &appsv1.LegacyRenderedTemplateSpec{
+				ConfigTemplateExtension: appsv1.ConfigTemplateExtension{
 					Namespace:   "default",
 					TemplateRef: updatedCMObject.GetName(),
-					Policy:      appsv1alpha1.OnlyAddPolicy,
+					Policy:      appsv1.OnlyAddPolicy,
 				},
 			}
 
@@ -210,11 +209,11 @@ max_connections=666
 
 	Context("with none Merge", func() {
 		It("test mergerConfigTemplate none policy", func() {
-			importedTemplate := &appsv1alpha1.LegacyRenderedTemplateSpec{
-				ConfigTemplateExtension: appsv1alpha1.ConfigTemplateExtension{
+			importedTemplate := &appsv1.LegacyRenderedTemplateSpec{
+				ConfigTemplateExtension: appsv1.ConfigTemplateExtension{
 					Namespace:   "default",
 					TemplateRef: updatedCMObject.GetName(),
-					Policy:      appsv1alpha1.NoneMergePolicy,
+					Policy:      appsv1.NoneMergePolicy,
 				},
 			}
 
@@ -227,8 +226,8 @@ max_connections=666
 
 	Context("failed test", func() {
 		It("test mergerConfigTemplate function", func() {
-			importedTemplate := &appsv1alpha1.LegacyRenderedTemplateSpec{
-				ConfigTemplateExtension: appsv1alpha1.ConfigTemplateExtension{
+			importedTemplate := &appsv1.LegacyRenderedTemplateSpec{
+				ConfigTemplateExtension: appsv1.ConfigTemplateExtension{
 					Namespace:   "default",
 					TemplateRef: updatedCMObject.GetName(),
 					Policy:      "",
@@ -241,8 +240,8 @@ max_connections=666
 		})
 
 		It("not configconstraint", func() {
-			importedTemplate := &appsv1alpha1.LegacyRenderedTemplateSpec{
-				ConfigTemplateExtension: appsv1alpha1.ConfigTemplateExtension{
+			importedTemplate := &appsv1.LegacyRenderedTemplateSpec{
+				ConfigTemplateExtension: appsv1.ConfigTemplateExtension{
 					Namespace:   "default",
 					TemplateRef: updatedCMObject.GetName(),
 					Policy:      "none",
@@ -257,8 +256,8 @@ max_connections=666
 		})
 
 		It("not formatter", func() {
-			importedTemplate := &appsv1alpha1.LegacyRenderedTemplateSpec{
-				ConfigTemplateExtension: appsv1alpha1.ConfigTemplateExtension{
+			importedTemplate := &appsv1.LegacyRenderedTemplateSpec{
+				ConfigTemplateExtension: appsv1.ConfigTemplateExtension{
 					Namespace:   "default",
 					TemplateRef: updatedCMObject.GetName(),
 					Policy:      "none",

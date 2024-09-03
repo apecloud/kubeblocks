@@ -25,7 +25,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -63,7 +63,7 @@ var _ = Describe("cluster shard component", func() {
 		)
 
 		var (
-			cluster *appsv1alpha1.Cluster
+			cluster *appsv1.Cluster
 		)
 
 		BeforeEach(func() {
@@ -88,10 +88,10 @@ var _ = Describe("cluster shard component", func() {
 				Create(&testCtx).
 				GetObject()
 			compKey := client.ObjectKeyFromObject(mockCompObj)
-			Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1alpha1.Component{}, true)).Should(Succeed())
+			Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1.Component{}, true)).Should(Succeed())
 
-			shardingSpec := &appsv1alpha1.ShardingSpec{
-				Template: appsv1alpha1.ClusterComponentSpec{
+			shardingSpec := &appsv1.ShardingSpec{
+				Template: appsv1.ClusterComponentSpec{
 					Replicas: 2,
 				},
 				Name:   mysqlShardingName,

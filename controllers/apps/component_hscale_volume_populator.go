@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -67,7 +67,7 @@ const (
 
 func newDataClone(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
+	cluster *appsv1.Cluster,
 	component *component.SynthesizedComponent,
 	itsObj, itsProto *workloads.InstanceSet,
 	backupKey types.NamespacedName) (dataClone, error) {
@@ -115,7 +115,7 @@ func newDataClone(reqCtx intctrlutil.RequestCtx,
 type baseDataClone struct {
 	reqCtx            intctrlutil.RequestCtx
 	cli               client.Client
-	cluster           *appsv1alpha1.Cluster
+	cluster           *appsv1.Cluster
 	component         *component.SynthesizedComponent
 	itsObj            *workloads.InstanceSet
 	itsProto          *workloads.InstanceSet
@@ -439,7 +439,7 @@ func (d *backupDataClone) CheckRestoreStatus(templateName string, startingIndex 
 // getBackupPolicyFromTemplate gets backup policy from template policy template.
 func getBackupPolicyFromTemplate(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
+	cluster *appsv1.Cluster,
 	componentDef, backupPolicyTemplateName string) (*dpv1alpha1.BackupPolicy, error) {
 	backupPolicyList := &dpv1alpha1.BackupPolicyList{}
 	if err := cli.List(reqCtx.Ctx, backupPolicyList,

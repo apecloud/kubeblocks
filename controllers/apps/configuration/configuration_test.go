@@ -87,8 +87,8 @@ func mockConfigResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint) {
 	configuration := builder.NewConfigurationBuilder(testCtx.DefaultNamespace, core.GenerateComponentConfigurationName(clusterName, defaultCompName)).
 		ClusterRef(clusterName).
 		Component(defaultCompName).
-		AddConfigurationItem(appsv1alpha1.ComponentConfigSpec{
-			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+		AddConfigurationItem(appsv1.ComponentConfigSpec{
+			ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
 				Name:        configSpecName,
 				TemplateRef: configmap.Name,
 				Namespace:   configmap.Namespace,
@@ -102,7 +102,7 @@ func mockConfigResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint) {
 	return configmap, constraint
 }
 
-func mockReconcileResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint, *appsv1alpha1.Cluster, *appsv1.Component, *component.SynthesizedComponent) {
+func mockReconcileResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint, *appsv1.Cluster, *appsv1.Component, *component.SynthesizedComponent) {
 	configmap, constraint := mockConfigResource()
 
 	By("Create a component definition obj and mock to available")
@@ -159,7 +159,7 @@ func mockReconcileResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint, 
 
 func initConfiguration(resourceCtx *configctrl.ResourceCtx,
 	synthesizedComponent *component.SynthesizedComponent,
-	clusterObj *appsv1alpha1.Cluster,
+	clusterObj *appsv1.Cluster,
 	componentObj *appsv1.Component) error {
 	return configctrl.NewCreatePipeline(configctrl.ReconcileCtx{
 		ResourceCtx:          resourceCtx,

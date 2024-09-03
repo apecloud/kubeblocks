@@ -39,7 +39,7 @@ import (
 type ReconcileCtx struct {
 	*ResourceCtx
 
-	Cluster              *appsv1alpha1.Cluster
+	Cluster              *appsv1.Cluster
 	Component            *appsv1.Component
 	SynthesizedComponent *component.SynthesizedComponent
 	PodSpec              *corev1.PodSpec

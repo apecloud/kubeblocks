@@ -40,7 +40,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -212,7 +211,7 @@ func (r *ComponentVersionReconciler) deletionHandler(rctx intctrlutil.RequestCtx
 				"cannot be deleted because of existing referencing Cluster.")
 		}
 		if res, err := intctrlutil.ValidateReferenceCR(rctx, r.Client, compVersion, constant.ComponentVersionLabelKey,
-			recordEvent, &appsv1alpha1.ClusterList{}); res != nil || err != nil {
+			recordEvent, &appsv1.ClusterList{}); res != nil || err != nil {
 			return res, err
 		}
 		return nil, nil

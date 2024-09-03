@@ -31,7 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -75,7 +74,7 @@ func (r *ServiceDescriptorReconciler) Reconcile(ctx context.Context, req ctrl.Re
 				"cannot be deleted because of existing service referencing Cluster.")
 		}
 		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, serviceDescriptor,
-			constant.ServiceDescriptorNameLabelKey, recordEvent, &appsv1alpha1.ClusterList{}); res != nil || err != nil {
+			constant.ServiceDescriptorNameLabelKey, recordEvent, &appsv1.ClusterList{}); res != nil || err != nil {
 			return res, err
 		}
 		return nil, nil

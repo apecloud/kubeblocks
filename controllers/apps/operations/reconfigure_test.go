@@ -76,7 +76,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 
 	initClusterForOps := func(opsRes *OpsResource) {
 		Expect(opsutil.UpdateClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())
-		opsRes.Cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
+		opsRes.Cluster.Status.Phase = appsv1.RunningClusterPhase
 	}
 
 	assureCfgTplObj := func(tplName, cmName, ns string) (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint) {
@@ -150,7 +150,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			// mock cluster is Running to support reconfiguring ops
 			By("mock cluster status")
 			patch := client.MergeFrom(clusterObject.DeepCopy())
-			clusterObject.Status.Phase = appsv1alpha1.RunningClusterPhase
+			clusterObject.Status.Phase = appsv1.RunningClusterPhase
 			Expect(k8sClient.Status().Patch(ctx, clusterObject, patch)).Should(Succeed())
 		}
 
@@ -319,7 +319,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			By("Reconfigure configure")
 			_, _ = opsManager.Reconcile(reqCtx, k8sClient, opsRes)
 			// mock cluster.status.component.phase to Updating
-			mockClusterCompPhase := func(clusterObj *appsv1alpha1.Cluster, phase appsv1alpha1.ClusterComponentPhase) {
+			mockClusterCompPhase := func(clusterObj *appsv1.Cluster, phase appsv1.ClusterComponentPhase) {
 				clusterObject := clusterObj.DeepCopy()
 				patch := client.MergeFrom(clusterObject.DeepCopy())
 				compStatus := clusterObject.Status.Components[defaultCompName]
@@ -327,20 +327,20 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 				clusterObject.Status.Components[defaultCompName] = compStatus
 				Expect(k8sClient.Status().Patch(ctx, clusterObject, patch)).Should(Succeed())
 			}
-			mockClusterCompPhase(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase)
+			mockClusterCompPhase(opsRes.Cluster, appsv1.UpdatingClusterCompPhase)
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.Cluster), opsRes.Cluster)).Should(Succeed())
 
 			By("check cluster.status.components[*].phase == Reconfiguring")
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
-			Expect(opsRes.Cluster.Status.Components[defaultCompName].Phase).Should(Equal(appsv1alpha1.UpdatingClusterCompPhase)) // appsv1alpha1.ReconfiguringPhase
+			Expect(opsRes.Cluster.Status.Components[defaultCompName].Phase).Should(Equal(appsv1.UpdatingClusterCompPhase)) // appsv1.ReconfiguringPhase
 			// TODO: add status condition expect
 			_, _ = opsManager.Reconcile(reqCtx, k8sClient, opsRes)
 			// mock cluster.status.component.phase to Running
-			mockClusterCompPhase(opsRes.Cluster, appsv1alpha1.RunningClusterCompPhase)
+			mockClusterCompPhase(opsRes.Cluster, appsv1.RunningClusterCompPhase)
 
 			By("check cluster.status.components[*].phase == Running")
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.Cluster), opsRes.Cluster)).Should(Succeed())
-			Expect(opsRes.Cluster.Status.Components[defaultCompName].Phase).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+			Expect(opsRes.Cluster.Status.Components[defaultCompName].Phase).Should(Equal(appsv1.RunningClusterCompPhase))
 		})
 	})
 })

@@ -87,7 +87,7 @@ var VolumeSnapshotSignature = func(_ snapshotv1.VolumeSnapshot, _ *snapshotv1.Vo
 var VolumeSnapshotClassSignature = func(_ snapshotv1.VolumeSnapshotClass, _ *snapshotv1.VolumeSnapshotClass, _ snapshotv1.VolumeSnapshotClassList, _ *snapshotv1.VolumeSnapshotClassList) {
 }
 
-var ClusterSignature = func(_ appsv1alpha1.Cluster, _ *appsv1alpha1.Cluster, _ appsv1alpha1.ClusterList, _ *appsv1alpha1.ClusterList) {
+var ClusterSignature = func(_ appsv1.Cluster, _ *appsv1.Cluster, _ appsv1.ClusterList, _ *appsv1.ClusterList) {
 }
 var ClusterDefinitionSignature = func(_ appsv1.ClusterDefinition, _ *appsv1.ClusterDefinition, _ appsv1.ClusterDefinitionList, _ *appsv1.ClusterDefinitionList) {
 }

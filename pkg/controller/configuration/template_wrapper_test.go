@@ -28,7 +28,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -38,7 +37,7 @@ import (
 
 var _ = Describe("TemplateWrapperTest", func() {
 	var mockK8sCli *testutil.K8sClientMockHelper
-	var clusterObj *appsv1alpha1.Cluster
+	var clusterObj *appsv1.Cluster
 	var componentObj *appsv1.Component
 	var compDefObj *appsv1.ComponentDefinition
 	var clusterComponent *component.SynthesizedComponent

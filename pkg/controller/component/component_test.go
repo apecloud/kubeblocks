@@ -31,7 +31,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
@@ -47,7 +46,7 @@ var _ = Describe("Component", func() {
 
 		var (
 			compDef *appsv1.ComponentDefinition
-			cluster *appsv1alpha1.Cluster
+			cluster *appsv1.Cluster
 		)
 
 		BeforeEach(func() {

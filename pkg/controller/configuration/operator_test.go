@@ -40,7 +40,7 @@ import (
 )
 
 var _ = Describe("ConfigurationOperatorTest", func() {
-	var clusterObj *appsv1alpha1.Cluster
+	var clusterObj *appsv1.Cluster
 	var compDefObj *appsv1.ComponentDefinition
 	var componentObj *appsv1.Component
 	var synthesizedComponent *component.SynthesizedComponent

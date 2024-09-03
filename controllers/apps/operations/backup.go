@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -44,8 +45,8 @@ var _ OpsHandler = BackupOpsHandler{}
 func init() {
 	// ToClusterPhase is not defined, because 'backup' does not affect the cluster phase.
 	backupBehaviour := OpsBehaviour{
-		FromClusterPhases: []appsv1alpha1.ClusterPhase{appsv1alpha1.RunningClusterPhase,
-			appsv1alpha1.UpdatingClusterPhase, appsv1alpha1.AbnormalClusterPhase},
+		FromClusterPhases: []appsv1.ClusterPhase{appsv1.RunningClusterPhase,
+			appsv1.UpdatingClusterPhase, appsv1.AbnormalClusterPhase},
 		OpsHandler: BackupOpsHandler{},
 	}
 
@@ -104,7 +105,7 @@ func (b BackupOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, c
 	return nil
 }
 
-func buildBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *appsv1alpha1.OpsRequest, cluster *appsv1alpha1.Cluster) (*dpv1alpha1.Backup, error) {
+func buildBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *appsv1alpha1.OpsRequest, cluster *appsv1.Cluster) (*dpv1alpha1.Backup, error) {
 	var err error
 
 	backupSpec := opsRequest.Spec.GetBackup()
@@ -180,7 +181,7 @@ func buildBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *a
 	return backup, nil
 }
 
-func getDefaultBackupPolicy(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1alpha1.Cluster, backupPolicy string) (string, error) {
+func getDefaultBackupPolicy(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1.Cluster, backupPolicy string) (string, error) {
 	// if backupPolicy is not empty, return it directly
 	if backupPolicy != "" {
 		return backupPolicy, nil

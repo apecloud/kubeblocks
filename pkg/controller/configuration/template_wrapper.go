@@ -55,12 +55,12 @@ type renderWrapper struct {
 
 	ctx       context.Context
 	cli       client.Client
-	cluster   *appsv1alpha1.Cluster
+	cluster   *appsv1.Cluster
 	component *appsv1.Component
 }
 
 func newTemplateRenderWrapper(ctx context.Context, cli client.Client, templateBuilder *configTemplateBuilder,
-	cluster *appsv1alpha1.Cluster, component *appsv1.Component) renderWrapper {
+	cluster *appsv1.Cluster, component *appsv1.Component) renderWrapper {
 	return renderWrapper{
 		ctx:       ctx,
 		cli:       cli,
@@ -100,7 +100,7 @@ func (wrapper *renderWrapper) checkRerenderTemplateSpec(cfgCMName string, localO
 	return cmObj, nil
 }
 
-func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1alpha1.Cluster,
+func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1.Cluster,
 	component *component.SynthesizedComponent, localObjs []client.Object, configuration *appsv1alpha1.Configuration) error {
 	revision := fromConfiguration(configuration)
 	for _, configSpec := range component.ConfigTemplates {
@@ -188,7 +188,7 @@ func applyUpdatedParameters(item *appsv1alpha1.ConfigurationItemDetail, cm *core
 	return
 }
 
-func (wrapper *renderWrapper) rerenderConfigTemplate(cluster *appsv1alpha1.Cluster,
+func (wrapper *renderWrapper) rerenderConfigTemplate(cluster *appsv1.Cluster,
 	component *component.SynthesizedComponent,
 	configSpec appsv1.ComponentConfigSpec,
 	item *appsv1alpha1.ConfigurationItemDetail,
@@ -211,7 +211,7 @@ func (wrapper *renderWrapper) rerenderConfigTemplate(cluster *appsv1alpha1.Clust
 	// render user specified template
 	if item != nil && item.ImportTemplateRef != nil {
 		newData, err := mergerConfigTemplate(
-			&appsv1alpha1.LegacyRenderedTemplateSpec{
+			&appsv1.LegacyRenderedTemplateSpec{
 				ConfigTemplateExtension: *item.ImportTemplateRef,
 			},
 			wrapper.templateBuilder,
@@ -228,7 +228,7 @@ func (wrapper *renderWrapper) rerenderConfigTemplate(cluster *appsv1alpha1.Clust
 	return newCMObj, nil
 }
 
-func (wrapper *renderWrapper) renderScriptTemplate(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent,
+func (wrapper *renderWrapper) renderScriptTemplate(cluster *appsv1.Cluster, component *component.SynthesizedComponent,
 	localObjs []client.Object) error {
 	for _, templateSpec := range component.ScriptTemplates {
 		cmName := core.GetComponentCfgName(cluster.Name, component.Name, templateSpec.Name)
@@ -328,7 +328,7 @@ func UpdateCMConfigSpecLabels(cm *corev1.ConfigMap, configSpec appsv1.ComponentC
 }
 
 // generateConfigMapFromTpl renders config file by config template provided by provider.
-func generateConfigMapFromTpl(cluster *appsv1alpha1.Cluster,
+func generateConfigMapFromTpl(cluster *appsv1.Cluster,
 	component *component.SynthesizedComponent,
 	tplBuilder *configTemplateBuilder,
 	cmName string,

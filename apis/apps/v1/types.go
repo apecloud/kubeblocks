@@ -20,6 +20,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+const (
+	APIVersion            = "apps.kubeblocks.io/v1"
+	ClusterDefinitionKind = "ClusterDefinition"
+	ClusterKind           = "Cluster"
+	ComponentKind         = "Component"
+)
+
 // Phase represents the status of a CR.
 //
 // +enum

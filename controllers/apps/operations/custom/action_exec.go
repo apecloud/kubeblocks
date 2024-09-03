@@ -22,6 +22,7 @@ package custom
 import (
 	corev1 "k8s.io/api/core/v1"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -31,18 +32,18 @@ import (
 
 type ExecAction struct {
 	OpsRequest     *appsv1alpha1.OpsRequest
-	Cluster        *appsv1alpha1.Cluster
+	Cluster        *appsv1.Cluster
 	OpsDef         *appsv1alpha1.OpsDefinition
 	CustomCompOps  *appsv1alpha1.CustomOpsComponent
-	Comp           *appsv1alpha1.ClusterComponentSpec
+	Comp           *appsv1.ClusterComponentSpec
 	progressDetail appsv1alpha1.ProgressStatusDetail
 }
 
 func NewExecAction(opsRequest *appsv1alpha1.OpsRequest,
-	cluster *appsv1alpha1.Cluster,
+	cluster *appsv1.Cluster,
 	opsDef *appsv1alpha1.OpsDefinition,
 	customCompOps *appsv1alpha1.CustomOpsComponent,
-	comp *appsv1alpha1.ClusterComponentSpec,
+	comp *appsv1.ClusterComponentSpec,
 	progressDetail appsv1alpha1.ProgressStatusDetail) *ExecAction {
 	return &ExecAction{
 		OpsRequest:     opsRequest,
@@ -168,10 +169,14 @@ func (e *ExecAction) buildExecPodSpec(actionCtx ActionContext,
 		}, execAction.Command...),
 	}
 	intctrlutil.InjectZeroResourcesLimitsIfEmpty(container)
+	var tolerations []corev1.Toleration
+	if e.Comp.SchedulingPolicy != nil {
+		tolerations = e.Comp.SchedulingPolicy.Tolerations
+	}
 	return &corev1.PodSpec{
 		Containers: []corev1.Container{*container},
 		// tolerate all taints
-		Tolerations:      e.Comp.Tolerations,
+		Tolerations:      tolerations,
 		ImagePullSecrets: intctrlutil.BuildImagePullSecrets(),
 	}, nil
 }

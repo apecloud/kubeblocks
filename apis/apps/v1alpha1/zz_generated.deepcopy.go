@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1alpha1
 
 import (
+	apisappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -3051,7 +3052,7 @@ func (in *LastComponentConfiguration) DeepCopyInto(out *LastComponentConfigurati
 	}
 	if in.Services != nil {
 		in, out := &in.Services, &out.Services
-		*out = make([]ClusterComponentService, len(*in))
+		*out = make([]apisappsv1.ClusterComponentService, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -3074,7 +3075,7 @@ func (in *LastComponentConfiguration) DeepCopyInto(out *LastComponentConfigurati
 	}
 	if in.Instances != nil {
 		in, out := &in.Instances, &out.Instances
-		*out = make([]InstanceTemplate, len(*in))
+		*out = make([]apisappsv1.InstanceTemplate, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -3486,7 +3487,7 @@ func (in *OpsRequestBehaviour) DeepCopyInto(out *OpsRequestBehaviour) {
 	*out = *in
 	if in.FromClusterPhases != nil {
 		in, out := &in.FromClusterPhases, &out.FromClusterPhases
-		*out = make([]ClusterPhase, len(*in))
+		*out = make([]apisappsv1.ClusterPhase, len(*in))
 		copy(*out, *in)
 	}
 }
@@ -4424,7 +4425,7 @@ func (in *ScaleOut) DeepCopyInto(out *ScaleOut) {
 	in.ReplicaChanger.DeepCopyInto(&out.ReplicaChanger)
 	if in.NewInstances != nil {
 		in, out := &in.NewInstances, &out.NewInstances
-		*out = make([]InstanceTemplate, len(*in))
+		*out = make([]apisappsv1.InstanceTemplate, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

@@ -20,13 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -39,7 +38,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 	const kbToolsImage = "apecloud/kubeblocks-tools:latest"
 
 	var noneCommand = []string{"/bin/true"}
-	var clusterObj *appsv1alpha1.Cluster
+	var clusterObj *appsv1.Cluster
 	var compDefObj *appsv1.ComponentDefinition
 	var clusterComponent *component.SynthesizedComponent
 
@@ -96,11 +95,11 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 				ConfigLazyRenderedVolumes: make(map[string]corev1.VolumeMount),
 			}
 			cfgManagerParams.ConfigSpecsBuildParams[0].ConfigSpec.VolumeName = "data"
-			cfgManagerParams.ConfigSpecsBuildParams[0].ConfigSpec.LegacyRenderedConfigSpec = &appsv1alpha1.LegacyRenderedTemplateSpec{
-				ConfigTemplateExtension: appsv1alpha1.ConfigTemplateExtension{
+			cfgManagerParams.ConfigSpecsBuildParams[0].ConfigSpec.LegacyRenderedConfigSpec = &appsv1.LegacyRenderedTemplateSpec{
+				ConfigTemplateExtension: appsv1.ConfigTemplateExtension{
 					Namespace:   testCtx.DefaultNamespace,
 					TemplateRef: "secondary_template",
-					Policy:      appsv1alpha1.NoneMergePolicy,
+					Policy:      appsv1.NoneMergePolicy,
 				},
 			}
 			Expect(buildReloadToolsContainer(cfgManagerParams, &its.Spec.Template.Spec)).Should(Succeed())

@@ -32,7 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -45,7 +44,7 @@ var (
 // BuildSynthesizedComponent builds a new SynthesizedComponent object, which is a mixture of component-related configs from ComponentDefinition and Component.
 func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	cli client.Reader,
-	cluster *appsv1alpha1.Cluster,
+	cluster *appsv1.Cluster,
 	compDef *appsv1.ComponentDefinition,
 	comp *appsv1.Component) (*SynthesizedComponent, error) {
 	return buildSynthesizedComponent(reqCtx, cli, compDef, comp, cluster, nil)
@@ -54,7 +53,7 @@ func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 // BuildSynthesizedComponent4Generated builds SynthesizedComponent for generated Component which w/o ComponentDefinition.
 func BuildSynthesizedComponent4Generated(reqCtx intctrlutil.RequestCtx,
 	cli client.Reader,
-	cluster *appsv1alpha1.Cluster,
+	cluster *appsv1.Cluster,
 	comp *appsv1.Component) (*appsv1.ComponentDefinition, *SynthesizedComponent, error) {
 	clusterCompSpec, err := getClusterCompSpec4Component(reqCtx.Ctx, cli, cluster, comp)
 	if err != nil {
@@ -78,8 +77,8 @@ func BuildSynthesizedComponent4Generated(reqCtx intctrlutil.RequestCtx,
 // TODO: remove this
 func BuildSynthesizedComponentWrapper(reqCtx intctrlutil.RequestCtx,
 	cli client.Reader,
-	cluster *appsv1alpha1.Cluster,
-	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*SynthesizedComponent, error) {
+	cluster *appsv1.Cluster,
+	clusterCompSpec *appsv1.ClusterComponentSpec) (*SynthesizedComponent, error) {
 	if clusterCompSpec == nil {
 		return nil, fmt.Errorf("cluster component spec is not provided")
 	}
@@ -101,8 +100,8 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	cli client.Reader,
 	compDef *appsv1.ComponentDefinition,
 	comp *appsv1.Component,
-	cluster *appsv1alpha1.Cluster,
-	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*SynthesizedComponent, error) {
+	cluster *appsv1.Cluster,
+	clusterCompSpec *appsv1.ClusterComponentSpec) (*SynthesizedComponent, error) {
 	if compDef == nil || comp == nil {
 		return nil, nil
 	}
@@ -212,7 +211,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	return synthesizeComp, nil
 }
 
-func clusterGeneration(cluster *appsv1alpha1.Cluster, comp *appsv1.Component) string {
+func clusterGeneration(cluster *appsv1.Cluster, comp *appsv1.Component) string {
 	if comp != nil && comp.Annotations != nil {
 		if generation, ok := comp.Annotations[constant.KubeBlocksGenerationKey]; ok {
 			return generation
@@ -222,7 +221,7 @@ func clusterGeneration(cluster *appsv1alpha1.Cluster, comp *appsv1.Component) st
 	return strconv.FormatInt(cluster.Generation, 10)
 }
 
-func buildComp2CompDefs(ctx context.Context, cli client.Reader, cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (map[string]string, error) {
+func buildComp2CompDefs(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster, clusterCompSpec *appsv1.ClusterComponentSpec) (map[string]string, error) {
 	if cluster == nil {
 		return nil, nil
 	}

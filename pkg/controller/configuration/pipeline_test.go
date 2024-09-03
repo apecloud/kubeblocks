@@ -45,7 +45,7 @@ import (
 var _ = Describe("ConfigurationPipelineTest", func() {
 	const testConfigFile = "postgresql.conf"
 
-	var clusterObj *appsv1alpha1.Cluster
+	var clusterObj *appsv1.Cluster
 	var componentObj *appsv1.Component
 	var compDefObj *appsv1.ComponentDefinition
 	var synthesizedComponent *component.SynthesizedComponent

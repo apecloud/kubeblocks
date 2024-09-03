@@ -24,7 +24,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 )
 
@@ -33,7 +32,7 @@ type configOperator struct {
 }
 
 func NewConfigReconcileTask(resourceCtx *ResourceCtx,
-	cluster *appsv1alpha1.Cluster,
+	cluster *appsv1.Cluster,
 	component *appsv1.Component,
 	synthesizedComponent *component.SynthesizedComponent,
 	podSpec *corev1.PodSpec,

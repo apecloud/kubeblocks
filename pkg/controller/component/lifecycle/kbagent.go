@@ -30,7 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -170,10 +169,10 @@ func (a *kbagent) precondition(ctx context.Context, cli client.Reader, spec *app
 
 func (a *kbagent) clusterReadyCheck(ctx context.Context, cli client.Reader) error {
 	ready := func(object client.Object) bool {
-		cluster := object.(*appsv1alpha1.Cluster)
-		return cluster.Status.Phase == appsv1alpha1.RunningClusterPhase
+		cluster := object.(*appsv1.Cluster)
+		return cluster.Status.Phase == appsv1.RunningClusterPhase
 	}
-	return a.readyCheck(ctx, cli, a.synthesizedComp.ClusterName, "cluster", &appsv1alpha1.Cluster{}, ready)
+	return a.readyCheck(ctx, cli, a.synthesizedComp.ClusterName, "cluster", &appsv1.Cluster{}, ready)
 }
 
 func (a *kbagent) compReadyCheck(ctx context.Context, cli client.Reader) error {

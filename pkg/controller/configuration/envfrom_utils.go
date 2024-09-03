@@ -28,7 +28,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
@@ -39,7 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
-func injectTemplateEnvFrom(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent, podSpec *corev1.PodSpec, cli client.Client, ctx context.Context, localObjs []client.Object) error {
+func injectTemplateEnvFrom(cluster *appsv1.Cluster, component *component.SynthesizedComponent, podSpec *corev1.PodSpec, cli client.Client, ctx context.Context, localObjs []client.Object) error {
 	var err error
 	var cm *corev1.ConfigMap
 
@@ -128,7 +127,7 @@ func fetchConfigmap(localObjs []client.Object, cmName, namespace string, cli cli
 	return cmObj, nil
 }
 
-func createEnvFromConfigmap(cluster *appsv1alpha1.Cluster, componentName string, template appsv1.ComponentConfigSpec, originKey client.ObjectKey, envMap map[string]string, ctx context.Context, cli client.Client) (*corev1.ConfigMap, error) {
+func createEnvFromConfigmap(cluster *appsv1.Cluster, componentName string, template appsv1.ComponentConfigSpec, originKey client.ObjectKey, envMap map[string]string, ctx context.Context, cli client.Client) (*corev1.ConfigMap, error) {
 	cmKey := client.ObjectKey{
 		Name:      core.GenerateEnvFromName(originKey.Name),
 		Namespace: originKey.Namespace,

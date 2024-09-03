@@ -34,7 +34,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
@@ -132,7 +131,7 @@ var _ = Describe("Config Builder Test", func() {
 
 	newCMBuildParams := func(hasScripts bool) *CfgManagerBuildParams {
 		param := &CfgManagerBuildParams{
-			Cluster: &appsv1alpha1.Cluster{
+			Cluster: &appsv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "abcd",
 					Namespace: "default",

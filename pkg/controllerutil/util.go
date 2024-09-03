@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -64,7 +65,7 @@ func GetUncachedObjects() []client.Object {
 		// avoid to cache potential large data objects
 		&corev1.ConfigMap{},
 		&corev1.Secret{},
-		&appsv1alpha1.Cluster{},
+		&appsv1.Cluster{},
 		&appsv1alpha1.Configuration{},
 	}
 }
@@ -141,7 +142,7 @@ func MergeMetadataMaps(originalMap map[string]string, targetMaps ...map[string]s
 	return mergeMap
 }
 
-var innerScheme, _ = appsv1alpha1.SchemeBuilder.Build()
+var innerScheme, _ = appsv1.SchemeBuilder.Build()
 
 func SetOwnerReference(owner, object metav1.Object) error {
 	return controllerutil.SetOwnerReference(owner, object, innerScheme)

@@ -45,7 +45,7 @@ var _ = Describe("CustomOps", func() {
 		compObj     *appsv1.Component
 		opsDef      *appsv1alpha1.OpsDefinition
 		reqCtx      intctrlutil.RequestCtx
-		cluster     *appsv1alpha1.Cluster
+		cluster     *appsv1.Cluster
 	)
 
 	cleanEnv := func() {

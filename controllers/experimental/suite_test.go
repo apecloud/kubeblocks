@@ -31,7 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	//+kubebuilder:scaffold:imports
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	experimentalv1alpha1 "github.com/apecloud/kubeblocks/apis/experimental/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -61,7 +61,7 @@ func mockTestTree() *kubebuilderx.ObjectTree {
 		SetTargetComponentNames(componentNames).
 		GetObject()
 
-	specs := []appsv1alpha1.ClusterComponentSpec{
+	specs := []appsv1.ClusterComponentSpec{
 		{
 			Name: componentNames[0],
 		},
@@ -102,7 +102,7 @@ var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
 	model.AddScheme(experimentalv1alpha1.AddToScheme)
-	model.AddScheme(appsv1alpha1.AddToScheme)
+	model.AddScheme(appsv1.AddToScheme)
 	model.AddScheme(workloads.AddToScheme)
 
 	//+kubebuilder:scaffold:scheme

@@ -22,6 +22,8 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 const (
@@ -545,8 +547,8 @@ const (
 )
 
 type OpsRequestBehaviour struct {
-	FromClusterPhases []ClusterPhase
-	ToClusterPhase    ClusterPhase
+	FromClusterPhases []kbappsv1.ClusterPhase
+	ToClusterPhase    kbappsv1.ClusterPhase
 }
 
 type OpsRecorder struct {

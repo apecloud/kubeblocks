@@ -170,17 +170,17 @@ func (mr *MockClientMockRecorder) JoinMember(arg0 interface{}) *gomock.Call {
 }
 
 // LeaveMember mocks base method.
-func (m *MockClient) LeaveMember(arg0 context.Context) error {
+func (m *MockClient) LeaveMember(arg0 context.Context, arg1 string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "LeaveMember", arg0)
+	ret := m.ctrl.Call(m, "LeaveMember", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // LeaveMember indicates an expected call of LeaveMember.
-func (mr *MockClientMockRecorder) LeaveMember(arg0 interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) LeaveMember(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LeaveMember", reflect.TypeOf((*MockClient)(nil).LeaveMember), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LeaveMember", reflect.TypeOf((*MockClient)(nil).LeaveMember), arg0, arg1)
 }
 
 // ListSystemAccounts mocks base method.

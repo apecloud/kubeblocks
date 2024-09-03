@@ -447,33 +447,33 @@ var _ = Describe("Lorry HTTP Client", func() {
 		})
 
 		It("success if leave once", func() {
-			mockDBManager.EXPECT().GetCurrentMemberName().Return(podName).Times(2)
+			mockDBManager.EXPECT().GetCurrentMemberName().Return(podName).Times(1)
 			mockDBManager.EXPECT().LeaveMemberFromCluster(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 			mockDCSStore.EXPECT().GetCluster().Return(cluster, nil)
 			mockDCSStore.EXPECT().UpdateHaConfig().Return(nil).Times(2)
-			Expect(lorryClient.LeaveMember(context.TODO())).Should(Succeed())
+			Expect(lorryClient.LeaveMember(context.TODO(), "")).Should(Succeed())
 			Expect(cluster.HaConfig.DeleteMembers).Should(HaveLen(1))
 		})
 
 		It("success if leave twice", func() {
-			mockDBManager.EXPECT().GetCurrentMemberName().Return(podName).Times(4)
+			mockDBManager.EXPECT().GetCurrentMemberName().Return(podName).Times(2)
 			mockDBManager.EXPECT().LeaveMemberFromCluster(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
 			mockDCSStore.EXPECT().GetCluster().Return(cluster, nil).Times(2)
 			mockDCSStore.EXPECT().UpdateHaConfig().Return(nil).Times(3)
 			// first leave
-			Expect(lorryClient.LeaveMember(context.TODO())).Should(Succeed())
+			Expect(lorryClient.LeaveMember(context.TODO(), "")).Should(Succeed())
 			Expect(cluster.HaConfig.DeleteMembers).Should(HaveLen(1))
 			// second leave
-			Expect(lorryClient.LeaveMember(context.TODO())).Should(Succeed())
+			Expect(lorryClient.LeaveMember(context.TODO(), "")).Should(Succeed())
 			Expect(cluster.HaConfig.DeleteMembers).Should(HaveLen(1))
 		})
 
 		It("not implemented", func() {
-			mockDBManager.EXPECT().GetCurrentMemberName().Return(podName).Times(2)
+			mockDBManager.EXPECT().GetCurrentMemberName().Return(podName).Times(1)
 			mockDBManager.EXPECT().LeaveMemberFromCluster(gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf(msg))
 			mockDCSStore.EXPECT().GetCluster().Return(cluster, nil)
 			mockDCSStore.EXPECT().UpdateHaConfig().Return(nil)
-			err := lorryClient.LeaveMember(context.TODO())
+			err := lorryClient.LeaveMember(context.TODO(), "")
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring(msg))
 		})
@@ -509,7 +509,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 			_ = ops[strings.ToLower(string(util.LeaveMemberOperation))].Init(context.TODO())
 			customManager, _ := custom.NewManager(engines.Properties{})
 			register.SetCustomManager(customManager)
-			err := lorryClient.LeaveMember(context.TODO())
+			err := lorryClient.LeaveMember(context.TODO(), "")
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring("executable file not found"))
 		})

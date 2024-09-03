@@ -97,6 +97,7 @@ func (r restartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		return "", 0, err
 	}
 	if len(orderedComps) > 1 {
+		// the first component already restarts in "Action" step.
 		if err := r.restartComponents(reqCtx, cli, opsRes, orderedComps, true); err != nil {
 			return "", 0, err
 		}

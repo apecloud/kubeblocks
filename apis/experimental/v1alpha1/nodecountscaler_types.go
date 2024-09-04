@@ -98,7 +98,7 @@ const (
 // +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories={kubeblocks,all},shortName=ncs
+// +kubebuilder:resource:categories={kubeblocks},shortName=ncs
 // +kubebuilder:printcolumn:name="TARGET-CLUSTER-NAME",type="string",JSONPath=".spec.targetClusterName",description="target cluster name."
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type==\"ScaleReady\")].status",description="scale ready."
 // +kubebuilder:printcolumn:name="REASON",type="string",JSONPath=".status.conditions[?(@.type==\"ScaleReady\")].reason",description="reason."

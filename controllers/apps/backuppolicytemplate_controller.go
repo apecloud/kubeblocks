@@ -74,7 +74,7 @@ func (r *BackupPolicyTemplateReconciler) Reconcile(ctx context.Context, req reco
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *BackupPolicyTemplateReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
+	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.BackupPolicyTemplate{}).
 		Complete(r)
 }

@@ -190,7 +190,7 @@ jobs:
       - name: auto create pr head new branch
         if: ${{ (steps.update_apis_doc.outputs.file_changes || steps.upgrade_addon_version.outputs.file_changes) && github.ref_name == 'main' }}
         run: |
-          gh pr create --head "support/auto-update-${{ env.RELEASE_COMMIT }}" --title "chore: auto upgrade addons version or update apis doc" --body ""
+          gh pr create --base "${{ github.ref }}" --head "support/auto-update-${{ env.RELEASE_COMMIT }}" --title "chore: auto upgrade addons version or update apis doc" --body ""
 
       - name: push addons version changes
         uses: ad-m/github-push-action@master

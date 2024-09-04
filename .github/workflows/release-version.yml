@@ -149,7 +149,7 @@ jobs:
       - name: auto create pr head new branch
         if: ${{ steps.upgrade_addon_version.outputs.file_changes && github.ref_name == 'main' }}
         run: |
-          gh pr create --head "support/auto-upgrade-addons-${{ env.RELEASE_COMMIT }}" --title "chore: auto upgrade kubeblocks addons version" --body ""
+          gh pr create --base "${{ github.ref }}" --head "support/auto-upgrade-addons-${{ env.RELEASE_COMMIT }}" --title "chore: auto upgrade kubeblocks addons version" --body ""
 
       - name: push addons version changes
         uses: ad-m/github-push-action@master

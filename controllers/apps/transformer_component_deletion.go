@@ -27,7 +27,6 @@ import (
 	"github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -177,7 +176,6 @@ func (t *componentDeletionTransformer) getCluster(transCtx *componentTransformCo
 func compOwnedKinds() []client.ObjectList {
 	return []client.ObjectList{
 		&workloads.InstanceSetList{},
-		&policyv1.PodDisruptionBudgetList{},
 		&corev1.ServiceList{},
 		&corev1.ServiceAccountList{},
 		&rbacv1.RoleBindingList{},

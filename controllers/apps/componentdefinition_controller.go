@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"hash/fnv"
 	"reflect"
 	"strings"
@@ -411,26 +412,33 @@ func getNCheckCompDefinition(ctx context.Context, cli client.Reader, name string
 	return compDef, nil
 }
 
-// listCompDefinitionsWithPrefix returns all component definitions whose names have prefix @namePrefix.
-func listCompDefinitionsWithPrefix(ctx context.Context, cli client.Reader, namePrefix string) ([]*appsv1alpha1.ComponentDefinition, error) {
+// listCompDefinitionsWithPattern returns all component definitions whose names have prefix @namePrefix.
+func listCompDefinitionsWithPattern(ctx context.Context, cli client.Reader, namePattern string) ([]*appsv1alpha1.ComponentDefinition, error) {
 	compDefList := &appsv1alpha1.ComponentDefinitionList{}
 	if err := cli.List(ctx, compDefList); err != nil {
 		return nil, err
 	}
 	compDefsFullyMatched := make([]*appsv1alpha1.ComponentDefinition, 0)
 	compDefsPrefixMatched := make([]*appsv1alpha1.ComponentDefinition, 0)
+	compDefsRegularExprMatched := make([]*appsv1alpha1.ComponentDefinition, 0)
 	for i, item := range compDefList.Items {
-		if item.Name == namePrefix {
+		if item.Name == namePattern {
 			compDefsFullyMatched = append(compDefsFullyMatched, &compDefList.Items[i])
 		}
-		if strings.HasPrefix(item.Name, namePrefix) {
+		if strings.HasPrefix(item.Name, namePattern) {
 			compDefsPrefixMatched = append(compDefsPrefixMatched, &compDefList.Items[i])
+		}
+		if component.CompDefMatched(item.Name, namePattern) {
+			compDefsRegularExprMatched = append(compDefsRegularExprMatched, &compDefList.Items[i])
 		}
 	}
 	if len(compDefsFullyMatched) > 0 {
 		return compDefsFullyMatched, nil
 	}
-	return compDefsPrefixMatched, nil
+	if len(compDefsPrefixMatched) > 0 {
+		return compDefsPrefixMatched, nil
+	}
+	return compDefsRegularExprMatched, nil
 }
 
 func checkUniqueItemWithValue(slice any, fieldName string, val any) bool {

@@ -178,7 +178,7 @@ func (r *ComponentVersionReconciler) buildReleaseToCompDefinitionMapping(cli cli
 				continue
 			}
 			var err error
-			compDefs[compDef], err = listCompDefinitionsWithPrefix(rctx.Ctx, cli, compDef)
+			compDefs[compDef], err = listCompDefinitionsWithPattern(rctx.Ctx, cli, compDef)
 			if err != nil {
 				return nil, err
 			}
@@ -345,7 +345,7 @@ func resolveCompDefinitionNServiceVersion(ctx context.Context, cli client.Reader
 	var (
 		compDef *appsv1alpha1.ComponentDefinition
 	)
-	compDefs, err := listCompDefinitionsWithPrefix(ctx, cli, compDefName)
+	compDefs, err := listCompDefinitionsWithPattern(ctx, cli, compDefName)
 	if err != nil {
 		return compDef, serviceVersion, err
 	}

@@ -76,7 +76,8 @@ func (r restartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		return err
 	}
 	if len(orderedComps) > 0 {
-		return r.restartComponents(reqCtx, cli, opsRes, orderedComps[:1], false)
+		// will restart components in "ReconcileAction"
+		return nil
 	}
 	return r.restartComponents(reqCtx, cli, opsRes, opsRes.OpsRequest.Spec.RestartList, false)
 }
@@ -96,9 +97,8 @@ func (r restartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 	if err != nil {
 		return "", 0, err
 	}
-	if len(orderedComps) > 1 {
-		// the first component already restarts in "Action" step.
-		if err := r.restartComponents(reqCtx, cli, opsRes, orderedComps, true); err != nil {
+	if len(orderedComps) > 0 {
+		if err = r.restartComponents(reqCtx, cli, opsRes, orderedComps, true); err != nil {
 			return "", 0, err
 		}
 	}
@@ -150,7 +150,7 @@ func (r restartOpsHandler) getComponentOrders(reqCtx intctrlutil.RequestCtx, cli
 
 func (r restartOpsHandler) restartComponents(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, comOpsList []opsv1alpha1.ComponentOps, inOrder bool) error {
 	for index, compOps := range comOpsList {
-		if !r.matchToRestart(opsRes.OpsRequest, comOpsList, index, inOrder) {
+		if !r.matchToRestart(opsRes, comOpsList, index, inOrder) {
 			continue
 		}
 		matchingLabels := client.MatchingLabels{constant.AppInstanceLabelKey: opsRes.Cluster.Name}
@@ -176,20 +176,26 @@ func (r restartOpsHandler) restartComponents(reqCtx intctrlutil.RequestCtx, cli 
 				return err
 			}
 		}
+		if inOrder {
+			// if a component has been restarted in order, break
+			break
+		}
 	}
 	return nil
 }
 
-func (r restartOpsHandler) matchToRestart(opsRequest *opsv1alpha1.OpsRequest, comOpsList []opsv1alpha1.ComponentOps, index int, inOrder bool) bool {
+func (r restartOpsHandler) matchToRestart(opsRes *OpsResource, comOpsList []opsv1alpha1.ComponentOps, index int, inOrder bool) bool {
 	if !inOrder {
 		return true
 	}
-	if index == 0 {
-		// already restart in "Action" step.
-		return false
-	}
 	compHasRestartCompleted := func(compName string) bool {
-		progressDetails := opsRequest.Status.Components[compName].ProgressDetails
+		if r.getCompReplicas(opsRes.Cluster, compName) == 0 {
+			return true
+		}
+		progressDetails := opsRes.OpsRequest.Status.Components[compName].ProgressDetails
+		if len(progressDetails) == 0 {
+			return false
+		}
 		for _, v := range progressDetails {
 			if !isCompletedProgressStatus(v.Status) {
 				return false
@@ -197,11 +203,24 @@ func (r restartOpsHandler) matchToRestart(opsRequest *opsv1alpha1.OpsRequest, co
 		}
 		return true
 	}
-	lastOrderCompName := comOpsList[index-1].ComponentName
-	if !compHasRestartCompleted(lastOrderCompName) {
-		return false
+	if index > 0 {
+		if !compHasRestartCompleted(comOpsList[index-1].ComponentName) {
+			return false
+		}
 	}
 	return !compHasRestartCompleted(comOpsList[index].ComponentName)
+}
+
+func (r restartOpsHandler) getCompReplicas(cluster *appsv1alpha1.Cluster, compName string) int32 {
+	compSpec := cluster.Spec.GetComponentByName(compName)
+	if compSpec != nil {
+		return compSpec.Replicas
+	}
+	shardingSpec := cluster.Spec.GetShardingByName(compName)
+	if shardingSpec != nil {
+		return shardingSpec.Template.Replicas
+	}
+	return 0
 }
 
 // isRestarted checks whether the component has been restarted

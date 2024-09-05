@@ -129,7 +129,7 @@ var _ = Describe("Restart OpsRequest", func() {
 			By("test restart Action")
 			rHandler := restartOpsHandler{}
 			_ = rHandler.Action(reqCtx, k8sClient, opsRes)
-			ExpectCompRestarted(opsRes.OpsRequest, defaultCompName, true)
+			ExpectCompRestarted(opsRes.OpsRequest, defaultCompName, false)
 			ExpectCompRestarted(opsRes.OpsRequest, secondaryCompName, false)
 			ExpectCompRestarted(opsRes.OpsRequest, thirdCompName, false)
 

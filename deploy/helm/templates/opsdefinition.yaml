@@ -56,7 +56,12 @@ spec:
                   set -e
                   # do switchover
                   url="http://${TARGET_POD_IP}:${LORRY_HTTP_PORT}/v1.0/switchover" 
-                  params="{\"parameters\": {\"primary\":\"${primary}\",\"candidate\":\"${candidate}\"}, \"metadata\": ${metadata}}"
+                  metadata=${metadata}
+                  if [ -z ${metadata} ]; then
+                    params="{\"parameters\": {\"primary\":\"${primary}\",\"candidate\":\"${candidate}\"}}"
+                  else
+                    params="{\"parameters\": {\"primary\":\"${primary}\",\"candidate\":\"${candidate}\"}, \"metadata\": ${metadata}}"
+                  fi
                   echo "curl ${url}, parameters: ${params}"
                   res=`curl -s -X POST -H 'Content-Type: application/json' "${url}" -d "${params}"`
                   echo "curl result: ${res}"

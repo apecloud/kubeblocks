@@ -570,7 +570,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 			}
 			clusterTemp.HaConfig.SetEnable(true)
 			mockDCSStore.EXPECT().GetCluster().Return(clusterTemp, nil).AnyTimes()
-			mockDCSStore.EXPECT().CreateSwitchover(gomock.Any(), gomock.Any()).Return(nil)
+			mockDCSStore.EXPECT().CreateSwitchover(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 			mockDBManager.EXPECT().IsLeaderMember(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).Times(1)
 			mockDBManager.EXPECT().HasOtherHealthyMembers(gomock.Any(), gomock.Any(), gomock.Any()).Return([]*dcs.Member{{}, {}}).Times(1)
 			err := lorryClient.Switchover(context.TODO(), "pod-0", "", false)
@@ -584,7 +584,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 			}
 			clusterTemp.HaConfig.SetEnable(true)
 			mockDCSStore.EXPECT().GetCluster().Return(clusterTemp, nil).AnyTimes()
-			mockDCSStore.EXPECT().CreateSwitchover(gomock.Any(), gomock.Any()).Return(nil)
+			mockDCSStore.EXPECT().CreateSwitchover(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 			mockDBManager.EXPECT().IsMemberHealthy(gomock.Any(), gomock.Any(), gomock.Any()).Return(true).Times(1)
 			err := lorryClient.Switchover(context.TODO(), "", "pod-1", false)
 			Expect(err).Should(BeNil())
@@ -597,7 +597,7 @@ var _ = Describe("Lorry HTTP Client", func() {
 			}
 			clusterTemp.HaConfig.SetEnable(true)
 			mockDCSStore.EXPECT().GetCluster().Return(clusterTemp, nil).AnyTimes()
-			mockDCSStore.EXPECT().CreateSwitchover(gomock.Any(), gomock.Any()).Return(nil)
+			mockDCSStore.EXPECT().CreateSwitchover(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 			mockDBManager.EXPECT().IsLeaderMember(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).Times(1)
 			mockDBManager.EXPECT().IsMemberHealthy(gomock.Any(), gomock.Any(), gomock.Any()).Return(true).Times(1)
 			err := lorryClient.Switchover(context.TODO(), "pod-0", "pod-1", false)

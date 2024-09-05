@@ -106,6 +106,7 @@ func OperationWrapper(op operations.Operation) fasthttp.RequestHandler {
 		}
 		opsReq := &operations.OpsRequest{
 			Parameters: req.Parameters,
+			Metadata:   req.Metadata,
 			Data:       b,
 		}
 

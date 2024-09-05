@@ -40,7 +40,7 @@ For a detailed list of Addons and their features, please refer to [supported add
 
 The unified API makes KubeBlocks an excellent choice if you need to run multiple types of databases on Kubernetes. It can significantly reduce the learning curve associated with mastering multiple operators.
 
-## How unified APIs reduces your learning curve
+## How unified APIs reduce your learning curve
 
 Here is an example of how to use KubeBlocks' Cluster API to write a YAML file and create a MySQL Cluster with three replicas.
 
@@ -107,7 +107,6 @@ spec:
 ```
 
 </TabItem>
-
 <TabItem value="MongoDB" label="MongoDB">
 
 ```yaml
@@ -138,8 +137,8 @@ spec:
           requests:
             storage: 10Gi
 ```
-</TabItem>
 
+</TabItem>
 <TabItem value="Redis" label="Redis">
 
 ```yaml
@@ -188,8 +187,8 @@ spec:
             requests:
               storage: 10Gi
 ```
-</TabItem>
 
+</TabItem>
 </Tabs>
 
 This means that managing multiple databases on Kubernetes becomes simple, efficient, and standardized, saving you a lot of time that would otherwise be spent searching through manuals and API references.

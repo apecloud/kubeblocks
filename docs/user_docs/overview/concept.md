@@ -7,7 +7,7 @@ sidebar_position: 2
 
 # Concepts
 
-You've already seen the benefits of using unified APIs to represent various databases in the section ["How Unified APIs Reduces Your Learning Curve"](./introduction.md#how-unified-apis-reduces-your-learning-curve). If you take a closer look at those examples, you'll notice two key concepts in the sample YAML files: **Cluster** and **Component**. For instance, `test-mysql` is a Cluster that includes a Component called `mysql` (with a componentDef of `apecloud-mysql`). Similarly, `test-redis` is also a Cluster, and it includes two Components: one called `redis` (with a componentDef of `redis-7`), which has two replicas, and another called `redis-sentinel` (with a componentDef of `redis-sentinel`), which has three replicas.
+You've already seen the benefits of using unified APIs to represent various databases in the section ["How Unified APIs Reduce Your Learning Curve"](./introduction.md#how-unified-apis-reduce-your-learning-curve). If you take a closer look at those examples, you'll notice two key concepts in the sample YAML files: **Cluster** and **Component**. For instance, `test-mysql` is a Cluster that includes a Component called `mysql` (with a componentDef of `apecloud-mysql`). Similarly, `test-redis` is also a Cluster, and it includes two Components: one called `redis` (with a componentDef of `redis-7`), which has two replicas, and another called `redis-sentinel` (with a componentDef of `redis-sentinel`), which has three replicas.
 
 In this document, we will explain the reasons behind these two concepts and provide a brief introduction to the underlying API (i.e., CRD).
 
@@ -107,7 +107,7 @@ A Cluster object represents an entire database cluster managed by KubeBlocks. A 
 For distributed databases with a sharded-nothing architecture, like Redis Cluster, the Cluster supports managing multiple shards, with each shard managed by a separate Component. This architecture also supports dynamic resharding: if you need to scale out and add a new shard, you simply add a new Component; conversely, if you need to scale in and reduce the number of shards, you remove a Component.
 
 #### Component
-Component is a fundamental building block of a Cluster object. For example, a Redis Cluster can include Components like ‘redis’, ‘sentinel’, and potentially a proxy like ‘twemproxy’.
+Component is a fundamental building block of a Cluster object. For example, a Redis Cluster can include Components like `redis`, `sentinel`, and potentially a proxy like `twemproxy`.
 
 The Component object is responsible for managing the lifecycle of all replicas within a Component, It supports a wide range of operations including provisioning, stopping, restarting, termination, upgrading, configuration changes, vertical and horizontal scaling, failover, switchover, scheduling configuration, exposing Services, managing system accounts.
 
@@ -120,7 +120,7 @@ A database instance, or replica, consists of a Pod and several other auxiliary o
 
 ### KubeBlocks API for Addon
 
-::: note
+:::note
 
 Only Addon developers need to understand the ClusterDefinition and ComponentDefinition APIs. As a result, KubeBlocks users can easily bypass these two APIs.
 :::

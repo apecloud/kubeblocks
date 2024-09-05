@@ -23,7 +23,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"hash/fnv"
 	"reflect"
 	"strings"
@@ -41,6 +40,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsconfig "github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -412,7 +412,7 @@ func getNCheckCompDefinition(ctx context.Context, cli client.Reader, name string
 	return compDef, nil
 }
 
-// listCompDefinitionsWithPattern returns all component definitions whose names have prefix @namePrefix.
+// listCompDefinitionsWithPattern returns all component definitions whose names match the given pattern (namePrefix or regular expression)
 func listCompDefinitionsWithPattern(ctx context.Context, cli client.Reader, namePattern string) ([]*appsv1alpha1.ComponentDefinition, error) {
 	compDefList := &appsv1alpha1.ComponentDefinitionList{}
 	if err := cli.List(ctx, compDefList); err != nil {
@@ -420,7 +420,7 @@ func listCompDefinitionsWithPattern(ctx context.Context, cli client.Reader, name
 	}
 	compDefsFullyMatched := make([]*appsv1alpha1.ComponentDefinition, 0)
 	compDefsPrefixMatched := make([]*appsv1alpha1.ComponentDefinition, 0)
-	compDefsRegularExprMatched := make([]*appsv1alpha1.ComponentDefinition, 0)
+	compDefsRegexMatched := make([]*appsv1alpha1.ComponentDefinition, 0)
 	for i, item := range compDefList.Items {
 		if item.Name == namePattern {
 			compDefsFullyMatched = append(compDefsFullyMatched, &compDefList.Items[i])
@@ -429,7 +429,7 @@ func listCompDefinitionsWithPattern(ctx context.Context, cli client.Reader, name
 			compDefsPrefixMatched = append(compDefsPrefixMatched, &compDefList.Items[i])
 		}
 		if component.CompDefMatched(item.Name, namePattern) {
-			compDefsRegularExprMatched = append(compDefsRegularExprMatched, &compDefList.Items[i])
+			compDefsRegexMatched = append(compDefsRegexMatched, &compDefList.Items[i])
 		}
 	}
 	if len(compDefsFullyMatched) > 0 {
@@ -438,7 +438,7 @@ func listCompDefinitionsWithPattern(ctx context.Context, cli client.Reader, name
 	if len(compDefsPrefixMatched) > 0 {
 		return compDefsPrefixMatched, nil
 	}
-	return compDefsRegularExprMatched, nil
+	return compDefsRegexMatched, nil
 }
 
 func checkUniqueItemWithValue(slice any, fieldName string, val any) bool {

@@ -1270,7 +1270,7 @@ type UpdatedParameters struct {
 // +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories={kubeblocks,all},shortName=ops
+// +kubebuilder:resource:categories={kubeblocks},shortName=ops
 // +kubebuilder:printcolumn:name="TYPE",type="string",JSONPath=".spec.type",description="Operation request type."
 // +kubebuilder:printcolumn:name="CLUSTER",type="string",JSONPath=".spec.clusterName",description="Operand cluster."
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="Operation status phase."

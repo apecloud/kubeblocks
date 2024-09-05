@@ -270,17 +270,16 @@ func adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp *SynthesizedComp
 	if err != nil {
 		return err
 	}
-	if len(image) == 0 {
-		return nil
+
+	if len(image) > 0 {
+		// init-container to copy binaries to the shared mount point /kubeblocks
+		initContainer := buildKBAgentInitContainer()
+		synthesizedComp.PodSpec.InitContainers = append(synthesizedComp.PodSpec.InitContainers, *initContainer)
+
+		container.Image = image
+		container.Command[0] = kbAgentCommandOnSharedMount
+		container.VolumeMounts = append(container.VolumeMounts, sharedVolumeMount)
 	}
-
-	// init-container to copy binaries to the shared mount point /kubeblocks
-	initContainer := buildKBAgentInitContainer()
-	synthesizedComp.PodSpec.InitContainers = append(synthesizedComp.PodSpec.InitContainers, *initContainer)
-
-	container.Image = image
-	container.Command[0] = kbAgentCommandOnSharedMount
-	container.VolumeMounts = append(container.VolumeMounts, sharedVolumeMount)
 
 	// TODO: share more container resources
 	if c != nil {
@@ -342,15 +341,6 @@ func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) (str
 		if c == nil {
 			return "", nil, fmt.Errorf("exec container %s not found", container)
 		}
-	}
-	if len(image) > 0 && len(container) > 0 {
-		if c.Image == image {
-			return image, c, nil
-		}
-		return "", nil, fmt.Errorf("exec image and container must be the same")
-	}
-	if len(image) == 0 && len(container) > 0 {
-		image = c.Image
 	}
 	return image, c, nil
 }

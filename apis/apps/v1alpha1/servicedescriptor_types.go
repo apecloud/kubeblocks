@@ -133,7 +133,7 @@ type ServiceDescriptorStatus struct {
 // +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories={kubeblocks,all},shortName=sd
+// +kubebuilder:resource:categories={kubeblocks},shortName=sd
 // +kubebuilder:printcolumn:name="SERVICE_KIND",type="string",JSONPath=".spec.serviceKind",description="service kind"
 // +kubebuilder:printcolumn:name="SERVICE_VERSION",type="string",JSONPath=".spec.serviceVersion",description="service version"
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"

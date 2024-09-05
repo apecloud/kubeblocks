@@ -102,13 +102,13 @@ var _ = Describe("Restart OpsRequest", func() {
 
 		ExpectCompRestarted := func(opsRequest *appsv1alpha1.OpsRequest, compName string, expectRestarted bool) {
 			instanceSetName := constant.GenerateWorkloadNamePattern(clusterName, compName)
-			Expect(testapps.CheckObj(&testCtx, client.ObjectKey{Name: instanceSetName, Namespace: testCtx.DefaultNamespace},
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: instanceSetName, Namespace: testCtx.DefaultNamespace},
 				func(g Gomega, pobj *workloads.InstanceSet) {
 					startTimestamp := opsRes.OpsRequest.Status.StartTimestamp
 					workloadRestartTimeStamp := pobj.Spec.Template.Annotations[constant.RestartAnnotationKey]
 					res, _ := time.Parse(time.RFC3339, workloadRestartTimeStamp)
 					g.Expect(!startTimestamp.After(res)).Should(Equal(expectRestarted))
-				}))
+				})).Should(Succeed())
 		}
 
 		It("Test restart OpsRequest with existing update orders", func() {
@@ -151,8 +151,8 @@ var _ = Describe("Restart OpsRequest", func() {
 					},
 				}
 			}
-			setCompProgress(secondaryCompName, appsv1alpha1.SucceedProgressStatus)
-			setCompProgress(thirdCompName, appsv1alpha1.PendingProgressStatus)
+			setCompProgress(defaultCompName, appsv1alpha1.SucceedProgressStatus)
+			setCompProgress(secondaryCompName, appsv1alpha1.PendingProgressStatus)
 
 			By("test reconcile Action and expect to restart third component")
 			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)

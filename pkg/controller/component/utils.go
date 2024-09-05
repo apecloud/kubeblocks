@@ -42,10 +42,19 @@ func CompDefMatched(compDef, compDefPattern string) bool {
 	if strings.HasPrefix(compDef, compDefPattern) {
 		return true
 	}
+
+	isRegexPattern := func(pattern string) bool {
+		escapedPattern := regexp.QuoteMeta(pattern)
+		return escapedPattern != pattern
+	}
+
 	isRegex := false
 	regex, err := regexp.Compile(compDefPattern)
 	if err == nil {
-		isRegex = true
+		// distinguishing between regular expressions and ordinary strings.
+		if isRegexPattern(compDefPattern) {
+			isRegex = true
+		}
 	}
 	if !isRegex {
 		return false

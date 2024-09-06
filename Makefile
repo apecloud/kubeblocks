@@ -276,6 +276,10 @@ dataprotection: generate test-go-generate build-checks ## Build dataprotection b
 kbagent: generate test-go-generate build-checks
 	$(GO) build -ldflags=${LD_FLAGS} -o bin/kbagent ./cmd/kbagent/main.go
 
+.PHONY: helmhook
+helmhook:
+	$(GO) build -o bin/helmhook ./cmd/helmhook/main.go
+
 CERT_ROOT_CA ?= $(WEBHOOK_CERT_DIR)/rootCA.key
 .PHONY: webhook-cert
 webhook-cert: $(CERT_ROOT_CA) ## Create root CA certificates for admission webhooks testing.

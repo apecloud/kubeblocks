@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	errors "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/yaml"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
@@ -66,6 +67,20 @@ func deleteDeployment(ctx context.Context, client *kubernetes.Clientset, ns, com
 		return err
 	}
 
+	// before delete deployment, out the deployment yaml, if deployment was deleted
+	// by mistake, we can recover it by apply the yaml.
+	tempDeploy := deploy.DeepCopy()
+	tempDeploy.ManagedFields = nil
+	bytes, err := yaml.Marshal(tempDeploy)
+	if err != nil {
+		return err
+	}
+	fmt.Printf(`
+------------------- Deployment %s -------------------
+%s
+------------------ Deployment %s end ----------------`,
+		deploy.Name, string(bytes), deploy.Name)
+
 	if err = client.AppsV1().Deployments(deploy.Namespace).Delete(ctx, deploy.Name,
 		metav1.DeleteOptions{
 			GracePeriodSeconds: func() *int64 {
@@ -80,7 +95,7 @@ func deleteDeployment(ctx context.Context, client *kubernetes.Clientset, ns, com
 	return wait.PollUntilContextTimeout(context.Background(), 5*time.Second, 1*time.Minute, true,
 		func(_ context.Context) (bool, error) {
 			deploy, err = getter(ctx, client, ns, componentName)
-			if err != nil && errors.IgnoreNotFound(err) == nil {
+			if err == nil && deploy == nil {
 				return true, nil
 			}
 			return false, err

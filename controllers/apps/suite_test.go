@@ -48,7 +48,7 @@ import (
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/apis/workloads/legacy"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -142,9 +142,9 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	model.AddScheme(snapshotv1.AddToScheme)
 
-	err = workloads.AddToScheme(scheme.Scheme)
+	err = workloadsv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
-	model.AddScheme(workloads.AddToScheme)
+	model.AddScheme(workloadsv1.AddToScheme)
 
 	err = legacy.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())

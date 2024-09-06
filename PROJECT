@@ -144,6 +144,18 @@ resources:
   version: v1alpha1
 - api:
     crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: kubeblocks.io
+  group: workloads
+  kind: InstanceSet
+  path: github.com/apecloud/kubeblocks/apis/workloads/v1
+  version: v1
+  webhooks:
+    conversion: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
   controller: true
   domain: kubeblocks.io
   group: dataprotection

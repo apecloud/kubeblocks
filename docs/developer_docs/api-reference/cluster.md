@@ -18,6 +18,9 @@ sidebar_label: Cluster
 <a href="#apps.kubeblocks.io%2fv1beta1">apps.kubeblocks.io/v1beta1</a>
 </li>
 <li>
+<a href="#workloads.kubeblocks.io%2fv1">workloads.kubeblocks.io/v1</a>
+</li>
+<li>
 <a href="#workloads.kubeblocks.io%2fv1alpha1">workloads.kubeblocks.io/v1alpha1</a>
 </li>
 </ul>
@@ -29747,6 +29750,2022 @@ string
 </td>
 <td>
 <p>Identifies the name of the process to which the Unix signal will be sent.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<hr/>
+<h2 id="workloads.kubeblocks.io/v1">workloads.kubeblocks.io/v1</h2>
+<div>
+</div>
+Resource Types:
+<ul><li>
+<a href="#workloads.kubeblocks.io/v1.InstanceSet">InstanceSet</a>
+</li></ul>
+<h3 id="workloads.kubeblocks.io/v1.InstanceSet">InstanceSet
+</h3>
+<div>
+<p>InstanceSet is the Schema for the instancesets API.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>apiVersion</code><br/>
+string</td>
+<td>
+<code>workloads.kubeblocks.io/v1</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+string
+</td>
+<td><code>InstanceSet</code></td>
+</tr>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+<p>Contains the metadata for the particular object, such as name, namespace, labels, and annotations.</p>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">
+InstanceSetSpec
+</a>
+</em>
+</td>
+<td>
+<p>Defines the desired state of the state machine. It includes the configuration details for the state machine.</p>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>replicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the desired number of replicas of the given Template.
+These replicas are instantiations of the same Template, with each having a consistent identity.
+Defaults to 1 if unspecified.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>defaultTemplateOrdinals</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.Ordinals">
+Ordinals
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the desired Ordinals of the default template.
+The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the default template.</p>
+<p>For example, if Ordinals is &#123;ranges: [&#123;start: 0, end: 1&#125;], discrete: [7]&#125;,
+then the instance names generated under the default template would be
+$(cluster.name)-$(component.name)-0、$(cluster.name)-$(component.name)-1 and $(cluster.name)-$(component.name)-7</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>minReadySeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the minimum number of seconds a newly created pod should be ready
+without any of its container crashing to be considered available.
+Defaults to 0, meaning the pod will be considered available as soon as it is ready.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>selector</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#labelselector-v1-meta">
+Kubernetes meta/v1.LabelSelector
+</a>
+</em>
+</td>
+<td>
+<p>Represents a label query over pods that should match the desired replica count indicated by the <code>replica</code> field.
+It must match the labels defined in the pod template.
+More info: <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors">https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors</a></p>
+</td>
+</tr>
+<tr>
+<td>
+<code>service</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#service-v1-core">
+Kubernetes core/v1.Service
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the behavior of a service spec.
+Provides read-write service.
+<a href="https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status">https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status</a></p>
+<p>Note: This field will be removed in future version.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>template</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podtemplatespec-v1-core">
+Kubernetes core/v1.PodTemplateSpec
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>instances</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceTemplate">
+[]InstanceTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Overrides values in default Template.</p>
+<p>Instance is the fundamental unit managed by KubeBlocks.
+It represents a Pod with additional objects such as PVCs, Services, ConfigMaps, etc.
+An InstanceSet manages instances with a total count of Replicas,
+and by default, all these instances are generated from the same template.
+The InstanceTemplate provides a way to override values in the default template,
+allowing the InstanceSet to manage instances from different templates.</p>
+<p>The naming convention for instances (pods) based on the InstanceSet Name, InstanceTemplate Name, and ordinal.
+The constructed instance name follows the pattern: $(instance_set.name)-$(template.name)-$(ordinal).
+By default, the ordinal starts from 0 for each InstanceTemplate.
+It is important to ensure that the Name of each InstanceTemplate is unique.</p>
+<p>The sum of replicas across all InstanceTemplates should not exceed the total number of Replicas specified for the InstanceSet.
+Any remaining replicas will be generated using the default template and will follow the default naming rules.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>offlineInstances</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the names of instances to be transitioned to offline status.</p>
+<p>Marking an instance as offline results in the following:</p>
+<ol>
+<li>The associated pod is stopped, and its PersistentVolumeClaim (PVC) is retained for potential
+future reuse or data recovery, but it is no longer actively used.</li>
+<li>The ordinal number assigned to this instance is preserved, ensuring it remains unique
+and avoiding conflicts with new instances.</li>
+</ol>
+<p>Setting instances to offline allows for a controlled scale-in process, preserving their data and maintaining
+ordinal consistency within the cluster.
+Note that offline instances and their associated resources, such as PVCs, are not automatically deleted.
+The cluster administrator must manually manage the cleanup and removal of these resources when they are no longer needed.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeClaimTemplates</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#persistentvolumeclaim-v1-core">
+[]Kubernetes core/v1.PersistentVolumeClaim
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a list of PersistentVolumeClaim templates that define the storage requirements for each replica.
+Each template specifies the desired characteristics of a persistent volume, such as storage class,
+size, and access modes.
+These templates are used to dynamically provision persistent volumes for replicas upon their creation.
+The final name of each PVC is generated by appending the pod&rsquo;s identifier to the name specified in volumeClaimTemplates[*].name.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podManagementPolicy</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podmanagementpolicytype-v1-apps">
+Kubernetes apps/v1.PodManagementPolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Controls how pods are created during initial scale up,
+when replacing pods on nodes, or when scaling down.</p>
+<p>The default policy is <code>OrderedReady</code>, where pods are created in increasing order and the controller waits until each pod is ready before
+continuing. When scaling down, the pods are removed in the opposite order.
+The alternative policy is <code>Parallel</code> which will create pods in parallel
+to match the desired scale without waiting, and on scale down will delete
+all pods at once.</p>
+<p>Note: This field will be removed in future version.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>parallelPodManagementConcurrency</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
+or when scaling down. It only used when <code>PodManagementPolicy</code> is set to <code>Parallel</code>.
+The default Concurrency is 100%.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podUpdatePolicy</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.PodUpdatePolicyType">
+PodUpdatePolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PodUpdatePolicy indicates how pods should be updated</p>
+<ul>
+<li><code>StrictInPlace</code> indicates that only allows in-place upgrades.
+Any attempt to modify other fields will be rejected.</li>
+<li><code>PreferInPlace</code> indicates that we will first attempt an in-place upgrade of the Pod.
+If that fails, it will fall back to the ReCreate, where pod will be recreated.
+Default value is &ldquo;PreferInPlace&rdquo;</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>updateStrategy</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#statefulsetupdatestrategy-v1-apps">
+Kubernetes apps/v1.StatefulSetUpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<p>Indicates the StatefulSetUpdateStrategy that will be
+employed to update Pods in the InstanceSet when a revision is made to
+Template.
+UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if MemberUpdateStrategy is not nil</p>
+<p>Note: This field will be removed in future version.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>roles</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.ReplicaRole">
+[]ReplicaRole
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A list of roles defined in the system.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>roleProbe</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.RoleProbe">
+RoleProbe
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides method to probe role.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>membershipReconfiguration</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.MembershipReconfiguration">
+MembershipReconfiguration
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides actions to do membership dynamic reconfiguration.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memberUpdateStrategy</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.MemberUpdateStrategy">
+MemberUpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Members(Pods) update strategy.</p>
+<ul>
+<li>serial: update Members one by one that guarantee minimum component unavailable time.</li>
+<li>bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.</li>
+<li>parallel: force parallel</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>paused</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates that the InstanceSet is paused, meaning the reconciliation of this InstanceSet object will be paused.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>credential</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.Credential">
+Credential
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Credential used to connect to DB engine</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceSetStatus">
+InstanceSetStatus
+</a>
+</em>
+</td>
+<td>
+<p>Represents the current information about the state machine. This data may be out of date.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.AccessMode">AccessMode
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.ReplicaRole">ReplicaRole</a>)
+</p>
+<div>
+<p>AccessMode defines SVC access mode enums.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;None&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;ReadWrite&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Readonly&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.Action">Action
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.MembershipReconfiguration">MembershipReconfiguration</a>, <a href="#workloads.kubeblocks.io/v1.RoleProbe">RoleProbe</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>image</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Refers to the utility image that contains the command which can be utilized to retrieve or process role information.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>command</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<p>A set of instructions that will be executed within the Container to retrieve or process role information. This field is required.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>args</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Additional parameters used to perform specific statements. This field is optional.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.ConditionType">ConditionType
+(<code>string</code> alias)</h3>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;InstanceAvailable&#34;</p></td>
+<td><p>InstanceAvailable ConditionStatus will be True if all instances(pods) are in the ready condition
+and continue for &ldquo;MinReadySeconds&rdquo; seconds. Otherwise, it will be set to False.</p>
+</td>
+</tr><tr><td><p>&#34;InstanceFailure&#34;</p></td>
+<td><p>InstanceFailure is added in an instance set when at least one of its instances(pods) is in a <code>Failed</code> phase.</p>
+</td>
+</tr><tr><td><p>&#34;InstanceReady&#34;</p></td>
+<td><p>InstanceReady is added in an instance set when at least one of its instances(pods) is in a Ready condition.
+ConditionStatus will be True if all its instances(pods) are in a Ready condition.
+Or, a NotReady reason with not ready instances encoded in the Message filed will be set.</p>
+</td>
+</tr><tr><td><p>&#34;InstanceUpdateRestricted&#34;</p></td>
+<td><p>InstanceUpdateRestricted represents a ConditionType that indicates updates to an InstanceSet are blocked(when the
+PodUpdatePolicy is set to StrictInPlace but the pods cannot be updated in-place).</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.Credential">Credential
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>username</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.CredentialVar">
+CredentialVar
+</a>
+</em>
+</td>
+<td>
+<p>Defines the user&rsquo;s name for the credential.
+The corresponding environment variable will be KB_ITS_USERNAME.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>password</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.CredentialVar">
+CredentialVar
+</a>
+</em>
+</td>
+<td>
+<p>Represents the user&rsquo;s password for the credential.
+The corresponding environment variable will be KB_ITS_PASSWORD.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.CredentialVar">CredentialVar
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.Credential">Credential</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>value</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the value of the environment variable. This field is optional and defaults to an empty string.
+The value can include variable references in the format $(VAR_NAME) which will be expanded using previously defined environment variables in the container and any service environment variables.</p>
+<p>If a variable cannot be resolved, the reference in the input string will remain unchanged.
+Double $$ can be used to escape the $(VAR_NAME) syntax, resulting in a single $ and producing the string literal &ldquo;$(VAR_NAME)&rdquo;.
+Escaped references will not be expanded, regardless of whether the variable exists or not.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>valueFrom</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvarsource-v1-core">
+Kubernetes core/v1.EnvVarSource
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the source for the environment variable&rsquo;s value. This field is optional and cannot be used if the &lsquo;Value&rsquo; field is not empty.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSet">InstanceSet</a>)
+</p>
+<div>
+<p>InstanceSetSpec defines the desired state of InstanceSet</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>replicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the desired number of replicas of the given Template.
+These replicas are instantiations of the same Template, with each having a consistent identity.
+Defaults to 1 if unspecified.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>defaultTemplateOrdinals</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.Ordinals">
+Ordinals
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the desired Ordinals of the default template.
+The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the default template.</p>
+<p>For example, if Ordinals is &#123;ranges: [&#123;start: 0, end: 1&#125;], discrete: [7]&#125;,
+then the instance names generated under the default template would be
+$(cluster.name)-$(component.name)-0、$(cluster.name)-$(component.name)-1 and $(cluster.name)-$(component.name)-7</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>minReadySeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the minimum number of seconds a newly created pod should be ready
+without any of its container crashing to be considered available.
+Defaults to 0, meaning the pod will be considered available as soon as it is ready.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>selector</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#labelselector-v1-meta">
+Kubernetes meta/v1.LabelSelector
+</a>
+</em>
+</td>
+<td>
+<p>Represents a label query over pods that should match the desired replica count indicated by the <code>replica</code> field.
+It must match the labels defined in the pod template.
+More info: <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors">https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors</a></p>
+</td>
+</tr>
+<tr>
+<td>
+<code>service</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#service-v1-core">
+Kubernetes core/v1.Service
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the behavior of a service spec.
+Provides read-write service.
+<a href="https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status">https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status</a></p>
+<p>Note: This field will be removed in future version.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>template</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podtemplatespec-v1-core">
+Kubernetes core/v1.PodTemplateSpec
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>instances</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceTemplate">
+[]InstanceTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Overrides values in default Template.</p>
+<p>Instance is the fundamental unit managed by KubeBlocks.
+It represents a Pod with additional objects such as PVCs, Services, ConfigMaps, etc.
+An InstanceSet manages instances with a total count of Replicas,
+and by default, all these instances are generated from the same template.
+The InstanceTemplate provides a way to override values in the default template,
+allowing the InstanceSet to manage instances from different templates.</p>
+<p>The naming convention for instances (pods) based on the InstanceSet Name, InstanceTemplate Name, and ordinal.
+The constructed instance name follows the pattern: $(instance_set.name)-$(template.name)-$(ordinal).
+By default, the ordinal starts from 0 for each InstanceTemplate.
+It is important to ensure that the Name of each InstanceTemplate is unique.</p>
+<p>The sum of replicas across all InstanceTemplates should not exceed the total number of Replicas specified for the InstanceSet.
+Any remaining replicas will be generated using the default template and will follow the default naming rules.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>offlineInstances</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the names of instances to be transitioned to offline status.</p>
+<p>Marking an instance as offline results in the following:</p>
+<ol>
+<li>The associated pod is stopped, and its PersistentVolumeClaim (PVC) is retained for potential
+future reuse or data recovery, but it is no longer actively used.</li>
+<li>The ordinal number assigned to this instance is preserved, ensuring it remains unique
+and avoiding conflicts with new instances.</li>
+</ol>
+<p>Setting instances to offline allows for a controlled scale-in process, preserving their data and maintaining
+ordinal consistency within the cluster.
+Note that offline instances and their associated resources, such as PVCs, are not automatically deleted.
+The cluster administrator must manually manage the cleanup and removal of these resources when they are no longer needed.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeClaimTemplates</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#persistentvolumeclaim-v1-core">
+[]Kubernetes core/v1.PersistentVolumeClaim
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a list of PersistentVolumeClaim templates that define the storage requirements for each replica.
+Each template specifies the desired characteristics of a persistent volume, such as storage class,
+size, and access modes.
+These templates are used to dynamically provision persistent volumes for replicas upon their creation.
+The final name of each PVC is generated by appending the pod&rsquo;s identifier to the name specified in volumeClaimTemplates[*].name.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podManagementPolicy</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podmanagementpolicytype-v1-apps">
+Kubernetes apps/v1.PodManagementPolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Controls how pods are created during initial scale up,
+when replacing pods on nodes, or when scaling down.</p>
+<p>The default policy is <code>OrderedReady</code>, where pods are created in increasing order and the controller waits until each pod is ready before
+continuing. When scaling down, the pods are removed in the opposite order.
+The alternative policy is <code>Parallel</code> which will create pods in parallel
+to match the desired scale without waiting, and on scale down will delete
+all pods at once.</p>
+<p>Note: This field will be removed in future version.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>parallelPodManagementConcurrency</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
+or when scaling down. It only used when <code>PodManagementPolicy</code> is set to <code>Parallel</code>.
+The default Concurrency is 100%.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podUpdatePolicy</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.PodUpdatePolicyType">
+PodUpdatePolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PodUpdatePolicy indicates how pods should be updated</p>
+<ul>
+<li><code>StrictInPlace</code> indicates that only allows in-place upgrades.
+Any attempt to modify other fields will be rejected.</li>
+<li><code>PreferInPlace</code> indicates that we will first attempt an in-place upgrade of the Pod.
+If that fails, it will fall back to the ReCreate, where pod will be recreated.
+Default value is &ldquo;PreferInPlace&rdquo;</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>updateStrategy</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#statefulsetupdatestrategy-v1-apps">
+Kubernetes apps/v1.StatefulSetUpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<p>Indicates the StatefulSetUpdateStrategy that will be
+employed to update Pods in the InstanceSet when a revision is made to
+Template.
+UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if MemberUpdateStrategy is not nil</p>
+<p>Note: This field will be removed in future version.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>roles</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.ReplicaRole">
+[]ReplicaRole
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A list of roles defined in the system.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>roleProbe</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.RoleProbe">
+RoleProbe
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides method to probe role.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>membershipReconfiguration</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.MembershipReconfiguration">
+MembershipReconfiguration
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides actions to do membership dynamic reconfiguration.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memberUpdateStrategy</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.MemberUpdateStrategy">
+MemberUpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Members(Pods) update strategy.</p>
+<ul>
+<li>serial: update Members one by one that guarantee minimum component unavailable time.</li>
+<li>bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.</li>
+<li>parallel: force parallel</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>paused</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates that the InstanceSet is paused, meaning the reconciliation of this InstanceSet object will be paused.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>credential</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.Credential">
+Credential
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Credential used to connect to DB engine</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.InstanceSetStatus">InstanceSetStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSet">InstanceSet</a>)
+</p>
+<div>
+<p>InstanceSetStatus defines the observed state of InstanceSet</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>observedGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>observedGeneration is the most recent generation observed for this InstanceSet. It corresponds to the
+InstanceSet&rsquo;s generation, which is updated on mutation by the API Server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>replicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>replicas is the number of instances created by the InstanceSet controller.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>readyReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>readyReplicas is the number of instances created for this InstanceSet with a Ready Condition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>currentReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>currentReplicas is the number of instances created by the InstanceSet controller from the InstanceSet version
+indicated by CurrentRevisions.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updatedReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>updatedReplicas is the number of instances created by the InstanceSet controller from the InstanceSet version
+indicated by UpdateRevisions.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>currentRevision</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>currentRevision, if not empty, indicates the version of the InstanceSet used to generate instances in the
+sequence [0,currentReplicas).</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updateRevision</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>updateRevision, if not empty, indicates the version of the InstanceSet used to generate instances in the sequence
+[replicas-updatedReplicas,replicas)</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>conditions</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#condition-v1-meta">
+[]Kubernetes meta/v1.Condition
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents the latest available observations of an instanceset&rsquo;s current state.
+Known .status.conditions.type are: &ldquo;InstanceFailure&rdquo;, &ldquo;InstanceReady&rdquo;</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>availableReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Total number of available instances (ready for at least minReadySeconds) targeted by this InstanceSet.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>initReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the initial number of instances when the cluster is first initialized.
+This value is set to spec.Replicas at the time of object creation and remains constant thereafter.
+Used only when spec.roles set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>readyInitReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents the number of instances that have already reached the MembersStatus during the cluster initialization stage.
+This value remains constant once it equals InitReplicas.
+Used only when spec.roles set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>membersStatus</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.MemberStatus">
+[]MemberStatus
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides the status of each member in the cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>readyWithoutPrimary</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates whether it is required for the InstanceSet to have at least one primary instance ready.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>currentRevisions</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>currentRevisions, if not empty, indicates the old version of the InstanceSet used to generate the underlying workload.
+key is the pod name, value is the revision.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updateRevisions</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>updateRevisions, if not empty, indicates the new version of the InstanceSet used to generate the underlying workload.
+key is the pod name, value is the revision.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>templatesStatus</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceTemplateStatus">
+[]InstanceTemplateStatus
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>TemplatesStatus represents status of each instance generated by InstanceTemplates</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
+</p>
+<div>
+<p>InstanceTemplate allows customization of individual replica configurations within a Component,
+without altering the base component template defined in ClusterComponentSpec.
+It enables the application of distinct settings to specific instances (replicas),
+providing flexibility while maintaining a common configuration baseline.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name specifies the unique name of the instance Pod created using this InstanceTemplate.
+This name is constructed by concatenating the component&rsquo;s name, the template&rsquo;s name, and the instance&rsquo;s ordinal
+using the pattern: $(cluster.name)-$(component.name)-$(template.name)-$(ordinal). Ordinals start from 0.
+The specified name overrides any default naming conventions or patterns.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>replicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the number of instances (Pods) to create from this InstanceTemplate.
+This field allows setting how many replicated instances of the component,
+with the specific overrides in the InstanceTemplate, are created.
+The default value is 1. A value of 0 disables instance creation.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ordinals</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.Ordinals">
+Ordinals
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the desired Ordinals of this InstanceTemplate.
+The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.</p>
+<p>For example, if Ordinals is &#123;ranges: [&#123;start: 0, end: 1&#125;], discrete: [7]&#125;,
+then the instance names generated under this InstanceTemplate would be
+$(cluster.name)-$(component.name)-$(template.name)-0、$(cluster.name)-$(component.name)-$(template.name)-1 and
+$(cluster.name)-$(component.name)-$(template.name)-7</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>annotations</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a map of key-value pairs to be merged into the Pod&rsquo;s existing annotations.
+Existing keys will have their values overwritten, while new keys will be added to the annotations.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a map of key-value pairs that will be merged into the Pod&rsquo;s existing labels.
+Values for existing keys will be overwritten, and new keys will be added.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>image</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies an override for the first container&rsquo;s image in the pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>schedulingPolicy</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.SchedulingPolicy">
+SchedulingPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the scheduling policy for the Component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>resources</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcerequirements-v1-core">
+Kubernetes core/v1.ResourceRequirements
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies an override for the resource requirements of the first container in the Pod.
+This field allows for customizing resource allocation (CPU, memory, etc.) for the container.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>env</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines Env to override.
+Add new or override existing envs.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumes</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volume-v1-core">
+[]Kubernetes core/v1.Volume
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines Volumes to override.
+Add new or override existing volumes.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeMounts</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volumemount-v1-core">
+[]Kubernetes core/v1.VolumeMount
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines VolumeMounts to override.
+Add new or override existing volume mounts of the first container in the pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeClaimTemplates</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#persistentvolumeclaim-v1-core">
+[]Kubernetes core/v1.PersistentVolumeClaim
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines VolumeClaimTemplates to override.
+Add new or override existing volume claim templates.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.InstanceTemplateStatus">InstanceTemplateStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetStatus">InstanceSetStatus</a>)
+</p>
+<div>
+<p>InstanceTemplateStatus aggregates the status of replicas for each InstanceTemplate</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name, the name of the InstanceTemplate.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>replicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Replicas is the number of replicas of the InstanceTemplate.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>readyReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ReadyReplicas is the number of Pods that have a Ready Condition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>availableReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>AvailableReplicas is the number of Pods that ready for at least minReadySeconds.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>currentReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>currentReplicas is the number of instances created by the InstanceSet controller from the InstanceSet version
+indicated by CurrentRevisions.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updatedReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>UpdatedReplicas is the number of Pods created by the InstanceSet controller from the InstanceSet version
+indicated by UpdateRevisions.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.MemberStatus">MemberStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetStatus">InstanceSetStatus</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>podName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Represents the name of the pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>role</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.ReplicaRole">
+ReplicaRole
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the role of the replica in the cluster.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.MemberUpdateStrategy">MemberUpdateStrategy
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
+</p>
+<div>
+<p>MemberUpdateStrategy defines Cluster Component update strategy.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;BestEffortParallel&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Parallel&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Serial&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.MembershipReconfiguration">MembershipReconfiguration
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>switchoverAction</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the environment variables that can be used in all following Actions:
+- KB_ITS_USERNAME: Represents the username part of the credential
+- KB_ITS_PASSWORD: Represents the password part of the credential
+- KB_ITS_LEADER_HOST: Represents the leader host
+- KB_ITS_TARGET_HOST: Represents the target host
+- KB_ITS_SERVICE_PORT: Represents the service port</p>
+<p>Defines the action to perform a switchover.
+If the Image is not configured, the latest <a href="https://busybox.net/">BusyBox</a> image will be used.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memberJoinAction</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the action to add a member.
+If the Image is not configured, the Image from the previous non-nil action will be used.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memberLeaveAction</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the action to remove a member.
+If the Image is not configured, the Image from the previous non-nil action will be used.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>logSyncAction</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the action to trigger the new member to start log syncing.
+If the Image is not configured, the Image from the previous non-nil action will be used.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>promoteAction</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the action to inform the cluster that the new member can join voting now.
+If the Image is not configured, the Image from the previous non-nil action will be used.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.Ordinals">Ordinals
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>)
+</p>
+<div>
+<p>Ordinals represents a combination of continuous segments and individual values.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ranges</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.Range">
+[]Range
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>discrete</code><br/>
+<em>
+[]int32
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.PodUpdatePolicyType">PodUpdatePolicyType
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;PreferInPlace&#34;</p></td>
+<td><p>PreferInPlacePodUpdatePolicyType indicates that we will first attempt an in-place upgrade of the Pod.
+If that fails, it will fall back to the ReCreate, where pod will be recreated.</p>
+</td>
+</tr><tr><td><p>&#34;StrictInPlace&#34;</p></td>
+<td><p>StrictInPlacePodUpdatePolicyType indicates that only allows in-place upgrades.
+Any attempt to modify other fields will be rejected.</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.Range">Range
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.Ordinals">Ordinals</a>)
+</p>
+<div>
+<p>Range represents a range with a start and an end value.
+It is used to define a continuous segment.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>start</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>end</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.ReplicaRole">ReplicaRole
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.MemberStatus">MemberStatus</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Defines the role name of the replica.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>accessMode</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.AccessMode">
+AccessMode
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the service capabilities of this member.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>canVote</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates if this member has voting rights.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>isLeader</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Determines if this member is the leader.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.RoleProbe">RoleProbe
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
+</p>
+<div>
+<p>RoleProbe defines how to observe role</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>customHandler</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.Action">
+[]Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines a custom method for role probing.
+Actions defined here are executed in series.
+Upon completion of all actions, the final output should be a single string representing the role name defined in spec.Roles.
+The latest <a href="https://busybox.net/">BusyBox</a> image will be used if Image is not configured.
+Environment variables can be used in Command:
+- v_KB_ITS_LAST<em>STDOUT: stdout from the last action, watch for &lsquo;v</em>&rsquo; prefix
+- KB_ITS_USERNAME: username part of the credential
+- KB_ITS_PASSWORD: password part of the credential</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>initialDelaySeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the number of seconds to wait after the container has started before initiating role probing.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>timeoutSeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the number of seconds after which the probe times out.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>periodSeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the frequency (in seconds) of probe execution.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>successThreshold</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the minimum number of consecutive successes for the probe to be considered successful after having failed.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>failureThreshold</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the minimum number of consecutive failures for the probe to be considered failed after having succeeded.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>roleUpdateMechanism</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.RoleUpdateMechanism">
+RoleUpdateMechanism
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the method for updating the pod role label.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.RoleUpdateMechanism">RoleUpdateMechanism
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.RoleProbe">RoleProbe</a>)
+</p>
+<div>
+<p>RoleUpdateMechanism defines the way how pod role label being updated.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;DirectAPIServerEventUpdate&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;ReadinessProbeEventUpdate&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.SchedulingPolicy">SchedulingPolicy
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>)
+</p>
+<div>
+<p>SchedulingPolicy the scheduling policy.
+Deprecated: Unify with apps/v1alpha1.SchedulingPolicy</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>schedulerName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>If specified, the Pod will be dispatched by specified scheduler.
+If not specified, the Pod will be dispatched by default scheduler.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>nodeSelector</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>NodeSelector is a selector which must be true for the Pod to fit on a node.
+Selector which must match a node&rsquo;s labels for the Pod to be scheduled on that node.
+More info: <a href="https://kubernetes.io/docs/concepts/configuration/assign-pod-node/">https://kubernetes.io/docs/concepts/configuration/assign-pod-node/</a></p>
+</td>
+</tr>
+<tr>
+<td>
+<code>nodeName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>NodeName is a request to schedule this Pod onto a specific node. If it is non-empty,
+the scheduler simply schedules this Pod onto that node, assuming that it fits resource
+requirements.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>affinity</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#affinity-v1-core">
+Kubernetes core/v1.Affinity
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a group of affinity scheduling rules of the Cluster, including NodeAffinity, PodAffinity, and PodAntiAffinity.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>tolerations</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#toleration-v1-core">
+[]Kubernetes core/v1.Toleration
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Allows Pods to be scheduled onto nodes with matching taints.
+Each toleration in the array allows the Pod to tolerate node taints based on
+specified <code>key</code>, <code>value</code>, <code>effect</code>, and <code>operator</code>.</p>
+<ul>
+<li>The <code>key</code>, <code>value</code>, and <code>effect</code> identify the taint that the toleration matches.</li>
+<li>The <code>operator</code> determines how the toleration matches the taint.</li>
+</ul>
+<p>Pods with matching tolerations are allowed to be scheduled on tainted nodes, typically reserved for specific purposes.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>topologySpreadConstraints</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#topologyspreadconstraint-v1-core">
+[]Kubernetes core/v1.TopologySpreadConstraint
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>TopologySpreadConstraints describes how a group of Pods ought to spread across topology
+domains. Scheduler will schedule Pods in a way which abides by the constraints.
+All topologySpreadConstraints are ANDed.</p>
 </td>
 </tr>
 </tbody>

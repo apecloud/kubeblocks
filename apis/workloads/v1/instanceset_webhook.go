@@ -17,29 +17,19 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package controllerutil
+package v1
 
 import (
-	"context"
-
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-// GetPodListByInstanceSet gets ITS pod list.
-func GetPodListByInstanceSet(ctx context.Context, cli client.Client, its *workloads.InstanceSet) ([]corev1.Pod, error) {
-	selector, err := metav1.LabelSelectorAsMap(its.Spec.Selector)
-	if err != nil {
-		return nil, err
-	}
-	podList := &corev1.PodList{}
-	if err := cli.List(ctx, podList,
-		&client.ListOptions{Namespace: its.Namespace},
-		client.MatchingLabels(selector)); err != nil {
-		return nil, err
-	}
-	return podList.Items, nil
+// log is for logging in this package.
+// var instancesetlog = logf.Log.WithName("instanceset-resource")
+
+func (r *InstanceSet) SetupWebhookWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewWebhookManagedBy(mgr).
+		For(r).
+		Complete()
 }
+
+// TODO(user): EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!

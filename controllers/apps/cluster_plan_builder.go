@@ -41,7 +41,7 @@ import (
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -108,12 +108,13 @@ func (c *clusterTransformContext) GetLogger() logr.Logger {
 
 func init() {
 	model.AddScheme(appsv1alpha1.AddToScheme)
+	model.AddScheme(appsv1beta1.AddToScheme)
+	model.AddScheme(appsv1.AddToScheme)
 	model.AddScheme(dpv1alpha1.AddToScheme)
 	model.AddScheme(snapshotv1.AddToScheme)
 	model.AddScheme(snapshotv1beta1.AddToScheme)
 	model.AddScheme(extensionsv1alpha1.AddToScheme)
-	model.AddScheme(workloadsv1alpha1.AddToScheme)
-	model.AddScheme(appsv1beta1.AddToScheme)
+	model.AddScheme(workloadsv1.AddToScheme)
 }
 
 // PlanBuilder implementation

@@ -156,6 +156,12 @@ type RestoreActionSpec struct {
 	//
 	// +optional
 	PostReady []ActionSpec `json:"postReady,omitempty"`
+
+	// Determines if a base backup is required during restoration.
+	//
+	// +optional
+	// +kubebuilder:default=true
+	BaseBackupRequired *bool `json:"baseBackupRequired,omitempty"`
 }
 
 // ActionSpec defines an action that should be executed. Only one of the fields may be set.

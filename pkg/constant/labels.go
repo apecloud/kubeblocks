@@ -99,6 +99,13 @@ func GetClusterWellKnownLabels(clusterName string) map[string]string {
 	}
 }
 
+// GetKBKnownLabels returns the kb-known labels for the headless svc
+func GetKBKnownLabels() map[string]string {
+	return map[string]string{
+		AppManagedByLabelKey: AppName,
+	}
+}
+
 // GetComponentWellKnownLabels returns the well-known labels for Component API
 func GetComponentWellKnownLabels(clusterName, componentName string) map[string]string {
 	return map[string]string{

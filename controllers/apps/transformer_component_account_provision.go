@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"fmt"
 	"strings"
 
 	"golang.org/x/exp/slices"
@@ -178,28 +177,12 @@ func (t *componentAccountProvisionTransformer) markAccountProvisioned(cond *meta
 
 func (t *componentAccountProvisionTransformer) lifecycleAction(transCtx *componentTransformContext) (lifecycle.Lifecycle, error) {
 	synthesizedComp := transCtx.SynthesizeComponent
-
-	// TODO(v1.0): remove this, and use the role selector in lifecycle action.
-	roleName := ""
-	for _, role := range synthesizedComp.Roles {
-		if role.Serviceable && role.Writable {
-			roleName = role.Name
-		}
-	}
-	if roleName == "" {
-		return nil, nil
-	}
-
-	pods, err := component.ListOwnedPodsWithRole(transCtx.Context, transCtx.Client,
-		synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, roleName)
+	pods, err := component.ListOwnedPods(transCtx.Context, transCtx.Client,
+		synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
 	if err != nil {
 		return nil, err
 	}
-	if len(pods) == 0 {
-		return nil, fmt.Errorf("unable to find appropriate pods to create accounts")
-	}
-
-	lfa, err := lifecycle.New(transCtx.SynthesizeComponent, pods[0])
+	lfa, err := lifecycle.New(transCtx.SynthesizeComponent, nil, pods...)
 	if err != nil {
 		return nil, err
 	}

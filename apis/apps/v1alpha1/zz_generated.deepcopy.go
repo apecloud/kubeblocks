@@ -1799,6 +1799,11 @@ func (in *ComponentVars) DeepCopyInto(out *ComponentVars) {
 		*out = new(VarOption)
 		**out = **in
 	}
+	if in.ShortName != nil {
+		in, out := &in.ShortName, &out.ShortName
+		*out = new(VarOption)
+		**out = **in
+	}
 	if in.Replicas != nil {
 		in, out := &in.Replicas, &out.Replicas
 		*out = new(VarOption)

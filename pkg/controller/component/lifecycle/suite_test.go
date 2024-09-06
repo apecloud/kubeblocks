@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package storage
+package lifecycle
 
 import (
 	"context"
@@ -27,6 +27,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/go-logr/logr"
 	"go.uber.org/zap/zapcore"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -37,11 +38,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	// +kubebuilder:scaffold:imports
-	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/testutil"
-	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -54,9 +54,14 @@ var testEnv *envtest.Environment
 var ctx context.Context
 var cancel context.CancelFunc
 var testCtx testutil.TestContext
+var logger logr.Logger
 
 func init() {
 	viper.AutomaticEnv()
+	model.AddScheme(appsv1alpha1.AddToScheme)
+	// viper.Set("ENABLE_DEBUG_LOG", "true")
+
+	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 }
 
 func TestAPIs(t *testing.T) {
@@ -73,13 +78,18 @@ var _ = BeforeSuite(func() {
 	}
 
 	ctx, cancel = context.WithCancel(context.TODO())
-
-	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
-	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks-tools:latest")
+	logger = logf.FromContext(ctx).WithValues()
+	logger.Info("logger start")
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
+		CRDDirectoryPaths: []string{
+			filepath.Join("..", "..", "..", "..", "config", "crd", "bases"),
+			// use dependent external CRDs.
+			// resolved by ref: https://github.com/operator-framework/operator-sdk/issues/4434#issuecomment-786794418
+			// filepath.Join(build.Default.GOPATH, "pkg", "mod", "github.com", "kubernetes-csi/external-snapshotter/",
+			//	"client/v6@v6.2.0", "config", "crd"),
+		},
 		ErrorIfCRDPathMissing: true,
 	}
 
@@ -89,7 +99,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
-	err = storagev1alpha1.AddToScheme(scheme.Scheme)
+	err = appsv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:scheme
@@ -98,9 +108,6 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 
-	testCtx = testutil.NewDefaultTestContext(ctx, k8sClient, testEnv)
-	testapps.ToIgnoreFinalizers = append(testapps.ToIgnoreFinalizers, storageFinalizerName)
-
 	// run reconcile
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme:  scheme.Scheme,
@@ -108,11 +115,7 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (&StorageProviderReconciler{
-		Client: k8sManager.GetClient(),
-		Scheme: k8sManager.GetScheme(),
-	}).SetupWithManager(k8sManager)
-	Expect(err).ToNot(HaveOccurred())
+	testCtx = testutil.NewDefaultTestContext(ctx, k8sClient, testEnv)
 
 	go func() {
 		defer GinkgoRecover()
@@ -122,10 +125,8 @@ var _ = BeforeSuite(func() {
 })
 
 var _ = AfterSuite(func() {
-	By("tearing down the test environment")
 	cancel()
-	Eventually(func(g Gomega) {
-		err := testEnv.Stop()
-		Expect(err).NotTo(HaveOccurred())
-	}).Should(Succeed())
+	By("tearing down the test environment")
+	err := testEnv.Stop()
+	Expect(err).NotTo(HaveOccurred())
 })

@@ -12611,6 +12611,13 @@ spec:
                               - Required
                               - Optional
                               type: string
+                            shortName:
+                              description: Reference to the short name of the Component
+                                object.
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
                           type: object
                         configMapKeyRef:
                           description: Selects a key of a ConfigMap.

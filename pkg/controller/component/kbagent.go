@@ -38,11 +38,7 @@ import (
 )
 
 const (
-	kbAgentContainerName     = "kbagent"
-	kbAgentInitContainerName = "init-kbagent"
-	kbAgentCommand           = "/bin/kbagent"
-	kbAgentPortName          = "http"
-
+	kbAgentCommand              = "/bin/kbagent"
 	kbAgentSharedMountPath      = "/kubeblocks"
 	kbAgentCommandOnSharedMount = "/kubeblocks/kbagent"
 
@@ -56,18 +52,18 @@ var (
 )
 
 func IsKBAgentContainer(c *corev1.Container) bool {
-	return c.Name == kbAgentContainerName || c.Name == kbAgentInitContainerName
+	return c.Name == kbagent.ContainerName || c.Name == kbagent.InitContainerName
 }
 
 func UpdateKBAgentContainer4HostNetwork(synthesizedComp *SynthesizedComponent) {
-	idx, c := intctrlutil.GetContainerByName(synthesizedComp.PodSpec.Containers, kbAgentContainerName)
+	idx, c := intctrlutil.GetContainerByName(synthesizedComp.PodSpec.Containers, kbagent.ContainerName)
 	if c == nil {
 		return
 	}
 
 	httpPort := 0
 	for _, port := range c.Ports {
-		if port.Name == kbAgentPortName {
+		if port.Name == kbagent.DefaultPortName {
 			httpPort = int(port.ContainerPort)
 			break
 		}
@@ -108,7 +104,7 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 	}
 
 	port := int(ports[0])
-	container := builder.NewContainerBuilder(kbAgentContainerName).
+	container := builder.NewContainerBuilder(kbagent.ContainerName).
 		SetImage(viper.GetString(constant.KBToolsImage)).
 		SetImagePullPolicy(corev1.PullIfNotPresent).
 		AddCommands(kbAgentCommand).
@@ -117,7 +113,7 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 		AddEnv(envVars...).
 		AddPorts(corev1.ContainerPort{
 			ContainerPort: int32(port),
-			Name:          kbAgentPortName,
+			Name:          kbagent.DefaultPortName,
 			Protocol:      "TCP",
 		}).
 		SetStartupProbe(corev1.Probe{
@@ -139,7 +135,7 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 			synthesizedComp.HostNetwork.ContainerPorts,
 			appsv1alpha1.HostNetworkContainerPort{
 				Container: container.Name,
-				Ports:     []string{kbAgentPortName},
+				Ports:     []string{kbagent.DefaultPortName},
 			})
 	}
 
@@ -229,7 +225,7 @@ func buildKBAgentStartupEnvs(synthesizedComp *SynthesizedComponent) ([]corev1.En
 		probes = append(probes, *p)
 	}
 
-	return kbagent.BuildStartupEnvs(actions, probes)
+	return kbagent.BuildStartupEnv(actions, probes)
 }
 
 func buildAction4KBAgent(action *appsv1alpha1.Action, name string) *proto.Action {
@@ -274,17 +270,16 @@ func adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp *SynthesizedComp
 	if err != nil {
 		return err
 	}
-	if len(image) == 0 {
-		return nil
+
+	if len(image) > 0 {
+		// init-container to copy binaries to the shared mount point /kubeblocks
+		initContainer := buildKBAgentInitContainer()
+		synthesizedComp.PodSpec.InitContainers = append(synthesizedComp.PodSpec.InitContainers, *initContainer)
+
+		container.Image = image
+		container.Command[0] = kbAgentCommandOnSharedMount
+		container.VolumeMounts = append(container.VolumeMounts, sharedVolumeMount)
 	}
-
-	// init-container to copy binaries to the shared mount point /kubeblocks
-	initContainer := buildKBAgentInitContainer()
-	synthesizedComp.PodSpec.InitContainers = append(synthesizedComp.PodSpec.InitContainers, *initContainer)
-
-	container.Image = image
-	container.Command[0] = kbAgentCommandOnSharedMount
-	container.VolumeMounts = append(container.VolumeMounts, sharedVolumeMount)
 
 	// TODO: share more container resources
 	if c != nil {
@@ -347,20 +342,11 @@ func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) (str
 			return "", nil, fmt.Errorf("exec container %s not found", container)
 		}
 	}
-	if len(image) > 0 && len(container) > 0 {
-		if c.Image == image {
-			return image, c, nil
-		}
-		return "", nil, fmt.Errorf("exec image and container must be the same")
-	}
-	if len(image) == 0 && len(container) > 0 {
-		image = c.Image
-	}
 	return image, c, nil
 }
 
 func buildKBAgentInitContainer() *corev1.Container {
-	return builder.NewContainerBuilder(kbAgentInitContainerName).
+	return builder.NewContainerBuilder(kbagent.InitContainerName).
 		SetImage(viper.GetString(constant.KBToolsImage)).
 		SetImagePullPolicy(corev1.PullIfNotPresent).
 		AddCommands([]string{"cp", "-r", kbAgentCommand, "/bin/curl", kbAgentSharedMountPath + "/"}...).

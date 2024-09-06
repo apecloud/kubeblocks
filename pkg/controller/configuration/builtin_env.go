@@ -30,6 +30,7 @@ import (
 	coreclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
@@ -228,7 +229,7 @@ func (w *envWrapper) doEnvReplace(replacedVars *set.LinkedHashSetString, oldValu
 		clusterName   = w.clusterName
 		clusterUID    = w.clusterUID
 		componentName = w.componentName
-		builtInEnvMap = component.GetReplacementMapForBuiltInEnv(clusterName, clusterUID, componentName)
+		builtInEnvMap = getReplacementMapForBuiltInEnv(clusterName, clusterUID, componentName)
 	)
 
 	kbInnerEnvReplaceFn := func(envName string, strToReplace string) string {
@@ -306,4 +307,20 @@ func containerResourceRefValue(fieldSelector *corev1.ResourceFieldSelector, c *c
 
 func fieldRefValue(podReference *corev1.ObjectFieldSelector, podSpec *corev1.PodSpec) (string, error) {
 	return "", cfgcore.MakeError("not support pod field ref")
+}
+
+func getReplacementMapForBuiltInEnv(clusterName, clusterUID, componentName string) map[string]string {
+	cc := constant.GenerateClusterComponentName(clusterName, componentName)
+	replacementMap := map[string]string{
+		constant.EnvPlaceHolder(constant.KBEnvClusterName):     clusterName,
+		constant.EnvPlaceHolder(constant.KBEnvCompName):        componentName,
+		constant.EnvPlaceHolder(constant.KBEnvClusterCompName): cc,
+		constant.KBComponentEnvCMPlaceHolder:                   constant.GenerateClusterComponentEnvPattern(clusterName, componentName),
+	}
+	clusterUIDPostfix := clusterUID
+	if len(clusterUID) > 8 {
+		clusterUIDPostfix = clusterUID[len(clusterUID)-8:]
+	}
+	replacementMap[constant.EnvPlaceHolder(constant.KBEnvClusterUIDPostfix8Deprecated)] = clusterUIDPostfix
+	return replacementMap
 }

@@ -18,12 +18,6 @@ spec:
   - name: qdrant
     # References the name of a ComponentDefinition. The ComponentDefinition specifies the behavior and characteristics of the Component. If both `componentDefRef` and `componentDef` are provided, the `componentDef` will take precedence over `componentDefRef`.
     componentDef: qdrant
-    # Specifies a group of affinity scheduling rules for the Component. It allows users to control how the Component's Pods are scheduled onto nodes in the cluster.
-    affinity:
-      podAntiAffinity: Preferred
-      topologyKeys:
-      - kubernetes.io/hostname
-      tenancy: SharedNode
     # Determines whether the metrics exporter needs to be published to the service endpoint.  
     disableExporter: true
     # Specifies the name of the ServiceAccount required by the running Component.   

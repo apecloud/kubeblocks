@@ -460,6 +460,10 @@ spec:
               restore:
                 description: Specifies the restore action.
                 properties:
+                  baseBackupRequired:
+                    default: true
+                    description: Determines if a base backup is required during restoration.
+                    type: boolean
                   postReady:
                     description: Specifies the actions that should be executed after
                       the data has been prepared and is ready for restoration.

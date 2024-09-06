@@ -21,27 +21,19 @@ package client
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"net/http"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
-
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
-// TODO: move to a common package
 const (
-	kbAgentContainerName = "kbagent"
-	kbAgentPortName      = "http"
+	defaultConnectTimeout = 5 * time.Second
 )
 
 type Client interface {
-	CallAction(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error)
-
-	// LaunchProbe(ctx context.Context, probe proto.Probe) error
+	Action(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error)
 }
 
 // HACK: for unit test only.
@@ -62,36 +54,30 @@ func GetMockClient() Client {
 	return mockClient
 }
 
-func NewClient(pod corev1.Pod) (Client, error) {
+func NewClient(host string, port int32) (Client, error) {
 	if mockClient != nil || mockClientError != nil {
 		return mockClient, mockClientError
 	}
 
-	port, err := intctrlutil.GetPortByName(pod, kbAgentContainerName, kbAgentPortName)
-	if err != nil {
-		// has no kb-agent defined
+	if host == "" && port == 0 {
 		return nil, nil
-	}
-
-	ip := pod.Status.PodIP
-	if ip == "" {
-		return nil, fmt.Errorf("pod %v has no ip", pod.Name)
 	}
 
 	// don't use default http-client
 	dialer := &net.Dialer{
-		Timeout: 5 * time.Second,
+		Timeout: defaultConnectTimeout,
 	}
 	transport := &http.Transport{
 		Dial:                dialer.Dial,
-		TLSHandshakeTimeout: 5 * time.Second,
+		TLSHandshakeTimeout: defaultConnectTimeout,
 	}
 	cli := &http.Client{
-		Timeout:   time.Second * 30,
+		// don't set timeout at client level
+		// Timeout:   time.Second * 30,
 		Transport: transport,
 	}
 	return &httpClient{
-		host:   ip,
+		host:   host,
 		port:   port,
 		client: cli,
 	}, nil

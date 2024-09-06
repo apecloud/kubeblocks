@@ -17,13 +17,23 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package storage
+package proto
 
-const (
-	// name of the custom finalizer
-	storageFinalizerName = "storage.kubeblocks.io/finalizer"
+type Service struct {
+	Kind    string
+	Version string
+	URI     string
+}
 
-	// event reasons
-	CSIDriverObjectFound = "CSIDriverObjectFound"
-	CheckCSIDriverFailed = "CheckCSIDriverFailed"
+var (
+	ServiceAction = &Service{
+		Kind:    "Action",
+		Version: "v1.0",
+		URI:     "/v1.0/action",
+	}
+	ServiceProbe = &Service{
+		Kind:    "Probe",
+		Version: "v1.0",
+		URI:     "/v1.0/probe",
+	}
 )

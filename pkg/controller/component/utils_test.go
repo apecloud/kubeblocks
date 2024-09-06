@@ -24,9 +24,9 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("build service references", func() {
-	Context("component utils", func() {
-		It("comp def name matched test", func() {
+var _ = Describe("component utils", func() {
+	Context("component definition reference matching test", func() {
+		It("name, name prefix, regex expression matching", func() {
 			type compDefMatch struct {
 				compDefPattern string
 				compDef        string

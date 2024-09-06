@@ -23,7 +23,6 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -260,17 +259,7 @@ func buildComp2CompDefs(ctx context.Context, cli client.Reader, cluster *appsv1.
 	return mapping, nil
 }
 
-// buildLabelsAndAnnotations builds labels and annotations for synthesizedComponent.
 func buildLabelsAndAnnotations(compDef *appsv1.ComponentDefinition, comp *appsv1.Component, synthesizeComp *SynthesizedComponent) {
-	replaceEnvPlaceholderTokens := func(clusterName, uid, componentName string, kvMap map[string]string) map[string]string {
-		replacedMap := make(map[string]string, len(kvMap))
-		builtInEnvMap := GetReplacementMapForBuiltInEnv(clusterName, uid, componentName)
-		for k, v := range kvMap {
-			replacedMap[ReplaceNamedVars(builtInEnvMap, k, -1, true)] = ReplaceNamedVars(builtInEnvMap, v, -1, true)
-		}
-		return replacedMap
-	}
-
 	mergeMaps := func(baseMap, overrideMap map[string]string) map[string]string {
 		for k, v := range overrideMap {
 			baseMap[k] = v
@@ -279,18 +268,18 @@ func buildLabelsAndAnnotations(compDef *appsv1.ComponentDefinition, comp *appsv1
 	}
 
 	if compDef.Spec.Labels != nil || comp.Labels != nil {
-		baseLabels := make(map[string]string)
-		if compDef.Spec.Labels != nil {
-			baseLabels = replaceEnvPlaceholderTokens(synthesizeComp.ClusterName, synthesizeComp.ClusterUID, synthesizeComp.Name, compDef.Spec.Labels)
+		baseLabels := compDef.Spec.Labels
+		if baseLabels == nil {
+			baseLabels = make(map[string]string)
 		}
 		// override labels from component
 		synthesizeComp.Labels = mergeMaps(baseLabels, comp.Labels)
 	}
 
 	if compDef.Spec.Annotations != nil || comp.Annotations != nil {
-		baseAnnotations := make(map[string]string)
-		if compDef.Spec.Annotations != nil {
-			baseAnnotations = replaceEnvPlaceholderTokens(synthesizeComp.ClusterName, synthesizeComp.ClusterUID, synthesizeComp.Name, compDef.Spec.Annotations)
+		baseAnnotations := compDef.Spec.Annotations
+		if baseAnnotations == nil {
+			baseAnnotations = make(map[string]string)
 		}
 		// override annotations from component
 		synthesizeComp.Annotations = mergeMaps(baseAnnotations, comp.Annotations)
@@ -572,36 +561,6 @@ func buildCompatibleHorizontalScalePolicy(compDef *appsv1.ComponentDefinition, s
 			synthesizeComp.HorizontalScaleBackupPolicyTemplate = &templateName
 		}
 	}
-}
-
-// GetReplacementMapForBuiltInEnv gets the replacement map for KubeBlocks built-in environment variables.
-func GetReplacementMapForBuiltInEnv(clusterName, clusterUID, componentName string) map[string]string {
-	cc := constant.GenerateClusterComponentName(clusterName, componentName)
-	replacementMap := map[string]string{
-		constant.EnvPlaceHolder(constant.KBEnvClusterName):     clusterName,
-		constant.EnvPlaceHolder(constant.KBEnvCompName):        componentName,
-		constant.EnvPlaceHolder(constant.KBEnvClusterCompName): cc,
-		constant.KBComponentEnvCMPlaceHolder:                   constant.GenerateClusterComponentEnvPattern(clusterName, componentName),
-	}
-	clusterUIDPostfix := clusterUID
-	if len(clusterUID) > 8 {
-		clusterUIDPostfix = clusterUID[len(clusterUID)-8:]
-	}
-	replacementMap[constant.EnvPlaceHolder(constant.KBEnvClusterUIDPostfix8Deprecated)] = clusterUIDPostfix
-	return replacementMap
-}
-
-// ReplaceNamedVars replaces the placeholder in targetVar if it is match and returns the replaced result
-func ReplaceNamedVars(namedValuesMap map[string]string, targetVar string, limits int, matchAll bool) string {
-	for placeHolderKey, mappingValue := range namedValuesMap {
-		r := strings.Replace(targetVar, placeHolderKey, mappingValue, limits)
-		// early termination on matching, when matchAll = false
-		if r != targetVar && !matchAll {
-			return r
-		}
-		targetVar = r
-	}
-	return targetVar
 }
 
 func GetConfigSpecByName(synthesizedComp *SynthesizedComponent, configSpec string) *appsv1.ComponentConfigSpec {

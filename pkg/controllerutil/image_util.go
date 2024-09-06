@@ -22,11 +22,11 @@ package controllerutil
 import (
 	//  Import the crypto sha256 algorithm for the docker image parser to work
 	_ "crypto/sha256"
-	"fmt"
-	"strings"
-
+	"sync"
 	//  Import the crypto/sha512 algorithm for the docker image parser to work with 384 and 512 sha hashes
 	_ "crypto/sha512"
+	"fmt"
+	"strings"
 
 	"github.com/distribution/reference"
 
@@ -41,8 +41,8 @@ import (
 // > most registries only support two slash-separated components.
 // > For Docker's public registry, the path format is as follows:
 // > [NAMESPACE/]REPOSITORY: The first, optional component is typically a user's or an organization's
-// namespace. The second, mandatory component is the repository name. When the namespace is
-// not present, Docker uses `library` as the default namespace.
+// > namespace. The second, mandatory component is the repository name. When the namespace is
+// > not present, Docker uses `library` as the default namespace.
 //
 // So if there are more than two components, specify them both, or they won't be matched.
 type RegistryNamespaceConfig struct {
@@ -62,15 +62,24 @@ type RegistriesConfig struct {
 	Registries       []RegistryConfig
 }
 
-var registriesConfig = RegistriesConfig{}
+// this lock protects r/w to this variable itself,
+// not the data it points to
+var registriesConfigMutex sync.RWMutex
+var registriesConfig = &RegistriesConfig{}
 
-func init() {
-	ReloadRegistryConfig()
+func GetRegistriesConfig() *RegistriesConfig {
+	registriesConfigMutex.RLock()
+	defer registriesConfigMutex.RUnlock()
+
+	// this will return a copy of the pointer
+	return registriesConfig
 }
 
 func ReloadRegistryConfig() {
-	// TODO: this is needed in componnet controller test, is there a better way?
-	registriesConfig = RegistriesConfig{}
+	registriesConfigMutex.Lock()
+	defer registriesConfigMutex.Unlock()
+
+	registriesConfig = &RegistriesConfig{}
 	if err := viper.UnmarshalKey(constant.CfgRegistries, &registriesConfig); err != nil {
 		panic(err)
 	}
@@ -86,6 +95,8 @@ func ReloadRegistryConfig() {
 			}
 		}
 	}
+
+	fmt.Printf("registriesConfig is %v\n", registriesConfig)
 }
 
 // For a detailed explanation of an image's format, see:
@@ -127,25 +138,26 @@ func ReplaceImageRegistry(image string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	registriesConfigCopy := GetRegistriesConfig()
 
 	chooseRegistry := func() string {
-		if registriesConfig.DefaultRegistry != "" {
-			return registriesConfig.DefaultRegistry
+		if registriesConfigCopy.DefaultRegistry != "" {
+			return registriesConfigCopy.DefaultRegistry
 		} else {
 			return registry
 		}
 	}
 
 	chooseNamespace := func() string {
-		if registriesConfig.DefaultNamespace != "" {
-			return registriesConfig.DefaultNamespace
+		if registriesConfigCopy.DefaultNamespace != "" {
+			return registriesConfigCopy.DefaultNamespace
 		} else {
 			return namespace
 		}
 	}
 
 	var dstRegistry, dstNamespace string
-	for _, registryMapping := range registriesConfig.Registries {
+	for _, registryMapping := range registriesConfigCopy.Registries {
 		if registryMapping.From == registry {
 			if len(registryMapping.To) != 0 {
 				dstRegistry = registryMapping.To

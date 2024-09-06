@@ -38,7 +38,7 @@ var _ = Describe("image util test", func() {
 
 	AfterEach(func() {
 		// reset config
-		registriesConfig = RegistriesConfig{}
+		registriesConfig = &RegistriesConfig{}
 	})
 
 	It("parses image", func() {
@@ -69,7 +69,7 @@ var _ = Describe("image util test", func() {
 	})
 
 	It("replaces image when default config exists", func() {
-		registriesConfig = RegistriesConfig{
+		registriesConfig = &RegistriesConfig{
 			DefaultRegistry: "foo.bar",
 		}
 		for _, image := range imageList {
@@ -82,7 +82,7 @@ var _ = Describe("image util test", func() {
 			}
 		}
 
-		registriesConfig = RegistriesConfig{
+		registriesConfig = &RegistriesConfig{
 			DefaultRegistry:  "foo.bar",
 			DefaultNamespace: "test",
 		}
@@ -94,7 +94,7 @@ var _ = Describe("image util test", func() {
 	})
 
 	It("replaces image when single registry config exists", func() {
-		registriesConfig = RegistriesConfig{
+		registriesConfig = &RegistriesConfig{
 			DefaultRegistry: "foo.bar",
 			Registries: []RegistryConfig{
 				{

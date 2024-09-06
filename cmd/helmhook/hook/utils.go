@@ -25,7 +25,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	errors "sigs.k8s.io/controller-runtime/pkg/client"
@@ -60,32 +59,31 @@ func GetKubeBlocksDeploy(ctx context.Context, client *kubernetes.Clientset, ns s
 	return &deployments.Items[0], nil
 }
 
-// stopKubeBlocksDeploy gets deployment include KubeBlocks.
-func stopKubeBlocksDeploy(ctx context.Context, client *kubernetes.Clientset, ns, componentName string, getter deploymentGetter) error {
+// deleteDeployment deletes deployment.
+func deleteDeployment(ctx context.Context, client *kubernetes.Clientset, ns, componentName string, getter deploymentGetter) error {
 	deploy, err := getter(ctx, client, ns, componentName)
 	if err != nil {
 		return err
 	}
 
-	if _, err = client.AppsV1().Deployments(deploy.Namespace).Patch(ctx, deploy.Name, types.JSONPatchType,
-		[]byte(`[{"op": "replace", "path": "/spec/replicas", "value": 0}]`),
-		metav1.PatchOptions{}); err != nil {
+	if err = client.AppsV1().Deployments(deploy.Namespace).Delete(ctx, deploy.Name,
+		metav1.DeleteOptions{
+			GracePeriodSeconds: func() *int64 {
+				seconds := int64(0)
+				return &seconds
+			}(),
+		}); err != nil {
 		return err
 	}
 
-	// wait for deployment to be stopped
+	// wait for deployment to be deleted
 	return wait.PollUntilContextTimeout(context.Background(), 5*time.Second, 1*time.Minute, true,
 		func(_ context.Context) (bool, error) {
 			deploy, err = getter(ctx, client, ns, componentName)
-			if err != nil {
-				return false, err
-			}
-			if *deploy.Spec.Replicas == 0 &&
-				deploy.Status.Replicas == 0 &&
-				deploy.Status.AvailableReplicas == 0 {
+			if err != nil && errors.IgnoreNotFound(err) == nil {
 				return true, nil
 			}
-			return false, nil
+			return false, err
 		})
 }
 

@@ -67,7 +67,7 @@ func deleteDeployment(ctx context.Context, client *kubernetes.Clientset, ns, com
 		return err
 	}
 
-	// before delete deployment, out the deployment yaml, if deployment was deleted
+	// before delete deployment, output the deployment yaml, if deployment was deleted
 	// by mistake, we can recover it by apply the yaml.
 	tempDeploy := deploy.DeepCopy()
 	tempDeploy.ManagedFields = nil

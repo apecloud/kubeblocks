@@ -284,8 +284,8 @@ func (t *componentServiceTransformer) createOrUpdateService(ctx graph.TransformC
 			Namespace: service.Namespace,
 			Name:      service.Name,
 		}
-		obj := &corev1.Service{}
-		if err := ctx.GetClient().Get(ctx.GetContext(), key, obj, inDataContext4C()); err != nil {
+		originSvc := &corev1.Service{}
+		if err := ctx.GetClient().Get(ctx.GetContext(), key, originSvc, inDataContext4C()); err != nil {
 			if apierrors.IsNotFound(err) {
 				graphCli.Create(dag, service, inDataContext4G())
 				return nil
@@ -294,34 +294,40 @@ func (t *componentServiceTransformer) createOrUpdateService(ctx graph.TransformC
 		}
 
 		// don't update service not owned by the owner, to keep compatible with existed cluster
-		if !model.IsOwnerOf(owner, obj) {
+		if !model.IsOwnerOf(owner, originSvc) {
 			return nil
 		}
 
-		objCopy := obj.DeepCopy()
-		objCopy.Spec = service.Spec
+		newSvc := originSvc.DeepCopy()
+		newSvc.Spec = service.Spec
 
 		// if skip immutable check, update the service directly
-		if skipImmutableCheckForComponentService(obj) {
-			resolveServiceDefaultFields(&obj.Spec, &objCopy.Spec)
-			if !reflect.DeepEqual(obj, objCopy) {
-				graphCli.Update(dag, obj, objCopy, inDataContext4G())
+		if skipImmutableCheckForComponentService(originSvc) {
+			resolveServiceDefaultFields(&originSvc.Spec, &newSvc.Spec)
+			if !reflect.DeepEqual(originSvc, newSvc) {
+				graphCli.Update(dag, originSvc, newSvc, inDataContext4G())
 			}
 			return nil
 		}
-		// otherwise only support to update the params associated with appsv1alpha1.ClusterComponentService and further change
-		overrideMutableParams := func(obj, objCopy *corev1.Service) {
-			objCopy.Spec.Type = obj.Spec.Type
-			objCopy.Name = obj.Name
-			objCopy.Spec.Selector = obj.Spec.Selector
-			objCopy.Annotations = obj.Annotations
+		// otherwise only support to update the override params defined in cluster.spec.componentSpec[].services
+
+		overrideMutableParams := func(originSvc, newSvc *corev1.Service) {
+			newSvc.Spec.Type = originSvc.Spec.Type
+			newSvc.Name = originSvc.Name
+			newSvc.Spec.Selector = originSvc.Spec.Selector
+			newSvc.Annotations = originSvc.Annotations
 		}
-		overrideMutableParams(obj, objCopy)
-		if reflect.DeepEqual(obj, objCopy) {
-			overrideMutableParams(service, objCopy)
-			if !reflect.DeepEqual(obj, objCopy) {
-				graphCli.Update(dag, obj, objCopy, inDataContext4G())
-			}
+
+		// modify mutable field of newSvc to check if it is overridable
+		overrideMutableParams(originSvc, newSvc)
+		if !reflect.DeepEqual(originSvc, newSvc) {
+			// other fields are immutable, we can't update the service
+			return nil
+		}
+
+		overrideMutableParams(service, newSvc)
+		if !reflect.DeepEqual(originSvc, newSvc) {
+			graphCli.Update(dag, originSvc, newSvc, inDataContext4G())
 		}
 		return nil
 	}

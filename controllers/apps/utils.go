@@ -90,7 +90,7 @@ func resolveServiceDefaultFields(obj, objCopy *corev1.ServiceSpec) {
 	var exist *corev1.ServicePort
 	for i, port := range objCopy.Ports {
 		for _, oldPort := range obj.Ports {
-			// assume that port.Name is user specified, if which is not changed, we need to keep the old NodePort and TargetPort if they are not set
+			// assume that port.Name is user specified, if it is not changed, we need to keep the old NodePort and TargetPort if they are not set
 			if port.Name != "" && port.Name == oldPort.Name {
 				exist = &oldPort
 				break

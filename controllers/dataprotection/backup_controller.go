@@ -34,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/clock"
@@ -873,14 +874,19 @@ func getClusterObjectString(cluster *appsv1alpha1.Cluster) (*string, error) {
 	newCluster := &appsv1alpha1.Cluster{
 		Spec: cluster.Spec,
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: cluster.Namespace,
-			Name:      cluster.Name,
+			Namespace:   cluster.Namespace,
+			Name:        cluster.Name,
+			Annotations: map[string]string{},
 		},
 		TypeMeta: cluster.TypeMeta,
 	}
-	if v, ok := cluster.Annotations[constant.ExtraEnvAnnotationKey]; ok {
-		newCluster.Annotations = map[string]string{
-			constant.ExtraEnvAnnotationKey: v,
+	removedAnnotations := map[string]sets.Empty{
+		constant.OpsRequestAnnotationKey:   {},
+		corev1.LastAppliedConfigAnnotation: {},
+	}
+	for k, v := range cluster.Annotations {
+		if _, ok := removedAnnotations[k]; !ok {
+			newCluster.Annotations[k] = v
 		}
 	}
 	clusterString, err := getObjectString(newCluster)

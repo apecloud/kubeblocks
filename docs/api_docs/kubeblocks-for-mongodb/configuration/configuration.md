@@ -11,7 +11,7 @@ This guide shows how to configure cluster parameters.
 
 ## Before you start
 
-1. [Install KubeBlocks](./../../installation/install-kubeblocks.md).
+1. [Install KubeBlocks](../../../user_docs/installation/install-with-helm/install-kubeblocks.md).
 2. [Create a MongoDB cluster](./../cluster-management/create-and-connect-to-a-mongodb-cluster.md).
 
 ## Configure cluster parameters by configuration file

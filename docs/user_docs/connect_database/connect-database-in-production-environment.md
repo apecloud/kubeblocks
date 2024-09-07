@@ -6,20 +6,28 @@ sidebar_position: 3
 sidebar_label: Production environment
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Connect database in production environment
 
 In the production environment, it is normal to connect a database with CLI and SDK clients. There are three scenarios.
 
-- Scenario 1: Client1 and the database are in the same Kubernetes cluster. To connect client1 and the database, see [Option 3](#option-3-connect-database-in-the-same-kubernetes-cluster).
-- Scenario 2: Client2 is outside the Kubernetes cluster, but it is in the same VPC as the database. To connect client2 and the database, see [Option 5](#option-5-client-outside-the-kubernetes-cluster-but-in-the-same-vpc-as-the-kubernetes-cluster).
-- Scenario 3: Client3 and the database are in different VPCs, such as other VPCs or the public network. To connect client3 and the database, see [Option 4](#option-4-connect-database-with-clients-in-other-vpcs-or-public-networks).
+- Scenario 1: Client1 and the database are in the same Kubernetes cluster. To connect client1 and the database, see [Use ClusterIP](#scenario-1-connect-database-in-the-same-kubernetes-cluster).
+- Scenario 2: Client2 is outside the Kubernetes cluster, but it is in the same VPC as the database. To connect client2 and the database, see [Expose VPC Private Address](#scenario-2-client-outside-the-kubernetes-cluster-but-in-the-same-vpc-as-the-kubernetes-cluster).
+- Scenario 3: Client3 and the database are in different VPCs, such as other VPCs or the public network. To connect client3 and the database, see [Expose VPC Public Address](#scenario-3-connect-database-with-clients-in-other-vpcs-or-public-networks).
 
 See the figure below to get a clear image of the network location.
 ![Example](./../../img/connect_database_in_a_production_environment.png)
 
-## Option 3. Connect database in the same Kubernetes cluster
+## Scenario 1. Connect database in the same Kubernetes cluster
 
-You can connect with the database ClusterIP or domain name. To check the database endpoint, use `kbcli cluster describe ${cluster-name}`.
+You can connect with the database ClusterIP or domain name.
+
+<Tabs>
+<TabItem value="kbcli" label="kbcli" default>
+
+To check the database endpoint, use `kbcli cluster describe ${cluster-name}`.
 
 ```bash
 kbcli cluster describe x
@@ -48,33 +56,19 @@ Events(last 5 warnings, see more:kbcli cluster list-events -n default x):
 TIME   TYPE   REASON   OBJECT   MESSAGE
 ```
 
-## Option 4. Connect database with clients in other VPCs or public networks
+</TabItem>
+<TabItem value="kubectl" label="kubectl">
 
-You can enable the External LoadBalancer of the cloud vendor.
-
-:::note
-
-The following command creates a LoadBalancer instance for the database instance, which may incur expenses from your cloud vendor.
-
-:::
+To check the database endpoint, use `kubectl get service <cluster-name>-<component-name>`.
 
 ```bash
-kbcli cluster expose ${cluster-name} --type internet --enable=true
+kubectl get service mycluster-mysql
 ```
 
-To disable the LoadBalancer instance, execute the following command.
+</TabItem>
+</Tabs>
 
-```bash
-kbcli cluster expose ${cluster-name} --type internet --enable=false
-```
-
-:::note
-
-The instance is inaccessible after you disable the LoadBalancer instance.
-
-:::
-
-## Option 5. Client outside the Kubernetes cluster but in the same VPC as the Kubernetes cluster
+## Scenario 2. Client outside the Kubernetes cluster but in the same VPC as the Kubernetes cluster
 
 A stable domain name for long-term connections is required. An Internal LoadBalancer provided by the cloud vendor can be used for this purpose.
 
@@ -84,9 +78,42 @@ The following command creates a LoadBalancer instance for the database instance,
 
 :::
 
+:::
+
+<Tabs>
+<TabItem value="kbcli" label="kbcli" default>
+
 ```bash
 kbcli cluster expose ${cluster-name} --type vpc --enable=true
 ```
+
+</TabItem>
+<TabItem value="kubectl" label="kubectl">
+
+```yaml
+kubectl apply -f - <<EOF
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: ops-expose
+spec:
+  clusterRef: mycluster
+  expose:
+  - componentName: mysql
+    services:
+    - annotations:
+        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: intranet
+      ipFamilyPolicy: PreferDualStack
+      name: vpc
+      serviceType: LoadBalancer
+    switch: Enable
+  ttlSecondsBeforeAbort: 0
+  type: Expose
+EOF
+```
+
+</TabItem>
+</Tabs>
 
 To disable the LoadBalancer instance, execute the following command.
 
@@ -96,6 +123,127 @@ Once disabled, the instance is not accessible.
 
 :::
 
+<Tabs>
+<TabItem value="kbcli" label="kbcli" default>
+
 ```bash
 kbcli cluster expose ${cluster-name} --type vpc --enable=false
 ```
+
+</TabItem>
+<TabItem value="kubectl" label="kubectl">
+
+```yaml
+kubectl apply -f - <<EOF
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: ops-expose
+spec:
+  clusterRef: mycluster
+  expose:
+  - componentName: mysql
+    services:
+    - annotations:
+        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: intranet
+      ipFamilyPolicy: PreferDualStack
+      name: vpc
+      serviceType: LoadBalancer
+    switch: Disable
+  ttlSecondsBeforeAbort: 0
+  type: Expose
+EOF
+```
+
+</TabItem>
+</Tabs>
+
+
+## Scenario 3. Connect database with clients in other VPCs or public networks
+
+You can enable the External LoadBalancer of the cloud vendor.
+
+:::note
+
+The following command creates a LoadBalancer instance for the database instance, which may incur expenses from your cloud vendor.
+
+:::
+
+<Tabs>
+<TabItem value="kbcli" label="kbcli" default>
+
+```bash
+kbcli cluster expose ${cluster-name} --type internet --enable=true
+```
+
+</TabItem>
+<TabItem value="kubectl" label="kubectl">
+
+```yaml
+kubectl apply -f - <<EOF
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: ops-expose-enable
+spec:
+  clusterRef: mycluster
+  expose:
+    - componentName: mysql
+      services:
+        - annotations:
+            service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: internet
+          ipFamilyPolicy: PreferDualStack
+          name: vpc
+          serviceType: LoadBalancer
+      switch: Enable
+  ttlSecondsBeforeAbort: 0
+  type: Expose
+  EOF
+```
+
+</TabItem>
+</Tabs>
+
+
+To disable the LoadBalancer instance, execute the following command.
+
+<Tabs>
+<TabItem value="kbcli" label="kbcli" default>
+
+```bash
+kbcli cluster expose ${cluster-name} --type internet --enable=false
+```
+
+</TabItem>
+<TabItem value="kubectl" label="kubectl">
+
+```yaml
+kubectl apply -f - <<EOF
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: ops-expose-disable
+spec:
+  clusterRef: mycluster
+  expose:
+  - componentName: mysql
+    services:
+    - annotations:
+        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: internet
+      ipFamilyPolicy: PreferDualStack
+      name: vpc
+      serviceType: LoadBalancer
+    switch: Disable
+  ttlSecondsBeforeAbort: 0
+  type: Expose
+EOF
+```
+
+</TabItem>
+</Tabs>
+
+:::note
+
+The instance is inaccessible after you disable the LoadBalancer instance.
+
+:::

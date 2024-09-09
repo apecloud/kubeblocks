@@ -39,7 +39,7 @@ apis/workloads/ @free6om @apecloud/kb-reviewers
 controllers/workloads/ @free6om @apecloud/kb-reviewers
 
 # Docs
-docs/ @michelle-0808 @apecloud/kb-reviewers
+docs/ @michelle-0808 @shanshanying @apecloud/kb-reviewers
 
 # Examples
 examples/ @ahjing99 @apecloud/kb-reviewers

@@ -66,7 +66,9 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 			"spec.terminationPolicy %s is preventing deletion.", cluster.Spec.TerminationPolicy)
 		return graph.ErrPrematureStop
 	case appsv1alpha1.Halt:
-		toDeleteNamespacedKinds, toDeleteNonNamespacedKinds = kindsForHalt()
+		transCtx.EventRecorder.Eventf(cluster, corev1.EventTypeWarning, "Halt",
+			"spec.terminationPolicy %s is preventing deletion. Halt policy is deprecated is 0.9.1 and will have same meaning as DoNotTerminate.", cluster.Spec.TerminationPolicy)
+		return graph.ErrPrematureStop
 	case appsv1alpha1.Delete:
 		toDeleteNamespacedKinds, toDeleteNonNamespacedKinds = kindsForDelete()
 	case appsv1alpha1.WipeOut:

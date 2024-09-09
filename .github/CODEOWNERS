@@ -31,7 +31,7 @@ apis/experimental/ @free6om @apecloud/kb-reviewers
 controllers/experimental/ @free6om @apecloud/kb-reviewers
 
 # Extensions APIs
-apis/experimental/ @ldming @apecloud/kb-reviewers
+apis/extensions/ @ldming @apecloud/kb-reviewers
 controllers/extensions/ @ldming @apecloud/kb-reviewers
 
 # Workloads APIs
@@ -42,4 +42,4 @@ controllers/workloads/ @free6om @apecloud/kb-reviewers
 docs/ @michelle-0808 @shanshanying @apecloud/kb-reviewers
 
 # Examples
-examples/ @ahjing99 @apecloud/kb-reviewers
+examples/ @ahjing99 @shanshanying @apecloud/kb-reviewers

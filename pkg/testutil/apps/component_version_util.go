@@ -43,7 +43,7 @@ func CompDefName(r string) string {
 }
 
 func CompDefNameWithFuzzyRegex(r string) string {
-	return fmt.Sprintf("^%s-%s*", CompDefinitionName, r)
+	return fmt.Sprintf("^%s-%s(\\.\\d+)?$", CompDefinitionName, r)
 }
 
 func CompDefNameWithExactRegex(r string) string {

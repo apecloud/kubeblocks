@@ -218,8 +218,8 @@ func Test_buildVolumeMode(t *testing.T) {
 	viper.Set(constant.FeatureGateIgnoreConfigTemplateDefaultMode, false)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := buildVolumeMode(tt.args.configs, tt.args.configSpec); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("buildVolumeMode() = %v, want %v", got, tt.want)
+			if got := BuildVolumeMode(tt.args.configs, tt.args.configSpec); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("BuildVolumeMode() = %v, want %v", got, tt.want)
 			}
 		})
 	}

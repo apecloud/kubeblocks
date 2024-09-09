@@ -1,1 +1,45 @@
-* @nayutah @ldming @free6om @wangyelei @Y-Rookie @weicao @shanshanying @leon-inf @zjx20
+* @kb-reviewers
+
+# Cluster APIs
+apis/**/cluster*.go @leon-inf @Y-Rookie @kb-reviewers
+apis/**/component*.go @leon-inf @Y-Rookie @kb-reviewers
+apis/**/service*.go @leon-inf @Y-Rookie @kb-reviewers
+controllers/apps/cluster*.go @leon-inf @Y-Rookie @kb-reviewers
+controllers/apps/transformer_cluster*.go @leon-inf @Y-Rookie @kb-reviewers
+controllers/apps/component*.go @leon-inf @Y-Rookie @kb-reviewers
+controllers/apps/transformer_component*.go @leon-inf @Y-Rookie @kb-reviewers
+controllers/apps/service*.go @leon-inf @Y-Rookie @kb-reviewers
+
+# OpsRequest API
+apis/**/opsrequest*.go @wangyelei @kb-reviewers
+apis/**/opsdefinition*.go @wangyelei @kb-reviewers
+controllers/apps/opsdefinition*.go @wangyelei @kb-reviewers
+controllers/apps/operations/ @wangyelei @kb-reviewers
+
+# Config API
+apis/**/config*.go @sophon-zt @kb-reviewers
+controllers/apps/configuration/ @sophon-zt @kb-reviewers
+controllers/apps/operations/reconfigure*.go @sophon-zt @kb-reviewers
+
+# DataProtection APIs
+apis/dataprotection/ @ldming @wangyelei @zjx20 @kb-reviewers
+controllers/dataprotection/ @ldming @wangyelei @zjx20 @kb-reviewers
+pkg/dataprotection/ @ldming @wangyelei @zjx20 @kb-reviewers
+
+# Experimental APIs
+apis/experimental/ @free6om @kb-reviewers
+controllers/experimental/ @free6om @kb-reviewers
+
+# Extensions APIs
+apis/experimental/ @ldming @kb-reviewers
+controllers/extensions/ @ldming @kb-reviewers
+
+# Workloads APIs
+apis/workloads/ @free6om @kb-reviewers
+controllers/workloads/ @free6om @kb-reviewers
+
+# Docs
+docs/ @michelle-0808 @kb-reviewers
+
+# Examples
+examples/ @ahjing99 @kb-reviewers

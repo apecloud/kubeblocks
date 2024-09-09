@@ -37,12 +37,23 @@ const (
 func AppImage(app, tag string) string {
 	return fmt.Sprintf("%s:%s", app, tag)
 }
+
 func CompDefName(r string) string {
 	return fmt.Sprintf("%s-%s", CompDefinitionName, r)
 }
+
+func CompDefNameWithFuzzyRegex(r string) string {
+	return fmt.Sprintf("^%s-%s*", CompDefinitionName, r)
+}
+
+func CompDefNameWithExactRegex(r string) string {
+	return fmt.Sprintf("^%s-%s$", CompDefinitionName, r)
+}
+
 func ReleaseID(r string) string {
 	return fmt.Sprintf("%s-%s", ReleasePrefix, r)
 }
+
 func ServiceVersion(r string) string {
 	if len(r) == 0 {
 		return ServiceVersionPrefix

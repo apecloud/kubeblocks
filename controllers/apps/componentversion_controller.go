@@ -26,6 +26,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/pkg/errors"
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -140,6 +141,13 @@ func (r *ComponentVersionReconciler) reconcile(rctx intctrlutil.RequestCtx,
 	//	slices.Contains([]appsv1alpha1.Phase{appsv1alpha1.AvailablePhase}, compVersion.Status.Phase) {
 	//	return intctrlutil.Reconciled()
 	// }
+
+	if err = validateCompatibilityRulesCompDef(compVersion); err != nil {
+		if err1 := r.unavailable(r.Client, rctx, compVersion, err); err1 != nil {
+			return intctrlutil.CheckedRequeueWithError(err1, rctx.Log, "")
+		}
+		return intctrlutil.CheckedRequeueWithError(err, rctx.Log, "")
+	}
 
 	releaseToCompDefinitions, err := r.buildReleaseToCompDefinitionMapping(r.Client, rctx, compVersion)
 	if err != nil {
@@ -340,12 +348,24 @@ func (r *ComponentVersionReconciler) validateImages(release appsv1alpha1.Compone
 	return nil
 }
 
+// validateCompDef validates the reference component definition name pattern defined in compatibility rules.
+func validateCompatibilityRulesCompDef(compVersion *appsv1alpha1.ComponentVersion) error {
+	for _, rule := range compVersion.Spec.CompatibilityRules {
+		for _, compDefName := range rule.CompDefs {
+			if err := component.ValidateCompDefRegexp(compDefName); err != nil {
+				return errors.Wrapf(err, "invalid reference to component definition name pattern: %s in compatibility rules", compDefName)
+			}
+		}
+	}
+	return nil
+}
+
 // resolveCompDefinitionNServiceVersion resolves and returns the specific component definition object and the service version supported.
-func resolveCompDefinitionNServiceVersion(ctx context.Context, cli client.Reader, compDefName, serviceVersion string) (*appsv1alpha1.ComponentDefinition, string, error) {
+func resolveCompDefinitionNServiceVersion(ctx context.Context, cli client.Reader, compDefNamePattern, serviceVersion string) (*appsv1alpha1.ComponentDefinition, string, error) {
 	var (
 		compDef *appsv1alpha1.ComponentDefinition
 	)
-	compDefs, err := listCompDefinitionsWithPattern(ctx, cli, compDefName)
+	compDefs, err := listCompDefinitionsWithPattern(ctx, cli, compDefNamePattern)
 	if err != nil {
 		return compDef, serviceVersion, err
 	}
@@ -368,7 +388,7 @@ func resolveCompDefinitionNServiceVersion(ctx context.Context, cli client.Reader
 	// component definitions that support the service version
 	compatibleCompDefs := serviceVersionToCompDefs[serviceVersion]
 	if len(compatibleCompDefs) == 0 {
-		return compDef, serviceVersion, fmt.Errorf("no matched component definition found: %s", compDefName)
+		return compDef, serviceVersion, fmt.Errorf("no matched component definition found: %s", compDefNamePattern)
 	}
 
 	// choose the latest one

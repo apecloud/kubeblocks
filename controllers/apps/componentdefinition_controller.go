@@ -27,6 +27,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -212,6 +213,38 @@ func (r *ComponentDefinitionReconciler) validateRuntime(cli client.Client, rctx 
 
 func (r *ComponentDefinitionReconciler) validateVars(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1alpha1.ComponentDefinition) error {
+	if !checkUniqueItemWithValue(cmpd.Spec.Vars, "Name", nil) {
+		return fmt.Errorf("duplicate names of component vars are not allowed")
+	}
+
+	// validate the reference to component definition name pattern
+	var compDef string
+	for _, cVar := range cmpd.Spec.Vars {
+		if cVar.ValueFrom == nil {
+			continue
+		}
+		switch {
+		case cVar.ValueFrom.HostNetworkVarRef != nil:
+			compDef = cVar.ValueFrom.HostNetworkVarRef.CompDef
+		case cVar.ValueFrom.ServiceVarRef != nil:
+			compDef = cVar.ValueFrom.ServiceVarRef.CompDef
+		case cVar.ValueFrom.ServiceRefVarRef != nil:
+			compDef = cVar.ValueFrom.ServiceRefVarRef.CompDef
+		case cVar.ValueFrom.ComponentVarRef != nil:
+			compDef = cVar.ValueFrom.ComponentVarRef.CompDef
+		case cVar.ValueFrom.CredentialVarRef != nil:
+			compDef = cVar.ValueFrom.CredentialVarRef.CompDef
+		default:
+			continue
+		}
+
+		if len(compDef) == 0 {
+			continue
+		}
+		if err := component.ValidateCompDefRegexp(compDef); err != nil {
+			return errors.Wrapf(err, "invalid reference to component definition name pattern: %s", compDef)
+		}
+	}
 	return nil
 }
 
@@ -419,26 +452,19 @@ func listCompDefinitionsWithPattern(ctx context.Context, cli client.Reader, name
 		return nil, err
 	}
 	compDefsFullyMatched := make([]*appsv1alpha1.ComponentDefinition, 0)
-	compDefsPrefixMatched := make([]*appsv1alpha1.ComponentDefinition, 0)
-	compDefsRegexMatched := make([]*appsv1alpha1.ComponentDefinition, 0)
+	compDefsPatternMatched := make([]*appsv1alpha1.ComponentDefinition, 0)
 	for i, item := range compDefList.Items {
 		if item.Name == namePattern {
 			compDefsFullyMatched = append(compDefsFullyMatched, &compDefList.Items[i])
 		}
-		if strings.HasPrefix(item.Name, namePattern) {
-			compDefsPrefixMatched = append(compDefsPrefixMatched, &compDefList.Items[i])
-		}
 		if component.CompDefMatched(item.Name, namePattern) {
-			compDefsRegexMatched = append(compDefsRegexMatched, &compDefList.Items[i])
+			compDefsPatternMatched = append(compDefsPatternMatched, &compDefList.Items[i])
 		}
 	}
 	if len(compDefsFullyMatched) > 0 {
 		return compDefsFullyMatched, nil
 	}
-	if len(compDefsPrefixMatched) > 0 {
-		return compDefsPrefixMatched, nil
-	}
-	return compDefsRegexMatched, nil
+	return compDefsPatternMatched, nil
 }
 
 func checkUniqueItemWithValue(slice any, fieldName string, val any) bool {

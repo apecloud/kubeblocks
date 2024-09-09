@@ -38,12 +38,17 @@ func inDataContext() *multicluster.ClientOption {
 	return multicluster.InDataContext()
 }
 
+func ValidateCompDefRegexp(compDefPattern string) error {
+	_, err := regexp.Compile(compDefPattern)
+	return err
+}
+
 func CompDefMatched(compDef, compDefPattern string) bool {
 	if strings.HasPrefix(compDef, compDefPattern) {
 		return true
 	}
 
-	isRegexPattern := func(pattern string) bool {
+	isRegexpPattern := func(pattern string) bool {
 		escapedPattern := regexp.QuoteMeta(pattern)
 		return escapedPattern != pattern
 	}
@@ -52,7 +57,7 @@ func CompDefMatched(compDef, compDefPattern string) bool {
 	regex, err := regexp.Compile(compDefPattern)
 	if err == nil {
 		// distinguishing between regular expressions and ordinary strings.
-		if isRegexPattern(compDefPattern) {
+		if isRegexpPattern(compDefPattern) {
 			isRegex = true
 		}
 	}

@@ -25,6 +25,40 @@ import (
 )
 
 var _ = Describe("component utils", func() {
+	Context("component definition reference regex validate test", func() {
+		It("should return nil for valid regular expressions", func() {
+			validExpressions := []string{
+				`mysql`,
+				`-mysql-`,
+				`mysql-8.0.30`,
+				`\d+`,
+				`[a-zA-Z]+`,
+				`^mysql-\d+\.\d+\.\d+$`,
+				`^[v\-]*?(\d{1,2}\.){0,3}\d{1,2}$`,
+			}
+
+			for _, expr := range validExpressions {
+				err := ValidateCompDefRegexp(expr)
+				Expect(err).Should(BeNil())
+			}
+		})
+
+		It("should return an error for invalid regular expressions", func() {
+			invalidExpressions := []string{
+				`(*)`,
+				`(abc`,
+				`a**`,
+				`x[a-z`,
+				`[z-a]`,
+			}
+
+			for _, expr := range invalidExpressions {
+				err := ValidateCompDefRegexp(expr)
+				Expect(err).ShouldNot(BeNil())
+			}
+		})
+	})
+
 	Context("component definition reference matching test", func() {
 		It("name, name prefix, regex expression matching", func() {
 			type compDefMatch struct {

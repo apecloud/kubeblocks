@@ -191,6 +191,14 @@ func (r *ClusterDefinitionReconciler) validateTopology(rctx intctrlutil.RequestC
 			return err
 		}
 	}
+
+	// validate topology reference component definitions name pattern
+	for _, comp := range topology.Components {
+		if err := component.ValidateCompDefRegexp(comp.CompDef); err != nil {
+			return fmt.Errorf("invalid component definition reference pattern: %s", comp.CompDef)
+		}
+	}
+
 	compDefs, err := r.loadTopologyCompDefs(rctx.Ctx, topology)
 	if err != nil {
 		return err

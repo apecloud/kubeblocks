@@ -4029,9 +4029,9 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>References the name of a ComponentDefinition object.
-The ComponentDefinition specifies the behavior and characteristics of the Component.
-If both <code>componentDefRef</code> and <code>componentDef</code> are provided,
+<p>Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
+custom resource (CR) that defines the Component&rsquo;s characteristics and behavior.</p>
+<p>If both <code>componentDefRef</code> and <code>componentDef</code> are provided,
 the <code>componentDef</code> will take precedence over <code>componentDefRef</code>.</p>
 </td>
 </tr>
@@ -4928,8 +4928,9 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>CompDef specifies the definition used by the component that the referent object resident in.
-If not specified, the component itself will be used.</p>
+<p>Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
+custom resource (CR) used by the component that the referent object resident in.</p>
+<p>If not specified, the component itself will be used.</p>
 </td>
 </tr>
 <tr>

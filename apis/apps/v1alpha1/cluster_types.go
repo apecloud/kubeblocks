@@ -588,8 +588,9 @@ type ClusterComponentSpec struct {
 	// +optional
 	ComponentDefRef string `json:"componentDefRef,omitempty"`
 
-	// References the name of a ComponentDefinition object.
-	// The ComponentDefinition specifies the behavior and characteristics of the Component.
+	// Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
+	// custom resource (CR) that defines the Component's characteristics and behavior.
+	//
 	// If both `componentDefRef` and `componentDef` are provided,
 	// the `componentDef` will take precedence over `componentDefRef`.
 	//

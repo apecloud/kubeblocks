@@ -336,6 +336,75 @@ var _ = Describe("ComponentDefinition Controller", func() {
 		})
 	})
 
+	Context("vars", func() {
+		It("ok", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				AddVar(appsv1alpha1.EnvVar{
+					Name:  "VAR1",
+					Value: "value1",
+				}).
+				Create(&testCtx).GetObject()
+
+			checkObjectStatus(componentDefObj, appsv1alpha1.AvailablePhase)
+		})
+
+		It("duplicate vars name", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				AddVar(appsv1alpha1.EnvVar{
+					Name:  "VAR1",
+					Value: "value1",
+				}).
+				AddVar(appsv1alpha1.EnvVar{
+					Name:  "VAR1",
+					Value: "value2",
+				}).
+				Create(&testCtx).GetObject()
+			checkObjectStatus(componentDefObj, appsv1alpha1.UnavailablePhase)
+		})
+
+		It("valid var component definition name pattern", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				AddVar(appsv1alpha1.EnvVar{
+					Name: "VAR1",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ServiceRefVarRef: &appsv1alpha1.ServiceRefVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								Name:    "service",
+								CompDef: "valid",
+							},
+						},
+					},
+				}).
+				Create(&testCtx).GetObject()
+			checkObjectStatus(componentDefObj, appsv1alpha1.AvailablePhase)
+		})
+
+		It("invalid var component definition name pattern", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				AddVar(appsv1alpha1.EnvVar{
+					Name: "VAR1",
+					ValueFrom: &appsv1alpha1.VarSource{
+						ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
+							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+								Name:    "service",
+								CompDef: "(invalid",
+							},
+						},
+					},
+				}).
+				Create(&testCtx).GetObject()
+			checkObjectStatus(componentDefObj, appsv1alpha1.UnavailablePhase)
+		})
+	})
+
 	Context("immutable", func() {
 		newCmpdFn := func(processor func(*testapps.MockComponentDefinitionFactory)) *appsv1alpha1.ComponentDefinition {
 			By("create a ComponentDefinition obj")

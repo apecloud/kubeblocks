@@ -28,6 +28,7 @@ import (
 
 var _ = Describe("image util test", func() {
 	imageList := [][]string{
+		// original image name, registry, namespace, image name, tag and digest
 		{"busybox", "docker.io", "library", "busybox", ""},
 		{"apecloud/busybox:1.28", "docker.io", "apecloud", "busybox", ":1.28"},
 		{"foo.io/a/b/busybox", "foo.io", "a/b", "busybox", ""},
@@ -93,30 +94,69 @@ var _ = Describe("image util test", func() {
 		}
 	})
 
-	It("replaces image when single registry config exists", func() {
+	It("replaces image when registry/namespace config exists", func() {
 		registriesConfig = &RegistriesConfig{
-			DefaultRegistry: "foo.bar",
-			Registries: []RegistryConfig{
+			DefaultRegistry:  "foo.bar",
+			DefaultNamespace: "default",
+			RegistryConfig: []RegistryConfig{
 				{
 					From: "docker.io",
 					To:   "bar.io",
 					Namespaces: []RegistryNamespaceConfig{
 						{From: "library", To: "foo"},
+						{From: "apecloud", To: ""},
 					},
 				},
 				{
 					From: "foo.io",
+					To:   "foo.bar",
 					Namespaces: []RegistryNamespaceConfig{
 						{From: "a/b", To: "foo"},
+					},
+				},
+				{
+					From: "registry.k8s.io",
+					To:   "k8s.bar",
+					Namespaces: []RegistryNamespaceConfig{
+						{From: "", To: "k8s"},
 					},
 				},
 			},
 		}
 		expectedImage := []string{
 			"bar.io/foo/busybox",
-			"bar.io/apecloud/busybox:1.28",
+			"bar.io/busybox:1.28",
 			"foo.bar/foo/busybox",
-			"foo.bar/pause:latest@sha256:1ff6c18fbef2045af6b9c16bf034cc421a29027b800e4f9b68ae9b1cb3e9ae07",
+			"k8s.bar/k8s/pause:latest@sha256:1ff6c18fbef2045af6b9c16bf034cc421a29027b800e4f9b68ae9b1cb3e9ae07",
+		}
+		for i, image := range imageList {
+			newImage, err := ReplaceImageRegistry(image[0])
+			Expect(err).NotTo(HaveOccurred())
+			Expect(newImage).To(Equal(expectedImage[i]))
+		}
+	})
+
+	It("replaces image w/ or w/o RegistryDefaultNamespace", func() {
+		registriesConfig = &RegistriesConfig{
+			DefaultRegistry:  "foo.bar",
+			DefaultNamespace: "default",
+			RegistryConfig: []RegistryConfig{
+				{
+					From:                     "docker.io",
+					To:                       "bar.io",
+					RegistryDefaultNamespace: "docker",
+				},
+				{
+					From: "foo.io",
+					To:   "foo.bar",
+				},
+			},
+		}
+		expectedImage := []string{
+			"bar.io/docker/busybox",
+			"bar.io/docker/busybox:1.28",
+			"foo.bar/a/b/busybox",
+			"foo.bar/default/pause:latest@sha256:1ff6c18fbef2045af6b9c16bf034cc421a29027b800e4f9b68ae9b1cb3e9ae07",
 		}
 		for i, image := range imageList {
 			newImage, err := ReplaceImageRegistry(image[0])

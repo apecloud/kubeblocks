@@ -23,12 +23,14 @@ import (
 	//  Import the crypto sha256 algorithm for the docker image parser to work
 	_ "crypto/sha256"
 	"sync"
+
 	//  Import the crypto/sha512 algorithm for the docker image parser to work with 384 and 512 sha hashes
 	_ "crypto/sha512"
 	"fmt"
 	"strings"
 
 	"github.com/distribution/reference"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -51,15 +53,16 @@ type RegistryNamespaceConfig struct {
 }
 
 type RegistryConfig struct {
-	From       string
-	To         string
-	Namespaces []RegistryNamespaceConfig
+	From                     string
+	To                       string
+	RegistryDefaultNamespace string
+	Namespaces               []RegistryNamespaceConfig
 }
 
 type RegistriesConfig struct {
 	DefaultRegistry  string
 	DefaultNamespace string
-	Registries       []RegistryConfig
+	RegistryConfig   []RegistryConfig
 }
 
 // this lock protects r/w to this variable itself,
@@ -84,19 +87,18 @@ func ReloadRegistryConfig() {
 		panic(err)
 	}
 
-	for _, registry := range registriesConfig.Registries {
+	for _, registry := range registriesConfig.RegistryConfig {
 		if len(registry.From) == 0 {
 			panic("from can't be empty")
 		}
 
-		for _, namespace := range registry.Namespaces {
-			if len(namespace.From) == 0 || len(namespace.To) == 0 {
-				panic("namespace can't be empty")
-			}
+		if len(registry.To) == 0 {
+			panic("to can't be empty")
 		}
 	}
 
-	fmt.Printf("registriesConfig is %v\n", registriesConfig)
+	logger := log.Log
+	logger.Info("registriesConfig reloaded", "registriesConfig", registriesConfig)
 }
 
 // For a detailed explanation of an image's format, see:
@@ -148,32 +150,33 @@ func ReplaceImageRegistry(image string) (string, error) {
 		}
 	}
 
-	chooseNamespace := func() string {
+	chooseNamespace := func() *string {
 		if registriesConfigCopy.DefaultNamespace != "" {
-			return registriesConfigCopy.DefaultNamespace
+			return &registriesConfigCopy.DefaultNamespace
 		} else {
-			return namespace
+			return &namespace
 		}
 	}
 
-	var dstRegistry, dstNamespace string
-	for _, registryMapping := range registriesConfigCopy.Registries {
+	var dstRegistry string
+	var dstNamespace *string
+	for _, registryMapping := range registriesConfigCopy.RegistryConfig {
 		if registryMapping.From == registry {
-			if len(registryMapping.To) != 0 {
-				dstRegistry = registryMapping.To
-			} else {
-				dstRegistry = chooseRegistry()
-			}
+			dstRegistry = registryMapping.To
 
 			for _, namespaceConf := range registryMapping.Namespaces {
 				if namespace == namespaceConf.From {
-					dstNamespace = namespaceConf.To
+					dstNamespace = &namespaceConf.To
 					break
 				}
 			}
 
-			if dstNamespace == "" {
-				dstNamespace = namespace
+			if dstNamespace == nil {
+				if registryMapping.RegistryDefaultNamespace != "" {
+					dstNamespace = &registryMapping.RegistryDefaultNamespace
+				} else {
+					dstNamespace = &namespace
+				}
 			}
 
 			break
@@ -183,11 +186,14 @@ func ReplaceImageRegistry(image string) (string, error) {
 	// no match in registriesConf.Registries
 	if dstRegistry == "" {
 		dstRegistry = chooseRegistry()
+	}
+
+	if dstNamespace == nil {
 		dstNamespace = chooseNamespace()
 	}
 
-	if dstNamespace == "" {
+	if *dstNamespace == "" {
 		return fmt.Sprintf("%v/%v%v", dstRegistry, repository, remainder), nil
 	}
-	return fmt.Sprintf("%v/%v/%v%v", dstRegistry, dstNamespace, repository, remainder), nil
+	return fmt.Sprintf("%v/%v/%v%v", dstRegistry, *dstNamespace, repository, remainder), nil
 }

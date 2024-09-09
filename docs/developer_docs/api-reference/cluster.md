@@ -11047,6 +11047,22 @@ an existed ServiceAccount in this field.</p>
 </tr>
 <tr>
 <td>
+<code>instanceUpdateStrategy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.InstanceUpdateStrategy">
+InstanceUpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates the InstanceUpdateStrategy that will be
+employed to update Pods in the InstanceSet when a revision is made to
+Template.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>parallelPodManagementConcurrency</code><br/>
 <em>
 <a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
@@ -15268,6 +15284,22 @@ Existing usage should be updated to the current preferred approach to avoid comp
 </tr>
 <tr>
 <td>
+<code>instanceUpdateStrategy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.InstanceUpdateStrategy">
+InstanceUpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates the InstanceUpdateStrategy that will be
+employed to update Pods in the InstanceSet when a revision is made to
+Template.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>parallelPodManagementConcurrency</code><br/>
 <em>
 <a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
@@ -18921,6 +18953,22 @@ Future versions might change the default ServiceAccount creation strategy to one
 potentially revising the naming to &ldquo;kb-&#123;cluster.name&#125;-&#123;component.name&#125;&rdquo;.</p>
 <p>Users can override the automatic ServiceAccount assignment by explicitly setting the name of
 an existed ServiceAccount in this field.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>instanceUpdateStrategy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.InstanceUpdateStrategy">
+InstanceUpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates the InstanceUpdateStrategy that will be
+employed to update Pods in the InstanceSet when a revision is made to
+Template.</p>
 </td>
 </tr>
 <tr>
@@ -22761,6 +22809,59 @@ Add new or override existing volume mounts of the first container in the Pod.</p
 <em>(Optional)</em>
 <p>Defines VolumeClaimTemplates to override.
 Add new or override existing volume claim templates.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.InstanceUpdateStrategy">InstanceUpdateStrategy
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>)
+</p>
+<div>
+<p>InstanceUpdateStrategy indicates the strategy that the InstanceSet
+controller will use to perform updates.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>partition</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Partition indicates the number of pods that should be updated during a rolling update.
+The remaining pods will remain untouched. This is helpful in defining how many pods
+should participate in the update process. The update process will follow the order
+of pod names in descending lexicographical (dictionary) order. The default value is
+ComponentSpec.Replicas (i.e., update all pods).</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>maxUnavailable</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The maximum number of pods that can be unavailable during the update.
+Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+Absolute number is calculated from percentage by rounding up. This can not be 0.
+Defaults to 1. The field applies to all pods. That means if there is any unavailable pod,
+it will be counted towards MaxUnavailable.</p>
 </td>
 </tr>
 </tbody>

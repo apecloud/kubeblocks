@@ -34,10 +34,14 @@ func (r *ServiceDescriptor) ConvertTo(dstRaw conversion.Hub) error {
 	dst.ObjectMeta = r.ObjectMeta
 
 	// spec
-	copier.Copy(&dst.Spec, &r.Spec)
+	if err := copier.Copy(&dst.Spec, &r.Spec); err != nil {
+		return err
+	}
 
 	// status
-	copier.Copy(&dst.Status, &r.Status)
+	if err := copier.Copy(&dst.Status, &r.Status); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -50,10 +54,14 @@ func (r *ServiceDescriptor) ConvertFrom(srcRaw conversion.Hub) error {
 	r.ObjectMeta = src.ObjectMeta
 
 	// spec
-	copier.Copy(&r.Spec, &src.Spec)
+	if err := copier.Copy(&r.Spec, &src.Spec); err != nil {
+		return err
+	}
 
 	// status
-	copier.Copy(&r.Status, &src.Status)
+	if err := copier.Copy(&r.Status, &src.Status); err != nil {
+		return err
+	}
 
 	return nil
 }

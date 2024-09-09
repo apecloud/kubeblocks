@@ -22,6 +22,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
@@ -446,6 +447,25 @@ const (
 	// The `BestEffortParallel` strategy strikes a balance between update speed and component availability.
 	BestEffortParallelStrategy UpdateStrategy = "BestEffortParallel"
 )
+
+// InstanceUpdateStrategy indicates the strategy that the InstanceSet
+// controller will use to perform updates.
+type InstanceUpdateStrategy struct {
+	// Partition indicates the number of pods that should be updated during a rolling update.
+	// The remaining pods will remain untouched. This is helpful in defining how many pods
+	// should participate in the update process. The update process will follow the order
+	// of pod names in descending lexicographical (dictionary) order. The default value is
+	// ComponentSpec.Replicas (i.e., update all pods).
+	// +optional
+	Partition *int32 `json:"partition,omitempty"`
+	// The maximum number of pods that can be unavailable during the update.
+	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+	// Absolute number is calculated from percentage by rounding up. This can not be 0.
+	// Defaults to 1. The field applies to all pods. That means if there is any unavailable pod,
+	// it will be counted towards MaxUnavailable.
+	// +optional
+	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
+}
 
 // TerminationPolicyType defines termination policy types.
 //

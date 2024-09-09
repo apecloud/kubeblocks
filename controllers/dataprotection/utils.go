@@ -40,7 +40,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
@@ -217,12 +217,12 @@ func GetTargetPods(reqCtx intctrlutil.RequestCtx,
 // getCluster gets the cluster and will ignore the error.
 func getCluster(ctx context.Context,
 	cli client.Client,
-	targetPod *corev1.Pod) *appsv1.Cluster {
+	targetPod *corev1.Pod) *kbappsv1.Cluster {
 	clusterName := targetPod.Labels[constant.AppInstanceLabelKey]
 	if len(clusterName) == 0 {
 		return nil
 	}
-	cluster := &appsv1.Cluster{}
+	cluster := &kbappsv1.Cluster{}
 	if err := cli.Get(ctx, client.ObjectKey{
 		Namespace: targetPod.Namespace,
 		Name:      clusterName,
@@ -236,7 +236,7 @@ func getCluster(ctx context.Context,
 // listObjectsOfCluster list the objects of the cluster by labels.
 func listObjectsOfCluster(ctx context.Context,
 	cli client.Client,
-	cluster *appsv1.Cluster,
+	cluster *kbappsv1.Cluster,
 	object client.ObjectList) (client.ObjectList, error) {
 	labels := constant.GetClusterWellKnownLabels(cluster.Name)
 	if err := cli.List(ctx, object, client.InNamespace(cluster.Namespace), client.MatchingLabels(labels)); err != nil {

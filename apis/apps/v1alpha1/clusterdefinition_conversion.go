@@ -21,6 +21,7 @@ package v1alpha1
 
 import (
 	"github.com/jinzhu/copier"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -34,11 +35,17 @@ func (r *ClusterDefinition) ConvertTo(dstRaw conversion.Hub) error {
 	dst.ObjectMeta = r.ObjectMeta
 
 	// spec
-	copier.Copy(&dst.Spec, &r.Spec)
-	// TODO(v1.0): changed fields
+	if err := copier.Copy(&dst.Spec, &r.Spec); err != nil {
+		return err
+	}
+	if err := incrementConvertTo(r, dst); err != nil {
+		return err
+	}
 
 	// status
-	copier.Copy(&dst.Status, &r.Status)
+	if err := copier.Copy(&dst.Status, &r.Status); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -51,11 +58,54 @@ func (r *ClusterDefinition) ConvertFrom(srcRaw conversion.Hub) error {
 	r.ObjectMeta = src.ObjectMeta
 
 	// spec
-	copier.Copy(&r.Spec, &src.Spec)
-	// TODO(v1.0): changed fields
+	if err := copier.Copy(&r.Spec, &src.Spec); err != nil {
+		return err
+	}
+	if err := incrementConvertFrom(r, src, &clusterDefinitionConverter{}); err != nil {
+		return err
+	}
 
 	// status
-	copier.Copy(&r.Status, &src.Status)
+	if err := copier.Copy(&r.Status, &src.Status); err != nil {
+		return err
+	}
 
 	return nil
+}
+
+func (r *ClusterDefinition) incrementConvertTo(metav1.Object) (incrementChange, error) {
+	return &clusterDefinitionConverter{
+		Spec: clusterDefinitionSpecConverter{
+			Type:                 r.Spec.Type,
+			ComponentDefs:        r.Spec.ComponentDefs,
+			ConnectionCredential: r.Spec.ConnectionCredential,
+		},
+		Status: clusterDefinitionStatusConverter{
+			ServiceRefs: r.Status.ServiceRefs,
+		},
+	}, nil
+}
+
+func (r *ClusterDefinition) incrementConvertFrom(_ metav1.Object, ic incrementChange) error {
+	c := ic.(*clusterDefinitionConverter)
+	r.Spec.Type = c.Spec.Type
+	r.Spec.ComponentDefs = c.Spec.ComponentDefs
+	r.Spec.ConnectionCredential = c.Spec.ConnectionCredential
+	r.Status.ServiceRefs = c.Status.ServiceRefs
+	return nil
+}
+
+type clusterDefinitionConverter struct {
+	Spec   clusterDefinitionSpecConverter   `json:"spec,omitempty"`
+	Status clusterDefinitionStatusConverter `json:"status,omitempty"`
+}
+
+type clusterDefinitionSpecConverter struct {
+	Type                 string                       `json:"type,omitempty"`
+	ComponentDefs        []ClusterComponentDefinition `json:"componentDefs"`
+	ConnectionCredential map[string]string            `json:"connectionCredential,omitempty"`
+}
+
+type clusterDefinitionStatusConverter struct {
+	ServiceRefs string `json:"serviceRefs,omitempty"`
 }

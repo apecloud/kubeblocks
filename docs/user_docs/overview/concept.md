@@ -128,7 +128,7 @@ Only Addon developers need to understand the ClusterDefinition and ComponentDefi
 #### ClusterDefinition
 ClusterDefinition is an API used to define all available topologies of a database cluster, offering a variety of topological configurations to meet diverse deployment needs and scenarios.
 
-Each topology includes a list of component, each linked to a ComponentDefinition, which enhances reusability and reduce redundancy. For example, widely used components such as etcd and Zookeeper can be defined once and reused across multiple ClusterDefinitions, simplifying the setup of new systems.
+Each topology includes a list of components, each linked to a ComponentDefinition, which enhances reusability and reduce redundancy. For example, ComponentDefinition of widely used components such as etcd and Zookeeper can be defined once and reused across multiple ClusterDefinitions, simplifying the setup of new systems.
 
 Additionally, ClusterDefinition also specifies the sequence of startup, upgrade, and shutdown for components, ensuring a controlled and predictable management of component lifecycles.
 

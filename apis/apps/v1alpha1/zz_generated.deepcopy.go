@@ -638,6 +638,11 @@ func (in *ClusterComponentSpec) DeepCopyInto(out *ClusterComponentSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.SchedulingPolicy != nil {
+		in, out := &in.SchedulingPolicy, &out.SchedulingPolicy
+		*out = new(SchedulingPolicy)
+		(*in).DeepCopyInto(*out)
+	}
 	in.Resources.DeepCopyInto(&out.Resources)
 	if in.VolumeClaimTemplates != nil {
 		in, out := &in.VolumeClaimTemplates, &out.VolumeClaimTemplates
@@ -1175,6 +1180,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	if in.SchedulingPolicy != nil {
+		in, out := &in.SchedulingPolicy, &out.SchedulingPolicy
+		*out = new(SchedulingPolicy)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.RuntimeClassName != nil {
 		in, out := &in.RuntimeClassName, &out.RuntimeClassName
@@ -2409,6 +2419,11 @@ func (in *ComponentSpec) DeepCopyInto(out *ComponentSpec) {
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	if in.SchedulingPolicy != nil {
+		in, out := &in.SchedulingPolicy, &out.SchedulingPolicy
+		*out = new(SchedulingPolicy)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.TLSConfig != nil {
 		in, out := &in.TLSConfig, &out.TLSConfig

@@ -36,6 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/apiconversion"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -68,17 +69,16 @@ func IsGenerated(comp *appsv1alpha1.Component) bool {
 func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.ClusterComponentSpec,
 	labels, annotations map[string]string) (*appsv1alpha1.Component, error) {
 	compName := FullName(cluster.Name, compSpec.Name)
-	affinities := BuildAffinity(cluster, compSpec)
-	tolerations, err := BuildTolerations(cluster, compSpec)
-	if err != nil {
-		return nil, err
-	}
 	compDefName := func() string {
 		if strings.HasPrefix(compSpec.ComponentDef, constant.KBGeneratedVirtualCompDefPrefix) {
 			return ""
 		}
 		return compSpec.ComponentDef
 	}()
+	schedulingPolicy, err := scheduling.BuildSchedulingPolicy(cluster, compSpec)
+	if err != nil {
+		return nil, err
+	}
 	compBuilder := builder.NewComponentBuilder(cluster.Namespace, compName, compDefName).
 		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 		AddLabelsInMap(constant.GetComponentWellKnownLabels(cluster.Name, compSpec.Name)).
@@ -87,9 +87,8 @@ func BuildComponent(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluste
 		SetLabels(compSpec.Labels).
 		SetAnnotations(compSpec.Annotations).
 		SetEnv(compSpec.Env).
-		SetAffinity(affinities).
-		SetTolerations(tolerations).
 		SetDisableExporter(compSpec.GetDisableExporter()).
+		SetSchedulingPolicy(schedulingPolicy).
 		SetReplicas(compSpec.Replicas).
 		SetResources(compSpec.Resources).
 		SetServiceAccountName(compSpec.ServiceAccountName).

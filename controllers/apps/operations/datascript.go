@@ -36,7 +36,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	componetutil "github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -333,11 +333,11 @@ func buildDataScriptJobs(reqCtx intctrlutil.RequestCtx, cli client.Client, clust
 		// add labels
 		job.Labels = getDataScriptJobLabels(cluster.Name, component.Name, ops.Name)
 		// add tolerations
-		tolerations, err := componetutil.BuildTolerations(cluster, component)
+		schedulingPolicy, err := scheduling.BuildSchedulingPolicy(cluster, component)
 		if err != nil {
 			return nil, intctrlutil.NewFatalError(err.Error())
 		}
-		job.Spec.Template.Spec.Tolerations = tolerations
+		job.Spec.Template.Spec.Tolerations = schedulingPolicy.Tolerations
 		// add owner reference
 		scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 		if err := controllerutil.SetOwnerReference(ops, job, scheme); err != nil {

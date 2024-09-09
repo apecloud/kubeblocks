@@ -35,9 +35,7 @@ func (r *ClusterDefinition) ConvertTo(dstRaw conversion.Hub) error {
 
 	// spec
 	copier.Copy(&dst.Spec, &r.Spec)
-	// TODO(v1.0):
-	// 1. add original ClusterDefinition definition back
-	// 2. changed fields
+	// TODO(v1.0): changed fields
 
 	// status
 	copier.Copy(&dst.Status, &r.Status)
@@ -54,9 +52,7 @@ func (r *ClusterDefinition) ConvertFrom(srcRaw conversion.Hub) error {
 
 	// spec
 	copier.Copy(&r.Spec, &src.Spec)
-	// TODO(v1.0):
-	// 1. add original ClusterDefinition definition back
-	// 2. changed fields
+	// TODO(v1.0): changed fields
 
 	// status
 	copier.Copy(&r.Status, &src.Status)

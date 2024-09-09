@@ -33,7 +33,8 @@ func (r *ComponentDefinition) ConvertTo(dstRaw conversion.Hub) error {
 	dst.ObjectMeta = r.ObjectMeta
 
 	// spec
-	copier.Copy(&dst.Spec, &r.Spec) // TODO(v1.0): changed fields
+	copier.Copy(&dst.Spec, &r.Spec)
+	// TODO(v1.0): changed fields
 
 	// status
 	copier.Copy(&dst.Status, &r.Status)
@@ -49,7 +50,8 @@ func (r *ComponentDefinition) ConvertFrom(srcRaw conversion.Hub) error {
 	r.ObjectMeta = src.ObjectMeta
 
 	// spec
-	copier.Copy(&r.Spec, &src.Spec) // TODO(v1.0): changed fields
+	copier.Copy(&r.Spec, &src.Spec)
+	// TODO(v1.0): changed fields
 
 	// status
 	copier.Copy(&r.Status, &src.Status)

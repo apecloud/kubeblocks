@@ -77,7 +77,7 @@ func (s *server) StartNonBlocking() error {
 		apiListenAddress := s.config.Address
 		l, err := net.Listen("tcp", fmt.Sprintf("%s:%v", apiListenAddress, s.config.Port))
 		if err != nil {
-			logger.Error(err, "listen address", apiListenAddress, "port", s.config.Port)
+			logger.Error(err, "listen", "address", apiListenAddress, "port", s.config.Port)
 		} else {
 			listeners = append(listeners, l)
 		}

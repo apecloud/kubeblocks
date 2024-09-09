@@ -1,45 +1,45 @@
-* @kb-reviewers
+* @apecloud/kb-reviewers
 
 # Cluster APIs
-apis/**/cluster*.go @leon-inf @Y-Rookie @kb-reviewers
-apis/**/component*.go @leon-inf @Y-Rookie @kb-reviewers
-apis/**/service*.go @leon-inf @Y-Rookie @kb-reviewers
-controllers/apps/cluster*.go @leon-inf @Y-Rookie @kb-reviewers
-controllers/apps/transformer_cluster*.go @leon-inf @Y-Rookie @kb-reviewers
-controllers/apps/component*.go @leon-inf @Y-Rookie @kb-reviewers
-controllers/apps/transformer_component*.go @leon-inf @Y-Rookie @kb-reviewers
-controllers/apps/service*.go @leon-inf @Y-Rookie @kb-reviewers
+apis/**/cluster*.go @leon-inf @Y-Rookie @apecloud/kb-reviewers
+apis/**/component*.go @leon-inf @Y-Rookie @apecloud/kb-reviewers
+apis/**/service*.go @leon-inf @Y-Rookie @apecloud/kb-reviewers
+controllers/apps/cluster*.go @leon-inf @Y-Rookie @apecloud/kb-reviewers
+controllers/apps/transformer_cluster*.go @leon-inf @Y-Rookie @apecloud/kb-reviewers
+controllers/apps/component*.go @leon-inf @Y-Rookie @apecloud/kb-reviewers
+controllers/apps/transformer_component*.go @leon-inf @Y-Rookie @apecloud/kb-reviewers
+controllers/apps/service*.go @leon-inf @Y-Rookie @apecloud/kb-reviewers
 
 # OpsRequest API
-apis/**/opsrequest*.go @wangyelei @kb-reviewers
-apis/**/opsdefinition*.go @wangyelei @kb-reviewers
-controllers/apps/opsdefinition*.go @wangyelei @kb-reviewers
-controllers/apps/operations/ @wangyelei @kb-reviewers
+apis/**/opsrequest*.go @wangyelei @apecloud/kb-reviewers
+apis/**/opsdefinition*.go @wangyelei @apecloud/kb-reviewers
+controllers/apps/opsdefinition*.go @wangyelei @apecloud/kb-reviewers
+controllers/apps/operations/ @wangyelei @apecloud/kb-reviewers
 
 # Config API
-apis/**/config*.go @sophon-zt @kb-reviewers
-controllers/apps/configuration/ @sophon-zt @kb-reviewers
-controllers/apps/operations/reconfigure*.go @sophon-zt @kb-reviewers
+apis/**/config*.go @sophon-zt @apecloud/kb-reviewers
+controllers/apps/configuration/ @sophon-zt @apecloud/kb-reviewers
+controllers/apps/operations/reconfigure*.go @sophon-zt @apecloud/kb-reviewers
 
 # DataProtection APIs
-apis/dataprotection/ @ldming @wangyelei @zjx20 @kb-reviewers
-controllers/dataprotection/ @ldming @wangyelei @zjx20 @kb-reviewers
-pkg/dataprotection/ @ldming @wangyelei @zjx20 @kb-reviewers
+apis/dataprotection/ @ldming @wangyelei @zjx20 @apecloud/kb-reviewers
+controllers/dataprotection/ @ldming @wangyelei @zjx20 @apecloud/kb-reviewers
+pkg/dataprotection/ @ldming @wangyelei @zjx20 @apecloud/kb-reviewers
 
 # Experimental APIs
-apis/experimental/ @free6om @kb-reviewers
-controllers/experimental/ @free6om @kb-reviewers
+apis/experimental/ @free6om @apecloud/kb-reviewers
+controllers/experimental/ @free6om @apecloud/kb-reviewers
 
 # Extensions APIs
-apis/experimental/ @ldming @kb-reviewers
-controllers/extensions/ @ldming @kb-reviewers
+apis/experimental/ @ldming @apecloud/kb-reviewers
+controllers/extensions/ @ldming @apecloud/kb-reviewers
 
 # Workloads APIs
-apis/workloads/ @free6om @kb-reviewers
-controllers/workloads/ @free6om @kb-reviewers
+apis/workloads/ @free6om @apecloud/kb-reviewers
+controllers/workloads/ @free6om @apecloud/kb-reviewers
 
 # Docs
-docs/ @michelle-0808 @kb-reviewers
+docs/ @michelle-0808 @apecloud/kb-reviewers
 
 # Examples
-examples/ @ahjing99 @kb-reviewers
+examples/ @ahjing99 @apecloud/kb-reviewers

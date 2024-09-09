@@ -56,7 +56,12 @@ func runCommand(ctx context.Context, action *proto.ExecAction, parameters map[st
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
-			err = errors.Wrap(proto.ErrFailed, string(<-stderrChan))
+			stderrMsg := string(<-stderrChan)
+			if len(stderrMsg) > 0 {
+				err = errors.Wrapf(proto.ErrFailed, "exec exit %d and stderr: %s", exitErr.ExitCode(), stderrMsg)
+			} else {
+				err = errors.Wrapf(proto.ErrFailed, "exec exit %d but stderr is blank", exitErr.ExitCode())
+			}
 		}
 		return nil, err
 	}

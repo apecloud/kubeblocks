@@ -11,6 +11,7 @@ spec:
   {{- end }}
   selector:
     matchLabels:
+      app.kubernetes.io/component: "apps"
       {{- include "kubeblocks.selectorLabels" . | nindent 6 }}
       {{- with .Values.extraLabels }}
         {{- toYaml . | nindent 6 }}
@@ -26,6 +27,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
+        app.kubernetes.io/component: "apps"
         {{- include "kubeblocks.selectorLabels" . | nindent 8 }}
         {{- with .Values.extraLabels }}
           {{- toYaml . | nindent 8 }}

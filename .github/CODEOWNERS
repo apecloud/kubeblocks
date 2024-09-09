@@ -1,1 +1,45 @@
-* @nayutah @ldming @heng4fun @free6om @wangyelei @Y-Rookie @weicao
+* @apecloud/kb-reviewers
+
+# Cluster APIs
+apis/**/cluster*.go @leon-inf @Y-Rookie @apecloud/kb-reviewers
+apis/**/component*.go @leon-inf @Y-Rookie @apecloud/kb-reviewers
+apis/**/service*.go @leon-inf @Y-Rookie @apecloud/kb-reviewers
+controllers/apps/cluster*.go @leon-inf @Y-Rookie @apecloud/kb-reviewers
+controllers/apps/transformer_cluster*.go @leon-inf @Y-Rookie @apecloud/kb-reviewers
+controllers/apps/component*.go @leon-inf @Y-Rookie @apecloud/kb-reviewers
+controllers/apps/transformer_component*.go @leon-inf @Y-Rookie @apecloud/kb-reviewers
+controllers/apps/service*.go @leon-inf @Y-Rookie @apecloud/kb-reviewers
+
+# OpsRequest API
+apis/**/opsrequest*.go @wangyelei @apecloud/kb-reviewers
+apis/**/opsdefinition*.go @wangyelei @apecloud/kb-reviewers
+controllers/apps/opsdefinition*.go @wangyelei @apecloud/kb-reviewers
+controllers/apps/operations/ @wangyelei @apecloud/kb-reviewers
+
+# Config API
+apis/**/config*.go @sophon-zt @apecloud/kb-reviewers
+controllers/apps/configuration/ @sophon-zt @apecloud/kb-reviewers
+controllers/apps/operations/reconfigure*.go @sophon-zt @apecloud/kb-reviewers
+
+# DataProtection APIs
+apis/dataprotection/ @ldming @wangyelei @zjx20 @apecloud/kb-reviewers
+controllers/dataprotection/ @ldming @wangyelei @zjx20 @apecloud/kb-reviewers
+pkg/dataprotection/ @ldming @wangyelei @zjx20 @apecloud/kb-reviewers
+
+# Experimental APIs
+apis/experimental/ @free6om @apecloud/kb-reviewers
+controllers/experimental/ @free6om @apecloud/kb-reviewers
+
+# Extensions APIs
+apis/extensions/ @ldming @apecloud/kb-reviewers
+controllers/extensions/ @ldming @apecloud/kb-reviewers
+
+# Workloads APIs
+apis/workloads/ @free6om @apecloud/kb-reviewers
+controllers/workloads/ @free6om @apecloud/kb-reviewers
+
+# Docs
+docs/ @michelle-0808 @shanshanying @apecloud/kb-reviewers
+
+# Examples
+examples/ @ahjing99 @shanshanying @apecloud/kb-reviewers

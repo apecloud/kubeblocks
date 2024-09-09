@@ -276,6 +276,10 @@ manager: cue-fmt generate manager-go-generate test-go-generate build-checks ## B
 dataprotection: generate test-go-generate build-checks ## Build dataprotection binary.
 	$(GO) build -ldflags=${LD_FLAGS} -o bin/dataprotection ./cmd/dataprotection/main.go
 
+.PHONY: helmhook
+helmhook:
+	$(GO) build -o bin/helmhook ./cmd/helmhook/main.go
+
 CERT_ROOT_CA ?= $(WEBHOOK_CERT_DIR)/rootCA.key
 .PHONY: webhook-cert
 webhook-cert: $(CERT_ROOT_CA) ## Create root CA certificates for admission webhooks testing.

@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1alpha1
 
 import (
+	"github.com/jinzhu/copier"
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -33,24 +34,10 @@ func (r *ServiceDescriptor) ConvertTo(dstRaw conversion.Hub) error {
 	dst.ObjectMeta = r.ObjectMeta
 
 	// spec
-	dst.Spec.ServiceKind = r.Spec.ServiceKind
-	dst.Spec.ServiceVersion = r.Spec.ServiceVersion
-	dst.Spec.Endpoint = r.credentialVarTo(r.Spec.Endpoint)
-	dst.Spec.Host = r.credentialVarTo(r.Spec.Host)
-	dst.Spec.Port = r.credentialVarTo(r.Spec.Port)
-	if r.Spec.Auth == nil {
-		dst.Spec.Auth = nil
-	} else {
-		dst.Spec.Auth = &appsv1.ConnectionCredentialAuth{
-			Username: r.credentialVarTo(r.Spec.Auth.Username),
-			Password: r.credentialVarTo(r.Spec.Auth.Password),
-		}
-	}
+	copier.Copy(&dst.Spec, &r.Spec)
 
 	// status
-	dst.Status.ObservedGeneration = r.Status.ObservedGeneration
-	dst.Status.Phase = appsv1.Phase(r.Status.Phase)
-	dst.Status.Message = r.Status.Message
+	copier.Copy(&dst.Status, &r.Status)
 
 	return nil
 }
@@ -63,44 +50,10 @@ func (r *ServiceDescriptor) ConvertFrom(srcRaw conversion.Hub) error {
 	r.ObjectMeta = src.ObjectMeta
 
 	// spec
-	r.Spec.ServiceKind = src.Spec.ServiceKind
-	r.Spec.ServiceVersion = src.Spec.ServiceVersion
-	r.Spec.Endpoint = r.credentialVarFrom(src.Spec.Endpoint)
-	r.Spec.Host = r.credentialVarFrom(src.Spec.Host)
-	r.Spec.Port = r.credentialVarFrom(src.Spec.Port)
-	if r.Spec.Auth == nil {
-		r.Spec.Auth = nil
-	} else {
-		r.Spec.Auth = &ConnectionCredentialAuth{
-			Username: r.credentialVarFrom(src.Spec.Auth.Username),
-			Password: r.credentialVarFrom(src.Spec.Auth.Password),
-		}
-	}
+	copier.Copy(&r.Spec, &src.Spec)
 
 	// status
-	r.Status.ObservedGeneration = src.Status.ObservedGeneration
-	r.Status.Phase = Phase(src.Status.Phase)
-	r.Status.Message = src.Status.Message
+	copier.Copy(&r.Status, &src.Status)
 
-	return nil
-}
-
-func (r *ServiceDescriptor) credentialVarTo(src *CredentialVar) *appsv1.CredentialVar {
-	if src != nil {
-		return &appsv1.CredentialVar{
-			Value:     src.Value,
-			ValueFrom: src.ValueFrom,
-		}
-	}
-	return nil
-}
-
-func (r *ServiceDescriptor) credentialVarFrom(src *appsv1.CredentialVar) *CredentialVar {
-	if src != nil {
-		return &CredentialVar{
-			Value:     src.Value,
-			ValueFrom: src.ValueFrom,
-		}
-	}
 	return nil
 }

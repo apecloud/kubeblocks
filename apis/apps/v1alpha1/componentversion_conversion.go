@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1alpha1
 
 import (
+	"github.com/jinzhu/copier"
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -33,14 +34,10 @@ func (r *ComponentVersion) ConvertTo(dstRaw conversion.Hub) error {
 	dst.ObjectMeta = r.ObjectMeta
 
 	// spec
-	dst.Spec.CompatibilityRules = r.compatibilityRulesTo(r.Spec.CompatibilityRules)
-	dst.Spec.Releases = r.releasesTo(r.Spec.Releases)
+	copier.Copy(&dst.Spec, &r.Spec)
 
 	// status
-	dst.Status.ObservedGeneration = r.Status.ObservedGeneration
-	dst.Status.Phase = appsv1.Phase(r.Status.Phase)
-	dst.Status.Message = r.Status.Message
-	dst.Status.ServiceVersions = r.Status.ServiceVersions
+	copier.Copy(&dst.Status, &r.Status)
 
 	return nil
 }
@@ -53,74 +50,10 @@ func (r *ComponentVersion) ConvertFrom(srcRaw conversion.Hub) error {
 	r.ObjectMeta = src.ObjectMeta
 
 	// spec
-	r.Spec.CompatibilityRules = r.compatibilityRulesFrom(src.Spec.CompatibilityRules)
-	r.Spec.Releases = r.releasesFrom(src.Spec.Releases)
+	copier.Copy(&r.Spec, &src.Spec)
 
 	// status
-	r.Status.ObservedGeneration = src.Status.ObservedGeneration
-	r.Status.Phase = Phase(src.Status.Phase)
-	r.Status.Message = src.Status.Message
-	r.Status.ServiceVersions = src.Status.ServiceVersions
+	copier.Copy(&r.Status, &src.Status)
 
-	return nil
-}
-
-func (r *ComponentVersion) compatibilityRulesTo(src []ComponentVersionCompatibilityRule) []appsv1.ComponentVersionCompatibilityRule {
-	if src != nil {
-		rules := make([]appsv1.ComponentVersionCompatibilityRule, 0)
-		for _, rule := range src {
-			rules = append(rules, appsv1.ComponentVersionCompatibilityRule{
-				CompDefs: rule.CompDefs,
-				Releases: rule.Releases,
-			})
-		}
-		return rules
-	}
-	return nil
-}
-
-func (r *ComponentVersion) compatibilityRulesFrom(src []appsv1.ComponentVersionCompatibilityRule) []ComponentVersionCompatibilityRule {
-	if src != nil {
-		rules := make([]ComponentVersionCompatibilityRule, 0)
-		for _, rule := range src {
-			rules = append(rules, ComponentVersionCompatibilityRule{
-				CompDefs: rule.CompDefs,
-				Releases: rule.Releases,
-			})
-		}
-		return rules
-	}
-	return nil
-}
-
-func (r *ComponentVersion) releasesTo(src []ComponentVersionRelease) []appsv1.ComponentVersionRelease {
-	if src != nil {
-		releases := make([]appsv1.ComponentVersionRelease, 0)
-		for _, release := range src {
-			releases = append(releases, appsv1.ComponentVersionRelease{
-				Name:           release.Name,
-				Changes:        release.Changes,
-				ServiceVersion: release.ServiceVersion,
-				Images:         release.Images,
-			})
-		}
-		return releases
-	}
-	return nil
-}
-
-func (r *ComponentVersion) releasesFrom(src []appsv1.ComponentVersionRelease) []ComponentVersionRelease {
-	if src != nil {
-		releases := make([]ComponentVersionRelease, 0)
-		for _, release := range src {
-			releases = append(releases, ComponentVersionRelease{
-				Name:           release.Name,
-				Changes:        release.Changes,
-				ServiceVersion: release.ServiceVersion,
-				Images:         release.Images,
-			})
-		}
-		return releases
-	}
 	return nil
 }

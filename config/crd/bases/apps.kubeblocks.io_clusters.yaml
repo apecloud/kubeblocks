@@ -16991,6 +16991,27 @@ spec:
                       description: Specifies Annotations to override or add for underlying
                         Pods.
                       type: object
+                    classDefRef:
+                      description: |-
+                        References the class defined in ComponentClassDefinition.
+
+
+                        Deprecated since v0.9.
+                        This field is maintained for backward compatibility and its use is discouraged.
+                        Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
+                      properties:
+                        class:
+                          description: Defines the name of the class that is defined
+                            in the ComponentClassDefinition.
+                          type: string
+                        name:
+                          description: Specifies the name of the ComponentClassDefinition.
+                          maxLength: 63
+                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                          type: string
+                      required:
+                      - class
+                      type: object
                     componentDef:
                       description: |-
                         References the name of a ComponentDefinition object.
@@ -26110,6 +26131,27 @@ spec:
                             type: string
                           description: Specifies Annotations to override or add for
                             underlying Pods.
+                          type: object
+                        classDefRef:
+                          description: |-
+                            References the class defined in ComponentClassDefinition.
+
+
+                            Deprecated since v0.9.
+                            This field is maintained for backward compatibility and its use is discouraged.
+                            Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
+                          properties:
+                            class:
+                              description: Defines the name of the class that is defined
+                                in the ComponentClassDefinition.
+                              type: string
+                            name:
+                              description: Specifies the name of the ComponentClassDefinition.
+                              maxLength: 63
+                              pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                              type: string
+                          required:
+                          - class
                           type: object
                         componentDef:
                           description: |-

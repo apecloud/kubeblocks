@@ -20,15 +20,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1alpha1
 
 import (
+	"github.com/jinzhu/copier"
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
+
+	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
 // ConvertTo converts this InstanceSet to the Hub version (v1).
 func (r *InstanceSet) ConvertTo(dstRaw conversion.Hub) error {
+	dst := dstRaw.(*workloadsv1.InstanceSet)
+
+	// objectMeta
+	dst.ObjectMeta = r.ObjectMeta
+
+	// spec
+	copier.Copy(&dst.Spec, &r.Spec)
+
+	// status
+	copier.Copy(&dst.Status, &r.Status)
+
 	return nil
 }
 
 // ConvertFrom converts from the Hub version (v1) to this version.
 func (r *InstanceSet) ConvertFrom(srcRaw conversion.Hub) error {
+	src := srcRaw.(*workloadsv1.InstanceSet)
+
+	// objectMeta
+	r.ObjectMeta = src.ObjectMeta
+
+	// spec
+	copier.Copy(&r.Spec, &src.Spec)
+
+	// status
+	copier.Copy(&r.Status, &src.Status)
+
 	return nil
 }

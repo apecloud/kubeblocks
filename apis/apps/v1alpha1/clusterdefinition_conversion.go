@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1alpha1
 
 import (
+	"github.com/jinzhu/copier"
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -33,13 +34,13 @@ func (r *ClusterDefinition) ConvertTo(dstRaw conversion.Hub) error {
 	dst.ObjectMeta = r.ObjectMeta
 
 	// spec
-	dst.Spec.Topologies = r.topologiesTo(r.Spec.Topologies)
+	copier.Copy(&dst.Spec, &r.Spec)
+	// TODO(v1.0):
+	// 1. add original ClusterDefinition definition back
+	// 2. changed fields
 
 	// status
-	dst.Status.ObservedGeneration = r.Status.ObservedGeneration
-	dst.Status.Phase = appsv1.Phase(r.Status.Phase)
-	dst.Status.Message = r.Status.Message
-	dst.Status.Topologies = r.Status.Topologies
+	copier.Copy(&dst.Status, &r.Status)
 
 	return nil
 }
@@ -52,97 +53,13 @@ func (r *ClusterDefinition) ConvertFrom(srcRaw conversion.Hub) error {
 	r.ObjectMeta = src.ObjectMeta
 
 	// spec
-	r.Spec.Topologies = r.topologiesFrom(src.Spec.Topologies)
+	copier.Copy(&r.Spec, &src.Spec)
+	// TODO(v1.0):
+	// 1. add original ClusterDefinition definition back
+	// 2. changed fields
 
 	// status
-	r.Status.ObservedGeneration = src.Status.ObservedGeneration
-	r.Status.Phase = Phase(src.Status.Phase)
-	r.Status.Message = src.Status.Message
-	r.Status.Topologies = src.Status.Topologies
+	copier.Copy(&r.Status, &src.Status)
 
-	return nil
-}
-
-func (r *ClusterDefinition) topologiesTo(src []ClusterTopology) []appsv1.ClusterTopology {
-	if src != nil {
-		topologies := make([]appsv1.ClusterTopology, 0)
-		for _, topology := range src {
-			topologies = append(topologies, appsv1.ClusterTopology{
-				Name:       topology.Name,
-				Components: r.topologyComponentTo(topology.Components),
-				Orders:     r.topologyOrdersTo(topology.Orders),
-				Default:    topology.Default,
-			})
-		}
-		return topologies
-	}
-	return nil
-}
-
-func (r *ClusterDefinition) topologyComponentTo(src []ClusterTopologyComponent) []appsv1.ClusterTopologyComponent {
-	if src != nil {
-		comps := make([]appsv1.ClusterTopologyComponent, 0)
-		for _, comp := range src {
-			comps = append(comps, appsv1.ClusterTopologyComponent{
-				Name:    comp.Name,
-				CompDef: comp.CompDef,
-			})
-		}
-		return comps
-	}
-	return nil
-}
-
-func (r *ClusterDefinition) topologyOrdersTo(src *ClusterTopologyOrders) *appsv1.ClusterTopologyOrders {
-	if src != nil {
-		return &appsv1.ClusterTopologyOrders{
-			Provision: src.Provision,
-			Terminate: src.Terminate,
-			Update:    src.Update,
-		}
-	}
-	return nil
-}
-
-func (r *ClusterDefinition) topologiesFrom(src []appsv1.ClusterTopology) []ClusterTopology {
-	if src != nil {
-		topologies := make([]ClusterTopology, 0)
-		for _, topology := range src {
-			topologies = append(topologies, ClusterTopology{
-				Name:       topology.Name,
-				Components: r.topologyComponentFrom(topology.Components),
-				Orders:     r.topologyOrdersFrom(topology.Orders),
-				Default:    topology.Default,
-			})
-		}
-		return topologies
-	}
-	return nil
-}
-
-func (r *ClusterDefinition) topologyComponentFrom(src []appsv1.ClusterTopologyComponent) []ClusterTopologyComponent {
-	if src != nil {
-		comps := make([]ClusterTopologyComponent, 0)
-		for _, comp := range src {
-			comps = append(comps, ClusterTopologyComponent{
-				Name:    comp.Name,
-				CompDef: comp.CompDef,
-			})
-		}
-		return comps
-	}
-	return nil
-}
-
-func (r *ClusterDefinition) topologyOrdersFrom(src *appsv1.ClusterTopologyOrders) *ClusterTopologyOrders {
-	if src != nil {
-		if src != nil {
-			return &ClusterTopologyOrders{
-				Provision: src.Provision,
-				Terminate: src.Terminate,
-				Update:    src.Update,
-			}
-		}
-	}
 	return nil
 }

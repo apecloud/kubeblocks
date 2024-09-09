@@ -606,6 +606,16 @@ type ClusterComponentSpec struct {
 	// +optional
 	ServiceVersion string `json:"serviceVersion,omitempty"`
 
+	// References the class defined in ComponentClassDefinition.
+	//
+	// Deprecated since v0.9.
+	// This field is maintained for backward compatibility and its use is discouraged.
+	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
+	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
+	// +optional
+	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
+
 	// Defines a list of ServiceRef for a Component, enabling access to both external services and
 	// Services provided by other Clusters.
 	//
@@ -799,6 +809,9 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	UpdateStrategy *UpdateStrategy `json:"updateStrategy,omitempty"`
+
+	// TODO(v1.0): ?
+	// InstanceUpdateStrategy *InstanceUpdateStrategy
 
 	// Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
 	// or when scaling down. It only used when `PodManagementPolicy` is set to `Parallel`.
@@ -1297,6 +1310,21 @@ type ClusterComponentConfigSource struct {
 	// - Config template of components from other clusters
 	// - Secret
 	// - Local file
+}
+
+// ClassDefRef is deprecated since v0.9.
+type ClassDefRef struct {
+	// Specifies the name of the ComponentClassDefinition.
+	//
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +optional
+	Name string `json:"name,omitempty"`
+
+	// Defines the name of the class that is defined in the ComponentClassDefinition.
+	//
+	// +kubebuilder:validation:Required
+	Class string `json:"class"`
 }
 
 // ClusterNetwork is deprecated since v0.9.

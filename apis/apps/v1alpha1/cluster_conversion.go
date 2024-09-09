@@ -20,15 +20,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1alpha1
 
 import (
+	"github.com/jinzhu/copier"
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
+
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 // ConvertTo converts this Cluster to the Hub version (v1).
 func (r *Cluster) ConvertTo(dstRaw conversion.Hub) error {
+	dst := dstRaw.(*appsv1.Cluster)
+
+	// objectMeta
+	dst.ObjectMeta = r.ObjectMeta
+
+	// spec
+	copier.Copy(&dst.Spec, &r.Spec)
+	// TODO(v1.0):
+	// 1. add original Cluster definition back
+	// 2. changed fields
+
+	// status
+	copier.Copy(&dst.Status, &r.Status)
+
 	return nil
 }
 
 // ConvertFrom converts from the Hub version (v1) to this version.
 func (r *Cluster) ConvertFrom(srcRaw conversion.Hub) error {
+	src := srcRaw.(*appsv1.Cluster)
+
+	// objectMeta
+	r.ObjectMeta = src.ObjectMeta
+
+	// spec
+	copier.Copy(&r.Spec, &src.Spec)
+	// TODO(v1.0):
+	// 1. add original Cluster definition back
+	// 2. changed fields
+
+	// status
+	copier.Copy(&r.Status, &src.Status)
+
 	return nil
 }

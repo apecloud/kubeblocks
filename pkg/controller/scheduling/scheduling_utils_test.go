@@ -69,7 +69,60 @@ var _ = Describe("affinity utils", func() {
 				GetObject()
 			compSpec = &clusterObj.Spec.ComponentSpecs[0]
 		}
+
+		buildObjsNewAPI = func() {
+			affinity := &corev1.Affinity{
+				NodeAffinity: &corev1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+						NodeSelectorTerms: []corev1.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{
+										Key:      labelKey,
+										Operator: corev1.NodeSelectorOpIn,
+										Values:   []string{labelValue},
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			schedulingPolocy := appsv1alpha1.SchedulingPolicy{
+				Affinity: affinity,
+			}
+
+			clusterObj = testapps.NewClusterFactory("default", clusterName, "").
+				AddComponent(compName, "").
+				SetSchedulingPolicy(schedulingPolocy).
+				GetObject()
+			compSpec = &clusterObj.Spec.ComponentSpecs[0]
+		}
 	)
+
+	Context("with new scheduling policy API", func() {
+		BeforeEach(func() {
+			buildObjsNewAPI()
+		})
+
+		It("should have correct Affinity when data plane affinity is set", func() {
+			viper.Set(constant.CfgKeyDataPlaneAffinity,
+				fmt.Sprintf("{\"nodeAffinity\":{\"preferredDuringSchedulingIgnoredDuringExecution\":[{\"preference\":{\"matchExpressions\":[{\"key\":\"%s\",\"operator\":\"In\",\"values\":[\"true\"]}]},\"weight\":100}]}}", nodeKey))
+			defer viper.Set(constant.CfgKeyDataPlaneAffinity, "")
+
+			originClusteSchedulingPolicy := clusterObj.Spec.SchedulingPolicy.DeepCopy()
+			schedulingPolicy, err := BuildSchedulingPolicy(clusterObj, compSpec)
+			Expect(err).Should(Succeed())
+			Expect(schedulingPolicy).ShouldNot(BeNil())
+			// cluster's scheduling policy should be unchanged
+			Expect(clusterObj.Spec.SchedulingPolicy).Should(Equal(originClusteSchedulingPolicy))
+
+			nodeAffinity := schedulingPolicy.Affinity.NodeAffinity
+			Expect(nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).Should(Equal(labelKey))
+			Expect(nodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Preference.MatchExpressions[0].Key).Should(Equal(nodeKey))
+		})
+	})
 
 	Context("with PodAntiAffinity set to Required", func() {
 		BeforeEach(func() {

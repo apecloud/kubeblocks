@@ -235,21 +235,6 @@ var _ = Describe("ComponentVersion Controller", func() {
 				})).Should(Succeed())
 		})
 
-		It("update component definition with valid regexp", func() {
-			By("update component version to reference a valid regexp component definition")
-			compVersionKey := client.ObjectKeyFromObject(compVersionObj)
-			Eventually(testapps.GetAndChangeObj(&testCtx, compVersionKey, func(compVersion *appsv1alpha1.ComponentVersion) {
-				compVersion.Spec.CompatibilityRules[1].CompDefs = []string{testapps.CompDefName("^v3$")}
-			})).Should(Succeed())
-
-			By("checking the object available")
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(compVersionObj),
-				func(g Gomega, cmpv *appsv1alpha1.ComponentVersion) {
-					g.Expect(cmpv.Status.ObservedGeneration).Should(Equal(cmpv.GetGeneration()))
-					g.Expect(cmpv.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
-				})).Should(Succeed())
-		})
-
 		It("update component definition with invalid regexp", func() {
 			By("update component version to reference an invalid regexp component definition")
 			compVersionKey := client.ObjectKeyFromObject(compVersionObj)

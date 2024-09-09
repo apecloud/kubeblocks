@@ -2,7 +2,7 @@
 title: Supported addons 
 description: Addons supported by KubeBlocks
 keywords: [addons, enable, KubeBlocks, prometheus, s3, alertmanager,]
-sidebar_position: 3
+sidebar_position: 2
 sidebar_label: Supported addons 
 ---
 
@@ -45,6 +45,7 @@ KubeBlocks, as a cloud-native data infrastructure based on Kubernetes, provides 
 | postgresql      | PostgreSQL is an advanced, enterprise class open source relational database that supports both SQL (relational) and JSON (non-relational) querying.                                                            |
 | pulsar          | Apache® Pulsar™ is an open-source, distributed messaging and streaming platform built for the cloud. |
 | qdrant          | Qdrant is a vector database & vector similarity search engine.                                                                                                                                                    |
+| rabbitmq        | RabbitMQ is a reliable and mature messaging and streaming broker.  |
 | redis           | Redis is a fast, open source, in-memory, key-value data store.                                                                                                                                                    |
 | risingwave      | RisingWave is a distributed SQL database for stream processing. It is designed to reduce the complexity and cost of building real-time applications. |
 | solr            | Solr is the popular, blazing-fast, open source enterprise search platform built on Apache Lucene. |
@@ -96,6 +97,7 @@ KubeBlocks, as a cloud-native data infrastructure based on Kubernetes, provides 
 | postgresql | <p>12.14.0</p><p>12.14.1</p><p>12.15.0</p><p>14.7.2</p><p>14.8.0</p> | ✔️              | ✔️                | ✔️            | ✔️                | ✔️                | ✔️      | ✔️              | ✔️    | ✔️      | ✔️                           | ✔️       | ✔️        | ✔️          | ✔️       |
 | pulsar              | 2.11.2                                                    | ✔️                | ✔️                | ✔️            | ✔️                | ✔️                | N/A    | N/A            | N/A  | ✔️      | N/A                         | N/A     | N/A      | N/A        | ✔️       |
 | qdrant              | 1.5.0                                                     | ✔️                | ✔️                | ✔️            | ✔️                | ✔️                | N/A    | ✔️              | N/A  | N/A    | N/A                         | N/A     | N/A      | N/A        | ✔️       |
+| rabbitmq            | <p>3.13.2</p><p>3.12.14</p><p>3.11.28</p><p>3.10.25</p><p>3.9.29</p><p>3.8.14</p>    | ✔️   | ✔️  | ✔️            | ✔️                | ✔️                | ✔️      | N/A            | N/A  | N/A    | N/A                         | Managed by the RabitMQ Management system.     | ✔️      | ✔️        |✔️     |
 | redis               | 7.0.6                                                     | ✔️                | ✔️                | ✔️            | ✔️                | ✔️                | ✔️      | ✔️              | ✔️    | ✔️      | N/A                         | ✔️       | ✔️        | N/A        | ✔️       |
 | risingwave          | 1.0.0                                                     | ✔️                | ✔️                | ✔️            | ✔️                | ✔️                | N/A    | N/A            | N/A  | N/A    | N/A                         | N/A     | N/A      | N/A        | N/A     |
 | starrocks           | 3.1.1                                                     | ✔️                | ✔️                | ✔️            | ✔️                | ✔️                | N/A    | N/A            | N/A  | N/A    | N/A                         | N/A     | N/A      | N/A        | N/A     |

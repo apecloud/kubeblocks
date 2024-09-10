@@ -51,7 +51,7 @@ type RegistryConfig struct {
 	// or they won't be matched. Note empty namespace is legal too.
 	//
 	// key is the orignal namespace, value is the new namespace
-	Namespaces map[string]string
+	Namespaces map[string]string `mapstructure:"namespaces"`
 }
 
 type RegistriesConfig struct {

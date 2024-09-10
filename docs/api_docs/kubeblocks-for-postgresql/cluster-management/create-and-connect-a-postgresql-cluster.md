@@ -271,4 +271,4 @@ You can also port forward the service to connect to the database from your local
 
 </Tabs>
 
-For the detailed database connection guide, refer to [Connect database](./../../connect_database/overview-of-database-connection.md).
+For the detailed database connection guide, refer to [Connect database](./../../../user_docs/connect_database/overview-of-database-connection.md).

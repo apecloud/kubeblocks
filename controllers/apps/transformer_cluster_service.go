@@ -293,8 +293,8 @@ func (t *clusterServiceTransformer) createOrUpdateService(ctx graph.TransformCon
 		Namespace: service.Namespace,
 		Name:      service.Name,
 	}
-	obj := &corev1.Service{}
-	if err := ctx.GetClient().Get(ctx.GetContext(), key, obj, inDataContext4C()); err != nil {
+	originSvc := &corev1.Service{}
+	if err := ctx.GetClient().Get(ctx.GetContext(), key, originSvc, inDataContext4C()); err != nil {
 		if apierrors.IsNotFound(err) {
 			graphCli.Create(dag, service, inDataContext4G())
 			return nil
@@ -302,13 +302,13 @@ func (t *clusterServiceTransformer) createOrUpdateService(ctx graph.TransformCon
 		return err
 	}
 
-	objCopy := obj.DeepCopy()
-	objCopy.Spec = service.Spec
+	newSvc := originSvc.DeepCopy()
+	newSvc.Spec = service.Spec
 
-	resolveServiceDefaultFields(&obj.Spec, &objCopy.Spec)
+	resolveServiceDefaultFields(&originSvc.Spec, &newSvc.Spec)
 
-	if !reflect.DeepEqual(obj, objCopy) {
-		graphCli.Update(dag, obj, objCopy, inDataContext4G())
+	if !reflect.DeepEqual(originSvc, newSvc) {
+		graphCli.Update(dag, originSvc, newSvc, inDataContext4G())
 	}
 	return nil
 }

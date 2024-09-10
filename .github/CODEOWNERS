@@ -40,6 +40,7 @@ controllers/workloads/ @free6om @apecloud/kb-reviewers
 
 # Docs
 docs/ @michelle-0808 @shanshanying @apecloud/kb-reviewers
+i18n/ @michelle-0808 @shanshanying @apecloud/kb-reviewers
 docs/developer_docs/api-reference/
 
 # Examples

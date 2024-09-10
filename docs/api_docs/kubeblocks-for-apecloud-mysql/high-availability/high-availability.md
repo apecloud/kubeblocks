@@ -21,7 +21,7 @@ The faults here are all simulated by deleting pods. When there are sufficient re
 
 ### Before you start
 
-* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
+* [Install KubeBlocks](../../../user_docs/installation/install-with-helm/install-kubeblocks.md).
 * [Create an ApeCloud MySQL RaftGroup Cluster](./../cluster-management/create-and-connect-an-apecloud-mysql-cluster.md).
 * Run `kubectl get cd apecloud-mysql -o yaml` to check whether _rolechangedprobe_ is enabled in the ApeCloud MySQL RaftGroup Cluster (it is enabled by default). If the following configuration exists, it indicates that it is enabled:
 

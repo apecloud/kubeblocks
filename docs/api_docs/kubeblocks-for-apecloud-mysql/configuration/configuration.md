@@ -18,7 +18,7 @@ But it's also important to note that the dynamic parameter configuration doesn't
 
 ## Before you start
 
-1. [Install KubeBlocks](./../../installation/install-kubeblocks.md).
+1. [Install KubeBlocks](../../../user_docs/installation/install-with-helm/install-kubeblocks.md).
 2. [Create an ApeCloud MySQL cluster](./../cluster-management/create-and-connect-an-apecloud-mysql-cluster.md).
 
 ## Configure cluster parameters by editing configuration file

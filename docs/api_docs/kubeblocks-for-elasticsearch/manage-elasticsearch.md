@@ -17,10 +17,10 @@ KubeBlocks supports the management of Elasticsearch. This tutorial illustrates h
 
 ## Before you start
 
-* [Install KubeBlocks](./../installation/install-kubeblocks.md).
+* [Install KubeBlocks](../../user_docs/installation/install-with-helm/install-kubeblocks.md).
 * View all the database types and versions available for creating a cluster.
   
-  Make sure the `elasticsearch` cluster definition is installed. If the cluster definition is not available, refer to [this doc](./../installation/install-addons.md) to enable it first.
+  Make sure the `elasticsearch` cluster definition is installed. If the cluster definition is not available, refer to [this doc](../../user_docs/installation/install-with-helm/install-addons.md) to enable it first.
 
   ```bash
   kubectl get clusterdefinition elasticsearch

@@ -44,3 +44,7 @@ docs/developer_docs/api-reference/
 
 # Examples
 examples/ @ahjing99 @shanshanying @apecloud/kb-reviewers
+
+# Tests
+.github/ @JashBook @ahjing99 @apecloud/kb-reviewers
+test/e2e/ @JashBook @ahjing99 @linghan-hub @apecloud/kb-reviewers

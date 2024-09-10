@@ -102,23 +102,23 @@ var _ = Describe("image util test", func() {
 				{
 					From: "docker.io",
 					To:   "bar.io",
-					Namespaces: []RegistryNamespaceConfig{
-						{From: "library", To: "foo"},
-						{From: "apecloud", To: ""},
+					Namespaces: map[string]string{
+						"library":  "foo",
+						"apecloud": "",
 					},
 				},
 				{
 					From: "foo.io",
 					To:   "foo.bar",
-					Namespaces: []RegistryNamespaceConfig{
-						{From: "a/b", To: "foo"},
+					Namespaces: map[string]string{
+						"a/b": "foo",
 					},
 				},
 				{
 					From: "registry.k8s.io",
 					To:   "k8s.bar",
-					Namespaces: []RegistryNamespaceConfig{
-						{From: "", To: "k8s"},
+					Namespaces: map[string]string{
+						"": "k8s",
 					},
 				},
 			},

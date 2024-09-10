@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package controllerutil
 
 import (
-	//  Import the crypto/sha256 and crypto/sha512 algorithm for the docker image parser to work
+	//  Import these crypto algorithm so that the image parser can work with digest
 	_ "crypto/sha256"
 	_ "crypto/sha512"
 	"fmt"
@@ -34,33 +34,30 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-// RegistryNamespaceConfig maps registry namespaces.
-//
-// Quote from https://docs.docker.com/reference/cli/docker/image/tag/
-// > While the OCI Distribution Specification supports more than two slash-separated components,
-// > most registries only support two slash-separated components.
-// > For Docker's public registry, the path format is as follows:
-// > [NAMESPACE/]REPOSITORY: The first, optional component is typically a user's or an organization's
-// > namespace. The second, mandatory component is the repository name. When the namespace is
-// > not present, Docker uses `library` as the default namespace.
-//
-// So if there are more than two components, specify them both, or they won't be matched.
-type RegistryNamespaceConfig struct {
-	From string
-	To   string
-}
-
 type RegistryConfig struct {
-	From                     string
-	To                       string
-	RegistryDefaultNamespace string
-	Namespaces               []RegistryNamespaceConfig
+	From                     string `mapstructure:"from"`
+	To                       string `mapstructure:"to"`
+	RegistryDefaultNamespace string `mapstructure:"registryDefaultNamespace"`
+
+	// Quote from https://docs.docker.com/reference/cli/docker/image/tag/
+	// > While the OCI Distribution Specification supports more than two slash-separated components,
+	// > most registries only support two slash-separated components.
+	// > For Docker's public registry, the path format is as follows:
+	// > [NAMESPACE/]REPOSITORY: The first, optional component is typically a user's or an organization's
+	// > namespace. The second, mandatory component is the repository name. When the namespace is
+	// > not present, Docker uses `library` as the default namespace.
+	//
+	// So if there are more than two components (like `a/b` as a namespace), specify them both,
+	// or they won't be matched. Note empty namespace is legal too.
+	//
+	// key is the orignal namespace, value is the new namespace
+	Namespaces map[string]string
 }
 
 type RegistriesConfig struct {
-	DefaultRegistry  string
-	DefaultNamespace string
-	RegistryConfig   []RegistryConfig
+	DefaultRegistry  string           `mapstructure:"defaultRegistry"`
+	DefaultNamespace string           `mapstructure:"defaultNamespace"`
+	RegistryConfig   []RegistryConfig `mapstructure:"registryConfig"`
 }
 
 // this lock protects r/w to this variable itself,
@@ -95,8 +92,7 @@ func ReloadRegistryConfig() {
 		}
 	}
 
-	logger := log.Log
-	logger.Info("registriesConfig reloaded", "registriesConfig", registriesConfig)
+	log.Log.Info("registriesConfig reloaded", "registriesConfig", registriesConfig)
 }
 
 // For a detailed explanation of an image's format, see:
@@ -162,9 +158,9 @@ func ReplaceImageRegistry(image string) (string, error) {
 		if registryMapping.From == registry {
 			dstRegistry = registryMapping.To
 
-			for _, namespaceConf := range registryMapping.Namespaces {
-				if namespace == namespaceConf.From {
-					dstNamespace = &namespaceConf.To
+			for orig, new := range registryMapping.Namespaces {
+				if namespace == orig {
+					dstNamespace = &new
 					break
 				}
 			}

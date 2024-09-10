@@ -51,7 +51,7 @@ type RegistryConfig struct {
 	// or they won't be matched. Note empty namespace is legal too.
 	//
 	// key is the orignal namespace, value is the new namespace
-	Namespaces map[string]string `mapstructure:"namespaces"`
+	NamespaceMapping map[string]string `mapstructure:"namespaceMapping"`
 }
 
 type RegistriesConfig struct {
@@ -158,7 +158,7 @@ func ReplaceImageRegistry(image string) (string, error) {
 		if registryMapping.From == registry {
 			dstRegistry = registryMapping.To
 
-			for orig, new := range registryMapping.Namespaces {
+			for orig, new := range registryMapping.NamespaceMapping {
 				if namespace == orig {
 					dstNamespace = &new
 					break

@@ -102,7 +102,7 @@ var _ = Describe("image util test", func() {
 				{
 					From: "docker.io",
 					To:   "bar.io",
-					Namespaces: map[string]string{
+					NamespaceMapping: map[string]string{
 						"library":  "foo",
 						"apecloud": "",
 					},
@@ -110,14 +110,14 @@ var _ = Describe("image util test", func() {
 				{
 					From: "foo.io",
 					To:   "foo.bar",
-					Namespaces: map[string]string{
+					NamespaceMapping: map[string]string{
 						"a/b": "foo",
 					},
 				},
 				{
 					From: "registry.k8s.io",
 					To:   "k8s.bar",
-					Namespaces: map[string]string{
+					NamespaceMapping: map[string]string{
 						"": "k8s",
 					},
 				},

@@ -20,14 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package controllerutil
 
 import (
-	//  Import the crypto sha256 algorithm for the docker image parser to work
+	//  Import the crypto/sha256 and crypto/sha512 algorithm for the docker image parser to work
 	_ "crypto/sha256"
-	"sync"
-
-	//  Import the crypto/sha512 algorithm for the docker image parser to work with 384 and 512 sha hashes
 	_ "crypto/sha512"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/distribution/reference"
 	"sigs.k8s.io/controller-runtime/pkg/log"

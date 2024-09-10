@@ -17,11 +17,11 @@ This tutorial shows how to create and connect to a Redis cluster.
 
 ### Before you start
 
-* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
+* [Install KubeBlocks](../../../user_docs/installation/install-with-helm/install-kubeblocks.md).
 
 * View all the database types and versions available for creating a cluster.
 
-  Make sure the `redis` cluster definition is installed. If the cluster definition is not available, refer to [this doc](./../../installation/install-addons.md) to enable it first.
+  Make sure the `redis` cluster definition is installed. If the cluster definition is not available, refer to [this doc](../../../user_docs/installation/install-with-helm/install-addons.md) to enable it first.
 
   ```bash
   kubectl get clusterdefinition redis
@@ -273,4 +273,4 @@ You can also port forward the service to connect to the database from your local
 
 </Tabs>
 
-For the detailed database connection guide, refer to [Connect database](./../../connect_database/overview-of-database-connection.md).
+For the detailed database connection guide, refer to [Connect database](./../../../user_docs/connect_database/overview-of-database-connection.md).

@@ -429,6 +429,11 @@ func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent 
 	if err := controllerutil.SetControllerReference(parent, pod, model.GetScheme()); err != nil {
 		return nil, err
 	}
+	for _, pvc := range pvcs {
+		if err = controllerutil.SetControllerReference(parent, pvc, model.GetScheme()); err != nil {
+			return nil, err
+		}
+	}
 	inst := &instance{
 		pod:  pod,
 		pvcs: pvcs,

@@ -26,7 +26,7 @@ For Pulsar, there are 3 types of parameters:
 
 ## Before you start
 
-1. [Install KubeBlocks](./../../installation/install-kubeblocks.md).
+1. [Install KubeBlocks](../../../user_docs/installation/install-with-helm/install-kubeblocks.md).
 2. [Create a Pulsar cluster](./../cluster-management/create-pulsar-cluster-on-kubeblocks.md).
 
 ## Configure cluster parameters by configuration file

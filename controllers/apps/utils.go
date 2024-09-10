@@ -87,10 +87,10 @@ func clientOption(v *model.ObjectVertex) *multicluster.ClientOption {
 	return multicluster.InControlContext()
 }
 
-func resolveServiceDefaultFields(originSvc, newSvc *corev1.ServiceSpec) {
+func resolveServiceDefaultFields(oldSpec, newSpec *corev1.ServiceSpec) {
 	var exist *corev1.ServicePort
-	for i, port := range newSvc.Ports {
-		for _, oldPort := range originSvc.Ports {
+	for i, port := range newSpec.Ports {
+		for _, oldPort := range oldSpec.Ports {
 			// assume that port.Name is user specified, if it is not changed, we need to keep the old NodePort and TargetPort if they are not set
 			if port.Name != "" && port.Name == oldPort.Name {
 				exist = &oldPort
@@ -101,40 +101,40 @@ func resolveServiceDefaultFields(originSvc, newSvc *corev1.ServiceSpec) {
 			continue
 		}
 		// if the service type is NodePort or LoadBalancer, and the nodeport is not set, we should use the nodeport of the exist service
-		if shouldAllocateNodePorts(newSvc) && port.NodePort == 0 && exist.NodePort != 0 {
-			newSvc.Ports[i].NodePort = exist.NodePort
+		if shouldAllocateNodePorts(newSpec) && port.NodePort == 0 && exist.NodePort != 0 {
+			newSpec.Ports[i].NodePort = exist.NodePort
 			port.NodePort = exist.NodePort
 		}
 		if port.TargetPort.IntVal == 0 && port.TargetPort.StrVal == "" {
 			port.TargetPort = exist.TargetPort
 		}
 		if reflect.DeepEqual(port, *exist) {
-			newSvc.Ports[i].TargetPort = exist.TargetPort
+			newSpec.Ports[i].TargetPort = exist.TargetPort
 		}
 	}
-	if len(newSvc.ClusterIP) == 0 {
-		newSvc.ClusterIP = originSvc.ClusterIP
+	if len(newSpec.ClusterIP) == 0 {
+		newSpec.ClusterIP = oldSpec.ClusterIP
 	}
-	if len(newSvc.ClusterIPs) == 0 {
-		newSvc.ClusterIPs = originSvc.ClusterIPs
+	if len(newSpec.ClusterIPs) == 0 {
+		newSpec.ClusterIPs = oldSpec.ClusterIPs
 	}
-	if len(newSvc.Type) == 0 {
-		newSvc.Type = originSvc.Type
+	if len(newSpec.Type) == 0 {
+		newSpec.Type = oldSpec.Type
 	}
-	if len(newSvc.SessionAffinity) == 0 {
-		newSvc.SessionAffinity = originSvc.SessionAffinity
+	if len(newSpec.SessionAffinity) == 0 {
+		newSpec.SessionAffinity = oldSpec.SessionAffinity
 	}
-	if len(newSvc.IPFamilies) == 0 || (len(newSvc.IPFamilies) == 1 && *newSvc.IPFamilyPolicy != corev1.IPFamilyPolicySingleStack) {
-		newSvc.IPFamilies = originSvc.IPFamilies
+	if len(newSpec.IPFamilies) == 0 || (len(newSpec.IPFamilies) == 1 && *newSpec.IPFamilyPolicy != corev1.IPFamilyPolicySingleStack) {
+		newSpec.IPFamilies = oldSpec.IPFamilies
 	}
-	if newSvc.IPFamilyPolicy == nil {
-		newSvc.IPFamilyPolicy = originSvc.IPFamilyPolicy
+	if newSpec.IPFamilyPolicy == nil {
+		newSpec.IPFamilyPolicy = oldSpec.IPFamilyPolicy
 	}
-	if newSvc.InternalTrafficPolicy == nil {
-		newSvc.InternalTrafficPolicy = originSvc.InternalTrafficPolicy
+	if newSpec.InternalTrafficPolicy == nil {
+		newSpec.InternalTrafficPolicy = oldSpec.InternalTrafficPolicy
 	}
-	if newSvc.ExternalTrafficPolicy == "" && originSvc.ExternalTrafficPolicy != "" {
-		newSvc.ExternalTrafficPolicy = originSvc.ExternalTrafficPolicy
+	if newSpec.ExternalTrafficPolicy == "" && oldSpec.ExternalTrafficPolicy != "" {
+		newSpec.ExternalTrafficPolicy = oldSpec.ExternalTrafficPolicy
 	}
 }
 

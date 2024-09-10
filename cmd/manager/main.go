@@ -47,6 +47,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	viewcontrollers "github.com/apecloud/kubeblocks/controllers/view"
+
 	// +kubebuilder:scaffold:imports
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -112,6 +115,7 @@ func init() {
 	utilruntime.Must(legacy.AddToScheme(scheme))
 	utilruntime.Must(apiextv1.AddToScheme(scheme))
 	utilruntime.Must(experimentalv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(viewv1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 
 	viper.SetConfigName("config")                          // name of config file (without extension)
@@ -520,6 +524,20 @@ func main() {
 			setupLog.Error(err, "unable to create controller", "controller", "NodeCountScaler")
 			os.Exit(1)
 		}
+	}
+	if err = (&viewcontrollers.ReconciliationViewReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ReconciliationView")
+		os.Exit(1)
+	}
+	if err = (&viewcontrollers.ReconciliationPlanReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ReconciliationPlan")
+		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
 

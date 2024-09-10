@@ -71,7 +71,7 @@ In summary, PV is the actual storage resource, while PVC is a request for storag
 
 In Kubernetes, a Service acts as a load balancer. It defines a logical set of Pods and provides a policy for accessing them. Since Pods are ephemeral and can be dynamically created and destroyed, their IP addresses are not stable. A Service resolves this issue by providing a stable network endpoint (a virtual IP address, known as a ClusterIP) that remains constant, allowing other Pods or external clients to communicate with the set of Pods behind the Service without needing to know their specific IP addresses.
 
-Service supports different types: ClusterIP (internal cluster access), NodePort (external access via `<NodeIP>:<NodePort>`), LoadBalancer (exposes the Service externally using a cloud provider’s load balancer), and ExternalName (maps the Service to an external DNS).
+Service supports different types: ClusterIP (internal cluster access), NodePort (external access via `<NodeIP>:<NodePort>`), LoadBalancer (exposes the Service externally using a cloud provider's load balancer), and ExternalName (maps the Service to an external DNS).
 
 ## ConfigMap
 

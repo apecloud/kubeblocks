@@ -1207,7 +1207,9 @@ type ComponentVars struct {
 
 // ClusterObjectReference defines information to let you locate the referenced object inside the same Cluster.
 type ClusterObjectReference struct {
-	// CompDef specifies the definition used by the component that the referent object resident in.
+	// Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
+	// custom resource (CR) used by the component that the referent object resident in.
+	//
 	// If not specified, the component itself will be used.
 	//
 	// +optional

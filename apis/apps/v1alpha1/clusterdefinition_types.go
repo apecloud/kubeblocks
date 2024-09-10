@@ -135,14 +135,15 @@ type ClusterTopologyComponent struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// Specifies the name or prefix of the ComponentDefinition custom resource(CR) that
-	// defines the Component's characteristics and behavior.
+	// Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
+	// custom resource (CR) that defines the Component's characteristics and behavior.
 	//
-	// When a prefix is used, the system selects the ComponentDefinition CR with the latest version that matches the prefix.
+	// The system selects the ComponentDefinition CR with the latest version that matches the pattern.
 	// This approach allows:
 	//
 	// 1. Precise selection by providing the exact name of a ComponentDefinition CR.
-	// 2. Flexible and automatic selection of the most up-to-date ComponentDefinition CR by specifying a prefix.
+	// 2. Flexible and automatic selection of the most up-to-date ComponentDefinition CR
+	// 	  by specifying a name prefix or regular expression pattern.
 	//
 	// Once set, this field cannot be updated.
 	//

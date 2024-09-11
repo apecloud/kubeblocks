@@ -2169,6 +2169,30 @@ var _ = Describe("vars", func() {
 				checkEnvVarWithValue(envVars, "service-host", svcName1)
 			})
 
+			It("w/o option - comp def name with regexp", func() {
+				vars := []appsv1.EnvVar{
+					{
+						Name: "service-host",
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
+									CompDef:  "^" + synthesizedComp.CompDefName + "$", // compDef name with regexp
+									Name:     "service",
+									Optional: required(),
+								},
+								ServiceVars: appsv1.ServiceVars{
+									Host: &appsv1.VarRequired,
+								},
+							},
+						},
+					},
+				}
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+				Expect(err).Should(Succeed())
+				Expect(templateVars).Should(HaveKeyWithValue("service-host", svcName1))
+				checkEnvVarWithValue(envVars, "service-host", svcName1)
+			})
+
 			It("w/ option - ref others", func() {
 				vars := []appsv1.EnvVar{
 					{

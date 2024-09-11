@@ -26,6 +26,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/pkg/errors"
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -141,6 +142,13 @@ func (r *ComponentVersionReconciler) reconcile(rctx intctrlutil.RequestCtx,
 	//	return intctrlutil.Reconciled()
 	// }
 
+	if err = validateCompatibilityRulesCompDef(compVersion); err != nil {
+		if err1 := r.unavailable(r.Client, rctx, compVersion, err); err1 != nil {
+			return intctrlutil.CheckedRequeueWithError(err1, rctx.Log, "")
+		}
+		return intctrlutil.CheckedRequeueWithError(err, rctx.Log, "")
+	}
+
 	releaseToCompDefinitions, err := r.buildReleaseToCompDefinitionMapping(r.Client, rctx, compVersion)
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, rctx.Log, "")
@@ -178,7 +186,7 @@ func (r *ComponentVersionReconciler) buildReleaseToCompDefinitionMapping(cli cli
 				continue
 			}
 			var err error
-			compDefs[compDef], err = listCompDefinitionsWithPrefix(rctx.Ctx, cli, compDef)
+			compDefs[compDef], err = listCompDefinitionsWithPattern(rctx.Ctx, cli, compDef)
 			if err != nil {
 				return nil, err
 			}
@@ -340,12 +348,24 @@ func (r *ComponentVersionReconciler) validateImages(release appsv1.ComponentVers
 	return nil
 }
 
+// validateCompatibilityRulesCompDef validates the reference component definition name pattern defined in compatibility rules.
+func validateCompatibilityRulesCompDef(compVersion *appsv1.ComponentVersion) error {
+	for _, rule := range compVersion.Spec.CompatibilityRules {
+		for _, compDefName := range rule.CompDefs {
+			if err := component.ValidateCompDefRegexp(compDefName); err != nil {
+				return errors.Wrapf(err, "invalid reference to component definition name pattern: %s in compatibility rules", compDefName)
+			}
+		}
+	}
+	return nil
+}
+
 // resolveCompDefinitionNServiceVersion resolves and returns the specific component definition object and the service version supported.
 func resolveCompDefinitionNServiceVersion(ctx context.Context, cli client.Reader, compDefName, serviceVersion string) (*appsv1.ComponentDefinition, string, error) {
 	var (
 		compDef *appsv1.ComponentDefinition
 	)
-	compDefs, err := listCompDefinitionsWithPrefix(ctx, cli, compDefName)
+	compDefs, err := listCompDefinitionsWithPattern(ctx, cli, compDefName)
 	if err != nil {
 		return compDef, serviceVersion, err
 	}

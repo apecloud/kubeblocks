@@ -22,9 +22,11 @@ package apps
 import (
 	"fmt"
 
+	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
@@ -53,6 +55,10 @@ func (t *clusterLoadRefResourcesTransformer) Transform(ctx graph.TransformContex
 		return newRequeueError(requeueDuration, err.Error())
 	}
 
+	if err = t.checkAllCompDefinition(cluster); err != nil {
+		return newRequeueError(requeueDuration, err.Error())
+	}
+
 	if withClusterTopology(cluster) {
 		// check again with cluster definition loaded,
 		// and update topology to cluster spec in case the default topology changed.
@@ -72,6 +78,28 @@ func (t *clusterLoadRefResourcesTransformer) apiValidation(cluster *appsv1.Clust
 	}
 	return fmt.Errorf("cluster API validate error, clusterDef: %s, topology: %s, comps: %d, legacy comps: %d, simplified API: %v",
 		cluster.Spec.ClusterDefRef, cluster.Spec.Topology, clusterCompCnt(cluster), legacyClusterCompCnt(cluster), withClusterSimplifiedAPI(cluster))
+}
+
+func (t *clusterLoadRefResourcesTransformer) checkAllCompDefinition(cluster *appsv1.Cluster) error {
+	validate := func(spec appsv1.ClusterComponentSpec) error {
+		if len(spec.ComponentDef) > 0 {
+			if err := component.ValidateCompDefRegexp(spec.ComponentDef); err != nil {
+				return errors.Wrapf(err, "invalid reference component definition name pattern: %s", spec.ComponentDef)
+			}
+		}
+		return nil
+	}
+	for _, compSpec := range cluster.Spec.ComponentSpecs {
+		if err := validate(compSpec); err != nil {
+			return err
+		}
+	}
+	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
+		if err := validate(shardingSpec.Template); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (t *clusterLoadRefResourcesTransformer) checkNUpdateClusterTopology(transCtx *clusterTransformContext, cluster *appsv1.Cluster) error {

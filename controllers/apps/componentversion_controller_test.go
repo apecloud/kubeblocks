@@ -235,6 +235,21 @@ var _ = Describe("ComponentVersion Controller", func() {
 				})).Should(Succeed())
 		})
 
+		It("update component definition with invalid regexp", func() {
+			By("update component version to reference an invalid regexp component definition")
+			compVersionKey := client.ObjectKeyFromObject(compVersionObj)
+			Eventually(testapps.GetAndChangeObj(&testCtx, compVersionKey, func(compVersion *appsv1.ComponentVersion) {
+				compVersion.Spec.CompatibilityRules[1].CompDefs = []string{testapps.CompDefName("(invalid-v3")}
+			})).Should(Succeed())
+
+			By("checking the object unavailable")
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(compVersionObj),
+				func(g Gomega, cmpv *appsv1.ComponentVersion) {
+					g.Expect(cmpv.Status.ObservedGeneration).Should(Equal(cmpv.GetGeneration()))
+					g.Expect(cmpv.Status.Phase).Should(Equal(appsv1.UnavailablePhase))
+				})).Should(Succeed())
+		})
+
 		It("delete component definition", func() {
 			By("update component version to delete definition v1.*")
 			compVersionKey := client.ObjectKeyFromObject(compVersionObj)
@@ -488,6 +503,66 @@ var _ = Describe("ComponentVersion Controller", func() {
 
 			By("with definition v2 prefix")
 			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, testapps.CompDefName("v2"), "")
+			Expect(err).Should(Succeed())
+			Expect(compDef.Name).Should(Equal(testapps.CompDefName("v2.0")))
+			Expect(resolvedServiceVersion).Should(Equal(testapps.ServiceVersion("v2")))
+			updateNCheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
+		})
+
+		It("regular expression match definition", func() {
+			By("with definition exact regex and service version 1")
+			compDef, resolvedServiceVersion, err := resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, testapps.CompDefNameWithExactRegex("v2.0"), testapps.ServiceVersion("v1"))
+			Expect(err).Should(Succeed())
+			Expect(compDef.Name).Should(Equal(testapps.CompDefName("v2.0")))
+			Expect(resolvedServiceVersion).Should(Equal(testapps.ServiceVersion("v1")))
+			updateNCheckCompDefinitionImages(compDef, resolvedServiceVersion, "r4", "r4")
+
+			By("with definition exact regex and service version v2")
+			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, testapps.CompDefNameWithExactRegex("v2.0"), testapps.ServiceVersion("v2"))
+			Expect(err).Should(Succeed())
+			Expect(compDef.Name).Should(Equal(testapps.CompDefName("v2.0")))
+			Expect(resolvedServiceVersion).Should(Equal(testapps.ServiceVersion("v2")))
+			updateNCheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
+
+			By("with definition exact regex and service version v3")
+			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, testapps.CompDefNameWithExactRegex("v3.0"), testapps.ServiceVersion("v3"))
+			Expect(err).Should(Succeed())
+			Expect(compDef.Name).Should(Equal(testapps.CompDefName("v3.0")))
+			Expect(resolvedServiceVersion).Should(Equal(testapps.ServiceVersion("v3")))
+			updateNCheckCompDefinitionImages(compDef, resolvedServiceVersion, "r5", "r5")
+
+			By("with definition v1 fuzzy regex and service version v0")
+			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, testapps.CompDefNameWithFuzzyRegex("v1"), testapps.ServiceVersion("v1"))
+			Expect(err).Should(Succeed())
+			Expect(compDef.Name).Should(Equal(testapps.CompDefName("v1.1")))
+			Expect(resolvedServiceVersion).Should(Equal(testapps.ServiceVersion("v1")))
+			updateNCheckCompDefinitionImages(compDef, resolvedServiceVersion, "r4", "r4")
+
+			By("with definition v2 fuzzy regex and service version v1")
+			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, testapps.CompDefNameWithFuzzyRegex("v2"), testapps.ServiceVersion("v2"))
+			Expect(err).Should(Succeed())
+			Expect(compDef.Name).Should(Equal(testapps.CompDefName("v2.0")))
+			Expect(resolvedServiceVersion).Should(Equal(testapps.ServiceVersion("v2")))
+			updateNCheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
+		})
+
+		It("regular expression match definition and w/o service version", func() {
+			By("with definition regex")
+			compDef, resolvedServiceVersion, err := resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, "^"+testapps.CompDefinitionName, "")
+			Expect(err).Should(Succeed())
+			Expect(compDef.Name).Should(Equal(testapps.CompDefName("v3.0")))
+			Expect(resolvedServiceVersion).Should(Equal(testapps.ServiceVersion("v3")))
+			updateNCheckCompDefinitionImages(compDef, resolvedServiceVersion, "r5", "r5")
+
+			By("with definition v1 regex")
+			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, testapps.CompDefNameWithFuzzyRegex("v1"), "")
+			Expect(err).Should(Succeed())
+			Expect(compDef.Name).Should(Equal(testapps.CompDefName("v1.1")))
+			Expect(resolvedServiceVersion).Should(Equal(testapps.ServiceVersion("v2")))
+			updateNCheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
+
+			By("with definition v2 regex")
+			compDef, resolvedServiceVersion, err = resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, testapps.CompDefNameWithFuzzyRegex("v2"), "")
 			Expect(err).Should(Succeed())
 			Expect(compDef.Name).Should(Equal(testapps.CompDefName("v2.0")))
 			Expect(resolvedServiceVersion).Should(Equal(testapps.ServiceVersion("v2")))

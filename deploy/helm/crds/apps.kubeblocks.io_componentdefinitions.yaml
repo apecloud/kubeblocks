@@ -12493,7 +12493,10 @@ spec:
                           properties:
                             compDef:
                               description: |-
-                                CompDef specifies the definition used by the component that the referent object resident in.
+                                Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
+                                custom resource (CR) used by the component that the referent object resident in.
+
+
                                 If not specified, the component itself will be used.
                               type: string
                             componentName:
@@ -12644,7 +12647,10 @@ spec:
                           properties:
                             compDef:
                               description: |-
-                                CompDef specifies the definition used by the component that the referent object resident in.
+                                Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
+                                custom resource (CR) used by the component that the referent object resident in.
+
+
                                 If not specified, the component itself will be used.
                               type: string
                             multipleClusterObjectOption:
@@ -12723,7 +12729,10 @@ spec:
                           properties:
                             compDef:
                               description: |-
-                                CompDef specifies the definition used by the component that the referent object resident in.
+                                Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
+                                custom resource (CR) used by the component that the referent object resident in.
+
+
                                 If not specified, the component itself will be used.
                               type: string
                             container:
@@ -12832,7 +12841,10 @@ spec:
                           properties:
                             compDef:
                               description: |-
-                                CompDef specifies the definition used by the component that the referent object resident in.
+                                Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
+                                custom resource (CR) used by the component that the referent object resident in.
+
+
                                 If not specified, the component itself will be used.
                               type: string
                             endpoint:
@@ -12932,7 +12944,10 @@ spec:
                           properties:
                             compDef:
                               description: |-
-                                CompDef specifies the definition used by the component that the referent object resident in.
+                                Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
+                                custom resource (CR) used by the component that the referent object resident in.
+
+
                                 If not specified, the component itself will be used.
                               type: string
                             host:
@@ -27484,7 +27499,10 @@ spec:
                           properties:
                             compDef:
                               description: |-
-                                CompDef specifies the definition used by the component that the referent object resident in.
+                                Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
+                                custom resource (CR) used by the component that the referent object resident in.
+
+
                                 If not specified, the component itself will be used.
                               type: string
                             componentName:
@@ -27598,7 +27616,10 @@ spec:
                           properties:
                             compDef:
                               description: |-
-                                CompDef specifies the definition used by the component that the referent object resident in.
+                                Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
+                                custom resource (CR) used by the component that the referent object resident in.
+
+
                                 If not specified, the component itself will be used.
                               type: string
                             multipleClusterObjectOption:
@@ -27677,7 +27698,10 @@ spec:
                           properties:
                             compDef:
                               description: |-
-                                CompDef specifies the definition used by the component that the referent object resident in.
+                                Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
+                                custom resource (CR) used by the component that the referent object resident in.
+
+
                                 If not specified, the component itself will be used.
                               type: string
                             container:
@@ -27786,7 +27810,10 @@ spec:
                           properties:
                             compDef:
                               description: |-
-                                CompDef specifies the definition used by the component that the referent object resident in.
+                                Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
+                                custom resource (CR) used by the component that the referent object resident in.
+
+
                                 If not specified, the component itself will be used.
                               type: string
                             endpoint:
@@ -27886,7 +27913,10 @@ spec:
                           properties:
                             compDef:
                               description: |-
-                                CompDef specifies the definition used by the component that the referent object resident in.
+                                Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
+                                custom resource (CR) used by the component that the referent object resident in.
+
+
                                 If not specified, the component itself will be used.
                               type: string
                             host:

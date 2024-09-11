@@ -35,6 +35,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsconfig "github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -185,6 +186,14 @@ func (r *ClusterDefinitionReconciler) validateTopology(rctx intctrlutil.RequestC
 			return err
 		}
 	}
+
+	// validate topology reference component definitions name pattern
+	for _, comp := range topology.Components {
+		if err := component.ValidateCompDefRegexp(comp.CompDef); err != nil {
+			return fmt.Errorf("invalid component definition reference pattern: %s", comp.CompDef)
+		}
+	}
+
 	compDefs, err := r.loadTopologyCompDefs(rctx.Ctx, topology)
 	if err != nil {
 		return err
@@ -241,7 +250,7 @@ func (r *ClusterDefinitionReconciler) loadTopologyCompDefs(ctx context.Context,
 	for _, comp := range topology.Components {
 		defs := make([]*appsv1.ComponentDefinition, 0)
 		for compDefName := range compDefs {
-			if strings.HasPrefix(compDefName, comp.CompDef) {
+			if component.CompDefMatched(compDefName, comp.CompDef) {
 				defs = append(defs, compDefs[compDefName])
 			}
 		}

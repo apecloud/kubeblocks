@@ -2325,9 +2325,9 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>References the name of a ComponentDefinition object.
-The ComponentDefinition specifies the behavior and characteristics of the Component.
-If both <code>componentDefRef</code> and <code>componentDef</code> are provided,
+<p>Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
+custom resource (CR) that defines the Component&rsquo;s characteristics and behavior.</p>
+<p>If both <code>componentDefRef</code> and <code>componentDef</code> are provided,
 the <code>componentDef</code> will take precedence over <code>componentDefRef</code>.</p>
 </td>
 </tr>
@@ -3072,8 +3072,9 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>CompDef specifies the definition used by the component that the referent object resident in.
-If not specified, the component itself will be used.</p>
+<p>Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
+custom resource (CR) used by the component that the referent object resident in.</p>
+<p>If not specified, the component itself will be used.</p>
 </td>
 </tr>
 <tr>
@@ -3636,13 +3637,14 @@ string
 </em>
 </td>
 <td>
-<p>Specifies the name or prefix of the ComponentDefinition custom resource(CR) that
-defines the Component&rsquo;s characteristics and behavior.</p>
-<p>When a prefix is used, the system selects the ComponentDefinition CR with the latest version that matches the prefix.
+<p>Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
+custom resource (CR) that defines the Component&rsquo;s characteristics and behavior.</p>
+<p>The system selects the ComponentDefinition CR with the latest version that matches the pattern.
 This approach allows:</p>
 <ol>
 <li>Precise selection by providing the exact name of a ComponentDefinition CR.</li>
-<li>Flexible and automatic selection of the most up-to-date ComponentDefinition CR by specifying a prefix.</li>
+<li>Flexible and automatic selection of the most up-to-date ComponentDefinition CR
+by specifying a name prefix or regular expression pattern.</li>
 </ol>
 <p>Once set, this field cannot be updated.</p>
 </td>
@@ -5844,11 +5846,12 @@ The value will be presented in the following format: FQDN1,FQDN2,&hellip;</p>
 </td>
 <td>
 <p>CompDefs specifies names for the component definitions associated with this ComponentVersion.
-Each name in the list can represent an exact name, or a name prefix.</p>
+Each name in the list can represent an exact name, a name prefix, or a regular expression pattern.</p>
 <p>For example:</p>
 <ul>
 <li>&ldquo;mysql-8.0.30-v1alpha1&rdquo;: Matches the exact name &ldquo;mysql-8.0.30-v1alpha1&rdquo;</li>
 <li>&ldquo;mysql-8.0.30&rdquo;: Matches all names starting with &ldquo;mysql-8.0.30&rdquo;</li>
+<li>&rdquo;^mysql-8.0.\d&#123;1,2&#125;$&ldquo;: Matches all names starting with &ldquo;mysql-8.0.&rdquo; followed by one or two digits.</li>
 </ul>
 </td>
 </tr>
@@ -14908,9 +14911,9 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>References the name of a ComponentDefinition object.
-The ComponentDefinition specifies the behavior and characteristics of the Component.
-If both <code>componentDefRef</code> and <code>componentDef</code> are provided,
+<p>Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
+custom resource (CR) that defines the Component&rsquo;s characteristics and behavior.</p>
+<p>If both <code>componentDefRef</code> and <code>componentDef</code> are provided,
 the <code>componentDef</code> will take precedence over <code>componentDefRef</code>.</p>
 </td>
 </tr>
@@ -16089,8 +16092,9 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>CompDef specifies the definition used by the component that the referent object resident in.
-If not specified, the component itself will be used.</p>
+<p>Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
+custom resource (CR) used by the component that the referent object resident in.</p>
+<p>If not specified, the component itself will be used.</p>
 </td>
 </tr>
 <tr>
@@ -16903,13 +16907,14 @@ string
 </em>
 </td>
 <td>
-<p>Specifies the name or prefix of the ComponentDefinition custom resource(CR) that
-defines the Component&rsquo;s characteristics and behavior.</p>
-<p>When a prefix is used, the system selects the ComponentDefinition CR with the latest version that matches the prefix.
+<p>Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
+custom resource (CR) that defines the Component&rsquo;s characteristics and behavior.</p>
+<p>The system selects the ComponentDefinition CR with the latest version that matches the pattern.
 This approach allows:</p>
 <ol>
 <li>Precise selection by providing the exact name of a ComponentDefinition CR.</li>
-<li>Flexible and automatic selection of the most up-to-date ComponentDefinition CR by specifying a prefix.</li>
+<li>Flexible and automatic selection of the most up-to-date ComponentDefinition CR
+by specifying a name prefix or regular expression pattern.</li>
 </ol>
 <p>Once set, this field cannot be updated.</p>
 </td>
@@ -19735,11 +19740,12 @@ The value will be presented in the following format: FQDN1,FQDN2,&hellip;</p>
 </td>
 <td>
 <p>CompDefs specifies names for the component definitions associated with this ComponentVersion.
-Each name in the list can represent an exact name, or a name prefix.</p>
+Each name in the list can represent an exact name, a name prefix, or a regular expression pattern.</p>
 <p>For example:</p>
 <ul>
 <li>&ldquo;mysql-8.0.30-v1alpha1&rdquo;: Matches the exact name &ldquo;mysql-8.0.30-v1alpha1&rdquo;</li>
 <li>&ldquo;mysql-8.0.30&rdquo;: Matches all names starting with &ldquo;mysql-8.0.30&rdquo;</li>
+<li>&rdquo;^mysql-8.0.\d&#123;1,2&#125;$&ldquo;: Matches all names starting with &ldquo;mysql-8.0.&rdquo; followed by one or two digits.</li>
 </ul>
 </td>
 </tr>

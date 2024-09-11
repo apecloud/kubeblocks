@@ -31,7 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -337,6 +336,75 @@ var _ = Describe("ComponentDefinition Controller", func() {
 		})
 	})
 
+	Context("vars", func() {
+		It("ok", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				AddVar(kbappsv1.EnvVar{
+					Name:  "VAR1",
+					Value: "value1",
+				}).
+				Create(&testCtx).GetObject()
+
+			checkObjectStatus(componentDefObj, kbappsv1.AvailablePhase)
+		})
+
+		It("duplicate vars name", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				AddVar(kbappsv1.EnvVar{
+					Name:  "VAR1",
+					Value: "value1",
+				}).
+				AddVar(kbappsv1.EnvVar{
+					Name:  "VAR1",
+					Value: "value2",
+				}).
+				Create(&testCtx).GetObject()
+			checkObjectStatus(componentDefObj, kbappsv1.UnavailablePhase)
+		})
+
+		It("valid var component definition name", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				AddVar(kbappsv1.EnvVar{
+					Name: "VAR1",
+					ValueFrom: &kbappsv1.VarSource{
+						ServiceRefVarRef: &kbappsv1.ServiceRefVarSelector{
+							ClusterObjectReference: kbappsv1.ClusterObjectReference{
+								Name:    "service",
+								CompDef: "valid",
+							},
+						},
+					},
+				}).
+				Create(&testCtx).GetObject()
+			checkObjectStatus(componentDefObj, kbappsv1.AvailablePhase)
+		})
+
+		It("invalid var component definition name", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				AddVar(kbappsv1.EnvVar{
+					Name: "VAR1",
+					ValueFrom: &kbappsv1.VarSource{
+						ServiceVarRef: &kbappsv1.ServiceVarSelector{
+							ClusterObjectReference: kbappsv1.ClusterObjectReference{
+								Name:    "service",
+								CompDef: "(invalid",
+							},
+						},
+					},
+				}).
+				Create(&testCtx).GetObject()
+			checkObjectStatus(componentDefObj, kbappsv1.UnavailablePhase)
+		})
+	})
+
 	Context("immutable", func() {
 		newCmpdFn := func(processor func(*testapps.MockComponentDefinitionFactory)) *kbappsv1.ComponentDefinition {
 			By("create a ComponentDefinition obj")
@@ -381,7 +449,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentDefObj),
 				func(g Gomega, cmpd *kbappsv1.ComponentDefinition) {
 					g.Expect(cmpd.Status.ObservedGeneration).Should(Equal(cmpd.GetGeneration()))
-					g.Expect(cmpd.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
+					g.Expect(cmpd.Status.Phase).Should(Equal(kbappsv1.AvailablePhase))
 					g.Expect(cmpd.Spec.Description).Should(Equal("v0.0.2"))
 					g.Expect(cmpd.Spec.PodManagementPolicy).ShouldNot(BeNil())
 					g.Expect(*cmpd.Spec.PodManagementPolicy).Should(Equal(appsv1.ParallelPodManagement))
@@ -399,7 +467,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 				cmpd.Spec.UpdateStrategy = &parallel
 			})()).Should(Succeed())
 
-			By(fmt.Sprintf("checking the updated object as %s", strings.ToLower(string(appsv1alpha1.AvailablePhase))))
+			By(fmt.Sprintf("checking the updated object as %s", strings.ToLower(string(kbappsv1.AvailablePhase))))
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentDefObj),
 				func(g Gomega, cmpd *kbappsv1.ComponentDefinition) {
 					g.Expect(cmpd.Status.ObservedGeneration).Should(Equal(cmpd.GetGeneration()))
@@ -427,7 +495,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 				cmpd.Spec.UpdateStrategy = &parallel
 			})()).Should(Succeed())
 
-			By(fmt.Sprintf("checking the updated object as %s", strings.ToLower(string(appsv1alpha1.UnavailablePhase))))
+			By(fmt.Sprintf("checking the updated object as %s", strings.ToLower(string(kbappsv1.UnavailablePhase))))
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentDefObj),
 				func(g Gomega, cmpd *kbappsv1.ComponentDefinition) {
 					g.Expect(cmpd.Status.ObservedGeneration).Should(Equal(cmpd.GetGeneration()))
@@ -449,7 +517,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 				cmpd.Spec.UpdateStrategy = nil
 			})()).Should(Succeed())
 
-			By(fmt.Sprintf("checking the updated object as %s", strings.ToLower(string(appsv1alpha1.AvailablePhase))))
+			By(fmt.Sprintf("checking the updated object as %s", strings.ToLower(string(kbappsv1.AvailablePhase))))
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentDefObj),
 				func(g Gomega, cmpd *kbappsv1.ComponentDefinition) {
 					g.Expect(cmpd.Status.ObservedGeneration).Should(Equal(cmpd.GetGeneration()))

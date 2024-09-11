@@ -27,6 +27,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -40,6 +41,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsconfig "github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -211,6 +213,38 @@ func (r *ComponentDefinitionReconciler) validateRuntime(cli client.Client, rctx 
 
 func (r *ComponentDefinitionReconciler) validateVars(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1.ComponentDefinition) error {
+	if !checkUniqueItemWithValue(cmpd.Spec.Vars, "Name", nil) {
+		return fmt.Errorf("duplicate names of component vars are not allowed")
+	}
+
+	// validate the reference to component definition name pattern
+	var compDef string
+	for _, cVar := range cmpd.Spec.Vars {
+		if cVar.ValueFrom == nil {
+			continue
+		}
+		switch {
+		case cVar.ValueFrom.HostNetworkVarRef != nil:
+			compDef = cVar.ValueFrom.HostNetworkVarRef.CompDef
+		case cVar.ValueFrom.ServiceVarRef != nil:
+			compDef = cVar.ValueFrom.ServiceVarRef.CompDef
+		case cVar.ValueFrom.ServiceRefVarRef != nil:
+			compDef = cVar.ValueFrom.ServiceRefVarRef.CompDef
+		case cVar.ValueFrom.ComponentVarRef != nil:
+			compDef = cVar.ValueFrom.ComponentVarRef.CompDef
+		case cVar.ValueFrom.CredentialVarRef != nil:
+			compDef = cVar.ValueFrom.CredentialVarRef.CompDef
+		default:
+			continue
+		}
+
+		if len(compDef) == 0 {
+			continue
+		}
+		if err := component.ValidateCompDefRegexp(compDef); err != nil {
+			return errors.Wrapf(err, "invalid reference to component definition name pattern: %s", compDef)
+		}
+	}
 	return nil
 }
 
@@ -412,26 +446,26 @@ func getNCheckCompDefinition(ctx context.Context, cli client.Reader, name string
 	return compDef, nil
 }
 
-// listCompDefinitionsWithPrefix returns all component definitions whose names have prefix @namePrefix.
-func listCompDefinitionsWithPrefix(ctx context.Context, cli client.Reader, namePrefix string) ([]*appsv1.ComponentDefinition, error) {
+// listCompDefinitionsWithPattern returns all component definitions whose names match the given pattern
+func listCompDefinitionsWithPattern(ctx context.Context, cli client.Reader, name string) ([]*appsv1.ComponentDefinition, error) {
 	compDefList := &appsv1.ComponentDefinitionList{}
 	if err := cli.List(ctx, compDefList); err != nil {
 		return nil, err
 	}
 	compDefsFullyMatched := make([]*appsv1.ComponentDefinition, 0)
-	compDefsPrefixMatched := make([]*appsv1.ComponentDefinition, 0)
+	compDefsPatternMatched := make([]*appsv1.ComponentDefinition, 0)
 	for i, item := range compDefList.Items {
-		if item.Name == namePrefix {
+		if item.Name == name {
 			compDefsFullyMatched = append(compDefsFullyMatched, &compDefList.Items[i])
 		}
-		if strings.HasPrefix(item.Name, namePrefix) {
-			compDefsPrefixMatched = append(compDefsPrefixMatched, &compDefList.Items[i])
+		if component.CompDefMatched(item.Name, name) {
+			compDefsPatternMatched = append(compDefsPatternMatched, &compDefList.Items[i])
 		}
 	}
 	if len(compDefsFullyMatched) > 0 {
 		return compDefsFullyMatched, nil
 	}
-	return compDefsPrefixMatched, nil
+	return compDefsPatternMatched, nil
 }
 
 func checkUniqueItemWithValue(slice any, fieldName string, val any) bool {

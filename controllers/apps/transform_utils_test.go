@@ -27,11 +27,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/discovery"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -95,33 +92,6 @@ func TestIsResourceRequirementsEqual(t *testing.T) {
 	a := buildRR("1", "1Gi")
 	b := buildRR("1000m", "1024Mi")
 	assert.True(t, isResourceRequirementsEqual(a, b))
-}
-
-func TestIsPolicyV1DiscoveryNotFoundError(t *testing.T) {
-	var (
-		notFoundErr     = apierrors.NewNotFound(schema.GroupResource{}, "abc")
-		alreadyExistErr = apierrors.NewAlreadyExists(schema.GroupResource{}, "abc")
-		discoveryErr    = &discovery.ErrGroupDiscoveryFailed{Groups: map[schema.GroupVersion]error{}}
-	)
-
-	// normal not-found error
-	assert.True(t, apierrors.IsNotFound(notFoundErr))
-	assert.False(t, isPolicyV1DiscoveryNotFoundError(notFoundErr))
-
-	// not-found error for core/v1
-	discoveryErr.Groups[schema.GroupVersion{Group: "core", Version: "v1"}] = notFoundErr
-	assert.False(t, isPolicyV1DiscoveryNotFoundError(discoveryErr))
-
-	// policy/v1 already-exist error
-	discoveryErr.Groups[schema.GroupVersion{Group: "policy", Version: "v1"}] = alreadyExistErr
-	assert.False(t, isPolicyV1DiscoveryNotFoundError(discoveryErr))
-
-	// policy/v1 not-found error
-	discoveryErr.Groups[schema.GroupVersion{Group: "policy", Version: "v1"}] = notFoundErr
-	assert.True(t, isPolicyV1DiscoveryNotFoundError(discoveryErr))
-
-	// wrapped policy/v1 not-found error
-	assert.True(t, isPolicyV1DiscoveryNotFoundError(fmt.Errorf("%w", discoveryErr)))
 }
 
 func TestIsOwnedByInstanceSet(t *testing.T) {

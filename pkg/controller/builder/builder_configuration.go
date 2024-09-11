@@ -118,3 +118,8 @@ func ToV1alpha1ConfigSpec(spec *appsv1.ComponentConfigSpec) *appsv1alpha1.Compon
 	}
 	return v1
 }
+
+func (c *ConfigurationBuilder) SetConfigurationItem(items []appsv1alpha1.ConfigTemplateItemDetail) *ConfigurationBuilder {
+	c.get().Spec.ConfigItemDetails = items
+	return c
+}

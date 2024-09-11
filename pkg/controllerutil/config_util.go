@@ -137,13 +137,9 @@ func IsRerender(configMap *corev1.ConfigMap, item v1alpha1.ConfigTemplateItemDet
 	if configMap == nil {
 		return true
 	}
-	if item.Version == "" && item.Payload.Data == nil && item.ImportTemplateRef == nil {
+	if item.Payload.Data == nil && item.UserConfigTemplates == nil {
 		return false
 	}
-	if version := configMap.Annotations[constant.CMConfigurationTemplateVersion]; version != item.Version {
-		return true
-	}
-
 	var updatedVersion v1alpha1.ConfigTemplateItemDetail
 	updatedVersionStr, ok := configMap.Annotations[constant.ConfigAppliedVersionAnnotationKey]
 	if ok && updatedVersionStr != "" {
@@ -152,7 +148,7 @@ func IsRerender(configMap *corev1.ConfigMap, item v1alpha1.ConfigTemplateItemDet
 		}
 	}
 	return !reflect.DeepEqual(updatedVersion.Payload, item.Payload) ||
-		!reflect.DeepEqual(updatedVersion.ImportTemplateRef, item.ImportTemplateRef)
+		!reflect.DeepEqual(updatedVersion.UserConfigTemplates, item.UserConfigTemplates)
 }
 
 // GetConfigSpecReconcilePhase gets the configuration phase

@@ -30,14 +30,14 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 )
 
-// componentParametersReloadActionTransformer handles component configuration render
-type componentParametersReloadActionTransformer struct {
+// componentParametersReloadSidecarTransformer handles component configuration render
+type componentParametersReloadSidecarTransformer struct {
 	client.Client
 }
 
-var _ graph.Transformer = &componentParametersReloadActionTransformer{}
+var _ graph.Transformer = &componentParametersReloadSidecarTransformer{}
 
-func (t *componentParametersReloadActionTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (t *componentParametersReloadSidecarTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
 
 	comp := transCtx.Component

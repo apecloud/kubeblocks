@@ -20,38 +20,95 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"context"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/common"
+	"github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
+// clusterServiceTransformer handles cluster services.
 type componentConfigurationTransformer struct {
 	client.Client
 }
 
-var _ = componentConfigurationTransformer{}
+var _ graph.Transformer = &componentConfigurationTransformer{}
 
-func (c *componentConfigurationTransformer) Transform(ctx graph.TransformContext, _ *graph.DAG) error {
+func (c *componentConfigurationTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
-	synthesizedComp := transCtx.SynthesizeComponent
 
-	config := appsv1alpha1.ComponentConfiguration{}
-	configKey := client.ObjectKey{Namespace: synthesizedComp.Namespace,
-		Name: cfgcore.GenerateComponentConfigurationName(synthesizedComp.ClusterName, synthesizedComp.Name)}
-	if err := c.Get(ctx.GetContext(), configKey, &config); err != nil {
-		return client.IgnoreNotFound(err)
+	if model.IsObjectDeleting(transCtx.ComponentOrig) {
+		return nil
+	}
+	if common.IsCompactMode(transCtx.ComponentOrig.Annotations) {
+		transCtx.V(1).Info("Component is in compact mode, no need to create configuration related objects",
+			"component", client.ObjectKeyFromObject(transCtx.ComponentOrig))
+		return nil
 	}
 
-	configNew := config.DeepCopy()
-	updated, err := configuration.UpdateConfigPayload(&configNew.Spec, synthesizedComp)
+	return c.reconcile(transCtx, transCtx.SynthesizeComponent, dag)
+}
+
+func (c *componentConfigurationTransformer) reconcile(transCtx *componentTransformContext, component *component.SynthesizedComponent, dag *graph.DAG) error {
+	existingConfig, err := c.runningComponentConfiguration(transCtx, transCtx.GetClient(), component)
 	if err != nil {
 		return err
 	}
-	if !updated {
-		return nil
+
+	cluster := transCtx.Cluster
+	config, err := buildConfiguration(transCtx, cluster, component)
+	if err != nil {
+		return err
 	}
-	return c.Patch(ctx.GetContext(), configNew, client.MergeFrom(config.DeepCopy()))
+	if _, err = configuration.UpdateConfigPayload(&config.Spec, component); err != nil {
+		return err
+	}
+
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	if existingConfig != nil {
+		graphCli.Update(dag, existingConfig, config, inDataContext4G())
+	} else {
+		graphCli.Create(dag, config, inDataContext4G())
+	}
+	return nil
+}
+
+func (c *componentConfigurationTransformer) runningComponentConfiguration(ctx context.Context, cli client.Reader, component *component.SynthesizedComponent) (*appsv1alpha1.ComponentConfiguration, error) {
+	key := client.ObjectKey{
+		Name:      core.GenerateComponentConfigurationName(component.ClusterName, component.Name),
+		Namespace: component.Namespace,
+	}
+	existingConfig := &appsv1alpha1.ComponentConfiguration{}
+	err := cli.Get(ctx, key, existingConfig, inDataContext4C())
+	if err == nil {
+		return existingConfig, nil
+	}
+	if !apierrors.IsNotFound(err) {
+		return nil, err
+	}
+	return nil, nil
+}
+
+func buildConfiguration(transCtx *componentTransformContext, cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) (*appsv1alpha1.ComponentConfiguration, error) {
+	items, err := configuration.ClassifyParamsFromConfigTemplate(transCtx, transCtx.GetClient(), transCtx.Component, transCtx.CompDef, component)
+	if err != nil {
+		return nil, err
+	}
+
+	return builder.NewConfigurationBuilder(cluster.Namespace,
+		core.GenerateComponentConfigurationName(cluster.Name, component.Name)).
+		AddLabelsInMap(constant.GetComponentWellKnownLabels(cluster.Name, component.Name)).
+		ClusterRef(cluster.Name).
+		Component(component.Name).
+		SetConfigurationItem(items).
+		GetObject(), nil
 }

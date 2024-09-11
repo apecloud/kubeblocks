@@ -176,7 +176,7 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			// provision component system accounts, depend on vars
 			&componentAccountProvisionTransformer{},
 			// render component configurations
-			&componentParametersReloadActionTransformer{Client: r.Client},
+			&componentParametersReloadSidecarTransformer{Client: r.Client},
 			// handle restore before workloads transform
 			&componentRestoreTransformer{Client: r.Client},
 			// handle upgrade from the legacy RSM API to the InstanceSet API

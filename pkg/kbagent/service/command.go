@@ -119,10 +119,10 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 	}()
 
 	mergedEnv := func() []string {
-		// order: parameters (action specific variables) | os env
+		// order: os env | parameters (action specific variables)
 		env := util.EnvM2L(parameters)
 		if len(env) > 0 {
-			env = append(env, os.Environ()...)
+			env = append(os.Environ(), env...)
 		}
 		return env
 	}()

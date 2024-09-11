@@ -311,6 +311,7 @@ const (
 	VolumeRestorePolicyKeyForRestore  = "volumeRestorePolicy"
 	DoReadyRestoreAfterClusterRunning = "doReadyRestoreAfterClusterRunning"
 	RestoreTimeKeyForRestore          = "restoreTime"
+	EnvForRestore                     = "restoreEnv"
 	ConnectionPassword                = "connectionPassword"
 )
 

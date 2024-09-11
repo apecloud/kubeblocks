@@ -251,6 +251,7 @@ func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
 				SourceTargetName: sourceTargetName,
 			},
 			RestoreTime: r.restoreTime,
+			Env:         r.env,
 			ReadyConfig: &dpv1alpha1.ReadyConfig{
 				ExecAction: &dpv1alpha1.ExecAction{
 					Target: dpv1alpha1.ExecActionTarget{
@@ -361,6 +362,9 @@ func (r *RestoreManager) initFromAnnotation(synthesizedComponent *component.Synt
 	doReadyRestoreAfterClusterRunning := backupSource[constant.DoReadyRestoreAfterClusterRunning]
 	if doReadyRestoreAfterClusterRunning == "true" {
 		r.doReadyRestoreAfterClusterRunning = true
+	}
+	if env := backupSource[constant.EnvForRestore]; env != "" {
+		json.Unmarshal([]byte(env), &r.env)
 	}
 	return GetBackupFromClusterAnnotation(r.Ctx, r.Client, backupSource, synthesizedComponent.Name, r.Cluster.Namespace)
 }

@@ -18336,6 +18336,20 @@ Supported time formats:</p>
 </tr>
 <tr>
 <td>
+<code>env</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a list of environment variables to be set in the container.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>volumeRestorePolicy</code><br/>
 <em>
 string

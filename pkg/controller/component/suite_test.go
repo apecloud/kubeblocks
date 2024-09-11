@@ -64,8 +64,6 @@ var logger logr.Logger
 
 func init() {
 	viper.AutomaticEnv()
-	model.AddScheme(appsv1alpha1.AddToScheme)
-	model.AddScheme(appsv1beta1.AddToScheme)
 	model.AddScheme(appsv1.AddToScheme)
 	// viper.Set("ENABLE_DEBUG_LOG", "true")
 

@@ -30,7 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -78,19 +77,19 @@ var _ = Describe("clusterDeletionTransformer", func() {
 		reader = &mockReader{
 			objs: []client.Object{
 				clusterDef,
-				&appsv1alpha1.Component{
+				&appsv1.Component{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: testCtx.DefaultNamespace,
 						Name:      "test-cluster-comp1",
 					},
 				},
-				&appsv1alpha1.Component{
+				&appsv1.Component{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: testCtx.DefaultNamespace,
 						Name:      "test-cluster-comp2",
 					},
 				},
-				&appsv1alpha1.Component{
+				&appsv1.Component{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: testCtx.DefaultNamespace,
 						Name:      "test-cluster-comp3",

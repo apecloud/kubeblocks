@@ -364,7 +364,9 @@ func (r *RestoreManager) initFromAnnotation(synthesizedComponent *component.Synt
 		r.doReadyRestoreAfterClusterRunning = true
 	}
 	if env := backupSource[constant.EnvForRestore]; env != "" {
-		json.Unmarshal([]byte(env), &r.env)
+		if err = json.Unmarshal([]byte(env), &r.env); err != nil {
+			return nil, err
+		}
 	}
 	return GetBackupFromClusterAnnotation(r.Ctx, r.Client, backupSource, synthesizedComponent.Name, r.Cluster.Namespace)
 }

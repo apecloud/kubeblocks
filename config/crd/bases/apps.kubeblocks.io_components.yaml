@@ -5016,6 +5016,9 @@ spec:
                               description: The name of the Component where the pods
                                 reside in.
                               type: string
+                            role:
+                              description: The role of the pods to reference.
+                              type: string
                           required:
                           - component
                           type: object

@@ -2776,20 +2776,6 @@ CredentialVar
 </tr>
 <tr>
 <td>
-<code>auth</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ConnectionCredentialAuth">
-ConnectionCredentialAuth
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the authentication credentials required for accessing an external service.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>podFQDNs</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.CredentialVar">
@@ -2800,6 +2786,20 @@ CredentialVar
 <td>
 <em>(Optional)</em>
 <p>Specifies the pod FQDNs of the external service.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>auth</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ConnectionCredentialAuth">
+ConnectionCredentialAuth
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the authentication credentials required for accessing an external service.</p>
 </td>
 </tr>
 </table>
@@ -15958,20 +15958,6 @@ CredentialVar
 </tr>
 <tr>
 <td>
-<code>auth</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ConnectionCredentialAuth">
-ConnectionCredentialAuth
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the authentication credentials required for accessing an external service.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>podFQDNs</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.CredentialVar">
@@ -15982,6 +15968,20 @@ CredentialVar
 <td>
 <em>(Optional)</em>
 <p>Specifies the pod FQDNs of the external service.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>auth</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ConnectionCredentialAuth">
+ConnectionCredentialAuth
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the authentication credentials required for accessing an external service.</p>
 </td>
 </tr>
 </tbody>
@@ -16189,6 +16189,19 @@ ServiceRefServiceSelector
 </tr>
 <tr>
 <td>
+<code>podFQDNs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ServiceRefPodFQDNsSelector">
+ServiceRefPodFQDNsSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
 <code>credential</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefCredentialSelector">
@@ -16201,19 +16214,6 @@ ServiceRefCredentialSelector
 <p>Specifies the SystemAccount to authenticate and establish a connection with the referenced Cluster.
 The SystemAccount should be defined in <code>componentDefinition.spec.systemAccounts</code>
 of the Component providing the service in the referenced Cluster.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>podFQDNs</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ServiceRefPodFQDNsSelector">
-ServiceRefPodFQDNsSelector
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
 </td>
 </tr>
 </tbody>
@@ -16397,6 +16397,18 @@ string
 <p>The name of the Component where the pods reside in.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>role</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The role of the pods to reference.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ServiceRefServiceSelector">ServiceRefServiceSelector
@@ -16564,6 +16576,19 @@ VarOption
 </tr>
 <tr>
 <td>
+<code>podFQDNs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
 <code>CredentialVars</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.CredentialVars">
@@ -16575,21 +16600,6 @@ CredentialVars
 <p>
 (Members of <code>CredentialVars</code> are embedded into this type.)
 </p>
-</td>
-</tr>
-<tr>
-<td>
-<code>podFQDNs</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.VarOption">
-VarOption
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Reference to a pod FQDN list.
-The value will be presented in the following format: FQDN1,FQDN2,&hellip;</p>
 </td>
 </tr>
 </tbody>

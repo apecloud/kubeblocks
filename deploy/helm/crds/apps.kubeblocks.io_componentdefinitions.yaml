@@ -12925,9 +12925,8 @@ spec:
                               - Optional
                               type: string
                             podFQDNs:
-                              description: |-
-                                Reference to a pod FQDN list.
-                                The value will be presented in the following format: FQDN1,FQDN2,...
+                              description: VarOption defines whether a variable is
+                                required or optional.
                               enum:
                               - Required
                               - Optional

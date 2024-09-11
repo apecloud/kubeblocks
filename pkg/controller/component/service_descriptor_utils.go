@@ -121,9 +121,9 @@ func handleServiceRefFromCluster(ctx context.Context, cli client.Reader, namespa
 	setter(b.SetEndpoint, vars.endpoint)
 	setter(b.SetHost, vars.host)
 	setter(b.SetPort, vars.port)
+	setter(b.SetPodFQDNs, vars.podFQDNs)
 	setter(b.SetAuthUsername, vars.username)
 	setter(b.SetAuthPassword, vars.password)
-	setter(b.SetPodFQDNs, vars.podFQDNs)
 	return b.GetObject(), nil
 }
 
@@ -131,16 +131,17 @@ func referencedVars(ctx context.Context, cli client.Reader, namespace string, se
 	if err := referencedServiceVars(ctx, cli, namespace, serviceRef, vars); err != nil {
 		return err
 	}
-	if err := referencedCredentialVars(ctx, cli, namespace, serviceRef, vars); err != nil {
+	if err := referencedPodFQDNsVar(ctx, cli, namespace, serviceRef, vars); err != nil {
 		return err
 	}
-	if err := referencedPodFQDNsVar(ctx, cli, namespace, serviceRef, vars); err != nil {
+	if err := referencedCredentialVars(ctx, cli, namespace, serviceRef, vars); err != nil {
 		return err
 	}
 	return nil
 }
 
-func referencedServiceVars(ctx context.Context, cli client.Reader, namespace string, serviceRef appsv1alpha1.ServiceRef, vars *serviceRefReferenceVars) error {
+func referencedServiceVars(ctx context.Context, cli client.Reader, namespace string,
+	serviceRef appsv1alpha1.ServiceRef, vars *serviceRefReferenceVars) error {
 	var (
 		selector = serviceRef.ClusterServiceSelector
 		obj      any
@@ -185,6 +186,37 @@ func referencedServiceVars(ctx context.Context, cli client.Reader, namespace str
 	return nil
 }
 
+func referencedPodFQDNsVar(ctx context.Context, cli client.Reader, namespace string,
+	serviceRef appsv1alpha1.ServiceRef, vars *serviceRefReferenceVars) error {
+	var (
+		selector = serviceRef.ClusterServiceSelector
+	)
+	if selector.PodFQDNs == nil {
+		return nil
+	}
+
+	if serviceRef.Namespace != "" {
+		namespace = serviceRef.Namespace
+	}
+	var (
+		fqdn        string
+		err         error
+		clusterName = selector.Cluster
+		compName    = selector.PodFQDNs.Component
+	)
+	if selector.PodFQDNs.Role == nil {
+		fqdn, err = componentVarPodsGetter(ctx, cli, namespace, clusterName, compName, nil, true)
+	} else {
+		fqdn, err = componentVarPodsWithRoleGetter(ctx, cli, namespace, clusterName, compName, *selector.PodFQDNs.Role, true)
+	}
+	if err != nil {
+		return err
+	}
+	vars.podFQDNs = &appsv1alpha1.CredentialVar{Value: fqdn}
+
+	return nil
+}
+
 func referencedCredentialVars(ctx context.Context, cli client.Reader, namespace string,
 	serviceRef appsv1alpha1.ServiceRef, vars *serviceRefReferenceVars) error {
 	var (
@@ -195,12 +227,13 @@ func referencedCredentialVars(ctx context.Context, cli client.Reader, namespace 
 		return nil
 	}
 
+	if len(serviceRef.Namespace) > 0 && serviceRef.Namespace != namespace {
+		return fmt.Errorf("prohibits referencing credential variables from different namespaces, service-ref： %s", serviceRef.Name)
+	}
+
 	secretKey := types.NamespacedName{
 		Namespace: namespace,
 		Name:      constant.GenerateAccountSecretName(selector.Cluster, selector.Credential.Component, selector.Credential.Name),
-	}
-	if serviceRef.Namespace != "" {
-		secretKey.Namespace = serviceRef.Namespace
 	}
 	secret := &corev1.Secret{}
 	if err := cli.Get(ctx, secretKey, secret); err != nil {
@@ -209,28 +242,6 @@ func referencedCredentialVars(ctx context.Context, cli client.Reader, namespace 
 
 	copySecretDataToCredentialVar(namespace, secret, constant.AccountNameForSecret, &vars.username)
 	copySecretDataToCredentialVar(namespace, secret, constant.AccountPasswdForSecret, &vars.password)
-
-	return nil
-}
-
-func referencedPodFQDNsVar(ctx context.Context, cli client.Reader, namespace string,
-	serviceRef appsv1alpha1.ServiceRef, vars *serviceRefReferenceVars) error {
-	var (
-		selector = serviceRef.ClusterServiceSelector
-	)
-
-	if selector.PodFQDNs == nil {
-		return nil
-	}
-
-	if serviceRef.Namespace != "" {
-		namespace = serviceRef.Namespace
-	}
-	fqdn, err := podFQDNsGetter(ctx, cli, namespace, selector.Cluster, selector.PodFQDNs.Component, nil)
-	if err != nil {
-		return err
-	}
-	vars.podFQDNs = &appsv1alpha1.CredentialVar{Value: fqdn}
 
 	return nil
 }

@@ -987,13 +987,10 @@ type ServiceRefVars struct {
 	// +optional
 	Port *VarOption `json:"port,omitempty"`
 
-	CredentialVars `json:",inline"`
-
-	// Reference to a pod FQDN list.
-	// The value will be presented in the following format: FQDN1,FQDN2,...
-	//
 	// +optional
 	PodFQDNs *VarOption `json:"podFQDNs,omitempty"`
+
+	CredentialVars `json:",inline"`
 }
 
 // HostNetworkVarSelector selects a var from host-network resources.

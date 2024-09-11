@@ -4261,7 +4261,7 @@ spec:
                                     key must be defined
                                   type: boolean
                               required:
-                                - key
+                              - key
                               type: object
                               x-kubernetes-map-type: atomic
                             fieldRef:
@@ -4278,7 +4278,7 @@ spec:
                                     specified API version.
                                   type: string
                               required:
-                                - fieldPath
+                              - fieldPath
                               type: object
                               x-kubernetes-map-type: atomic
                             resourceFieldRef:
@@ -4292,8 +4292,8 @@ spec:
                                   type: string
                                 divisor:
                                   anyOf:
-                                    - type: integer
-                                    - type: string
+                                  - type: integer
+                                  - type: string
                                   description: Specifies the output format of the
                                     exposed resources, defaults to "1"
                                   pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
@@ -4302,7 +4302,7 @@ spec:
                                   description: 'Required: resource to select'
                                   type: string
                               required:
-                                - resource
+                              - resource
                               type: object
                               x-kubernetes-map-type: atomic
                             secretKeyRef:
@@ -4324,12 +4324,12 @@ spec:
                                     must be defined
                                   type: boolean
                               required:
-                                - key
+                              - key
                               type: object
                               x-kubernetes-map-type: atomic
                           type: object
                       required:
-                        - name
+                      - name
                       type: object
                     type: array
                     x-kubernetes-preserve-unknown-fields: true
@@ -4424,7 +4424,7 @@ spec:
                                     key must be defined
                                   type: boolean
                               required:
-                                - key
+                              - key
                               type: object
                               x-kubernetes-map-type: atomic
                             fieldRef:
@@ -4441,7 +4441,7 @@ spec:
                                     specified API version.
                                   type: string
                               required:
-                                - fieldPath
+                              - fieldPath
                               type: object
                               x-kubernetes-map-type: atomic
                             resourceFieldRef:
@@ -4455,8 +4455,8 @@ spec:
                                   type: string
                                 divisor:
                                   anyOf:
-                                    - type: integer
-                                    - type: string
+                                  - type: integer
+                                  - type: string
                                   description: Specifies the output format of the
                                     exposed resources, defaults to "1"
                                   pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
@@ -4465,7 +4465,7 @@ spec:
                                   description: 'Required: resource to select'
                                   type: string
                               required:
-                                - resource
+                              - resource
                               type: object
                               x-kubernetes-map-type: atomic
                             secretKeyRef:
@@ -4487,12 +4487,12 @@ spec:
                                     must be defined
                                   type: boolean
                               required:
-                                - key
+                              - key
                               type: object
                               x-kubernetes-map-type: atomic
                           type: object
                       required:
-                        - name
+                      - name
                       type: object
                     type: array
                     x-kubernetes-preserve-unknown-fields: true

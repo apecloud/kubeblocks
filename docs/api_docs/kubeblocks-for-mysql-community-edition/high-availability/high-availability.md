@@ -21,7 +21,7 @@ The faults here are all simulated by deleting pods. When there are sufficient re
 
 ### Before you start
 
-* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
+* [Install KubeBlocks](../../../user_docs/installation/install-with-helm/install-kubeblocks.md).
 * [Create a MySQL Replication Cluster](./../cluster-management/create-and-connect-a-mysql-cluster.md).
 * Run `kubectl get cd mysql -o yaml` to check whether _rolechangedprobe_ is enabled in the MySQL Replication Cluster (it is enabled by default). If the following configuration exists, it indicates that it is enabled:
 
@@ -63,7 +63,7 @@ The faults here are all simulated by deleting pods. When there are sufficient re
 
    ***How the automatic recovery works***
 
-   After the primary pod is deleted, the MySQL Replication Cluster elects a new primary pod. In this example, `mycluster-mysql-0` is elected as the new primary pod. KubeBlocks detects that the primary pod has changed, and sends a notification to update the access link. The original exception node automatically rebuilds and recovers to the normal Replication Cluster state. It normally takes 30 seconds from exception to recovery.
+   After the primary pod is deleted, the MySQL Replication Cluster elects a new primary pod. In this example, `mycluster-mysql-1` is elected as the new primary pod. KubeBlocks detects that the primary pod has changed, and sends a notification to update the access link. The original exception node automatically rebuilds and recovers to the normal Replication Cluster state. It normally takes 30 seconds from exception to recovery.
 
 ### Secondary pod exception
 

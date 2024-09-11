@@ -28,10 +28,6 @@ import TabItem from '@theme/TabItem';
 
 执行以下命令查看终止策略。
 
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
 ```bash
 kbcli cluster list pg-cluster
 >
@@ -39,45 +35,10 @@ NAME         NAMESPACE   CLUSTER-DEFINITION   VERSION             TERMINATION-PO
 pg-cluster   default     postgresql           postgresql-14.7.0   Delete               Running   Mar 03,2023 18:49 UTC+0800
 ```
 
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
-
-```bash
-kubectl -n demo get cluster pg-cluster
->
-NAME         CLUSTER-DEFINITION   VERSION             TERMINATION-POLICY   STATUS    AGE
-pg-cluster   postgresql           postgresql-14.8.0   Delete               Running   29m
-```
-
-</TabItem>
-
-</Tabs>
-
 ## 步骤
 
 执行以下命令，删除集群。
 
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
 ```bash
 kbcli cluster delete pg-cluster
 ```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
-
-如果想删除集群和所有相关资源，可以将终止策略修改为 `WipeOut`，然后再删除该集群。
-
-```bash
-kubectl patch -n demo cluster pg-cluster -p '{"spec":{"terminationPolicy":"WipeOut"}}' --type="merge"
-
-kubectl delete -n demo cluster pg-cluster
-```
-
-</TabItem>
-
-</Tabs>

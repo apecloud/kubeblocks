@@ -11,7 +11,7 @@ This guide shows how to configure cluster parameters.
 
 ## Before you start
 
-1. [Install KubeBlocks](./../../installation/install-kubeblocks.md).
+1. [Install KubeBlocks](../../../user_docs/installation/install-with-helm/install-kubeblocks.md).
 2. [Create a MongoDB cluster](./../cluster-management/create-and-connect-to-a-mongodb-cluster.md).
 
 ## Configure cluster parameters by configuration file
@@ -140,7 +140,7 @@ You can also view the details of this configuration file and parameters.
   kbcli cluster explain-config mycluster --param=systemLog.verbosity --config-specs=mongodb-config -n demo
   ```
 
-  `--config-specs` is required to specify a configuration template since ApeCloud MySQL currently supports multiple templates. You can run `kbcli cluster describe-config mycluster` to view the all template names.
+  `--config-specs` is required to specify a configuration template if there are multiple templates. You can run `kbcli cluster describe-config mycluster` to view the all template names.
 
   <details>
 

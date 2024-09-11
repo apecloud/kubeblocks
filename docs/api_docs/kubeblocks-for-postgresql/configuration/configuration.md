@@ -17,7 +17,7 @@ But it's also important to note that the dynamic parameter configuration doesn't
 
 ## Before you start
 
-1. [Install KubeBlocks](./../../installation/install-kubeblocks.md).
+1. [Install KubeBlocks](../../../user_docs/installation/install-with-helm/install-kubeblocks.md).
 2. [Create a PostgreSQL cluster](./../cluster-management/create-and-connect-a-postgresql-cluster.md).
 
 ## Configure cluster parameters by editing configuration file

@@ -193,7 +193,8 @@ Choose a policy based on the desired level of resource cleanup and data preserva
 <ul>
 <li><code>DoNotTerminate</code>: Prevents deletion of the Cluster. This policy ensures that all resources remain intact.</li>
 <li><code>Halt</code>: Deletes Cluster resources like Pods and Services but retains Persistent Volume Claims (PVCs),
-allowing for data preservation while stopping other operations.</li>
+allowing for data preservation while stopping other operations.
+Warning: Halt policy is deprecated in 0.9.1 and will have same meaning as DoNotTerminate.</li>
 <li><code>Delete</code>: Extends the <code>Halt</code> policy by also removing PVCs, leading to a thorough cleanup while
 removing all persistent data.</li>
 <li><code>WipeOut</code>: An aggressive policy that deletes all Cluster resources, including volume snapshots and
@@ -4043,9 +4044,9 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>References the name of a ComponentDefinition object.
-The ComponentDefinition specifies the behavior and characteristics of the Component.
-If both <code>componentDefRef</code> and <code>componentDef</code> are provided,
+<p>Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
+custom resource (CR) that defines the Component&rsquo;s characteristics and behavior.</p>
+<p>If both <code>componentDefRef</code> and <code>componentDef</code> are provided,
 the <code>componentDef</code> will take precedence over <code>componentDefRef</code>.</p>
 </td>
 </tr>
@@ -4942,8 +4943,9 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>CompDef specifies the definition used by the component that the referent object resident in.
-If not specified, the component itself will be used.</p>
+<p>Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
+custom resource (CR) used by the component that the referent object resident in.</p>
+<p>If not specified, the component itself will be used.</p>
 </td>
 </tr>
 <tr>
@@ -5236,7 +5238,8 @@ Choose a policy based on the desired level of resource cleanup and data preserva
 <ul>
 <li><code>DoNotTerminate</code>: Prevents deletion of the Cluster. This policy ensures that all resources remain intact.</li>
 <li><code>Halt</code>: Deletes Cluster resources like Pods and Services but retains Persistent Volume Claims (PVCs),
-allowing for data preservation while stopping other operations.</li>
+allowing for data preservation while stopping other operations.
+Warning: Halt policy is deprecated in 0.9.1 and will have same meaning as DoNotTerminate.</li>
 <li><code>Delete</code>: Extends the <code>Halt</code> policy by also removing PVCs, leading to a thorough cleanup while
 removing all persistent data.</li>
 <li><code>WipeOut</code>: An aggressive policy that deletes all Cluster resources, including volume snapshots and
@@ -5755,13 +5758,14 @@ string
 </em>
 </td>
 <td>
-<p>Specifies the name or prefix of the ComponentDefinition custom resource(CR) that
-defines the Component&rsquo;s characteristics and behavior.</p>
-<p>When a prefix is used, the system selects the ComponentDefinition CR with the latest version that matches the prefix.
+<p>Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
+custom resource (CR) that defines the Component&rsquo;s characteristics and behavior.</p>
+<p>The system selects the ComponentDefinition CR with the latest version that matches the pattern.
 This approach allows:</p>
 <ol>
 <li>Precise selection by providing the exact name of a ComponentDefinition CR.</li>
-<li>Flexible and automatic selection of the most up-to-date ComponentDefinition CR by specifying a prefix.</li>
+<li>Flexible and automatic selection of the most up-to-date ComponentDefinition CR
+by specifying a name prefix or regular expression pattern.</li>
 </ol>
 <p>Once set, this field cannot be updated.</p>
 </td>
@@ -5831,6 +5835,98 @@ separated by commas.</p>
 This sequence is designed for components that have dependencies or require specific update procedures.</p>
 <p>Components that can be updated independently or have no dependencies can be listed together in the same stage,
 separated by commas.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ClusterVarSelector">ClusterVarSelector
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.VarSource">VarSource</a>)
+</p>
+<div>
+<p>ClusterVarSelector selects a var from a Cluster.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ClusterVars</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterVars">
+ClusterVars
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ClusterVars</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ClusterVars">ClusterVars
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterVarSelector">ClusterVarSelector</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>namespace</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reference to the namespace of the Cluster object.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>clusterName</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reference to the name of the Cluster object.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>clusterUID</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reference to the UID of the Cluster object.</p>
 </td>
 </tr>
 </tbody>
@@ -6776,28 +6872,6 @@ Action
 at which the action should trigger: <code>Immediately</code>, <code>RuntimeReady</code>, <code>ComponentReady</code>, and <code>ClusterReady</code>.
 with <code>ComponentReady</code> being the default.</p>
 <p>The PostProvision Action is intended to run only once.</p>
-<p>The container executing this action has access to following environment variables:</p>
-<ul>
-<li><p>KB_CLUSTER_POD_IP_LIST: Comma-separated list of the cluster&rsquo;s pod IP addresses (e.g., &ldquo;podIp1,podIp2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_POD_NAME_LIST: Comma-separated list of the cluster&rsquo;s pod names (e.g., &ldquo;pod1,pod2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_POD_HOST_NAME_LIST: Comma-separated list of host names, each corresponding to a pod in
-KB_CLUSTER_POD_NAME_LIST (e.g., &ldquo;hostName1,hostName2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_POD_HOST_IP_LIST: Comma-separated list of host IP addresses, each corresponding to a pod in
-KB_CLUSTER_POD_NAME_LIST (e.g., &ldquo;hostIp1,hostIp2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_COMPONENT_POD_NAME_LIST: Comma-separated list of all pod names within the component
-(e.g., &ldquo;pod1,pod2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_COMPONENT_POD_IP_LIST: Comma-separated list of pod IP addresses,
-matching the order of pods in KB_CLUSTER_COMPONENT_POD_NAME_LIST (e.g., &ldquo;podIp1,podIp2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_COMPONENT_POD_HOST_NAME_LIST: Comma-separated list of host names for each pod,
-matching the order of pods in KB_CLUSTER_COMPONENT_POD_NAME_LIST (e.g., &ldquo;hostName1,hostName2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_COMPONENT_POD_HOST_IP_LIST: Comma-separated list of host IP addresses for each pod,
-matching the order of pods in KB_CLUSTER_COMPONENT_POD_NAME_LIST (e.g., &ldquo;hostIp1,hostIp2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_COMPONENT_LIST: Comma-separated list of all cluster components (e.g., &ldquo;comp1,comp2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_COMPONENT_DELETING_LIST: Comma-separated list of components that are currently being deleted
-(e.g., &ldquo;comp1,comp2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_COMPONENT_UNDELETED_LIST: Comma-separated list of components that are not being deleted
-(e.g., &ldquo;comp1,comp2&rdquo;).</p></li>
-</ul>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
 </tr>
@@ -6817,33 +6891,6 @@ Action
 <p>This action is executed immediately when a scale-down operation for the Component is initiated.
 The actual termination and cleanup of the Component and its associated resources will not proceed
 until the PreTerminate action has completed successfully.</p>
-<p>The container executing this action has access to following environment variables:</p>
-<ul>
-<li><p>KB_CLUSTER_POD_IP_LIST: Comma-separated list of the cluster&rsquo;s pod IP addresses (e.g., &ldquo;podIp1,podIp2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_POD_NAME_LIST: Comma-separated list of the cluster&rsquo;s pod names (e.g., &ldquo;pod1,pod2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_POD_HOST_NAME_LIST: Comma-separated list of host names, each corresponding to a pod in
-KB_CLUSTER_POD_NAME_LIST (e.g., &ldquo;hostName1,hostName2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_POD_HOST_IP_LIST: Comma-separated list of host IP addresses, each corresponding to a pod in
-KB_CLUSTER_POD_NAME_LIST (e.g., &ldquo;hostIp1,hostIp2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_COMPONENT_POD_NAME_LIST: Comma-separated list of all pod names within the component
-(e.g., &ldquo;pod1,pod2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_COMPONENT_POD_IP_LIST: Comma-separated list of pod IP addresses,
-matching the order of pods in KB_CLUSTER_COMPONENT_POD_NAME_LIST (e.g., &ldquo;podIp1,podIp2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_COMPONENT_POD_HOST_NAME_LIST: Comma-separated list of host names for each pod,
-matching the order of pods in KB_CLUSTER_COMPONENT_POD_NAME_LIST (e.g., &ldquo;hostName1,hostName2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_COMPONENT_POD_HOST_IP_LIST: Comma-separated list of host IP addresses for each pod,
-matching the order of pods in KB_CLUSTER_COMPONENT_POD_NAME_LIST (e.g., &ldquo;hostIp1,hostIp2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_COMPONENT_LIST: Comma-separated list of all cluster components (e.g., &ldquo;comp1,comp2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_COMPONENT_DELETING_LIST: Comma-separated list of components that are currently being deleted
-(e.g., &ldquo;comp1,comp2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_COMPONENT_UNDELETED_LIST: Comma-separated list of components that are not being deleted
-(e.g., &ldquo;comp1,comp2&rdquo;).</p></li>
-<li><p>KB_CLUSTER_COMPONENT_IS_SCALING_IN: Indicates whether the component is currently scaling in.
-If this variable is present and set to &ldquo;true&rdquo;, it denotes that the component is undergoing a scale-in operation.
-During scale-in, data rebalancing is necessary to maintain cluster integrity.
-Contrast this with a cluster deletion scenario where data rebalancing is not required as the entire cluster
-is being cleaned up.</p></li>
-</ul>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
 </tr>
@@ -6894,11 +6941,8 @@ Action
 This approach aims to minimize downtime and maintain availability in systems with a leader-follower topology,
 during events such as planned maintenance or when performing stop, shutdown, restart, or upgrade operations
 involving the current leader node.</p>
-<p>The container executing this action has access to following environment variables:</p>
+<p>The container executing this action has access to following variables:</p>
 <ul>
-<li>KB_LEADER_POD_IP: The IP address of the current leader&rsquo;s pod prior to the switchover.</li>
-<li>KB_LEADER_POD_NAME: The name of the current leader&rsquo;s pod prior to the switchover.</li>
-<li>KB_LEADER_POD_FQDN: The FQDN of the current leader&rsquo;s pod prior to the switchover.</li>
 <li>KB_SWITCHOVER_CANDIDATE_NAME: The name of the pod for the new leader candidate, which may not be specified (empty).</li>
 <li>KB_SWITCHOVER_CANDIDATE_FQDN: The FQDN of the new leader candidate&rsquo;s pod, which may not be specified (empty).</li>
 </ul>
@@ -7101,6 +7145,11 @@ Action
 <p>Use Case:
 This action is designed to create system accounts that are utilized for replication, monitoring, backup,
 and other administrative tasks.</p>
+<p>The container executing this action has access to following variables:</p>
+<ul>
+<li>KB_ACCOUNT_NAME: The name of the system account to be created.</li>
+<li>KB_ACCOUNT_STATEMENT: The statement used to create the system account.</li>
+</ul>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
 </tr>
@@ -8023,6 +8072,20 @@ VarOption
 </tr>
 <tr>
 <td>
+<code>shortName</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reference to the short name of the Component object.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>replicas</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.VarOption">
@@ -8037,7 +8100,7 @@ VarOption
 </tr>
 <tr>
 <td>
-<code>instanceNames</code><br/>
+<code>podNames</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.VarOption">
 VarOption
@@ -8046,8 +8109,8 @@ VarOption
 </td>
 <td>
 <em>(Optional)</em>
-<p>Reference to the instanceName list of the component.
-and the value will be presented in the following format: instanceName1,instanceName2,&hellip;</p>
+<p>Reference to the pod name list of the component.
+and the value will be presented in the following format: name1,name2,&hellip;</p>
 </td>
 </tr>
 <tr>
@@ -8062,6 +8125,36 @@ VarOption
 <td>
 <em>(Optional)</em>
 <p>Reference to the pod FQDN list of the component.
+The value will be presented in the following format: FQDN1,FQDN2,&hellip;</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podNamesForRole</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.RoledVar">
+RoledVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reference to the pod name list of the component that have a specific role.
+The value will be presented in the following format: name1,name2,&hellip;</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podFQDNsForRole</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.RoledVar">
+RoledVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reference to the pod FQDN list of the component that have a specific role.
 The value will be presented in the following format: FQDN1,FQDN2,&hellip;</p>
 </td>
 </tr>
@@ -8092,11 +8185,12 @@ The value will be presented in the following format: FQDN1,FQDN2,&hellip;</p>
 </td>
 <td>
 <p>CompDefs specifies names for the component definitions associated with this ComponentVersion.
-Each name in the list can represent an exact name, or a name prefix.</p>
+Each name in the list can represent an exact name, a name prefix, or a regular expression pattern.</p>
 <p>For example:</p>
 <ul>
 <li>&ldquo;mysql-8.0.30-v1alpha1&rdquo;: Matches the exact name &ldquo;mysql-8.0.30-v1alpha1&rdquo;</li>
 <li>&ldquo;mysql-8.0.30&rdquo;: Matches all names starting with &ldquo;mysql-8.0.30&rdquo;</li>
+<li>&rdquo;^mysql-8.0.\d&#123;1,2&#125;$&ldquo;: Matches all names starting with &ldquo;mysql-8.0.&rdquo; followed by one or two digits.</li>
 </ul>
 </td>
 </tr>
@@ -9987,7 +10081,23 @@ string
 <em>(Optional)</em>
 <p>Specifies the container image to be used for running the Action.</p>
 <p>When specified, a dedicated container will be created using this image to execute the Action.
-This field is mutually exclusive with the <code>container</code> field; only one of them should be provided.</p>
+All actions with same image will share the same container.</p>
+<p>This field cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>env</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents a list of environment variables that will be injected into the container.
+These variables enable the container to adapt its behavior based on the environment it&rsquo;s running in.</p>
 <p>This field cannot be updated.</p>
 </td>
 </tr>
@@ -10021,22 +10131,6 @@ If the shell is required, it must be explicitly invoked in the command.</p>
 </tr>
 <tr>
 <td>
-<code>env</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
-[]Kubernetes core/v1.EnvVar
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Represents a list of environment variables that will be injected into the container.
-These variables enable the container to adapt its behavior based on the environment it&rsquo;s running in.</p>
-<p>This field cannot be updated.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>targetPodSelector</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.TargetPodSelector">
@@ -10049,8 +10143,10 @@ TargetPodSelector
 <p>Defines the criteria used to select the target Pod(s) for executing the Action.
 This is useful when there is no default target replica identified.
 It allows for precise control over which Pod(s) the Action should run in.</p>
+<p>If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+to be removed or added; or a random pod if the Action is triggered at the component level, such as
+post-provision or pre-terminate of the component.</p>
 <p>This field cannot be updated.</p>
-<p>Note: This field is reserved for future use and is not currently active.</p>
 </td>
 </tr>
 <tr>
@@ -10070,7 +10166,6 @@ The impact of this field depends on the <code>targetPodSelector</code> value:</p
 will be selected for the Action.</li>
 </ul>
 <p>This field cannot be updated.</p>
-<p>Note: This field is reserved for future use and is not currently active.</p>
 </td>
 </tr>
 <tr>
@@ -10082,12 +10177,14 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the name of the container within the target Pod where the action will be executed.</p>
-<p>This name must correspond to one of the containers defined in <code>componentDefinition.spec.runtime</code>.
-If this field is not specified, the default behavior is to use the first container listed in
-<code>componentDefinition.spec.runtime</code>.</p>
+<p>Specifies the name of the container within the same pod whose resources will be shared with the action.
+This allows the action to utilize the specified container&rsquo;s resources without executing within it.</p>
+<p>The name must match one of the containers defined in <code>componentDefinition.spec.runtime</code>.</p>
+<p>The resources that can be shared are included:</p>
+<ul>
+<li>volume mounts</li>
+</ul>
 <p>This field cannot be updated.</p>
-<p>Note: This field is reserved for future use and is not currently active.</p>
 </td>
 </tr>
 </tbody>
@@ -14849,6 +14946,47 @@ This value is set to 0 by default, indicating that there will be no delay betwee
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.RoledVar">RoledVar
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentVars">ComponentVars</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>role</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>option</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.Rule">Rule
 </h3>
 <p>
@@ -16524,6 +16662,20 @@ ServiceVars
 <tbody>
 <tr>
 <td>
+<code>serviceType</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServiceType references the type of the service.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>host</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.VarOption">
@@ -17791,7 +17943,7 @@ string
 <h3 id="apps.kubeblocks.io/v1alpha1.VarOption">VarOption
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentVars">ComponentVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.CredentialVars">CredentialVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.NamedVar">NamedVar</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVars">ServiceRefVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVars">ServiceVars</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterVars">ClusterVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentVars">ComponentVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.CredentialVars">CredentialVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.NamedVar">NamedVar</a>, <a href="#apps.kubeblocks.io/v1alpha1.RoledVar">RoledVar</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVars">ServiceRefVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVars">ServiceVars</a>)
 </p>
 <div>
 <p>VarOption defines whether a variable is required or optional.</p>
@@ -17908,6 +18060,20 @@ ComponentVarSelector
 <td>
 <em>(Optional)</em>
 <p>Selects a defined var of a Component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>clusterVarRef</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterVarSelector">
+ClusterVarSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Selects a defined var of a Cluster.</p>
 </td>
 </tr>
 </tbody>

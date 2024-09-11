@@ -22,7 +22,7 @@ KubeBlocks supports the management of StarRocks.
 
 ***Steps***
 
-1. Execute the following command to create a StarRocks cluster. You can change the `cluster-definition` value as any other database supported.
+1. Execute the following command to create a StarRocks cluster.
 
    ```bash
    kbcli cluster create mycluster --cluster-definition=starrocks
@@ -36,7 +36,7 @@ KubeBlocks supports the management of StarRocks.
 
 :::note
 
-View more flags for creating a MySQL cluster to create a cluster with customized specifications.
+View more flags for creating a cluster to create a cluster with customized specifications.
   
 ```bash
 kbcli cluster create --help
@@ -44,7 +44,7 @@ kbcli cluster create --help
 
 :::
 
-2. Check whether the cluster is created.
+1. Check whether the cluster is created.
 
    ```bash
    kbcli cluster list
@@ -53,7 +53,7 @@ kbcli cluster create --help
    mycluster   default     starrocks            starrocks-3.1.1   Delete               Running    Jul 17,2024 19:06 UTC+0800   
    ```
 
-3. Check the cluster information.
+2. Check the cluster information.
 
    ```bash
     kbcli cluster describe mycluster

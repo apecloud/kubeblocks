@@ -2,7 +2,7 @@
 title: 资源描述
 description: Kafka 资源描述
 keywords: [kafka, Java 堆, 硬件资源]
-sidebar_position: 2
+sidebar_position: 4
 sidebar_label: 资源描述
 ---
 

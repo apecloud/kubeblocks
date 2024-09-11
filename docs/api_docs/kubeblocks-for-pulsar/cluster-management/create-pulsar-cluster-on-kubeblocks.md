@@ -6,6 +6,8 @@ sidebar_position: 1
 sidebar_label: Create
 ---
 
+# Create a Pulsar Cluster
+
 ## Introduction
 
 KubeBlocks can quickly integrate new engines through good abstraction. KubeBlocks supports Pulsar operations, including basic lifecycle operations such as cluster creation, deletion, and restart, as well as advanced operations such as horizontal and vertical scaling, volume expansion, configuration changes, and monitoring.
@@ -24,11 +26,11 @@ Refer to the [Pulsar official document](https://pulsar.apache.org/docs/3.1.x/) f
 
 ## Before you start
 
-* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
+* [Install KubeBlocks](../../../user_docs/installation/install-with-helm/install-kubeblocks.md).
 
 * View all the database types and versions available for creating a cluster.
 
-  Make sure the `pulsar` cluster definition is installed. If the cluster definition is not available, refer to [this doc](./../../installation/install-addons.md) to enable it first.
+  Make sure the `pulsar` cluster definition is installed. If the cluster definition is not available, refer to [this doc](../../../user_docs/installation/install-with-helm/install-addons.md) to enable it first.
 
   ```bash
   kubectl get clusterdefinition redis

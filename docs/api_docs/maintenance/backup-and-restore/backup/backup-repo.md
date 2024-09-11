@@ -21,7 +21,7 @@ Make sure you have all the following prepared.
 
 * [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
 * [Install Helm](https://helm.sh/docs/intro/install/)
-* [Install KubeBlocks](./../../../installation/install-kubeblocks.md)
+* [Install KubeBlocks](../../../../user_docs/installation/install-with-helm/install-kubeblocks.md)
 
 ## Install MinIO
 

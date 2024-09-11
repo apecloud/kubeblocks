@@ -93,58 +93,9 @@ import TabItem from '@theme/TabItem';
 
 1. 将 `host-network-accessible` 的值设置为 true。
 
-    <Tabs>
-    <TabItem value="kbcli" label="kbcli" default>
-
     ```bash
     kbcli cluster create kafka --host-network-accessible=true
     ```
-
-    </TabItem>
-    <TabItem value="kubectl" label="kubectl" >
-
-    ```bash
-    kubectl apply -f - <<EOF
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: Cluster
-    metadata:
-      name: kafka
-      namespace: default
-    spec:
-      affinity:
-        podAntiAffinity: Preferred
-        tenancy: SharedNode
-        topologyKeys:
-        - kubernetes.io/hostname
-      clusterDefinitionRef: kafka
-      clusterVersionRef: kafka-3.3.2
-      componentSpecs:
-      - componentDefRef: kafka-server
-        monitor: false
-        name: broker
-        replicas: 1
-        resources:
-          limits:
-            cpu: "1"
-            memory: 1Gi
-          requests:
-            cpu: "1"
-            memory: 1Gi
-        serviceAccountName: kb-sa-kafka
-        services:
-        - annotations: 
-            service.beta.kubernetes.io/aws-load-balancer-type: nlb
-            service.beta.kubernetes.io/aws-load-balancer-internal: "true"
-          name: vpc
-          serviceType: LoadBalancer
-        tls: false
-      terminationPolicy: Delete
-    EOF
-    ```
-
-    </TabItem>
-
-    </Tabs>
 
 2. 获取相应的 ELB 地址。
 
@@ -176,59 +127,9 @@ import TabItem from '@theme/TabItem';
 
 1. 将 `--publicly-accessible` 的值设置为 true。
 
-    <Tabs>
-    <TabItem value="kbcli" label="kbcli" default>
-
     ```bash
     kbcli cluster create kafka --publicly-accessible=true
     ```
-
-    </TabItem>
-
-    <TabItem value="kubectl" label="kubectl" >
-
-    ```bash
-    kubectl apply -f - <<EOF
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: Cluster
-    metadata:
-      name: kafka
-      namespace: default
-    spec:
-      affinity:
-        podAntiAffinity: Preferred
-        tenancy: SharedNode
-        topologyKeys:
-        - kubernetes.io/hostname
-      clusterDefinitionRef: kafka
-      clusterVersionRef: kafka-3.3.2
-      componentSpecs:
-      - componentDefRef: kafka-server
-        monitor: false
-        name: broker
-        replicas: 1
-        resources:
-          limits:
-            cpu: "1"
-            memory: 1Gi
-          requests:
-            cpu: "1"
-            memory: 1Gi
-        serviceAccountName: kb-sa-kafka
-        services:
-        - annotations: 
-            service.beta.kubernetes.io/aws-load-balancer-type: nlb
-            service.beta.kubernetes.io/aws-load-balancer-internal: "false"
-          name: vpc
-          serviceType: LoadBalancer
-        tls: false
-      terminationPolicy: Delete
-    EOF
-    ```
-
-    </TabItem>
-
-    </Tabs>
 
 2. 获取实例对应的 ELB 地址。
 

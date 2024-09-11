@@ -8,7 +8,7 @@ sidebar_label: 磁盘扩容
 
 # 磁盘扩容
 
-KubeBlocks 支持 Pod 扩缩容。
+KubeBlocks 支持 Pod 磁盘存储扩容。
 
 ## 开始之前
 
@@ -18,44 +18,29 @@ KubeBlocks 支持 Pod 扩缩容。
 kbcli cluster list kafka  
 ```
 
-## 选项 1. 使用 kbcli
+## 步骤
 
-使用 `kbcli cluster volume-expand` 命令配置所需资源，然后再次输入集群名称进行磁盘扩容。
+1. 使用 `kbcli cluster volume-expand` 命令配置所需资源，然后再次输入集群名称进行磁盘扩容。
 
-```bash
-kbcli cluster volume-expand --storage=30G --components=kafka --volume-claim-templates=data kafka
-```
+   ```bash
+   kbcli cluster volume-expand --storage=40Gi --components=kafka --volume-claim-templates=data kafka
+   ```
 
-- `--components` 表示需扩容的组件名称。
-- `--volume-claim-templates` 表示组件中的 VolumeClaimTemplate 名称。
-- `--storage` 表示磁盘需扩容至的大小。
+   - `--components` 表示需扩容的组件名称。
+   - `--volume-claim-templates` 表示组件中的 VolumeClaimTemplate 名称。
+   - `--storage` 表示磁盘需扩容至的大小。
 
-## 选项 2. 更改集群的 YAML 文件
+2. 验证磁盘扩容操作是否成功。
 
-在集群的 YAML 文件中更改 `spec.components.volumeClaimTemplates.spec.resources` 的值。
+   ```bash
+   kbcli cluster list kafka-cluster
+   >
+   NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS          CREATED-TIME
+   kafka-cluster        default          redis                     kafka-3.3.2              Delete                    Running        May 11,2023 15:27 UTC+0800
+   ```
 
-`spec.components.volumeClaimTemplates.spec.resources` 是 Pod 的存储资源信息，更改此值会触发磁盘扩容。
+3. 检查资源规格是否已变更。
 
-```yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: Cluster
-metadata:
-  name: kafka
-  namespace: default
-spec:
-  clusterDefinitionRef: kafka
-  clusterVersionRef: kafka-3.3.2
-  componentSpecs:
-  - name: kafka 
-    componentDefRef: kafka
-    replicas: 1
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi # 修改磁盘容量
-  terminationPolicy: Halt
-```
+    ```bash
+    kbcli cluster describe kafka-cluster
+    ```

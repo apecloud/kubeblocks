@@ -13,19 +13,15 @@ import TabItem from '@theme/TabItem';
 
 This tutorial shows how to create and connect to a Redis cluster.
 
-KuebBlocks for Redis supports Standalone clusters and Replication Cluster.
-
-For your better high-availability experience, KubeBlocks creates a Redis Replication Cluster by default.
-
 ## Create a Redis cluster
 
 ### Before you start
 
-* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
+* [Install KubeBlocks](../../../user_docs/installation/install-with-helm/install-kubeblocks.md).
 
 * View all the database types and versions available for creating a cluster.
 
-  Make sure the `redis` cluster definition is installed. If the cluster definition is not available, refer to [this doc](./../../installation/install-addons.md) to enable it first.
+  Make sure the `redis` cluster definition is installed. If the cluster definition is not available, refer to [this doc](../../../user_docs/installation/install-with-helm/install-addons.md) to enable it first.
 
   ```bash
   kubectl get clusterdefinition redis
@@ -115,13 +111,11 @@ EOF
 | `spec.affinity.topologyKeys`          | It represents the key of node labels used to define the topology domain for Pod anti-affinity and Pod spread constraints.   |
 | `spec.tolerations`                    | It is an array that specifies tolerations attached to the cluster's Pods, allowing them to be scheduled onto nodes with matching taints.  |
 | `spec.componentSpecs`                 | It is the list of components that define the cluster components. This field allows customized configuration of each component within a cluster.   |
-| `spec.componentSpecs.componentDefRef` | It is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition apecloud-mysql -o json \| jq '.spec.componentDefs[].name'`.   |
+| `spec.componentSpecs.componentDefRef` | It is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition redis -o json \| jq '.spec.componentDefs[].name'`.   |
 | `spec.componentSpecs.name`            | It specifies the name of the component.     |
 | `spec.componentSpecs.disableExporter` | It defines whether the monitoring function is enabled. |
 | `spec.componentSpecs.replicas`        | It specifies the number of replicas of the component.  |
 | `spec.componentSpecs.resources`       | It specifies the resource requirements of the component.  |
-
-For the details of different parameters, you can refer to API docs for developers.
 
 Run the following command to see the created Redis cluster object:
 
@@ -279,4 +273,4 @@ You can also port forward the service to connect to the database from your local
 
 </Tabs>
 
-For the detailed database connection guide, refer to [Connect database](./../../connect_database/overview-of-database-connection.md).
+For the detailed database connection guide, refer to [Connect database](./../../../user_docs/connect_database/overview-of-database-connection.md).

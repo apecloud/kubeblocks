@@ -11,7 +11,7 @@ KubeBlocks integrates [the open-source Patroni solution](https://patroni.readthe
 
 ## Before you start
 
-* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
+* [Install KubeBlocks](../../../user_docs/installation/install-with-helm/install-kubeblocks.md).
 * [Create a PostgreSQL Replication Cluster](./../cluster-management/create-and-connect-a-postgresql-cluster.md#create-a-postgresql-cluster).
 * Check whether the following role probe parameters exist to verify the role probe is enabled.
 
@@ -101,7 +101,7 @@ KubeBlocks integrates [the open-source Patroni solution](https://patroni.readthe
 
    ![PostgreSQL replication info](./../../../img/api-ha-pg-replication-info.png)
 
-   From the output, `pg-cluster-postgresql-0` has been assigned as the secondary pod.
+   From the output, `mycluster-postgresql-0` has been assigned as the secondary pod.
 
 5. View the status of the PostgreSQL cluster and pods again.
 
@@ -113,4 +113,4 @@ KubeBlocks integrates [the open-source Patroni solution](https://patroni.readthe
 
    ![PostgreSQL cluster status after HA](./../../../img/api-ha-pg-after.png)
 
-   After the failover, `mycluster-postgresql-0` becomes the secondary pod and `pg-cluster-postgresql-1` becomes the primary pod.
+   After the failover, `mycluster-postgresql-0` becomes the secondary pod and `mycluster-postgresql-1` becomes the primary pod.

@@ -25,12 +25,6 @@ Check whether the cluster STATUS is `Running`. Otherwise, the following operatio
 
 ```bash
 kubectl get cluster mycluster -n demo
-```
-
-***Example***
-
-```bash
-kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
 mycluster   redis                redis-7.0.6    Delete               Running   4d18h

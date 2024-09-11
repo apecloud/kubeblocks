@@ -477,7 +477,7 @@ type OpsDefinitionStatus struct {
 // +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories={kubeblocks,all},scope=Cluster,shortName=od
+// +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=od
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="OpsDefinition status phase."
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 

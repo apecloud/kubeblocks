@@ -17,10 +17,10 @@ This tutorial illustrates how to create and manage a Xinference cluster by `kube
 
 ## Before you start
 
-* [Install KubeBlocks](./../installation/install-kubeblocks.md).
+* [Install KubeBlocks](../../user_docs/installation/install-with-helm/install-kubeblocks.md).
 * View all the database types and versions available for creating a cluster.
   
-  Make sure the `xinference` cluster definition is installed. If the cluster definition is not available, refer to [this doc](./../installation/install-addons.md) to enable it first.
+  Make sure the `xinference` cluster definition is installed. If the cluster definition is not available, refer to [this doc](../../user_docs/installation/install-with-helm/install-addons.md) to enable it first.
 
   ```bash
   kubectl get clusterdefinition xinference
@@ -90,7 +90,7 @@ EOF
 | `spec.affinity.topologyKeys`          | It represents the key of node labels used to define the topology domain for Pod anti-affinity and Pod spread constraints.   |
 | `spec.tolerations`                    | It is an array that specifies tolerations attached to the cluster's Pods, allowing them to be scheduled onto nodes with matching taints.  |
 | `spec.componentSpecs`                 | It is the list of components that define the cluster components. This field allows customized configuration of each component within a cluster.   |
-| `spec.componentSpecs.componentDefRef` | It is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition apecloud-mysql -o json \| jq '.spec.componentDefs[].name'`.   |
+| `spec.componentSpecs.componentDefRef` | It is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition xinference -o json \| jq '.spec.componentDefs[].name'`.   |
 | `spec.componentSpecs.name`            | It specifies the name of the component.     |
 | `spec.componentSpecs.replicas`        | It specifies the number of replicas of the component.  |
 | `spec.componentSpecs.resources`       | It specifies the resource requirements of the component.  |

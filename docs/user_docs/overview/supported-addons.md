@@ -2,7 +2,7 @@
 title: Supported addons 
 description: Addons supported by KubeBlocks
 keywords: [addons, enable, KubeBlocks, prometheus, s3, alertmanager,]
-sidebar_position: 2
+sidebar_position: 4
 sidebar_label: Supported addons 
 ---
 
@@ -29,7 +29,7 @@ KubeBlocks, as a cloud-native data infrastructure based on Kubernetes, provides 
 | mariadb         | MariaDB is a high performance open source relational database management system that is widely used for web and application servers. |
 | milvus          | Milvus is a flexible, reliable, & blazing-fast cloud-native, open-source vector database.                                                                                                                         |
 | minio           | MinIO is an object storage solution that provides an Amazon Web Services S3-compatible API and supports all core S3 features. |
-| mogdb           | MOgDB is a stable and easy-to-use enterprise-ready relational database based on the openGauss open source database. |
+| mogdb           | MogDB is a stable and easy-to-use enterprise-ready relational database based on the openGauss open source database. |
 | mongodb         | MongoDB is a document-oriented NoSQL database used for high volume data storage.                                                                                                                                  |
 | mysql           | MySQL is a widely used, open-source relational database management system (RDBMS). |
 | nebula          | NebulaGraph is an open source graph database that can store and process graphs with trillions of edges and vertices.                                                                                              |

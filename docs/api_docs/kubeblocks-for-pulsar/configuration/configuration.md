@@ -2,12 +2,13 @@
 title: Configure cluster parameters
 description: Configure cluster parameters
 keywords: [pulsar, parameter, configuration, reconfiguration]
-sidebar_position: 4
+sidebar_position: 1
+sidebar_label: Configuration
 ---
 
 # Configure cluster parameters
 
-This guide shows how to configure cluster parameters by creating an opsRequest.
+This guide shows how to configure cluster parameters.
 
 For Pulsar, there are 3 types of parameters:
 
@@ -25,7 +26,7 @@ For Pulsar, there are 3 types of parameters:
 
 ## Before you start
 
-1. [Install KubeBlocks](./../../installation/install-kubeblocks.md).
+1. [Install KubeBlocks](../../../user_docs/installation/install-with-helm/install-kubeblocks.md).
 2. [Create a Pulsar cluster](./../cluster-management/create-pulsar-cluster-on-kubeblocks.md).
 
 ## Configure cluster parameters by configuration file
@@ -46,7 +47,7 @@ Using kubectl to configure pulsar cluster requires modifying the configuration f
 
 ## Configure cluster parameters with OpsRequest
 
-1. Define an OpsRequest file and configure the parameters in the OpsRequest in a yaml file named `mycluster-configuring-demo.yaml`. In this example, `max_connections` is configured as `600`.
+1. Define an OpsRequest file and configure the parameters in the OpsRequest in a yaml file named `mycluster-configuring-demo.yaml`. In this example, `lostBookieRecoveryDelay` is configured as `1000`.
 
    ```bash
    apiVersion: apps.kubeblocks.io/v1alpha1

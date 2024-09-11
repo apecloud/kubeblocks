@@ -1,6 +1,6 @@
 ---
-title: KubeBlocks overview
-description: KubeBlocks, kbcli, multicloud
+title: Introduction
+description: introduction to KubeBlocks
 keywords: [kubeblocks, overview, introduction]
 sidebar_position: 1
 ---
@@ -12,7 +12,7 @@ import TabItem from '@theme/TabItem';
 
 ## What is KubeBlocks
 
-KubeBlocks is an open-source Kubernetes operator for databases, enabling users to run and manage multiple types of databases on Kubernetes. As far as we know, most database operators typically manage only one specific type of database. For example:
+KubeBlocks is an open-source Kubernetes operator for databases (more specifically, for stateful applications, including databases and middleware like message queues), enabling users to run and manage multiple types of databases on Kubernetes. As far as we know, most database operators typically manage only one specific type of database. For example:
 - CloudNativePG, Zalando, CrunchyData, StackGres operator can manage PostgreSQL
 - Strimzi manages Kafka
 - Oracle and Percona MySQL operator manage MySQL
@@ -217,7 +217,7 @@ This means that managing multiple databases on Kubernetes becomes simple, effici
   - Rolling upgrades
   - Decommission a specific replica
   - Minor version upgrades
-- In addition to the declarative API, KubeBlocks also offers an Ops API for executing one-time operational tasks on database clusters. The Ops API supports additional features such as queuing, concurrency control, progress tracking, and operation rollback.
+- In addition to the declarative API, KubeBlocks also offers an OpsRequest API for executing one-time operational tasks on database clusters. The OpsRequest API supports additional features such as queuing, concurrency control, progress tracking, and operation rollback.
 - Observability: Supports integration with Prometheus and Grafana.
 - Includes a powerful and intuitive command-line tool `kbcli`, which makes operating KubeBlocks CRs on Kubernetes more straightforward and reduces keystrokes. For those well-versed in Kubernetes, kbcli can be used alongside kubectl to provide a more streamlined way of performing operations.
 

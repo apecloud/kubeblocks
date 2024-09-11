@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -36,10 +35,13 @@ type ReconciliationViewSpec struct {
 	// +optional
 	TargetObject *ObjectReference `json:"targetObject,omitempty"`
 
-	// WithReconciliationPlan specifies whether to show the reconciliation view with the plan.
+	// Depth of the object tree.
+	// Default is 1, means the top primary object only.
 	//
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=1
 	// +optional
-	WithReconciliationPlan bool `json:"withReconciliationPlan"`
+	Depth *int32 `json:"depth,omitempty"`
 
 	// StateEvaluationExpression overrides the value specified in ReconciliationViewDefinition.
 	//
@@ -54,30 +56,36 @@ type ReconciliationViewSpec struct {
 
 // ReconciliationViewStatus defines the observed state of ReconciliationView
 type ReconciliationViewStatus struct {
-	Plan *ReconciliationPlanStatus `json:"plan,omitempty"`
+	// InitialObjectTree specifies the initial object tree.
+	//
+	InitialObjectTree ObjectTreeNode `json:"initialObjectTree"`
 
-	Summary ViewSummary `json:"summary"`
+	// DesiredObjectTree specifies the object tree if the spec.desiredSpec is applied.
+	//
+	DesiredObjectTree ObjectTreeNode `json:"desiredObjectTree"`
 
-	View ObjectReconciliationView `json:"view"`
+	// PlanSummary summarizes the desired state by comparing it to the initial state.
+	//
+	PlanSummary PlanSummary `json:"planSummary"`
+
+	// ViewSummary summarizes the current state by comparing it to the initial state.
+	//
+	ViewSummary ViewSummary `json:"viewSummary"`
+
+	// Plan describes the detail reconciliation process when the current spec of the TargetObject is fully applied.
+	//
+	Plan []ObjectChange `json:"plan"`
+
+	// View describes the detail reconciliation progress ongoing.
+	//
+	View []ObjectChange `json:"view"`
 }
 
+// ViewSummary defines a summary of reconciliation view.
 type ViewSummary struct {
+	// ObjectSummaries summarizes each object type.
+	//
 	ObjectSummaries []ObjectSummary `json:"objectSummaries"`
-}
-
-type ObjectReconciliationView struct {
-	// ObjectReference specifies the Object this view described.
-	//
-	ObjectReference corev1.ObjectReference `json:"objectReference"`
-
-	// Changes describes all changes related to this object, including the associated Events, in order.
-	//
-	Changes []ObjectChange `json:"changes"`
-
-	// SecondaryObjectViews describes views of all the secondary objects of this object, if any.
-	// The secondary objects are collected by the rules specified in ReconciliationViewDefinition.
-	//
-	SecondaryObjectViews []ObjectReconciliationView `json:"secondaryObjectViews,omitempty"`
 }
 
 //+kubebuilder:object:root=true

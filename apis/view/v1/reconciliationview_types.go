@@ -20,25 +20,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // ReconciliationViewSpec defines the desired state of ReconciliationView
 type ReconciliationViewSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// ViewDefinition specifies the name of the ReconciliationViewDefinition.
+	//
+	ViewDefinition string `json:"viewDefinition"`
 
-	// Foo is an example field of ReconciliationView. Edit reconciliationview_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// TargetObject specifies the target Cluster object.
+	// Default is the Cluster object with same namespace and name as this ReconciliationView object.
+	//
+	// +optional
+	TargetObject *ObjectReference `json:"targetObject,omitempty"`
+
+	// WithReconciliationPlan specifies whether to show the reconciliation view with the plan.
+	//
+	// +optional
+	WithReconciliationPlan bool `json:"withReconciliationPlan"`
+
+	// StateEvaluationExpression overrides the value specified in ReconciliationViewDefinition.
+	//
+	// +optional
+	StateEvaluationExpression *string `json:"stateEvaluationExpression,omitempty"`
+
+	// Locale specifies the locale to use when localizing the reconciliation view.
+	//
+	// +optional
+	Locale *string `json:"locale,omitempty"`
 }
 
 // ReconciliationViewStatus defines the observed state of ReconciliationView
 type ReconciliationViewStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	Plan *ReconciliationPlanStatus `json:"plan,omitempty"`
+
+	Summary ViewSummary `json:"summary"`
+
+	View ObjectReconciliationView `json:"view"`
+}
+
+type ViewSummary struct {
+	ObjectSummaries []ObjectSummary `json:"objectSummaries"`
+}
+
+type ObjectReconciliationView struct {
+	// ObjectReference specifies the Object this view described.
+	//
+	ObjectReference corev1.ObjectReference `json:"objectReference"`
+
+	// Changes describes all changes related to this object, including the associated Events, in order.
+	//
+	Changes []ObjectChange `json:"changes"`
+
+	// SecondaryObjectViews describes views of all the secondary objects of this object, if any.
+	// The secondary objects are collected by the rules specified in ReconciliationViewDefinition.
+	//
+	SecondaryObjectViews []ObjectReconciliationView `json:"secondaryObjectViews,omitempty"`
 }
 
 //+kubebuilder:object:root=true

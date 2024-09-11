@@ -309,7 +309,7 @@ func (r *RestoreManager) buildSchedulingSpec(comp *component.SynthesizedComponen
 		compSpec = r.Cluster.Spec.GetComponentByName(comp.Name)
 	}
 	schedulingPolicy, err := scheduling.BuildSchedulingPolicy(r.Cluster, compSpec)
-	if err != nil {
+	if err != nil || schedulingPolicy == nil {
 		return dpv1alpha1.SchedulingSpec{}, err
 	}
 	return dpv1alpha1.SchedulingSpec{

@@ -148,7 +148,7 @@ type clusterSpecConverter struct {
 	Resources          ClusterResources                `json:"resources,omitempty"`
 	Storage            ClusterStorage                  `json:"storage,omitempty"`
 	Network            *ClusterNetwork                 `json:"network,omitempty"`
-	Components         map[string]clusterCompConverter `json:"Components,omitempty"`
+	Components         map[string]clusterCompConverter `json:"components,omitempty"`
 	Shardings          map[string]clusterCompConverter `json:"shardings,omitempty"`
 }
 

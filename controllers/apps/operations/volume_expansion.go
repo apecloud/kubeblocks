@@ -1,5 +1,4 @@
 /*
-/*
 Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project

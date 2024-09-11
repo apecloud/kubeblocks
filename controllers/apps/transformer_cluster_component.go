@@ -33,7 +33,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -403,7 +402,7 @@ type compNotExistPrecondition struct {
 
 func (c *compNotExistPrecondition) match(transCtx *clusterTransformContext, dag *graph.DAG, compName string) (bool, error) {
 	get := func(compKey types.NamespacedName) (bool, error) {
-		comp := &appsv1alpha1.Component{}
+		comp := &appsv1.Component{}
 		err := transCtx.Client.Get(transCtx.Context, compKey, comp)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
@@ -412,7 +411,7 @@ func (c *compNotExistPrecondition) match(transCtx *clusterTransformContext, dag 
 	}
 	dagCreate := func(compKey types.NamespacedName) bool {
 		graphCli, _ := transCtx.Client.(model.GraphClient)
-		comp := &appsv1alpha1.Component{
+		comp := &appsv1.Component{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: compKey.Namespace,
 				Name:      compKey.Name,
@@ -447,7 +446,7 @@ type compPhasePrecondition struct {
 func (c *compPhasePrecondition) match(transCtx *clusterTransformContext, dag *graph.DAG, compName string) (bool, error) {
 	dagGet := func(compKey types.NamespacedName) bool {
 		graphCli, _ := transCtx.Client.(model.GraphClient)
-		for _, obj := range graphCli.FindAll(dag, &appsv1alpha1.Component{}) {
+		for _, obj := range graphCli.FindAll(dag, &appsv1.Component{}) {
 			if client.ObjectKeyFromObject(obj) == compKey {
 				return true
 			}

@@ -15,10 +15,10 @@ run-name: Delete Release:${{ inputs.release-version }}
 jobs:
   delete-release:
     if: github.event_name != 'schedule'
-    uses: apecloud/apecloud-cd/.github/workflows/release-delete.yml@v0.1.38
+    uses: apecloud/apecloud-cd/.github/workflows/release-delete.yml@force_delete_release
     with:
       VERSION: "${{ inputs.release-version }}"
-      APECD_REF: "v0.1.38"
+      APECD_REF: "force_delete_release"
     secrets: inherit
 
   delete-release-schedule:

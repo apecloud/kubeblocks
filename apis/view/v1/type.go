@@ -95,7 +95,7 @@ type ObjectTreeNode struct {
 	// The secondary objects are collected by the rules specified in ReconciliationViewDefinition.
 	//
 	// +optional
-	Secondaries []ObjectTreeNode `json:"secondaries,omitempty"`
+	Secondaries []*ObjectTreeNode `json:"secondaries,omitempty"`
 }
 
 // ObjectChange defines a detailed change of an object.

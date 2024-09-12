@@ -59,7 +59,7 @@ func (t *componentAccountProvisionTransformer) Transform(ctx graph.TransformCont
 		return nil
 	}
 
-	if len(transCtx.SynthesizeComponent.SystemAccounts) > 0 {
+	if len(transCtx.SynthesizeComponent.SystemAccounts) == 0 {
 		return nil
 	}
 	if transCtx.Component.Status.Phase != appsv1alpha1.RunningClusterCompPhase {

@@ -80,6 +80,9 @@ func filterInPlaceFields(src *corev1.PodTemplateSpec) *corev1.PodTemplateSpec {
 	template.Spec.ActiveDeadlineSeconds = nil
 	// filter spec.tolerations
 	template.Spec.Tolerations = nil
+	// filter scheduling fields, they have no effect on running pods
+	template.Spec.NodeSelector = nil
+	template.Spec.NodeName = ""
 	// filter spec.containers[*].resources["cpu|memory"]
 	for i := range template.Spec.Containers {
 		delete(template.Spec.Containers[i].Resources.Requests, corev1.ResourceCPU)

@@ -84,6 +84,11 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		template2TotalReplicas[template.Name] = templateReplicas
 	}
 
+	podToNodeMapping, err := parseNodeSelectorOnceAnnotation(its)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+
 	for _, pod := range podList {
 		parentName, _ := ParseParentNameAndOrdinal(pod.Name)
 		templateName, _ := strings.CutPrefix(parentName, its.Name)
@@ -125,6 +130,11 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 				updatedReplicas++
 				template2TemplatesStatus[templateName].UpdatedReplicas++
 			}
+		}
+
+		if _, ok := podToNodeMapping[pod.Name]; ok {
+			delete(podToNodeMapping, pod.Name)
+			setNodeSelectorOnceAnnotation(its, podToNodeMapping)
 		}
 	}
 	its.Status.Replicas = replicas

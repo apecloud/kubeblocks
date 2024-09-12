@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
@@ -50,6 +51,32 @@ var _ = Describe("status reconciler test", func() {
 	})
 
 	Context("PreCondition & Reconcile", func() {
+		reconcilePods := func(tree *kubebuilderx.ObjectTree) {
+			By("fix meta")
+			reconciler = NewFixMetaReconciler()
+			res, err := reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Commit))
+
+			By("update revisions")
+			reconciler = NewRevisionUpdateReconciler()
+			res, err = reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+
+			By("assistant object")
+			reconciler = NewAssistantObjectReconciler()
+			res, err = reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+
+			By("replicas alignment")
+			reconciler = NewReplicasAlignmentReconciler()
+			res, err = reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+		}
+
 		It("should work well", func() {
 			By("PreCondition")
 			its.Generation = 1
@@ -74,34 +101,12 @@ var _ = Describe("status reconciler test", func() {
 			its.Spec.Instances = append(its.Spec.Instances, instanceFoo)
 
 			// prepare for update
-			By("fix meta")
-			reconciler = NewFixMetaReconciler()
-			res, err := reconciler.Reconcile(tree)
-			Expect(err).Should(BeNil())
-			Expect(res).Should(Equal(kubebuilderx.Commit))
-
-			By("update revisions")
-			reconciler = NewRevisionUpdateReconciler()
-			res, err = reconciler.Reconcile(tree)
-			Expect(err).Should(BeNil())
-			Expect(res).Should(Equal(kubebuilderx.Continue))
-
-			By("assistant object")
-			reconciler = NewAssistantObjectReconciler()
-			res, err = reconciler.Reconcile(tree)
-			Expect(err).Should(BeNil())
-			Expect(res).Should(Equal(kubebuilderx.Continue))
-
-			By("replicas alignment")
-			reconciler = NewReplicasAlignmentReconciler()
-			res, err = reconciler.Reconcile(tree)
-			Expect(err).Should(BeNil())
-			Expect(res).Should(Equal(kubebuilderx.Continue))
+			reconcilePods(tree)
 
 			By("all pods are not ready")
 			reconciler = NewStatusReconciler()
 			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ConditionSatisfied))
-			res, err = reconciler.Reconcile(tree)
+			res, err := reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
 			Expect(its.Status.Replicas).Should(BeEquivalentTo(0))
@@ -244,6 +249,20 @@ var _ = Describe("status reconciler test", func() {
 			Expect(its.Status.Conditions[2].Type).Should(BeEquivalentTo(workloads.InstanceFailure))
 			Expect(its.Status.Conditions[2].Reason).Should(BeEquivalentTo(workloads.ReasonInstanceFailure))
 			Expect(its.Status.Conditions[2].Message).Should(BeEquivalentTo(message))
+		})
+
+		It("updates nodeSelectorOnce Annotation", func() {
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(its)
+			reconcilePods(tree)
+
+			name := "bar-0"
+			setNodeSelectorOnceAnnotation(its, map[string]string{name: "foo"})
+			reconciler = NewStatusReconciler()
+			res, err := reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			Expect(its.Annotations[constant.NodeSelectorOnceAnnotationKey]).To(BeEmpty())
 		})
 	})
 

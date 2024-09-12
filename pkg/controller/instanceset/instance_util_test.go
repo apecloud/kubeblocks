@@ -213,6 +213,22 @@ var _ = Describe("instance util test", func() {
 			Expect(instance.pvcs[0].Labels[constant.VolumeClaimTemplateNameLabelKey]).Should(Equal(volumeClaimTemplates[0].Name))
 			Expect(instance.pvcs[0].Spec.Resources).Should(Equal(volumeClaimTemplates[0].Spec.Resources))
 		})
+
+		It("adds nodeSelector according to annotation", func() {
+			itsExt, err := buildInstanceSetExt(its, nil)
+			Expect(err).Should(BeNil())
+			nameTemplate, err := buildInstanceName2TemplateMap(itsExt)
+			Expect(err).Should(BeNil())
+			name := name + "-0"
+			Expect(nameTemplate).Should(HaveKey(name))
+			template := nameTemplate[name]
+
+			node := "test-node-1"
+			setNodeSelectorOnceAnnotation(its, map[string]string{name: node})
+			instance, err := buildInstanceByTemplate(name, template, its, "")
+
+			Expect(instance.pod.Spec.NodeSelector[corev1.LabelHostname]).To(Equal(node))
+		})
 	})
 
 	Context("buildInstancePVCByTemplate", func() {

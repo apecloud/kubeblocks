@@ -15,7 +15,7 @@
 # Variables                                                                    #
 ################################################################################
 APP_NAME = kubeblocks
-VERSION ?= 0.8.0-alpha.0
+VERSION ?= 0.9.0
 GITHUB_PROXY ?=
 INIT_ENV ?= false
 TEST_TYPE ?= wesql

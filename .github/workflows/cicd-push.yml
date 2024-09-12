@@ -105,7 +105,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        ops: [ 'manifests', 'mod-vendor', 'generate', 'lint', 'staticcheck' ]
+        ops: [ 'manifests', 'mod-vendor', 'generate', 'lint', 'staticcheck', 'test' ]
     steps:
       - uses: actions/checkout@v4
       - name: install lib
@@ -136,25 +136,15 @@ jobs:
               exit 1
           fi
 
-  push-make-test:
-    needs: trigger-mode
-    runs-on: [self-hosted, gke-runner-go1.21]
-    if: contains(needs.trigger-mode.outputs.trigger-mode, '[test]')
-    outputs:
-      runner-name: ${{ steps.get_runner_name.outputs.runner_name }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: make test
-        run: |
-          make test
-
       - name: ignore cover pkgs
+        if: matrix.ops == 'test'
         run: |
           bash .github/utils/utils.sh --type 14 \
               --file cover.out \
               --ignore-pkgs "${{ vars.IGNORE_COVERAGE_PKG }}"
 
       - name: upload coverage report
+        if: matrix.ops == 'test'
         uses: codecov/codecov-action@v3
         continue-on-error: true
         with:
@@ -163,25 +153,6 @@ jobs:
           flags: unittests
           name: codecov-report
           verbose: true
-
-      - name: kill kube-apiserver and etcd
-        id: get_runner_name
-        if: ${{ always() }}
-        run: |
-          echo runner_name=${RUNNER_NAME} >> $GITHUB_OUTPUT
-          bash .github/utils/utils.sh --type 8
-
-  remove-runner:
-    needs: [ trigger-mode, push-make-test ]
-    runs-on: ubuntu-latest
-    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[test]') && always() }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: remove runner
-        run: |
-          bash .github/utils/utils.sh --type 9 \
-            --github-token "${{ env.GITHUB_TOKEN }}" \
-            --runner-name ${{ needs.push-make-test.outputs.runner-name }}
 
   check-image:
     needs: trigger-mode
@@ -312,7 +283,7 @@ jobs:
 
   push-check:
     name: make-test
-    needs: [ trigger-mode, push-pre-check, push-make-test, check-image, check-tools-image,
+    needs: [ trigger-mode, push-pre-check, check-image, check-tools-image,
              check-datascript-image, check-dataprotection-image, check-helm, apis-doc, check-license-header ]
     if: ${{ always() }}
     runs-on: ubuntu-latest
@@ -321,13 +292,6 @@ jobs:
         run: |
           if [[ "${{ needs.push-pre-check.result }}" == "failure" || "${{ needs.push-pre-check.result }}" == "cancelled" ]]; then
               echo "push pre check fail"
-              exit 1
-          fi
-
-      - name: make test check
-        run: |
-          if [[ "${{ needs.push-make-test.result }}" == "failure" || "${{ needs.push-make-test.result }}" == "cancelled" ]]; then
-              echo "make test fail"
               exit 1
           fi
 

@@ -406,6 +406,10 @@ func checkNRollbackProtoImages(itsObj, itsProto *workloads.InstanceSet) {
 	for i, cc := range [][]corev1.Container{itsObj.Spec.Template.Spec.InitContainers, itsObj.Spec.Template.Spec.Containers} {
 		images[i] = make(map[string]string)
 		for _, c := range cc {
+			// skip the kb-agent container
+			if component.IsKBAgentContainer(&c) {
+				continue
+			}
 			images[i][c.Name] = c.Image
 		}
 	}

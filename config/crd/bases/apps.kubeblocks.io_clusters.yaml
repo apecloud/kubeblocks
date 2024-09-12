@@ -405,8 +405,10 @@ spec:
                       type: object
                     componentDef:
                       description: |-
-                        References the name of a ComponentDefinition object.
-                        The ComponentDefinition specifies the behavior and characteristics of the Component.
+                        Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
+                        custom resource (CR) that defines the Component's characteristics and behavior.
+
+
                         If both `componentDefRef` and `componentDef` are provided,
                         the `componentDef` will take precedence over `componentDefRef`.
                       maxLength: 64
@@ -9525,8 +9527,10 @@ spec:
                           type: object
                         componentDef:
                           description: |-
-                            References the name of a ComponentDefinition object.
-                            The ComponentDefinition specifies the behavior and characteristics of the Component.
+                            Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
+                            custom resource (CR) that defines the Component's characteristics and behavior.
+
+
                             If both `componentDefRef` and `componentDef` are provided,
                             the `componentDef` will take precedence over `componentDefRef`.
                           maxLength: 64
@@ -16963,6 +16967,7 @@ spec:
                   - `DoNotTerminate`: Prevents deletion of the Cluster. This policy ensures that all resources remain intact.
                   - `Halt`: Deletes Cluster resources like Pods and Services but retains Persistent Volume Claims (PVCs),
                     allowing for data preservation while stopping other operations.
+                     Warning: Halt policy is deprecated in 0.9.1 and will have same meaning as DoNotTerminate.
                   - `Delete`: Extends the `Halt` policy by also removing PVCs, leading to a thorough cleanup while
                     removing all persistent data.
                   - `WipeOut`: An aggressive policy that deletes all Cluster resources, including volume snapshots and

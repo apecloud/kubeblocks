@@ -110,7 +110,7 @@ type ObjectChange struct {
 	// ObjectUpdate - specifies that this is an object update.
 	// ObjectDeletion - specifies that this is an object deletion.
 	//
-	// +kubebuilder:validation:Enum={Event,ObjectCreation, ObjectUpdate, ObjectDeletion}
+	// +kubebuilder:validation:Enum={Event, ObjectCreation, ObjectUpdate, ObjectDeletion}
 	Type string `json:"type"`
 
 	// EventAttributes specifies the attributes of the event when Type is Event.

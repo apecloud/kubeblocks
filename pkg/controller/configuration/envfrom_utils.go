@@ -143,7 +143,7 @@ func createEnvFromConfigmap(cluster *appsv1.Cluster, componentName string, templ
 	cm.Name = cmKey.Name
 	cm.Namespace = cmKey.Namespace
 	cm.Data = envMap
-	cm.Labels = constant.GetKBConfigMapWellKnownLabels(template.Name, cluster.Spec.ClusterDefRef, cluster.Name, componentName)
+	cm.Labels = constant.GetKBConfigMapWellKnownLabels(template.Name, cluster.Spec.ClusterDef, cluster.Name, componentName)
 	if err := intctrlutil.SetOwnerReference(cluster, cm); err != nil {
 		return nil, err
 	}

@@ -99,6 +99,7 @@ func (r *Cluster) incrementConvertFrom(srcRaw metav1.Object, ic incrementChange)
 func (r *Cluster) changesToCluster(cluster *appsv1.Cluster) {
 	// changed:
 	//   spec
+	//     clusterDefRef -> clusterDef
 	//     components
 	//       - volumeClaimTemplates
 	//           spec:
@@ -113,11 +114,15 @@ func (r *Cluster) changesToCluster(cluster *appsv1.Cluster) {
 	//   status
 	//     components
 	//       - message: ComponentMessageMap -> map[string]string
+	if len(r.Spec.ClusterDefRef) > 0 {
+		cluster.Spec.ClusterDef = r.Spec.ClusterDefRef
+	}
 }
 
 func (r *Cluster) changesFromCluster(cluster *appsv1.Cluster) {
 	// changed:
 	//   spec
+	//     clusterDefRef -> clusterDef
 	//     components
 	//       - volumeClaimTemplates
 	//           spec:
@@ -132,6 +137,9 @@ func (r *Cluster) changesFromCluster(cluster *appsv1.Cluster) {
 	//   status
 	//     components
 	//       - message: ComponentMessageMap -> map[string]string
+	if len(cluster.Spec.ClusterDef) > 0 {
+		r.Spec.ClusterDefRef = cluster.Spec.ClusterDef
+	}
 }
 
 type clusterConverter struct {
@@ -140,6 +148,7 @@ type clusterConverter struct {
 }
 
 type clusterSpecConverter struct {
+	ClusterVersionRef  string                          `json:"clusterVersionRef,omitempty"`
 	Affinity           *Affinity                       `json:"affinity,omitempty"`
 	Tolerations        []corev1.Toleration             `json:"tolerations,omitempty"`
 	Tenancy            TenancyType                     `json:"tenancy,omitempty"`
@@ -153,11 +162,16 @@ type clusterSpecConverter struct {
 }
 
 type clusterCompConverter struct {
+	ComponentDefRef        string                  `json:"componentDefRef,omitempty"`
 	ClassDefRef            *ClassDefRef            `json:"classDefRef,omitempty"`
+	EnabledLogs            []string                `json:"enabledLogs,omitempty"`
 	Affinity               *Affinity               `json:"affinity,omitempty"`
 	Tolerations            []corev1.Toleration     `json:"tolerations,omitempty"`
 	SwitchPolicy           *ClusterSwitchPolicy    `json:"switchPolicy,omitempty"`
+	UserResourceRefs       *UserResourceRefs       `json:"userResourceRefs,omitempty"`
+	UpdateStrategy         *UpdateStrategy         `json:"updateStrategy,omitempty"`
 	InstanceUpdateStrategy *InstanceUpdateStrategy `json:"instanceUpdateStrategy,omitempty"`
+	Monitor                *bool                   `json:"monitor,omitempty"`
 }
 
 type clusterStatusConverter struct {
@@ -171,6 +185,7 @@ type clusterCompStatusConverter struct {
 }
 
 func (c *clusterConverter) fromCluster(cluster *Cluster) {
+	c.Spec.ClusterVersionRef = cluster.Spec.ClusterVersionRef
 	c.Spec.Affinity = cluster.Spec.Affinity
 	c.Spec.Tolerations = cluster.Spec.Tolerations
 	c.Spec.Tenancy = cluster.Spec.Tenancy
@@ -182,11 +197,16 @@ func (c *clusterConverter) fromCluster(cluster *Cluster) {
 
 	deletedComp := func(spec ClusterComponentSpec) clusterCompConverter {
 		return clusterCompConverter{
+			ComponentDefRef:        spec.ComponentDefRef,
 			ClassDefRef:            spec.ClassDefRef,
+			EnabledLogs:            spec.EnabledLogs,
 			Affinity:               spec.Affinity,
 			Tolerations:            spec.Tolerations,
 			SwitchPolicy:           spec.SwitchPolicy,
+			UserResourceRefs:       spec.UserResourceRefs,
+			UpdateStrategy:         spec.UpdateStrategy,
 			InstanceUpdateStrategy: spec.InstanceUpdateStrategy,
+			Monitor:                spec.Monitor,
 		}
 	}
 	for _, comp := range cluster.Spec.ComponentSpecs {
@@ -206,6 +226,7 @@ func (c *clusterConverter) fromCluster(cluster *Cluster) {
 }
 
 func (c *clusterConverter) toCluster(cluster *Cluster) {
+	cluster.Spec.ClusterVersionRef = c.Spec.ClusterVersionRef
 	cluster.Spec.Affinity = c.Spec.Affinity
 	cluster.Spec.Tolerations = c.Spec.Tolerations
 	cluster.Spec.Tenancy = c.Spec.Tenancy
@@ -216,11 +237,16 @@ func (c *clusterConverter) toCluster(cluster *Cluster) {
 	cluster.Spec.Network = c.Spec.Network
 
 	deletedComp := func(comp clusterCompConverter, spec *ClusterComponentSpec) {
+		spec.ComponentDefRef = comp.ComponentDefRef
 		spec.ClassDefRef = comp.ClassDefRef
+		spec.EnabledLogs = comp.EnabledLogs
 		spec.Affinity = comp.Affinity
 		spec.Tolerations = comp.Tolerations
 		spec.SwitchPolicy = comp.SwitchPolicy
+		spec.UserResourceRefs = comp.UserResourceRefs
+		spec.UpdateStrategy = comp.UpdateStrategy
 		spec.InstanceUpdateStrategy = comp.InstanceUpdateStrategy
+		spec.Monitor = comp.Monitor
 	}
 	for i, spec := range cluster.Spec.ComponentSpecs {
 		comp, ok := c.Spec.Components[spec.Name]

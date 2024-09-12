@@ -252,7 +252,7 @@ func buildServiceAccount(transCtx *componentTransformContext) (*corev1.ServiceAc
 	)
 
 	// TODO(component): dependency on cluster definition
-	backupPolicyTPL, err := getDefaultBackupPolicyTemplate(transCtx, cluster.Spec.ClusterDefRef)
+	backupPolicyTPL, err := getDefaultBackupPolicyTemplate(transCtx, cluster.Spec.ClusterDef)
 	if err != nil {
 		return nil, false, err
 	}

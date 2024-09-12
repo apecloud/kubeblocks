@@ -61,11 +61,6 @@ func (t *clusterServiceTransformer) Transform(ctx graph.TransformContext, dag *g
 		return err
 	}
 
-	convertedServices, err := t.convertLegacyClusterCompSpecServices(transCtx, cluster)
-	if err != nil {
-		return err
-	}
-
 	handleServiceFunc := func(origSvc, genSvc *appsv1.ClusterService) error {
 		service, err := t.buildService(transCtx, cluster, origSvc, genSvc)
 		if err != nil {
@@ -95,71 +90,11 @@ func (t *clusterServiceTransformer) Transform(ctx graph.TransformContext, dag *g
 		}
 	}
 
-	for i := range convertedServices {
-		if err = handleServiceFunc(&convertedServices[i], &convertedServices[i]); err != nil {
-			return err
-		}
-	}
-
 	for svc := range services {
 		graphCli.Delete(dag, services[svc])
 	}
 
 	return nil
-}
-
-// convertLegacyClusterCompSpecServices converts legacy services defined in Cluster.Spec.ComponentSpecs[x].Services to Cluster.Spec.Services.
-func (t *clusterServiceTransformer) convertLegacyClusterCompSpecServices(transCtx *clusterTransformContext, cluster *appsv1.Cluster) ([]appsv1.ClusterService, error) {
-	// don't convert services if the cluster has defined in new API
-	if withClusterTopology(cluster) || withClusterUserDefined(cluster) {
-		return nil, nil
-	}
-
-	convertedServices := make([]appsv1.ClusterService, 0)
-	for _, compSpec := range transCtx.ComponentSpecs {
-		if len(compSpec.Services) == 0 {
-			continue
-		}
-
-		// We only handle legacy services defined based on Cluster.Spec.ComponentSpecs[x].Services prior to version 0.8.0 of kubeblocks.
-		// After kubeblocks 0.8.0 it should be defined via Cluster.Spec.Services.
-		if transCtx.ClusterDef == nil || len(compSpec.ComponentDefRef) == 0 {
-			continue
-		}
-
-		// TODO(v1.0): compatible with legacy cluster services
-		// clusterCompDef := transCtx.ClusterDef.GetComponentDefByName(compSpec.ComponentDefRef)
-		// if clusterCompDef == nil {
-		//	continue
-		// }
-		//
-		// for _, item := range compSpec.Services {
-		//	legacyService := &appsv1.ClusterService{
-		//		Service: appsv1.Service{
-		//			Name:        constant.GenerateClusterServiceName(cluster.Name, item.Name),
-		//			ServiceName: constant.GenerateClusterServiceName(cluster.Name, item.Name),
-		//			Annotations: item.Annotations,
-		//			Spec: corev1.ServiceSpec{
-		//				Ports: []corev1.ServicePort{},
-		//				Type:  item.ServiceType,
-		//			},
-		//		},
-		//		ComponentSelector: compSpec.Name,
-		//	}
-		//	legacyServiceName := constant.GenerateComponentServiceName(cluster.Name, compSpec.Name, item.Name)
-		//	legacyServiceExist, err := checkLegacyServiceExist(transCtx, legacyServiceName, cluster.Namespace)
-		//	if err != nil {
-		//		return nil, err
-		//	}
-		//	// the generation converted service name is different with the exist legacy service name, if the legacy service exist, we should use the legacy service name
-		//	if legacyServiceExist {
-		//		legacyService.Name = legacyServiceName
-		//		legacyService.ServiceName = legacyServiceName
-		//	}
-		//	convertedServices = append(convertedServices, *legacyService)
-		// }
-	}
-	return convertedServices, nil
 }
 
 func (t *clusterServiceTransformer) buildService(transCtx *clusterTransformContext, cluster *appsv1.Cluster,

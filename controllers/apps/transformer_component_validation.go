@@ -47,9 +47,6 @@ func (t *componentValidationTransformer) Transform(ctx graph.TransformContext, d
 		setProvisioningStartedCondition(&comp.Status.Conditions, comp.Name, comp.Generation, err)
 	}()
 
-	if err = validateEnabledLogs(comp, transCtx.CompDef); err != nil {
-		return newRequeueError(requeueDuration, err.Error())
-	}
 	if err = validateCompReplicas(comp, transCtx.CompDef); err != nil {
 		return newRequeueError(requeueDuration, err.Error())
 	}
@@ -57,34 +54,6 @@ func (t *componentValidationTransformer) Transform(ctx graph.TransformContext, d
 	// 	return newRequeueError(requeueDuration, err.Error())
 	// }
 	return nil
-}
-
-func validateEnabledLogs(comp *appsv1.Component, compDef *appsv1.ComponentDefinition) error {
-	invalidLogNames := validateEnabledLogConfigs(compDef, comp.Spec.EnabledLogs)
-	if len(invalidLogNames) > 0 {
-		return fmt.Errorf("logs %s are not defined in the definition", invalidLogNames)
-	}
-	return nil
-}
-
-func validateEnabledLogConfigs(compDef *appsv1.ComponentDefinition, enabledLogs []string) []string {
-	invalidLogNames := make([]string, 0, len(enabledLogs))
-	logTypes := make(map[string]struct{})
-
-	for _, logConfig := range compDef.Spec.LogConfigs {
-		logTypes[logConfig.Name] = struct{}{}
-	}
-
-	// imply that all values in enabledLogs config are invalid.
-	if len(logTypes) == 0 {
-		return enabledLogs
-	}
-	for _, name := range enabledLogs {
-		if _, ok := logTypes[name]; !ok {
-			invalidLogNames = append(invalidLogNames, name)
-		}
-	}
-	return invalidLogNames
 }
 
 func validateCompReplicas(comp *appsv1.Component, compDef *appsv1.ComponentDefinition) error {

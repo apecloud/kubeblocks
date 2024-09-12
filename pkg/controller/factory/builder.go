@@ -384,7 +384,7 @@ func BuildVolumeSnapshotClass(name string, driver string) *snapshotv1.VolumeSnap
 
 func BuildServiceAccount(cluster *appsv1.Cluster, saName string) *corev1.ServiceAccount {
 	// TODO(component): compName
-	wellKnownLabels := constant.GetKBWellKnownLabels(cluster.Spec.ClusterDefRef, cluster.Name, "")
+	wellKnownLabels := constant.GetKBWellKnownLabels(cluster.Spec.ClusterDef, cluster.Name, "")
 	return builder.NewServiceAccountBuilder(cluster.Namespace, saName).
 		AddLabelsInMap(wellKnownLabels).
 		SetImagePullSecrets(intctrlutil.BuildImagePullSecrets()).
@@ -393,7 +393,7 @@ func BuildServiceAccount(cluster *appsv1.Cluster, saName string) *corev1.Service
 
 func BuildRoleBinding(cluster *appsv1.Cluster, saName string) *rbacv1.RoleBinding {
 	// TODO(component): compName
-	wellKnownLabels := constant.GetKBWellKnownLabels(cluster.Spec.ClusterDefRef, cluster.Name, "")
+	wellKnownLabels := constant.GetKBWellKnownLabels(cluster.Spec.ClusterDef, cluster.Name, "")
 	return builder.NewRoleBindingBuilder(cluster.Namespace, saName).
 		AddLabelsInMap(wellKnownLabels).
 		SetRoleRef(rbacv1.RoleRef{
@@ -411,7 +411,7 @@ func BuildRoleBinding(cluster *appsv1.Cluster, saName string) *rbacv1.RoleBindin
 
 func BuildClusterRoleBinding(cluster *appsv1.Cluster, saName string) *rbacv1.ClusterRoleBinding {
 	// TODO(component): compName
-	wellKnownLabels := constant.GetKBWellKnownLabels(cluster.Spec.ClusterDefRef, cluster.Name, "")
+	wellKnownLabels := constant.GetKBWellKnownLabels(cluster.Spec.ClusterDef, cluster.Name, "")
 	return builder.NewClusterRoleBindingBuilder(cluster.Namespace, saName).
 		AddLabelsInMap(wellKnownLabels).
 		SetRoleRef(rbacv1.RoleRef{

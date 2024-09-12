@@ -197,11 +197,6 @@ func (in *ClusterComponentSpec) DeepCopyInto(out *ClusterComponentSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.EnabledLogs != nil {
-		in, out := &in.EnabledLogs, &out.EnabledLogs
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	}
 	if in.Labels != nil {
 		in, out := &in.Labels, &out.Labels
 		*out = make(map[string]string, len(*in))
@@ -269,11 +264,6 @@ func (in *ClusterComponentSpec) DeepCopyInto(out *ClusterComponentSpec) {
 		*out = new(Issuer)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.UpdateStrategy != nil {
-		in, out := &in.UpdateStrategy, &out.UpdateStrategy
-		*out = new(UpdateStrategy)
-		**out = **in
-	}
 	if in.ParallelPodManagementConcurrency != nil {
 		in, out := &in.ParallelPodManagementConcurrency, &out.ParallelPodManagementConcurrency
 		*out = new(intstr.IntOrString)
@@ -283,11 +273,6 @@ func (in *ClusterComponentSpec) DeepCopyInto(out *ClusterComponentSpec) {
 		in, out := &in.PodUpdatePolicy, &out.PodUpdatePolicy
 		*out = new(PodUpdatePolicyType)
 		**out = **in
-	}
-	if in.UserResourceRefs != nil {
-		in, out := &in.UserResourceRefs, &out.UserResourceRefs
-		*out = new(UserResourceRefs)
-		(*in).DeepCopyInto(*out)
 	}
 	if in.Instances != nil {
 		in, out := &in.Instances, &out.Instances
@@ -303,11 +288,6 @@ func (in *ClusterComponentSpec) DeepCopyInto(out *ClusterComponentSpec) {
 	}
 	if in.DisableExporter != nil {
 		in, out := &in.DisableExporter, &out.DisableExporter
-		*out = new(bool)
-		**out = **in
-	}
-	if in.Monitor != nil {
-		in, out := &in.Monitor, &out.Monitor
 		*out = new(bool)
 		**out = **in
 	}
@@ -1196,11 +1176,6 @@ func (in *ComponentSpec) DeepCopyInto(out *ComponentSpec) {
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
-	}
-	if in.EnabledLogs != nil {
-		in, out := &in.EnabledLogs, &out.EnabledLogs
-		*out = make([]string, len(*in))
-		copy(*out, *in)
 	}
 	if in.ParallelPodManagementConcurrency != nil {
 		in, out := &in.ParallelPodManagementConcurrency, &out.ParallelPodManagementConcurrency

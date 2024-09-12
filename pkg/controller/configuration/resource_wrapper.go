@@ -127,7 +127,7 @@ func (r *ResourceFetcher[T]) ComponentAndComponentDef() *T {
 func (r *ResourceFetcher[T]) ClusterDef() *T {
 	clusterDefKey := client.ObjectKey{
 		Namespace: "",
-		Name:      r.ClusterObj.Spec.ClusterDefRef,
+		Name:      r.ClusterObj.Spec.ClusterDef,
 	}
 	return r.Wrap(func() error {
 		r.ClusterDefObj = &appsv1.ClusterDefinition{}

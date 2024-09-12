@@ -134,8 +134,7 @@ spec:
                     description: |-
                       Secondaries describes all the secondary objects of this object, if any.
                       The secondary objects are collected by the rules specified in ReconciliationViewDefinition.
-                    items: {}
-                    type: array
+                    x-kubernetes-preserve-unknown-fields: true
                 required:
                 - objectReference
                 type: object
@@ -190,8 +189,7 @@ spec:
                     description: |-
                       Secondaries describes all the secondary objects of this object, if any.
                       The secondary objects are collected by the rules specified in ReconciliationViewDefinition.
-                    items: {}
-                    type: array
+                    x-kubernetes-preserve-unknown-fields: true
                 required:
                 - objectReference
                 type: object

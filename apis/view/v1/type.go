@@ -94,6 +94,8 @@ type ObjectTreeNode struct {
 	// Secondaries describes all the secondary objects of this object, if any.
 	// The secondary objects are collected by the rules specified in ReconciliationViewDefinition.
 	//
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +kubebuilder:validation:Schemaless
 	// +optional
 	Secondaries []*ObjectTreeNode `json:"secondaries,omitempty"`
 }

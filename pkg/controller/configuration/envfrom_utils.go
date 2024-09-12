@@ -250,7 +250,7 @@ func fromConfigSpec(configSpec appsv1alpha1.ComponentConfigSpec, cm *corev1.Conf
 	return keys
 }
 
-func SyncEnvConfigmap(configSpec appsv1alpha1.ComponentConfigSpec, cmObj *corev1.ConfigMap, cc *appsv1beta1.ConfigConstraintSpec, cli client.Client, ctx context.Context, cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) error {
+func SyncEnvSourceObject(configSpec appsv1alpha1.ComponentConfigSpec, cmObj *corev1.ConfigMap, cc *appsv1beta1.ConfigConstraintSpec, cli client.Client, ctx context.Context, cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) error {
 	if !configSpec.InjectEnvEnabled() || cc == nil || cc.FileFormatConfig == nil {
 		return nil
 	}

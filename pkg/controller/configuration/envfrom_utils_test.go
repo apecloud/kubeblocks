@@ -114,7 +114,7 @@ var _ = Describe("ConfigEnvFrom test", func() {
 			Expect(injectTemplateEnvFrom(cluster, synthesizeComp, podSpec, k8sMockClient.Client(), reqCtx.Ctx, nil)).Should(Succeed())
 		})
 
-		It("should SyncEnvConfigmap success", func() {
+		It("should SyncEnvSourceObject success", func() {
 			configSpec := compDef.Spec.Configs[0]
 			configSpec.Keys = []string{"env-config"}
 
@@ -137,11 +137,11 @@ var _ = Describe("ConfigEnvFrom test", func() {
 			k8sMockClient.MockUpdateMethod(testutil.WithFailed(core.MakeError("failed to patch"), testutil.WithTimes(1)),
 				testutil.WithSucceed(), testutil.WithAnyTimes())
 
-			Expect(SyncEnvConfigmap(configSpec, origCMObject, &configConstraint.Spec, k8sMockClient.Client(), ctx, cluster, synthesizeComp)).ShouldNot(Succeed())
-			Expect(SyncEnvConfigmap(configSpec, origCMObject, &configConstraint.Spec, k8sMockClient.Client(), ctx, cluster, synthesizeComp)).Should(Succeed())
+			Expect(SyncEnvSourceObject(configSpec, origCMObject, &configConstraint.Spec, k8sMockClient.Client(), ctx, cluster, synthesizeComp)).ShouldNot(Succeed())
+			Expect(SyncEnvSourceObject(configSpec, origCMObject, &configConstraint.Spec, k8sMockClient.Client(), ctx, cluster, synthesizeComp)).Should(Succeed())
 		})
 
-		It("SyncEnvConfigmap abnormal test", func() {
+		It("SyncEnvSourceObject abnormal test", func() {
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx: ctx,
 				Log: logger,
@@ -154,7 +154,7 @@ var _ = Describe("ConfigEnvFrom test", func() {
 
 			configSpec := compDef.Spec.Configs[0]
 			configSpec.InjectEnvTo = nil
-			Expect(SyncEnvConfigmap(configSpec, origCMObject, &configConstraint.Spec, k8sMockClient.Client(), ctx, cluster, synthesizeComp)).Should(Succeed())
+			Expect(SyncEnvSourceObject(configSpec, origCMObject, &configConstraint.Spec, k8sMockClient.Client(), ctx, cluster, synthesizeComp)).Should(Succeed())
 
 			configSpec.InjectEnvTo = nil
 			cmObj := origCMObject.DeepCopy()
@@ -167,7 +167,7 @@ var _ = Describe("ConfigEnvFrom test", func() {
 
 			configSpec = compDef.Spec.Configs[0]
 			configSpec.Keys = []string{"env-config", "not-exist"}
-			Expect(SyncEnvConfigmap(configSpec, origCMObject, &configConstraint.Spec, k8sMockClient.Client(), ctx, cluster, synthesizeComp)).Should(Succeed())
+			Expect(SyncEnvSourceObject(configSpec, origCMObject, &configConstraint.Spec, k8sMockClient.Client(), ctx, cluster, synthesizeComp)).Should(Succeed())
 		})
 	})
 })

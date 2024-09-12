@@ -366,7 +366,7 @@ func (p *updatePipeline) UpdateConfigVersion(revision string) *updatePipeline {
 func (p *updatePipeline) Sync() *updatePipeline {
 	return p.Wrap(func() error {
 		if p.ConfigConstraintObj != nil && !p.isDone() {
-			if err := SyncEnvConfigmap(*p.configSpec, p.newCM, &p.ConfigConstraintObj.Spec, p.Client, p.Context, p.ctx.Cluster, p.ctx.SynthesizedComponent); err != nil {
+			if err := SyncEnvSourceObject(*p.configSpec, p.newCM, &p.ConfigConstraintObj.Spec, p.Client, p.Context, p.ctx.Cluster, p.ctx.SynthesizedComponent); err != nil {
 				return err
 			}
 		}

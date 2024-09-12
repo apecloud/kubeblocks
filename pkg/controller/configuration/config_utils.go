@@ -41,12 +41,13 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-func createConfigObjects(cli client.Client, ctx context.Context, objs []client.Object, secretObjs []client.Object) error {
+func createConfigObjects(cli client.Client, ctx context.Context, objs []client.Object, excludeObjs []client.Object) error {
 	for _, obj := range objs {
-		if slices.Contains(secretObjs, obj) {
+		if slices.Contains(excludeObjs, obj) {
 			continue
 		}
 		if err := cli.Create(ctx, obj, inDataContext()); err != nil {
+
 			if !apierrors.IsAlreadyExists(err) {
 				return err
 			}

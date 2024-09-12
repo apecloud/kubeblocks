@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -59,9 +58,6 @@ func NewInstanceSetFactory(namespace, name string, clusterName string, component
 							constant.AppManagedByLabelKey:   constant.AppName,
 						},
 					},
-				},
-				UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
-					Type: appsv1.OnDeleteStatefulSetStrategyType,
 				},
 			},
 		}, f)

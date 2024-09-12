@@ -123,6 +123,7 @@ var _ = Describe("update plan test.", func() {
 			By("build a serial plan")
 			strategy := workloads.SerialUpdateStrategy
 			its.Spec.MemberUpdateStrategy = &strategy
+			its.Spec.UpdateStrategy.MemberUpdateStrategy = &strategy
 			expectedPlan := [][]*corev1.Pod{
 				{pod4},
 				{pod2},
@@ -139,6 +140,7 @@ var _ = Describe("update plan test.", func() {
 			By("build a serial plan")
 			strategy := workloads.SerialUpdateStrategy
 			its.Spec.MemberUpdateStrategy = &strategy
+			its.Spec.UpdateStrategy.MemberUpdateStrategy = &strategy
 			expectedPlan := [][]*corev1.Pod{
 				{pod4},
 				{pod2},
@@ -155,6 +157,7 @@ var _ = Describe("update plan test.", func() {
 			By("build a parallel plan")
 			strategy := workloads.ParallelUpdateStrategy
 			its.Spec.MemberUpdateStrategy = &strategy
+			its.Spec.UpdateStrategy.MemberUpdateStrategy = &strategy
 			expectedPlan := [][]*corev1.Pod{
 				{pod0, pod1, pod2, pod3, pod4, pod5, pod6},
 			}
@@ -165,6 +168,7 @@ var _ = Describe("update plan test.", func() {
 			By("build a best effort parallel plan")
 			strategy := workloads.BestEffortParallelUpdateStrategy
 			its.Spec.MemberUpdateStrategy = &strategy
+			its.Spec.UpdateStrategy.MemberUpdateStrategy = &strategy
 			expectedPlan := [][]*corev1.Pod{
 				{pod2, pod3, pod4, pod6},
 				{pod1},
@@ -178,6 +182,7 @@ var _ = Describe("update plan test.", func() {
 			By("build a serial plan with role-less and heterogeneous pods")
 			strategy := workloads.SerialUpdateStrategy
 			its.Spec.MemberUpdateStrategy = &strategy
+			its.Spec.UpdateStrategy.MemberUpdateStrategy = &strategy
 			its.Spec.Roles = nil
 			for _, pod := range []*corev1.Pod{pod0, pod1, pod2, pod3, pod4, pod5, pod6} {
 				labels := pod.Labels

@@ -34,8 +34,9 @@ type ReconciliationPlanSpec struct {
 	// DesiredSpec specifies desired spec of the Cluster object.
 	// The desired spec will be merged into the current spec in the same way as `kubectl apply` to build the final spec,
 	// and the reconciliation plan will be calculated by comparing the current spec to the final spec.
+	// DesiredSpec should be a valid YAML string.
 	//
-	DesiredSpec any `json:"desiredSpec"`
+	DesiredSpec string `json:"desiredSpec"`
 
 	// Depth of the object tree.
 	// Default is 1, means the top primary object only.

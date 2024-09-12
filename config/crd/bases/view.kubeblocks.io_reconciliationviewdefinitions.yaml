@@ -1,0 +1,188 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+  labels:
+    app.kubernetes.io/name: kubeblocks
+  name: reconciliationviewdefinitions.view.kubeblocks.io
+spec:
+  group: view.kubeblocks.io
+  names:
+    kind: ReconciliationViewDefinition
+    listKind: ReconciliationViewDefinitionList
+    plural: reconciliationviewdefinitions
+    singular: reconciliationviewdefinition
+  scope: Namespaced
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: ReconciliationViewDefinition is the Schema for the reconciliationviewdefinitions
+          API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ReconciliationViewDefinitionSpec defines the desired state
+              of ReconciliationViewDefinition
+            properties:
+              i18nResourceRef:
+                description: |-
+                  I18nResourceRef specifies the ConfigMap object that contains the i18n resources
+                  which are used to make the View/Plan Status more user-friendly.
+                properties:
+                  name:
+                    description: |-
+                      Name of the referent.
+                      Default is same as the ReconciliationPlan object.
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent.
+                      Default is same as the ReconciliationPlan object.
+                    type: string
+                type: object
+              locale:
+                description: Locale specifies the default locale.
+                type: string
+              ownershipRules:
+                description: |-
+                  OwnershipRules specifies ownership rules to build the object tree.
+                  A primary object and all its recursive secondary objects compose an object tree.
+                items:
+                  description: OwnershipRule defines an ownership rule between primary
+                    resource and its secondary resources.
+                  properties:
+                    ownedResources:
+                      description: OwnedResources specifies all the secondary resources
+                        of Primary.
+                      items:
+                        description: OwnedResource defines a secondary resource and
+                          the ownership criteria between its primary resource.
+                        properties:
+                          criteria:
+                            description: Criteria specifies the ownership criteria
+                              with its primary resource.
+                            properties:
+                              builtinRelationshipCriteria:
+                                description: |-
+                                  BuiltinRelationshipCriteria specifies to use the well-known builtin relationship between some primary resource with its secondary resources.
+                                  Currently supported resources:
+                                  PVC-PV pair.
+                                type: boolean
+                              labelCriteria:
+                                additionalProperties:
+                                  type: string
+                                description: |-
+                                  LabelCriteria specifies the labels used to select the secondary objects.
+                                  The value of each k-v pair can contain placeholder that will be replaced by the ReconciliationView Controller.
+                                  Placeholder is formatted as "$(PLACEHOLDER)".
+                                  Currently supported PLACEHOLDER:
+                                  primary.name - the name of the primary object.
+                                type: object
+                              selectorCriteria:
+                                description: |-
+                                  SelectorCriteria specifies the selector field path in the primary object.
+                                  For example, if the StatefulSet is the primary resource, selector will be "spec.selector".
+                                  The selector field should be a map[string]string
+                                  or LabelSelector (https://kubernetes.io/docs/reference/kubernetes-api/common-definitions/label-selector/#LabelSelector)
+                                properties:
+                                  path:
+                                    description: Path of the field.
+                                    type: string
+                                required:
+                                - path
+                                type: object
+                              validation:
+                                default: Controller
+                                description: Validation specifies the method to validate
+                                  the OwnerReference of secondary resources.
+                                enum:
+                                - Controller
+                                - Owner
+                                - None
+                                type: string
+                            type: object
+                          secondary:
+                            description: Secondary specifies the secondary object
+                              type.
+                            properties:
+                              apiVersion:
+                                description: APIVersion of the type.
+                                type: string
+                              kind:
+                                description: Kind of the type.
+                                type: string
+                            required:
+                            - apiVersion
+                            - kind
+                            type: object
+                        required:
+                        - criteria
+                        - secondary
+                        type: object
+                      type: array
+                    primary:
+                      description: Primary specifies the primary object type.
+                      properties:
+                        apiVersion:
+                          description: APIVersion of the type.
+                          type: string
+                        kind:
+                          description: Kind of the type.
+                          type: string
+                      required:
+                      - apiVersion
+                      - kind
+                      type: object
+                  required:
+                  - ownedResources
+                  - primary
+                  type: object
+                type: array
+              stateEvaluationExpression:
+                description: |-
+                  StateEvaluationExpression is used to evaluate whether the primary object has reach its desired state
+                  by applying the expression to the object tree.
+                properties:
+                  cueExpression:
+                    description: |-
+                      CueExpression specifies to use CUE to evaluation the object state.
+                      The root object used in the expression is the primary object.
+                    properties:
+                      expression:
+                        description: Expression specifies the CUE expression.
+                        type: string
+                    required:
+                    - expression
+                    type: object
+                type: object
+            required:
+            - ownershipRules
+            - stateEvaluationExpression
+            type: object
+          status:
+            description: ReconciliationViewDefinitionStatus defines the observed state
+              of ReconciliationViewDefinition
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

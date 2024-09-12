@@ -926,6 +926,58 @@ rules:
   - list
   - watch
 - apiGroups:
+  - view.kubeblocks.io
+  resources:
+  - reconciliationplans
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - view.kubeblocks.io
+  resources:
+  - reconciliationplans/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - view.kubeblocks.io
+  resources:
+  - reconciliationplans/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - view.kubeblocks.io
+  resources:
+  - reconciliationviews
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - view.kubeblocks.io
+  resources:
+  - reconciliationviews/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - view.kubeblocks.io
+  resources:
+  - reconciliationviews/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - workloads.kubeblocks.io
   resources:
   - instancesets

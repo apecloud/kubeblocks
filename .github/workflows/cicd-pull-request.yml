@@ -171,7 +171,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: pr pre check
-        if: github.event.pull_request.head.repo.full_name != github.repository
         run: |
           if [[ "${{ needs.pr-pre-check.result }}" == "failure" || "${{ needs.pr-pre-check.result }}" == "cancelled" ]]; then
               echo "make test fail"

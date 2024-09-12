@@ -1,4 +1,4 @@
-name: CICD-PULL-REQUEST
+name: Pull Request
 
 on:
   pull_request_review:
@@ -16,7 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       trigger-mode: ${{ steps.get_trigger_mode.outputs.trigger_mode }}
-      matrix: ${{ steps.get_trigger_mode.outputs.matrix }}
+      git-commit: ${{ steps.get_git_info.outputs.git_commit }}
+      git-version: ${{ steps.get_git_info.outputs.git_version }}
     steps:
       - name: Cancel Previous Runs
         uses: styfle/cancel-workflow-action@0.11.0
@@ -43,27 +44,27 @@ jobs:
           echo $TRIGGER_MODE
           echo trigger_mode=$TRIGGER_MODE >> $GITHUB_OUTPUT
 
-          TEST_PACKAGES=`bash .github/utils/utils.sh --type 16 \
-              --trigger-type "$TRIGGER_MODE" \
-              --test-pkgs "${{ vars.TEST_PKGS }}" \
-              --test-check "${{ vars.TEST_CHECK }}" \
-              --test-pkgs-first "${{ vars.TEST_PKGS_FIRST }}" \
-              --ignore-pkgs "${{ vars.SKIP_CHECK_PKG }}"`
-          echo "$TEST_PACKAGES"
-          echo "matrix={\"include\":[$TEST_PACKAGES]}" >> $GITHUB_OUTPUT
+      - name: get git info
+        id: get_git_info
+        run: |
+          GIT_COMMIT=$(git rev-list -1 HEAD)
+          GIT_VERSION=$(git describe --always --abbrev=0 --tag)
+          echo git_commit=$GIT_COMMIT >> $GITHUB_OUTPUT
+          echo git_version=$GIT_VERSION >> $GITHUB_OUTPUT
 
-  test-parallel:
-    name: test
+  pr-pre-check:
     needs: trigger-mode
-    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[test]') && github.event.pull_request.head.repo.full_name == github.repository }}
+    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[test]') }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
-      matrix: ${{ fromJSON(needs.trigger-mode.outputs.matrix) }}
+      matrix:
+        ops: [ 'manifests', 'mod-vendor', 'generate', 'lint', 'staticcheck', 'test' ]
     steps:
       - uses: actions/checkout@v4
       - name: install lib
         run: |
+          sudo rm /etc/apt/sources.list.d/microsoft-prod.list
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             libbtrfs-dev \
@@ -77,47 +78,27 @@ jobs:
       - name: Install golangci-lint
         if: matrix.ops == 'lint'
         run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.54.2
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.55.2
 
       - name: make ${{ matrix.ops }}
-        if: ${{ ! contains(matrix.ops, '/') }}
         run: |
           make ${{ matrix.ops }}
-
-      - name: make test ${{ matrix.ops }}
-        if: ${{ contains(matrix.ops, '/') }}
-        run: |
-          if [[ -d "./${{ matrix.ops }}" ]]; then
-              make test TEST_PACKAGES=./${{ matrix.ops }}/...
+          FILE_CHANGES=`git diff --name-only ${{ github.sha }}`
+          if [[ ("${{ matrix.ops }}" == 'generate' || "${{ matrix.ops }}" == 'manifests') && -n "$FILE_CHANGES" ]]; then
+              echo $FILE_CHANGES
+              echo "make "${{ matrix.ops }}" causes inconsistent files"
+              exit 1
           fi
 
-  make-test:
-    needs: trigger-mode
-    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[test]') && github.event.pull_request.head.repo.full_name != github.repository }}
-    outputs:
-      runner-name: ${{ steps.get_runner_name.outputs.runner_name }}
-    runs-on: [ self-hosted, gke-runner-go1.21 ]
-    steps:
-      - uses: actions/checkout@v4
-      - name: make mod-vendor
-        run: |
-          make mod-vendor
-
-      - name: make lint
-        run: |
-          make lint
-
-      - name: make test
-        run: |
-          make test
-
       - name: ignore cover pkgs
+        if: matrix.ops == 'test'
         run: |
           bash .github/utils/utils.sh --type 14 \
               --file cover.out \
               --ignore-pkgs "${{ vars.IGNORE_COVERAGE_PKG }}"
 
       - name: upload coverage report
+        if: matrix.ops == 'test'
         uses: codecov/codecov-action@v3
         continue-on-error: true
         with:
@@ -127,35 +108,20 @@ jobs:
           name: codecov-report
           verbose: true
 
-      - name: kill kube-apiserver and etcd
-        id: get_runner_name
-        if: ${{ always() }}
-        run: |
-          echo runner_name=${RUNNER_NAME} >> $GITHUB_OUTPUT
-          bash .github/utils/utils.sh --type 8
-
-  remove-runner:
-    needs: [ trigger-mode, make-test ]
-    runs-on: ubuntu-latest
-    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[test]') && github.event.pull_request.head.repo.full_name != github.repository && always()  }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: remove runner
-        run: |
-          bash .github/utils/utils.sh --type 9 \
-              --github-token ${{ env.GITHUB_TOKEN }} \
-              --runner-name ${{ needs.make-test.outputs.runner-name }}
-
   check-image:
     needs: trigger-mode
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[docker]')
-    uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.24
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.64
     with:
       MAKE_OPS_PRE: "generate"
       IMG: "apecloud/kubeblocks"
       GO_VERSION: "1.21"
       BUILDX_PLATFORMS: "linux/amd64"
       DOCKERFILE_PATH: "./docker/Dockerfile"
+      BUILDX_ARGS: |
+        VERSION=${{ needs.trigger-mode.outputs.git-version }}
+        GIT_COMMIT=${{ needs.trigger-mode.outputs.git-commit }}
+        GIT_VERSION=${{ needs.trigger-mode.outputs.git-version }}
     secrets: inherit
 
   check-tools-image:
@@ -207,22 +173,13 @@ jobs:
 
   pr-check:
     name: make test
-    needs: [ trigger-mode, test-parallel, make-test, check-image, check-tools-image, check-datascript-image, check-dataprotection-image, check-helm ]
+    needs: [ trigger-mode, pr-pre-check, check-image, check-tools-image, check-datascript-image, check-dataprotection-image, check-helm ]
     if: ${{ github.event.review.state == 'approved' && always() }}
     runs-on: ubuntu-latest
     steps:
-      - name: test parallel check
-        if: github.event.pull_request.head.repo.full_name == github.repository
+      - name: pr pre check
         run: |
-          if [[ "${{ needs.test-parallel.result }}" == "failure" || "${{ needs.test-parallel.result }}" == "cancelled" ]]; then
-              echo "test parallel fail"
-              exit 1
-          fi
-
-      - name: make test check
-        if: github.event.pull_request.head.repo.full_name != github.repository
-        run: |
-          if [[ "${{ needs.make-test.result }}" == "failure" || "${{ needs.make-test.result }}" == "cancelled" ]]; then
+          if [[ "${{ needs.pr-pre-check.result }}" == "failure" || "${{ needs.pr-pre-check.result }}" == "cancelled" ]]; then
               echo "make test fail"
               exit 1
           fi

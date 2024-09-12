@@ -23,29 +23,12 @@ jobs:
       APECD_REF: "v0.1.38"
     secrets: inherit
 
-  trigger-mode:
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.get_trigger_mode.outputs.matrix }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: release message
-        id: get_trigger_mode
-        run: |
-          TEST_PACKAGES=`bash .github/utils/utils.sh --type 16 \
-              --trigger-type "[test]" \
-              --test-pkgs "${{ vars.TEST_PKGS }}" \
-              --test-check "${{ vars.TEST_CHECK }}" \
-              --test-pkgs-first "${{ vars.TEST_PKGS_FIRST }}" \
-              --ignore-pkgs "${{ vars.SKIP_CHECK_PKG }}"`
-          echo "matrix={\"include\":[$TEST_PACKAGES]}" >> $GITHUB_OUTPUT
-
   release-test:
-    needs: [ trigger-mode ]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
-      matrix: ${{ fromJSON(needs.trigger-mode.outputs.matrix) }}
+      matrix:
+        ops: [ 'manifests', 'mod-vendor', 'generate', 'lint', 'staticcheck', 'test' ]
     steps:
       - uses: actions/checkout@v4
       - name: install lib
@@ -66,15 +49,13 @@ jobs:
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.54.2
 
       - name: make ${{ matrix.ops }}
-        if: ${{ ! contains(matrix.ops, '/') }}
         run: |
           make ${{ matrix.ops }}
-
-      - name: make test ${{ matrix.ops }}
-        if: ${{ contains(matrix.ops, '/') }}
-        run: |
-          if [[ -d "./${{ matrix.ops }}" ]]; then
-              make test TEST_PACKAGES=./${{ matrix.ops }}/...
+          FILE_CHANGES=`git diff --name-only ${{ github.sha }}`
+          if [[ ("${{ matrix.ops }}" == 'generate' || "${{ matrix.ops }}" == 'manifests') && -n "$FILE_CHANGES" ]]; then
+              echo $FILE_CHANGES
+              echo "make "${{ matrix.ops }}" causes inconsistent files"
+              exit 1
           fi
 
   release-branch:

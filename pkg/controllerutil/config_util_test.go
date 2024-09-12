@@ -120,8 +120,7 @@ func TestIsRerender(t *testing.T) {
 			cm: builder.NewConfigMapBuilder("default", "test").
 				GetObject(),
 			item: v1alpha1.ConfigTemplateItemDetail{
-				Name:    "test",
-				Version: "v1",
+				Name: "test",
 			},
 		},
 		want: true,
@@ -132,8 +131,7 @@ func TestIsRerender(t *testing.T) {
 				AddAnnotations(constant.CMConfigurationTemplateVersion, "v1").
 				GetObject(),
 			item: v1alpha1.ConfigTemplateItemDetail{
-				Name:    "test",
-				Version: "v2",
+				Name: "test",
 			},
 		},
 		want: true,
@@ -144,8 +142,7 @@ func TestIsRerender(t *testing.T) {
 				AddAnnotations(constant.CMConfigurationTemplateVersion, "v1").
 				GetObject(),
 			item: v1alpha1.ConfigTemplateItemDetail{
-				Name:    "test",
-				Version: "v1",
+				Name: "test",
 			},
 		},
 		want: false,
@@ -157,7 +154,7 @@ func TestIsRerender(t *testing.T) {
 				GetObject(),
 			item: v1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
-				ImportTemplateRef: &v1alpha1.ConfigTemplateExtension{
+				UserConfigTemplates: &v1alpha1.ConfigTemplateExtension{
 					TemplateRef: "contig-test-template",
 					Namespace:   "default",
 					Policy:      v1alpha1.PatchPolicy,
@@ -181,7 +178,7 @@ func TestIsRerender(t *testing.T) {
 				GetObject(),
 			item: v1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
-				ImportTemplateRef: &v1alpha1.ConfigTemplateExtension{
+				UserConfigTemplates: &v1alpha1.ConfigTemplateExtension{
 					TemplateRef: "contig-test-template",
 					Namespace:   "default",
 					Policy:      v1alpha1.PatchPolicy,

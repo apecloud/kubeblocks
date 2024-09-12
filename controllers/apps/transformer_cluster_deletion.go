@@ -168,7 +168,7 @@ func kindsForHalt() ([]client.ObjectList, []client.ObjectList) {
 		&batchv1.JobList{},
 		// The owner of the configuration in version 0.9 has been adjusted to component cr.
 		// for compatible with version 0.8
-		&appsv1alpha1.ConfigurationList{},
+		&appsv1alpha1.ComponentConfigurationList{},
 	}
 	nonNamespacedKindsPlus := []client.ObjectList{
 		&rbacv1.ClusterRoleBindingList{},

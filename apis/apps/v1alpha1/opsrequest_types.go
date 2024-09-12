@@ -291,7 +291,7 @@ type Instance struct {
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// The instance will rebuild on the specified node when the instance uses local PersistentVolume as the storage disk.
+	// The instance will rebuild on the specified node.
 	// If not set, it will rebuild on a random node.
 	// +optional
 	TargetNodeName string `json:"targetNodeName,omitempty"`

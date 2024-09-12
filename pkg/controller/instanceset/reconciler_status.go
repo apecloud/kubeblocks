@@ -133,8 +133,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 
 		if _, ok := podToNodeMapping[pod.Name]; ok {
-			delete(podToNodeMapping, pod.Name)
-			setNodeSelectorOnceAnnotation(its, podToNodeMapping)
+			deleteNodeSelectorOnceAnnotation(its, pod.Name)
 		}
 	}
 	its.Status.Replicas = replicas

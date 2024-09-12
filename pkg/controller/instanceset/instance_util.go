@@ -382,8 +382,13 @@ func parseNodeSelectorOnceAnnotation(its *workloads.InstanceSet) (map[string]str
 	return podToNodeMapping, nil
 }
 
-// set its's annotation in place
-func setNodeSelectorOnceAnnotation(its *workloads.InstanceSet, podToNodeMapping map[string]string) error {
+// sets annotation in place
+func deleteNodeSelectorOnceAnnotation(its *workloads.InstanceSet, podName string) error {
+	podToNodeMapping, err := parseNodeSelectorOnceAnnotation(its)
+	if err != nil {
+		return err
+	}
+	delete(podToNodeMapping, podName)
 	if len(podToNodeMapping) == 0 {
 		delete(its.Annotations, constant.NodeSelectorOnceAnnotationKey)
 	} else {
@@ -391,11 +396,28 @@ func setNodeSelectorOnceAnnotation(its *workloads.InstanceSet, podToNodeMapping 
 		if err != nil {
 			return err
 		}
-		if its.Annotations == nil {
-			its.Annotations = make(map[string]string)
-		}
 		its.Annotations[constant.NodeSelectorOnceAnnotationKey] = string(data)
 	}
+	return nil
+}
+
+// MergeNodeSelectorOnceAnnotation merges its's nodeSelectorOnce annotation in place
+func MergeNodeSelectorOnceAnnotation(its *workloads.InstanceSet, podToNodeMapping map[string]string) error {
+	origPodToNodeMapping, err := parseNodeSelectorOnceAnnotation(its)
+	if err != nil {
+		return err
+	}
+	for k, v := range podToNodeMapping {
+		origPodToNodeMapping[k] = v
+	}
+	data, err := json.Marshal(podToNodeMapping)
+	if err != nil {
+		return err
+	}
+	if its.Annotations == nil {
+		its.Annotations = make(map[string]string)
+	}
+	its.Annotations[constant.NodeSelectorOnceAnnotationKey] = string(data)
 	return nil
 }
 

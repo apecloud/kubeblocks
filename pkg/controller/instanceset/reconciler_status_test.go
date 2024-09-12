@@ -257,7 +257,7 @@ var _ = Describe("status reconciler test", func() {
 			reconcilePods(tree)
 
 			name := "bar-0"
-			setNodeSelectorOnceAnnotation(its, map[string]string{name: "foo"})
+			MergeNodeSelectorOnceAnnotation(its, map[string]string{name: "foo"})
 			reconciler = NewStatusReconciler()
 			res, err := reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())

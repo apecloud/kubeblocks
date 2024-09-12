@@ -224,7 +224,7 @@ var _ = Describe("instance util test", func() {
 			template := nameTemplate[name]
 
 			node := "test-node-1"
-			setNodeSelectorOnceAnnotation(its, map[string]string{name: node})
+			MergeNodeSelectorOnceAnnotation(its, map[string]string{name: node})
 			instance, err := buildInstanceByTemplate(name, template, its, "")
 
 			Expect(instance.pod.Spec.NodeSelector[corev1.LabelHostname]).To(Equal(node))

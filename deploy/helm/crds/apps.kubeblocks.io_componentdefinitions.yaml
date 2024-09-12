@@ -19015,14 +19015,38 @@ spec:
                     - scrapePort
                     type: object
                 type: object
-              parametersDefs:
+              parametersDescriptions:
                 description: |-
                   Specifies the name of the ParametersDefinition to associate the configuration file.
                   The ParametersDefinition object defines the format of the configuration file and all parameters type.
                 items:
-                  type: string
+                  properties:
+                    name:
+                      description: |-
+                        Defines the unique identifier of the config file name.
+
+
+                        It must be a string of maximum 63 characters, and can only include lowercase alphanumeric characters,
+                        hyphens, and periods.
+                        The name must start and end with an alphanumeric character.
+                      maxLength: 63
+                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                      type: string
+                    parametersDefName:
+                      description: |-
+                        Specifies the name of the ParametersDefinition to associate the configuration file.
+                        The ParametersDefinition object defines the format of the configuration file and all parameters type.
+                      maxLength: 63
+                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                      type: string
+                  required:
+                  - name
+                  - parametersDefName
+                  type: object
                 type: array
-                x-kubernetes-list-type: set
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
               podManagementPolicy:
                 description: |-
                   InstanceSet controls the creation of pods during initial scale up, replacement of pods on nodes, and scaling down.

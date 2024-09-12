@@ -25,6 +25,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	"github.com/golang/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
@@ -36,8 +37,10 @@ import (
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
@@ -163,13 +166,11 @@ max_connections = '1000'
 			})
 
 			err := createPipeline.Prepare().
-				UpdateConfiguration(). // reconcile Configuration
-				Configuration(). // sync Configuration
-				CreateConfigTemplate().
+				UpdateConfigurationForTest().
+				Configuration().
+				InitConfigRelatedObject().
 				UpdatePodVolumes().
 				BuildConfigManagerSidecar().
-				UpdateConfigRelatedObject().
-				// UpdateConfigurationStatus().
 				Complete()
 			Expect(err).Should(Succeed())
 
@@ -225,3 +226,78 @@ max_connections = '1000'
 	})
 
 })
+
+func (p *reloadActionBuilderHelper) UpdateConfigurationForTest() *reloadActionBuilderHelper {
+	buildConfiguration := func() (err error) {
+		expectedConfiguration := p.createConfiguration()
+		if intctrlutil.SetControllerReference(p.ctx.Component, expectedConfiguration) != nil {
+			return
+		}
+		_, _ = UpdateConfigPayload(&expectedConfiguration.Spec, p.ctx.SynthesizedComponent)
+
+		existingConfiguration := appsv1alpha1.ComponentConfiguration{}
+		err = p.ResourceFetcher.Client.Get(p.Context, client.ObjectKeyFromObject(expectedConfiguration), &existingConfiguration)
+		switch {
+		case err == nil:
+			return p.updateConfiguration(expectedConfiguration, &existingConfiguration)
+		case apierrors.IsNotFound(err):
+			return p.ResourceFetcher.Client.Create(p.Context, expectedConfiguration)
+		default:
+			return err
+		}
+	}
+	return p.Wrap(buildConfiguration)
+}
+
+func (p *reloadActionBuilderHelper) createConfiguration() *appsv1alpha1.ComponentConfiguration {
+	builder := builder.NewConfigurationBuilder(p.Namespace,
+		cfgcore.GenerateComponentConfigurationName(p.ClusterName, p.ComponentName),
+	)
+	for _, template := range p.ctx.SynthesizedComponent.ConfigTemplates {
+		builder.AddConfigurationItem(template)
+	}
+	return builder.Component(p.ComponentName).
+		ClusterRef(p.ClusterName).
+		AddLabelsInMap(constant.GetComponentWellKnownLabels(p.ClusterName, p.ComponentName)).
+		GetObject()
+}
+
+func (p *reloadActionBuilderHelper) updateConfiguration(expected *appsv1alpha1.ComponentConfiguration, existing *appsv1alpha1.ComponentConfiguration) error {
+	fromMap := func(items []appsv1alpha1.ConfigTemplateItemDetail) *cfgutil.Sets {
+		sets := cfgutil.NewSet()
+		for _, item := range items {
+			sets.Add(item.Name)
+		}
+		return sets
+	}
+
+	updateConfigSpec := func(item appsv1alpha1.ConfigTemplateItemDetail) appsv1alpha1.ConfigTemplateItemDetail {
+		if newItem := expected.Spec.GetConfigurationItem(item.Name); newItem != nil {
+			item.ConfigSpec = newItem.ConfigSpec
+		}
+		return item
+	}
+
+	oldSets := fromMap(existing.Spec.ConfigItemDetails)
+	newSets := fromMap(expected.Spec.ConfigItemDetails)
+
+	addSets := cfgutil.Difference(newSets, oldSets)
+	delSets := cfgutil.Difference(oldSets, newSets)
+
+	newConfigItems := make([]appsv1alpha1.ConfigTemplateItemDetail, 0)
+	for _, item := range existing.Spec.ConfigItemDetails {
+		if !delSets.InArray(item.Name) {
+			newConfigItems = append(newConfigItems, updateConfigSpec(item))
+		}
+	}
+	for _, item := range expected.Spec.ConfigItemDetails {
+		if addSets.InArray(item.Name) {
+			newConfigItems = append(newConfigItems, item)
+		}
+	}
+
+	patch := client.MergeFrom(existing)
+	updated := existing.DeepCopy()
+	updated.Spec.ConfigItemDetails = newConfigItems
+	return p.Client.Patch(p.Context, updated, patch)
+}

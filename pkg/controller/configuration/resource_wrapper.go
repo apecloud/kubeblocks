@@ -130,18 +130,16 @@ func (r *ResourceFetcher[T]) ComponentSpec() *T {
 }
 
 func (r *ResourceFetcher[T]) Configuration() *T {
-	configKey := client.ObjectKey{
-		Name:      cfgcore.GenerateComponentConfigurationName(r.ClusterName, r.ComponentName),
-		Namespace: r.Namespace,
-	}
-	return r.Wrap(func() (err error) {
-		configuration := appsv1alpha1.ComponentConfiguration{}
-		err = r.Client.Get(r.Context, configKey, &configuration)
-		if err != nil {
-			return client.IgnoreNotFound(err)
+	return r.Wrap(func() error {
+		if r.ConfigurationObj != nil {
+			return nil
 		}
-		r.ConfigurationObj = &configuration
-		return
+		configKey := client.ObjectKey{
+			Name:      cfgcore.GenerateComponentConfigurationName(r.ClusterName, r.ComponentName),
+			Namespace: r.Namespace,
+		}
+		r.ConfigurationObj = &appsv1alpha1.ComponentConfiguration{}
+		return r.Client.Get(r.Context, configKey, r.ConfigurationObj)
 	})
 }
 

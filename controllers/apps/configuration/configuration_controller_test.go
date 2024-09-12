@@ -94,24 +94,13 @@ var _ = Describe("Configuration Controller", func() {
 		It("Invalid component test", func() {
 			_, _, clusterObj, componentObj, synthesizedComp := mockReconcileResource()
 
-			cfgKey := client.ObjectKey{
-				Name:      core.GenerateComponentConfigurationName(clusterName, "invalid-component"),
-				Namespace: testCtx.DefaultNamespace,
-			}
-
 			Expect(initConfiguration(&configctrl.ResourceCtx{
 				Client:        k8sClient,
 				Context:       ctx,
 				Namespace:     testCtx.DefaultNamespace,
 				ClusterName:   clusterName,
 				ComponentName: "invalid-component",
-			}, synthesizedComp, clusterObj, componentObj)).Should(Succeed())
-
-			Eventually(func(g Gomega) {
-				cfg := &appsv1alpha1.ComponentConfiguration{}
-				g.Expect(k8sClient.Get(ctx, cfgKey, cfg)).Should(Succeed())
-				g.Expect(cfg.Status.Message).Should(ContainSubstring("not found cluster component"))
-			}, time.Second*60, time.Second*1).Should(Succeed())
+			}, synthesizedComp, clusterObj, componentObj)).ShouldNot(Succeed())
 		})
 	})
 

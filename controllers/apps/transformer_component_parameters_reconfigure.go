@@ -23,6 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -56,6 +57,7 @@ func (t *componentParametersReloadSidecarTransformer) Transform(ctx graph.Transf
 
 	// get dependOnObjs which will be used in configuration render
 	var dependOnObjs []client.Object
+	var configObj *appsv1alpha1.ComponentConfiguration
 	for _, vertex := range dag.Vertices() {
 		v, _ := vertex.(*model.ObjectVertex)
 		if cm, ok := v.Obj.(*corev1.ConfigMap); ok {
@@ -65,6 +67,9 @@ func (t *componentParametersReloadSidecarTransformer) Transform(ctx graph.Transf
 		if secret, ok := v.Obj.(*corev1.Secret); ok {
 			dependOnObjs = append(dependOnObjs, secret)
 			continue
+		}
+		if config, ok := v.Obj.(*appsv1alpha1.ComponentConfiguration); ok {
+			configObj = config
 		}
 	}
 
@@ -81,6 +86,7 @@ func (t *componentParametersReloadSidecarTransformer) Transform(ctx graph.Transf
 		comp,
 		synthesizeComp,
 		synthesizeComp.PodSpec,
+		configObj,
 		dependOnObjs); err != nil {
 		return err
 	}

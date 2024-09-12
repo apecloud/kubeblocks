@@ -87,7 +87,7 @@ func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	tasks := make([]Task, 0, len(config.Spec.ConfigItemDetails))
 	for _, item := range config.Spec.ConfigItemDetails {
-		if status := fromItemStatus(reqCtx, &config.Status, item); status != nil {
+		if status := fromItemStatus(reqCtx, &config.Status, item, config.Generation); status != nil {
 			tasks = append(tasks, NewTask(item, status))
 		}
 	}
@@ -120,9 +120,9 @@ func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	if err := r.runTasks(TaskContext{config, ctx, fetcherTask}, tasks); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to run configuration reconcile task.")
 	}
-	if !isAllReady(config) {
-		return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
-	}
+	// if !isAllReady(config) {
+	// 	return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
+	// }
 	return intctrlutil.Reconciled()
 }
 
@@ -137,15 +137,15 @@ func (r *ConfigurationReconciler) failWithInvalidComponent(configuration *appsv1
 	return intctrlutil.Reconciled()
 }
 
-func isAllReady(configuration *appsv1alpha1.ComponentConfiguration) bool {
-	for _, item := range configuration.Spec.ConfigItemDetails {
-		itemStatus := configuration.Status.GetItemStatus(item.Name)
-		if itemStatus != nil && !isFinishStatus(itemStatus.Phase) {
-			return false
-		}
-	}
-	return true
-}
+// func isAllReady(configuration *appsv1alpha1.ComponentConfiguration) bool {
+// 	for _, item := range configuration.Spec.ConfigItemDetails {
+// 		itemStatus := configuration.Status.GetItemStatus(item.Name)
+// 		if itemStatus != nil && !isFinishStatus(itemStatus.Phase) {
+// 			return false
+// 		}
+// 	}
+// 	return true
+// }
 
 func (r *ConfigurationReconciler) runTasks(taskCtx TaskContext, tasks []Task) (err error) {
 	var (
@@ -203,15 +203,19 @@ func (r *ConfigurationReconciler) SetupWithManager(mgr ctrl.Manager, multiCluste
 	return b.Complete(r)
 }
 
-func fromItemStatus(ctx intctrlutil.RequestCtx, status *appsv1alpha1.ComponentConfigurationStatus, item appsv1alpha1.ConfigTemplateItemDetail) *appsv1alpha1.ConfigTemplateItemDetailStatus {
+func fromItemStatus(ctx intctrlutil.RequestCtx, status *appsv1alpha1.ComponentConfigurationStatus, item appsv1alpha1.ConfigTemplateItemDetail, generation int64) *appsv1alpha1.ConfigTemplateItemDetailStatus {
 	if item.ConfigSpec == nil {
 		ctx.Log.V(1).WithName(item.Name).Info(fmt.Sprintf("configuration is creating and pass: %s", item.Name))
 		return nil
 	}
 	itemStatus := status.GetItemStatus(item.Name)
 	if itemStatus == nil || itemStatus.Phase == "" {
-		ctx.Log.V(1).WithName(item.Name).Info(fmt.Sprintf("configuration cr is creating and pass: %v", item))
-		return nil
+		status.ConfigurationItemStatus = append(status.ConfigurationItemStatus, appsv1alpha1.ConfigTemplateItemDetailStatus{
+			Name:           item.Name,
+			Phase:          appsv1alpha1.CInitPhase,
+			UpdateRevision: strconv.FormatInt(generation, 10),
+		})
+		itemStatus = status.GetItemStatus(item.Name)
 	}
 	if !isReconcileStatus(itemStatus.Phase) {
 		ctx.Log.V(1).WithName(item.Name).Info(fmt.Sprintf("configuration cr is creating or deleting and pass: %v", itemStatus))

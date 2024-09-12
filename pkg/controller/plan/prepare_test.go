@@ -29,6 +29,8 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -71,7 +73,6 @@ var _ = Describe("Prepare Test", func() {
 		compDefObj     *appsv1.ComponentDefinition
 		cluster        *appsv1.Cluster
 		comp           *appsv1.Component
-		configSpecName string
 	)
 
 	Context("create cluster with component and component definition API, testing render configuration", func() {
@@ -91,8 +92,7 @@ var _ = Describe("Prepare Test", func() {
 			createAllTypesClusterDef()
 
 			testapps.CreateCustomizedObj(&testCtx, "config/envfrom-config.yaml", &corev1.ConfigMap{}, testCtx.UseDefaultNamespace())
-			tpl := testapps.CreateCustomizedObj(&testCtx, "config/envfrom-constraint.yaml", &appsv1beta1.ConfigConstraint{})
-			configSpecName = tpl.Name
+			testapps.CreateCustomizedObj(&testCtx, "config/envfrom-constraint.yaml", &appsv1beta1.ConfigConstraint{})
 
 			pvcSpec := testapps.NewPVCSpec("1Gi")
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
@@ -112,6 +112,17 @@ var _ = Describe("Prepare Test", func() {
 			synthesizeComp, err := component.BuildSynthesizedComponent(ctx, testCtx.Cli, compDefObj, comp, cluster)
 			Expect(err).Should(Succeed())
 			Expect(synthesizeComp.PodSpec).ShouldNot(BeNil())
+
+			synthesizeComp.ConfigTemplates[0].InjectEnvTo = []string{testapps.DefaultMySQLContainerName}
+			configObj := builder.NewConfigurationBuilder(cluster.Namespace,
+				cfgcore.GenerateComponentConfigurationName(cluster.Name, synthesizeComp.Name)).
+				AddLabelsInMap(constant.GetComponentWellKnownLabels(cluster.Name, synthesizeComp.Name)).
+				ClusterRef(cluster.Name).
+				Component(synthesizeComp.Name).
+				AddConfigurationItem(synthesizeComp.ConfigTemplates[0]).
+				GetObject()
+			configObj.SetUID("config_test_id")
+
 			resCtx := &configuration.ResourceCtx{
 				Context:       testCtx.Ctx,
 				Client:        testCtx.Cli,
@@ -119,9 +130,9 @@ var _ = Describe("Prepare Test", func() {
 				ClusterName:   synthesizeComp.ClusterName,
 				ComponentName: synthesizeComp.Name,
 			}
-			err = BuildReloadActionContainer(resCtx, cluster, comp, synthesizeComp, synthesizeComp.PodSpec, nil)
+			err = BuildReloadActionContainer(resCtx, cluster, comp, synthesizeComp, synthesizeComp.PodSpec, configObj, nil)
 			Expect(err).Should(Succeed())
-			Expect(configuration.CheckEnvFrom(&synthesizeComp.PodSpec.Containers[0], cfgcore.GenerateEnvFromName(cfgcore.GetComponentCfgName(cluster.Name, synthesizeComp.Name, configSpecName)))).Should(BeFalse())
+			Expect(configuration.CheckEnvFrom(&synthesizeComp.PodSpec.Containers[0], cfgcore.GenerateEnvFromName(cfgcore.GetComponentCfgName(cluster.Name, synthesizeComp.Name, synthesizeComp.ConfigTemplates[0].Name)))).Should(BeTrue())
 		})
 	})
 })

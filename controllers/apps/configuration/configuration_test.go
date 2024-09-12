@@ -80,23 +80,6 @@ func mockConfigResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint) {
 		g.Expect(tpl.Status.Phase).Should(BeEquivalentTo(appsv1alpha1.AvailablePhase))
 	})).Should(Succeed())
 
-	By("Create a configuration obj")
-	// test-cluster-mysql-mysql-config-tpl
-	configuration := builder.NewConfigurationBuilder(testCtx.DefaultNamespace, core.GenerateComponentConfigurationName(clusterName, defaultCompName)).
-		ClusterRef(clusterName).
-		Component(defaultCompName).
-		AddConfigurationItem(appsv1.ComponentConfigSpec{
-			ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
-				Name:        configSpecName,
-				TemplateRef: configmap.Name,
-				Namespace:   configmap.Namespace,
-				VolumeName:  configVolumeName,
-			},
-			ConfigConstraintRef: constraint.Name,
-		}).
-		GetObject()
-	Expect(testCtx.CreateObj(testCtx.Ctx, configuration)).Should(Succeed())
-
 	return configmap, constraint
 }
 
@@ -148,6 +131,14 @@ func mockReconcileResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint, 
 	synthesizedComp, err := component.BuildSynthesizedComponent(testCtx.Ctx, testCtx.Cli, compDefObj, compObj, clusterObj)
 	Expect(err).ShouldNot(HaveOccurred())
 
+	By("Create a configuration obj")
+	configuration := builder.NewConfigurationBuilder(testCtx.DefaultNamespace, core.GenerateComponentConfigurationName(clusterName, defaultCompName)).
+		ClusterRef(clusterName).
+		Component(defaultCompName).
+		AddConfigurationItem(synthesizedComp.ConfigTemplates[0]).
+		GetObject()
+	Expect(testCtx.CreateObj(testCtx.Ctx, configuration)).Should(Succeed())
+
 	return configmap, constraint, clusterObj, compObj, synthesizedComp
 }
 
@@ -163,11 +154,8 @@ func initConfiguration(resourceCtx *configctrl.ResourceCtx,
 		PodSpec:              synthesizedComponent.PodSpec,
 	}).
 		Prepare().
-		UpdateConfiguration(). // reconcile Configuration
-		Configuration(). // sync Configuration
-		CreateConfigTemplate().
-		UpdateConfigRelatedObject().
-		// UpdateConfigurationStatus().
+		Configuration().
+		InitConfigRelatedObject().
 		Complete()
 }
 

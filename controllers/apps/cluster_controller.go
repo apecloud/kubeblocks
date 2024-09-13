@@ -137,14 +137,14 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&clusterAssureMetaTransformer{},
 			// validate cd & cv's existence and availability
 			&clusterLoadRefResourcesTransformer{},
+			// handle cluster shared account
+			&clusterSharedAccountTransformer{},
 			// normalize the cluster and component API
 			&ClusterAPINormalizationTransformer{},
 			// placement replicas across data-plane k8s clusters
 			&clusterPlacementTransformer{multiClusterMgr: r.MultiClusterMgr},
 			// handle cluster services
 			&clusterServiceTransformer{},
-			// handle cluster shared account
-			&clusterSharedAccountTransformer{},
 			// handle the restore for cluster
 			&clusterRestoreTransformer{},
 			// create all cluster components objects

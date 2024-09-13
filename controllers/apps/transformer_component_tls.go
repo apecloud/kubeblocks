@@ -150,23 +150,24 @@ func buildTLSCert(ctx context.Context, cli client.Reader, synthesizedComp compon
 			return err
 		}
 	case appsv1alpha1.IssuerKubeBlocks:
+		graphCli, _ := cli.(model.GraphClient)
 		secretName := plan.GenerateTLSSecretName(synthesizedComp.ClusterName, synthesizedComp.Name)
 		existSecret := &corev1.Secret{}
-		if err := cli.Get(ctx, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: secretName}, existSecret); err != nil && !errors.IsNotFound(err) {
-			return err
-		}
-		graphCli, _ := cli.(model.GraphClient)
-		if existSecret != nil {
-			updateTLSSecretMeta(existSecret, graphCli, dag, synthesizedComp)
-			return nil
-		}
-		secret, err := plan.ComposeTLSSecret(synthesizedComp)
+		err := cli.Get(ctx, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: secretName}, existSecret)
 		if err != nil {
+			if errors.IsNotFound(err) {
+				secret, err := plan.ComposeTLSSecret(synthesizedComp)
+				if err != nil {
+					return err
+				}
+				graphCli.Create(dag, secret)
+				return nil
+			}
 			return err
+		} else {
+			updateTLSSecretMeta(existSecret, graphCli, dag, synthesizedComp)
 		}
-		graphCli.Create(dag, secret)
 	}
-
 	return nil
 }
 

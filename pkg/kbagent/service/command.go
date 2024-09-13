@@ -120,28 +120,22 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 	}()
 
 	mergedEnv := func() []string {
-		// order: os env | parameters (action specific variables)
+		// order: parameters (action specific variables) | var | action env
 		env := util.EnvM2L(parameters)
-		envMap := make(map[string]string)
-
-		for _, e := range env {
-			if kv := strings.SplitN(e, "=", 2); len(kv) == 2 {
-				envMap[kv[0]] = kv[1]
-			}
-		}
-
-		for _, e := range os.Environ() {
-			if kv := strings.SplitN(e, "=", 2); len(kv) == 2 {
-				if _, exists := envMap[kv[0]]; !exists {
-					envMap[kv[0]] = kv[1]
+		filterDuplicates := func(env []string, filter func(string) bool) []string {
+			newEnv := make([]string, 0, len(env))
+			for _, e := range env {
+				if filter(e) {
+					newEnv = append(newEnv, e)
 				}
 			}
+			return newEnv
 		}
-
-		env = make([]string, 0, len(envMap))
-		for key, value := range envMap {
-			env = append(env, key+"="+value)
-		}
+		env = append(env, filterDuplicates(os.Environ(), func(env string) bool {
+			kv := strings.Split(env, "=")
+			_, ok := parameters[kv[0]]
+			return !ok
+		})...)
 		return env
 	}()
 

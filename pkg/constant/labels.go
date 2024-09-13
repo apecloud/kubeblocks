@@ -115,6 +115,15 @@ func GetComponentWellKnownLabels(clusterName, componentName string) map[string]s
 	}
 }
 
+// GetShardingWellKnownLabels returns the well-known labels for Sharding API
+func GetShardingWellKnownLabels(clusterName, shardingName string) map[string]string {
+	return map[string]string{
+		AppManagedByLabelKey:      AppName,
+		AppInstanceLabelKey:       clusterName,
+		KBAppShardingNameLabelKey: shardingName,
+	}
+}
+
 // GetAppVersionLabel returns the label for AppVersion
 func GetAppVersionLabel(appVersion string) map[string]string {
 	return map[string]string{

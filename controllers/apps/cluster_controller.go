@@ -143,6 +143,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&clusterPlacementTransformer{multiClusterMgr: r.MultiClusterMgr},
 			// handle cluster services
 			&clusterServiceTransformer{},
+			// handle cluster shared account
+			&clusterSharedAccountTransformer{},
 			// handle the restore for cluster
 			&clusterRestoreTransformer{},
 			// create all cluster components objects

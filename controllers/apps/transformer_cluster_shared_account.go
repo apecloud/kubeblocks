@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"fmt"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -53,51 +52,63 @@ func (t *clusterSharedAccountTransformer) Transform(ctx graph.TransformContext, 
 	}
 
 	// currently, we only support shared system account for sharding components
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	return t.reconcileShardingsSharedAccounts(transCtx, graphCli, dag)
+}
+
+func (t *clusterSharedAccountTransformer) reconcileShardingsSharedAccounts(transCtx *clusterTransformContext,
+	graphCli model.GraphClient, dag *graph.DAG) error {
 	if len(transCtx.Cluster.Spec.ShardingSpecs) == 0 {
 		return nil
 	}
 
-	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for _, shardingSpec := range transCtx.Cluster.Spec.ShardingSpecs {
 		if len(shardingSpec.Template.SystemAccounts) == 0 {
-			continue
+			return nil
 		}
 		for i, account := range shardingSpec.Template.SystemAccounts {
-			// respect the secretRef if it is set
-			if account.SecretRef != nil {
-				continue
-			}
-
-			// if seed is not set, we consider it does not need to share the same account secret
-			if account.PasswordConfig != nil && len(account.PasswordConfig.Seed) == 0 {
-				continue
-			}
-
-			// check if the shared account secret already exists
-			secretName := constant.GenerateShardingSharedAccountSecretName(transCtx.Cluster.Name, shardingSpec.Name, account.Name)
-			secret, err := t.checkShardingSharedAccountSecretExist(transCtx, transCtx.Cluster, secretName, graphCli, dag)
-			if err != nil {
+			if err := t.createNConvertToSharedAccountSecret(transCtx, &account, shardingSpec, graphCli, dag); err != nil {
 				return err
 			}
-			if secret != nil {
-				continue
-			}
-
-			// create the shared account secret if not exist
-			secret, err = t.buildAccountSecret(transCtx.Cluster, account, shardingSpec.Name, secretName)
-			if err != nil {
-				return err
-			}
-			graphCli.Create(dag, secret)
-
-			// update account secretRef to the shared secret and reset the password seed
-			shardingSpec.Template.SystemAccounts[i].SecretRef = &appsv1alpha1.ProvisionSecretRef{
-				Name:      secret.Name,
-				Namespace: transCtx.Cluster.Namespace,
-			}
-			shardingSpec.Template.SystemAccounts[i].PasswordConfig.Seed = ""
+			shardingSpec.Template.SystemAccounts[i] = account
 		}
 	}
+	return nil
+}
+
+func (t *clusterSharedAccountTransformer) createNConvertToSharedAccountSecret(transCtx *clusterTransformContext,
+	account *appsv1alpha1.ComponentSystemAccount, shardingSpec appsv1alpha1.ShardingSpec, graphCli model.GraphClient, dag *graph.DAG) error {
+	// respect the secretRef if it is set
+	if account.SecretRef != nil {
+		return nil
+	}
+
+	// if seed is not set, we consider it does not need to share the same account secret
+	if account.PasswordConfig != nil && len(account.PasswordConfig.Seed) == 0 {
+		return nil
+	}
+
+	// Check if the shared account secret already exists
+	secretName := constant.GenerateShardingSharedAccountSecretName(transCtx.Cluster.Name, shardingSpec.Name, account.Name)
+	if secret, err := t.checkShardingSharedAccountSecretExist(transCtx, transCtx.Cluster, secretName, graphCli, dag); err != nil {
+		return err
+	} else if secret != nil {
+		return nil
+	}
+
+	// Create the shared account secret if it does not exist
+	secret, err := t.buildAccountSecret(transCtx.Cluster, *account, shardingSpec.Name, secretName)
+	if err != nil {
+		return err
+	}
+	graphCli.Create(dag, secret)
+
+	// Update account SecretRef to the shared secret
+	account.SecretRef = &appsv1alpha1.ProvisionSecretRef{
+		Name:      secret.Name,
+		Namespace: transCtx.Cluster.Namespace,
+	}
+
 	return nil
 }
 
@@ -131,21 +142,6 @@ func (t *clusterSharedAccountTransformer) buildAccountSecret(cluster *appsv1alph
 	account appsv1alpha1.ComponentSystemAccount, shardingName, secretName string) (*corev1.Secret, error) {
 	password := t.generatePassword(account)
 	return t.buildAccountSecretWithPassword(cluster, account, shardingName, secretName, password)
-}
-
-func (t *clusterSharedAccountTransformer) getPasswordFromSecret(ctx graph.TransformContext, account appsv1alpha1.SystemAccount) ([]byte, error) {
-	secretKey := types.NamespacedName{
-		Namespace: account.SecretRef.Namespace,
-		Name:      account.SecretRef.Name,
-	}
-	secret := &corev1.Secret{}
-	if err := ctx.GetClient().Get(ctx.GetContext(), secretKey, secret); err != nil {
-		return nil, err
-	}
-	if len(secret.Data) == 0 || len(secret.Data[constant.AccountPasswdForSecret]) == 0 {
-		return nil, fmt.Errorf("referenced account secret has no required credential field")
-	}
-	return secret.Data[constant.AccountPasswdForSecret], nil
 }
 
 func (t *clusterSharedAccountTransformer) generatePassword(account appsv1alpha1.ComponentSystemAccount) []byte {

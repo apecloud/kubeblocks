@@ -258,12 +258,6 @@ func equalBasicInPlaceFields(old, new *corev1.Pod) bool {
 }
 
 func equalResourcesInPlaceFields(old, new *corev1.Pod) bool {
-	if len(old.Spec.Containers) != len(new.Spec.Containers) {
-		if len(old.Spec.Containers) < len(new.Spec.Containers) {
-			return false
-		}
-		return isContainerInjected(old.Spec.Containers, new.Spec.Containers)
-	}
 	for _, nc := range new.Spec.Containers {
 		index := slices.IndexFunc(old.Spec.Containers, func(oc corev1.Container) bool {
 			return oc.Name == nc.Name
@@ -337,23 +331,6 @@ func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (PodUpdateP
 		return InPlaceUpdatePolicy, nil
 	}
 	return NoOpsPolicy, nil
-}
-
-// These lines're used for scenarios that user have other controllers/webhooks like OpenKruise SidecarSet running.
-// It'll mutate the pod to inject custom containers (e.g. sidecars) in. InstanceSet will tolerate these behaviors and avoid pod recreation if additional containers're injected.
-func isContainerInjected(cur, expect []corev1.Container) bool {
-	for _, ec := range expect {
-		index := slices.IndexFunc(cur, func(cc corev1.Container) bool {
-			return ec.Name == cc.Name
-		})
-		if index < 0 {
-			return false
-		}
-		if ec.Image != cur[index].Image {
-			return false
-		}
-	}
-	return true
 }
 
 // IsPodUpdated tells whether the pod's spec is as expected in the InstanceSet.

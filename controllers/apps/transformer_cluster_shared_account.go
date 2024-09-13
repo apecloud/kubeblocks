@@ -67,6 +67,13 @@ func (t *clusterSharedAccountTransformer) reconcileShardingsSharedAccounts(trans
 			return nil
 		}
 		for i, account := range shardingSpec.Template.SystemAccounts {
+			needCreate, err := t.needCreateSharedAccount(transCtx, &account, shardingSpec, graphCli, dag)
+			if err != nil {
+				return err
+			}
+			if !needCreate {
+				continue
+			}
 			if err := t.createNConvertToSharedAccountSecret(transCtx, &account, shardingSpec, graphCli, dag); err != nil {
 				return err
 			}
@@ -76,27 +83,33 @@ func (t *clusterSharedAccountTransformer) reconcileShardingsSharedAccounts(trans
 	return nil
 }
 
-func (t *clusterSharedAccountTransformer) createNConvertToSharedAccountSecret(transCtx *clusterTransformContext,
-	account *appsv1alpha1.ComponentSystemAccount, shardingSpec appsv1alpha1.ShardingSpec, graphCli model.GraphClient, dag *graph.DAG) error {
+func (t *clusterSharedAccountTransformer) needCreateSharedAccount(transCtx *clusterTransformContext,
+	account *appsv1alpha1.ComponentSystemAccount, shardingSpec appsv1alpha1.ShardingSpec, graphCli model.GraphClient, dag *graph.DAG) (bool, error) {
 	// respect the secretRef if it is set
 	if account.SecretRef != nil {
-		return nil
+		return false, nil
 	}
 
 	// if seed is not set, we consider it does not need to share the same account secret
+	// TODO: wo may support another way to judge if the need to create shared account secret in the future
 	if account.PasswordConfig != nil && len(account.PasswordConfig.Seed) == 0 {
-		return nil
+		return false, nil
 	}
 
-	// Check if the shared account secret already exists
 	secretName := constant.GenerateShardingSharedAccountSecretName(transCtx.Cluster.Name, shardingSpec.Name, account.Name)
 	if secret, err := t.checkShardingSharedAccountSecretExist(transCtx, transCtx.Cluster, secretName, graphCli, dag); err != nil {
-		return err
+		return false, err
 	} else if secret != nil {
-		return nil
+		return false, nil
 	}
 
+	return true, nil
+}
+
+func (t *clusterSharedAccountTransformer) createNConvertToSharedAccountSecret(transCtx *clusterTransformContext,
+	account *appsv1alpha1.ComponentSystemAccount, shardingSpec appsv1alpha1.ShardingSpec, graphCli model.GraphClient, dag *graph.DAG) error {
 	// Create the shared account secret if it does not exist
+	secretName := constant.GenerateShardingSharedAccountSecretName(transCtx.Cluster.Name, shardingSpec.Name, account.Name)
 	secret, err := t.buildAccountSecret(transCtx.Cluster, *account, shardingSpec.Name, secretName)
 	if err != nil {
 		return err

@@ -526,8 +526,9 @@ func main() {
 		}
 	}
 	if err = (&viewcontrollers.ReconciliationViewReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("reconciliation-view-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ReconciliationView")
 		os.Exit(1)

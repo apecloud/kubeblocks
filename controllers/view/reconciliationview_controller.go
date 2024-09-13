@@ -21,19 +21,25 @@ package view
 
 import (
 	"context"
-
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
 
 // ReconciliationViewReconciler reconciles a ReconciliationView object
 type ReconciliationViewReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme               *runtime.Scheme
+	Recorder             record.EventRecorder
+	ObjectStore          ObjectStore
+	ObjectTreeRootFinder ObjectTreeRootFinder
+	InformerManager      InformerManager
 }
 
 //+kubebuilder:rbac:groups=view.kubeblocks.io,resources=reconciliationviews,verbs=get;list;watch;create;update;patch;delete
@@ -42,24 +48,67 @@ type ReconciliationViewReconciler struct {
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the ReconciliationView object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.4/pkg/reconcile
 func (r *ReconciliationViewReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	logger := log.FromContext(ctx).WithValues("ReconciliationView", req.NamespacedName)
 
-	// TODO(user): your logic here
+	res, err := kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
+		//Prepare(viewResources()).
+		//Do(viewResourcesValidation()).
+		//Do(updateInformerManager()).
+		//Do(viewCalculation()).
+		//Do(stateEvaluation()).
+		Commit()
 
-	return ctrl.Result{}, nil
+	// TODO(free6om): err handling
+
+	// load view, viewDef, i18n resources
+	//
+	// validation viewDef
+	//
+	// if isViewCreationOrUpdate, create new Informer and/or increase reference count
+	// if isViewDeletion, decrease reference count and delete informer if count to zero.
+	//
+	// view calculation
+	//
+	// build new object set from cache
+	// update object.uid to tree.primaryReference map(one object might belong to many tree, not int KB)
+	// build old object set from view.status.currentObjectTree
+	// calculate createSet, deleteSet and updateSet
+	// build view progress from three sets.
+	// for createSet, build objectChange.description by reading i18n of the corresponding object type.
+	// for updateSet, read old version from object store by object type and resource version, calculate the diff, render the objectChange.description
+	// for deleteSet, build objectChange.description by reading i18n of the corresponding object type.
+	// sort the view progress by resource version.
+	// concat it to view.status.view
+	// save new version objects to object store.
+	//
+	// state evaluation(to find whether a new reconciliation cycle has started)
+	//
+	// traverse the view progress list from tail to head:
+	// if object type is not target object type, continue
+	// read the corresponding version of the object from object store by objectChange.resourceVersion
+	// evaluation state
+	// if we find the first-false-then-true pattern, means a new reconciliation cycle starts.
+	// build new view.status.initialObjectTree by read all max but less than primary.resourceVersion version of objects from object store
+	// truncate status.view
+	// clean useless version of objects in object store:
+	// traverse the truncated status.view list
+	// delete object with version objectChange.version
+
+	return res, err
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ReconciliationViewReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	r.ObjectStore = NewObjectStore()
+	r.ObjectTreeRootFinder = NewObjectTreeRootFinder(r.Client)
+	r.InformerManager = NewInformerManager(r.ObjectTreeRootFinder.GetEventChannel())
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&viewv1.ReconciliationView{}).
+		WatchesRawSource(&source.Channel{Source: r.ObjectTreeRootFinder.GetEventChannel()}, r.ObjectTreeRootFinder.GetEventHandler()).
 		Complete(r)
 }

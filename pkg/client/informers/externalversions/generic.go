@@ -26,6 +26,7 @@ import (
 	v1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
+	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
@@ -116,6 +117,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		// Group=extensions.kubeblocks.io, Version=v1alpha1
 	case extensionsv1alpha1.SchemeGroupVersion.WithResource("addons"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Extensions().V1alpha1().Addons().Informer()}, nil
+
+		// Group=workloads.kubeblocks.io, Version=v1
+	case workloadsv1.SchemeGroupVersion.WithResource("instancesets"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Workloads().V1().InstanceSets().Informer()}, nil
 
 		// Group=workloads.kubeblocks.io, Version=v1alpha1
 	case workloadsv1alpha1.SchemeGroupVersion.WithResource("instancesets"):

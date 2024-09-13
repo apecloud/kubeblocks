@@ -37,9 +37,9 @@ func BuildSchedulingPolicy(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComp
 }
 
 func buildSchedulingPolicy(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSpec) (*appsv1.SchedulingPolicy, error) {
-	schedulingPolicy := cluster.Spec.SchedulingPolicy
+	schedulingPolicy := cluster.Spec.SchedulingPolicy.DeepCopy()
 	if compSpec != nil && compSpec.SchedulingPolicy != nil {
-		schedulingPolicy = compSpec.SchedulingPolicy
+		schedulingPolicy = compSpec.SchedulingPolicy.DeepCopy()
 	}
 
 	mergeGlobalAffinity := func() error {

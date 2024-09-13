@@ -76,13 +76,14 @@ func (r *ComponentDefinition) ConvertFrom(srcRaw conversion.Hub) error {
 // convertTo converts this ComponentDefinition to the Hub version (v1).
 func (r *ComponentDefinition) incrementConvertTo(dstRaw metav1.Object) (incrementChange, error) {
 	// changed
-	r.changesToComponentDefinition(dstRaw.(*appsv1.ComponentDefinition))
+	if err := r.changesToComponentDefinition(dstRaw.(*appsv1.ComponentDefinition)); err != nil {
+		return nil, err
+	}
 
 	// deleted
 	c := &componentDefinitionConverter{
-		Monitor:                   r.Spec.Monitor,
-		RoleArbitrator:            r.Spec.RoleArbitrator,
-		LifecycleActionSwitchover: r.Spec.LifecycleActions.Switchover,
+		Monitor:        r.Spec.Monitor,
+		RoleArbitrator: r.Spec.RoleArbitrator,
 	}
 	if r.Spec.LifecycleActions != nil && r.Spec.LifecycleActions.Switchover != nil {
 		c.LifecycleActionSwitchover = r.Spec.LifecycleActions.Switchover
@@ -104,12 +105,10 @@ func (r *ComponentDefinition) incrementConvertFrom(srcRaw metav1.Object, ic incr
 	}
 
 	// changed
-	r.changesFromComponentDefinition(srcRaw.(*appsv1.ComponentDefinition))
-
-	return nil
+	return r.changesFromComponentDefinition(srcRaw.(*appsv1.ComponentDefinition))
 }
 
-func (r *ComponentDefinition) changesToComponentDefinition(cmpd *appsv1.ComponentDefinition) {
+func (r *ComponentDefinition) changesToComponentDefinition(cmpd *appsv1.ComponentDefinition) error {
 	// changed:
 	//   spec
 	//     vars
@@ -122,12 +121,15 @@ func (r *ComponentDefinition) changesToComponentDefinition(cmpd *appsv1.Componen
 		if v.ValueFrom == nil || v.ValueFrom.ComponentVarRef == nil || v.ValueFrom.ComponentVarRef.InstanceNames == nil {
 			continue
 		}
-		r.toV1VarsPodNames(v, cmpd)
+		if err := r.toV1VarsPodNames(v, cmpd); err != nil {
+			return err
+		}
 	}
 	r.toV1LifecycleActions(cmpd)
+	return nil
 }
 
-func (r *ComponentDefinition) changesFromComponentDefinition(cmpd *appsv1.ComponentDefinition) {
+func (r *ComponentDefinition) changesFromComponentDefinition(cmpd *appsv1.ComponentDefinition) error {
 	// changed:
 	//   spec
 	//     vars
@@ -140,27 +142,52 @@ func (r *ComponentDefinition) changesFromComponentDefinition(cmpd *appsv1.Compon
 		if v.ValueFrom == nil || v.ValueFrom.ComponentVarRef == nil || v.ValueFrom.ComponentVarRef.PodNames == nil {
 			continue
 		}
-		r.fromV1VarsPodNames(v)
+		if err := r.fromV1VarsPodNames(v); err != nil {
+			return err
+		}
 	}
 	r.fromV1LifecycleActions(cmpd)
+	return nil
 }
 
-func (r *ComponentDefinition) toV1VarsPodNames(v EnvVar, cmpd *appsv1.ComponentDefinition) {
+func (r *ComponentDefinition) toV1VarsPodNames(v EnvVar, cmpd *appsv1.ComponentDefinition) error {
 	for i, vv := range cmpd.Spec.Vars {
 		if vv.Name == v.Name {
 			opt := appsv1.VarOption(*v.ValueFrom.ComponentVarRef.InstanceNames)
+			if cmpd.Spec.Vars[i].ValueFrom == nil {
+				cmpd.Spec.Vars[i].ValueFrom = &appsv1.VarSource{}
+			}
+			if cmpd.Spec.Vars[i].ValueFrom.ComponentVarRef == nil {
+				if err := copier.Copy(&cmpd.Spec.Vars[i].ValueFrom.ComponentVarRef.ClusterObjectReference,
+					&v.ValueFrom.ComponentVarRef.ClusterObjectReference); err != nil {
+					return err
+				}
+			}
 			cmpd.Spec.Vars[i].ValueFrom.ComponentVarRef.PodNames = &opt
+			break
 		}
 	}
+	return nil
 }
 
-func (r *ComponentDefinition) fromV1VarsPodNames(v appsv1.EnvVar) {
+func (r *ComponentDefinition) fromV1VarsPodNames(v appsv1.EnvVar) error {
 	for i, vv := range r.Spec.Vars {
 		if vv.Name == v.Name {
 			opt := VarOption(*v.ValueFrom.ComponentVarRef.PodNames)
+			if r.Spec.Vars[i].ValueFrom == nil {
+				r.Spec.Vars[i].ValueFrom = &VarSource{}
+			}
+			if r.Spec.Vars[i].ValueFrom.ComponentVarRef == nil {
+				if err := copier.Copy(&r.Spec.Vars[i].ValueFrom.ComponentVarRef.ClusterObjectReference,
+					&v.ValueFrom.ComponentVarRef.ClusterObjectReference); err != nil {
+					return err
+				}
+			}
 			r.Spec.Vars[i].ValueFrom.ComponentVarRef.InstanceNames = &opt
+			break
 		}
 	}
+	return nil
 }
 
 func (r *ComponentDefinition) toV1LifecycleActions(cmpd *appsv1.ComponentDefinition) {

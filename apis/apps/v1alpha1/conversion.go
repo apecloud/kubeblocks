@@ -21,7 +21,6 @@ package v1alpha1
 
 import (
 	"encoding/json"
-	"maps"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -81,7 +80,7 @@ func incrementConvertFrom(converter incrementConverter, source metav1.Object, ic
 			if err := json.Unmarshal([]byte(data), ic); err != nil {
 				return err
 			}
-			maps.DeleteFunc(annotations, func(k, v string) bool { return k == kbIncrementConverterAK })
+			delete(annotations, kbIncrementConverterAK)
 			source.SetAnnotations(annotations)
 		}
 	}

@@ -96,6 +96,8 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 
 	var vcts []corev1.PersistentVolumeClaim
 	for _, vct := range synthesizedComp.VolumeClaimTemplates {
+		intctrlutil.MergeMetadataMapInplace(synthesizedComp.UserDefinedLabels, &vct.ObjectMeta.Labels)
+		intctrlutil.MergeMetadataMapInplace(synthesizedComp.UserDefinedAnnotations, &vct.ObjectMeta.Annotations)
 		vcts = append(vcts, vctToPVC(vct))
 	}
 	itsBuilder.SetVolumeClaimTemplates(vcts...)
@@ -300,9 +302,7 @@ func BuildConfigMapWithTemplate(cluster *appsv1alpha1.Cluster,
 		AddLabelsInMap(wellKnownLabels).
 		AddLabels(constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType).
 		AddLabels(constant.CMTemplateNameLabelKey, configTemplateSpec.TemplateRef).
-		AddLabelsInMap(synthesizedComp.UserDefinedLabels).
 		AddAnnotations(constant.DisableUpgradeInsConfigurationAnnotationKey, strconv.FormatBool(false)).
-		AddAnnotationsInMap(synthesizedComp.UserDefinedAnnotations).
 		SetData(configs).
 		GetObject()
 }

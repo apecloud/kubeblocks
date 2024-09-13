@@ -35,6 +35,7 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 )
 
 // ComposeTLSSecret composes a TSL secret object.
@@ -42,15 +43,8 @@ import (
 //  1. missing public function doc
 //  2. should avoid using Go template to call a function, this is too hacky & costly,
 //     should just call underlying registered Go template function.
-func ComposeTLSSecret(namespace, clusterName, componentName string) (*v1.Secret, error) {
-	name := GenerateTLSSecretName(clusterName, componentName)
-	secret := builder.NewSecretBuilder(namespace, name).
-		AddLabels(constant.AppManagedByLabelKey, constant.AppName).
-		AddLabels(constant.AppInstanceLabelKey, clusterName).
-		AddLabels(constant.KBAppComponentLabelKey, componentName).
-		SetStringData(map[string]string{}).
-		GetObject()
-
+func ComposeTLSSecret(synthesizedComp component.SynthesizedComponent) (*v1.Secret, error) {
+	secret := BuildTLSSecret(synthesizedComp)
 	// use ca gen cert
 	// IP: 127.0.0.1 and ::1
 	// DNS: localhost and *.<clusterName>-<componentName>-headless.<namespace>.svc.cluster.local
@@ -63,19 +57,31 @@ func ComposeTLSSecret(namespace, clusterName, componentName string) (*v1.Secret,
 	{{- $cert.Cert -}}
 	{{- print "%s" -}}
 	{{- $cert.Key -}}
-`, componentName, clusterName, componentName, namespace, spliter, spliter)
+`, synthesizedComp.Name, synthesizedComp.ClusterName, synthesizedComp.Name, synthesizedComp.Namespace, spliter, spliter)
 	out, err := buildFromTemplate(SignedCertTpl, nil)
 	if err != nil {
 		return nil, err
 	}
 	parts := strings.Split(out, spliter)
 	if len(parts) != 3 {
-		return nil, errors.Errorf("generate TLS certificates failed with cluster name %s, component name %s in namespace %s", clusterName, componentName, namespace)
+		return nil, errors.Errorf("generate TLS certificates failed with cluster name %s, component name %s in namespace %s", synthesizedComp.ClusterName, synthesizedComp.Name, synthesizedComp.Namespace)
 	}
 	secret.StringData[constant.CAName] = parts[0]
 	secret.StringData[constant.CertName] = parts[1]
 	secret.StringData[constant.KeyName] = parts[2]
 	return secret, nil
+}
+
+func BuildTLSSecret(synthesizedComp component.SynthesizedComponent) *v1.Secret {
+	name := GenerateTLSSecretName(synthesizedComp.ClusterName, synthesizedComp.Name)
+	return builder.NewSecretBuilder(synthesizedComp.Namespace, name).
+		AddLabels(constant.AppManagedByLabelKey, constant.AppName).
+		AddLabels(constant.AppInstanceLabelKey, synthesizedComp.ClusterName).
+		AddLabels(constant.KBAppComponentLabelKey, synthesizedComp.Name).
+		AddLabelsInMap(synthesizedComp.UserDefinedLabels).
+		AddAnnotationsInMap(synthesizedComp.UserDefinedAnnotations).
+		SetStringData(map[string]string{}).
+		GetObject()
 }
 
 func GenerateTLSSecretName(clusterName, componentName string) string {

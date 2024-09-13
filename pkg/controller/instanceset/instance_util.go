@@ -532,6 +532,8 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		}
 		requests[corev1.ResourceStorage] = *newPVC.Spec.Resources.Requests.Storage()
 		oldPVC.Spec.Resources.Requests = requests
+		mergeMap(&newPVC.Annotations, &oldPVC.Annotations)
+		mergeMap(&newPVC.Labels, &oldPVC.Labels)
 		return oldPVC
 	}
 

@@ -654,12 +654,12 @@ type ClusterComponentSpec struct {
 	// +optional
 	EnabledLogs []string `json:"enabledLogs,omitempty"`
 
-	// Specifies Labels to override or add for underlying Pods, Account Secrets, ConfigMaps, Services Owned by Component.
+	// Specifies Labels to override or add for underlying Pods, PVCs, Account & TLS Secrets, Services Owned by Component.
 	//
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
 
-	// Specifies Annotations to override or add for underlying Pods, Account Secrets, ConfigMaps, Services Owned by Component.
+	// Specifies Annotations to override or add for underlying Pods, PVCs, Account & TLS Secrets, Services Owned by Component.
 	//
 	// +optional
 	Annotations map[string]string `json:"annotations,omitempty"`

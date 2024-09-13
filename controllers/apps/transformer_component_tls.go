@@ -22,6 +22,7 @@ package apps
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -150,19 +151,33 @@ func buildTLSCert(ctx context.Context, cli client.Reader, synthesizedComp compon
 		}
 	case appsv1alpha1.IssuerKubeBlocks:
 		secretName := plan.GenerateTLSSecretName(synthesizedComp.ClusterName, synthesizedComp.Name)
-		preSecret := &corev1.Secret{}
-		if err := cli.Get(ctx, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: secretName}, preSecret); !errors.IsNotFound(err) {
-			return err
-		}
-		secret, err := plan.ComposeTLSSecret(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
-		if err != nil {
+		existSecret := &corev1.Secret{}
+		if err := cli.Get(ctx, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: secretName}, existSecret); err != nil && !errors.IsNotFound(err) {
 			return err
 		}
 		graphCli, _ := cli.(model.GraphClient)
+		if existSecret != nil {
+			updateTLSSecretMeta(existSecret, graphCli, dag, synthesizedComp)
+			return nil
+		}
+		secret, err := plan.ComposeTLSSecret(synthesizedComp)
+		if err != nil {
+			return err
+		}
 		graphCli.Create(dag, secret)
 	}
 
 	return nil
+}
+
+func updateTLSSecretMeta(existSecret *corev1.Secret, graphCli model.GraphClient, dag *graph.DAG, synthesizedComp component.SynthesizedComponent) {
+	secretProto := plan.BuildTLSSecret(synthesizedComp)
+	existSecretCopy := existSecret.DeepCopy()
+	existSecretCopy.Labels = secretProto.Labels
+	existSecretCopy.Annotations = secretProto.Annotations
+	if !reflect.DeepEqual(existSecret, existSecretCopy) {
+		graphCli.Update(dag, existSecret, existSecretCopy)
+	}
 }
 
 func updateTLSVolumeAndVolumeMount(podSpec *corev1.PodSpec, clusterName string, synthesizeComp component.SynthesizedComponent) error {

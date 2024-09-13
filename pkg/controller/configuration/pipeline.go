@@ -197,7 +197,7 @@ func (p *pipeline) UpdateConfigRelatedObject() *pipeline {
 		if err := injectTemplateEnvFrom(p.ctx.Cluster, p.ctx.SynthesizedComponent, p.ctx.PodSpec, p.Client, p.Context, p.renderWrapper.renderedObjs); err != nil {
 			return err
 		}
-		return createConfigObjects(p.Client, p.Context, p.renderWrapper.renderedObjs)
+		return createConfigObjects(p.Client, p.Context, p.renderWrapper.renderedObjs, p.renderWrapper.renderedSecretObjs)
 	}
 
 	return p.Wrap(updateMeta)
@@ -367,9 +367,12 @@ func (p *updatePipeline) UpdateConfigVersion(revision string) *updatePipeline {
 func (p *updatePipeline) Sync() *updatePipeline {
 	return p.Wrap(func() error {
 		if p.ConfigConstraintObj != nil && !p.isDone() {
-			if err := SyncEnvConfigmap(*p.configSpec, p.newCM, &p.ConfigConstraintObj.Spec, p.Client, p.Context); err != nil {
+			if err := SyncEnvSourceObject(*p.configSpec, p.newCM, &p.ConfigConstraintObj.Spec, p.Client, p.Context, p.ctx.Cluster, p.ctx.SynthesizedComponent); err != nil {
 				return err
 			}
+		}
+		if InjectEnvEnabled(*p.configSpec) && toSecret(*p.configSpec) {
+			return nil
 		}
 		switch {
 		case p.isDone():

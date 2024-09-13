@@ -3948,6 +3948,18 @@ or cluster topology. Examples:</p>
 </ul>
 </td>
 </tr>
+<tr>
+<td>
+<code>asSecret</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Whether to store the final rendered parameters as a secret.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec
@@ -5623,6 +5635,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Refers to the volume name of PodTemplate. The configuration file produced through the configuration
 template will be mounted to the corresponding volume. Must be a DNS_LABEL name.
 The volume name must be defined in podSpec.containers[*].volumeMounts.</p>
@@ -17328,6 +17341,18 @@ or cluster topology. Examples:</p>
 </ul>
 </td>
 </tr>
+<tr>
+<td>
+<code>asSecret</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Whether to store the final rendered parameters as a secret.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentDefRef">ComponentDefRef
@@ -19456,6 +19481,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Refers to the volume name of PodTemplate. The configuration file produced through the configuration
 template will be mounted to the corresponding volume. Must be a DNS_LABEL name.
 The volume name must be defined in podSpec.containers[*].volumeMounts.</p>

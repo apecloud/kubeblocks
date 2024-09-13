@@ -251,7 +251,7 @@ NAME        CLUSTER-DEFINITION    VERSION        TERMINATION-POLICY     STATUS  
 mycluster                                        Delete                 Running   47m
 ```
 
-#### Option 1. Apply an OpsRquest
+#### Option 1. Apply an OpsRequest
 
 1. Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
 
@@ -391,7 +391,7 @@ NAME        CLUSTER-DEFINITION    VERSION        TERMINATION-POLICY     STATUS  
 mycluster                                        Delete                 Running   47m
 ```
 
-#### Option 1. Apply an OpsRquest
+#### Option 1. Apply an OpsRequest
 
 1. Apply an OpsRequest to a specified cluster. Configure the parameters according to your needs.
 

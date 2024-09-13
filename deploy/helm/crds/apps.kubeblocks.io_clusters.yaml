@@ -3757,9 +3757,6 @@ spec:
                       maxLength: 22
                       pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
-                      x-kubernetes-validations:
-                      - message: name is immutable
-                        rule: self == oldSelf
                     offlineInstances:
                       description: |-
                         Specifies the names of instances to be transitioned to offline status.
@@ -7148,9 +7145,6 @@ spec:
                   required:
                   - replicas
                   type: object
-                  x-kubernetes-validations:
-                  - message: componentDef is required once set
-                    rule: '!has(oldSelf.componentDef) || has(self.componentDef)'
                 maxItems: 128
                 minItems: 1
                 type: array
@@ -12431,9 +12425,6 @@ spec:
                           maxLength: 22
                           pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                           type: string
-                          x-kubernetes-validations:
-                          - message: name is immutable
-                            rule: self == oldSelf
                         offlineInstances:
                           description: |-
                             Specifies the names of instances to be transitioned to offline status.
@@ -15850,9 +15841,6 @@ spec:
                       required:
                       - replicas
                       type: object
-                      x-kubernetes-validations:
-                      - message: componentDef is required once set
-                        rule: '!has(oldSelf.componentDef) || has(self.componentDef)'
                   required:
                   - name
                   - template

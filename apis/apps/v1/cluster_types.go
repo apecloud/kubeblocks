@@ -262,7 +262,6 @@ const (
 )
 
 // ClusterComponentSpec defines the specification of a Component within a Cluster.
-// +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDef) || has(self.componentDef)", message="componentDef is required once set"
 type ClusterComponentSpec struct {
 	// Specifies the Component's name.
 	// It's part of the Service DNS name and must comply with the IANA service naming rule.
@@ -271,7 +270,6 @@ type ClusterComponentSpec struct {
 	//
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name is immutable"
 	// +optional
 	Name string `json:"name"`
 

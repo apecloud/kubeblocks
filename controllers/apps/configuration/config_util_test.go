@@ -27,7 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -51,7 +51,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 	var (
 		configMapObj        *corev1.ConfigMap
 		configConstraintObj *appsv1beta1.ConfigConstraint
-		compDefObj          *appsv1alpha1.ComponentDefinition
+		compDefObj          *appsv1.ComponentDefinition
 	)
 
 	cleanEnv := func() {
@@ -162,9 +162,9 @@ var _ = Describe("ConfigWrapper util test", func() {
 	Context("ComponentDefinition CR test without config Constraints", func() {
 		It("Should success without error", func() {
 			// remove ConfigConstraintRef
-			_, err := handleConfigTemplate(compDefObj, func(templates []appsv1alpha1.ComponentConfigSpec) (bool, error) {
+			_, err := handleConfigTemplate(compDefObj, func(templates []appsv1.ComponentConfigSpec) (bool, error) {
 				return true, nil
-			}, func(compDef *appsv1alpha1.ComponentDefinition) error {
+			}, func(compDef *appsv1.ComponentDefinition) error {
 				if len(compDef.Spec.Configs) == 0 {
 					return nil
 				}

@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -108,7 +108,7 @@ func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 		}
 	}
 	// if component needs to do post ready restore after cluster is running, annotate component
-	if c.Cluster.Status.Phase == appsv1alpha1.RunningClusterPhase {
+	if c.Cluster.Status.Phase == appsv1.RunningClusterPhase {
 		for _, compSpec := range c.Cluster.Spec.ComponentSpecs {
 			backupSource, ok := backupMap[compSpec.Name]
 			if !ok {
@@ -118,7 +118,7 @@ func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 				continue
 			}
 			compObjName := component.FullName(c.Cluster.Name, compSpec.Name)
-			compObj := &appsv1alpha1.Component{}
+			compObj := &appsv1.Component{}
 			if err = c.Client.Get(c.GetContext(), client.ObjectKey{Name: compObjName, Namespace: c.Cluster.Namespace}, compObj); err != nil {
 				return err
 			}
@@ -132,7 +132,7 @@ func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 func (c *clusterRestoreTransformer) cleanupRestoreAnnotationForSharding(dag *graph.DAG,
 	shardName string,
 	restoreDoneForShardComponents bool) error {
-	if c.Cluster.Status.Phase != appsv1alpha1.RunningClusterPhase {
+	if c.Cluster.Status.Phase != appsv1.RunningClusterPhase {
 		return nil
 	}
 	if !restoreDoneForShardComponents {
@@ -149,7 +149,7 @@ func (c *clusterRestoreTransformer) cleanupRestoreAnnotationForSharding(dag *gra
 	return nil
 }
 
-func (c *clusterRestoreTransformer) annotateComponent(dag *graph.DAG, compObj *appsv1alpha1.Component) {
+func (c *clusterRestoreTransformer) annotateComponent(dag *graph.DAG, compObj *appsv1.Component) {
 	// annotate component to reconcile for postReady restore.
 	compObj.Labels[constant.ReconcileAnnotationKey] = "DoPostReadyRestore"
 	graphCli, _ := c.Client.(model.GraphClient)

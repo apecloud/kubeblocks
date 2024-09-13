@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
@@ -65,8 +66,8 @@ func createConfigObjects(cli client.Client, ctx context.Context, objs []client.O
 
 // buildConfigManagerWithComponent build the configmgr sidecar container and update it
 // into PodSpec if configuration reload option is on
-func buildConfigManagerWithComponent(podSpec *corev1.PodSpec, configSpecs []appsv1alpha1.ComponentConfigSpec,
-	ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, synthesizedComp *component.SynthesizedComponent) error {
+func buildConfigManagerWithComponent(podSpec *corev1.PodSpec, configSpecs []appsv1.ComponentConfigSpec,
+	ctx context.Context, cli client.Client, cluster *appsv1.Cluster, synthesizedComp *component.SynthesizedComponent) error {
 	var err error
 	var buildParams *cfgcm.CfgManagerBuildParams
 
@@ -169,9 +170,9 @@ func updateCfgManagerVolumes(podSpec *corev1.PodSpec, configManager *cfgcm.CfgMa
 	}
 }
 
-func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1alpha1.ComponentConfigSpec) ([]corev1.VolumeMount, []appsv1alpha1.ComponentConfigSpec) {
+func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1.ComponentConfigSpec) ([]corev1.VolumeMount, []appsv1.ComponentConfigSpec) {
 	// Ignore useless configTemplate
-	usingConfigSpecs := make([]appsv1alpha1.ComponentConfigSpec, 0, len(configSpecs))
+	usingConfigSpecs := make([]appsv1.ComponentConfigSpec, 0, len(configSpecs))
 	config2Containers := make(map[string][]*corev1.Container)
 	for _, configSpec := range configSpecs {
 		usingContainers := intctrlutil.GetPodContainerWithVolumeMount(podSpec, configSpec.VolumeName)
@@ -207,7 +208,7 @@ func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1a
 	return volumeDirs, usingConfigSpecs
 }
 
-func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *appsv1alpha1.Cluster, comp *component.SynthesizedComponent, configSpecBuildParams []cfgcm.ConfigSpecMeta, volumeDirs []corev1.VolumeMount, podSpec *corev1.PodSpec) (*cfgcm.CfgManagerBuildParams, error) {
+func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *appsv1.Cluster, comp *component.SynthesizedComponent, configSpecBuildParams []cfgcm.ConfigSpecMeta, volumeDirs []corev1.VolumeMount, podSpec *corev1.PodSpec) (*cfgcm.CfgManagerBuildParams, error) {
 	cfgManagerParams := &cfgcm.CfgManagerBuildParams{
 		ManagerName:               constant.ConfigSidecarName,
 		ComponentName:             comp.Name,
@@ -305,7 +306,7 @@ func enableVScaleTrigger(configSpec *appsv1alpha1.ComponentConfigSpec) bool {
 	return validRerenderResources(configSpec) && slices.Contains(configSpec.ReRenderResourceTypes, appsv1alpha1.ComponentVScaleType)
 }
 
-func configSetFromComponent(templates []appsv1alpha1.ComponentConfigSpec) []string {
+func configSetFromComponent(templates []appsv1.ComponentConfigSpec) []string {
 	configSet := make([]string, 0)
 	for _, template := range templates {
 		configSet = append(configSet, template.Name)

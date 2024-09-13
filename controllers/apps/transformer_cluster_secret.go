@@ -23,7 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -39,7 +39,7 @@ func (c *clusterSecretTransformer) Transform(ctx graph.TransformContext, dag *gr
 
 	var secrets, noneClusterObjects []client.Object
 	secrets = graphCli.FindAll(dag, &corev1.Secret{})
-	noneClusterObjects = graphCli.FindAll(dag, &appsv1alpha1.Cluster{}, &model.HaveDifferentTypeWithOption{})
+	noneClusterObjects = graphCli.FindAll(dag, &appsv1.Cluster{}, &model.HaveDifferentTypeWithOption{})
 	for _, secret := range secrets {
 		if graphCli.IsAction(dag, secret, model.ActionUpdatePtr()) {
 			graphCli.Noop(dag, secret)

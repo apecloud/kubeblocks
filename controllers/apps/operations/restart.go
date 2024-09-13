@@ -29,8 +29,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -44,8 +45,8 @@ var _ OpsHandler = restartOpsHandler{}
 func init() {
 	restartBehaviour := OpsBehaviour{
 		// if cluster is Abnormal or Failed, new opsRequest may repair it.
-		FromClusterPhases: appsv1alpha1.GetClusterUpRunningPhases(),
-		ToClusterPhase:    appsv1alpha1.UpdatingClusterPhase,
+		FromClusterPhases: appsv1.GetClusterUpRunningPhases(),
+		ToClusterPhase:    appsv1.UpdatingClusterPhase,
 		QueueByCluster:    true,
 		OpsHandler:        restartOpsHandler{},
 	}

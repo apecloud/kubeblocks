@@ -32,7 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
@@ -176,11 +176,11 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 // SetupWithManager sets up the controller with the Manager.
 func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
-		For(&appsv1alpha1.Cluster{}).
+		For(&appsv1.Cluster{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: int(math.Ceil(viper.GetFloat64(constant.CfgKBReconcileWorkers) / 4)),
 		}).
-		Owns(&appsv1alpha1.Component{}).
+		Owns(&appsv1.Component{}).
 		Owns(&corev1.Service{}). // cluster services
 		Owns(&corev1.Secret{}).  // cluster conn-credential secret
 		Owns(&dpv1alpha1.BackupPolicy{}).

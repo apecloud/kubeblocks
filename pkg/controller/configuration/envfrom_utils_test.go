@@ -26,7 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
@@ -44,8 +44,8 @@ var _ = Describe("ConfigEnvFrom test", func() {
 	)
 
 	var (
-		compDef *appsv1alpha1.ComponentDefinition
-		cluster *appsv1alpha1.Cluster
+		compDef *appsv1.ComponentDefinition
+		cluster *appsv1.Cluster
 
 		k8sMockClient    *testutil.K8sClientMockHelper
 		origCMObject     *corev1.ConfigMap

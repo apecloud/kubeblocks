@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -57,7 +58,7 @@ func (e ExposeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clien
 		exposeMap = opsRes.OpsRequest.Spec.ToExposeListToMap()
 	)
 	reqCtx.Log.Info("cluster service before action", "clusterService", opsRes.Cluster.Spec.Services)
-	compMap := make(map[string]appsv1alpha1.ClusterComponentSpec)
+	compMap := make(map[string]appsv1.ClusterComponentSpec)
 	for _, comp := range opsRes.Cluster.Spec.ComponentSpecs {
 		compMap[comp.Name] = comp
 	}
@@ -104,7 +105,7 @@ func (e ExposeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cli
 		opsRequest.Status.Components = make(map[string]appsv1alpha1.OpsRequestComponentStatus)
 		for _, v := range opsRequest.Spec.ExposeList {
 			opsRequest.Status.Components[v.ComponentName] = appsv1alpha1.OpsRequestComponentStatus{
-				Phase: appsv1alpha1.UpdatingClusterCompPhase, // appsv1alpha1.ExposingPhase,
+				Phase: appsv1.UpdatingClusterCompPhase, // appsv1.ExposingPhase,
 			}
 		}
 	}
@@ -124,7 +125,7 @@ func (e ExposeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cli
 		// update component status if completed
 		if actualCount == expectCount {
 			p := opsRequest.Status.Components[v.ComponentName]
-			p.Phase = appsv1alpha1.RunningClusterCompPhase
+			p.Phase = appsv1.RunningClusterCompPhase
 		}
 	}
 	opsRequest.Status.Progress = fmt.Sprintf("%d/%d", actualProgressCount, expectProgressCount)
@@ -243,7 +244,7 @@ func (e ExposeOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, c
 	return nil
 }
 
-func (e ExposeOpsHandler) removeClusterServices(cluster *appsv1alpha1.Cluster,
+func (e ExposeOpsHandler) removeClusterServices(cluster *appsv1.Cluster,
 	clusterCompSpecName string,
 	exposeServices []appsv1alpha1.OpsService) error {
 	if cluster == nil || len(exposeServices) == 0 {
@@ -264,7 +265,7 @@ func (e ExposeOpsHandler) removeClusterServices(cluster *appsv1alpha1.Cluster,
 
 func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
+	cluster *appsv1.Cluster,
 	clusterCompSpecName string,
 	compDefName string,
 	exposeServices []appsv1alpha1.OpsService) error {
@@ -290,7 +291,7 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 		return false
 	}
 
-	convertDefaultCompDefServicePorts := func(compServices []appsv1alpha1.ComponentService) ([]corev1.ServicePort, error) {
+	convertDefaultCompDefServicePorts := func(compServices []appsv1.ComponentService) ([]corev1.ServicePort, error) {
 		if len(compServices) == 0 {
 			return nil, fmt.Errorf("component service is not defined, expose operation is not supported, cluster: %s, component: %s", cluster.Name, clusterCompSpecName)
 		}
@@ -353,8 +354,8 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 
 		genServiceName := generateServiceName(clusterCompSpecName, exposeService.Name)
 
-		clusterService := appsv1alpha1.ClusterService{
-			Service: appsv1alpha1.Service{
+		clusterService := appsv1.ClusterService{
+			Service: appsv1.Service{
 				Name:        genServiceName,
 				ServiceName: genServiceName,
 				Annotations: exposeService.Annotations,

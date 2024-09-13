@@ -25,9 +25,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -72,7 +74,7 @@ func NewTask(item appsv1alpha1.ConfigurationItemDetail, status *appsv1alpha1.Con
 				return syncStatus(configMap, status)
 			case appsv1alpha1.CPendingPhase,
 				appsv1alpha1.CMergeFailedPhase:
-				return syncImpl(fetcher, item, status, synComponent, revision, configSpec)
+				return syncImpl(fetcher, item, status, synComponent, revision, builder.ToV1ConfigSpec(configSpec))
 			case appsv1alpha1.CCreatingPhase:
 				return nil
 			}
@@ -94,7 +96,7 @@ func syncImpl(fetcher *Task,
 	status *appsv1alpha1.ConfigurationItemDetailStatus,
 	synthesizedComponent *component.SynthesizedComponent,
 	revision string,
-	configSpec *appsv1alpha1.ComponentConfigSpec) (err error) {
+	configSpec *appsv1.ComponentConfigSpec) (err error) {
 	err = configctrl.NewReconcilePipeline(configctrl.ReconcileCtx{
 		ResourceCtx:          fetcher.ResourceCtx,
 		Cluster:              fetcher.ClusterObj,

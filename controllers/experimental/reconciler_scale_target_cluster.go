@@ -26,7 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	experimental "github.com/apecloud/kubeblocks/apis/experimental/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
@@ -49,7 +49,7 @@ func (r *scaleTargetClusterReconciler) Reconcile(tree *kubebuilderx.ObjectTree) 
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
-	cluster, _ := object.(*appsv1alpha1.Cluster)
+	cluster, _ := object.(*appsv1.Cluster)
 	nodes := tree.List(&corev1.Node{})
 	// TODO(free6om): filter nodes that satisfy pod template spec of each component (by nodeSelector, nodeAffinity&nodeAntiAffinity, tolerations)
 	desiredReplicas := int32(len(nodes))

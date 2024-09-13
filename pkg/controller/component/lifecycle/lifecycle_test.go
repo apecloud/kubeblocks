@@ -35,7 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
@@ -120,20 +120,20 @@ var _ = Describe("lifecycle", func() {
 					},
 				},
 			},
-			LifecycleActions: &appsv1alpha1.ComponentLifecycleActions{
-				PostProvision: &appsv1alpha1.Action{
-					Exec: &appsv1alpha1.ExecAction{
+			LifecycleActions: &appsv1.ComponentLifecycleActions{
+				PostProvision: &appsv1.Action{
+					Exec: &appsv1.ExecAction{
 						Command: []string{"/bin/bash", "-c", "echo -n post-provision"},
 					},
 					TimeoutSeconds: 5,
-					RetryPolicy: &appsv1alpha1.RetryPolicy{
+					RetryPolicy: &appsv1.RetryPolicy{
 						MaxRetries:    5,
 						RetryInterval: 10,
 					},
 				},
-				RoleProbe: &appsv1alpha1.Probe{
-					Action: appsv1alpha1.Action{
-						Exec: &appsv1alpha1.ExecAction{
+				RoleProbe: &appsv1.Probe{
+					Action: appsv1.Action{
+						Exec: &appsv1.ExecAction{
 							Command: []string{"/bin/bash", "-c", "echo -n role-probe"},
 						},
 						TimeoutSeconds: 5,
@@ -362,7 +362,7 @@ var _ = Describe("lifecycle", func() {
 			reader := &mockReader{
 				cli: k8sClient,
 				objs: []client.Object{
-					&appsv1alpha1.Component{
+					&appsv1.Component{
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: synthesizedComp.Namespace,
 							Name:      constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name),
@@ -371,7 +371,7 @@ var _ = Describe("lifecycle", func() {
 							},
 						},
 					},
-					&appsv1alpha1.Component{
+					&appsv1.Component{
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: synthesizedComp.Namespace,
 							Name:      constant.GenerateClusterComponentName(synthesizedComp.ClusterName, "another"),
@@ -422,7 +422,7 @@ var _ = Describe("lifecycle", func() {
 		})
 
 		It("precondition", func() {
-			clusterReady := appsv1alpha1.ClusterReadyPreConditionType
+			clusterReady := appsv1.ClusterReadyPreConditionType
 			synthesizedComp.LifecycleActions.PostProvision.PreCondition = &clusterReady
 
 			lifecycle, err := New(synthesizedComp, nil, pods...)
@@ -432,13 +432,13 @@ var _ = Describe("lifecycle", func() {
 			reader := &mockReader{
 				cli: k8sClient,
 				objs: []client.Object{
-					&appsv1alpha1.Cluster{
+					&appsv1.Cluster{
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: synthesizedComp.Namespace,
 							Name:      synthesizedComp.ClusterName,
 						},
-						Status: appsv1alpha1.ClusterStatus{
-							Phase: appsv1alpha1.RunningClusterPhase,
+						Status: appsv1.ClusterStatus{
+							Phase: appsv1.RunningClusterPhase,
 						},
 					},
 				},
@@ -455,7 +455,7 @@ var _ = Describe("lifecycle", func() {
 		})
 
 		It("precondition - fail", func() {
-			clusterReady := appsv1alpha1.ClusterReadyPreConditionType
+			clusterReady := appsv1.ClusterReadyPreConditionType
 			synthesizedComp.LifecycleActions.PostProvision.PreCondition = &clusterReady
 
 			lifecycle, err := New(synthesizedComp, nil, pods...)
@@ -465,13 +465,13 @@ var _ = Describe("lifecycle", func() {
 			reader := &mockReader{
 				cli: k8sClient,
 				objs: []client.Object{
-					&appsv1alpha1.Cluster{
+					&appsv1.Cluster{
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: synthesizedComp.Namespace,
 							Name:      synthesizedComp.ClusterName,
 						},
-						Status: appsv1alpha1.ClusterStatus{
-							Phase: appsv1alpha1.FailedClusterPhase,
+						Status: appsv1.ClusterStatus{
+							Phase: appsv1.FailedClusterPhase,
 						},
 					},
 				},
@@ -483,7 +483,7 @@ var _ = Describe("lifecycle", func() {
 		})
 
 		It("pod selector - any", func() {
-			synthesizedComp.LifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1alpha1.AnyReplica
+			synthesizedComp.LifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.AnyReplica
 			pods = []*corev1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -537,7 +537,7 @@ var _ = Describe("lifecycle", func() {
 		})
 
 		It("pod selector - role", func() {
-			synthesizedComp.LifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1alpha1.RoleSelector
+			synthesizedComp.LifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.RoleSelector
 			synthesizedComp.LifecycleActions.PostProvision.Exec.MatchingKey = "leader"
 			pods = []*corev1.Pod{
 				{
@@ -594,7 +594,7 @@ var _ = Describe("lifecycle", func() {
 		})
 
 		It("pod selector - has no matched", func() {
-			synthesizedComp.LifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1alpha1.RoleSelector
+			synthesizedComp.LifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.RoleSelector
 			synthesizedComp.LifecycleActions.PostProvision.Exec.MatchingKey = "leader"
 			pods = []*corev1.Pod{
 				{

@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
@@ -40,8 +41,8 @@ func init() {
 	vsHandler := verticalScalingHandler{}
 	verticalScalingBehaviour := OpsBehaviour{
 		// if cluster is Abnormal or Failed, new opsRequest may can repair it.
-		FromClusterPhases: appsv1alpha1.GetClusterUpRunningPhases(),
-		ToClusterPhase:    appsv1alpha1.UpdatingClusterPhase,
+		FromClusterPhases: appsv1.GetClusterUpRunningPhases(),
+		ToClusterPhase:    appsv1.UpdatingClusterPhase,
 		OpsHandler:        vsHandler,
 		QueueByCluster:    true,
 		CancelFunc:        vsHandler.Cancel,
@@ -59,7 +60,7 @@ func (vs verticalScalingHandler) ActionStartedCondition(reqCtx intctrlutil.Reque
 // Action modifies cluster component resources according to
 // the definition of opsRequest with spec.componentNames and spec.componentOps.verticalScaling
 func (vs verticalScalingHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	applyVerticalScaling := func(compSpec *appsv1alpha1.ClusterComponentSpec, obj ComponentOpsInterface) error {
+	applyVerticalScaling := func(compSpec *appsv1.ClusterComponentSpec, obj ComponentOpsInterface) error {
 		verticalScaling := obj.(appsv1alpha1.VerticalScaling)
 		if vs.verticalScalingComp(verticalScaling) {
 			compSpec.Resources = verticalScaling.ResourceRequirements
@@ -197,15 +198,15 @@ func (vs verticalScalingHandler) podApplyCompOps(
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
 func (vs verticalScalingHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.VerticalScalingList)
-	compOpsHelper.saveLastConfigurations(opsRes, func(compSpec appsv1alpha1.ClusterComponentSpec, comOps ComponentOpsInterface) appsv1alpha1.LastComponentConfiguration {
+	compOpsHelper.saveLastConfigurations(opsRes, func(compSpec appsv1.ClusterComponentSpec, comOps ComponentOpsInterface) appsv1alpha1.LastComponentConfiguration {
 		verticalScaling := comOps.(appsv1alpha1.VerticalScaling)
-		var instanceTemplates []appsv1alpha1.InstanceTemplate
+		var instanceTemplates []appsv1.InstanceTemplate
 		for _, vIns := range verticalScaling.Instances {
 			for _, compIns := range compSpec.Instances {
 				if vIns.Name != compIns.Name {
 					continue
 				}
-				instanceTemplates = append(instanceTemplates, appsv1alpha1.InstanceTemplate{
+				instanceTemplates = append(instanceTemplates, appsv1.InstanceTemplate{
 					Name:      compIns.Name,
 					Resources: compIns.Resources,
 				})
@@ -223,7 +224,7 @@ func (vs verticalScalingHandler) SaveLastConfiguration(reqCtx intctrlutil.Reques
 // Cancel this function defines the cancel verticalScaling action.
 func (vs verticalScalingHandler) Cancel(reqCxt intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.VerticalScalingList)
-	return compOpsHelper.cancelComponentOps(reqCxt.Ctx, cli, opsRes, func(lastConfig *appsv1alpha1.LastComponentConfiguration, comp *appsv1alpha1.ClusterComponentSpec) {
+	return compOpsHelper.cancelComponentOps(reqCxt.Ctx, cli, opsRes, func(lastConfig *appsv1alpha1.LastComponentConfiguration, comp *appsv1.ClusterComponentSpec) {
 		comp.Resources = lastConfig.ResourceRequirements
 		for _, lastIns := range lastConfig.Instances {
 			for i := range comp.Instances {

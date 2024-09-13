@@ -26,8 +26,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
@@ -48,9 +48,9 @@ var _ = Describe("object rbac transformer test.", func() {
 	var dag *graph.DAG
 	var graphCli model.GraphClient
 	var transformer graph.Transformer
-	var cluster *appsv1alpha1.Cluster
-	var compDefObj *appsv1alpha1.ComponentDefinition
-	var compObj *appsv1alpha1.Component
+	var cluster *appsv1.Cluster
+	var compDefObj *appsv1.ComponentDefinition
+	var compObj *appsv1.Component
 	var saKey types.NamespacedName
 	var allSettings map[string]interface{}
 
@@ -179,7 +179,7 @@ var _ = Describe("object rbac transformer test.", func() {
 	})
 })
 
-func mockDAG(graphCli model.GraphClient, cluster *appsv1alpha1.Cluster) *graph.DAG {
+func mockDAG(graphCli model.GraphClient, cluster *appsv1.Cluster) *graph.DAG {
 	d := graph.NewDAG()
 	graphCli.Root(d, cluster, cluster, model.ActionStatusPtr())
 	its := &workloads.InstanceSet{}

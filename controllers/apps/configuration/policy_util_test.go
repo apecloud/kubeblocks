@@ -32,9 +32,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -95,7 +95,7 @@ func withMockInstanceSet(replicas int, labels map[string]string) ParamsOps {
 
 func withClusterComponent(replicas int) ParamsOps {
 	return func(params *reconfigureParams) {
-		params.ClusterComponent = &appsv1alpha1.ClusterComponentSpec{
+		params.ClusterComponent = &appsv1.ClusterComponentSpec{
 			Name:     "test",
 			Replicas: func() int32 { rep := int32(replicas); return rep }(),
 		}
@@ -162,7 +162,7 @@ func newMockReconfigureParams(testName string, cli client.Client, paramOps ...Pa
 		},
 		SynthesizedComponent: &component.SynthesizedComponent{
 			MinReadySeconds: 5,
-			Roles: []appsv1alpha1.ReplicaRole{
+			Roles: []appsv1.ReplicaRole{
 				{
 					Name:        "leader",
 					Serviceable: true,
@@ -177,7 +177,7 @@ func newMockReconfigureParams(testName string, cli client.Client, paramOps ...Pa
 				},
 			},
 		},
-		Cluster: &appsv1alpha1.Cluster{
+		Cluster: &appsv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test",
 			}},

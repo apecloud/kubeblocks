@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
@@ -43,8 +44,8 @@ var _ = Describe("Reconfigure util test", func() {
 
 	var (
 		k8sMockClient *testutil.K8sClientMockHelper
-		tpl           appsv1alpha1.ComponentConfigSpec
-		tpl2          appsv1alpha1.ComponentConfigSpec
+		tpl           appsv1.ComponentConfigSpec
+		tpl2          appsv1.ComponentConfigSpec
 		updatedCfg    appsv1alpha1.ConfigurationItem
 	)
 
@@ -53,7 +54,7 @@ var _ = Describe("Reconfigure util test", func() {
 		componentName = "mysql"
 	)
 
-	mockCfgTplObj := func(tpl appsv1alpha1.ComponentConfigSpec) (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint, *appsv1alpha1.Configuration) {
+	mockCfgTplObj := func(tpl appsv1.ComponentConfigSpec) (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint, *appsv1alpha1.Configuration) {
 		By("By assure an cm obj")
 
 		cfgCM := testapps.NewCustomizedObj("operations_config/config-template.yaml",
@@ -74,16 +75,16 @@ var _ = Describe("Reconfigure util test", func() {
 
 	BeforeEach(func() {
 		k8sMockClient = testutil.NewK8sMockClient()
-		tpl = appsv1alpha1.ComponentConfigSpec{
-			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+		tpl = appsv1.ComponentConfigSpec{
+			ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
 				Name:        "for_test",
 				TemplateRef: "cm_obj",
 			},
 			ConfigConstraintRef: "cfg_constraint_obj",
 			Keys:                []string{"my.cnf"},
 		}
-		tpl2 = appsv1alpha1.ComponentConfigSpec{
-			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+		tpl2 = appsv1.ComponentConfigSpec{
+			ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
 				Name:        "for_test2",
 				TemplateRef: "cm_obj",
 			},

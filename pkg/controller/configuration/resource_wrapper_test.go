@@ -28,7 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -45,7 +45,7 @@ var _ = Describe("resource Fetcher", func() {
 
 	var (
 		k8sMockClient *testutil.K8sClientMockHelper
-		cluster       *appsv1alpha1.Cluster
+		cluster       *appsv1.Cluster
 	)
 
 	BeforeEach(func() {

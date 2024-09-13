@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -37,8 +38,8 @@ var _ OpsHandler = StopOpsHandler{}
 
 func init() {
 	stopBehaviour := OpsBehaviour{
-		FromClusterPhases: append(appsv1alpha1.GetClusterUpRunningPhases(), appsv1alpha1.UpdatingClusterPhase),
-		ToClusterPhase:    appsv1alpha1.StoppingClusterPhase,
+		FromClusterPhases: append(appsv1.GetClusterUpRunningPhases(), appsv1.UpdatingClusterPhase),
+		ToClusterPhase:    appsv1.StoppingClusterPhase,
 		QueueByCluster:    true,
 		OpsHandler:        StopOpsHandler{},
 	}
@@ -59,8 +60,8 @@ func (stop StopOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	)
 
 	// if the cluster is already stopping or stopped, return
-	if slices.Contains([]appsv1alpha1.ClusterPhase{appsv1alpha1.StoppedClusterPhase,
-		appsv1alpha1.StoppingClusterPhase}, opsRes.Cluster.Status.Phase) {
+	if slices.Contains([]appsv1.ClusterPhase{appsv1.StoppedClusterPhase,
+		appsv1.StoppingClusterPhase}, opsRes.Cluster.Status.Phase) {
 		return nil
 	}
 
@@ -73,7 +74,7 @@ func (stop StopOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		return err
 	}
 
-	stopComp := func(compSpec *appsv1alpha1.ClusterComponentSpec) {
+	stopComp := func(compSpec *appsv1.ClusterComponentSpec) {
 		compSpec.Stop = func() *bool { b := true; return &b }()
 	}
 

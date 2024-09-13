@@ -36,11 +36,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -53,14 +54,14 @@ type clusterTransformContext struct {
 	Client client.Reader
 	record.EventRecorder
 	logr.Logger
-	Cluster       *appsv1alpha1.Cluster
-	OrigCluster   *appsv1alpha1.Cluster
-	ClusterDef    *appsv1alpha1.ClusterDefinition
-	ComponentDefs map[string]*appsv1alpha1.ComponentDefinition
+	Cluster       *appsv1.Cluster
+	OrigCluster   *appsv1.Cluster
+	ClusterDef    *appsv1.ClusterDefinition
+	ComponentDefs map[string]*appsv1.ComponentDefinition
 	// ComponentSpecs includes all cluster component specs generated from ComponentSpecs and ShardingSpecs
-	ComponentSpecs []*appsv1alpha1.ClusterComponentSpec
+	ComponentSpecs []*appsv1.ClusterComponentSpec
 	// ShardingComponentSpecs includes all sharding component specs generated from ShardingSpecs
-	ShardingComponentSpecs map[string][]*appsv1alpha1.ClusterComponentSpec
+	ShardingComponentSpecs map[string][]*appsv1.ClusterComponentSpec
 	// Labels to be added to components, mapping with ComponentSpecs.
 	Labels map[string]map[string]string
 	// Annotations to be added to components, mapping with ComponentSpecs.
@@ -107,18 +108,19 @@ func (c *clusterTransformContext) GetLogger() logr.Logger {
 
 func init() {
 	model.AddScheme(appsv1alpha1.AddToScheme)
+	model.AddScheme(appsv1beta1.AddToScheme)
+	model.AddScheme(appsv1.AddToScheme)
 	model.AddScheme(dpv1alpha1.AddToScheme)
 	model.AddScheme(snapshotv1.AddToScheme)
 	model.AddScheme(snapshotv1beta1.AddToScheme)
 	model.AddScheme(extensionsv1alpha1.AddToScheme)
-	model.AddScheme(workloadsv1alpha1.AddToScheme)
-	model.AddScheme(appsv1beta1.AddToScheme)
+	model.AddScheme(workloadsv1.AddToScheme)
 }
 
 // PlanBuilder implementation
 
 func (c *clusterPlanBuilder) Init() error {
-	cluster := &appsv1alpha1.Cluster{}
+	cluster := &appsv1.Cluster{}
 	if err := c.cli.Get(c.transCtx.Context, c.req.NamespacedName, cluster); err != nil {
 		return err
 	}
@@ -145,7 +147,7 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 		if c.transCtx.Cluster.IsDeleting() {
 			return
 		}
-		preCheckCondition := meta.FindStatusCondition(c.transCtx.Cluster.Status.Conditions, appsv1alpha1.ConditionTypeProvisioningStarted)
+		preCheckCondition := meta.FindStatusCondition(c.transCtx.Cluster.Status.Conditions, appsv1.ConditionTypeProvisioningStarted)
 		if preCheckCondition == nil {
 			// this should not happen
 			return
@@ -237,7 +239,7 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 	}
 
 	// cluster object has more business to do, handle them here
-	if _, ok = node.Obj.(*appsv1alpha1.Cluster); ok {
+	if _, ok = node.Obj.(*appsv1.Cluster); ok {
 		if err := c.reconcileCluster(node); err != nil {
 			return err
 		}
@@ -246,8 +248,8 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 }
 
 func (c *clusterPlanBuilder) reconcileCluster(node *model.ObjectVertex) error {
-	cluster := node.Obj.(*appsv1alpha1.Cluster).DeepCopy()
-	origCluster := node.OriObj.(*appsv1alpha1.Cluster)
+	cluster := node.Obj.(*appsv1.Cluster).DeepCopy()
+	origCluster := node.OriObj.(*appsv1.Cluster)
 	switch *node.Action {
 	// cluster.meta and cluster.spec might change
 	case model.STATUS:
@@ -325,7 +327,7 @@ func (c *clusterPlanBuilder) reconcileDeleteObject(ctx context.Context, node *mo
 		return nil
 	}
 	// delete secondary objects
-	if _, ok := node.Obj.(*appsv1alpha1.Cluster); !ok {
+	if _, ok := node.Obj.(*appsv1.Cluster); !ok {
 		err := backgroundDeleteObject()
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err
@@ -340,8 +342,8 @@ func (c *clusterPlanBuilder) reconcileStatusObject(ctx context.Context, node *mo
 		return err
 	}
 	// handle condition and phase changing triggered events
-	if newCluster, ok := node.Obj.(*appsv1alpha1.Cluster); ok {
-		oldCluster, _ := node.OriObj.(*appsv1alpha1.Cluster)
+	if newCluster, ok := node.Obj.(*appsv1.Cluster); ok {
+		oldCluster, _ := node.OriObj.(*appsv1.Cluster)
 		c.emitConditionUpdatingEvent(oldCluster.Status.Conditions, newCluster.Status.Conditions)
 		c.emitStatusUpdatingEvent(oldCluster.Status, newCluster.Status)
 	}
@@ -369,7 +371,7 @@ func (c *clusterPlanBuilder) emitConditionUpdatingEvent(oldConditions, newCondit
 	}
 }
 
-func (c *clusterPlanBuilder) emitStatusUpdatingEvent(oldStatus, newStatus appsv1alpha1.ClusterStatus) {
+func (c *clusterPlanBuilder) emitStatusUpdatingEvent(oldStatus, newStatus appsv1.ClusterStatus) {
 	cluster := c.transCtx.Cluster
 	newPhase := newStatus.Phase
 	if newPhase == oldStatus.Phase {
@@ -378,11 +380,11 @@ func (c *clusterPlanBuilder) emitStatusUpdatingEvent(oldStatus, newStatus appsv1
 	eType := corev1.EventTypeNormal
 	message := ""
 	switch newPhase {
-	case appsv1alpha1.RunningClusterPhase:
+	case appsv1.RunningClusterPhase:
 		message = fmt.Sprintf("Cluster: %s is ready, current phase is %s", cluster.Name, newPhase)
-	case appsv1alpha1.StoppedClusterPhase:
+	case appsv1.StoppedClusterPhase:
 		message = fmt.Sprintf("Cluster: %s stopped successfully.", cluster.Name)
-	case appsv1alpha1.FailedClusterPhase, appsv1alpha1.AbnormalClusterPhase:
+	case appsv1.FailedClusterPhase, appsv1.AbnormalClusterPhase:
 		message = fmt.Sprintf("Cluster: %s is %s, check according to the components message", cluster.Name, newPhase)
 		eType = corev1.EventTypeWarning
 	}

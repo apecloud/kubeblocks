@@ -32,6 +32,7 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -77,19 +78,19 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 	initClusterAnnotationAndPhaseForOps := func(opsRes *OpsResource) {
 		Expect(opsutil.UpdateClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())
 		Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
-			opsRes.Cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
+			opsRes.Cluster.Status.Phase = appsv1.RunningClusterPhase
 		})).ShouldNot(HaveOccurred())
 	}
 
 	Context("Test OpsRequest", func() {
 		commonHScaleConsensusCompTest := func(reqCtx intctrlutil.RequestCtx,
-			changeClusterSpec func(cluster *appsv1alpha1.Cluster),
+			changeClusterSpec func(cluster *appsv1.Cluster),
 			horizontalScaling appsv1alpha1.HorizontalScaling) (*OpsResource, []*corev1.Pod) {
 			By("init operations resources with CLusterDefinition/Hybrid components Cluster/consensus Pods")
 			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
 			its := testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
 			if changeClusterSpec != nil {
-				Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func(cluster *appsv1alpha1.Cluster) {
+				Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func(cluster *appsv1.Cluster) {
 					changeClusterSpec(cluster)
 				})).Should(Succeed())
 			}
@@ -100,7 +101,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, horizontalScaling)
 			// set ops phase to Pending
 			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase
-			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase, defaultCompName)
+			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingClusterCompPhase, defaultCompName)
 
 			By("expect for opsRequest phase is Creating after doing action")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
@@ -110,7 +111,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			By("check for the replicas of consensus component after doing action again when opsRequest phase is Creating")
 			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, tmpCluster *appsv1.Cluster) {
 				if horizontalScaling.Replicas == nil {
 					return
 				}
@@ -174,7 +175,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 		}
 
 		testHScaleReplicas := func(
-			changeClusterSpec func(cluster *appsv1alpha1.Cluster),
+			changeClusterSpec func(cluster *appsv1.Cluster),
 			horizontalScaling appsv1alpha1.HorizontalScaling,
 			mockHScale func(podList []*corev1.Pod)) {
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
@@ -276,7 +277,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			testCancelHScale(appsv1alpha1.HorizontalScaling{ScaleIn: &appsv1alpha1.ScaleIn{ReplicaChanger: appsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(2)}}}, true)
 		})
 
-		setClusterCompSpec := func(cluster *appsv1alpha1.Cluster, instances []appsv1alpha1.InstanceTemplate, offlineInstances []string) {
+		setClusterCompSpec := func(cluster *appsv1.Cluster, instances []appsv1.InstanceTemplate, offlineInstances []string) {
 			for i, v := range cluster.Spec.ComponentSpecs {
 				if v.Name == defaultCompName {
 					cluster.Spec.ComponentSpecs[i].OfflineInstances = offlineInstances
@@ -286,7 +287,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			}
 		}
 
-		testHScaleWithSpecifiedPod := func(changeClusterSpec func(cluster *appsv1alpha1.Cluster),
+		testHScaleWithSpecifiedPod := func(changeClusterSpec func(cluster *appsv1.Cluster),
 			horizontalScaling appsv1alpha1.HorizontalScaling,
 			expectOfflineInstances []string,
 			mockHScale func(podList []*corev1.Pod)) *OpsResource {
@@ -311,8 +312,8 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 		It("test offline the specified pod of the component", func() {
 			toDeletePodName := fmt.Sprintf("%s-%s-1", clusterName, defaultCompName)
 			offlineInstances := []string{toDeletePodName}
-			opsRes := testHScaleWithSpecifiedPod(func(cluster *appsv1alpha1.Cluster) {
-				setClusterCompSpec(cluster, []appsv1alpha1.InstanceTemplate{
+			opsRes := testHScaleWithSpecifiedPod(func(cluster *appsv1.Cluster) {
+				setClusterCompSpec(cluster, []appsv1.InstanceTemplate{
 					{Name: insTplName, Replicas: pointer.Int32(1)},
 				}, nil)
 			}, appsv1alpha1.HorizontalScaling{
@@ -330,8 +331,8 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 		It("test offline the specified pod and scale out another replicas", func() {
 			toDeletePodName := fmt.Sprintf("%s-%s-1", clusterName, defaultCompName)
 			offlineInstances := []string{toDeletePodName}
-			opsRes := testHScaleWithSpecifiedPod(func(cluster *appsv1alpha1.Cluster) {
-				setClusterCompSpec(cluster, []appsv1alpha1.InstanceTemplate{
+			opsRes := testHScaleWithSpecifiedPod(func(cluster *appsv1.Cluster) {
+				setClusterCompSpec(cluster, []appsv1.InstanceTemplate{
 					{Name: insTplName, Replicas: pointer.Int32(1)},
 				}, nil)
 			}, appsv1alpha1.HorizontalScaling{
@@ -354,8 +355,8 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 		It("test offline the specified pod and auto-sync replicaChanges", func() {
 			offlineInstanceName := fmt.Sprintf("%s-%s-%s-0", clusterName, defaultCompName, insTplName)
 			offlineInstances := []string{offlineInstanceName}
-			opsRes := testHScaleWithSpecifiedPod(func(cluster *appsv1alpha1.Cluster) {
-				setClusterCompSpec(cluster, []appsv1alpha1.InstanceTemplate{
+			opsRes := testHScaleWithSpecifiedPod(func(cluster *appsv1.Cluster) {
+				setClusterCompSpec(cluster, []appsv1.InstanceTemplate{
 					{Name: insTplName, Replicas: pointer.Int32(1)},
 				}, nil)
 			}, appsv1alpha1.HorizontalScaling{
@@ -376,8 +377,8 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 		It("test online the specified pod of the instance template and auto-sync replicaChanges", func() {
 			offlineInstanceName := fmt.Sprintf("%s-%s-%s-0", clusterName, defaultCompName, insTplName)
 			offlineInstances := []string{offlineInstanceName}
-			opsRes := testHScaleWithSpecifiedPod(func(cluster *appsv1alpha1.Cluster) {
-				setClusterCompSpec(cluster, []appsv1alpha1.InstanceTemplate{
+			opsRes := testHScaleWithSpecifiedPod(func(cluster *appsv1.Cluster) {
+				setClusterCompSpec(cluster, []appsv1.InstanceTemplate{
 					{Name: insTplName, Replicas: pointer.Int32(1)},
 				}, offlineInstances)
 			}, appsv1alpha1.HorizontalScaling{
@@ -398,8 +399,8 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 		It("test offline and online the specified pod and auto-sync replicaChanges", func() {
 			onlinePodName := fmt.Sprintf("%s-%s-1", clusterName, defaultCompName)
 			offlinePodName := fmt.Sprintf("%s-%s-%s-0", clusterName, defaultCompName, insTplName)
-			opsRes := testHScaleWithSpecifiedPod(func(cluster *appsv1alpha1.Cluster) {
-				setClusterCompSpec(cluster, []appsv1alpha1.InstanceTemplate{
+			opsRes := testHScaleWithSpecifiedPod(func(cluster *appsv1.Cluster) {
+				setClusterCompSpec(cluster, []appsv1.InstanceTemplate{
 					{Name: insTplName, Replicas: pointer.Int32(1)},
 				}, []string{onlinePodName})
 			}, appsv1alpha1.HorizontalScaling{
@@ -422,26 +423,26 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 		})
 
 		It("h-scale new instance templates and scale in all old replicas", func() {
-			templateFoo := appsv1alpha1.InstanceTemplate{
+			templateFoo := appsv1.InstanceTemplate{
 				Name:     insTplName,
 				Replicas: func() *int32 { r := int32(3); return &r }(),
 			}
-			templateBar := appsv1alpha1.InstanceTemplate{
+			templateBar := appsv1.InstanceTemplate{
 				Name:     "bar",
 				Replicas: func() *int32 { r := int32(3); return &r }(),
 			}
-			instances := []appsv1alpha1.InstanceTemplate{templateFoo, templateBar}
+			instances := []appsv1.InstanceTemplate{templateFoo, templateBar}
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 			opsRes, pods := commonHScaleConsensusCompTest(reqCtx, nil, appsv1alpha1.HorizontalScaling{
 				ScaleOut: &appsv1alpha1.ScaleOut{
-					NewInstances: []appsv1alpha1.InstanceTemplate{templateFoo, templateBar},
+					NewInstances: []appsv1.InstanceTemplate{templateFoo, templateBar},
 				},
 				ScaleIn: &appsv1alpha1.ScaleIn{
 					ReplicaChanger: appsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(3)},
 				},
 			})
 			By("verify cluster spec is correct")
-			var targetSpec *appsv1alpha1.ClusterComponentSpec
+			var targetSpec *appsv1.ClusterComponentSpec
 			for i := range opsRes.Cluster.Spec.ComponentSpecs {
 				spec := &opsRes.Cluster.Spec.ComponentSpecs[i]
 				if spec.Name == defaultCompName {
@@ -467,7 +468,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			opsRes.OpsRequest.Spec.Force = true
 			// set ops phase to Pending
 			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase
-			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase, defaultCompName)
+			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingClusterCompPhase, defaultCompName)
 
 			By("expect for opsRequest phase is Creating after doing action")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
@@ -582,6 +583,6 @@ func cancelOpsRequest(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, cancel
 func mockConsensusCompToRunning(opsRes *OpsResource) {
 	// mock consensus component is Running
 	compStatus := opsRes.Cluster.Status.Components[defaultCompName]
-	compStatus.Phase = appsv1alpha1.RunningClusterCompPhase
+	compStatus.Phase = appsv1.RunningClusterCompPhase
 	opsRes.Cluster.Status.Components[defaultCompName] = compStatus
 }

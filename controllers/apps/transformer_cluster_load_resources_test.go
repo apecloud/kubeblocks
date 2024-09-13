@@ -23,18 +23,18 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 var _ = Describe("cluster load resources transformer test", func() {
 	Context("cluster api validation", func() {
 		It("with cluster topology", func() {
 			By("explicitly specify topology")
-			cluster := &appsv1alpha1.Cluster{
-				Spec: appsv1alpha1.ClusterSpec{
+			cluster := &appsv1.Cluster{
+				Spec: appsv1.ClusterSpec{
 					ClusterDefRef: "clusterdef",
 					Topology:      "topology",
-					ComponentSpecs: []appsv1alpha1.ClusterComponentSpec{
+					ComponentSpecs: []appsv1.ClusterComponentSpec{
 						{
 							ComponentDef: "compdef",
 						},
@@ -63,9 +63,9 @@ var _ = Describe("cluster load resources transformer test", func() {
 
 		It("with cluster user defined", func() {
 			By("specify componentDef only")
-			cluster := &appsv1alpha1.Cluster{
-				Spec: appsv1alpha1.ClusterSpec{
-					ComponentSpecs: []appsv1alpha1.ClusterComponentSpec{
+			cluster := &appsv1.Cluster{
+				Spec: appsv1.ClusterSpec{
+					ComponentSpecs: []appsv1.ClusterComponentSpec{
 						{
 							ComponentDef: "compdef",
 						},
@@ -88,10 +88,10 @@ var _ = Describe("cluster load resources transformer test", func() {
 		})
 
 		It("with cluster legacy definition", func() {
-			cluster := &appsv1alpha1.Cluster{
-				Spec: appsv1alpha1.ClusterSpec{
+			cluster := &appsv1.Cluster{
+				Spec: appsv1.ClusterSpec{
 					ClusterDefRef: "clusterdef",
-					ComponentSpecs: []appsv1alpha1.ClusterComponentSpec{
+					ComponentSpecs: []appsv1.ClusterComponentSpec{
 						{
 							ComponentDefRef: "compdef",
 						},

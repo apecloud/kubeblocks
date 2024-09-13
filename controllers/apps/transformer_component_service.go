@@ -30,8 +30,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -97,7 +97,7 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 }
 
 func (t *componentServiceTransformer) listOwnedServices(ctx context.Context, cli client.Reader,
-	comp *appsv1alpha1.Component, synthesizedComp *component.SynthesizedComponent) (map[string]*corev1.Service, error) {
+	comp *appsv1.Component, synthesizedComp *component.SynthesizedComponent) (map[string]*corev1.Service, error) {
 	services, err := component.ListOwnedServices(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
 	if err != nil {
 		return nil, err
@@ -111,8 +111,8 @@ func (t *componentServiceTransformer) listOwnedServices(ctx context.Context, cli
 	return owned, nil
 }
 
-func (t *componentServiceTransformer) buildCompService(comp *appsv1alpha1.Component,
-	synthesizeComp *component.SynthesizedComponent, service *appsv1alpha1.ComponentService) ([]*corev1.Service, error) {
+func (t *componentServiceTransformer) buildCompService(comp *appsv1.Component,
+	synthesizeComp *component.SynthesizedComponent, service *appsv1.ComponentService) ([]*corev1.Service, error) {
 	if service.DisableAutoProvision != nil && *service.DisableAutoProvision {
 		return nil, nil
 	}
@@ -120,21 +120,21 @@ func (t *componentServiceTransformer) buildCompService(comp *appsv1alpha1.Compon
 	if t.isPodService(service) {
 		return t.buildPodService(comp, synthesizeComp, service)
 	}
-	return t.buildServices(comp, synthesizeComp, []*appsv1alpha1.ComponentService{service})
+	return t.buildServices(comp, synthesizeComp, []*appsv1.ComponentService{service})
 }
 
-func (t *componentServiceTransformer) isPodService(service *appsv1alpha1.ComponentService) bool {
+func (t *componentServiceTransformer) isPodService(service *appsv1.ComponentService) bool {
 	return service.PodService != nil && *service.PodService
 }
 
-func (t *componentServiceTransformer) buildPodService(comp *appsv1alpha1.Component,
-	synthesizeComp *component.SynthesizedComponent, service *appsv1alpha1.ComponentService) ([]*corev1.Service, error) {
+func (t *componentServiceTransformer) buildPodService(comp *appsv1.Component,
+	synthesizeComp *component.SynthesizedComponent, service *appsv1.ComponentService) ([]*corev1.Service, error) {
 	pods, err := t.podsNameNOrdinal(synthesizeComp)
 	if err != nil {
 		return nil, err
 	}
 
-	services := make([]*appsv1alpha1.ComponentService, 0)
+	services := make([]*appsv1.ComponentService, 0)
 	for name, ordinal := range pods {
 		svc := service.DeepCopy()
 		svc.Name = fmt.Sprintf("%s-%d", service.Name, ordinal)
@@ -175,8 +175,8 @@ func (t *componentServiceTransformer) podsNameNOrdinal(synthesizeComp *component
 	return pods, nil
 }
 
-func (t *componentServiceTransformer) buildServices(comp *appsv1alpha1.Component,
-	synthesizeComp *component.SynthesizedComponent, compServices []*appsv1alpha1.ComponentService) ([]*corev1.Service, error) {
+func (t *componentServiceTransformer) buildServices(comp *appsv1.Component,
+	synthesizeComp *component.SynthesizedComponent, compServices []*appsv1.ComponentService) ([]*corev1.Service, error) {
 	services := make([]*corev1.Service, 0, len(compServices))
 	for _, compService := range compServices {
 		svc, err := t.buildService(comp, synthesizeComp, compService)
@@ -188,8 +188,8 @@ func (t *componentServiceTransformer) buildServices(comp *appsv1alpha1.Component
 	return services, nil
 }
 
-func (t *componentServiceTransformer) buildService(comp *appsv1alpha1.Component,
-	synthesizeComp *component.SynthesizedComponent, service *appsv1alpha1.ComponentService) (*corev1.Service, error) {
+func (t *componentServiceTransformer) buildService(comp *appsv1.Component,
+	synthesizeComp *component.SynthesizedComponent, service *appsv1.ComponentService) (*corev1.Service, error) {
 	var (
 		namespace   = synthesizeComp.Namespace
 		clusterName = synthesizeComp.ClusterName
@@ -219,7 +219,7 @@ func (t *componentServiceTransformer) buildService(comp *appsv1alpha1.Component,
 	return svcObj, nil
 }
 
-func (t *componentServiceTransformer) builtinSelector(comp *appsv1alpha1.Component) map[string]string {
+func (t *componentServiceTransformer) builtinSelector(comp *appsv1.Component) map[string]string {
 	selectors := map[string]string{
 		constant.AppManagedByLabelKey:   "",
 		constant.AppInstanceLabelKey:    "",
@@ -245,14 +245,14 @@ func (t *componentServiceTransformer) checkRoleSelector(synthesizeComp *componen
 	return nil
 }
 
-func (t *componentServiceTransformer) skipDefaultHeadlessSvc(synthesizeComp *component.SynthesizedComponent, service *appsv1alpha1.ComponentService) bool {
+func (t *componentServiceTransformer) skipDefaultHeadlessSvc(synthesizeComp *component.SynthesizedComponent, service *appsv1.ComponentService) bool {
 	svcName := constant.GenerateComponentServiceName(synthesizeComp.ClusterName, synthesizeComp.Name, service.ServiceName)
 	defaultHeadlessSvcName := constant.GenerateDefaultComponentHeadlessServiceName(synthesizeComp.ClusterName, synthesizeComp.Name)
 	return svcName == defaultHeadlessSvcName
 }
 
 func (t *componentServiceTransformer) createOrUpdateService(ctx graph.TransformContext, dag *graph.DAG,
-	graphCli model.GraphClient, compService *appsv1alpha1.ComponentService, service *corev1.Service, owner client.Object) error {
+	graphCli model.GraphClient, compService *appsv1.ComponentService, service *corev1.Service, owner client.Object) error {
 	var (
 		kind       string
 		podService = t.isPodService(compService)

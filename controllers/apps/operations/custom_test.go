@@ -22,11 +22,13 @@ package operations
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -40,10 +42,10 @@ var _ = Describe("CustomOps", func() {
 		compDefName = "test-compdef-" + randomStr
 		clusterName = "test-cluster-" + randomStr
 		opsResource *OpsResource
-		compObj     *appsv1alpha1.Component
+		compObj     *appsv1.Component
 		opsDef      *appsv1alpha1.OpsDefinition
 		reqCtx      intctrlutil.RequestCtx
-		cluster     *appsv1alpha1.Cluster
+		cluster     *appsv1.Cluster
 	)
 
 	cleanEnv := func() {
@@ -182,7 +184,7 @@ var _ = Describe("CustomOps", func() {
 
 			By("mock component is Running")
 			Expect(testapps.ChangeObjStatus(&testCtx, compObj, func() {
-				compObj.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+				compObj.Status.Phase = appsv1.RunningClusterCompPhase
 			})).Should(Succeed())
 
 			By("job should be created successfully")

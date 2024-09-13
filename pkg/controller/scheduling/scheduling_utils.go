@@ -21,7 +21,6 @@ package scheduling
 
 import (
 	"encoding/json"
-
 	corev1 "k8s.io/api/core/v1"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -37,9 +36,9 @@ func BuildSchedulingPolicy(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComp
 }
 
 func buildSchedulingPolicy(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSpec) (*appsv1.SchedulingPolicy, error) {
-	schedulingPolicy := cluster.Spec.SchedulingPolicy
+	schedulingPolicy := cluster.Spec.SchedulingPolicy.DeepCopy()
 	if compSpec != nil && compSpec.SchedulingPolicy != nil {
-		schedulingPolicy = compSpec.SchedulingPolicy
+		schedulingPolicy = compSpec.SchedulingPolicy.DeepCopy()
 	}
 
 	mergeGlobalAffinity := func() error {

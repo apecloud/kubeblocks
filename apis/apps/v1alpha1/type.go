@@ -62,9 +62,9 @@ type ComponentTemplateSpec struct {
 	// template will be mounted to the corresponding volume. Must be a DNS_LABEL name.
 	// The volume name must be defined in podSpec.containers[*].volumeMounts.
 	//
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
+	// +optional
 	VolumeName string `json:"volumeName"`
 
 	// The operator attempts to set default file permissions for scripts (0555) and configurations (0444).
@@ -198,6 +198,11 @@ type ComponentConfigSpec struct {
 	// +listType=set
 	// +optional
 	ReRenderResourceTypes []RerenderResourceType `json:"reRenderResourceTypes,omitempty"`
+
+	// Whether to store the final rendered parameters as a secret.
+	//
+	// +optional
+	AsSecret *bool `json:"asSecret,omitempty"`
 }
 
 // RerenderResourceType defines the resource requirements for a component.

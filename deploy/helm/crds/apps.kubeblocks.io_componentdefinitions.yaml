@@ -138,6 +138,10 @@ spec:
                         type: string
                       type: array
                       x-kubernetes-list-type: set
+                    asSecret:
+                      description: Whether to store the final rendered parameters
+                        as a secret.
+                      type: boolean
                     constraintRef:
                       description: Specifies the name of the referenced configuration
                         constraints object.
@@ -289,7 +293,6 @@ spec:
                       type: string
                   required:
                   - name
-                  - volumeName
                   type: object
                 type: array
                 x-kubernetes-list-map-keys:
@@ -11638,7 +11641,6 @@ spec:
                       type: string
                   required:
                   - name
-                  - volumeName
                   type: object
                 type: array
                 x-kubernetes-list-map-keys:

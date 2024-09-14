@@ -21,6 +21,7 @@ package apps
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -36,6 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	ctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // componentAccountTransformer handles component system accounts.
@@ -57,37 +59,47 @@ func (t *componentAccountTransformer) Transform(ctx graph.TransformContext, dag 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 
 	for _, account := range synthesizeComp.SystemAccounts {
-		exist, err := t.checkAccountSecretExist(ctx, synthesizeComp, account)
+		existSecret, err := t.checkAccountSecretExist(ctx, synthesizeComp, account)
 		if err != nil {
 			return err
-		}
-		if exist {
-			continue
 		}
 		secret, err := t.buildAccountSecret(transCtx, synthesizeComp, account)
 		if err != nil {
 			return err
 		}
-		graphCli.Create(dag, secret, inUniversalContext4G())
+
+		if existSecret == nil {
+			graphCli.Create(dag, secret, inUniversalContext4G())
+			continue
+		}
+
+		// just update existed account secret metadata if needed
+		existSecretCopy := existSecret.DeepCopy()
+		ctrlutil.MergeMetadataMapInplace(secret.Labels, &existSecretCopy.Labels)
+		ctrlutil.MergeMetadataMapInplace(secret.Annotations, &existSecretCopy.Annotations)
+		if !reflect.DeepEqual(existSecret, existSecretCopy) {
+			graphCli.Update(dag, existSecret, existSecretCopy, inUniversalContext4G())
+		}
 	}
 	// TODO: (good-first-issue) if an account is deleted from the Spec, the secret and account should be deleted
 	return nil
 }
 
 func (t *componentAccountTransformer) checkAccountSecretExist(ctx graph.TransformContext,
-	synthesizeComp *component.SynthesizedComponent, account appsv1.SystemAccount) (bool, error) {
+	synthesizeComp *component.SynthesizedComponent, account appsv1.SystemAccount) (*corev1.Secret, error) {
 	secretKey := types.NamespacedName{
 		Namespace: synthesizeComp.Namespace,
 		Name:      constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, account.Name),
 	}
-	err := ctx.GetClient().Get(ctx.GetContext(), secretKey, &corev1.Secret{})
+	secret := &corev1.Secret{}
+	err := ctx.GetClient().Get(ctx.GetContext(), secretKey, secret)
 	switch {
 	case err == nil:
-		return true, nil
+		return secret, nil
 	case apierrors.IsNotFound(err):
-		return false, nil
+		return nil, nil
 	default:
-		return false, err
+		return nil, err
 	}
 }
 
@@ -153,7 +165,9 @@ func (t *componentAccountTransformer) buildAccountSecretWithPassword(ctx *compon
 	labels := constant.GetComponentWellKnownLabels(synthesizeComp.ClusterName, synthesizeComp.Name)
 	secret := builder.NewSecretBuilder(synthesizeComp.Namespace, secretName).
 		AddLabelsInMap(labels).
+		AddLabelsInMap(synthesizeComp.UserDefinedLabels).
 		AddLabels(constant.ClusterAccountLabelKey, account.Name).
+		AddAnnotationsInMap(synthesizeComp.UserDefinedAnnotations).
 		PutData(constant.AccountNameForSecret, []byte(account.Name)).
 		PutData(constant.AccountPasswdForSecret, password).
 		SetImmutable(true).

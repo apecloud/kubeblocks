@@ -607,8 +607,7 @@ These templates are used to dynamically provision persistent volumes for the Com
 </td>
 <td>
 <em>(Optional)</em>
-<p>Overrides Services defined in referenced ComponentDefinition.
-by clients.</p>
+<p>Overrides Services defined in referenced ComponentDefinition.</p>
 </td>
 </tr>
 <tr>
@@ -3804,6 +3803,18 @@ or cluster topology. Examples:</p>
 </ul>
 </td>
 </tr>
+<tr>
+<td>
+<code>asSecret</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Whether to store the final rendered parameters as a secret.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec
@@ -5020,8 +5031,7 @@ These templates are used to dynamically provision persistent volumes for the Com
 </td>
 <td>
 <em>(Optional)</em>
-<p>Overrides Services defined in referenced ComponentDefinition.
-by clients.</p>
+<p>Overrides Services defined in referenced ComponentDefinition.</p>
 </td>
 </tr>
 <tr>
@@ -5458,6 +5468,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Refers to the volume name of PodTemplate. The configuration file produced through the configuration
 template will be mounted to the corresponding volume. Must be a DNS_LABEL name.
 The volume name must be defined in podSpec.containers[*].volumeMounts.</p>
@@ -5941,52 +5952,6 @@ This precaution helps prevent space depletion while maintaining read-only access
 If the space utilization later falls below this threshold, the system reverts the volume to read-write mode
 as defined in <code>componentDefinition.spec.lifecycleActions.readWrite</code>, restoring full functionality.</p>
 <p>Note: This field cannot be updated.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.ConfigMapRef">ConfigMapRef
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.UserResourceRefs">UserResourceRefs</a>)
-</p>
-<div>
-<p>ConfigMapRef defines a reference to a ConfigMap.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>ResourceMeta</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ResourceMeta">
-ResourceMeta
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>ResourceMeta</code> are embedded into this type.)
-</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>configMap</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#configmapvolumesource-v1-core">
-Kubernetes core/v1.ConfigMapVolumeSource
-</a>
-</em>
-</td>
-<td>
-<p>ConfigMap specifies the ConfigMap to be mounted as a volume.</p>
 </td>
 </tr>
 </tbody>
@@ -7847,70 +7812,6 @@ int32
 <td></td>
 </tr></tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1.ResourceMeta">ResourceMeta
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ConfigMapRef">ConfigMapRef</a>, <a href="#apps.kubeblocks.io/v1.SecretRef">SecretRef</a>)
-</p>
-<div>
-<p>ResourceMeta encapsulates metadata and configuration for referencing ConfigMaps and Secrets as volumes.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Name is the name of the referenced ConfigMap or Secret object. It must conform to DNS label standards.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>mountPoint</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>MountPoint is the filesystem path where the volume will be mounted.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>subPath</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>SubPath specifies a path within the volume from which to mount.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>asVolumeFrom</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>AsVolumeFrom lists the names of containers in which the volume should be mounted.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1.RetryPolicy">RetryPolicy
 </h3>
 <p>
@@ -8100,52 +8001,6 @@ specified <code>key</code>, <code>value</code>, <code>effect</code>, and <code>o
 <p>TopologySpreadConstraints describes how a group of Pods ought to spread across topology
 domains. Scheduler will schedule Pods in a way which abides by the constraints.
 All topologySpreadConstraints are ANDed.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.SecretRef">SecretRef
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.UserResourceRefs">UserResourceRefs</a>)
-</p>
-<div>
-<p>SecretRef defines a reference to a Secret.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>ResourceMeta</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ResourceMeta">
-ResourceMeta
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>ResourceMeta</code> are embedded into this type.)
-</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>secret</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#secretvolumesource-v1-core">
-Kubernetes core/v1.SecretVolumeSource
-</a>
-</em>
-</td>
-<td>
-<p>Secret specifies the Secret to be mounted as a volume.</p>
 </td>
 </tr>
 </tbody>
@@ -9805,49 +9660,6 @@ The operator waits for each replica to be updated and ready before proceeding to
 This ensures that only one replica is unavailable at a time during the update process.</p>
 </td>
 </tr></tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.UserResourceRefs">UserResourceRefs
-</h3>
-<div>
-<p>UserResourceRefs defines references to user-defined Secrets and ConfigMaps.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>secretRefs</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.SecretRef">
-[]SecretRef
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>SecretRefs defines the user-defined Secrets.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>configMapRefs</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ConfigMapRef">
-[]ConfigMapRef
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ConfigMapRefs defines the user-defined ConfigMaps.</p>
-</td>
-</tr>
-</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.VarOption">VarOption
 (<code>string</code> alias)</h3>
@@ -17160,6 +16972,18 @@ or cluster topology. Examples:</p>
 </ul>
 </td>
 </tr>
+<tr>
+<td>
+<code>asSecret</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Whether to store the final rendered parameters as a secret.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentDefRef">ComponentDefRef
@@ -19288,6 +19112,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Refers to the volume name of PodTemplate. The configuration file produced through the configuration
 template will be mounted to the corresponding volume. Must be a DNS_LABEL name.
 The volume name must be defined in podSpec.containers[*].volumeMounts.</p>

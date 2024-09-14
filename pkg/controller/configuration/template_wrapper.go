@@ -53,6 +53,8 @@ type renderWrapper struct {
 	templateAnnotations map[string]string
 	renderedObjs        []client.Object
 
+	renderedSecretObjs []client.Object
+
 	ctx       context.Context
 	cli       client.Client
 	cluster   *appsv1.Cluster
@@ -115,7 +117,7 @@ func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1.Cluster,
 		// and does not update the ConfigMap objects in the subsequent reconfiguration process.
 		// The subsequent reconfiguration process is handled by the Configuration controller.
 		if origCMObj != nil {
-			wrapper.addVolumeMountMeta(configSpec.ComponentTemplateSpec, origCMObj, false)
+			wrapper.addVolumeMountMeta(configSpec.ComponentTemplateSpec, origCMObj, false, !toSecret(configSpec))
 			continue
 		}
 		if configuration != nil {
@@ -128,7 +130,7 @@ func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1.Cluster,
 		if err := applyUpdatedParameters(item, newCMObj, configSpec, wrapper.cli, wrapper.ctx); err != nil {
 			return err
 		}
-		if err := wrapper.addRenderedObject(configSpec.ComponentTemplateSpec, newCMObj, configuration); err != nil {
+		if err := wrapper.addRenderedObject(configSpec.ComponentTemplateSpec, newCMObj, configuration, !toSecret(configSpec)); err != nil {
 			return err
 		}
 		if err := updateConfigMetaForCM(newCMObj, item, revision); err != nil {
@@ -229,6 +231,9 @@ func (wrapper *renderWrapper) rerenderConfigTemplate(cluster *appsv1.Cluster,
 		newCMObj.Data = newData
 	}
 	UpdateCMConfigSpecLabels(newCMObj, configSpec)
+	if InjectEnvEnabled(configSpec) && toSecret(configSpec) {
+		wrapper.renderedSecretObjs = append(wrapper.renderedSecretObjs, newCMObj)
+	}
 	return newCMObj, nil
 }
 
@@ -240,7 +245,7 @@ func (wrapper *renderWrapper) renderScriptTemplate(cluster *appsv1.Cluster, comp
 			Name:      cmName,
 			Namespace: wrapper.cluster.Namespace}, generics.ToGVK(&corev1.ConfigMap{}))
 		if object != nil {
-			wrapper.addVolumeMountMeta(templateSpec, object, false)
+			wrapper.addVolumeMountMeta(templateSpec, object, false, true)
 			continue
 		}
 
@@ -249,14 +254,14 @@ func (wrapper *renderWrapper) renderScriptTemplate(cluster *appsv1.Cluster, comp
 		if err != nil {
 			return err
 		}
-		if err := wrapper.addRenderedObject(templateSpec, cm, nil); err != nil {
+		if err := wrapper.addRenderedObject(templateSpec, cm, nil, true); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (wrapper *renderWrapper) addRenderedObject(templateSpec appsv1.ComponentTemplateSpec, cm *corev1.ConfigMap, configuration *appsv1alpha1.Configuration) (err error) {
+func (wrapper *renderWrapper) addRenderedObject(templateSpec appsv1.ComponentTemplateSpec, cm *corev1.ConfigMap, configuration *appsv1alpha1.Configuration, asVolume bool) (err error) {
 	// The owner of the configmap object is a cluster,
 	// in order to manage the life cycle of configmap
 	if configuration != nil {
@@ -269,12 +274,14 @@ func (wrapper *renderWrapper) addRenderedObject(templateSpec appsv1.ComponentTem
 	}
 
 	core.SetParametersUpdateSource(cm, constant.ReconfigureManagerSource)
-	wrapper.addVolumeMountMeta(templateSpec, cm, true)
+	wrapper.addVolumeMountMeta(templateSpec, cm, true, asVolume)
 	return nil
 }
 
-func (wrapper *renderWrapper) addVolumeMountMeta(templateSpec appsv1.ComponentTemplateSpec, object client.Object, rendered bool) {
-	wrapper.volumes[object.GetName()] = templateSpec
+func (wrapper *renderWrapper) addVolumeMountMeta(templateSpec appsv1.ComponentTemplateSpec, object client.Object, rendered bool, asVolume bool) {
+	if asVolume {
+		wrapper.volumes[object.GetName()] = templateSpec
+	}
 	if rendered {
 		wrapper.renderedObjs = append(wrapper.renderedObjs, object)
 	}

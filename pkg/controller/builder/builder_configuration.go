@@ -66,6 +66,7 @@ func ToV1ConfigSpec(spec *appsv1alpha1.ComponentConfigSpec) *appsv1.ComponentCon
 		ConfigConstraintRef: spec.ConfigConstraintRef,
 		AsEnvFrom:           spec.AsEnvFrom,
 		InjectEnvTo:         spec.InjectEnvTo,
+		AsSecret:            spec.AsSecret,
 	}
 	if spec.LegacyRenderedConfigSpec != nil {
 		v1.LegacyRenderedConfigSpec = &appsv1.LegacyRenderedTemplateSpec{
@@ -98,6 +99,7 @@ func ToV1alpha1ConfigSpec(spec *appsv1.ComponentConfigSpec) *appsv1alpha1.Compon
 		ConfigConstraintRef: spec.ConfigConstraintRef,
 		AsEnvFrom:           spec.AsEnvFrom,
 		InjectEnvTo:         spec.InjectEnvTo,
+		AsSecret:            spec.AsSecret,
 	}
 	if spec.LegacyRenderedConfigSpec != nil {
 		v1.LegacyRenderedConfigSpec = &appsv1alpha1.LegacyRenderedTemplateSpec{

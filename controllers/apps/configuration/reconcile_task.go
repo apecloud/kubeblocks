@@ -23,6 +23,7 @@ import (
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -58,6 +59,12 @@ func NewTask(item appsv1alpha1.ConfigurationItemDetail, status *appsv1alpha1.Con
 				return core.MakeError("not found config spec: %s", item.Name)
 			}
 			if err := fetcher.ConfigMap(item.Name).Complete(); err != nil {
+				if !apierrors.IsNotFound(err) {
+					return err
+				}
+				if item.ConfigSpec.InjectEnvEnabled() && item.ConfigSpec.ToSecret() {
+					return syncSecretStatus(status)
+				}
 				return err
 			}
 			// Do reconcile for config template
@@ -74,6 +81,14 @@ func NewTask(item appsv1alpha1.ConfigurationItemDetail, status *appsv1alpha1.Con
 		},
 		Status: status,
 	}
+}
+
+func syncSecretStatus(status *appsv1alpha1.ConfigurationItemDetailStatus) error {
+	status.Phase = appsv1alpha1.CFinishedPhase
+	if status.LastDoneRevision == "" {
+		status.LastDoneRevision = status.UpdateRevision
+	}
+	return nil
 }
 
 func syncImpl(fetcher *Task,

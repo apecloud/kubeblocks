@@ -29,12 +29,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 // CompatibleCompVersions4Definition returns all component versions that are compatible with specified component definition.
-func CompatibleCompVersions4Definition(ctx context.Context, cli client.Reader, compDef *appsv1alpha1.ComponentDefinition) ([]*appsv1alpha1.ComponentVersion, error) {
-	compVersionList := &appsv1alpha1.ComponentVersionList{}
+func CompatibleCompVersions4Definition(ctx context.Context, cli client.Reader, compDef *appsv1.ComponentDefinition) ([]*appsv1.ComponentVersion, error) {
+	compVersionList := &appsv1.ComponentVersionList{}
 	labels := client.MatchingLabels{
 		compDef.Name: compDef.Name,
 	}
@@ -46,12 +46,12 @@ func CompatibleCompVersions4Definition(ctx context.Context, cli client.Reader, c
 		return nil, nil
 	}
 
-	compVersions := make([]*appsv1alpha1.ComponentVersion, 0)
+	compVersions := make([]*appsv1.ComponentVersion, 0)
 	for i, compVersion := range compVersionList.Items {
 		if compVersion.Generation != compVersion.Status.ObservedGeneration {
 			return nil, fmt.Errorf("the matched ComponentVersion is not up to date: %s", compVersion.Name)
 		}
-		if compVersion.Status.Phase != appsv1alpha1.AvailablePhase {
+		if compVersion.Status.Phase != appsv1.AvailablePhase {
 			return nil, fmt.Errorf("the matched ComponentVersion is unavailable: %s", compVersion.Name)
 		}
 		compVersions = append(compVersions, &compVersionList.Items[i])
@@ -86,7 +86,7 @@ func CompareServiceVersion(required, provided string) (bool, error) {
 
 // UpdateCompDefinitionImages4ServiceVersion resolves and updates images for the component definition.
 func UpdateCompDefinitionImages4ServiceVersion(ctx context.Context, cli client.Reader,
-	compDef *appsv1alpha1.ComponentDefinition, serviceVersion string) error {
+	compDef *appsv1.ComponentDefinition, serviceVersion string) error {
 	compVersions, err := CompatibleCompVersions4Definition(ctx, cli, compDef)
 	if err != nil {
 		return err
@@ -97,8 +97,8 @@ func UpdateCompDefinitionImages4ServiceVersion(ctx context.Context, cli client.R
 	return resolveImagesWithCompVersions(compDef, compVersions, serviceVersion)
 }
 
-func resolveImagesWithCompVersions(compDef *appsv1alpha1.ComponentDefinition,
-	compVersions []*appsv1alpha1.ComponentVersion, serviceVersion string) error {
+func resolveImagesWithCompVersions(compDef *appsv1.ComponentDefinition,
+	compVersions []*appsv1.ComponentVersion, serviceVersion string) error {
 	appsInDef := covertImagesFromCompDefinition(compDef)
 	appsByUser, err := findMatchedImagesFromCompVersions(compVersions, serviceVersion)
 	if err != nil {
@@ -134,7 +134,7 @@ func resolveImagesWithCompVersions(compDef *appsv1alpha1.ComponentDefinition,
 	return nil
 }
 
-func covertImagesFromCompDefinition(compDef *appsv1alpha1.ComponentDefinition) map[string]appNameVersionImage {
+func covertImagesFromCompDefinition(compDef *appsv1.ComponentDefinition) map[string]appNameVersionImage {
 	apps := make(map[string]appNameVersionImage)
 	checkNAdd := func(c *corev1.Container) {
 		if len(c.Image) > 0 {
@@ -154,7 +154,7 @@ func covertImagesFromCompDefinition(compDef *appsv1alpha1.ComponentDefinition) m
 	return apps
 }
 
-func findMatchedImagesFromCompVersions(compVersions []*appsv1alpha1.ComponentVersion, serviceVersion string) (map[string]appNameVersionImage, error) {
+func findMatchedImagesFromCompVersions(compVersions []*appsv1.ComponentVersion, serviceVersion string) (map[string]appNameVersionImage, error) {
 	appsWithReleases := make(map[string]map[string]appNameVersionImage)
 	for _, compVersion := range compVersions {
 		for _, release := range compVersion.Spec.Releases {

@@ -22,25 +22,25 @@ package apps
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 type MockServiceDescriptorFactory struct {
-	BaseFactory[appsv1alpha1.ServiceDescriptor, *appsv1alpha1.ServiceDescriptor, MockServiceDescriptorFactory]
+	BaseFactory[appsv1.ServiceDescriptor, *appsv1.ServiceDescriptor, MockServiceDescriptorFactory]
 }
 
 func NewServiceDescriptorFactory(namespace, name string) *MockServiceDescriptorFactory {
 	f := &MockServiceDescriptorFactory{}
 	f.Init(namespace, name,
-		&appsv1alpha1.ServiceDescriptor{
+		&appsv1.ServiceDescriptor{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
 				Labels: map[string]string{
 					constant.AppManagedByLabelKey: constant.AppName,
 				},
 			},
-			Spec: appsv1alpha1.ServiceDescriptorSpec{},
+			Spec: appsv1.ServiceDescriptorSpec{},
 		}, f)
 	return f
 }
@@ -55,27 +55,27 @@ func (factory *MockServiceDescriptorFactory) SetServiceVersion(serviceVersion st
 	return factory
 }
 
-func (factory *MockServiceDescriptorFactory) SetEndpoint(endpoint appsv1alpha1.CredentialVar) *MockServiceDescriptorFactory {
+func (factory *MockServiceDescriptorFactory) SetEndpoint(endpoint appsv1.CredentialVar) *MockServiceDescriptorFactory {
 	factory.Get().Spec.Endpoint = &endpoint
 	return factory
 }
 
-func (factory *MockServiceDescriptorFactory) SetHost(host appsv1alpha1.CredentialVar) *MockServiceDescriptorFactory {
+func (factory *MockServiceDescriptorFactory) SetHost(host appsv1.CredentialVar) *MockServiceDescriptorFactory {
 	factory.Get().Spec.Host = &host
 	return factory
 }
 
-func (factory *MockServiceDescriptorFactory) SetPort(port appsv1alpha1.CredentialVar) *MockServiceDescriptorFactory {
+func (factory *MockServiceDescriptorFactory) SetPort(port appsv1.CredentialVar) *MockServiceDescriptorFactory {
 	factory.Get().Spec.Port = &port
 	return factory
 }
 
-func (factory *MockServiceDescriptorFactory) SetPodFQDNs(podFQDNs appsv1alpha1.CredentialVar) *MockServiceDescriptorFactory {
+func (factory *MockServiceDescriptorFactory) SetPodFQDNs(podFQDNs appsv1.CredentialVar) *MockServiceDescriptorFactory {
 	factory.Get().Spec.PodFQDNs = &podFQDNs
 	return factory
 }
 
-func (factory *MockServiceDescriptorFactory) SetAuth(auth appsv1alpha1.ConnectionCredentialAuth) *MockServiceDescriptorFactory {
+func (factory *MockServiceDescriptorFactory) SetAuth(auth appsv1.ConnectionCredentialAuth) *MockServiceDescriptorFactory {
 	factory.Get().Spec.Auth = &auth
 	return factory
 }

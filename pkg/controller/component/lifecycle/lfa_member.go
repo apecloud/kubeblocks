@@ -26,7 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 )
@@ -56,7 +56,7 @@ type switchover struct {
 	namespace   string
 	clusterName string
 	compName    string
-	roles       []appsv1alpha1.ReplicaRole
+	roles       []appsv1.ReplicaRole
 	candidate   string
 }
 
@@ -140,7 +140,7 @@ func (a *memberLeave) parameters(ctx context.Context, cli client.Reader) (map[st
 // - KB_LEADER_POD_NAME: The name of the current leader's pod prior to the switchover.
 // - KB_LEADER_POD_FQDN: The FQDN of the current leader's pod prior to the switchover.
 
-func hackParameters4Switchover(ctx context.Context, cli client.Reader, namespace, clusterName, compName string, roles []appsv1alpha1.ReplicaRole) (map[string]string, error) {
+func hackParameters4Switchover(ctx context.Context, cli client.Reader, namespace, clusterName, compName string, roles []appsv1.ReplicaRole) (map[string]string, error) {
 	const (
 		leaderPodName = "KB_LEADER_POD_NAME"
 		leaderPodFQDN = "KB_LEADER_POD_FQDN"
@@ -171,7 +171,7 @@ func hackParameters4Switchover(ctx context.Context, cli client.Reader, namespace
 	}, nil
 }
 
-func leaderRole(roles []appsv1alpha1.ReplicaRole) (string, error) {
+func leaderRole(roles []appsv1.ReplicaRole) (string, error) {
 	targetRole := ""
 	for _, role := range roles {
 		if role.Serviceable && role.Writable {

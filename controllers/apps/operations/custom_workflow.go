@@ -24,6 +24,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/operations/custom"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -146,7 +147,7 @@ steps:
 
 func (w *WorkflowContext) getAction(action appsv1alpha1.OpsAction,
 	compCustomItem *appsv1alpha1.CustomOpsComponent,
-	compSpec *appsv1alpha1.ClusterComponentSpec,
+	compSpec *appsv1.ClusterComponentSpec,
 	progressDetail appsv1alpha1.ProgressStatusDetail) custom.OpsAction {
 	switch {
 	case action.Workload != nil:

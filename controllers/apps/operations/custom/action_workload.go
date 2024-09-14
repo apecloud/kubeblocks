@@ -23,6 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -31,18 +32,18 @@ import (
 
 type WorkloadAction struct {
 	OpsRequest     *appsv1alpha1.OpsRequest
-	Cluster        *appsv1alpha1.Cluster
+	Cluster        *appsv1.Cluster
 	OpsDef         *appsv1alpha1.OpsDefinition
 	CustomCompOps  *appsv1alpha1.CustomOpsComponent
-	Comp           *appsv1alpha1.ClusterComponentSpec
+	Comp           *appsv1.ClusterComponentSpec
 	progressDetail appsv1alpha1.ProgressStatusDetail
 }
 
 func NewWorkloadAction(opsRequest *appsv1alpha1.OpsRequest,
-	cluster *appsv1alpha1.Cluster,
+	cluster *appsv1.Cluster,
 	opsDef *appsv1alpha1.OpsDefinition,
 	customCompOps *appsv1alpha1.CustomOpsComponent,
-	comp *appsv1alpha1.ClusterComponentSpec,
+	comp *appsv1.ClusterComponentSpec,
 	progressDetail appsv1alpha1.ProgressStatusDetail) *WorkloadAction {
 	return &WorkloadAction{
 		OpsRequest:     opsRequest,
@@ -181,8 +182,8 @@ func (w *WorkloadAction) buildPodSpec(actionCtx ActionContext,
 	if podSpec.RestartPolicy == "" {
 		podSpec.RestartPolicy = corev1.RestartPolicyNever
 	}
-	if len(podSpec.Tolerations) == 0 {
-		podSpec.Tolerations = w.Comp.Tolerations
+	if len(podSpec.Tolerations) == 0 && w.Comp.SchedulingPolicy != nil {
+		podSpec.Tolerations = w.Comp.SchedulingPolicy.Tolerations
 	}
 	switch {
 	case w.OpsRequest.Spec.CustomOps.ServiceAccountName != nil:

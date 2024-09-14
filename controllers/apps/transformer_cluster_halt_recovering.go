@@ -28,7 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
@@ -81,14 +81,14 @@ func (t *clusterHaltRecoveryTransformer) Transform(ctx graph.TransformContext, d
 	l, ok := pvcList.Items[0].Annotations[constant.LastAppliedClusterAnnotationKey]
 	if !ok || l == "" {
 		return emitError(metav1.Condition{
-			Type:   appsv1alpha1.ConditionTypeHaltRecovery,
+			Type:   appsv1.ConditionTypeHaltRecovery,
 			Reason: "UncleanedResources",
 			Message: fmt.Sprintf("found uncleaned resources, requires manual deletion, check with `kubectl -n %s get pvc,secret,cm -l %s=%s`",
 				cluster.Namespace, constant.AppInstanceLabelKey, cluster.Name),
 		})
 	}
 
-	lc := &appsv1alpha1.Cluster{}
+	lc := &appsv1.Cluster{}
 	if err := json.Unmarshal([]byte(l), lc); err != nil {
 		return newRequeueError(requeueDuration, err.Error())
 	}
@@ -101,7 +101,7 @@ func (t *clusterHaltRecoveryTransformer) Transform(ctx graph.TransformContext, d
 	// check clusterDefRef equality
 	if cluster.Spec.ClusterDefRef != lc.Spec.ClusterDefRef {
 		return emitError(metav1.Condition{
-			Type:    appsv1alpha1.ConditionTypeHaltRecovery,
+			Type:    appsv1.ConditionTypeHaltRecovery,
 			Reason:  "HaltRecoveryFailed",
 			Message: fmt.Sprintf("not equal to last applied cluster.spec.clusterDefRef %s", lc.Spec.ClusterDefRef),
 		})
@@ -110,7 +110,7 @@ func (t *clusterHaltRecoveryTransformer) Transform(ctx graph.TransformContext, d
 	// check component len equality
 	if l := len(lc.Spec.ComponentSpecs); l != len(cluster.Spec.ComponentSpecs) {
 		return emitError(metav1.Condition{
-			Type:    appsv1alpha1.ConditionTypeHaltRecovery,
+			Type:    appsv1.ConditionTypeHaltRecovery,
 			Reason:  "HaltRecoveryFailed",
 			Message: fmt.Sprintf("inconsistent spec.componentSpecs counts to last applied cluster.spec.componentSpecs (len=%d)", l),
 		})
@@ -126,7 +126,7 @@ func (t *clusterHaltRecoveryTransformer) Transform(ctx graph.TransformContext, d
 			}
 			if comp.ComponentDefRef != lastUsedComp.ComponentDefRef {
 				return emitError(metav1.Condition{
-					Type:   appsv1alpha1.ConditionTypeHaltRecovery,
+					Type:   appsv1.ConditionTypeHaltRecovery,
 					Reason: "HaltRecoveryFailed",
 					Message: fmt.Sprintf("not equal to last applied cluster.spec.componentSpecs[%s].componentDefRef=%s",
 						comp.Name, lastUsedComp.ComponentDefRef),
@@ -134,7 +134,7 @@ func (t *clusterHaltRecoveryTransformer) Transform(ctx graph.TransformContext, d
 			}
 			if comp.Replicas != lastUsedComp.Replicas {
 				return emitError(metav1.Condition{
-					Type:   appsv1alpha1.ConditionTypeHaltRecovery,
+					Type:   appsv1.ConditionTypeHaltRecovery,
 					Reason: "HaltRecoveryFailed",
 					Message: fmt.Sprintf("not equal to last applied cluster.spec.componentSpecs[%s].replicas=%d",
 						comp.Name, lastUsedComp.Replicas),
@@ -150,7 +150,7 @@ func (t *clusterHaltRecoveryTransformer) Transform(ctx graph.TransformContext, d
 			if !isVolumeClaimTemplatesEqual(comp.VolumeClaimTemplates, lastUsedComp.VolumeClaimTemplates) {
 				objJSON, _ := json.Marshal(&lastUsedComp.VolumeClaimTemplates)
 				return emitError(metav1.Condition{
-					Type:   appsv1alpha1.ConditionTypeHaltRecovery,
+					Type:   appsv1.ConditionTypeHaltRecovery,
 					Reason: "HaltRecoveryFailed",
 					Message: fmt.Sprintf("not equal to last applied cluster.spec.componentSpecs[%s].volumeClaimTemplates=%s; add '%s=true' annotation to void this check",
 						comp.Name, objJSON, constant.HaltRecoveryAllowInconsistentResAnnotKey),
@@ -160,7 +160,7 @@ func (t *clusterHaltRecoveryTransformer) Transform(ctx graph.TransformContext, d
 			if !isResourceRequirementsEqual(comp.Resources, lastUsedComp.Resources) {
 				objJSON, _ := json.Marshal(&lastUsedComp.Resources)
 				return emitError(metav1.Condition{
-					Type:   appsv1alpha1.ConditionTypeHaltRecovery,
+					Type:   appsv1.ConditionTypeHaltRecovery,
 					Reason: "HaltRecoveryFailed",
 					Message: fmt.Sprintf("not equal to last applied cluster.spec.componentSpecs[%s].resources=%s; add '%s=true' annotation to void this check",
 						comp.Name, objJSON, constant.HaltRecoveryAllowInconsistentResAnnotKey),
@@ -172,7 +172,7 @@ func (t *clusterHaltRecoveryTransformer) Transform(ctx graph.TransformContext, d
 		}
 		if !found {
 			return emitError(metav1.Condition{
-				Type:   appsv1alpha1.ConditionTypeHaltRecovery,
+				Type:   appsv1.ConditionTypeHaltRecovery,
 				Reason: "HaltRecoveryFailed",
 				Message: fmt.Sprintf("cluster.spec.componentSpecs[%s] not found in last applied cluster",
 					comp.Name),

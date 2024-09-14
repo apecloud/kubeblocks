@@ -608,6 +608,16 @@ type ClusterComponentSpec struct {
 	// +optional
 	ServiceVersion string `json:"serviceVersion,omitempty"`
 
+	// References the class defined in ComponentClassDefinition.
+	//
+	// Deprecated since v0.9.
+	// This field is maintained for backward compatibility and its use is discouraged.
+	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
+	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
+	// +optional
+	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
+
 	// Defines a list of ServiceRef for a Component, enabling access to both external services and
 	// Services provided by other Clusters.
 	//
@@ -801,6 +811,13 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	UpdateStrategy *UpdateStrategy `json:"updateStrategy,omitempty"`
+
+	// Indicates the InstanceUpdateStrategy that will be
+	// employed to update Pods in the InstanceSet when a revision is made to
+	// Template.
+	//
+	// +optional
+	InstanceUpdateStrategy *InstanceUpdateStrategy `json:"instanceUpdateStrategy,omitempty"`
 
 	// Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
 	// or when scaling down. It only used when `PodManagementPolicy` is set to `Parallel`.
@@ -1301,6 +1318,21 @@ type ClusterComponentConfigSource struct {
 	// - Local file
 }
 
+// ClassDefRef is deprecated since v0.9.
+type ClassDefRef struct {
+	// Specifies the name of the ComponentClassDefinition.
+	//
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +optional
+	Name string `json:"name,omitempty"`
+
+	// Defines the name of the class that is defined in the ComponentClassDefinition.
+	//
+	// +kubebuilder:validation:Required
+	Class string `json:"class"`
+}
+
 // ClusterNetwork is deprecated since v0.9.
 type ClusterNetwork struct {
 	// Indicates whether the host network can be accessed. By default, this is set to false.
@@ -1385,9 +1417,6 @@ type ServiceRefClusterSelector struct {
 	// +optional
 	Service *ServiceRefServiceSelector `json:"service,omitempty"`
 
-	// +optional
-	PodFQDNs *ServiceRefPodFQDNsSelector `json:"podFQDNs,omitempty"`
-
 	// Specifies the SystemAccount to authenticate and establish a connection with the referenced Cluster.
 	// The SystemAccount should be defined in `componentDefinition.spec.systemAccounts`
 	// of the Component providing the service in the referenced Cluster.
@@ -1423,18 +1452,6 @@ type ServiceRefServiceSelector struct {
 	//
 	// +optional
 	Port string `json:"port,omitempty"`
-}
-
-type ServiceRefPodFQDNsSelector struct {
-	// The name of the Component where the pods reside in.
-	//
-	// +kubebuilder:validation:Required
-	Component string `json:"component"`
-
-	// The role of the pods to reference.
-	//
-	// +optional
-	Role *string `json:"role,omitempty"`
 }
 
 type ServiceRefCredentialSelector struct {
@@ -1505,18 +1522,18 @@ func init() {
 	SchemeBuilder.Register(&Cluster{}, &ClusterList{})
 }
 
-func (r Cluster) IsDeleting() bool {
+func (r *Cluster) IsDeleting() bool {
 	if r.GetDeletionTimestamp().IsZero() {
 		return false
 	}
 	return r.Spec.TerminationPolicy != DoNotTerminate
 }
 
-func (r Cluster) IsUpdating() bool {
+func (r *Cluster) IsUpdating() bool {
 	return r.Status.ObservedGeneration != r.Generation
 }
 
-func (r Cluster) IsStatusUpdating() bool {
+func (r *Cluster) IsStatusUpdating() bool {
 	return !r.IsDeleting() && !r.IsUpdating()
 }
 

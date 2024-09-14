@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	ctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -177,7 +177,7 @@ single_thread_memory = 294912
 				"default",
 				nil, nil)
 
-			cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, component, nil, &appsv1alpha1.Cluster{
+			cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, component, nil, &appsv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "my_test",
 					Namespace: "default",
@@ -202,7 +202,7 @@ single_thread_memory = 294912
 			viper.Set(constant.KubernetesClusterDomainEnv, "test-domain")
 
 			cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, component, nil,
-				&appsv1alpha1.Cluster{
+				&appsv1.Cluster{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "my_test",
 						Namespace: "default",
@@ -269,7 +269,7 @@ single_thread_memory = 294912
 			)
 
 			cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, component, nil,
-				&appsv1alpha1.Cluster{
+				&appsv1.Cluster{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "my_test",
 						Namespace: "default",

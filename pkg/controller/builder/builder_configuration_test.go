@@ -23,7 +23,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 )
 
@@ -38,13 +38,13 @@ var _ = Describe("configuration builder", func() {
 		config := NewConfigurationBuilder(ns, name).
 			ClusterRef(clusterName).
 			Component(componentName).
-			AddConfigurationItem(v1alpha1.ComponentConfigSpec{
-				ComponentTemplateSpec: v1alpha1.ComponentTemplateSpec{
+			AddConfigurationItem(appsv1.ComponentConfigSpec{
+				ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
 					Name: "mysql-config",
 				},
 			}).
-			AddConfigurationItem(v1alpha1.ComponentConfigSpec{
-				ComponentTemplateSpec: v1alpha1.ComponentTemplateSpec{
+			AddConfigurationItem(appsv1.ComponentConfigSpec{
+				ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
 					Name: "mysql-oteld-config",
 				},
 			}).

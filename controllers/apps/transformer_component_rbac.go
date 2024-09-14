@@ -30,8 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
@@ -104,11 +105,11 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 	return nil
 }
 
-func isLifecycleActionsEnabled(compDef *appsv1alpha1.ComponentDefinition) bool {
+func isLifecycleActionsEnabled(compDef *appsv1.ComponentDefinition) bool {
 	return compDef.Spec.LifecycleActions != nil
 }
 
-func isDataProtectionEnabled(backupTpl *appsv1alpha1.BackupPolicyTemplate, cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component) bool {
+func isDataProtectionEnabled(backupTpl *appsv1alpha1.BackupPolicyTemplate, cluster *appsv1.Cluster, comp *appsv1.Component) bool {
 	if backupTpl != nil && len(comp.Spec.CompDef) > 0 {
 		for _, policy := range backupTpl.Spec.BackupPolicies {
 			for _, compDef := range policy.ComponentDefs {
@@ -121,7 +122,7 @@ func isDataProtectionEnabled(backupTpl *appsv1alpha1.BackupPolicyTemplate, clust
 	return false
 }
 
-func isVolumeProtectionEnabled(compDef *appsv1alpha1.ComponentDefinition) bool {
+func isVolumeProtectionEnabled(compDef *appsv1.ComponentDefinition) bool {
 	for _, vol := range compDef.Spec.Volumes {
 		if vol.HighWatermark > 0 && vol.HighWatermark < 100 {
 			return true
@@ -283,7 +284,7 @@ func buildServiceAccount(transCtx *componentTransformContext) (*corev1.ServiceAc
 	return saObj, volumeProtectionEnable, nil
 }
 
-func buildRoleBinding(cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component, serviceAccountName string) (*rbacv1.RoleBinding, error) {
+func buildRoleBinding(cluster *appsv1.Cluster, comp *appsv1.Component, serviceAccountName string) (*rbacv1.RoleBinding, error) {
 	roleBinding := factory.BuildRoleBinding(cluster, serviceAccountName)
 	if err := setCompOwnershipNFinalizer(comp, roleBinding); err != nil {
 		return nil, err

@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -98,7 +99,7 @@ func needDoSwitchover(ctx context.Context,
 // createSwitchoverJob creates a switchover job to do switchover.
 func createSwitchoverJob(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
+	cluster *appsv1.Cluster,
 	synthesizedComp *component.SynthesizedComponent,
 	switchover *appsv1alpha1.Switchover) error {
 	switchoverJob, err := renderSwitchoverCmdJob(reqCtx.Ctx, cli, cluster, synthesizedComp, switchover)
@@ -173,7 +174,7 @@ func checkPodRoleLabelConsistency(ctx context.Context,
 // renderSwitchoverCmdJob renders and creates the switchover command jobs.
 func renderSwitchoverCmdJob(ctx context.Context,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
+	cluster *appsv1.Cluster,
 	synthesizedComp *component.SynthesizedComponent,
 	switchover *appsv1alpha1.Switchover) (*batchv1.Job, error) {
 	if synthesizedComp.LifecycleActions == nil || synthesizedComp.LifecycleActions.Switchover == nil || switchover == nil {
@@ -187,7 +188,7 @@ func renderSwitchoverCmdJob(ctx context.Context,
 		return nil, errors.New("serviceable and writable pod not found")
 	}
 
-	renderJob := func(switchoverSpec *appsv1alpha1.Action, switchoverEnvs []corev1.EnvVar) (*batchv1.Job, error) {
+	renderJob := func(switchoverSpec *appsv1.Action, switchoverEnvs []corev1.EnvVar) (*batchv1.Job, error) {
 		if switchoverSpec == nil {
 			return nil, errors.New("switchover exec action not found")
 		}
@@ -259,7 +260,7 @@ func getSwitchoverCmdJobLabel(clusterName, componentName string) map[string]stri
 
 // buildSwitchoverCandidateEnv builds the candidate instance name environment variable for the switchover job.
 func buildSwitchoverCandidateEnv(
-	cluster *appsv1alpha1.Cluster,
+	cluster *appsv1.Cluster,
 	componentName string,
 	switchover *appsv1alpha1.Switchover) []corev1.EnvVar {
 	svcName := strings.Join([]string{cluster.Name, componentName, "headless"}, "-")
@@ -284,7 +285,7 @@ func buildSwitchoverCandidateEnv(
 // buildSwitchoverEnvs builds the environment variables for the switchover job.
 func buildSwitchoverEnvs(ctx context.Context,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
+	cluster *appsv1.Cluster,
 	synthesizeComp *component.SynthesizedComponent,
 	switchover *appsv1alpha1.Switchover) ([]corev1.EnvVar, error) {
 	if synthesizeComp == nil || synthesizeComp.LifecycleActions == nil ||

@@ -31,7 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	coreclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	ctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
@@ -53,7 +53,7 @@ bootstrap:
 	var (
 		podSpec   *corev1.PodSpec
 		component *ctrlcomp.SynthesizedComponent
-		cluster   *appsv1alpha1.Cluster
+		cluster   *appsv1.Cluster
 
 		mockClient *testutil.K8sClientMockHelper
 	)
@@ -198,7 +198,7 @@ bootstrap:
 				},
 			},
 		}
-		cluster = &appsv1alpha1.Cluster{
+		cluster = &appsv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "my",
 				UID:  "b006a20c-fb03-441c-bffa-2605cad7e297",
@@ -234,7 +234,7 @@ bootstrap:
 					}},
 			}
 			cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, component, localObjs,
-				&appsv1alpha1.Cluster{
+				&appsv1.Cluster{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "my_test",
 						Namespace: "default",

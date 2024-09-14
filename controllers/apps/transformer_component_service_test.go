@@ -30,7 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -50,7 +50,7 @@ var _ = Describe(" component service transformer test", func() {
 		transCtx *componentTransformContext
 	)
 
-	newDAG := func(graphCli model.GraphClient, comp *appsv1alpha1.Component) *graph.DAG {
+	newDAG := func(graphCli model.GraphClient, comp *appsv1.Component) *graph.DAG {
 		d := graph.NewDAG()
 		graphCli.Root(d, comp, comp, model.ActionStatusPtr())
 		return d
@@ -58,7 +58,7 @@ var _ = Describe(" component service transformer test", func() {
 
 	BeforeEach(func() {
 		reader = &mockReader{}
-		comp := &appsv1alpha1.Component{
+		comp := &appsv1.Component{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: testCtx.DefaultNamespace,
 				Name:      constant.GenerateClusterComponentName(clusterName, compName),
@@ -68,7 +68,7 @@ var _ = Describe(" component service transformer test", func() {
 					constant.KBAppComponentLabelKey: compName,
 				},
 			},
-			Spec: appsv1alpha1.ComponentSpec{},
+			Spec: appsv1.ComponentSpec{},
 		}
 		graphCli := model.NewGraphClient(reader)
 		dag = newDAG(graphCli, comp)
@@ -83,9 +83,9 @@ var _ = Describe(" component service transformer test", func() {
 				Namespace:   testCtx.DefaultNamespace,
 				ClusterName: clusterName,
 				Name:        compName,
-				ComponentServices: []appsv1alpha1.ComponentService{
+				ComponentServices: []appsv1.ComponentService{
 					{
-						Service: appsv1alpha1.Service{
+						Service: appsv1.Service{
 							Name:        "default",
 							ServiceName: "default",
 						},

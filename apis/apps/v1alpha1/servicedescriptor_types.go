@@ -64,11 +64,6 @@ type ServiceDescriptorSpec struct {
 	// +optional
 	Port *CredentialVar `json:"port,omitempty"`
 
-	// Specifies the pod FQDNs of the external service.
-	//
-	// +optional
-	PodFQDNs *CredentialVar `json:"podFQDNs,omitempty"`
-
 	// Specifies the authentication credentials required for accessing an external service.
 	//
 	// +optional
@@ -132,10 +127,6 @@ type ServiceDescriptorStatus struct {
 	//
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
-}
-
-func (r ServiceDescriptorStatus) GetTerminalPhases() []Phase {
-	return []Phase{AvailablePhase}
 }
 
 // +genclient

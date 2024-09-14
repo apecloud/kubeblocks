@@ -26,7 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	experimentalv1alpha1 "github.com/apecloud/kubeblocks/apis/experimental/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
@@ -53,7 +53,7 @@ var _ = Describe("scale target cluster reconciler test", func() {
 			Expect(newNCS.Status.LastScaleTime.Compare(beforeReconcile.Time)).Should(BeNumerically(">=", 0))
 			object, err := tree.Get(builder.NewClusterBuilder(newNCS.Namespace, newNCS.Spec.TargetClusterName).GetObject())
 			Expect(err).Should(BeNil())
-			newCluster, ok := object.(*appsv1alpha1.Cluster)
+			newCluster, ok := object.(*appsv1.Cluster)
 			Expect(ok).Should(BeTrue())
 			nodes := tree.List(&corev1.Node{})
 			desiredReplicas := int32(len(nodes))

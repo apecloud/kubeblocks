@@ -27,7 +27,7 @@ import (
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -65,7 +65,7 @@ func CreateOrUpdateVolume(volumes []corev1.Volume, volumeName string, createFn c
 	return append(volumes, createFn(volumeName)), nil
 }
 
-func CreateOrUpdatePodVolumes(podSpec *corev1.PodSpec, volumes map[string]appsv1alpha1.ComponentTemplateSpec, configSet []string) error {
+func CreateOrUpdatePodVolumes(podSpec *corev1.PodSpec, volumes map[string]appsv1.ComponentTemplateSpec, configSet []string) error {
 	var (
 		err        error
 		podVolumes = podSpec.Volumes
@@ -87,7 +87,7 @@ func CreateOrUpdatePodVolumes(podSpec *corev1.PodSpec, volumes map[string]appsv1
 					ConfigMap: &corev1.ConfigMapVolumeSource{
 						LocalObjectReference: corev1.LocalObjectReference{Name: cmName},
 						// TODO: remove ComponentTemplateSpec.DefaultMode
-						DefaultMode: buildVolumeMode(configSet, templateSpec),
+						DefaultMode: BuildVolumeMode(configSet, templateSpec),
 					},
 				},
 			}
@@ -106,7 +106,7 @@ func CreateOrUpdatePodVolumes(podSpec *corev1.PodSpec, volumes map[string]appsv1
 	return nil
 }
 
-func buildVolumeMode(configs []string, configSpec appsv1alpha1.ComponentTemplateSpec) *int32 {
+func BuildVolumeMode(configs []string, configSpec appsv1.ComponentTemplateSpec) *int32 {
 	// If the defaultMode is not set, permissions are automatically set based on the template type.
 	if !viper.GetBool(constant.FeatureGateIgnoreConfigTemplateDefaultMode) && configSpec.DefaultMode != nil {
 		return configSpec.DefaultMode

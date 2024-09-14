@@ -40,10 +40,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -104,9 +105,11 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	err = appsv1beta1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
-	err = workloads.AddToScheme(scheme.Scheme)
+	err = appsv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 	err = dpv1alpha1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+	err = workloads.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:scheme
@@ -146,7 +149,7 @@ var _ = AfterSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 })
 
-func initOperationsResources(compDefName, clusterName string) (*OpsResource, *appsv1alpha1.ComponentDefinition, *appsv1alpha1.Cluster) {
+func initOperationsResources(compDefName, clusterName string) (*OpsResource, *appsv1.ComponentDefinition, *appsv1.Cluster) {
 	compDef := testapps.NewComponentDefinitionFactory(compDefName).
 		SetDefaultSpec().
 		Create(&testCtx).
@@ -167,10 +170,10 @@ func initOperationsResources(compDefName, clusterName string) (*OpsResource, *ap
 
 	By("mock cluster is Running and the status operations")
 	Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
-		clusterObject.Status.Phase = appsv1alpha1.RunningClusterPhase
-		clusterObject.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
+		clusterObject.Status.Phase = appsv1.RunningClusterPhase
+		clusterObject.Status.Components = map[string]appsv1.ClusterComponentStatus{
 			defaultCompName: {
-				Phase: appsv1alpha1.RunningClusterCompPhase,
+				Phase: appsv1.RunningClusterCompPhase,
 			},
 		}
 	})).Should(Succeed())
@@ -189,7 +192,7 @@ func initInstanceSetPods(ctx context.Context, cli client.Client, opsRes *OpsReso
 	return pods
 }
 
-func mockComponentIsOperating(cluster *appsv1alpha1.Cluster, expectPhase appsv1alpha1.ClusterComponentPhase, compNames ...string) {
+func mockComponentIsOperating(cluster *appsv1.Cluster, expectPhase appsv1.ClusterComponentPhase, compNames ...string) {
 	Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
 		for _, v := range compNames {
 			compStatus := cluster.Status.Components[v]

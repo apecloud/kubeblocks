@@ -255,7 +255,9 @@ func BuildPVC(cluster *appsv1.Cluster,
 	wellKnownLabels := constant.GetKBWellKnownLabels(synthesizedComp.ClusterDefName, cluster.Name, synthesizedComp.Name)
 	pvcBuilder := builder.NewPVCBuilder(pvcKey.Namespace, pvcKey.Name).
 		AddLabelsInMap(wellKnownLabels).
+		AddLabelsInMap(synthesizedComp.UserDefinedLabels).
 		AddLabels(constant.VolumeClaimTemplateNameLabelKey, vct.Name).
+		AddAnnotationsInMap(synthesizedComp.UserDefinedAnnotations).
 		SetAccessModes(vct.Spec.AccessModes).
 		SetResources(vct.Spec.Resources)
 	if vct.Spec.StorageClassName != nil {

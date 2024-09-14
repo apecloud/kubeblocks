@@ -22,7 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 func TestFromContainerPort(t *testing.T) {
@@ -48,7 +48,7 @@ func TestFromContainerPort(t *testing.T) {
 		name: "port name",
 		args: args{
 			exporter: Exporter{
-				Exporter: appsv1alpha1.Exporter{
+				Exporter: appsv1.Exporter{
 					ContainerName: "metrics",
 					ScrapePath:    "/metrics",
 					ScrapePort:    "http",
@@ -61,7 +61,7 @@ func TestFromContainerPort(t *testing.T) {
 		name: "port number",
 		args: args{
 			exporter: Exporter{
-				Exporter: appsv1alpha1.Exporter{
+				Exporter: appsv1.Exporter{
 					ContainerName: "metrics",
 					ScrapePath:    "/metrics",
 					ScrapePort:    "8080",
@@ -74,7 +74,7 @@ func TestFromContainerPort(t *testing.T) {
 		name: "empty port test",
 		args: args{
 			exporter: Exporter{
-				Exporter: appsv1alpha1.Exporter{
+				Exporter: appsv1.Exporter{
 					ContainerName: "metrics",
 					ScrapePath:    "/metrics",
 				},

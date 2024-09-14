@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
@@ -86,8 +87,8 @@ func mockConfigResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint) {
 	configuration := builder.NewConfigurationBuilder(testCtx.DefaultNamespace, core.GenerateComponentConfigurationName(clusterName, defaultCompName)).
 		ClusterRef(clusterName).
 		Component(defaultCompName).
-		AddConfigurationItem(appsv1alpha1.ComponentConfigSpec{
-			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+		AddConfigurationItem(appsv1.ComponentConfigSpec{
+			ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
 				Name:        configSpecName,
 				TemplateRef: configmap.Name,
 				Namespace:   configmap.Namespace,
@@ -101,7 +102,7 @@ func mockConfigResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint) {
 	return configmap, constraint
 }
 
-func mockReconcileResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint, *appsv1alpha1.Cluster, *appsv1alpha1.Component, *component.SynthesizedComponent) {
+func mockReconcileResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint, *appsv1.Cluster, *appsv1.Component, *component.SynthesizedComponent) {
 	configmap, constraint := mockConfigResource()
 
 	By("Create a component definition obj and mock to available")
@@ -113,8 +114,8 @@ func mockReconcileResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint, 
 			core.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
 		Create(&testCtx).
 		GetObject()
-	Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(compDefObj), func(obj *appsv1alpha1.ComponentDefinition) {
-		obj.Status.Phase = appsv1alpha1.AvailablePhase
+	Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(compDefObj), func(obj *appsv1.ComponentDefinition) {
+		obj.Status.Phase = appsv1.AvailablePhase
 	})()).Should(Succeed())
 
 	By("Creating a cluster")
@@ -158,8 +159,8 @@ func mockReconcileResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint, 
 
 func initConfiguration(resourceCtx *configctrl.ResourceCtx,
 	synthesizedComponent *component.SynthesizedComponent,
-	clusterObj *appsv1alpha1.Cluster,
-	componentObj *appsv1alpha1.Component) error {
+	clusterObj *appsv1.Cluster,
+	componentObj *appsv1.Component) error {
 	return configctrl.NewCreatePipeline(configctrl.ReconcileCtx{
 		ResourceCtx:          resourceCtx,
 		Component:            componentObj,
@@ -193,7 +194,8 @@ func cleanEnv() {
 	testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
 	// namespaced
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentSignature, true, inNS, ml)
-	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ConfigMapSignature, true, inNS, ml)
+	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ConfigMapSignature, true, inNS)
+	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.SecretSignature, true, inNS)
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.InstanceSetSignature, true, inNS, ml)
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ConfigurationSignature, false, inNS, ml)
 }

@@ -30,6 +30,7 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -104,7 +105,7 @@ var _ = Describe("OpsUtil functions", func() {
 
 			By("mock component failed")
 			clusterComp := opsRes.Cluster.Status.Components[defaultCompName]
-			clusterComp.Phase = appsv1alpha1.FailedClusterCompPhase
+			clusterComp.Phase = appsv1.FailedClusterCompPhase
 			opsRes.Cluster.Status.SetComponentStatus(defaultCompName, clusterComp)
 
 			By("expect for opsRequest is running")
@@ -214,7 +215,7 @@ var _ = Describe("OpsUtil functions", func() {
 			ops2 := runHscaleOps(appsv1alpha1.OpsPendingPhase)
 
 			By("check opsRequest annotation in cluster")
-			cluster := &appsv1alpha1.Cluster{}
+			cluster := &appsv1.Cluster{}
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.Cluster), cluster)).Should(Succeed())
 			opsSlice, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
 			Expect(len(opsSlice)).Should(Equal(2))
@@ -238,7 +239,7 @@ var _ = Describe("OpsUtil functions", func() {
 				g.Expect(ops.Status.Phase).Should(Equal(appsv1alpha1.OpsCancelledPhase))
 			})
 
-			testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, cluster *appsv1alpha1.Cluster) {
+			testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, cluster *appsv1.Cluster) {
 				opsSlice, _ = opsutil.GetOpsRequestSliceFromCluster(cluster)
 				// expect cluster's opsRequest queue is empty
 				g.Expect(opsSlice).Should(BeEmpty())
@@ -308,7 +309,7 @@ var _ = Describe("OpsUtil functions", func() {
 
 			By("mock cluster phase to Updating")
 			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
-				opsRes.Cluster.Status.Phase = appsv1alpha1.UpdatingClusterPhase
+				opsRes.Cluster.Status.Phase = appsv1.UpdatingClusterPhase
 			})).Should(Succeed())
 
 			By("expect the ops phase is failed")

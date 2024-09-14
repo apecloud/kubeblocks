@@ -26,7 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
@@ -63,7 +63,7 @@ var _ = Describe("Component Version", func() {
 					Image: testapps.AppImage(testapps.AppName, testapps.ReleaseID(""))}).
 				GetObject()
 
-			releases := []appsv1alpha1.ComponentVersionRelease{
+			releases := []appsv1.ComponentVersionRelease{
 				{
 					Name:           testapps.ReleaseID("r0"),
 					Changes:        "init release in v1",
@@ -92,19 +92,19 @@ var _ = Describe("Component Version", func() {
 
 			By("first release for the definition")
 			compVersionObj := testapps.NewComponentVersionFactory(testapps.CompVersionName).
-				SetSpec(appsv1alpha1.ComponentVersionSpec{
-					CompatibilityRules: []appsv1alpha1.ComponentVersionCompatibilityRule{
+				SetSpec(appsv1.ComponentVersionSpec{
+					CompatibilityRules: []appsv1.ComponentVersionCompatibilityRule{
 						{
 							CompDefs: []string{testapps.CompDefName("v1")},
 							Releases: []string{releases[0].Name},
 						},
 					},
-					Releases: []appsv1alpha1.ComponentVersionRelease{releases[0]},
+					Releases: []appsv1.ComponentVersionRelease{releases[0]},
 				}).
 				GetObject()
 
 			By("with app image in r0")
-			err := resolveImagesWithCompVersions(compDefObj, []*appsv1alpha1.ComponentVersion{compVersionObj}, testapps.ServiceVersion("v1"))
+			err := resolveImagesWithCompVersions(compDefObj, []*appsv1.ComponentVersion{compVersionObj}, testapps.ServiceVersion("v1"))
 			Expect(err).Should(Succeed())
 			Expect(compDefObj.Spec.Runtime.Containers[0].Image).Should(Equal(releases[0].Images[testapps.AppName]))
 
@@ -113,7 +113,7 @@ var _ = Describe("Component Version", func() {
 			compVersionObj.Spec.CompatibilityRules[0].Releases = append(compVersionObj.Spec.CompatibilityRules[0].Releases, releases[1].Name)
 
 			By("with app image still in r0")
-			err = resolveImagesWithCompVersions(compDefObj, []*appsv1alpha1.ComponentVersion{compVersionObj}, testapps.ServiceVersion("v1"))
+			err = resolveImagesWithCompVersions(compDefObj, []*appsv1.ComponentVersion{compVersionObj}, testapps.ServiceVersion("v1"))
 			Expect(err).Should(Succeed())
 			Expect(compDefObj.Spec.Runtime.Containers[0].Image).Should(Equal(releases[0].Images[testapps.AppName]))
 
@@ -122,7 +122,7 @@ var _ = Describe("Component Version", func() {
 			compVersionObj.Spec.CompatibilityRules[0].Releases = append(compVersionObj.Spec.CompatibilityRules[0].Releases, releases[2].Name)
 
 			By("with app image in r2")
-			err = resolveImagesWithCompVersions(compDefObj, []*appsv1alpha1.ComponentVersion{compVersionObj}, testapps.ServiceVersion("v1"))
+			err = resolveImagesWithCompVersions(compDefObj, []*appsv1.ComponentVersion{compVersionObj}, testapps.ServiceVersion("v1"))
 			Expect(err).Should(Succeed())
 			Expect(compDefObj.Spec.Runtime.Containers[0].Image).Should(Equal(releases[2].Images[testapps.AppName]))
 		})

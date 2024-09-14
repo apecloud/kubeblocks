@@ -25,6 +25,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"time"
 
@@ -119,11 +120,21 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 	}()
 
 	mergedEnv := func() []string {
-		// order: parameters (action specific variables) | os env
-		env := util.EnvM2L(parameters)
-		if len(env) > 0 {
-			env = append(env, os.Environ()...)
+		// order: parameters (action specific variables) | var | action env
+		filterDuplicates := func(osEnv []string, filter func(string) bool) []string {
+			unionEnv := make([]string, 0, len(osEnv))
+			for _, e := range osEnv {
+				if filter(e) {
+					unionEnv = append(unionEnv, e)
+				}
+			}
+			return unionEnv
 		}
+		env := append(util.EnvM2L(parameters), filterDuplicates(os.Environ(), func(env string) bool {
+			kv := strings.Split(env, "=")
+			_, ok := parameters[kv[0]]
+			return !ok
+		})...)
 		return env
 	}()
 

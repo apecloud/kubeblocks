@@ -32,6 +32,7 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -60,8 +61,8 @@ var _ OpsHandler = rebuildInstanceOpsHandler{}
 
 func init() {
 	rebuildInstanceBehaviour := OpsBehaviour{
-		FromClusterPhases: []appsv1alpha1.ClusterPhase{appsv1alpha1.AbnormalClusterPhase, appsv1alpha1.FailedClusterPhase, appsv1alpha1.UpdatingClusterPhase},
-		ToClusterPhase:    appsv1alpha1.UpdatingClusterPhase,
+		FromClusterPhases: []appsv1.ClusterPhase{appsv1.AbnormalClusterPhase, appsv1.FailedClusterPhase, appsv1.UpdatingClusterPhase},
+		ToClusterPhase:    appsv1.UpdatingClusterPhase,
 		QueueByCluster:    true,
 		OpsHandler:        rebuildInstanceOpsHandler{},
 	}
@@ -81,8 +82,8 @@ func (r rebuildInstanceOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli cli
 			continue
 		}
 		// check if the component has matched the `Phase` condition
-		if !opsRes.OpsRequest.Spec.Force && !slices.Contains([]appsv1alpha1.ClusterComponentPhase{appsv1alpha1.FailedClusterCompPhase,
-			appsv1alpha1.AbnormalClusterCompPhase, appsv1alpha1.UpdatingClusterCompPhase}, compStatus.Phase) {
+		if !opsRes.OpsRequest.Spec.Force && !slices.Contains([]appsv1.ClusterComponentPhase{appsv1.FailedClusterCompPhase,
+			appsv1.AbnormalClusterCompPhase, appsv1.UpdatingClusterCompPhase}, compStatus.Phase) {
 			return intctrlutil.NewFatalError(fmt.Sprintf(`the phase of component "%s" can not be %s`, v.ComponentName, compStatus.Phase))
 		}
 		var (
@@ -143,7 +144,7 @@ func (r rebuildInstanceOpsHandler) validateRebuildInstanceWithHScale(reqCtx intc
 
 func (r rebuildInstanceOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.RebuildFrom)
-	getLastComponentInfo := func(compSpec appsv1alpha1.ClusterComponentSpec, comOps ComponentOpsInterface) appsv1alpha1.LastComponentConfiguration {
+	getLastComponentInfo := func(compSpec appsv1.ClusterComponentSpec, comOps ComponentOpsInterface) appsv1alpha1.LastComponentConfiguration {
 		lastCompConfiguration := appsv1alpha1.LastComponentConfiguration{
 			Replicas:         pointer.Int32(compSpec.Replicas),
 			Instances:        compSpec.Instances,
@@ -371,7 +372,7 @@ func (r rebuildInstanceOpsHandler) getRebuildInstanceWrapper(opsRes *OpsResource
 func (r rebuildInstanceOpsHandler) scaleOutCompReplicasAndSyncProgress(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
-	compSpec *appsv1alpha1.ClusterComponentSpec,
+	compSpec *appsv1.ClusterComponentSpec,
 	rebuildInstance appsv1alpha1.RebuildInstance,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus,
 	rebuildInsWrapper map[string]*rebuildInstanceWrapper) error {
@@ -431,7 +432,7 @@ func (r rebuildInstanceOpsHandler) checkProgressForScalingOutPods(reqCtx intctrl
 	cli client.Client,
 	opsRes *OpsResource,
 	rebuildInstance appsv1alpha1.RebuildInstance,
-	compSpec *appsv1alpha1.ClusterComponentSpec,
+	compSpec *appsv1.ClusterComponentSpec,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus) (int, int, []string, error) {
 	var (
 		instancesNeedToOffline []string
@@ -502,10 +503,10 @@ func (r rebuildInstanceOpsHandler) checkProgressForScalingOutPods(reqCtx intctrl
 }
 
 // offlineSpecifiedInstances to take the specific instances offline.
-func (r rebuildInstanceOpsHandler) offlineSpecifiedInstances(compSpec *appsv1alpha1.ClusterComponentSpec, clusterName string, instancesNeedToOffline []string) {
+func (r rebuildInstanceOpsHandler) offlineSpecifiedInstances(compSpec *appsv1.ClusterComponentSpec, clusterName string, instancesNeedToOffline []string) {
 	for _, insName := range instancesNeedToOffline {
 		compSpec.OfflineInstances = append(compSpec.OfflineInstances, insName)
-		templateName := appsv1alpha1.GetInstanceTemplateName(clusterName, compSpec.Name, insName)
+		templateName := appsv1.GetInstanceTemplateName(clusterName, compSpec.Name, insName)
 		if templateName == constant.EmptyInsTemplateName {
 			continue
 		}
@@ -533,7 +534,7 @@ func (r rebuildInstanceOpsHandler) getScalingOutPodNameFromMessage(progressMsg s
 
 func (r rebuildInstanceOpsHandler) buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
+	cluster *appsv1.Cluster,
 	componentName string) (*component.SynthesizedComponent, error) {
 	compSpec := getComponentSpecOrShardingTemplate(cluster, componentName)
 	if compSpec.ComponentDef == "" {

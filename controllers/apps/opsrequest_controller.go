@@ -42,9 +42,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/controllers/apps/operations"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -93,8 +94,8 @@ func (r *OpsRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: int(math.Ceil(viper.GetFloat64(constant.CfgKBReconcileWorkers) / 2)),
 		}).
-		Watches(&appsv1alpha1.Cluster{}, handler.EnqueueRequestsFromMapFunc(r.parseRunningOpsRequests)).
-		Watches(&workloadsv1alpha1.InstanceSet{}, handler.EnqueueRequestsFromMapFunc(r.parseRunningOpsRequestsForInstanceSet)).
+		Watches(&appsv1.Cluster{}, handler.EnqueueRequestsFromMapFunc(r.parseRunningOpsRequests)).
+		Watches(&workloads.InstanceSet{}, handler.EnqueueRequestsFromMapFunc(r.parseRunningOpsRequestsForInstanceSet)).
 		Watches(&dpv1alpha1.Backup{}, handler.EnqueueRequestsFromMapFunc(r.parseBackupOpsRequest)).
 		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.parseVolumeExpansionOpsRequest)).
 		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.parsePod)).
@@ -135,7 +136,7 @@ func (r *OpsRequestReconciler) handleDeletion(reqCtx intctrlutil.RequestCtx, ops
 
 // fetchCluster fetches the Cluster from the OpsRequest.
 func (r *OpsRequestReconciler) fetchCluster(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error) {
-	cluster := &appsv1alpha1.Cluster{}
+	cluster := &appsv1.Cluster{}
 	opsBehaviour, ok := operations.GetOpsManager().OpsMap[opsRes.OpsRequest.Spec.Type]
 	if !ok || opsBehaviour.OpsHandler == nil {
 		return nil, operations.PatchOpsHandlerNotSupported(reqCtx.Ctx, r.Client, opsRes)
@@ -300,7 +301,7 @@ func (r *OpsRequestReconciler) addClusterLabelAndSetOwnerReference(reqCtx intctr
 	}
 	opsRequest.Labels[constant.AppInstanceLabelKey] = opsRequest.Spec.GetClusterName()
 	opsRequest.Labels[constant.OpsRequestTypeLabelKey] = string(opsRequest.Spec.Type)
-	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
+	scheme, _ := appsv1.SchemeBuilder.Build()
 	if err := controllerutil.SetOwnerReference(opsRes.Cluster, opsRequest, scheme); err != nil {
 		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 	}
@@ -346,7 +347,7 @@ func (r *OpsRequestReconciler) doOpsRequestAction(reqCtx intctrlutil.RequestCtx,
 
 // handleOpsReqDeletedDuringRunning handles the cluster annotation if the OpsRequest is deleted during running.
 func (r *OpsRequestReconciler) handleOpsReqDeletedDuringRunning(reqCtx intctrlutil.RequestCtx) error {
-	clusterList := &appsv1alpha1.ClusterList{}
+	clusterList := &appsv1.ClusterList{}
 	if err := r.Client.List(reqCtx.Ctx, clusterList, client.InNamespace(reqCtx.Req.Namespace)); err != nil {
 		return err
 	}
@@ -358,7 +359,7 @@ func (r *OpsRequestReconciler) handleOpsReqDeletedDuringRunning(reqCtx intctrlut
 	return nil
 }
 
-func (r *OpsRequestReconciler) cleanupOpsAnnotationForCluster(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster) error {
+func (r *OpsRequestReconciler) cleanupOpsAnnotationForCluster(reqCtx intctrlutil.RequestCtx, cluster *appsv1.Cluster) error {
 	opsRequestSlice, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
 	index, _ := operations.GetOpsRecorderFromSlice(opsRequestSlice, reqCtx.Req.Name)
 	if index == -1 {
@@ -369,7 +370,7 @@ func (r *OpsRequestReconciler) cleanupOpsAnnotationForCluster(reqCtx intctrlutil
 	return opsutil.UpdateClusterOpsAnnotations(reqCtx.Ctx, r.Client, cluster, opsRequestSlice)
 }
 
-func (r *OpsRequestReconciler) getRunningOpsRequestsFromCluster(cluster *appsv1alpha1.Cluster) []reconcile.Request {
+func (r *OpsRequestReconciler) getRunningOpsRequestsFromCluster(cluster *appsv1.Cluster) []reconcile.Request {
 	var (
 		opsRequestSlice []appsv1alpha1.OpsRecorder
 		err             error
@@ -416,17 +417,17 @@ func (r *OpsRequestReconciler) getRunningOpsRequestsFromCluster(cluster *appsv1a
 }
 
 func (r *OpsRequestReconciler) parseRunningOpsRequests(ctx context.Context, object client.Object) []reconcile.Request {
-	cluster := object.(*appsv1alpha1.Cluster)
+	cluster := object.(*appsv1.Cluster)
 	return r.getRunningOpsRequestsFromCluster(cluster)
 }
 
 func (r *OpsRequestReconciler) parseRunningOpsRequestsForInstanceSet(ctx context.Context, object client.Object) []reconcile.Request {
-	its := object.(*workloadsv1alpha1.InstanceSet)
+	its := object.(*workloads.InstanceSet)
 	clusterName := its.Labels[constant.AppInstanceLabelKey]
 	if clusterName == "" {
 		return nil
 	}
-	cluster := &appsv1alpha1.Cluster{}
+	cluster := &appsv1.Cluster{}
 	if err := r.Client.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: its.Namespace}, cluster); err != nil {
 		return nil
 	}

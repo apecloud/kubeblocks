@@ -26,6 +26,7 @@ import (
 	gruntime "runtime"
 	"strings"
 
+	"github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/scheme"
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,12 +36,22 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 	"github.com/apecloud/kubeblocks/version"
 )
+
+var (
+	innerScheme = scheme.Scheme
+)
+
+func init() {
+	appsv1alpha1.AddToScheme(innerScheme) // nolint: errcheck
+	appsv1.AddToScheme(innerScheme)       // nolint: errcheck
+}
 
 // GetUncachedObjects returns a list of K8s objects, for these object types,
 // and their list types, client.Reader will read directly from the API server instead
@@ -64,7 +75,7 @@ func GetUncachedObjects() []client.Object {
 		// avoid to cache potential large data objects
 		&corev1.ConfigMap{},
 		&corev1.Secret{},
-		&appsv1alpha1.Cluster{},
+		&appsv1.Cluster{},
 		&appsv1alpha1.Configuration{},
 	}
 }
@@ -140,8 +151,6 @@ func MergeMetadataMaps(originalMap map[string]string, targetMaps ...map[string]s
 	}
 	return mergeMap
 }
-
-var innerScheme, _ = appsv1alpha1.SchemeBuilder.Build()
 
 func SetOwnerReference(owner, object metav1.Object) error {
 	return controllerutil.SetOwnerReference(owner, object, innerScheme)

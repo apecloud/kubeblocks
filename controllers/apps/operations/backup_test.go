@@ -25,6 +25,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -98,14 +99,14 @@ var _ = Describe("Backup OpsRequest", func() {
 
 		It("should create a backup resource when cluster phase is Updating", func() {
 			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
-				opsRes.Cluster.Status.Phase = appsv1alpha1.UpdatingClusterPhase
+				opsRes.Cluster.Status.Phase = appsv1.UpdatingClusterPhase
 			})).Should(Succeed())
 			testBackupOps(opsRes)
 		})
 
 		It("should failed when cluster phase is Failed", func() {
 			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
-				opsRes.Cluster.Status.Phase = appsv1alpha1.FailedClusterPhase
+				opsRes.Cluster.Status.Phase = appsv1.FailedClusterPhase
 			})).Should(Succeed())
 
 			By("create Backup OpsRequest")

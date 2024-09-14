@@ -22,6 +22,9 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 const (
@@ -62,9 +65,9 @@ type ComponentTemplateSpec struct {
 	// template will be mounted to the corresponding volume. Must be a DNS_LABEL name.
 	// The volume name must be defined in podSpec.containers[*].volumeMounts.
 	//
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
+	// +optional
 	VolumeName string `json:"volumeName"`
 
 	// The operator attempts to set default file permissions for scripts (0555) and configurations (0444).
@@ -198,6 +201,11 @@ type ComponentConfigSpec struct {
 	// +listType=set
 	// +optional
 	ReRenderResourceTypes []RerenderResourceType `json:"reRenderResourceTypes,omitempty"`
+
+	// Whether to store the final rendered parameters as a secret.
+	//
+	// +optional
+	AsSecret *bool `json:"asSecret,omitempty"`
 }
 
 // RerenderResourceType defines the resource requirements for a component.
@@ -445,6 +453,25 @@ const (
 	BestEffortParallelStrategy UpdateStrategy = "BestEffortParallel"
 )
 
+// InstanceUpdateStrategy indicates the strategy that the InstanceSet
+// controller will use to perform updates.
+type InstanceUpdateStrategy struct {
+	// Partition indicates the number of pods that should be updated during a rolling update.
+	// The remaining pods will remain untouched. This is helpful in defining how many pods
+	// should participate in the update process. The update process will follow the order
+	// of pod names in descending lexicographical (dictionary) order. The default value is
+	// ComponentSpec.Replicas (i.e., update all pods).
+	// +optional
+	Partition *int32 `json:"partition,omitempty"`
+	// The maximum number of pods that can be unavailable during the update.
+	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+	// Absolute number is calculated from percentage by rounding up. This can not be 0.
+	// Defaults to 1. The field applies to all pods. That means if there is any unavailable pod,
+	// it will be counted towards MaxUnavailable.
+	// +optional
+	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
+}
+
 // TerminationPolicyType defines termination policy types.
 //
 // +enum
@@ -545,8 +572,8 @@ const (
 )
 
 type OpsRequestBehaviour struct {
-	FromClusterPhases []ClusterPhase
-	ToClusterPhase    ClusterPhase
+	FromClusterPhases []kbappsv1.ClusterPhase
+	ToClusterPhase    kbappsv1.ClusterPhase
 }
 
 type OpsRecorder struct {
@@ -889,10 +916,6 @@ type VarSource struct {
 	// Selects a defined var of a Component.
 	// +optional
 	ComponentVarRef *ComponentVarSelector `json:"componentVarRef,omitempty"`
-
-	// Selects a defined var of a Cluster.
-	// +optional
-	ClusterVarRef *ClusterVarSelector `json:"clusterVarRef,omitempty"`
 }
 
 // VarOption defines whether a variable is required or optional.
@@ -908,14 +931,6 @@ var (
 type NamedVar struct {
 	// +optional
 	Name string `json:"name,omitempty"`
-
-	// +optional
-	Option *VarOption `json:"option,omitempty"`
-}
-
-type RoledVar struct {
-	// +optional
-	Role string `json:"role,omitempty"`
 
 	// +optional
 	Option *VarOption `json:"option,omitempty"`
@@ -942,11 +957,6 @@ type HostNetworkVars struct {
 
 // ServiceVars defines the vars that can be referenced from a Service.
 type ServiceVars struct {
-	// ServiceType references the type of the service.
-	//
-	// +optional
-	ServiceType *VarOption `json:"serviceType,omitempty"`
-
 	// +optional
 	Host *VarOption `json:"host,omitempty"`
 
@@ -1037,11 +1047,6 @@ type ComponentVars struct {
 	// +optional
 	ComponentName *VarOption `json:"componentName,omitempty"`
 
-	// Reference to the short name of the Component object.
-	//
-	// +optional
-	ShortName *VarOption `json:"shortName,omitempty"`
-
 	// Reference to the replicas of the component.
 	//
 	// +optional
@@ -1051,47 +1056,13 @@ type ComponentVars struct {
 	// and the value will be presented in the following format: name1,name2,...
 	//
 	// +optional
-	PodNames *VarOption `json:"podNames,omitempty"`
+	InstanceNames *VarOption `json:"instanceNames,omitempty"`
 
 	// Reference to the pod FQDN list of the component.
 	// The value will be presented in the following format: FQDN1,FQDN2,...
 	//
 	// +optional
 	PodFQDNs *VarOption `json:"podFQDNs,omitempty"`
-
-	// Reference to the pod name list of the component that have a specific role.
-	// The value will be presented in the following format: name1,name2,...
-	//
-	// +optional
-	PodNamesForRole *RoledVar `json:"podNamesForRole,omitempty"`
-
-	// Reference to the pod FQDN list of the component that have a specific role.
-	// The value will be presented in the following format: FQDN1,FQDN2,...
-	//
-	// +optional
-	PodFQDNsForRole *RoledVar `json:"podFQDNsForRole,omitempty"`
-}
-
-// ClusterVarSelector selects a var from a Cluster.
-type ClusterVarSelector struct {
-	ClusterVars `json:",inline"`
-}
-
-type ClusterVars struct {
-	// Reference to the namespace of the Cluster object.
-	//
-	// +optional
-	Namespace *VarOption `json:"namespace,omitempty"`
-
-	// Reference to the name of the Cluster object.
-	//
-	// +optional
-	ClusterName *VarOption `json:"clusterName,omitempty"`
-
-	// Reference to the UID of the Cluster object.
-	//
-	// +optional
-	ClusterUID *VarOption `json:"clusterUID,omitempty"`
 }
 
 // ClusterObjectReference defines information to let you locate the referenced object inside the same Cluster.

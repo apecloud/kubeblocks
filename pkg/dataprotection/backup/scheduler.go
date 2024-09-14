@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -399,11 +400,11 @@ func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 	}
 	targetPodSelector := targets[0].PodSelector
 	clusterName := targetPodSelector.MatchLabels[constant.AppInstanceLabelKey]
-	cluster := &appsv1alpha1.Cluster{}
+	cluster := &appsv1.Cluster{}
 	if err := s.Client.Get(s.Ctx, client.ObjectKey{Name: clusterName, Namespace: s.BackupSchedule.Namespace}, cluster); err != nil {
 		return err
 	}
-	if !slices.Contains(appsv1alpha1.GetReconfiguringRunningPhases(), cluster.Status.Phase) {
+	if !slices.Contains(appsv1.GetReconfiguringRunningPhases(), cluster.Status.Phase) {
 		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting for the cluster %s to be available.", clusterName)
 	}
 	ops := appsv1alpha1.OpsRequest{

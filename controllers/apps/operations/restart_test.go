@@ -22,9 +22,11 @@ package operations
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -63,7 +65,7 @@ var _ = Describe("Restart OpsRequest", func() {
 	Context("Test OpsRequest", func() {
 		var (
 			opsRes  *OpsResource
-			cluster *appsv1alpha1.Cluster
+			cluster *appsv1.Cluster
 			reqCtx  intctrlutil.RequestCtx
 		)
 
@@ -76,7 +78,7 @@ var _ = Describe("Restart OpsRequest", func() {
 		It("Test restart OpsRequest", func() {
 			By("create Restart opsRequest")
 			opsRes.OpsRequest = createRestartOpsObj(clusterName, "restart-ops-"+randomStr)
-			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase, defaultCompName)
+			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingClusterCompPhase, defaultCompName)
 
 			By("mock restart OpsRequest is Running")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
@@ -94,7 +96,7 @@ var _ = Describe("Restart OpsRequest", func() {
 		It("expect failed when cluster is stopped", func() {
 			By("mock cluster is stopped")
 			Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
-				cluster.Status.Phase = appsv1alpha1.StoppedClusterPhase
+				cluster.Status.Phase = appsv1.StoppedClusterPhase
 			})).Should(Succeed())
 			By("create Restart opsRequest")
 			opsRes.OpsRequest = createRestartOpsObj(clusterName, "restart-ops-"+randomStr)

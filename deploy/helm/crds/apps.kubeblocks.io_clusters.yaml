@@ -207,7 +207,6 @@ spec:
                         If both `componentDefRef` and `componentDef` are provided,
                         the `componentDef` will take precedence over `componentDefRef`.
                       maxLength: 64
-                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     componentDefRef:
                       description: |-
@@ -9103,7 +9102,6 @@ spec:
                             If both `componentDefRef` and `componentDef` are provided,
                             the `componentDef` will take precedence over `componentDefRef`.
                           maxLength: 64
-                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                           type: string
                         componentDefRef:
                           description: |-
@@ -17025,7 +17023,6 @@ spec:
                         If both `componentDefRef` and `componentDef` are provided,
                         the `componentDef` will take precedence over `componentDefRef`.
                       maxLength: 64
-                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     componentDefRef:
                       description: |-
@@ -26196,7 +26193,6 @@ spec:
                             If both `componentDefRef` and `componentDef` are provided,
                             the `componentDef` will take precedence over `componentDefRef`.
                           maxLength: 64
-                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                           type: string
                         componentDefRef:
                           description: |-

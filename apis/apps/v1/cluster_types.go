@@ -311,7 +311,6 @@ type ClusterComponentSpec struct {
 	// the `componentDef` will take precedence over `componentDefRef`.
 	//
 	// +kubebuilder:validation:MaxLength=64
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	ComponentDef string `json:"componentDef,omitempty"`
 

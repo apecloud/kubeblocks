@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -236,7 +237,7 @@ func isFinishStatus(phase appsv1alpha1.ConfigurationPhase) bool {
 }
 
 func buildTemplateVars(ctx context.Context, cli client.Reader,
-	compDef *appsv1alpha1.ComponentDefinition, synthesizedComp *component.SynthesizedComponent) error {
+	compDef *appsv1.ComponentDefinition, synthesizedComp *component.SynthesizedComponent) error {
 	if compDef != nil && len(compDef.Spec.Vars) > 0 {
 		templateVars, _, err := component.ResolveTemplateNEnvVars(ctx, cli, synthesizedComp, compDef.Spec.Vars)
 		if err != nil {

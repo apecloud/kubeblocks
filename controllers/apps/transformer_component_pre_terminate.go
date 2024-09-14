@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/component/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -44,7 +44,7 @@ var _ graph.Transformer = &componentPreTerminateTransformer{}
 func (t *componentPreTerminateTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
 	comp := transCtx.Component
-	if comp.GetDeletionTimestamp().IsZero() || comp.Status.Phase != appsv1alpha1.DeletingClusterCompPhase {
+	if comp.GetDeletionTimestamp().IsZero() || comp.Status.Phase != appsv1.DeletingClusterCompPhase {
 		return nil
 	}
 
@@ -54,7 +54,7 @@ func (t *componentPreTerminateTransformer) Transform(ctx graph.TransformContext,
 	compDefKey := types.NamespacedName{
 		Name: comp.Spec.CompDef,
 	}
-	compDef := &appsv1alpha1.ComponentDefinition{}
+	compDef := &appsv1.ComponentDefinition{}
 	if err := transCtx.Client.Get(transCtx.Context, compDefKey, compDef); err != nil {
 		return err
 	}
@@ -102,7 +102,7 @@ func (t *componentPreTerminateTransformer) markPreTerminateDone(transCtx *compon
 	return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting for pre-terminate annotation to be set")
 }
 
-func (t *componentPreTerminateTransformer) preTerminate(transCtx *componentTransformContext, compDef *appsv1alpha1.ComponentDefinition) error {
+func (t *componentPreTerminateTransformer) preTerminate(transCtx *componentTransformContext, compDef *appsv1.ComponentDefinition) error {
 	lfa, err := t.lifecycleAction4Component(transCtx, compDef)
 	if err != nil {
 		return err
@@ -110,7 +110,7 @@ func (t *componentPreTerminateTransformer) preTerminate(transCtx *componentTrans
 	return lfa.PreTerminate(transCtx.Context, transCtx.Client, nil)
 }
 
-func (t *componentPreTerminateTransformer) lifecycleAction4Component(transCtx *componentTransformContext, compDef *appsv1alpha1.ComponentDefinition) (lifecycle.Lifecycle, error) {
+func (t *componentPreTerminateTransformer) lifecycleAction4Component(transCtx *componentTransformContext, compDef *appsv1.ComponentDefinition) (lifecycle.Lifecycle, error) {
 	synthesizedComp, err1 := t.synthesizedComponent(transCtx, compDef)
 	if err1 != nil {
 		return nil, err1
@@ -127,7 +127,7 @@ func (t *componentPreTerminateTransformer) lifecycleAction4Component(transCtx *c
 	return lifecycle.New(synthesizedComp, nil, pods...)
 }
 
-func (t *componentPreTerminateTransformer) synthesizedComponent(transCtx *componentTransformContext, compDef *appsv1alpha1.ComponentDefinition) (*component.SynthesizedComponent, error) {
+func (t *componentPreTerminateTransformer) synthesizedComponent(transCtx *componentTransformContext, compDef *appsv1.ComponentDefinition) (*component.SynthesizedComponent, error) {
 	var (
 		ctx  = transCtx.Context
 		cli  = transCtx.Client
@@ -138,7 +138,7 @@ func (t *componentPreTerminateTransformer) synthesizedComponent(transCtx *compon
 	if err != nil {
 		return nil, newRequeueError(requeueDuration, err.Error())
 	}
-	cluster := &appsv1alpha1.Cluster{}
+	cluster := &appsv1.Cluster{}
 	err = cli.Get(ctx, types.NamespacedName{Name: clusterName, Namespace: comp.Namespace}, cluster)
 	if err != nil {
 		return nil, newRequeueError(requeueDuration, err.Error())

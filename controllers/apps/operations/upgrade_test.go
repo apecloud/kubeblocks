@@ -27,6 +27,7 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -76,21 +77,21 @@ var _ = Describe("Upgrade OpsRequest", func() {
 		// do upgrade
 		_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 		Expect(err).ShouldNot(HaveOccurred())
-		mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase, defaultCompName)
+		mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingClusterCompPhase, defaultCompName)
 	}
 
-	mockClusterRunning := func(clusterObject *appsv1alpha1.Cluster) {
+	mockClusterRunning := func(clusterObject *appsv1.Cluster) {
 		Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
-			clusterObject.Status.Phase = appsv1alpha1.RunningClusterPhase
-			clusterObject.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
+			clusterObject.Status.Phase = appsv1.RunningClusterPhase
+			clusterObject.Status.Components = map[string]appsv1.ClusterComponentStatus{
 				defaultCompName: {
-					Phase: appsv1alpha1.RunningClusterCompPhase,
+					Phase: appsv1.RunningClusterCompPhase,
 				},
 			}
 		})).Should(Succeed())
 	}
 
-	initOpsResWithComponentDef := func(createCompVersion bool) (*appsv1alpha1.ComponentDefinition, *appsv1alpha1.ComponentDefinition, *OpsResource) {
+	initOpsResWithComponentDef := func(createCompVersion bool) (*appsv1.ComponentDefinition, *appsv1.ComponentDefinition, *OpsResource) {
 		compDef1 := testapps.NewComponentDefinitionFactory(testapps.CompDefName("cmpd-1")).
 			SetServiceVersion(testapps.ServiceVersion(serviceVer0)).
 			SetRuntime(&corev1.Container{
@@ -103,8 +104,8 @@ var _ = Describe("Upgrade OpsRequest", func() {
 		}).Create(&testCtx).GetObject()
 		if createCompVersion {
 			compVersion := testapps.NewComponentVersionFactory(testapps.CompVersionName).
-				SetSpec(appsv1alpha1.ComponentVersionSpec{
-					CompatibilityRules: []appsv1alpha1.ComponentVersionCompatibilityRule{
+				SetSpec(appsv1.ComponentVersionSpec{
+					CompatibilityRules: []appsv1.ComponentVersionCompatibilityRule{
 						{
 							// use prefix
 							CompDefs: []string{compDef1.Name},
@@ -116,7 +117,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 							Releases: []string{release2, release3}, // sv: v2
 						},
 					},
-					Releases: []appsv1alpha1.ComponentVersionRelease{
+					Releases: []appsv1.ComponentVersionRelease{
 						{
 							Name:           release0,
 							Changes:        "init release",
@@ -162,7 +163,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 				Create(&testCtx).
 				GetObject()
 			// label the componentDef info to the ComponentVersion
-			Expect(testapps.ChangeObj(&testCtx, compVersion, func(version *appsv1alpha1.ComponentVersion) {
+			Expect(testapps.ChangeObj(&testCtx, compVersion, func(version *appsv1.ComponentVersion) {
 				if version.Labels == nil {
 					version.Labels = map[string]string{}
 				}
@@ -172,7 +173,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 
 			// mock ComponentVersion to Available
 			Expect(testapps.ChangeObjStatus(&testCtx, compVersion, func() {
-				compVersion.Status.Phase = appsv1alpha1.AvailablePhase
+				compVersion.Status.Phase = appsv1.AvailablePhase
 				compVersion.Status.ObservedGeneration = compVersion.Generation
 			})).Should(Succeed())
 		}
@@ -190,7 +191,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 		return compDef1, compDef2, opsRes
 	}
 
-	createUpgradeOpsRequest := func(clusterObject *appsv1alpha1.Cluster, upgradeSpec appsv1alpha1.Upgrade) *appsv1alpha1.OpsRequest {
+	createUpgradeOpsRequest := func(clusterObject *appsv1.Cluster, upgradeSpec appsv1alpha1.Upgrade) *appsv1alpha1.OpsRequest {
 		ops := testapps.NewOpsRequestObj("upgrade-ops-"+randomStr, testCtx.DefaultNamespace,
 			clusterObject.Name, appsv1alpha1.UpgradeType)
 		ops.Spec.Upgrade = &upgradeSpec
@@ -202,13 +203,13 @@ var _ = Describe("Upgrade OpsRequest", func() {
 
 	expectOpsSucceed := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, compNames ...string) {
 		// mock component to running
-		mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.RunningClusterCompPhase, compNames...)
+		mockComponentIsOperating(opsRes.Cluster, appsv1.RunningClusterCompPhase, compNames...)
 		_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 		Expect(err).ShouldNot(HaveOccurred())
 		Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsSucceedPhase))
 	}
 
-	mockPodsAppliedImage := func(cluster *appsv1alpha1.Cluster, releaseVersion string) {
+	mockPodsAppliedImage := func(cluster *appsv1.Cluster, releaseVersion string) {
 		pods := testapps.MockInstanceSetPods(&testCtx, nil, cluster, defaultCompName)
 		image := testapps.AppImage(testapps.AppName, releaseVersion)
 		for i := range pods {
@@ -273,7 +274,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			By("expect for this opsRequest is Running")
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			makeUpgradeOpsIsRunning(reqCtx, opsRes)
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, cluster *appsv1alpha1.Cluster) {
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, cluster *appsv1.Cluster) {
 				g.Expect(cluster.Spec.ComponentSpecs[0].ComponentDef).Should(Equal(compDef2.Name))
 				g.Expect(cluster.Spec.ComponentSpecs[0].ServiceVersion).Should(Equal(serviceVer2))
 			})).Should(Succeed())
@@ -301,7 +302,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			By("expect for this opsRequest is Running and reuse the original ComponentDefinition")
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			makeUpgradeOpsIsRunning(reqCtx, opsRes)
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, cluster *appsv1alpha1.Cluster) {
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, cluster *appsv1.Cluster) {
 				g.Expect(cluster.Spec.ComponentSpecs[0].ComponentDef).Should(Equal(compDef1.Name))
 				g.Expect(cluster.Spec.ComponentSpecs[0].ServiceVersion).Should(Equal(serviceVer1))
 			})).Should(Succeed())
@@ -329,7 +330,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			By(" expect for this opsRequest is Running")
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			makeUpgradeOpsIsRunning(reqCtx, opsRes)
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, cluster *appsv1alpha1.Cluster) {
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, cluster *appsv1.Cluster) {
 				g.Expect(cluster.Spec.ComponentSpecs[0].ComponentDef).Should(Equal(compDef1.Name))
 				g.Expect(cluster.Spec.ComponentSpecs[0].ServiceVersion).Should(BeEmpty())
 			})).Should(Succeed())
@@ -356,7 +357,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			By("expecting no changes to serviceVersion")
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			makeUpgradeOpsIsRunning(reqCtx, opsRes)
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, cluster *appsv1alpha1.Cluster) {
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, cluster *appsv1.Cluster) {
 				g.Expect(cluster.Spec.ComponentSpecs[0].ComponentDef).Should(Equal(compDef2.Name))
 				g.Expect(cluster.Spec.ComponentSpecs[0].ServiceVersion).Should(Equal(serviceVer0))
 			})).Should(Succeed())
@@ -379,7 +380,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			By("expecting no changes to cluster.spec.componentSpec[0].componentDef")
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			makeUpgradeOpsIsRunning(reqCtx, opsRes)
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, cluster *appsv1alpha1.Cluster) {
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, cluster *appsv1.Cluster) {
 				g.Expect(cluster.Spec.ComponentSpecs[0].ComponentDef).Should(Equal(compDef1.Name))
 				g.Expect(cluster.Spec.ComponentSpecs[0].ServiceVersion).Should(Equal(""))
 			})).Should(Succeed())

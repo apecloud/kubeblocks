@@ -38,7 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsconfig "github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -75,7 +75,7 @@ func (r *ComponentDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.
 
 	rctx.Log.V(1).Info("reconcile", "component", req.NamespacedName)
 
-	cmpd := &appsv1alpha1.ComponentDefinition{}
+	cmpd := &appsv1.ComponentDefinition{}
 	if err := r.Client.Get(rctx.Ctx, rctx.Req.NamespacedName, cmpd); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, rctx.Log, "")
 	}
@@ -86,19 +86,19 @@ func (r *ComponentDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.
 // SetupWithManager sets up the controller with the Manager.
 func (r *ComponentDefinitionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
-		For(&appsv1alpha1.ComponentDefinition{}).
+		For(&appsv1.ComponentDefinition{}).
 		Complete(r)
 }
 
 func (r *ComponentDefinitionReconciler) reconcile(rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition) (ctrl.Result, error) {
+	cmpd *appsv1.ComponentDefinition) (ctrl.Result, error) {
 	res, err := intctrlutil.HandleCRDeletion(rctx, r, cmpd, componentDefinitionFinalizerName, r.deletionHandler(rctx, cmpd))
 	if res != nil {
 		return *res, err
 	}
 
 	if cmpd.Status.ObservedGeneration == cmpd.Generation &&
-		slices.Contains([]appsv1alpha1.Phase{appsv1alpha1.AvailablePhase}, cmpd.Status.Phase) {
+		slices.Contains([]appsv1.Phase{appsv1.AvailablePhase}, cmpd.Status.Phase) {
 		return intctrlutil.Reconciled()
 	}
 
@@ -123,14 +123,14 @@ func (r *ComponentDefinitionReconciler) reconcile(rctx intctrlutil.RequestCtx,
 }
 
 func (r *ComponentDefinitionReconciler) deletionHandler(rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition) func() (*ctrl.Result, error) {
+	cmpd *appsv1.ComponentDefinition) func() (*ctrl.Result, error) {
 	return func() (*ctrl.Result, error) {
 		recordEvent := func() {
 			r.Recorder.Event(cmpd, corev1.EventTypeWarning, constant.ReasonRefCRUnavailable,
 				"cannot be deleted because of existing referencing Component.")
 		}
 		if res, err := intctrlutil.ValidateReferenceCR(rctx, r.Client, cmpd, constant.ComponentDefinitionLabelKey,
-			recordEvent, &appsv1alpha1.ComponentList{}); res != nil || err != nil {
+			recordEvent, &appsv1.ComponentList{}); res != nil || err != nil {
 			return res, err
 		}
 		return nil, nil
@@ -138,17 +138,17 @@ func (r *ComponentDefinitionReconciler) deletionHandler(rctx intctrlutil.Request
 }
 
 func (r *ComponentDefinitionReconciler) available(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition) error {
-	return r.status(cli, rctx, cmpd, appsv1alpha1.AvailablePhase, "")
+	cmpd *appsv1.ComponentDefinition) error {
+	return r.status(cli, rctx, cmpd, appsv1.AvailablePhase, "")
 }
 
 func (r *ComponentDefinitionReconciler) unavailable(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition, err error) error {
-	return r.status(cli, rctx, cmpd, appsv1alpha1.UnavailablePhase, err.Error())
+	cmpd *appsv1.ComponentDefinition, err error) error {
+	return r.status(cli, rctx, cmpd, appsv1.UnavailablePhase, err.Error())
 }
 
 func (r *ComponentDefinitionReconciler) status(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition, phase appsv1alpha1.Phase, message string) error {
+	cmpd *appsv1.ComponentDefinition, phase appsv1.Phase, message string) error {
 	patch := client.MergeFrom(cmpd.DeepCopy())
 	cmpd.Status.ObservedGeneration = cmpd.Generation
 	cmpd.Status.Phase = phase
@@ -157,7 +157,7 @@ func (r *ComponentDefinitionReconciler) status(cli client.Client, rctx intctrlut
 }
 
 func (r *ComponentDefinitionReconciler) immutableHash(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition) error {
+	cmpd *appsv1.ComponentDefinition) error {
 	if r.skipImmutableCheck(cmpd) {
 		return nil
 	}
@@ -178,8 +178,8 @@ func (r *ComponentDefinitionReconciler) immutableHash(cli client.Client, rctx in
 }
 
 func (r *ComponentDefinitionReconciler) validate(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition) error {
-	for _, validator := range []func(client.Client, intctrlutil.RequestCtx, *appsv1alpha1.ComponentDefinition) error{
+	cmpd *appsv1.ComponentDefinition) error {
+	for _, validator := range []func(client.Client, intctrlutil.RequestCtx, *appsv1.ComponentDefinition) error{
 		r.validateServiceVersion,
 		r.validateRuntime,
 		r.validateVars,
@@ -202,17 +202,17 @@ func (r *ComponentDefinitionReconciler) validate(cli client.Client, rctx intctrl
 }
 
 func (r *ComponentDefinitionReconciler) validateServiceVersion(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition) error {
+	cmpd *appsv1.ComponentDefinition) error {
 	return validateServiceVersion(cmpd.Spec.ServiceVersion)
 }
 
 func (r *ComponentDefinitionReconciler) validateRuntime(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition) error {
+	cmpd *appsv1.ComponentDefinition) error {
 	return nil
 }
 
 func (r *ComponentDefinitionReconciler) validateVars(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition) error {
+	cmpd *appsv1.ComponentDefinition) error {
 	if !checkUniqueItemWithValue(cmpd.Spec.Vars, "Name", nil) {
 		return fmt.Errorf("duplicate names of component vars are not allowed")
 	}
@@ -249,7 +249,7 @@ func (r *ComponentDefinitionReconciler) validateVars(cli client.Client, rctx int
 }
 
 func (r *ComponentDefinitionReconciler) validateVolumes(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition) error {
+	cmpd *appsv1.ComponentDefinition) error {
 	if !checkUniqueItemWithValue(cmpd.Spec.Volumes, "Name", nil) {
 		return fmt.Errorf("duplicate volume names are not allowed")
 	}
@@ -270,7 +270,7 @@ func (r *ComponentDefinitionReconciler) validateVolumes(cli client.Client, rctx 
 }
 
 func (r *ComponentDefinitionReconciler) validateHostNetwork(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition) error {
+	cmpd *appsv1.ComponentDefinition) error {
 	if cmpd.Spec.HostNetwork == nil {
 		return nil
 	}
@@ -304,7 +304,7 @@ func (r *ComponentDefinitionReconciler) validateHostNetwork(cli client.Client, r
 }
 
 func (r *ComponentDefinitionReconciler) validateServices(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition) error {
+	cmpd *appsv1.ComponentDefinition) error {
 	if !checkUniqueItemWithValue(cmpd.Spec.Services, "Name", nil) {
 		return fmt.Errorf("duplicate names of component service are not allowed")
 	}
@@ -332,28 +332,28 @@ func (r *ComponentDefinitionReconciler) validateServices(cli client.Client, rctx
 }
 
 func (r *ComponentDefinitionReconciler) validateConfigs(cli client.Client, rctx intctrlutil.RequestCtx,
-	compDef *appsv1alpha1.ComponentDefinition) error {
+	compDef *appsv1.ComponentDefinition) error {
 	return appsconfig.ReconcileConfigSpecsForReferencedCR(cli, rctx, compDef)
 }
 
 func (r *ComponentDefinitionReconciler) validatePolicyRules(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition) error {
+	cmpd *appsv1.ComponentDefinition) error {
 	// TODO: how to check the acquired rules can be granted?
 	return nil
 }
 
 func (r *ComponentDefinitionReconciler) validateLabels(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition) error {
+	cmpd *appsv1.ComponentDefinition) error {
 	return nil
 }
 
 func (r *ComponentDefinitionReconciler) validateReplicasLimit(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition) error {
+	cmpd *appsv1.ComponentDefinition) error {
 	return nil
 }
 
 func (r *ComponentDefinitionReconciler) validateSystemAccounts(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition) error {
+	cmpd *appsv1.ComponentDefinition) error {
 	for _, v := range cmpd.Spec.SystemAccounts {
 		if v.SecretRef == nil && !v.InitAccount && (cmpd.Spec.LifecycleActions == nil || cmpd.Spec.LifecycleActions.AccountProvision == nil) {
 			return fmt.Errorf(`the AccountProvision action is needed to provision system account %s`, v.Name)
@@ -371,18 +371,19 @@ func (r *ComponentDefinitionReconciler) validateSystemAccounts(cli client.Client
 }
 
 func (r *ComponentDefinitionReconciler) validateReplicaRoles(cli client.Client, reqCtx intctrlutil.RequestCtx,
-	cmpd *appsv1alpha1.ComponentDefinition) error {
+	cmpd *appsv1.ComponentDefinition) error {
 	if !checkUniqueItemWithValue(cmpd.Spec.Roles, "Name", nil) {
 		return fmt.Errorf("duplicate replica roles are not allowed")
 	}
 	return nil
 }
 
-func (r *ComponentDefinitionReconciler) validateLifecycleActions(cli client.Client, reqCtx intctrlutil.RequestCtx, cmpd *appsv1alpha1.ComponentDefinition) error {
+func (r *ComponentDefinitionReconciler) validateLifecycleActions(cli client.Client, reqCtx intctrlutil.RequestCtx,
+	cmpd *appsv1.ComponentDefinition) error {
 	return nil
 }
 
-func (r *ComponentDefinitionReconciler) immutableCheck(cmpd *appsv1alpha1.ComponentDefinition) error {
+func (r *ComponentDefinitionReconciler) immutableCheck(cmpd *appsv1.ComponentDefinition) error {
 	if r.skipImmutableCheck(cmpd) {
 		return nil
 	}
@@ -400,7 +401,7 @@ func (r *ComponentDefinitionReconciler) immutableCheck(cmpd *appsv1alpha1.Compon
 	return nil
 }
 
-func (r *ComponentDefinitionReconciler) skipImmutableCheck(cmpd *appsv1alpha1.ComponentDefinition) bool {
+func (r *ComponentDefinitionReconciler) skipImmutableCheck(cmpd *appsv1.ComponentDefinition) bool {
 	if cmpd.Annotations == nil {
 		return false
 	}
@@ -408,7 +409,7 @@ func (r *ComponentDefinitionReconciler) skipImmutableCheck(cmpd *appsv1alpha1.Co
 	return ok && strings.ToLower(skip) == "true"
 }
 
-func (r *ComponentDefinitionReconciler) cmpdHash(cmpd *appsv1alpha1.ComponentDefinition) (string, error) {
+func (r *ComponentDefinitionReconciler) cmpdHash(cmpd *appsv1.ComponentDefinition) (string, error) {
 	objCopy := cmpd.DeepCopy()
 
 	// reset all mutable fields
@@ -428,36 +429,36 @@ func (r *ComponentDefinitionReconciler) cmpdHash(cmpd *appsv1alpha1.ComponentDef
 	return rand.SafeEncodeString(fmt.Sprintf("%d", hash.Sum32())), nil
 }
 
-func getNCheckCompDefinition(ctx context.Context, cli client.Reader, name string) (*appsv1alpha1.ComponentDefinition, error) {
+func getNCheckCompDefinition(ctx context.Context, cli client.Reader, name string) (*appsv1.ComponentDefinition, error) {
 	compKey := types.NamespacedName{
 		Name: name,
 	}
-	compDef := &appsv1alpha1.ComponentDefinition{}
+	compDef := &appsv1.ComponentDefinition{}
 	if err := cli.Get(ctx, compKey, compDef); err != nil {
 		return nil, err
 	}
 	if compDef.Generation != compDef.Status.ObservedGeneration {
 		return nil, fmt.Errorf("the referenced ComponentDefinition is not up to date: %s", compDef.Name)
 	}
-	if compDef.Status.Phase != appsv1alpha1.AvailablePhase {
+	if compDef.Status.Phase != appsv1.AvailablePhase {
 		return nil, fmt.Errorf("the referenced ComponentDefinition is unavailable: %s", compDef.Name)
 	}
 	return compDef, nil
 }
 
-// listCompDefinitionsWithPattern returns all component definitions whose names match the given pattern (namePrefix or regular expression)
-func listCompDefinitionsWithPattern(ctx context.Context, cli client.Reader, namePattern string) ([]*appsv1alpha1.ComponentDefinition, error) {
-	compDefList := &appsv1alpha1.ComponentDefinitionList{}
+// listCompDefinitionsWithPattern returns all component definitions whose names match the given pattern
+func listCompDefinitionsWithPattern(ctx context.Context, cli client.Reader, name string) ([]*appsv1.ComponentDefinition, error) {
+	compDefList := &appsv1.ComponentDefinitionList{}
 	if err := cli.List(ctx, compDefList); err != nil {
 		return nil, err
 	}
-	compDefsFullyMatched := make([]*appsv1alpha1.ComponentDefinition, 0)
-	compDefsPatternMatched := make([]*appsv1alpha1.ComponentDefinition, 0)
+	compDefsFullyMatched := make([]*appsv1.ComponentDefinition, 0)
+	compDefsPatternMatched := make([]*appsv1.ComponentDefinition, 0)
 	for i, item := range compDefList.Items {
-		if item.Name == namePattern {
+		if item.Name == name {
 			compDefsFullyMatched = append(compDefsFullyMatched, &compDefList.Items[i])
 		}
-		if component.CompDefMatched(item.Name, namePattern) {
+		if component.CompDefMatched(item.Name, name) {
 			compDefsPatternMatched = append(compDefsPatternMatched, &compDefList.Items[i])
 		}
 	}

@@ -31,7 +31,7 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
-    name: v1alpha1
+    name: v1
     schema:
       openAPIV3Schema:
         description: ComponentVersion is the Schema for the componentversions API
@@ -173,5 +173,161 @@ spec:
         type: object
     served: true
     storage: true
+    subresources:
+      status: {}
+  - additionalPrinterColumns:
+    - description: service versions
+      jsonPath: .status.serviceVersions
+      name: Versions
+      type: string
+    - description: status phase
+      jsonPath: .status.phase
+      name: Status
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ComponentVersion is the Schema for the componentversions API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ComponentVersionSpec defines the desired state of ComponentVersion
+            properties:
+              compatibilityRules:
+                description: CompatibilityRules defines compatibility rules between
+                  sets of component definitions and releases.
+                items:
+                  description: ComponentVersionCompatibilityRule defines the compatibility
+                    between a set of component definitions and a set of releases.
+                  properties:
+                    compDefs:
+                      description: |-
+                        CompDefs specifies names for the component definitions associated with this ComponentVersion.
+                        Each name in the list can represent an exact name, a name prefix, or a regular expression pattern.
+
+
+                        For example:
+
+
+                        - "mysql-8.0.30-v1alpha1": Matches the exact name "mysql-8.0.30-v1alpha1"
+                        - "mysql-8.0.30": Matches all names starting with "mysql-8.0.30"
+                        - "^mysql-8.0.\d{1,2}$": Matches all names starting with "mysql-8.0." followed by one or two digits.
+                      items:
+                        type: string
+                      maxItems: 128
+                      minItems: 1
+                      type: array
+                    releases:
+                      description: Releases is a list of identifiers for the releases.
+                      items:
+                        type: string
+                      maxItems: 128
+                      minItems: 1
+                      type: array
+                  required:
+                  - compDefs
+                  - releases
+                  type: object
+                maxItems: 128
+                minItems: 1
+                type: array
+              releases:
+                description: Releases represents different releases of component instances
+                  within this ComponentVersion.
+                items:
+                  description: ComponentVersionRelease represents a release of component
+                    instances within a ComponentVersion.
+                  properties:
+                    changes:
+                      description: Changes provides information about the changes
+                        made in this release.
+                      maxLength: 256
+                      type: string
+                    images:
+                      additionalProperties:
+                        type: string
+                      description: Images define the new images for different containers
+                        within the release.
+                      maxProperties: 128
+                      minProperties: 1
+                      type: object
+                      x-kubernetes-validations:
+                      - message: Container name may not exceed maximum length of 32
+                          characters
+                        rule: self.all(key, size(key) <= 32)
+                      - message: Image name may not exceed maximum length of 256 characters
+                        rule: self.all(key, size(self[key]) <= 256)
+                    name:
+                      description: |-
+                        Name is a unique identifier for this release.
+                        Cannot be updated.
+                      maxLength: 32
+                      type: string
+                    serviceVersion:
+                      description: |-
+                        ServiceVersion defines the version of the well-known service that the component provides.
+                        The version should follow the syntax and semantics of the "Semantic Versioning" specification (http://semver.org/).
+                        If the release is used, it will serve as the service version for component instances, overriding the one defined in the component definition.
+                        Cannot be updated.
+                      maxLength: 32
+                      type: string
+                  required:
+                  - images
+                  - name
+                  - serviceVersion
+                  type: object
+                maxItems: 128
+                minItems: 1
+                type: array
+            required:
+            - compatibilityRules
+            - releases
+            type: object
+          status:
+            description: ComponentVersionStatus defines the observed state of ComponentVersion
+            properties:
+              message:
+                description: Extra message for current phase.
+                type: string
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation observed
+                  for this ComponentVersion.
+                format: int64
+                type: integer
+              phase:
+                description: |-
+                  Phase valid values are ``, `Available`, 'Unavailable`.
+                  Available is ComponentVersion become available, and can be used for co-related objects.
+                enum:
+                - Available
+                - Unavailable
+                type: string
+              serviceVersions:
+                description: ServiceVersions represent the supported service versions
+                  of this ComponentVersion.
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: false
     subresources:
       status: {}

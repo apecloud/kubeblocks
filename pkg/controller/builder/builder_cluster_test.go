@@ -23,7 +23,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 var _ = Describe("cluster builder", func() {
@@ -32,7 +32,7 @@ var _ = Describe("cluster builder", func() {
 			name = "foo"
 			ns   = "default"
 		)
-		specs := []appsv1alpha1.ClusterComponentSpec{
+		specs := []appsv1.ClusterComponentSpec{
 			{
 				Name: "foo-0",
 			},

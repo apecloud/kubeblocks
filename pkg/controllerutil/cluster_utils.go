@@ -24,12 +24,12 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 // GetOriginalOrGeneratedComponentSpecByName get an original or generated cluster component spec by componentName.
 func GetOriginalOrGeneratedComponentSpecByName(ctx context.Context, cli client.Reader,
-	cluster *appsv1alpha1.Cluster, componentName string) (*appsv1alpha1.ClusterComponentSpec, error) {
+	cluster *appsv1.Cluster, componentName string) (*appsv1.ClusterComponentSpec, error) {
 	compSpec := cluster.Spec.GetComponentByName(componentName)
 	if compSpec != nil {
 		return compSpec, nil

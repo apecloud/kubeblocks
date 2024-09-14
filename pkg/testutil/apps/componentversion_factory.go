@@ -20,25 +20,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 type MockComponentVersionFactory struct {
-	BaseFactory[appsv1alpha1.ComponentVersion, *appsv1alpha1.ComponentVersion, MockComponentVersionFactory]
+	BaseFactory[appsv1.ComponentVersion, *appsv1.ComponentVersion, MockComponentVersionFactory]
 }
 
 func NewComponentVersionFactory(name string) *MockComponentVersionFactory {
 	f := &MockComponentVersionFactory{}
-	f.Init("", name, &appsv1alpha1.ComponentVersion{
-		Spec: appsv1alpha1.ComponentVersionSpec{
-			CompatibilityRules: []appsv1alpha1.ComponentVersionCompatibilityRule{},
-			Releases:           []appsv1alpha1.ComponentVersionRelease{},
+	f.Init("", name, &appsv1.ComponentVersion{
+		Spec: appsv1.ComponentVersionSpec{
+			CompatibilityRules: []appsv1.ComponentVersionCompatibilityRule{},
+			Releases:           []appsv1.ComponentVersionRelease{},
 		},
 	}, f)
 	return f
 }
 
-func (f *MockComponentVersionFactory) SetSpec(spec appsv1alpha1.ComponentVersionSpec) *MockComponentVersionFactory {
+func (f *MockComponentVersionFactory) SetSpec(spec appsv1.ComponentVersionSpec) *MockComponentVersionFactory {
 	f.Get().Spec = spec
 	return f
 }
@@ -49,7 +49,7 @@ func (f *MockComponentVersionFactory) SetDefaultSpec(compDef string) *MockCompon
 }
 
 func (f *MockComponentVersionFactory) AddRelease(name, changes, serviceVersion string, images map[string]string) *MockComponentVersionFactory {
-	release := appsv1alpha1.ComponentVersionRelease{
+	release := appsv1.ComponentVersionRelease{
 		Name:           name,
 		Changes:        changes,
 		ServiceVersion: serviceVersion,
@@ -60,7 +60,7 @@ func (f *MockComponentVersionFactory) AddRelease(name, changes, serviceVersion s
 }
 
 func (f *MockComponentVersionFactory) AddCompatibilityRule(compDefs, releases []string) *MockComponentVersionFactory {
-	rule := appsv1alpha1.ComponentVersionCompatibilityRule{
+	rule := appsv1.ComponentVersionCompatibilityRule{
 		CompDefs: compDefs,
 		Releases: releases,
 	}

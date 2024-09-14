@@ -26,7 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/gotemplate"
 )
@@ -41,9 +41,8 @@ type configTemplateBuilder struct {
 	builtInObjects   *builtInObjects
 
 	podSpec *corev1.PodSpec
-	// cluster *appsv1alpha1.Cluster
-	ctx context.Context
-	cli client.Reader
+	ctx     context.Context
+	cli     client.Reader
 }
 
 const defaultTemplateName = "KbTemplate"
@@ -91,7 +90,7 @@ func (c *configTemplateBuilder) injectBuiltInObjectsAndFunctions(
 	podSpec *corev1.PodSpec,
 	component *component.SynthesizedComponent,
 	localObjs []client.Object,
-	cluster *appsv1alpha1.Cluster) {
+	cluster *appsv1.Cluster) {
 	c.podSpec = podSpec
 	c.builtInFunctions = BuiltInCustomFunctions(c, component, localObjs)
 	c.builtInObjects = buildInComponentObjects(podSpec, component, cluster)

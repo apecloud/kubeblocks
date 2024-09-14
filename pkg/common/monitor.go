@@ -22,7 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 const (
@@ -34,10 +34,10 @@ const (
 
 const (
 	defaultScrapePath   = "/metrics"
-	defaultScrapeScheme = string(appsv1alpha1.HTTPProtocol)
+	defaultScrapeScheme = string(appsv1.HTTPProtocol)
 )
 
-func FromScrapePath(exporter appsv1alpha1.Exporter) string {
+func FromScrapePath(exporter appsv1.Exporter) string {
 	if exporter.ScrapePath != "" {
 		return exporter.ScrapePath
 	}
@@ -82,7 +82,7 @@ func FromContainerPort(exporter Exporter, container *corev1.Container) string {
 	return ""
 }
 
-func FromScheme(exporter appsv1alpha1.Exporter) string {
+func FromScheme(exporter appsv1.Exporter) string {
 	if exporter.ScrapeScheme != "" {
 		return string(exporter.ScrapeScheme)
 	}

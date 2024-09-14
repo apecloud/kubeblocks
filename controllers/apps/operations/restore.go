@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/operations/util"
@@ -62,7 +63,7 @@ func (r RestoreOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx,
 
 // Action implements the restore action.
 func (r RestoreOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	var cluster *appsv1alpha1.Cluster
+	var cluster *appsv1.Cluster
 	var err error
 
 	opsRequest := opsRes.OpsRequest
@@ -106,7 +107,7 @@ func (r RestoreOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 	clusterDef := opsRequest.Spec.GetClusterName()
 
 	// get cluster
-	cluster := &appsv1alpha1.Cluster{}
+	cluster := &appsv1.Cluster{}
 	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{
 		Namespace: opsRequest.GetNamespace(),
 		Name:      clusterDef,
@@ -118,9 +119,9 @@ func (r RestoreOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 	}
 
 	// check if the cluster is running
-	if cluster.Status.Phase == appsv1alpha1.RunningClusterPhase {
+	if cluster.Status.Phase == appsv1.RunningClusterPhase {
 		return appsv1alpha1.OpsSucceedPhase, 0, nil
-	} else if cluster.Status.Phase == appsv1alpha1.FailedClusterPhase {
+	} else if cluster.Status.Phase == appsv1.FailedClusterPhase {
 		return appsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("restore failed")
 	}
 	return appsv1alpha1.OpsRunningPhase, 0, nil
@@ -131,7 +132,7 @@ func (r RestoreOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, 
 	return nil
 }
 
-func (r RestoreOpsHandler) restoreClusterFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *appsv1alpha1.OpsRequest) (*appsv1alpha1.Cluster, error) {
+func (r RestoreOpsHandler) restoreClusterFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *appsv1alpha1.OpsRequest) (*appsv1.Cluster, error) {
 	restoreSpec := opsRequest.Spec.GetRestore()
 	if restoreSpec == nil {
 		return nil, intctrlutil.NewFatalError("spec.restore can not be empty")
@@ -176,8 +177,8 @@ func (r RestoreOpsHandler) restoreClusterFromBackup(reqCtx intctrlutil.RequestCt
 	return clusterObj, nil
 }
 
-func (r RestoreOpsHandler) getClusterObjFromBackup(backup *dpv1alpha1.Backup, opsRequest *appsv1alpha1.OpsRequest) (*appsv1alpha1.Cluster, error) {
-	cluster := &appsv1alpha1.Cluster{}
+func (r RestoreOpsHandler) getClusterObjFromBackup(backup *dpv1alpha1.Backup, opsRequest *appsv1alpha1.OpsRequest) (*appsv1.Cluster, error) {
+	cluster := &appsv1.Cluster{}
 	// use the cluster snapshot to restore firstly
 	clusterString, ok := backup.Annotations[constant.ClusterSnapshotAnnotationKey]
 	if !ok {
@@ -198,7 +199,7 @@ func (r RestoreOpsHandler) getClusterObjFromBackup(backup *dpv1alpha1.Backup, op
 	cluster.Annotations[constant.RestoreFromBackupAnnotationKey] = restoreAnnotation
 	cluster.Name = opsRequest.Spec.GetClusterName()
 	// Reset cluster services
-	var services []appsv1alpha1.ClusterService
+	var services []appsv1.ClusterService
 	for i := range cluster.Spec.Services {
 		svc := cluster.Spec.Services[i]
 		if svc.Service.Spec.Type == corev1.ServiceTypeLoadBalancer {

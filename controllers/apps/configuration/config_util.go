@@ -31,7 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
@@ -116,7 +116,7 @@ func ReconcileConfigSpecsForReferencedCR[T generics.Object, PT generics.PObject[
 }
 
 func DeleteConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, obj client.Object) error {
-	handler := func(configSpecs []appsv1alpha1.ComponentConfigSpec) (bool, error) {
+	handler := func(configSpecs []appsv1.ComponentConfigSpec) (bool, error) {
 		return true, batchDeleteConfigMapFinalizer(cli, ctx, configSpecs, obj)
 	}
 	_, err := handleConfigTemplate(obj, handler)
@@ -152,7 +152,7 @@ func validateConfigMapOwners(cli client.Client, ctx intctrlutil.RequestCtx, labe
 	return true, nil
 }
 
-func batchDeleteConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, configSpecs []appsv1alpha1.ComponentConfigSpec, cr client.Object) error {
+func batchDeleteConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, configSpecs []appsv1.ComponentConfigSpec, cr client.Object) error {
 	validator := func(obj client.Object) bool {
 		return obj.GetName() == cr.GetName() && obj.GetNamespace() == cr.GetNamespace()
 	}
@@ -160,7 +160,7 @@ func batchDeleteConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx
 		labels := client.MatchingLabels{
 			core.GenerateTPLUniqLabelKeyWithConfig(configSpec.Name): configSpec.TemplateRef,
 		}
-		if ok, err := validateConfigMapOwners(cli, ctx, labels, validator, &appsv1alpha1.ClusterDefinitionList{}, &appsv1alpha1.ComponentDefinitionList{}); err != nil {
+		if ok, err := validateConfigMapOwners(cli, ctx, labels, validator, &appsv1.ClusterDefinitionList{}, &appsv1.ComponentDefinitionList{}); err != nil {
 			return err
 		} else if !ok {
 			continue
@@ -173,13 +173,13 @@ func batchDeleteConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx
 }
 
 func updateConfigMapFinalizer(client client.Client, ctx intctrlutil.RequestCtx, obj client.Object) (bool, error) {
-	handler := func(configSpecs []appsv1alpha1.ComponentConfigSpec) (bool, error) {
+	handler := func(configSpecs []appsv1.ComponentConfigSpec) (bool, error) {
 		return true, batchUpdateConfigMapFinalizer(client, ctx, configSpecs)
 	}
 	return handleConfigTemplate(obj, handler)
 }
 
-func batchUpdateConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, configSpecs []appsv1alpha1.ComponentConfigSpec) error {
+func batchUpdateConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, configSpecs []appsv1.ComponentConfigSpec) error {
 	for _, configSpec := range configSpecs {
 		if err := updateConfigMapFinalizerImpl(cli, ctx, configSpec); err != nil {
 			return err
@@ -188,7 +188,7 @@ func batchUpdateConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx
 	return nil
 }
 
-func updateConfigMapFinalizerImpl(cli client.Client, ctx intctrlutil.RequestCtx, configSpec appsv1alpha1.ComponentConfigSpec) error {
+func updateConfigMapFinalizerImpl(cli client.Client, ctx intctrlutil.RequestCtx, configSpec appsv1.ComponentConfigSpec) error {
 	// step1: add finalizer
 	// step2: add labels: CMConfigurationTypeLabelKey
 	// step3: update immutable
@@ -215,7 +215,7 @@ func updateConfigMapFinalizerImpl(cli client.Client, ctx intctrlutil.RequestCtx,
 	return cli.Patch(ctx.Ctx, cmObj, patch)
 }
 
-func deleteConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, configSpec appsv1alpha1.ComponentConfigSpec) error {
+func deleteConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, configSpec appsv1.ComponentConfigSpec) error {
 	cmObj, err := getConfigMapByTemplateName(cli, ctx, configSpec.TemplateRef, configSpec.Namespace)
 	if err != nil && apierrors.IsNotFound(err) {
 		return nil
@@ -233,16 +233,16 @@ func deleteConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, con
 	return cli.Patch(ctx.Ctx, cmObj, patch)
 }
 
-type ConfigTemplateHandler func([]appsv1alpha1.ComponentConfigSpec) (bool, error)
-type componentValidateHandler func(*appsv1alpha1.ComponentDefinition) error
+type ConfigTemplateHandler func([]appsv1.ComponentConfigSpec) (bool, error)
+type componentValidateHandler func(*appsv1.ComponentDefinition) error
 
 func handleConfigTemplate(object client.Object, handler ConfigTemplateHandler, handler2 ...componentValidateHandler) (bool, error) {
 	var (
 		err             error
-		configTemplates []appsv1alpha1.ComponentConfigSpec
+		configTemplates []appsv1.ComponentConfigSpec
 	)
 	switch cr := object.(type) {
-	case *appsv1alpha1.ComponentDefinition:
+	case *appsv1.ComponentDefinition:
 		configTemplates, err = getConfigTemplateFromComponentDef(cr, handler2...)
 	default:
 		return false, core.MakeError("not support CR type: %v", cr)
@@ -258,14 +258,14 @@ func handleConfigTemplate(object client.Object, handler ConfigTemplateHandler, h
 	}
 }
 
-func getConfigTemplateFromComponentDef(componentDef *appsv1alpha1.ComponentDefinition,
-	validators ...componentValidateHandler) ([]appsv1alpha1.ComponentConfigSpec, error) {
-	configTemplates := make([]appsv1alpha1.ComponentConfigSpec, 0)
+func getConfigTemplateFromComponentDef(componentDef *appsv1.ComponentDefinition,
+	validators ...componentValidateHandler) ([]appsv1.ComponentConfigSpec, error) {
+	configTemplates := make([]appsv1.ComponentConfigSpec, 0)
 	// For compatibility with the previous lifecycle management of configurationSpec.TemplateRef,
 	// it is necessary to convert ScriptSpecs to ConfigSpecs,
 	// ensuring that the script-related configmap is not allowed to be deleted.
 	for _, scriptSpec := range componentDef.Spec.Scripts {
-		configTemplates = append(configTemplates, appsv1alpha1.ComponentConfigSpec{
+		configTemplates = append(configTemplates, appsv1.ComponentConfigSpec{
 			ComponentTemplateSpec: scriptSpec,
 		})
 	}
@@ -281,14 +281,14 @@ func getConfigTemplateFromComponentDef(componentDef *appsv1alpha1.ComponentDefin
 }
 
 func checkConfigTemplate(client client.Client, ctx intctrlutil.RequestCtx, obj client.Object) (bool, error) {
-	handler := func(configSpecs []appsv1alpha1.ComponentConfigSpec) (bool, error) {
+	handler := func(configSpecs []appsv1.ComponentConfigSpec) (bool, error) {
 		return validateConfigTemplate(client, ctx, configSpecs)
 	}
 	return handleConfigTemplate(obj, handler)
 }
 
 func updateLabelsByConfigSpec[T generics.Object, PT generics.PObject[T]](cli client.Client, ctx intctrlutil.RequestCtx, obj PT) (bool, error) {
-	handler := func(configSpecs []appsv1alpha1.ComponentConfigSpec) (bool, error) {
+	handler := func(configSpecs []appsv1.ComponentConfigSpec) (bool, error) {
 		patch := client.MergeFrom(PT(obj.DeepCopy()))
 		configuration.BuildConfigConstraintLabels(obj, configSpecs)
 		return true, cli.Patch(ctx.Ctx, obj, patch)
@@ -296,14 +296,14 @@ func updateLabelsByConfigSpec[T generics.Object, PT generics.PObject[T]](cli cli
 	return handleConfigTemplate(obj, handler)
 }
 
-func validateConfigTemplate(cli client.Client, ctx intctrlutil.RequestCtx, configSpecs []appsv1alpha1.ComponentConfigSpec) (bool, error) {
+func validateConfigTemplate(cli client.Client, ctx intctrlutil.RequestCtx, configSpecs []appsv1.ComponentConfigSpec) (bool, error) {
 	// validate ConfigTemplate
-	foundAndCheckConfigSpec := func(configSpec appsv1alpha1.ComponentConfigSpec, logger logr.Logger) (*appsv1beta1.ConfigConstraint, error) {
+	foundAndCheckConfigSpec := func(configSpec appsv1.ComponentConfigSpec, logger logr.Logger) (*appsv1beta1.ConfigConstraint, error) {
 		if _, err := getConfigMapByTemplateName(cli, ctx, configSpec.TemplateRef, configSpec.Namespace); err != nil {
 			logger.Error(err, "failed to get config template cm object!")
 			return nil, err
 		}
-		if configSpec.VolumeName == "" && !configSpec.InjectEnvEnabled() {
+		if configSpec.VolumeName == "" && configuration.InjectEnvEnabled(configSpec) {
 			return nil, core.MakeError("config template volume name and envFrom is empty!")
 		}
 		if configSpec.ConfigConstraintRef == "" {

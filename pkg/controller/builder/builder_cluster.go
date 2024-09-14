@@ -20,20 +20,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package builder
 
 import (
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 type ClusterBuilder struct {
-	BaseBuilder[appsv1alpha1.Cluster, *appsv1alpha1.Cluster, ClusterBuilder]
+	BaseBuilder[appsv1.Cluster, *appsv1.Cluster, ClusterBuilder]
 }
 
 func NewClusterBuilder(namespace, name string) *ClusterBuilder {
 	builder := &ClusterBuilder{}
-	builder.init(namespace, name, &appsv1alpha1.Cluster{}, builder)
+	builder.init(namespace, name, &appsv1.Cluster{}, builder)
 	return builder
 }
 
-func (builder *ClusterBuilder) SetComponentSpecs(specs []appsv1alpha1.ClusterComponentSpec) *ClusterBuilder {
+func (builder *ClusterBuilder) SetComponentSpecs(specs []appsv1.ClusterComponentSpec) *ClusterBuilder {
 	builder.get().Spec.ComponentSpecs = specs
 	return builder
 }

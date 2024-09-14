@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -66,7 +66,7 @@ func (t *clusterServiceTransformer) Transform(ctx graph.TransformContext, dag *g
 		return err
 	}
 
-	handleServiceFunc := func(origSvc, genSvc *appsv1alpha1.ClusterService) error {
+	handleServiceFunc := func(origSvc, genSvc *appsv1.ClusterService) error {
 		service, err := t.buildService(transCtx, cluster, origSvc, genSvc)
 		if err != nil {
 			return err
@@ -109,13 +109,13 @@ func (t *clusterServiceTransformer) Transform(ctx graph.TransformContext, dag *g
 }
 
 // convertLegacyClusterCompSpecServices converts legacy services defined in Cluster.Spec.ComponentSpecs[x].Services to Cluster.Spec.Services.
-func (t *clusterServiceTransformer) convertLegacyClusterCompSpecServices(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) ([]appsv1alpha1.ClusterService, error) {
+func (t *clusterServiceTransformer) convertLegacyClusterCompSpecServices(transCtx *clusterTransformContext, cluster *appsv1.Cluster) ([]appsv1.ClusterService, error) {
 	// don't convert services if the cluster has defined in new API
 	if withClusterTopology(cluster) || withClusterUserDefined(cluster) {
 		return nil, nil
 	}
 
-	convertedServices := make([]appsv1alpha1.ClusterService, 0)
+	convertedServices := make([]appsv1.ClusterService, 0)
 	for _, compSpec := range transCtx.ComponentSpecs {
 		if len(compSpec.Services) == 0 {
 			continue
@@ -134,8 +134,8 @@ func (t *clusterServiceTransformer) convertLegacyClusterCompSpecServices(transCt
 		// }
 		//
 		// for _, item := range compSpec.Services {
-		//	legacyService := &appsv1alpha1.ClusterService{
-		//		Service: appsv1alpha1.Service{
+		//	legacyService := &appsv1.ClusterService{
+		//		Service: appsv1.Service{
 		//			Name:        constant.GenerateClusterServiceName(cluster.Name, item.Name),
 		//			ServiceName: constant.GenerateClusterServiceName(cluster.Name, item.Name),
 		//			Annotations: item.Annotations,
@@ -162,8 +162,8 @@ func (t *clusterServiceTransformer) convertLegacyClusterCompSpecServices(transCt
 	return convertedServices, nil
 }
 
-func (t *clusterServiceTransformer) buildService(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster,
-	origSvc, genSvc *appsv1alpha1.ClusterService) (*corev1.Service, error) {
+func (t *clusterServiceTransformer) buildService(transCtx *clusterTransformContext, cluster *appsv1.Cluster,
+	origSvc, genSvc *appsv1.ClusterService) (*corev1.Service, error) {
 	var (
 		namespace   = cluster.Namespace
 		clusterName = cluster.Name
@@ -201,13 +201,13 @@ func (t *clusterServiceTransformer) buildService(transCtx *clusterTransformConte
 }
 
 func (t *clusterServiceTransformer) genMultiServiceIfNeed(transCtx *clusterTransformContext,
-	cluster *appsv1alpha1.Cluster, clusterService *appsv1alpha1.ClusterService) ([]*appsv1alpha1.ClusterService, error) {
+	cluster *appsv1.Cluster, clusterService *appsv1.ClusterService) ([]*appsv1.ClusterService, error) {
 	if len(clusterService.ShardingSelector) == 0 || len(cluster.Spec.ShardingSpecs) == 0 {
-		return []*appsv1alpha1.ClusterService{clusterService}, nil
+		return []*appsv1.ClusterService{clusterService}, nil
 	}
 
 	shardingName := ""
-	shardingCompSpecs := make([]*appsv1alpha1.ClusterComponentSpec, 0)
+	shardingCompSpecs := make([]*appsv1.ClusterComponentSpec, 0)
 	for k, v := range transCtx.ShardingComponentSpecs {
 		if k != clusterService.ShardingSelector {
 			continue
@@ -221,10 +221,10 @@ func (t *clusterServiceTransformer) genMultiServiceIfNeed(transCtx *clusterTrans
 	}
 
 	if !enableShardService(cluster, shardingName) {
-		return []*appsv1alpha1.ClusterService{clusterService}, nil
+		return []*appsv1.ClusterService{clusterService}, nil
 	}
 
-	shardOrdinalClusterSvcs := make([]*appsv1alpha1.ClusterService, 0, len(shardingCompSpecs))
+	shardOrdinalClusterSvcs := make([]*appsv1.ClusterService, 0, len(shardingCompSpecs))
 	for _, shardingCompSpec := range shardingCompSpecs {
 		svc := clusterService.DeepCopy()
 		svc.Name = fmt.Sprintf("%s-%s", clusterService.Name, shardingCompSpec.Name)
@@ -238,7 +238,7 @@ func (t *clusterServiceTransformer) genMultiServiceIfNeed(transCtx *clusterTrans
 	return shardOrdinalClusterSvcs, nil
 }
 
-func (t *clusterServiceTransformer) builtinSelector(cluster *appsv1alpha1.Cluster) map[string]string {
+func (t *clusterServiceTransformer) builtinSelector(cluster *appsv1.Cluster) map[string]string {
 	selectors := map[string]string{
 		constant.AppManagedByLabelKey: constant.AppName,
 		constant.AppInstanceLabelKey:  cluster.Name,
@@ -246,7 +246,7 @@ func (t *clusterServiceTransformer) builtinSelector(cluster *appsv1alpha1.Cluste
 	return selectors
 }
 
-func (t *clusterServiceTransformer) checkComponent(transCtx *clusterTransformContext, clusterService *appsv1alpha1.ClusterService) (*appsv1alpha1.ComponentDefinition, error) {
+func (t *clusterServiceTransformer) checkComponent(transCtx *clusterTransformContext, clusterService *appsv1.ClusterService) (*appsv1.ComponentDefinition, error) {
 	compName := clusterService.ComponentSelector
 	for _, compSpec := range transCtx.ComponentSpecs {
 		if compSpec.Name == compName {
@@ -260,7 +260,7 @@ func (t *clusterServiceTransformer) checkComponent(transCtx *clusterTransformCon
 	return nil, fmt.Errorf("the component of service selector is not exist, service: %s, component: %s", clusterService.Name, compName)
 }
 
-func (t *clusterServiceTransformer) checkComponentRoles(compDef *appsv1alpha1.ComponentDefinition, clusterService *appsv1alpha1.ClusterService) error {
+func (t *clusterServiceTransformer) checkComponentRoles(compDef *appsv1.ComponentDefinition, clusterService *appsv1.ClusterService) error {
 	definedRoles := make(map[string]bool)
 	for _, role := range compDef.Spec.Roles {
 		definedRoles[strings.ToLower(role.Name)] = true
@@ -272,7 +272,7 @@ func (t *clusterServiceTransformer) checkComponentRoles(compDef *appsv1alpha1.Co
 }
 
 func (t *clusterServiceTransformer) listOwnedClusterServices(transCtx *clusterTransformContext,
-	cluster *appsv1alpha1.Cluster) (map[string]*corev1.Service, error) {
+	cluster *appsv1.Cluster) (map[string]*corev1.Service, error) {
 	svcList := &corev1.ServiceList{}
 	labels := client.MatchingLabels(constant.GetClusterWellKnownLabels(cluster.Name))
 	if err := transCtx.Client.List(transCtx.Context, svcList, labels, client.InNamespace(cluster.Namespace)); err != nil {
@@ -377,7 +377,7 @@ func resolveServiceDefaultFields(obj, objCopy *corev1.ServiceSpec) {
 //	return true, nil
 // }
 
-func enableShardService(cluster *appsv1alpha1.Cluster, shardingName string) bool {
+func enableShardService(cluster *appsv1.Cluster, shardingName string) bool {
 	enableShardSvcList, ok := cluster.Annotations[constant.ShardSvcAnnotationKey]
 	if !ok || !slices.Contains(strings.Split(enableShardSvcList, ","), shardingName) {
 		return false
@@ -386,7 +386,7 @@ func enableShardService(cluster *appsv1alpha1.Cluster, shardingName string) bool
 }
 
 // genComponentSelector generates component selector for sharding service.
-func genComponentSelector(origSvc, genSvc *appsv1alpha1.ClusterService) string {
+func genComponentSelector(origSvc, genSvc *appsv1.ClusterService) string {
 	origSvcPrefix := constant.GenerateShardingNameSvcPrefix(origSvc.Name)
 	if strings.HasPrefix(genSvc.Name, origSvcPrefix) {
 		return strings.TrimPrefix(genSvc.Name, origSvcPrefix)

@@ -23,32 +23,23 @@ import (
 	"github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/types"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/testutil"
 )
-
-// GetComponentGeneration gets the testing component's metadata.generation.
-func GetComponentGeneration(testCtx *testutil.TestContext, compKey types.NamespacedName) func(gomega.Gomega) int64 {
-	return func(g gomega.Gomega) int64 {
-		comp := &appsv1alpha1.Component{}
-		g.Expect(testCtx.Cli.Get(testCtx.Ctx, compKey, comp)).Should(gomega.Succeed())
-		return comp.GetGeneration()
-	}
-}
 
 // GetComponentObservedGeneration gets the testing component's ObservedGeneration in status for verification.
 func GetComponentObservedGeneration(testCtx *testutil.TestContext, compKey types.NamespacedName) func(gomega.Gomega) int64 {
 	return func(g gomega.Gomega) int64 {
-		comp := &appsv1alpha1.Component{}
+		comp := &appsv1.Component{}
 		g.Expect(testCtx.Cli.Get(testCtx.Ctx, compKey, comp)).Should(gomega.Succeed())
 		return comp.Status.ObservedGeneration
 	}
 }
 
 // GetComponentPhase gets the testing component's phase in status for verification.
-func GetComponentPhase(testCtx *testutil.TestContext, compKey types.NamespacedName) func(gomega.Gomega) appsv1alpha1.ClusterComponentPhase {
-	return func(g gomega.Gomega) appsv1alpha1.ClusterComponentPhase {
-		comp := &appsv1alpha1.Component{}
+func GetComponentPhase(testCtx *testutil.TestContext, compKey types.NamespacedName) func(gomega.Gomega) appsv1.ClusterComponentPhase {
+	return func(g gomega.Gomega) appsv1.ClusterComponentPhase {
+		comp := &appsv1.Component{}
 		g.Expect(testCtx.Cli.Get(testCtx.Ctx, compKey, comp)).Should(gomega.Succeed())
 		return comp.Status.Phase
 	}

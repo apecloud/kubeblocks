@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
@@ -41,8 +42,8 @@ var _ error = &WaitForClusterPhaseErr{}
 
 type WaitForClusterPhaseErr struct {
 	clusterName   string
-	currentPhase  appsv1alpha1.ClusterPhase
-	expectedPhase []appsv1alpha1.ClusterPhase
+	currentPhase  appsv1.ClusterPhase
+	expectedPhase []appsv1.ClusterPhase
 }
 
 func (e *WaitForClusterPhaseErr) Error() string {
@@ -58,8 +59,8 @@ type handleStatusProgressWithComponent func(reqCtx intctrlutil.RequestCtx,
 type handleReconfigureOpsStatus func(cmStatus *appsv1alpha1.ConfigurationItemStatus) error
 
 // getClusterDefByName gets the ClusterDefinition object by the name.
-func getClusterDefByName(ctx context.Context, cli client.Client, clusterDefName string) (*appsv1alpha1.ClusterDefinition, error) {
-	clusterDef := &appsv1alpha1.ClusterDefinition{}
+func getClusterDefByName(ctx context.Context, cli client.Client, clusterDefName string) (*appsv1.ClusterDefinition, error) {
+	clusterDef := &appsv1.ClusterDefinition{}
 	if err := cli.Get(ctx, client.ObjectKey{Name: clusterDefName}, clusterDef); err != nil {
 		return nil, err
 	}
@@ -197,7 +198,7 @@ func updateReconfigureStatusByCM(reconfiguringStatus *appsv1alpha1.Reconfiguring
 
 // validateOpsWaitingPhase validates whether the current cluster phase is expected, and whether the waiting time exceeds the limit.
 // only requests with `Pending` phase will be validated.
-func validateOpsWaitingPhase(cluster *appsv1alpha1.Cluster, ops *appsv1alpha1.OpsRequest, opsBehaviour OpsBehaviour) error {
+func validateOpsWaitingPhase(cluster *appsv1.Cluster, ops *appsv1alpha1.OpsRequest, opsBehaviour OpsBehaviour) error {
 	if ops.Force() {
 		return nil
 	}
@@ -308,7 +309,7 @@ func updateHAConfigIfNecessary(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	return cli.Update(reqCtx.Ctx, haConfig)
 }
 
-func getComponentSpecOrShardingTemplate(cluster *appsv1alpha1.Cluster, componentName string) *appsv1alpha1.ClusterComponentSpec {
+func getComponentSpecOrShardingTemplate(cluster *appsv1.Cluster, componentName string) *appsv1.ClusterComponentSpec {
 	for _, v := range cluster.Spec.ComponentSpecs {
 		if v.Name == componentName {
 			return &v

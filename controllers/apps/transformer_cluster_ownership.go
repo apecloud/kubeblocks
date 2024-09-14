@@ -23,7 +23,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -40,7 +40,7 @@ func (f *clusterOwnershipTransformer) Transform(ctx graph.TransformContext, dag 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	cluster := transCtx.Cluster
 
-	objects := graphCli.FindAll(dag, &appsv1alpha1.Cluster{}, &model.HaveDifferentTypeWithOption{})
+	objects := graphCli.FindAll(dag, &appsv1.Cluster{}, &model.HaveDifferentTypeWithOption{})
 
 	controllerutil.AddFinalizer(cluster, constant.DBClusterFinalizerName)
 	for _, object := range objects {

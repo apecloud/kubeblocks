@@ -21,16 +21,19 @@ package operations
 
 import (
 	"fmt"
+
 	"slices"
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/configuration/validate"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -57,7 +60,7 @@ type pipeline struct {
 
 	updatedObject    *appsv1alpha1.Configuration
 	configConstraint *appsv1beta1.ConfigConstraint
-	configSpec       *appsv1alpha1.ComponentConfigSpec
+	configSpec       *appsv1.ComponentConfigSpec
 
 	reconfigureContext
 	configctrl.ResourceFetcher[pipeline]
@@ -91,7 +94,7 @@ func (p *pipeline) Validate() *pipeline {
 			return cfgcore.MakeError("failed to reconfigure, not existed config[%s]", p.config.Name)
 		}
 
-		p.configSpec = item.ConfigSpec
+		p.configSpec = builder.ToV1ConfigSpec(item.ConfigSpec)
 		return nil
 	}
 
@@ -172,7 +175,7 @@ func (p *pipeline) doMergeImpl(parameters appsv1alpha1.ConfigurationItem) error 
 	return p.createUpdatePatch(item, configSpec)
 }
 
-func (p *pipeline) createUpdatePatch(item *appsv1alpha1.ConfigurationItemDetail, configSpec *appsv1alpha1.ComponentConfigSpec) error {
+func (p *pipeline) createUpdatePatch(item *appsv1alpha1.ConfigurationItemDetail, configSpec *appsv1.ComponentConfigSpec) error {
 	if p.configConstraint == nil {
 		return nil
 	}

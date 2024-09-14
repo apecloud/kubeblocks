@@ -26,12 +26,13 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/constant"
 )
 
-func SetOpsRequestToCluster(cluster *appsv1alpha1.Cluster, opsRequestSlice []appsv1alpha1.OpsRecorder) {
+func SetOpsRequestToCluster(cluster *appsv1.Cluster, opsRequestSlice []appsv1alpha1.OpsRecorder) {
 	if cluster.Annotations == nil {
 		cluster.Annotations = map[string]string{}
 	}
@@ -46,7 +47,7 @@ func SetOpsRequestToCluster(cluster *appsv1alpha1.Cluster, opsRequestSlice []app
 // UpdateClusterOpsAnnotations updates OpsRequest annotation in Cluster.annotations
 func UpdateClusterOpsAnnotations(ctx context.Context,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
+	cluster *appsv1.Cluster,
 	opsRequestSlice []appsv1alpha1.OpsRecorder) error {
 	SetOpsRequestToCluster(cluster, opsRequestSlice)
 	return cli.Update(ctx, cluster)
@@ -70,7 +71,7 @@ func PatchOpsRequestReconcileAnnotation(ctx context.Context, cli client.Client, 
 
 // GetOpsRequestSliceFromCluster gets OpsRequest slice from cluster annotations.
 // this records what OpsRequests are running in cluster
-func GetOpsRequestSliceFromCluster(cluster *appsv1alpha1.Cluster) ([]appsv1alpha1.OpsRecorder, error) {
+func GetOpsRequestSliceFromCluster(cluster *appsv1.Cluster) ([]appsv1alpha1.OpsRecorder, error) {
 	var (
 		opsRequestValue string
 		opsRequestSlice []appsv1alpha1.OpsRecorder

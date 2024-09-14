@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -110,7 +111,7 @@ var _ = Describe("Restore OpsRequest", func() {
 			_ = restoreHandler.Action(reqCtx, k8sClient, opsRes)
 
 			By("test restore reconcile function")
-			opsRes.Cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
+			opsRes.Cluster.Status.Phase = appsv1.RunningClusterPhase
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsSucceedPhase))
@@ -118,10 +119,10 @@ var _ = Describe("Restore OpsRequest", func() {
 
 		It("test if source cluster exists services", func() {
 			By("mock backup annotations and labels")
-			opsRes.Cluster.Spec.Services = []appsv1alpha1.ClusterService{
+			opsRes.Cluster.Spec.Services = []appsv1.ClusterService{
 				{
 					ComponentSelector: defaultCompName,
-					Service: appsv1alpha1.Service{
+					Service: appsv1.Service{
 						Name: "svc",
 						Spec: corev1.ServiceSpec{
 							Ports: []corev1.ServicePort{
@@ -132,7 +133,7 @@ var _ = Describe("Restore OpsRequest", func() {
 				},
 				{
 					ComponentSelector: defaultCompName,
-					Service: appsv1alpha1.Service{
+					Service: appsv1.Service{
 						Name:        "svc-2",
 						ServiceName: "svc-2",
 						Spec: corev1.ServiceSpec{
@@ -170,7 +171,7 @@ var _ = Describe("Restore OpsRequest", func() {
 			_ = restoreHandler.Action(reqCtx, k8sClient, opsRes)
 
 			By("the loadBalancer should be reset")
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: restoreClusterName, Namespace: opsRes.OpsRequest.Namespace}, func(g Gomega, restoreCluster *appsv1alpha1.Cluster) {
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: restoreClusterName, Namespace: opsRes.OpsRequest.Namespace}, func(g Gomega, restoreCluster *appsv1.Cluster) {
 				Expect(restoreCluster.Spec.Services).Should(HaveLen(1))
 			})).Should(Succeed())
 		})

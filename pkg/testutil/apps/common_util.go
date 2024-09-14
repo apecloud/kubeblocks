@@ -82,7 +82,7 @@ func ChangeObjStatus[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *t
 // Each helper returns a Gomega assertion function, which should be passed into
 // Eventually() or Consistently() as the first parameter.
 // Example:
-// Eventually(GetAndChangeObj(testCtx, key, func(fetched *appsv1alpha1.ClusterDefinition) {
+// Eventually(GetAndChangeObj(testCtx, key, func(fetched *appsv1.ClusterDefinition) {
 //		    // modify fetched clusterDef
 //      })).Should(Succeed())
 // Warning: these functions should NOT be used together with Expect().
@@ -120,7 +120,7 @@ func GetAndChangeObjStatus[T intctrlutil.Object, PT intctrlutil.PObject[T]](
 // Each helper returns a Gomega assertion function, which should be passed into
 // Eventually() or Consistently() as the first parameter.
 // Example:
-// Eventually(CheckObj(testCtx, key, func(g Gomega, fetched *appsv1alpha1.Cluster) {
+// Eventually(CheckObj(testCtx, key, func(g Gomega, fetched *appsv1.Cluster) {
 //   g.Expect(..).To(BeTrue()) // do some check
 // })).Should(Succeed())
 // Warning: these functions should NOT be used together with Expect().

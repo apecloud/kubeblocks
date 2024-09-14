@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
@@ -42,9 +43,9 @@ func init() {
 	opsManager := GetOpsManager()
 	reconfigureBehaviour := OpsBehaviour{
 		// REVIEW: can do opsrequest if not running?
-		FromClusterPhases: appsv1alpha1.GetReconfiguringRunningPhases(),
+		FromClusterPhases: appsv1.GetReconfiguringRunningPhases(),
 		// TODO: add cluster reconcile Reconfiguring phase.
-		ToClusterPhase: appsv1alpha1.UpdatingClusterPhase,
+		ToClusterPhase: appsv1.UpdatingClusterPhase,
 		QueueByCluster: true,
 		OpsHandler:     &reAction,
 	}

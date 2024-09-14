@@ -37,7 +37,7 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -101,7 +101,7 @@ var _ = Describe("Backup Controller test", func() {
 		var (
 			backupPolicy *dpv1alpha1.BackupPolicy
 			repoPVCName  string
-			cluster      *appsv1alpha1.Cluster
+			cluster      *appsv1.Cluster
 			pvcName      string
 			targetPod    *corev1.Pod
 		)
@@ -1041,7 +1041,7 @@ var _ = Describe("Backup Controller test", func() {
 		var (
 			backupPolicy *dpv1alpha1.BackupPolicy
 			repoPVCName  string
-			cluster      *appsv1alpha1.Cluster
+			cluster      *appsv1.Cluster
 		)
 
 		BeforeEach(func() {

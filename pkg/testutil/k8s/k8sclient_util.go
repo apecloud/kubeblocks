@@ -145,7 +145,7 @@ func (helper *K8sClientMockHelper) MockCreateMethod(options ...any) {
 func (helper *K8sClientMockHelper) MockUpdateMethod(options ...any) {
 	helper.updateCaller.Caller(func() (CallerFunction, DoReturnedFunction) {
 		caller := func() *gomock.Call {
-			return helper.k8sClient.EXPECT().Update(gomock.Any(), gomock.Any())
+			return helper.k8sClient.EXPECT().Update(gomock.Any(), gomock.Any(), gomock.Any())
 		}
 		doAndReturn := func(caller *gomock.Call, fnWrap func(obj client.Object) error) {
 			caller.DoAndReturn(func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {

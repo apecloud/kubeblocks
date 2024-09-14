@@ -25,7 +25,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -39,7 +39,7 @@ type postProvision struct {
 	namespace   string
 	clusterName string
 	compName    string
-	action      *appsv1alpha1.Action
+	action      *appsv1.Action
 }
 
 var _ lifecycleAction = &postProvision{}
@@ -56,7 +56,7 @@ type preTerminate struct {
 	namespace   string
 	clusterName string
 	compName    string
-	action      *appsv1alpha1.Action
+	action      *appsv1.Action
 }
 
 var _ lifecycleAction = &preTerminate{}
@@ -116,7 +116,7 @@ func hackParameters4Comp(ctx context.Context, cli client.Reader, namespace, clus
 		scalingInComp          = "KB_CLUSTER_COMPONENT_IS_SCALING_IN"
 	)
 
-	compList := &appsv1alpha1.ComponentList{}
+	compList := &appsv1.ComponentList{}
 	if err := cli.List(ctx, compList, client.InNamespace(namespace), client.MatchingLabels{constant.AppInstanceLabelKey: clusterName}); err != nil {
 		return nil, err
 	}

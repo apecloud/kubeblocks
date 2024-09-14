@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
@@ -71,7 +72,7 @@ func (r *OpsRequest) Force() bool {
 // Validate validates OpsRequest
 func (r *OpsRequest) Validate(ctx context.Context,
 	k8sClient client.Client,
-	cluster *Cluster,
+	cluster *appsv1.Cluster,
 	needCheckClusterPhase bool) error {
 	if needCheckClusterPhase {
 		if err := r.validateClusterPhase(cluster); err != nil {
@@ -82,7 +83,7 @@ func (r *OpsRequest) Validate(ctx context.Context,
 }
 
 // validateClusterPhase validates whether the current cluster state supports the OpsRequest
-func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
+func (r *OpsRequest) validateClusterPhase(cluster *appsv1.Cluster) error {
 	opsBehaviour := OpsRequestBehaviourMapper[r.Spec.Type]
 	// if the OpsType has no cluster phases, ignore it
 	if len(opsBehaviour.FromClusterPhases) == 0 {
@@ -118,7 +119,7 @@ func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 // validateOps validates ops attributes
 func (r *OpsRequest) validateOps(ctx context.Context,
 	k8sClient client.Client,
-	cluster *Cluster) error {
+	cluster *appsv1.Cluster) error {
 	// Check whether the corresponding attribute is legal according to the operation type
 	switch r.Spec.Type {
 	case UpgradeType:
@@ -144,7 +145,7 @@ func (r *OpsRequest) validateOps(ctx context.Context,
 }
 
 // validateExpose validates expose api when spec.type is Expose
-func (r *OpsRequest) validateExpose(_ context.Context, cluster *Cluster) error {
+func (r *OpsRequest) validateExpose(_ context.Context, cluster *appsv1.Cluster) error {
 	exposeList := r.Spec.ExposeList
 	if exposeList == nil {
 		return notEmptyError("spec.expose")
@@ -173,7 +174,7 @@ func (r *OpsRequest) validateExpose(_ context.Context, cluster *Cluster) error {
 	return r.checkComponentExistence(cluster, compOpsList)
 }
 
-func (r *OpsRequest) validateRebuildInstance(cluster *Cluster) error {
+func (r *OpsRequest) validateRebuildInstance(cluster *appsv1.Cluster) error {
 	rebuildFrom := r.Spec.RebuildFrom
 	if len(rebuildFrom) == 0 {
 		return notEmptyError("spec.rebuildFrom")
@@ -186,7 +187,7 @@ func (r *OpsRequest) validateRebuildInstance(cluster *Cluster) error {
 }
 
 // validateUpgrade validates spec.restart
-func (r *OpsRequest) validateRestart(cluster *Cluster) error {
+func (r *OpsRequest) validateRestart(cluster *appsv1.Cluster) error {
 	restartList := r.Spec.RestartList
 	if len(restartList) == 0 {
 		return notEmptyError("spec.restart")
@@ -195,7 +196,7 @@ func (r *OpsRequest) validateRestart(cluster *Cluster) error {
 }
 
 // validateUpgrade validates spec.clusterOps.upgrade
-func (r *OpsRequest) validateUpgrade(ctx context.Context, k8sClient client.Client, cluster *Cluster) error {
+func (r *OpsRequest) validateUpgrade(ctx context.Context, k8sClient client.Client, cluster *appsv1.Cluster) error {
 	upgrade := r.Spec.Upgrade
 	if upgrade == nil {
 		return notEmptyError("spec.upgrade")
@@ -210,7 +211,7 @@ func (r *OpsRequest) validateUpgrade(ctx context.Context, k8sClient client.Clien
 }
 
 // validateVerticalScaling validates api when spec.type is VerticalScaling
-func (r *OpsRequest) validateVerticalScaling(cluster *Cluster) error {
+func (r *OpsRequest) validateVerticalScaling(cluster *appsv1.Cluster) error {
 	verticalScalingList := r.Spec.VerticalScalingList
 	if len(verticalScalingList) == 0 {
 		return notEmptyError("spec.verticalScaling")
@@ -243,7 +244,7 @@ func (r *OpsRequest) validateVerticalScaling(cluster *Cluster) error {
 // validateVerticalScaling validate api is legal when spec.type is VerticalScaling
 func (r *OpsRequest) validateReconfigure(ctx context.Context,
 	k8sClient client.Client,
-	cluster *Cluster) error {
+	cluster *appsv1.Cluster) error {
 	reconfigure := r.Spec.Reconfigure
 	if reconfigure == nil && len(r.Spec.Reconfigures) == 0 {
 		return notEmptyError("spec.reconfigure")
@@ -261,7 +262,7 @@ func (r *OpsRequest) validateReconfigure(ctx context.Context,
 
 func (r *OpsRequest) validateReconfigureParams(ctx context.Context,
 	k8sClient client.Client,
-	cluster *Cluster,
+	cluster *appsv1.Cluster,
 	reconfigure *Reconfigure) error {
 	if cluster.Spec.GetComponentByName(reconfigure.ComponentName) == nil {
 		return fmt.Errorf("component %s not found", reconfigure.ComponentName)
@@ -322,7 +323,7 @@ func compareQuantity(requestQuantity, limitQuantity *resource.Quantity) bool {
 }
 
 // validateHorizontalScaling validates api when spec.type is HorizontalScaling
-func (r *OpsRequest) validateHorizontalScaling(_ context.Context, _ client.Client, cluster *Cluster) error {
+func (r *OpsRequest) validateHorizontalScaling(_ context.Context, _ client.Client, cluster *appsv1.Cluster) error {
 	horizontalScalingList := r.Spec.HorizontalScalingList
 	if len(horizontalScalingList) == 0 {
 		return notEmptyError("spec.horizontalScaling")
@@ -363,7 +364,7 @@ func (r *OpsRequest) CountOfflineOrOnlineInstances(clusterName, componentName st
 	return offlineOrOnlineInsCountMap
 }
 
-func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, compSpec ClusterComponentSpec, clusterName string, isSharding bool) error {
+func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, compSpec appsv1.ClusterComponentSpec, clusterName string, isSharding bool) error {
 	scaleIn := hScale.ScaleIn
 	scaleOut := hScale.ScaleOut
 	if hScale.Replicas != nil && (scaleIn != nil || scaleOut != nil) {
@@ -385,7 +386,7 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 	// Rules:
 	// 1. length of offlineInstancesToOnline or onlineInstancesToOffline can't greater than the configured replicaChanges for the component.
 	// 2. replicaChanges for component must greater than or equal to the sum of replicaChanges configured in instance templates.
-	validateHScaleOperation := func(replicaChanger ReplicaChanger, newInstances []InstanceTemplate, offlineOrOnlineInsNames []string, isScaleIn bool) error {
+	validateHScaleOperation := func(replicaChanger ReplicaChanger, newInstances []appsv1.InstanceTemplate, offlineOrOnlineInsNames []string, isScaleIn bool) error {
 		msgPrefix := "ScaleIn:"
 		hScaleInstanceFieldName := "onlineInstancesToOffline"
 		if !isScaleIn {
@@ -461,7 +462,7 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 }
 
 // validateVolumeExpansion validates volumeExpansion api when spec.type is VolumeExpansion
-func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Client, cluster *Cluster) error {
+func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Client, cluster *appsv1.Cluster) error {
 	volumeExpansionList := r.Spec.VolumeExpansionList
 	if len(volumeExpansionList) == 0 {
 		return notEmptyError("spec.volumeExpansion")
@@ -485,7 +486,7 @@ func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Cli
 }
 
 // validateSwitchover validates switchover api when spec.type is Switchover.
-func (r *OpsRequest) validateSwitchover(ctx context.Context, cli client.Client, cluster *Cluster) error {
+func (r *OpsRequest) validateSwitchover(ctx context.Context, cli client.Client, cluster *appsv1.Cluster) error {
 	switchoverList := r.Spec.SwitchoverList
 	if len(switchoverList) == 0 {
 		return notEmptyError("spec.switchover")
@@ -501,9 +502,9 @@ func (r *OpsRequest) validateSwitchover(ctx context.Context, cli client.Client, 
 	return validateSwitchoverResourceList(ctx, cli, cluster, switchoverList)
 }
 
-func (r *OpsRequest) checkInstanceTemplate(cluster *Cluster, componentOps ComponentOps, inputInstances []string) error {
+func (r *OpsRequest) checkInstanceTemplate(cluster *appsv1.Cluster, componentOps ComponentOps, inputInstances []string) error {
 	instanceNameMap := make(map[string]sets.Empty)
-	setInstanceMap := func(instances []InstanceTemplate) {
+	setInstanceMap := func(instances []appsv1.InstanceTemplate) {
 		for i := range instances {
 			instanceNameMap[instances[i].Name] = sets.Empty{}
 		}
@@ -533,7 +534,7 @@ func (r *OpsRequest) checkInstanceTemplate(cluster *Cluster, componentOps Compon
 }
 
 // checkComponentExistence checks whether components to be operated exist in cluster spec.
-func (r *OpsRequest) checkComponentExistence(cluster *Cluster, compOpsList []ComponentOps) error {
+func (r *OpsRequest) checkComponentExistence(cluster *appsv1.Cluster, compOpsList []ComponentOps) error {
 	compNameMap := make(map[string]sets.Empty)
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		compNameMap[compSpec.Name] = sets.Empty{}
@@ -557,7 +558,7 @@ func (r *OpsRequest) checkComponentExistence(cluster *Cluster, compOpsList []Com
 	return nil
 }
 
-func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.Client, cluster *Cluster) error {
+func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.Client, cluster *appsv1.Cluster) error {
 	type Entity struct {
 		existInSpec         bool
 		storageClassName    *string
@@ -591,7 +592,7 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 			setVols(ins.VolumeClaimTemplates, comp.ComponentOps.ComponentName, ins.Name)
 		}
 	}
-	fillVol := func(vct ClusterComponentVolumeClaimTemplate, key string, isShardingComp bool) {
+	fillVol := func(vct appsv1.ClusterComponentVolumeClaimTemplate, key string, isShardingComp bool) {
 		e, ok := vols[key][vct.Name]
 		if !ok {
 			return
@@ -601,7 +602,7 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 		e.isShardingComponent = isShardingComp
 		vols[key][vct.Name] = e
 	}
-	fillCompVols := func(compSpec ClusterComponentSpec, componentName string, isShardingComp bool) {
+	fillCompVols := func(compSpec appsv1.ClusterComponentSpec, componentName string, isShardingComp bool) {
 		key := getKey(componentName, "")
 		if _, ok := vols[key]; !ok {
 			return // ignore not-exist component
@@ -771,7 +772,7 @@ func GetRunningOpsByOpsType(ctx context.Context, cli client.Client,
 }
 
 // validateSwitchoverResourceList checks if switchover resourceList is legal.
-func validateSwitchoverResourceList(ctx context.Context, cli client.Client, cluster *Cluster, switchoverList []Switchover) error {
+func validateSwitchoverResourceList(ctx context.Context, cli client.Client, cluster *appsv1.Cluster, switchoverList []Switchover) error {
 	var (
 		targetRole string
 	)

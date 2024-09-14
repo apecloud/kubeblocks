@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
@@ -67,7 +67,7 @@ var _ = Describe("TLSUtilsTest", func() {
 		It("should work well", func() {
 			ctx := context.Background()
 			name := "bar"
-			secretRef := &appsv1alpha1.TLSSecretRef{
+			secretRef := &appsv1.TLSSecretRef{
 				Name: name,
 				CA:   "caName",
 				Cert: "certName",

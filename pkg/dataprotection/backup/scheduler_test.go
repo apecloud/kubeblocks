@@ -27,7 +27,7 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	ctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -83,7 +83,7 @@ var _ = Describe("Scheduler Test", func() {
 			backupSchedule *dpv1alpha1.BackupSchedule
 			actionSet      *dpv1alpha1.ActionSet
 			scheduler      *Scheduler
-			cluster        *appsv1alpha1.Cluster
+			cluster        *appsv1.Cluster
 		)
 
 		BeforeEach(func() {
@@ -104,7 +104,7 @@ var _ = Describe("Scheduler Test", func() {
 			backupSchedule = testdp.NewFakeBackupSchedule(&testCtx, func(schedule *dpv1alpha1.BackupSchedule) {
 				schedule.OwnerReferences = []v1.OwnerReference{
 					{
-						APIVersion: appsv1alpha1.APIVersion,
+						APIVersion: appsv1.APIVersion,
 						Kind:       "Cluster",
 						Name:       cluster.Name,
 						UID:        cluster.UID,
@@ -161,7 +161,7 @@ var _ = Describe("Scheduler Test", func() {
 				backupSchedule = testdp.NewFakeBackupSchedule(&testCtx, func(schedule *dpv1alpha1.BackupSchedule) {
 					schedule.OwnerReferences = []v1.OwnerReference{
 						{
-							APIVersion: appsv1alpha1.APIVersion,
+							APIVersion: appsv1.APIVersion,
 							Kind:       "Cluster",
 							Name:       cluster.Name,
 							UID:        cluster.UID,

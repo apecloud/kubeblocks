@@ -30,10 +30,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var (
@@ -43,33 +43,29 @@ var (
 // BuildSynthesizedComponent builds a new SynthesizedComponent object, which is a mixture of component-related configs from ComponentDefinition and Component.
 func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	cli client.Reader,
-	cluster *appsv1alpha1.Cluster,
-	compDef *appsv1alpha1.ComponentDefinition,
-	comp *appsv1alpha1.Component) (*SynthesizedComponent, error) {
-	return buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, cluster, nil)
+	cluster *appsv1.Cluster,
+	compDef *appsv1.ComponentDefinition,
+	comp *appsv1.Component) (*SynthesizedComponent, error) {
+	return buildSynthesizedComponent(reqCtx, cli, compDef, comp, cluster, nil)
 }
 
 // BuildSynthesizedComponent4Generated builds SynthesizedComponent for generated Component which w/o ComponentDefinition.
 func BuildSynthesizedComponent4Generated(reqCtx intctrlutil.RequestCtx,
 	cli client.Reader,
-	cluster *appsv1alpha1.Cluster,
-	comp *appsv1alpha1.Component) (*appsv1alpha1.ComponentDefinition, *SynthesizedComponent, error) {
-	clusterDef, err := getClusterReferencedResources(reqCtx.Ctx, cli, cluster)
-	if err != nil {
-		return nil, nil, err
-	}
-	clusterCompSpec, err := getClusterCompSpec4Component(reqCtx.Ctx, cli, clusterDef, cluster, comp)
+	cluster *appsv1.Cluster,
+	comp *appsv1.Component) (*appsv1.ComponentDefinition, *SynthesizedComponent, error) {
+	clusterCompSpec, err := getClusterCompSpec4Component(reqCtx.Ctx, cli, cluster, comp)
 	if err != nil {
 		return nil, nil, err
 	}
 	if clusterCompSpec == nil {
 		return nil, nil, fmt.Errorf("cluster component spec is not found: %s", comp.Name)
 	}
-	compDef, err := getOrBuildComponentDefinition(reqCtx.Ctx, cli, clusterDef, cluster, clusterCompSpec)
+	compDef, err := getOrBuildComponentDefinition(reqCtx.Ctx, cli, cluster, clusterCompSpec)
 	if err != nil {
 		return nil, nil, err
 	}
-	synthesizedComp, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, clusterDef, cluster, clusterCompSpec)
+	synthesizedComp, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, cluster, clusterCompSpec)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -80,16 +76,12 @@ func BuildSynthesizedComponent4Generated(reqCtx intctrlutil.RequestCtx,
 // TODO: remove this
 func BuildSynthesizedComponentWrapper(reqCtx intctrlutil.RequestCtx,
 	cli client.Reader,
-	cluster *appsv1alpha1.Cluster,
-	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*SynthesizedComponent, error) {
+	cluster *appsv1.Cluster,
+	clusterCompSpec *appsv1.ClusterComponentSpec) (*SynthesizedComponent, error) {
 	if clusterCompSpec == nil {
 		return nil, fmt.Errorf("cluster component spec is not provided")
 	}
-	clusterDef, err := getClusterReferencedResources(reqCtx.Ctx, cli, cluster)
-	if err != nil {
-		return nil, err
-	}
-	compDef, err := getOrBuildComponentDefinition(reqCtx.Ctx, cli, clusterDef, cluster, clusterCompSpec)
+	compDef, err := getOrBuildComponentDefinition(reqCtx.Ctx, cli, cluster, clusterCompSpec)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +89,7 @@ func BuildSynthesizedComponentWrapper(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
-	return buildSynthesizedComponent(reqCtx, cli, compDef, comp, clusterDef, cluster, clusterCompSpec)
+	return buildSynthesizedComponent(reqCtx, cli, compDef, comp, cluster, clusterCompSpec)
 }
 
 // buildSynthesizedComponent builds a new SynthesizedComponent object, which is a mixture of component-related configs from ComponentDefinition and Component.
@@ -105,11 +97,10 @@ func BuildSynthesizedComponentWrapper(reqCtx intctrlutil.RequestCtx,
 // TODO: remove @reqCtx & @cli
 func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	cli client.Reader,
-	compDef *appsv1alpha1.ComponentDefinition,
-	comp *appsv1alpha1.Component,
-	clusterDef *appsv1alpha1.ClusterDefinition,
-	cluster *appsv1alpha1.Cluster,
-	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (*SynthesizedComponent, error) {
+	compDef *appsv1.ComponentDefinition,
+	comp *appsv1.Component,
+	cluster *appsv1.Cluster,
+	clusterCompSpec *appsv1.ClusterComponentSpec) (*SynthesizedComponent, error) {
 	if compDef == nil || comp == nil {
 		return nil, nil
 	}
@@ -177,10 +168,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	}
 
 	// build scheduling policy for workload
-	if err = buildSchedulingPolicy(synthesizeComp, comp); err != nil {
-		reqCtx.Log.Error(err, "failed to build scheduling policy")
-		return nil, err
-	}
+	buildSchedulingPolicy(synthesizeComp, comp)
 
 	// update resources
 	buildAndUpdateResources(synthesizeComp, comp)
@@ -222,7 +210,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	return synthesizeComp, nil
 }
 
-func clusterGeneration(cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component) string {
+func clusterGeneration(cluster *appsv1.Cluster, comp *appsv1.Component) string {
 	if comp != nil && comp.Annotations != nil {
 		if generation, ok := comp.Annotations[constant.KubeBlocksGenerationKey]; ok {
 			return generation
@@ -232,7 +220,7 @@ func clusterGeneration(cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Compone
 	return strconv.FormatInt(cluster.Generation, 10)
 }
 
-func buildComp2CompDefs(ctx context.Context, cli client.Reader, cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (map[string]string, error) {
+func buildComp2CompDefs(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster, clusterCompSpec *appsv1.ClusterComponentSpec) (map[string]string, error) {
 	if cluster == nil {
 		return nil, nil
 	}
@@ -271,8 +259,7 @@ func buildComp2CompDefs(ctx context.Context, cli client.Reader, cluster *appsv1a
 	return mapping, nil
 }
 
-// buildLabelsAndAnnotations builds labels and annotations for synthesizedComponent.
-func buildLabelsAndAnnotations(compDef *appsv1alpha1.ComponentDefinition, comp *appsv1alpha1.Component, synthesizeComp *SynthesizedComponent) {
+func buildLabelsAndAnnotations(compDef *appsv1.ComponentDefinition, comp *appsv1.Component, synthesizeComp *SynthesizedComponent) {
 	mergeMaps := func(baseMap, overrideMap map[string]string) map[string]string {
 		for k, v := range overrideMap {
 			baseMap[k] = v
@@ -299,7 +286,7 @@ func buildLabelsAndAnnotations(compDef *appsv1alpha1.ComponentDefinition, comp *
 	}
 }
 
-func mergeUserDefinedEnv(synthesizedComp *SynthesizedComponent, comp *appsv1alpha1.Component) error {
+func mergeUserDefinedEnv(synthesizedComp *SynthesizedComponent, comp *appsv1.Component) error {
 	if comp == nil || len(comp.Spec.Env) == 0 {
 		return nil
 	}
@@ -321,13 +308,13 @@ func mergeUserDefinedEnv(synthesizedComp *SynthesizedComponent, comp *appsv1alph
 	return nil
 }
 
-func mergeSystemAccounts(compDefAccounts []appsv1alpha1.SystemAccount,
-	compAccounts []appsv1alpha1.ComponentSystemAccount) []appsv1alpha1.SystemAccount {
+func mergeSystemAccounts(compDefAccounts []appsv1.SystemAccount,
+	compAccounts []appsv1.ComponentSystemAccount) []appsv1.SystemAccount {
 	if len(compAccounts) == 0 {
 		return compDefAccounts
 	}
 
-	override := func(compAccount appsv1alpha1.ComponentSystemAccount, idx int) {
+	override := func(compAccount appsv1.ComponentSystemAccount, idx int) {
 		if compAccount.PasswordConfig != nil {
 			compDefAccounts[idx].PasswordGenerationPolicy = *compAccount.PasswordConfig
 		}
@@ -350,35 +337,25 @@ func mergeSystemAccounts(compDefAccounts []appsv1alpha1.SystemAccount,
 	return compDefAccounts
 }
 
-func buildSchedulingPolicy(synthesizedComp *SynthesizedComponent, comp *appsv1alpha1.Component) error {
-	var (
-		schedulingPolicy = comp.Spec.SchedulingPolicy
-		err              error
-	)
-	if schedulingPolicy == nil {
-		// for compatibility, we need to build scheduling policy from component's affinity and tolerations
-		schedulingPolicy, err = scheduling.BuildSchedulingPolicy4Component(synthesizedComp.ClusterName,
-			synthesizedComp.Name, comp.Spec.Affinity, comp.Spec.Tolerations)
-		if err != nil {
-			return err
-		}
+func buildSchedulingPolicy(synthesizedComp *SynthesizedComponent, comp *appsv1.Component) {
+	if comp.Spec.SchedulingPolicy != nil {
+		schedulingPolicy := comp.Spec.SchedulingPolicy
+		synthesizedComp.PodSpec.SchedulerName = schedulingPolicy.SchedulerName
+		synthesizedComp.PodSpec.NodeSelector = schedulingPolicy.NodeSelector
+		synthesizedComp.PodSpec.NodeName = schedulingPolicy.NodeName
+		synthesizedComp.PodSpec.Affinity = schedulingPolicy.Affinity
+		synthesizedComp.PodSpec.Tolerations = schedulingPolicy.Tolerations
+		synthesizedComp.PodSpec.TopologySpreadConstraints = schedulingPolicy.TopologySpreadConstraints
 	}
-	synthesizedComp.PodSpec.SchedulerName = schedulingPolicy.SchedulerName
-	synthesizedComp.PodSpec.NodeSelector = schedulingPolicy.NodeSelector
-	synthesizedComp.PodSpec.NodeName = schedulingPolicy.NodeName
-	synthesizedComp.PodSpec.Affinity = schedulingPolicy.Affinity
-	synthesizedComp.PodSpec.Tolerations = schedulingPolicy.Tolerations
-	synthesizedComp.PodSpec.TopologySpreadConstraints = schedulingPolicy.TopologySpreadConstraints
-	return nil
 }
 
-func buildVolumeClaimTemplates(synthesizeComp *SynthesizedComponent, comp *appsv1alpha1.Component) {
+func buildVolumeClaimTemplates(synthesizeComp *SynthesizedComponent, comp *appsv1.Component) {
 	if comp.Spec.VolumeClaimTemplates != nil {
 		synthesizeComp.VolumeClaimTemplates = toVolumeClaimTemplates(&comp.Spec)
 	}
 }
 
-func mergeUserDefinedVolumes(synthesizedComp *SynthesizedComponent, comp *appsv1alpha1.Component) error {
+func mergeUserDefinedVolumes(synthesizedComp *SynthesizedComponent, comp *appsv1.Component) error {
 	if comp == nil {
 		return nil
 	}
@@ -398,7 +375,7 @@ func mergeUserDefinedVolumes(synthesizedComp *SynthesizedComponent, comp *appsv1
 		volumes[vct.Name] = true
 	}
 
-	checkConfigNScriptTemplate := func(tpl appsv1alpha1.ComponentTemplateSpec) error {
+	checkConfigNScriptTemplate := func(tpl appsv1.ComponentTemplateSpec) error {
 		if volumes[tpl.VolumeName] {
 			return fmt.Errorf("duplicated volume %s for template %s", tpl.VolumeName, tpl.Name)
 		}
@@ -434,7 +411,7 @@ func mergeUserDefinedVolumes(synthesizedComp *SynthesizedComponent, comp *appsv1
 }
 
 // limitSharedMemoryVolumeSize limits the shared memory volume size to memory requests/limits.
-func limitSharedMemoryVolumeSize(synthesizeComp *SynthesizedComponent, comp *appsv1alpha1.Component) {
+func limitSharedMemoryVolumeSize(synthesizeComp *SynthesizedComponent, comp *appsv1.Component) {
 	shm := defaultShmQuantity
 	if comp.Spec.Resources.Limits != nil {
 		if comp.Spec.Resources.Limits.Memory().Cmp(shm) > 0 {
@@ -460,37 +437,51 @@ func limitSharedMemoryVolumeSize(synthesizeComp *SynthesizedComponent, comp *app
 	}
 }
 
-func toVolumeClaimTemplates(compSpec *appsv1alpha1.ComponentSpec) []corev1.PersistentVolumeClaimTemplate {
+func toVolumeClaimTemplates(compSpec *appsv1.ComponentSpec) []corev1.PersistentVolumeClaimTemplate {
+	storageClassName := func(spec appsv1.PersistentVolumeClaimSpec, defaultStorageClass string) *string {
+		if spec.StorageClassName != nil && *spec.StorageClassName != "" {
+			return spec.StorageClassName
+		}
+		if defaultStorageClass != "" {
+			return &defaultStorageClass
+		}
+		return nil
+	}
 	var ts []corev1.PersistentVolumeClaimTemplate
 	for _, t := range compSpec.VolumeClaimTemplates {
 		ts = append(ts, corev1.PersistentVolumeClaimTemplate{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: t.Name,
 			},
-			Spec: t.Spec.ToV1PersistentVolumeClaimSpec(),
+			Spec: corev1.PersistentVolumeClaimSpec{
+				AccessModes:      t.Spec.AccessModes,
+				Resources:        t.Spec.Resources,
+				StorageClassName: storageClassName(t.Spec, viper.GetString(constant.CfgKeyDefaultStorageClass)),
+				VolumeMode:       t.Spec.VolumeMode,
+			},
 		})
 	}
 	return ts
 }
 
 // buildAndUpdateResources updates podSpec resources from component
-func buildAndUpdateResources(synthesizeComp *SynthesizedComponent, comp *appsv1alpha1.Component) {
+func buildAndUpdateResources(synthesizeComp *SynthesizedComponent, comp *appsv1.Component) {
 	if comp.Spec.Resources.Requests != nil || comp.Spec.Resources.Limits != nil {
 		synthesizeComp.PodSpec.Containers[0].Resources = comp.Spec.Resources
 	}
 }
 
-func buildComponentServices(synthesizeComp *SynthesizedComponent, comp *appsv1alpha1.Component) {
+func buildComponentServices(synthesizeComp *SynthesizedComponent, comp *appsv1.Component) {
 	if len(synthesizeComp.ComponentServices) == 0 || len(comp.Spec.Services) == 0 {
 		return
 	}
 
-	services := map[string]appsv1alpha1.ComponentService{}
+	services := map[string]appsv1.ComponentService{}
 	for i, svc := range comp.Spec.Services {
 		services[svc.Name] = comp.Spec.Services[i]
 	}
 
-	override := func(svc *appsv1alpha1.ComponentService) {
+	override := func(svc *appsv1.ComponentService) {
 		svc1, ok := services[svc.Name]
 		if ok {
 			svc.Spec.Type = svc1.Spec.Type
@@ -506,12 +497,12 @@ func buildComponentServices(synthesizeComp *SynthesizedComponent, comp *appsv1al
 	}
 }
 
-func overrideConfigTemplates(synthesizedComp *SynthesizedComponent, comp *appsv1alpha1.Component) error {
+func overrideConfigTemplates(synthesizedComp *SynthesizedComponent, comp *appsv1.Component) error {
 	if comp == nil || len(comp.Spec.Configs) == 0 {
 		return nil
 	}
 
-	templates := make(map[string]*appsv1alpha1.ComponentConfigSpec)
+	templates := make(map[string]*appsv1.ComponentConfigSpec)
 	for i, template := range synthesizedComp.ConfigTemplates {
 		templates[template.Name] = &synthesizedComp.ConfigTemplates[i]
 	}
@@ -556,14 +547,14 @@ func buildServiceAccountName(synthesizeComp *SynthesizedComponent) {
 	synthesizeComp.PodSpec.ServiceAccountName = synthesizeComp.ServiceAccountName
 }
 
-func buildRuntimeClassName(synthesizeComp *SynthesizedComponent, comp *appsv1alpha1.Component) {
+func buildRuntimeClassName(synthesizeComp *SynthesizedComponent, comp *appsv1.Component) {
 	if comp.Spec.RuntimeClassName == nil {
 		return
 	}
 	synthesizeComp.PodSpec.RuntimeClassName = comp.Spec.RuntimeClassName
 }
 
-func buildCompatibleHorizontalScalePolicy(compDef *appsv1alpha1.ComponentDefinition, synthesizeComp *SynthesizedComponent) {
+func buildCompatibleHorizontalScalePolicy(compDef *appsv1.ComponentDefinition, synthesizeComp *SynthesizedComponent) {
 	if compDef.Annotations != nil {
 		templateName, ok := compDef.Annotations[constant.HorizontalScaleBackupPolicyTemplateKey]
 		if ok {
@@ -572,7 +563,7 @@ func buildCompatibleHorizontalScalePolicy(compDef *appsv1alpha1.ComponentDefinit
 	}
 }
 
-func GetConfigSpecByName(synthesizedComp *SynthesizedComponent, configSpec string) *appsv1alpha1.ComponentConfigSpec {
+func GetConfigSpecByName(synthesizedComp *SynthesizedComponent, configSpec string) *appsv1.ComponentConfigSpec {
 	for i := range synthesizedComp.ConfigTemplates {
 		template := &synthesizedComp.ConfigTemplates[i]
 		if template.Name == configSpec {

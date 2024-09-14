@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
@@ -56,17 +56,17 @@ var _ = Describe("test ServiceDescriptor controller", func() {
 		It("test ServiceDescriptor controller", func() {
 			By("create a ServiceDescriptor obj")
 
-			endpoint := appsv1alpha1.CredentialVar{
+			endpoint := appsv1.CredentialVar{
 				Value: "mock-endpoint",
 			}
-			port := appsv1alpha1.CredentialVar{
+			port := appsv1.CredentialVar{
 				Value: "mock-port",
 			}
-			auth := appsv1alpha1.ConnectionCredentialAuth{
-				Username: &appsv1alpha1.CredentialVar{
+			auth := appsv1.ConnectionCredentialAuth{
+				Username: &appsv1.CredentialVar{
 					Value: "mock-username",
 				},
-				Password: &appsv1alpha1.CredentialVar{
+				Password: &appsv1.CredentialVar{
 					Value: "mock-password",
 				},
 			}
@@ -81,14 +81,14 @@ var _ = Describe("test ServiceDescriptor controller", func() {
 
 			By("wait for ServiceDescriptor phase is available when serviceDescriptor is valid")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(validServiceDescriptor),
-				func(g Gomega, tmpSCC *appsv1alpha1.ServiceDescriptor) {
-					g.Expect(tmpSCC.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
+				func(g Gomega, tmpSCC *appsv1.ServiceDescriptor) {
+					g.Expect(tmpSCC.Status.Phase).Should(Equal(appsv1.AvailablePhase))
 				})).Should(Succeed())
 
 			invalidSDName := "service-descriptor-invalid-" + randomStr
 			mockSecretRefName := "mock-secret-for-scc" + randomStr
-			authValueFrom := appsv1alpha1.ConnectionCredentialAuth{
-				Username: &appsv1alpha1.CredentialVar{
+			authValueFrom := appsv1.ConnectionCredentialAuth{
+				Username: &appsv1.CredentialVar{
 					ValueFrom: &corev1.EnvVarSource{
 						SecretKeyRef: &corev1.SecretKeySelector{
 							LocalObjectReference: corev1.LocalObjectReference{
@@ -98,7 +98,7 @@ var _ = Describe("test ServiceDescriptor controller", func() {
 						},
 					},
 				},
-				Password: &appsv1alpha1.CredentialVar{
+				Password: &appsv1.CredentialVar{
 					ValueFrom: &corev1.EnvVarSource{
 						SecretKeyRef: &corev1.SecretKeySelector{
 							LocalObjectReference: corev1.LocalObjectReference{
@@ -118,8 +118,8 @@ var _ = Describe("test ServiceDescriptor controller", func() {
 				Create(&testCtx).GetObject()
 			By("wait for ServiceDescriptor phase is Unavailable because serviceDescriptor secretRef not found")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(invalidServiceDescriptor),
-				func(g Gomega, tmpSCC *appsv1alpha1.ServiceDescriptor) {
-					g.Expect(tmpSCC.Status.Phase).Should(Equal(appsv1alpha1.UnavailablePhase))
+				func(g Gomega, tmpSCC *appsv1.ServiceDescriptor) {
+					g.Expect(tmpSCC.Status.Phase).Should(Equal(appsv1.UnavailablePhase))
 				})).Should(Succeed())
 
 			secret := &corev1.Secret{
@@ -135,8 +135,8 @@ var _ = Describe("test ServiceDescriptor controller", func() {
 			Expect(testCtx.CheckedCreateObj(ctx, secret)).Should(Succeed())
 			By("wait for ServiceDescriptor phase is available because serviceDescriptor secretRef found")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(invalidServiceDescriptor),
-				func(g Gomega, tmpSCC *appsv1alpha1.ServiceDescriptor) {
-					g.Expect(tmpSCC.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
+				func(g Gomega, tmpSCC *appsv1.ServiceDescriptor) {
+					g.Expect(tmpSCC.Status.Phase).Should(Equal(appsv1.AvailablePhase))
 				})).Should(Succeed())
 		})
 	})

@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -39,8 +39,8 @@ var _ = Describe("synthesized component", func() {
 			Log: logger,
 		}
 		cli     client.Reader
-		compDef *appsv1alpha1.ComponentDefinition
-		comp    *appsv1alpha1.Component
+		compDef *appsv1.ComponentDefinition
+		comp    *appsv1.Component
 	)
 
 	cleanEnv := func() {
@@ -70,21 +70,21 @@ var _ = Describe("synthesized component", func() {
 
 	Context("config template", func() {
 		BeforeEach(func() {
-			compDef = &appsv1alpha1.ComponentDefinition{
+			compDef = &appsv1.ComponentDefinition{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-compdef",
 				},
-				Spec: appsv1alpha1.ComponentDefinitionSpec{
-					Configs: []appsv1alpha1.ComponentConfigSpec{
+				Spec: appsv1.ComponentDefinitionSpec{
+					Configs: []appsv1.ComponentConfigSpec{
 						{
-							ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+							ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
 								Name:        "app",
 								TemplateRef: "app",
 								VolumeName:  "app",
 							},
 						},
 						{
-							ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+							ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
 								Name:       "external",
 								VolumeName: "external",
 							},
@@ -92,7 +92,7 @@ var _ = Describe("synthesized component", func() {
 					},
 				},
 			}
-			comp = &appsv1alpha1.Component{
+			comp = &appsv1.Component{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-cluster-comp",
 					Labels: map[string]string{
@@ -103,14 +103,14 @@ var _ = Describe("synthesized component", func() {
 						constant.KubeBlocksGenerationKey: "1",
 					},
 				},
-				Spec: appsv1alpha1.ComponentSpec{
-					Configs: []appsv1alpha1.ClusterComponentConfig{},
+				Spec: appsv1.ComponentSpec{
+					Configs: []appsv1.ClusterComponentConfig{},
 				},
 			}
 		})
 
 		It("comp def", func() {
-			synthesizedComp, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil)
+			synthesizedComp, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil)
 			Expect(err).Should(BeNil())
 
 			Expect(synthesizedComp).ShouldNot(BeNil())
@@ -118,9 +118,9 @@ var _ = Describe("synthesized component", func() {
 		})
 
 		It("w/ comp override - ok", func() {
-			comp.Spec.Configs = append(comp.Spec.Configs, appsv1alpha1.ClusterComponentConfig{
+			comp.Spec.Configs = append(comp.Spec.Configs, appsv1.ClusterComponentConfig{
 				Name: func() *string { name := "external"; return &name }(),
-				ClusterComponentConfigSource: appsv1alpha1.ClusterComponentConfigSource{
+				ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{
 					ConfigMap: &corev1.ConfigMapVolumeSource{
 						LocalObjectReference: corev1.LocalObjectReference{
 							Name: "external-cm",
@@ -128,7 +128,7 @@ var _ = Describe("synthesized component", func() {
 					},
 				},
 			})
-			synthesizedComp, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil)
+			synthesizedComp, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil)
 			Expect(err).Should(BeNil())
 
 			Expect(synthesizedComp).ShouldNot(BeNil())
@@ -140,9 +140,9 @@ var _ = Describe("synthesized component", func() {
 		})
 
 		It("w/ comp override - not defined", func() {
-			comp.Spec.Configs = append(comp.Spec.Configs, appsv1alpha1.ClusterComponentConfig{
+			comp.Spec.Configs = append(comp.Spec.Configs, appsv1.ClusterComponentConfig{
 				Name: func() *string { name := "not-defined"; return &name }(),
-				ClusterComponentConfigSource: appsv1alpha1.ClusterComponentConfigSource{
+				ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{
 					ConfigMap: &corev1.ConfigMapVolumeSource{
 						LocalObjectReference: corev1.LocalObjectReference{
 							Name: "external-cm",
@@ -150,16 +150,16 @@ var _ = Describe("synthesized component", func() {
 					},
 				},
 			})
-			_, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil)
+			_, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("not defined in definition"))
 		})
 
 		It("w/ comp override - both specified", func() {
 			compDef.Spec.Configs[1].TemplateRef = "external"
-			comp.Spec.Configs = append(comp.Spec.Configs, appsv1alpha1.ClusterComponentConfig{
+			comp.Spec.Configs = append(comp.Spec.Configs, appsv1.ClusterComponentConfig{
 				Name: func() *string { name := "external"; return &name }(),
-				ClusterComponentConfigSource: appsv1alpha1.ClusterComponentConfigSource{
+				ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{
 					ConfigMap: &corev1.ConfigMapVolumeSource{
 						LocalObjectReference: corev1.LocalObjectReference{
 							Name: "external-cm",
@@ -167,17 +167,17 @@ var _ = Describe("synthesized component", func() {
 					},
 				},
 			})
-			_, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil)
+			_, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("partial overriding is not supported"))
 		})
 
 		It("w/ comp override - both not specified", func() {
-			comp.Spec.Configs = append(comp.Spec.Configs, appsv1alpha1.ClusterComponentConfig{
+			comp.Spec.Configs = append(comp.Spec.Configs, appsv1.ClusterComponentConfig{
 				Name:                         func() *string { name := "external"; return &name }(),
-				ClusterComponentConfigSource: appsv1alpha1.ClusterComponentConfigSource{},
+				ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{},
 			})
-			_, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil)
+			_, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("there is no content provided for config template"))
 		})
@@ -185,11 +185,11 @@ var _ = Describe("synthesized component", func() {
 
 	Context("env", func() {
 		BeforeEach(func() {
-			compDef = &appsv1alpha1.ComponentDefinition{
+			compDef = &appsv1.ComponentDefinition{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-compdef",
 				},
-				Spec: appsv1alpha1.ComponentDefinitionSpec{
+				Spec: appsv1.ComponentDefinitionSpec{
 					Runtime: corev1.PodSpec{
 						Containers: []corev1.Container{
 							{
@@ -205,7 +205,7 @@ var _ = Describe("synthesized component", func() {
 					},
 				},
 			}
-			comp = &appsv1alpha1.Component{
+			comp = &appsv1.Component{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-cluster-comp",
 					Labels: map[string]string{
@@ -216,7 +216,7 @@ var _ = Describe("synthesized component", func() {
 						constant.KubeBlocksGenerationKey: "1",
 					},
 				},
-				Spec: appsv1alpha1.ComponentSpec{
+				Spec: appsv1.ComponentSpec{
 					Env: []corev1.EnvVar{
 						{
 							Name:  "ukey",
@@ -230,13 +230,13 @@ var _ = Describe("synthesized component", func() {
 		It("duplicated", func() {
 			comp.Spec.Env = append(comp.Spec.Env, comp.Spec.Env[0])
 
-			_, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil)
+			_, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("duplicated user-defined env var"))
 		})
 
 		It("ok", func() {
-			synthesizedComp, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil)
+			synthesizedComp, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil)
 			Expect(err).Should(BeNil())
 			Expect(synthesizedComp).ShouldNot(BeNil())
 			Expect(synthesizedComp.PodSpec.Containers[0].Env).Should(HaveLen(2))
@@ -246,11 +246,11 @@ var _ = Describe("synthesized component", func() {
 
 	Context("volumes", func() {
 		BeforeEach(func() {
-			compDef = &appsv1alpha1.ComponentDefinition{
+			compDef = &appsv1.ComponentDefinition{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-compdef",
 				},
-				Spec: appsv1alpha1.ComponentDefinitionSpec{
+				Spec: appsv1.ComponentDefinitionSpec{
 					Runtime: corev1.PodSpec{
 						Volumes: []corev1.Volume{
 							{
@@ -279,7 +279,7 @@ var _ = Describe("synthesized component", func() {
 					},
 				},
 			}
-			comp = &appsv1alpha1.Component{
+			comp = &appsv1.Component{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-cluster-comp",
 					Labels: map[string]string{
@@ -290,7 +290,7 @@ var _ = Describe("synthesized component", func() {
 						constant.KubeBlocksGenerationKey: "1",
 					},
 				},
-				Spec: appsv1alpha1.ComponentSpec{
+				Spec: appsv1.ComponentSpec{
 					Volumes: []corev1.Volume{
 						{
 							Name: "data",
@@ -309,7 +309,7 @@ var _ = Describe("synthesized component", func() {
 		It("duplicated", func() {
 			comp.Spec.Volumes = append(comp.Spec.Volumes, comp.Spec.Volumes[0])
 
-			_, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil)
+			_, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("duplicated volume"))
 		})
@@ -317,7 +317,7 @@ var _ = Describe("synthesized component", func() {
 		It("duplicated with definition", func() {
 			comp.Spec.Volumes = append(comp.Spec.Volumes, compDef.Spec.Runtime.Volumes[0])
 
-			_, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil)
+			_, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("duplicated volume"))
 		})
@@ -326,13 +326,13 @@ var _ = Describe("synthesized component", func() {
 		//	volumes := comp.Spec.Volumes
 		//	comp.Spec.Volumes = comp.Spec.Volumes[0:1]
 		//
-		//	_, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil)
+		//	_, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil)
 		//	Expect(err).ShouldNot(BeNil())
 		//	Expect(err.Error()).Should(And(ContainSubstring("volumes should be provided for mounts"), ContainSubstring(volumes[1].Name)))
 		// })
 
 		It("ok", func() {
-			synthesizedComp, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil, nil)
+			synthesizedComp, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, nil, nil)
 			Expect(err).Should(BeNil())
 			Expect(synthesizedComp).ShouldNot(BeNil())
 			Expect(synthesizedComp.PodSpec.Volumes).Should(HaveLen(4))

@@ -30,10 +30,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -46,7 +47,7 @@ import (
 )
 
 // BuildInstanceSet builds an InstanceSet object from SynthesizedComponent.
-func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, componentDef *appsv1alpha1.ComponentDefinition) (*workloads.InstanceSet, error) {
+func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, componentDef *appsv1.ComponentDefinition) (*workloads.InstanceSet, error) {
 	var (
 		compDefName = synthesizedComp.CompDefName
 		namespace   = synthesizedComp.Namespace
@@ -135,7 +136,7 @@ func vctToPVC(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeC
 }
 
 // getMonitorAnnotations returns the annotations for the monitor.
-func getMonitorAnnotations(synthesizedComp *component.SynthesizedComponent, componentDef *appsv1alpha1.ComponentDefinition) map[string]string {
+func getMonitorAnnotations(synthesizedComp *component.SynthesizedComponent, componentDef *appsv1.ComponentDefinition) map[string]string {
 	if synthesizedComp.DisableExporter == nil || *synthesizedComp.DisableExporter || componentDef == nil {
 		return nil
 	}
@@ -213,7 +214,7 @@ func GetRestorePassword(synthesizedComp *component.SynthesizedComponent) string 
 }
 
 // GetRestoreSystemAccountPassword gets restore password if exists during recovery.
-func GetRestoreSystemAccountPassword(synthesizedComp *component.SynthesizedComponent, account appsv1alpha1.SystemAccount) string {
+func GetRestoreSystemAccountPassword(synthesizedComp *component.SynthesizedComponent, account appsv1.SystemAccount) string {
 	valueString := synthesizedComp.Annotations[constant.RestoreFromBackupAnnotationKey]
 	if len(valueString) == 0 {
 		return ""
@@ -245,7 +246,7 @@ func GetRestoreSystemAccountPassword(synthesizedComp *component.SynthesizedCompo
 	return password
 }
 
-func BuildPVC(cluster *appsv1alpha1.Cluster,
+func BuildPVC(cluster *appsv1.Cluster,
 	synthesizedComp *component.SynthesizedComponent,
 	vct *corev1.PersistentVolumeClaimTemplate,
 	pvcKey types.NamespacedName,
@@ -273,7 +274,7 @@ func BuildPVC(cluster *appsv1alpha1.Cluster,
 	return pvc
 }
 
-func BuildBackup(cluster *appsv1alpha1.Cluster,
+func BuildBackup(cluster *appsv1.Cluster,
 	synthesizedComp *component.SynthesizedComponent,
 	backupPolicyName string,
 	backupKey types.NamespacedName,
@@ -291,7 +292,7 @@ func BuildBackup(cluster *appsv1alpha1.Cluster,
 		GetObject()
 }
 
-func BuildConfigMapWithTemplate(cluster *appsv1alpha1.Cluster,
+func BuildConfigMapWithTemplate(cluster *appsv1.Cluster,
 	synthesizedComp *component.SynthesizedComponent,
 	configs map[string]string,
 	cmName string,
@@ -384,7 +385,7 @@ func BuildVolumeSnapshotClass(name string, driver string) *snapshotv1.VolumeSnap
 		GetObject()
 }
 
-func BuildServiceAccount(cluster *appsv1alpha1.Cluster, saName string) *corev1.ServiceAccount {
+func BuildServiceAccount(cluster *appsv1.Cluster, saName string) *corev1.ServiceAccount {
 	// TODO(component): compName
 	wellKnownLabels := constant.GetKBWellKnownLabels(cluster.Spec.ClusterDefRef, cluster.Name, "")
 	return builder.NewServiceAccountBuilder(cluster.Namespace, saName).
@@ -393,7 +394,7 @@ func BuildServiceAccount(cluster *appsv1alpha1.Cluster, saName string) *corev1.S
 		GetObject()
 }
 
-func BuildRoleBinding(cluster *appsv1alpha1.Cluster, saName string) *rbacv1.RoleBinding {
+func BuildRoleBinding(cluster *appsv1.Cluster, saName string) *rbacv1.RoleBinding {
 	// TODO(component): compName
 	wellKnownLabels := constant.GetKBWellKnownLabels(cluster.Spec.ClusterDefRef, cluster.Name, "")
 	return builder.NewRoleBindingBuilder(cluster.Namespace, saName).
@@ -411,7 +412,7 @@ func BuildRoleBinding(cluster *appsv1alpha1.Cluster, saName string) *rbacv1.Role
 		GetObject()
 }
 
-func BuildClusterRoleBinding(cluster *appsv1alpha1.Cluster, saName string) *rbacv1.ClusterRoleBinding {
+func BuildClusterRoleBinding(cluster *appsv1.Cluster, saName string) *rbacv1.ClusterRoleBinding {
 	// TODO(component): compName
 	wellKnownLabels := constant.GetKBWellKnownLabels(cluster.Spec.ClusterDefRef, cluster.Name, "")
 	return builder.NewClusterRoleBindingBuilder(cluster.Namespace, saName).

@@ -29,7 +29,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
@@ -63,7 +63,7 @@ var _ = Describe("config_util", func() {
 			}
 			tests := []struct {
 				name    string
-				tpls    []v1alpha1.ComponentConfigSpec
+				tpls    []appsv1.ComponentConfigSpec
 				want    *appsv1beta1.ReloadAction
 				wantErr bool
 			}{{
@@ -75,18 +75,18 @@ var _ = Describe("config_util", func() {
 			}, {
 				// empty config templates
 				name:    "test",
-				tpls:    []v1alpha1.ComponentConfigSpec{},
+				tpls:    []appsv1.ComponentConfigSpec{},
 				want:    nil,
 				wantErr: false,
 			}, {
 				// config templates without configConstraintObj
 				name: "test",
-				tpls: []v1alpha1.ComponentConfigSpec{{
-					ComponentTemplateSpec: v1alpha1.ComponentTemplateSpec{
+				tpls: []appsv1.ComponentConfigSpec{{
+					ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
 						Name: "for_test",
 					},
 				}, {
-					ComponentTemplateSpec: v1alpha1.ComponentTemplateSpec{
+					ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
 						Name: "for_test2",
 					},
 				}},
@@ -95,8 +95,8 @@ var _ = Describe("config_util", func() {
 			}, {
 				// normal
 				name: "test",
-				tpls: []v1alpha1.ComponentConfigSpec{{
-					ComponentTemplateSpec: v1alpha1.ComponentTemplateSpec{
+				tpls: []appsv1.ComponentConfigSpec{{
+					ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
 						Name: "for_test",
 					},
 					ConfigConstraintRef: "eg_v1",
@@ -106,8 +106,8 @@ var _ = Describe("config_util", func() {
 			}, {
 				// not exist config constraint
 				name: "test",
-				tpls: []v1alpha1.ComponentConfigSpec{{
-					ComponentTemplateSpec: v1alpha1.ComponentTemplateSpec{
+				tpls: []appsv1.ComponentConfigSpec{{
+					ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
 						Name: "for_test",
 					},
 					ConfigConstraintRef: "not_exist",

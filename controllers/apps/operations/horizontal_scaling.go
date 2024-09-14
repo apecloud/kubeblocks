@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -45,8 +46,8 @@ func init() {
 	hsHandler := horizontalScalingOpsHandler{}
 	horizontalScalingBehaviour := OpsBehaviour{
 		// if cluster is Abnormal or Failed, new opsRequest may repair it.
-		FromClusterPhases: appsv1alpha1.GetClusterUpRunningPhases(),
-		ToClusterPhase:    appsv1alpha1.UpdatingClusterPhase,
+		FromClusterPhases: appsv1.GetClusterUpRunningPhases(),
+		ToClusterPhase:    appsv1.UpdatingClusterPhase,
 		QueueByCluster:    true,
 		OpsHandler:        hsHandler,
 		CancelFunc:        hsHandler.Cancel,
@@ -62,8 +63,8 @@ func (hs horizontalScalingOpsHandler) ActionStartedCondition(reqCtx intctrlutil.
 
 // Action modifies Cluster.spec.components[*].replicas from the opsRequest
 func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	if slices.Contains([]appsv1alpha1.ClusterPhase{appsv1alpha1.StoppedClusterPhase,
-		appsv1alpha1.StoppingClusterPhase}, opsRes.Cluster.Status.Phase) {
+	if slices.Contains([]appsv1.ClusterPhase{appsv1.StoppedClusterPhase,
+		appsv1.StoppingClusterPhase}, opsRes.Cluster.Status.Phase) {
 		return intctrlutil.NewFatalError("please start the cluster before scaling the cluster horizontally")
 	}
 	compOpsSet := newComponentOpsHelper(opsRes.OpsRequest.Spec.HorizontalScalingList)
@@ -97,7 +98,7 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 		return err
 	}
 
-	if err := compOpsSet.updateClusterComponentsAndShardings(opsRes.Cluster, func(compSpec *appsv1alpha1.ClusterComponentSpec, obj ComponentOpsInterface) error {
+	if err := compOpsSet.updateClusterComponentsAndShardings(opsRes.Cluster, func(compSpec *appsv1.ClusterComponentSpec, obj ComponentOpsInterface) error {
 		horizontalScaling := obj.(appsv1alpha1.HorizontalScaling)
 		lastCompConfiguration := opsRes.OpsRequest.Status.LastConfiguration.Components[obj.GetComponentName()]
 		if horizontalScaling.ScaleIn != nil && len(horizontalScaling.ScaleIn.OnlineInstancesToOffline) > 0 {
@@ -163,7 +164,7 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.Request
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
 func (hs horizontalScalingOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.HorizontalScalingList)
-	getLastComponentInfo := func(compSpec appsv1alpha1.ClusterComponentSpec, comOps ComponentOpsInterface) appsv1alpha1.LastComponentConfiguration {
+	getLastComponentInfo := func(compSpec appsv1.ClusterComponentSpec, comOps ComponentOpsInterface) appsv1alpha1.LastComponentConfiguration {
 		lastCompConfiguration := appsv1alpha1.LastComponentConfiguration{
 			Replicas:         pointer.Int32(compSpec.Replicas),
 			Instances:        compSpec.Instances,
@@ -178,7 +179,7 @@ func (hs horizontalScalingOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.R
 // getCreateAndDeletePodSet gets the pod set that are created and deleted in this opsRequest.
 func (hs horizontalScalingOpsHandler) getCreateAndDeletePodSet(opsRes *OpsResource,
 	lastCompConfiguration appsv1alpha1.LastComponentConfiguration,
-	currCompSpec appsv1alpha1.ClusterComponentSpec,
+	currCompSpec appsv1.ClusterComponentSpec,
 	horizontalScaling appsv1alpha1.HorizontalScaling,
 	fullCompName string) (map[string]string, map[string]string, error) {
 	clusterName := opsRes.Cluster.Name
@@ -218,7 +219,7 @@ func (hs horizontalScalingOpsHandler) getCreateAndDeletePodSet(opsRes *OpsResour
 // Cancel this function defines the cancel horizontalScaling action.
 func (hs horizontalScalingOpsHandler) Cancel(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.HorizontalScalingList)
-	if err := compOpsHelper.cancelComponentOps(reqCtx.Ctx, cli, opsRes, func(lastConfig *appsv1alpha1.LastComponentConfiguration, comp *appsv1alpha1.ClusterComponentSpec) {
+	if err := compOpsHelper.cancelComponentOps(reqCtx.Ctx, cli, opsRes, func(lastConfig *appsv1alpha1.LastComponentConfiguration, comp *appsv1.ClusterComponentSpec) {
 		comp.Replicas = *lastConfig.Replicas
 		comp.Instances = lastConfig.Instances
 		comp.OfflineInstances = lastConfig.OfflineInstances
@@ -291,9 +292,9 @@ func (hs horizontalScalingOpsHandler) checkIntersectionWithEarlierOps(opsRes *Op
 // getExpectedCompValues gets the expected replicas, instances, offlineInstances.
 func (hs horizontalScalingOpsHandler) getExpectedCompValues(
 	opsRes *OpsResource,
-	compSpec *appsv1alpha1.ClusterComponentSpec,
+	compSpec *appsv1.ClusterComponentSpec,
 	lastCompConfiguration appsv1alpha1.LastComponentConfiguration,
-	horizontalScaling appsv1alpha1.HorizontalScaling) (int32, []appsv1alpha1.InstanceTemplate, []string, error) {
+	horizontalScaling appsv1alpha1.HorizontalScaling) (int32, []appsv1.InstanceTemplate, []string, error) {
 	compReplicas := compSpec.Replicas
 	compInstanceTpls := compSpec.Instances
 	compOfflineInstances := compSpec.OfflineInstances
@@ -317,12 +318,12 @@ func (hs horizontalScalingOpsHandler) autoSyncReplicaChanges(
 	opsRes *OpsResource,
 	horizontalScaling appsv1alpha1.HorizontalScaling,
 	compReplicas int32,
-	compInstanceTpls []appsv1alpha1.InstanceTemplate,
+	compInstanceTpls []appsv1.InstanceTemplate,
 	compExpectOfflineInstances []string) error {
 	// sync the replicaChanges for component and instance template.
 	getSyncedInstancesAndReplicaChanges := func(offlineOrOnlineInsCountMap map[string]int32,
 		replicaChanger appsv1alpha1.ReplicaChanger,
-		newInstances []appsv1alpha1.InstanceTemplate) ([]appsv1alpha1.InstanceReplicasTemplate, *int32) {
+		newInstances []appsv1.InstanceTemplate) ([]appsv1alpha1.InstanceReplicasTemplate, *int32) {
 		allReplicaChanges := int32(0)
 		insTplMap := map[string]sets.Empty{}
 		for _, v := range replicaChanger.Instances {
@@ -392,9 +393,9 @@ func (hs horizontalScalingOpsHandler) getCompExpectReplicas(horizontalScaling ap
 
 // getCompExpectedOfflineInstances gets the expected instance templates of the component.
 func (hs horizontalScalingOpsHandler) getCompExpectedInstances(
-	compInstanceTpls []appsv1alpha1.InstanceTemplate,
+	compInstanceTpls []appsv1.InstanceTemplate,
 	horizontalScaling appsv1alpha1.HorizontalScaling,
-) []appsv1alpha1.InstanceTemplate {
+) []appsv1.InstanceTemplate {
 	if horizontalScaling.Replicas != nil {
 		return compInstanceTpls
 	}

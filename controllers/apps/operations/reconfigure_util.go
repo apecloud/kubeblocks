@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
@@ -142,7 +143,7 @@ func makeReconfiguringResult(err error, ops ...func(*reconfiguringResult)) recon
 	return result
 }
 
-func constructReconfiguringConditions(result reconfiguringResult, resource *OpsResource, configSpec *appsv1alpha1.ComponentConfigSpec) *metav1.Condition {
+func constructReconfiguringConditions(result reconfiguringResult, resource *OpsResource, configSpec *appsv1.ComponentConfigSpec) *metav1.Condition {
 	if result.noFormatFilesUpdated || (result.configPatch != nil && result.configPatch.IsModify) {
 		return appsv1alpha1.NewReconfigureRunningCondition(
 			resource.OpsRequest,

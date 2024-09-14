@@ -21,7 +21,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -29,7 +29,7 @@ import (
 )
 
 // BuildConfigConstraintLabels builds config constraints labels for object
-func BuildConfigConstraintLabels(object client.Object, configSpecs []appsv1alpha1.ComponentConfigSpec) {
+func BuildConfigConstraintLabels(object client.Object, configSpecs []appsv1.ComponentConfigSpec) {
 	asMapLabels := make(map[string]string)
 	for _, configSpec := range configSpecs {
 		asMapLabels[core.GenerateTPLUniqLabelKeyWithConfig(configSpec.Name)] = configSpec.TemplateRef

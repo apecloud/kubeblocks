@@ -28,6 +28,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -53,9 +54,9 @@ func newComponentOpsHelper[T ComponentOpsInterface](compOpsList []T) componentOp
 	return compOpsHelper
 }
 
-func (c componentOpsHelper) updateClusterComponentsAndShardings(cluster *appsv1alpha1.Cluster,
-	updateFunc func(compSpec *appsv1alpha1.ClusterComponentSpec, compOpsItem ComponentOpsInterface) error) error {
-	updateComponentSpecs := func(compSpec *appsv1alpha1.ClusterComponentSpec, componentName string) error {
+func (c componentOpsHelper) updateClusterComponentsAndShardings(cluster *appsv1.Cluster,
+	updateFunc func(compSpec *appsv1.ClusterComponentSpec, compOpsItem ComponentOpsInterface) error) error {
+	updateComponentSpecs := func(compSpec *appsv1.ClusterComponentSpec, componentName string) error {
 		if obj, ok := c.componentOpsSet[componentName]; ok {
 			if err := updateFunc(compSpec, obj); err != nil {
 				return err
@@ -81,8 +82,8 @@ func (c componentOpsHelper) updateClusterComponentsAndShardings(cluster *appsv1a
 }
 
 func (c componentOpsHelper) saveLastConfigurations(opsRes *OpsResource,
-	buildLastCompConfiguration func(compSpec appsv1alpha1.ClusterComponentSpec, obj ComponentOpsInterface) appsv1alpha1.LastComponentConfiguration) {
-	setLastCompConfiguration := func(compSpec appsv1alpha1.ClusterComponentSpec,
+	buildLastCompConfiguration func(compSpec appsv1.ClusterComponentSpec, obj ComponentOpsInterface) appsv1alpha1.LastComponentConfiguration) {
+	setLastCompConfiguration := func(compSpec appsv1.ClusterComponentSpec,
 		lastConfiguration *appsv1alpha1.LastConfiguration,
 		componentName string) {
 		obj, ok := c.componentOpsSet[componentName]
@@ -108,8 +109,8 @@ func (c componentOpsHelper) saveLastConfigurations(opsRes *OpsResource,
 func (c componentOpsHelper) cancelComponentOps(ctx context.Context,
 	cli client.Client,
 	opsRes *OpsResource,
-	updateCompSpec func(lastConfig *appsv1alpha1.LastComponentConfiguration, comp *appsv1alpha1.ClusterComponentSpec)) error {
-	rollBackCompSpec := func(compSpec *appsv1alpha1.ClusterComponentSpec,
+	updateCompSpec func(lastConfig *appsv1alpha1.LastComponentConfiguration, comp *appsv1.ClusterComponentSpec)) error {
+	rollBackCompSpec := func(compSpec *appsv1.ClusterComponentSpec,
 		lastCompInfos map[string]appsv1alpha1.LastComponentConfiguration,
 		componentName string) {
 		lastConfig, ok := lastCompInfos[componentName]
@@ -161,7 +162,7 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 		completedProgressCount int32
 		requeueTimeAfterFailed time.Duration
 		err                    error
-		clusterDef             *appsv1alpha1.ClusterDefinition
+		clusterDef             *appsv1.ClusterDefinition
 	)
 	if opsRes.Cluster.Spec.ClusterDefRef != "" {
 		if clusterDef, err = getClusterDefByName(reqCtx.Ctx, cli, opsRes.Cluster.Spec.ClusterDefRef); err != nil {
@@ -175,11 +176,11 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 		opsRequest.Status.Components = map[string]appsv1alpha1.OpsRequestComponentStatus{}
 	}
 	var progressResources []progressResource
-	setProgressResource := func(compSpec *appsv1alpha1.ClusterComponentSpec, compOps ComponentOpsInterface,
+	setProgressResource := func(compSpec *appsv1.ClusterComponentSpec, compOps ComponentOpsInterface,
 		fullComponentName string, isShardingComponent bool) error {
-		var componentDefinition *appsv1alpha1.ComponentDefinition
+		var componentDefinition *appsv1.ComponentDefinition
 		if compSpec.ComponentDef != "" {
-			componentDefinition = &appsv1alpha1.ComponentDefinition{}
+			componentDefinition = &appsv1.ComponentDefinition{}
 			if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: compSpec.ComponentDef}, componentDefinition); err != nil {
 				return err
 			}
@@ -268,7 +269,7 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 				opsIsCompleted = false
 			}
 		} else {
-			if !slices.Contains(appsv1alpha1.GetComponentTerminalPhases(), componentPhase) || completedCount == 0 {
+			if !slices.Contains(appsv1.GetComponentTerminalPhases(), componentPhase) || completedCount == 0 {
 				opsIsCompleted = false
 			}
 		}

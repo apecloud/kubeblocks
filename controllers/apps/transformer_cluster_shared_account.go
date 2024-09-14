@@ -67,7 +67,7 @@ func (t *clusterSharedAccountTransformer) reconcileShardingsSharedAccounts(trans
 			return nil
 		}
 		for i, account := range shardingSpec.Template.SystemAccounts {
-			needCreate, err := t.needCreateSharedAccount(transCtx, &account, shardingSpec, graphCli, dag)
+			needCreate, err := t.needCreateSharedAccount(transCtx, &account, shardingSpec)
 			if err != nil {
 				return err
 			}
@@ -84,7 +84,7 @@ func (t *clusterSharedAccountTransformer) reconcileShardingsSharedAccounts(trans
 }
 
 func (t *clusterSharedAccountTransformer) needCreateSharedAccount(transCtx *clusterTransformContext,
-	account *appsv1.ComponentSystemAccount, shardingSpec appsv1.ShardingSpec, graphCli model.GraphClient, dag *graph.DAG) (bool, error) {
+	account *appsv1.ComponentSystemAccount, shardingSpec appsv1.ShardingSpec) (bool, error) {
 	// respect the secretRef if it is set
 	if account.SecretRef != nil {
 		return false, nil
@@ -97,7 +97,7 @@ func (t *clusterSharedAccountTransformer) needCreateSharedAccount(transCtx *clus
 	}
 
 	secretName := constant.GenerateShardingSharedAccountSecretName(transCtx.Cluster.Name, shardingSpec.Name, account.Name)
-	if secret, err := t.checkShardingSharedAccountSecretExist(transCtx, transCtx.Cluster, secretName, graphCli, dag); err != nil {
+	if secret, err := t.checkShardingSharedAccountSecretExist(transCtx, transCtx.Cluster, secretName); err != nil {
 		return false, err
 	} else if secret != nil {
 		return false, nil
@@ -126,7 +126,7 @@ func (t *clusterSharedAccountTransformer) createNConvertToSharedAccountSecret(tr
 }
 
 func (t *clusterSharedAccountTransformer) checkShardingSharedAccountSecretExist(transCtx *clusterTransformContext,
-	cluster *appsv1.Cluster, secretName string, graphCli model.GraphClient, dag *graph.DAG) (*corev1.Secret, error) {
+	cluster *appsv1.Cluster, secretName string) (*corev1.Secret, error) {
 	secretKey := types.NamespacedName{
 		Namespace: cluster.Namespace,
 		Name:      secretName,
@@ -137,14 +137,6 @@ func (t *clusterSharedAccountTransformer) checkShardingSharedAccountSecretExist(
 	case err == nil:
 		return secret, nil
 	case apierrors.IsNotFound(err):
-		// check if secret exist in dag
-		dagSecrets := graphCli.FindAll(dag, &corev1.Secret{})
-		for _, v := range dagSecrets {
-			ds := v.(*corev1.Secret)
-			if ds.Name == secretName {
-				return ds, nil
-			}
-		}
 		return nil, nil
 	default:
 		return nil, err

@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -94,7 +95,7 @@ func (r rebuildInstanceOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli cli
 			if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: ins.Name, Namespace: opsRes.Cluster.Namespace}, targetPod); err != nil {
 				return err
 			}
-			synthesizedComp, err = r.buildSynthesizedComponent(reqCtx, cli, opsRes.Cluster, targetPod.Labels[constant.KBAppComponentLabelKey])
+			synthesizedComp, err = r.buildSynthesizedComponent(reqCtx.Ctx, cli, opsRes.Cluster, targetPod.Labels[constant.KBAppComponentLabelKey])
 			if err != nil {
 				return err
 			}
@@ -417,7 +418,7 @@ func (r rebuildInstanceOpsHandler) checkProgressForScalingOutPods(reqCtx intctrl
 		failedCount            int
 		completedCount         int
 	)
-	synthesizedComp, err := r.buildSynthesizedComponent(reqCtx, cli, opsRes.Cluster, rebuildInstance.ComponentName)
+	synthesizedComp, err := r.buildSynthesizedComponent(reqCtx.Ctx, cli, opsRes.Cluster, rebuildInstance.ComponentName)
 	if err != nil {
 		return 0, 0, nil, err
 	}
@@ -510,20 +511,15 @@ func (r rebuildInstanceOpsHandler) getScalingOutPodNameFromMessage(progressMsg s
 	return strings.Replace(strArr[0], scalingOutPodPrefixMsg+": ", "", 1)
 }
 
-func (r rebuildInstanceOpsHandler) buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
+func (r rebuildInstanceOpsHandler) buildSynthesizedComponent(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1.Cluster,
 	componentName string) (*component.SynthesizedComponent, error) {
-	compSpec := getComponentSpecOrShardingTemplate(cluster, componentName)
-	if compSpec.ComponentDef == "" {
-		// TODO: remove after 0.9
-		return component.BuildSynthesizedComponentWrapper(reqCtx, cli, cluster, compSpec)
-	}
-	comp, compDef, err := component.GetCompNCompDefByName(reqCtx.Ctx, cli, cluster.Namespace, constant.GenerateClusterComponentName(cluster.Name, componentName))
+	comp, compDef, err := component.GetCompNCompDefByName(ctx, cli, cluster.Namespace, constant.GenerateClusterComponentName(cluster.Name, componentName))
 	if err != nil {
 		return nil, err
 	}
-	return component.BuildSynthesizedComponent(reqCtx, cli, cluster, compDef, comp)
+	return component.BuildSynthesizedComponent(ctx, cli, compDef, comp, cluster)
 }
 
 func (r rebuildInstanceOpsHandler) prepareInplaceRebuildHelper(reqCtx intctrlutil.RequestCtx,
@@ -563,7 +559,7 @@ func (r rebuildInstanceOpsHandler) prepareInplaceRebuildHelper(reqCtx intctrluti
 	if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: instance.Name, Namespace: opsRes.Cluster.Namespace}, targetPod); err != nil {
 		return nil, err
 	}
-	synthesizedComp, err = r.buildSynthesizedComponent(reqCtx, cli, opsRes.Cluster, targetPod.Labels[constant.KBAppComponentLabelKey])
+	synthesizedComp, err = r.buildSynthesizedComponent(reqCtx.Ctx, cli, opsRes.Cluster, targetPod.Labels[constant.KBAppComponentLabelKey])
 	if err != nil {
 		return nil, err
 	}

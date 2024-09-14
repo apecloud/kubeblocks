@@ -61,11 +61,7 @@ func VarReferenceRegExp() *regexp.Regexp {
 
 // ResolveTemplateNEnvVars resolves all built-in and user-defined vars for config template and Env usage.
 func ResolveTemplateNEnvVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent, definedVars []appsv1.EnvVar) (map[string]any, []corev1.EnvVar, error) {
-	return resolveTemplateNEnvVars(ctx, cli, synthesizedComp, definedVars, false)
-}
-
-func ResolveEnvVars4LegacyCluster(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent, definedVars []appsv1.EnvVar) (map[string]any, []corev1.EnvVar, error) {
-	return resolveTemplateNEnvVars(ctx, cli, synthesizedComp, definedVars, true)
+	return resolveTemplateNEnvVars(ctx, cli, synthesizedComp, definedVars)
 }
 
 func InjectEnvVars(synthesizedComp *SynthesizedComponent, envVars []corev1.EnvVar, envFromSources []corev1.EnvFromSource) {
@@ -104,23 +100,19 @@ func InjectEnvVars4Containers(synthesizedComp *SynthesizedComponent, envVars []c
 }
 
 func resolveTemplateNEnvVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	definedVars []appsv1.EnvVar, legacy bool) (map[string]any, []corev1.EnvVar, error) {
+	definedVars []appsv1.EnvVar) (map[string]any, []corev1.EnvVar, error) {
 	templateVars, envVars, err := resolveNewTemplateNEnvVars(ctx, cli, synthesizedComp, definedVars)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	implicitEnvVars, err := buildLegacyImplicitEnvVars(synthesizedComp, legacy)
+	implicitEnvVars, err := buildLegacyImplicitEnvVars(synthesizedComp)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	if legacy {
-		envVars = implicitEnvVars
-	} else {
-		// TODO: duplicated
-		envVars = append(envVars, implicitEnvVars...)
-	}
+	// TODO: duplicated
+	envVars = append(envVars, implicitEnvVars...)
 
 	formattedTemplateVars := func() map[string]any {
 		vars := make(map[string]any)
@@ -142,9 +134,9 @@ func resolveNewTemplateNEnvVars(ctx context.Context, cli client.Reader, synthesi
 	return templateVars, append(envVars, credentialVars...), nil
 }
 
-func buildLegacyImplicitEnvVars(synthesizedComp *SynthesizedComponent, legacy bool) ([]corev1.EnvVar, error) {
+func buildLegacyImplicitEnvVars(synthesizedComp *SynthesizedComponent) ([]corev1.EnvVar, error) {
 	envVars := make([]corev1.EnvVar, 0)
-	envVars = append(envVars, buildDefaultEnvVars(synthesizedComp, legacy)...)
+	envVars = append(envVars, buildDefaultEnvVars(synthesizedComp)...)
 	envVars = append(envVars, buildEnv4TLS(synthesizedComp)...)
 	userDefinedVars, err := buildEnv4UserDefined(synthesizedComp.Annotations)
 	if err != nil {
@@ -305,7 +297,7 @@ func resolveValueReferenceNEscaping(templateVars, credentialVars map[string]core
 	return v1, v2
 }
 
-func buildDefaultEnvVars(synthesizedComp *SynthesizedComponent, legacy bool) []corev1.EnvVar {
+func buildDefaultEnvVars(synthesizedComp *SynthesizedComponent) []corev1.EnvVar {
 	vars := make([]corev1.EnvVar, 0)
 	// can not use map, it is unordered
 	namedFields := []struct {
@@ -339,19 +331,10 @@ func buildDefaultEnvVars(synthesizedComp *SynthesizedComponent, legacy bool) []c
 	clusterCompName := func() string {
 		return constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name)
 	}()
-	if legacy {
-		vars = append(vars, []corev1.EnvVar{
-			{Name: constant.KBEnvClusterName, Value: synthesizedComp.ClusterName},
-			{Name: constant.KBEnvCompName, Value: synthesizedComp.Name},
-			{Name: constant.KBEnvClusterCompName, Value: clusterCompName},
-			{Name: constant.KBEnvClusterUIDPostfix8Deprecated, Value: clusterUIDPostfix(synthesizedComp)},
-			{Name: constant.KBEnvPodFQDN, Value: fmt.Sprintf("%s.%s-headless.%s.svc", constant.EnvPlaceHolder(constant.KBEnvPodName), constant.EnvPlaceHolder(constant.KBEnvClusterCompName), constant.EnvPlaceHolder(constant.KBEnvNamespace))}}...)
-	} else {
-		vars = append(vars, corev1.EnvVar{
-			Name:  constant.KBEnvPodFQDN,
-			Value: fmt.Sprintf("%s.%s-headless.%s.svc", constant.EnvPlaceHolder(constant.KBEnvPodName), clusterCompName, constant.EnvPlaceHolder(constant.KBEnvNamespace)),
-		})
-	}
+	vars = append(vars, corev1.EnvVar{
+		Name:  constant.KBEnvPodFQDN,
+		Value: fmt.Sprintf("%s.%s-headless.%s.svc", constant.EnvPlaceHolder(constant.KBEnvPodName), clusterCompName, constant.EnvPlaceHolder(constant.KBEnvNamespace)),
+	})
 	return vars
 }
 

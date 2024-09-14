@@ -27,7 +27,6 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
-	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // componentLoadResourcesTransformer handles referenced resources validation and load them into context
@@ -56,31 +55,7 @@ func (t *componentLoadResourcesTransformer) Transform(ctx graph.TransformContext
 	}
 	transCtx.Cluster = cluster
 
-	if component.IsGenerated(transCtx.ComponentOrig) {
-		err = t.transformForGeneratedComponent(transCtx)
-	} else {
-		err = t.transformForNativeComponent(transCtx)
-	}
-	return err
-}
-
-func (t *componentLoadResourcesTransformer) transformForGeneratedComponent(transCtx *componentTransformContext) error {
-	reqCtx := ictrlutil.RequestCtx{
-		Ctx:      transCtx.Context,
-		Log:      transCtx.Logger,
-		Recorder: transCtx.EventRecorder,
-	}
-	comp := transCtx.Component
-
-	compDef, synthesizedComp, err := component.BuildSynthesizedComponent4Generated(reqCtx, transCtx.Client, transCtx.Cluster, comp)
-	if err != nil {
-		message := fmt.Sprintf("build synthesized component for %s failed: %s", comp.Name, err.Error())
-		return newRequeueError(requeueDuration, message)
-	}
-	transCtx.CompDef = compDef
-	transCtx.SynthesizeComponent = synthesizedComp
-
-	return nil
+	return t.transformForNativeComponent(transCtx)
 }
 
 func (t *componentLoadResourcesTransformer) transformForNativeComponent(transCtx *componentTransformContext) error {
@@ -98,12 +73,7 @@ func (t *componentLoadResourcesTransformer) transformForNativeComponent(transCtx
 	}
 	transCtx.CompDef = compDef
 
-	reqCtx := ictrlutil.RequestCtx{
-		Ctx:      transCtx.Context,
-		Log:      transCtx.Logger,
-		Recorder: transCtx.EventRecorder,
-	}
-	synthesizedComp, err := component.BuildSynthesizedComponent(reqCtx, transCtx.Client, transCtx.Cluster, compDef, comp)
+	synthesizedComp, err := component.BuildSynthesizedComponent(ctx, transCtx.Client, compDef, comp, transCtx.Cluster)
 	if err != nil {
 		message := fmt.Sprintf("build synthesized component for %s failed: %s", comp.Name, err.Error())
 		return newRequeueError(requeueDuration, message)

@@ -56,9 +56,6 @@ type ResourceFetcher[T any] struct {
 	ComponentDefObj *appsv1.ComponentDefinition
 	ClusterComObj   *appsv1.ClusterComponentSpec
 
-	// Deprecated: this API will be removed from version 0.9.0
-	ClusterDefObj *appsv1.ClusterDefinition
-
 	ConfigMapObj        *corev1.ConfigMap
 	ConfigurationObj    *appsv1alpha1.Configuration
 	ConfigConstraintObj *appsv1beta1.ConfigConstraint
@@ -122,22 +119,9 @@ func (r *ResourceFetcher[T]) ComponentAndComponentDef() *T {
 	})
 }
 
-// ClusterDef get clusterDefinition cr
-// Deprecated: use ComponentDefinition instead
-func (r *ResourceFetcher[T]) ClusterDef() *T {
-	clusterDefKey := client.ObjectKey{
-		Namespace: "",
-		Name:      r.ClusterObj.Spec.ClusterDef,
-	}
-	return r.Wrap(func() error {
-		r.ClusterDefObj = &appsv1.ClusterDefinition{}
-		return r.Client.Get(r.Context, clusterDefKey, r.ClusterDefObj)
-	})
-}
-
 func (r *ResourceFetcher[T]) ComponentSpec() *T {
 	return r.Wrap(func() (err error) {
-		r.ClusterComObj, err = controllerutil.GetOriginalOrGeneratedComponentSpecByName(r.Context, r.Client, r.ClusterObj, r.ComponentName)
+		r.ClusterComObj, err = controllerutil.GetComponentSpecByName(r.Context, r.Client, r.ClusterObj, r.ComponentName)
 		if err != nil {
 			return err
 		}

@@ -25,7 +25,6 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -34,7 +33,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 func FullName(clusterName, compName string) string {
@@ -57,26 +55,14 @@ func GetClusterUID(comp *appsv1.Component) (string, error) {
 	return getCompLabelValue(comp, constant.KBAppClusterUIDLabelKey)
 }
 
-// IsGenerated checks if the component is generated from legacy cluster definitions.
-func IsGenerated(comp *appsv1.Component) bool {
-	return len(comp.Spec.CompDef) == 0
-}
-
 // BuildComponent builds a new Component object from cluster component spec and definition.
 func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSpec,
 	labels, annotations map[string]string) (*appsv1.Component, error) {
-	compName := FullName(cluster.Name, compSpec.Name)
-	compDefName := func() string {
-		if strings.HasPrefix(compSpec.ComponentDef, constant.KBGeneratedVirtualCompDefPrefix) {
-			return ""
-		}
-		return compSpec.ComponentDef
-	}()
 	schedulingPolicy, err := scheduling.BuildSchedulingPolicy(cluster, compSpec)
 	if err != nil {
 		return nil, err
 	}
-	compBuilder := builder.NewComponentBuilder(cluster.Namespace, compName, compDefName).
+	compBuilder := builder.NewComponentBuilder(cluster.Namespace, FullName(cluster.Name, compSpec.Name), compSpec.ComponentDef).
 		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 		AddLabelsInMap(constant.GetComponentWellKnownLabels(cluster.Name, compSpec.Name)).
 		AddLabels(constant.KBAppClusterUIDLabelKey, string(cluster.UID)).
@@ -93,6 +79,7 @@ func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSp
 		SetPodUpdatePolicy(compSpec.PodUpdatePolicy).
 		SetVolumeClaimTemplates(compSpec.VolumeClaimTemplates).
 		SetVolumes(compSpec.Volumes).
+		SetServices(compSpec.Services).
 		SetConfigs(compSpec.Configs).
 		SetServiceRefs(compSpec.ServiceRefs).
 		SetTLSConfig(compSpec.TLS, compSpec.Issuer).
@@ -113,37 +100,7 @@ func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSp
 			compBuilder.AddAnnotations(constant.KBAppMultiClusterPlacementKey, p)
 		}
 	}
-	if !IsGenerated(compBuilder.GetObject()) {
-		compBuilder.SetServices(compSpec.Services)
-	}
 	return compBuilder.GetObject(), nil
-}
-
-func getComponentDefinition(ctx context.Context, cli client.Reader,
-	spec *appsv1.ClusterComponentSpec) (*appsv1.ComponentDefinition, error) {
-	if len(spec.ComponentDef) > 0 {
-		compDef := &appsv1.ComponentDefinition{}
-		if err := cli.Get(ctx, types.NamespacedName{Name: spec.ComponentDef}, compDef); err != nil {
-			return nil, err
-		}
-		return compDef, nil
-	}
-	return nil, fmt.Errorf("the component definition is not provided")
-}
-
-func getClusterCompSpec4Component(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster, comp *appsv1.Component) (*appsv1.ClusterComponentSpec, error) {
-	compName, err := ShortName(cluster.Name, comp.Name)
-	if err != nil {
-		return nil, err
-	}
-	compSpec, err := intctrlutil.GetOriginalOrGeneratedComponentSpecByName(ctx, cli, cluster, compName)
-	if err != nil {
-		return nil, err
-	}
-	if compSpec != nil {
-		return compSpec, nil
-	}
-	return nil, fmt.Errorf("cluster component spec is not found for component: %s", comp.Name)
 }
 
 func getCompLabelValue(comp *appsv1.Component, label string) (string, error) {

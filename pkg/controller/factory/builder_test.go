@@ -37,7 +37,6 @@ import (
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -107,26 +106,16 @@ var _ = Describe("builder", func() {
 			}).GetObject()
 	}
 
-	newReqCtx := func() intctrlutil.RequestCtx {
-		reqCtx := intctrlutil.RequestCtx{
-			Ctx:      testCtx.Ctx,
-			Log:      logger,
-			Recorder: clusterRecorder,
-		}
-		return reqCtx
-	}
-
 	newAllFieldsSynthesizedComponent := func(compDef *appsv1.ComponentDefinition, cluster *appsv1.Cluster) *component.SynthesizedComponent {
-		reqCtx := newReqCtx()
 		By("assign every available fields")
 		comp, err := component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
 		Expect(err).Should(Succeed())
-		synthesizeComp, err := component.BuildSynthesizedComponent(reqCtx, testCtx.Cli, cluster, compDef, comp)
+		synthesizeComp, err := component.BuildSynthesizedComponent(testCtx.Ctx, testCtx.Cli, compDef, comp, cluster)
 		Expect(err).Should(Succeed())
 		Expect(synthesizeComp).ShouldNot(BeNil())
 		// to resolve and inject env vars
 		synthesizeComp.Annotations = cluster.Annotations
-		_, envVars, err := component.ResolveTemplateNEnvVars(reqCtx.Ctx, testCtx.Cli, synthesizeComp, nil)
+		_, envVars, err := component.ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizeComp, nil)
 		Expect(err).Should(Succeed())
 		component.InjectEnvVars(synthesizeComp, envVars, nil)
 		return synthesizeComp

@@ -27,8 +27,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
-// GetOriginalOrGeneratedComponentSpecByName get an original or generated cluster component spec by componentName.
-func GetOriginalOrGeneratedComponentSpecByName(ctx context.Context, cli client.Reader,
+func GetComponentSpecByName(ctx context.Context, cli client.Reader,
 	cluster *appsv1.Cluster, componentName string) (*appsv1.ClusterComponentSpec, error) {
 	compSpec := cluster.Spec.GetComponentByName(componentName)
 	if compSpec != nil {

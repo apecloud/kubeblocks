@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
+	"context"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
@@ -46,7 +47,7 @@ type Task struct {
 
 type TaskContext struct {
 	configuration *appsv1alpha1.Configuration
-	reqCtx        intctrlutil.RequestCtx
+	ctx           context.Context
 	fetcher       *Task
 }
 

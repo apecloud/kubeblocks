@@ -181,7 +181,7 @@ var _ = Describe("vars", func() {
 
 			By("check default env vars")
 			targetEnvVars := builtinTemplateVars(synthesizedComp, nil)
-			targetEnvVars = append(targetEnvVars, buildDefaultEnvVars(synthesizedComp, false)...)
+			targetEnvVars = append(targetEnvVars, buildDefaultEnvVars(synthesizedComp)...)
 			checkEnvVars(envVars, targetEnvVars)
 		})
 

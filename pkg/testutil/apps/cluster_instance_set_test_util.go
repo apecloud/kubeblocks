@@ -23,7 +23,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -115,9 +114,7 @@ func MockInstanceSetPods(
 		}
 		return nil
 	}()
-	replicas := getReplicas()
-	replicasStr := strconv.Itoa(replicas)
-	podList := make([]*corev1.Pod, replicas)
+	podList := make([]*corev1.Pod, getReplicas())
 	podNames := generatePodNames(cluster, compName)
 	for i, pName := range podNames {
 		var podRole, accessMode string
@@ -135,7 +132,6 @@ func MockInstanceSetPods(
 		if annotations == nil {
 			annotations = make(map[string]string)
 		}
-		annotations[constant.ComponentReplicasAnnotationKey] = replicasStr
 		pod.Annotations = annotations
 		podList[i] = pod
 	}

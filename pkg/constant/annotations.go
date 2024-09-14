@@ -32,14 +32,12 @@ const (
 	RestartAnnotationKey                     = "kubeblocks.io/restart"                   // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
 	RestoreFromBackupAnnotationKey           = "kubeblocks.io/restore-from-backup"
 	RestoreDoneAnnotationKey                 = "kubeblocks.io/restore-done"
-	BackupSourceTargetAnnotationKey          = "kubeblocks.io/backup-source-target"    // RestoreFromBackupAnnotationKey specifies the component to recover from the backup.
-	ComponentReplicasAnnotationKey           = "apps.kubeblocks.io/component-replicas" // ComponentReplicasAnnotationKey specifies the number of pods in replicas
+	BackupSourceTargetAnnotationKey          = "kubeblocks.io/backup-source-target" // RestoreFromBackupAnnotationKey specifies the component to recover from the backup.
 	BackupPolicyTemplateAnnotationKey        = "apps.kubeblocks.io/backup-policy-template"
 	LastAppliedClusterAnnotationKey          = "apps.kubeblocks.io/last-applied-cluster"
 	PVLastClaimPolicyAnnotationKey           = "apps.kubeblocks.io/pv-last-claim-policy"
 	HaltRecoveryAllowInconsistentResAnnotKey = "clusters.apps.kubeblocks.io/allow-inconsistent-resource"
 	KubeBlocksGenerationKey                  = "kubeblocks.io/generation"
-	ExtraEnvAnnotationKey                    = "kubeblocks.io/extra-env"
 	LastRoleSnapshotVersionAnnotationKey     = "apps.kubeblocks.io/last-role-snapshot-version"
 	ComponentScaleInAnnotationKey            = "apps.kubeblocks.io/component-scale-in" // ComponentScaleInAnnotationKey specifies whether the component is scaled in
 	DisableHAAnnotationKey                   = "kubeblocks.io/disable-ha"

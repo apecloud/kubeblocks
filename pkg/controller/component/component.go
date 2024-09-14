@@ -51,10 +51,6 @@ func GetClusterName(comp *appsv1.Component) (string, error) {
 	return getCompLabelValue(comp, constant.AppInstanceLabelKey)
 }
 
-func GetClusterUID(comp *appsv1.Component) (string, error) {
-	return getCompLabelValue(comp, constant.KBAppClusterUIDLabelKey)
-}
-
 // BuildComponent builds a new Component object from cluster component spec and definition.
 func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSpec,
 	labels, annotations map[string]string) (*appsv1.Component, error) {
@@ -65,7 +61,6 @@ func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSp
 	compBuilder := builder.NewComponentBuilder(cluster.Namespace, FullName(cluster.Name, compSpec.Name), compSpec.ComponentDef).
 		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 		AddLabelsInMap(constant.GetComponentWellKnownLabels(cluster.Name, compSpec.Name)).
-		AddLabels(constant.KBAppClusterUIDLabelKey, string(cluster.UID)).
 		SetServiceVersion(compSpec.ServiceVersion).
 		SetLabels(compSpec.Labels).
 		SetAnnotations(compSpec.Annotations).

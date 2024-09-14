@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package factory
 
 import (
-	"encoding/json"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -57,15 +56,6 @@ var _ = Describe("builder", func() {
 		return compDebObj
 	}
 
-	newExtraEnvs := func() map[string]string {
-		jsonStr, _ := json.Marshal(map[string]string{
-			"mock-key": "mock-value",
-		})
-		return map[string]string{
-			constant.ExtraEnvAnnotationKey: string(jsonStr),
-		}
-	}
-
 	newAllFieldsClusterObj := func(compDefObj *appsv1.ComponentDefinition, create bool) (*appsv1.Cluster, *appsv1.ComponentDefinition, types.NamespacedName) {
 		// setup Cluster obj requires default ComponentDefinition object
 		if compDefObj == nil {
@@ -73,7 +63,6 @@ var _ = Describe("builder", func() {
 		}
 		pvcSpec := testapps.NewPVCSpec("1Gi")
 		clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
-			AddAnnotationsInMap(newExtraEnvs()).
 			AddComponent(mysqlCompName, compDefObj.GetName()).
 			SetReplicas(1).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).

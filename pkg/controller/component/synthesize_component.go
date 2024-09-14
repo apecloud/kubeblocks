@@ -53,10 +53,6 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 	if err != nil {
 		return nil, err
 	}
-	clusterUID, err := GetClusterUID(comp)
-	if err != nil {
-		return nil, err
-	}
 	compName, err := ShortName(clusterName, comp.Name)
 	if err != nil {
 		return nil, err
@@ -69,7 +65,7 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 	synthesizeComp := &SynthesizedComponent{
 		Namespace:                        comp.Namespace,
 		ClusterName:                      clusterName,
-		ClusterUID:                       clusterUID,
+		ClusterUID:                       string(cluster.UID),
 		Comp2CompDefs:                    comp2CompDef,
 		Name:                             compName,
 		FullCompName:                     comp.Name,

@@ -73,7 +73,7 @@ const (
 
 var (
 	backupPolicyTPLName   = "test-backup-policy-template-mysql"
-	podAnnotationKey4Test = fmt.Sprintf("%s-test", constant.ComponentReplicasAnnotationKey)
+	podAnnotationKey4Test = "component-replicas-test"
 )
 
 var mockKBAgentClient = func(mock func(*kbagent.MockClientMockRecorder)) {
@@ -463,7 +463,6 @@ var _ = Describe("Component Controller", func() {
 		clusterName := cluster.Name
 		itsName := cluster.Name + "-" + componentName
 		pods := make([]corev1.Pod, 0)
-		replicasStr := strconv.Itoa(number)
 		for i := 0; i < number; i++ {
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -477,8 +476,7 @@ var _ = Describe("Component Controller", func() {
 						appsv1.ControllerRevisionHashLabelKey: "mock-version",
 					},
 					Annotations: map[string]string{
-						podAnnotationKey4Test:                   fmt.Sprintf("%d", number),
-						constant.ComponentReplicasAnnotationKey: replicasStr,
+						podAnnotationKey4Test: fmt.Sprintf("%d", number),
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -1255,74 +1253,6 @@ var _ = Describe("Component Controller", func() {
 				Name:  constant.KBEnvCompReplicas,
 				Value: "1", // default replicas
 			},
-			{
-				Name: constant.KBEnvPodName,
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{
-						APIVersion: "v1",
-						FieldPath:  "metadata.name",
-					},
-				},
-			},
-			{
-				Name: constant.KBEnvPodUID,
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{
-						APIVersion: "v1",
-						FieldPath:  "metadata.uid",
-					},
-				},
-			},
-			{
-				Name: constant.KBEnvPodIP,
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{
-						APIVersion: "v1",
-						FieldPath:  "status.podIP",
-					},
-				},
-			},
-			{
-				Name: constant.KBEnvPodIPs,
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{
-						APIVersion: "v1",
-						FieldPath:  "status.podIPs",
-					},
-				},
-			},
-			{
-				Name: constant.KBEnvPodFQDN,
-				Value: fmt.Sprintf("%s.%s-headless.%s.svc", constant.EnvPlaceHolder(constant.KBEnvPodName),
-					constant.GenerateClusterComponentName(clusterObj.Name, compName), constant.EnvPlaceHolder(constant.KBEnvNamespace)),
-			},
-			{
-				Name: constant.KBEnvNodeName,
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{
-						APIVersion: "v1",
-						FieldPath:  "spec.nodeName",
-					},
-				},
-			},
-			{
-				Name: constant.KBEnvHostIP,
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{
-						APIVersion: "v1",
-						FieldPath:  "status.hostIP",
-					},
-				},
-			},
-			{
-				Name: constant.KBEnvServiceAccountName,
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{
-						APIVersion: "v1",
-						FieldPath:  "spec.serviceAccountName",
-					},
-				},
-			},
 		}
 		itsKey := types.NamespacedName{
 			Namespace: compObj.Namespace,
@@ -1722,19 +1652,8 @@ var _ = Describe("Component Controller", func() {
 			its.Annotations["time"] = time.Now().Format(time.RFC3339)
 		})()).Should(Succeed())
 
-		By("Checking pods' annotations")
-		Eventually(func(g Gomega) {
-			pods, err := intctrlutil.GetPodListByInstanceSet(ctx, k8sClient, its)
-			g.Expect(err).ShouldNot(HaveOccurred())
-			g.Expect(pods).Should(HaveLen(int(*its.Spec.Replicas)))
-			for _, pod := range pods {
-				g.Expect(pod.Annotations).ShouldNot(BeNil())
-				g.Expect(pod.Annotations[constant.ComponentReplicasAnnotationKey]).Should(Equal(strconv.Itoa(int(*its.Spec.Replicas))))
-			}
-		}).Should(Succeed())
-		itsPatch := client.MergeFrom(its.DeepCopy())
-
 		By("Updating ITS status")
+		itsPatch := client.MergeFrom(its.DeepCopy())
 		its.Status.UpdateRevision = "mock-version"
 		pods, err := intctrlutil.GetPodListByInstanceSet(ctx, k8sClient, its)
 		Expect(err).Should(BeNil())

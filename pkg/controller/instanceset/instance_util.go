@@ -377,7 +377,7 @@ func parseNodeSelectorOnceAnnotation(its *workloads.InstanceSet) (map[string]str
 		return podToNodeMapping, nil
 	}
 	if err := json.Unmarshal([]byte(data), &podToNodeMapping); err != nil {
-		return nil, fmt.Errorf("can't unmarshal scheduling infomation: %w", err)
+		return nil, fmt.Errorf("can't unmarshal scheduling information: %w", err)
 	}
 	return podToNodeMapping, nil
 }

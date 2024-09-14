@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -84,7 +84,7 @@ func (t *clusterSharedAccountTransformer) reconcileShardingsSharedAccounts(trans
 }
 
 func (t *clusterSharedAccountTransformer) needCreateSharedAccount(transCtx *clusterTransformContext,
-	account *appsv1alpha1.ComponentSystemAccount, shardingSpec appsv1alpha1.ShardingSpec, graphCli model.GraphClient, dag *graph.DAG) (bool, error) {
+	account *appsv1.ComponentSystemAccount, shardingSpec appsv1.ShardingSpec, graphCli model.GraphClient, dag *graph.DAG) (bool, error) {
 	// respect the secretRef if it is set
 	if account.SecretRef != nil {
 		return false, nil
@@ -107,7 +107,7 @@ func (t *clusterSharedAccountTransformer) needCreateSharedAccount(transCtx *clus
 }
 
 func (t *clusterSharedAccountTransformer) createNConvertToSharedAccountSecret(transCtx *clusterTransformContext,
-	account *appsv1alpha1.ComponentSystemAccount, shardingSpec appsv1alpha1.ShardingSpec, graphCli model.GraphClient, dag *graph.DAG) error {
+	account *appsv1.ComponentSystemAccount, shardingSpec appsv1.ShardingSpec, graphCli model.GraphClient, dag *graph.DAG) error {
 	// Create the shared account secret if it does not exist
 	secretName := constant.GenerateShardingSharedAccountSecretName(transCtx.Cluster.Name, shardingSpec.Name, account.Name)
 	secret, err := t.buildAccountSecret(transCtx.Cluster, *account, shardingSpec.Name, secretName)
@@ -117,7 +117,7 @@ func (t *clusterSharedAccountTransformer) createNConvertToSharedAccountSecret(tr
 	graphCli.Create(dag, secret)
 
 	// Update account SecretRef to the shared secret
-	account.SecretRef = &appsv1alpha1.ProvisionSecretRef{
+	account.SecretRef = &appsv1.ProvisionSecretRef{
 		Name:      secret.Name,
 		Namespace: transCtx.Cluster.Namespace,
 	}
@@ -126,7 +126,7 @@ func (t *clusterSharedAccountTransformer) createNConvertToSharedAccountSecret(tr
 }
 
 func (t *clusterSharedAccountTransformer) checkShardingSharedAccountSecretExist(transCtx *clusterTransformContext,
-	cluster *appsv1alpha1.Cluster, secretName string, graphCli model.GraphClient, dag *graph.DAG) (*corev1.Secret, error) {
+	cluster *appsv1.Cluster, secretName string, graphCli model.GraphClient, dag *graph.DAG) (*corev1.Secret, error) {
 	secretKey := types.NamespacedName{
 		Namespace: cluster.Namespace,
 		Name:      secretName,
@@ -151,26 +151,26 @@ func (t *clusterSharedAccountTransformer) checkShardingSharedAccountSecretExist(
 	}
 }
 
-func (t *clusterSharedAccountTransformer) buildAccountSecret(cluster *appsv1alpha1.Cluster,
-	account appsv1alpha1.ComponentSystemAccount, shardingName, secretName string) (*corev1.Secret, error) {
+func (t *clusterSharedAccountTransformer) buildAccountSecret(cluster *appsv1.Cluster,
+	account appsv1.ComponentSystemAccount, shardingName, secretName string) (*corev1.Secret, error) {
 	password := t.generatePassword(account)
 	return t.buildAccountSecretWithPassword(cluster, account, shardingName, secretName, password)
 }
 
-func (t *clusterSharedAccountTransformer) generatePassword(account appsv1alpha1.ComponentSystemAccount) []byte {
+func (t *clusterSharedAccountTransformer) generatePassword(account appsv1.ComponentSystemAccount) []byte {
 	config := account.PasswordConfig
 	passwd, _ := common.GeneratePassword((int)(config.Length), (int)(config.NumDigits), (int)(config.NumSymbols), false, "")
 	switch config.LetterCase {
-	case appsv1alpha1.UpperCases:
+	case appsv1.UpperCases:
 		passwd = strings.ToUpper(passwd)
-	case appsv1alpha1.LowerCases:
+	case appsv1.LowerCases:
 		passwd = strings.ToLower(passwd)
 	}
 	return []byte(passwd)
 }
 
-func (t *clusterSharedAccountTransformer) buildAccountSecretWithPassword(cluster *appsv1alpha1.Cluster,
-	account appsv1alpha1.ComponentSystemAccount, shardingName, secretName string, password []byte) (*corev1.Secret, error) {
+func (t *clusterSharedAccountTransformer) buildAccountSecretWithPassword(cluster *appsv1.Cluster,
+	account appsv1.ComponentSystemAccount, shardingName, secretName string, password []byte) (*corev1.Secret, error) {
 	labels := constant.GetShardingWellKnownLabels(cluster.Name, shardingName)
 	secret := builder.NewSecretBuilder(cluster.Namespace, secretName).
 		AddLabelsInMap(labels).

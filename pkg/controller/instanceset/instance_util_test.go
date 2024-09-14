@@ -228,6 +228,18 @@ var _ = Describe("instance util test", func() {
 			instance, err := buildInstanceByTemplate(name, template, its, "")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(instance.pod.Spec.NodeSelector[corev1.LabelHostname]).To(Equal(node))
+
+			By("test with an already existing annotation")
+			delete(its.Annotations, constant.NodeSelectorOnceAnnotationKey)
+			Expect(MergeNodeSelectorOnceAnnotation(its, map[string]string{"other-pod": "other-node"})).To(Succeed())
+			Expect(MergeNodeSelectorOnceAnnotation(its, map[string]string{name: node})).To(Succeed())
+			mapping, err := ParseNodeSelectorOnceAnnotation(its)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(mapping).To(HaveKeyWithValue("other-pod", "other-node"))
+			Expect(mapping).To(HaveKeyWithValue(name, node))
+			instance, err = buildInstanceByTemplate(name, template, its, "")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(instance.pod.Spec.NodeSelector[corev1.LabelHostname]).To(Equal(node))
 		})
 	})
 

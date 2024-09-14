@@ -400,6 +400,11 @@ func (r rebuildInstanceOpsHandler) scaleOutCompReplicasAndSyncProgress(reqCtx in
 		setScaleOutInsMap(workloadName, "", compSpec.Replicas-allTemplateReplicas, compSpec.OfflineInstances, wrapper)
 	}
 
+	its := &workloads.InstanceSet{}
+	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: workloadName, Namespace: opsRes.OpsRequest.Namespace}, its); err != nil {
+		return err
+	}
+	itsUpdated := false
 	for _, ins := range rebuildInstance.Instances {
 		// set progress details
 		scaleOutInsName := scaleOutInsMap[ins.Name]
@@ -412,16 +417,16 @@ func (r rebuildInstanceOpsHandler) scaleOutCompReplicasAndSyncProgress(reqCtx in
 
 		// specify node to scale out
 		if ins.TargetNodeName != "" {
-			its := &workloads.InstanceSet{}
-			if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: workloadName, Namespace: opsRes.OpsRequest.Namespace}, its); err != nil {
-				return err
-			}
 			if err := instanceset.MergeNodeSelectorOnceAnnotation(its, map[string]string{scaleOutInsName: ins.TargetNodeName}); err != nil {
 				return err
 			}
-			if err := cli.Update(reqCtx.Ctx, its); err != nil {
-				return err
-			}
+			itsUpdated = true
+		}
+	}
+
+	if itsUpdated {
+		if err := cli.Update(reqCtx.Ctx, its); err != nil {
+			return err
 		}
 	}
 	return nil

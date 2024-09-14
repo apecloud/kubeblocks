@@ -84,7 +84,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		template2TotalReplicas[template.Name] = templateReplicas
 	}
 
-	podToNodeMapping, err := parseNodeSelectorOnceAnnotation(its)
+	podToNodeMapping, err := ParseNodeSelectorOnceAnnotation(its)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}

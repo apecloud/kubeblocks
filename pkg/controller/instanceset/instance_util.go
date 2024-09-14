@@ -369,8 +369,8 @@ func ConvertOrdinalsToSortedList(ordinals workloads.Ordinals) ([]int32, error) {
 	return sortedOrdinalList, nil
 }
 
-// returned map will not be nil
-func parseNodeSelectorOnceAnnotation(its *workloads.InstanceSet) (map[string]string, error) {
+// ParseNodeSelectorOnceAnnotation will return a non-nil map
+func ParseNodeSelectorOnceAnnotation(its *workloads.InstanceSet) (map[string]string, error) {
 	podToNodeMapping := make(map[string]string)
 	data, ok := its.Annotations[constant.NodeSelectorOnceAnnotationKey]
 	if !ok {
@@ -384,7 +384,7 @@ func parseNodeSelectorOnceAnnotation(its *workloads.InstanceSet) (map[string]str
 
 // sets annotation in place
 func deleteNodeSelectorOnceAnnotation(its *workloads.InstanceSet, podName string) error {
-	podToNodeMapping, err := parseNodeSelectorOnceAnnotation(its)
+	podToNodeMapping, err := ParseNodeSelectorOnceAnnotation(its)
 	if err != nil {
 		return err
 	}
@@ -403,14 +403,14 @@ func deleteNodeSelectorOnceAnnotation(its *workloads.InstanceSet, podName string
 
 // MergeNodeSelectorOnceAnnotation merges its's nodeSelectorOnce annotation in place
 func MergeNodeSelectorOnceAnnotation(its *workloads.InstanceSet, podToNodeMapping map[string]string) error {
-	origPodToNodeMapping, err := parseNodeSelectorOnceAnnotation(its)
+	origPodToNodeMapping, err := ParseNodeSelectorOnceAnnotation(its)
 	if err != nil {
 		return err
 	}
 	for k, v := range podToNodeMapping {
 		origPodToNodeMapping[k] = v
 	}
-	data, err := json.Marshal(podToNodeMapping)
+	data, err := json.Marshal(origPodToNodeMapping)
 	if err != nil {
 		return err
 	}
@@ -443,7 +443,7 @@ func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent 
 	pod.Spec.Hostname = pod.Name
 	pod.Spec.Subdomain = getHeadlessSvcName(parent.Name)
 
-	podToNodeMapping, err := parseNodeSelectorOnceAnnotation(parent)
+	podToNodeMapping, err := ParseNodeSelectorOnceAnnotation(parent)
 	if err != nil {
 		return nil, err
 	}

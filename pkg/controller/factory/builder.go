@@ -31,7 +31,6 @@ import (
 	"k8s.io/klog/v2"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -298,7 +297,7 @@ func BuildConfigMapWithTemplate(cluster *appsv1.Cluster,
 	synthesizedComp *component.SynthesizedComponent,
 	configs map[string]string,
 	cmName string,
-	configTemplateSpec appsv1alpha1.ComponentTemplateSpec) *corev1.ConfigMap {
+	configTemplateSpec appsv1.ComponentTemplateSpec) *corev1.ConfigMap {
 	wellKnownLabels := constant.GetKBWellKnownLabels(synthesizedComp.ClusterDefName, cluster.Name, synthesizedComp.Name)
 	wellKnownLabels[constant.AppComponentLabelKey] = synthesizedComp.CompDefName
 	return builder.NewConfigMapBuilder(cluster.Namespace, cmName).

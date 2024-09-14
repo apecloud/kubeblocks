@@ -298,8 +298,8 @@ func (r rebuildInstanceOpsHandler) rebuildInstancesWithHScaling(reqCtx intctrlut
 	)
 	if len(compStatus.ProgressDetails) == 0 {
 		// 1. scale out the required instances
-		r.scaleOutRequiredInstances(reqCtx, cli, opsRes, rebuildInstance, compStatus)
-		return 0, 0, nil
+		err := r.scaleOutRequiredInstances(reqCtx, cli, opsRes, rebuildInstance, compStatus)
+		return 0, 0, err
 	}
 	for i := range opsRes.Cluster.Spec.ComponentSpecs {
 		compSpec := &opsRes.Cluster.Spec.ComponentSpecs[i]

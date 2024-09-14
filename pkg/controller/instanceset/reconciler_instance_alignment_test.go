@@ -167,7 +167,7 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			tree.SetRoot(its)
 			name := "bar-1"
 			node := "test-1"
-			setNodeSelectorOnceAnnotation(its, map[string]string{name: node})
+			MergeNodeSelectorOnceAnnotation(its, map[string]string{name: node})
 
 			res, err := reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())

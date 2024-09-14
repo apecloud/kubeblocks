@@ -263,17 +263,12 @@ func doSwitchover(ctx context.Context, cli client.Reader, synthesizedComp *compo
 		return nil
 	}
 
-	pod, err := getServiceableNWritablePod(ctx, cli, *synthesizedComp)
-	if err != nil {
-		return err
-	}
-
 	pods, err := component.ListOwnedPods(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
 	if err != nil {
 		return err
 	}
 
-	lfa, err := lifecycle.New(synthesizedComp, pod, pods...)
+	lfa, err := lifecycle.New(synthesizedComp, nil, pods...)
 	if err != nil {
 		return err
 	}

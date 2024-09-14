@@ -395,7 +395,7 @@ spec:
                       additionalProperties:
                         type: string
                       description: Specifies Annotations to override or add for underlying
-                        Pods.
+                        Pods, PVCs, Account & TLS Secrets, Services Owned by Component.
                       type: object
                     classDefRef:
                       description: |-
@@ -3777,7 +3777,7 @@ spec:
                       additionalProperties:
                         type: string
                       description: Specifies Labels to override or add for underlying
-                        Pods.
+                        Pods, PVCs, Account & TLS Secrets, Services Owned by Component.
                       type: object
                     monitor:
                       description: |-
@@ -8975,7 +8975,8 @@ spec:
                           additionalProperties:
                             type: string
                           description: Specifies Annotations to override or add for
-                            underlying Pods.
+                            underlying Pods, PVCs, Account & TLS Secrets, Services
+                            Owned by Component.
                           type: object
                         classDefRef:
                           description: |-
@@ -12408,7 +12409,7 @@ spec:
                           additionalProperties:
                             type: string
                           description: Specifies Labels to override or add for underlying
-                            Pods.
+                            Pods, PVCs, Account & TLS Secrets, Services Owned by Component.
                           type: object
                         monitor:
                           description: |-

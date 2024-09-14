@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
-	"regexp"
 	"slices"
 	"sort"
 	"strconv"
@@ -40,7 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
@@ -66,8 +65,6 @@ type instanceSetExt struct {
 	instanceTemplates []*workloads.InstanceTemplate
 }
 
-var instanceNameRegex = regexp.MustCompile("(.*)-([0-9]+)$")
-
 var (
 	reader *zstd.Decoder
 	writer *zstd.Encoder
@@ -91,13 +88,15 @@ type instance struct {
 func ParseParentNameAndOrdinal(s string) (string, int) {
 	parent := s
 	ordinal := -1
-	subMatches := instanceNameRegex.FindStringSubmatch(s)
-	if len(subMatches) < 3 {
+
+	index := strings.LastIndex(s, "-")
+	if index < 0 {
 		return parent, ordinal
 	}
-	parent = subMatches[1]
-	if i, err := strconv.ParseInt(subMatches[2], 10, 32); err == nil {
+	ordinalStr := s[index+1:]
+	if i, err := strconv.ParseInt(ordinalStr, 10, 32); err == nil {
 		ordinal = int(i)
+		parent = s[:index]
 	}
 	return parent, ordinal
 }
@@ -110,8 +109,18 @@ func sortObjects[T client.Object](objects []T, rolePriorityMap map[string]int, r
 		role := strings.ToLower(objects[i].GetLabels()[constant.RoleLabelKey])
 		return rolePriorityMap[role]
 	}
+
+	// cache the parent names and ordinals to accelerate the parsing process when there is a massive number of Pods.
+	namesCache := make(map[string]string, len(objects))
+	ordinalsCache := make(map[string]int, len(objects))
 	getNameNOrdinalFunc := func(i int) (string, int) {
-		return ParseParentNameAndOrdinal(objects[i].GetName())
+		if name, ok := namesCache[objects[i].GetName()]; ok {
+			return name, ordinalsCache[objects[i].GetName()]
+		}
+		name, ordinal := ParseParentNameAndOrdinal(objects[i].GetName())
+		namesCache[objects[i].GetName()] = name
+		ordinalsCache[objects[i].GetName()] = ordinal
+		return name, ordinal
 	}
 	baseSort(objects, getNameNOrdinalFunc, getRolePriorityFunc, reverse)
 }
@@ -419,6 +428,11 @@ func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent 
 
 	if err := controllerutil.SetControllerReference(parent, pod, model.GetScheme()); err != nil {
 		return nil, err
+	}
+	for _, pvc := range pvcs {
+		if err = controllerutil.SetControllerReference(parent, pvc, model.GetScheme()); err != nil {
+			return nil, err
+		}
 	}
 	inst := &instance{
 		pod:  pod,

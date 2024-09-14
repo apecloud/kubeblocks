@@ -62,10 +62,10 @@ const (
 )
 
 // GetKBConfigMapWellKnownLabels returns the well-known labels for KB ConfigMap
-func GetKBConfigMapWellKnownLabels(cmTplName, clusterDefName, clusterName, componentName string) map[string]string {
+func GetKBConfigMapWellKnownLabels(cmTplName, componentDefName, clusterName, componentName string) map[string]string {
 	return map[string]string{
 		CMTemplateNameLabelKey: cmTplName,
-		AppNameLabelKey:        clusterDefName,
+		AppNameLabelKey:        componentDefName,
 		AppInstanceLabelKey:    clusterName,
 		KBAppComponentLabelKey: componentName,
 	}
@@ -96,6 +96,13 @@ func GetClusterWellKnownLabels(clusterName string) map[string]string {
 	return map[string]string{
 		AppManagedByLabelKey: AppName,
 		AppInstanceLabelKey:  clusterName,
+	}
+}
+
+// GetKBKnownLabels returns the kb-known labels for the headless svc
+func GetKBKnownLabels() map[string]string {
+	return map[string]string{
+		AppManagedByLabelKey: AppName,
 	}
 }
 

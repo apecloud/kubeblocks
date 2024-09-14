@@ -15,7 +15,7 @@ In the RedisReplication Cluster provided by KubeBlocks, Sentinel is deployed as 
 
 ## Before you start
 
-* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
+* [Install KubeBlocks](../../../user_docs/installation/install-with-helm/install-kubeblocks.md).
 * [Create a Redis Replication Cluster](./../cluster-management/create-and-connect-a-redis-cluster.md#create-a-redis-cluster).
 * Check the role probe.
   * Check whether the following role probe parameters exist to verify the role probe is enabled.

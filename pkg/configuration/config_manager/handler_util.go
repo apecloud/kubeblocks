@@ -28,7 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 )
@@ -48,7 +48,7 @@ type CfgManagerBuildParams struct {
 
 	// add volume to pod
 	ScriptVolume           []corev1.Volume
-	Cluster                *appsv1alpha1.Cluster
+	Cluster                *appsv1.Cluster
 	ConfigSpecsBuildParams []ConfigSpecMeta
 
 	// init tools container
@@ -155,7 +155,7 @@ func CreateValidConfigMapFilter() NotifyEventFilter {
 	}
 }
 
-func GetSupportReloadConfigSpecs(configSpecs []appsv1alpha1.ComponentConfigSpec, cli client.Client, ctx context.Context) ([]ConfigSpecMeta, error) {
+func GetSupportReloadConfigSpecs(configSpecs []appsv1.ComponentConfigSpec, cli client.Client, ctx context.Context) ([]ConfigSpecMeta, error) {
 	var reloadConfigSpecMeta []ConfigSpecMeta
 	for _, configSpec := range configSpecs {
 		// pass if support change and reload ConfigMap when parameters change

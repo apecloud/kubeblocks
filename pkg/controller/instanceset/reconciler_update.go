@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -110,15 +110,17 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 	unavailable := maxUnavailable - currentUnavailable
 
-	// TODO(free6om): compute updateCount from PodManagementPolicy(Serial/OrderedReady, Parallel, BestEffortParallel).
-	// align MemberUpdateStrategy with PodManagementPolicy if it has nil value.
-	itsForPlan := getInstanceSetForUpdatePlan(its)
-	plan := NewUpdatePlan(*itsForPlan, oldPodList, IsPodUpdated)
-	podsToBeUpdated, err := plan.Execute()
-	if err != nil {
-		return kubebuilderx.Continue, err
+	// if it's a roleful InstanceSet, we use updateCount to represent Pods can be updated according to the spec.memberUpdateStrategy.
+	updateCount := len(oldPodList)
+	if len(its.Spec.Roles) > 0 {
+		itsForPlan := getInstanceSetForUpdatePlan(its)
+		plan := NewUpdatePlan(*itsForPlan, oldPodList, IsPodUpdated)
+		podsToBeUpdated, err := plan.Execute()
+		if err != nil {
+			return kubebuilderx.Continue, err
+		}
+		updateCount = len(podsToBeUpdated)
 	}
-	updateCount := len(podsToBeUpdated)
 
 	updatingPods := 0
 	updatedPods := 0

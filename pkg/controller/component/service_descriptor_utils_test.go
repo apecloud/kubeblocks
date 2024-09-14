@@ -30,7 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -145,13 +145,12 @@ var _ = Describe("build service references", func() {
 		)
 
 		var (
-			compDef         *appsv1alpha1.ComponentDefinition
-			comp            *appsv1alpha1.Component
-			synthesizedComp *SynthesizedComponent
-
-			serviceRefDeclaration = appsv1alpha1.ServiceRefDeclaration{
+			compDef               *appsv1.ComponentDefinition
+			comp                  *appsv1.Component
+			synthesizedComp       *SynthesizedComponent
+			serviceRefDeclaration = appsv1.ServiceRefDeclaration{
 				Name: etcd,
-				ServiceRefDeclarationSpecs: []appsv1alpha1.ServiceRefDeclarationSpec{
+				ServiceRefDeclarationSpecs: []appsv1.ServiceRefDeclarationSpec{
 					{
 						ServiceKind:    etcd,
 						ServiceVersion: etcdVersion,
@@ -161,21 +160,21 @@ var _ = Describe("build service references", func() {
 		)
 
 		BeforeEach(func() {
-			compDef = &appsv1alpha1.ComponentDefinition{
+			compDef = &appsv1.ComponentDefinition{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "compdef",
 				},
-				Spec: appsv1alpha1.ComponentDefinitionSpec{
-					ServiceRefDeclarations: []appsv1alpha1.ServiceRefDeclaration{serviceRefDeclaration},
+				Spec: appsv1.ComponentDefinitionSpec{
+					ServiceRefDeclarations: []appsv1.ServiceRefDeclaration{serviceRefDeclaration},
 				},
 			}
-			comp = &appsv1alpha1.Component{
+			comp = &appsv1.Component{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: namespace,
 					Name:      "comp",
 				},
-				Spec: appsv1alpha1.ComponentSpec{
-					ServiceRefs: []appsv1alpha1.ServiceRef{},
+				Spec: appsv1.ComponentSpec{
+					ServiceRefs: []appsv1.ServiceRef{},
 				},
 			}
 			synthesizedComp = &SynthesizedComponent{
@@ -203,12 +202,12 @@ var _ = Describe("build service references", func() {
 		})
 
 		It("service vars - cluster service", func() {
-			comp.Spec.ServiceRefs = []appsv1alpha1.ServiceRef{
+			comp.Spec.ServiceRefs = []appsv1.ServiceRef{
 				{
 					Name: serviceRefDeclaration.Name,
-					ClusterServiceSelector: &appsv1alpha1.ServiceRefClusterSelector{
+					ClusterServiceSelector: &appsv1.ServiceRefClusterSelector{
 						Cluster: etcdCluster,
-						Service: &appsv1alpha1.ServiceRefServiceSelector{
+						Service: &appsv1.ServiceRefServiceSelector{
 							Service: "client",
 							Port:    "client",
 						},
@@ -255,12 +254,12 @@ var _ = Describe("build service references", func() {
 		})
 
 		It("service vars - component service", func() {
-			comp.Spec.ServiceRefs = []appsv1alpha1.ServiceRef{
+			comp.Spec.ServiceRefs = []appsv1.ServiceRef{
 				{
 					Name: serviceRefDeclaration.Name,
-					ClusterServiceSelector: &appsv1alpha1.ServiceRefClusterSelector{
+					ClusterServiceSelector: &appsv1.ServiceRefClusterSelector{
 						Cluster: etcdCluster,
-						Service: &appsv1alpha1.ServiceRefServiceSelector{
+						Service: &appsv1.ServiceRefServiceSelector{
 							Component: etcdComponent,
 							Service:   "", // default service
 							Port:      "peer",
@@ -308,12 +307,12 @@ var _ = Describe("build service references", func() {
 		})
 
 		It("service vars - pod service", func() {
-			comp.Spec.ServiceRefs = []appsv1alpha1.ServiceRef{
+			comp.Spec.ServiceRefs = []appsv1.ServiceRef{
 				{
 					Name: serviceRefDeclaration.Name,
-					ClusterServiceSelector: &appsv1alpha1.ServiceRefClusterSelector{
+					ClusterServiceSelector: &appsv1.ServiceRefClusterSelector{
 						Cluster: etcdCluster,
-						Service: &appsv1alpha1.ServiceRefServiceSelector{
+						Service: &appsv1.ServiceRefServiceSelector{
 							Component: etcdComponent,
 							Service:   "peer",
 							Port:      "peer",
@@ -348,23 +347,23 @@ var _ = Describe("build service references", func() {
 					newPodService(0),
 					newPodService(1),
 					newPodService(2),
-					&appsv1alpha1.Component{
+					&appsv1.Component{
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: namespace,
 							Name:      FullName(etcdCluster, etcdComponent),
 						},
-						Spec: appsv1alpha1.ComponentSpec{
+						Spec: appsv1.ComponentSpec{
 							CompDef: "test-compdef",
 						},
 					},
-					&appsv1alpha1.ComponentDefinition{
+					&appsv1.ComponentDefinition{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "test-compdef",
 						},
-						Spec: appsv1alpha1.ComponentDefinitionSpec{
-							Services: []appsv1alpha1.ComponentService{
+						Spec: appsv1.ComponentDefinitionSpec{
+							Services: []appsv1.ComponentService{
 								{
-									Service: appsv1alpha1.Service{
+									Service: appsv1.Service{
 										Name:        "peer",
 										ServiceName: "peer",
 									},
@@ -398,13 +397,13 @@ var _ = Describe("build service references", func() {
 		})
 
 		It("credential vars - same namespace", func() {
-			comp.Spec.ServiceRefs = []appsv1alpha1.ServiceRef{
+			comp.Spec.ServiceRefs = []appsv1.ServiceRef{
 				{
 					Name:      serviceRefDeclaration.Name,
 					Namespace: namespace,
-					ClusterServiceSelector: &appsv1alpha1.ServiceRefClusterSelector{
+					ClusterServiceSelector: &appsv1.ServiceRefClusterSelector{
 						Cluster: etcdCluster,
-						Credential: &appsv1alpha1.ServiceRefCredentialSelector{
+						Credential: &appsv1.ServiceRefCredentialSelector{
 							Component: etcdComponent,
 							Name:      "default",
 						},
@@ -451,13 +450,13 @@ var _ = Describe("build service references", func() {
 		})
 
 		It("credential vars - different namespace", func() {
-			comp.Spec.ServiceRefs = []appsv1alpha1.ServiceRef{
+			comp.Spec.ServiceRefs = []appsv1.ServiceRef{
 				{
 					Name:      serviceRefDeclaration.Name,
 					Namespace: "external",
-					ClusterServiceSelector: &appsv1alpha1.ServiceRefClusterSelector{
+					ClusterServiceSelector: &appsv1.ServiceRefClusterSelector{
 						Cluster: etcdCluster,
-						Credential: &appsv1alpha1.ServiceRefCredentialSelector{
+						Credential: &appsv1.ServiceRefCredentialSelector{
 							Component: etcdComponent,
 							Name:      "default",
 						},

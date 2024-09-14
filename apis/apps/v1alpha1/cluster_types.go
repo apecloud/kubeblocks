@@ -92,6 +92,7 @@ type ClusterSpec struct {
 	// - `DoNotTerminate`: Prevents deletion of the Cluster. This policy ensures that all resources remain intact.
 	// - `Halt`: Deletes Cluster resources like Pods and Services but retains Persistent Volume Claims (PVCs),
 	//   allowing for data preservation while stopping other operations.
+	//    Warning: Halt policy is deprecated in 0.9.1 and will have same meaning as DoNotTerminate.
 	// - `Delete`: Extends the `Halt` policy by also removing PVCs, leading to a thorough cleanup while
 	//   removing all persistent data.
 	// - `WipeOut`: An aggressive policy that deletes all Cluster resources, including volume snapshots and
@@ -588,8 +589,9 @@ type ClusterComponentSpec struct {
 	// +optional
 	ComponentDefRef string `json:"componentDefRef,omitempty"`
 
-	// References the name of a ComponentDefinition object.
-	// The ComponentDefinition specifies the behavior and characteristics of the Component.
+	// Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
+	// custom resource (CR) that defines the Component's characteristics and behavior.
+	//
 	// If both `componentDefRef` and `componentDef` are provided,
 	// the `componentDef` will take precedence over `componentDefRef`.
 	//
@@ -605,6 +607,16 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:validation:MaxLength=32
 	// +optional
 	ServiceVersion string `json:"serviceVersion,omitempty"`
+
+	// References the class defined in ComponentClassDefinition.
+	//
+	// Deprecated since v0.9.
+	// This field is maintained for backward compatibility and its use is discouraged.
+	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
+	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
+	// +optional
+	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
 
 	// Defines a list of ServiceRef for a Component, enabling access to both external services and
 	// Services provided by other Clusters.
@@ -799,6 +811,13 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
 	// +optional
 	UpdateStrategy *UpdateStrategy `json:"updateStrategy,omitempty"`
+
+	// Indicates the InstanceUpdateStrategy that will be
+	// employed to update Pods in the InstanceSet when a revision is made to
+	// Template.
+	//
+	// +optional
+	InstanceUpdateStrategy *InstanceUpdateStrategy `json:"instanceUpdateStrategy,omitempty"`
 
 	// Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
 	// or when scaling down. It only used when `PodManagementPolicy` is set to `Parallel`.
@@ -1299,6 +1318,21 @@ type ClusterComponentConfigSource struct {
 	// - Local file
 }
 
+// ClassDefRef is deprecated since v0.9.
+type ClassDefRef struct {
+	// Specifies the name of the ComponentClassDefinition.
+	//
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +optional
+	Name string `json:"name,omitempty"`
+
+	// Defines the name of the class that is defined in the ComponentClassDefinition.
+	//
+	// +kubebuilder:validation:Required
+	Class string `json:"class"`
+}
+
 // ClusterNetwork is deprecated since v0.9.
 type ClusterNetwork struct {
 	// Indicates whether the host network can be accessed. By default, this is set to false.
@@ -1488,18 +1522,18 @@ func init() {
 	SchemeBuilder.Register(&Cluster{}, &ClusterList{})
 }
 
-func (r Cluster) IsDeleting() bool {
+func (r *Cluster) IsDeleting() bool {
 	if r.GetDeletionTimestamp().IsZero() {
 		return false
 	}
 	return r.Spec.TerminationPolicy != DoNotTerminate
 }
 
-func (r Cluster) IsUpdating() bool {
+func (r *Cluster) IsUpdating() bool {
 	return r.Status.ObservedGeneration != r.Generation
 }
 
-func (r Cluster) IsStatusUpdating() bool {
+func (r *Cluster) IsStatusUpdating() bool {
 	return !r.IsDeleting() && !r.IsUpdating()
 }
 

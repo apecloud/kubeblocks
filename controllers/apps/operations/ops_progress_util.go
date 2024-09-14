@@ -33,8 +33,9 @@ import (
 	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
@@ -366,7 +367,7 @@ func getProgressFailedMessage(opsMessageKey, objectKey, componentName, podMessag
 }
 
 // getFailedPodMessage gets the failed pod message from cluster component status
-func getFailedPodMessage(cluster *appsv1alpha1.Cluster, componentName string, pod *corev1.Pod) string {
+func getFailedPodMessage(cluster *appsv1.Cluster, componentName string, pod *corev1.Pod) string {
 	clusterCompStatus := cluster.Status.Components[componentName]
 	return clusterCompStatus.GetObjectMessage(constant.PodKind, pod.Name)
 }

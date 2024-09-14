@@ -24,6 +24,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/kubectl/pkg/util/storage"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -84,7 +86,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 			constant.KBAppComponentLabelKey, consensusCompName).SetStorage("2Gi").SetStorageClass(storageClassName).CheckedCreate(&testCtx)
 	}
 
-	initResourcesForVolumeExpansion := func(clusterObject *appsv1alpha1.Cluster, opsRes *OpsResource, storage string, replicas int) (*appsv1alpha1.OpsRequest, []string) {
+	initResourcesForVolumeExpansion := func(clusterObject *appsv1.Cluster, opsRes *OpsResource, storage string, replicas int) (*appsv1alpha1.OpsRequest, []string) {
 		pvcNames := opsRes.Cluster.GetVolumeClaimNames(consensusCompName)
 		for _, pvcName := range pvcNames {
 			createPVC(clusterObject.Name, storageClassName, vctName, pvcName)
@@ -144,13 +146,13 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 	}
 
 	testVolumeExpansion := func(reqCtx intctrlutil.RequestCtx,
-		clusterObject *appsv1alpha1.Cluster,
+		clusterObject *appsv1.Cluster,
 		opsRes *OpsResource,
 		requestStorage,
 		actualStorage string) {
 		// mock cluster is Running to support volume expansion ops
 		Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
-			clusterObject.Status.Phase = appsv1alpha1.RunningClusterPhase
+			clusterObject.Status.Phase = appsv1.RunningClusterPhase
 		})).ShouldNot(HaveOccurred())
 
 		// init resources for volume expansion
@@ -199,7 +201,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsSucceedPhase))
 	}
 
-	testDeleteRunningVolumeExpansion := func(clusterObject *appsv1alpha1.Cluster, opsRes *OpsResource) {
+	testDeleteRunningVolumeExpansion := func(clusterObject *appsv1.Cluster, opsRes *OpsResource) {
 		// init resources for volume expansion
 		newOps, pvcNames := initResourcesForVolumeExpansion(clusterObject, opsRes, "5Gi", 1)
 		Expect(k8sClient.Delete(ctx, newOps)).Should(Succeed())
@@ -211,7 +213,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		pvc := &corev1.PersistentVolumeClaim{}
 		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: pvcNames[0], Namespace: testCtx.DefaultNamespace}, pvc)).Should(Succeed())
 
-		Eventually(testapps.GetClusterPhase(&testCtx, client.ObjectKeyFromObject(clusterObject))).Should(Equal(appsv1alpha1.RunningClusterPhase))
+		Eventually(testapps.GetClusterPhase(&testCtx, client.ObjectKeyFromObject(clusterObject))).Should(Equal(appsv1.RunningClusterPhase))
 	}
 
 	Context("Test VolumeExpansion", func() {
@@ -231,10 +233,10 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 
 			By("Test OpsManager.MainEnter function with ClusterOps")
 			Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
-				clusterObject.Status.Phase = appsv1alpha1.RunningClusterPhase
-				clusterObject.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
+				clusterObject.Status.Phase = appsv1.RunningClusterPhase
+				clusterObject.Status.Components = map[string]appsv1.ClusterComponentStatus{
 					consensusCompName: {
-						Phase: appsv1alpha1.RunningClusterCompPhase,
+						Phase: appsv1.RunningClusterCompPhase,
 					},
 				}
 			})).ShouldNot(HaveOccurred())

@@ -36,7 +36,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/util"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
@@ -67,9 +67,9 @@ var _ = Describe("Config Handler Test", func() {
 		DeferCleanup(mockK8sCli.Finish)
 	})
 
-	newConfigSpec := func() appsv1alpha1.ComponentConfigSpec {
-		return appsv1alpha1.ComponentConfigSpec{
-			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+	newConfigSpec := func() appsv1.ComponentConfigSpec {
+		return appsv1.ComponentConfigSpec{
+			ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
 				Name:        "config",
 				TemplateRef: "config-template",
 				VolumeName:  "/opt/config",
@@ -179,8 +179,8 @@ var _ = Describe("Config Handler Test", func() {
 			_, err = CreateExecHandler([]string{}, "", nil, "")
 			Expect(err.Error()).To(ContainSubstring("invalid command"))
 			c, err := CreateExecHandler([]string{"go", "version"}, "", &ConfigSpecInfo{
-				ConfigSpec: appsv1alpha1.ComponentConfigSpec{
-					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+				ConfigSpec: appsv1.ComponentConfigSpec{
+					ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
 						Name: "for_test",
 					}}},
 				"")

@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 const (
@@ -55,9 +55,9 @@ const (
 )
 
 var (
-	NewLifecycleAction = func(name string) *appsv1alpha1.Action {
-		return &appsv1alpha1.Action{
-			Exec: &appsv1alpha1.ExecAction{
+	NewLifecycleAction = func(name string) *appsv1.Action {
+		return &appsv1.Action{
+			Exec: &appsv1.ExecAction{
 				Command: []string{"/bin/sh", "-c", fmt.Sprintf("echo %s", name)},
 			},
 		}
@@ -105,7 +105,7 @@ var (
 		Command: []string{"/scripts/setup.sh"},
 	}
 
-	defaultComponentDefSpec = appsv1alpha1.ComponentDefinitionSpec{
+	defaultComponentDefSpec = appsv1.ComponentDefinitionSpec{
 		Provider:       "kubeblocks.io",
 		Description:    "ApeCloud MySQL is a database that is compatible with MySQL syntax and achieves high availability\n  through the utilization of the RAFT consensus protocol.",
 		ServiceKind:    "mysql",
@@ -115,7 +115,7 @@ var (
 				defaultMySQLContainer,
 			},
 		},
-		Volumes: []appsv1alpha1.ComponentVolume{
+		Volumes: []appsv1.ComponentVolume{
 			{
 				Name:         DataVolumeName,
 				NeedSnapshot: true,
@@ -125,9 +125,9 @@ var (
 				NeedSnapshot: true,
 			},
 		},
-		Services: []appsv1alpha1.ComponentService{
+		Services: []appsv1.ComponentService{
 			{
-				Service: appsv1alpha1.Service{
+				Service: appsv1.Service{
 					Name: "default",
 					Spec: corev1.ServiceSpec{
 						Ports: []corev1.ServicePort{
@@ -145,7 +145,7 @@ var (
 				},
 			},
 			{
-				Service: appsv1alpha1.Service{
+				Service: appsv1.Service{
 					Name:        "rw",
 					ServiceName: "rw",
 					Spec: corev1.ServiceSpec{
@@ -164,7 +164,7 @@ var (
 				},
 			},
 			{
-				Service: appsv1alpha1.Service{
+				Service: appsv1.Service{
 					Name:        "ro",
 					ServiceName: "ro",
 					Spec: corev1.ServiceSpec{
@@ -183,30 +183,30 @@ var (
 				},
 			},
 		},
-		SystemAccounts: []appsv1alpha1.SystemAccount{
+		SystemAccounts: []appsv1.SystemAccount{
 			{
 				Name:        "root",
 				InitAccount: true,
-				PasswordGenerationPolicy: appsv1alpha1.PasswordConfig{
+				PasswordGenerationPolicy: appsv1.PasswordConfig{
 					Length:     16,
 					NumDigits:  8,
 					NumSymbols: 8,
-					LetterCase: appsv1alpha1.MixedCases,
+					LetterCase: appsv1.MixedCases,
 				},
 			},
 			{
 				Name:      "admin",
 				Statement: "CREATE USER $(USERNAME) IDENTIFIED BY '$(PASSWORD)'; GRANT ALL PRIVILEGES ON *.* TO $(USERNAME);",
-				PasswordGenerationPolicy: appsv1alpha1.PasswordConfig{
+				PasswordGenerationPolicy: appsv1.PasswordConfig{
 					Length:     10,
 					NumDigits:  5,
 					NumSymbols: 0,
-					LetterCase: appsv1alpha1.MixedCases,
+					LetterCase: appsv1.MixedCases,
 				},
 			},
 		},
-		UpdateStrategy: &[]appsv1alpha1.UpdateStrategy{appsv1alpha1.BestEffortParallelStrategy}[0],
-		Roles: []appsv1alpha1.ReplicaRole{
+		UpdateStrategy: &[]appsv1.UpdateStrategy{appsv1.BestEffortParallelStrategy}[0],
+		Roles: []appsv1.ReplicaRole{
 			{
 				Name:        "leader",
 				Serviceable: true,
@@ -226,15 +226,15 @@ var (
 				Votable:     false,
 			},
 		},
-		Exporter: &appsv1alpha1.Exporter{
+		Exporter: &appsv1.Exporter{
 			ScrapePath:   "metrics",
 			ScrapePort:   "http-metric",
-			ScrapeScheme: appsv1alpha1.HTTPProtocol,
+			ScrapeScheme: appsv1.HTTPProtocol,
 		},
-		LifecycleActions: &appsv1alpha1.ComponentLifecycleActions{
+		LifecycleActions: &appsv1.ComponentLifecycleActions{
 			PostProvision: nil,
 			PreTerminate:  nil,
-			RoleProbe: &appsv1alpha1.Probe{
+			RoleProbe: &appsv1.Probe{
 				Action:        *NewLifecycleAction("role-probe"),
 				PeriodSeconds: 1,
 			},
@@ -250,9 +250,9 @@ var (
 		},
 	}
 
-	DefaultCompDefConfigs = []appsv1alpha1.ComponentConfigSpec{
+	DefaultCompDefConfigs = []appsv1.ComponentConfigSpec{
 		{
-			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+			ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
 				Name:        DefaultConfigSpecName,
 				TemplateRef: DefaultConfigSpecTplRef,
 				VolumeName:  DefaultConfigSpecVolumeName,
@@ -261,7 +261,7 @@ var (
 		},
 	}
 
-	DefaultCompDefScripts = []appsv1alpha1.ComponentTemplateSpec{
+	DefaultCompDefScripts = []appsv1.ComponentTemplateSpec{
 		{
 			Name:        DefaultScriptSpecName,
 			TemplateRef: DefaultScriptSpecTplRef,
@@ -269,15 +269,15 @@ var (
 		},
 	}
 
-	defaultComponentVerSpec = func(compDef string) appsv1alpha1.ComponentVersionSpec {
-		return appsv1alpha1.ComponentVersionSpec{
-			CompatibilityRules: []appsv1alpha1.ComponentVersionCompatibilityRule{
+	defaultComponentVerSpec = func(compDef string) appsv1.ComponentVersionSpec {
+		return appsv1.ComponentVersionSpec{
+			CompatibilityRules: []appsv1.ComponentVersionCompatibilityRule{
 				{
 					CompDefs: []string{compDef},
 					Releases: []string{"8.0.30-r1"},
 				},
 			},
-			Releases: []appsv1alpha1.ComponentVersionRelease{
+			Releases: []appsv1.ComponentVersionRelease{
 				{
 					Name:           "8.0.30-r1",
 					Changes:        "init release",

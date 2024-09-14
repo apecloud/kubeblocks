@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -46,7 +46,7 @@ const (
 	testConfigContent         = "test-config-content"
 )
 
-func allFieldsCompDefObj(create bool) *appsv1alpha1.ComponentDefinition {
+func allFieldsCompDefObj(create bool) *appsv1.ComponentDefinition {
 	compDef := testapps.NewComponentDefinitionFactory(compDefName).
 		SetDefaultSpec().
 		AddConfigTemplate(configTemplateName, mysqlConfigName, mysqlConfigConstraintName, testCtx.DefaultNamespace, testapps.ConfVolumeName).
@@ -58,7 +58,7 @@ func allFieldsCompDefObj(create bool) *appsv1alpha1.ComponentDefinition {
 	return compDef
 }
 
-func newAllFieldsClusterObj(compDef *appsv1alpha1.ComponentDefinition, create bool) (*appsv1alpha1.Cluster, *appsv1alpha1.ComponentDefinition, types.NamespacedName) {
+func newAllFieldsClusterObj(compDef *appsv1.ComponentDefinition, create bool) (*appsv1.Cluster, *appsv1.ComponentDefinition, types.NamespacedName) {
 	// setup Cluster obj requires default ComponentDefinition object
 	if compDef == nil {
 		compDef = allFieldsCompDefObj(create)
@@ -78,7 +78,7 @@ func newAllFieldsClusterObj(compDef *appsv1alpha1.ComponentDefinition, create bo
 	return clusterObj, compDef, key
 }
 
-func newAllFieldsSynthesizedComponent(compDef *appsv1alpha1.ComponentDefinition, cluster *appsv1alpha1.Cluster) *component.SynthesizedComponent {
+func newAllFieldsSynthesizedComponent(compDef *appsv1.ComponentDefinition, cluster *appsv1.Cluster) *component.SynthesizedComponent {
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx: testCtx.Ctx,
 		Log: logger,
@@ -93,12 +93,12 @@ func newAllFieldsSynthesizedComponent(compDef *appsv1alpha1.ComponentDefinition,
 	addTestVolumeMount(synthesizeComp.PodSpec, mysqlCompName)
 	if len(synthesizeComp.ConfigTemplates) > 0 {
 		configSpec := &synthesizeComp.ConfigTemplates[0]
-		configSpec.ReRenderResourceTypes = []appsv1alpha1.RerenderResourceType{appsv1alpha1.ComponentVScaleType, appsv1alpha1.ComponentHScaleType}
+		configSpec.ReRenderResourceTypes = []appsv1.RerenderResourceType{appsv1.ComponentVScaleType, appsv1.ComponentHScaleType}
 	}
 	return synthesizeComp
 }
 
-func newAllFieldsComponent(cluster *appsv1alpha1.Cluster) *appsv1alpha1.Component {
+func newAllFieldsComponent(cluster *appsv1.Cluster) *appsv1.Component {
 	comp, _ := component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
 	return comp
 }

@@ -26,6 +26,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
@@ -38,8 +39,8 @@ import (
 type ReconcileCtx struct {
 	*ResourceCtx
 
-	Cluster              *appsv1alpha1.Cluster
-	Component            *appsv1alpha1.Component
+	Cluster              *appsv1.Cluster
+	Component            *appsv1.Component
 	SynthesizedComponent *component.SynthesizedComponent
 	PodSpec              *corev1.PodSpec
 
@@ -60,7 +61,7 @@ type updatePipeline struct {
 
 	item       appsv1alpha1.ConfigurationItemDetail
 	itemStatus *appsv1alpha1.ConfigurationItemDetailStatus
-	configSpec *appsv1alpha1.ComponentConfigSpec
+	configSpec *appsv1.ComponentConfigSpec
 	// replace of ConfigMapObj
 	// originalCM  *corev1.ConfigMap
 	newCM       *corev1.ConfigMap
@@ -75,7 +76,7 @@ func NewCreatePipeline(ctx ReconcileCtx) *pipeline {
 	return p.Init(ctx.ResourceCtx, p)
 }
 
-func NewReconcilePipeline(ctx ReconcileCtx, item appsv1alpha1.ConfigurationItemDetail, itemStatus *appsv1alpha1.ConfigurationItemDetailStatus, configSpec *appsv1alpha1.ComponentConfigSpec) *updatePipeline {
+func NewReconcilePipeline(ctx ReconcileCtx, item appsv1alpha1.ConfigurationItemDetail, itemStatus *appsv1alpha1.ConfigurationItemDetailStatus, configSpec *appsv1.ComponentConfigSpec) *updatePipeline {
 	p := &updatePipeline{
 		reconcile:  true,
 		item:       item,
@@ -196,7 +197,7 @@ func (p *pipeline) UpdateConfigRelatedObject() *pipeline {
 		if err := injectTemplateEnvFrom(p.ctx.Cluster, p.ctx.SynthesizedComponent, p.ctx.PodSpec, p.Client, p.Context, p.renderWrapper.renderedObjs); err != nil {
 			return err
 		}
-		return createConfigObjects(p.Client, p.Context, p.renderWrapper.renderedObjs)
+		return createConfigObjects(p.Client, p.Context, p.renderWrapper.renderedObjs, p.renderWrapper.renderedSecretObjs)
 	}
 
 	return p.Wrap(updateMeta)
@@ -274,7 +275,7 @@ func (p *updatePipeline) PrepareForTemplate() *updatePipeline {
 	return p.Wrap(buildTemplate)
 }
 
-func (p *updatePipeline) ConfigSpec() *appsv1alpha1.ComponentConfigSpec {
+func (p *updatePipeline) ConfigSpec() *appsv1.ComponentConfigSpec {
 	return p.configSpec
 }
 
@@ -305,7 +306,7 @@ func (p *updatePipeline) RerenderTemplate() *updatePipeline {
 }
 
 func (p *updatePipeline) ApplyParameters() *updatePipeline {
-	patchMerge := func(p *updatePipeline, spec appsv1alpha1.ComponentConfigSpec, cm *corev1.ConfigMap, item appsv1alpha1.ConfigurationItemDetail) error {
+	patchMerge := func(p *updatePipeline, spec appsv1.ComponentConfigSpec, cm *corev1.ConfigMap, item appsv1alpha1.ConfigurationItemDetail) error {
 		if p.isDone() || len(item.ConfigFileParams) == 0 {
 			return nil
 		}
@@ -366,9 +367,12 @@ func (p *updatePipeline) UpdateConfigVersion(revision string) *updatePipeline {
 func (p *updatePipeline) Sync() *updatePipeline {
 	return p.Wrap(func() error {
 		if p.ConfigConstraintObj != nil && !p.isDone() {
-			if err := SyncEnvConfigmap(*p.configSpec, p.newCM, &p.ConfigConstraintObj.Spec, p.Client, p.Context); err != nil {
+			if err := SyncEnvSourceObject(*p.configSpec, p.newCM, &p.ConfigConstraintObj.Spec, p.Client, p.Context, p.ctx.Cluster, p.ctx.SynthesizedComponent); err != nil {
 				return err
 			}
+		}
+		if InjectEnvEnabled(*p.configSpec) && toSecret(*p.configSpec) {
+			return nil
 		}
 		switch {
 		case p.isDone():

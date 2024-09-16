@@ -132,9 +132,12 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			}
 		}
 
-		if _, ok := podToNodeMapping[pod.Name]; ok {
-			if err := deleteNodeSelectorOnceAnnotation(its, pod.Name); err != nil {
-				return kubebuilderx.Continue, err
+		if nodeName, ok := podToNodeMapping[pod.Name]; ok {
+			// there's chance that a pod is currently running and wait to be deleted so that it can be rescheduled
+			if pod.Spec.NodeName == nodeName {
+				if err := deleteNodeSelectorOnceAnnotation(its, pod.Name); err != nil {
+					return kubebuilderx.Continue, err
+				}
 			}
 		}
 	}

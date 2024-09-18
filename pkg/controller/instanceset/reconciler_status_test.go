@@ -257,7 +257,18 @@ var _ = Describe("status reconciler test", func() {
 			reconcilePods(tree)
 
 			name := "bar-0"
-			Expect(MergeNodeSelectorOnceAnnotation(its, map[string]string{name: "foo"})).To(Succeed())
+			nodeName := "foo"
+			Expect(MergeNodeSelectorOnceAnnotation(its, map[string]string{name: nodeName})).To(Succeed())
+			By("mock pod's nodeName")
+			pods := tree.List(&corev1.Pod{})
+			for _, podObj := range pods {
+				pod := podObj.(*corev1.Pod)
+				if pod.Name != name {
+					continue
+				}
+				pod.Spec.NodeName = nodeName
+				break
+			}
 			reconciler = NewStatusReconciler()
 			res, err := reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())

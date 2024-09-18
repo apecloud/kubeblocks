@@ -83,6 +83,17 @@ func (a *switchover) parameters(ctx context.Context, cli client.Reader) (map[str
 	return m, nil
 }
 
+type MemberJoinStatus string
+
+const (
+	MemberJoinProcessing MemberJoinStatus = "processing"
+	MemberJoinCompleted  MemberJoinStatus = "completed"
+)
+
+func (s MemberJoinStatus) String() string {
+	return string(s)
+}
+
 type memberJoin struct {
 	namespace   string
 	clusterName string

@@ -31,7 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
@@ -269,7 +269,7 @@ func findPortByPortName(container corev1.Container) (int32, bool) {
 }
 
 // UpdateConfigPayload updates the configuration payload
-func UpdateConfigPayload(config *appsv1alpha1.ComponentConfigurationSpec, component *component.SynthesizedComponent) (bool, error) {
+func UpdateConfigPayload(config *configurationv1alpha1.ComponentParameterSpec, component *component.SynthesizedComponent) (bool, error) {
 	updated := false
 	for i := range config.ConfigItemDetails {
 		configSpec := &config.ConfigItemDetails[i]
@@ -294,16 +294,16 @@ func UpdateConfigPayload(config *appsv1alpha1.ComponentConfigurationSpec, compon
 	return updated, nil
 }
 
-func validRerenderResources(configSpec *appsv1alpha1.ComponentConfigSpec) bool {
+func validRerenderResources(configSpec *appsv1.ComponentConfigSpec) bool {
 	return configSpec != nil && len(configSpec.ReRenderResourceTypes) != 0
 }
 
-func enableHScaleTrigger(configSpec *appsv1alpha1.ComponentConfigSpec) bool {
-	return validRerenderResources(configSpec) && slices.Contains(configSpec.ReRenderResourceTypes, appsv1alpha1.ComponentHScaleType)
+func enableHScaleTrigger(configSpec *appsv1.ComponentConfigSpec) bool {
+	return validRerenderResources(configSpec) && slices.Contains(configSpec.ReRenderResourceTypes, appsv1.ComponentHScaleType)
 }
 
-func enableVScaleTrigger(configSpec *appsv1alpha1.ComponentConfigSpec) bool {
-	return validRerenderResources(configSpec) && slices.Contains(configSpec.ReRenderResourceTypes, appsv1alpha1.ComponentVScaleType)
+func enableVScaleTrigger(configSpec *appsv1.ComponentConfigSpec) bool {
+	return validRerenderResources(configSpec) && slices.Contains(configSpec.ReRenderResourceTypes, appsv1.ComponentVScaleType)
 }
 
 func configSetFromComponent(templates []appsv1.ComponentConfigSpec) []string {

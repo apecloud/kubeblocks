@@ -27,10 +27,10 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
-	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -39,19 +39,19 @@ import (
 type Task struct {
 	configctrl.ResourceFetcher[Task]
 
-	Status *appsv1alpha1.ConfigTemplateItemDetailStatus
+	Status *configurationv1alpha1.ConfigTemplateItemDetailStatus
 	Name   string
 
 	Do func(fetcher *Task, component *component.SynthesizedComponent, revision string) error
 }
 
 type TaskContext struct {
-	configuration *appsv1alpha1.ComponentConfiguration
+	configuration *configurationv1alpha1.ComponentParameter
 	ctx           context.Context
 	fetcher       *Task
 }
 
-func NewTask(item appsv1alpha1.ConfigTemplateItemDetail, status *appsv1alpha1.ConfigTemplateItemDetailStatus) Task {
+func NewTask(item configurationv1alpha1.ConfigTemplateItemDetail, status *configurationv1alpha1.ConfigTemplateItemDetailStatus) Task {
 	return Task{
 		Name: item.Name,
 		Do: func(fetcher *Task, synComponent *component.SynthesizedComponent, revision string) error {
@@ -63,7 +63,7 @@ func NewTask(item appsv1alpha1.ConfigTemplateItemDetail, status *appsv1alpha1.Co
 				if !apierrors.IsNotFound(err) {
 					return err
 				}
-				if item.ConfigSpec.InjectEnvEnabled() && item.ConfigSpec.ToSecret() {
+				if configctrl.InjectEnvEnabled(*item.ConfigSpec) && configctrl.ToSecret(*item.ConfigSpec) {
 					return syncSecretStatus(status)
 				}
 				return err
@@ -73,10 +73,10 @@ func NewTask(item appsv1alpha1.ConfigTemplateItemDetail, status *appsv1alpha1.Co
 			switch intctrlutil.GetConfigSpecReconcilePhase(configMap, item, status) {
 			default:
 				return syncStatus(configMap, status)
-			case appsv1alpha1.CPendingPhase,
-				appsv1alpha1.CMergeFailedPhase:
-				return syncImpl(fetcher, item, status, synComponent, revision, builder.ToV1ConfigSpec(configSpec))
-			case appsv1alpha1.CCreatingPhase:
+			case configurationv1alpha1.CPendingPhase,
+				configurationv1alpha1.CMergeFailedPhase:
+				return syncImpl(fetcher, item, status, synComponent, revision, configSpec)
+			case configurationv1alpha1.CCreatingPhase:
 				return nil
 			}
 		},
@@ -84,8 +84,8 @@ func NewTask(item appsv1alpha1.ConfigTemplateItemDetail, status *appsv1alpha1.Co
 	}
 }
 
-func syncSecretStatus(status *appsv1alpha1.ConfigTemplateItemDetailStatus) error {
-	status.Phase = appsv1alpha1.CFinishedPhase
+func syncSecretStatus(status *configurationv1alpha1.ConfigTemplateItemDetailStatus) error {
+	status.Phase = configurationv1alpha1.CFinishedPhase
 	if status.LastDoneRevision == "" {
 		status.LastDoneRevision = status.UpdateRevision
 	}
@@ -93,8 +93,8 @@ func syncSecretStatus(status *appsv1alpha1.ConfigTemplateItemDetailStatus) error
 }
 
 func syncImpl(fetcher *Task,
-	item appsv1alpha1.ConfigTemplateItemDetail,
-	status *appsv1alpha1.ConfigTemplateItemDetailStatus,
+	item configurationv1alpha1.ConfigTemplateItemDetail,
+	status *configurationv1alpha1.ConfigTemplateItemDetailStatus,
 	synthesizedComponent *component.SynthesizedComponent,
 	revision string,
 	configSpec *appsv1.ComponentConfigSpec) (err error) {
@@ -116,19 +116,19 @@ func syncImpl(fetcher *Task,
 
 	if err != nil {
 		status.Message = cfgutil.ToPointer(err.Error())
-		status.Phase = appsv1alpha1.CMergeFailedPhase
+		status.Phase = configurationv1alpha1.CMergeFailedPhase
 	} else {
 		status.Message = nil
-		status.Phase = appsv1alpha1.CMergedPhase
+		status.Phase = configurationv1alpha1.CMergedPhase
 	}
 	status.UpdateRevision = revision
 	return err
 }
 
-func syncStatus(configMap *corev1.ConfigMap, status *appsv1alpha1.ConfigTemplateItemDetailStatus) (err error) {
+func syncStatus(configMap *corev1.ConfigMap, status *configurationv1alpha1.ConfigTemplateItemDetailStatus) (err error) {
 	annotations := configMap.GetAnnotations()
 	// status.CurrentRevision = GetCurrentRevision(annotations)
-	revisions := RetrieveRevision(annotations)
+	revisions := configuration.RetrieveRevision(annotations)
 	if len(revisions) == 0 {
 		return
 	}
@@ -141,16 +141,16 @@ func syncStatus(configMap *corev1.ConfigMap, status *appsv1alpha1.ConfigTemplate
 	return
 }
 
-func updateLastDoneRevision(revision ConfigurationRevision, status *appsv1alpha1.ConfigTemplateItemDetailStatus) {
-	if revision.Phase == appsv1alpha1.CFinishedPhase {
+func updateLastDoneRevision(revision configuration.ConfigurationRevision, status *configurationv1alpha1.ConfigTemplateItemDetailStatus) {
+	if revision.Phase == configurationv1alpha1.CFinishedPhase {
 		status.LastDoneRevision = strconv.FormatInt(revision.Revision, 10)
 	}
 }
 
-func updateRevision(revision ConfigurationRevision, status *appsv1alpha1.ConfigTemplateItemDetailStatus) {
+func updateRevision(revision configuration.ConfigurationRevision, status *configurationv1alpha1.ConfigTemplateItemDetailStatus) {
 	if revision.StrRevision == status.UpdateRevision {
 		status.Phase = revision.Phase
-		status.ReconcileDetail = &appsv1alpha1.ReconcileDetail{
+		status.ReconcileDetail = &configurationv1alpha1.ReconcileDetail{
 			CurrentRevision: revision.StrRevision,
 			Policy:          revision.Result.Policy,
 			SucceedCount:    revision.Result.SucceedCount,

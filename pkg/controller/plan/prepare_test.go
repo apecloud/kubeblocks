@@ -70,9 +70,9 @@ var _ = Describe("Prepare Test", func() {
 	)
 
 	var (
-		compDefObj     *appsv1.ComponentDefinition
-		cluster        *appsv1.Cluster
-		comp           *appsv1.Component
+		compDefObj *appsv1.ComponentDefinition
+		cluster    *appsv1.Cluster
+		comp       *appsv1.Component
 	)
 
 	Context("create cluster with component and component definition API, testing render configuration", func() {

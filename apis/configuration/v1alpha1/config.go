@@ -87,17 +87,6 @@ const (
 )
 
 type ParametersInFile struct {
-	// Defines the unique identifier of the config file name.
-	//
-	// It must be a string of maximum 63 characters, and can only include lowercase alphanumeric characters,
-	// hyphens, and periods.
-	// The name must start and end with an alphanumeric character.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	Name string `json:"name"`
-
 	// Holds the configuration keys and values. This field is a workaround for issues found in kubebuilder and code-generator.
 	// Refer to https://github.com/kubernetes-sigs/kubebuilder/issues/528 and https://github.com/kubernetes/code-generator/issues/50 for more details.
 	//

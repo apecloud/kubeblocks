@@ -33,8 +33,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -54,7 +54,7 @@ var _ = Describe("ConfigurationPipelineTest", func() {
 	var synthesizedComponent *component.SynthesizedComponent
 	var configMapObj *corev1.ConfigMap
 	var configConstraint *appsv1beta1.ConfigConstraint
-	var configurationObj *appsv1alpha1.ComponentConfiguration
+	var configurationObj *configurationv1alpha1.ComponentParameter
 	var k8sMockClient *testutil.K8sClientMockHelper
 
 	mockAPIResource := func(lazyFetcher testutil.Getter) {
@@ -70,7 +70,7 @@ var _ = Describe("ConfigurationPipelineTest", func() {
 		k8sMockClient.MockCreateMethod(testutil.WithCreateReturned(testutil.WithCreatedSucceedResult(), testutil.WithAnyTimes()))
 		k8sMockClient.MockPatchMethod(testutil.WithPatchReturned(func(obj client.Object, patch client.Patch) error {
 			switch v := obj.(type) {
-			case *appsv1alpha1.ComponentConfiguration:
+			case *configurationv1alpha1.ComponentParameter:
 				if client.ObjectKeyFromObject(obj) == client.ObjectKeyFromObject(configurationObj) {
 					configurationObj.Spec = *v.Spec.DeepCopy()
 					configurationObj.Status = *v.Status.DeepCopy()
@@ -83,7 +83,7 @@ var _ = Describe("ConfigurationPipelineTest", func() {
 			Patch(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 			DoAndReturn(func(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
 				switch v := obj.(type) {
-				case *appsv1alpha1.ComponentConfiguration:
+				case *configurationv1alpha1.ComponentParameter:
 					if client.ObjectKeyFromObject(obj) == client.ObjectKeyFromObject(configurationObj) {
 						configurationObj.Status = *v.Status.DeepCopy()
 					}
@@ -176,7 +176,7 @@ max_connections = '1000'
 
 			By("update configuration resource for mocking reconfiguring")
 			item := configurationObj.Spec.ConfigItemDetails[0]
-			item.ConfigFileParams = map[string]appsv1alpha1.ParametersInFile{
+			item.ConfigFileParams = map[string]configurationv1alpha1.ParametersInFile{
 				testConfigFile: {
 					Parameters: map[string]*string{
 						"max_connections": cfgutil.ToPointer("2000"),
@@ -235,7 +235,7 @@ func (p *reloadActionBuilderHelper) UpdateConfigurationForTest() *reloadActionBu
 		}
 		_, _ = UpdateConfigPayload(&expectedConfiguration.Spec, p.ctx.SynthesizedComponent)
 
-		existingConfiguration := appsv1alpha1.ComponentConfiguration{}
+		existingConfiguration := configurationv1alpha1.ComponentParameter{}
 		err = p.ResourceFetcher.Client.Get(p.Context, client.ObjectKeyFromObject(expectedConfiguration), &existingConfiguration)
 		switch {
 		case err == nil:
@@ -249,7 +249,7 @@ func (p *reloadActionBuilderHelper) UpdateConfigurationForTest() *reloadActionBu
 	return p.Wrap(buildConfiguration)
 }
 
-func (p *reloadActionBuilderHelper) createConfiguration() *appsv1alpha1.ComponentConfiguration {
+func (p *reloadActionBuilderHelper) createConfiguration() *configurationv1alpha1.ComponentParameter {
 	builder := builder.NewConfigurationBuilder(p.Namespace,
 		cfgcore.GenerateComponentConfigurationName(p.ClusterName, p.ComponentName),
 	)
@@ -262,8 +262,8 @@ func (p *reloadActionBuilderHelper) createConfiguration() *appsv1alpha1.Componen
 		GetObject()
 }
 
-func (p *reloadActionBuilderHelper) updateConfiguration(expected *appsv1alpha1.ComponentConfiguration, existing *appsv1alpha1.ComponentConfiguration) error {
-	fromMap := func(items []appsv1alpha1.ConfigTemplateItemDetail) *cfgutil.Sets {
+func (p *reloadActionBuilderHelper) updateConfiguration(expected *configurationv1alpha1.ComponentParameter, existing *configurationv1alpha1.ComponentParameter) error {
+	fromMap := func(items []configurationv1alpha1.ConfigTemplateItemDetail) *cfgutil.Sets {
 		sets := cfgutil.NewSet()
 		for _, item := range items {
 			sets.Add(item.Name)
@@ -271,8 +271,8 @@ func (p *reloadActionBuilderHelper) updateConfiguration(expected *appsv1alpha1.C
 		return sets
 	}
 
-	updateConfigSpec := func(item appsv1alpha1.ConfigTemplateItemDetail) appsv1alpha1.ConfigTemplateItemDetail {
-		if newItem := expected.Spec.GetConfigurationItem(item.Name); newItem != nil {
+	updateConfigSpec := func(item configurationv1alpha1.ConfigTemplateItemDetail) configurationv1alpha1.ConfigTemplateItemDetail {
+		if newItem := intctrlutil.GetConfigurationItem(&expected.Spec, item.Name); newItem != nil {
 			item.ConfigSpec = newItem.ConfigSpec
 		}
 		return item
@@ -284,7 +284,7 @@ func (p *reloadActionBuilderHelper) updateConfiguration(expected *appsv1alpha1.C
 	addSets := cfgutil.Difference(newSets, oldSets)
 	delSets := cfgutil.Difference(oldSets, newSets)
 
-	newConfigItems := make([]appsv1alpha1.ConfigTemplateItemDetail, 0)
+	newConfigItems := make([]configurationv1alpha1.ConfigTemplateItemDetail, 0)
 	for _, item := range existing.Spec.ConfigItemDetails {
 		if !delSets.InArray(item.Name) {
 			newConfigItems = append(newConfigItems, updateConfigSpec(item))

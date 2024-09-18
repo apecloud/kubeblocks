@@ -33,6 +33,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -93,7 +94,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		return cfgCM, cfgTpl
 	}
 
-	assureConfigInstanceObj := func(clusterName, componentName, ns string, compDef *appsv1.ComponentDefinition) (*appsv1alpha1.ComponentConfiguration, *corev1.ConfigMap) {
+	assureConfigInstanceObj := func(clusterName, componentName, ns string, compDef *appsv1.ComponentDefinition) (*configurationv1alpha1.ComponentParameter, *corev1.ConfigMap) {
 		if len(compDef.Spec.Configs) == 0 {
 			return nil, nil
 		}
@@ -143,7 +144,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		return configuration.GetObject(), cmObj
 	}
 
-	assureMockReconfigureData := func(policyName string) (*OpsResource, *appsv1alpha1.ComponentConfiguration, *corev1.ConfigMap) {
+	assureMockReconfigureData := func(policyName string) (*OpsResource, *configurationv1alpha1.ComponentParameter, *corev1.ConfigMap) {
 		By("init operations resources ")
 		opsRes, compDef, clusterObject := initOperationsResources(compDefName, clusterName)
 
@@ -259,7 +260,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 					}
 					cm.Annotations[constant.ConfigAppliedVersionAnnotationKey] = string(b)
 					b, err = json.Marshal(intctrlutil.Result{
-						Phase:      appsv1alpha1.CFinishedPhase,
+						Phase:      configurationv1alpha1.CFinishedPhase,
 						Policy:     "simple",
 						ExecResult: "none",
 					})

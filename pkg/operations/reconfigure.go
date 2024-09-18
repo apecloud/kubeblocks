@@ -30,6 +30,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
@@ -62,10 +63,10 @@ func (r *reconfigureAction) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx,
 	return nil
 }
 
-func handleReconfigureStatusProgress(result *appsv1alpha1.ReconcileDetail, opsStatus *opsv1alpha1.OpsRequestStatus, phase appsv1alpha1.ConfigurationPhase) handleReconfigureOpsStatus {
+func handleReconfigureStatusProgress(result *configurationv1alpha1.ReconcileDetail, opsStatus *opsv1alpha1.OpsRequestStatus, phase configurationv1alpha1.ConfigurationPhase) handleReconfigureOpsStatus {
 	return func(cmStatus *opsv1alpha1.ConfigurationItemStatus) (err error) {
 		// the Pending phase is waiting to be executed, and there is currently no valid ReconcileDetail information.
-		if result != nil && phase != appsv1alpha1.CPendingPhase {
+		if result != nil && phase != configurationv1alpha1.CPendingPhase {
 			cmStatus.LastAppliedStatus = result.ExecResult
 			cmStatus.UpdatePolicy = appsv1alpha1.UpgradePolicy(result.Policy)
 			cmStatus.SucceedCount = result.SucceedCount
@@ -197,19 +198,19 @@ func (r *reconfigureAction) doSyncReconfigureStatus(params reconfigureParams) (o
 		return "", err
 	}
 
-	item := resource.ConfigurationObj.Spec.GetConfigurationItem(configSpec.Name)
-	itemStatus := resource.ConfigurationObj.Status.GetItemStatus(configSpec.Name)
+	item := intctrlutil.GetConfigurationItem(&resource.ConfigurationObj.Spec, configSpec.Name)
+	itemStatus := intctrlutil.GetItemStatus(&resource.ConfigurationObj.Status, configSpec.Name)
 	if item == nil || itemStatus == nil {
 		return opsv1alpha1.OpsRunningPhase, nil
 	}
 
 	switch phase := reconfiguringPhase(resource, *item, itemStatus); phase {
-	case appsv1alpha1.CCreatingPhase, appsv1alpha1.CInitPhase:
+	case configurationv1alpha1.CCreatingPhase, configurationv1alpha1.CInitPhase:
 		return opsv1alpha1.OpsFailedPhase, core.MakeError("the configuration is creating or initializing, is not ready to reconfigure")
-	case appsv1alpha1.CFailedAndPausePhase:
+	case configurationv1alpha1.CFailedAndPausePhase:
 		return opsv1alpha1.OpsFailedPhase,
 			syncStatus(params.configurationStatus, params.resource, itemStatus, phase)
-	case appsv1alpha1.CFinishedPhase:
+	case configurationv1alpha1.CFinishedPhase:
 		return opsv1alpha1.OpsSucceedPhase,
 			syncStatus(params.configurationStatus, params.resource, itemStatus, phase)
 	default:
@@ -291,8 +292,8 @@ func needReconfigure(request *opsv1alpha1.OpsRequest, status *opsv1alpha1.Reconf
 
 func syncStatus(reconfiguringStatus *opsv1alpha1.ReconfiguringStatus,
 	opsRes *OpsResource,
-	status *appsv1alpha1.ConfigTemplateItemDetailStatus,
-	phase appsv1alpha1.ConfigurationPhase) error {
+	status *configurationv1alpha1.ConfigTemplateItemDetailStatus,
+	phase configurationv1alpha1.ConfigurationPhase) error {
 	err := updateReconfigureStatusByCM(reconfiguringStatus, status.Name,
 		handleReconfigureStatusProgress(status.ReconcileDetail, &opsRes.OpsRequest.Status, phase))
 	meta.SetStatusCondition(&reconfiguringStatus.Conditions, *opsv1alpha1.NewReconfigureRunningCondition(
@@ -301,10 +302,10 @@ func syncStatus(reconfiguringStatus *opsv1alpha1.ReconfiguringStatus,
 }
 
 func reconfiguringPhase(resource *configctrl.Fetcher,
-	detail appsv1alpha1.ConfigTemplateItemDetail,
-	status *appsv1alpha1.ConfigTemplateItemDetailStatus) appsv1alpha1.ConfigurationPhase {
+	detail configurationv1alpha1.ConfigTemplateItemDetail,
+	status *configurationv1alpha1.ConfigTemplateItemDetailStatus) configurationv1alpha1.ConfigurationPhase {
 	if status.ReconcileDetail == nil || status.ReconcileDetail.CurrentRevision != status.UpdateRevision {
-		return appsv1alpha1.CPendingPhase
+		return configurationv1alpha1.CPendingPhase
 	}
 	return intctrlutil.GetConfigSpecReconcilePhase(resource.ConfigMapObj, detail, status)
 }

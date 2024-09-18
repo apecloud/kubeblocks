@@ -21,13 +21,13 @@ package configuration
 
 import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-func DoMerge(baseData map[string]string, patch map[string]appsv1alpha1.ParametersInFile, cc *appsv1beta1.ConfigConstraint, configSpec appsv1.ComponentConfigSpec) (map[string]string, error) {
+func DoMerge(baseData map[string]string, patch map[string]configurationv1alpha1.ParametersInFile, cc *appsv1beta1.ConfigConstraint, configSpec appsv1.ComponentConfigSpec) (map[string]string, error) {
 	var (
 		updatedFiles  = make(map[string]string, len(patch))
 		updatedParams = make([]core.ParamPairs, 0, len(patch))

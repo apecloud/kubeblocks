@@ -62,3 +62,30 @@ func GetConfigParameterMeta(ctx context.Context, cli client.Reader, parameterDes
 
 	return params, nil
 }
+
+func GetConfigurationItem(parameter *configurationv1alpha1.ComponentParameterSpec, name string) *configurationv1alpha1.ConfigTemplateItemDetail {
+	for i := range parameter.ConfigItemDetails {
+		configItem := &parameter.ConfigItemDetails[i]
+		if configItem.Name == name {
+			return configItem
+		}
+	}
+	return nil
+}
+
+func GetConfigSpec(parameter *configurationv1alpha1.ComponentParameterSpec, configSpecName string) *appsv1.ComponentConfigSpec {
+	if configItem := GetConfigurationItem(parameter, configSpecName); configItem != nil {
+		return configItem.ConfigSpec
+	}
+	return nil
+}
+
+func GetItemStatus(status *configurationv1alpha1.ComponentParameterStatus, name string) *configurationv1alpha1.ConfigTemplateItemDetailStatus {
+	for i := range status.ConfigurationItemStatus {
+		itemStatus := &status.ConfigurationItemStatus[i]
+		if itemStatus.Name == name {
+			return itemStatus
+		}
+	}
+	return nil
+}

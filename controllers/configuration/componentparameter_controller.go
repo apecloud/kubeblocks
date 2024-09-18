@@ -21,14 +21,22 @@ package configuration
 
 import (
 	"context"
+	"fmt"
+	"strconv"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // ComponentParameterReconciler reconciles a ComponentParameter object
@@ -52,11 +60,59 @@ type ComponentParameterReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.4/pkg/reconcile
 func (r *ComponentParameterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	reqCtx := intctrlutil.RequestCtx{
+		Ctx:      ctx,
+		Req:      req,
+		Log:      log.FromContext(ctx).WithName("ConfigurationParameterReconcile").WithValues("configuration", req.NamespacedName),
+		Recorder: r.Recorder,
+	}
 
-	// TODO(user): your logic here
+	config := &configurationv1alpha1.ComponentParameter{}
+	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, config); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "cannot find configuration")
+	}
 
-	return ctrl.Result{}, nil
+	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, config, constant.ConfigFinalizerName, nil)
+	if res != nil {
+		return *res, err
+	}
+
+	tasks := make([]Task, 0, len(config.Spec.ConfigItemDetails))
+	for _, item := range config.Spec.ConfigItemDetails {
+		if status := fromItemStatus(reqCtx, &config.Status, item, config.Generation); status != nil {
+			tasks = append(tasks, NewTask(item, status))
+		}
+	}
+	if len(tasks) == 0 {
+		return intctrlutil.Reconciled()
+	}
+
+	fetcherTask := &Task{}
+	err = fetcherTask.Init(&configctrl.ResourceCtx{
+		Context:       ctx,
+		Client:        r.Client,
+		Namespace:     config.Namespace,
+		ClusterName:   config.Spec.ClusterName,
+		ComponentName: config.Spec.ComponentName,
+	}, fetcherTask).Cluster().
+		ComponentAndComponentDef().
+		ComponentSpec().
+		Complete()
+	if err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to get related object.")
+	}
+
+	if !fetcherTask.ClusterObj.GetDeletionTimestamp().IsZero() {
+		reqCtx.Log.Info("cluster is deleting, skip reconcile")
+		return intctrlutil.Reconciled()
+	}
+	if fetcherTask.ClusterComObj == nil || fetcherTask.ComponentObj == nil {
+		return r.failWithInvalidComponent(config, reqCtx)
+	}
+	if err := r.runTasks(TaskContext{config, reqCtx, fetcherTask}, tasks); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to run configuration reconcile task.")
+	}
+	return intctrlutil.Reconciled()
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -64,4 +120,100 @@ func (r *ComponentParameterReconciler) SetupWithManager(mgr ctrl.Manager) error 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&configurationv1alpha1.ComponentParameter{}).
 		Complete(r)
+}
+
+func (r *ComponentParameterReconciler) failWithInvalidComponent(configuration *configurationv1alpha1.ComponentParameter, reqCtx intctrlutil.RequestCtx) (ctrl.Result, error) {
+	msg := fmt.Sprintf("not found cluster component or cluster definition component: [%s]", configuration.Spec.ComponentName)
+	reqCtx.Log.Error(fmt.Errorf("%s", msg), "")
+	patch := client.MergeFrom(configuration.DeepCopy())
+	configuration.Status.Message = msg
+	if err := r.Client.Status().Patch(reqCtx.Ctx, configuration, patch); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update configuration status.")
+	}
+	return intctrlutil.Reconciled()
+}
+
+func (r *ComponentParameterReconciler) runTasks(taskCtx TaskContext, tasks []Task) (err error) {
+	var (
+		errs            []error
+		synthesizedComp *component.SynthesizedComponent
+
+		ctx           = taskCtx.reqCtx.Ctx
+		configuration = taskCtx.configuration
+	)
+
+	if len(taskCtx.fetcher.ComponentObj.Spec.CompDef) == 0 {
+		// build synthesized component for generated component
+		synthesizedComp, err = component.BuildSynthesizedComponentWrapper(taskCtx.reqCtx, r.Client, taskCtx.fetcher.ClusterObj, taskCtx.fetcher.ClusterComObj)
+	} else {
+		// build synthesized component for native component
+		synthesizedComp, err = component.BuildSynthesizedComponent(taskCtx.reqCtx, r.Client, taskCtx.fetcher.ClusterObj, taskCtx.fetcher.ComponentDefObj, taskCtx.fetcher.ComponentObj)
+		if err == nil {
+			err = buildTemplateVars(taskCtx.reqCtx.Ctx, r.Client, taskCtx.fetcher.ComponentDefObj, synthesizedComp)
+		}
+	}
+	if err != nil {
+		return err
+	}
+
+	// TODO manager multiple version
+	patch := client.MergeFrom(configuration.DeepCopy())
+	revision := strconv.FormatInt(configuration.GetGeneration(), 10)
+	for _, task := range tasks {
+		if err := task.Do(taskCtx.fetcher, synthesizedComp, revision); err != nil {
+			errs = append(errs, err)
+			continue
+		}
+	}
+
+	configuration.Status.Message = ""
+	if len(errs) > 0 {
+		configuration.Status.Message = utilerrors.NewAggregate(errs).Error()
+	}
+	if err := r.Client.Status().Patch(ctx, configuration, patch); err != nil {
+		errs = append(errs, err)
+	}
+	if len(errs) == 0 {
+		return nil
+	}
+	return utilerrors.NewAggregate(errs)
+}
+
+func fromItemStatus(ctx intctrlutil.RequestCtx, status *configurationv1alpha1.ComponentParameterStatus, item configurationv1alpha1.ConfigTemplateItemDetail, generation int64) *configurationv1alpha1.ConfigTemplateItemDetailStatus {
+	if item.ConfigSpec == nil {
+		ctx.Log.V(1).WithName(item.Name).Info(fmt.Sprintf("configuration is creating and pass: %s", item.Name))
+		return nil
+	}
+	itemStatus := intctrlutil.GetItemStatus(status, item.Name)
+	if itemStatus == nil || itemStatus.Phase == "" {
+		status.ConfigurationItemStatus = append(status.ConfigurationItemStatus, configurationv1alpha1.ConfigTemplateItemDetailStatus{
+			Name:           item.Name,
+			Phase:          configurationv1alpha1.CInitPhase,
+			UpdateRevision: strconv.FormatInt(generation, 10),
+		})
+		itemStatus = intctrlutil.GetItemStatus(status, item.Name)
+	}
+	if !isReconcileStatus(itemStatus.Phase) {
+		ctx.Log.V(1).WithName(item.Name).Info(fmt.Sprintf("configuration cr is creating or deleting and pass: %v", itemStatus))
+		return nil
+	}
+	return itemStatus
+}
+
+func isReconcileStatus(phase configurationv1alpha1.ConfigurationPhase) bool {
+	return phase != "" &&
+		phase != configurationv1alpha1.CCreatingPhase &&
+		phase != configurationv1alpha1.CDeletingPhase
+}
+
+func buildTemplateVars(ctx context.Context, cli client.Reader,
+	compDef *appsv1.ComponentDefinition, synthesizedComp *component.SynthesizedComponent) error {
+	if compDef != nil && len(compDef.Spec.Vars) > 0 {
+		templateVars, _, err := component.ResolveTemplateNEnvVars(ctx, cli, synthesizedComp, compDef.Spec.Vars)
+		if err != nil {
+			return err
+		}
+		synthesizedComp.TemplateVars = templateVars
+	}
+	return nil
 }

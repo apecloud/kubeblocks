@@ -29,8 +29,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -57,7 +57,7 @@ type ResourceFetcher[T any] struct {
 	ClusterComObj   *appsv1.ClusterComponentSpec
 
 	ConfigMapObj        *corev1.ConfigMap
-	ConfigurationObj    *appsv1alpha1.ComponentConfiguration
+	ConfigurationObj    *configurationv1alpha1.ComponentParameter
 	ConfigConstraintObj *appsv1beta1.ConfigConstraint
 }
 
@@ -138,7 +138,7 @@ func (r *ResourceFetcher[T]) Configuration() *T {
 			Name:      cfgcore.GenerateComponentConfigurationName(r.ClusterName, r.ComponentName),
 			Namespace: r.Namespace,
 		}
-		r.ConfigurationObj = &appsv1alpha1.ComponentConfiguration{}
+		r.ConfigurationObj = &configurationv1alpha1.ComponentParameter{}
 		return r.Client.Get(r.Context, configKey, r.ConfigurationObj)
 	})
 }

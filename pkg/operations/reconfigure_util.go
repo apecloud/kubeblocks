@@ -30,6 +30,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/configuration/validate"
@@ -208,21 +209,21 @@ func formatConfigPatchToMessage(configPatch *core.ConfigPatchInfo, execStatus *c
 		configPatch.DeleteConfig)
 }
 
-func updateFileContent(item *appsv1alpha1.ConfigTemplateItemDetail, key string, content string) {
+func updateFileContent(item *configurationv1alpha1.ConfigTemplateItemDetail, key string, content string) {
 	params, ok := item.ConfigFileParams[key]
 	if !ok {
-		item.ConfigFileParams[key] = appsv1alpha1.ParametersInFile{
+		item.ConfigFileParams[key] = configurationv1alpha1.ParametersInFile{
 			Content: &content,
 		}
 		return
 	}
-	item.ConfigFileParams[key] = appsv1alpha1.ParametersInFile{
+	item.ConfigFileParams[key] = configurationv1alpha1.ParametersInFile{
 		Parameters: params.Parameters,
 		Content:    &content,
 	}
 }
 
-func updateParameters(item *appsv1alpha1.ConfigTemplateItemDetail, key string, parameters []opsv1alpha1.ParameterPair, filter validate.ValidatorOptions) {
+func updateParameters(item *configurationv1alpha1.ConfigTemplateItemDetail, key string, parameters []opsv1alpha1.ParameterPair, filter validate.ValidatorOptions) {
 	updatedParams := make(map[string]*string, len(parameters))
 	for _, parameter := range parameters {
 		if filter(parameter.Key) {
@@ -232,13 +233,13 @@ func updateParameters(item *appsv1alpha1.ConfigTemplateItemDetail, key string, p
 
 	params, ok := item.ConfigFileParams[key]
 	if !ok {
-		item.ConfigFileParams[key] = appsv1alpha1.ParametersInFile{
+		item.ConfigFileParams[key] = configurationv1alpha1.ParametersInFile{
 			Parameters: updatedParams,
 		}
 		return
 	}
 
-	item.ConfigFileParams[key] = appsv1alpha1.ParametersInFile{
+	item.ConfigFileParams[key] = configurationv1alpha1.ParametersInFile{
 		Content:    params.Content,
 		Parameters: mergeMaps(params.Parameters, updatedParams),
 	}

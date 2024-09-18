@@ -32,6 +32,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
@@ -254,13 +255,13 @@ func (t *componentStatusTransformer) isAllConfigSynced(transCtx *componentTransf
 		Namespace: t.cluster.Namespace,
 		Name:      cfgcore.GenerateComponentConfigurationName(t.cluster.Name, t.synthesizeComp.Name),
 	}
-	configuration := &appsv1alpha1.ComponentConfiguration{}
+	configuration := &configurationv1alpha1.ComponentParameter{}
 	if err := t.Client.Get(transCtx.Context, configurationKey, configuration); err != nil {
 		return false, err
 	}
 	for _, configSpec := range t.synthesizeComp.ConfigTemplates {
-		item := configuration.Spec.GetConfigurationItem(configSpec.Name)
-		status := configuration.Status.GetItemStatus(configSpec.Name)
+		item := intctrlutil.GetConfigurationItem(&configuration.Spec, configSpec.Name)
+		status := intctrlutil.GetItemStatus(&configuration.Status, configSpec.Name)
 		// for creating phase
 		if item == nil || status == nil {
 			return false, nil
@@ -272,7 +273,7 @@ func (t *componentStatusTransformer) isAllConfigSynced(transCtx *componentTransf
 		if err := t.Client.Get(transCtx.Context, cmKey, cmObj, inDataContext4C()); err != nil {
 			return false, err
 		}
-		if intctrlutil.GetConfigSpecReconcilePhase(cmObj, *item, status) != appsv1alpha1.CFinishedPhase {
+		if intctrlutil.GetConfigSpecReconcilePhase(cmObj, *item, status) != configurationv1alpha1.CFinishedPhase {
 			return false, nil
 		}
 	}

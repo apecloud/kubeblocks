@@ -21,7 +21,6 @@ package builder
 
 import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 )
 
@@ -52,39 +51,6 @@ func (c *ConfigurationParameterBuilder) AddConfigurationItem(configSpec appsv1.C
 			ConfigSpec: configSpec.DeepCopy(),
 		})
 	return c
-}
-
-func ToV1ConfigSpec(spec *appsv1alpha1.ComponentConfigSpec) *appsv1.ComponentConfigSpec {
-	v1 := &appsv1.ComponentConfigSpec{
-		ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
-			Name:        spec.Name,
-			TemplateRef: spec.TemplateRef,
-			Namespace:   spec.Namespace,
-			VolumeName:  spec.VolumeName,
-			DefaultMode: spec.DefaultMode,
-		},
-		Keys:                spec.Keys,
-		ConfigConstraintRef: spec.ConfigConstraintRef,
-		AsEnvFrom:           spec.AsEnvFrom,
-		InjectEnvTo:         spec.InjectEnvTo,
-		AsSecret:            spec.AsSecret,
-	}
-	if spec.LegacyRenderedConfigSpec != nil {
-		v1.LegacyRenderedConfigSpec = &appsv1.LegacyRenderedTemplateSpec{
-			ConfigTemplateExtension: appsv1.ConfigTemplateExtension{
-				TemplateRef: spec.LegacyRenderedConfigSpec.TemplateRef,
-				Namespace:   spec.LegacyRenderedConfigSpec.Namespace,
-				Policy:      appsv1.MergedPolicy(spec.LegacyRenderedConfigSpec.Policy),
-			},
-		}
-	}
-	if spec.ReRenderResourceTypes != nil {
-		v1.ReRenderResourceTypes = make([]appsv1.RerenderResourceType, 0)
-		for _, r := range spec.ReRenderResourceTypes {
-			v1.ReRenderResourceTypes = append(v1.ReRenderResourceTypes, appsv1.RerenderResourceType(r))
-		}
-	}
-	return v1
 }
 
 func (c *ConfigurationParameterBuilder) SetConfigurationItem(items []configurationv1alpha1.ConfigTemplateItemDetail) *ConfigurationParameterBuilder {

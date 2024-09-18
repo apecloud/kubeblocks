@@ -31,8 +31,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
-	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -89,7 +90,7 @@ func TestFromUpdatedConfig(t *testing.T) {
 func TestIsRerender(t *testing.T) {
 	type args struct {
 		cm   *corev1.ConfigMap
-		item v1alpha1.ConfigTemplateItemDetail
+		item configurationv1alpha1.ConfigTemplateItemDetail
 	}
 	tests := []struct {
 		name string
@@ -100,7 +101,7 @@ func TestIsRerender(t *testing.T) {
 		name: "test",
 		args: args{
 			cm: nil,
-			item: v1alpha1.ConfigTemplateItemDetail{
+			item: configurationv1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
 			},
 		},
@@ -109,7 +110,7 @@ func TestIsRerender(t *testing.T) {
 		name: "test",
 		args: args{
 			cm: builder.NewConfigMapBuilder("default", "test").GetObject(),
-			item: v1alpha1.ConfigTemplateItemDetail{
+			item: configurationv1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
 			},
 		},
@@ -119,7 +120,7 @@ func TestIsRerender(t *testing.T) {
 		args: args{
 			cm: builder.NewConfigMapBuilder("default", "test").
 				GetObject(),
-			item: v1alpha1.ConfigTemplateItemDetail{
+			item: configurationv1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
 			},
 		},
@@ -130,7 +131,7 @@ func TestIsRerender(t *testing.T) {
 			cm: builder.NewConfigMapBuilder("default", "test").
 				AddAnnotations(constant.CMConfigurationTemplateVersion, "v1").
 				GetObject(),
-			item: v1alpha1.ConfigTemplateItemDetail{
+			item: configurationv1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
 			},
 		},
@@ -141,7 +142,7 @@ func TestIsRerender(t *testing.T) {
 			cm: builder.NewConfigMapBuilder("default", "test").
 				AddAnnotations(constant.CMConfigurationTemplateVersion, "v1").
 				GetObject(),
-			item: v1alpha1.ConfigTemplateItemDetail{
+			item: configurationv1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
 			},
 		},
@@ -152,12 +153,12 @@ func TestIsRerender(t *testing.T) {
 			cm: builder.NewConfigMapBuilder("default", "test").
 				AddAnnotations(constant.ConfigAppliedVersionAnnotationKey, "").
 				GetObject(),
-			item: v1alpha1.ConfigTemplateItemDetail{
+			item: configurationv1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
-				UserConfigTemplates: &v1alpha1.ConfigTemplateExtension{
+				UserConfigTemplates: &appsv1.ConfigTemplateExtension{
 					TemplateRef: "contig-test-template",
 					Namespace:   "default",
-					Policy:      v1alpha1.PatchPolicy,
+					Policy:      appsv1.PatchPolicy,
 				},
 			},
 		},
@@ -176,12 +177,12 @@ func TestIsRerender(t *testing.T) {
 }
 `).
 				GetObject(),
-			item: v1alpha1.ConfigTemplateItemDetail{
+			item: configurationv1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
-				UserConfigTemplates: &v1alpha1.ConfigTemplateExtension{
+				UserConfigTemplates: &appsv1.ConfigTemplateExtension{
 					TemplateRef: "contig-test-template",
 					Namespace:   "default",
-					Policy:      v1alpha1.PatchPolicy,
+					Policy:      appsv1.PatchPolicy,
 				},
 			},
 		},
@@ -192,9 +193,9 @@ func TestIsRerender(t *testing.T) {
 			cm: builder.NewConfigMapBuilder("default", "test").
 				AddAnnotations(constant.ConfigAppliedVersionAnnotationKey, "").
 				GetObject(),
-			item: v1alpha1.ConfigTemplateItemDetail{
+			item: configurationv1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
-				Payload: v1alpha1.Payload{
+				Payload: configurationv1alpha1.Payload{
 					Data: map[string]any{
 						"key": "value",
 					},
@@ -208,9 +209,9 @@ func TestIsRerender(t *testing.T) {
 			cm: builder.NewConfigMapBuilder("default", "test").
 				AddAnnotations(constant.ConfigAppliedVersionAnnotationKey, ` {"payload":{"key":"value"}} `).
 				GetObject(),
-			item: v1alpha1.ConfigTemplateItemDetail{
+			item: configurationv1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
-				Payload: v1alpha1.Payload{
+				Payload: configurationv1alpha1.Payload{
 					Data: map[string]any{
 						"key": "value",
 					},
@@ -231,48 +232,48 @@ func TestIsRerender(t *testing.T) {
 func TestGetConfigSpecReconcilePhase(t *testing.T) {
 	type args struct {
 		cm     *corev1.ConfigMap
-		item   v1alpha1.ConfigTemplateItemDetail
-		status *v1alpha1.ConfigTemplateItemDetailStatus
+		item   configurationv1alpha1.ConfigTemplateItemDetail
+		status *configurationv1alpha1.ConfigTemplateItemDetailStatus
 	}
 	tests := []struct {
 		name string
 		args args
-		want v1alpha1.ConfigurationPhase
+		want configurationv1alpha1.ConfigurationPhase
 	}{{
 		name: "test",
 		args: args{
 			cm: nil,
-			item: v1alpha1.ConfigTemplateItemDetail{
+			item: configurationv1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
 			},
 		},
-		want: v1alpha1.CCreatingPhase,
+		want: configurationv1alpha1.CCreatingPhase,
 	}, {
 		name: "test",
 		args: args{
 			cm: builder.NewConfigMapBuilder("default", "test").GetObject(),
-			item: v1alpha1.ConfigTemplateItemDetail{
+			item: configurationv1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
 			},
-			status: &v1alpha1.ConfigTemplateItemDetailStatus{
-				Phase: v1alpha1.CInitPhase,
+			status: &configurationv1alpha1.ConfigTemplateItemDetailStatus{
+				Phase: configurationv1alpha1.CInitPhase,
 			},
 		},
-		want: v1alpha1.CPendingPhase,
+		want: configurationv1alpha1.CPendingPhase,
 	}, {
 		name: "test",
 		args: args{
 			cm: builder.NewConfigMapBuilder("default", "test").
 				AddAnnotations(constant.ConfigAppliedVersionAnnotationKey, `{"name":"test"}`).
 				GetObject(),
-			item: v1alpha1.ConfigTemplateItemDetail{
+			item: configurationv1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
 			},
-			status: &v1alpha1.ConfigTemplateItemDetailStatus{
-				Phase: v1alpha1.CUpgradingPhase,
+			status: &configurationv1alpha1.ConfigTemplateItemDetailStatus{
+				Phase: configurationv1alpha1.CUpgradingPhase,
 			},
 		},
-		want: v1alpha1.CUpgradingPhase,
+		want: configurationv1alpha1.CUpgradingPhase,
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -400,7 +401,7 @@ var _ = Describe("config_util", func() {
 
 func TestCheckAndPatchPayload(t *testing.T) {
 	type args struct {
-		item      *v1alpha1.ConfigTemplateItemDetail
+		item      *configurationv1alpha1.ConfigTemplateItemDetail
 		payloadID string
 		payload   interface{}
 	}
@@ -412,7 +413,7 @@ func TestCheckAndPatchPayload(t *testing.T) {
 	}{{
 		name: "test",
 		args: args{
-			item:      &v1alpha1.ConfigTemplateItemDetail{},
+			item:      &configurationv1alpha1.ConfigTemplateItemDetail{},
 			payloadID: constant.BinaryVersionPayload,
 			payload:   "md5-12912uy1232o9y2",
 		},
@@ -427,8 +428,8 @@ func TestCheckAndPatchPayload(t *testing.T) {
 	}, {
 		name: "test-delete-payload",
 		args: args{
-			item: &v1alpha1.ConfigTemplateItemDetail{
-				Payload: v1alpha1.Payload{
+			item: &configurationv1alpha1.ConfigTemplateItemDetail{
+				Payload: configurationv1alpha1.Payload{
 					Data: map[string]any{
 						constant.BinaryVersionPayload: "md5-12912uy1232o9y2",
 					},
@@ -441,8 +442,8 @@ func TestCheckAndPatchPayload(t *testing.T) {
 	}, {
 		name: "test-update-payload",
 		args: args{
-			item: &v1alpha1.ConfigTemplateItemDetail{
-				Payload: v1alpha1.Payload{
+			item: &configurationv1alpha1.ConfigTemplateItemDetail{
+				Payload: configurationv1alpha1.Payload{
 					Data: map[string]any{
 						constant.BinaryVersionPayload: "md5-12912uy1232o9y2",
 						constant.ComponentResourcePayload: map[string]any{

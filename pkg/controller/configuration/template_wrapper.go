@@ -32,8 +32,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/configuration/validate"
@@ -103,10 +103,10 @@ func (wrapper *renderWrapper) checkRerenderTemplateSpec(cfgCMName string, localO
 }
 
 func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1.Cluster,
-	component *component.SynthesizedComponent, localObjs []client.Object, configuration *appsv1alpha1.ComponentConfiguration) error {
+	component *component.SynthesizedComponent, localObjs []client.Object, configuration *configurationv1alpha1.ComponentParameter) error {
 	revision := fromConfiguration(configuration)
 	for _, configSpec := range component.ConfigTemplates {
-		var item *appsv1alpha1.ConfigTemplateItemDetail
+		var item *configurationv1alpha1.ConfigTemplateItemDetail
 		cmName := core.GetComponentCfgName(cluster.Name, component.Name, configSpec.Name)
 		origCMObj, err := wrapper.checkRerenderTemplateSpec(cmName, localObjs)
 		if err != nil {
@@ -117,11 +117,11 @@ func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1.Cluster,
 		// and does not update the ConfigMap objects in the subsequent reconfiguration process.
 		// The subsequent reconfiguration process is handled by the Configuration controller.
 		if origCMObj != nil {
-			wrapper.addVolumeMountMeta(configSpec.ComponentTemplateSpec, origCMObj, false, !toSecret(configSpec))
+			wrapper.addVolumeMountMeta(configSpec.ComponentTemplateSpec, origCMObj, false, !ToSecret(configSpec))
 			continue
 		}
 		if configuration != nil {
-			item = configuration.Spec.GetConfigurationItem(configSpec.Name)
+			item = intctrlutil.GetConfigurationItem(&configuration.Spec, configSpec.Name)
 		}
 		newCMObj, err := wrapper.rerenderConfigTemplate(cluster, component, configSpec, item)
 		if err != nil {
@@ -130,7 +130,7 @@ func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1.Cluster,
 		if err := applyUpdatedParameters(item, newCMObj, configSpec, wrapper.cli, wrapper.ctx); err != nil {
 			return err
 		}
-		if err := wrapper.addRenderedObject(configSpec.ComponentTemplateSpec, newCMObj, configuration, !toSecret(configSpec)); err != nil {
+		if err := wrapper.addRenderedObject(configSpec.ComponentTemplateSpec, newCMObj, configuration, !ToSecret(configSpec)); err != nil {
 			return err
 		}
 		if err := updateConfigMetaForCM(newCMObj, item, revision); err != nil {
@@ -140,14 +140,14 @@ func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1.Cluster,
 	return nil
 }
 
-func fromConfiguration(configuration *appsv1alpha1.ComponentConfiguration) string {
+func fromConfiguration(configuration *configurationv1alpha1.ComponentParameter) string {
 	if configuration == nil {
 		return ""
 	}
 	return strconv.FormatInt(configuration.GetGeneration(), 10)
 }
 
-func updateConfigMetaForCM(newCMObj *corev1.ConfigMap, item *appsv1alpha1.ConfigTemplateItemDetail, revision string) (err error) {
+func updateConfigMetaForCM(newCMObj *corev1.ConfigMap, item *configurationv1alpha1.ConfigTemplateItemDetail, revision string) (err error) {
 	if item == nil {
 		return
 	}
@@ -169,7 +169,7 @@ func updateConfigMetaForCM(newCMObj *corev1.ConfigMap, item *appsv1alpha1.Config
 	return
 }
 
-func applyUpdatedParameters(item *appsv1alpha1.ConfigTemplateItemDetail, cm *corev1.ConfigMap, configSpec appsv1.ComponentConfigSpec, cli client.Client, ctx context.Context) (err error) {
+func applyUpdatedParameters(item *configurationv1alpha1.ConfigTemplateItemDetail, cm *corev1.ConfigMap, configSpec appsv1.ComponentConfigSpec, cli client.Client, ctx context.Context) (err error) {
 	var newData map[string]string
 	var configConstraint *appsv1beta1.ConfigConstraint
 
@@ -193,7 +193,7 @@ func applyUpdatedParameters(item *appsv1alpha1.ConfigTemplateItemDetail, cm *cor
 func (wrapper *renderWrapper) rerenderConfigTemplate(cluster *appsv1.Cluster,
 	component *component.SynthesizedComponent,
 	configSpec appsv1.ComponentConfigSpec,
-	item *appsv1alpha1.ConfigTemplateItemDetail,
+	item *configurationv1alpha1.ConfigTemplateItemDetail,
 ) (*corev1.ConfigMap, error) {
 	cmName := core.GetComponentCfgName(cluster.Name, component.Name, configSpec.Name)
 	newCMObj, err := generateConfigMapFromTpl(cluster,
@@ -217,7 +217,7 @@ func (wrapper *renderWrapper) rerenderConfigTemplate(cluster *appsv1.Cluster,
 				ConfigTemplateExtension: appsv1.ConfigTemplateExtension{
 					TemplateRef: item.UserConfigTemplates.TemplateRef,
 					Namespace:   item.UserConfigTemplates.Namespace,
-					Policy:      appsv1.MergedPolicy(item.UserConfigTemplates.Policy),
+					Policy:      item.UserConfigTemplates.Policy,
 				},
 			},
 			wrapper.templateBuilder,
@@ -231,7 +231,7 @@ func (wrapper *renderWrapper) rerenderConfigTemplate(cluster *appsv1.Cluster,
 		newCMObj.Data = newData
 	}
 	UpdateCMConfigSpecLabels(newCMObj, configSpec)
-	if InjectEnvEnabled(configSpec) && toSecret(configSpec) {
+	if InjectEnvEnabled(configSpec) && ToSecret(configSpec) {
 		wrapper.renderedSecretObjs = append(wrapper.renderedSecretObjs, newCMObj)
 	}
 	return newCMObj, nil
@@ -261,7 +261,7 @@ func (wrapper *renderWrapper) renderScriptTemplate(cluster *appsv1.Cluster, comp
 	return nil
 }
 
-func (wrapper *renderWrapper) addRenderedObject(templateSpec appsv1.ComponentTemplateSpec, cm *corev1.ConfigMap, configuration *appsv1alpha1.ComponentConfiguration, asVolume bool) (err error) {
+func (wrapper *renderWrapper) addRenderedObject(templateSpec appsv1.ComponentTemplateSpec, cm *corev1.ConfigMap, configuration *configurationv1alpha1.ComponentParameter, asVolume bool) (err error) {
 	// The owner of the configmap object is a cluster,
 	// in order to manage the life cycle of configmap
 	if configuration != nil {

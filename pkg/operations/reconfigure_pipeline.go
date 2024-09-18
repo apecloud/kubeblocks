@@ -28,12 +28,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/configuration/validate"
-	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -58,7 +57,7 @@ type pipeline struct {
 	configPatch       *cfgcore.ConfigPatchInfo
 	isFileUpdated     bool
 
-	updatedObject    *appsv1alpha1.ComponentConfiguration
+	updatedObject    *configurationv1alpha1.ComponentParameter
 	configConstraint *appsv1beta1.ConfigConstraint
 	configSpec       *appsv1.ComponentConfigSpec
 
@@ -88,13 +87,12 @@ func (p *pipeline) Validate() *pipeline {
 			)
 		}
 
-		item := p.ConfigurationObj.Spec.GetConfigurationItem(p.config.Name)
+		item := intctrlutil.GetConfigurationItem(&p.ConfigurationObj.Spec, p.config.Name)
 		if item == nil || item.ConfigSpec == nil {
 			p.isFailed = true
 			return cfgcore.MakeError("failed to reconfigure, not existed config[%s]", p.config.Name)
 		}
-
-		p.configSpec = builder.ToV1ConfigSpec(item.ConfigSpec)
+		p.configSpec = item.ConfigSpec
 		return nil
 	}
 
@@ -140,14 +138,14 @@ func (p *pipeline) ConfigConstraints() *pipeline {
 func (p *pipeline) doMergeImpl(parameters opsv1alpha1.ConfigurationItem) error {
 	newConfigObj := p.ConfigurationObj.DeepCopy()
 
-	item := newConfigObj.Spec.GetConfigurationItem(p.config.Name)
+	item := intctrlutil.GetConfigurationItem(&newConfigObj.Spec, p.config.Name)
 	if item == nil {
 		return cfgcore.MakeError("not found config item: %s", parameters.Name)
 	}
 
 	configSpec := p.configSpec
 	if item.ConfigFileParams == nil {
-		item.ConfigFileParams = make(map[string]appsv1alpha1.ParametersInFile)
+		item.ConfigFileParams = make(map[string]configurationv1alpha1.ParametersInFile)
 	}
 	filter := validate.WithKeySelector(configSpec.Keys)
 	paramFilter := createImmutableParamsFilter(p.configConstraint)
@@ -175,7 +173,8 @@ func (p *pipeline) doMergeImpl(parameters opsv1alpha1.ConfigurationItem) error {
 	return p.createUpdatePatch(item, configSpec)
 }
 
-func (p *pipeline) createUpdatePatch(item *appsv1alpha1.ConfigTemplateItemDetail, configSpec *appsv1.ComponentConfigSpec) error {
+func (p *pipeline) createUpdatePatch(item *configurationv1alpha1.ConfigTemplateItemDetail,
+	configSpec *appsv1.ComponentConfigSpec) error {
 	if p.configConstraint == nil {
 		return nil
 	}

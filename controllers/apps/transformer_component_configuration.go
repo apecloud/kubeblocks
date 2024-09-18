@@ -27,6 +27,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -99,7 +100,7 @@ func (c *componentConfigurationTransformer) runningComponentConfiguration(ctx co
 	return nil, nil
 }
 
-func buildConfiguration(transCtx *componentTransformContext, cluster *appsv1.Cluster, component *component.SynthesizedComponent) (*appsv1alpha1.ComponentConfiguration, error) {
+func buildConfiguration(transCtx *componentTransformContext, cluster *appsv1.Cluster, component *component.SynthesizedComponent) (*configurationv1alpha1.ComponentParameter, error) {
 	items, err := configuration.ClassifyParamsFromConfigTemplate(transCtx, transCtx.GetClient(), transCtx.Component, transCtx.CompDef, component)
 	if err != nil {
 		return nil, err

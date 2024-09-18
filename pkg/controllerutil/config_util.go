@@ -31,6 +31,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	configv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/configuration/validate"
@@ -38,10 +39,10 @@ import (
 )
 
 type Result struct {
-	Phase      v1alpha1.ConfigurationPhase `json:"phase"`
-	Revision   string                      `json:"revision"`
-	Policy     string                      `json:"policy"`
-	ExecResult string                      `json:"execResult"`
+	Phase      configv1alpha1.ConfigurationPhase `json:"phase"`
+	Revision   string                            `json:"revision"`
+	Policy     string                            `json:"policy"`
+	ExecResult string                            `json:"execResult"`
 
 	SucceedCount  int32 `json:"succeedCount"`
 	ExpectedCount int32 `json:"expectedCount"`
@@ -115,7 +116,7 @@ func fromUpdatedConfig(m map[string]string, sets *set.LinkedHashSetString) map[s
 }
 
 // IsApplyConfigChanged checks if the configuration is changed
-func IsApplyConfigChanged(configMap *corev1.ConfigMap, item v1alpha1.ConfigTemplateItemDetail) bool {
+func IsApplyConfigChanged(configMap *corev1.ConfigMap, item configv1alpha1.ConfigTemplateItemDetail) bool {
 	if configMap == nil {
 		return false
 	}
@@ -133,7 +134,7 @@ func IsApplyConfigChanged(configMap *corev1.ConfigMap, item v1alpha1.ConfigTempl
 }
 
 // IsRerender checks if the configuration template is changed
-func IsRerender(configMap *corev1.ConfigMap, item v1alpha1.ConfigTemplateItemDetail) bool {
+func IsRerender(configMap *corev1.ConfigMap, item configv1alpha1.ConfigTemplateItemDetail) bool {
 	if configMap == nil {
 		return true
 	}
@@ -153,18 +154,18 @@ func IsRerender(configMap *corev1.ConfigMap, item v1alpha1.ConfigTemplateItemDet
 
 // GetConfigSpecReconcilePhase gets the configuration phase
 func GetConfigSpecReconcilePhase(configMap *corev1.ConfigMap,
-	item v1alpha1.ConfigTemplateItemDetail,
-	status *v1alpha1.ConfigTemplateItemDetailStatus) v1alpha1.ConfigurationPhase {
+	item configv1alpha1.ConfigTemplateItemDetail,
+	status *configv1alpha1.ConfigTemplateItemDetailStatus) configv1alpha1.ConfigurationPhase {
 	if status == nil || status.Phase == "" {
-		return v1alpha1.CCreatingPhase
+		return configv1alpha1.CCreatingPhase
 	}
 	if !IsApplyConfigChanged(configMap, item) {
-		return v1alpha1.CPendingPhase
+		return configv1alpha1.CPendingPhase
 	}
 	return status.Phase
 }
 
-func CheckAndPatchPayload(item *v1alpha1.ConfigTemplateItemDetail, payloadID string, payload interface{}) (bool, error) {
+func CheckAndPatchPayload(item *configv1alpha1.ConfigTemplateItemDetail, payloadID string, payload interface{}) (bool, error) {
 	if item == nil {
 		return false, nil
 	}

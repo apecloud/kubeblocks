@@ -64,11 +64,11 @@ func injectTemplateEnvFrom(cluster *appsv1.Cluster, component *component.Synthes
 		if err != nil {
 			return core.WrapError(err, "failed to generate env configmap[%s]", cmName)
 		}
-		if toSecret(configSpec) && configSpec.VolumeName != "" {
+		if ToSecret(configSpec) && configSpec.VolumeName != "" {
 			podSpec.Volumes = updateSecretVolumes(podSpec.Volumes, configSpec, envSourceObject, component)
 		} else {
-			injectEnvFrom(podSpec.Containers, containersInjectedTo(configSpec), envSourceObject.GetName(), withEnvSource(toSecret(configSpec)))
-			injectEnvFrom(podSpec.InitContainers, containersInjectedTo(configSpec), envSourceObject.GetName(), withEnvSource(toSecret(configSpec)))
+			injectEnvFrom(podSpec.Containers, containersInjectedTo(configSpec), envSourceObject.GetName(), withEnvSource(ToSecret(configSpec)))
+			injectEnvFrom(podSpec.InitContainers, containersInjectedTo(configSpec), envSourceObject.GetName(), withEnvSource(ToSecret(configSpec)))
 		}
 		return nil
 	}
@@ -176,7 +176,7 @@ func createOrUpdateResourceFromConfigTemplate(cluster *appsv1.Cluster, component
 		_ = intctrlutil.SetOwnerReference(cluster, obj)
 	}
 
-	if toSecret(template) {
+	if ToSecret(template) {
 		return updateOrCreateEnvObject(ctx, cli, &corev1.Secret{}, cmKey, func(c *corev1.Secret) {
 			c.StringData = envMap
 			updateObjectMeta(c)
@@ -268,7 +268,7 @@ func InjectEnvEnabled(spec appsv1.ComponentConfigSpec) bool {
 	return len(spec.AsEnvFrom) > 0 || len(spec.InjectEnvTo) > 0
 }
 
-func toSecret(spec appsv1.ComponentConfigSpec) bool {
+func ToSecret(spec appsv1.ComponentConfigSpec) bool {
 	return spec.AsSecret != nil && *spec.AsSecret
 }
 

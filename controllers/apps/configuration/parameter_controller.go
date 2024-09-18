@@ -39,6 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -115,7 +116,7 @@ func (r *ParameterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to check last-applied-configuration")
 	} else if isAppliedConfigs {
-		return updateConfigPhase(r.Client, reqCtx, config, appsv1alpha1.CFinishedPhase, configurationNoChangedMessage)
+		return updateConfigPhase(r.Client, reqCtx, config, configurationv1alpha1.CFinishedPhase, configurationNoChangedMessage)
 	}
 
 	resources, err := prepareRelatedResource(reqCtx, r.Client, config)
@@ -129,7 +130,7 @@ func (r *ParameterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			corev1.EventTypeWarning,
 			appsv1alpha1.ReasonReconfigureFailed,
 			configurationNotRelatedComponentMessage)
-		return updateConfigPhase(r.Client, reqCtx, config, appsv1alpha1.CFinishedPhase, configurationNotRelatedComponentMessage)
+		return updateConfigPhase(r.Client, reqCtx, config, configurationv1alpha1.CFinishedPhase, configurationNotRelatedComponentMessage)
 	}
 
 	return r.sync(reqCtx, config, resources)
@@ -209,7 +210,7 @@ func (r *ParameterReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *cor
 	if len(reconcileContext.InstanceSetList) == 0 {
 		reqCtx.Recorder.Event(configMap, corev1.EventTypeWarning, appsv1alpha1.ReasonReconfigureFailed,
 			"the configmap is not used by any container, skip reconfigure")
-		return updateConfigPhase(r.Client, reqCtx, configMap, appsv1alpha1.CFinishedPhase, configurationNotUsingMessage)
+		return updateConfigPhase(r.Client, reqCtx, configMap, configurationv1alpha1.CFinishedPhase, configurationNotUsingMessage)
 	}
 
 	return r.performUpgrade(reconfigureParams{
@@ -259,7 +260,7 @@ func (r *ParameterReconciler) performUpgrade(params reconfigureParams) (ctrl.Res
 			params.Client,
 			params.Ctx,
 			params.ConfigMap,
-			reconciled(returnedStatus, policy.GetPolicyName(), appsv1alpha1.CFailedAndPausePhase,
+			reconciled(returnedStatus, policy.GetPolicyName(), configurationv1alpha1.CFailedAndPausePhase,
 				withFailed(core.MakeError("unknown status"), false)),
 		)
 	case ESFailedAndRetry:
@@ -267,7 +268,7 @@ func (r *ParameterReconciler) performUpgrade(params reconfigureParams) (ctrl.Res
 			params.Client,
 			params.Ctx,
 			params.ConfigMap,
-			reconciled(returnedStatus, policy.GetPolicyName(), appsv1alpha1.CFailedPhase,
+			reconciled(returnedStatus, policy.GetPolicyName(), configurationv1alpha1.CFailedPhase,
 				withFailed(err, true)),
 		)
 	case ESRetry:
@@ -275,14 +276,14 @@ func (r *ParameterReconciler) performUpgrade(params reconfigureParams) (ctrl.Res
 			params.Client,
 			params.Ctx,
 			params.ConfigMap,
-			reconciled(returnedStatus, policy.GetPolicyName(), appsv1alpha1.CUpgradingPhase),
+			reconciled(returnedStatus, policy.GetPolicyName(), configurationv1alpha1.CUpgradingPhase),
 		)
 	case ESFailed:
 		return updateConfigPhaseWithResult(
 			params.Client,
 			params.Ctx,
 			params.ConfigMap,
-			reconciled(returnedStatus, policy.GetPolicyName(), appsv1alpha1.CFailedAndPausePhase,
+			reconciled(returnedStatus, policy.GetPolicyName(), configurationv1alpha1.CFailedAndPausePhase,
 				withFailed(err, false)),
 		)
 	case ESNone:
@@ -293,7 +294,7 @@ func (r *ParameterReconciler) performUpgrade(params reconfigureParams) (ctrl.Res
 			"the reconfigure[%s] request[%s] has been processed successfully",
 			policy.GetPolicyName(),
 			getOpsRequestID(params.ConfigMap))
-		result := reconciled(returnedStatus, policy.GetPolicyName(), appsv1alpha1.CFinishedPhase)
+		result := reconciled(returnedStatus, policy.GetPolicyName(), configurationv1alpha1.CFinishedPhase)
 		return r.updateConfigCMStatus(params.Ctx, params.ConfigMap, policy.GetPolicyName(), &result)
 	}
 }

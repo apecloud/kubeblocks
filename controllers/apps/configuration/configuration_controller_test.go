@@ -28,9 +28,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
@@ -118,17 +120,17 @@ var _ = Describe("Configuration Controller", func() {
 				Name:      core.GetComponentCfgName(synthesizedComp.ClusterName, synthesizedComp.Name, synthesizedComp.ConfigTemplates[0].Name),
 				Namespace: testCtx.DefaultNamespace,
 			}
-			checkCfgStatus := func(phase appsv1alpha1.ConfigurationPhase) func() bool {
+			checkCfgStatus := func(phase configurationv1alpha1.ConfigurationPhase) func() bool {
 				return func() bool {
-					cfg := &appsv1alpha1.Configuration{}
+					cfg := &configurationv1alpha1.ComponentParameter{}
 					Expect(k8sClient.Get(ctx, cfgKey, cfg)).Should(Succeed())
-					itemStatus := cfg.Status.GetItemStatus(configSpecName)
+					itemStatus := intctrlutil.GetItemStatus(&cfg.Status, configSpecName)
 					return itemStatus != nil && itemStatus.Phase == phase
 				}
 			}
 
 			By("wait for configuration status to be init phase.")
-			Eventually(checkCfgStatus(appsv1alpha1.CInitPhase)).Should(BeFalse())
+			Eventually(checkCfgStatus(configurationv1alpha1.CInitPhase)).Should(BeFalse())
 			Expect(initConfiguration(&configctrl.ResourceCtx{
 				Client:        k8sClient,
 				Context:       ctx,
@@ -137,7 +139,7 @@ var _ = Describe("Configuration Controller", func() {
 				ComponentName: defaultCompName,
 			}, synthesizedComp, clusterObj, componentObj)).Should(Succeed())
 
-			Eventually(checkCfgStatus(appsv1alpha1.CFinishedPhase)).Should(BeTrue())
+			Eventually(checkCfgStatus(configurationv1alpha1.CFinishedPhase)).Should(BeTrue())
 
 			Eventually(testapps.CheckObjExists(&testCtx, renderedKey, &corev1.ConfigMap{}, false)).Should(Succeed())
 			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKey{
@@ -146,8 +148,8 @@ var _ = Describe("Configuration Controller", func() {
 			}, &corev1.Secret{}, true)).Should(Succeed())
 
 			By("reconfiguring parameters.")
-			Eventually(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *appsv1alpha1.Configuration) {
-				cfg.Spec.GetConfigurationItem(configSpecName).ConfigFileParams = map[string]appsv1alpha1.ConfigParams{
+			Eventually(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *configurationv1alpha1.ComponentParameter) {
+				intctrlutil.GetConfigurationItem(&cfg.Spec, configSpecName).ConfigFileParams = map[string]configurationv1alpha1.ParametersInFile{
 					"my.cnf": {
 						Parameters: map[string]*string{
 							"max_connections": cfgutil.ToPointer("1000"),
@@ -158,9 +160,9 @@ var _ = Describe("Configuration Controller", func() {
 			})).Should(Succeed())
 
 			Eventually(func(g Gomega) {
-				cfg := &appsv1alpha1.Configuration{}
+				cfg := &configurationv1alpha1.ComponentParameter{}
 				g.Expect(k8sClient.Get(ctx, cfgKey, cfg)).Should(Succeed())
-				itemStatus := cfg.Status.GetItemStatus(configSpecName)
+				itemStatus := intctrlutil.GetItemStatus(&cfg.Status, configSpecName)
 				g.Expect(itemStatus).ShouldNot(BeNil())
 				g.Expect(itemStatus.UpdateRevision).Should(BeEquivalentTo("2"))
 				g.Expect(itemStatus.Phase).Should(BeEquivalentTo(appsv1alpha1.CFinishedPhase))

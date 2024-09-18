@@ -24,6 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
 )
@@ -54,7 +55,7 @@ func BuildReloadActionContainer(resourceCtx *configuration.ResourceCtx,
 	component *appsv1.Component,
 	synthesizedComponent *component.SynthesizedComponent,
 	podSpec *corev1.PodSpec,
-	configObj *appsv1alpha1.ComponentConfiguration,
+	configObj *configurationv1alpha1.ComponentParameter,
 	localObjs []client.Object) error {
 
 	builder := reloadActionContainerBuilder{

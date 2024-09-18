@@ -27,6 +27,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -40,7 +41,7 @@ type ReconcileCtx struct {
 	Component            *appsv1.Component
 	SynthesizedComponent *component.SynthesizedComponent
 	PodSpec              *corev1.PodSpec
-	Configuration        *appsv1alpha1.ComponentConfiguration
+	Configuration        *configurationv1alpha1.ComponentParameter
 
 	Cache []client.Object
 }
@@ -57,10 +58,10 @@ type updatePipeline struct {
 	reconcile     bool
 	renderWrapper renderWrapper
 
-	item       appsv1alpha1.ConfigTemplateItemDetail
-	itemStatus *appsv1alpha1.ConfigTemplateItemDetailStatus
+	item       configurationv1alpha1.ConfigTemplateItemDetail
+	itemStatus *configurationv1alpha1.ConfigTemplateItemDetailStatus
 	configSpec *appsv1.ComponentConfigSpec
-	
+
 	newCM       *corev1.ConfigMap
 	configPatch *core.ConfigPatchInfo
 
@@ -74,7 +75,7 @@ func NewReloadActionBuilderHelper(ctx ReconcileCtx) *reloadActionBuilderHelper {
 	return p.Init(ctx.ResourceCtx, p)
 }
 
-func NewReconcilePipeline(ctx ReconcileCtx, item appsv1alpha1.ConfigTemplateItemDetail, itemStatus *appsv1alpha1.ConfigTemplateItemDetailStatus, configSpec *appsv1.ComponentConfigSpec) *updatePipeline {
+func NewReconcilePipeline(ctx ReconcileCtx, item configurationv1alpha1.ConfigTemplateItemDetail, itemStatus *configurationv1alpha1.ConfigTemplateItemDetailStatus, configSpec *appsv1.ComponentConfigSpec) *updatePipeline {
 	p := &updatePipeline{
 		reconcile:  true,
 		item:       item,
@@ -133,7 +134,7 @@ func CheckAndUpdateItemStatus(updated *appsv1alpha1.ComponentConfiguration, item
 func (p *reloadActionBuilderHelper) UpdatePodVolumes() *reloadActionBuilderHelper {
 	return p.Wrap(func() error {
 		component := p.ctx.SynthesizedComponent
-		volumes := make(map[string]appsv1alpha1.ComponentTemplateSpec, len(component.ConfigTemplates))
+		volumes := make(map[string]appsv1.ComponentTemplateSpec, len(component.ConfigTemplates))
 		for _, configSpec := range component.ConfigTemplates {
 			cmName := core.GetComponentCfgName(component.ClusterName, component.Name, configSpec.Name)
 			volumes[cmName] = configSpec.ComponentTemplateSpec
@@ -219,7 +220,7 @@ func (p *updatePipeline) RerenderTemplate() *updatePipeline {
 }
 
 func (p *updatePipeline) ApplyParameters() *updatePipeline {
-	patchMerge := func(p *updatePipeline, spec appsv1.ComponentConfigSpec, cm *corev1.ConfigMap, item appsv1alpha1.ConfigTemplateItemDetail) error {
+	patchMerge := func(p *updatePipeline, spec appsv1.ComponentConfigSpec, cm *corev1.ConfigMap, item configurationv1alpha1.ConfigTemplateItemDetail) error {
 		if p.isDone() || len(item.ConfigFileParams) == 0 {
 			return nil
 		}
@@ -284,7 +285,7 @@ func (p *updatePipeline) Sync() *updatePipeline {
 				return err
 			}
 		}
-		if InjectEnvEnabled(*p.configSpec) && toSecret(*p.configSpec) {
+		if InjectEnvEnabled(*p.configSpec) && ToSecret(*p.configSpec) {
 			return nil
 		}
 		switch {
@@ -312,7 +313,7 @@ func (p *updatePipeline) SyncStatus() *updatePipeline {
 		if p.configSpec == nil || p.itemStatus == nil {
 			return
 		}
-		p.itemStatus.Phase = appsv1alpha1.CMergedPhase
+		p.itemStatus.Phase = configurationv1alpha1.CMergedPhase
 		return
 	})
 }

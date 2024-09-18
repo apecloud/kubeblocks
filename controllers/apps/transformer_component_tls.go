@@ -31,7 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -103,7 +103,7 @@ func checkAndTriggerReRender(ctx context.Context, synthesizedComp component.Synt
 	if ((tls == nil || !tls.Enable) && tlsEnabledInCM) ||
 		(tls != nil && tls.Enable && !tlsEnabledInCM) {
 		// tls config changed
-		conf := &appsv1alpha1.ComponentConfiguration{}
+		conf := &configurationv1alpha1.ComponentParameter{}
 		confKey := types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: cfgcore.GenerateComponentConfigurationName(synthesizedComp.ClusterName, synthesizedComp.Name)}
 		if err := cli.Get(ctx, confKey, conf); err != nil {
 			return client.IgnoreNotFound(err)

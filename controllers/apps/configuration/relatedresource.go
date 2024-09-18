@@ -26,7 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
@@ -36,7 +36,7 @@ import (
 type reconfigureRelatedResource struct {
 	ctx        context.Context
 	client     client.Client
-	configSpec *appsv1alpha1.ComponentConfigSpec
+	configSpec *appsv1.ComponentConfigSpec
 
 	clusterName   string
 	componentName string
@@ -80,7 +80,7 @@ func prepareCC(resources *reconfigureRelatedResource, fetcher *configctrl.Fetche
 		return nil
 	}
 
-	configSpec := fetcher.ConfigurationObj.Spec.GetConfigSpec(configSpecName)
+	configSpec := intctrlutil.GetConfigSpec(&fetcher.ConfigurationObj.Spec, configSpecName)
 	if configSpec == nil {
 		return fmt.Errorf("not found config spec: %s in configuration[%s]", configSpecName, fetcher.ConfigurationObj.Name)
 	}

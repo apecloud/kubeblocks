@@ -23,6 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -231,9 +232,18 @@ func GetInstanceTemplateName(clusterName, componentName, instanceName string) st
 	return strings.Replace(compInsKey, workloadPrefix+"-", "", 1)
 }
 
+func (t *InstanceTemplate) GetName() string {
+	return t.Name
+}
+
 func (t *InstanceTemplate) GetReplicas() int32 {
 	if t.Replicas != nil {
 		return *t.Replicas
 	}
 	return defaultInstanceTemplateReplicas
+}
+
+// GetOrdinals TODO(free6om): Remove after resolving the circular dependencies between apps and workloads.
+func (t *InstanceTemplate) GetOrdinals() workloads.Ordinals {
+	return workloads.Ordinals{}
 }

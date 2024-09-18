@@ -70,6 +70,11 @@ func (factory *MockServiceDescriptorFactory) SetPort(port appsv1.CredentialVar) 
 	return factory
 }
 
+func (factory *MockServiceDescriptorFactory) SetPodFQDNs(podFQDNs appsv1.CredentialVar) *MockServiceDescriptorFactory {
+	factory.Get().Spec.PodFQDNs = &podFQDNs
+	return factory
+}
+
 func (factory *MockServiceDescriptorFactory) SetAuth(auth appsv1.ConnectionCredentialAuth) *MockServiceDescriptorFactory {
 	factory.Get().Spec.Auth = &auth
 	return factory

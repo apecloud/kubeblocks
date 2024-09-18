@@ -150,6 +150,7 @@ const (
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//w+kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=rvd
 
 // ReconciliationViewDefinition is the Schema for the reconciliationviewdefinitions API
 type ReconciliationViewDefinition struct {

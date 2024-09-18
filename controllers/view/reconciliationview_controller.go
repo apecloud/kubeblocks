@@ -55,9 +55,9 @@ func (r *ReconciliationViewReconciler) Reconcile(ctx context.Context, req ctrl.R
 	logger := log.FromContext(ctx).WithValues("ReconciliationView", req.NamespacedName)
 
 	res, err := kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
-		//Prepare(viewResources()).
-		//Do(viewResourcesValidation()).
-		//Do(updateInformerManager()).
+		Prepare(viewResources()).
+		Do(viewResourcesValidation(ctx, r.Client)).
+		Do(updateInformerManager(r.InformerManager)).
 		//Do(viewCalculation()).
 		//Do(stateEvaluation()).
 		Commit()

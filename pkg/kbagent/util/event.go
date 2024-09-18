@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -46,84 +47,78 @@ const (
 )
 
 var (
-	baseInfo eventBaseInfo
-	once     sync.Once
-)
-
-type eventBaseInfo struct {
+	once      sync.Once
+	counter   int32
 	namespace string
 	podName   string
 	podUID    string
 	nodeName  string
-}
+)
 
 func SendEventWithMessage(logger *logr.Logger, reason string, message string) {
 	go func() {
 		once.Do(func() {
-			baseInfo = eventBaseInfo{
-				namespace: os.Getenv(constant.KBEnvNamespace),
-				podName:   os.Getenv(constant.KBEnvPodName),
-				podUID:    os.Getenv(constant.KBEnvPodUID),
-				nodeName:  os.Getenv(constant.KBEnvNodeName),
-			}
+			namespace = os.Getenv(constant.KBEnvNamespace)
+			podName = os.Getenv(constant.KBEnvPodName)
+			podUID = os.Getenv(constant.KBEnvPodUID)
+			nodeName = os.Getenv(constant.KBEnvNodeName)
 		})
-		err := sendOrUpdateEvent(reason, message)
+		err := createOrUpdateEvent(reason, message)
 		if logger != nil && err != nil {
 			logger.Error(err, "send or update event failed")
 		}
 	}()
 }
 
-func sendOrUpdateEvent(reason string, message string) error {
-	suffix := hashReasonNMessage(reason, message)
-	eventName := fmt.Sprintf("%s.%s.%s", baseInfo.podName, baseInfo.podUID, suffix)
+func createOrUpdateEvent(reason string, message string) error {
 	clientSet, err := getK8sClientSet()
 	if err != nil {
 		return fmt.Errorf("error getting k8s clientset: %v", err)
 	}
-	event, err := clientSet.CoreV1().Events(baseInfo.namespace).Get(context.TODO(), eventName, metav1.GetOptions{})
+	event, err := clientSet.CoreV1().Events(namespace).Get(context.TODO(), string(atomic.LoadInt32(&counter)-1), metav1.GetOptions{})
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			return fmt.Errorf("error getting event: %v", err)
 		}
-		event = createEvent(reason, message, eventName)
-		return sendEvent(clientSet, event)
+		event = newEvent(reason, message)
+		return createEvent(clientSet, event)
 	}
+
 	return updateEvent(clientSet, event)
 }
 
-func createEvent(reason string, message string, eventName string) *corev1.Event {
+func newEvent(reason string, message string) *corev1.Event {
 	return &corev1.Event{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      eventName,
-			Namespace: baseInfo.namespace,
+			Name:      string(atomic.AddInt32(&counter, 1)),
+			Namespace: namespace,
 		},
 		InvolvedObject: corev1.ObjectReference{
 			Kind:      "Pod",
-			Namespace: baseInfo.namespace,
-			Name:      baseInfo.podName,
-			UID:       types.UID(baseInfo.podUID),
+			Namespace: namespace,
+			Name:      podName,
+			UID:       types.UID(podUID),
 			FieldPath: "spec.containers{kbagent}",
 		},
 		Reason:  reason,
 		Message: message,
 		Source: corev1.EventSource{
 			Component: "kbagent",
-			Host:      baseInfo.nodeName,
+			Host:      nodeName,
 		},
 		FirstTimestamp:      metav1.Now(),
 		LastTimestamp:       metav1.Now(),
 		EventTime:           metav1.NowMicro(),
 		ReportingController: "kbagent",
-		ReportingInstance:   baseInfo.podName,
+		ReportingInstance:   podName,
 		Action:              reason,
 		Type:                "Normal",
 	}
 }
 
-func sendEvent(clientSet *kubernetes.Clientset, event *corev1.Event) error {
+func createEvent(clientSet *kubernetes.Clientset, event *corev1.Event) error {
 	for i := 0; i < sendEventMaxAttempts; i++ {
-		_, err := clientSet.CoreV1().Events(baseInfo.namespace).Create(context.Background(), event, metav1.CreateOptions{})
+		_, err := clientSet.CoreV1().Events(namespace).Create(context.Background(), event, metav1.CreateOptions{})
 		if err == nil {
 			return nil
 		}
@@ -136,7 +131,7 @@ func updateEvent(clientSet *kubernetes.Clientset, event *corev1.Event) error {
 	event.Count += 1
 	event.LastTimestamp = metav1.Now()
 
-	_, err := clientSet.CoreV1().Events(baseInfo.namespace).Update(context.Background(), event, metav1.UpdateOptions{})
+	_, err := clientSet.CoreV1().Events(namespace).Update(context.Background(), event, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("error updating event: %v", err)
 	}

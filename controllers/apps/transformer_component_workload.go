@@ -82,6 +82,7 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	cluster := transCtx.Cluster
 	compDef := transCtx.CompDef
 	synthesizeComp := transCtx.SynthesizeComponent
+	compoenent := transCtx.Component
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      transCtx.Context,
 		Log:      transCtx.Logger,
@@ -109,11 +110,7 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	if runningITS == nil {
 		if protoITS != nil {
-			if err := setCompOwnershipNFinalizer(transCtx.Component, protoITS); err != nil {
-				return err
-			}
-			graphCli.Create(dag, protoITS)
-			return nil
+			err = t.handleCreate(reqCtx, graphCli, dag, compoenent, protoITS)
 		}
 	} else {
 		if protoITS == nil {
@@ -171,6 +168,17 @@ func (t *componentWorkloadTransformer) stopWorkload(protoITS *workloads.Instance
 	}
 }
 
+func (t *componentWorkloadTransformer) handleCreate(_ intctrlutil.RequestCtx, cli model.GraphClient, dag *graph.DAG, component *appsv1.Component, protoITS *workloads.InstanceSet) error {
+	if err := setCompOwnershipNFinalizer(component, protoITS); err != nil {
+		return err
+	}
+
+	cli.Create(dag, protoITS)
+	// TODO(kubejocker): update initial pod memberLeave status
+
+	return nil
+}
+
 func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCtx, cli model.GraphClient, dag *graph.DAG,
 	cluster *appsv1.Cluster, synthesizeComp *component.SynthesizedComponent, runningITS, protoITS *workloads.InstanceSet) error {
 	if !isCompStopped(synthesizeComp) {
@@ -202,6 +210,10 @@ func (t *componentWorkloadTransformer) handleWorkloadUpdate(reqCtx intctrlutil.R
 
 	// handle workload horizontal scale
 	if err := cwo.horizontalScale(); err != nil {
+		return err
+	}
+
+	if err := cwo.checkAndDoMemberJoin(); err != nil {
 		return err
 	}
 
@@ -553,6 +565,9 @@ func (r *componentWorkloadOps) postScaleOut(itsObj *workloads.InstanceSet) error
 		}
 	}
 
+	if err := r.recordPodForMemberJoin(itsObj); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -598,11 +613,7 @@ func (r *componentWorkloadOps) scaleOut(itsObj *workloads.InstanceSet) error {
 			return err
 		}
 	}
-	if succeed {
-		// pvcs are ready, ITS.replicas should be updated
-		graphCli.Update(r.dag, nil, r.protoITS)
-		return r.postScaleOut(itsObj)
-	} else {
+	if !succeed {
 		graphCli.Noop(r.dag, r.protoITS)
 		// update objs will trigger reconcile, no need to requeue error
 		objs1, objs2, err := d.CloneData(d)
@@ -617,6 +628,47 @@ func (r *componentWorkloadOps) scaleOut(itsObj *workloads.InstanceSet) error {
 		}
 		return nil
 	}
+
+	// pvcs are ready, ITS.replicas should be updated
+	graphCli.Update(r.dag, nil, r.protoITS)
+	return r.postScaleOut(itsObj)
+}
+
+func (r *componentWorkloadOps) recordPodForMemberJoin(itsObj *workloads.InstanceSet) error {
+	pods, err := component.ListOwnedPods(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, r.cluster.Name, r.synthesizeComp.Name)
+	if err != nil {
+		return err
+	}
+
+	podsToMemberJoin := make([]*corev1.Pod, 0)
+	lifecycleStatus := itsObj.Status.LifeCycleActionsStatus
+	for _, podName := range r.runningItsPodNames {
+		// if the pod not exists in the running pod names, it should be a member that needs to join
+		for _, pod := range pods {
+			if pod.Name != podName {
+				continue
+			}
+			podsToMemberJoin = append(podsToMemberJoin, pod)
+			markMemberJoinStatus(lifecycleStatus, podName, lifecycle.MemberJoinProcessing)
+		}
+	}
+
+	return nil
+}
+
+func markMemberJoinStatus(obj map[string]workloads.ActionStatus, podName string, status lifecycle.MemberJoinStatus) {
+	if obj == nil {
+		obj = make(map[string]workloads.ActionStatus)
+	}
+
+	if _, ok := obj[podName]; !ok {
+		obj[podName] = workloads.ActionStatus{MemberLeaveStatus: status.String()}
+		return
+	}
+
+	actonStatus := obj[podName]
+	actonStatus.MemberLeaveStatus = status.String()
+	obj[podName] = actonStatus
 }
 
 func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
@@ -924,6 +976,32 @@ func (r *componentWorkloadOps) buildProtoITSWorkloadVertex() *model.ObjectVertex
 		if v.Obj == r.protoITS {
 			return v
 		}
+	}
+	return nil
+}
+
+func (r *componentWorkloadOps) checkAndDoMemberJoin() error {
+	pods, err := component.ListOwnedPods(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, r.cluster.Name, r.synthesizeComp.Name)
+	if err != nil {
+		return err
+	}
+	actionStatus := r.runningITS.Status.LifeCycleActionsStatus
+
+	for _, pod := range pods {
+		if actionStatus[pod.Name].MemberLeaveStatus != lifecycle.MemberJoinProcessing.String() {
+			continue
+		}
+		lfa, err := lifecycle.New(r.synthesizeComp, pod, pods...)
+		if err != nil {
+			return err
+		}
+
+		if err2 := lfa.MemberJoin(r.reqCtx.Ctx, r.cli, nil); err2 != nil {
+			if !errors.Is(err2, lifecycle.ErrActionNotDefined) && err == nil {
+
+			}
+		}
+		markMemberJoinStatus(actionStatus, pod.Name, lifecycle.MemberJoinCompleted)
 	}
 	return nil
 }

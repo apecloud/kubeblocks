@@ -450,7 +450,9 @@ func buildInstancePVCByTemplate(name string, template *instanceTemplateExt, pare
 		pvc := builder.NewPVCBuilder(parent.Namespace, pvcName).
 			AddLabelsInMap(template.Labels).
 			AddLabelsInMap(labels).
+			AddLabelsInMap(claimTemplate.Labels).
 			AddLabels(constant.VolumeClaimTemplateNameLabelKey, claimTemplate.Name).
+			AddAnnotationsInMap(claimTemplate.Annotations).
 			SetSpec(*claimTemplate.Spec.DeepCopy()).
 			GetObject()
 		if template.Name != "" {
@@ -513,6 +515,8 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	}
 
 	copyAndMergePVC := func(oldPVC, newPVC *corev1.PersistentVolumeClaim) client.Object {
+		mergeMap(&newPVC.Annotations, &oldPVC.Annotations)
+		mergeMap(&newPVC.Labels, &oldPVC.Labels)
 		// resources.request.storage and accessModes support in-place update.
 		// resources.request.storage only supports volume expansion.
 		if reflect.DeepEqual(oldPVC.Spec.AccessModes, newPVC.Spec.AccessModes) &&

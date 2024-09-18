@@ -111,7 +111,12 @@ var _ = Describe("TLS self-signed cert function", func() {
 			BeforeEach(func() {
 				// prepare self provided tls certs secret
 				var err error
-				userProvidedTLSSecretObj, err = plan.ComposeTLSSecret(testCtx.DefaultNamespace, "test", "self-provided")
+				synthesizedComp := component.SynthesizedComponent{
+					Namespace:   testCtx.DefaultNamespace,
+					ClusterName: "test",
+					Name:        "self-provided",
+				}
+				userProvidedTLSSecretObj, err = plan.ComposeTLSSecret(synthesizedComp)
 				Expect(err).Should(BeNil())
 				Expect(k8sClient.Create(ctx, userProvidedTLSSecretObj)).Should(Succeed())
 			})
@@ -236,7 +241,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 					},
 				}
 				dag = &graph.DAG{}
-				kbTLSSecretObj, err = plan.ComposeTLSSecret(testCtx.DefaultNamespace, synthesizedComp.ClusterName, synthesizedComp.Name)
+				kbTLSSecretObj, err = plan.ComposeTLSSecret(synthesizedComp)
 				Expect(err).Should(BeNil())
 				Expect(k8sClient.Create(ctx, kbTLSSecretObj)).Should(Succeed())
 			})

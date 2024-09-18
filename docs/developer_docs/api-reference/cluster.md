@@ -10521,7 +10521,7 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies Labels to override or add for underlying Pods.</p>
+<p>Specifies Labels to override or add for underlying Pods, PVCs, Account &amp; TLS Secrets, Services Owned by Component.</p>
 </td>
 </tr>
 <tr>
@@ -10533,7 +10533,7 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies Annotations to override or add for underlying Pods.</p>
+<p>Specifies Annotations to override or add for underlying Pods, PVCs, Account &amp; TLS Secrets, Services Owned by Component.</p>
 </td>
 </tr>
 <tr>
@@ -14657,7 +14657,7 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies Labels to override or add for underlying Pods.</p>
+<p>Specifies Labels to override or add for underlying Pods, PVCs, Account &amp; TLS Secrets, Services Owned by Component.</p>
 </td>
 </tr>
 <tr>
@@ -14669,7 +14669,7 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies Annotations to override or add for underlying Pods.</p>
+<p>Specifies Annotations to override or add for underlying Pods, PVCs, Account &amp; TLS Secrets, Services Owned by Component.</p>
 </td>
 </tr>
 <tr>
@@ -18446,7 +18446,7 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies Labels to override or add for underlying Pods.</p>
+<p>Specifies Labels to override or add for underlying Pods, PVCs, Account &amp; TLS Secrets, Services Owned by Component.</p>
 </td>
 </tr>
 <tr>
@@ -18458,7 +18458,7 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies Annotations to override or add for underlying Pods.</p>
+<p>Specifies Annotations to override or add for underlying Pods, PVCs, Account &amp; TLS Secrets, Services Owned by Component.</p>
 </td>
 </tr>
 <tr>

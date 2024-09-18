@@ -4020,7 +4020,7 @@ spec:
                             type: string
                           targetNodeName:
                             description: |-
-                              The instance will rebuild on the specified node when the instance uses local PersistentVolume as the storage disk.
+                              The instance will rebuild on the specified node.
                               If not set, it will rebuild on a random node.
                             type: string
                         required:

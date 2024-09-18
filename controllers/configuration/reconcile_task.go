@@ -28,7 +28,6 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -128,7 +127,7 @@ func syncImpl(fetcher *Task,
 func syncStatus(configMap *corev1.ConfigMap, status *configurationv1alpha1.ConfigTemplateItemDetailStatus) (err error) {
 	annotations := configMap.GetAnnotations()
 	// status.CurrentRevision = GetCurrentRevision(annotations)
-	revisions := configuration.RetrieveRevision(annotations)
+	revisions := RetrieveRevision(annotations)
 	if len(revisions) == 0 {
 		return
 	}
@@ -141,13 +140,13 @@ func syncStatus(configMap *corev1.ConfigMap, status *configurationv1alpha1.Confi
 	return
 }
 
-func updateLastDoneRevision(revision configuration.ConfigurationRevision, status *configurationv1alpha1.ConfigTemplateItemDetailStatus) {
+func updateLastDoneRevision(revision ConfigurationRevision, status *configurationv1alpha1.ConfigTemplateItemDetailStatus) {
 	if revision.Phase == configurationv1alpha1.CFinishedPhase {
 		status.LastDoneRevision = strconv.FormatInt(revision.Revision, 10)
 	}
 }
 
-func updateRevision(revision configuration.ConfigurationRevision, status *configurationv1alpha1.ConfigTemplateItemDetailStatus) {
+func updateRevision(revision ConfigurationRevision, status *configurationv1alpha1.ConfigTemplateItemDetailStatus) {
 	if revision.StrRevision == status.UpdateRevision {
 		status.Phase = revision.Phase
 		status.ReconcileDetail = &configurationv1alpha1.ReconcileDetail{

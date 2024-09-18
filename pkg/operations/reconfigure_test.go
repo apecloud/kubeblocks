@@ -112,7 +112,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		By("update configuration status")
 		revision := "1"
 		Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(configuration.GetObject()),
-			func(config *appsv1alpha1.ComponentConfiguration) {
+			func(config *configurationv1alpha1.ComponentParameter) {
 				revision = cast.ToString(config.GetGeneration())
 				for _, item := range config.Spec.ConfigItemDetails {
 					configutil.CheckAndUpdateItemStatus(config, item, revision)
@@ -231,14 +231,14 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsRunningPhase))
 
 			By("mock configuration.status.phase to Finished")
-			var item *appsv1alpha1.ConfigTemplateItemDetail
+			var item *configurationv1alpha1.ConfigTemplateItemDetail
 			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(configuration),
-				func(config *appsv1alpha1.ComponentConfiguration) {
-					item = config.Spec.GetConfigurationItem("mysql-test")
+				func(config *configurationv1alpha1.ComponentParameter) {
+					item = intctrlutil.GetConfigurationItem(&config.Spec, "mysql-test")
 					for i := 0; i < len(config.Status.ConfigurationItemStatus); i++ {
-						config.Status.ConfigurationItemStatus[i].Phase = appsv1alpha1.CFinishedPhase
+						config.Status.ConfigurationItemStatus[i].Phase = configurationv1alpha1.CFinishedPhase
 						if config.Status.ConfigurationItemStatus[i].Name == item.Name {
-							config.Status.ConfigurationItemStatus[i].ReconcileDetail = &appsv1alpha1.ReconcileDetail{
+							config.Status.ConfigurationItemStatus[i].ReconcileDetail = &configurationv1alpha1.ReconcileDetail{
 								Policy:          "simple",
 								CurrentRevision: config.Status.ConfigurationItemStatus[i].UpdateRevision,
 								SucceedCount:    2,

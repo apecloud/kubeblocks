@@ -48,8 +48,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
-	configurationcontrollers "github.com/apecloud/kubeblocks/controllers/configuration"
-
 	// +kubebuilder:scaffold:imports
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -62,7 +60,7 @@ import (
 	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	appscontrollers "github.com/apecloud/kubeblocks/controllers/apps"
-	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
+	"github.com/apecloud/kubeblocks/controllers/configuration"
 	experimentalcontrollers "github.com/apecloud/kubeblocks/controllers/experimental"
 	extensionscontrollers "github.com/apecloud/kubeblocks/controllers/extensions"
 	k8scorecontrollers "github.com/apecloud/kubeblocks/controllers/k8score"
@@ -483,7 +481,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&configurationcontrollers.ParametersDefinitionReconciler{
+		if err = (&configuration.ParametersDefinitionReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("parameters-definition-controller"),
@@ -501,21 +499,12 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&configurationcontrollers.ComponentParameterReconciler{
+		if err = (&configuration.ComponentParameterReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("component-parameter-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "ComponentParameter")
-			os.Exit(1)
-		}
-
-		if err = (&configuration.ConfigurationReconciler{
-			Client:   client,
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("configuration-controller"),
 		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Configuration")
+			setupLog.Error(err, "unable to create controller", "controller", "ComponentParameter")
 			os.Exit(1)
 		}
 	}

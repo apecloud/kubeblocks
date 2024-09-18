@@ -50,17 +50,17 @@ var _ = Describe("Configuration Controller", func() {
 				Name:      core.GenerateComponentConfigurationName(clusterName, defaultCompName),
 				Namespace: testCtx.DefaultNamespace,
 			}
-			checkCfgStatus := func(phase appsv1alpha1.ConfigurationPhase) func() bool {
+			checkCfgStatus := func(phase configurationv1alpha1.ConfigurationPhase) func() bool {
 				return func() bool {
-					cfg := &appsv1alpha1.ComponentConfiguration{}
+					cfg := &configurationv1alpha1.ComponentParameter{}
 					Expect(k8sClient.Get(ctx, cfgKey, cfg)).Should(Succeed())
-					itemStatus := cfg.Status.GetItemStatus(configSpecName)
+					itemStatus := intctrlutil.GetItemStatus(&cfg.Status, configSpecName)
 					return itemStatus != nil && itemStatus.Phase == phase
 				}
 			}
 
 			By("wait for configuration status to be init phase.")
-			Eventually(checkCfgStatus(appsv1alpha1.CInitPhase)).Should(BeFalse())
+			Eventually(checkCfgStatus(configurationv1alpha1.CInitPhase)).Should(BeFalse())
 			Expect(initConfiguration(&configctrl.ResourceCtx{
 				Client:        k8sClient,
 				Context:       ctx,
@@ -69,11 +69,11 @@ var _ = Describe("Configuration Controller", func() {
 				ComponentName: defaultCompName,
 			}, synthesizedComp, clusterObj, componentObj)).Should(Succeed())
 
-			Eventually(checkCfgStatus(appsv1alpha1.CFinishedPhase)).Should(BeTrue())
+			Eventually(checkCfgStatus(configurationv1alpha1.CFinishedPhase)).Should(BeTrue())
 
 			By("reconfiguring parameters.")
-			Eventually(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *appsv1alpha1.ComponentConfiguration) {
-				cfg.Spec.GetConfigurationItem(configSpecName).ConfigFileParams = map[string]appsv1alpha1.ParametersInFile{
+			Eventually(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *configurationv1alpha1.ComponentParameter) {
+				intctrlutil.GetConfigurationItem(&cfg.Spec, configSpecName).ConfigFileParams = map[string]configurationv1alpha1.ParametersInFile{
 					"my.cnf": {
 						Parameters: map[string]*string{
 							"max_connections": cfgutil.ToPointer("1000"),
@@ -84,9 +84,9 @@ var _ = Describe("Configuration Controller", func() {
 			})).Should(Succeed())
 
 			Eventually(func(g Gomega) {
-				cfg := &appsv1alpha1.ComponentConfiguration{}
+				cfg := &configurationv1alpha1.ComponentParameter{}
 				g.Expect(k8sClient.Get(ctx, cfgKey, cfg)).Should(Succeed())
-				itemStatus := cfg.Status.GetItemStatus(configSpecName)
+				itemStatus := intctrlutil.GetItemStatus(&cfg.Status, configSpecName)
 				g.Expect(itemStatus).ShouldNot(BeNil())
 				g.Expect(itemStatus.UpdateRevision).Should(BeEquivalentTo("2"))
 				g.Expect(itemStatus.Phase).Should(BeEquivalentTo(appsv1alpha1.CFinishedPhase))

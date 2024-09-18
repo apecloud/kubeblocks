@@ -26,7 +26,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -106,8 +105,8 @@ func (p *reloadActionBuilderHelper) RenderScriptTemplate() *reloadActionBuilderH
 	})
 }
 
-func CheckAndUpdateItemStatus(updated *appsv1alpha1.ComponentConfiguration, item appsv1alpha1.ConfigTemplateItemDetail, reversion string) {
-	foundStatus := func(name string) *appsv1alpha1.ConfigTemplateItemDetailStatus {
+func CheckAndUpdateItemStatus(updated *configurationv1alpha1.ComponentParameter, item configurationv1alpha1.ConfigTemplateItemDetail, reversion string) {
+	foundStatus := func(name string) *configurationv1alpha1.ConfigTemplateItemDetailStatus {
 		for i := range updated.Status.ConfigurationItemStatus {
 			status := &updated.Status.ConfigurationItemStatus[i]
 			if status.Name == name {
@@ -119,13 +118,13 @@ func CheckAndUpdateItemStatus(updated *appsv1alpha1.ComponentConfiguration, item
 
 	status := foundStatus(item.Name)
 	if status != nil && status.Phase == "" {
-		status.Phase = appsv1alpha1.CInitPhase
+		status.Phase = configurationv1alpha1.CInitPhase
 	}
 	if status == nil {
 		updated.Status.ConfigurationItemStatus = append(updated.Status.ConfigurationItemStatus,
-			appsv1alpha1.ConfigTemplateItemDetailStatus{
+			configurationv1alpha1.ConfigTemplateItemDetailStatus{
 				Name:           item.Name,
-				Phase:          appsv1alpha1.CInitPhase,
+				Phase:          configurationv1alpha1.CInitPhase,
 				UpdateRevision: reversion,
 			})
 	}

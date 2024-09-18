@@ -26,7 +26,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
@@ -84,12 +83,12 @@ func (c *componentConfigurationTransformer) reconcile(transCtx *componentTransfo
 	return nil
 }
 
-func (c *componentConfigurationTransformer) runningComponentConfiguration(ctx context.Context, cli client.Reader, component *component.SynthesizedComponent) (*appsv1alpha1.ComponentConfiguration, error) {
+func (c *componentConfigurationTransformer) runningComponentConfiguration(ctx context.Context, cli client.Reader, component *component.SynthesizedComponent) (*configurationv1alpha1.ComponentParameter, error) {
 	key := client.ObjectKey{
 		Name:      core.GenerateComponentConfigurationName(component.ClusterName, component.Name),
 		Namespace: component.Namespace,
 	}
-	existingConfig := &appsv1alpha1.ComponentConfiguration{}
+	existingConfig := &configurationv1alpha1.ComponentParameter{}
 	err := cli.Get(ctx, key, existingConfig, inDataContext4C())
 	if err == nil {
 		return existingConfig, nil

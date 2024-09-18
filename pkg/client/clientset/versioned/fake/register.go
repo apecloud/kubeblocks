@@ -22,6 +22,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	operationsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
@@ -41,6 +42,7 @@ var localSchemeBuilder = runtime.SchemeBuilder{
 	appsv1alpha1.AddToScheme,
 	appsv1beta1.AddToScheme,
 	appsv1.AddToScheme,
+	configurationv1alpha1.AddToScheme,
 	dataprotectionv1alpha1.AddToScheme,
 	extensionsv1alpha1.AddToScheme,
 	operationsv1alpha1.AddToScheme,

@@ -28,7 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 )
 
 // ParametersDefinitionReconciler reconciles a ParametersDefinition object
@@ -38,9 +38,9 @@ type ParametersDefinitionReconciler struct {
 	Recorder record.EventRecorder
 }
 
-// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=parametersdefinitions,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=parametersdefinitions/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=parametersdefinitions/finalizers,verbs=update
+// +kubebuilder:rbac:groups=configuration.kubeblocks.io,resources=parametersdefinitions,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=configuration.kubeblocks.io,resources=parametersdefinitions/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=configuration.kubeblocks.io,resources=parametersdefinitions/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -62,6 +62,6 @@ func (r *ParametersDefinitionReconciler) Reconcile(ctx context.Context, req ctrl
 // SetupWithManager sets up the controller with the Manager.
 func (r *ParametersDefinitionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&appsv1beta1.ParametersDefinition{}).
+		For(&configurationv1alpha1.ParametersDefinition{}).
 		Complete(r)
 }

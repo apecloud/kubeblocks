@@ -21,8 +21,8 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/openapi"
 )
 
@@ -31,12 +31,12 @@ type ParameterMeta struct {
 	ConfigTemplateName string
 }
 
-func GetConfigParameterMeta(ctx context.Context, cli client.Reader, parameterDesc appsv1alpha1.ComponentParametersDescription, configTemplate *appsv1alpha1.ComponentConfigSpec) (map[string]*ParameterMeta, error) {
+func GetConfigParameterMeta(ctx context.Context, cli client.Reader, parameterDesc appsv1.ComponentParametersDescription, configTemplate *appsv1.ComponentConfigSpec) (map[string]*ParameterMeta, error) {
 	paramDefKey := client.ObjectKey{
 		Name: parameterDesc.ParametersDefName,
 	}
 
-	paramDef := &appsv1beta1.ParametersDefinition{}
+	paramDef := &configurationv1alpha1.ParametersDefinition{}
 	if err := cli.Get(ctx, paramDefKey, paramDef); err != nil {
 		return nil, err
 	}

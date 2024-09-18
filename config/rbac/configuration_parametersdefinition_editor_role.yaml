@@ -12,7 +12,7 @@ metadata:
   name: parametersdefinition-editor-role
 rules:
 - apiGroups:
-  - apps.kubeblocks.io
+  - configuration.kubeblocks.io
   resources:
   - parametersdefinitions
   verbs:
@@ -24,7 +24,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - apps.kubeblocks.io
+  - configuration.kubeblocks.io
   resources:
   - parametersdefinitions/status
   verbs:

@@ -263,32 +263,6 @@ rules:
 - apiGroups:
   - apps.kubeblocks.io
   resources:
-  - parametersdefinitions
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - parametersdefinitions/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - parametersdefinitions/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
   - servicedescriptors
   verbs:
   - create
@@ -362,6 +336,58 @@ rules:
   - jobs/status
   verbs:
   - get
+- apiGroups:
+  - configuration.kubeblocks.io
+  resources:
+  - componentparameters
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - configuration.kubeblocks.io
+  resources:
+  - componentparameters/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - configuration.kubeblocks.io
+  resources:
+  - componentparameters/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - configuration.kubeblocks.io
+  resources:
+  - parametersdefinitions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - configuration.kubeblocks.io
+  resources:
+  - parametersdefinitions/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - configuration.kubeblocks.io
+  resources:
+  - parametersdefinitions/status
+  verbs:
+  - get
+  - patch
+  - update
 - apiGroups:
   - coordination.k8s.io
   resources:

@@ -284,6 +284,20 @@ type ComponentSpec struct {
 	//
 	// +optional
 	Stop *bool `json:"stop,omitempty"`
+
+	// Specifies the user-defined configuration template.
+	//
+	// When provided, the `userConfigTemplates` overrides the default configuration template in the ComponentDefinition
+	// specified in `spec.configs[*].templateRef`.
+	// This allows users to customize the configuration template according to their specific requirements.
+	//
+	// +optional
+	UserConfigTemplates map[string]ConfigTemplateExtension `json:"userConfigTemplates,omitempty"`
+
+	// Specifies the user-defined configuration template or parameters.
+	//
+	// +optional
+	ComponentParameters ComponentParameters `json:"parameters,omitempty"`
 }
 
 // ComponentStatus represents the observed state of a Component within the Cluster.

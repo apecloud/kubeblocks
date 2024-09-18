@@ -24,6 +24,7 @@ import (
 	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	v1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	v1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	operationsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
@@ -96,8 +97,12 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		// Group=apps.kubeblocks.io, Version=v1beta1
 	case v1beta1.SchemeGroupVersion.WithResource("configconstraints"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().ConfigConstraints().Informer()}, nil
-	case v1beta1.SchemeGroupVersion.WithResource("parametersdefinitions"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().ParametersDefinitions().Informer()}, nil
+
+		// Group=configuration.kubeblocks.io, Version=v1alpha1
+	case configurationv1alpha1.SchemeGroupVersion.WithResource("componentparameters"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Configuration().V1alpha1().ComponentParameters().Informer()}, nil
+	case configurationv1alpha1.SchemeGroupVersion.WithResource("parametersdefinitions"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Configuration().V1alpha1().ParametersDefinitions().Informer()}, nil
 
 		// Group=dataprotection.kubeblocks.io, Version=v1alpha1
 	case dataprotectionv1alpha1.SchemeGroupVersion.WithResource("actionsets"):

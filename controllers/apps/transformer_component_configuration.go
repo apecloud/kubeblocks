@@ -25,6 +25,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
@@ -98,7 +99,7 @@ func (c *componentConfigurationTransformer) runningComponentConfiguration(ctx co
 	return nil, nil
 }
 
-func buildConfiguration(transCtx *componentTransformContext, cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) (*appsv1alpha1.ComponentConfiguration, error) {
+func buildConfiguration(transCtx *componentTransformContext, cluster *appsv1.Cluster, component *component.SynthesizedComponent) (*appsv1alpha1.ComponentConfiguration, error) {
 	items, err := configuration.ClassifyParamsFromConfigTemplate(transCtx, transCtx.GetClient(), transCtx.Component, transCtx.CompDef, component)
 	if err != nil {
 		return nil, err

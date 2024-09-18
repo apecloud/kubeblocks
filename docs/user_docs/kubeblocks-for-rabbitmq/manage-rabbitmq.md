@@ -15,7 +15,7 @@ KubeBlocks supports the management of RabbitMQ.
 ## Before you start
 
 - [Install kbcli](./../installation/install-with-kbcli/install-kbcli.md).
-- [Install KubeBlocks](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md).
+- Install KubeBlocks [by kbcli](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [by helm](./../installation/install-with-helm/install-kubeblocks.md).
 - Install and enable the rabbitmq addon [by kbcli](./../installation/install-with-kbcli/install-addons.md) or [by Helm](./../installation/install-with-helm/install-addons.md).
 
 ## Create a cluster
@@ -25,7 +25,7 @@ KubeBlocks supports the management of RabbitMQ.
 
 ***Steps***
 
-1. Execute the following command to create a StarRocks cluster.
+1. Execute the following command to create a RabbitMQ cluster.
 
    ```bash
    kbcli cluster create mycluster --cluster-definition=rabbitmq --namespace=demo
@@ -50,10 +50,10 @@ kbcli cluster create --help
 2. Check whether the cluster is created.
 
    ```bash
-   kbcli cluster list
+   kbcli cluster list --namespace=demo
    >
    NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS     CREATED-TIME
-   mycluster   default     rabbitmq             rabbitmq-3.13.2   Delete               Running    Sep 13,2024 11:06 UTC+0800   
+   mycluster   demo        rabbitmq             rabbitmq-3.13.2   Delete               Running    Sep 13,2024 11:06 UTC+0800   
    ```
 
 </TabItem>
@@ -133,73 +133,9 @@ kubectl get cluster mycluster -n demo -o yaml
 
 </Tabs>
 
-## Connect to a RabbitMQ cluster
+## Connect to the cluster
 
-Here is an example of connecting to the RabbitMQ cluster in the demo environment on the localhost. For more connection options, refer to [Connect Database](./../connect_database/overview-of-database-connection.md) for details.
-
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
-Run the command below to connect to the cluster.
-
-```bash
-kbcli cluster connect <clustername>  --namespace <name>
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
-
-</TabItem>
-
-***Steps:***
-
-1. Use the kubectl exec command to open an interactive shell session inside the MySQL Pod. This allows you to run commands directly within the Pod's environment.
-
-   ```bash
-   kubectl exec -ti -n demo mycluster-mysql-0 -- bash
-   >
-   root@mycluster-rabbitmq-0:/#
-   ```
-
-   `-ti`: Opens an interactive terminal session (-t allocates a pseudo-TTY, and -i keeps the session open).
-   `-n demo`: Specifies the demo namespace where your Pod is running.
-   `mycluster-rabbitmq-0`: The name of the MySQL Pod. Make sure to replace this with the actual Pod name if it's different.
-   `-- bash`: Opens a Bash shell inside the Pod. You can also use sh if Bash is not available in the container.
-
-2. View the cluster status.
-
-   ```bash
-   root@mycluster-rabbitmq-0:/# rabbitmqctl cluster_status
-   >
-   Cluster status of node rabbit@mycluster-rabbitmq-0.mycluster-rabbitmq-headless.demo ...
-   Basics
-
-   Cluster name: mycluster
-   Total CPU cores available cluster-wide: 30
-
-   Disk Nodes
-
-   rabbit@mycluster-rabbitmq-0.mycluster-rabbitmq-headless.demo
-   rabbit@mycluster-rabbitmq-1.mycluster-rabbitmq-headless.demo
-   rabbit@mycluster-rabbitmq-2.mycluster-rabbitmq-headless.demo
-
-   Running Nodes
-
-   rabbit@mycluster-rabbitmq-0.mycluster-rabbitmq-headless.demo
-   rabbit@mycluster-rabbitmq-1.mycluster-rabbitmq-headless.demo
-   rabbit@mycluster-rabbitmq-2.mycluster-rabbitmq-headless.demo
-
-   Versions
-
-   rabbit@mycluster-rabbitmq-0.mycluster-rabbitmq-headless.demo: RabbitMQ 3.13.2 on Erlang 26.2.5
-   rabbit@mycluster-rabbitmq-1.mycluster-rabbitmq-headless.demo: RabbitMQ 3.13.2 on Erlang 26.2.5
-   rabbit@mycluster-rabbitmq-2.mycluster-rabbitmq-headless.demo: RabbitMQ 3.13.2 on Erlang 26.2.5
-   ......
-   ```
-
-</Tabs>
+Use the [RabbitMQ tools](https://www.rabbitmq.com/docs/cli) to connect to and manage the RabbitMQ cluster.
 
 ## Scale
 
@@ -212,16 +148,16 @@ kbcli cluster connect <clustername>  --namespace <name>
 Before you start, check whether the cluster status is Running. Otherwise, the following operations may fail.
 
 ```bash
-kbcli cluster list rabbitmq
+kbcli cluster list rabbitmq -n demo
 >
-NAME       CLUSTER-DEFINITION     VERSION           TERMINATION-POLICY    STATUS    AGE
-rabbitmq   rabbitmq               rabbitmq-3.13.2   Delete                Running   47m
+NAME       NAMESPACE    CLUSTER-DEFINITION     VERSION           TERMINATION-POLICY    STATUS    AGE
+rabbitmq   demo         rabbitmq               rabbitmq-3.13.2   Delete                Running   47m
 ```
 
 Use the following command to perform vertical scaling.
 
 ```bash
-kbcli cluster vscale mycluster --cpu=2 --memory=2Gi --components=rabbitmq
+kbcli cluster vscale mycluster --cpu=2 --memory=2Gi --components=rabbitmq -n demo
 ```
 
 Please wait a few seconds until the scaling process is over.
@@ -229,7 +165,7 @@ Please wait a few seconds until the scaling process is over.
 The `kbcli cluster vscale` command prints a command to help check the progress of scaling operations.
 
 ```bash
-kbcli cluster describe-ops mycluster-verticalscaling-smx8b -n default
+kbcli cluster describe-ops mycluster-verticalscaling-smx8b -n demo
 ```
 
 Validate the vertical scale operation. When the cluster is running again, the operation is completed.
@@ -285,7 +221,7 @@ mycluster                                        Delete                 Running 
    demo        ops-vertical-scaling   VerticalScaling   mycluster   Succeed   3/3        6m
    ```
 
-   If an error occurs, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
+   If an error occurs, you can troubleshoot it with `kubectl describe ops -n demo` command to view the events of this operation.
 
 3. Check whether the corresponding resources change.
 
@@ -349,16 +285,16 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
 Before you start, check whether the cluster status is Running. Otherwise, the following operations may fail.
 
 ```bash
-kbcli cluster list rabbitmq
+kbcli cluster list rabbitmq -n demo
 >
-NAME       CLUSTER-DEFINITION     VERSION           TERMINATION-POLICY    STATUS    AGE
-rabbitmq   rabbitmq               rabbitmq-3.13.2   Delete                Running   47m
+NAME       NAMESPACE    CLUSTER-DEFINITION     VERSION           TERMINATION-POLICY    STATUS    AGE
+rabbitmq   demo         rabbitmq               rabbitmq-3.13.2   Delete                Running   47m
 ```
 
 Use the following command to perform horizontal scaling.
 
 ```bash
-kbcli cluster hscale mycluster --replicas=3 --components=rabbitmq
+kbcli cluster hscale mycluster --replicas=3 --components=rabbitmq -n demo
 ```
 
 - `--components` describes the component name ready for horizontal scaling.
@@ -369,13 +305,13 @@ Please wait a few seconds until the scaling process is over.
 The `kbcli cluster hscale` command prints a command to help check the progress of scaling operations.
 
 ```bash
-kbcli cluster describe-ops mycluster-horizontalscaling-smx8b -n default
+kbcli cluster describe-ops mycluster-horizontalscaling-smx8b -n demo
 ```
 
 Validate the horizontal scale operation. When the cluster is running again, the operation is completed.
 
 ```bash
-kbcli cluster describe mycluster
+kbcli cluster describe mycluster -n demo
 ```
 
 </TabItem>
@@ -425,7 +361,7 @@ mycluster                                        Delete                 Running 
    demo        ops-horizontal-scaling   HorizontalScaling   mycluster   Succeed   3/3        6m
    ```
 
-   If an error occurs, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
+   If an error occurs, you can troubleshoot it with `kubectl describe ops -n demo` command to view the events of this operation.
 
 3. Check whether the corresponding resources change.
 
@@ -479,16 +415,16 @@ mycluster                                        Delete                 Running 
 Before you start, check whether the cluster status is Running. Otherwise, the following operations may fail.
 
 ```bash
-kbcli cluster list rabbitmq
+kbcli cluster list rabbitmq -n demo
 >
-NAME       CLUSTER-DEFINITION     VERSION           TERMINATION-POLICY    STATUS    AGE
-rabbitmq   rabbitmq               rabbitmq-3.13.2   Delete                Running   47m
+NAME       NAMESPACE    CLUSTER-DEFINITION     VERSION           TERMINATION-POLICY    STATUS    AGE
+rabbitmq   demo         rabbitmq               rabbitmq-3.13.2   Delete                Running   47m
 ```
 
 Use the following command to perform volume expansion.
 
 ```bash
-kbcli cluster volume-expand mycluster --storage=40Gi --components=rabbitmq
+kbcli cluster volume-expand mycluster --storage=40Gi --components=rabbitmq -n demo
 ```
 
 The volume expansion may take a few minutes.
@@ -496,13 +432,13 @@ The volume expansion may take a few minutes.
 The `kbcli cluster volume-expand` command prints a command to help check the progress of scaling operations.
 
 ```bash
-kbcli cluster describe-ops mycluster-volumeexpansion-smx8b -n default
+kbcli cluster describe-ops mycluster-volumeexpansion-smx8b -n demo
 ```
 
 Validate the volume expansion operation. When the cluster is running again, the operation is completed.
 
 ```bash
-kbcli cluster describe mycluster
+kbcli cluster describe mycluster -n demo
 ```
 
 </TabItem>
@@ -522,7 +458,7 @@ mycluster                                        Delete                 Running 
 
 1. Change the value of storage according to your need and run the command below to expand the volume of a cluster.
 
-    ```yaml
+    ```bash
     kubectl apply -f - <<EOF
     apiVersion: apps.kubeblocks.io/v1alpha1
     kind: OpsRequest
@@ -549,7 +485,7 @@ mycluster                                        Delete                 Running 
     demo        ops-volume-expansion   VolumeExpansion   mycluster   Succeed   3/3        6m
     ```
 
-    If an error occurs, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
+    If an error occurs, you can troubleshoot it with `kubectl describe ops -n demo` command to view the events of this operation.
 
 3. Check whether the corresponding cluster resources change.
 
@@ -563,7 +499,7 @@ mycluster                                        Delete                 Running 
 
    `spec.componentSpecs.volumeClaimTemplates.spec.resources` is the storage resource information of the pod and changing this value triggers the volume expansion of a cluster.
 
-   ```yaml
+   ```bash
    kubectl edit cluster mycluster -n demo
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
@@ -608,7 +544,7 @@ mycluster                                        Delete                 Running 
 
    ```bash
    kbcli cluster restart mycluster --components="rabbitmq" \
-   --ttlSecondsAfterSucceed=30
+   --ttlSecondsAfterSucceed=30 -n demo
    ```
 
    - `components` describes the component name that needs to be restarted.
@@ -619,10 +555,10 @@ mycluster                                        Delete                 Running 
    Run the command below to check the cluster status to check the restarting status.
 
    ```bash
-   kbcli cluster list mycluster
+   kbcli cluster list mycluster -n demo
    >
    NAME        NAMESPACE   CLUSTER-DEFINITION     VERSION            TERMINATION-POLICY   STATUS    CREATED-TIME
-   mycluster   default     rabbitmq               rabbitmq-3.13.2    Delete               Running   Sep 13,2024 11:06 UTC+0800
+   mycluster   demo        rabbitmq               rabbitmq-3.13.2    Delete               Running   Sep 13,2024 12:06 UTC+0800
    ```
 
    * STATUS=Updating: it means the cluster restart is in progress.
@@ -679,13 +615,13 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 1. Configure the name of your cluster and run the command below to stop this cluster.
 
    ```bash
-   kbcli cluster stop mycluster
+   kbcli cluster stop mycluster -n demo
    ```
 
 2. Check the status of the cluster to see whether it is stopped.
 
     ```bash
-    kbcli cluster list
+    kbcli cluster list -n demo
     ```
 
 </TabItem>
@@ -711,7 +647,7 @@ EOF
 
 #### Option 2. Edit the cluster YAML file
 
-Configure replicas as 0 to delete pods.
+Configure `replicas` as 0 to delete pods.
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -766,13 +702,13 @@ spec:
 1. Configure the name of your cluster and run the command below to start this cluster.
 
    ```bash
-   kbcli cluster start mycluster
+   kbcli cluster start mycluster -n demo
    ```
 
 2. Check the status of the cluster to see whether it is running again.
 
     ```bash
-    kbcli cluster list
+    kbcli cluster list -n demo
     ```
 
 </TabItem>

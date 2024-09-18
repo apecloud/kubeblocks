@@ -35,6 +35,11 @@ func GenerateAccountSecretName(clusterName, compName, name string) string {
 	return fmt.Sprintf("%s-%s-account-%s", clusterName, compName, replacedName)
 }
 
+// GenerateShardingSharedAccountSecretName generates the sharding shared account secret name
+func GenerateShardingSharedAccountSecretName(clusterName, shardingName, accountName string) string {
+	return fmt.Sprintf("%s-%s-%s", clusterName, shardingName, accountName)
+}
+
 // GenerateClusterServiceName generates the service name for cluster.
 func GenerateClusterServiceName(clusterName, svcName string) string {
 	if len(svcName) > 0 {

@@ -27,14 +27,14 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/testutil"
 )
 
 // NewOpsRequestObj only generates the OpsRequest Object, instead of actually creating this resource.
-func NewOpsRequestObj(opsRequestName, namespace, clusterName string, opsType appsv1alpha1.OpsType) *appsv1alpha1.OpsRequest {
-	return &appsv1alpha1.OpsRequest{
+func NewOpsRequestObj(opsRequestName, namespace, clusterName string, opsType opsv1alpha1.OpsType) *opsv1alpha1.OpsRequest {
+	return &opsv1alpha1.OpsRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      opsRequestName,
 			Namespace: namespace,
@@ -43,7 +43,7 @@ func NewOpsRequestObj(opsRequestName, namespace, clusterName string, opsType app
 				constant.OpsRequestTypeLabelKey: string(opsType),
 			},
 		},
-		Spec: appsv1alpha1.OpsRequestSpec{
+		Spec: opsv1alpha1.OpsRequestSpec{
 			ClusterName: clusterName,
 			Type:        opsType,
 		},
@@ -51,7 +51,7 @@ func NewOpsRequestObj(opsRequestName, namespace, clusterName string, opsType app
 }
 
 // CreateOpsRequest calls the api to create the OpsRequest resource.
-func CreateOpsRequest(ctx context.Context, testCtx testutil.TestContext, opsRequest *appsv1alpha1.OpsRequest) *appsv1alpha1.OpsRequest {
+func CreateOpsRequest(ctx context.Context, testCtx testutil.TestContext, opsRequest *opsv1alpha1.OpsRequest) *opsv1alpha1.OpsRequest {
 	gomega.Expect(testCtx.CreateObj(ctx, opsRequest)).Should(gomega.Succeed())
 	// wait until cluster created
 	gomega.Eventually(CheckObjExists(&testCtx, client.ObjectKeyFromObject(opsRequest), opsRequest, true)).Should(gomega.Succeed())
@@ -59,9 +59,9 @@ func CreateOpsRequest(ctx context.Context, testCtx testutil.TestContext, opsRequ
 }
 
 // GetOpsRequestPhase gets the testing opsRequest phase for verification.
-func GetOpsRequestPhase(testCtx *testutil.TestContext, opsKey types.NamespacedName) func(gomega.Gomega) appsv1alpha1.OpsPhase {
-	return func(g gomega.Gomega) appsv1alpha1.OpsPhase {
-		tmpOps := &appsv1alpha1.OpsRequest{}
+func GetOpsRequestPhase(testCtx *testutil.TestContext, opsKey types.NamespacedName) func(gomega.Gomega) opsv1alpha1.OpsPhase {
+	return func(g gomega.Gomega) opsv1alpha1.OpsPhase {
+		tmpOps := &opsv1alpha1.OpsRequest{}
 		g.Expect(testCtx.Cli.Get(testCtx.Ctx, opsKey, tmpOps)).To(gomega.Succeed())
 		return tmpOps.Status.Phase
 	}

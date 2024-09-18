@@ -53,7 +53,7 @@ KubeBlocks 0.9 可以兼容 KubeBlocks 0.8 的 API，但不保证兼容 0.8 之�
 2. 删除不兼容的OpsDefinition
 
    ```bash
-   kubectl delete opsdefinitions.apps.kubeblocks.io kafka-quota kafka-topic kafka-user-acl switchover
+   kubectl delete opsdefinitions.operations.kubeblocks.io kafka-quota kafka-topic kafka-user-acl switchover
    ```
 
 3. 安装 CRD。

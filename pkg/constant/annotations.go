@@ -41,9 +41,7 @@ const (
 	KubeBlocksGenerationKey                  = "kubeblocks.io/generation"
 	LastRoleSnapshotVersionAnnotationKey     = "apps.kubeblocks.io/last-role-snapshot-version"
 	ComponentScaleInAnnotationKey            = "apps.kubeblocks.io/component-scale-in" // ComponentScaleInAnnotationKey specifies whether the component is scaled in
-	DisableHAAnnotationKey                   = "kubeblocks.io/disable-ha"
-	OpsDependentOnSuccessfulOpsAnnoKey       = "ops.kubeblocks.io/dependent-on-successful-ops" // OpsDependentOnSuccessfulOpsAnnoKey wait for the dependent ops to succeed before executing the current ops. If it fails, this ops will also fail.
-	RelatedOpsAnnotationKey                  = "ops.kubeblocks.io/related-ops"
+	DisableHAAnnotationKey                   = "kubeblocks.io/disable-ha"              // OpsDependentOnSuccessfulOpsAnnoKey wait for the dependent ops to succeed before executing the current ops. If it fails, this ops will also fail.
 
 	// SkipImmutableCheckAnnotationKey specifies to skip the mutation check for the object.
 	// The mutation check is only applied to the fields that are declared as immutable.

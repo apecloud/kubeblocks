@@ -23,8 +23,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-
-	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 const (
@@ -32,7 +30,6 @@ const (
 	ClusterDefinitionKind = "ClusterDefinition"
 	ClusterKind           = "Cluster"
 	ComponentKind         = "Component"
-	OpsRequestKind        = "OpsRequestKind"
 
 	defaultInstanceTemplateReplicas = 1
 )
@@ -325,32 +322,6 @@ const (
 	UnavailablePhase Phase = "Unavailable"
 )
 
-// OpsPhase defines opsRequest phase.
-// +enum
-// +kubebuilder:validation:Enum={Pending,Creating,Running,Cancelling,Cancelled,Aborted,Failed,Succeed}
-type OpsPhase string
-
-const (
-	OpsPendingPhase    OpsPhase = "Pending"
-	OpsCreatingPhase   OpsPhase = "Creating"
-	OpsRunningPhase    OpsPhase = "Running"
-	OpsCancellingPhase OpsPhase = "Cancelling"
-	OpsSucceedPhase    OpsPhase = "Succeed"
-	OpsCancelledPhase  OpsPhase = "Cancelled"
-	OpsFailedPhase     OpsPhase = "Failed"
-	OpsAbortedPhase    OpsPhase = "Aborted"
-)
-
-// PodSelectionPolicy pod selection strategy.
-// +enum
-// +kubebuilder:validation:Enum={All,Any}
-type PodSelectionPolicy string
-
-const (
-	All PodSelectionPolicy = "All"
-	Any PodSelectionPolicy = "Any"
-)
-
 // PodAvailabilityPolicy pod availability strategy.
 // +enum
 // +kubebuilder:validation:Enum={Available,PreferredAvailable,None}
@@ -361,45 +332,6 @@ const (
 	UnAvailablePolicy      PodAvailabilityPolicy = "UnAvailable"
 	NoneAvailabilityPolicy PodAvailabilityPolicy = "None"
 )
-
-// OpsWorkloadType policy after action failure.
-// +enum
-// +kubebuilder:validation:Enum={Job,Pod}
-type OpsWorkloadType string
-
-const (
-	PodWorkload OpsWorkloadType = "Pod"
-	JobWorkload OpsWorkloadType = "Job"
-)
-
-// OpsType defines operation types.
-// +enum
-// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart,Reconfiguring,Start,Stop,Expose,Switchover,Backup,Restore,RebuildInstance,Custom}
-type OpsType string
-
-const (
-	VerticalScalingType   OpsType = "VerticalScaling"
-	HorizontalScalingType OpsType = "HorizontalScaling"
-	VolumeExpansionType   OpsType = "VolumeExpansion"
-	UpgradeType           OpsType = "Upgrade"
-	ReconfiguringType     OpsType = "Reconfiguring"
-	SwitchoverType        OpsType = "Switchover"
-	RestartType           OpsType = "Restart" // RestartType the restart operation is a special case of the rolling update operation.
-	StopType              OpsType = "Stop"    // StopType the stop operation will delete all pods in a cluster concurrently.
-	StartType             OpsType = "Start"   // StartType the start operation will start the pods which is deleted in stop operation.
-	ExposeType            OpsType = "Expose"
-	BackupType            OpsType = "Backup"
-	RestoreType           OpsType = "Restore"
-	RebuildInstanceType   OpsType = "RebuildInstance" // RebuildInstance rebuilding an instance is very useful when a node is offline or an instance is unrecoverable.
-	CustomType            OpsType = "Custom"          // use opsDefinition
-)
-
-// ComponentResourceKey defines the resource key of component, such as pod/pvc.
-// +enum
-// +kubebuilder:validation:Enum={pods}
-type ComponentResourceKey string
-
-const PodsCompResourceKey ComponentResourceKey = "pods"
 
 // AccessMode defines the modes of access granted to the SVC.
 // The modes can be `None`, `Readonly`, or `ReadWrite`.
@@ -547,45 +479,6 @@ const (
 	// zone or node based on other scheduling decisions.
 	AvailabilityPolicyNone AvailabilityPolicyType = "none"
 )
-
-// ProgressStatus defines the status of the opsRequest progress.
-// +enum
-// +kubebuilder:validation:Enum={Processing,Pending,Failed,Succeed}
-type ProgressStatus string
-
-const (
-	PendingProgressStatus    ProgressStatus = "Pending"
-	ProcessingProgressStatus ProgressStatus = "Processing"
-	FailedProgressStatus     ProgressStatus = "Failed"
-	SucceedProgressStatus    ProgressStatus = "Succeed"
-)
-
-// ActionTaskStatus defines the status of the task.
-// +enum
-// +kubebuilder:validation:Enum={Processing,Failed,Succeed}
-type ActionTaskStatus string
-
-const (
-	ProcessingActionTaskStatus ActionTaskStatus = "Processing"
-	FailedActionTaskStatus     ActionTaskStatus = "Failed"
-	SucceedActionTaskStatus    ActionTaskStatus = "Succeed"
-)
-
-type OpsRequestBehaviour struct {
-	FromClusterPhases []kbappsv1.ClusterPhase
-	ToClusterPhase    kbappsv1.ClusterPhase
-}
-
-type OpsRecorder struct {
-	// name OpsRequest name
-	Name string `json:"name"`
-	// opsRequest type
-	Type OpsType `json:"type"`
-	// indicates whether the current opsRequest is in the queue
-	InQueue bool `json:"inQueue,omitempty"`
-	// indicates that the operation is queued for execution within its own-type scope.
-	QueueBySelf bool `json:"queueBySelf,omitempty"`
-}
 
 // LetterCase defines the available cases to be used in password generation.
 //
@@ -1175,4 +1068,17 @@ type PrometheusScheme string
 const (
 	HTTPProtocol  PrometheusScheme = "http"
 	HTTPSProtocol PrometheusScheme = "https"
+)
+
+// FailurePolicyType specifies the type of failure policy.
+//
+// +enum
+// +kubebuilder:validation:Enum={Ignore,Fail}
+type FailurePolicyType string
+
+const (
+	// FailurePolicyIgnore means that an error will be ignored but logged.
+	FailurePolicyIgnore FailurePolicyType = "Ignore"
+	// FailurePolicyFail means that an error will be reported.
+	FailurePolicyFail FailurePolicyType = "Fail"
 )

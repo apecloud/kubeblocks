@@ -261,7 +261,7 @@ rules:
   - patch
   - update
 - apiGroups:
-  - apps.kubeblocks.io
+  - operations.kubeblocks.io
   resources:
   - opsdefinitions
   verbs:
@@ -273,13 +273,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - apps.kubeblocks.io
+  - operations.kubeblocks.io
   resources:
   - opsdefinitions/finalizers
   verbs:
   - update
 - apiGroups:
-  - apps.kubeblocks.io
+  - operations.kubeblocks.io
   resources:
   - opsdefinitions/status
   verbs:
@@ -287,7 +287,7 @@ rules:
   - patch
   - update
 - apiGroups:
-  - apps.kubeblocks.io
+  - operations.kubeblocks.io
   resources:
   - opsrequests
   verbs:
@@ -299,13 +299,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - apps.kubeblocks.io
+  - operations.kubeblocks.io
   resources:
   - opsrequests/finalizers
   verbs:
   - update
 - apiGroups:
-  - apps.kubeblocks.io
+  - operations.kubeblocks.io
   resources:
   - opsrequests/status
   verbs:

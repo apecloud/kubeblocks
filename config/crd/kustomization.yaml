@@ -6,7 +6,6 @@ resources:
 - bases/apps.kubeblocks.io_clusters.yaml
 - bases/apps.kubeblocks.io_clusterdefinitions.yaml
 - bases/apps.kubeblocks.io_configconstraints.yaml
-- bases/apps.kubeblocks.io_opsrequests.yaml
 - bases/dataprotection.kubeblocks.io_actionsets.yaml
 - bases/dataprotection.kubeblocks.io_backupschedules.yaml
 - bases/dataprotection.kubeblocks.io_backuppolicies.yaml
@@ -19,10 +18,11 @@ resources:
 - bases/apps.kubeblocks.io_servicedescriptors.yaml
 - bases/apps.kubeblocks.io_componentdefinitions.yaml
 - bases/apps.kubeblocks.io_components.yaml
-- bases/apps.kubeblocks.io_opsdefinitions.yaml
 - bases/apps.kubeblocks.io_componentversions.yaml
 - bases/dataprotection.kubeblocks.io_storageproviders.yaml
 - bases/experimental.kubeblocks.io_nodecountscalers.yaml
+- bases/operations.kubeblocks.io_opsrequests.yaml
+- bases/apps.kubeblocks.io_opsdefinitions.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:

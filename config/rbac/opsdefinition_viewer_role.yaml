@@ -5,7 +5,7 @@ metadata:
   name: opsdefinition-viewer-role
 rules:
 - apiGroups:
-  - apps.kubeblocks.io
+  - operations.kubeblocks.io
   resources:
   - opsdefinitions
   verbs:
@@ -13,7 +13,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - apps.kubeblocks.io
+  - operations.kubeblocks.io
   resources:
   - opsdefinitions/status
   verbs:

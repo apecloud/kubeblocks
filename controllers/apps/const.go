@@ -28,12 +28,5 @@ const (
 )
 
 const (
-	reasonOpsCancelActionNotSupported = "CancelActionNotSupported"
-	reasonOpsCancelActionFailed       = "CancelActionFailed"
-	reasonOpsReconcileStatusFailed    = "ReconcileStatusFailed"
-	reasonOpsDoActionFailed           = "DoActionFailed"
-)
-
-const (
 	trueVal = "true"
 )

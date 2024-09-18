@@ -175,7 +175,7 @@ var _ = Describe("Cluster Controller", func() {
 			GetObject()
 
 		By("Create a bpt obj")
-		createBackupPolicyTpl(compDefObj.Name)
+		testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.Name)
 
 		By("Wait objects available")
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(compDefObj),
@@ -1248,22 +1248,3 @@ var _ = Describe("Cluster Controller", func() {
 		})
 	})
 })
-
-func createBackupPolicyTpl(compDef string) {
-	By("create actionSet")
-	fakeActionSet("")
-
-	By("Creating a BackupPolicyTemplate")
-	bpt := testapps.NewBackupPolicyTemplateFactory(backupPolicyTPLName).
-		AddLabels(compDef, compDef)
-
-	ttl := "7d"
-	bpt = bpt.AddBackupPolicy(compDef).
-		AddBackupMethod(backupMethodName, false, actionSetName).
-		SetBackupMethodVolumeMounts("data", "/data").
-		AddBackupMethod(vsBackupMethodName, true, "").
-		SetBackupMethodVolumes([]string{"data"}).
-		AddSchedule(backupMethodName, "0 0 * * *", ttl, true).
-		AddSchedule(vsBackupMethodName, "0 0 * * *", ttl, true)
-	bpt.Create(&testCtx)
-}

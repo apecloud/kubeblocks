@@ -94,7 +94,7 @@ var _ = Describe("OpsUtil functions", func() {
 			var instances []opsv1alpha1.Instance
 			for _, insName := range instanceNames {
 				instances = append(instances, opsv1alpha1.Instance{
-					Name: insName,
+					Name:           insName,
 					TargetNodeName: targetNodeName,
 				})
 			}

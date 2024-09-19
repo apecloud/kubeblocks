@@ -230,4 +230,4 @@ In a production environment, we recommend deploying the KubeBlocks Operator (alo
 
 Each database replica runs within its own Pod. In addition to the container running the database process, the Pod includes several sidecar containers: one called `lorry` (which will be renamed to kbagent starting from KubeBlocks v1.0) that executes Action commands from the KubeBlocks controller, and another called `config-manager` that manages database configuration files and supports hot updates. Optionally, The engine's Addon may have an exporter container to collect metrics for Prometheus monitoring.
 
-![KubeBlocks Architecture](../../img/kubeblocks-architecture.png)
+![KubeBlocks Architecture](../../img/kubeblocks-architecture-ha.png)

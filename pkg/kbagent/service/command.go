@@ -26,7 +26,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -143,34 +142,9 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 		cmd.Env = mergedEnv
 	}
 
-	var (
-		stdin          io.WriteCloser
-		stdout, stderr io.ReadCloser
-	)
-	if stdinReader != nil {
-		var stdinErr error
-		stdin, stdinErr = cmd.StdinPipe()
-		if stdinErr != nil {
-			cancelTimeout()
-			return nil, errors.Wrapf(proto.ErrInternalError, "failed to create stdin pipe: %v", stdinErr)
-		}
-	}
-	if stdoutWriter != nil {
-		var stdoutErr error
-		stdout, stdoutErr = cmd.StdoutPipe()
-		if stdoutErr != nil {
-			cancelTimeout()
-			return nil, errors.Wrapf(proto.ErrInternalError, "failed to create stdout pipe: %v", stdoutErr)
-		}
-	}
-	if stderrWriter != nil {
-		var stderrErr error
-		stderr, stderrErr = cmd.StderrPipe()
-		if stderrErr != nil {
-			cancelTimeout()
-			return nil, errors.Wrapf(proto.ErrInternalError, "failed to create stderr pipe: %v", stderrErr)
-		}
-	}
+	cmd.Stdin = stdinReader
+	cmd.Stdout = stdoutWriter
+	cmd.Stderr = stderrWriter
 
 	errChan := make(chan error)
 	go func() {
@@ -186,49 +160,6 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 			return
 		}
 
-		var wg sync.WaitGroup
-		wg.Add(3)
-
-		var ioCopyError error
-		go func() {
-			defer wg.Done()
-			if stdinReader != nil {
-				defer stdin.Close()
-				_, copyErr := io.Copy(stdin, stdinReader)
-				if copyErr != nil {
-					if errors.Is(copyErr, os.ErrClosed) {
-						return
-					}
-					ioCopyError = errors.Wrapf(proto.ErrFailed, "failed to copy from input reader to stdin: %v", copyErr)
-				}
-			}
-		}()
-		go func() {
-			defer wg.Done()
-			if stdoutWriter != nil {
-				_, copyErr := io.Copy(stdoutWriter, stdout)
-				if copyErr != nil {
-					if errors.Is(copyErr, os.ErrClosed) {
-						return
-					}
-					ioCopyError = errors.Wrapf(proto.ErrFailed, "failed to copy stdout to output writer: %v", copyErr)
-				}
-			}
-		}()
-		go func() {
-			defer wg.Done()
-			if stderrWriter != nil {
-				_, copyErr := io.Copy(stderrWriter, stderr)
-				if copyErr != nil {
-					if errors.Is(copyErr, os.ErrClosed) {
-						return
-					}
-					ioCopyError = errors.Wrapf(proto.ErrFailed, "failed to copy stderr to error writer: %v", copyErr)
-				}
-			}
-		}()
-
-		// wait for the command to finish and the pipes to be closed
 		execErr := cmd.Wait()
 		if execErr != nil {
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
@@ -236,13 +167,10 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 			}
 		}
 
-		// and then wait for the io copy goroutines to finish
-		wg.Wait()
-
 		if execErr != nil {
 			errChan <- execErr
 		} else {
-			errChan <- ioCopyError
+			errChan <- nil
 		}
 	}()
 	return errChan, nil

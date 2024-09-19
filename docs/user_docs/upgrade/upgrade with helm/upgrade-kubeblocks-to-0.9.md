@@ -40,7 +40,7 @@ KubeBlocks 0.9 is compatible with KubeBlocks 0.8 APIs, but compatibility with AP
          helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version {VERSION} --set keepAddons=true
          ```
 
-         Replace `{VERSION}` with your current KubeBlocks version, such as 0.8.3.
+         Replace `{VERSION}` with your current KubeBlocks version, such as 0.9.0.
 
     - Check addons.
 

@@ -16,7 +16,7 @@ KubeBlocks supports the management of Xinference.
 
 - [Install kbcli](./../installation/install-with-kbcli/install-kbcli.md).
 - [Install KubeBlocks](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md).
-- [Install and enable the xinference addon](./../overview/supported-addons.md#use-addons).
+- [Install and enable the xinference addon](./../installation/install-with-kbcli/install-addons.md).
 
 ## Create a cluster
 

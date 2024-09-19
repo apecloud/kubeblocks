@@ -146,7 +146,7 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 	cmd.Stdout = stdoutWriter
 	cmd.Stderr = stderrWriter
 
-	errChan := make(chan error)
+	errChan := make(chan error, 1)
 	go func() {
 		defer cancelTimeout()
 		defer close(errChan)

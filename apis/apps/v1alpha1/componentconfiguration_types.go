@@ -80,7 +80,7 @@ type ConfigTemplateItemDetail struct {
 	// This allows users to override the default configuration according to their specific needs.
 	//
 	// +optional
-	ConfigFileParams map[string]ParametersInFile `json:"configFileParams,omitempty"`
+	ConfigFileParams map[string]ConfigParams `json:"configFileParams,omitempty"`
 }
 
 // ComponentConfigurationSpec defines the desired state of ComponentConfiguration

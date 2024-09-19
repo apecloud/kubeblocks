@@ -27,7 +27,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
@@ -89,7 +88,7 @@ var _ = Describe("Configuration Controller", func() {
 				itemStatus := intctrlutil.GetItemStatus(&cfg.Status, configSpecName)
 				g.Expect(itemStatus).ShouldNot(BeNil())
 				g.Expect(itemStatus.UpdateRevision).Should(BeEquivalentTo("2"))
-				g.Expect(itemStatus.Phase).Should(BeEquivalentTo(appsv1alpha1.CFinishedPhase))
+				g.Expect(itemStatus.Phase).Should(BeEquivalentTo(configurationv1alpha1.CFinishedPhase))
 			}, time.Second*60, time.Second*1).Should(Succeed())
 		})
 
@@ -165,7 +164,7 @@ var _ = Describe("Configuration Controller", func() {
 				itemStatus := intctrlutil.GetItemStatus(&cfg.Status, configSpecName)
 				g.Expect(itemStatus).ShouldNot(BeNil())
 				g.Expect(itemStatus.UpdateRevision).Should(BeEquivalentTo("2"))
-				g.Expect(itemStatus.Phase).Should(BeEquivalentTo(appsv1alpha1.CFinishedPhase))
+				g.Expect(itemStatus.Phase).Should(BeEquivalentTo(configurationv1alpha1.CFinishedPhase))
 			}, time.Second*60, time.Second*1).Should(Succeed())
 
 			Eventually(testapps.CheckObjExists(&testCtx, renderedKey, &corev1.ConfigMap{}, false)).Should(Succeed())

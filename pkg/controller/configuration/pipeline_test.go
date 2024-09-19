@@ -186,13 +186,22 @@ max_connections = '1000'
 					Content: cfgutil.ToPointer(`for test`),
 				},
 			}
+			status := intctrlutil.GetItemStatus(&configurationObj.Status, item.Name)
+			if status == nil {
+				configurationObj.Status.ConfigurationItemStatus = append(configurationObj.Status.ConfigurationItemStatus, configurationv1alpha1.ConfigTemplateItemDetailStatus{
+					Name:           item.Name,
+					Phase:          configurationv1alpha1.CInitPhase,
+					UpdateRevision: strconv.FormatInt(configurationObj.GetGeneration(), 10),
+				})
+				status = intctrlutil.GetItemStatus(&configurationObj.Status, item.Name)
+			}
 			reconcileTask := NewReconcilePipeline(ReconcileCtx{
 				ResourceCtx:          createPipeline.ResourceCtx,
 				Cluster:              clusterObj,
 				Component:            componentObj,
 				SynthesizedComponent: synthesizedComponent,
 				PodSpec:              synthesizedComponent.PodSpec,
-			}, item, &configurationObj.Status.ConfigurationItemStatus[0], nil)
+			}, item, status, nil)
 
 			By("update configuration resource")
 			err = reconcileTask.InitConfigSpec().

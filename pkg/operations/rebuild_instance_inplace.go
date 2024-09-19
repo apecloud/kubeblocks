@@ -247,7 +247,7 @@ func (inPlaceHelper *inplaceRebuildHelper) buildRestoreMetaObject(opsRequest *op
 // createPostReadyRestore creates a Restore to restore the data with postReady stage.
 func (inPlaceHelper *inplaceRebuildHelper) createPostReadyRestore(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
-	opsRequest *appsv1alpha1.OpsRequest,
+	opsRequest *opsv1alpha1.OpsRequest,
 	restoreName string) error {
 	labels := getWellKnownLabels(inPlaceHelper.synthesizedComp)
 	if inPlaceHelper.targetPod.Labels[constant.KBAppPodNameLabelKey] == inPlaceHelper.targetPod.Name {

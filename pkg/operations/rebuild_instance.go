@@ -328,7 +328,7 @@ func (r rebuildInstanceOpsHandler) scaleOutRequiredInstances(reqCtx intctrlutil.
 	cli client.Client,
 	opsRes *OpsResource,
 	rebuildInstance opsv1alpha1.RebuildInstance,
-	compStatus *opsv1alpha1.OpsRequestComponentStatus) {
+	compStatus *opsv1alpha1.OpsRequestComponentStatus) error {
 	// 1. sort the instances
 	slices.SortFunc(rebuildInstance.Instances, func(a, b opsv1alpha1.Instance) bool {
 		return a.Name < b.Name
@@ -376,7 +376,7 @@ func (r rebuildInstanceOpsHandler) scaleOutCompReplicasAndSyncProgress(reqCtx in
 	compSpec *appsv1.ClusterComponentSpec,
 	rebuildInstance opsv1alpha1.RebuildInstance,
 	compStatus *opsv1alpha1.OpsRequestComponentStatus,
-	rebuildInsWrapper map[string]*rebuildInstanceWrapper) {
+	rebuildInsWrapper map[string]*rebuildInstanceWrapper) error {
 	scaleOutInsMap := map[string]string{}
 	setScaleOutInsMap := func(workloadName, templateName string,
 		replicas int32, offlineInstances []string, wrapper *rebuildInstanceWrapper) {

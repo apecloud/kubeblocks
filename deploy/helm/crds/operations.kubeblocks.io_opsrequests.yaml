@@ -8760,16 +8760,6 @@ spec:
                             - name
                             type: object
                           type: array
-                        targetResources:
-                          additionalProperties:
-                            items:
-                              type: string
-                            type: array
-                          description: |-
-                            Records the information about various types of resources associated with the Component prior to any changes.
-                            Currently, only one type of resource is supported: "pods".
-                            The "pods" key maps to a list of names of all Pods of the Component.
-                          type: object
                         volumeClaimTemplates:
                           description: Records volumes' storage size of the Component
                             prior to any changes.

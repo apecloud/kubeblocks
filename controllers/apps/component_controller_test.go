@@ -63,12 +63,6 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-const (
-	backupMethodName   = "test-backup-method"
-	vsBackupMethodName = "test-vs-backup-method"
-	actionSetName      = "test-action-set"
-)
-
 var podAnnotationKey4Test = fmt.Sprintf("%s-test", constant.ComponentReplicasAnnotationKey)
 
 var _ = Describe("Component Controller", func() {

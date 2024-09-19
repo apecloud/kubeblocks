@@ -1050,7 +1050,7 @@ var _ = Describe("Cluster Controller", func() {
 					backup: &appsv1.ClusterBackup{
 						Enabled:                 &boolTrue,
 						RetentionPeriod:         retention("1d"),
-						Method:                  vsBackupMethodName,
+						Method:                  testdp.VSBackupMethodName,
 						CronExpression:          "*/1 * * * *",
 						StartingDeadlineMinutes: int64Ptr(int64(10)),
 						PITREnabled:             &boolTrue,
@@ -1062,7 +1062,7 @@ var _ = Describe("Cluster Controller", func() {
 					backup: &appsv1.ClusterBackup{
 						Enabled:                 &boolFalse,
 						RetentionPeriod:         retention("1d"),
-						Method:                  vsBackupMethodName,
+						Method:                  testdp.VSBackupMethodName,
 						CronExpression:          "*/1 * * * *",
 						StartingDeadlineMinutes: int64Ptr(int64(10)),
 						PITREnabled:             &boolTrue,
@@ -1074,7 +1074,7 @@ var _ = Describe("Cluster Controller", func() {
 					backup: &appsv1.ClusterBackup{
 						Enabled:                 &boolTrue,
 						RetentionPeriod:         retention("2d"),
-						Method:                  backupMethodName,
+						Method:                  testdp.BackupMethodName,
 						CronExpression:          "*/1 * * * *",
 						StartingDeadlineMinutes: int64Ptr(int64(10)),
 						RepoName:                backupRepoName,

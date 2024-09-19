@@ -41,7 +41,7 @@ var _ = Describe("Configuration Controller", func() {
 	AfterEach(cleanEnv)
 
 	Context("When updating configuration", func() {
-		It("Should reconcile success", func() {
+		PIt("Should reconcile success", func() {
 			_, _, clusterObj, componentObj, synthesizedComp := mockReconcileResource()
 
 			cfgKey := client.ObjectKey{

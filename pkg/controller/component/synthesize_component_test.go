@@ -94,6 +94,7 @@ var _ = Describe("synthesized component", func() {
 						constant.AppInstanceLabelKey: "test-cluster",
 					},
 					Annotations: map[string]string{
+						constant.KBAppClusterUIDKey:      "uuid",
 						constant.KubeBlocksGenerationKey: "1",
 					},
 				},
@@ -206,6 +207,7 @@ var _ = Describe("synthesized component", func() {
 						constant.AppInstanceLabelKey: "test-cluster",
 					},
 					Annotations: map[string]string{
+						constant.KBAppClusterUIDKey:      "uuid",
 						constant.KubeBlocksGenerationKey: "1",
 					},
 				},
@@ -279,6 +281,7 @@ var _ = Describe("synthesized component", func() {
 						constant.AppInstanceLabelKey: "test-cluster",
 					},
 					Annotations: map[string]string{
+						constant.KBAppClusterUIDKey:      "uuid",
 						constant.KubeBlocksGenerationKey: "1",
 					},
 				},

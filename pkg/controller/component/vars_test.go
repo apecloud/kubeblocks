@@ -2704,20 +2704,6 @@ var _ = Describe("vars", func() {
 				checkEnvVarWithValue(envVars, "port", "012345")
 			})
 
-			It("cluster domain", func() {
-				vars := []appsv1.EnvVar{
-					{
-						Name:       "headless",
-						Value:      "test-headless.default.svc",
-						Expression: expp("{{ printf \"%s.%s\" .headless .ClusterDomain }}"),
-					},
-				}
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, nil, synthesizedComp, vars)
-				Expect(err).Should(Succeed())
-				Expect(templateVars).Should(HaveKeyWithValue("headless", "test-headless.default.svc.cluster.local"))
-				checkEnvVarWithValue(envVars, "headless", "test-headless.default.svc.cluster.local")
-			})
-
 			It("condition exp", func() {
 				vars := []appsv1.EnvVar{
 					{

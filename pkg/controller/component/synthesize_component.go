@@ -48,7 +48,6 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 	if compDef == nil || comp == nil {
 		return nil, nil
 	}
-
 	clusterName, err := GetClusterName(comp)
 	if err != nil {
 		return nil, err
@@ -65,7 +64,7 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 	synthesizeComp := &SynthesizedComponent{
 		Namespace:                        comp.Namespace,
 		ClusterName:                      clusterName,
-		ClusterUID:                       string(cluster.UID),
+		ClusterUID:                       clusterUID(cluster, comp),
 		Comp2CompDefs:                    comp2CompDef,
 		Name:                             compName,
 		FullCompName:                     comp.Name,
@@ -145,6 +144,16 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 	}
 
 	return synthesizeComp, nil
+}
+
+func clusterUID(cluster *appsv1.Cluster, comp *appsv1.Component) string {
+	if comp != nil && comp.Annotations != nil {
+		if uid, ok := comp.Annotations[constant.KBAppClusterUIDKey]; ok {
+			return uid
+		}
+	}
+	// back-off to use cluster.UID
+	return string(cluster.UID)
 }
 
 func clusterGeneration(cluster *appsv1.Cluster, comp *appsv1.Component) string {

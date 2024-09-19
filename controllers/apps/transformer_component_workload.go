@@ -565,9 +565,6 @@ func (r *componentWorkloadOps) postScaleOut(itsObj *workloads.InstanceSet) error
 		}
 	}
 
-	if err := r.recordPodForMemberJoin(itsObj); err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -598,8 +595,13 @@ func (r *componentWorkloadOps) scaleOut(itsObj *workloads.InstanceSet) error {
 	if *itsObj.Spec.Replicas == 0 {
 		return nil
 	}
+
+	if err := r.recordPodForMemberJoin(); err != nil {
+		return err
+	}
+
 	graphCli := model.NewGraphClient(r.cli)
-	graphCli.Noop(r.dag, r.protoITS)
+	graphCli.Status(r.dag, nil, r.protoITS)
 	d, err := newDataClone(r.reqCtx, r.cli, r.cluster, r.synthesizeComp, itsObj, r.protoITS, backupKey)
 	if err != nil {
 		return err
@@ -634,41 +636,16 @@ func (r *componentWorkloadOps) scaleOut(itsObj *workloads.InstanceSet) error {
 	return r.postScaleOut(itsObj)
 }
 
-func (r *componentWorkloadOps) recordPodForMemberJoin(itsObj *workloads.InstanceSet) error {
-	pods, err := component.ListOwnedPods(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, r.cluster.Name, r.synthesizeComp.Name)
-	if err != nil {
-		return err
-	}
-
-	podsToMemberJoin := make([]*corev1.Pod, 0)
-	lifecycleStatus := itsObj.Status.LifeCycleActionsStatus
-	for _, podName := range r.runningItsPodNames {
-		// if the pod not exists in the running pod names, it should be a member that needs to join
-		for _, pod := range pods {
-			if pod.Name != podName {
-				continue
-			}
-			podsToMemberJoin = append(podsToMemberJoin, pod)
-			markMemberJoinStatus(lifecycleStatus, podName, lifecycle.MemberJoinProcessing)
+func (r *componentWorkloadOps) recordPodForMemberJoin() error {
+	var podToMemberjoin []string
+	for podName := range r.desiredCompPodNameSet {
+		if _, ok := r.runningItsPodNameSet[podName]; ok {
+			continue
 		}
+		podToMemberjoin = append(podToMemberjoin, podName)
 	}
-
+	r.protoITS.Annotations[constant.MemberJoinStatusAnnotationKey] = strings.Join(podToMemberjoin, ",")
 	return nil
-}
-
-func markMemberJoinStatus(obj map[string]workloads.ActionStatus, podName string, status lifecycle.MemberJoinStatus) {
-	if obj == nil {
-		obj = make(map[string]workloads.ActionStatus)
-	}
-
-	if _, ok := obj[podName]; !ok {
-		obj[podName] = workloads.ActionStatus{MemberLeaveStatus: status.String()}
-		return
-	}
-
-	actonStatus := obj[podName]
-	actonStatus.MemberLeaveStatus = status.String()
-	obj[podName] = actonStatus
 }
 
 func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
@@ -985,10 +962,17 @@ func (r *componentWorkloadOps) checkAndDoMemberJoin() error {
 	if err != nil {
 		return err
 	}
-	actionStatus := r.runningITS.Status.LifeCycleActionsStatus
+	memberJoinStatus := r.runningITS.Annotations[constant.MemberJoinStatusAnnotationKey]
+	if memberJoinStatus == "" {
+		return nil
+	}
 
+	podsToMemberJoin := sets.New(strings.Split(memberJoinStatus, ",")...)
 	for _, pod := range pods {
-		if actionStatus[pod.Name].MemberLeaveStatus != lifecycle.MemberJoinProcessing.String() {
+		if _, ok := podsToMemberJoin[pod.Name]; !ok {
+			continue
+		}
+		if pod.Status.Phase != corev1.PodRunning {
 			continue
 		}
 		lfa, err := lifecycle.New(r.synthesizeComp, pod, pods...)
@@ -996,14 +980,16 @@ func (r *componentWorkloadOps) checkAndDoMemberJoin() error {
 			return err
 		}
 
-		if err2 := lfa.MemberJoin(r.reqCtx.Ctx, r.cli, nil); err2 != nil {
-			if !errors.Is(err2, lifecycle.ErrActionNotDefined) && err == nil {
-
+		if err2 := lfa.MemberJoin(r.reqCtx.Ctx, r.cli, nil); err2 != nil && !errors.Is(err2, lifecycle.ErrActionNotDefined) {
+			if err == nil {
+				err = err2
 			}
+		} else {
+			podsToMemberJoin.Delete(pod.Name)
 		}
-		markMemberJoinStatus(actionStatus, pod.Name, lifecycle.MemberJoinCompleted)
 	}
-	return nil
+	r.protoITS.Annotations[constant.MemberJoinStatusAnnotationKey] = strings.Join(podsToMemberJoin.UnsortedList(), ",")
+	return err
 }
 
 func getRunningVolumes(ctx context.Context, cli client.Client, synthesizedComp *component.SynthesizedComponent,

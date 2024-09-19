@@ -9,11 +9,15 @@ metadata:
 spec:
   group: view.kubeblocks.io
   names:
+    categories:
+    - kubeblocks
     kind: ReconciliationViewDefinition
     listKind: ReconciliationViewDefinitionList
     plural: reconciliationviewdefinitions
+    shortNames:
+    - rvd
     singular: reconciliationviewdefinition
-  scope: Namespaced
+  scope: Cluster
   versions:
   - name: v1
     schema:

@@ -20,6 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package view
 
 import (
+	"context"
+	"fmt"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/util/workqueue"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -34,6 +42,7 @@ import (
 type InformerManager interface {
 	Watch(watcher, watched schema.GroupVersionKind) error
 	UnWatch(watcher, watched schema.GroupVersionKind) error
+	Start() error
 }
 
 type informerManager struct {
@@ -41,6 +50,25 @@ type informerManager struct {
 
 	informerRefCounter map[schema.GroupVersionKind]sets.Set[schema.GroupVersionKind]
 	refCounterLock     sync.Mutex
+
+	cache cache.Cache
+	ctx   context.Context
+
+	handler handler.EventHandler
+
+	// Queue is an listeningQueue that listens for events from Informers and adds object keys to
+	// the Queue for processing
+	queue workqueue.RateLimitingInterface
+
+	scheme *runtime.Scheme
+}
+
+func (m *informerManager) Start() error {
+	go func() {
+		for m.processNextWorkItem() {
+		}
+	}()
+	return nil
 }
 
 func (m *informerManager) Watch(watcher, watched schema.GroupVersionKind) error {
@@ -78,20 +106,77 @@ func (m *informerManager) UnWatch(watcher, watched schema.GroupVersionKind) erro
 	return nil
 }
 
+// processNextWorkItem will read a single work item off the workqueue and
+// attempt to process it, by calling the reconcileHandler.
+func (m *informerManager) processNextWorkItem() bool {
+	obj, shutdown := m.queue.Get()
+	if shutdown {
+		// Stop working
+		return false
+	}
+
+	defer m.queue.Done(obj)
+	switch o := obj.(type) {
+	case event.CreateEvent:
+		m.eventChan <- event.GenericEvent{Object: o.Object}
+	case event.UpdateEvent:
+		m.eventChan <- event.GenericEvent{Object: o.ObjectNew}
+	case event.DeleteEvent:
+		m.eventChan <- event.GenericEvent{Object: o.Object}
+	case event.GenericEvent:
+		m.eventChan <- o
+	}
+
+	return true
+}
+
 func (m *informerManager) createInformer(gvk schema.GroupVersionKind) error {
-	//TODO implement me
-	panic("implement me")
+	o, err := m.scheme.New(gvk)
+	if err != nil {
+		return err
+	}
+	obj, ok := o.(client.Object)
+	if !ok {
+		return fmt.Errorf("can't find object of type %s", gvk)
+	}
+	src := source.Kind(m.cache, obj)
+	return src.Start(m.ctx, m.handler, m.queue)
 }
 
 func (m *informerManager) deleteInformer(gvk schema.GroupVersionKind) error {
-	//TODO implement me
-	panic("implement me")
+	// Can't call m.cache.RemoveInformer() here, as m.cache is shared with all other controllers in the same Manager,
+	// they may still need the informer.
+	return nil
 }
 
-func NewInformerManager(eventChan chan event.GenericEvent) InformerManager {
+type eventProxy struct{}
+
+func (e *eventProxy) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+	q.Add(evt)
+}
+
+func (e *eventProxy) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
+	q.Add(evt)
+}
+
+func (e *eventProxy) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+	q.Add(evt)
+}
+
+func (e *eventProxy) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+	q.Add(evt)
+}
+
+func NewInformerManager(cache cache.Cache, scheme *runtime.Scheme, eventChan chan event.GenericEvent) InformerManager {
 	return &informerManager{
+		cache:              cache,
+		scheme:             scheme,
 		eventChan:          eventChan,
+		handler:            &eventProxy{},
 		informerRefCounter: make(map[schema.GroupVersionKind]sets.Set[schema.GroupVersionKind]),
+		queue: workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{
+			Name: "informer-manager",
+		}),
 	}
 }
 
@@ -149,3 +234,4 @@ func updateInformerManager(manager InformerManager) kubebuilderx.Reconciler {
 
 var _ InformerManager = &informerManager{}
 var _ kubebuilderx.Reconciler = &informerManagerReconciler{}
+var _ handler.EventHandler = &eventProxy{}

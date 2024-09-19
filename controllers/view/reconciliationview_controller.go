@@ -105,7 +105,10 @@ func (r *ReconciliationViewReconciler) Reconcile(ctx context.Context, req ctrl.R
 func (r *ReconciliationViewReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.ObjectStore = NewObjectStore()
 	r.ObjectTreeRootFinder = NewObjectTreeRootFinder(r.Client)
-	r.InformerManager = NewInformerManager(r.ObjectTreeRootFinder.GetEventChannel())
+	r.InformerManager = NewInformerManager(mgr.GetCache(), mgr.GetScheme(), r.ObjectTreeRootFinder.GetEventChannel())
+	if err := r.InformerManager.Start(); err != nil {
+		return err
+	}
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&viewv1.ReconciliationView{}).

@@ -57,7 +57,6 @@ func runCommand(ctx context.Context, action *proto.ExecAction, parameters map[st
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
 			stderrMsg := string(errBuffer.Bytes())
-			//stderrMsg := string(<-stderrChan)
 			if len(stderrMsg) > 0 {
 				err = errors.Wrapf(proto.ErrFailed, "exec exit %d and stderr: %s", exitErr.ExitCode(), stderrMsg)
 			} else {

@@ -226,6 +226,7 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 
 		// do component switchover and check the result one by one
 		if err := doSwitchover(reqCtx.Ctx, cli, synthesizedComp, &switchover, switchoverCondition); err != nil {
+			failedCount += 1
 			doNCheckSwitchoverProcessDetail.Message = fmt.Sprintf("do switchover and check role label for component %s failed, error: %s", switchover.ComponentName, err.Error())
 			doNCheckSwitchoverProcessDetail.Status = appsv1alpha1.ProcessingProgressStatus
 			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1.UpdatingClusterCompPhase, doNCheckSwitchoverProcessDetail, switchover.ComponentName)

@@ -931,6 +931,12 @@ type Restore struct {
 	//
 	RestorePointInTime string `json:"restorePointInTime,omitempty"`
 
+	// Specifies a list of environment variables to be set in the container.
+	//
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +optional
+	Env []corev1.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
+
 	// Specifies the policy for restoring volume claims of a Component's Pods.
 	// It determines whether the volume claims should be restored sequentially (one by one) or in parallel (all at once).
 	// Support values:

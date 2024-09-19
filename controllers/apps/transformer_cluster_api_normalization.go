@@ -21,14 +21,12 @@ package apps
 
 import (
 	"fmt"
-	"maps"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -61,8 +59,6 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 	if err != nil {
 		return err
 	}
-	transCtx.Labels = t.buildCompLabelsInheritedFromCluster(transCtx, cluster)
-	transCtx.Annotations = t.buildCompAnnotationsInheritedFromCluster(transCtx, cluster)
 
 	// resolve all component definitions referenced
 	if err = t.resolveCompDefinitions(transCtx); err != nil {
@@ -173,31 +169,6 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Sharding(transCtx *c
 	return compSpecs, nil
 }
 
-func (t *ClusterAPINormalizationTransformer) buildCompLabelsInheritedFromCluster(transCtx *clusterTransformContext,
-	cluster *appsv1.Cluster) map[string]map[string]string {
-	clusterLabels := filterReservedLabels(cluster.Labels)
-	labels := make(map[string]map[string]string)
-	for _, compSpec := range transCtx.ComponentSpecs {
-		labels[compSpec.Name] = maps.Clone(clusterLabels)
-	}
-	for name, shardingCompSpecs := range transCtx.ShardingComponentSpecs {
-		for _, compSpec := range shardingCompSpecs {
-			labels[compSpec.Name] = controllerutil.MergeMetadataMaps(clusterLabels, constant.GetShardingNameLabel(name))
-		}
-	}
-	return labels
-}
-
-func (t *ClusterAPINormalizationTransformer) buildCompAnnotationsInheritedFromCluster(transCtx *clusterTransformContext,
-	cluster *appsv1.Cluster) map[string]map[string]string {
-	clusterAnnotations := filterReservedAnnotations(cluster.Annotations)
-	annotations := make(map[string]map[string]string)
-	for _, compSpec := range transCtx.ComponentSpecs {
-		annotations[compSpec.Name] = maps.Clone(clusterAnnotations)
-	}
-	return annotations
-}
-
 func (t *ClusterAPINormalizationTransformer) resolveCompDefinitions(transCtx *clusterTransformContext) error {
 	if transCtx.ComponentDefs == nil {
 		transCtx.ComponentDefs = make(map[string]*appsv1.ComponentDefinition)
@@ -289,34 +260,4 @@ func (t *ClusterAPINormalizationTransformer) updateCompSpecs4Specified(transCtx 
 		cluster.Spec.ShardingSpecs[i].Template.ServiceVersion = resolvedCompSpecs[idx].ServiceVersion
 		idx += int(sharding.Shards)
 	}
-}
-
-// filterReservedEntries filters out reserved keys from a map based on a provided set of reserved keys
-func filterReservedEntries(entries map[string]string, reservedKeys []string) map[string]string {
-	reservedSet := make(map[string]struct{}, len(reservedKeys))
-	for _, key := range reservedKeys {
-		reservedSet[key] = struct{}{}
-	}
-
-	filteredEntries := make(map[string]string)
-	for key, value := range entries {
-		if _, exists := reservedSet[key]; !exists {
-			filteredEntries[key] = value
-		}
-	}
-	return filteredEntries
-}
-
-func filterReservedLabels(labels map[string]string) map[string]string {
-	if labels == nil {
-		return nil
-	}
-	return filterReservedEntries(labels, constant.GetKBReservedLabelKeys())
-}
-
-func filterReservedAnnotations(annotations map[string]string) map[string]string {
-	if annotations == nil {
-		return nil
-	}
-	return filterReservedEntries(annotations, constant.GetKBReservedAnnotationKeys())
 }

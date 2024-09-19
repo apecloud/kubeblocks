@@ -84,7 +84,8 @@ func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 			if targetName, ok := v.Annotations[constant.BackupSourceTargetAnnotationKey]; ok {
 				compName := v.Labels[constant.KBAppComponentLabelKey]
 				allocateTargetMap[targetName] = compName
-				c.Annotations[compName][constant.BackupSourceTargetAnnotationKey] = targetName
+				// TODO(v1.0): ???
+				// c.Annotations[compName][constant.BackupSourceTargetAnnotationKey] = targetName
 			}
 		}
 		if len(allocateTargetMap) == len(backup.Status.Targets) {
@@ -94,18 +95,19 @@ func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 			}
 			continue
 		}
-		for _, target := range backup.Status.Targets {
-			if _, ok = allocateTargetMap[target.Name]; ok {
-				continue
-			}
-			for _, compSpec := range c.ShardingComponentSpecs[shardingSpec.Name] {
-				if _, ok = c.Annotations[compSpec.Name][constant.BackupSourceTargetAnnotationKey]; ok {
-					continue
-				}
-				c.Annotations[compSpec.Name][constant.BackupSourceTargetAnnotationKey] = target.Name
-				break
-			}
-		}
+		// TODO(v1.0): ???
+		// for _, target := range backup.Status.Targets {
+		//	if _, ok = allocateTargetMap[target.Name]; ok {
+		//		continue
+		//	}
+		//	for _, compSpec := range c.ShardingComponentSpecs[shardingSpec.Name] {
+		//		if _, ok = c.Annotations[compSpec.Name][constant.BackupSourceTargetAnnotationKey]; ok {
+		//			continue
+		//		}
+		//		c.Annotations[compSpec.Name][constant.BackupSourceTargetAnnotationKey] = target.Name
+		//		break
+		//	}
+		// }
 	}
 	// if component needs to do post ready restore after cluster is running, annotate component
 	if c.Cluster.Status.Phase == appsv1.RunningClusterPhase {

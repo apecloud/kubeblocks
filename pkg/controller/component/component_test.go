@@ -60,7 +60,7 @@ var _ = Describe("Component", func() {
 		})
 
 		compObj := func() *appsv1.Component {
-			comp, err := BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
+			comp, err := BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
 			return comp
 		}

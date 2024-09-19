@@ -324,7 +324,7 @@ func getTargetPods(
 	if cluster.Spec.GetShardingByName(compName) != nil {
 		// get pods of the sharding components
 		podList := &corev1.PodList{}
-		labels := constant.GetClusterWellKnownLabels(cluster.Namespace)
+		labels := constant.GetClusterLabels(cluster.Namespace)
 		labels[constant.KBAppShardingNameLabelKey] = compName
 		if podSelector.Role != "" {
 			labels[constant.RoleLabelKey] = podSelector.Role

@@ -163,9 +163,10 @@ func (t *clusterSharedAccountTransformer) generatePassword(account appsv1.Compon
 
 func (t *clusterSharedAccountTransformer) buildAccountSecretWithPassword(cluster *appsv1.Cluster,
 	account appsv1.ComponentSystemAccount, shardingName, secretName string, password []byte) (*corev1.Secret, error) {
-	labels := constant.GetShardingWellKnownLabels(cluster.Name, shardingName)
+	labels := constant.GetClusterLabels(cluster.Name)
 	secret := builder.NewSecretBuilder(cluster.Namespace, secretName).
 		AddLabelsInMap(labels).
+		AddLabelsInMap(constant.GetShardingNameLabel(shardingName)).
 		AddLabels(constant.ClusterAccountLabelKey, account.Name).
 		PutData(constant.AccountNameForSecret, []byte(account.Name)).
 		PutData(constant.AccountPasswdForSecret, password).

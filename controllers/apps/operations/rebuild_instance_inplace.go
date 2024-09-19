@@ -547,10 +547,7 @@ func getPVCMapAndVolumes(opsRes *OpsResource,
 }
 
 func getWellKnownLabels(synthesizedComp *component.SynthesizedComponent) map[string]string {
-	if synthesizedComp.CompDefName != "" {
-		return constant.GetKBWellKnownLabelsWithCompDef(synthesizedComp.CompDefName, synthesizedComp.ClusterName, synthesizedComp.Name)
-	}
-	return constant.GetKBWellKnownLabels(synthesizedComp.ClusterDefName, synthesizedComp.ClusterName, synthesizedComp.Name)
+	return constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)
 }
 
 // instanceIsAvailable checks if the instance is available.

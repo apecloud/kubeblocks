@@ -31,6 +31,7 @@ const (
 	KBVersionValidate    = "addon.kubeblocks.io/kubeblocks-version"
 
 	// label keys
+	appVersion    = "app.kubernetes.io/version"
 	AddonProvider = "addon.kubeblocks.io/provider"
 	AddonVersion  = "addon.kubeblocks.io/version"
 

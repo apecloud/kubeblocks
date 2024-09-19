@@ -363,7 +363,6 @@ var _ = Describe("Addon controller", func() {
 					Labels: map[string]string{
 						constant.AppComponentLabelKey: "apps",
 						constant.AppNameLabelKey:      "kubeblocks",
-						constant.AppVersionLabelKey:   "0.9.0-beta.5",
 					},
 				},
 				Spec: appsv1.DeploymentSpec{

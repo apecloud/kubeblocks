@@ -55,7 +55,7 @@ func ListOwnedPodsWithRole(ctx context.Context, cli client.Reader, namespace, cl
 
 func ListOwnedPVCs(ctx context.Context, cli client.Reader, namespace, clusterName, compName string,
 	opts ...client.ListOption) ([]*corev1.PersistentVolumeClaim, error) {
-	labels := constant.GetComponentWellKnownLabels(clusterName, compName)
+	labels := constant.GetCompLabels(clusterName, compName)
 	if opts == nil {
 		opts = make([]client.ListOption, 0)
 	}
@@ -65,7 +65,7 @@ func ListOwnedPVCs(ctx context.Context, cli client.Reader, namespace, clusterNam
 
 func ListOwnedServices(ctx context.Context, cli client.Reader, namespace, clusterName, compName string,
 	opts ...client.ListOption) ([]*corev1.Service, error) {
-	labels := constant.GetComponentWellKnownLabels(clusterName, compName)
+	labels := constant.GetCompLabels(clusterName, compName)
 	if opts == nil {
 		opts = make([]client.ListOption, 0)
 	}
@@ -88,16 +88,16 @@ func GetMinReadySeconds(ctx context.Context, cli client.Client, cluster appsv1.C
 }
 
 func listWorkloads(ctx context.Context, cli client.Reader, namespace, clusterName, compName string) ([]*workloads.InstanceSet, error) {
-	labels := constant.GetComponentWellKnownLabels(clusterName, compName)
+	labels := constant.GetCompLabels(clusterName, compName)
 	return listObjWithLabelsInNamespace(ctx, cli, generics.InstanceSetSignature, namespace, labels)
 }
 
 func listPods(ctx context.Context, cli client.Reader, namespace, clusterName, compName string,
 	labels map[string]string, opts ...client.ListOption) ([]*corev1.Pod, error) {
 	if labels == nil {
-		labels = constant.GetComponentWellKnownLabels(clusterName, compName)
+		labels = constant.GetCompLabels(clusterName, compName)
 	} else {
-		maps.Copy(labels, constant.GetComponentWellKnownLabels(clusterName, compName))
+		maps.Copy(labels, constant.GetCompLabels(clusterName, compName))
 	}
 	if opts == nil {
 		opts = make([]client.ListOption, 0)

@@ -354,7 +354,7 @@ var _ = Describe("Cluster Controller", func() {
 		}
 		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1.Component) {
 			g.Expect(comp.Generation).Should(BeEquivalentTo(1))
-			for k, v := range constant.GetComponentWellKnownLabels(clusterObj.Name, compName) {
+			for k, v := range constant.GetCompLabels(clusterObj.Name, compName) {
 				g.Expect(comp.Labels).Should(HaveKeyWithValue(k, v))
 			}
 			if compDefName == compDefObj.Name {
@@ -626,7 +626,7 @@ var _ = Describe("Cluster Controller", func() {
 		By("create last cluster service manually which will not owned by cluster")
 		lastServiceName := constant.GenerateClusterServiceName(clusterObj.Name, lastService.ServiceName)
 		svcObj := builder.NewServiceBuilder(clusterObj.Namespace, lastServiceName).
-			AddLabelsInMap(constant.GetClusterWellKnownLabels(clusterObj.Name)).
+			AddLabelsInMap(constant.GetClusterLabels(clusterObj.Name)).
 			SetSpec(&lastService.Spec).
 			AddSelector(constant.KBAppComponentLabelKey, lastService.ComponentSelector).
 			// AddSelector(constant.RoleLabelKey, lastService.RoleSelector[0]).

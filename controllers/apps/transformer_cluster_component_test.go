@@ -228,7 +228,7 @@ var _ = Describe("cluster component transformer test", func() {
 		}
 		Expect(compSpec).ShouldNot(BeNil())
 
-		comp, err := component.BuildComponent(transCtx.Cluster, compSpec, nil, nil)
+		comp, err := component.BuildComponent(transCtx.Cluster, compSpec)
 		Expect(err).Should(BeNil())
 
 		for _, setter := range setters {

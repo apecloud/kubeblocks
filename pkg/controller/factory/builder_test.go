@@ -97,7 +97,7 @@ var _ = Describe("builder", func() {
 
 	newAllFieldsSynthesizedComponent := func(compDef *appsv1.ComponentDefinition, cluster *appsv1.Cluster) *component.SynthesizedComponent {
 		By("assign every available fields")
-		comp, err := component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
+		comp, err := component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0])
 		Expect(err).Should(Succeed())
 		synthesizeComp, err := component.BuildSynthesizedComponent(testCtx.Ctx, testCtx.Cli, compDef, comp, cluster)
 		Expect(err).Should(Succeed())
@@ -120,12 +120,12 @@ var _ = Describe("builder", func() {
 		It("builds PVC correctly", func() {
 			snapshotName := "test-snapshot-name"
 			its := newItsObj()
-			_, cluster, synthesizedComponent := newClusterObjs(nil)
+			_, _, synthesizedComponent := newClusterObjs(nil)
 			pvcKey := types.NamespacedName{
 				Namespace: "default",
 				Name:      "data-mysql-01-replicasets-0",
 			}
-			pvc := BuildPVC(cluster, synthesizedComponent, &synthesizedComponent.VolumeClaimTemplates[0], pvcKey, "", snapshotName)
+			pvc := BuildPVC(synthesizedComponent, &synthesizedComponent.VolumeClaimTemplates[0], pvcKey, "", snapshotName)
 			Expect(pvc).ShouldNot(BeNil())
 			Expect(pvc.Spec.AccessModes).Should(Equal(its.Spec.VolumeClaimTemplates[0].Spec.AccessModes))
 			Expect(pvc.Spec.Resources).Should(Equal(synthesizedComponent.VolumeClaimTemplates[0].Spec.Resources))
@@ -255,25 +255,25 @@ var _ = Describe("builder", func() {
 		})
 
 		It("builds serviceaccount correctly", func() {
-			_, cluster, _ := newClusterObjs(nil)
+			_, cluster, synthesizedComp := newClusterObjs(nil)
 			expectName := fmt.Sprintf("kb-%s", cluster.Name)
-			sa := BuildServiceAccount(cluster, expectName)
+			sa := BuildServiceAccount(synthesizedComp, expectName)
 			Expect(sa).ShouldNot(BeNil())
 			Expect(sa.Name).Should(Equal(expectName))
 		})
 
 		It("builds rolebinding correctly", func() {
-			_, cluster, _ := newClusterObjs(nil)
+			_, cluster, synthesizedComp := newClusterObjs(nil)
 			expectName := fmt.Sprintf("kb-%s", cluster.Name)
-			rb := BuildRoleBinding(cluster, expectName)
+			rb := BuildRoleBinding(synthesizedComp, expectName)
 			Expect(rb).ShouldNot(BeNil())
 			Expect(rb.Name).Should(Equal(expectName))
 		})
 
 		It("builds clusterrolebinding correctly", func() {
-			_, cluster, _ := newClusterObjs(nil)
+			_, cluster, synthesizedComp := newClusterObjs(nil)
 			expectName := fmt.Sprintf("kb-%s", cluster.Name)
-			crb := BuildClusterRoleBinding(cluster, expectName)
+			crb := BuildClusterRoleBinding(synthesizedComp, expectName)
 			Expect(crb).ShouldNot(BeNil())
 			Expect(crb.Name).Should(Equal(expectName))
 		})

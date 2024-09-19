@@ -259,7 +259,7 @@ func (d *baseDataClone) createPVCs(vcts []*corev1.PersistentVolumeClaimTemplate)
 			} else if exist {
 				continue
 			}
-			pvc := factory.BuildPVC(d.cluster, d.component, vct, pvcKey, templateName, "")
+			pvc := factory.BuildPVC(d.component, vct, pvcKey, templateName, "")
 			objs = append(objs, pvc)
 		}
 	}

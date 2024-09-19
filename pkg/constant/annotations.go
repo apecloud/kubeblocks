@@ -67,12 +67,3 @@ func GetServiceVersionAnnotation(serviceVersion string) map[string]string {
 		KBAppServiceVersionKey: serviceVersion,
 	}
 }
-
-// GetKBReservedAnnotationKeys returns the reserved annotation keys for KubeBlocks
-func GetKBReservedAnnotationKeys() []string {
-	return []string{
-		KubeBlocksGenerationKey,
-		ReconcileAnnotationKey,
-		KBAppServiceVersionKey,
-	}
-}

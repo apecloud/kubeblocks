@@ -21,20 +21,13 @@ package constant
 
 // k8s recommended well-known label keys
 const (
-	// AppInstanceLabelKey refer cluster.Name
-	AppInstanceLabelKey = "app.kubernetes.io/instance"
-	// AppNameLabelKey refer clusterDefinition.Name before KubeBlocks Version 0.8.0 or refer ComponentDefinition.Name after KubeBlocks Version 0.8.0 (TODO：Pending)
-	AppNameLabelKey = "app.kubernetes.io/name"
-	// AppComponentLabelKey refer clusterDefinition.Spec.ComponentDefs[*].Name before KubeBlocks Version 0.8.0 or refer ComponentDefinition.Name after KubeBlocks Version 0.8.0
-	AppComponentLabelKey = "app.kubernetes.io/component"
-	// AppVersionLabelKey refer clusterVersion.Name before KubeBlocks Version 0.8.0 or refer ComponentDefinition.Name after KubeBlocks Version 0.8.0
-	AppVersionLabelKey   = "app.kubernetes.io/version"
 	AppManagedByLabelKey = "app.kubernetes.io/managed-by"
-	RegionLabelKey       = "topology.kubernetes.io/region"
-	ZoneLabelKey         = "topology.kubernetes.io/zone"
+	AppNameLabelKey      = "app.kubernetes.io/name"
+	AppInstanceLabelKey  = "app.kubernetes.io/instance"
+	AppComponentLabelKey = "app.kubernetes.io/component"
 )
 
-// well-known labels for KubeBlocks and its resources
+// labels for KubeBlocks
 const (
 	BackupProtectionLabelKey               = "kubeblocks.io/backup-protection" // BackupProtectionLabelKey Backup delete protection policy label
 	RoleLabelKey                           = "kubeblocks.io/role"              // RoleLabelKey consensusSet and replicationSet role label key
@@ -60,78 +53,46 @@ const (
 	ServiceDescriptorNameLabelKey          = "servicedescriptor.kubeblocks.io/name"
 )
 
-// GetKBConfigMapWellKnownLabels returns the well-known labels for KB ConfigMap
-func GetKBConfigMapWellKnownLabels(cmTplName, componentDefName, clusterName, componentName string) map[string]string {
-	return map[string]string{
-		CMTemplateNameLabelKey: cmTplName,
-		AppNameLabelKey:        componentDefName,
-		AppInstanceLabelKey:    clusterName,
-		KBAppComponentLabelKey: componentName,
-	}
-}
-
-// GetKBWellKnownLabels returns the well-known labels for KB resources with ClusterDefinition API
-func GetKBWellKnownLabels(clusterDefName, clusterName, componentName string) map[string]string {
-	return map[string]string{
-		AppManagedByLabelKey:   AppName,
-		AppNameLabelKey:        clusterDefName,
-		AppInstanceLabelKey:    clusterName,
-		KBAppComponentLabelKey: componentName,
-	}
-}
-
-// GetKBWellKnownLabelsWithCompDef returns the well-known labels for KB resources with ComponentDefinition API
-func GetKBWellKnownLabelsWithCompDef(compDefName, clusterName, componentName string) map[string]string {
-	return map[string]string{
-		AppManagedByLabelKey:   AppName,
-		AppNameLabelKey:        compDefName, // TODO: reusing AppNameLabelKey for compDefName ?
-		AppInstanceLabelKey:    clusterName,
-		KBAppComponentLabelKey: componentName,
-	}
-}
-
-// GetClusterWellKnownLabels returns the well-known labels for a cluster
-func GetClusterWellKnownLabels(clusterName string) map[string]string {
+func GetClusterLabels(clusterName string) map[string]string {
 	return map[string]string{
 		AppManagedByLabelKey: AppName,
 		AppInstanceLabelKey:  clusterName,
 	}
 }
 
-// GetKBKnownLabels returns the kb-known labels for the headless svc
-func GetKBKnownLabels() map[string]string {
-	return map[string]string{
+func GetClusterLabelsWithDef(clusterName, clusterDef string) map[string]string {
+	labels := map[string]string{
 		AppManagedByLabelKey: AppName,
+		AppInstanceLabelKey:  clusterName,
 	}
+	if len(clusterDef) > 0 {
+		labels[AppNameLabelKey] = clusterDef
+	}
+	return labels
 }
 
-// GetComponentWellKnownLabels returns the well-known labels for Component API
-func GetComponentWellKnownLabels(clusterName, componentName string) map[string]string {
+func GetCompLabels(clusterName, compName string) map[string]string {
 	return map[string]string{
 		AppManagedByLabelKey:   AppName,
 		AppInstanceLabelKey:    clusterName,
-		KBAppComponentLabelKey: componentName,
+		KBAppComponentLabelKey: compName,
 	}
 }
 
-// GetShardingWellKnownLabels returns the well-known labels for Sharding API
-func GetShardingWellKnownLabels(clusterName, shardingName string) map[string]string {
-	return map[string]string{
-		AppManagedByLabelKey:      AppName,
-		AppInstanceLabelKey:       clusterName,
-		KBAppShardingNameLabelKey: shardingName,
+func GetCompLabelsWithDef(clusterName, compName, compDef string) map[string]string {
+	labels := map[string]string{
+		AppManagedByLabelKey:   AppName,
+		AppInstanceLabelKey:    clusterName,
+		KBAppComponentLabelKey: compName,
 	}
+	if len(compDef) > 0 {
+		labels[AppComponentLabelKey] = compDef
+	}
+	return labels
 }
 
-// GetAppVersionLabel returns the label for AppVersion
-func GetAppVersionLabel(appVersion string) map[string]string {
-	return map[string]string{
-		AppVersionLabelKey: appVersion,
-	}
-}
-
-// GetComponentDefLabel returns the label for ComponentDefinition (refer ComponentDefinition.Name)
-func GetComponentDefLabel(compDefName string) map[string]string {
+// GetCompDefLabel returns the label for ComponentDefinition (refer ComponentDefinition.Name)
+func GetCompDefLabel(compDefName string) map[string]string {
 	return map[string]string{
 		AppComponentLabelKey: compDefName,
 	}
@@ -144,17 +105,12 @@ func GetShardingNameLabel(shardingName string) map[string]string {
 	}
 }
 
-// GetKBReservedLabelKeys returns the reserved label keys for KubeBlocks
-func GetKBReservedLabelKeys() []string {
-	return []string{
-		AppManagedByLabelKey,
-		AppNameLabelKey,
-		AppInstanceLabelKey,
-		AppComponentLabelKey,
-		AppVersionLabelKey,
-		KBAppComponentLabelKey,
-		KBAppShardingNameLabelKey,
-		KBManagedByKey,
-		RoleLabelKey,
+// GetKBConfigMapWellKnownLabels returns the well-known labels for KB ConfigMap
+func GetKBConfigMapWellKnownLabels(cmTplName, componentDefName, clusterName, componentName string) map[string]string {
+	return map[string]string{
+		CMTemplateNameLabelKey: cmTplName,
+		AppNameLabelKey:        componentDefName,
+		AppInstanceLabelKey:    clusterName,
+		KBAppComponentLabelKey: componentName,
 	}
 }

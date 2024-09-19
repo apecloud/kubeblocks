@@ -162,12 +162,13 @@ func (t *componentAccountTransformer) generatePassword(account appsv1.SystemAcco
 func (t *componentAccountTransformer) buildAccountSecretWithPassword(ctx *componentTransformContext,
 	synthesizeComp *component.SynthesizedComponent, account appsv1.SystemAccount, password []byte) (*corev1.Secret, error) {
 	secretName := constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, account.Name)
-	labels := constant.GetComponentWellKnownLabels(synthesizeComp.ClusterName, synthesizeComp.Name)
+	labels := constant.GetCompLabels(synthesizeComp.ClusterName, synthesizeComp.Name)
 	secret := builder.NewSecretBuilder(synthesizeComp.Namespace, secretName).
 		AddLabelsInMap(labels).
 		AddLabelsInMap(synthesizeComp.UserDefinedLabels).
-		AddLabels(constant.ClusterAccountLabelKey, account.Name).
+		AddLabelsInMap(synthesizeComp.Labels).
 		AddAnnotationsInMap(synthesizeComp.UserDefinedAnnotations).
+		AddAnnotationsInMap(synthesizeComp.Annotations).
 		PutData(constant.AccountNameForSecret, []byte(account.Name)).
 		PutData(constant.AccountPasswdForSecret, password).
 		SetImmutable(true).

@@ -320,7 +320,7 @@ var _ = Describe("service references", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: namespace,
 						Name:      fmt.Sprintf("%s-%d", constant.GenerateComponentServiceName(etcdCluster, etcdComponent, "peer"), ordinal),
-						Labels:    constant.GetComponentWellKnownLabels(etcdCluster, etcdComponent),
+						Labels:    constant.GetCompLabels(etcdCluster, etcdComponent),
 					},
 					Spec: corev1.ServiceSpec{
 						Ports: []corev1.ServicePort{

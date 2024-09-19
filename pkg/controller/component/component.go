@@ -52,15 +52,15 @@ func GetClusterName(comp *appsv1.Component) (string, error) {
 }
 
 // BuildComponent builds a new Component object from cluster component spec and definition.
-func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSpec,
-	labels, annotations map[string]string) (*appsv1.Component, error) {
+func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSpec) (*appsv1.Component, error) {
 	schedulingPolicy, err := scheduling.BuildSchedulingPolicy(cluster, compSpec)
 	if err != nil {
 		return nil, err
 	}
 	compBuilder := builder.NewComponentBuilder(cluster.Namespace, FullName(cluster.Name, compSpec.Name), compSpec.ComponentDef).
+		AddLabelsInMap(constant.GetCompLabelsWithDef(cluster.Name, compSpec.Name, compSpec.ComponentDef)).
+		// TODO(v1.0): cmpd.spec.labels & cmpd.spec.annotations
 		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
-		AddLabelsInMap(constant.GetComponentWellKnownLabels(cluster.Name, compSpec.Name)).
 		SetServiceVersion(compSpec.ServiceVersion).
 		SetLabels(compSpec.Labels).
 		SetAnnotations(compSpec.Annotations).
@@ -83,12 +83,6 @@ func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSp
 		SetRuntimeClassName(cluster.Spec.RuntimeClassName).
 		SetSystemAccounts(compSpec.SystemAccounts).
 		SetStop(compSpec.Stop)
-	if labels != nil {
-		compBuilder.AddLabelsInMap(labels)
-	}
-	if annotations != nil {
-		compBuilder.AddAnnotationsInMap(annotations)
-	}
 	if cluster.Annotations != nil {
 		p, ok := cluster.Annotations[constant.KBAppMultiClusterPlacementKey]
 		if ok {

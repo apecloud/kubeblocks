@@ -1167,7 +1167,7 @@ func getKubeBlocksVersion(ctx context.Context, r *AddonReconciler) (string, erro
 		return "", fmt.Errorf("KubeBlocks deployment has no labels")
 	}
 
-	v, ok := labels[constant.AppVersionLabelKey]
+	v, ok := labels[appVersion]
 	if !ok {
 		return "", fmt.Errorf("KubeBlocks deployment has no version label")
 	}

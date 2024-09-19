@@ -212,7 +212,7 @@ func (p *pipeline) createConfiguration() *appsv1alpha1.Configuration {
 	}
 	return builder.Component(p.ComponentName).
 		ClusterRef(p.ClusterName).
-		AddLabelsInMap(constant.GetComponentWellKnownLabels(p.ClusterName, p.ComponentName)).
+		AddLabelsInMap(constant.GetCompLabels(p.ClusterName, p.ComponentName)).
 		GetObject()
 }
 

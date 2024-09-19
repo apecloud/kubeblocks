@@ -965,7 +965,7 @@ func compServiceGetter(ctx context.Context, cli client.Reader, namespace, cluste
 
 	// fall-back to list services and find the matched prefix
 	svcList := &corev1.ServiceList{}
-	matchingLabels := client.MatchingLabels(constant.GetComponentWellKnownLabels(clusterName, compName))
+	matchingLabels := client.MatchingLabels(constant.GetCompLabels(clusterName, compName))
 	err = cli.List(ctx, svcList, matchingLabels, inDataContext())
 	if err != nil {
 		return nil, err

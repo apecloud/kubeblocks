@@ -12,53 +12,18 @@ RabbitMQ is a reliable and mature messaging and streaming broker, which is easy 
 
 KubeBlocks supports the management of RabbitMQ.
 
-## Before you start
-
-- [Install kbcli](./../installation/install-with-kbcli/install-kbcli.md).
-- Install KubeBlocks [by kbcli](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [by helm](./../installation/install-with-helm/install-kubeblocks.md).
-- Install and enable the rabbitmq addon [by kbcli](./../installation/install-with-kbcli/install-addons.md) or [by Helm](./../installation/install-with-helm/install-addons.md).
-
-## Create a cluster
-
-<Tabs>
-<TabItem value="kbcli" label="kbcli" default>
-
-***Steps***
-
-1. Execute the following command to create a RabbitMQ cluster.
-
-   ```bash
-   kbcli cluster create mycluster --cluster-definition=rabbitmq --namespace=demo
-   ```
-
-   You can also create a cluster with specified CPU, memory and storage values.
-
-   ```bash
-   kbcli cluster create mycluster --cluster-definition=rabbitmq --set cpu=1,memory=2Gi,storage=10Gi,mode=clustermode --namespace=demo
-   ```
-
 :::note
 
-View more flags for creating a cluster to create a cluster with customized specifications.
-  
-```bash
-kbcli cluster create --help
-```
+Currently, KubeBlocks only supports managing RabbitMQ by `kubectl`.
 
 :::
 
-2. Check whether the cluster is created.
+## Before you start
 
-   ```bash
-   kbcli cluster list --namespace=demo
-   >
-   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS     CREATED-TIME
-   mycluster   demo        rabbitmq             rabbitmq-3.13.2   Delete               Running    Sep 13,2024 11:06 UTC+0800   
-   ```
+- Install KubeBlocks [by kbcli](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [by Helm](./../installation/install-with-helm/install-kubeblocks.md).
+- Install and enable the rabbitmq addon [by kbcli](./../installation/install-with-kbcli/install-addons.md) or [by Helm](./../installation/install-with-helm/install-addons.md).
 
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+## Create a cluster
 
 KubeBlocks implements a Cluster CRD to define a cluster. Here is an example of creating a RabbitMQ cluster with three replicas. Pods are distributed on different nodes by default. But if you only have one node for a cluster with three replicas, set `spec.affinity.topologyKeys` as `null`.
 
@@ -129,10 +94,6 @@ Run the following command to see the created RabbitMQ cluster object:
 kubectl get cluster mycluster -n demo -o yaml
 ```
 
-</TabItem>
-
-</Tabs>
-
 ## Connect to the cluster
 
 Use the [RabbitMQ tools](https://www.rabbitmq.com/docs/cli) to connect to and manage the RabbitMQ cluster.
@@ -140,43 +101,6 @@ Use the [RabbitMQ tools](https://www.rabbitmq.com/docs/cli) to connect to and ma
 ## Scale
 
 ### Scale vertically
-
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
-Before you start, check whether the cluster status is Running. Otherwise, the following operations may fail.
-
-```bash
-kbcli cluster list rabbitmq -n demo
->
-NAME       NAMESPACE    CLUSTER-DEFINITION     VERSION           TERMINATION-POLICY    STATUS    AGE
-rabbitmq   demo         rabbitmq               rabbitmq-3.13.2   Delete                Running   47m
-```
-
-Use the following command to perform vertical scaling.
-
-```bash
-kbcli cluster vscale mycluster --cpu=2 --memory=2Gi --components=rabbitmq -n demo
-```
-
-Please wait a few seconds until the scaling process is over.
-
-The `kbcli cluster vscale` command prints a command to help check the progress of scaling operations.
-
-```bash
-kbcli cluster describe-ops mycluster-verticalscaling-smx8b -n demo
-```
-
-Validate the vertical scale operation. When the cluster is running again, the operation is completed.
-
-```bash
-kbcli cluster describe mycluster
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
 
 Before you start, check whether the cluster status is `Running`. Otherwise, the following operations may fail.
 
@@ -217,8 +141,8 @@ mycluster                                        Delete                 Running 
    ```bash
    kubectl get ops -n demo
    >
-   NAMESPACE   NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
-   demo        ops-vertical-scaling   VerticalScaling   mycluster   Succeed   3/3        6m
+   NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
+   ops-vertical-scaling   VerticalScaling   mycluster   Succeed   3/3        6m
    ```
 
    If an error occurs, you can troubleshoot it with `kubectl describe ops -n demo` command to view the events of this operation.
@@ -268,55 +192,11 @@ mycluster                                        Delete                 Running 
     kubectl describe cluster mycluster -n demo
     ```
 
-</TabItem>
-
-</Tabs>
-
 ### Scale horizontally
 
 Horizontal scaling changes the amount of pods. For example, you can scale out replicas from three to five.
 
 From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out instances, refer to [Horizontal Scale](./../../api_docs/maintenance/scale/horizontal-scale.md) in API docs for more details and examples.
-
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
-Before you start, check whether the cluster status is Running. Otherwise, the following operations may fail.
-
-```bash
-kbcli cluster list rabbitmq -n demo
->
-NAME       NAMESPACE    CLUSTER-DEFINITION     VERSION           TERMINATION-POLICY    STATUS    AGE
-rabbitmq   demo         rabbitmq               rabbitmq-3.13.2   Delete                Running   47m
-```
-
-Use the following command to perform horizontal scaling.
-
-```bash
-kbcli cluster hscale mycluster --replicas=3 --components=rabbitmq -n demo
-```
-
-- `--components` describes the component name ready for horizontal scaling.
-- `--replicas` describes the replica amount of the specified components. Edit the amount based on your demands to scale in or out replicas.
-
-Please wait a few seconds until the scaling process is over.
-
-The `kbcli cluster hscale` command prints a command to help check the progress of scaling operations.
-
-```bash
-kbcli cluster describe-ops mycluster-horizontalscaling-smx8b -n demo
-```
-
-Validate the horizontal scale operation. When the cluster is running again, the operation is completed.
-
-```bash
-kbcli cluster describe mycluster -n demo
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
 
 Before you start, check whether the cluster status is `Running`. Otherwise, the following operations may fail.
 
@@ -357,8 +237,8 @@ mycluster                                        Delete                 Running 
    ```bash
    kubectl get ops -n demo
    >
-   NAMESPACE   NAME                     TYPE                CLUSTER     STATUS    PROGRESS   AGE
-   demo        ops-horizontal-scaling   HorizontalScaling   mycluster   Succeed   3/3        6m
+   NAME                     TYPE                CLUSTER     STATUS    PROGRESS   AGE
+   ops-horizontal-scaling   HorizontalScaling   mycluster   Succeed   2/2        6m
    ```
 
    If an error occurs, you can troubleshoot it with `kubectl describe ops -n demo` command to view the events of this operation.
@@ -402,48 +282,7 @@ mycluster                                        Delete                 Running 
     kubectl describe cluster mycluster -n demo
     ```
 
-</TabItem>
-
-</Tabs>
-
 ## Volume expansion
-
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
-Before you start, check whether the cluster status is Running. Otherwise, the following operations may fail.
-
-```bash
-kbcli cluster list rabbitmq -n demo
->
-NAME       NAMESPACE    CLUSTER-DEFINITION     VERSION           TERMINATION-POLICY    STATUS    AGE
-rabbitmq   demo         rabbitmq               rabbitmq-3.13.2   Delete                Running   47m
-```
-
-Use the following command to perform volume expansion.
-
-```bash
-kbcli cluster volume-expand mycluster --storage=40Gi --components=rabbitmq -n demo
-```
-
-The volume expansion may take a few minutes.
-
-The `kbcli cluster volume-expand` command prints a command to help check the progress of scaling operations.
-
-```bash
-kbcli cluster describe-ops mycluster-volumeexpansion-smx8b -n demo
-```
-
-Validate the volume expansion operation. When the cluster is running again, the operation is completed.
-
-```bash
-kbcli cluster describe mycluster -n demo
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
 
 Before you start, check whether the cluster status is `Running`. Otherwise, the following operations may fail.
 
@@ -481,8 +320,8 @@ mycluster                                        Delete                 Running 
     ```bash
     kubectl get ops -n demo
     >
-    NAMESPACE   NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
-    demo        ops-volume-expansion   VolumeExpansion   mycluster   Succeed   3/3        6m
+    NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
+    ops-volume-expansion   VolumeExpansion   mycluster   Succeed   1/1        6m
     ```
 
     If an error occurs, you can troubleshoot it with `kubectl describe ops -n demo` command to view the events of this operation.
@@ -528,45 +367,7 @@ mycluster                                        Delete                 Running 
     kubectl describe cluster mycluster -n demo
     ```
 
-</TabItem>
-
-</Tabs>
-
 ## Restart
-
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
-1. Restart a cluster.
-
-   Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
-
-   ```bash
-   kbcli cluster restart mycluster --components="rabbitmq" \
-   --ttlSecondsAfterSucceed=30 -n demo
-   ```
-
-   - `components` describes the component name that needs to be restarted.
-   - `ttlSecondsAfterSucceed` describes the time to live of an OpsRequest job after the restarting succeeds.
-
-2. Validate the restarting.
-
-   Run the command below to check the cluster status to check the restarting status.
-
-   ```bash
-   kbcli cluster list mycluster -n demo
-   >
-   NAME        NAMESPACE   CLUSTER-DEFINITION     VERSION            TERMINATION-POLICY   STATUS    CREATED-TIME
-   mycluster   demo        rabbitmq               rabbitmq-3.13.2    Delete               Running   Sep 13,2024 12:06 UTC+0800
-   ```
-
-   * STATUS=Updating: it means the cluster restart is in progress.
-   * STATUS=Running: it means the cluster has been restarted.
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
 
 1. Restart a cluster.
 
@@ -590,7 +391,7 @@ mycluster                                        Delete                 Running 
    ```bash
    kubectl get pod -n demo
 
-   kubectl get ops ops-restart -n demo
+   kubectl get ops -n demo
    ```
 
    During the restarting process, there are two status types for pods.
@@ -598,35 +399,11 @@ mycluster                                        Delete                 Running 
    - STATUS=Terminating: it means the cluster restart is in progress.
    - STATUS=Running: it means the cluster has been restarted.
 
-</TabItem>
-
-</Tabs>
-
 ## Stop/Start a cluster
 
 You can stop/start a cluster to save computing resources. When a cluster is stopped, the computing resources of this cluster are released, which means the pods of Kubernetes are released, but the storage resources are reserved. You can start this cluster again by snapshots if you want to restore the cluster resources.
 
 ### Stop a cluster
-
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
-1. Configure the name of your cluster and run the command below to stop this cluster.
-
-   ```bash
-   kbcli cluster stop mycluster -n demo
-   ```
-
-2. Check the status of the cluster to see whether it is stopped.
-
-    ```bash
-    kbcli cluster list -n demo
-    ```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
 
 #### Option 1. Apply an OpsRequest
 
@@ -689,31 +466,7 @@ spec:
       services:
 ```
 
-</TabItem>
-
-</Tabs>
-
 ### Start a cluster
-
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
-1. Configure the name of your cluster and run the command below to start this cluster.
-
-   ```bash
-   kbcli cluster start mycluster -n demo
-   ```
-
-2. Check the status of the cluster to see whether it is running again.
-
-    ```bash
-    kbcli cluster list -n demo
-    ```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
 
 #### Option 1. Apply an OpsRequest
 
@@ -775,10 +528,6 @@ spec:
                 storage: 20Gi
       services:
 ```
-
-</TabItem>
-
-</Tabs>
 
 ## Monitor
 

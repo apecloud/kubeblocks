@@ -69,8 +69,8 @@ func runCommand(ctx context.Context, action *proto.ExecAction, parameters map[st
 }
 
 func runCommandNonBlocking(ctx context.Context, action *proto.ExecAction, parameters map[string]string, timeout *int32) (chan []byte, chan []byte, chan error, error) {
-	stdoutBuf := bytes.NewBuffer(make([]byte, 0, 1))
-	stderrBuf := bytes.NewBuffer(make([]byte, 0, 1))
+	stdoutBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
+	stderrBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
 	execErrorChan, err := runCommandX(ctx, action, parameters, timeout, nil, stdoutBuf, stderrBuf)
 	if err != nil {
 		return nil, nil, nil, err

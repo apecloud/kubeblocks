@@ -13435,7 +13435,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>The instance will rebuild on the specified node when the instance uses local PersistentVolume as the storage disk.
+<p>The instance will rebuild on the specified node.
 If not set, it will rebuild on a random node.</p>
 </td>
 </tr>

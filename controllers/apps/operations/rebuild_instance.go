@@ -28,11 +28,13 @@ import (
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
@@ -296,8 +298,8 @@ func (r rebuildInstanceOpsHandler) rebuildInstancesWithHScaling(reqCtx intctrlut
 	)
 	if len(compStatus.ProgressDetails) == 0 {
 		// 1. scale out the required instances
-		r.scaleOutRequiredInstances(opsRes, rebuildInstance, compStatus)
-		return 0, 0, nil
+		err := r.scaleOutRequiredInstances(reqCtx, cli, opsRes, rebuildInstance, compStatus)
+		return 0, 0, err
 	}
 	for i := range opsRes.Cluster.Spec.ComponentSpecs {
 		compSpec := &opsRes.Cluster.Spec.ComponentSpecs[i]
@@ -320,9 +322,11 @@ func (r rebuildInstanceOpsHandler) rebuildInstancesWithHScaling(reqCtx intctrlut
 	return completedCount, failedCount, nil
 }
 
-func (r rebuildInstanceOpsHandler) scaleOutRequiredInstances(opsRes *OpsResource,
+func (r rebuildInstanceOpsHandler) scaleOutRequiredInstances(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	opsRes *OpsResource,
 	rebuildInstance appsv1alpha1.RebuildInstance,
-	compStatus *appsv1alpha1.OpsRequestComponentStatus) {
+	compStatus *appsv1alpha1.OpsRequestComponentStatus) error {
 	// 1. sort the instances
 	slices.SortFunc(rebuildInstance.Instances, func(a, b appsv1alpha1.Instance) bool {
 		return a.Name < b.Name
@@ -344,9 +348,9 @@ func (r rebuildInstanceOpsHandler) scaleOutRequiredInstances(opsRes *OpsResource
 			opsRes.Recorder.Eventf(opsRes.OpsRequest, corev1.EventTypeWarning, reasonCompReplicasChanged, "then replicas of the component %s has been changed", compName)
 			continue
 		}
-		r.scaleOutCompReplicasAndSyncProgress(opsRes, compSpec, rebuildInstance, compStatus, rebuildInsWrapper)
-		break
+		return r.scaleOutCompReplicasAndSyncProgress(reqCtx, cli, opsRes, compSpec, rebuildInstance, compStatus, rebuildInsWrapper)
 	}
+	return nil
 }
 
 // getRebuildInstanceWrapper assembles the corresponding replicas and instances based on the template
@@ -364,11 +368,13 @@ func (r rebuildInstanceOpsHandler) getRebuildInstanceWrapper(opsRes *OpsResource
 	return rebuildInsWrapper
 }
 
-func (r rebuildInstanceOpsHandler) scaleOutCompReplicasAndSyncProgress(opsRes *OpsResource,
+func (r rebuildInstanceOpsHandler) scaleOutCompReplicasAndSyncProgress(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	opsRes *OpsResource,
 	compSpec *appsv1alpha1.ClusterComponentSpec,
 	rebuildInstance appsv1alpha1.RebuildInstance,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus,
-	rebuildInsWrapper map[string]*rebuildInstanceWrapper) {
+	rebuildInsWrapper map[string]*rebuildInstanceWrapper) error {
 	scaleOutInsMap := map[string]string{}
 	setScaleOutInsMap := func(workloadName, templateName string,
 		replicas int32, offlineInstances []string, wrapper *rebuildInstanceWrapper) {
@@ -392,8 +398,14 @@ func (r rebuildInstanceOpsHandler) scaleOutCompReplicasAndSyncProgress(opsRes *O
 	if wrapper, ok := rebuildInsWrapper[""]; ok {
 		setScaleOutInsMap(workloadName, "", compSpec.Replicas-allTemplateReplicas, compSpec.OfflineInstances, wrapper)
 	}
-	// set progress details
+
+	its := &workloads.InstanceSet{}
+	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: workloadName, Namespace: opsRes.OpsRequest.Namespace}, its); err != nil {
+		return err
+	}
+	itsUpdated := false
 	for _, ins := range rebuildInstance.Instances {
+		// set progress details
 		scaleOutInsName := scaleOutInsMap[ins.Name]
 		setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails,
 			appsv1alpha1.ProgressStatusDetail{
@@ -401,7 +413,22 @@ func (r rebuildInstanceOpsHandler) scaleOutCompReplicasAndSyncProgress(opsRes *O
 				Status:    appsv1alpha1.ProcessingProgressStatus,
 				Message:   r.buildScalingOutPodMessage(scaleOutInsName, "Processing"),
 			})
+
+		// specify node to scale out
+		if ins.TargetNodeName != "" {
+			if err := instanceset.MergeNodeSelectorOnceAnnotation(its, map[string]string{scaleOutInsName: ins.TargetNodeName}); err != nil {
+				return err
+			}
+			itsUpdated = true
+		}
 	}
+
+	if itsUpdated {
+		if err := cli.Update(reqCtx.Ctx, its); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // checkProgressForScalingOutPods checks if the new pods are available.

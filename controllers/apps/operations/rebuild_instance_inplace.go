@@ -31,11 +31,13 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -357,7 +359,7 @@ func (inPlaceHelper *inplaceRebuildHelper) rebuildSourcePVCsAndRecreateInstance(
 		}
 		// set volumeName to tmp pvc, it will be used when recreating the source pvc.
 		tmpPVC.Spec.VolumeName = pv.Name
-		// 5. recreate the source pbc.
+		// 5. recreate the source pvc.
 		if err = inPlaceHelper.recreateSourcePVC(reqCtx, cli, tmpPVC, sourcePVCName, opsRequest.Name); err != nil {
 			return err
 		}
@@ -368,6 +370,23 @@ func (inPlaceHelper *inplaceRebuildHelper) rebuildSourcePVCsAndRecreateInstance(
 	if opsRequest.Spec.Force {
 		options = append(options, client.GracePeriodSeconds(0))
 	}
+
+	if inPlaceHelper.instance.TargetNodeName != "" {
+		// under the circumstance of using cloud disks, need to set node selector again to make sure pod
+		// goes to the specified node
+		its := &workloads.InstanceSet{}
+		itsName := constant.GenerateWorkloadNamePattern(inPlaceHelper.synthesizedComp.ClusterName, inPlaceHelper.synthesizedComp.Name)
+		if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: itsName, Namespace: inPlaceHelper.synthesizedComp.Namespace}, its); err != nil {
+			return err
+		}
+		if err := instanceset.MergeNodeSelectorOnceAnnotation(its, map[string]string{inPlaceHelper.targetPod.Name: inPlaceHelper.instance.TargetNodeName}); err != nil {
+			return err
+		}
+		if err := cli.Update(reqCtx.Ctx, its); err != nil {
+			return err
+		}
+	}
+
 	return intctrlutil.BackgroundDeleteObject(cli, reqCtx.Ctx, inPlaceHelper.targetPod, options...)
 }
 

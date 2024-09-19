@@ -100,22 +100,31 @@ type ObjectTreeNode struct {
 	Secondaries []*ObjectTreeNode `json:"secondaries,omitempty"`
 }
 
+type ObjectChangeType string
+
+const (
+	ObjectCreationType ObjectChangeType = "ObjectCreation"
+	ObjectUpdateType   ObjectChangeType = "ObjectUpdate"
+	ObjectDeletionType ObjectChangeType = "ObjectDeletion"
+	EventType          ObjectChangeType = "Event"
+)
+
 // ObjectChange defines a detailed change of an object.
 type ObjectChange struct {
-	// ObjectReference specifies the Object this plan described.
+	// ObjectReference specifies the Object this change described.
 	//
 	ObjectReference corev1.ObjectReference `json:"objectReference"`
 
-	// Type specifies the change type.
+	// ChangeType specifies the change type.
 	// Event - specifies that this is a Kubernetes Event.
 	// ObjectCreation - specifies that this is an object creation.
 	// ObjectUpdate - specifies that this is an object update.
 	// ObjectDeletion - specifies that this is an object deletion.
 	//
 	// +kubebuilder:validation:Enum={Event, ObjectCreation, ObjectUpdate, ObjectDeletion}
-	Type string `json:"type"`
+	ChangeType ObjectChangeType `json:"changeType"`
 
-	// EventAttributes specifies the attributes of the event when Type is Event.
+	// EventAttributes specifies the attributes of the event when ChangeType is Event.
 	//
 	// +optional
 	EventAttributes *EventAttributes `json:"eventAttributes,omitempty"`

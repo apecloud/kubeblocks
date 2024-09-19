@@ -58,7 +58,7 @@ func (r *ReconciliationViewReconciler) Reconcile(ctx context.Context, req ctrl.R
 		Prepare(viewResources()).
 		Do(viewResourcesValidation(ctx, r.Client)).
 		Do(updateInformerManager(r.InformerManager)).
-		//Do(viewCalculation()).
+		Do(viewCalculation(ctx, r.Client)).
 		//Do(stateEvaluation()).
 		Commit()
 
@@ -74,7 +74,7 @@ func (r *ReconciliationViewReconciler) Reconcile(ctx context.Context, req ctrl.R
 	// view calculation
 	//
 	// build new object set from cache
-	// update object.uid to tree.primaryReference map(one object might belong to many tree, not int KB)
+	// update object.uid to tree.primaryReference map(one object might belong to many tree, not in KB)
 	// build old object set from view.status.currentObjectTree
 	// calculate createSet, deleteSet and updateSet
 	// build view progress from three sets.

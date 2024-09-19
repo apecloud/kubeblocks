@@ -64,6 +64,11 @@ type ReconciliationViewStatus struct {
 	//
 	DesiredObjectTree ObjectTreeNode `json:"desiredObjectTree"`
 
+	// CurrentObjectTree specifies the current object tree.
+	// Ideally, CurrentObjectTree should be same as applying changes in View to InitialObjectTree.
+	//
+	CurrentObjectTree ObjectTreeNode `json:"currentObjectTree"`
+
 	// PlanSummary summarizes the desired state by comparing it to the initial state.
 	//
 	PlanSummary PlanSummary `json:"planSummary"`

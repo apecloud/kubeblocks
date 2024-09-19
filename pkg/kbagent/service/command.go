@@ -78,7 +78,7 @@ func runCommandNonBlocking(ctx context.Context, action *proto.ExecAction, parame
 
 	stdoutChan := make(chan []byte, defaultBufferSize)
 	stderrChan := make(chan []byte, defaultBufferSize)
-	errChan := make(chan error)
+	errChan := make(chan error, 1)
 	go func() {
 		defer close(errChan)
 		defer close(stderrChan)

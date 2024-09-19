@@ -48,7 +48,7 @@ func gather[T interface{}](ch chan T) *T {
 }
 
 func runCommand(ctx context.Context, action *proto.ExecAction, parameters map[string]string, timeout *int32) ([]byte, error) {
-	stdoutChan, stderrChan, errChan, err := runCommandNonBlocking(ctx, action, parameters, timeout)
+	outBuffer, errBuffer, errChan, err := runCommandNonBlocking(ctx, action, parameters, timeout)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +56,8 @@ func runCommand(ctx context.Context, action *proto.ExecAction, parameters map[st
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
-			stderrMsg := string(<-stderrChan)
+			stderrMsg := string(errBuffer.Bytes())
+			//stderrMsg := string(<-stderrChan)
 			if len(stderrMsg) > 0 {
 				err = errors.Wrapf(proto.ErrFailed, "exec exit %d and stderr: %s", exitErr.ExitCode(), stderrMsg)
 			} else {
@@ -65,10 +66,10 @@ func runCommand(ctx context.Context, action *proto.ExecAction, parameters map[st
 		}
 		return nil, err
 	}
-	return <-stdoutChan, nil
+	return outBuffer.Bytes(), nil
 }
 
-func runCommandNonBlocking(ctx context.Context, action *proto.ExecAction, parameters map[string]string, timeout *int32) (chan []byte, chan []byte, chan error, error) {
+func runCommandNonBlocking(ctx context.Context, action *proto.ExecAction, parameters map[string]string, timeout *int32) (*bytes.Buffer, *bytes.Buffer, chan error, error) {
 	stdoutBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
 	stderrBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
 	execErrorChan, err := runCommandX(ctx, action, parameters, timeout, nil, stdoutBuf, stderrBuf)
@@ -76,13 +77,9 @@ func runCommandNonBlocking(ctx context.Context, action *proto.ExecAction, parame
 		return nil, nil, nil, err
 	}
 
-	stdoutChan := make(chan []byte, 1)
-	stderrChan := make(chan []byte, 1)
 	errChan := make(chan error, 1)
 	go func() {
 		defer close(errChan)
-		defer close(stderrChan)
-		defer close(stdoutChan)
 
 		// wait for the command to finish
 		execErr, ok := <-execErrorChan
@@ -90,11 +87,10 @@ func runCommandNonBlocking(ctx context.Context, action *proto.ExecAction, parame
 			execErr = errors.New("runtime error: error chan closed unexpectedly")
 		}
 
-		stdoutChan <- stdoutBuf.Bytes()
-		stderrChan <- stderrBuf.Bytes()
 		errChan <- execErr
+
 	}()
-	return stdoutChan, stderrChan, errChan, nil
+	return stdoutBuf, stderrBuf, errChan, nil
 }
 
 func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[string]string, timeout *int32,

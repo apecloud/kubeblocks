@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package service
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -56,9 +57,9 @@ type actionService struct {
 }
 
 type runningAction struct {
-	stdoutChan chan []byte
-	stderrChan chan []byte
-	errChan    chan error
+	outBuffer *bytes.Buffer
+	errBuffer *bytes.Buffer
+	errChan   chan error
 }
 
 var _ Service = &actionService{}
@@ -127,14 +128,14 @@ func (s *actionService) handleExecActionNonBlocking(ctx context.Context, req *pr
 
 	running, ok := s.runningActions[req.Action]
 	if !ok {
-		stdoutChan, stderrChan, errChan, err := runCommandNonBlocking(ctx, action.Exec, req.Parameters, req.TimeoutSeconds)
+		outBuffer, errBuffer, errChan, err := runCommandNonBlocking(ctx, action.Exec, req.Parameters, req.TimeoutSeconds)
 		if err != nil {
 			return nil, err
 		}
 		running = &runningAction{
-			stdoutChan: stdoutChan,
-			stderrChan: stderrChan,
-			errChan:    errChan,
+			outBuffer: outBuffer,
+			errBuffer: errBuffer,
+			errChan:   errChan,
 		}
 		s.runningActions[req.Action] = running
 	}
@@ -146,5 +147,5 @@ func (s *actionService) handleExecActionNonBlocking(ctx context.Context, req *pr
 	if *err != nil {
 		return nil, *err
 	}
-	return *gather(running.stdoutChan), nil
+	return running.outBuffer.Bytes(), nil
 }

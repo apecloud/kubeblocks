@@ -69,15 +69,15 @@ func runCommand(ctx context.Context, action *proto.ExecAction, parameters map[st
 }
 
 func runCommandNonBlocking(ctx context.Context, action *proto.ExecAction, parameters map[string]string, timeout *int32) (chan []byte, chan []byte, chan error, error) {
-	stdoutBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
-	stderrBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
+	stdoutBuf := bytes.NewBuffer(make([]byte, 1))
+	stderrBuf := bytes.NewBuffer(make([]byte, 1))
 	execErrorChan, err := runCommandX(ctx, action, parameters, timeout, nil, stdoutBuf, stderrBuf)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
-	stdoutChan := make(chan []byte, defaultBufferSize)
-	stderrChan := make(chan []byte, defaultBufferSize)
+	stdoutChan := make(chan []byte, 1)
+	stderrChan := make(chan []byte, 1)
 	errChan := make(chan error, 1)
 	go func() {
 		defer close(errChan)

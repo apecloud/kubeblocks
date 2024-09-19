@@ -203,7 +203,7 @@ func TestWalkBFS(t *testing.T) {
 
 func TestValidate(t *testing.T) {
 	dag := NewDAG()
-	err := dag.validate()
+	err := dag.Validate()
 	if err == nil {
 		t.Error("nil root not found")
 	}
@@ -217,7 +217,7 @@ func TestValidate(t *testing.T) {
 	dag.Connect(1, 2)
 	dag.Connect(2, 3)
 	dag.Connect(3, 1)
-	err = dag.validate()
+	err = dag.Validate()
 	if err == nil {
 		t.Error("cycle not found")
 	}
@@ -225,7 +225,7 @@ func TestValidate(t *testing.T) {
 		t.Error("error not as expected")
 	}
 	dag.Connect(1, 1)
-	err = dag.validate()
+	err = dag.Validate()
 	if err == nil {
 		t.Error("self-cycle not found")
 	}

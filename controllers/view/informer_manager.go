@@ -193,11 +193,11 @@ func (r *informerManagerReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (ku
 	o, _ := tree.Get(&viewv1.ReconciliationViewDefinition{})
 	viewDef, _ := o.(*viewv1.ReconciliationViewDefinition)
 	parseGVK := func(ot viewv1.ObjectType) error {
-		gv, err := schema.ParseGroupVersion(ot.APIVersion)
+		gvk, err := objectTypeToGVK(&ot)
 		if err != nil {
 			return err
 		}
-		gvks.Insert(gv.WithKind(ot.Kind))
+		gvks.Insert(*gvk)
 		return nil
 	}
 	for _, rule := range viewDef.Spec.OwnershipRules {

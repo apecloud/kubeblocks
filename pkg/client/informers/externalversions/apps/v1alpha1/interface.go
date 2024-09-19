@@ -32,14 +32,14 @@ type Interface interface {
 	ClusterDefinitions() ClusterDefinitionInformer
 	// Components returns a ComponentInformer.
 	Components() ComponentInformer
-	// ComponentConfigurations returns a ComponentConfigurationInformer.
-	ComponentConfigurations() ComponentConfigurationInformer
 	// ComponentDefinitions returns a ComponentDefinitionInformer.
 	ComponentDefinitions() ComponentDefinitionInformer
 	// ComponentVersions returns a ComponentVersionInformer.
 	ComponentVersions() ComponentVersionInformer
 	// ConfigConstraints returns a ConfigConstraintInformer.
 	ConfigConstraints() ConfigConstraintInformer
+	// Configurations returns a ConfigurationInformer.
+	Configurations() ConfigurationInformer
 	// ServiceDescriptors returns a ServiceDescriptorInformer.
 	ServiceDescriptors() ServiceDescriptorInformer
 }
@@ -75,11 +75,6 @@ func (v *version) Components() ComponentInformer {
 	return &componentInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// ComponentConfigurations returns a ComponentConfigurationInformer.
-func (v *version) ComponentConfigurations() ComponentConfigurationInformer {
-	return &componentConfigurationInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
-}
-
 // ComponentDefinitions returns a ComponentDefinitionInformer.
 func (v *version) ComponentDefinitions() ComponentDefinitionInformer {
 	return &componentDefinitionInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
@@ -93,6 +88,11 @@ func (v *version) ComponentVersions() ComponentVersionInformer {
 // ConfigConstraints returns a ConfigConstraintInformer.
 func (v *version) ConfigConstraints() ConfigConstraintInformer {
 	return &configConstraintInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// Configurations returns a ConfigurationInformer.
+func (v *version) Configurations() ConfigurationInformer {
+	return &configurationInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // ServiceDescriptors returns a ServiceDescriptorInformer.

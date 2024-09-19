@@ -89,3 +89,7 @@ func GetItemStatus(status *configurationv1alpha1.ComponentParameterStatus, name 
 	}
 	return nil
 }
+
+func ParametersDefinitionTerminalPhases(status configurationv1alpha1.ParametersDefinitionStatus, generation int64) bool {
+	return status.ObservedGeneration == generation && status.Phase == configurationv1alpha1.PDAvailablePhase
+}

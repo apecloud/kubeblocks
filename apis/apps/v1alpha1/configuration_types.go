@@ -83,8 +83,8 @@ type ConfigTemplateItemDetail struct {
 	ConfigFileParams map[string]ConfigParams `json:"configFileParams,omitempty"`
 }
 
-// ComponentConfigurationSpec defines the desired state of ComponentConfiguration
-type ComponentConfigurationSpec struct {
+// ConfigurationSpec defines the desired state of ComponentConfiguration
+type ConfigurationSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
@@ -197,8 +197,8 @@ type ConfigTemplateItemDetailStatus struct {
 	ReconcileDetail *ReconcileDetail `json:"reconcileDetail,omitempty"`
 }
 
-// ComponentConfigurationStatus defines the observed state of ComponentConfiguration
-type ComponentConfigurationStatus struct {
+// ConfigurationStatus defines the observed state of ComponentConfiguration
+type ConfigurationStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
@@ -246,24 +246,24 @@ type ComponentConfigurationStatus struct {
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="config status phase."
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
-// ComponentConfiguration is the Schema for the componentconfigurations API
-type ComponentConfiguration struct {
+// Configuration is the Schema for the configurations API
+type Configuration struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ComponentConfigurationSpec   `json:"spec,omitempty"`
-	Status ComponentConfigurationStatus `json:"status,omitempty"`
+	Spec   ConfigurationSpec   `json:"spec,omitempty"`
+	Status ConfigurationStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// ComponentConfigurationList contains a list of ComponentConfiguration
-type ComponentConfigurationList struct {
+// ConfigurationList contains a list of Configuration
+type ConfigurationList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ComponentConfiguration `json:"items"`
+	Items           []Configuration `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&ComponentConfiguration{}, &ComponentConfigurationList{})
+	SchemeBuilder.Register(&Configuration{}, &ConfigurationList{})
 }

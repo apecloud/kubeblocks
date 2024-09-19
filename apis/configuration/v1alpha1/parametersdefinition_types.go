@@ -22,8 +22,6 @@ package v1alpha1
 import (
 	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 )
 
 // +genclient
@@ -218,7 +216,7 @@ type ParameterDeletedPolicy struct {
 	// If set to "Reset", the parameter will be re-rendered through the configuration template.
 	//
 	// +kubebuilder:validation:Required
-	DeletedMethod v1beta1.ParameterDeletedMethod `json:"deletedMethod"`
+	DeletedMethod ParameterDeletedMethod `json:"deletedMethod"`
 
 	// Specifies the value to use if DeletedMethod is RestoreToDefault.
 	// Example: pg
@@ -239,7 +237,7 @@ type ParametersDefinitionStatus struct {
 	// When set to PDAvailablePhase, the ParamsDesc can be referenced by ComponentDefinition.
 	//
 	// +optional
-	Phase v1beta1.ParametersDescPhase `json:"phase,omitempty"`
+	Phase ParametersDescPhase `json:"phase,omitempty"`
 
 	// Represents a list of detailed status of the ParametersDescription object.
 	//

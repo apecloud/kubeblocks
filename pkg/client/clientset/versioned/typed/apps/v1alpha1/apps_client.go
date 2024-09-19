@@ -32,10 +32,10 @@ type AppsV1alpha1Interface interface {
 	ClustersGetter
 	ClusterDefinitionsGetter
 	ComponentsGetter
-	ComponentConfigurationsGetter
 	ComponentDefinitionsGetter
 	ComponentVersionsGetter
 	ConfigConstraintsGetter
+	ConfigurationsGetter
 	ServiceDescriptorsGetter
 }
 
@@ -60,10 +60,6 @@ func (c *AppsV1alpha1Client) Components(namespace string) ComponentInterface {
 	return newComponents(c, namespace)
 }
 
-func (c *AppsV1alpha1Client) ComponentConfigurations(namespace string) ComponentConfigurationInterface {
-	return newComponentConfigurations(c, namespace)
-}
-
 func (c *AppsV1alpha1Client) ComponentDefinitions() ComponentDefinitionInterface {
 	return newComponentDefinitions(c)
 }
@@ -74,6 +70,10 @@ func (c *AppsV1alpha1Client) ComponentVersions() ComponentVersionInterface {
 
 func (c *AppsV1alpha1Client) ConfigConstraints() ConfigConstraintInterface {
 	return newConfigConstraints(c)
+}
+
+func (c *AppsV1alpha1Client) Configurations(namespace string) ConfigurationInterface {
+	return newConfigurations(c, namespace)
 }
 
 func (c *AppsV1alpha1Client) ServiceDescriptors(namespace string) ServiceDescriptorInterface {

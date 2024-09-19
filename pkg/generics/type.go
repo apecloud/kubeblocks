@@ -130,6 +130,9 @@ var StorageProviderSignature = func(_ dpv1alpha1.StorageProvider, _ *dpv1alpha1.
 var ConfigurationSignature = func(_ configurationv1alpha1.ComponentParameter, _ *configurationv1alpha1.ComponentParameter, _ configurationv1alpha1.ComponentParameterList, _ *configurationv1alpha1.ComponentParameterList) {
 }
 
+var ParametersDefinitionSignature = func(_ configurationv1alpha1.ParametersDefinition, _ *configurationv1alpha1.ParametersDefinition, _ configurationv1alpha1.ParametersDefinitionList, _ *configurationv1alpha1.ParametersDefinitionList) {
+}
+
 func ToGVK(object client.Object) schema.GroupVersionKind {
 	t := reflect.TypeOf(object)
 	if t.Kind() != reflect.Pointer {

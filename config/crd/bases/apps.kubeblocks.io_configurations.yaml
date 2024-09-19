@@ -5,19 +5,19 @@ metadata:
     controller-gen.kubebuilder.io/version: v0.14.0
   labels:
     app.kubernetes.io/name: kubeblocks
-  name: componentconfigurations.apps.kubeblocks.io
+  name: configurations.apps.kubeblocks.io
 spec:
   group: apps.kubeblocks.io
   names:
     categories:
     - kubeblocks
     - all
-    kind: ComponentConfiguration
-    listKind: ComponentConfigurationList
-    plural: componentconfigurations
+    kind: Configuration
+    listKind: ConfigurationList
+    plural: configurations
     shortNames:
     - config
-    singular: componentconfiguration
+    singular: configuration
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -39,8 +39,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ComponentConfiguration is the Schema for the componentconfigurations
-          API
+        description: Configuration is the Schema for the configurations API
         properties:
           apiVersion:
             description: |-
@@ -60,7 +59,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: ComponentConfigurationSpec defines the desired state of ComponentConfiguration
+            description: ConfigurationSpec defines the desired state of ComponentConfiguration
             properties:
               clusterName:
                 description: Specifies the name of the Cluster that this configuration
@@ -446,8 +445,7 @@ spec:
             - componentName
             type: object
           status:
-            description: ComponentConfigurationStatus defines the observed state of
-              ComponentConfiguration
+            description: ConfigurationStatus defines the observed state of ComponentConfiguration
             properties:
               conditions:
                 description: Provides detailed status information for opsRequest.

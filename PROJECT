@@ -290,14 +290,6 @@ resources:
 - api:
     crdVersion: v1
     namespaced: true
-  domain: kubeblocks.io
-  group: apps
-  kind: ComponentConfiguration
-  path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
-  version: v1alpha1
-- api:
-    crdVersion: v1
-    namespaced: true
   controller: true
   domain: kubeblocks.io
   group: configuration
@@ -311,5 +303,13 @@ resources:
   group: configuration
   kind: ParametersDefinition
   path: github.com/apecloud/kubeblocks/apis/configuration/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: kubeblocks.io
+  group: apps
+  kind: Configuration
+  path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
   version: v1alpha1
 version: "3"

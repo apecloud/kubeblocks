@@ -33,6 +33,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -176,7 +177,8 @@ func compOwnedKinds() []client.ObjectList {
 		&batchv1.JobList{},
 		&dpv1alpha1.RestoreList{},
 		&dpv1alpha1.BackupList{},
-		&appsv1alpha1.ComponentConfigurationList{},
+		&appsv1alpha1.ConfigurationList{},
+		&configurationv1alpha1.ComponentParameterList{},
 	}
 }
 

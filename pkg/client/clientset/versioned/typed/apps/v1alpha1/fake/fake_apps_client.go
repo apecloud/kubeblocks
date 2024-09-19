@@ -44,10 +44,6 @@ func (c *FakeAppsV1alpha1) Components(namespace string) v1alpha1.ComponentInterf
 	return &FakeComponents{c, namespace}
 }
 
-func (c *FakeAppsV1alpha1) ComponentConfigurations(namespace string) v1alpha1.ComponentConfigurationInterface {
-	return &FakeComponentConfigurations{c, namespace}
-}
-
 func (c *FakeAppsV1alpha1) ComponentDefinitions() v1alpha1.ComponentDefinitionInterface {
 	return &FakeComponentDefinitions{c}
 }
@@ -58,6 +54,10 @@ func (c *FakeAppsV1alpha1) ComponentVersions() v1alpha1.ComponentVersionInterfac
 
 func (c *FakeAppsV1alpha1) ConfigConstraints() v1alpha1.ConfigConstraintInterface {
 	return &FakeConfigConstraints{c}
+}
+
+func (c *FakeAppsV1alpha1) Configurations(namespace string) v1alpha1.ConfigurationInterface {
+	return &FakeConfigurations{c, namespace}
 }
 
 func (c *FakeAppsV1alpha1) ServiceDescriptors(namespace string) v1alpha1.ServiceDescriptorInterface {

@@ -32,59 +32,59 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 )
 
-// ComponentConfigurationInformer provides access to a shared informer and lister for
-// ComponentConfigurations.
-type ComponentConfigurationInformer interface {
+// ConfigurationInformer provides access to a shared informer and lister for
+// Configurations.
+type ConfigurationInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.ComponentConfigurationLister
+	Lister() v1alpha1.ConfigurationLister
 }
 
-type componentConfigurationInformer struct {
+type configurationInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
 	namespace        string
 }
 
-// NewComponentConfigurationInformer constructs a new informer for ComponentConfiguration type.
+// NewConfigurationInformer constructs a new informer for Configuration type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewComponentConfigurationInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredComponentConfigurationInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewConfigurationInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredConfigurationInformer(client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredComponentConfigurationInformer constructs a new informer for ComponentConfiguration type.
+// NewFilteredConfigurationInformer constructs a new informer for Configuration type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredComponentConfigurationInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredConfigurationInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1alpha1().ComponentConfigurations(namespace).List(context.TODO(), options)
+				return client.AppsV1alpha1().Configurations(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1alpha1().ComponentConfigurations(namespace).Watch(context.TODO(), options)
+				return client.AppsV1alpha1().Configurations(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&appsv1alpha1.ComponentConfiguration{},
+		&appsv1alpha1.Configuration{},
 		resyncPeriod,
 		indexers,
 	)
 }
 
-func (f *componentConfigurationInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredComponentConfigurationInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *configurationInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredConfigurationInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *componentConfigurationInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&appsv1alpha1.ComponentConfiguration{}, f.defaultInformer)
+func (f *configurationInformer) Informer() cache.SharedIndexInformer {
+	return f.factory.InformerFor(&appsv1alpha1.Configuration{}, f.defaultInformer)
 }
 
-func (f *componentConfigurationInformer) Lister() v1alpha1.ComponentConfigurationLister {
-	return v1alpha1.NewComponentConfigurationLister(f.Informer().GetIndexer())
+func (f *configurationInformer) Lister() v1alpha1.ConfigurationLister {
+	return v1alpha1.NewConfigurationLister(f.Informer().GetIndexer())
 }

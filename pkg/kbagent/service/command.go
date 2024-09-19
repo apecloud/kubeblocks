@@ -166,12 +166,7 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 				execErr = proto.ErrTimedOut
 			}
 		}
-
-		if execErr != nil {
-			errChan <- execErr
-		} else {
-			errChan <- nil
-		}
+		errChan <- execErr
 	}()
 	return errChan, nil
 }

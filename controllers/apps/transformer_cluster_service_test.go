@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -48,7 +48,7 @@ var _ = Describe("cluster service transformer test", func() {
 		transCtx *clusterTransformContext
 	)
 
-	newDAG := func(graphCli model.GraphClient, cluster *appsv1alpha1.Cluster) *graph.DAG {
+	newDAG := func(graphCli model.GraphClient, cluster *appsv1.Cluster) *graph.DAG {
 		d := graph.NewDAG()
 		graphCli.Root(d, cluster, cluster, model.ActionStatusPtr())
 		return d
@@ -59,8 +59,8 @@ var _ = Describe("cluster service transformer test", func() {
 		graphCli := model.NewGraphClient(reader)
 		cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName).
 			SetReplicas(1).
-			AddService(appsv1alpha1.ClusterService{
-				Service: appsv1alpha1.Service{
+			AddService(appsv1.ClusterService{
+				Service: appsv1.Service{
 					Name:        testapps.ServiceNodePortName,
 					ServiceName: testapps.ServiceNodePortName,
 					Spec: corev1.ServiceSpec{

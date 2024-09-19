@@ -601,7 +601,7 @@ func (r *componentWorkloadOps) scaleOut(itsObj *workloads.InstanceSet) error {
 	}
 
 	graphCli := model.NewGraphClient(r.cli)
-	graphCli.Noop(r.dag, r.protoITS)
+	graphCli.Status(r.dag, nil, r.protoITS)
 	d, err := newDataClone(r.reqCtx, r.cli, r.cluster, r.synthesizeComp, itsObj, r.protoITS, backupKey)
 	if err != nil {
 		return err
@@ -641,25 +641,28 @@ func (r *componentWorkloadOps) recordPodForMemberJoin() error {
 		if _, ok := r.runningItsPodNameSet[podName]; ok {
 			continue
 		}
-		markMemberJoinStatus(r.runningITS.Status.LifecycleActionsStatus, podName, lifecycle.MemberJoinProcessing)
+		r.protoITS.Status = markMemberJoinStatus(r.protoITS.Status, podName, lifecycle.MemberJoinProcessing)
 	}
 
 	return nil
 }
 
-func markMemberJoinStatus(obj map[string]workloads.ActionStatus, podName string, status lifecycle.MemberJoinStatus) {
-	if obj == nil {
-		obj = make(map[string]workloads.ActionStatus)
+func markMemberJoinStatus(itsStatus workloads.InstanceSetStatus, podName string, status lifecycle.MemberJoinStatus) workloads.InstanceSetStatus {
+	lfaStatus := itsStatus.LifecycleActionsStatus
+	if lfaStatus == nil {
+		lfaStatus = make(map[string]workloads.ActionStatus)
 	}
 
-	if _, ok := obj[podName]; !ok {
-		obj[podName] = workloads.ActionStatus{MemberLeaveStatus: status.String()}
-		return
+	if _, ok := lfaStatus[podName]; !ok {
+		lfaStatus[podName] = workloads.ActionStatus{MemberLeaveStatus: status.String()}
+	} else {
+		mlStatus := lfaStatus[podName]
+		mlStatus.MemberLeaveStatus = status.String()
+		lfaStatus[podName] = mlStatus
 	}
 
-	actonStatus := obj[podName]
-	actonStatus.MemberLeaveStatus = status.String()
-	obj[podName] = actonStatus
+	itsStatus.LifecycleActionsStatus = lfaStatus
+	return itsStatus
 }
 
 func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
@@ -977,8 +980,11 @@ func (r *componentWorkloadOps) checkAndDoMemberJoin() error {
 		return err
 	}
 	actionStatus := r.runningITS.Status.LifecycleActionsStatus
-
+	if actionStatus == nil {
+		return nil
+	}
 	for _, pod := range pods {
+
 		if actionStatus[pod.Name].MemberLeaveStatus != lifecycle.MemberJoinProcessing.String() {
 			continue
 		}
@@ -992,7 +998,7 @@ func (r *componentWorkloadOps) checkAndDoMemberJoin() error {
 
 			}
 		}
-		markMemberJoinStatus(actionStatus, pod.Name, lifecycle.MemberJoinCompleted)
+		markMemberJoinStatus(r.runningITS.Status, pod.Name, lifecycle.MemberJoinCompleted)
 	}
 	return nil
 }

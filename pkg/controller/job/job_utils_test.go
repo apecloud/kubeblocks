@@ -28,7 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
@@ -44,7 +44,7 @@ var _ = Describe("Job Utils Test", func() {
 		)
 
 		var (
-			cluster *appsv1alpha1.Cluster
+			cluster *appsv1.Cluster
 		)
 
 		createJob := func(name string, keys ...string) *batchv1.Job {

@@ -62,10 +62,10 @@ const (
 )
 
 // GetKBConfigMapWellKnownLabels returns the well-known labels for KB ConfigMap
-func GetKBConfigMapWellKnownLabels(cmTplName, clusterDefName, clusterName, componentName string) map[string]string {
+func GetKBConfigMapWellKnownLabels(cmTplName, componentDefName, clusterName, componentName string) map[string]string {
 	return map[string]string{
 		CMTemplateNameLabelKey: cmTplName,
-		AppNameLabelKey:        clusterDefName,
+		AppNameLabelKey:        componentDefName,
 		AppInstanceLabelKey:    clusterName,
 		KBAppComponentLabelKey: componentName,
 	}
@@ -112,6 +112,15 @@ func GetComponentWellKnownLabels(clusterName, componentName string) map[string]s
 		AppManagedByLabelKey:   AppName,
 		AppInstanceLabelKey:    clusterName,
 		KBAppComponentLabelKey: componentName,
+	}
+}
+
+// GetShardingWellKnownLabels returns the well-known labels for Sharding API
+func GetShardingWellKnownLabels(clusterName, shardingName string) map[string]string {
+	return map[string]string{
+		AppManagedByLabelKey:      AppName,
+		AppInstanceLabelKey:       clusterName,
+		KBAppShardingNameLabelKey: shardingName,
 	}
 }
 

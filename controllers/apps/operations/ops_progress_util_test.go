@@ -31,6 +31,7 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -74,7 +75,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 
 	initClusterForOps := func(opsRes *OpsResource) {
 		Expect(opsutil.UpdateClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())
-		opsRes.Cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
+		opsRes.Cluster.Status.Phase = appsv1.RunningClusterPhase
 	}
 
 	testProgressDetailsWithStatefulPodUpdating := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, pods []*corev1.Pod) {
@@ -102,7 +103,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 
 			By("create restart ops and pods of component")
 			opsRes.OpsRequest = createRestartOpsObj(clusterName, "restart-"+randomStr)
-			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase, defaultCompName)
+			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingClusterCompPhase, defaultCompName)
 			podList := initInstanceSetPods(ctx, k8sClient, opsRes)
 
 			By("mock restart OpsRequest is Running")
@@ -126,7 +127,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: defaultCompName},
 				Replicas:     pointer.Int32(1),
 			})
-			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase, defaultCompName) // appsv1alpha1.HorizontalScalingPhase
+			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingClusterCompPhase, defaultCompName) // appsv1.HorizontalScalingPhase
 			initClusterForOps(opsRes)
 
 			By("mock HorizontalScaling OpsRequest phase is running")
@@ -179,7 +180,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: defaultCompName},
 				Replicas:     pointer.Int32(4),
 			})
-			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase, defaultCompName) // appsv1alpha1.HorizontalScalingPhase
+			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingClusterCompPhase, defaultCompName) // appsv1.HorizontalScalingPhase
 			initClusterForOps(opsRes)
 
 			By("mock HorizontalScaling OpsRequest phase is running")

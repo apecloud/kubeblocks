@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
@@ -50,13 +51,13 @@ type ResourceFetcher[T any] struct {
 	obj *T
 	*ResourceCtx
 
-	ClusterObj      *appsv1alpha1.Cluster
-	ComponentObj    *appsv1alpha1.Component
-	ComponentDefObj *appsv1alpha1.ComponentDefinition
-	ClusterComObj   *appsv1alpha1.ClusterComponentSpec
+	ClusterObj      *appsv1.Cluster
+	ComponentObj    *appsv1.Component
+	ComponentDefObj *appsv1.ComponentDefinition
+	ClusterComObj   *appsv1.ClusterComponentSpec
 
 	// Deprecated: this API will be removed from version 0.9.0
-	ClusterDefObj *appsv1alpha1.ClusterDefinition
+	ClusterDefObj *appsv1.ClusterDefinition
 
 	ConfigMapObj        *corev1.ConfigMap
 	ConfigurationObj    *appsv1alpha1.Configuration
@@ -84,7 +85,7 @@ func (r *ResourceFetcher[T]) Cluster() *T {
 		Name:      r.ClusterName,
 	}
 	return r.Wrap(func() error {
-		r.ClusterObj = &appsv1alpha1.Cluster{}
+		r.ClusterObj = &appsv1.Cluster{}
 		return r.Client.Get(r.Context, clusterKey, r.ClusterObj)
 	})
 }
@@ -95,7 +96,7 @@ func (r *ResourceFetcher[T]) ComponentAndComponentDef() *T {
 		Name:      constant.GenerateClusterComponentName(r.ClusterName, r.ComponentName),
 	}
 	return r.Wrap(func() error {
-		r.ComponentObj = &appsv1alpha1.Component{}
+		r.ComponentObj = &appsv1.Component{}
 		err := r.Client.Get(r.Context, componentKey, r.ComponentObj)
 		if apierrors.IsNotFound(err) {
 			return nil
@@ -110,11 +111,11 @@ func (r *ResourceFetcher[T]) ComponentAndComponentDef() *T {
 		compDefKey := types.NamespacedName{
 			Name: r.ComponentObj.Spec.CompDef,
 		}
-		r.ComponentDefObj = &appsv1alpha1.ComponentDefinition{}
+		r.ComponentDefObj = &appsv1.ComponentDefinition{}
 		if err := r.Client.Get(r.Context, compDefKey, r.ComponentDefObj); err != nil {
 			return err
 		}
-		if r.ComponentDefObj.Status.Phase != appsv1alpha1.AvailablePhase {
+		if r.ComponentDefObj.Status.Phase != appsv1.AvailablePhase {
 			return fmt.Errorf("ComponentDefinition referenced is unavailable: %s", r.ComponentDefObj.Name)
 		}
 		return nil
@@ -129,7 +130,7 @@ func (r *ResourceFetcher[T]) ClusterDef() *T {
 		Name:      r.ClusterObj.Spec.ClusterDefRef,
 	}
 	return r.Wrap(func() error {
-		r.ClusterDefObj = &appsv1alpha1.ClusterDefinition{}
+		r.ClusterDefObj = &appsv1.ClusterDefinition{}
 		return r.Client.Get(r.Context, clusterDefKey, r.ClusterDefObj)
 	})
 }

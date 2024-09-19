@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -36,8 +37,8 @@ var _ OpsHandler = StartOpsHandler{}
 
 func init() {
 	stopBehaviour := OpsBehaviour{
-		FromClusterPhases: []appsv1alpha1.ClusterPhase{appsv1alpha1.StoppedClusterPhase},
-		ToClusterPhase:    appsv1alpha1.UpdatingClusterPhase,
+		FromClusterPhases: []appsv1.ClusterPhase{appsv1.StoppedClusterPhase},
+		ToClusterPhase:    appsv1.UpdatingClusterPhase,
 		QueueByCluster:    true,
 		OpsHandler:        StartOpsHandler{},
 	}
@@ -55,7 +56,7 @@ func (start StartOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCt
 func (start StartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	var (
 		cluster   = opsRes.Cluster
-		startComp = func(compSpec *appsv1alpha1.ClusterComponentSpec) {
+		startComp = func(compSpec *appsv1.ClusterComponentSpec) {
 			compSpec.Stop = nil
 		}
 	)

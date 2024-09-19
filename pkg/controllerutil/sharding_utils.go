@@ -27,7 +27,7 @@ import (
 	"github.com/pkg/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
@@ -37,8 +37,8 @@ const (
 )
 
 func GenShardingCompSpecList(ctx context.Context, cli client.Reader,
-	cluster *appsv1alpha1.Cluster, shardingSpec *appsv1alpha1.ShardingSpec) ([]*appsv1alpha1.ClusterComponentSpec, error) {
-	compSpecList := make([]*appsv1alpha1.ClusterComponentSpec, 0)
+	cluster *appsv1.Cluster, shardingSpec *appsv1.ShardingSpec) ([]*appsv1.ClusterComponentSpec, error) {
+	compSpecList := make([]*appsv1.ClusterComponentSpec, 0)
 	// list undeleted sharding component specs, the deleting ones are not included
 	undeletedShardingCompSpecs, err := listUndeletedShardingCompSpecs(ctx, cli, cluster, shardingSpec)
 	if err != nil {
@@ -73,14 +73,14 @@ func GenShardingCompSpecList(ctx context.Context, cli client.Reader,
 
 // listNCheckShardingComponents lists sharding components and checks if the sharding components are correct. It returns undeleted and deleting sharding components.
 func listNCheckShardingComponents(ctx context.Context, cli client.Reader,
-	cluster *appsv1alpha1.Cluster, shardingSpec *appsv1alpha1.ShardingSpec) ([]appsv1alpha1.Component, []appsv1alpha1.Component, error) {
+	cluster *appsv1.Cluster, shardingSpec *appsv1.ShardingSpec) ([]appsv1.Component, []appsv1.Component, error) {
 	shardingComps, err := ListShardingComponents(ctx, cli, cluster, shardingSpec.Name)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	deletingShardingComps := make([]appsv1alpha1.Component, 0)
-	undeletedShardingComps := make([]appsv1alpha1.Component, 0)
+	deletingShardingComps := make([]appsv1.Component, 0)
+	undeletedShardingComps := make([]appsv1.Component, 0)
 	for _, comp := range shardingComps {
 		if comp.GetDeletionTimestamp().IsZero() {
 			undeletedShardingComps = append(undeletedShardingComps, comp)
@@ -97,8 +97,8 @@ func listNCheckShardingComponents(ctx context.Context, cli client.Reader,
 }
 
 func ListShardingComponents(ctx context.Context, cli client.Reader,
-	cluster *appsv1alpha1.Cluster, shardingName string) ([]appsv1alpha1.Component, error) {
-	compList := &appsv1alpha1.ComponentList{}
+	cluster *appsv1.Cluster, shardingName string) ([]appsv1.Component, error) {
+	compList := &appsv1.ComponentList{}
 	ml := client.MatchingLabels{
 		constant.AppInstanceLabelKey:       cluster.Name,
 		constant.KBAppShardingNameLabelKey: shardingName,
@@ -110,17 +110,17 @@ func ListShardingComponents(ctx context.Context, cli client.Reader,
 }
 
 // listUndeletedShardingCompSpecs lists undeleted sharding component specs.
-func listUndeletedShardingCompSpecs(ctx context.Context, cli client.Reader, cluster *appsv1alpha1.Cluster, shardingSpec *appsv1alpha1.ShardingSpec) ([]*appsv1alpha1.ClusterComponentSpec, error) {
+func listUndeletedShardingCompSpecs(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster, shardingSpec *appsv1.ShardingSpec) ([]*appsv1.ClusterComponentSpec, error) {
 	return listShardingCompSpecs(ctx, cli, cluster, shardingSpec, false)
 }
 
 // listAllShardingCompSpecs lists all sharding component specs, including undeleted and deleting ones.
-func listAllShardingCompSpecs(ctx context.Context, cli client.Reader, cluster *appsv1alpha1.Cluster, shardingSpec *appsv1alpha1.ShardingSpec) ([]*appsv1alpha1.ClusterComponentSpec, error) {
+func listAllShardingCompSpecs(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster, shardingSpec *appsv1.ShardingSpec) ([]*appsv1.ClusterComponentSpec, error) {
 	return listShardingCompSpecs(ctx, cli, cluster, shardingSpec, true)
 }
 
 // listShardingCompSpecs lists sharding component specs, with an option to include those marked for deletion.
-func listShardingCompSpecs(ctx context.Context, cli client.Reader, cluster *appsv1alpha1.Cluster, shardingSpec *appsv1alpha1.ShardingSpec, includeDeleting bool) ([]*appsv1alpha1.ClusterComponentSpec, error) {
+func listShardingCompSpecs(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster, shardingSpec *appsv1.ShardingSpec, includeDeleting bool) ([]*appsv1.ClusterComponentSpec, error) {
 	if shardingSpec == nil {
 		return nil, nil
 	}
@@ -130,10 +130,10 @@ func listShardingCompSpecs(ctx context.Context, cli client.Reader, cluster *apps
 		return nil, err
 	}
 
-	compSpecList := make([]*appsv1alpha1.ClusterComponentSpec, 0, len(undeletedShardingComps)+len(deletingShardingComps))
+	compSpecList := make([]*appsv1.ClusterComponentSpec, 0, len(undeletedShardingComps)+len(deletingShardingComps))
 	shardTpl := shardingSpec.Template
 
-	processComps := func(comps []appsv1alpha1.Component) error {
+	processComps := func(comps []appsv1.Component) error {
 		for _, comp := range comps {
 			compShortName, err := parseCompShortName(cluster.Name, comp.Name)
 			if err != nil {

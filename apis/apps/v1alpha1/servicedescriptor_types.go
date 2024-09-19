@@ -129,10 +129,6 @@ type ServiceDescriptorStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
-func (r ServiceDescriptorStatus) GetTerminalPhases() []Phase {
-	return []Phase{AvailablePhase}
-}
-
 // +genclient
 // +k8s:openapi-gen=true
 // +kubebuilder:object:root=true

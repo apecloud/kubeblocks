@@ -49,6 +49,9 @@ const (
 	// SkipImmutableCheckAnnotationKey specifies to skip the mutation check for the object.
 	// The mutation check is only applied to the fields that are declared as immutable.
 	SkipImmutableCheckAnnotationKey = "apps.kubeblocks.io/skip-immutable-check"
+
+	// NodeSelectorOnceAnnotationKey adds nodeSelector in podSpec for one pod exactly once
+	NodeSelectorOnceAnnotationKey = "workloads.kubeblocks.io/node-selector-once"
 )
 
 // annotations for multi-cluster

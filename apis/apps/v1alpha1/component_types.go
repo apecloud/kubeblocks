@@ -68,12 +68,12 @@ type ComponentSpec struct {
 	// +optional
 	ServiceRefs []ServiceRef `json:"serviceRefs,omitempty"`
 
-	// Specifies Labels to override or add for underlying Pods.
+	// Specifies Labels to override or add for underlying Pods, PVCs, Account & TLS Secrets, Services Owned by Component.
 	//
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
 
-	// Specifies Annotations to override or add for underlying Pods.
+	// Specifies Annotations to override or add for underlying Pods, PVCs, Account & TLS Secrets, Services Owned by Component.
 	//
 	// +optional
 	Annotations map[string]string `json:"annotations,omitempty"`
@@ -162,6 +162,13 @@ type ComponentSpec struct {
 	//
 	// +optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
+
+	// Indicates the InstanceUpdateStrategy that will be
+	// employed to update Pods in the InstanceSet when a revision is made to
+	// Template.
+	//
+	// +optional
+	InstanceUpdateStrategy *InstanceUpdateStrategy `json:"instanceUpdateStrategy,omitempty"`
 
 	// Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
 	// or when scaling down. It only used when `PodManagementPolicy` is set to `Parallel`.

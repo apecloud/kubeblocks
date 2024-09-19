@@ -26,18 +26,18 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 type ComponentDefinitionBuilder struct {
-	BaseBuilder[appsv1alpha1.ComponentDefinition, *appsv1alpha1.ComponentDefinition, ComponentDefinitionBuilder]
+	BaseBuilder[appsv1.ComponentDefinition, *appsv1.ComponentDefinition, ComponentDefinitionBuilder]
 }
 
 func NewComponentDefinitionBuilder(name string) *ComponentDefinitionBuilder {
 	builder := &ComponentDefinitionBuilder{}
 	builder.init("", name,
-		&appsv1alpha1.ComponentDefinition{
-			Spec: appsv1alpha1.ComponentDefinitionSpec{},
+		&appsv1.ComponentDefinition{
+			Spec: appsv1.ComponentDefinitionSpec{},
 		}, builder)
 	return builder
 }
@@ -81,22 +81,22 @@ func (builder *ComponentDefinitionBuilder) AddVolumeMounts(containerName string,
 	return builder
 }
 
-func (builder *ComponentDefinitionBuilder) AddVar(v appsv1alpha1.EnvVar) *ComponentDefinitionBuilder {
+func (builder *ComponentDefinitionBuilder) AddVar(v appsv1.EnvVar) *ComponentDefinitionBuilder {
 	if builder.get().Spec.Vars == nil {
-		builder.get().Spec.Vars = make([]appsv1alpha1.EnvVar, 0)
+		builder.get().Spec.Vars = make([]appsv1.EnvVar, 0)
 	}
 	builder.get().Spec.Vars = append(builder.get().Spec.Vars, v)
 	return builder
 }
 
 func (builder *ComponentDefinitionBuilder) AddVolume(name string, snapshot bool, watermark int) *ComponentDefinitionBuilder {
-	vol := appsv1alpha1.ComponentVolume{
+	vol := appsv1.ComponentVolume{
 		Name:          name,
 		NeedSnapshot:  snapshot,
 		HighWatermark: watermark,
 	}
 	if builder.get().Spec.Volumes == nil {
-		builder.get().Spec.Volumes = make([]appsv1alpha1.ComponentVolume, 0)
+		builder.get().Spec.Volumes = make([]appsv1.ComponentVolume, 0)
 	}
 	builder.get().Spec.Volumes = append(builder.get().Spec.Volumes, vol)
 	return builder
@@ -112,8 +112,8 @@ func (builder *ComponentDefinitionBuilder) AddService(name, serviceName string, 
 }
 
 func (builder *ComponentDefinitionBuilder) AddServiceExt(name, serviceName string, serviceSpec corev1.ServiceSpec, roleSelector string) *ComponentDefinitionBuilder {
-	svc := appsv1alpha1.ComponentService{
-		Service: appsv1alpha1.Service{
+	svc := appsv1.ComponentService{
+		Service: appsv1.Service{
 			Name:         name,
 			ServiceName:  serviceName,
 			Spec:         serviceSpec,
@@ -121,7 +121,7 @@ func (builder *ComponentDefinitionBuilder) AddServiceExt(name, serviceName strin
 		},
 	}
 	if builder.get().Spec.Services == nil {
-		builder.get().Spec.Services = make([]appsv1alpha1.ComponentService, 0)
+		builder.get().Spec.Services = make([]appsv1.ComponentService, 0)
 	}
 	builder.get().Spec.Services = append(builder.get().Spec.Services, svc)
 	return builder
@@ -129,8 +129,8 @@ func (builder *ComponentDefinitionBuilder) AddServiceExt(name, serviceName strin
 
 func (builder *ComponentDefinitionBuilder) AddConfigTemplate(name, configTemplateRef, configConstraintRef,
 	namespace, volumeName string, injectEnvTo ...string) *ComponentDefinitionBuilder {
-	config := appsv1alpha1.ComponentConfigSpec{
-		ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+	config := appsv1.ComponentConfigSpec{
+		ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
 			Name:        name,
 			TemplateRef: configTemplateRef,
 			Namespace:   namespace,
@@ -140,38 +140,27 @@ func (builder *ComponentDefinitionBuilder) AddConfigTemplate(name, configTemplat
 		InjectEnvTo:         injectEnvTo,
 	}
 	if builder.get().Spec.Configs == nil {
-		builder.get().Spec.Configs = make([]appsv1alpha1.ComponentConfigSpec, 0)
+		builder.get().Spec.Configs = make([]appsv1.ComponentConfigSpec, 0)
 	}
 	builder.get().Spec.Configs = append(builder.get().Spec.Configs, config)
 	return builder
 }
 
 func (builder *ComponentDefinitionBuilder) AddLogConfig(name, filePathPattern string) *ComponentDefinitionBuilder {
-	logConfig := appsv1alpha1.LogConfig{
+	logConfig := appsv1.LogConfig{
 		FilePathPattern: filePathPattern,
 		Name:            name,
 	}
 	if builder.get().Spec.LogConfigs == nil {
-		builder.get().Spec.LogConfigs = make([]appsv1alpha1.LogConfig, 0)
+		builder.get().Spec.LogConfigs = make([]appsv1.LogConfig, 0)
 	}
 	builder.get().Spec.LogConfigs = append(builder.get().Spec.LogConfigs, logConfig)
 	return builder
 }
 
-// func (builder *ComponentDefinitionBuilder) SetMonitor(builtIn bool, scrapePort intstr.IntOrString, scrapePath string) *ComponentDefinitionBuilder {
-// 	builder.get().Spec.Monitor = &appsv1alpha1.MonitorConfig{
-// 		BuiltIn: builtIn,
-// 		Exporter: &appsv1alpha1.ExporterConfig{
-// 			ScrapePort: scrapePort,
-// 			ScrapePath: scrapePath,
-// 		},
-// 	}
-// 	return builder
-// }
-
 func (builder *ComponentDefinitionBuilder) AddScriptTemplate(name, configTemplateRef, namespace, volumeName string,
 	mode *int32) *ComponentDefinitionBuilder {
-	script := appsv1alpha1.ComponentTemplateSpec{
+	script := appsv1.ComponentTemplateSpec{
 		Name:        name,
 		TemplateRef: configTemplateRef,
 		Namespace:   namespace,
@@ -179,7 +168,7 @@ func (builder *ComponentDefinitionBuilder) AddScriptTemplate(name, configTemplat
 		DefaultMode: mode,
 	}
 	if builder.get().Spec.Scripts == nil {
-		builder.get().Spec.Scripts = make([]appsv1alpha1.ComponentTemplateSpec, 0)
+		builder.get().Spec.Scripts = make([]appsv1.ComponentTemplateSpec, 0)
 	}
 	builder.get().Spec.Scripts = append(builder.get().Spec.Scripts, script)
 	return builder
@@ -196,7 +185,7 @@ func (builder *ComponentDefinitionBuilder) SetLabels(labels map[string]string) *
 }
 
 func (builder *ComponentDefinitionBuilder) SetReplicasLimit(minReplicas, maxReplicas int32) *ComponentDefinitionBuilder {
-	builder.get().Spec.ReplicasLimit = &appsv1alpha1.ReplicasLimit{
+	builder.get().Spec.ReplicasLimit = &appsv1.ReplicasLimit{
 		MinReplicas: minReplicas,
 		MaxReplicas: maxReplicas,
 	}
@@ -204,31 +193,31 @@ func (builder *ComponentDefinitionBuilder) SetReplicasLimit(minReplicas, maxRepl
 }
 
 func (builder *ComponentDefinitionBuilder) AddSystemAccount(accountName string, initAccount bool, statement string) *ComponentDefinitionBuilder {
-	account := appsv1alpha1.SystemAccount{
+	account := appsv1.SystemAccount{
 		Name:        accountName,
 		InitAccount: initAccount,
 		Statement:   statement,
 	}
 	if builder.get().Spec.SystemAccounts == nil {
-		builder.get().Spec.SystemAccounts = make([]appsv1alpha1.SystemAccount, 0)
+		builder.get().Spec.SystemAccounts = make([]appsv1.SystemAccount, 0)
 	}
 	builder.get().Spec.SystemAccounts = append(builder.get().Spec.SystemAccounts, account)
 	return builder
 }
 
-func (builder *ComponentDefinitionBuilder) SetUpdateStrategy(strategy *appsv1alpha1.UpdateStrategy) *ComponentDefinitionBuilder {
+func (builder *ComponentDefinitionBuilder) SetUpdateStrategy(strategy *appsv1.UpdateStrategy) *ComponentDefinitionBuilder {
 	builder.get().Spec.UpdateStrategy = strategy
 	return builder
 }
 
 func (builder *ComponentDefinitionBuilder) AddRole(name string, serviceable, writable bool) *ComponentDefinitionBuilder {
-	role := appsv1alpha1.ReplicaRole{
+	role := appsv1.ReplicaRole{
 		Name:        name,
 		Serviceable: serviceable,
 		Writable:    writable,
 	}
 	if builder.get().Spec.Roles == nil {
-		builder.get().Spec.Roles = make([]appsv1alpha1.ReplicaRole, 0)
+		builder.get().Spec.Roles = make([]appsv1.ReplicaRole, 0)
 	}
 	builder.get().Spec.Roles = append(builder.get().Spec.Roles, role)
 	return builder

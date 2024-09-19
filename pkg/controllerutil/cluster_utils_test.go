@@ -25,7 +25,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -63,7 +63,7 @@ var _ = Describe("cluster utils test", func() {
 		)
 
 		var (
-			cluster *appsv1alpha1.Cluster
+			cluster *appsv1.Cluster
 		)
 
 		BeforeEach(func() {
@@ -97,7 +97,7 @@ var _ = Describe("cluster utils test", func() {
 				Create(&testCtx).
 				GetObject()
 			compKey := client.ObjectKeyFromObject(mockCompObj)
-			Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1alpha1.Component{}, true)).Should(Succeed())
+			Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1.Component{}, true)).Should(Succeed())
 
 			compSpec, err = GetOriginalOrGeneratedComponentSpecByName(testCtx.Ctx, k8sClient, cluster, mysqlShardingCompName)
 			Expect(err).ShouldNot(HaveOccurred())

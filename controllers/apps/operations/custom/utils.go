@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/util/jsonpath"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -53,10 +54,10 @@ const (
 // buildComponentDefEnvs builds the env vars by the opsDefinition.spec.componentDefinitionRef
 func buildComponentEnvs(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
+	cluster *appsv1.Cluster,
 	opsDef *appsv1alpha1.OpsDefinition,
 	env *[]corev1.EnvVar,
-	comp *appsv1alpha1.ClusterComponentSpec) error {
+	comp *appsv1.ClusterComponentSpec) error {
 	// inject built-in component env
 	fullCompName := constant.GenerateClusterComponentName(cluster.Name, comp.Name)
 	*env = append(*env, []corev1.EnvVar{
@@ -233,10 +234,10 @@ func buildVarWithEnv(targetPod *corev1.Pod, container *corev1.Container, envName
 
 func buildActionPodEnv(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
+	cluster *appsv1.Cluster,
 	opsDef *appsv1alpha1.OpsDefinition,
 	ops *appsv1alpha1.OpsRequest,
-	comp *appsv1alpha1.ClusterComponentSpec,
+	comp *appsv1.ClusterComponentSpec,
 	compCustomItem *appsv1alpha1.CustomOpsComponent,
 	podInfoExtractor *appsv1alpha1.PodInfoExtractor,
 	targetPod *corev1.Pod) ([]corev1.EnvVar, error) {
@@ -313,7 +314,7 @@ func getTargetTemplateAndPod(ctx context.Context,
 func getTargetPods(
 	ctx context.Context,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
+	cluster *appsv1.Cluster,
 	podSelector appsv1alpha1.PodSelector,
 	compName string) ([]*corev1.Pod, error) {
 	var (

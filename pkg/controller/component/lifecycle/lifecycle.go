@@ -26,14 +26,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 )
 
 type Options struct {
 	NonBlocking    *bool
 	TimeoutSeconds *int32
-	RetryPolicy    *appsv1alpha1.RetryPolicy
+	RetryPolicy    *appsv1.RetryPolicy
 }
 
 type Lifecycle interface {

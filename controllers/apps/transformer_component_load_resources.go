@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -49,7 +49,7 @@ func (t *componentLoadResourcesTransformer) Transform(ctx graph.TransformContext
 		return newRequeueError(requeueDuration, err.Error())
 	}
 
-	cluster := &appsv1alpha1.Cluster{}
+	cluster := &appsv1.Cluster{}
 	err = transCtx.Client.Get(transCtx.Context, types.NamespacedName{Name: clusterName, Namespace: comp.Namespace}, cluster)
 	if err != nil {
 		return newRequeueError(requeueDuration, err.Error())

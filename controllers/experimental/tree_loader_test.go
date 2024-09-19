@@ -32,9 +32,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	experimental "github.com/apecloud/kubeblocks/apis/experimental/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
@@ -74,8 +74,8 @@ var _ = Describe("tree loader test", func() {
 					return nil
 				}).Times(1)
 			k8sMock.EXPECT().
-				Get(gomock.Any(), gomock.Any(), &appsv1alpha1.Cluster{}, gomock.Any()).
-				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *appsv1alpha1.Cluster, _ ...client.GetOption) error {
+				Get(gomock.Any(), gomock.Any(), &appsv1.Cluster{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *appsv1.Cluster, _ ...client.GetOption) error {
 					*obj = *cluster
 					return nil
 				}).Times(1)

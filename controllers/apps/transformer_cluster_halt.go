@@ -25,7 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -38,7 +38,7 @@ var _ graph.Transformer = &clusterHaltTransformer{}
 func (t *clusterHaltTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*clusterTransformContext)
 	cluster := transCtx.OrigCluster
-	if !cluster.IsDeleting() || cluster.Spec.TerminationPolicy != appsv1alpha1.Halt {
+	if !cluster.IsDeleting() || cluster.Spec.TerminationPolicy != appsv1.Halt {
 		return nil
 	}
 
@@ -60,6 +60,6 @@ func haltPreserveKinds() []client.ObjectList {
 
 // preserveClusterObjects preserves the objects owned by the cluster when the cluster is being deleted
 func preserveClusterObjects(ctx context.Context, cli client.Reader, graphCli model.GraphClient, dag *graph.DAG,
-	cluster *appsv1alpha1.Cluster, ml client.MatchingLabels, toPreserveKinds []client.ObjectList) error {
+	cluster *appsv1.Cluster, ml client.MatchingLabels, toPreserveKinds []client.ObjectList) error {
 	return preserveObjects(ctx, cli, graphCli, dag, cluster, ml, toPreserveKinds, constant.DBClusterFinalizerName, constant.LastAppliedClusterAnnotationKey)
 }

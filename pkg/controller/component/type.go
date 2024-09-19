@@ -25,8 +25,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 type SynthesizedComponent struct {
@@ -44,32 +43,32 @@ type SynthesizedComponent struct {
 	Resources                        corev1.ResourceRequirements            `json:"resources,omitempty"`
 	PodSpec                          *corev1.PodSpec                        `json:"podSpec,omitempty"`
 	VolumeClaimTemplates             []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
-	LogConfigs                       []v1alpha1.LogConfig                   `json:"logConfigs,omitempty"`
-	ConfigTemplates                  []v1alpha1.ComponentConfigSpec         `json:"configTemplates,omitempty"`
-	ScriptTemplates                  []v1alpha1.ComponentTemplateSpec       `json:"scriptTemplates,omitempty"`
-	TLSConfig                        *v1alpha1.TLSConfig                    `json:"tlsConfig"`
+	LogConfigs                       []kbappsv1.LogConfig                   `json:"logConfigs,omitempty"`
+	ConfigTemplates                  []kbappsv1.ComponentConfigSpec         `json:"configTemplates,omitempty"`
+	ScriptTemplates                  []kbappsv1.ComponentTemplateSpec       `json:"scriptTemplates,omitempty"`
+	TLSConfig                        *kbappsv1.TLSConfig                    `json:"tlsConfig"`
 	ServiceAccountName               string                                 `json:"serviceAccountName,omitempty"`
-	ServiceReferences                map[string]*v1alpha1.ServiceDescriptor `json:"serviceReferences,omitempty"`
+	ServiceReferences                map[string]*kbappsv1.ServiceDescriptor `json:"serviceReferences,omitempty"`
 	UserDefinedLabels                map[string]string
 	UserDefinedAnnotations           map[string]string
 	TemplateVars                     map[string]any                      `json:"templateVars,omitempty"`
 	EnvVars                          []corev1.EnvVar                     `json:"envVars,omitempty"`
 	EnvFromSources                   []corev1.EnvFromSource              `json:"envFromSources,omitempty"`
-	Instances                        []v1alpha1.InstanceTemplate         `json:"instances,omitempty"`
+	Instances                        []kbappsv1.InstanceTemplate         `json:"instances,omitempty"`
 	OfflineInstances                 []string                            `json:"offlineInstances,omitempty"`
-	Roles                            []v1alpha1.ReplicaRole              `json:"roles,omitempty"`
+	Roles                            []kbappsv1.ReplicaRole              `json:"roles,omitempty"`
 	Labels                           map[string]string                   `json:"labels,omitempty"`
 	Annotations                      map[string]string                   `json:"annotations,omitempty"`
-	UpdateStrategy                   *v1alpha1.UpdateStrategy            `json:"updateStrategy,omitempty"`
+	UpdateStrategy                   *kbappsv1.UpdateStrategy            `json:"updateStrategy,omitempty"`
 	PodManagementPolicy              *appsv1.PodManagementPolicyType     `json:"podManagementPolicy,omitempty"`
 	ParallelPodManagementConcurrency *intstr.IntOrString                 `json:"parallelPodManagementConcurrency,omitempty"`
-	PodUpdatePolicy                  *workloads.PodUpdatePolicyType      `json:"podUpdatePolicy,omitempty"`
+	PodUpdatePolicy                  *kbappsv1.PodUpdatePolicyType       `json:"podUpdatePolicy,omitempty"`
 	PolicyRules                      []rbacv1.PolicyRule                 `json:"policyRules,omitempty"`
-	LifecycleActions                 *v1alpha1.ComponentLifecycleActions `json:"lifecycleActions,omitempty"`
-	SystemAccounts                   []v1alpha1.SystemAccount            `json:"systemAccounts,omitempty"`
-	Volumes                          []v1alpha1.ComponentVolume          `json:"volumes,omitempty"`
-	HostNetwork                      *v1alpha1.HostNetwork               `json:"hostNetwork,omitempty"`
-	ComponentServices                []v1alpha1.ComponentService         `json:"componentServices,omitempty"`
+	LifecycleActions                 *kbappsv1.ComponentLifecycleActions `json:"lifecycleActions,omitempty"`
+	SystemAccounts                   []kbappsv1.SystemAccount            `json:"systemAccounts,omitempty"`
+	Volumes                          []kbappsv1.ComponentVolume          `json:"volumes,omitempty"`
+	HostNetwork                      *kbappsv1.HostNetwork               `json:"hostNetwork,omitempty"`
+	ComponentServices                []kbappsv1.ComponentService         `json:"componentServices,omitempty"`
 	MinReadySeconds                  int32                               `json:"minReadySeconds,omitempty"`
 	Sidecars                         []string                            `json:"sidecars,omitempty"`
 	DisableExporter                  *bool                               `json:"disableExporter,omitempty"`

@@ -42,7 +42,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -847,7 +847,7 @@ var _ = Describe("Addon controller", func() {
 				GetObject()
 			clusterKey = client.ObjectKeyFromObject(clusterObj)
 
-			cluster := &appsv1alpha1.Cluster{}
+			cluster := &kbappsv1.Cluster{}
 			Eventually(func(g Gomega) {
 				err := testCtx.Cli.Get(ctx, clusterKey, cluster)
 				g.Expect(err).To(Not(HaveOccurred()))
@@ -887,7 +887,7 @@ var _ = Describe("Addon controller", func() {
 				GetObject()
 			clusterKey = client.ObjectKeyFromObject(clusterObj)
 
-			cluster := &appsv1alpha1.Cluster{}
+			cluster := &kbappsv1.Cluster{}
 			Eventually(func(g Gomega) {
 				err := testCtx.Cli.Get(ctx, clusterKey, cluster)
 				g.Expect(err).To(Not(HaveOccurred()))

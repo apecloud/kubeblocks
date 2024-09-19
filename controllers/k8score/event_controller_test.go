@@ -34,8 +34,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
@@ -133,7 +133,7 @@ var _ = Describe("Event Controller", func() {
 				WithRandomName().
 				AddComponent(defaultCompName, compDefObj.GetName()).
 				Create(&testCtx).GetObject()
-			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(clusterObj), &appsv1alpha1.Cluster{}, true)).Should(Succeed())
+			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(clusterObj), &appsv1.Cluster{}, true)).Should(Succeed())
 
 			itsName := fmt.Sprintf("%s-%s", clusterObj.Name, defaultCompName)
 			its := testapps.NewInstanceSetFactory(clusterObj.Namespace, itsName, clusterObj.Name, defaultCompName).

@@ -36,8 +36,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/component/lifecycle"
@@ -57,7 +57,7 @@ type componentWorkloadTransformer struct {
 type componentWorkloadOps struct {
 	cli            client.Client
 	reqCtx         intctrlutil.RequestCtx
-	cluster        *appsv1alpha1.Cluster
+	cluster        *appsv1.Cluster
 	synthesizeComp *component.SynthesizedComponent
 	dag            *graph.DAG
 
@@ -139,7 +139,7 @@ func (t *componentWorkloadTransformer) runningInstanceSetObject(ctx graph.Transf
 }
 
 func (t *componentWorkloadTransformer) reconcileWorkload(synthesizedComp *component.SynthesizedComponent,
-	comp *appsv1alpha1.Component, runningITS, protoITS *workloads.InstanceSet) error {
+	comp *appsv1.Component, runningITS, protoITS *workloads.InstanceSet) error {
 	if runningITS != nil {
 		*protoITS.Spec.Selector = *runningITS.Spec.Selector
 		protoITS.Spec.Template.Labels = intctrlutil.MergeMetadataMaps(runningITS.Spec.Template.Labels, synthesizedComp.UserDefinedLabels)
@@ -172,7 +172,7 @@ func (t *componentWorkloadTransformer) stopWorkload(protoITS *workloads.Instance
 }
 
 func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCtx, cli model.GraphClient, dag *graph.DAG,
-	cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, runningITS, protoITS *workloads.InstanceSet) error {
+	cluster *appsv1.Cluster, synthesizeComp *component.SynthesizedComponent, runningITS, protoITS *workloads.InstanceSet) error {
 	if !isCompStopped(synthesizeComp) {
 		// postpone the update of the workload until the component is back to running.
 		if err := t.handleWorkloadUpdate(reqCtx, dag, cluster, synthesizeComp, runningITS, protoITS); err != nil {
@@ -189,7 +189,7 @@ func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCt
 }
 
 func (t *componentWorkloadTransformer) handleWorkloadUpdate(reqCtx intctrlutil.RequestCtx, dag *graph.DAG,
-	cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, obj, its *workloads.InstanceSet) error {
+	cluster *appsv1.Cluster, synthesizeComp *component.SynthesizedComponent, obj, its *workloads.InstanceSet) error {
 	cwo, err := newComponentWorkloadOps(reqCtx, t.Client, cluster, synthesizeComp, obj, its, dag)
 	if err != nil {
 		return err
@@ -905,7 +905,7 @@ func getRunningVolumes(ctx context.Context, cli client.Client, synthesizedComp *
 	return matchedPVCs, nil
 }
 
-func buildInstanceSetPlacementAnnotation(comp *appsv1alpha1.Component, its *workloads.InstanceSet) {
+func buildInstanceSetPlacementAnnotation(comp *appsv1.Component, its *workloads.InstanceSet) {
 	p := placement(comp)
 	if len(p) > 0 {
 		if its.Annotations == nil {
@@ -917,7 +917,7 @@ func buildInstanceSetPlacementAnnotation(comp *appsv1alpha1.Component, its *work
 
 func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
+	cluster *appsv1.Cluster,
 	synthesizeComp *component.SynthesizedComponent,
 	runningITS *workloads.InstanceSet,
 	protoITS *workloads.InstanceSet,

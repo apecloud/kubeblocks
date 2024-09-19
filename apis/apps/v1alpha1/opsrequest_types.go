@@ -21,6 +21,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 // TODO: @wangyelei could refactor to ops group
@@ -291,7 +293,7 @@ type Instance struct {
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// The instance will rebuild on the specified node when the instance uses local PersistentVolume as the storage disk.
+	// The instance will rebuild on the specified node.
 	// If not set, it will rebuild on a random node.
 	// +optional
 	TargetNodeName string `json:"targetNodeName,omitempty"`
@@ -484,7 +486,7 @@ type ScaleOut struct {
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=name
-	NewInstances []InstanceTemplate `json:"newInstances,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+	NewInstances []appsv1.InstanceTemplate `json:"newInstances,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// Specifies the instances in the offline list to bring back online.
 	// +optional
@@ -1086,7 +1088,7 @@ type LastComponentConfiguration struct {
 
 	// Records the ClusterComponentService list of the Component prior to any changes.
 	// +optional
-	Services []ClusterComponentService `json:"services,omitempty"`
+	Services []appsv1.ClusterComponentService `json:"services,omitempty"`
 
 	// Records the information about various types of resources associated with the Component prior to any changes.
 	// Currently, only one type of resource is supported: "pods".
@@ -1096,7 +1098,7 @@ type LastComponentConfiguration struct {
 
 	// Records the InstanceTemplate list of the Component prior to any changes.
 	// +optional
-	Instances []InstanceTemplate `json:"instances,omitempty"`
+	Instances []appsv1.InstanceTemplate `json:"instances,omitempty"`
 
 	// Records the offline instances of the Component prior to any changes.
 	// +optional
@@ -1126,7 +1128,7 @@ type OpsRequestComponentStatus struct {
 	// Records the current phase of the Component, mirroring `cluster.status.components[componentName].phase`.
 	// Possible values include "Creating", "Running", "Updating", "Stopping", "Stopped", "Deleting", "Failed", "Abnormal".
 	// +optional
-	Phase ClusterComponentPhase `json:"phase,omitempty"`
+	Phase appsv1.ClusterComponentPhase `json:"phase,omitempty"`
 
 	// Records the timestamp when the Component last transitioned to a "Failed" or "Abnormal" phase.
 	// +optional

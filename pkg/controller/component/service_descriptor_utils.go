@@ -30,13 +30,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 )
 
 func buildServiceReferences(ctx context.Context, cli client.Reader,
-	synthesizedComp *SynthesizedComponent, compDef *appsv1alpha1.ComponentDefinition, comp *appsv1alpha1.Component) error {
+	synthesizedComp *SynthesizedComponent, compDef *appsv1.ComponentDefinition, comp *appsv1.Component) error {
 	if err := buildServiceReferencesWithoutResolve(ctx, cli, synthesizedComp, compDef, comp); err != nil {
 		return err
 	}
@@ -44,17 +44,17 @@ func buildServiceReferences(ctx context.Context, cli client.Reader,
 }
 
 func buildServiceReferencesWithoutResolve(ctx context.Context, cli client.Reader,
-	synthesizedComp *SynthesizedComponent, compDef *appsv1alpha1.ComponentDefinition, comp *appsv1alpha1.Component) error {
+	synthesizedComp *SynthesizedComponent, compDef *appsv1.ComponentDefinition, comp *appsv1.Component) error {
 	if compDef == nil || comp == nil || len(compDef.Spec.ServiceRefDeclarations) == 0 {
 		return nil
 	}
 
-	serviceRefs := map[string]*appsv1alpha1.ServiceRef{}
+	serviceRefs := map[string]*appsv1.ServiceRef{}
 	for i, serviceRef := range comp.Spec.ServiceRefs {
 		serviceRefs[serviceRef.Name] = &comp.Spec.ServiceRefs[i]
 	}
 
-	serviceReferences := make(map[string]*appsv1alpha1.ServiceDescriptor, len(compDef.Spec.ServiceRefDeclarations))
+	serviceReferences := make(map[string]*appsv1.ServiceDescriptor, len(compDef.Spec.ServiceRefDeclarations))
 	for _, serviceRefDecl := range compDef.Spec.ServiceRefDeclarations {
 		serviceRef, ok := serviceRefs[serviceRefDecl.Name]
 		if !ok {
@@ -66,7 +66,7 @@ func buildServiceReferencesWithoutResolve(ctx context.Context, cli client.Reader
 
 		var (
 			namespace = synthesizedComp.Namespace
-			sd        *appsv1alpha1.ServiceDescriptor
+			sd        *appsv1.ServiceDescriptor
 			err       error
 		)
 		switch {
@@ -89,14 +89,23 @@ func buildServiceReferencesWithoutResolve(ctx context.Context, cli client.Reader
 	return nil
 }
 
+type serviceRefReferenceVars struct {
+	endpoint *appsv1.CredentialVar
+	host     *appsv1.CredentialVar
+	port     *appsv1.CredentialVar
+	username *appsv1.CredentialVar
+	password *appsv1.CredentialVar
+	podFQDNs *appsv1.CredentialVar
+}
+
 func handleServiceRefFromCluster(ctx context.Context, cli client.Reader, namespace string,
-	serviceRef appsv1alpha1.ServiceRef, serviceRefDecl appsv1alpha1.ServiceRefDeclaration, legacy bool) (*appsv1alpha1.ServiceDescriptor, error) {
+	serviceRef appsv1.ServiceRef, serviceRefDecl appsv1.ServiceRefDeclaration, legacy bool) (*appsv1.ServiceDescriptor, error) {
 	resolver := referencedVars
 	if legacy {
 		resolver = referencedVars4Legacy
 	}
-	vars, err := resolver(ctx, cli, namespace, serviceRef)
-	if err != nil {
+	vars := &serviceRefReferenceVars{}
+	if err := resolver(ctx, cli, namespace, serviceRef, vars); err != nil {
 		return nil, err
 	}
 
@@ -104,41 +113,43 @@ func handleServiceRefFromCluster(ctx context.Context, cli client.Reader, namespa
 	b := builder.NewServiceDescriptorBuilder(namespace, serviceRefDecl.Name).
 		SetServiceVersion("").
 		SetServiceKind("")
-	for i, s := range []func(appsv1alpha1.CredentialVar) *builder.ServiceDescriptorBuilder{b.SetEndpoint, b.SetHost, b.SetPort, b.SetAuthUsername, b.SetAuthPassword} {
-		if vars[i] != nil {
-			s(*vars[i])
+	setter := func(s func(appsv1.CredentialVar) *builder.ServiceDescriptorBuilder, v *appsv1.CredentialVar) {
+		if v != nil {
+			s(*v)
 		}
 	}
+	setter(b.SetEndpoint, vars.endpoint)
+	setter(b.SetHost, vars.host)
+	setter(b.SetPort, vars.port)
+	setter(b.SetPodFQDNs, vars.podFQDNs)
+	setter(b.SetAuthUsername, vars.username)
+	setter(b.SetAuthPassword, vars.password)
 	return b.GetObject(), nil
 }
 
-func referencedVars(ctx context.Context, cli client.Reader, namespace string, serviceRef appsv1alpha1.ServiceRef) ([]*appsv1alpha1.CredentialVar, error) {
-	var (
-		vars = []*appsv1alpha1.CredentialVar{nil, nil, nil, nil, nil}
-		err  error
-	)
-	vars[0], vars[1], vars[2], err = referencedServiceVars(ctx, cli, namespace, serviceRef)
-	if err != nil {
-		return nil, err
+func referencedVars(ctx context.Context, cli client.Reader, namespace string, serviceRef appsv1.ServiceRef, vars *serviceRefReferenceVars) error {
+	if err := referencedServiceVars(ctx, cli, namespace, serviceRef, vars); err != nil {
+		return err
 	}
-	vars[3], vars[4], err = referencedCredentialVars(ctx, cli, namespace, serviceRef)
-	if err != nil {
-		return nil, err
+	if err := referencedPodFQDNsVar(ctx, cli, namespace, serviceRef, vars); err != nil {
+		return err
 	}
-	return vars, nil
+	if err := referencedCredentialVars(ctx, cli, namespace, serviceRef, vars); err != nil {
+		return err
+	}
+	return nil
 }
 
 func referencedServiceVars(ctx context.Context, cli client.Reader, namespace string,
-	serviceRef appsv1alpha1.ServiceRef) (*appsv1alpha1.CredentialVar, *appsv1alpha1.CredentialVar, *appsv1alpha1.CredentialVar, error) {
+	serviceRef appsv1.ServiceRef, vars *serviceRefReferenceVars) error {
 	var (
-		selector   = serviceRef.ClusterServiceSelector
-		host, port *appsv1alpha1.CredentialVar
-		obj        any
-		err        error
+		selector = serviceRef.ClusterServiceSelector
+		obj      any
+		err      error
 	)
 
 	if selector.Service == nil {
-		return nil, nil, nil, nil
+		return nil
 	}
 
 	if serviceRef.Namespace != "" {
@@ -153,73 +164,90 @@ func referencedServiceVars(ctx context.Context, cli client.Reader, namespace str
 		obj, err = compServiceGetter(ctx, cli, namespace, selector.Cluster, selector.Service.Component, selector.Service.Service)
 	}
 	if err != nil {
-		return nil, nil, nil, err
+		return err
 	}
 
-	host = &appsv1alpha1.CredentialVar{Value: composeHostValueFromServices(obj)}
+	vars.host = &appsv1.CredentialVar{Value: composeHostValueFromServices(obj)}
 	if p := composePortValueFromServices(obj, selector.Service.Port); p != nil {
-		port = &appsv1alpha1.CredentialVar{Value: *p}
+		vars.port = &appsv1.CredentialVar{Value: *p}
 	}
 
-	endpoint := func() *appsv1alpha1.CredentialVar {
-		hval := host.Value
-		if port == nil {
-			return &appsv1alpha1.CredentialVar{Value: hval}
+	vars.endpoint = func() *appsv1.CredentialVar {
+		hval := vars.host.Value
+		if vars.port == nil {
+			return &appsv1.CredentialVar{Value: hval}
 		}
 		if strings.Contains(hval, ",") {
 			// pod-service, the port value has format: host1:port1,host2,port2,...
-			return &appsv1alpha1.CredentialVar{Value: port.Value}
+			return &appsv1.CredentialVar{Value: vars.port.Value}
 		}
-		return &appsv1alpha1.CredentialVar{Value: fmt.Sprintf("%s:%s", hval, port.Value)}
+		return &appsv1.CredentialVar{Value: fmt.Sprintf("%s:%s", hval, vars.port.Value)}
+	}()
+	return nil
+}
+
+func referencedPodFQDNsVar(ctx context.Context, cli client.Reader, namespace string,
+	serviceRef appsv1.ServiceRef, vars *serviceRefReferenceVars) error {
+	var (
+		selector = serviceRef.ClusterServiceSelector
+	)
+	if selector.PodFQDNs == nil {
+		return nil
 	}
-	return endpoint(), host, port, nil
+
+	if serviceRef.Namespace != "" {
+		namespace = serviceRef.Namespace
+	}
+	var (
+		fqdn        string
+		err         error
+		clusterName = selector.Cluster
+		compName    = selector.PodFQDNs.Component
+	)
+	if selector.PodFQDNs.Role == nil {
+		fqdn, err = componentVarPodsGetter(ctx, cli, namespace, clusterName, compName, nil, true)
+	} else {
+		fqdn, err = componentVarPodsWithRoleGetter(ctx, cli, namespace, clusterName, compName, *selector.PodFQDNs.Role, true)
+	}
+	if err != nil {
+		return err
+	}
+	vars.podFQDNs = &appsv1.CredentialVar{Value: fqdn}
+
+	return nil
 }
 
 func referencedCredentialVars(ctx context.Context, cli client.Reader, namespace string,
-	serviceRef appsv1alpha1.ServiceRef) (*appsv1alpha1.CredentialVar, *appsv1alpha1.CredentialVar, error) {
+	serviceRef appsv1.ServiceRef, vars *serviceRefReferenceVars) error {
 	var (
 		selector = serviceRef.ClusterServiceSelector
-		vars     = []*appsv1alpha1.CredentialVar{nil, nil}
 	)
 
 	if selector.Credential == nil {
-		return nil, nil, nil
+		return nil
+	}
+
+	if len(serviceRef.Namespace) > 0 && serviceRef.Namespace != namespace {
+		return fmt.Errorf("prohibits referencing credential variables from different namespaces, service-ref： %s", serviceRef.Name)
 	}
 
 	secretKey := types.NamespacedName{
 		Namespace: namespace,
 		Name:      constant.GenerateAccountSecretName(selector.Cluster, selector.Credential.Component, selector.Credential.Name),
 	}
-	if serviceRef.Namespace != "" {
-		secretKey.Namespace = serviceRef.Namespace
-	}
 	secret := &corev1.Secret{}
 	if err := cli.Get(ctx, secretKey, secret); err != nil {
-		return nil, nil, err
+		return err
 	}
 
-	for idx, key := range []string{constant.AccountNameForSecret, constant.AccountPasswdForSecret} {
-		if _, ok := secret.Data[key]; ok {
-			if secret.Namespace == namespace {
-				vars[idx] = &appsv1alpha1.CredentialVar{
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{Name: secret.Name},
-							Key:                  key,
-						},
-					},
-				}
-			} else {
-				vars[idx] = &appsv1alpha1.CredentialVar{
-					Value: string(secret.Data[key]),
-				}
-			}
-		}
-	}
-	return vars[0], vars[1], nil
+	copySecretDataToCredentialVar(namespace, secret, constant.AccountNameForSecret, &vars.username)
+	copySecretDataToCredentialVar(namespace, secret, constant.AccountPasswdForSecret, &vars.password)
+
+	return nil
 }
 
-func referencedVars4Legacy(ctx context.Context, cli client.Reader, namespace string, serviceRef appsv1alpha1.ServiceRef) ([]*appsv1alpha1.CredentialVar, error) {
+func referencedVars4Legacy(ctx context.Context, cli client.Reader, namespace string,
+	serviceRef appsv1.ServiceRef, vars *serviceRefReferenceVars) error {
 	secret := &corev1.Secret{}
 	secretKey := types.NamespacedName{
 		Namespace: func() string {
@@ -232,41 +260,44 @@ func referencedVars4Legacy(ctx context.Context, cli client.Reader, namespace str
 		Name: fmt.Sprintf("%s-conn-credential", serviceRef.Cluster),
 	}
 	if err := cli.Get(ctx, secretKey, secret); err != nil {
-		return nil, err
+		return err
 	}
 
-	vars := []*appsv1alpha1.CredentialVar{nil, nil, nil, nil, nil}
-	keys := []string{
-		constant.ServiceDescriptorEndpointKey,
-		constant.ServiceDescriptorHostKey,
-		constant.ServiceDescriptorPortKey,
-		constant.ServiceDescriptorUsernameKey,
-		constant.ServiceDescriptorPasswordKey,
+	copySecretDataToCredentialVar("", secret, constant.ServiceDescriptorEndpointKey, &vars.endpoint)
+	copySecretDataToCredentialVar("", secret, constant.ServiceDescriptorPortKey, &vars.port)
+	copySecretDataToCredentialVar("", secret, constant.ServiceDescriptorUsernameKey, &vars.username)
+	copySecretDataToCredentialVar("", secret, constant.ServiceDescriptorPasswordKey, &vars.password)
+
+	// don't set the host and podFQDNs for legacy clusters
+	vars.host = nil
+	vars.podFQDNs = nil
+
+	return nil
+}
+
+func copySecretDataToCredentialVar(namespace string, secret *corev1.Secret, key string, v **appsv1.CredentialVar) {
+	if _, ok := secret.Data[key]; !ok {
+		return
 	}
-	for idx, key := range keys {
-		if key == constant.ServiceDescriptorHostKey {
-			// don't set the host for legacy clusters
-			continue
-		}
-		if _, ok := secret.Data[key]; ok {
-			vars[idx] = &appsv1alpha1.CredentialVar{
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{Name: secret.Name},
-						Key:                  key,
-					},
+	if secret.Namespace == namespace || namespace == "" {
+		*v = &appsv1.CredentialVar{
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: secret.Name},
+					Key:                  key,
 				},
-			}
+			},
 		}
+	} else {
+		*v = &appsv1.CredentialVar{Value: string(secret.Data[key])}
 	}
-	return vars, nil
 }
 
 // handleServiceRefFromServiceDescriptor handles the service reference is provided by external ServiceDescriptor object.
 func handleServiceRefFromServiceDescriptor(ctx context.Context, cli client.Reader, namespace string,
-	serviceRef appsv1alpha1.ServiceRef, serviceRefDecl appsv1alpha1.ServiceRefDeclaration) (*appsv1alpha1.ServiceDescriptor, error) {
+	serviceRef appsv1.ServiceRef, serviceRefDecl appsv1.ServiceRefDeclaration) (*appsv1.ServiceDescriptor, error) {
 	// verify service kind and version
-	verifyServiceKindAndVersion := func(serviceDescriptor appsv1alpha1.ServiceDescriptor, _ ...appsv1alpha1.ServiceRefDeclarationSpec) bool {
+	verifyServiceKindAndVersion := func(serviceDescriptor appsv1.ServiceDescriptor, _ ...appsv1.ServiceRefDeclarationSpec) bool {
 		for _, serviceRefDeclSpec := range serviceRefDecl.ServiceRefDeclarationSpecs {
 			if getWellKnownServiceKindAliasMapping(serviceRefDeclSpec.ServiceKind) != getWellKnownServiceKindAliasMapping(serviceDescriptor.Spec.ServiceKind) {
 				continue
@@ -286,11 +317,11 @@ func handleServiceRefFromServiceDescriptor(ctx context.Context, cli client.Reade
 		Namespace: namespace,
 		Name:      serviceRef.ServiceDescriptor,
 	}
-	serviceDescriptor := &appsv1alpha1.ServiceDescriptor{}
+	serviceDescriptor := &appsv1.ServiceDescriptor{}
 	if err := cli.Get(ctx, serviceDescriptorKey, serviceDescriptor); err != nil {
 		return nil, err
 	}
-	if serviceDescriptor.Status.Phase != appsv1alpha1.AvailablePhase {
+	if serviceDescriptor.Status.Phase != appsv1.AvailablePhase {
 		return nil, fmt.Errorf("service descriptor %s status is not available", serviceDescriptor.Name)
 	}
 

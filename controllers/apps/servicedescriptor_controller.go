@@ -23,7 +23,6 @@ import (
 	"context"
 	"fmt"
 
-	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -31,7 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -64,7 +63,7 @@ func (r *ServiceDescriptorReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		Recorder: r.Recorder,
 	}
 
-	serviceDescriptor := &appsv1alpha1.ServiceDescriptor{}
+	serviceDescriptor := &appsv1.ServiceDescriptor{}
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, serviceDescriptor); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
@@ -75,7 +74,7 @@ func (r *ServiceDescriptorReconciler) Reconcile(ctx context.Context, req ctrl.Re
 				"cannot be deleted because of existing service referencing Cluster.")
 		}
 		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, serviceDescriptor,
-			constant.ServiceDescriptorNameLabelKey, recordEvent, &appsv1alpha1.ClusterList{}); res != nil || err != nil {
+			constant.ServiceDescriptorNameLabelKey, recordEvent, &appsv1.ClusterList{}); res != nil || err != nil {
 			return res, err
 		}
 		return nil, nil
@@ -85,18 +84,18 @@ func (r *ServiceDescriptorReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	if serviceDescriptor.Status.ObservedGeneration == serviceDescriptor.Generation &&
-		slices.Contains(serviceDescriptor.Status.GetTerminalPhases(), serviceDescriptor.Status.Phase) {
+		serviceDescriptor.Status.Phase == appsv1.AvailablePhase {
 		return intctrlutil.Reconciled()
 	}
 
 	if err := r.checkServiceDescriptor(reqCtx, serviceDescriptor); err != nil {
-		if err := r.updateServiceDescriptorStatus(r.Client, reqCtx, serviceDescriptor, appsv1alpha1.UnavailablePhase); err != nil {
+		if err := r.updateServiceDescriptorStatus(r.Client, reqCtx, serviceDescriptor, appsv1.UnavailablePhase); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "InvalidServiceDescriptor update unavailable status failed")
 		}
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "InvalidServiceDescriptor")
 	}
 
-	err = r.updateServiceDescriptorStatus(r.Client, reqCtx, serviceDescriptor, appsv1alpha1.AvailablePhase)
+	err = r.updateServiceDescriptorStatus(r.Client, reqCtx, serviceDescriptor, appsv1.AvailablePhase)
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
@@ -108,12 +107,12 @@ func (r *ServiceDescriptorReconciler) Reconcile(ctx context.Context, req ctrl.Re
 // SetupWithManager sets up the controller with the Manager.
 func (r *ServiceDescriptorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
-		For(&appsv1alpha1.ServiceDescriptor{}).
+		For(&appsv1.ServiceDescriptor{}).
 		Complete(r)
 }
 
 // checkServiceDescriptor checks if the service descriptor is valid.
-func (r *ServiceDescriptorReconciler) checkServiceDescriptor(reqCtx intctrlutil.RequestCtx, serviceDescriptor *appsv1alpha1.ServiceDescriptor) error {
+func (r *ServiceDescriptorReconciler) checkServiceDescriptor(reqCtx intctrlutil.RequestCtx, serviceDescriptor *appsv1.ServiceDescriptor) error {
 	secretRefExistFn := func(envFrom *corev1.EnvVarSource) bool {
 		if envFrom == nil || envFrom.SecretKeyRef == nil {
 			return true
@@ -146,6 +145,10 @@ func (r *ServiceDescriptorReconciler) checkServiceDescriptor(reqCtx intctrlutil.
 		return fmt.Errorf("port.valueFrom.secretRef %s not found", serviceDescriptor.Spec.Port.ValueFrom.SecretKeyRef.Name)
 	}
 
+	if serviceDescriptor.Spec.PodFQDNs != nil && !secretRefExistFn(serviceDescriptor.Spec.PodFQDNs.ValueFrom) {
+		return fmt.Errorf("podFQDNs.valueFrom.secretRef %s not found", serviceDescriptor.Spec.PodFQDNs.ValueFrom.SecretKeyRef.Name)
+	}
+
 	if serviceDescriptor.Spec.Auth != nil {
 		if serviceDescriptor.Spec.Auth.Username != nil && !secretRefExistFn(serviceDescriptor.Spec.Auth.Username.ValueFrom) {
 			return fmt.Errorf("auth.username.valueFrom.secretRef %s not found", serviceDescriptor.Spec.Auth.Username.ValueFrom.SecretKeyRef.Name)
@@ -159,7 +162,7 @@ func (r *ServiceDescriptorReconciler) checkServiceDescriptor(reqCtx intctrlutil.
 }
 
 // updateServiceDescriptorStatus updates the status of the service descriptor.
-func (r *ServiceDescriptorReconciler) updateServiceDescriptorStatus(cli client.Client, ctx intctrlutil.RequestCtx, serviceDescriptor *appsv1alpha1.ServiceDescriptor, phase appsv1alpha1.Phase) error {
+func (r *ServiceDescriptorReconciler) updateServiceDescriptorStatus(cli client.Client, ctx intctrlutil.RequestCtx, serviceDescriptor *appsv1.ServiceDescriptor, phase appsv1.Phase) error {
 	patch := client.MergeFrom(serviceDescriptor.DeepCopy())
 	serviceDescriptor.Status.Phase = phase
 	serviceDescriptor.Status.ObservedGeneration = serviceDescriptor.Generation

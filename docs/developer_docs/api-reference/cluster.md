@@ -1788,6 +1788,20 @@ CredentialVar
 </tr>
 <tr>
 <td>
+<code>podFQDNs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.CredentialVar">
+CredentialVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the pod FQDNs of the external service.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>auth</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.ConnectionCredentialAuth">
@@ -8916,6 +8930,20 @@ CredentialVar
 </tr>
 <tr>
 <td>
+<code>podFQDNs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.CredentialVar">
+CredentialVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the pod FQDNs of the external service.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>auth</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.ConnectionCredentialAuth">
@@ -9133,6 +9161,19 @@ ServiceRefServiceSelector
 </tr>
 <tr>
 <td>
+<code>podFQDNs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ServiceRefPodFQDNsSelector">
+ServiceRefPodFQDNsSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
 <code>credential</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.ServiceRefCredentialSelector">
@@ -9302,6 +9343,46 @@ For instance, <code>^8.0.8$</code>, <code>8.0.\d&#123;1,2&#125;$</code>, <code>^
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.ServiceRefPodFQDNsSelector">ServiceRefPodFQDNsSelector
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ServiceRefClusterSelector">ServiceRefClusterSelector</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>component</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The name of the Component where the pods reside in.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>role</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The role of the pods to reference.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.ServiceRefServiceSelector">ServiceRefServiceSelector
 </h3>
 <p>
@@ -9455,6 +9536,19 @@ VarOption
 <tr>
 <td>
 <code>port</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>podFQDNs</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.VarOption">
 VarOption
@@ -22583,7 +22677,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>The instance will rebuild on the specified node when the instance uses local PersistentVolume as the storage disk.
+<p>The instance will rebuild on the specified node.
 If not set, it will rebuild on a random node.</p>
 </td>
 </tr>

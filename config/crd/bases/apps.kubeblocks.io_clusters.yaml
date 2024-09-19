@@ -5194,6 +5194,18 @@ spec:
                                 - component
                                 - name
                                 type: object
+                              podFQDNs:
+                                properties:
+                                  component:
+                                    description: The name of the Component where the
+                                      pods reside in.
+                                    type: string
+                                  role:
+                                    description: The role of the pods to reference.
+                                    type: string
+                                required:
+                                - component
+                                type: object
                               service:
                                 description: Identifies a ClusterService from the
                                   list of Services defined in `cluster.spec.services`
@@ -14150,6 +14162,18 @@ spec:
                                     required:
                                     - component
                                     - name
+                                    type: object
+                                  podFQDNs:
+                                    properties:
+                                      component:
+                                        description: The name of the Component where
+                                          the pods reside in.
+                                        type: string
+                                      role:
+                                        description: The role of the pods to reference.
+                                        type: string
+                                    required:
+                                    - component
                                     type: object
                                   service:
                                     description: Identifies a ClusterService from

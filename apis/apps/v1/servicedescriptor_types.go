@@ -103,6 +103,11 @@ type ServiceDescriptorSpec struct {
 	// +optional
 	Port *CredentialVar `json:"port,omitempty"`
 
+	// Specifies the pod FQDNs of the external service.
+	//
+	// +optional
+	PodFQDNs *CredentialVar `json:"podFQDNs,omitempty"`
+
 	// Specifies the authentication credentials required for accessing an external service.
 	//
 	// +optional

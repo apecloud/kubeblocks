@@ -145,6 +145,10 @@ func (r *ServiceDescriptorReconciler) checkServiceDescriptor(reqCtx intctrlutil.
 		return fmt.Errorf("port.valueFrom.secretRef %s not found", serviceDescriptor.Spec.Port.ValueFrom.SecretKeyRef.Name)
 	}
 
+	if serviceDescriptor.Spec.PodFQDNs != nil && !secretRefExistFn(serviceDescriptor.Spec.PodFQDNs.ValueFrom) {
+		return fmt.Errorf("podFQDNs.valueFrom.secretRef %s not found", serviceDescriptor.Spec.PodFQDNs.ValueFrom.SecretKeyRef.Name)
+	}
+
 	if serviceDescriptor.Spec.Auth != nil {
 		if serviceDescriptor.Spec.Auth.Username != nil && !secretRefExistFn(serviceDescriptor.Spec.Auth.Username.ValueFrom) {
 			return fmt.Errorf("auth.username.valueFrom.secretRef %s not found", serviceDescriptor.Spec.Auth.Username.ValueFrom.SecretKeyRef.Name)

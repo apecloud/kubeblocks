@@ -31,7 +31,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
@@ -480,21 +482,118 @@ var _ = Describe("build service references", func() {
 			}
 
 			err := buildServiceReferencesWithoutResolve(testCtx.Ctx, reader, synthesizedComp, compDef, comp)
+			Expect(err).ShouldNot(Succeed())
+			Expect(err.Error()).Should(ContainSubstring("prohibits referencing credential variables from different namespaces"))
+		})
+
+		It("component vars - pod FQDNs", func() {
+			comp.Spec.ServiceRefs = []appsv1.ServiceRef{
+				{
+					Name: serviceRefDeclaration.Name,
+					ClusterServiceSelector: &appsv1.ServiceRefClusterSelector{
+						Cluster: etcdCluster,
+						PodFQDNs: &appsv1.ServiceRefPodFQDNsSelector{
+							Component: etcdComponent,
+						},
+					},
+				},
+			}
+			reader := &mockReader{
+				cli: testCtx.Cli,
+				objs: []client.Object{
+					&appsv1.Component{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: namespace,
+							Name:      constant.GenerateClusterComponentName(etcdCluster, etcdComponent),
+						},
+						Spec: appsv1.ComponentSpec{
+							Replicas: 2,
+						},
+					},
+				},
+			}
+
+			etcdComp := reader.objs[0].(*appsv1.Component)
+			podNames, _ := instanceset.GenerateAllInstanceNames(etcdComp.Name, etcdComp.Spec.Replicas, nil, nil, workloads.Ordinals{})
+			expectedPodFQDNs := strings.Join([]string{
+				PodFQDN(namespace, etcdComp.Name, podNames[0]),
+				PodFQDN(namespace, etcdComp.Name, podNames[1]),
+			}, ",")
+
+			err := buildServiceReferencesWithoutResolve(testCtx.Ctx, reader, synthesizedComp, compDef, comp)
 			Expect(err).Should(Succeed())
 
 			Expect(synthesizedComp.ServiceReferences).Should(HaveKey(serviceRefDeclaration.Name))
 			serviceDescriptor := synthesizedComp.ServiceReferences[serviceRefDeclaration.Name]
 			Expect(serviceDescriptor).Should(Not(BeNil()))
-			Expect(serviceDescriptor.Spec.Auth).Should(Not(BeNil()))
-			Expect(serviceDescriptor.Spec.Auth.Username).Should(Not(BeNil()))
-			Expect(serviceDescriptor.Spec.Auth.Username.Value).Should(Equal("username"))
-			Expect(serviceDescriptor.Spec.Auth.Username.ValueFrom).Should(BeNil())
-			Expect(serviceDescriptor.Spec.Auth.Password).Should(Not(BeNil()))
-			Expect(serviceDescriptor.Spec.Auth.Password.Value).Should(Equal("password"))
-			Expect(serviceDescriptor.Spec.Auth.Password.ValueFrom).Should(BeNil())
+			Expect(serviceDescriptor.Spec.PodFQDNs).Should(Not(BeNil()))
+			Expect(serviceDescriptor.Spec.PodFQDNs.Value).Should(Equal(expectedPodFQDNs))
 			Expect(serviceDescriptor.Spec.Endpoint).Should(BeNil())
 			Expect(serviceDescriptor.Spec.Host).Should(BeNil())
 			Expect(serviceDescriptor.Spec.Port).Should(BeNil())
+			Expect(serviceDescriptor.Spec.Auth).Should(BeNil())
+		})
+
+		It("component vars - pod FQDNs with role", func() {
+			comp.Spec.ServiceRefs = []appsv1.ServiceRef{
+				{
+					Name: serviceRefDeclaration.Name,
+					ClusterServiceSelector: &appsv1.ServiceRefClusterSelector{
+						Cluster: etcdCluster,
+						PodFQDNs: &appsv1.ServiceRefPodFQDNsSelector{
+							Component: etcdComponent,
+							Role:      &[]string{"leader"}[0],
+						},
+					},
+				},
+			}
+			reader := &mockReader{
+				cli: testCtx.Cli,
+				objs: []client.Object{
+					&corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: namespace,
+							Name:      constant.GeneratePodName(etcdCluster, etcdComponent, 0),
+							Labels: map[string]string{
+								constant.AppManagedByLabelKey:   constant.AppName,
+								constant.AppInstanceLabelKey:    etcdCluster,
+								constant.KBAppComponentLabelKey: etcdComponent,
+								constant.RoleLabelKey:           "follower",
+							},
+						},
+						Spec: corev1.PodSpec{},
+					},
+					&corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: namespace,
+							Name:      constant.GeneratePodName(etcdCluster, etcdComponent, 1),
+							Labels: map[string]string{
+								constant.AppManagedByLabelKey:   constant.AppName,
+								constant.AppInstanceLabelKey:    etcdCluster,
+								constant.KBAppComponentLabelKey: etcdComponent,
+								constant.RoleLabelKey:           "leader",
+							},
+						},
+						Spec: corev1.PodSpec{},
+					},
+				},
+			}
+
+			compName := constant.GenerateClusterComponentName(etcdCluster, etcdComponent)
+			expectedPodFQDNs := PodFQDN(namespace, compName, reader.objs[1].GetName())
+
+			err := buildServiceReferencesWithoutResolve(testCtx.Ctx, reader, synthesizedComp, compDef, comp)
+			Expect(err).Should(Succeed())
+
+			Expect(synthesizedComp.ServiceReferences).Should(HaveKey(serviceRefDeclaration.Name))
+			serviceDescriptor := synthesizedComp.ServiceReferences[serviceRefDeclaration.Name]
+			Expect(serviceDescriptor).Should(Not(BeNil()))
+			Expect(serviceDescriptor.Spec.PodFQDNs).Should(Not(BeNil()))
+			Expect(serviceDescriptor.Spec.PodFQDNs.Value).Should(Equal(expectedPodFQDNs))
+			Expect(serviceDescriptor.Spec.Endpoint).Should(BeNil())
+			Expect(serviceDescriptor.Spec.Host).Should(BeNil())
+			Expect(serviceDescriptor.Spec.Port).Should(BeNil())
+			Expect(serviceDescriptor.Spec.Auth).Should(BeNil())
 		})
 	})
 })

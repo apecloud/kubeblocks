@@ -12926,6 +12926,13 @@ spec:
                               - Required
                               - Optional
                               type: string
+                            podFQDNs:
+                              description: VarOption defines whether a variable is
+                                required or optional.
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
                             port:
                               description: VarOption defines whether a variable is
                                 required or optional.

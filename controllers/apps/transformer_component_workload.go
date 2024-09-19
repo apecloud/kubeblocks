@@ -565,9 +565,6 @@ func (r *componentWorkloadOps) postScaleOut(itsObj *workloads.InstanceSet) error
 		}
 	}
 
-	if err := r.recordPodForMemberJoin(itsObj); err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -598,6 +595,11 @@ func (r *componentWorkloadOps) scaleOut(itsObj *workloads.InstanceSet) error {
 	if *itsObj.Spec.Replicas == 0 {
 		return nil
 	}
+
+	if err := r.recordPodForMemberJoin(); err != nil {
+		return err
+	}
+
 	graphCli := model.NewGraphClient(r.cli)
 	graphCli.Noop(r.dag, r.protoITS)
 	d, err := newDataClone(r.reqCtx, r.cli, r.cluster, r.synthesizeComp, itsObj, r.protoITS, backupKey)
@@ -634,23 +636,12 @@ func (r *componentWorkloadOps) scaleOut(itsObj *workloads.InstanceSet) error {
 	return r.postScaleOut(itsObj)
 }
 
-func (r *componentWorkloadOps) recordPodForMemberJoin(itsObj *workloads.InstanceSet) error {
-	pods, err := component.ListOwnedPods(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, r.cluster.Name, r.synthesizeComp.Name)
-	if err != nil {
-		return err
-	}
-
-	podsToMemberJoin := make([]*corev1.Pod, 0)
-	lifecycleStatus := itsObj.Status.LifeCycleActionsStatus
-	for _, podName := range r.runningItsPodNames {
-		// if the pod not exists in the running pod names, it should be a member that needs to join
-		for _, pod := range pods {
-			if pod.Name != podName {
-				continue
-			}
-			podsToMemberJoin = append(podsToMemberJoin, pod)
-			markMemberJoinStatus(lifecycleStatus, podName, lifecycle.MemberJoinProcessing)
+func (r *componentWorkloadOps) recordPodForMemberJoin() error {
+	for podName := range r.desiredCompPodNameSet {
+		if _, ok := r.runningItsPodNameSet[podName]; ok {
+			continue
 		}
+		markMemberJoinStatus(r.runningITS.Status.LifecycleActionsStatus, podName, lifecycle.MemberJoinProcessing)
 	}
 
 	return nil
@@ -985,7 +976,7 @@ func (r *componentWorkloadOps) checkAndDoMemberJoin() error {
 	if err != nil {
 		return err
 	}
-	actionStatus := r.runningITS.Status.LifeCycleActionsStatus
+	actionStatus := r.runningITS.Status.LifecycleActionsStatus
 
 	for _, pod := range pods {
 		if actionStatus[pod.Name].MemberLeaveStatus != lifecycle.MemberJoinProcessing.String() {

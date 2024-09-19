@@ -12962,6 +12962,17 @@ spec:
                   Used only when spec.roles set.
                 format: int32
                 type: integer
+              lifecycleActionsStatus:
+                additionalProperties:
+                  properties:
+                    memberLeaveStatus:
+                      description: LifecycleActionsStatus represents the execution
+                        status of memberLeave lifecycle actions
+                      type: string
+                  type: object
+                description: LifecycleActionsStatus represents the execution status
+                  of lifecycle actions for each pod
+                type: object
               membersStatus:
                 description: Provides the status of each member in the cluster.
                 items:

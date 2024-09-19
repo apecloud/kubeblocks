@@ -320,13 +320,15 @@ type InstanceSetStatus struct {
 	// +optional
 	TemplatesStatus []InstanceTemplateStatus `json:"templatesStatus,omitempty"`
 
-	// LifeCycleActionsStatus represents the execution status of lifecycle actions for each pod
+	// LifecycleActionsStatus represents the execution status of lifecycle actions for each pod
 	// +optional
-	LifeCycleActionsStatus map[string]ActionStatus `json:"LifeCycleActionsStatus,omitempty"`
+	LifecycleActionsStatus map[string]ActionStatus `json:"lifecycleActionsStatus,omitempty"`
 }
 
 type ActionStatus struct {
-	MemberLeaveStatus string
+	// LifecycleActionsStatus represents the execution status of memberLeave lifecycle actions
+	// +optional
+	MemberLeaveStatus string `json:"memberLeaveStatus,omitempty"`
 }
 
 // Range represents a range with a start and an end value.

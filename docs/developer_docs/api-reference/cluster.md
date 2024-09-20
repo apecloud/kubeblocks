@@ -22164,7 +22164,7 @@ use the latest available version in ComponentVersion.</p>
 <td>
 <em>(Optional)</em>
 <p>Determine the appropriate version of the backup tool image from ComponentDefinition.
-Each name can represent an exact name, a name prefix, or a regular expression pattern.</p>
+Each name in the list can represent an exact name, a name prefix, or a regular expression pattern.</p>
 <p>For example:</p>
 <ul>
 <li>&ldquo;mysql-8.0.30-v1alpha1&rdquo;: Matches the exact name &ldquo;mysql-8.0.30-v1alpha1&rdquo;</li>
@@ -22185,7 +22185,7 @@ Each name can represent an exact name, a name prefix, or a regular expression pa
 <td>
 <em>(Optional)</em>
 <p>Determine the appropriate version of the backup tool image from ServiceVersion.
-the service version can represent an exact version, a version prefix, or a regular expression pattern.</p>
+Each service version in the list can represent an exact version, a version prefix, or a regular expression pattern.</p>
 <p>For example:</p>
 <ul>
 <li>&ldquo;8.0.33&rdquo;: Matches the exact version &ldquo;8.0.33&rdquo;</li>

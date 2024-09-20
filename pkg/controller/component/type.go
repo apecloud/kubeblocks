@@ -70,7 +70,6 @@ type SynthesizedComponent struct {
 	HostNetwork                      *kbappsv1.HostNetwork               `json:"hostNetwork,omitempty"`
 	ComponentServices                []kbappsv1.ComponentService         `json:"componentServices,omitempty"`
 	MinReadySeconds                  int32                               `json:"minReadySeconds,omitempty"`
-	Sidecars                         []string                            `json:"sidecars,omitempty"`
 	DisableExporter                  *bool                               `json:"disableExporter,omitempty"`
 	Stop                             *bool
 

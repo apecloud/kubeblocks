@@ -157,7 +157,6 @@ func kindsForHalt() ([]client.ObjectList, []client.ObjectList) {
 	namespacedKinds, nonNamespacedKinds := kindsForDoNotTerminate()
 	namespacedKindsPlus := []client.ObjectList{
 		&kbappsv1.ComponentList{},
-		&appsv1alpha1.OpsRequestList{},
 		&appsv1.StatefulSetList{},           // be compatible with 0.6 workloads.
 		&policyv1.PodDisruptionBudgetList{}, // be compatible with 0.6 workloads.
 		&corev1.ServiceList{},

@@ -263,58 +263,6 @@ rules:
 - apiGroups:
   - apps.kubeblocks.io
   resources:
-  - opsdefinitions
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - opsdefinitions/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - opsdefinitions/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - opsrequests
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - opsrequests/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - opsrequests/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
   - servicedescriptors
   verbs:
   - create
@@ -814,6 +762,58 @@ rules:
   - extensions.kubeblocks.io
   resources:
   - addons/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - operations.kubeblocks.io
+  resources:
+  - opsdefinitions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - operations.kubeblocks.io
+  resources:
+  - opsdefinitions/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - operations.kubeblocks.io
+  resources:
+  - opsdefinitions/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - operations.kubeblocks.io
+  resources:
+  - opsrequests
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - operations.kubeblocks.io
+  resources:
+  - opsrequests/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - operations.kubeblocks.io
+  resources:
+  - opsrequests/status
   verbs:
   - get
   - patch

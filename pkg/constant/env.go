@@ -19,14 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package constant
 
-import (
-	"fmt"
-)
-
-func EnvPlaceHolder(env string) string {
-	return fmt.Sprintf("$(%s)", env)
-}
-
 // Global
 const (
 	KBEnvNamespace = "KB_NAMESPACE"
@@ -45,42 +37,4 @@ const (
 	KBEnvCompName           = "KB_COMP_NAME"
 	KBEnvCompReplicas       = "KB_COMP_REPLICAS"
 	KBEnvCompServiceVersion = "KB_COMP_SERVICE_VERSION"
-)
-
-// Pod
-const (
-	KBEnvPodName          = "KB_POD_NAME"
-	KBEnvPodUID           = "KB_POD_UID"
-	KBEnvPodIP            = "KB_POD_IP"
-	KBEnvPodIPs           = "KB_POD_IPS"
-	KBEnvPodFQDN          = "KB_POD_FQDN"
-	KBEnvPodOrdinal       = "KB_POD_ORDINAL"
-	KBEnvPodIPDeprecated  = "KB_PODIP"
-	KBEnvPodIPsDeprecated = "KB_PODIPS"
-)
-
-// Host
-const (
-	KBEnvHostIP           = "KB_HOST_IP"
-	KBEnvNodeName         = "KB_NODENAME"
-	KBEnvHostIPDeprecated = "KB_HOSTIP"
-)
-
-// ServiceAccount
-const (
-	KBEnvServiceAccountName = "KB_SA_NAME"
-)
-
-// TLS
-const (
-	KBEnvTLSCertPath = "KB_TLS_CERT_PATH"
-	KBEnvTLSCertFile = "KB_TLS_CERT_FILE"
-	KBEnvTLSCAFile   = "KB_TLS_CA_FILE"
-	KBEnvTLSKeyFile  = "KB_TLS_KEY_FILE"
-)
-
-// Lorry
-const (
-	KBEnvServiceUser     = "KB_SERVICE_USER"
-	KBEnvServicePassword = "KB_SERVICE_PASSWORD"
 )

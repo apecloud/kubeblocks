@@ -20,7 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package util
 
 import (
+	"os"
 	"strings"
+
+	corev1 "k8s.io/api/core/v1"
+)
+
+const (
+	kbEnvNamespace = "KB_AGENT_NAMESPACE"
+	kbEnvPodName   = "KB_AGENT_POD_NAME"
+	kbEnvPodUID    = "KB_AGENT_POD_UID"
+	kbEnvNodeName  = "KB_AGENT_NODE_NAME"
 )
 
 func EnvM2L(m map[string]string) []string {
@@ -43,4 +53,61 @@ func EnvL2M(l []string) map[string]string {
 		}
 	}
 	return m
+}
+
+func DefaultEnvVars() []corev1.EnvVar {
+	return []corev1.EnvVar{
+		{
+			Name: kbEnvNamespace,
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "metadata.namespace",
+				},
+			},
+		},
+		{
+			Name: kbEnvPodName,
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "metadata.name",
+				},
+			},
+		},
+		{
+			Name: kbEnvPodUID,
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "metadata.uid",
+				},
+			},
+		},
+		{
+			Name: kbEnvNodeName,
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "spec.nodeName",
+				},
+			},
+		},
+	}
+}
+
+func namespace() string {
+	return os.Getenv(kbEnvNamespace)
+}
+
+func podName() string {
+	return os.Getenv(kbEnvPodName)
+}
+
+func podUID() string {
+	return os.Getenv(kbEnvPodUID)
+}
+
+func nodeName() string {
+	return os.Getenv(kbEnvNodeName)
 }

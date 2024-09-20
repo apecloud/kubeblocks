@@ -39,7 +39,6 @@ const (
 	PVLastClaimPolicyAnnotationKey           = "apps.kubeblocks.io/pv-last-claim-policy"
 	HaltRecoveryAllowInconsistentResAnnotKey = "clusters.apps.kubeblocks.io/allow-inconsistent-resource"
 	KubeBlocksGenerationKey                  = "kubeblocks.io/generation"
-	ExtraEnvAnnotationKey                    = "kubeblocks.io/extra-env"
 	LastRoleSnapshotVersionAnnotationKey     = "apps.kubeblocks.io/last-role-snapshot-version"
 	ComponentScaleInAnnotationKey            = "apps.kubeblocks.io/component-scale-in" // ComponentScaleInAnnotationKey specifies whether the component is scaled in
 	DisableHAAnnotationKey                   = "kubeblocks.io/disable-ha"

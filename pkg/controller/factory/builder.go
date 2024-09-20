@@ -75,11 +75,6 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 		AddLabelsInMap(synthesizedComp.UserDefinedLabels).
 		AddLabelsInMap(constant.GetClusterWellKnownLabels(clusterName)).
 		AddAnnotationsInMap(synthesizedComp.UserDefinedAnnotations)
-	if viper.GetBool(constant.FeatureGateComponentReplicasAnnotation) {
-		replicasStr := strconv.Itoa(int(synthesizedComp.Replicas))
-		podBuilder.AddAnnotations(constant.ComponentReplicasAnnotationKey, replicasStr)
-
-	}
 	template := corev1.PodTemplateSpec{
 		ObjectMeta: podBuilder.GetObject().ObjectMeta,
 		Spec:       *synthesizedComp.PodSpec.DeepCopy(),

@@ -38,7 +38,7 @@ import (
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
-var _ = Describe("build service references", func() {
+var _ = Describe("service references", func() {
 	cleanEnv := func() {
 		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
@@ -186,13 +186,8 @@ var _ = Describe("build service references", func() {
 		})
 
 		It("has service-ref not defined", func() {
-			// for generated components, undefined service-refs are ignored by default.
-			err := buildServiceReferencesWithoutResolve(testCtx.Ctx, testCtx.Cli, synthesizedComp, compDef, comp)
-			Expect(err).Should(Succeed())
-			Expect(synthesizedComp.ServiceReferences).Should(HaveLen(0))
-
 			comp.Spec.CompDef = compDef.GetName()
-			err = buildServiceReferencesWithoutResolve(testCtx.Ctx, testCtx.Cli, synthesizedComp, compDef, comp)
+			err := buildServiceReferencesWithoutResolve(testCtx.Ctx, testCtx.Cli, synthesizedComp, compDef, comp)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("service-ref for %s is not defined", serviceRefDeclaration.Name))
 

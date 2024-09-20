@@ -60,10 +60,9 @@ const (
 )
 
 const (
-	KBPrefix                        = "KB"
-	KBLowerPrefix                   = "kb"
-	KBGeneratedVirtualCompDefPrefix = "KB_GENERATED_VIRTUAL_COMP_DEF"
-	SlashScalingLowerSuffix         = "scaling"
+	KBPrefix                = "KB"
+	KBLowerPrefix           = "kb"
+	SlashScalingLowerSuffix = "scaling"
 )
 
 const (

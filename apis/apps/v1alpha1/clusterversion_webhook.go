@@ -17,13 +17,11 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
 	"fmt"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -48,7 +46,7 @@ var _ webhook.Validator = &ClusterVersion{}
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *ClusterVersion) ValidateCreate() (admission.Warnings, error) {
 	clusterversionlog.Info("validate create", "name", r.Name)
-	return nil, r.validate()
+	return nil, nil
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
@@ -66,59 +64,6 @@ func (r *ClusterVersion) ValidateUpdate(old runtime.Object) (admission.Warnings,
 func (r *ClusterVersion) ValidateDelete() (admission.Warnings, error) {
 	clusterversionlog.Info("validate delete", "name", r.Name)
 	return nil, nil
-}
-
-// Validate ClusterVersion.spec is legal
-func (r *ClusterVersion) validate() error {
-	var (
-		allErrs    field.ErrorList
-		ctx        = context.Background()
-		clusterDef = &ClusterDefinition{}
-	)
-	if webhookMgr == nil {
-		return nil
-	}
-	err := webhookMgr.client.Get(ctx, types.NamespacedName{
-		Namespace: r.Namespace,
-		Name:      r.Spec.ClusterDefinitionRef,
-	}, clusterDef)
-
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.clusterDefinitionRef"),
-			r.Spec.ClusterDefinitionRef, err.Error()))
-	} else {
-		notFoundComponentDefNames, noContainersComponents := r.GetInconsistentComponentsInfo(clusterDef)
-
-		if len(notFoundComponentDefNames) > 0 {
-			allErrs = append(allErrs, field.NotFound(field.NewPath("spec.components[*].type"),
-				getComponentDefNotFoundMsg(notFoundComponentDefNames, r.Spec.ClusterDefinitionRef)))
-		}
-
-		if len(noContainersComponents) > 0 {
-			allErrs = append(allErrs, field.NotFound(field.NewPath("spec.components[*].type"),
-				fmt.Sprintf("containers are not defined in ClusterDefinition.spec.components[*]: %v", noContainersComponents)))
-		}
-	}
-
-	if err := r.validateConfigTemplate(); err != nil {
-		allErrs = append(allErrs, field.Duplicate(field.NewPath("spec.components[*].configTemplateRefs"), err))
-	}
-
-	if len(allErrs) > 0 {
-		return apierrors.NewInvalid(
-			schema.GroupKind{Group: APIVersion, Kind: ClusterVersionKind},
-			r.Name, allErrs)
-	}
-	return nil
-}
-
-func (r *ClusterVersion) validateConfigTemplate() error {
-	for _, c := range r.Spec.ComponentVersions {
-		if len(c.ConfigSpecs) > 1 {
-			return validateConfigTemplateList(c.ConfigSpecs)
-		}
-	}
-	return nil
 }
 
 // GetInconsistentComponentsInfo get clusterVersion invalid component name and no containers component compared with clusterDefinitionDef
@@ -154,11 +99,6 @@ func (r *ClusterVersion) GetInconsistentComponentsInfo(clusterDef *ClusterDefini
 		}
 	}
 	return notFoundComponentDefNames, noContainersComponent
-}
-
-func getComponentDefNotFoundMsg(invalidComponentDefNames []string, clusterDefName string) string {
-	return fmt.Sprintf(" %v is not found in ClusterDefinition.spec.componentDefs[*].name of %s",
-		invalidComponentDefNames, clusterDefName)
 }
 
 // NewInvalidError create an invalid api error

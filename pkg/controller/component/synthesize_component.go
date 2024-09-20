@@ -61,7 +61,7 @@ func BuildSynthesizedComponent4Generated(reqCtx intctrlutil.RequestCtx,
 	if clusterCompSpec == nil {
 		return nil, nil, fmt.Errorf("cluster component spec is not found: %s", comp.Name)
 	}
-	compDef, err := getOrBuildComponentDefinition(reqCtx.Ctx, cli, cluster, clusterCompSpec)
+	compDef, err := getComponentDefinition(reqCtx.Ctx, cli, clusterCompSpec)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -81,7 +81,7 @@ func BuildSynthesizedComponentWrapper(reqCtx intctrlutil.RequestCtx,
 	if clusterCompSpec == nil {
 		return nil, fmt.Errorf("cluster component spec is not provided")
 	}
-	compDef, err := getOrBuildComponentDefinition(reqCtx.Ctx, cli, cluster, clusterCompSpec)
+	compDef, err := getComponentDefinition(reqCtx.Ctx, cli, clusterCompSpec)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +158,6 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		PodManagementPolicy:              compDef.Spec.PodManagementPolicy,
 		ParallelPodManagementConcurrency: comp.Spec.ParallelPodManagementConcurrency,
 		PodUpdatePolicy:                  comp.Spec.PodUpdatePolicy,
-		EnabledLogs:                      comp.Spec.EnabledLogs,
 	}
 
 	buildCompatibleHorizontalScalePolicy(compDefObj, synthesizeComp)

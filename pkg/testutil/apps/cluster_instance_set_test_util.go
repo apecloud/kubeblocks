@@ -40,8 +40,7 @@ import (
 )
 
 const (
-	errorLogName = "error"
-	replicas     = 3
+	replicas = 3
 )
 
 func InitConsensusMysql(testCtx *testutil.TestContext, clusterName, compDefName, compName string) (*appsv1.ComponentDefinition, *appsv1.Cluster) {
@@ -59,7 +58,6 @@ func CreateDefaultMysqlCluster(testCtx *testutil.TestContext, clusterName, compD
 	return NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 		AddComponent(compName, compDefName).
 		SetReplicas(replicas).
-		SetEnabledLogs(errorLogName).
 		AddVolumeClaimTemplate("data", pvcSpec).
 		Create(testCtx).
 		GetObject()

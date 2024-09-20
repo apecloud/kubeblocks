@@ -85,7 +85,7 @@ func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSp
 		SetAnnotations(compSpec.Annotations).
 		SetEnv(compSpec.Env).
 		SetSchedulingPolicy(schedulingPolicy).
-		SetDisableExporter(compSpec.GetDisableExporter()).
+		SetDisableExporter(compSpec.DisableExporter).
 		SetReplicas(compSpec.Replicas).
 		SetResources(compSpec.Resources).
 		SetServiceAccountName(compSpec.ServiceAccountName).
@@ -94,7 +94,6 @@ func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSp
 		SetVolumeClaimTemplates(compSpec.VolumeClaimTemplates).
 		SetVolumes(compSpec.Volumes).
 		SetConfigs(compSpec.Configs).
-		SetEnabledLogs(compSpec.EnabledLogs).
 		SetServiceRefs(compSpec.ServiceRefs).
 		SetTLSConfig(compSpec.TLS, compSpec.Issuer).
 		SetInstances(compSpec.Instances).
@@ -120,15 +119,11 @@ func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSp
 	return compBuilder.GetObject(), nil
 }
 
-func getOrBuildComponentDefinition(ctx context.Context, cli client.Reader,
-	cluster *appsv1.Cluster,
-	clusterCompSpec *appsv1.ClusterComponentSpec) (*appsv1.ComponentDefinition, error) {
-	if len(cluster.Spec.ClusterDefRef) > 0 && len(clusterCompSpec.ComponentDefRef) > 0 && len(clusterCompSpec.ComponentDef) == 0 {
-		return nil, fmt.Errorf("legacy cluster component definition is not supported any more")
-	}
-	if len(clusterCompSpec.ComponentDef) > 0 {
+func getComponentDefinition(ctx context.Context, cli client.Reader,
+	spec *appsv1.ClusterComponentSpec) (*appsv1.ComponentDefinition, error) {
+	if len(spec.ComponentDef) > 0 {
 		compDef := &appsv1.ComponentDefinition{}
-		if err := cli.Get(ctx, types.NamespacedName{Name: clusterCompSpec.ComponentDef}, compDef); err != nil {
+		if err := cli.Get(ctx, types.NamespacedName{Name: spec.ComponentDef}, compDef); err != nil {
 			return nil, err
 		}
 		return compDef, nil

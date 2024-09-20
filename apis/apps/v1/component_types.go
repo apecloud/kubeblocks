@@ -149,8 +149,7 @@ type ComponentSpec struct {
 	// +optional
 	Volumes []corev1.Volume `json:"volumes,omitempty"`
 
-	// Overrides Services defined in referenced ComponentDefinition and exposes endpoints that can be accessed
-	// by clients.
+	// Overrides Services defined in referenced ComponentDefinition and exposes endpoints that can be accessed by clients.
 	//
 	// +optional
 	Services []ComponentService `json:"services,omitempty"`
@@ -171,23 +170,6 @@ type ComponentSpec struct {
 	//
 	// +optional
 	Configs []ClusterComponentConfig `json:"configs,omitempty"`
-
-	// Specifies which types of logs should be collected for the Cluster.
-	// The log types are defined in the `componentDefinition.spec.logConfigs` field with the LogConfig entries.
-	//
-	// The elements in the `enabledLogs` array correspond to the names of the LogConfig entries.
-	// For example, if the `componentDefinition.spec.logConfigs` defines LogConfig entries with
-	// names "slow_query_log" and "error_log",
-	// you can enable the collection of these logs by including their names in the `enabledLogs` array:
-	// ```yaml
-	// enabledLogs:
-	// - slow_query_log
-	// - error_log
-	// ```
-	//
-	// +listType=set
-	// +optional
-	EnabledLogs []string `json:"enabledLogs,omitempty"`
 
 	// Specifies the name of the ServiceAccount required by the running Component.
 	// This ServiceAccount is used to grant necessary permissions for the Component's Pods to interact

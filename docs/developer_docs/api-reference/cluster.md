@@ -119,7 +119,7 @@ ClusterSpec
 <table>
 <tr>
 <td>
-<code>clusterDefinitionRef</code><br/>
+<code>clusterDef</code><br/>
 <em>
 string
 </em>
@@ -139,21 +139,6 @@ the composition of the Cluster by directly referencing specific ComponentDefinit
 within <code>componentSpecs[*].componentDef</code>.</p>
 <p>If this field is not provided, each component must be explicitly defined in <code>componentSpecs[*].componentDef</code>.</p>
 <p>Note: Once set, this field cannot be modified; it is immutable.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>clusterVersionRef</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Refers to the ClusterVersion name.</p>
-<p>Deprecated since v0.9, use ComponentVersion instead.
-This field is maintained for backward compatibility and its use is discouraged.
-Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
 </td>
 </tr>
 <tr>
@@ -622,8 +607,7 @@ These templates are used to dynamically provision persistent volumes for the Com
 </td>
 <td>
 <em>(Optional)</em>
-<p>Overrides Services defined in referenced ComponentDefinition and exposes endpoints that can be accessed
-by clients.</p>
+<p>Overrides Services defined in referenced ComponentDefinition and exposes endpoints that can be accessed by clients.</p>
 </td>
 </tr>
 <tr>
@@ -663,27 +647,6 @@ int32
 <td>
 <em>(Optional)</em>
 <p>Specifies the configuration content of a config template.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>enabledLogs</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies which types of logs should be collected for the Cluster.
-The log types are defined in the <code>componentDefinition.spec.logConfigs</code> field with the LogConfig entries.</p>
-<p>The elements in the <code>enabledLogs</code> array correspond to the names of the LogConfig entries.
-For example, if the <code>componentDefinition.spec.logConfigs</code> defines LogConfig entries with
-names &ldquo;slow_query_log&rdquo; and &ldquo;error_log&rdquo;,
-you can enable the collection of these logs by including their names in the <code>enabledLogs</code> array:</p>
-<pre><code class="language-yaml">enabledLogs:
-- slow_query_log
-- error_log
-</code></pre>
 </td>
 </tr>
 <tr>
@@ -2314,24 +2277,6 @@ but required otherwise.</p>
 </tr>
 <tr>
 <td>
-<code>componentDefRef</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>References a ClusterComponentDefinition defined in the <code>clusterDefinition.spec.componentDef</code> field.
-Must comply with the IANA service naming rule.</p>
-<p>Deprecated since v0.9,
-because defining Components in <code>clusterDefinition.spec.componentDef</code> field has been deprecated.
-This field is replaced by the <code>componentDef</code> field, use <code>componentDef</code> instead.
-This field is maintained for backward compatibility and its use is discouraged.
-Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>componentDef</code><br/>
 <em>
 string
@@ -2339,10 +2284,13 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
-custom resource (CR) that defines the Component&rsquo;s characteristics and behavior.</p>
-<p>If both <code>componentDefRef</code> and <code>componentDef</code> are provided,
-the <code>componentDef</code> will take precedence over <code>componentDefRef</code>.</p>
+<p>Specifies the ComponentDefinition custom resource (CR) that defines the Component&rsquo;s characteristics and behavior.</p>
+<p>Supports three different ways to specify the ComponentDefinition:</p>
+<ul>
+<li>the regular expression - recommended</li>
+<li>the full name - recommended</li>
+<li>the name prefix</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -2392,27 +2340,6 @@ identified using Cluster, Component and Service names.</li>
         component: &quot;postgresql&quot;
 </code></pre>
 <p>The example above includes ServiceRefs to an external Redis Sentinel service and a PostgreSQL Cluster.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>enabledLogs</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies which types of logs should be collected for the Component.
-The log types are defined in the <code>componentDefinition.spec.logConfigs</code> field with the LogConfig entries.</p>
-<p>The elements in the <code>enabledLogs</code> array correspond to the names of the LogConfig entries.
-For example, if the <code>componentDefinition.spec.logConfigs</code> defines LogConfig entries with
-names &ldquo;slow_query_log&rdquo; and &ldquo;error_log&rdquo;,
-you can enable the collection of these logs by including their names in the <code>enabledLogs</code> array:</p>
-<pre><code class="language-yaml">enabledLogs:
-- slow_query_log
-- error_log
-</code></pre>
 </td>
 </tr>
 <tr>
@@ -2627,23 +2554,6 @@ an existed ServiceAccount in this field.</p>
 </tr>
 <tr>
 <td>
-<code>updateStrategy</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.UpdateStrategy">
-UpdateStrategy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the update strategy for the Component.</p>
-<p>Deprecated since v0.9.
-This field is maintained for backward compatibility and its use is discouraged.
-Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>parallelPodManagementConcurrency</code><br/>
 <em>
 <a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
@@ -2676,26 +2586,6 @@ Any attempt to modify other fields will be rejected.</li>
 <li><code>PreferInPlace</code> indicates that we will first attempt an in-place upgrade of the Pod.
 If that fails, it will fall back to the ReCreate, where pod will be recreated.
 Default value is &ldquo;PreferInPlace&rdquo;</li>
-</ul>
-</td>
-</tr>
-<tr>
-<td>
-<code>userResourceRefs</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.UserResourceRefs">
-UserResourceRefs
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Allows users to specify custom ConfigMaps and Secrets to be mounted as volumes
-in the Cluster&rsquo;s Pods.
-This is useful in scenarios where users need to provide additional resources to the Cluster, such as:</p>
-<ul>
-<li>Mounting custom scripts or configuration files during Cluster startup.</li>
-<li>Mounting Secrets as volumes to provide sensitive information, like S3 AK/SK, to the Cluster.</li>
 </ul>
 </td>
 </tr>
@@ -2761,26 +2651,6 @@ bool
 <em>(Optional)</em>
 <p>Determines whether metrics exporter information is annotated on the Component&rsquo;s headless Service.</p>
 <p>If set to true, the following annotations will not be patched into the Service:</p>
-<ul>
-<li>&ldquo;monitor.kubeblocks.io/path&rdquo;</li>
-<li>&ldquo;monitor.kubeblocks.io/port&rdquo;</li>
-<li>&ldquo;monitor.kubeblocks.io/scheme&rdquo;</li>
-</ul>
-<p>These annotations allow the Prometheus installed by KubeBlocks to discover and scrape metrics from the exporter.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>monitor</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Deprecated since v0.9
-Determines whether metrics exporter information is annotated on the Component&rsquo;s headless Service.</p>
-<p>If set to true, the following annotations will be patched into the Service:</p>
 <ul>
 <li>&ldquo;monitor.kubeblocks.io/path&rdquo;</li>
 <li>&ldquo;monitor.kubeblocks.io/port&rdquo;</li>
@@ -3261,7 +3131,7 @@ Note that this and the <code>shardingSelector</code> are mutually exclusive and 
 <tbody>
 <tr>
 <td>
-<code>clusterDefinitionRef</code><br/>
+<code>clusterDef</code><br/>
 <em>
 string
 </em>
@@ -3281,21 +3151,6 @@ the composition of the Cluster by directly referencing specific ComponentDefinit
 within <code>componentSpecs[*].componentDef</code>.</p>
 <p>If this field is not provided, each component must be explicitly defined in <code>componentSpecs[*].componentDef</code>.</p>
 <p>Note: Once set, this field cannot be modified; it is immutable.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>clusterVersionRef</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Refers to the ClusterVersion name.</p>
-<p>Deprecated since v0.9, use ComponentVersion instead.
-This field is maintained for backward compatibility and its use is discouraged.
-Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
 </td>
 </tr>
 <tr>
@@ -5190,8 +5045,7 @@ These templates are used to dynamically provision persistent volumes for the Com
 </td>
 <td>
 <em>(Optional)</em>
-<p>Overrides Services defined in referenced ComponentDefinition and exposes endpoints that can be accessed
-by clients.</p>
+<p>Overrides Services defined in referenced ComponentDefinition and exposes endpoints that can be accessed by clients.</p>
 </td>
 </tr>
 <tr>
@@ -5231,27 +5085,6 @@ int32
 <td>
 <em>(Optional)</em>
 <p>Specifies the configuration content of a config template.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>enabledLogs</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies which types of logs should be collected for the Cluster.
-The log types are defined in the <code>componentDefinition.spec.logConfigs</code> field with the LogConfig entries.</p>
-<p>The elements in the <code>enabledLogs</code> array correspond to the names of the LogConfig entries.
-For example, if the <code>componentDefinition.spec.logConfigs</code> defines LogConfig entries with
-names &ldquo;slow_query_log&rdquo; and &ldquo;error_log&rdquo;,
-you can enable the collection of these logs by including their names in the <code>enabledLogs</code> array:</p>
-<pre><code class="language-yaml">enabledLogs:
-- slow_query_log
-- error_log
-</code></pre>
 </td>
 </tr>
 <tr>
@@ -6133,52 +5966,6 @@ This precaution helps prevent space depletion while maintaining read-only access
 If the space utilization later falls below this threshold, the system reverts the volume to read-write mode
 as defined in <code>componentDefinition.spec.lifecycleActions.readWrite</code>, restoring full functionality.</p>
 <p>Note: This field cannot be updated.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.ConfigMapRef">ConfigMapRef
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.UserResourceRefs">UserResourceRefs</a>)
-</p>
-<div>
-<p>ConfigMapRef defines a reference to a ConfigMap.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>ResourceMeta</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ResourceMeta">
-ResourceMeta
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>ResourceMeta</code> are embedded into this type.)
-</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>configMap</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#configmapvolumesource-v1-core">
-Kubernetes core/v1.ConfigMapVolumeSource
-</a>
-</em>
-</td>
-<td>
-<p>ConfigMap specifies the ConfigMap to be mounted as a volume.</p>
 </td>
 </tr>
 </tbody>
@@ -8039,70 +7826,6 @@ int32
 <td></td>
 </tr></tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1.ResourceMeta">ResourceMeta
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ConfigMapRef">ConfigMapRef</a>, <a href="#apps.kubeblocks.io/v1.SecretRef">SecretRef</a>)
-</p>
-<div>
-<p>ResourceMeta encapsulates metadata and configuration for referencing ConfigMaps and Secrets as volumes.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Name is the name of the referenced ConfigMap or Secret object. It must conform to DNS label standards.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>mountPoint</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>MountPoint is the filesystem path where the volume will be mounted.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>subPath</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>SubPath specifies a path within the volume from which to mount.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>asVolumeFrom</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>AsVolumeFrom lists the names of containers in which the volume should be mounted.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1.RetryPolicy">RetryPolicy
 </h3>
 <p>
@@ -8292,52 +8015,6 @@ specified <code>key</code>, <code>value</code>, <code>effect</code>, and <code>o
 <p>TopologySpreadConstraints describes how a group of Pods ought to spread across topology
 domains. Scheduler will schedule Pods in a way which abides by the constraints.
 All topologySpreadConstraints are ANDed.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.SecretRef">SecretRef
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.UserResourceRefs">UserResourceRefs</a>)
-</p>
-<div>
-<p>SecretRef defines a reference to a Secret.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>ResourceMeta</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ResourceMeta">
-ResourceMeta
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>ResourceMeta</code> are embedded into this type.)
-</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>secret</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#secretvolumesource-v1-core">
-Kubernetes core/v1.SecretVolumeSource
-</a>
-</em>
-</td>
-<td>
-<p>Secret specifies the Secret to be mounted as a volume.</p>
 </td>
 </tr>
 </tbody>
@@ -10040,7 +9717,7 @@ string
 <h3 id="apps.kubeblocks.io/v1.UpdateStrategy">UpdateStrategy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
 </p>
 <div>
 <p>UpdateStrategy defines the update strategy for cluster components. This strategy determines how updates are applied
@@ -10077,52 +9754,6 @@ The operator waits for each replica to be updated and ready before proceeding to
 This ensures that only one replica is unavailable at a time during the update process.</p>
 </td>
 </tr></tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.UserResourceRefs">UserResourceRefs
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>)
-</p>
-<div>
-<p>UserResourceRefs defines references to user-defined Secrets and ConfigMaps.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>secretRefs</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.SecretRef">
-[]SecretRef
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>SecretRefs defines the user-defined Secrets.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>configMapRefs</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ConfigMapRef">
-[]ConfigMapRef
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ConfigMapRefs defines the user-defined ConfigMaps.</p>
-</td>
-</tr>
-</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.VarOption">VarOption
 (<code>string</code> alias)</h3>

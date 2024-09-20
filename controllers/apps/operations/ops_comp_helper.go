@@ -164,8 +164,8 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 		err                    error
 		clusterDef             *appsv1.ClusterDefinition
 	)
-	if opsRes.Cluster.Spec.ClusterDefRef != "" {
-		if clusterDef, err = getClusterDefByName(reqCtx.Ctx, cli, opsRes.Cluster.Spec.ClusterDefRef); err != nil {
+	if opsRes.Cluster.Spec.ClusterDef != "" {
+		if clusterDef, err = getClusterDefByName(reqCtx.Ctx, cli, opsRes.Cluster.Spec.ClusterDef); err != nil {
 			return opsRequestPhase, 0, err
 		}
 	}

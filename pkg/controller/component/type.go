@@ -70,12 +70,10 @@ type SynthesizedComponent struct {
 	HostNetwork                      *kbappsv1.HostNetwork               `json:"hostNetwork,omitempty"`
 	ComponentServices                []kbappsv1.ComponentService         `json:"componentServices,omitempty"`
 	MinReadySeconds                  int32                               `json:"minReadySeconds,omitempty"`
-	Sidecars                         []string                            `json:"sidecars,omitempty"`
 	DisableExporter                  *bool                               `json:"disableExporter,omitempty"`
 	Stop                             *bool
 
 	// TODO(xingran): The following fields will be deprecated after KubeBlocks version 0.8.0
-	ClusterDefName                      string   `json:"clusterDefName,omitempty"` // the name of the clusterDefinition
-	EnabledLogs                         []string `json:"enabledLogs,omitempty"`
+	ClusterDefName                      string `json:"clusterDefName,omitempty"` // the name of the clusterDefinition
 	HorizontalScaleBackupPolicyTemplate *string
 }

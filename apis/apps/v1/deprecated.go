@@ -134,23 +134,6 @@ func (r *ClusterStatus) SetComponentStatus(name string, status ClusterComponentS
 	r.Components[name] = status
 }
 
-func (r *ClusterComponentSpec) GetDisableExporter() *bool {
-	if r.DisableExporter != nil {
-		return r.DisableExporter
-	}
-
-	toPointer := func(b bool) *bool {
-		p := b
-		return &p
-	}
-
-	// Compatible with previous versions of kb
-	if r.Monitor != nil {
-		return toPointer(!*r.Monitor)
-	}
-	return nil
-}
-
 func (r *ClusterComponentSpec) ToVolumeClaimTemplates() []corev1.PersistentVolumeClaimTemplate {
 	if r == nil {
 		return nil

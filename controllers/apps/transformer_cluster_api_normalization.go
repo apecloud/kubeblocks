@@ -96,12 +96,8 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs(transCtx *clusterTra
 	if withClusterTopology(cluster) {
 		return t.buildCompSpecs4Topology(transCtx.ClusterDef, cluster)
 	}
-	if withClusterUserDefined(cluster) || withClusterLegacyDefinition(cluster) {
+	if withClusterUserDefined(cluster) {
 		return t.buildCompSpecs4Specified(transCtx, cluster)
-	}
-	if withClusterSimplifiedAPI(cluster) {
-		// TODO(v1.0): check component definition
-		return nil, fmt.Errorf("simplified API is not supported")
 	}
 	return nil, nil
 }
@@ -221,14 +217,6 @@ func (t *ClusterAPINormalizationTransformer) resolveCompDefinitions(transCtx *cl
 
 func (t *ClusterAPINormalizationTransformer) resolveCompDefinitionNServiceVersion(transCtx *clusterTransformContext,
 	compSpec *appsv1.ClusterComponentSpec) (*appsv1.ComponentDefinition, string, error) {
-	if withClusterLegacyDefinition(transCtx.Cluster) || withClusterSimplifiedAPI(transCtx.Cluster) {
-		return nil, "", fmt.Errorf("legacy cluster definition or simplified API are not supported")
-	}
-	return t.resolveCompDefinitionNServiceVersionWithUpgrade(transCtx, compSpec)
-}
-
-func (t *ClusterAPINormalizationTransformer) resolveCompDefinitionNServiceVersionWithUpgrade(transCtx *clusterTransformContext,
-	compSpec *appsv1.ClusterComponentSpec) (*appsv1.ComponentDefinition, string, error) {
 	var (
 		ctx     = transCtx.Context
 		cli     = transCtx.Client
@@ -251,16 +239,10 @@ func (t *ClusterAPINormalizationTransformer) checkCompUpgrade(compSpec *appsv1.C
 }
 
 func (t *ClusterAPINormalizationTransformer) updateCompSpecs(transCtx *clusterTransformContext) {
-	var (
-		cluster = transCtx.Cluster
-	)
-	if withClusterLegacyDefinition(cluster) || withClusterSimplifiedAPI(cluster) {
-		return
-	}
-	if withClusterTopology(cluster) {
+	if withClusterTopology(transCtx.Cluster) {
 		t.updateCompSpecs4Topology(transCtx)
 	}
-	if withClusterUserDefined(cluster) {
+	if withClusterUserDefined(transCtx.Cluster) {
 		t.updateCompSpecs4Specified(transCtx)
 	}
 }

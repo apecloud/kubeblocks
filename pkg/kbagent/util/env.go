@@ -30,7 +30,7 @@ const (
 	kbEnvNamespace = "KB_AGENT_NAMESPACE"
 	kbEnvPodName   = "KB_AGENT_POD_NAME"
 	kbEnvPodUID    = "KB_AGENT_POD_UID"
-	kbEnvNodeName  = "KB_AGENT_NODENAME"
+	kbEnvNodeName  = "KB_AGENT_NODE_NAME"
 )
 
 func EnvM2L(m map[string]string) []string {

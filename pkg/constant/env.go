@@ -19,14 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package constant
 
-import (
-	"fmt"
-)
-
-func EnvPlaceHolder(env string) string {
-	return fmt.Sprintf("$(%s)", env)
-}
-
 // Global
 const (
 	KBEnvNamespace = "KB_NAMESPACE"
@@ -34,15 +26,13 @@ const (
 
 // Cluster
 const (
-	KBEnvClusterName                  = "KB_CLUSTER_NAME"
-	KBEnvClusterUID                   = "KB_CLUSTER_UID"
-	KBEnvClusterCompName              = "KB_CLUSTER_COMP_NAME"
-	KBEnvClusterUIDPostfix8Deprecated = "KB_CLUSTER_UID_POSTFIX_8"
+	KBEnvClusterName     = "KB_CLUSTER_NAME"
+	KBEnvClusterUID      = "KB_CLUSTER_UID"
+	KBEnvClusterCompName = "KB_CLUSTER_COMP_NAME"
 )
 
 // Component
 const (
-	KBEnvCompName           = "KB_COMP_NAME"
-	KBEnvCompReplicas       = "KB_COMP_REPLICAS"
-	KBEnvCompServiceVersion = "KB_COMP_SERVICE_VERSION"
+	KBEnvCompName     = "KB_COMP_NAME"
+	KBEnvCompReplicas = "KB_COMP_REPLICAS"
 )

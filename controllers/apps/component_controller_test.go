@@ -1229,30 +1229,6 @@ var _ = Describe("Component Controller", func() {
 					},
 				},
 			},
-			{
-				Name:  constant.KBEnvNamespace,
-				Value: clusterObj.Namespace,
-			},
-			{
-				Name:  constant.KBEnvClusterName,
-				Value: clusterObj.Name,
-			},
-			{
-				Name:  constant.KBEnvClusterUID,
-				Value: string(clusterObj.UID),
-			},
-			{
-				Name:  constant.KBEnvClusterCompName,
-				Value: constant.GenerateClusterComponentName(clusterObj.Name, compName),
-			},
-			{
-				Name:  constant.KBEnvCompName,
-				Value: compName,
-			},
-			{
-				Name:  constant.KBEnvCompReplicas,
-				Value: "1", // default replicas
-			},
 		}
 		itsKey := types.NamespacedName{
 			Namespace: compObj.Namespace,

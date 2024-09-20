@@ -44,8 +44,7 @@ func BuildStartupEnv(actions []proto.Action, probes []proto.Probe) ([]corev1.Env
 	if err != nil {
 		return nil, err
 	}
-	envs := util.DefaultEnvVars()
-	envs = append(envs, []corev1.EnvVar{
+	return append(util.DefaultEnvVars(), []corev1.EnvVar{
 		{
 			Name:  actionEnvName,
 			Value: da,
@@ -54,8 +53,7 @@ func BuildStartupEnv(actions []proto.Action, probes []proto.Probe) ([]corev1.Env
 			Name:  probeEnvName,
 			Value: dp,
 		},
-	}...)
-	return envs, nil
+	}...), nil
 }
 
 func Initialize(logger logr.Logger, envs []string) ([]service.Service, error) {

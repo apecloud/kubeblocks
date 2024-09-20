@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	configv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
@@ -45,16 +46,46 @@ const (
 	testConfigContent         = "test-config-content"
 )
 
-func allFieldsCompDefObj(create bool) *appsv1.ComponentDefinition {
-	compDef := testapps.NewComponentDefinitionFactory(compDefName).
+func allFieldsCompDefObj(create bool, options ...func(*testapps.MockComponentDefinitionFactory)) *appsv1.ComponentDefinition {
+	compDefFactory := testapps.NewComponentDefinitionFactory(compDefName).
 		SetDefaultSpec().
-		AddConfigTemplate(configTemplateName, mysqlConfigName, mysqlConfigConstraintName, testCtx.DefaultNamespace, testapps.ConfVolumeName).
-		AddScriptTemplate(scriptTemplateName, mysqlScriptsTemplateName, testCtx.DefaultNamespace, testapps.ScriptsVolumeName, nil).
-		GetObject()
-	if create {
-		Expect(testCtx.CreateObj(testCtx.Ctx, compDef)).Should(Succeed())
+		AddConfigTemplate(configTemplateName, mysqlConfigName, mysqlConfigConstraintName, testCtx.DefaultNamespace, testapps.ConfVolumeName, func(spec *appsv1.ComponentConfigSpec) {
+			spec.ComponentConfigDescriptions = []appsv1.ComponentConfigDescription{{Name: "file1"}}
+		}).
+		AddScriptTemplate(scriptTemplateName, mysqlScriptsTemplateName, testCtx.DefaultNamespace, testapps.ScriptsVolumeName, nil)
+	for _, option := range options {
+		option(compDefFactory)
 	}
-	return compDef
+
+	if create {
+		compDefFactory.Create(&testCtx)
+	}
+	return compDefFactory.GetObject()
+}
+
+func newParametersDefinition() (*configv1alpha1.ParametersDefinition, *configv1alpha1.ParametersDefinition) {
+	paramDef1 := testapps.NewParametersDefinitionFactory("param_def1").
+		Schema(`
+#Parameter: {
+  param1: string
+  param2: string
+  param3: string
+  param4: string
+}
+`).
+		GetObject()
+	paramDef2 := testapps.NewParametersDefinitionFactory("param_def2").
+		Schema(`
+#Parameter: {
+  param11: string
+  param12: string
+  param13: string
+  param14: string
+}
+`).
+		GetObject()
+
+	return paramDef1, paramDef2
 }
 
 func newAllFieldsClusterObj(compDef *appsv1.ComponentDefinition, create bool) (*appsv1.Cluster, *appsv1.ComponentDefinition, types.NamespacedName) {

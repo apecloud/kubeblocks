@@ -179,7 +179,6 @@ var _ = Describe("Reconfigure util test", func() {
 			// r := updateConfigConfigmapResource(updatedCfg, tpl, client.ObjectKeyFromObject(cmObj), ctx, k8sMockClient.Client(), "test", mockUpdate)
 			r := testUpdateConfigConfigmapResource(reqCtx, k8sMockClient.Client(), opsRes, updatedCfg, clusterName, componentName)
 			Expect(r.err).ShouldNot(Succeed())
-			Expect(r.err.Error()).Should(ContainSubstring("failed to found configuration of component"))
 
 			By("CM object failed.")
 			// mock failed

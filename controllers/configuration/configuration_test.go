@@ -83,14 +83,14 @@ func mockConfigResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint) {
 	return configmap, constraint
 }
 
-func mockReconcileResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint, *appsv1.Cluster, *appsv1.Component, *component.SynthesizedComponent) {
+func mockReconcileResource(options ...func(spec *appsv1.ComponentConfigSpec)) (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint, *appsv1.Cluster, *appsv1.Component, *component.SynthesizedComponent) {
 	configmap, constraint := mockConfigResource()
 
 	By("Create a component definition obj and mock to available")
 	compDefObj := testapps.NewComponentDefinitionFactory(compDefName).
 		WithRandomName().
 		SetDefaultSpec().
-		AddConfigTemplate(configSpecName, configmap.Name, constraint.Name, testCtx.DefaultNamespace, configVolumeName).
+		AddConfigTemplate(configSpecName, configmap.Name, constraint.Name, testCtx.DefaultNamespace, configVolumeName, options...).
 		AddLabels(core.GenerateTPLUniqLabelKeyWithConfig(configSpecName), configmap.Name,
 			core.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
 		Create(&testCtx).

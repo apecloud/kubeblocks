@@ -183,6 +183,7 @@ func (r *ComponentParameterReconciler) runTasks(taskCtx TaskContext, tasks []Tas
 	if len(errs) > 0 {
 		configuration.Status.Message = utilerrors.NewAggregate(errs).Error()
 	}
+	checkAndUpdatePhase(configuration)
 	if err := r.Client.Status().Patch(ctx, configuration, patch); err != nil {
 		errs = append(errs, err)
 	}
@@ -190,6 +191,24 @@ func (r *ComponentParameterReconciler) runTasks(taskCtx TaskContext, tasks []Tas
 		return nil
 	}
 	return utilerrors.NewAggregate(errs)
+}
+
+func checkAndUpdatePhase(config *configurationv1alpha1.ComponentParameter) {
+	var phase = configurationv1alpha1.CRunningPhase
+
+	defer func() {
+		config.Status.Phase = phase
+	}()
+
+	if len(config.Spec.ConfigItemDetails) != len(config.Status.ConfigurationItemStatus) {
+		return
+	}
+	for _, status := range config.Status.ConfigurationItemStatus {
+		if status.UpdateRevision != status.LastDoneRevision || status.Phase != configurationv1alpha1.CFinishedPhase {
+			return
+		}
+	}
+	phase = configurationv1alpha1.CFinishedPhase
 }
 
 func fromItemStatus(ctx intctrlutil.RequestCtx, status *configurationv1alpha1.ComponentParameterStatus, item configurationv1alpha1.ConfigTemplateItemDetail, generation int64) *configurationv1alpha1.ConfigTemplateItemDetailStatus {

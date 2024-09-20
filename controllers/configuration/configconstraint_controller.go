@@ -119,7 +119,5 @@ func (r *ConfigConstraintReconciler) Reconcile(ctx context.Context, req ctrl.Req
 func (r *ConfigConstraintReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
 		For(&appsv1beta1.ConfigConstraint{}).
-		// for other resource
-		Owns(&corev1.ConfigMap{}). // TODO(leon)
 		Complete(r)
 }

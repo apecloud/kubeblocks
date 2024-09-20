@@ -24,6 +24,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
@@ -35,6 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // clusterServiceTransformer handles cluster services.
@@ -65,22 +67,39 @@ func (c *componentConfigurationTransformer) reconcile(transCtx *componentTransfo
 		return err
 	}
 
+	graphCli, _ := transCtx.Client.(model.GraphClient)
 	cluster := transCtx.Cluster
 	config, err := buildConfiguration(transCtx, cluster, component)
 	if err != nil {
 		return err
 	}
+	if config == nil {
+		if existingConfig != nil {
+			graphCli.Delete(dag, existingConfig, inDataContext4G())
+		}
+		return nil
+	}
 	if _, err = configuration.UpdateConfigPayload(&config.Spec, component); err != nil {
 		return err
 	}
-
-	graphCli, _ := transCtx.Client.(model.GraphClient)
+	if err := controllerutil.SetOwnerReference(transCtx.Component, config, model.GetScheme()); err != nil {
+		return err
+	}
 	if existingConfig != nil {
-		graphCli.Update(dag, existingConfig, config, inDataContext4G())
+		graphCli.Update(dag, existingConfig, mergeConfigObject(existingConfig, config), inDataContext4G())
 	} else {
 		graphCli.Create(dag, config, inDataContext4G())
 	}
 	return nil
+}
+
+func mergeConfigObject(existing *configurationv1alpha1.ComponentParameter, expected *configurationv1alpha1.ComponentParameter) *configurationv1alpha1.ComponentParameter {
+	deepCopy := existing.DeepCopy()
+	deepCopy.Spec = expected.Spec
+	deepCopy.Labels = intctrlutil.MergeMetadataMaps(existing.Labels, existing.Labels)
+	deepCopy.Annotations = intctrlutil.MergeMetadataMaps(existing.Annotations, existing.Annotations)
+	deepCopy.OwnerReferences = expected.OwnerReferences
+	return deepCopy
 }
 
 func (c *componentConfigurationTransformer) runningComponentConfiguration(ctx context.Context, cli client.Reader, component *component.SynthesizedComponent) (*configurationv1alpha1.ComponentParameter, error) {
@@ -100,11 +119,15 @@ func (c *componentConfigurationTransformer) runningComponentConfiguration(ctx co
 }
 
 func buildConfiguration(transCtx *componentTransformContext, cluster *appsv1.Cluster, component *component.SynthesizedComponent) (*configurationv1alpha1.ComponentParameter, error) {
-	items, err := configuration.ClassifyParamsFromConfigTemplate(transCtx, transCtx.GetClient(), transCtx.Component, transCtx.CompDef, component)
-	if err != nil {
+	var err error
+	var items []configurationv1alpha1.ConfigTemplateItemDetail
+
+	if len(component.ConfigTemplates) == 0 {
+		return nil, nil
+	}
+	if items, err = configuration.ClassifyParamsFromConfigTemplate(transCtx, transCtx.GetClient(), transCtx.Component, transCtx.CompDef, component); err != nil {
 		return nil, err
 	}
-
 	return builder.NewConfigurationBuilder(cluster.Namespace,
 		core.GenerateComponentConfigurationName(cluster.Name, component.Name)).
 		AddLabelsInMap(constant.GetComponentWellKnownLabels(cluster.Name, component.Name)).

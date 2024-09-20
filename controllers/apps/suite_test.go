@@ -162,6 +162,7 @@ var _ = BeforeSuite(func() {
 
 	err = configv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
+	model.AddScheme(configv1alpha1.AddToScheme)
 
 	// +kubebuilder:scaffold:rscheme
 

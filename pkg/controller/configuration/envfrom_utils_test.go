@@ -62,7 +62,7 @@ var _ = Describe("ConfigEnvFrom test", func() {
 
 		compDef = testapps.NewComponentDefinitionFactory(compDefName).
 			SetDefaultSpec().
-			AddConfigTemplate(cm.Name, cm.Name, configConstraint.Name, testCtx.DefaultNamespace, "mysql-config", testapps.DefaultMySQLContainerName).
+			AddConfigTemplate(cm.Name, cm.Name, configConstraint.Name, testCtx.DefaultNamespace, "mysql-config", testapps.WithInjectEnv(testapps.DefaultMySQLContainerName)).
 			GetObject()
 
 		pvcSpec := testapps.NewPVCSpec("1Gi")

@@ -22,6 +22,7 @@ package apps
 import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
@@ -54,6 +55,9 @@ func (t *componentParametersReloadSidecarTransformer) Transform(ctx graph.Transf
 			"component", client.ObjectKeyFromObject(transCtx.ComponentOrig))
 		return nil
 	}
+	if len(synthesizeComp.ConfigTemplates) == 0 {
+		return nil
+	}
 
 	// get dependOnObjs which will be used in configuration render
 	var dependOnObjs []client.Object
@@ -71,6 +75,11 @@ func (t *componentParametersReloadSidecarTransformer) Transform(ctx graph.Transf
 		if config, ok := v.Obj.(*configurationv1alpha1.ComponentParameter); ok {
 			configObj = config
 		}
+	}
+
+	if configObj == nil {
+		log.Log.Info("not found ComponentParameter resource and pass")
+		return nil
 	}
 
 	// configuration render

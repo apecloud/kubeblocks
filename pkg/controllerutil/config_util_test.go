@@ -116,38 +116,6 @@ func TestIsRerender(t *testing.T) {
 		},
 		want: false,
 	}, {
-		name: "test",
-		args: args{
-			cm: builder.NewConfigMapBuilder("default", "test").
-				GetObject(),
-			item: configurationv1alpha1.ConfigTemplateItemDetail{
-				Name: "test",
-			},
-		},
-		want: true,
-	}, {
-		name: "test",
-		args: args{
-			cm: builder.NewConfigMapBuilder("default", "test").
-				AddAnnotations(constant.CMConfigurationTemplateVersion, "v1").
-				GetObject(),
-			item: configurationv1alpha1.ConfigTemplateItemDetail{
-				Name: "test",
-			},
-		},
-		want: true,
-	}, {
-		name: "test",
-		args: args{
-			cm: builder.NewConfigMapBuilder("default", "test").
-				AddAnnotations(constant.CMConfigurationTemplateVersion, "v1").
-				GetObject(),
-			item: configurationv1alpha1.ConfigTemplateItemDetail{
-				Name: "test",
-			},
-		},
-		want: false,
-	}, {
 		name: "import-template-test",
 		args: args{
 			cm: builder.NewConfigMapBuilder("default", "test").
@@ -169,7 +137,7 @@ func TestIsRerender(t *testing.T) {
 			cm: builder.NewConfigMapBuilder("default", "test").
 				AddAnnotations(constant.ConfigAppliedVersionAnnotationKey, `
 {
-  "importTemplateRef": {
+  "userConfigTemplates": {
     "templateRef": "contig-test-template",
     "namespace": "default",
     "policy": "patch"

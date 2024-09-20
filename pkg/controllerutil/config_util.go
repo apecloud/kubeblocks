@@ -29,7 +29,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	configv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
@@ -125,7 +124,7 @@ func IsApplyConfigChanged(configMap *corev1.ConfigMap, item configv1alpha1.Confi
 	if !ok {
 		return false
 	}
-	var target v1alpha1.ConfigTemplateItemDetail
+	var target configv1alpha1.ConfigTemplateItemDetail
 	if err := json.Unmarshal([]byte(lastAppliedVersion), &target); err != nil {
 		return false
 	}
@@ -141,7 +140,7 @@ func IsRerender(configMap *corev1.ConfigMap, item configv1alpha1.ConfigTemplateI
 	if item.Payload.Data == nil && item.UserConfigTemplates == nil {
 		return false
 	}
-	var updatedVersion v1alpha1.ConfigTemplateItemDetail
+	var updatedVersion configv1alpha1.ConfigTemplateItemDetail
 	updatedVersionStr, ok := configMap.Annotations[constant.ConfigAppliedVersionAnnotationKey]
 	if ok && updatedVersionStr != "" {
 		if err := json.Unmarshal([]byte(updatedVersionStr), &updatedVersion); err != nil {

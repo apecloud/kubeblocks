@@ -21,9 +21,10 @@ import (
 	"fmt"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
+	configv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -32,8 +33,8 @@ func ClassifyParamsFromConfigTemplate(ctx context.Context,
 	cli client.Reader,
 	component *appsv1.Component,
 	componentDef *appsv1.ComponentDefinition,
-	synthesizedComponent *component.SynthesizedComponent) ([]configurationv1alpha1.ConfigTemplateItemDetail, error) {
-	var itemDetails []configurationv1alpha1.ConfigTemplateItemDetail
+	synthesizedComponent *component.SynthesizedComponent) ([]configv1alpha1.ConfigTemplateItemDetail, error) {
+	var itemDetails []configv1alpha1.ConfigTemplateItemDetail
 
 	classifyParams, err := classifyComponentParameters(ctx, cli,
 		component.Spec.ComponentParameters,
@@ -48,8 +49,8 @@ func ClassifyParamsFromConfigTemplate(ctx context.Context,
 	return itemDetails, nil
 }
 
-func generateConfigTemplateItem(userConfigTemplates map[string]appsv1.ConfigTemplateExtension, configParams map[string]map[string]*configurationv1alpha1.ParametersInFile, template appsv1.ComponentConfigSpec) configurationv1alpha1.ConfigTemplateItemDetail {
-	itemDetail := configurationv1alpha1.ConfigTemplateItemDetail{
+func generateConfigTemplateItem(userConfigTemplates map[string]appsv1.ConfigTemplateExtension, configParams map[string]map[string]*configv1alpha1.ParametersInFile, template appsv1.ComponentConfigSpec) configv1alpha1.ConfigTemplateItemDetail {
+	itemDetail := configv1alpha1.ConfigTemplateItemDetail{
 		Name:       template.Name,
 		ConfigSpec: template.DeepCopy(),
 	}
@@ -67,7 +68,7 @@ func classifyComponentParameters(ctx context.Context,
 	reader client.Reader,
 	parameters appsv1.ComponentParameters,
 	parametersDefs []appsv1.ComponentParametersDescription,
-	templates []appsv1.ComponentConfigSpec) (map[string]map[string]*configurationv1alpha1.ParametersInFile, error) {
+	templates []appsv1.ComponentConfigSpec) (map[string]map[string]*configv1alpha1.ParametersInFile, error) {
 	if len(parameters) == 0 {
 		return nil, nil
 	}
@@ -79,25 +80,25 @@ func classifyComponentParameters(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
-	classifyParams := make(map[string]map[string]*configurationv1alpha1.ParametersInFile, len(templates))
+	classifyParams := make(map[string]map[string]*configv1alpha1.ParametersInFile, len(templates))
 	for paramKey, paramValue := range parameters {
 		updateConfigParameter(paramKey, paramValue, parametersMap, classifyParams)
 	}
 	return classifyParams, nil
 }
 
-func updateConfigParameter(paramKey string, paramValue *string, parametersMap map[string]*controllerutil.ParameterMeta, classifyParams map[string]map[string]*configurationv1alpha1.ParametersInFile) {
+func updateConfigParameter(paramKey string, paramValue *string, parametersMap map[string]*controllerutil.ParameterMeta, classifyParams map[string]map[string]*configv1alpha1.ParametersInFile) {
 
-	deRefParamInTemplate := func(name string) map[string]*configurationv1alpha1.ParametersInFile {
+	deRefParamInTemplate := func(name string) map[string]*configv1alpha1.ParametersInFile {
 		if _, ok := classifyParams[name]; !ok {
-			classifyParams[name] = make(map[string]*configurationv1alpha1.ParametersInFile)
+			classifyParams[name] = make(map[string]*configv1alpha1.ParametersInFile)
 		}
 		return classifyParams[name]
 	}
-	deRefParamInFile := func(templateName, fileName string) *configurationv1alpha1.ParametersInFile {
+	deRefParamInFile := func(templateName, fileName string) *configv1alpha1.ParametersInFile {
 		v := deRefParamInTemplate(templateName)
 		if _, ok := v[fileName]; !ok {
-			v[fileName] = &configurationv1alpha1.ParametersInFile{
+			v[fileName] = &configv1alpha1.ParametersInFile{
 				Parameters: make(map[string]*string),
 			}
 		}
@@ -106,7 +107,7 @@ func updateConfigParameter(paramKey string, paramValue *string, parametersMap ma
 
 	meta, ok := parametersMap[paramKey]
 	if !ok {
-		// logger.V(1).Info("ignore invalid param", "param", paramKey)
+		log.Log.Info("ignore invalid param", "param", paramKey)
 		return
 	}
 	deRefParamInFile(meta.ConfigTemplateName, meta.FileName).Parameters[paramKey] = paramValue
@@ -123,7 +124,7 @@ func getSchemaFromParametersDefinition(ctx context.Context, reader client.Reader
 
 	for _, parameterDef := range parametersDefs {
 		configSpec := fromConfigSpecFromParam(templates, parameterDef)
-		if configSpec != nil {
+		if configSpec == nil {
 			return nil, fmt.Errorf("not found config template: [%v]", parameterDef)
 		}
 		metas, err := controllerutil.GetConfigParameterMeta(ctx, reader, parameterDef, configSpec)
@@ -137,14 +138,14 @@ func getSchemaFromParametersDefinition(ctx context.Context, reader client.Reader
 
 func transformParametersInFile(paramDef appsv1.ComponentParametersDescription,
 	templates []appsv1.ComponentConfigSpec,
-	parameters appsv1.ComponentParameters) (map[string]map[string]*configurationv1alpha1.ParametersInFile, error) {
+	parameters appsv1.ComponentParameters) (map[string]map[string]*configv1alpha1.ParametersInFile, error) {
 	configSpec := fromConfigSpecFromParam(templates, paramDef)
-	if configSpec != nil {
+	if configSpec == nil {
 		return nil, fmt.Errorf("not found config template: [%v]", paramDef)
 	}
-	return map[string]map[string]*configurationv1alpha1.ParametersInFile{
+	return map[string]map[string]*configv1alpha1.ParametersInFile{
 		configSpec.Name: {
-			paramDef.Name: &configurationv1alpha1.ParametersInFile{
+			paramDef.Name: &configv1alpha1.ParametersInFile{
 				Parameters: parameters,
 			}},
 	}, nil
@@ -162,12 +163,12 @@ func fromConfigSpecFromParam(templates []appsv1.ComponentConfigSpec, description
 	return nil
 }
 
-func derefMapValues(m map[string]*configurationv1alpha1.ParametersInFile) map[string]configurationv1alpha1.ParametersInFile {
-	if len(m) == 1 {
+func derefMapValues(m map[string]*configv1alpha1.ParametersInFile) map[string]configv1alpha1.ParametersInFile {
+	if len(m) == 0 {
 		return nil
 	}
 
-	newMap := make(map[string]configurationv1alpha1.ParametersInFile, len(m))
+	newMap := make(map[string]configv1alpha1.ParametersInFile, len(m))
 	for key, inFile := range m {
 		newMap[key] = *inFile
 	}

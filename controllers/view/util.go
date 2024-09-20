@@ -20,7 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package view
 
 import (
+	"context"
+	"fmt"
+
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
 )
@@ -35,4 +41,36 @@ func objectTypeToGVK(objectType *viewv1.ObjectType) (*schema.GroupVersionKind, e
 	}
 	gvk := gv.WithKind(objectType.Kind)
 	return &gvk, nil
+}
+
+func getObjectsByGVK(ctx context.Context, cli client.Reader, scheme *runtime.Scheme, gvk *schema.GroupVersionKind, opts ...client.ListOption) ([]client.Object, error) {
+	runtimeObjectList, err := scheme.New(schema.GroupVersionKind{
+		Group:   gvk.Group,
+		Version: gvk.Version,
+		Kind:    gvk.Kind + "List",
+	})
+	if err != nil {
+		return nil, err
+	}
+	objectList, ok := runtimeObjectList.(client.ObjectList)
+	if !ok {
+		return nil, fmt.Errorf("list object is not a client.ObjectList for GVK %s", gvk)
+	}
+	if err = cli.List(ctx, objectList, opts...); err != nil {
+		return nil, err
+	}
+	runtimeObjects, err := meta.ExtractList(objectList)
+	if err != nil {
+		return nil, err
+	}
+	var objects []client.Object
+	for _, object := range runtimeObjects {
+		o, ok := object.(client.Object)
+		if !ok {
+			return nil, fmt.Errorf("object is not a client.Object for GVK %s", gvk)
+		}
+		objects = append(objects, o)
+	}
+
+	return objects, nil
 }

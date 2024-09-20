@@ -19,11 +19,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package view
 
-import "sigs.k8s.io/controller-runtime/pkg/client"
+import (
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
 
 type ObjectStore interface {
 	Insert(object client.Object) error
-	Get(object client.Object, revision string) (client.Object, error)
+	Get(objKey *corev1.ObjectReference) client.Object
 	Delete(object client.Object)
 }
 
@@ -36,7 +39,7 @@ func (o *objectStore) Insert(object client.Object) error {
 	panic("implement me")
 }
 
-func (o *objectStore) Get(object client.Object, revision string) (client.Object, error) {
+func (o *objectStore) Get(objKey *corev1.ObjectReference) client.Object {
 	//TODO implement me
 	panic("implement me")
 }

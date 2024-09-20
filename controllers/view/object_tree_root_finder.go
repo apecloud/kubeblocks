@@ -26,9 +26,7 @@ import (
 	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/go-logr/logr"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -128,31 +126,12 @@ func (f *rootFinder) findRoots(ctx context.Context, object client.Object) []reco
 					f.logger.Error(err, "convert objectType %s to GVK failed", rule.Primary)
 					return nil
 				}
-				runtimeObjectList, err := f.Scheme().New(schema.GroupVersionKind{
-					Group:   primaryGVK.Group,
-					Version: primaryGVK.Version,
-					Kind:    primaryGVK.Kind + "List",
-				})
+				objectList, err := getObjectsByGVK(ctx, f, f.Scheme(), primaryGVK)
 				if err != nil {
-					f.logger.Error(err, "create primary object list for % failed", primaryGVK)
+					f.logger.Error(err, "getObjectsByGVK for GVK %s failed", primaryGVK)
 					return nil
 				}
-				primaryObjectList, ok := runtimeObjectList.(client.ObjectList)
-				if !ok {
-					f.logger.Error(fmt.Errorf("list object is not a client.ObjectList for GVK %s", primaryGVK), "")
-					return nil
-				}
-				if err = f.List(ctx, primaryObjectList); err != nil {
-					f.logger.Error(err, "list objects failed", primaryGVK)
-					return nil
-				}
-				objectList, err := meta.ExtractList(primaryObjectList)
-				if err != nil {
-					f.logger.Error(err, "extract object list failed", primaryGVK)
-					return nil
-				}
-				for _, o := range objectList {
-					owner, _ := o.(client.Object)
+				for _, owner := range objectList {
 					if ownedBy(owner, obj, resource) {
 						waitingList.PushBack(owner)
 					}
@@ -195,11 +174,7 @@ func ownedBy(owner client.Object, obj client.Object, ownedResource viewv1.OwnedR
 	}
 
 	if ownedResource.Criteria.LabelCriteria != nil {
-		labels := make(map[string]string, len(ownedResource.Criteria.LabelCriteria))
-		for k, v := range ownedResource.Criteria.LabelCriteria {
-			value := strings.ReplaceAll(v, "$(primary.name)", owner.GetName())
-			labels[k] = value
-		}
+		labels := parseLabels(owner, ownedResource.Criteria.LabelCriteria)
 		if len(labels) > 0 && isSubset(labels, obj.GetLabels()) {
 			return true
 		}
@@ -209,6 +184,15 @@ func ownedBy(owner client.Object, obj client.Object, ownedResource viewv1.OwnedR
 	// TODO(free6om): handle builtin
 
 	return false
+}
+
+func parseLabels(obj client.Object, criteria map[string]string) map[string]string {
+	labels := make(map[string]string, len(criteria))
+	for k, v := range criteria {
+		value := strings.ReplaceAll(v, "$(primary.name)", obj.GetName())
+		labels[k] = value
+	}
+	return labels
 }
 
 // parseSelector checks if a field exists in the object and returns it if it's a metav1.LabelSelector

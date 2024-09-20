@@ -58,7 +58,7 @@ func (r *ReconciliationViewReconciler) Reconcile(ctx context.Context, req ctrl.R
 		Prepare(viewResources()).
 		Do(viewResourcesValidation(ctx, r.Client)).
 		Do(updateInformerManager(r.InformerManager)).
-		Do(viewCalculation(ctx, r.Client)).
+		Do(viewCalculation(ctx, r.Client, r.Scheme, r.ObjectStore)).
 		//Do(stateEvaluation()).
 		Commit()
 

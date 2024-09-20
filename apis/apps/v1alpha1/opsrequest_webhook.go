@@ -201,6 +201,11 @@ func (r *OpsRequest) validateEntry(isCreate bool) error {
 	if webhookMgr == nil || webhookMgr.client == nil {
 		return nil
 	}
+	// skip validating restore
+	if r.Spec.Type == RestoreType {
+		return nil
+	}
+
 	ctx := context.Background()
 	k8sClient := webhookMgr.client
 	cluster, err := r.getCluster(ctx, k8sClient)

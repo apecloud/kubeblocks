@@ -1082,3 +1082,14 @@ const (
 	// FailurePolicyFail means that an error will be reported.
 	FailurePolicyFail FailurePolicyType = "Fail"
 )
+
+const (
+	ReasonReconfigurePersisting    = "ReconfigurePersisting"
+	ReasonReconfigurePersisted     = "ReconfigurePersisted"
+	ReasonReconfigureFailed        = "ReconfigureFailed"
+	ReasonReconfigureRestartFailed = "ReconfigureRestartFailed"
+	ReasonReconfigureRestart       = "ReconfigureRestarted"
+	ReasonReconfigureNoChanged     = "ReconfigureNoChanged"
+	ReasonReconfigureSucceed       = "ReconfigureSucceed"
+	ReasonReconfigureRunning       = "ReconfigureRunning"
+)

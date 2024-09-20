@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -188,7 +189,7 @@ func updateReconfigureStatusByCM(reconfiguringStatus *opsv1alpha1.ReconfiguringS
 	cmCount := len(reconfiguringStatus.ConfigurationStatus)
 	reconfiguringStatus.ConfigurationStatus = append(reconfiguringStatus.ConfigurationStatus, opsv1alpha1.ConfigurationItemStatus{
 		Name:          tplName,
-		Status:        opsv1alpha1.ReasonReconfigurePersisting,
+		Status:        appsv1alpha1.ReasonReconfigurePersisting,
 		SucceedCount:  core.NotStarted,
 		ExpectedCount: core.Unconfirmed,
 	})

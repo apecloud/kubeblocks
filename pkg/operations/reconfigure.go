@@ -79,7 +79,7 @@ func handleReconfigureStatusProgress(result *appsv1alpha1.ReconcileDetail, opsSt
 
 func handleNewReconfigureRequest(configPatch *core.ConfigPatchInfo, lastAppliedConfigs map[string]string) handleReconfigureOpsStatus {
 	return func(cmStatus *opsv1alpha1.ConfigurationItemStatus) (err error) {
-		cmStatus.Status = opsv1alpha1.ReasonReconfigurePersisted
+		cmStatus.Status = appsv1alpha1.ReasonReconfigurePersisted
 		cmStatus.LastAppliedConfiguration = lastAppliedConfigs
 		if configPatch != nil {
 			cmStatus.UpdatedParameters = opsv1alpha1.UpdatedParameters{
@@ -260,7 +260,7 @@ func (r *reconfigureAction) doReconfiguring(params reconfigureParams) error {
 
 	params.reqCtx.Recorder.Eventf(params.resource.OpsRequest,
 		corev1.EventTypeNormal,
-		opsv1alpha1.ReasonReconfigurePersisted,
+		appsv1alpha1.ReasonReconfigurePersisted,
 		"the reconfiguring operation of component[%s] in cluster[%s] merged successfully", params.componentName, params.clusterName)
 
 	// merged successfully
@@ -281,7 +281,7 @@ func needReconfigure(request *opsv1alpha1.OpsRequest, status *opsv1alpha1.Reconf
 
 	// Check if the reconfiguring operation has been processed.
 	for _, condition := range status.Conditions {
-		if isExpectedPhase(condition, []string{opsv1alpha1.ReasonReconfigurePersisted, opsv1alpha1.ReasonReconfigureNoChanged}, metav1.ConditionTrue) {
+		if isExpectedPhase(condition, []string{appsv1alpha1.ReasonReconfigurePersisted, appsv1alpha1.ReasonReconfigureNoChanged}, metav1.ConditionTrue) {
 			return false
 		}
 	}

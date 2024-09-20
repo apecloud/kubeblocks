@@ -127,6 +127,13 @@ func (r *OpsRequestReconciler) handleDeletion(reqCtx intctrlutil.RequestCtx, ops
 	if opsRes.OpsRequest.Status.Phase == opsv1alpha1.OpsRunningPhase && !opsRes.Cluster.IsDeleting() {
 		return nil, nil
 	}
+	if opsRes.Cluster.IsDeleting() && opsRes.OpsRequest.DeletionTimestamp.IsZero() {
+		// delete the ops when the cluster is Deleting but opsRequest is not deleted.
+		if err := r.Client.Delete(reqCtx.Ctx, opsRes.OpsRequest); err != nil {
+			return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
+		}
+		return intctrlutil.ResultToP(intctrlutil.Reconciled())
+	}
 	return intctrlutil.HandleCRDeletion(reqCtx, r, opsRes.OpsRequest, constant.OpsRequestFinalizerName, func() (*ctrl.Result, error) {
 		if err := r.deleteCreatedPodsInKBNamespace(reqCtx, opsRes.OpsRequest); err != nil {
 			return nil, err

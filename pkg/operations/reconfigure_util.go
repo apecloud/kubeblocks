@@ -148,13 +148,13 @@ func constructReconfiguringConditions(result reconfiguringResult, resource *OpsR
 	if result.noFormatFilesUpdated || (result.configPatch != nil && result.configPatch.IsModify) {
 		return opsv1alpha1.NewReconfigureRunningCondition(
 			resource.OpsRequest,
-			opsv1alpha1.ReasonReconfigurePersisted,
+			appsv1alpha1.ReasonReconfigurePersisted,
 			configSpec.Name,
 			formatConfigPatchToMessage(result.configPatch, nil))
 	}
 	return opsv1alpha1.NewReconfigureRunningCondition(
 		resource.OpsRequest,
-		opsv1alpha1.ReasonReconfigureNoChanged,
+		appsv1alpha1.ReasonReconfigureNoChanged,
 		configSpec.Name,
 		formatConfigPatchToMessage(result.configPatch, nil))
 }

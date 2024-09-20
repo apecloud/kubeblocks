@@ -165,13 +165,13 @@ spec:
                   StateEvaluationExpression is used to evaluate whether the primary object has reach its desired state
                   by applying the expression to the object tree.
                 properties:
-                  cueExpression:
+                  celExpression:
                     description: |-
-                      CueExpression specifies to use CUE to evaluation the object state.
+                      CELExpression specifies to use CEL to evaluation the object state.
                       The root object used in the expression is the primary object.
                     properties:
                       expression:
-                        description: Expression specifies the CUE expression.
+                        description: Expression specifies the CEL expression.
                         type: string
                     required:
                     - expression

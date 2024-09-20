@@ -213,13 +213,26 @@ spec:
                         LocalDescription is the localized version of Description by using the Locale specified in `spec.locale`.
                         Empty if the `spec.locale` is not specified.
                       type: string
+                    changeType:
+                      description: |-
+                        ChangeType specifies the change type.
+                        Event - specifies that this is a Kubernetes Event.
+                        ObjectCreation - specifies that this is an object creation.
+                        ObjectUpdate - specifies that this is an object update.
+                        ObjectDeletion - specifies that this is an object deletion.
+                      enum:
+                      - Event
+                      - ObjectCreation
+                      - ObjectUpdate
+                      - ObjectDeletion
+                      type: string
                     description:
                       description: Description describes the change in a user-friendly
                         way.
                       type: string
                     eventAttributes:
                       description: EventAttributes specifies the attributes of the
-                        event when Type is Event.
+                        event when ChangeType is Event.
                       properties:
                         reason:
                           description: Reason of the Event.
@@ -232,7 +245,7 @@ spec:
                       - type
                       type: object
                     objectReference:
-                      description: ObjectReference specifies the Object this plan
+                      description: ObjectReference specifies the Object this change
                         described.
                       properties:
                         apiVersion:
@@ -294,24 +307,11 @@ spec:
                         It is set to empty when used in ObjectReconciliationPlan.
                       format: date-time
                       type: string
-                    type:
-                      description: |-
-                        Type specifies the change type.
-                        Event - specifies that this is a Kubernetes Event.
-                        ObjectCreation - specifies that this is an object creation.
-                        ObjectUpdate - specifies that this is an object update.
-                        ObjectDeletion - specifies that this is an object deletion.
-                      enum:
-                      - Event
-                      - ObjectCreation
-                      - ObjectUpdate
-                      - ObjectDeletion
-                      type: string
                   required:
+                  - changeType
                   - description
                   - objectReference
                   - revision
-                  - type
                   type: object
                 type: array
               reason:

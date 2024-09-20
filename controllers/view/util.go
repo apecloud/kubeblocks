@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -41,6 +42,13 @@ func objectTypeToGVK(objectType *viewv1.ObjectType) (*schema.GroupVersionKind, e
 	}
 	gvk := gv.WithKind(objectType.Kind)
 	return &gvk, nil
+}
+
+func objectRefToType(objectRef *corev1.ObjectReference) *viewv1.ObjectType {
+	return &viewv1.ObjectType{
+		APIVersion: objectRef.APIVersion,
+		Kind:       objectRef.Kind,
+	}
 }
 
 func getObjectsByGVK(ctx context.Context, cli client.Reader, scheme *runtime.Scheme, gvk *schema.GroupVersionKind, opts ...client.ListOption) ([]client.Object, error) {

@@ -27,7 +27,7 @@ import (
 type ObjectStore interface {
 	Insert(object client.Object) error
 	Get(objKey *corev1.ObjectReference) client.Object
-	Delete(object client.Object)
+	Delete(objKey *corev1.ObjectReference)
 }
 
 type objectStore struct {
@@ -44,9 +44,10 @@ func (o *objectStore) Get(objKey *corev1.ObjectReference) client.Object {
 	panic("implement me")
 }
 
-func (o *objectStore) Delete(object client.Object) {
+func (o *objectStore) Delete(objKey *corev1.ObjectReference) {
 	//TODO implement me
 	panic("implement me")
+	// TODO(free6om): decrease reference counter as one object may in many views
 }
 
 func NewObjectStore() ObjectStore {

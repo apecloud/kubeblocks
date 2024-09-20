@@ -46,7 +46,7 @@ type ReconciliationViewSpec struct {
 	// StateEvaluationExpression overrides the value specified in ReconciliationViewDefinition.
 	//
 	// +optional
-	StateEvaluationExpression *string `json:"stateEvaluationExpression,omitempty"`
+	StateEvaluationExpression *StateEvaluationExpression `json:"stateEvaluationExpression,omitempty"`
 
 	// Locale specifies the locale to use when localizing the reconciliation view.
 	//
@@ -58,16 +58,16 @@ type ReconciliationViewSpec struct {
 type ReconciliationViewStatus struct {
 	// InitialObjectTree specifies the initial object tree.
 	//
-	InitialObjectTree ObjectTreeNode `json:"initialObjectTree"`
+	InitialObjectTree *ObjectTreeNode `json:"initialObjectTree"`
 
 	// DesiredObjectTree specifies the object tree if the spec.desiredSpec is applied.
 	//
-	DesiredObjectTree ObjectTreeNode `json:"desiredObjectTree"`
+	DesiredObjectTree *ObjectTreeNode `json:"desiredObjectTree"`
 
 	// CurrentObjectTree specifies the current object tree.
 	// Ideally, CurrentObjectTree should be same as applying changes in View to InitialObjectTree.
 	//
-	CurrentObjectTree ObjectTreeNode `json:"currentObjectTree"`
+	CurrentObjectTree *ObjectTreeNode `json:"currentObjectTree"`
 
 	// PlanSummary summarizes the desired state by comparing it to the initial state.
 	//

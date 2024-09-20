@@ -116,18 +116,18 @@ type FieldPath struct {
 
 // StateEvaluationExpression defines an object state evaluation expression.
 // Currently supported types:
-// CUE - CUE expression (https://cuelang.org/).
+// CEL - Common Expression Language (https://cel.dev/).
 type StateEvaluationExpression struct {
-	// CueExpression specifies to use CUE to evaluation the object state.
+	// CELExpression specifies to use CEL to evaluation the object state.
 	// The root object used in the expression is the primary object.
 	//
 	// +optional
-	CueExpression *CueExpression `json:"cueExpression,omitempty"`
+	CELExpression *CELExpression `json:"celExpression,omitempty"`
 }
 
-// CueExpression defines a CUE expression.
-type CueExpression struct {
-	// Expression specifies the CUE expression.
+// CELExpression defines a CEL expression.
+type CELExpression struct {
+	// Expression specifies the CEL expression.
 	//
 	Expression string `json:"expression"`
 }

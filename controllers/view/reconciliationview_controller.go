@@ -21,6 +21,7 @@ package view
 
 import (
 	"context"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -59,7 +60,7 @@ func (r *ReconciliationViewReconciler) Reconcile(ctx context.Context, req ctrl.R
 		Do(viewResourcesValidation(ctx, r.Client)).
 		Do(updateInformerManager(r.InformerManager)).
 		Do(viewCalculation(ctx, r.Client, r.Scheme, r.ObjectStore)).
-		//Do(stateEvaluation()).
+		Do(viewStateEvaluation(ctx, r.Client, r.ObjectStore)).
 		Commit()
 
 	// TODO(free6om): err handling

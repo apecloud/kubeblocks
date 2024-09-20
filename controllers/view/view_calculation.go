@@ -109,7 +109,7 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 	// build old object set from view.status.currentObjectTree
 	oldObjectMap := make(map[model.GVKNObjKey]client.Object)
 	oldObjectSet := sets.New[model.GVKNObjKey]()
-	oldObjects := c.getAllObjectsFrom(&view.Status.CurrentObjectTree)
+	oldObjects := c.getAllObjectsFrom(view.Status.CurrentObjectTree)
 	for _, obj := range oldObjects {
 		objKey, err := c.getGVKNObjKey(obj)
 		if err != nil {
@@ -150,6 +150,9 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 			return kubebuilderx.Commit, err
 		}
 	}
+
+	// update view.status.currentObjectTree
+	view.Status.CurrentObjectTree = getObjectTreeWithRevision(view, viewDef, c.store, parseRevision(root.ResourceVersion))
 
 	return kubebuilderx.Continue, nil
 }

@@ -23,8 +23,8 @@ import (
 	"container/list"
 	"context"
 	"fmt"
-	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
-	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"strings"
+
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -33,7 +33,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"strings"
+
+	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
 
 type ObjectTreeRootFinder interface {

@@ -27,6 +27,7 @@ import (
 	appsv1beta1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/apps/v1beta1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/extensions/v1alpha1"
+	operationsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/operations/v1alpha1"
 	workloadsv1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/workloads/v1"
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/workloads/v1alpha1"
 	discovery "k8s.io/client-go/discovery"
@@ -41,6 +42,7 @@ type Interface interface {
 	AppsV1() appsv1.AppsV1Interface
 	DataprotectionV1alpha1() dataprotectionv1alpha1.DataprotectionV1alpha1Interface
 	ExtensionsV1alpha1() extensionsv1alpha1.ExtensionsV1alpha1Interface
+	OperationsV1alpha1() operationsv1alpha1.OperationsV1alpha1Interface
 	WorkloadsV1alpha1() workloadsv1alpha1.WorkloadsV1alpha1Interface
 	WorkloadsV1() workloadsv1.WorkloadsV1Interface
 }
@@ -53,6 +55,7 @@ type Clientset struct {
 	appsV1                 *appsv1.AppsV1Client
 	dataprotectionV1alpha1 *dataprotectionv1alpha1.DataprotectionV1alpha1Client
 	extensionsV1alpha1     *extensionsv1alpha1.ExtensionsV1alpha1Client
+	operationsV1alpha1     *operationsv1alpha1.OperationsV1alpha1Client
 	workloadsV1alpha1      *workloadsv1alpha1.WorkloadsV1alpha1Client
 	workloadsV1            *workloadsv1.WorkloadsV1Client
 }
@@ -80,6 +83,11 @@ func (c *Clientset) DataprotectionV1alpha1() dataprotectionv1alpha1.Dataprotecti
 // ExtensionsV1alpha1 retrieves the ExtensionsV1alpha1Client
 func (c *Clientset) ExtensionsV1alpha1() extensionsv1alpha1.ExtensionsV1alpha1Interface {
 	return c.extensionsV1alpha1
+}
+
+// OperationsV1alpha1 retrieves the OperationsV1alpha1Client
+func (c *Clientset) OperationsV1alpha1() operationsv1alpha1.OperationsV1alpha1Interface {
+	return c.operationsV1alpha1
 }
 
 // WorkloadsV1alpha1 retrieves the WorkloadsV1alpha1Client
@@ -156,6 +164,10 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 	if err != nil {
 		return nil, err
 	}
+	cs.operationsV1alpha1, err = operationsv1alpha1.NewForConfigAndClient(&configShallowCopy, httpClient)
+	if err != nil {
+		return nil, err
+	}
 	cs.workloadsV1alpha1, err = workloadsv1alpha1.NewForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
 		return nil, err
@@ -190,6 +202,7 @@ func New(c rest.Interface) *Clientset {
 	cs.appsV1 = appsv1.New(c)
 	cs.dataprotectionV1alpha1 = dataprotectionv1alpha1.New(c)
 	cs.extensionsV1alpha1 = extensionsv1alpha1.New(c)
+	cs.operationsV1alpha1 = operationsv1alpha1.New(c)
 	cs.workloadsV1alpha1 = workloadsv1alpha1.New(c)
 	cs.workloadsV1 = workloadsv1.New(c)
 

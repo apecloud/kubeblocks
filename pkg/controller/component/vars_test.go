@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -50,41 +49,6 @@ var _ = Describe("vars", func() {
 
 	expp := func(exp string) *string {
 		return &exp
-	}
-
-	checkTemplateVars := func(templateVars map[string]any, targetVars []corev1.EnvVar) {
-		templateVarsMapping := make(map[string]corev1.EnvVar)
-		for k, v := range templateVars {
-			val := ""
-			if v != nil {
-				val = v.(string)
-			}
-			templateVarsMapping[k] = corev1.EnvVar{Name: k, Value: val}
-		}
-
-		vars := make([]corev1.EnvVar, 0)
-		for _, v := range targetVars {
-			if templateVar, ok := templateVarsMapping[v.Name]; ok {
-				vars = append(vars, templateVar)
-			}
-		}
-		Expect(vars).Should(BeEquivalentTo(targetVars))
-	}
-
-	// without the order check
-	checkEnvVars := func(envVars []corev1.EnvVar, targetEnvVars []corev1.EnvVar) {
-		targetEnvVarMapping := map[string]corev1.EnvVar{}
-		for i, env := range targetEnvVars {
-			targetEnvVarMapping[env.Name] = targetEnvVars[i]
-		}
-
-		envVarMapping := map[string]corev1.EnvVar{}
-		for i, env := range envVars {
-			if _, ok := targetEnvVarMapping[env.Name]; ok {
-				envVarMapping[env.Name] = envVars[i]
-			}
-		}
-		Expect(envVarMapping).Should(BeEquivalentTo(targetEnvVarMapping))
 	}
 
 	checkEnvVarNotExist := func(envVars []corev1.EnvVar, envName string) {
@@ -170,50 +134,6 @@ var _ = Describe("vars", func() {
 					},
 				},
 			}
-		})
-
-		It("default vars", func() {
-			templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, nil)
-			Expect(err).Should(Succeed())
-
-			By("check default template vars")
-			checkTemplateVars(templateVars, builtinTemplateVars(synthesizedComp, nil))
-
-			By("check default env vars")
-			targetEnvVars := builtinTemplateVars(synthesizedComp, nil)
-			targetEnvVars = append(targetEnvVars, buildDefaultEnvVars(synthesizedComp)...)
-			checkEnvVars(envVars, targetEnvVars)
-		})
-
-		It("TLS env vars", func() {
-			synthesizedComp.TLSConfig = &appsv1.TLSConfig{
-				Enable: true,
-			}
-			_, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, nil)
-			Expect(err).Should(Succeed())
-			checkEnvVars(envVars, buildEnv4TLS(synthesizedComp))
-		})
-
-		It("user-defined env vars", func() {
-			By("invalid")
-			annotations := map[string]string{
-				constant.ExtraEnvAnnotationKey: "invalid-json-format",
-			}
-			synthesizedComp.Annotations = annotations
-			_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, nil)
-			Expect(err).ShouldNot(Succeed())
-
-			By("ok")
-			data, _ := json.Marshal(map[string]string{
-				"user-defined-var": "user-defined-value",
-			})
-			annotations = map[string]string{
-				constant.ExtraEnvAnnotationKey: string(data),
-			}
-			synthesizedComp.Annotations = annotations
-			_, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, nil)
-			Expect(err).Should(Succeed())
-			checkEnvVars(envVars, []corev1.EnvVar{{Name: "user-defined-var", Value: "user-defined-value"}})
 		})
 
 		It("component-ref env vars", func() {})
@@ -2801,20 +2721,6 @@ var _ = Describe("vars", func() {
 				Expect(err).Should(Succeed())
 				Expect(templateVars).Should(HaveKeyWithValue("port", "012345"))
 				checkEnvVarWithValue(envVars, "port", "012345")
-			})
-
-			It("cluster domain", func() {
-				vars := []appsv1.EnvVar{
-					{
-						Name:       "headless",
-						Value:      "test-headless.default.svc",
-						Expression: expp("{{ printf \"%s.%s\" .headless .ClusterDomain }}"),
-					},
-				}
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, nil, synthesizedComp, vars)
-				Expect(err).Should(Succeed())
-				Expect(templateVars).Should(HaveKeyWithValue("headless", "test-headless.default.svc.cluster.local"))
-				checkEnvVarWithValue(envVars, "headless", "test-headless.default.svc.cluster.local")
 			})
 
 			It("condition exp", func() {

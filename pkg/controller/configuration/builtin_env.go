@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -33,6 +34,12 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+)
+
+const (
+	kbEnvClusterUIDPostfix8Deprecated = "KB_CLUSTER_UID_POSTFIX_8"
+	kbComponentEnvCMPlaceHolder       = "$(COMP_ENV_CM_NAME)"
+	kbToolsImagePlaceHolder           = "$(KUBEBLOCKS_TOOLS_IMAGE)"
 )
 
 type envBuildInFunc func(container interface{}, envName string) (string, error)
@@ -312,15 +319,19 @@ func fieldRefValue(podReference *corev1.ObjectFieldSelector, podSpec *corev1.Pod
 func getReplacementMapForBuiltInEnv(clusterName, clusterUID, componentName string) map[string]string {
 	cc := constant.GenerateClusterComponentName(clusterName, componentName)
 	replacementMap := map[string]string{
-		constant.EnvPlaceHolder(constant.KBEnvClusterName):     clusterName,
-		constant.EnvPlaceHolder(constant.KBEnvCompName):        componentName,
-		constant.EnvPlaceHolder(constant.KBEnvClusterCompName): cc,
-		constant.KBComponentEnvCMPlaceHolder:                   constant.GenerateClusterComponentEnvPattern(clusterName, componentName),
+		envPlaceHolder(constant.KBEnvClusterName):     clusterName,
+		envPlaceHolder(constant.KBEnvCompName):        componentName,
+		envPlaceHolder(constant.KBEnvClusterCompName): cc,
+		kbComponentEnvCMPlaceHolder:                   constant.GenerateClusterComponentEnvPattern(clusterName, componentName),
 	}
 	clusterUIDPostfix := clusterUID
 	if len(clusterUID) > 8 {
 		clusterUIDPostfix = clusterUID[len(clusterUID)-8:]
 	}
-	replacementMap[constant.EnvPlaceHolder(constant.KBEnvClusterUIDPostfix8Deprecated)] = clusterUIDPostfix
+	replacementMap[envPlaceHolder(kbEnvClusterUIDPostfix8Deprecated)] = clusterUIDPostfix
 	return replacementMap
+}
+
+func envPlaceHolder(env string) string {
+	return fmt.Sprintf("$(%s)", env)
 }

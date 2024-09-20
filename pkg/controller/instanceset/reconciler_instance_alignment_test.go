@@ -161,5 +161,26 @@ var _ = Describe("replicas alignment reconciler test", func() {
 				})).Should(BeNumerically(">=", 0))
 			}
 		})
+
+		It("handles nodeSelectorOnce Annotation", func() {
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(its)
+			name := "bar-1"
+			node := "test-1"
+			Expect(MergeNodeSelectorOnceAnnotation(its, map[string]string{name: node})).To(Succeed())
+
+			res, err := reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			pods := tree.List(&corev1.Pod{})
+			for _, obj := range pods {
+				pod := obj.(*corev1.Pod)
+				if pod.Name == name {
+					Expect(pod.Spec.NodeSelector).To(Equal(map[string]string{
+						corev1.LabelHostname: node,
+					}))
+				}
+			}
+		})
 	})
 })

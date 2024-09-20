@@ -33,9 +33,11 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -50,6 +52,7 @@ var _ = Describe("OpsUtil functions", func() {
 		randomStr            = testCtx.GetRandomStr()
 		compDefName          = "test-compdef-" + randomStr
 		clusterName          = "test-cluster-" + randomStr
+		targetNodeName       = "test-node-1"
 		rebuildInstanceCount = 2
 	)
 
@@ -70,6 +73,7 @@ var _ = Describe("OpsUtil functions", func() {
 		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.BackupSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.RestoreSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.InstanceSetSignature, inNS, ml)
 		// default GracePeriod is 30s
 		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
@@ -90,7 +94,8 @@ var _ = Describe("OpsUtil functions", func() {
 			var instances []appsv1alpha1.Instance
 			for _, insName := range instanceNames {
 				instances = append(instances, appsv1alpha1.Instance{
-					Name: insName,
+					Name:           insName,
+					TargetNodeName: targetNodeName,
 				})
 			}
 			ops.Spec.RebuildFrom = []appsv1alpha1.RebuildInstance{
@@ -258,6 +263,7 @@ var _ = Describe("OpsUtil functions", func() {
 		It("test rebuild instance with no backup", func() {
 			By("init operations resources ")
 			opsRes := prepareOpsRes("", true)
+			its := testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
 			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsRunningPhase
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 
@@ -299,8 +305,18 @@ var _ = Describe("OpsUtil functions", func() {
 			}))
 
 			By("expect to clean up the tmp pods")
-			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).NotTo(HaveOccurred())
 			Eventually(testapps.List(&testCtx, generics.PodSignature, matchingLabels, client.InNamespace(opsRes.OpsRequest.Namespace))).Should(HaveLen(0))
+
+			By("check its' schedule once annotation")
+			podPrefix := constant.GenerateWorkloadNamePattern(clusterName, defaultCompName)
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(its), func(g Gomega, its *workloads.InstanceSet) {
+				mapping, err := instanceset.ParseNodeSelectorOnceAnnotation(its)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(mapping).To(HaveKeyWithValue(podPrefix+"-0", targetNodeName))
+				g.Expect(mapping).To(HaveKeyWithValue(podPrefix+"-1", targetNodeName))
+			})).Should(Succeed())
 		})
 
 		testRebuildInstanceWithBackup := func(ignoreRoleCheck bool) {
@@ -326,6 +342,7 @@ var _ = Describe("OpsUtil functions", func() {
 				}
 			})).Should(Succeed())
 			opsRes := prepareOpsRes(backup.Name, true)
+			_ = testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
 			if ignoreRoleCheck {
 				Expect(testapps.ChangeObj(&testCtx, opsRes.OpsRequest, func(request *appsv1alpha1.OpsRequest) {
 					if request.Annotations == nil {
@@ -435,8 +452,16 @@ var _ = Describe("OpsUtil functions", func() {
 			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(opsRes.Cluster.Spec.GetComponentByName(defaultCompName).Replicas).Should(BeEquivalentTo(5))
 
-			By("mock the new pods to available")
+			By("its have expected nodeSelector")
 			podPrefix := constant.GenerateWorkloadNamePattern(clusterName, defaultCompName)
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(its), func(g Gomega, its *workloads.InstanceSet) {
+				mapping, err := instanceset.ParseNodeSelectorOnceAnnotation(its)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(mapping).To(HaveKeyWithValue(podPrefix+"-3", targetNodeName))
+				g.Expect(mapping).To(HaveKeyWithValue(podPrefix+"-4", targetNodeName))
+			})).Should(Succeed())
+
+			By("mock the new pods to available")
 			testapps.MockInstanceSetPod(&testCtx, nil, clusterName, defaultCompName, podPrefix+"-3", "follower", "Readonly")
 			testapps.MockInstanceSetPod(&testCtx, nil, clusterName, defaultCompName, podPrefix+"-4", "follower", "Readonly")
 

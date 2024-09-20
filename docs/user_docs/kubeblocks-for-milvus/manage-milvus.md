@@ -18,7 +18,7 @@ KubeBlocks supports the management of Milvus.
 
 - [Install kbcli](./../installation/install-with-kbcli/install-kbcli.md).
 - [Install KubeBlocks](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md).
-- [Install and enable the milvus addon](./../overview/supported-addons.md#use-addons).
+- [Install and enable the milvus addon](./../installation/install-with-kbcli/install-addons.md).
 
 ## Create a cluster
 

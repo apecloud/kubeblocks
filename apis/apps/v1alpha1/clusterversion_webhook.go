@@ -19,7 +19,6 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
-	"reflect"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -56,10 +55,10 @@ func (r *ClusterVersion) ValidateCreate() (admission.Warnings, error) {
 func (r *ClusterVersion) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	clusterversionlog.Info("validate update", "name", r.Name)
 	// determine whether r.spec content is modified
-	lastClusterVersion := old.(*ClusterVersion)
-	if !reflect.DeepEqual(lastClusterVersion.Spec, r.Spec) {
-		return nil, newInvalidError(ClusterVersionKind, r.Name, "", "ClusterVersion.spec is immutable, you can not update it.")
-	}
+	// lastClusterVersion := old.(*ClusterVersion)
+	// if !reflect.DeepEqual(lastClusterVersion.Spec, r.Spec) {
+	// 	return nil, newInvalidError(ClusterVersionKind, r.Name, "", "ClusterVersion.spec is immutable, you can not update it.")
+	// }
 	return nil, nil
 }
 

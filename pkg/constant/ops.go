@@ -28,6 +28,7 @@ const (
 
 // annotations
 const (
+	DisableHAAnnotationKey             = "operations.kubeblocks.io/disable-ha"
 	RelatedOpsAnnotationKey            = "operations.kubeblocks.io/related-ops"
-	OpsDependentOnSuccessfulOpsAnnoKey = "operations.kubeblocks.io/dependent-on-successful-ops"
+	OpsDependentOnSuccessfulOpsAnnoKey = "operations.kubeblocks.io/dependent-on-successful-ops" // OpsDependentOnSuccessfulOpsAnnoKey wait for the dependent ops to succeed before executing the current ops. If it fails, this ops will also fail.
 )

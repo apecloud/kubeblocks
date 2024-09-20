@@ -114,7 +114,7 @@ func (r *ComponentParameterReconciler) Reconcile(ctx context.Context, req ctrl.R
 	if fetcherTask.ClusterComObj == nil || fetcherTask.ComponentObj == nil {
 		return r.failWithInvalidComponent(config, reqCtx)
 	}
-	if err := r.runTasks(TaskContext{config, reqCtx, fetcherTask}, tasks); err != nil {
+	if err := r.runTasks(TaskContext{config, ctx, fetcherTask}, tasks); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to run configuration reconcile task.")
 	}
 	return intctrlutil.Reconciled()
@@ -150,20 +150,13 @@ func (r *ComponentParameterReconciler) runTasks(taskCtx TaskContext, tasks []Tas
 	var (
 		errs            []error
 		synthesizedComp *component.SynthesizedComponent
-
-		ctx           = taskCtx.reqCtx.Ctx
-		configuration = taskCtx.configuration
+		configuration   = taskCtx.configuration
 	)
 
-	if len(taskCtx.fetcher.ComponentObj.Spec.CompDef) == 0 {
-		// build synthesized component for generated component
-		synthesizedComp, err = component.BuildSynthesizedComponentWrapper(taskCtx.reqCtx, r.Client, taskCtx.fetcher.ClusterObj, taskCtx.fetcher.ClusterComObj)
-	} else {
-		// build synthesized component for native component
-		synthesizedComp, err = component.BuildSynthesizedComponent(taskCtx.reqCtx, r.Client, taskCtx.fetcher.ClusterObj, taskCtx.fetcher.ComponentDefObj, taskCtx.fetcher.ComponentObj)
-		if err == nil {
-			err = buildTemplateVars(taskCtx.reqCtx.Ctx, r.Client, taskCtx.fetcher.ComponentDefObj, synthesizedComp)
-		}
+	synthesizedComp, err = component.BuildSynthesizedComponent(taskCtx.ctx, r.Client,
+		taskCtx.fetcher.ComponentDefObj, taskCtx.fetcher.ComponentObj, taskCtx.fetcher.ClusterObj)
+	if err == nil {
+		err = buildTemplateVars(taskCtx.ctx, r.Client, taskCtx.fetcher.ComponentDefObj, synthesizedComp)
 	}
 	if err != nil {
 		return err
@@ -184,7 +177,7 @@ func (r *ComponentParameterReconciler) runTasks(taskCtx TaskContext, tasks []Tas
 		configuration.Status.Message = utilerrors.NewAggregate(errs).Error()
 	}
 	checkAndUpdatePhase(configuration)
-	if err := r.Client.Status().Patch(ctx, configuration, patch); err != nil {
+	if err := r.Client.Status().Patch(taskCtx.ctx, configuration, patch); err != nil {
 		errs = append(errs, err)
 	}
 	if len(errs) == 0 {

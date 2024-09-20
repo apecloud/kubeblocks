@@ -169,7 +169,7 @@ func (r restartOpsHandler) restartComponents(reqCtx intctrlutil.RequestCtx, cli 
 		}
 		for i := range instanceSetList.Items {
 			instanceSet := &instanceSetList.Items[i]
-			if r.isRestarted(opsRes, instanceSet, &instanceSet.Spec.Template, compOps.ComponentName) {
+			if r.isRestarted(opsRes, instanceSet, &instanceSet.Spec.Template) {
 				continue
 			}
 			if err := cli.Update(reqCtx.Ctx, instanceSet); err != nil {
@@ -224,7 +224,7 @@ func (r restartOpsHandler) getCompReplicas(cluster *appsv1alpha1.Cluster, compNa
 }
 
 // isRestarted checks whether the component has been restarted
-func (r restartOpsHandler) isRestarted(opsRes *OpsResource, object client.Object, podTemplate *corev1.PodTemplateSpec, componentName string) bool {
+func (r restartOpsHandler) isRestarted(opsRes *OpsResource, object client.Object, podTemplate *corev1.PodTemplateSpec) bool {
 	cName := object.GetLabels()[constant.KBAppComponentLabelKey]
 	shardingName := object.GetLabels()[constant.KBAppShardingNameLabelKey]
 	if shardingName != "" {

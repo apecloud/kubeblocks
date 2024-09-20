@@ -44,7 +44,7 @@ type EventReconciler struct {
 }
 
 // events API only allows ready-only, create, patch
-// +kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch;create;patch
+// +kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch;create;patch;update;
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.

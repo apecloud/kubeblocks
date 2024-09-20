@@ -44,6 +44,7 @@ import (
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
 
 var _ = Describe("OpsUtil functions", func() {
@@ -89,7 +90,7 @@ var _ = Describe("OpsUtil functions", func() {
 	Context("Test Rebuild-Instance opsRequest", func() {
 		createRebuildInstanceOps := func(backupName string, inPlace bool, instanceNames ...string) *opsv1alpha1.OpsRequest {
 			opsName := "rebuild-instance-" + testCtx.GetRandomStr()
-			ops := testapps.NewOpsRequestObj(opsName, testCtx.DefaultNamespace,
+			ops := testops.NewOpsRequestObj(opsName, testCtx.DefaultNamespace,
 				clusterName, opsv1alpha1.RebuildInstanceType)
 			var instances []opsv1alpha1.Instance
 			for _, insName := range instanceNames {
@@ -106,7 +107,7 @@ var _ = Describe("OpsUtil functions", func() {
 					InPlace:      inPlace,
 				},
 			}
-			opsRequest := testapps.CreateOpsRequest(ctx, testCtx, ops)
+			opsRequest := testops.CreateOpsRequest(ctx, testCtx, ops)
 			opsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
 			return opsRequest
 		}

@@ -32,6 +32,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
 
 var _ = Describe("", func() {
@@ -68,7 +69,7 @@ var _ = Describe("", func() {
 			opsRes, _, clusterObject := initOperationsResources(compDefName, clusterName)
 
 			By("create Expose opsRequest")
-			ops := testapps.NewOpsRequestObj("expose-expose-"+randomStr, testCtx.DefaultNamespace,
+			ops := testops.NewOpsRequestObj("expose-expose-"+randomStr, testCtx.DefaultNamespace,
 				clusterObject.Name, opsv1alpha1.ExposeType)
 			ops.Spec.ExposeList = []opsv1alpha1.Expose{
 				{
@@ -83,14 +84,14 @@ var _ = Describe("", func() {
 					},
 				},
 			}
-			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
 			// set ops phase to Pending
 			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
 
 			By("mock expose OpsRequest phase is Creating")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 
 			// do expose action
 			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
@@ -106,7 +107,7 @@ var _ = Describe("", func() {
 			opsRes, _, clusterObject := initOperationsResources(compDefName, clusterName)
 
 			By("create Expose opsRequest")
-			ops := testapps.NewOpsRequestObj("expose-expose-"+randomStr, testCtx.DefaultNamespace,
+			ops := testops.NewOpsRequestObj("expose-expose-"+randomStr, testCtx.DefaultNamespace,
 				clusterObject.Name, opsv1alpha1.ExposeType)
 			ops.Spec.ExposeList = []opsv1alpha1.Expose{
 				{
@@ -126,14 +127,14 @@ var _ = Describe("", func() {
 					},
 				},
 			}
-			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
 			// set ops phase to Pending
 			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
 
 			By("mock expose OpsRequest phase is Creating")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 
 			// do expose action
 			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)

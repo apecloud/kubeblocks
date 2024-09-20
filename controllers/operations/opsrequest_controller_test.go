@@ -39,6 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	opsutil "github.com/apecloud/kubeblocks/pkg/operations/util"
+	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -173,7 +174,7 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		By("send VerticalScalingOpsRequest successfully")
 		opsKey := types.NamespacedName{Name: opsName, Namespace: testCtx.DefaultNamespace}
-		verticalScalingOpsRequest := testapps.NewOpsRequestObj(opsKey.Name, opsKey.Namespace,
+		verticalScalingOpsRequest := testops.NewOpsRequestObj(opsKey.Name, opsKey.Namespace,
 			clusterObj.Name, opsv1alpha1.VerticalScalingType)
 		verticalScalingOpsRequest.Spec.VerticalScalingList = []opsv1alpha1.VerticalScaling{
 			{
@@ -184,7 +185,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		Expect(testCtx.CreateObj(testCtx.Ctx, verticalScalingOpsRequest)).Should(Succeed())
 
 		By("wait for VerticalScalingOpsRequest is running")
-		Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(opsv1alpha1.OpsRunningPhase))
+		Eventually(testops.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(opsv1alpha1.OpsRunningPhase))
 
 		By("check cluster & component phase as updating")
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1.UpdatingClusterPhase))
@@ -210,7 +211,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		})).ShouldNot(HaveOccurred())
 
 		By("check VerticalScalingOpsRequest succeed")
-		Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(opsv1alpha1.OpsSucceedPhase))
+		Eventually(testops.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(opsv1alpha1.OpsSucceedPhase))
 
 		By("check cluster resource requirements changed")
 		targetRequests := scalingCtx.target.Requests
@@ -368,7 +369,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		createClusterHscaleOps := func(replicas int32) *opsv1alpha1.OpsRequest {
 			By("create a opsRequest to horizontal scale")
 			opsName := "hscale-ops-" + testCtx.GetRandomStr()
-			ops := testapps.NewOpsRequestObj(opsName, testCtx.DefaultNamespace,
+			ops := testops.NewOpsRequestObj(opsName, testCtx.DefaultNamespace,
 				clusterObj.Name, opsv1alpha1.HorizontalScalingType)
 			ops.Spec.HorizontalScalingList = []opsv1alpha1.HorizontalScaling{
 				{
@@ -404,7 +405,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			opsKey := client.ObjectKeyFromObject(ops)
 
 			By("expect component is Running if don't support volume snapshot during doing h-scale ops")
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(opsv1alpha1.OpsRunningPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(opsv1alpha1.OpsRunningPhase))
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *appsv1.Cluster) {
 				// the cluster spec has been updated by ops-controller to scale out.
 				g.Expect(fetched.Generation == initGeneration+1).Should(BeTrue())
@@ -443,7 +444,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			opsKey := client.ObjectKeyFromObject(ops)
 
 			By("expect cluster and component is reconciling the new spec")
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(opsv1alpha1.OpsRunningPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(opsv1alpha1.OpsRunningPhase))
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
 				g.Expect(cluster.Generation == 2).Should(BeTrue())
 				g.Expect(cluster.Status.ObservedGeneration == 2).Should(BeTrue())
@@ -551,7 +552,7 @@ var _ = Describe("OpsRequest Controller", func() {
 				g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1.RunningClusterCompPhase))
 				g.Expect(cluster.Status.Phase).Should(Equal(appsv1.RunningClusterPhase))
 			})).Should(Succeed())
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(opsv1alpha1.OpsSucceedPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(opsv1alpha1.OpsSucceedPhase))
 		}
 		It("HorizontalScaling via volume snapshot backup", args)
 
@@ -623,7 +624,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			createMysqlCluster(3)
 			ops := createClusterHscaleOps(5)
 			opsKey := client.ObjectKeyFromObject(ops)
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(opsv1alpha1.OpsRunningPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(opsv1alpha1.OpsRunningPhase))
 
 			By("check if existing horizontalScaling opsRequest annotation in cluster")
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, tmlCluster *appsv1.Cluster) {
@@ -655,7 +656,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			By("create a horizontalScaling ops")
 			ops := createClusterHscaleOps(5)
 			opsKey := client.ObjectKeyFromObject(ops)
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(opsv1alpha1.OpsRunningPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(opsv1alpha1.OpsRunningPhase))
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1.UpdatingClusterPhase))
 
 			By("create one pod")
@@ -720,7 +721,7 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		createRestartOps := func(clusterName string, index int, force ...bool) *opsv1alpha1.OpsRequest {
 			opsName := fmt.Sprintf("restart-ops-%d", index)
-			ops := testapps.NewOpsRequestObj(opsName, testCtx.DefaultNamespace,
+			ops := testops.NewOpsRequestObj(opsName, testCtx.DefaultNamespace,
 				clusterName, opsv1alpha1.RestartType)
 			ops.Spec.RestartList = []opsv1alpha1.ComponentOps{
 				{ComponentName: mysqlCompName},
@@ -728,7 +729,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			if len(force) > 0 {
 				ops.Spec.Force = force[0]
 			}
-			return testapps.CreateOpsRequest(ctx, testCtx, ops)
+			return testops.CreateOpsRequest(ctx, testCtx, ops)
 		}
 
 		It("test opsRequest queue", func() {
@@ -740,7 +741,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			By("create first restart ops")
 			time.Sleep(time.Second)
 			ops1 := createRestartOps(clusterObj.Name, 1)
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).Should(Equal(opsv1alpha1.OpsRunningPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).Should(Equal(opsv1alpha1.OpsRunningPhase))
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1.UpdatingClusterPhase))
 
 			By("create second restart ops")
@@ -751,11 +752,11 @@ var _ = Describe("OpsRequest Controller", func() {
 				}
 				request.Annotations[constant.OpsDependentOnSuccessfulOpsAnnoKey] = ops1.Name
 			})).Should(Succeed())
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops2))).Should(Equal(opsv1alpha1.OpsPendingPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops2))).Should(Equal(opsv1alpha1.OpsPendingPhase))
 
 			By("create third restart ops")
 			ops3 := createRestartOps(clusterObj.Name, 3)
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops3))).Should(Equal(opsv1alpha1.OpsPendingPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops3))).Should(Equal(opsv1alpha1.OpsPendingPhase))
 
 			By("expect for all opsRequests in the queue")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterObj), func(g Gomega, cluster *appsv1.Cluster) {
@@ -769,13 +770,13 @@ var _ = Describe("OpsRequest Controller", func() {
 
 			By("mock ops1 phase to Succeed")
 			mockCompRunning(replicas, true)
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).Should(Equal(opsv1alpha1.OpsSucceedPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).Should(Equal(opsv1alpha1.OpsSucceedPhase))
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(ops2), func(g Gomega, opsRequest *opsv1alpha1.OpsRequest) {
 				g.Expect(opsRequest.Annotations[constant.ReconcileAnnotationKey]).ShouldNot(BeEmpty())
 			})).Should(Succeed())
 
 			By("expect for next ops is Running")
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops2))).Should(Equal(opsv1alpha1.OpsRunningPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops2))).Should(Equal(opsv1alpha1.OpsRunningPhase))
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterObj), func(g Gomega, cluster *appsv1.Cluster) {
 				// ops1 should be dequeue
 				opsSlice, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
@@ -796,16 +797,16 @@ var _ = Describe("OpsRequest Controller", func() {
 			By("create first restart ops")
 			time.Sleep(time.Second)
 			ops1 := createRestartOps(clusterObj.Name, 1)
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).Should(Equal(opsv1alpha1.OpsRunningPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).Should(Equal(opsv1alpha1.OpsRunningPhase))
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1.UpdatingClusterPhase))
 
 			By("create secondary restart ops")
 			ops2 := createRestartOps(clusterObj.Name, 2)
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops2))).Should(Equal(opsv1alpha1.OpsPendingPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops2))).Should(Equal(opsv1alpha1.OpsPendingPhase))
 
 			By("create third restart ops with force flag")
 			ops3 := createRestartOps(clusterObj.Name, 3, true)
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops3))).Should(Equal(opsv1alpha1.OpsRunningPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops3))).Should(Equal(opsv1alpha1.OpsRunningPhase))
 
 			By("expect for ops3 is running and ops1/ops is aborted")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterObj), func(g Gomega, cluster *appsv1.Cluster) {
@@ -814,12 +815,12 @@ var _ = Describe("OpsRequest Controller", func() {
 				g.Expect(opsSlice[0].InQueue).Should(BeFalse())
 			})).Should(Succeed())
 
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).Should(Equal(opsv1alpha1.OpsAbortedPhase))
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops2))).Should(Equal(opsv1alpha1.OpsAbortedPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).Should(Equal(opsv1alpha1.OpsAbortedPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops2))).Should(Equal(opsv1alpha1.OpsAbortedPhase))
 
 			By("mock component to running and expect op3 phase to Succeed")
 			mockCompRunning(replicas, true)
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops3))).Should(Equal(opsv1alpha1.OpsSucceedPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops3))).Should(Equal(opsv1alpha1.OpsSucceedPhase))
 		})
 
 		It("test opsRequest queue for QueueBySelf", func() {
@@ -831,11 +832,11 @@ var _ = Describe("OpsRequest Controller", func() {
 			By("create first restart ops")
 			time.Sleep(time.Second)
 			restartOps1 := createRestartOps(clusterObj.Name, 0)
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(restartOps1))).Should(Equal(opsv1alpha1.OpsRunningPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(restartOps1))).Should(Equal(opsv1alpha1.OpsRunningPhase))
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1.UpdatingClusterPhase))
 
 			createExposeOps := func(clusterName string, index int, exposeSwitch opsv1alpha1.ExposeSwitch) *opsv1alpha1.OpsRequest {
-				ops := testapps.NewOpsRequestObj(fmt.Sprintf("expose-ops-%d", index), testCtx.DefaultNamespace,
+				ops := testops.NewOpsRequestObj(fmt.Sprintf("expose-ops-%d", index), testCtx.DefaultNamespace,
 					clusterName, opsv1alpha1.ExposeType)
 				ops.Spec.ExposeList = []opsv1alpha1.Expose{
 					{
@@ -853,19 +854,19 @@ var _ = Describe("OpsRequest Controller", func() {
 						},
 					},
 				}
-				return testapps.CreateOpsRequest(ctx, testCtx, ops)
+				return testops.CreateOpsRequest(ctx, testCtx, ops)
 			}
 			By("create expose ops which needs to queue by self")
 			exposeOps1 := createExposeOps(clusterObj.Name, 1, opsv1alpha1.EnableExposeSwitch)
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(exposeOps1))).Should(Equal(opsv1alpha1.OpsRunningPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(exposeOps1))).Should(Equal(opsv1alpha1.OpsRunningPhase))
 
 			By("create secondary restart ops and expect it to Pending")
 			restartOps2 := createRestartOps(clusterObj.Name, 2)
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(restartOps2))).Should(Equal(opsv1alpha1.OpsPendingPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(restartOps2))).Should(Equal(opsv1alpha1.OpsPendingPhase))
 
 			By("create secondary expose ops and expect it to Pending")
 			exposeOps2 := createExposeOps(clusterObj.Name, 3, opsv1alpha1.DisableExposeSwitch)
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(exposeOps2))).Should(Equal(opsv1alpha1.OpsPendingPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(exposeOps2))).Should(Equal(opsv1alpha1.OpsPendingPhase))
 
 			By("check opsRequest queue")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterObj), func(g Gomega, cluster *appsv1.Cluster) {
@@ -883,17 +884,17 @@ var _ = Describe("OpsRequest Controller", func() {
 
 			By("mock component to running and expect restartOps1 phase to Succeed")
 			mockCompRunning(replicas, true)
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(restartOps1))).Should(Equal(opsv1alpha1.OpsSucceedPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(restartOps1))).Should(Equal(opsv1alpha1.OpsSucceedPhase))
 
 			By("mock loadBalance service is ready")
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKey{Name: fmt.Sprintf("%s-%s-svc1", clusterObj.Name, mysqlCompName), Namespace: testCtx.DefaultNamespace}, func(svc *corev1.Service) {
 				svc.Status.LoadBalancer.Ingress = []corev1.LoadBalancerIngress{{Hostname: "test", IP: "192.168.1.110"}}
 			})()).Should(Succeed())
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(exposeOps1))).Should(Equal(opsv1alpha1.OpsSucceedPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(exposeOps1))).Should(Equal(opsv1alpha1.OpsSucceedPhase))
 
 			By("expect restartOps2 to Running and exposeOps2 to Succeed")
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(restartOps2))).Should(Equal(opsv1alpha1.OpsRunningPhase))
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(exposeOps2))).Should(Equal(opsv1alpha1.OpsSucceedPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(restartOps2))).Should(Equal(opsv1alpha1.OpsRunningPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(exposeOps2))).Should(Equal(opsv1alpha1.OpsSucceedPhase))
 		})
 
 		It("test opsRequest timeout", func() {
@@ -903,7 +904,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			mockCompRunning(replicas, false)
 
 			By("create a opsRequest and specified the timeoutSeconds to 1")
-			ops := testapps.NewOpsRequestObj("restart-ops-1", testCtx.DefaultNamespace,
+			ops := testops.NewOpsRequestObj("restart-ops-1", testCtx.DefaultNamespace,
 				clusterObj.Name, opsv1alpha1.HorizontalScalingType)
 			ops.Spec.TimeoutSeconds = pointer.Int32(1)
 			ops.Spec.HorizontalScalingList = []opsv1alpha1.HorizontalScaling{
@@ -912,19 +913,19 @@ var _ = Describe("OpsRequest Controller", func() {
 					ScaleOut:     &opsv1alpha1.ScaleOut{ReplicaChanger: opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)}},
 				},
 			}
-			testapps.CreateOpsRequest(ctx, testCtx, ops)
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops))).Should(Equal(opsv1alpha1.OpsRunningPhase))
+			testops.CreateOpsRequest(ctx, testCtx, ops)
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops))).Should(Equal(opsv1alpha1.OpsRunningPhase))
 
 			By("create a next opsRequest")
 			ops1 := createRestartOps(clusterObj.Name, 2, true)
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).Should(Equal(opsv1alpha1.OpsPendingPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).Should(Equal(opsv1alpha1.OpsPendingPhase))
 
 			By("mock timeout")
 			time.Sleep(time.Second)
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops))).Should(Equal(opsv1alpha1.OpsAbortedPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops))).Should(Equal(opsv1alpha1.OpsAbortedPhase))
 
 			By("expect for the next ops is running")
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).ShouldNot(Equal(opsv1alpha1.OpsPendingPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).ShouldNot(Equal(opsv1alpha1.OpsPendingPhase))
 		})
 	})
 })

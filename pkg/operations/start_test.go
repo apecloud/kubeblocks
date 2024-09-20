@@ -31,6 +31,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	opsutil "github.com/apecloud/kubeblocks/pkg/operations/util"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
 
 var _ = Describe("Start OpsRequest", func() {
@@ -69,9 +70,9 @@ var _ = Describe("Start OpsRequest", func() {
 			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
 			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
 			By("create Start opsRequest")
-			ops := testapps.NewOpsRequestObj("start-ops-"+randomStr, testCtx.DefaultNamespace,
+			ops := testops.NewOpsRequestObj("start-ops-"+randomStr, testCtx.DefaultNamespace,
 				clusterName, opsv1alpha1.StartType)
-			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
 
 			By("test start action and reconcile function")
 			Expect(opsutil.UpdateClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())
@@ -84,7 +85,7 @@ var _ = Describe("Start OpsRequest", func() {
 			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 			// do start action
 			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())

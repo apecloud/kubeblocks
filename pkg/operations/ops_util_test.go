@@ -38,6 +38,7 @@ import (
 	opsutil "github.com/apecloud/kubeblocks/pkg/operations/util"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
 
 var _ = Describe("OpsUtil functions", func() {
@@ -96,10 +97,10 @@ var _ = Describe("OpsUtil functions", func() {
 			pods := testapps.MockInstanceSetPods(&testCtx, nil, opsRes.Cluster, defaultCompName)
 			time.Sleep(time.Second)
 			By("Test the functions in ops_util.go")
-			ops := testapps.NewOpsRequestObj("restart-ops-"+randomStr, testCtx.DefaultNamespace,
+			ops := testops.NewOpsRequestObj("restart-ops-"+randomStr, testCtx.DefaultNamespace,
 				clusterName, opsv1alpha1.RestartType)
 			ops.Spec.RestartList = []opsv1alpha1.ComponentOps{{ComponentName: defaultCompName}}
-			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
 			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
 			opsRes.OpsRequest.Status.StartTimestamp = metav1.Now()
 
@@ -145,10 +146,10 @@ var _ = Describe("OpsUtil functions", func() {
 			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
 
 			By("Test the functions in ops_util.go")
-			ops := testapps.NewOpsRequestObj("restart-ops-"+randomStr, testCtx.DefaultNamespace,
+			ops := testops.NewOpsRequestObj("restart-ops-"+randomStr, testCtx.DefaultNamespace,
 				clusterName, opsv1alpha1.RestartType)
 			ops.Spec.RestartList = []opsv1alpha1.ComponentOps{{ComponentName: defaultCompName}}
-			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
 			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.OpsRequest, func() {
 				opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsCreatingPhase
 				opsRes.OpsRequest.Status.StartTimestamp = metav1.Time{Time: time.Now()}
@@ -185,7 +186,7 @@ var _ = Describe("OpsUtil functions", func() {
 			_ = testapps.MockInstanceSetPods(&testCtx, its, opsRes.Cluster, defaultCompName)
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsSucceedPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsSucceedPhase))
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(haConfig), func(g Gomega, cm *corev1.ConfigMap) {
 				cm.Annotations["enable"] = "true"
 			})).Should(Succeed())
@@ -299,7 +300,7 @@ var _ = Describe("OpsUtil functions", func() {
 			ops2.Status.Phase = opsv1alpha1.OpsPendingPhase
 			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops2))).Should(Equal(opsv1alpha1.OpsCancelledPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops2))).Should(Equal(opsv1alpha1.OpsCancelledPhase))
 		})
 
 		It("Test EnqueueOnForce=true", func() {
@@ -319,7 +320,7 @@ var _ = Describe("OpsUtil functions", func() {
 			})
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
 
 			By("Test EnqueueOnForce=true")
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, opsv1alpha1.HorizontalScaling{
@@ -331,7 +332,7 @@ var _ = Describe("OpsUtil functions", func() {
 			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
 			By("expect the ops phase is Creating")
 			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 		})
 	})
 })

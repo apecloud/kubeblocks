@@ -30,6 +30,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
 
 var _ = Describe("Backup OpsRequest", func() {
@@ -82,7 +83,7 @@ var _ = Describe("Backup OpsRequest", func() {
 			By("mock backup OpsRequest is Running")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 
 			By("test backup action and reconcile function")
 			bHandler := BackupOpsHandler{}
@@ -117,13 +118,13 @@ var _ = Describe("Backup OpsRequest", func() {
 			By("expect ops phase to Failed")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
 		})
 	})
 })
 
 func createBackupOpsObj(clusterName, backupOpsName string) *opsv1alpha1.OpsRequest {
-	ops := testapps.NewOpsRequestObj(backupOpsName, testCtx.DefaultNamespace,
+	ops := testops.NewOpsRequestObj(backupOpsName, testCtx.DefaultNamespace,
 		clusterName, opsv1alpha1.BackupType)
-	return testapps.CreateOpsRequest(ctx, testCtx, ops)
+	return testops.CreateOpsRequest(ctx, testCtx, ops)
 }

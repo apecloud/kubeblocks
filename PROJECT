@@ -283,6 +283,7 @@ resources:
     crdVersion: v1
     namespaced: true
   domain: kubeblocks.io
+  controller: true
   group: operations
   kind: OpsRequest
   path: github.com/apecloud/kubeblocks/apis/operations/v1alpha1

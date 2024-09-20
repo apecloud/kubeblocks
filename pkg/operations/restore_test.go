@@ -38,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
+	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
 
 var _ = Describe("Restore OpsRequest", func() {
@@ -104,7 +105,7 @@ var _ = Describe("Restore OpsRequest", func() {
 			By("mock restore OpsRequest is Running")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 
 			By("test restore action")
 			restoreHandler := RestoreOpsHandler{}
@@ -164,7 +165,7 @@ var _ = Describe("Restore OpsRequest", func() {
 			By("mock restore OpsRequest is Running")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 
 			By("test restore action")
 			restoreHandler := RestoreOpsHandler{}
@@ -199,5 +200,5 @@ func createRestoreOpsObj(clusterName, restoreOpsName, backupName string) *opsv1a
 			},
 		},
 	}
-	return testapps.CreateOpsRequest(ctx, testCtx, ops)
+	return testops.CreateOpsRequest(ctx, testCtx, ops)
 }

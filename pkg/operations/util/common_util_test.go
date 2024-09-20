@@ -30,6 +30,7 @@ import (
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/constant"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
 
 var _ = Describe("OpsRequest Controller", func() {
@@ -63,12 +64,12 @@ var _ = Describe("OpsRequest Controller", func() {
 			cluster := testapps.CreateDefaultMysqlCluster(&testCtx, clusterName, compDefName, defaultCompName)
 			By("init restart OpsRequest")
 			testOpsName := "restart-" + randomStr
-			ops := testapps.NewOpsRequestObj(testOpsName, testCtx.DefaultNamespace,
+			ops := testops.NewOpsRequestObj(testOpsName, testCtx.DefaultNamespace,
 				clusterName, opsv1alpha1.RestartType)
 			ops.Spec.RestartList = []opsv1alpha1.ComponentOps{
 				{ComponentName: defaultCompName},
 			}
-			testapps.CreateOpsRequest(ctx, testCtx, ops)
+			testops.CreateOpsRequest(ctx, testCtx, ops)
 
 			By("test PatchOpsRequestReconcileAnnotation function")
 			Expect(PatchOpsRequestReconcileAnnotation(ctx, k8sClient, cluster.Namespace, testOpsName)).Should(Succeed())

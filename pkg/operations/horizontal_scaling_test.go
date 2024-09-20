@@ -40,6 +40,7 @@ import (
 	opsutil "github.com/apecloud/kubeblocks/pkg/operations/util"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
 
 var _ = Describe("HorizontalScaling OpsRequest", func() {
@@ -106,7 +107,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			By("expect for opsRequest phase is Creating after doing action")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 
 			By("check for the replicas of consensus component after doing action again when opsRequest phase is Creating")
 			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
@@ -473,7 +474,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			By("expect for opsRequest phase is Creating after doing action")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 
 			By("do Action")
 			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
@@ -495,7 +496,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 					OnlineInstancesToOffline: []string{offlineInsName},
 				},
 			})
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
 			conditions := opsRes.OpsRequest.Status.Conditions
 			Expect(conditions[len(conditions)-1].Message).Should(ContainSubstring(
 				fmt.Sprintf(`instance "%s" specified in onlineInstancesToOffline is not online`, offlineInsName)))
@@ -526,7 +527,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 					OnlineInstancesToOffline: []string{offlineInsName},
 				},
 			})
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
 			conditions := opsRes.OpsRequest.Status.Conditions
 			Expect(conditions[len(conditions)-1].Message).Should(ContainSubstring(fmt.Sprintf(`instance "%s" cannot be taken offline as it has been created by another running opsRequest`, offlineInsName)))
 
@@ -534,7 +535,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			_ = createOpsAndToCreatingPhase(reqCtx, opsRes, opsv1alpha1.HorizontalScaling{
 				ScaleIn: &opsv1alpha1.ScaleIn{ReplicaChanger: opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)}},
 			})
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
 			conditions = opsRes.OpsRequest.Status.Conditions
 			Expect(conditions[len(conditions)-1].Message).Should(ContainSubstring(`cannot be taken offline as it has been created by another running opsRequest`))
 
@@ -543,15 +544,15 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			ops3 := createOpsAndToCreatingPhase(reqCtx, opsRes, opsv1alpha1.HorizontalScaling{
 				Replicas: pointer.Int32(3),
 			})
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).Should(Equal(opsv1alpha1.OpsAbortedPhase))
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops2))).Should(Equal(opsv1alpha1.OpsAbortedPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).Should(Equal(opsv1alpha1.OpsAbortedPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops2))).Should(Equal(opsv1alpha1.OpsAbortedPhase))
 
 			By("create a opsRequest with `scaleOut` field and expect to abort last running ops")
 			// if running opsRequest exists an overwrite replicas operation for a component or instanceTemplate, need to abort.
 			createOpsAndToCreatingPhase(reqCtx, opsRes, opsv1alpha1.HorizontalScaling{
 				ScaleOut: &opsv1alpha1.ScaleOut{ReplicaChanger: opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)}},
 			})
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops3))).Should(Equal(opsv1alpha1.OpsAbortedPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops3))).Should(Equal(opsv1alpha1.OpsAbortedPhase))
 			Expect(opsRes.Cluster.Spec.GetComponentByName(defaultCompName).Replicas).Should(BeEquivalentTo(4))
 		})
 	})
@@ -559,12 +560,12 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 
 func createHorizontalScaling(clusterName string, horizontalScaling opsv1alpha1.HorizontalScaling) *opsv1alpha1.OpsRequest {
 	horizontalOpsName := "horizontal-scaling-ops-" + testCtx.GetRandomStr()
-	ops := testapps.NewOpsRequestObj(horizontalOpsName, testCtx.DefaultNamespace,
+	ops := testops.NewOpsRequestObj(horizontalOpsName, testCtx.DefaultNamespace,
 		clusterName, opsv1alpha1.HorizontalScalingType)
 	ops.Spec.HorizontalScalingList = []opsv1alpha1.HorizontalScaling{
 		horizontalScaling,
 	}
-	opsRequest := testapps.CreateOpsRequest(ctx, testCtx, ops)
+	opsRequest := testops.CreateOpsRequest(ctx, testCtx, ops)
 	opsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
 	return opsRequest
 }

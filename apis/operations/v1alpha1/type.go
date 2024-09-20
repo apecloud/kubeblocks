@@ -17,7 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 // PodSelectionPolicy pod selection strategy.
@@ -116,8 +116,8 @@ const (
 )
 
 type OpsRequestBehaviour struct {
-	FromClusterPhases []kbappsv1.ClusterPhase
-	ToClusterPhase    kbappsv1.ClusterPhase
+	FromClusterPhases []appsv1.ClusterPhase
+	ToClusterPhase    appsv1.ClusterPhase
 }
 
 type OpsRecorder struct {

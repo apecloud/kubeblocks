@@ -32,6 +32,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
 
 var _ = Describe("Upgrade OpsRequest", func() {
@@ -73,7 +74,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 		By("mock upgrade OpsRequest phase is Running")
 		_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 		Expect(err).ShouldNot(HaveOccurred())
-		Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+		Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 		// do upgrade
 		_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 		Expect(err).ShouldNot(HaveOccurred())
@@ -192,10 +193,10 @@ var _ = Describe("Upgrade OpsRequest", func() {
 	}
 
 	createUpgradeOpsRequest := func(clusterObject *appsv1.Cluster, upgradeSpec opsv1alpha1.Upgrade) *opsv1alpha1.OpsRequest {
-		ops := testapps.NewOpsRequestObj("upgrade-ops-"+randomStr, testCtx.DefaultNamespace,
+		ops := testops.NewOpsRequestObj("upgrade-ops-"+randomStr, testCtx.DefaultNamespace,
 			clusterObject.Name, opsv1alpha1.UpgradeType)
 		ops.Spec.Upgrade = &upgradeSpec
-		opsRequest := testapps.CreateOpsRequest(ctx, testCtx, ops)
+		opsRequest := testops.CreateOpsRequest(ctx, testCtx, ops)
 		// set ops phase to Pending
 		opsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
 		return opsRequest
@@ -206,7 +207,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 		mockComponentIsOperating(opsRes.Cluster, appsv1.RunningClusterCompPhase, compNames...)
 		_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 		Expect(err).ShouldNot(HaveOccurred())
-		Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsSucceedPhase))
+		Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsSucceedPhase))
 	}
 
 	mockPodsAppliedImage := func(cluster *appsv1.Cluster, releaseVersion string) {

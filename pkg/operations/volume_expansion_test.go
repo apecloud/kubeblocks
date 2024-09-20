@@ -39,6 +39,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
 
 var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
@@ -97,7 +98,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 
 		}
 		currRandomStr := testCtx.GetRandomStr()
-		ops := testapps.NewOpsRequestObj("volumeexpansion-ops-"+currRandomStr, testCtx.DefaultNamespace,
+		ops := testops.NewOpsRequestObj("volumeexpansion-ops-"+currRandomStr, testCtx.DefaultNamespace,
 			clusterObject.Name, opsv1alpha1.VolumeExpansionType)
 		ops.Spec.VolumeExpansionList = []opsv1alpha1.VolumeExpansion{
 			{
@@ -113,7 +114,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		opsRes.OpsRequest = ops
 
 		// create opsRequest
-		ops = testapps.CreateOpsRequest(ctx, testCtx, ops)
+		ops = testops.CreateOpsRequest(ctx, testCtx, ops)
 		return ops, pvcNames
 	}
 

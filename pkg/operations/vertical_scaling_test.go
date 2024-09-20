@@ -38,6 +38,7 @@ import (
 	opsutil "github.com/apecloud/kubeblocks/pkg/operations/util"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
 
 var _ = Describe("VerticalScaling OpsRequest", func() {
@@ -77,18 +78,18 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
 
 			By("create VerticalScaling ops")
-			ops := testapps.NewOpsRequestObj("vertical-scaling-ops-"+randomStr, testCtx.DefaultNamespace,
+			ops := testops.NewOpsRequestObj("vertical-scaling-ops-"+randomStr, testCtx.DefaultNamespace,
 				clusterName, opsv1alpha1.VerticalScalingType)
 
 			ops.Spec.VerticalScalingList = verticalScaling
-			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
 			// set ops phase to Pending
 			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
 
 			By("test save last configuration and OpsRequest phase is Running")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 
 			By("test vertical scale action function")
 			vsHandler := verticalScalingHandler{}
@@ -124,7 +125,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			podList := initInstanceSetPods(ctx, k8sClient, opsRes)
 
 			By("create VerticalScaling ops")
-			ops := testapps.NewOpsRequestObj("vertical-scaling-ops-"+randomStr, testCtx.DefaultNamespace,
+			ops := testops.NewOpsRequestObj("vertical-scaling-ops-"+randomStr, testCtx.DefaultNamespace,
 				clusterName, opsv1alpha1.VerticalScalingType)
 			ops.Spec.VerticalScalingList = []opsv1alpha1.VerticalScaling{
 				{
@@ -137,7 +138,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 					},
 				},
 			}
-			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
 
 			By("mock opsRequest is Running")
 			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingClusterCompPhase, defaultCompName)
@@ -213,7 +214,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			})).Should(Succeed())
 
 			By("create the second opsRequest with force flag")
-			ops := testapps.NewOpsRequestObj("vertical-scaling-ops-1-"+randomStr, testCtx.DefaultNamespace,
+			ops := testops.NewOpsRequestObj("vertical-scaling-ops-1-"+randomStr, testCtx.DefaultNamespace,
 				clusterName, opsv1alpha1.VerticalScalingType)
 			ops.Spec.Force = true
 			ops.Spec.VerticalScalingList = []opsv1alpha1.VerticalScaling{
@@ -231,14 +232,14 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 					},
 				},
 			}
-			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
 			// set ops phase to Pending
 			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
 
 			By("mock the first reconcile and expect the opsPhase to Creating")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 
 			By("mock the next reconcile")
 			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
@@ -248,7 +249,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			})).Should(Succeed())
 
 			By("the first operations request is expected to be aborted.")
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(firstOpsRequest))).Should(Equal(opsv1alpha1.OpsAbortedPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(firstOpsRequest))).Should(Equal(opsv1alpha1.OpsAbortedPhase))
 			opsRequestSlice, _ := opsutil.GetOpsRequestSliceFromCluster(opsRes.Cluster)
 			Expect(len(opsRequestSlice)).Should(Equal(1))
 		})

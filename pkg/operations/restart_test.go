@@ -31,6 +31,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
 
 var _ = Describe("Restart OpsRequest", func() {
@@ -83,7 +84,7 @@ var _ = Describe("Restart OpsRequest", func() {
 			By("mock restart OpsRequest is Running")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 
 			By("test restart action and reconcile function")
 			rHandler := restartOpsHandler{}
@@ -113,12 +114,12 @@ var _ = Describe("Restart OpsRequest", func() {
 })
 
 func createRestartOpsObj(clusterName, restartOpsName string) *opsv1alpha1.OpsRequest {
-	ops := testapps.NewOpsRequestObj(restartOpsName, testCtx.DefaultNamespace,
+	ops := testops.NewOpsRequestObj(restartOpsName, testCtx.DefaultNamespace,
 		clusterName, opsv1alpha1.RestartType)
 	ops.Spec.RestartList = []opsv1alpha1.ComponentOps{
 		{ComponentName: defaultCompName},
 	}
-	opsRequest := testapps.CreateOpsRequest(ctx, testCtx, ops)
+	opsRequest := testops.CreateOpsRequest(ctx, testCtx, ops)
 	opsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
 	return opsRequest
 }

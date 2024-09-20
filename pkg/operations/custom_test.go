@@ -34,6 +34,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
 
 var _ = Describe("CustomOps", func() {
@@ -76,7 +77,7 @@ var _ = Describe("CustomOps", func() {
 
 	createCustomOps := func(comp string, params []opsv1alpha1.Parameter) *opsv1alpha1.OpsRequest {
 		opsName := "custom-ops-" + testCtx.GetRandomStr()
-		ops := testapps.NewOpsRequestObj(opsName, testCtx.DefaultNamespace,
+		ops := testops.NewOpsRequestObj(opsName, testCtx.DefaultNamespace,
 			cluster.Name, opsv1alpha1.CustomType)
 		ops.Spec.CustomOps = &opsv1alpha1.CustomOps{
 			OpsDefinitionName: opsDef.Name,

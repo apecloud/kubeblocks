@@ -187,7 +187,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			}
 
 			By("mock reconfigure success")
-			ops := testapps.NewOpsRequestObj("reconfigure-ops-"+randomStr, testCtx.DefaultNamespace,
+			ops := testops.NewOpsRequestObj("reconfigure-ops-"+randomStr, testCtx.DefaultNamespace,
 				clusterName, opsv1alpha1.ReconfiguringType)
 			ops.Spec.Reconfigure = &opsv1alpha1.Reconfigure{
 				Configurations: []opsv1alpha1.ConfigurationItem{{
@@ -282,7 +282,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			}
 
 			By("mock reconfigure success")
-			ops := testapps.NewOpsRequestObj("reconfigure-ops-"+randomStr+"-reload", testCtx.DefaultNamespace,
+			ops := testops.NewOpsRequestObj("reconfigure-ops-"+randomStr+"-reload", testCtx.DefaultNamespace,
 				clusterName, opsv1alpha1.ReconfiguringType)
 			ops.Spec.Reconfigure = &opsv1alpha1.Reconfigure{
 				Configurations: []opsv1alpha1.ConfigurationItem{{
@@ -310,7 +310,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
 			_, err := opsManager.Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 			// do reconfigure
 			_, err = opsManager.Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())

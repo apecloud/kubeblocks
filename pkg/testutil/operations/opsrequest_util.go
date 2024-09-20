@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package apps
+package operations
 
 import (
 	"context"
@@ -30,6 +30,7 @@ import (
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/testutil"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
 // NewOpsRequestObj only generates the OpsRequest Object, instead of actually creating this resource.
@@ -54,7 +55,7 @@ func NewOpsRequestObj(opsRequestName, namespace, clusterName string, opsType ops
 func CreateOpsRequest(ctx context.Context, testCtx testutil.TestContext, opsRequest *opsv1alpha1.OpsRequest) *opsv1alpha1.OpsRequest {
 	gomega.Expect(testCtx.CreateObj(ctx, opsRequest)).Should(gomega.Succeed())
 	// wait until cluster created
-	gomega.Eventually(CheckObjExists(&testCtx, client.ObjectKeyFromObject(opsRequest), opsRequest, true)).Should(gomega.Succeed())
+	gomega.Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(opsRequest), opsRequest, true)).Should(gomega.Succeed())
 	return opsRequest
 }
 

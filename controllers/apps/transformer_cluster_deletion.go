@@ -37,7 +37,6 @@ import (
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	opssv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -158,7 +157,6 @@ func kindsForHalt() ([]client.ObjectList, []client.ObjectList) {
 	namespacedKinds, nonNamespacedKinds := kindsForDoNotTerminate()
 	namespacedKindsPlus := []client.ObjectList{
 		&kbappsv1.ComponentList{},
-		&opssv1alpha1.OpsRequestList{},
 		&appsv1.StatefulSetList{},           // be compatible with 0.6 workloads.
 		&policyv1.PodDisruptionBudgetList{}, // be compatible with 0.6 workloads.
 		&corev1.ServiceList{},

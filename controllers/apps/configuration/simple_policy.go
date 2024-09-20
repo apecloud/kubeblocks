@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	opssv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 )
 
@@ -56,12 +56,12 @@ func restartAndCheckComponent(param reconfigureParams, funcs RollingUpgradeFuncs
 
 	recordEvent := func(obj client.Object) {
 		param.Ctx.Recorder.Eventf(obj,
-			corev1.EventTypeNormal, opssv1alpha1.ReasonReconfigureRestart,
+			corev1.EventTypeNormal, opsv1alpha1.ReasonReconfigureRestart,
 			"restarting component[%s] in cluster[%s], version: %s", param.ClusterComponent.Name, param.Cluster.Name, newVersion)
 	}
 	if obj, err := funcs.RestartComponent(param.Client, param.Ctx, configKey, newVersion, objs, recordEvent); err != nil {
 		param.Ctx.Recorder.Eventf(obj,
-			corev1.EventTypeWarning, opssv1alpha1.ReasonReconfigureRestartFailed,
+			corev1.EventTypeWarning, opsv1alpha1.ReasonReconfigureRestartFailed,
 			"failed to  restart component[%s] in cluster[%s], version: %s", client.ObjectKeyFromObject(obj), param.Cluster.Name, newVersion)
 		return makeReturnedStatus(ESFailedAndRetry), err
 	}

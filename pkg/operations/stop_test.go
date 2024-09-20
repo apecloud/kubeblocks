@@ -29,6 +29,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
 
 var _ = Describe("Stop OpsRequest", func() {
@@ -66,9 +67,9 @@ var _ = Describe("Stop OpsRequest", func() {
 			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
 			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
 			By("create Stop opsRequest")
-			ops := testapps.NewOpsRequestObj("stop-ops-"+randomStr, testCtx.DefaultNamespace,
+			ops := testops.NewOpsRequestObj("stop-ops-"+randomStr, testCtx.DefaultNamespace,
 				clusterName, opsv1alpha1.StopType)
-			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
 			// set ops phase to Pending
 			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
 
@@ -76,7 +77,7 @@ var _ = Describe("Stop OpsRequest", func() {
 			// update ops phase to running first
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 			// do stop cluster
 			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())

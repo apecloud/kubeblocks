@@ -39,6 +39,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
 
 var _ = Describe("Reconfigure util test", func() {
@@ -164,7 +165,7 @@ var _ = Describe("Reconfigure util test", func() {
 
 			opsRes := &OpsResource{
 				Recorder: k8sManager.GetEventRecorderFor("Reconfiguring"),
-				OpsRequest: testapps.NewOpsRequestObj("reconfigure-ops-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace, //nolint:goconst
+				OpsRequest: testops.NewOpsRequestObj("reconfigure-ops-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace, //nolint:goconst
 					clusterName, opsv1alpha1.ReconfiguringType),
 			}
 			reqCtx := intctrlutil.RequestCtx{

@@ -39,7 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	opssv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -128,7 +128,7 @@ func (r *ReconfigureReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			config.Labels[constant.CMConfigurationSpecProviderLabelKey], resources.componentName))
 		reqCtx.Recorder.Event(config,
 			corev1.EventTypeWarning,
-			opssv1alpha1.ReasonReconfigureFailed,
+			opsv1alpha1.ReasonReconfigureFailed,
 			configurationNotRelatedComponentMessage)
 		return updateConfigPhase(r.Client, reqCtx, config, appsv1alpha1.CFinishedPhase, configurationNotRelatedComponentMessage)
 	}
@@ -173,7 +173,7 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 
 	// No parameters updated
 	if configPatch != nil && !configPatch.IsModify {
-		reqCtx.Recorder.Event(configMap, corev1.EventTypeNormal, opssv1alpha1.ReasonReconfigureRunning, "nothing changed, skip reconfigure")
+		reqCtx.Recorder.Event(configMap, corev1.EventTypeNormal, opsv1alpha1.ReasonReconfigureRunning, "nothing changed, skip reconfigure")
 		return r.updateConfigCMStatus(reqCtx, configMap, core.ReconfigureNoChangeType, nil)
 	}
 
@@ -208,7 +208,7 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 	}
 
 	if len(reconcileContext.InstanceSetList) == 0 {
-		reqCtx.Recorder.Event(configMap, corev1.EventTypeWarning, opssv1alpha1.ReasonReconfigureFailed,
+		reqCtx.Recorder.Event(configMap, corev1.EventTypeWarning, opsv1alpha1.ReasonReconfigureFailed,
 			"the configmap is not used by any container, skip reconfigure")
 		return updateConfigPhase(r.Client, reqCtx, configMap, appsv1alpha1.CFinishedPhase, configurationNotUsingMessage)
 	}
@@ -290,7 +290,7 @@ func (r *ReconfigureReconciler) performUpgrade(params reconfigureParams) (ctrl.R
 		params.Ctx.Recorder.Eventf(
 			params.ConfigMap,
 			corev1.EventTypeNormal,
-			opssv1alpha1.ReasonReconfigureSucceed,
+			opsv1alpha1.ReasonReconfigureSucceed,
 			"the reconfigure[%s] request[%s] has been processed successfully",
 			policy.GetPolicyName(),
 			getOpsRequestID(params.ConfigMap))

@@ -36,6 +36,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
 
 var _ = Describe("", func() {
@@ -163,7 +164,7 @@ var _ = Describe("", func() {
 			opsRes.Cluster = clusterObj
 
 			By("create switchover opsRequest")
-			ops := testapps.NewOpsRequestObj("ops-switchover-"+randomStr, testCtx.DefaultNamespace,
+			ops := testops.NewOpsRequestObj("ops-switchover-"+randomStr, testCtx.DefaultNamespace,
 				clusterObj.Name, opsv1alpha1.SwitchoverType)
 			ops.Spec.SwitchoverList = []opsv1alpha1.Switchover{
 				{
@@ -171,14 +172,14 @@ var _ = Describe("", func() {
 					InstanceName: fmt.Sprintf("%s-%s-%d", clusterObj.Name, defaultCompName, 1),
 				},
 			}
-			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
 			// set ops phase to Pending
 			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
 
 			By("mock switchover OpsRequest phase is Creating")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 
 			// do switchover action
 			By("do switchover action")

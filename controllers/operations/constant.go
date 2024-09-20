@@ -21,8 +21,7 @@ package operations
 
 const (
 	// name of our custom finalizer
-	clusterDefinitionFinalizerName = "clusterdefinition.kubeblocks.io/finalizer"
-	opsDefinitionFinalizerName     = "opsdefinition.kubeblocks.io/finalizer"
+	opsDefinitionFinalizerName = "opsdefinition.kubeblocks.io/finalizer"
 )
 
 const (

@@ -607,7 +607,7 @@ These templates are used to dynamically provision persistent volumes for the Com
 </td>
 <td>
 <em>(Optional)</em>
-<p>Overrides Services defined in referenced ComponentDefinition.</p>
+<p>Overrides Services defined in referenced ComponentDefinition and exposes endpoints that can be accessed by clients.</p>
 </td>
 </tr>
 <tr>
@@ -5031,7 +5031,7 @@ These templates are used to dynamically provision persistent volumes for the Com
 </td>
 <td>
 <em>(Optional)</em>
-<p>Overrides Services defined in referenced ComponentDefinition.</p>
+<p>Overrides Services defined in referenced ComponentDefinition and exposes endpoints that can be accessed by clients.</p>
 </td>
 </tr>
 <tr>

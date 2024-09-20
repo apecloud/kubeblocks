@@ -4974,7 +4974,8 @@ spec:
                 maxLength: 32
                 type: string
               services:
-                description: Overrides Services defined in referenced ComponentDefinition.
+                description: Overrides Services defined in referenced ComponentDefinition
+                  and exposes endpoints that can be accessed by clients.
                 items:
                   description: |-
                     ComponentService defines a service that would be exposed as an inter-component service within a Cluster.

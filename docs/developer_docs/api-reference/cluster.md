@@ -607,7 +607,7 @@ These templates are used to dynamically provision persistent volumes for the Com
 </td>
 <td>
 <em>(Optional)</em>
-<p>Overrides Services defined in referenced ComponentDefinition.</p>
+<p>Overrides Services defined in referenced ComponentDefinition and exposes endpoints that can be accessed by clients.</p>
 </td>
 </tr>
 <tr>
@@ -1747,6 +1747,20 @@ CredentialVar
 <td>
 <em>(Optional)</em>
 <p>Specifies the port of the external service.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podFQDNs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.CredentialVar">
+CredentialVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the pod FQDNs of the external service.</p>
 </td>
 </tr>
 <tr>
@@ -5031,7 +5045,7 @@ These templates are used to dynamically provision persistent volumes for the Com
 </td>
 <td>
 <em>(Optional)</em>
-<p>Overrides Services defined in referenced ComponentDefinition.</p>
+<p>Overrides Services defined in referenced ComponentDefinition and exposes endpoints that can be accessed by clients.</p>
 </td>
 </tr>
 <tr>
@@ -8593,6 +8607,20 @@ CredentialVar
 </tr>
 <tr>
 <td>
+<code>podFQDNs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.CredentialVar">
+CredentialVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the pod FQDNs of the external service.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>auth</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.ConnectionCredentialAuth">
@@ -8810,6 +8838,19 @@ ServiceRefServiceSelector
 </tr>
 <tr>
 <td>
+<code>podFQDNs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ServiceRefPodFQDNsSelector">
+ServiceRefPodFQDNsSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
 <code>credential</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.ServiceRefCredentialSelector">
@@ -8979,6 +9020,46 @@ For instance, <code>^8.0.8$</code>, <code>8.0.\d&#123;1,2&#125;$</code>, <code>^
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.ServiceRefPodFQDNsSelector">ServiceRefPodFQDNsSelector
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ServiceRefClusterSelector">ServiceRefClusterSelector</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>component</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The name of the Component where the pods reside in.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>role</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The role of the pods to reference.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.ServiceRefServiceSelector">ServiceRefServiceSelector
 </h3>
 <p>
@@ -9132,6 +9213,19 @@ VarOption
 <tr>
 <td>
 <code>port</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>podFQDNs</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.VarOption">
 VarOption
@@ -22214,7 +22308,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>The instance will rebuild on the specified node when the instance uses local PersistentVolume as the storage disk.
+<p>The instance will rebuild on the specified node.
 If not set, it will rebuild on a random node.</p>
 </td>
 </tr>
@@ -27010,6 +27104,20 @@ Supported time formats:</p>
 <li>RFC3339 format, e.g. &ldquo;2023-11-25T18:52:53Z&rdquo;</li>
 <li>A human-readable date-time format, e.g. &ldquo;Jul 25,2023 18:52:53 UTC+0800&rdquo;</li>
 </ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>env</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a list of environment variables to be set in the container.</p>
 </td>
 </tr>
 <tr>

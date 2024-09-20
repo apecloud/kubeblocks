@@ -154,6 +154,9 @@ type ServiceRefClusterSelector struct {
 	// +optional
 	Service *ServiceRefServiceSelector `json:"service,omitempty"`
 
+	// +optional
+	PodFQDNs *ServiceRefPodFQDNsSelector `json:"podFQDNs,omitempty"`
+
 	// Specifies the SystemAccount to authenticate and establish a connection with the referenced Cluster.
 	// The SystemAccount should be defined in `componentDefinition.spec.systemAccounts`
 	// of the Component providing the service in the referenced Cluster.
@@ -189,6 +192,18 @@ type ServiceRefServiceSelector struct {
 	//
 	// +optional
 	Port string `json:"port,omitempty"`
+}
+
+type ServiceRefPodFQDNsSelector struct {
+	// The name of the Component where the pods reside in.
+	//
+	// +kubebuilder:validation:Required
+	Component string `json:"component"`
+
+	// The role of the pods to reference.
+	//
+	// +optional
+	Role *string `json:"role,omitempty"`
 }
 
 type ServiceRefCredentialSelector struct {

@@ -293,7 +293,7 @@ type Instance struct {
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// The instance will rebuild on the specified node when the instance uses local PersistentVolume as the storage disk.
+	// The instance will rebuild on the specified node.
 	// If not set, it will rebuild on a random node.
 	// +optional
 	TargetNodeName string `json:"targetNodeName,omitempty"`
@@ -930,6 +930,12 @@ type Restore struct {
 	// - A human-readable date-time format, e.g. "Jul 25,2023 18:52:53 UTC+0800"
 	//
 	RestorePointInTime string `json:"restorePointInTime,omitempty"`
+
+	// Specifies a list of environment variables to be set in the container.
+	//
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +optional
+	Env []corev1.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 
 	// Specifies the policy for restoring volume claims of a Component's Pods.
 	// It determines whether the volume claims should be restored sequentially (one by one) or in parallel (all at once).

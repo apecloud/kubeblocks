@@ -706,6 +706,9 @@ type ServiceRefVars struct {
 	// +optional
 	Port *VarOption `json:"port,omitempty"`
 
+	// +optional
+	PodFQDNs *VarOption `json:"podFQDNs,omitempty"`
+
 	CredentialVars `json:",inline"`
 }
 

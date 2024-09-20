@@ -17,7 +17,7 @@ After deploying KubeBlocks, you can use it to create various databases such as M
 - [MongoDB](./../kubeblocks-for-mongodb/cluster-management/create-and-connect-to-a-mongodb-cluster.md)
 - [Kafka](./../kubeblocks-for-kafka/cluster-management/create-a-kafka-cluster.md)
 - [Pulsar](./../kubeblocks-for-pulsar/cluster-management/create-pulsar-cluster-on-kubeblocks.md)
-- RabbitMQ
+- [RabbitMQ](./../kubeblocks-for-rabbitmq/manage-rabbitmq.md)
 - [Elasticsearch](./../kubeblocks-for-elasticsearch/manage-elasticsearch.md)
 - [StarRocks](./../kubeblocks-for-starrocks/manage-starrocks.md)
 - [Milvus](./../kubeblocks-for-milvus/manage-milvus.md)

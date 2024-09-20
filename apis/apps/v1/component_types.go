@@ -149,7 +149,7 @@ type ComponentSpec struct {
 	// +optional
 	Volumes []corev1.Volume `json:"volumes,omitempty"`
 
-	// Overrides Services defined in referenced ComponentDefinition.
+	// Overrides Services defined in referenced ComponentDefinition and exposes endpoints that can be accessed by clients.
 	//
 	// +optional
 	Services []ComponentService `json:"services,omitempty"`

@@ -20,7 +20,7 @@ KubeBlock Playground supports the following built-in monitoring addons:
 * `alertmanager-webhook-adaptor`: it includes the notification extension addon and is used to extend the notification capability of AlertManager. Currently, the custom bots of Feishu, DingTalk, and Wechat Enterprise are supported.
 * `apecloud-otel-collector`: it is used to collect the indicators of databases and the host machine.
 
-1. View all built-in addons and make sure the monitoring addons are enabled. If the monitoring addons are not enabled, [enable these addons](./../overview/supported-addons.md#use-addons) first.
+1. View all built-in addons and make sure the monitoring addons are enabled. If the monitoring addons are not enabled, [enable these addons](./../installation/install-with-kbcli/install-addons.md) first.
 
    ```bash
    # View all addons supported

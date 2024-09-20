@@ -4895,6 +4895,18 @@ spec:
                           - component
                           - name
                           type: object
+                        podFQDNs:
+                          properties:
+                            component:
+                              description: The name of the Component where the pods
+                                reside in.
+                              type: string
+                            role:
+                              description: The role of the pods to reference.
+                              type: string
+                          required:
+                          - component
+                          type: object
                         service:
                           description: Identifies a ClusterService from the list of
                             Services defined in `cluster.spec.services` of the referenced
@@ -4974,7 +4986,8 @@ spec:
                 maxLength: 32
                 type: string
               services:
-                description: Overrides Services defined in referenced ComponentDefinition.
+                description: Overrides Services defined in referenced ComponentDefinition
+                  and exposes endpoints that can be accessed by clients.
                 items:
                   description: |-
                     ComponentService defines a service that would be exposed as an inter-component service within a Cluster.

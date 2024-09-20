@@ -1461,6 +1461,20 @@ var _ = Describe("vars", func() {
 						},
 					},
 					{
+						Name: "serviceref-fqdn",
+						ValueFrom: &appsv1.VarSource{
+							ServiceRefVarRef: &appsv1.ServiceRefVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
+									Name:     "serviceref",
+									Optional: required(),
+								},
+								ServiceRefVars: appsv1.ServiceRefVars{
+									PodFQDNs: &appsv1.VarRequired,
+								},
+							},
+						},
+					},
+					{
 						Name: "serviceref-username",
 						ValueFrom: &appsv1.VarSource{
 							ServiceRefVarRef: &appsv1.ServiceRefVarSelector{
@@ -1511,6 +1525,9 @@ var _ = Describe("vars", func() {
 							Port: &appsv1.CredentialVar{
 								Value: "port",
 							},
+							PodFQDNs: &appsv1.CredentialVar{
+								Value: "fqdn",
+							},
 							Auth: &appsv1.ConnectionCredentialAuth{
 								Username: &appsv1.CredentialVar{
 									Value: "username",
@@ -1527,11 +1544,13 @@ var _ = Describe("vars", func() {
 				Expect(templateVars).Should(HaveKeyWithValue("serviceref-endpoint", "endpoint"))
 				Expect(templateVars).Should(HaveKeyWithValue("serviceref-host", "host"))
 				Expect(templateVars).Should(HaveKeyWithValue("serviceref-port", "port"))
+				Expect(templateVars).Should(HaveKeyWithValue("serviceref-fqdn", "fqdn"))
 				Expect(templateVars).ShouldNot(HaveKey("serviceref-username"))
 				Expect(templateVars).ShouldNot(HaveKey("serviceref-password"))
 				checkEnvVarWithValue(envVars, "serviceref-endpoint", "endpoint")
 				checkEnvVarWithValue(envVars, "serviceref-host", "host")
 				checkEnvVarWithValue(envVars, "serviceref-port", "port")
+				checkEnvVarWithValue(envVars, "serviceref-fqdn", "fqdn")
 				checkEnvVarWithValue(envVars, "serviceref-username", "username")
 				checkEnvVarWithValue(envVars, "serviceref-password", "password")
 			})

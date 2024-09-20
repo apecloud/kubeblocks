@@ -58,6 +58,11 @@ func (builder *ServiceDescriptorBuilder) SetPort(port appsv1.CredentialVar) *Ser
 	return builder
 }
 
+func (builder *ServiceDescriptorBuilder) SetPodFQDNs(podFQDNs appsv1.CredentialVar) *ServiceDescriptorBuilder {
+	builder.get().Spec.PodFQDNs = &podFQDNs
+	return builder
+}
+
 func (builder *ServiceDescriptorBuilder) SetAuth(auth appsv1.ConnectionCredentialAuth) *ServiceDescriptorBuilder {
 	builder.get().Spec.Auth = &auth
 	return builder

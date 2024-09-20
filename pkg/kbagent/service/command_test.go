@@ -46,7 +46,7 @@ var _ = Describe("command", func() {
 		return err
 	}
 
-	Context("runCommandX", func() {
+	PContext("runCommandX", func() {
 		It("simple", func() {
 			action := &proto.ExecAction{
 				Commands: []string{"/bin/bash", "-c", "echo -n simple"},
@@ -184,7 +184,7 @@ var _ = Describe("command", func() {
 		})
 	})
 
-	Context("runCommandNonBlocking", func() {
+	PContext("runCommandNonBlocking", func() {
 		It("ok", func() {
 			action := &proto.ExecAction{
 				Commands: []string{"/bin/bash", "-c", "echo -n ok"},
@@ -245,7 +245,7 @@ var _ = Describe("command", func() {
 		})
 	})
 
-	Context("runCommand", func() {
+	PContext("runCommand", func() {
 		It("ok", func() {
 			action := &proto.ExecAction{
 				Commands: []string{"/bin/bash", "-c", "echo -n ok"},

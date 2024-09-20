@@ -32,8 +32,8 @@ type Payload struct {
 	Data map[string]any `json:"-"`
 }
 
-// ConfigTemplateItemDetail corresponds to settings of a configuration template (a ConfigMap).
-type ConfigTemplateItemDetail struct {
+// ConfigurationItemDetail corresponds to settings of a configuration template (a ConfigMap).
+type ConfigurationItemDetail struct {
 	// Defines the unique identifier of the configuration template.
 	//
 	// It must be a string of maximum 63 characters, and can only include lowercase alphanumeric characters,
@@ -72,7 +72,7 @@ type ConfigTemplateItemDetail struct {
 	// This allows users to customize the configuration template according to their specific requirements.
 	//
 	// +optional
-	UserConfigTemplates *ConfigTemplateExtension `json:"userConfigTemplates,omitempty"`
+	ImportTemplateRef *ConfigTemplateExtension `json:"importTemplateRef,omitempty"`
 
 	// Specifies the user-defined configuration parameters.
 	//
@@ -100,13 +100,13 @@ type ConfigurationSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
 	ComponentName string `json:"componentName"`
 
-	// ConfigItemDetails is an array of ConfigTemplateItemDetail objects.
+	// ConfigItemDetails is an array of ConfigurationItemDetail objects.
 	//
-	// Each ConfigTemplateItemDetail corresponds to a configuration template,
+	// Each ConfigurationItemDetail corresponds to a configuration template,
 	// which is a ConfigMap that contains multiple configuration files.
 	// Each configuration file is stored as a key-value pair within the ConfigMap.
 	//
-	// The ConfigTemplateItemDetail includes information such as:
+	// The ConfigurationItemDetail includes information such as:
 	//
 	// - The configuration template (a ConfigMap)
 	// - The corresponding ConfigConstraint (constraints and validation rules for the configuration)
@@ -117,7 +117,7 @@ type ConfigurationSpec struct {
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=name
-	ConfigItemDetails []ConfigTemplateItemDetail `json:"configItemDetails,omitempty"`
+	ConfigItemDetails []ConfigurationItemDetail `json:"configItemDetails,omitempty"`
 }
 
 type ReconcileDetail struct {
@@ -154,7 +154,7 @@ type ReconcileDetail struct {
 	ErrMessage string `json:"errMessage,omitempty"`
 }
 
-type ConfigTemplateItemDetailStatus struct {
+type ConfigurationItemDetailStatus struct {
 	// Specifies the name of the configuration template. It is a required field and must be a string of maximum 63 characters.
 	// The name should only contain lowercase alphanumeric characters, hyphens, or periods. It should start and end with an alphanumeric character.
 	//
@@ -206,14 +206,6 @@ type ConfigurationStatus struct {
 	// +optional
 	Message string `json:"message,omitempty"`
 
-	// Indicates the current status of the configuration item.
-	//
-	// Possible values include "Creating", "Init", "Running", "Pending", "Merged", "MergeFailed", "FailedAndPause",
-	// "Upgrading", "Deleting", "FailedAndRetry", "Finished".
-	//
-	// +optional
-	Phase ConfigurationPhase `json:"phase,omitempty"`
-
 	// Represents the latest generation observed for this
 	// ClusterDefinition. It corresponds to the ConfigConstraint's generation, which is
 	// updated by the API Server.
@@ -233,7 +225,7 @@ type ConfigurationStatus struct {
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=name
-	ConfigurationItemStatus []ConfigTemplateItemDetailStatus `json:"configurationStatus"`
+	ConfigurationItemStatus []ConfigurationItemDetailStatus `json:"configurationStatus"`
 }
 
 // +genclient

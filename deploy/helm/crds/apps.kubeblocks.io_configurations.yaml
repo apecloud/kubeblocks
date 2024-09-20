@@ -77,22 +77,22 @@ spec:
                   rule: self == oldSelf
               configItemDetails:
                 description: |-
-                  ConfigItemDetails is an array of ConfigTemplateItemDetail objects.
+                  ConfigItemDetails is an array of ConfigurationItemDetail objects.
 
 
-                  Each ConfigTemplateItemDetail corresponds to a configuration template,
+                  Each ConfigurationItemDetail corresponds to a configuration template,
                   which is a ConfigMap that contains multiple configuration files.
                   Each configuration file is stored as a key-value pair within the ConfigMap.
 
 
-                  The ConfigTemplateItemDetail includes information such as:
+                  The ConfigurationItemDetail includes information such as:
 
 
                   - The configuration template (a ConfigMap)
                   - The corresponding ConfigConstraint (constraints and validation rules for the configuration)
                   - Volume mounts (for mounting the configuration files)
                 items:
-                  description: ConfigTemplateItemDetail corresponds to settings of
+                  description: ConfigurationItemDetail corresponds to settings of
                     a configuration template (a ConfigMap).
                   properties:
                     configFileParams:
@@ -156,60 +156,6 @@ spec:
                           description: Whether to store the final rendered parameters
                             as a secret.
                           type: boolean
-                        componentConfigDescriptions:
-                          description: |-
-                            Specifies the configuration files within the ConfigMap that support dynamic updates and parametersSchema.
-
-
-                            A configuration template (provided in the form of a ConfigMap) may contain templates for multiple
-                            configuration files.
-                            Some of these configuration files may support dynamic modification and reloading without requiring
-                            a pod restart.
-
-
-                            If empty, all configuration files in the ConfigMap do not support parameter update, but they can be modified directly through configmap.
-                          items:
-                            properties:
-                              name:
-                                description: |-
-                                  Defines the unique identifier of the config file name.
-
-
-                                  It must be a string of maximum 63 characters, and can only include lowercase alphanumeric characters,
-                                  hyphens, and periods.
-                                  The name must start and end with an alphanumeric character.
-                                maxLength: 63
-                                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                                type: string
-                              reRenderResourceTypes:
-                                description: |-
-                                  Specifies whether the configuration needs to be re-rendered after v-scale or h-scale operations to reflect changes.
-
-
-                                  In some scenarios, the configuration may need to be updated to reflect the changes in resource allocation
-                                  or cluster topology. Examples:
-
-
-                                  - Redis: adjust maxmemory after v-scale operation.
-                                  - MySQL: increase max connections after v-scale operation.
-                                  - Zookeeper: update zoo.cfg with new node addresses after h-scale operation.
-                                items:
-                                  description: RerenderResourceType defines the resource
-                                    requirements for a component.
-                                  enum:
-                                  - vscale
-                                  - hscale
-                                  - tls
-                                  type: string
-                                type: array
-                                x-kubernetes-list-type: set
-                            required:
-                            - name
-                            type: object
-                          type: array
-                          x-kubernetes-list-map-keys:
-                          - name
-                          x-kubernetes-list-type: map
                         constraintRef:
                           description: |-
                             Deprecated: configConstraint has been deprecated since 1.0.0
@@ -257,8 +203,6 @@ spec:
                           x-kubernetes-list-type: set
                         keys:
                           description: |-
-                            Deprecated: keys has been deprecated since 1.0.0
-                            Use `componentConfigDescriptions` instead.
                             Specifies the configuration files within the ConfigMap that support dynamic updates.
 
 
@@ -307,11 +251,6 @@ spec:
                               - patch
                               - replace
                               - none
-                              type: string
-                            templateName:
-                              description: Specifies the name of the referenced configuration
-                                template ConfigMap object.
-                              pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                               type: string
                             templateRef:
                               description: |-
@@ -375,27 +314,7 @@ spec:
                       required:
                       - name
                       type: object
-                    name:
-                      description: |-
-                        Defines the unique identifier of the configuration template.
-
-
-                        It must be a string of maximum 63 characters, and can only include lowercase alphanumeric characters,
-                        hyphens, and periods.
-                        The name must start and end with an alphanumeric character.
-                      maxLength: 63
-                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                      type: string
-                    payload:
-                      description: |-
-                        External controllers can trigger a configuration rerender by modifying this field.
-
-
-                        Note: Currently, the `payload` field is opaque and its content is not interpreted by the system.
-                        Modifying this field will cause a rerender, regardless of the specific content of this field.
-                      type: object
-                      x-kubernetes-preserve-unknown-fields: true
-                    userConfigTemplates:
+                    importTemplateRef:
                       description: |-
                         Specifies the user-defined configuration template.
 
@@ -420,11 +339,6 @@ spec:
                           - replace
                           - none
                           type: string
-                        templateName:
-                          description: Specifies the name of the referenced configuration
-                            template ConfigMap object.
-                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                          type: string
                         templateRef:
                           description: |-
                             Deprecated: Use `templateName` instead.
@@ -434,6 +348,26 @@ spec:
                       required:
                       - templateRef
                       type: object
+                    name:
+                      description: |-
+                        Defines the unique identifier of the configuration template.
+
+
+                        It must be a string of maximum 63 characters, and can only include lowercase alphanumeric characters,
+                        hyphens, and periods.
+                        The name must start and end with an alphanumeric character.
+                      maxLength: 63
+                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                      type: string
+                    payload:
+                      description: |-
+                        External controllers can trigger a configuration rerender by modifying this field.
+
+
+                        Note: Currently, the `payload` field is opaque and its content is not interpreted by the system.
+                        Modifying this field will cause a rerender, regardless of the specific content of this field.
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
                   required:
                   - name
                   type: object
@@ -612,26 +546,6 @@ spec:
                   updated by the API Server.
                 format: int64
                 type: integer
-              phase:
-                description: |-
-                  Indicates the current status of the configuration item.
-
-
-                  Possible values include "Creating", "Init", "Running", "Pending", "Merged", "MergeFailed", "FailedAndPause",
-                  "Upgrading", "Deleting", "FailedAndRetry", "Finished".
-                enum:
-                - Creating
-                - Init
-                - Running
-                - Pending
-                - Merged
-                - MergeFailed
-                - FailedAndPause
-                - Upgrading
-                - Deleting
-                - FailedAndRetry
-                - Finished
-                type: string
             required:
             - configurationStatus
             type: object

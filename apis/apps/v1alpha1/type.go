@@ -94,12 +94,6 @@ type ConfigTemplateExtension struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	TemplateRef string `json:"templateRef"`
 
-	// Specifies the name of the referenced configuration template ConfigMap object.
-	//
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	// +optional
-	TemplateName string `json:"templateName,omitempty"`
-
 	// Specifies the namespace of the referenced configuration template ConfigMap object.
 	// An empty namespace is equivalent to the "default" namespace.
 	//
@@ -122,55 +116,9 @@ type LegacyRenderedTemplateSpec struct {
 	ConfigTemplateExtension `json:",inline"`
 }
 
-type ComponentParameters map[string]*string
-
-type ComponentConfigDescription struct {
-	// Defines the unique identifier of the config file name.
-	//
-	// It must be a string of maximum 63 characters, and can only include lowercase alphanumeric characters,
-	// hyphens, and periods.
-	// The name must start and end with an alphanumeric character.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	Name string `json:"name"`
-
-	// Specifies whether the configuration needs to be re-rendered after v-scale or h-scale operations to reflect changes.
-	//
-	// In some scenarios, the configuration may need to be updated to reflect the changes in resource allocation
-	// or cluster topology. Examples:
-	//
-	// - Redis: adjust maxmemory after v-scale operation.
-	// - MySQL: increase max connections after v-scale operation.
-	// - Zookeeper: update zoo.cfg with new node addresses after h-scale operation.
-	//
-	// +listType=set
-	// +optional
-	ReRenderResourceTypes []RerenderResourceType `json:"reRenderResourceTypes,omitempty"`
-}
-
 type ComponentConfigSpec struct {
 	ComponentTemplateSpec `json:",inline"`
 
-	// Specifies the configuration files within the ConfigMap that support dynamic updates and parametersSchema.
-	//
-	// A configuration template (provided in the form of a ConfigMap) may contain templates for multiple
-	// configuration files.
-	// Some of these configuration files may support dynamic modification and reloading without requiring
-	// a pod restart.
-	//
-	// If empty, all configuration files in the ConfigMap do not support parameter update, but they can be modified directly through configmap.
-	//
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
-	// +optional
-	ComponentConfigDescriptions []ComponentConfigDescription `json:"componentConfigDescriptions,omitempty"`
-
-	// Deprecated: keys has been deprecated since 1.0.0
-	// Use `componentConfigDescriptions` instead.
 	// Specifies the configuration files within the ConfigMap that support dynamic updates.
 	//
 	// A configuration template (provided in the form of a ConfigMap) may contain templates for multiple

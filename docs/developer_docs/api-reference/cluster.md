@@ -11249,37 +11249,6 @@ bool
 If set, all the computing resources will be released.</p>
 </td>
 </tr>
-<tr>
-<td>
-<code>userConfigTemplates</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ConfigTemplateExtension">
-map[string]github.com/apecloud/kubeblocks/apis/apps/v1alpha1.ConfigTemplateExtension
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the user-defined configuration template.</p>
-<p>When provided, the <code>userConfigTemplates</code> overrides the default configuration template in the ComponentDefinition
-specified in <code>spec.configs[*].templateRef</code>.
-This allows users to customize the configuration template according to their specific requirements.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>parameters</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ComponentParameters">
-ComponentParameters
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the user-defined configuration template or parameters.</p>
-</td>
-</tr>
 </table>
 </td>
 </tr>
@@ -11668,21 +11637,6 @@ with each file being a key in the ConfigMap.</p>
 <p>The rendered configuration files will be mounted into the Component&rsquo;s containers
 according to the specified volume mount parameters.</p>
 <p>This field is immutable.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>parametersDescriptions</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ComponentParametersDescription">
-[]ComponentParametersDescription
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the name of the ParametersDefinition to associate the configuration file.
-The ParametersDefinition object defines the format of the configuration file and all parameters type.</p>
 </td>
 </tr>
 <tr>
@@ -12501,18 +12455,18 @@ string
 <td>
 <code>configItemDetails</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.ConfigTemplateItemDetail">
-[]ConfigTemplateItemDetail
+<a href="#apps.kubeblocks.io/v1alpha1.ConfigurationItemDetail">
+[]ConfigurationItemDetail
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>ConfigItemDetails is an array of ConfigTemplateItemDetail objects.</p>
-<p>Each ConfigTemplateItemDetail corresponds to a configuration template,
+<p>ConfigItemDetails is an array of ConfigurationItemDetail objects.</p>
+<p>Each ConfigurationItemDetail corresponds to a configuration template,
 which is a ConfigMap that contains multiple configuration files.
 Each configuration file is stored as a key-value pair within the ConfigMap.</p>
-<p>The ConfigTemplateItemDetail includes information such as:</p>
+<p>The ConfigurationItemDetail includes information such as:</p>
 <ul>
 <li>The configuration template (a ConfigMap)</li>
 <li>The corresponding ConfigConstraint (constraints and validation rules for the configuration)</li>
@@ -14873,37 +14827,6 @@ bool
 If set, all the computing resources will be released.</p>
 </td>
 </tr>
-<tr>
-<td>
-<code>customTemplates</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ConfigTemplateExtension">
-map[string]github.com/apecloud/kubeblocks/apis/apps/v1alpha1.ConfigTemplateExtension
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the user-defined configuration template.</p>
-<p>When provided, the <code>userConfigTemplates</code> overrides the default configuration template in the ComponentDefinition
-specified in <code>spec.configs[*].templateRef</code>.
-This allows users to customize the configuration template according to their specific requirements.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>parameters</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ComponentParameters">
-ComponentParameters
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the user-defined configuration template or parameters.</p>
-</td>
-</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterComponentStatus">ClusterComponentStatus
@@ -16563,62 +16486,10 @@ string
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ComponentConfigDescription">ComponentConfigDescription
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentConfigSpec">ComponentConfigSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Defines the unique identifier of the config file name.</p>
-<p>It must be a string of maximum 63 characters, and can only include lowercase alphanumeric characters,
-hyphens, and periods.
-The name must start and end with an alphanumeric character.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>reRenderResourceTypes</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.RerenderResourceType">
-[]RerenderResourceType
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies whether the configuration needs to be re-rendered after v-scale or h-scale operations to reflect changes.</p>
-<p>In some scenarios, the configuration may need to be updated to reflect the changes in resource allocation
-or cluster topology. Examples:</p>
-<ul>
-<li>Redis: adjust maxmemory after v-scale operation.</li>
-<li>MySQL: increase max connections after v-scale operation.</li>
-<li>Zookeeper: update zoo.cfg with new node addresses after h-scale operation.</li>
-</ul>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentConfigSpec">ComponentConfigSpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ConfigTemplateItemDetail">ConfigTemplateItemDetail</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentDefinition">ClusterComponentDefinition</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ConfigurationItemDetail">ConfigurationItemDetail</a>)
 </p>
 <div>
 </div>
@@ -16647,25 +16518,6 @@ ComponentTemplateSpec
 </tr>
 <tr>
 <td>
-<code>componentConfigDescriptions</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ComponentConfigDescription">
-[]ComponentConfigDescription
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the configuration files within the ConfigMap that support dynamic updates and parametersSchema.</p>
-<p>A configuration template (provided in the form of a ConfigMap) may contain templates for multiple
-configuration files.
-Some of these configuration files may support dynamic modification and reloading without requiring
-a pod restart.</p>
-<p>If empty, all configuration files in the ConfigMap do not support parameter update, but they can be modified directly through configmap.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>keys</code><br/>
 <em>
 []string
@@ -16673,9 +16525,7 @@ a pod restart.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Deprecated: keys has been deprecated since 1.0.0
-Use <code>componentConfigDescriptions</code> instead.
-Specifies the configuration files within the ConfigMap that support dynamic updates.</p>
+<p>Specifies the configuration files within the ConfigMap that support dynamic updates.</p>
 <p>A configuration template (provided in the form of a ConfigMap) may contain templates for multiple
 configuration files.
 Each configuration file corresponds to a key in the ConfigMap.
@@ -17159,21 +17009,6 @@ with each file being a key in the ConfigMap.</p>
 <p>The rendered configuration files will be mounted into the Component&rsquo;s containers
 according to the specified volume mount parameters.</p>
 <p>This field is immutable.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>parametersDescriptions</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ComponentParametersDescription">
-[]ComponentParametersDescription
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the name of the ParametersDefinition to associate the configuration file.
-The ParametersDefinition object defines the format of the configuration file and all parameters type.</p>
 </td>
 </tr>
 <tr>
@@ -17938,56 +17773,6 @@ and other administrative tasks.</p>
 </p>
 <div>
 </div>
-<h3 id="apps.kubeblocks.io/v1alpha1.ComponentParameters">ComponentParameters
-(<code>map[string]*string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>)
-</p>
-<div>
-</div>
-<h3 id="apps.kubeblocks.io/v1alpha1.ComponentParametersDescription">ComponentParametersDescription
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Defines the unique identifier of the config file name.</p>
-<p>It must be a string of maximum 63 characters, and can only include lowercase alphanumeric characters,
-hyphens, and periods.
-The name must start and end with an alphanumeric character.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>parametersDefName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies the name of the ParametersDefinition to associate the configuration file.
-The ParametersDefinition object defines the format of the configuration file and all parameters type.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentRefEnv">ComponentRefEnv
 </h3>
 <p>
@@ -18604,37 +18389,6 @@ bool
 <em>(Optional)</em>
 <p>Stop the Component.
 If set, all the computing resources will be released.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>userConfigTemplates</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ConfigTemplateExtension">
-map[string]github.com/apecloud/kubeblocks/apis/apps/v1alpha1.ConfigTemplateExtension
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the user-defined configuration template.</p>
-<p>When provided, the <code>userConfigTemplates</code> overrides the default configuration template in the ComponentDefinition
-specified in <code>spec.configs[*].templateRef</code>.
-This allows users to customize the configuration template according to their specific requirements.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>parameters</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ComponentParameters">
-ComponentParameters
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the user-defined configuration template or parameters.</p>
 </td>
 </tr>
 </tbody>
@@ -19820,7 +19574,7 @@ Kubernetes core/v1.ConfigMapVolumeSource
 <h3 id="apps.kubeblocks.io/v1alpha1.ConfigParams">ConfigParams
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigTemplateItemDetail">ConfigTemplateItemDetail</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigurationItemDetail">ConfigurationItemDetail</a>)
 </p>
 <div>
 </div>
@@ -19863,7 +19617,7 @@ map[string]*string
 <h3 id="apps.kubeblocks.io/v1alpha1.ConfigTemplateExtension">ConfigTemplateExtension
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ConfigTemplateItemDetail">ConfigTemplateItemDetail</a>, <a href="#apps.kubeblocks.io/v1alpha1.LegacyRenderedTemplateSpec">LegacyRenderedTemplateSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigurationItemDetail">ConfigurationItemDetail</a>, <a href="#apps.kubeblocks.io/v1alpha1.LegacyRenderedTemplateSpec">LegacyRenderedTemplateSpec</a>)
 </p>
 <div>
 </div>
@@ -19885,18 +19639,6 @@ string
 <td>
 <p>Deprecated: Use <code>templateName</code> instead.
 Specifies the name of the referenced configuration template ConfigMap object.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>templateName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the name of the referenced configuration template ConfigMap object.</p>
 </td>
 </tr>
 <tr>
@@ -19928,13 +19670,13 @@ MergedPolicy
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ConfigTemplateItemDetail">ConfigTemplateItemDetail
+<h3 id="apps.kubeblocks.io/v1alpha1.ConfigurationItemDetail">ConfigurationItemDetail
 </h3>
 <p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigurationSpec">ConfigurationSpec</a>)
 </p>
 <div>
-<p>ConfigTemplateItemDetail corresponds to settings of a configuration template (a ConfigMap).</p>
+<p>ConfigurationItemDetail corresponds to settings of a configuration template (a ConfigMap).</p>
 </div>
 <table>
 <thead>
@@ -19994,7 +19736,7 @@ It ensures that the configuration adheres to certain requirements and limitation
 </tr>
 <tr>
 <td>
-<code>userConfigTemplates</code><br/>
+<code>importTemplateRef</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ConfigTemplateExtension">
 ConfigTemplateExtension
@@ -20027,7 +19769,7 @@ This allows users to override the default configuration according to their speci
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ConfigTemplateItemDetailStatus">ConfigTemplateItemDetailStatus
+<h3 id="apps.kubeblocks.io/v1alpha1.ConfigurationItemDetailStatus">ConfigurationItemDetailStatus
 </h3>
 <p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigurationStatus">ConfigurationStatus</a>)
@@ -20125,7 +19867,7 @@ ReconcileDetail
 <h3 id="apps.kubeblocks.io/v1alpha1.ConfigurationPhase">ConfigurationPhase
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigTemplateItemDetailStatus">ConfigTemplateItemDetailStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.ConfigurationStatus">ConfigurationStatus</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigurationItemDetailStatus">ConfigurationItemDetailStatus</a>)
 </p>
 <div>
 <p>ConfigurationPhase defines the Configuration FSM phase</p>
@@ -20204,18 +19946,18 @@ string
 <td>
 <code>configItemDetails</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.ConfigTemplateItemDetail">
-[]ConfigTemplateItemDetail
+<a href="#apps.kubeblocks.io/v1alpha1.ConfigurationItemDetail">
+[]ConfigurationItemDetail
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>ConfigItemDetails is an array of ConfigTemplateItemDetail objects.</p>
-<p>Each ConfigTemplateItemDetail corresponds to a configuration template,
+<p>ConfigItemDetails is an array of ConfigurationItemDetail objects.</p>
+<p>Each ConfigurationItemDetail corresponds to a configuration template,
 which is a ConfigMap that contains multiple configuration files.
 Each configuration file is stored as a key-value pair within the ConfigMap.</p>
-<p>The ConfigTemplateItemDetail includes information such as:</p>
+<p>The ConfigurationItemDetail includes information such as:</p>
 <ul>
 <li>The configuration template (a ConfigMap)</li>
 <li>The corresponding ConfigConstraint (constraints and validation rules for the configuration)</li>
@@ -20255,22 +19997,6 @@ string
 </tr>
 <tr>
 <td>
-<code>phase</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ConfigurationPhase">
-ConfigurationPhase
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Indicates the current status of the configuration item.</p>
-<p>Possible values include &ldquo;Creating&rdquo;, &ldquo;Init&rdquo;, &ldquo;Running&rdquo;, &ldquo;Pending&rdquo;, &ldquo;Merged&rdquo;, &ldquo;MergeFailed&rdquo;, &ldquo;FailedAndPause&rdquo;,
-&ldquo;Upgrading&rdquo;, &ldquo;Deleting&rdquo;, &ldquo;FailedAndRetry&rdquo;, &ldquo;Finished&rdquo;.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>observedGeneration</code><br/>
 <em>
 int64
@@ -20301,8 +20027,8 @@ updated by the API Server.</p>
 <td>
 <code>configurationStatus</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.ConfigTemplateItemDetailStatus">
-[]ConfigTemplateItemDetailStatus
+<a href="#apps.kubeblocks.io/v1alpha1.ConfigurationItemDetailStatus">
+[]ConfigurationItemDetailStatus
 </a>
 </em>
 </td>
@@ -22363,7 +22089,7 @@ Cannot be updated.</p>
 <h3 id="apps.kubeblocks.io/v1alpha1.Payload">Payload
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigTemplateItemDetail">ConfigTemplateItemDetail</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigurationItemDetail">ConfigurationItemDetail</a>)
 </p>
 <div>
 </div>
@@ -23048,7 +22774,7 @@ MemberUpdateStrategy
 <h3 id="apps.kubeblocks.io/v1alpha1.ReconcileDetail">ReconcileDetail
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigTemplateItemDetailStatus">ConfigTemplateItemDetailStatus</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigurationItemDetailStatus">ConfigurationItemDetailStatus</a>)
 </p>
 <div>
 </div>
@@ -23358,7 +23084,7 @@ StatefulSetSpec
 <h3 id="apps.kubeblocks.io/v1alpha1.RerenderResourceType">RerenderResourceType
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentConfigDescription">ComponentConfigDescription</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentConfigSpec">ComponentConfigSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentConfigSpec">ComponentConfigSpec</a>)
 </p>
 <div>
 <p>RerenderResourceType defines the resource requirements for a component.</p>

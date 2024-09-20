@@ -53,7 +53,7 @@ func (c *Payload) DeepCopyInto(out *Payload) {
 	out.Data = clone
 }
 
-func (configuration *ConfigurationSpec) GetConfigurationItem(name string) *ConfigTemplateItemDetail {
+func (configuration *ConfigurationSpec) GetConfigurationItem(name string) *ConfigurationItemDetail {
 	for i := range configuration.ConfigItemDetails {
 		configItem := &configuration.ConfigItemDetails[i]
 		if configItem.Name == name {
@@ -70,7 +70,7 @@ func (configuration *ConfigurationSpec) GetConfigSpec(configSpecName string) *Co
 	return nil
 }
 
-func (status *ConfigurationStatus) GetItemStatus(name string) *ConfigTemplateItemDetailStatus {
+func (status *ConfigurationStatus) GetItemStatus(name string) *ConfigurationItemDetailStatus {
 	for i := range status.ConfigurationItemStatus {
 		itemStatus := &status.ConfigurationItemStatus[i]
 		if itemStatus.Name == name {

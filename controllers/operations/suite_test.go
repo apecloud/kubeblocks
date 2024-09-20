@@ -46,6 +46,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	configv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	"github.com/apecloud/kubeblocks/apis/workloads/legacy"
@@ -159,6 +160,10 @@ var _ = BeforeSuite(func() {
 	err = apiextv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 	model.AddScheme(apiextv1.AddToScheme)
+
+	err = configv1alpha1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+	model.AddScheme(configv1alpha1.AddToScheme)
 
 	// +kubebuilder:scaffold:rscheme
 

@@ -20,9 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package builder
 
 import (
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 type ComponentBuilder struct {
@@ -97,6 +98,16 @@ func (builder *ComponentBuilder) SetResources(resources corev1.ResourceRequireme
 
 func (builder *ComponentBuilder) SetDisableExporter(disableExporter *bool) *ComponentBuilder {
 	builder.get().Spec.DisableExporter = disableExporter
+	return builder
+}
+
+func (builder *ComponentBuilder) SetUserConfigTemplates(userConfigTemplates map[string]appsv1.ConfigTemplateExtension) *ComponentBuilder {
+	builder.get().Spec.UserConfigTemplates = userConfigTemplates
+	return builder
+}
+
+func (builder *ComponentBuilder) SetParameters(parameters appsv1.ComponentParameters) *ComponentBuilder {
+	builder.get().Spec.ComponentParameters = parameters
 	return builder
 }
 

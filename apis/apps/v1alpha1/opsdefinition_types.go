@@ -208,6 +208,14 @@ type PodSelector struct {
 
 type ComponentInfo struct {
 	// Specifies the name of the ComponentDefinition.
+	// The name can represent an exact name, a name prefix, or a regular expression pattern.
+	//
+	// For example:
+	//
+	// - "mysql-8.0.30-v1alpha1": Matches the exact name "mysql-8.0.30-v1alpha1"
+	// - "mysql-8.0.30": Matches all names starting with "mysql-8.0.30"
+	// - "^mysql-8.0.\d{1,2}$": Matches all names starting with "mysql-8.0." followed by one or two digits.
+	//
 	// +kubebuilder:validation:MaxLength=32
 	// +kubebuilder:validation:Required
 	ComponentDefinitionName string `json:"componentDefinitionName"`

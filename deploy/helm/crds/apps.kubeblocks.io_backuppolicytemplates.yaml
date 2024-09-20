@@ -231,7 +231,7 @@ spec:
                                             type: string
                                           names:
                                             description: |-
-                                              Represents an array of names of ClusterVersion or ComponentDefinition that can be mapped to
+                                              Represents an array of names of ClusterVersion or ComponentDefinition or ServiceVersion that can be mapped to
                                               the appropriate version of the backup tool image.
 
 
@@ -245,8 +245,17 @@ spec:
                                         type: object
                                       type: array
                                     componentDef:
-                                      description: Determine the appropriate version
-                                        of the backup tool image from ComponentDefinition.
+                                      description: |-
+                                        Determine the appropriate version of the backup tool image from ComponentDefinition.
+                                        Each name in the list can represent an exact name, a name prefix, or a regular expression pattern.
+
+
+                                        For example:
+
+
+                                        - "mysql-8.0.30-v1alpha1": Matches the exact name "mysql-8.0.30-v1alpha1"
+                                        - "mysql-8.0.30": Matches all names starting with "mysql-8.0.30"
+                                        - "^mysql-8.0.\d{1,2}$": Matches all names starting with "mysql-8.0." followed by one or two digits.
                                       items:
                                         properties:
                                           mappingValue:
@@ -255,7 +264,7 @@ spec:
                                             type: string
                                           names:
                                             description: |-
-                                              Represents an array of names of ClusterVersion or ComponentDefinition that can be mapped to
+                                              Represents an array of names of ClusterVersion or ComponentDefinition or ServiceVersion that can be mapped to
                                               the appropriate version of the backup tool image.
 
 
@@ -269,8 +278,17 @@ spec:
                                         type: object
                                       type: array
                                     serviceVersion:
-                                      description: Determine the appropriate version
-                                        of the backup tool image from ServiceVersion.
+                                      description: |-
+                                        Determine the appropriate version of the backup tool image from ServiceVersion.
+                                        Each service version in the list can represent an exact version, a version prefix, or a regular expression pattern.
+
+
+                                        For example:
+
+
+                                        - "8.0.33": Matches the exact version "8.0.33"
+                                        - "8.0": Matches all versions starting with "8.0"
+                                        - "^8.0.\d{1,2}$": Matches all versions starting with "8.0." followed by one or two digits.
                                       items:
                                         properties:
                                           mappingValue:
@@ -279,7 +297,7 @@ spec:
                                             type: string
                                           names:
                                             description: |-
-                                              Represents an array of names of ClusterVersion or ComponentDefinition that can be mapped to
+                                              Represents an array of names of ClusterVersion or ComponentDefinition or ServiceVersion that can be mapped to
                                               the appropriate version of the backup tool image.
 
 
@@ -960,10 +978,16 @@ spec:
                       type: string
                     componentDefs:
                       description: |-
-                        Specifies a list of names of ComponentDefinitions that the specified ClusterDefinition references.
-                        They should be different versions of definitions of the same component,
-                        thus allowing them to share a single BackupPolicy.
-                        Each name must adhere to the IANA Service Naming rule.
+                        Specifies the name of the ComponentDefinition.
+                        Each name in the list can represent an exact name, a name prefix, or a regular expression pattern.
+
+
+                        For example:
+
+
+                        - "mysql-8.0.30-v1alpha1": Matches the exact name "mysql-8.0.30-v1alpha1"
+                        - "mysql-8.0.30": Matches all names starting with "mysql-8.0.30"
+                        - "^mysql-8.0.\d{1,2}$": Matches all names starting with "mysql-8.0." followed by one or two digits.
                       items:
                         type: string
                       type: array

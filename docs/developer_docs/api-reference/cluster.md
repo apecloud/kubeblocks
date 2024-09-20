@@ -3970,10 +3970,14 @@ Existing usage should be updated to the current preferred approach to avoid comp
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies a list of names of ComponentDefinitions that the specified ClusterDefinition references.
-They should be different versions of definitions of the same component,
-thus allowing them to share a single BackupPolicy.
-Each name must adhere to the IANA Service Naming rule.</p>
+<p>Specifies the name of the ComponentDefinition.
+Each name in the list can represent an exact name, a name prefix, or a regular expression pattern.</p>
+<p>For example:</p>
+<ul>
+<li>&ldquo;mysql-8.0.30-v1alpha1&rdquo;: Matches the exact name &ldquo;mysql-8.0.30-v1alpha1&rdquo;</li>
+<li>&ldquo;mysql-8.0.30&rdquo;: Matches all names starting with &ldquo;mysql-8.0.30&rdquo;</li>
+<li>&rdquo;^mysql-8.0.\d&#123;1,2&#125;$&ldquo;: Matches all names starting with &ldquo;mysql-8.0.&rdquo; followed by one or two digits.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -8786,7 +8790,14 @@ string
 </em>
 </td>
 <td>
-<p>Specifies the name of the ComponentDefinition.</p>
+<p>Specifies the name of the ComponentDefinition.
+The name can represent an exact name, a name prefix, or a regular expression pattern.</p>
+<p>For example:</p>
+<ul>
+<li>&ldquo;mysql-8.0.30-v1alpha1&rdquo;: Matches the exact name &ldquo;mysql-8.0.30-v1alpha1&rdquo;</li>
+<li>&ldquo;mysql-8.0.30&rdquo;: Matches all names starting with &ldquo;mysql-8.0.30&rdquo;</li>
+<li>&rdquo;^mysql-8.0.\d&#123;1,2&#125;$&ldquo;: Matches all names starting with &ldquo;mysql-8.0.&rdquo; followed by one or two digits.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -22014,7 +22025,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the name of the ComponentDefinition.</p>
+<p>Specifies the name of the ComponentDefinition, only exact matches are supported.</p>
 </td>
 </tr>
 <tr>
@@ -22152,7 +22163,14 @@ use the latest available version in ComponentVersion.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Determine the appropriate version of the backup tool image from ComponentDefinition.</p>
+<p>Determine the appropriate version of the backup tool image from ComponentDefinition.
+Each name can represent an exact name, a name prefix, or a regular expression pattern.</p>
+<p>For example:</p>
+<ul>
+<li>&ldquo;mysql-8.0.30-v1alpha1&rdquo;: Matches the exact name &ldquo;mysql-8.0.30-v1alpha1&rdquo;</li>
+<li>&ldquo;mysql-8.0.30&rdquo;: Matches all names starting with &ldquo;mysql-8.0.30&rdquo;</li>
+<li>&rdquo;^mysql-8.0.\d&#123;1,2&#125;$&ldquo;: Matches all names starting with &ldquo;mysql-8.0.&rdquo; followed by one or two digits.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -22166,7 +22184,14 @@ use the latest available version in ComponentVersion.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Determine the appropriate version of the backup tool image from ServiceVersion.</p>
+<p>Determine the appropriate version of the backup tool image from ServiceVersion.
+the service version can represent an exact version, a version prefix, or a regular expression pattern.</p>
+<p>For example:</p>
+<ul>
+<li>&ldquo;8.0.33&rdquo;: Matches the exact version &ldquo;8.0.33&rdquo;</li>
+<li>&ldquo;8.0&rdquo;: Matches all versions starting with &ldquo;8.0&rdquo;</li>
+<li>&rdquo;^8.0.\d&#123;1,2&#125;$&ldquo;: Matches all versions starting with &ldquo;8.0.&rdquo; followed by one or two digits.</li>
+</ul>
 </td>
 </tr>
 </tbody>
@@ -22194,7 +22219,7 @@ use the latest available version in ComponentVersion.</p>
 </em>
 </td>
 <td>
-<p>Represents an array of names of ClusterVersion or ComponentDefinition that can be mapped to
+<p>Represents an array of names of ClusterVersion or ComponentDefinition or ServiceVersion that can be mapped to
 the appropriate version of the backup tool image.</p>
 <p>This mapping allows different versions of component images to correspond to specific versions of backup tool images.</p>
 </td>

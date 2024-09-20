@@ -53,7 +53,7 @@ KubeBlocks 0.9 is compatible with KubeBlocks 0.8 APIs, but compatibility with AP
 2. Delete the incompatible OpsDefinition.
 
    ```bash
-   kubectl delete opsdefinitions.operations.kubeblocks.io kafka-quota kafka-topic kafka-user-acl switchover
+   kubectl delete opsdefinitions.apps.kubeblocks.io kafka-quota kafka-topic kafka-user-acl switchover
    ```
 
 3. Install CRD.

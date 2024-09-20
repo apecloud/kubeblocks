@@ -128,7 +128,8 @@ func (r *OpsRequestReconciler) handleDeletion(reqCtx intctrlutil.RequestCtx, ops
 		return nil, nil
 	}
 	if opsRes.Cluster.IsDeleting() && opsRes.OpsRequest.DeletionTimestamp.IsZero() {
-		// delete the ops when the cluster is Deleting but opsRequest is not deleted.
+		// cluster will always be deleting if temporary pods created by opsRequest mount the instance's PVC.
+		// so we should delete the ops when the cluster is Deleting.
 		if err := r.Client.Delete(reqCtx.Ctx, opsRes.OpsRequest); err != nil {
 			return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 		}

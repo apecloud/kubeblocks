@@ -36,6 +36,12 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
+const (
+	kbEnvClusterUIDPostfix8Deprecated = "KB_CLUSTER_UID_POSTFIX_8"
+	kbComponentEnvCMPlaceHolder       = "$(COMP_ENV_CM_NAME)"
+	kbToolsImagePlaceHolder           = "$(KUBEBLOCKS_TOOLS_IMAGE)"
+)
+
 type envBuildInFunc func(container interface{}, envName string) (string, error)
 
 type envWrapper struct {
@@ -316,13 +322,13 @@ func getReplacementMapForBuiltInEnv(clusterName, clusterUID, componentName strin
 		envPlaceHolder(constant.KBEnvClusterName):     clusterName,
 		envPlaceHolder(constant.KBEnvCompName):        componentName,
 		envPlaceHolder(constant.KBEnvClusterCompName): cc,
-		constant.KBComponentEnvCMPlaceHolder:          constant.GenerateClusterComponentEnvPattern(clusterName, componentName),
+		kbComponentEnvCMPlaceHolder:                   constant.GenerateClusterComponentEnvPattern(clusterName, componentName),
 	}
 	clusterUIDPostfix := clusterUID
 	if len(clusterUID) > 8 {
 		clusterUIDPostfix = clusterUID[len(clusterUID)-8:]
 	}
-	replacementMap[envPlaceHolder(constant.KBEnvClusterUIDPostfix8Deprecated)] = clusterUIDPostfix
+	replacementMap[envPlaceHolder(kbEnvClusterUIDPostfix8Deprecated)] = clusterUIDPostfix
 	return replacementMap
 }
 

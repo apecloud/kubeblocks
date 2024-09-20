@@ -151,7 +151,6 @@ func builtinTemplateVars(synthesizedComp *SynthesizedComponent, definedVars []ap
 			{constant.KBEnvClusterCompName, constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name)},
 			{constant.KBEnvCompName, synthesizedComp.Name},
 			{constant.KBEnvCompReplicas, strconv.Itoa(int(synthesizedComp.Replicas))},
-			{constant.KBEnvClusterUIDPostfix8Deprecated, clusterUIDPostfix(synthesizedComp)},
 		} {
 			if !defined.Has(e[0]) {
 				vars = append(vars, corev1.EnvVar{Name: e[0], Value: e[1]})
@@ -160,13 +159,6 @@ func builtinTemplateVars(synthesizedComp *SynthesizedComponent, definedVars []ap
 		return vars
 	}
 	return []corev1.EnvVar{}
-}
-
-func clusterUIDPostfix(synthesizedComp *SynthesizedComponent) string {
-	if len(synthesizedComp.ClusterUID) > 8 {
-		return synthesizedComp.ClusterUID[len(synthesizedComp.ClusterUID)-8:]
-	}
-	return synthesizedComp.ClusterUID
 }
 
 func resolveVarsReferenceNEscaping(templateVars []corev1.EnvVar, credentialVars []corev1.EnvVar) ([]corev1.EnvVar, []corev1.EnvVar) {

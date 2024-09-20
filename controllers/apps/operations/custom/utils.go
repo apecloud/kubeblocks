@@ -47,6 +47,7 @@ const (
 	kbEnvCompHeadlessSVCName = "KB_COMP_HEADLESS_SVC_NAME"
 	kbEnvCompSVCName         = "KB_COMP_SVC_NAME"
 	kbEnvCompSVCPortPrefix   = "KB_COMP_SVC_PORT_"
+	kbEnvCompServiceVersion  = "KB_COMP_SERVICE_VERSION"
 	kbEnvAccountUserName     = "KB_ACCOUNT_USERNAME"
 	kbEnvAccountPassword     = "KB_ACCOUNT_PASSWORD"
 )
@@ -80,7 +81,7 @@ func buildComponentEnvs(reqCtx intctrlutil.RequestCtx,
 		return intctrlutil.NewFatalError(fmt.Sprintf(`componentDefinition "%s" is not support for this operations`, compDef.Name))
 	}
 
-	*env = append(*env, corev1.EnvVar{Name: constant.KBEnvCompServiceVersion, Value: compDef.Spec.ServiceVersion})
+	*env = append(*env, corev1.EnvVar{Name: kbEnvCompServiceVersion, Value: compDef.Spec.ServiceVersion})
 
 	buildSecretKeyRef := func(secretName, key string) *corev1.EnvVarSource {
 		return &corev1.EnvVarSource{

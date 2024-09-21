@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -30,7 +29,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/golang/mock/gomock"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/sethvargo/go-password/password"
 	"golang.org/x/exp/maps"
@@ -44,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/pointer"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -58,7 +57,6 @@ import (
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	kbagent "github.com/apecloud/kubeblocks/pkg/kbagent/client"
-	kbagentproto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
@@ -66,63 +64,8 @@ import (
 )
 
 const (
-	backupMethodName   = "test-backup-method"
-	vsBackupMethodName = "test-vs-backup-method"
-	actionSetName      = "test-action-set"
-)
-
-var (
-	backupPolicyTPLName   = "test-backup-policy-template-mysql"
 	podAnnotationKey4Test = "component-replicas-test"
 )
-
-var mockKBAgentClient = func(mock func(*kbagent.MockClientMockRecorder)) {
-	cli := kbagent.NewMockClient(gomock.NewController(GinkgoT()))
-	if mock != nil {
-		mock(cli.EXPECT())
-	}
-	kbagent.SetMockClient(cli, nil)
-}
-
-var mockKBAgentClientDefault = func() {
-	mockKBAgentClient(func(recorder *kbagent.MockClientMockRecorder) {
-		recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
-			return kbagentproto.ActionResponse{}, nil
-		}).AnyTimes()
-	})
-}
-
-var mockKBAgentClient4HScale = func(clusterKey types.NamespacedName, compName string, replicas int) {
-	mockKBAgentClient(func(recorder *kbagent.MockClientMockRecorder) {
-		recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
-			rsp := kbagentproto.ActionResponse{}
-			if req.Action != "memberLeave" {
-				return rsp, nil
-			}
-			var podList corev1.PodList
-			labels := client.MatchingLabels{
-				constant.AppInstanceLabelKey:    clusterKey.Name,
-				constant.KBAppComponentLabelKey: compName,
-			}
-			if err := testCtx.Cli.List(ctx, &podList, labels, client.InNamespace(clusterKey.Namespace)); err != nil {
-				return rsp, err
-			}
-			for _, pod := range podList.Items {
-				if pod.Annotations == nil {
-					panic(fmt.Sprintf("pod annotations is nil: %s", pod.Name))
-				}
-				if pod.Annotations[podAnnotationKey4Test] == fmt.Sprintf("%d", replicas) {
-					continue
-				}
-				pod.Annotations[podAnnotationKey4Test] = fmt.Sprintf("%d", replicas)
-				if err := testCtx.Cli.Update(ctx, &pod); err != nil {
-					return rsp, err
-				}
-			}
-			return rsp, nil
-		}).AnyTimes()
-	})
-}
 
 var _ = Describe("Component Controller", func() {
 	const (
@@ -213,7 +156,7 @@ var _ = Describe("Component Controller", func() {
 			GetObject()
 
 		By("Mock kb-agent client for the default transformer of system accounts provision")
-		mockKBAgentClientDefault()
+		testapps.MockKBAgentClientDefault()
 	}
 
 	waitForCreatingResourceCompletely := func(clusterKey client.ObjectKey, compNames ...string) {
@@ -576,7 +519,7 @@ var _ = Describe("Component Controller", func() {
 			mockComponentPVCsAndBound(comp, updatedReplicas, true, storageClassName)
 
 			if bpt != nil {
-				checkRestoreAndSetCompleted(clusterKey, comp.Name, updatedReplicas-int(comp.Replicas))
+				testdp.CheckRestoreAndSetCompleted(&testCtx, clusterKey, comp.Name, updatedReplicas-int(comp.Replicas))
 			}
 
 			if bpt != nil {
@@ -718,7 +661,7 @@ var _ = Describe("Component Controller", func() {
 		}
 
 		for i, comp := range cluster.Spec.ComponentSpecs {
-			mockKBAgentClient4HScale(clusterKey, comp.Name, updatedReplicas)
+			testapps.MockKBAgentClient4HScale(&testCtx, clusterKey, comp.Name, podAnnotationKey4Test, updatedReplicas)
 
 			By(fmt.Sprintf("H-scale component %s with policy %v", comp.Name, bpt(comp)))
 			horizontalScaleComp(updatedReplicas, &cluster.Spec.ComponentSpecs[i], storageClassName, bpt(comp))
@@ -1701,7 +1644,7 @@ var _ = Describe("Component Controller", func() {
 
 		By("Mocking restore phase to Completed")
 		// mock prepareData restore completed
-		mockRestoreCompleted(ml)
+		testdp.MockRestoreCompleted(&testCtx, ml)
 
 		By("Waiting for the cluster controller to create resources completely")
 		waitForCreatingResourceCompletely(clusterKey, compName)
@@ -1724,7 +1667,7 @@ var _ = Describe("Component Controller", func() {
 		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, tmpCluster *kbappsv1.Cluster) {
 			g.Expect(tmpCluster.Status.Phase).Should(Equal(kbappsv1.RunningClusterPhase))
 			// mock postReady restore completed
-			mockRestoreCompleted(ml)
+			testdp.MockRestoreCompleted(&testCtx, ml)
 			g.Expect(tmpCluster.Annotations[constant.RestoreFromBackupAnnotationKey]).Should(BeEmpty())
 		})).Should(Succeed())
 	}
@@ -1832,7 +1775,7 @@ var _ = Describe("Component Controller", func() {
 	Context("provisioning", func() {
 		BeforeEach(func() {
 			createAllDefinitionObjects()
-			createBackupPolicyTpl(compDefObj.GetName())
+			testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.GetName())
 		})
 
 		AfterEach(func() {
@@ -1919,7 +1862,7 @@ var _ = Describe("Component Controller", func() {
 	Context("h-scaling", func() {
 		BeforeEach(func() {
 			createAllDefinitionObjects()
-			createBackupPolicyTpl(compDefObj.GetName())
+			testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.GetName())
 		})
 
 		AfterEach(func() {
@@ -1939,7 +1882,7 @@ var _ = Describe("Component Controller", func() {
 		})
 
 		It("scale-out from 1 to 3 with backup(snapshot) policy normally", func() {
-			testHorizontalScale(defaultCompName, compDefObj.Name, 1, 3, &backupPolicyTPLName)
+			testHorizontalScale(defaultCompName, compDefObj.Name, 1, 3, pointer.String(testdp.BackupPolicyTPLName))
 		})
 
 		It("scale-out without data clone policy", func() {
@@ -1947,11 +1890,11 @@ var _ = Describe("Component Controller", func() {
 		})
 
 		It("scale-in from 3 to 1", func() {
-			testHorizontalScale(defaultCompName, compDefObj.Name, 3, 1, &backupPolicyTPLName)
+			testHorizontalScale(defaultCompName, compDefObj.Name, 3, 1, pointer.String(testdp.BackupPolicyTPLName))
 		})
 
 		It("scale-in to 0 and PVCs should not been deleted", func() {
-			testHorizontalScale(defaultCompName, compDefObj.Name, 3, 0, &backupPolicyTPLName)
+			testHorizontalScale(defaultCompName, compDefObj.Name, 3, 0, pointer.String(testdp.BackupPolicyTPLName))
 		})
 
 		Context("with different backup methods", func() {
@@ -2002,12 +1945,12 @@ var _ = Describe("Component Controller", func() {
 
 			It("h-scale with volume snapshot", func() {
 				testk8s.MockEnableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
-				testMultiCompHScale(&backupPolicyTPLName)
+				testMultiCompHScale(pointer.String(testdp.BackupPolicyTPLName))
 			})
 
 			It("h-scale with backup tool", func() {
 				testk8s.MockDisableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
-				testMultiCompHScale(&backupPolicyTPLName)
+				testMultiCompHScale(pointer.String(testdp.BackupPolicyTPLName))
 			})
 		})
 	})
@@ -2019,7 +1962,7 @@ var _ = Describe("Component Controller", func() {
 
 		BeforeEach(func() {
 			createAllDefinitionObjects()
-			createBackupPolicyTpl(compDefObj.GetName())
+			testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.GetName())
 			mockStorageClass = testk8s.CreateMockStorageClass(&testCtx, testk8s.DefaultStorageClassName)
 		})
 
@@ -2034,7 +1977,7 @@ var _ = Describe("Component Controller", func() {
 		It("scale-out with data clone policy", func() {
 			testVolumeExpansion(compDefObj, defaultCompName, mockStorageClass)
 			testk8s.MockEnableVolumeSnapshot(&testCtx, mockStorageClass.Name)
-			horizontalScale(5, mockStorageClass.Name, &backupPolicyTPLName, compDefObj.Name)
+			horizontalScale(5, mockStorageClass.Name, pointer.String(testdp.BackupPolicyTPLName), compDefObj.Name)
 		})
 
 		It("scale-out without data clone policy", func() {
@@ -2046,7 +1989,7 @@ var _ = Describe("Component Controller", func() {
 	Context("restore", func() {
 		BeforeEach(func() {
 			createAllDefinitionObjects()
-			createBackupPolicyTpl(compDefObj.GetName())
+			testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.GetName())
 		})
 
 		AfterEach(func() {
@@ -2266,73 +2209,3 @@ var _ = Describe("Component Controller", func() {
 		})
 	})
 })
-
-func mockRestoreCompleted(ml client.MatchingLabels) {
-	restoreList := dpv1alpha1.RestoreList{}
-	Expect(k8sClient.List(testCtx.Ctx, &restoreList, ml)).Should(Succeed())
-	for _, rs := range restoreList.Items {
-		err := testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(&rs), func(res *dpv1alpha1.Restore) {
-			res.Status.Phase = dpv1alpha1.RestorePhaseCompleted
-		})()
-		Expect(err).ShouldNot(HaveOccurred())
-	}
-}
-
-func checkRestoreAndSetCompleted(clusterKey types.NamespacedName, compName string, scaleOutReplicas int) {
-	By("Checking restore CR created")
-	ml := client.MatchingLabels{
-		constant.AppInstanceLabelKey:    clusterKey.Name,
-		constant.KBAppComponentLabelKey: compName,
-		constant.KBManagedByKey:         "cluster",
-	}
-	Eventually(testapps.List(&testCtx, generics.RestoreSignature,
-		ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(scaleOutReplicas))
-
-	By("Mocking restore phase to succeeded")
-	mockRestoreCompleted(ml)
-}
-
-func fakeActionSet(clusterDefName string) *dpv1alpha1.ActionSet {
-	actionSet := &dpv1alpha1.ActionSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   actionSetName,
-			Labels: map[string]string{},
-		},
-		Spec: dpv1alpha1.ActionSetSpec{
-			Env: []corev1.EnvVar{
-				{
-					Name:  "test-name",
-					Value: "test-value",
-				},
-			},
-			BackupType: dpv1alpha1.BackupTypeFull,
-			Backup: &dpv1alpha1.BackupActionSpec{
-				BackupData: &dpv1alpha1.BackupDataActionSpec{
-					JobActionSpec: dpv1alpha1.JobActionSpec{
-						BaseJobActionSpec: dpv1alpha1.BaseJobActionSpec{
-							Image:   "xtrabackup",
-							Command: []string{""},
-						},
-					},
-				},
-			},
-			Restore: &dpv1alpha1.RestoreActionSpec{
-				PrepareData: &dpv1alpha1.JobActionSpec{
-					BaseJobActionSpec: dpv1alpha1.BaseJobActionSpec{
-						Image: "xtrabackup",
-						Command: []string{
-							"sh",
-							"-c",
-							"/backup_scripts.sh",
-						},
-					},
-				},
-			},
-		},
-	}
-	if len(clusterDefName) > 0 {
-		actionSet.Labels[constant.ClusterDefLabelKey] = clusterDefName
-	}
-	testapps.CheckedCreateK8sResource(&testCtx, actionSet)
-	return actionSet
-}

@@ -26,7 +26,6 @@ import (
 	gruntime "runtime"
 	"strings"
 
-	"github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/scheme"
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,6 +34,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/scheme"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -50,6 +52,7 @@ var (
 
 func init() {
 	appsv1alpha1.AddToScheme(innerScheme) // nolint: errcheck
+	opsv1alpha1.AddToScheme(innerScheme)  // nolint: errcheck
 	appsv1.AddToScheme(innerScheme)       // nolint: errcheck
 }
 

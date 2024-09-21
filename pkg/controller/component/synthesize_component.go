@@ -73,10 +73,10 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		Comp2CompDefs:                    comp2CompDef,
 		Name:                             compName,
 		FullCompName:                     comp.Name,
+		Generation:                       strconv.FormatInt(comp.Generation, 10),
 		CompDefName:                      compDef.Name,
 		ServiceKind:                      compDefObj.Spec.ServiceKind,
 		ServiceVersion:                   comp.Spec.ServiceVersion,
-		ClusterGeneration:                clusterGeneration(cluster, comp),
 		UserDefinedLabels:                comp.Spec.Labels,
 		UserDefinedAnnotations:           comp.Spec.Annotations,
 		PodSpec:                          &compDef.Spec.Runtime,
@@ -149,16 +149,6 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 	}
 
 	return synthesizeComp, nil
-}
-
-func clusterGeneration(cluster *appsv1.Cluster, comp *appsv1.Component) string {
-	if comp != nil && comp.Annotations != nil {
-		if generation, ok := comp.Annotations[constant.KubeBlocksGenerationKey]; ok {
-			return generation
-		}
-	}
-	// back-off to use cluster.Generation
-	return strconv.FormatInt(cluster.Generation, 10)
 }
 
 func buildComp2CompDefs(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster) (map[string]string, error) {

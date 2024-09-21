@@ -52,7 +52,7 @@ func GetClusterName(comp *appsv1.Component) (string, error) {
 }
 
 func GetClusterUID(comp *appsv1.Component) (string, error) {
-	return getCompLabelValue(comp, constant.KBAppClusterUIDLabelKey)
+	return getCompAnnotationValue(comp, constant.KBAppClusterUIDKey)
 }
 
 // BuildComponent builds a new Component object from cluster component spec and definition.
@@ -64,8 +64,8 @@ func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSp
 	}
 	compBuilder := builder.NewComponentBuilder(cluster.Namespace, FullName(cluster.Name, compSpec.Name), compSpec.ComponentDef).
 		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
+		AddAnnotations(constant.KBAppClusterUIDKey, string(cluster.UID)).
 		AddLabelsInMap(constant.GetComponentWellKnownLabels(cluster.Name, compSpec.Name)).
-		AddLabels(constant.KBAppClusterUIDLabelKey, string(cluster.UID)).
 		SetServiceVersion(compSpec.ServiceVersion).
 		SetLabels(compSpec.Labels).
 		SetAnnotations(compSpec.Annotations).
@@ -103,13 +103,21 @@ func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSp
 	return compBuilder.GetObject(), nil
 }
 
+func getCompAnnotationValue(comp *appsv1.Component, annotation string) (string, error) {
+	return getCompValueFromMap(comp, comp.Annotations, "annotation", annotation)
+}
+
 func getCompLabelValue(comp *appsv1.Component, label string) (string, error) {
-	if comp.Labels == nil {
-		return "", fmt.Errorf("required label %s is not provided, component: %s", label, comp.GetName())
+	return getCompValueFromMap(comp, comp.Labels, "label", label)
+}
+
+func getCompValueFromMap(comp *appsv1.Component, m map[string]string, tp string, key string) (string, error) {
+	if m == nil {
+		return "", fmt.Errorf("required %s %s is not provided, component: %s", tp, key, comp.GetName())
 	}
-	val, ok := comp.Labels[label]
+	val, ok := m[key]
 	if !ok {
-		return "", fmt.Errorf("required label %s is not provided, component: %s", label, comp.GetName())
+		return "", fmt.Errorf("required %s %s is not provided, component: %s", tp, key, comp.GetName())
 	}
 	return val, nil
 }

@@ -81,8 +81,8 @@ var _ = Describe("cluster shard component", func() {
 		It("generate sharding component spec test", func() {
 			By("create mock sharding component object")
 			mockCompObj := testapps.NewComponentFactory(testCtx.DefaultNamespace, cluster.Name+"-"+mysqlShardingCompName, "").
+				AddAnnotations(constant.KBAppClusterUIDKey, string(cluster.UID)).
 				AddLabels(constant.AppInstanceLabelKey, cluster.Name).
-				AddLabels(constant.KBAppClusterUIDLabelKey, string(cluster.UID)).
 				AddLabels(constant.KBAppShardingNameLabelKey, mysqlShardingName).
 				SetReplicas(1).
 				Create(&testCtx).

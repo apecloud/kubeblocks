@@ -291,10 +291,8 @@ var _ = Describe("Component Controller", func() {
 	// createCompObj := func(compName, compDefName, serviceVersion string, processor func(*testapps.MockComponentFactory)) {
 	//	By("Creating a component")
 	//	factory := testapps.NewComponentFactory(testCtx.DefaultNamespace, component.FullName(clusterObj.Name, compName), compDefName).
-	//		AddLabelsInMap(map[string]string{
-	//			constant.AppInstanceLabelKey:     clusterObj.Name,
-	//			constant.KBAppClusterUIDLabelKey: string(clusterObj.UID),
-	//		}).
+	//		AddAnnotations(constant.KBAppClusterUIDKey, string(clusterObj.UID)),
+	//		AddLabels(constant.AppInstanceLabelKey, clusterObj.Name).
 	//		SetServiceVersion(serviceVersion).
 	//		SetReplicas(1)
 	//	if processor != nil {

@@ -60,10 +60,14 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 
 	// build annotations
 	mergeAnnotations := intctrlutil.MergeMetadataMaps(
-		constant.GetKBGenerationAnnotation(synthesizedComp.ClusterGeneration),
+		map[string]string{
+			constant.KubeBlocksGenerationKey: synthesizedComp.Generation,
+		},
 		getMonitorAnnotations(synthesizedComp, componentDef),
 		compDefLabel,
-		constant.GetServiceVersionAnnotation(synthesizedComp.ServiceVersion),
+		map[string]string{
+			constant.KBAppServiceVersionKey: synthesizedComp.ServiceVersion,
+		},
 		synthesizedComp.Annotations,
 	)
 

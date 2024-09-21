@@ -72,8 +72,8 @@ var _ = Describe("object rbac transformer test.", func() {
 		By("Creating a component")
 		fullCompName := constant.GenerateClusterComponentName(cluster.Name, compName)
 		compObj = testapps.NewComponentFactory(testCtx.DefaultNamespace, fullCompName, compDefName).
+			AddAnnotations(constant.KBAppClusterUIDKey, string(cluster.UID)).
 			AddLabels(constant.AppInstanceLabelKey, cluster.Name).
-			AddLabels(constant.KBAppClusterUIDLabelKey, string(cluster.UID)).
 			SetReplicas(1).
 			SetServiceAccountName(serviceAccountName).
 			GetObject()

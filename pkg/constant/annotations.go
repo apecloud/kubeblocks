@@ -38,6 +38,7 @@ const (
 	PVLastClaimPolicyAnnotationKey           = "apps.kubeblocks.io/pv-last-claim-policy"
 	HaltRecoveryAllowInconsistentResAnnotKey = "clusters.apps.kubeblocks.io/allow-inconsistent-resource"
 	KubeBlocksGenerationKey                  = "kubeblocks.io/generation"
+	KBAppClusterUIDKey                       = "apps.kubeblocks.io/cluster-uid"
 	LastRoleSnapshotVersionAnnotationKey     = "apps.kubeblocks.io/last-role-snapshot-version"
 	ComponentScaleInAnnotationKey            = "apps.kubeblocks.io/component-scale-in" // ComponentScaleInAnnotationKey specifies whether the component is scaled in
 	DisableHAAnnotationKey                   = "kubeblocks.io/disable-ha"
@@ -58,24 +59,12 @@ const (
 	MultiClusterServicePlacementKey = "apps.kubeblocks.io/multi-cluster-service-placement"
 )
 
-// GetKBGenerationAnnotation returns the annotation for kubeblocks generation.
-func GetKBGenerationAnnotation(generation string) map[string]string {
-	return map[string]string{
-		KubeBlocksGenerationKey: generation,
-	}
-}
-
-func GetServiceVersionAnnotation(serviceVersion string) map[string]string {
-	return map[string]string{
-		KBAppServiceVersionKey: serviceVersion,
-	}
-}
-
 // GetKBReservedAnnotationKeys returns the reserved annotation keys for KubeBlocks
 func GetKBReservedAnnotationKeys() []string {
 	return []string{
 		KubeBlocksGenerationKey,
 		ReconcileAnnotationKey,
+		KBAppClusterUIDKey,
 		KBAppServiceVersionKey,
 	}
 }

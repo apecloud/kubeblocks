@@ -32,11 +32,11 @@ type SynthesizedComponent struct {
 	Namespace                        string            `json:"namespace,omitempty"`
 	ClusterName                      string            `json:"clusterName,omitempty"`
 	ClusterUID                       string            `json:"clusterUID,omitempty"`
-	ClusterGeneration                string            `json:"clusterGeneration,omitempty"`
 	Comp2CompDefs                    map[string]string `json:"comp2CompDefs,omitempty"` // {compName: compDefName}
 	Name                             string            `json:"name,omitempty"`          // the name of the component w/o clusterName prefix
 	FullCompName                     string            `json:"fullCompName,omitempty"`  // the full name of the component w/ clusterName prefix
-	CompDefName                      string            `json:"compDefName,omitempty"`   // the name of the componentDefinition
+	Generation                       string
+	CompDefName                      string `json:"compDefName,omitempty"` // the name of the componentDefinition
 	ServiceKind                      string
 	ServiceVersion                   string                                 `json:"serviceVersion,omitempty"`
 	Replicas                         int32                                  `json:"replicas"`

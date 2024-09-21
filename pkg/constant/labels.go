@@ -41,7 +41,6 @@ const (
 	AccessModeLabelKey                     = "workloads.kubeblocks.io/access-mode"
 	ReadyWithoutPrimaryKey                 = "kubeblocks.io/ready-without-primary"
 	ClusterAccountLabelKey                 = "account.kubeblocks.io/name"
-	KBAppClusterUIDLabelKey                = "apps.kubeblocks.io/cluster-uid"
 	KBAppComponentLabelKey                 = "apps.kubeblocks.io/component-name"
 	KBAppShardingNameLabelKey              = "apps.kubeblocks.io/sharding-name"
 	KBManagedByKey                         = "apps.kubeblocks.io/managed-by" // KBManagedByKey marks resources that auto created

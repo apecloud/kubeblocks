@@ -165,11 +165,11 @@ func checkAllCompsUpToDate(transCtx *clusterTransformContext, cluster *appsv1.Cl
 		return false, nil
 	}
 	for _, comp := range compList.Items {
-		kbGeneration, ok := comp.Annotations[constant.KubeBlocksGenerationKey]
+		generation, ok := comp.Annotations[constant.KubeBlocksGenerationKey]
 		if !ok {
 			return false, nil
 		}
-		if comp.Generation != comp.Status.ObservedGeneration || kbGeneration != strconv.FormatInt(cluster.Generation, 10) {
+		if comp.Generation != comp.Status.ObservedGeneration || generation != strconv.FormatInt(cluster.Generation, 10) {
 			return false, nil
 		}
 	}

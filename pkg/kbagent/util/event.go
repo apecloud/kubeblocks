@@ -21,8 +21,6 @@ package util
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"sync"
@@ -62,6 +60,7 @@ func SendEventWithMessage(logger *logr.Logger, reason string, message string) {
 			podName = os.Getenv(constant.KBEnvPodName)
 			podUID = os.Getenv(constant.KBEnvPodUID)
 			nodeName = os.Getenv(constant.KBEnvNodeName)
+			atomic.StoreInt32(&counter, int32(time.Now().UnixNano()))
 		})
 		err := createOrUpdateEvent(reason, message)
 		if logger != nil && err != nil {
@@ -75,16 +74,19 @@ func createOrUpdateEvent(reason string, message string) error {
 	if err != nil {
 		return fmt.Errorf("error getting k8s clientset: %v", err)
 	}
-	event, err := clientSet.CoreV1().Events(namespace).Get(context.TODO(), string(atomic.LoadInt32(&counter)-1), metav1.GetOptions{})
+	lastEvent, err := clientSet.CoreV1().Events(namespace).Get(context.TODO(), string(atomic.LoadInt32(&counter)-1), metav1.GetOptions{})
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			return fmt.Errorf("error getting event: %v", err)
 		}
-		event = newEvent(reason, message)
-		return createEvent(clientSet, event)
+	}
+	if lastEvent != nil && lastEvent.Reason == reason && lastEvent.Message == message {
+		return updateEvent(clientSet, lastEvent)
 	}
 
-	return updateEvent(clientSet, event)
+	event := newEvent(reason, message)
+	return createEvent(clientSet, event)
+
 }
 
 func newEvent(reason string, message string) *corev1.Event {
@@ -148,10 +150,4 @@ func getK8sClientSet() (*kubernetes.Clientset, error) {
 		return nil, err
 	}
 	return clientSet, nil
-}
-
-func hashReasonNMessage(reason, message string) string {
-	h := sha256.New()
-	h.Write([]byte(reason + message))
-	return hex.EncodeToString(h.Sum(nil))
 }

@@ -189,13 +189,13 @@ var _ = Describe("command", func() {
 			action := &proto.ExecAction{
 				Commands: []string{"/bin/bash", "-c", "echo -n ok"},
 			}
-			outBuffer, errBuffer, errChan, err := runCommandNonBlocking(ctx, action, nil, nil)
+			resultChan, err := runCommandNonBlocking(ctx, action, nil, nil)
 			Expect(err).Should(BeNil())
 
-			execErr := <-errChan
-			Expect(execErr).Should(BeNil())
-			Expect(outBuffer.Bytes()).Should(Equal([]byte("ok")))
-			Expect(errBuffer.Bytes()).Should(HaveLen(0))
+			result := <-resultChan
+			Expect(result.err).Should(BeNil())
+			Expect(result.stdout.Bytes()).Should(Equal([]byte("ok")))
+			Expect(result.stderr.Bytes()).Should(HaveLen(0))
 		})
 
 		It("parameters", func() {
@@ -205,28 +205,28 @@ var _ = Describe("command", func() {
 			parameters := map[string]string{
 				"PARAM": "parameters",
 			}
-			outBuffer, errBuffer, errChan, err := runCommandNonBlocking(ctx, action, parameters, nil)
+			resultChan, err := runCommandNonBlocking(ctx, action, parameters, nil)
 			Expect(err).Should(BeNil())
 
-			execErr := <-errChan
-			Expect(execErr).Should(BeNil())
-			Expect(outBuffer.Bytes()).Should(Equal([]byte("parameters")))
-			Expect(errBuffer.Bytes()).Should(HaveLen(0))
+			result := <-resultChan
+			Expect(result.err).Should(BeNil())
+			Expect(result.stdout.Bytes()).Should(Equal([]byte("parameters")))
+			Expect(result.stderr.Bytes()).Should(HaveLen(0))
 		})
 
 		It("fail", func() {
 			action := &proto.ExecAction{
 				Commands: []string{"/bin/bash", "-c", "command-not-found"},
 			}
-			outBuffer, errBuffer, errChan, err := runCommandNonBlocking(ctx, action, nil, nil)
+			resultChan, err := runCommandNonBlocking(ctx, action, nil, nil)
 			Expect(err).Should(BeNil())
 
-			execErr := <-errChan
-			Expect(execErr).ShouldNot(BeNil())
+			result := <-resultChan
+			Expect(result.err).ShouldNot(BeNil())
 			var exitErr *exec.ExitError
-			Expect(errors.As(execErr, &exitErr)).Should(BeTrue())
-			Expect(outBuffer.Bytes()).Should(HaveLen(0))
-			Expect(errBuffer.Bytes()).Should(ContainSubstring("command not found"))
+			Expect(errors.As(result.err, &exitErr)).Should(BeTrue())
+			Expect(result.stdout.Bytes()).Should(HaveLen(0))
+			Expect(result.stderr.Bytes()).Should(ContainSubstring("command not found"))
 		})
 
 		It("timeout", func() {
@@ -234,14 +234,14 @@ var _ = Describe("command", func() {
 				Commands: []string{"/bin/bash", "-c", "sleep 60"},
 			}
 			timeout := int32(1)
-			outBuffer, errBuffer, errChan, err := runCommandNonBlocking(ctx, action, nil, &timeout)
+			resultChan, err := runCommandNonBlocking(ctx, action, nil, &timeout)
 			Expect(err).Should(BeNil())
 
-			execErr := <-errChan
-			Expect(execErr).ShouldNot(BeNil())
-			Expect(errors.Is(execErr, proto.ErrTimedOut)).Should(BeTrue())
-			Expect(outBuffer.Bytes()).Should(HaveLen(0))
-			Expect(errBuffer.Bytes()).Should(HaveLen(0))
+			result := <-resultChan
+			Expect(result.err).ShouldNot(BeNil())
+			Expect(errors.Is(result.err, proto.ErrTimedOut)).Should(BeTrue())
+			Expect(result.stdout.Bytes()).Should(HaveLen(0))
+			Expect(result.stderr.Bytes()).Should(HaveLen(0))
 		})
 	})
 

@@ -40,15 +40,16 @@ import (
 )
 
 type InformerManager interface {
-	Watch(watcher, watched schema.GroupVersionKind) error
-	UnWatch(watcher, watched schema.GroupVersionKind) error
+	SetContext(ctx context.Context)
 	Start() error
+	Watch(watcher client.Object, watched schema.GroupVersionKind) error
+	UnWatch(watcher client.Object, watched schema.GroupVersionKind) error
 }
 
 type informerManager struct {
 	eventChan chan event.GenericEvent
 
-	informerRefCounter map[schema.GroupVersionKind]sets.Set[schema.GroupVersionKind]
+	informerRefCounter map[schema.GroupVersionKind]sets.Set[model.GVKNObjKey]
 	refCounterLock     sync.Mutex
 
 	cache cache.Cache
@@ -63,6 +64,10 @@ type informerManager struct {
 	scheme *runtime.Scheme
 }
 
+func (m *informerManager) SetContext(ctx context.Context) {
+	m.ctx = ctx
+}
+
 func (m *informerManager) Start() error {
 	go func() {
 		for m.processNextWorkItem() {
@@ -71,25 +76,30 @@ func (m *informerManager) Start() error {
 	return nil
 }
 
-func (m *informerManager) Watch(watcher, watched schema.GroupVersionKind) error {
+func (m *informerManager) Watch(watcher client.Object, watched schema.GroupVersionKind) error {
 	m.refCounterLock.Lock()
 	defer m.refCounterLock.Unlock()
 
 	watchers, ok := m.informerRefCounter[watched]
 	if !ok {
-		watchers = sets.New[schema.GroupVersionKind]()
+		watchers = sets.New[model.GVKNObjKey]()
+		m.informerRefCounter[watched] = watchers
 	}
-	if watchers.Has(watcher) {
+	watcherRef, err := getObjectRef(watcher, m.scheme)
+	if err != nil {
+		return err
+	}
+	if watchers.Has(*watcherRef) {
 		return nil
 	}
 	if err := m.createInformer(watched); err != nil {
 		return nil
 	}
-	watchers.Insert(watcher)
+	watchers.Insert(*watcherRef)
 	return nil
 }
 
-func (m *informerManager) UnWatch(watcher, watched schema.GroupVersionKind) error {
+func (m *informerManager) UnWatch(watcher client.Object, watched schema.GroupVersionKind) error {
 	m.refCounterLock.Lock()
 	defer m.refCounterLock.Unlock()
 
@@ -97,7 +107,11 @@ func (m *informerManager) UnWatch(watcher, watched schema.GroupVersionKind) erro
 	if !ok {
 		return nil
 	}
-	watchers.Delete(watcher)
+	watcherRef, err := getObjectRef(watcher, m.scheme)
+	if err != nil {
+		return err
+	}
+	watchers.Delete(*watcherRef)
 	if watchers.Len() == 0 {
 		if err := m.deleteInformer(watched); err != nil {
 			return err
@@ -173,7 +187,7 @@ func NewInformerManager(cache cache.Cache, scheme *runtime.Scheme, eventChan cha
 		scheme:             scheme,
 		eventChan:          eventChan,
 		handler:            &eventProxy{},
-		informerRefCounter: make(map[schema.GroupVersionKind]sets.Set[schema.GroupVersionKind]),
+		informerRefCounter: make(map[schema.GroupVersionKind]sets.Set[model.GVKNObjKey]),
 		queue: workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{
 			Name: "informer-manager",
 		}),
@@ -212,13 +226,13 @@ func (r *informerManagerReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (ku
 	v, _ := tree.GetRoot().(*viewv1.ReconciliationView)
 	if model.IsObjectDeleting(tree.GetRoot()) {
 		for gvk, _ := range gvks {
-			if err := r.manager.UnWatch(v.GetObjectKind().GroupVersionKind(), gvk); err != nil {
+			if err := r.manager.UnWatch(v, gvk); err != nil {
 				return kubebuilderx.Commit, err
 			}
 		}
 	} else {
 		for gvk, _ := range gvks {
-			if err := r.manager.Watch(v.GetObjectKind().GroupVersionKind(), gvk); err != nil {
+			if err := r.manager.Watch(v, gvk); err != nil {
 				return kubebuilderx.Commit, err
 			}
 		}

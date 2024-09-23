@@ -528,12 +528,14 @@ func main() {
 			os.Exit(1)
 		}
 	}
+	var viewReconciler *viewcontrollers.ReconciliationViewReconciler
 	if viper.GetBool(viewFlagKey.viperName()) {
-		if err = (&viewcontrollers.ReconciliationViewReconciler{
+		viewReconciler = &viewcontrollers.ReconciliationViewReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("reconciliation-view-controller"),
-		}).SetupWithManager(mgr); err != nil {
+		}
+		if err := viewReconciler.SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "ReconciliationView")
 			os.Exit(1)
 		}
@@ -576,7 +578,11 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	ctx := ctrl.SetupSignalHandler()
+	if viper.GetBool(viewFlagKey.viperName()) && viewReconciler != nil {
+		viewReconciler.InformerManager.SetContext(ctx)
+	}
+	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}

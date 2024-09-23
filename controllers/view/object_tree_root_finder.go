@@ -23,6 +23,7 @@ import (
 	"container/list"
 	"context"
 	"fmt"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -98,6 +99,11 @@ func (f *rootFinder) findRoots(ctx context.Context, object client.Object) []reco
 		e := waitingList.Front()
 		waitingList.Remove(e)
 		obj, _ := e.Value.(client.Object)
+		objGVK, err := apiutil.GVKForObject(obj, f.Scheme())
+		if err != nil {
+			f.logger.Error(err, "get GVK of %s/%s failed", obj.GetNamespace(), obj.GetName())
+			return nil
+		}
 		found := false
 		for _, primaryType := range primaryTypeList {
 			gvk, err := objectTypeToGVK(&primaryType)
@@ -105,7 +111,7 @@ func (f *rootFinder) findRoots(ctx context.Context, object client.Object) []reco
 				f.logger.Error(err, "convert objectType %s to GVK failed", primaryType)
 				return nil
 			}
-			if obj.GetObjectKind().GroupVersionKind() == *gvk {
+			if objGVK == *gvk {
 				roots = append(roots, obj)
 				found = true
 			}
@@ -120,7 +126,7 @@ func (f *rootFinder) findRoots(ctx context.Context, object client.Object) []reco
 					f.logger.Error(err, "convert objectType %s to GVK failed", resource.Secondary)
 					return nil
 				}
-				if obj.GetObjectKind().GroupVersionKind() != *gvk {
+				if objGVK != *gvk {
 					continue
 				}
 				primaryGVK, err := objectTypeToGVK(&rule.Primary)

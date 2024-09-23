@@ -22,6 +22,7 @@ package view
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/types"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -68,6 +69,17 @@ func objectReferenceToRef(reference *corev1.ObjectReference) (*model.GVKNObjKey,
 			Name:      reference.Name,
 		},
 	}, nil
+}
+
+func objectRefToReference(objectRef model.GVKNObjKey, uid types.UID, resourceVersion string) *corev1.ObjectReference {
+	return &corev1.ObjectReference{
+		APIVersion:      objectRef.GroupVersionKind.GroupVersion().String(),
+		Kind:            objectRef.Kind,
+		Namespace:       objectRef.Namespace,
+		Name:            objectRef.Name,
+		UID:             uid,
+		ResourceVersion: resourceVersion,
+	}
 }
 
 func getObjectsByGVK(ctx context.Context, cli client.Reader, scheme *runtime.Scheme, gvk *schema.GroupVersionKind, opts ...client.ListOption) ([]client.Object, error) {

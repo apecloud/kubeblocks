@@ -44,6 +44,7 @@ type stateEvaluation struct {
 	ctx    context.Context
 	reader client.Reader
 	store  ObjectStore
+	scheme *runtime.Scheme
 }
 
 func (s *stateEvaluation) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
@@ -117,8 +118,12 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 	}
 	if latestReconciliationCycleStart <= 0 {
 		if view.Status.InitialObjectTree == nil {
+			reference, err := getObjectReference(root, s.scheme)
+			if err != nil {
+				return kubebuilderx.Commit, err
+			}
 			view.Status.InitialObjectTree = &viewv1.ObjectTreeNode{
-				Primary: *getObjectReference(root),
+				Primary: *reference,
 			}
 		}
 		return kubebuilderx.Continue, nil
@@ -126,7 +131,7 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 
 	// build new InitialObjectTree
 	var err error
-	view.Status.InitialObjectTree, err = getObjectTreeWithRevision(root, viewDef.Spec.OwnershipRules, s.store, view.Status.View[latestReconciliationCycleStart].Revision)
+	view.Status.InitialObjectTree, err = getObjectTreeWithRevision(root, viewDef.Spec.OwnershipRules, s.store, view.Status.View[latestReconciliationCycleStart].Revision, s.scheme)
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
@@ -148,7 +153,7 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 }
 
 // TODO(free6om): similar as getSecondaryObjectsOf, refactor and merge them
-func getObjectTreeWithRevision(primary client.Object, ownershipRules []viewv1.OwnershipRule, store ObjectStore, revision int64) (*viewv1.ObjectTreeNode, error) {
+func getObjectTreeWithRevision(primary client.Object, ownershipRules []viewv1.OwnershipRule, store ObjectStore, revision int64, scheme *runtime.Scheme) (*viewv1.ObjectTreeNode, error) {
 	// find matched rules
 	var matchedRules []*viewv1.OwnershipRule
 	for i := range ownershipRules {
@@ -157,13 +162,21 @@ func getObjectTreeWithRevision(primary client.Object, ownershipRules []viewv1.Ow
 		if err != nil {
 			return nil, err
 		}
-		if *gvk == primary.GetObjectKind().GroupVersionKind() {
+		primaryGVK, err := apiutil.GVKForObject(primary, scheme)
+		if err != nil {
+			return nil, err
+		}
+		if *gvk == primaryGVK {
 			matchedRules = append(matchedRules, rule)
 		}
 	}
 
+	reference, err := getObjectReference(primary, scheme)
+	if err != nil {
+		return nil, err
+	}
 	tree := &viewv1.ObjectTreeNode{
-		Primary: *getObjectReference(primary),
+		Primary: *reference,
 	}
 	// traverse rules, build subtree
 	var secondaries []client.Object
@@ -185,7 +198,7 @@ func getObjectTreeWithRevision(primary client.Object, ownershipRules []viewv1.Ow
 		}
 	}
 	for _, secondary := range secondaries {
-		subTree, err := getObjectTreeWithRevision(secondary, ownershipRules, store, revision)
+		subTree, err := getObjectTreeWithRevision(secondary, ownershipRules, store, revision, scheme)
 		if err != nil {
 			return nil, err
 		}
@@ -287,11 +300,12 @@ func doStateEvaluation(object client.Object, expression viewv1.StateEvaluationEx
 	return result, nil
 }
 
-func viewStateEvaluation(ctx context.Context, reader client.Reader, store ObjectStore) kubebuilderx.Reconciler {
+func viewStateEvaluation(ctx context.Context, reader client.Reader, store ObjectStore, scheme *runtime.Scheme) kubebuilderx.Reconciler {
 	return &stateEvaluation{
 		ctx:    ctx,
 		reader: reader,
 		store:  store,
+		scheme: scheme,
 	}
 }
 

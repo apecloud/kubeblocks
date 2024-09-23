@@ -23,6 +23,7 @@ import (
 	"container/list"
 	"context"
 	"fmt"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"strconv"
 
 	"golang.org/x/exp/slices"
@@ -42,8 +43,8 @@ import (
 type viewCalculator struct {
 	ctx    context.Context
 	cli    client.Reader
-	scheme *runtime.Scheme
 	store  ObjectStore
+	scheme *runtime.Scheme
 }
 
 func (c *viewCalculator) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
@@ -147,7 +148,7 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 	}
 
 	// update view.status.currentObjectTree
-	view.Status.CurrentObjectTree, err = getObjectTreeWithRevision(root, viewDef.Spec.OwnershipRules, c.store, parseRevision(root.ResourceVersion))
+	view.Status.CurrentObjectTree, err = getObjectTreeWithRevision(root, viewDef.Spec.OwnershipRules, c.store, parseRevision(root.ResourceVersion), c.scheme)
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
@@ -170,7 +171,7 @@ func buildChanges(objKeySet sets.Set[model.GVKNObjKey], oldObjectMap, newObjectM
 			obj = oldObj
 		}
 		change := viewv1.ObjectChange{
-			ObjectReference: *getObjectReference(obj),
+			ObjectReference: *objectRefToReference(key, obj.GetUID(), obj.GetResourceVersion()),
 			ChangeType:      changeType,
 			// TODO(free6om): EventAttributes
 			// TODO(free6om): State
@@ -210,6 +211,10 @@ func parseRevision(revisionStr string) int64 {
 }
 
 func (c *viewCalculator) getSecondaryObjectsOf(obj client.Object, ownershipRules []viewv1.OwnershipRule) ([]client.Object, error) {
+	objGVK, err := apiutil.GVKForObject(obj, c.scheme)
+	if err != nil {
+		return nil, err
+	}
 	// find matched rules
 	var rules []viewv1.OwnershipRule
 	for _, rule := range ownershipRules {
@@ -217,7 +222,7 @@ func (c *viewCalculator) getSecondaryObjectsOf(obj client.Object, ownershipRules
 		if err != nil {
 			return nil, err
 		}
-		if *gvk == obj.GetObjectKind().GroupVersionKind() {
+		if *gvk == objGVK {
 			rules = append(rules, rule)
 		}
 	}
@@ -283,8 +288,11 @@ func parseMatchingLabels(obj client.Object, criteria *viewv1.OwnershipCriteria) 
 }
 
 // getObjectReference creates a corev1.ObjectReference from a client.Object
-func getObjectReference(obj client.Object) *corev1.ObjectReference {
-	gvk := obj.GetObjectKind().GroupVersionKind()
+func getObjectReference(obj client.Object, scheme *runtime.Scheme) (*corev1.ObjectReference, error) {
+	gvk, err := apiutil.GVKForObject(obj, scheme)
+	if err != nil {
+		return nil, err
+	}
 
 	return &corev1.ObjectReference{
 		APIVersion:      gvk.GroupVersion().String(),
@@ -293,15 +301,15 @@ func getObjectReference(obj client.Object) *corev1.ObjectReference {
 		Name:            obj.GetName(),
 		UID:             obj.GetUID(),
 		ResourceVersion: obj.GetResourceVersion(),
-	}
+	}, nil
 }
 
-func viewCalculation(ctx context.Context, cli client.Client, scheme *runtime.Scheme, store ObjectStore) kubebuilderx.Reconciler {
+func viewCalculation(ctx context.Context, cli client.Client, store ObjectStore, scheme *runtime.Scheme) kubebuilderx.Reconciler {
 	return &viewCalculator{
 		ctx:    ctx,
 		cli:    cli,
-		scheme: scheme,
 		store:  store,
+		scheme: scheme,
 	}
 }
 

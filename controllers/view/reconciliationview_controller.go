@@ -64,8 +64,8 @@ func (r *ReconciliationViewReconciler) Reconcile(ctx context.Context, req ctrl.R
 		Prepare(viewResources()).
 		Do(viewResourcesValidation(ctx, r.Client)).
 		Do(updateInformerManager(r.InformerManager)).
-		Do(viewCalculation(ctx, r.Client, r.Scheme, r.ObjectStore)).
-		Do(viewStateEvaluation(ctx, r.Client, r.ObjectStore)).
+		Do(viewCalculation(ctx, r.Client, r.ObjectStore, r.Scheme)).
+		Do(viewStateEvaluation(ctx, r.Client, r.ObjectStore, r.Scheme)).
 		Commit()
 
 	// TODO(free6om): err handling

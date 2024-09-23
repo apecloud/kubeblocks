@@ -228,15 +228,6 @@ var _ = Describe("builder", func() {
 			Expect(*configmap.SecurityContext.RunAsUser).Should(BeEquivalentTo(int64(0)))
 		})
 
-		It("builds volume snapshot class correctly", func() {
-			className := "vsc-test"
-			driverName := "csi-driver-test"
-			obj := BuildVolumeSnapshotClass(className, driverName)
-			Expect(obj).ShouldNot(BeNil())
-			Expect(obj.Name).Should(Equal(className))
-			Expect(obj.Driver).Should(Equal(driverName))
-		})
-
 		It("builds cfg manager tools  correctly", func() {
 			_, cluster, _ := newClusterObjs(nil)
 			cfgManagerParams := &cfgcm.CfgManagerBuildParams{

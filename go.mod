@@ -34,7 +34,6 @@ require (
 	github.com/onsi/gomega v1.31.0
 	github.com/opencontainers/image-spec v1.1.0
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.71.0
 	github.com/prometheus/client_golang v1.19.0
 	github.com/replicatedhq/troubleshoot v0.57.0
 	github.com/rogpeppe/go-internal v1.12.0

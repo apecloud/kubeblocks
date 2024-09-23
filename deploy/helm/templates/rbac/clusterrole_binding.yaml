@@ -29,7 +29,6 @@ subjects:
     name: {{ include "kubeblocks.addonSAName" . }}
     namespace: {{ .Release.Namespace }}
 {{- end }}
-{{- if .Values.crd.enabled }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -45,4 +44,3 @@ subjects:
 - kind: ServiceAccount
   name: {{ include "kubeblocks.serviceAccountName" . }}
   namespace: {{ .Release.Namespace }}
-{{- end }}

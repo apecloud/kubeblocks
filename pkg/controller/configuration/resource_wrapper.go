@@ -29,8 +29,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -57,7 +57,7 @@ type ResourceFetcher[T any] struct {
 	ClusterComObj   *appsv1.ClusterComponentSpec
 
 	ConfigMapObj        *corev1.ConfigMap
-	ConfigurationObj    *appsv1alpha1.Configuration
+	ConfigurationObj    *configurationv1alpha1.ComponentParameter
 	ConfigConstraintObj *appsv1beta1.ConfigConstraint
 }
 
@@ -130,18 +130,16 @@ func (r *ResourceFetcher[T]) ComponentSpec() *T {
 }
 
 func (r *ResourceFetcher[T]) Configuration() *T {
-	configKey := client.ObjectKey{
-		Name:      cfgcore.GenerateComponentConfigurationName(r.ClusterName, r.ComponentName),
-		Namespace: r.Namespace,
-	}
-	return r.Wrap(func() (err error) {
-		configuration := appsv1alpha1.Configuration{}
-		err = r.Client.Get(r.Context, configKey, &configuration)
-		if err != nil {
-			return client.IgnoreNotFound(err)
+	return r.Wrap(func() error {
+		if r.ConfigurationObj != nil {
+			return nil
 		}
-		r.ConfigurationObj = &configuration
-		return
+		configKey := client.ObjectKey{
+			Name:      cfgcore.GenerateComponentConfigurationName(r.ClusterName, r.ComponentName),
+			Namespace: r.Namespace,
+		}
+		r.ConfigurationObj = &configurationv1alpha1.ComponentParameter{}
+		return r.Client.Get(r.Context, configKey, r.ConfigurationObj)
 	})
 }
 

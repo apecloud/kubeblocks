@@ -170,7 +170,7 @@ func (f *MockComponentDefinitionFactory) AddServiceExt(name, serviceName string,
 }
 
 func (f *MockComponentDefinitionFactory) AddConfigTemplate(name, configTemplateRef, configConstraintRef,
-	namespace, volumeName string, injectEnvTo ...string) *MockComponentDefinitionFactory {
+	namespace, volumeName string, options ...func(*kbappsv1.ComponentConfigSpec)) *MockComponentDefinitionFactory {
 	config := kbappsv1.ComponentConfigSpec{
 		ComponentTemplateSpec: kbappsv1.ComponentTemplateSpec{
 			Name:        name,
@@ -179,12 +179,23 @@ func (f *MockComponentDefinitionFactory) AddConfigTemplate(name, configTemplateR
 			VolumeName:  volumeName,
 		},
 		ConfigConstraintRef: configConstraintRef,
-		InjectEnvTo:         injectEnvTo,
 	}
+	for _, option := range options {
+		option(&config)
+	}
+
 	if f.Get().Spec.Configs == nil {
 		f.Get().Spec.Configs = make([]kbappsv1.ComponentConfigSpec, 0)
 	}
 	f.Get().Spec.Configs = append(f.Get().Spec.Configs, config)
+	return f
+}
+
+func (f *MockComponentDefinitionFactory) AddParametersDefinition(fileName string, paramDef string) *MockComponentDefinitionFactory {
+	f.Get().Spec.ParametersDescriptions = append(f.Get().Spec.ParametersDescriptions, kbappsv1.ComponentParametersDescription{
+		Name:              fileName,
+		ParametersDefName: paramDef,
+	})
 	return f
 }
 
@@ -352,4 +363,16 @@ func mergedAddVolumeMounts(c *corev1.Container, volumeMounts []corev1.VolumeMoun
 		mounts = append(mounts, v)
 	}
 	c.VolumeMounts = mounts
+}
+
+func WithSecret() func(*kbappsv1.ComponentConfigSpec) {
+	return func(spec *kbappsv1.ComponentConfigSpec) {
+		spec.AsSecret = func() *bool { var b = true; return &b }()
+	}
+}
+
+func WithInjectEnv(containers ...string) func(*kbappsv1.ComponentConfigSpec) {
+	return func(spec *kbappsv1.ComponentConfigSpec) {
+		spec.InjectEnvTo = containers
+	}
 }

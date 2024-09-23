@@ -512,6 +512,16 @@ type ComponentDefinitionSpec struct {
 	//
 	// +optional
 	Exporter *Exporter `json:"exporter,omitempty"`
+
+	// Specifies the name of the ParametersDefinition to associate the configuration file.
+	// The ParametersDefinition object defines the format of the configuration file and all parameters type.
+	//
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	ParametersDescriptions []ComponentParametersDescription `json:"parametersDescriptions,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 }
 
 // ComponentDefinitionStatus defines the observed state of ComponentDefinition.
@@ -1027,6 +1037,24 @@ type ComponentTemplateSpec struct {
 type ComponentConfigSpec struct {
 	ComponentTemplateSpec `json:",inline"`
 
+	// Specifies the configuration files within the ConfigMap that support dynamic updates and parametersSchema.
+	//
+	// A configuration template (provided in the form of a ConfigMap) may contain templates for multiple
+	// configuration files.
+	// Some of these configuration files may support dynamic modification and reloading without requiring
+	// a pod restart.
+	//
+	// If empty, all configuration files in the ConfigMap do not support parameter update, but they can be modified directly through configmap.
+	//
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	ComponentConfigDescriptions []ComponentConfigDescription `json:"componentConfigDescriptions,omitempty"`
+
+	// Deprecated: keys has been deprecated since 1.0.0
+	// Use `componentConfigDescriptions` instead.
 	// Specifies the configuration files within the ConfigMap that support dynamic updates.
 	//
 	// A configuration template (provided in the form of a ConfigMap) may contain templates for multiple
@@ -1112,6 +1140,34 @@ type ComponentConfigSpec struct {
 	//
 	// +optional
 	AsSecret *bool `json:"asSecret,omitempty"`
+}
+
+type ComponentParameters map[string]*string
+
+type ComponentConfigDescription struct {
+	// Defines the unique identifier of the config file name.
+	//
+	// It must be a string of maximum 63 characters, and can only include lowercase alphanumeric characters,
+	// hyphens, and periods.
+	// The name must start and end with an alphanumeric character.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	Name string `json:"name"`
+
+	// Specifies whether the configuration needs to be re-rendered after v-scale or h-scale operations to reflect changes.
+	//
+	// In some scenarios, the configuration may need to be updated to reflect the changes in resource allocation
+	// or cluster topology. Examples:
+	//
+	// - Redis: adjust maxmemory after v-scale operation.
+	// - MySQL: increase max connections after v-scale operation.
+	// - Zookeeper: update zoo.cfg with new node addresses after h-scale operation.
+	//
+	// +listType=set
+	// +optional
+	ReRenderResourceTypes []RerenderResourceType `json:"reRenderResourceTypes,omitempty"`
 }
 
 // LegacyRenderedTemplateSpec describes the configuration extension for the lazy rendered template.
@@ -1866,6 +1922,34 @@ type Exporter struct {
 	// +kubebuilder:validation:default="http"
 	// +optional
 	ScrapeScheme PrometheusScheme `json:"scrapeScheme,omitempty"`
+}
+
+type ComponentParametersDescription struct {
+	// Defines the unique identifier of the config file name.
+	//
+	// It must be a string of maximum 63 characters, and can only include lowercase alphanumeric characters,
+	// hyphens, and periods.
+	// The name must start and end with an alphanumeric character.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	Name string `json:"name"`
+
+	// // Specifies the name of the configuration template.
+	// //
+	// // +kubebuilder:validation:Required
+	// // +kubebuilder:validation:MaxLength=63
+	// // +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// ConfigTemplateName string `json:"configTemplateName"`
+
+	// Specifies the name of the ParametersDefinition to associate the configuration file.
+	// The ParametersDefinition object defines the format of the configuration file and all parameters type.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	ParametersDefName string `json:"parametersDefName"`
 }
 
 // PrometheusScheme defines the protocol of prometheus scrape metrics.

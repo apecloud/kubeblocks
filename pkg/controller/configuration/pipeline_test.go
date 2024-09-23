@@ -25,6 +25,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	"github.com/golang/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
@@ -32,12 +33,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
@@ -51,7 +54,7 @@ var _ = Describe("ConfigurationPipelineTest", func() {
 	var synthesizedComponent *component.SynthesizedComponent
 	var configMapObj *corev1.ConfigMap
 	var configConstraint *appsv1beta1.ConfigConstraint
-	var configurationObj *appsv1alpha1.Configuration
+	var configurationObj *configurationv1alpha1.ComponentParameter
 	var k8sMockClient *testutil.K8sClientMockHelper
 
 	mockAPIResource := func(lazyFetcher testutil.Getter) {
@@ -67,7 +70,7 @@ var _ = Describe("ConfigurationPipelineTest", func() {
 		k8sMockClient.MockCreateMethod(testutil.WithCreateReturned(testutil.WithCreatedSucceedResult(), testutil.WithAnyTimes()))
 		k8sMockClient.MockPatchMethod(testutil.WithPatchReturned(func(obj client.Object, patch client.Patch) error {
 			switch v := obj.(type) {
-			case *appsv1alpha1.Configuration:
+			case *configurationv1alpha1.ComponentParameter:
 				if client.ObjectKeyFromObject(obj) == client.ObjectKeyFromObject(configurationObj) {
 					configurationObj.Spec = *v.Spec.DeepCopy()
 					configurationObj.Status = *v.Status.DeepCopy()
@@ -80,7 +83,7 @@ var _ = Describe("ConfigurationPipelineTest", func() {
 			Patch(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 			DoAndReturn(func(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
 				switch v := obj.(type) {
-				case *appsv1alpha1.Configuration:
+				case *configurationv1alpha1.ComponentParameter:
 					if client.ObjectKeyFromObject(obj) == client.ObjectKeyFromObject(configurationObj) {
 						configurationObj.Status = *v.Status.DeepCopy()
 					}
@@ -134,7 +137,7 @@ max_connections = '1000'
 			synthesizedComponent.ConfigTemplates[0].Keys = []string{testConfigFile}
 
 			By("create configuration resource")
-			createPipeline := NewCreatePipeline(ReconcileCtx{
+			createPipeline := NewReloadActionBuilderHelper(ReconcileCtx{
 				ResourceCtx: &ResourceCtx{
 					Client:        k8sMockClient.Client(),
 					Context:       ctx,
@@ -163,19 +166,17 @@ max_connections = '1000'
 			})
 
 			err := createPipeline.Prepare().
-				UpdateConfiguration(). // reconcile Configuration
-				Configuration().       // sync Configuration
-				CreateConfigTemplate().
+				UpdateConfigurationForTest().
+				Configuration().
+				InitConfigRelatedObject().
 				UpdatePodVolumes().
 				BuildConfigManagerSidecar().
-				UpdateConfigRelatedObject().
-				UpdateConfigurationStatus().
 				Complete()
 			Expect(err).Should(Succeed())
 
 			By("update configuration resource for mocking reconfiguring")
 			item := configurationObj.Spec.ConfigItemDetails[0]
-			item.ConfigFileParams = map[string]appsv1alpha1.ConfigParams{
+			item.ConfigFileParams = map[string]configurationv1alpha1.ParametersInFile{
 				testConfigFile: {
 					Parameters: map[string]*string{
 						"max_connections": cfgutil.ToPointer("2000"),
@@ -185,13 +186,22 @@ max_connections = '1000'
 					Content: cfgutil.ToPointer(`for test`),
 				},
 			}
+			status := intctrlutil.GetItemStatus(&configurationObj.Status, item.Name)
+			if status == nil {
+				configurationObj.Status.ConfigurationItemStatus = append(configurationObj.Status.ConfigurationItemStatus, configurationv1alpha1.ConfigTemplateItemDetailStatus{
+					Name:           item.Name,
+					Phase:          configurationv1alpha1.CInitPhase,
+					UpdateRevision: strconv.FormatInt(configurationObj.GetGeneration(), 10),
+				})
+				status = intctrlutil.GetItemStatus(&configurationObj.Status, item.Name)
+			}
 			reconcileTask := NewReconcilePipeline(ReconcileCtx{
 				ResourceCtx:          createPipeline.ResourceCtx,
 				Cluster:              clusterObj,
 				Component:            componentObj,
 				SynthesizedComponent: synthesizedComponent,
 				PodSpec:              synthesizedComponent.PodSpec,
-			}, item, &configurationObj.Status.ConfigurationItemStatus[0], nil)
+			}, item, status, nil)
 
 			By("update configuration resource")
 			err = reconcileTask.InitConfigSpec().
@@ -208,7 +218,7 @@ max_connections = '1000'
 			Expect(err).Should(Succeed())
 
 			By("rerender configuration template")
-			reconcileTask.item.Version = "v2"
+			// reconcileTask.item.Version = "v2"
 			err = reconcileTask.InitConfigSpec().
 				Configuration().
 				ConfigMap(configTemplateName).
@@ -225,3 +235,78 @@ max_connections = '1000'
 	})
 
 })
+
+func (p *reloadActionBuilderHelper) UpdateConfigurationForTest() *reloadActionBuilderHelper {
+	buildConfiguration := func() (err error) {
+		expectedConfiguration := p.createConfiguration()
+		if intctrlutil.SetControllerReference(p.ctx.Component, expectedConfiguration) != nil {
+			return
+		}
+		_, _ = UpdateConfigPayload(&expectedConfiguration.Spec, p.ctx.SynthesizedComponent)
+
+		existingConfiguration := configurationv1alpha1.ComponentParameter{}
+		err = p.ResourceFetcher.Client.Get(p.Context, client.ObjectKeyFromObject(expectedConfiguration), &existingConfiguration)
+		switch {
+		case err == nil:
+			return p.updateConfiguration(expectedConfiguration, &existingConfiguration)
+		case apierrors.IsNotFound(err):
+			return p.ResourceFetcher.Client.Create(p.Context, expectedConfiguration)
+		default:
+			return err
+		}
+	}
+	return p.Wrap(buildConfiguration)
+}
+
+func (p *reloadActionBuilderHelper) createConfiguration() *configurationv1alpha1.ComponentParameter {
+	builder := builder.NewConfigurationBuilder(p.Namespace,
+		cfgcore.GenerateComponentConfigurationName(p.ClusterName, p.ComponentName),
+	)
+	for _, template := range p.ctx.SynthesizedComponent.ConfigTemplates {
+		builder.AddConfigurationItem(template)
+	}
+	return builder.Component(p.ComponentName).
+		ClusterRef(p.ClusterName).
+		AddLabelsInMap(constant.GetComponentWellKnownLabels(p.ClusterName, p.ComponentName)).
+		GetObject()
+}
+
+func (p *reloadActionBuilderHelper) updateConfiguration(expected *configurationv1alpha1.ComponentParameter, existing *configurationv1alpha1.ComponentParameter) error {
+	fromMap := func(items []configurationv1alpha1.ConfigTemplateItemDetail) *cfgutil.Sets {
+		sets := cfgutil.NewSet()
+		for _, item := range items {
+			sets.Add(item.Name)
+		}
+		return sets
+	}
+
+	updateConfigSpec := func(item configurationv1alpha1.ConfigTemplateItemDetail) configurationv1alpha1.ConfigTemplateItemDetail {
+		if newItem := intctrlutil.GetConfigurationItem(&expected.Spec, item.Name); newItem != nil {
+			item.ConfigSpec = newItem.ConfigSpec
+		}
+		return item
+	}
+
+	oldSets := fromMap(existing.Spec.ConfigItemDetails)
+	newSets := fromMap(expected.Spec.ConfigItemDetails)
+
+	addSets := cfgutil.Difference(newSets, oldSets)
+	delSets := cfgutil.Difference(oldSets, newSets)
+
+	newConfigItems := make([]configurationv1alpha1.ConfigTemplateItemDetail, 0)
+	for _, item := range existing.Spec.ConfigItemDetails {
+		if !delSets.InArray(item.Name) {
+			newConfigItems = append(newConfigItems, updateConfigSpec(item))
+		}
+	}
+	for _, item := range expected.Spec.ConfigItemDetails {
+		if addSets.InArray(item.Name) {
+			newConfigItems = append(newConfigItems, item)
+		}
+	}
+
+	patch := client.MergeFrom(existing)
+	updated := existing.DeepCopy()
+	updated.Spec.ConfigItemDetails = newConfigItems
+	return p.Client.Patch(p.Context, updated, patch)
+}

@@ -26,6 +26,8 @@ import (
 	fakeappsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/apps/v1alpha1/fake"
 	appsv1beta1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/apps/v1beta1"
 	fakeappsv1beta1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/apps/v1beta1/fake"
+	configurationv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/configuration/v1alpha1"
+	fakeconfigurationv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/configuration/v1alpha1/fake"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/dataprotection/v1alpha1"
 	fakedataprotectionv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/dataprotection/v1alpha1/fake"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/extensions/v1alpha1"
@@ -106,6 +108,11 @@ func (c *Clientset) AppsV1beta1() appsv1beta1.AppsV1beta1Interface {
 // AppsV1 retrieves the AppsV1Client
 func (c *Clientset) AppsV1() appsv1.AppsV1Interface {
 	return &fakeappsv1.FakeAppsV1{Fake: &c.Fake}
+}
+
+// ConfigurationV1alpha1 retrieves the ConfigurationV1alpha1Client
+func (c *Clientset) ConfigurationV1alpha1() configurationv1alpha1.ConfigurationV1alpha1Interface {
+	return &fakeconfigurationv1alpha1.FakeConfigurationV1alpha1{Fake: &c.Fake}
 }
 
 // DataprotectionV1alpha1 retrieves the DataprotectionV1alpha1Client

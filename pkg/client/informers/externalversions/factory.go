@@ -25,6 +25,7 @@ import (
 
 	versioned "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned"
 	apps "github.com/apecloud/kubeblocks/pkg/client/informers/externalversions/apps"
+	configuration "github.com/apecloud/kubeblocks/pkg/client/informers/externalversions/configuration"
 	dataprotection "github.com/apecloud/kubeblocks/pkg/client/informers/externalversions/dataprotection"
 	extensions "github.com/apecloud/kubeblocks/pkg/client/informers/externalversions/extensions"
 	internalinterfaces "github.com/apecloud/kubeblocks/pkg/client/informers/externalversions/internalinterfaces"
@@ -258,6 +259,7 @@ type SharedInformerFactory interface {
 	InformerFor(obj runtime.Object, newFunc internalinterfaces.NewInformerFunc) cache.SharedIndexInformer
 
 	Apps() apps.Interface
+	Configuration() configuration.Interface
 	Dataprotection() dataprotection.Interface
 	Extensions() extensions.Interface
 	Operations() operations.Interface
@@ -266,6 +268,10 @@ type SharedInformerFactory interface {
 
 func (f *sharedInformerFactory) Apps() apps.Interface {
 	return apps.New(f, f.namespace, f.tweakListOptions)
+}
+
+func (f *sharedInformerFactory) Configuration() configuration.Interface {
+	return configuration.New(f, f.namespace, f.tweakListOptions)
 }
 
 func (f *sharedInformerFactory) Dataprotection() dataprotection.Interface {

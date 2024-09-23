@@ -36,6 +36,7 @@ import (
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -169,6 +170,7 @@ func kindsForHalt() ([]client.ObjectList, []client.ObjectList) {
 		// The owner of the configuration in version 0.9 has been adjusted to component cr.
 		// for compatible with version 0.8
 		&appsv1alpha1.ConfigurationList{},
+		&configurationv1alpha1.ComponentParameterList{},
 	}
 	nonNamespacedKindsPlus := []client.ObjectList{
 		&rbacv1.ClusterRoleBindingList{},

@@ -38,7 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -170,13 +170,13 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			// handle tls volume and cert
 			&componentTLSTransformer{Client: r.Client},
 			// rerender parameters after v-scale and h-scale
-			&componentRelatedParametersTransformer{Client: r.Client},
+			&componentConfigurationTransformer{Client: r.Client},
 			// resolve and build vars for template and Env
 			&componentVarsTransformer{},
 			// provision component system accounts, depend on vars
 			&componentAccountProvisionTransformer{},
 			// render component configurations
-			&componentConfigurationTransformer{Client: r.Client},
+			&componentParametersReloadSidecarTransformer{Client: r.Client},
 			// handle restore before workloads transform
 			&componentRestoreTransformer{Client: r.Client},
 			// handle upgrade from the legacy RSM API to the InstanceSet API
@@ -229,7 +229,7 @@ func (r *ComponentReconciler) setupWithManager(mgr ctrl.Manager) error {
 		Owns(&dpv1alpha1.Restore{}).
 		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
 		Owns(&batchv1.Job{}).
-		Watches(&appsv1alpha1.Configuration{}, handler.EnqueueRequestsFromMapFunc(r.configurationEventHandler))
+		Owns(&configurationv1alpha1.ComponentParameter{})
 
 	if viper.GetBool(constant.EnableRBACManager) {
 		b.Owns(&rbacv1.ClusterRoleBinding{}).
@@ -253,7 +253,7 @@ func (r *ComponentReconciler) setupWithMultiClusterManager(mgr ctrl.Manager, mul
 		Owns(&workloads.InstanceSet{}).
 		Owns(&dpv1alpha1.Backup{}).
 		Owns(&dpv1alpha1.Restore{}).
-		Watches(&appsv1alpha1.Configuration{}, handler.EnqueueRequestsFromMapFunc(r.configurationEventHandler))
+		Owns(&configurationv1alpha1.ComponentParameter{})
 
 	eventHandler := handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)
 	multiClusterMgr.Watch(b, &corev1.Service{}, eventHandler).
@@ -285,21 +285,6 @@ func (r *ComponentReconciler) filterComponentResources(ctx context.Context, obj 
 			NamespacedName: types.NamespacedName{
 				Namespace: obj.GetNamespace(),
 				Name:      fullCompName,
-			},
-		},
-	}
-}
-
-func (r *ComponentReconciler) configurationEventHandler(_ context.Context, obj client.Object) []reconcile.Request {
-	cr, ok := obj.(*appsv1alpha1.Configuration)
-	if !ok {
-		return []reconcile.Request{}
-	}
-	return []reconcile.Request{
-		{
-			NamespacedName: types.NamespacedName{
-				Namespace: obj.GetNamespace(),
-				Name:      constant.GenerateClusterComponentName(cr.Spec.ClusterRef, cr.Spec.ComponentName),
 			},
 		},
 	}

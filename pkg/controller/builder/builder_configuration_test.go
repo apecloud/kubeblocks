@@ -51,7 +51,7 @@ var _ = Describe("configuration builder", func() {
 			GetObject()
 
 		Expect(config.Name).Should(BeEquivalentTo(name))
-		Expect(config.Spec.ClusterRef).Should(BeEquivalentTo(clusterName))
+		Expect(config.Spec.ClusterName).Should(BeEquivalentTo(clusterName))
 		Expect(config.Spec.ComponentName).Should(BeEquivalentTo(componentName))
 		Expect(len(config.Spec.ConfigItemDetails)).Should(Equal(2))
 	})

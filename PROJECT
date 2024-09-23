@@ -163,15 +163,6 @@ resources:
   controller: true
   domain: kubeblocks.io
   group: apps
-  kind: Configuration
-  path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
-  version: v1alpha1
-- api:
-    crdVersion: v1
-    namespaced: true
-  controller: true
-  domain: kubeblocks.io
-  group: apps
   kind: ServiceDescriptor
   path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
   version: v1alpha1
@@ -294,6 +285,31 @@ resources:
   domain: kubeblocks.io
   group: operations
   kind: OpsDefinition
+  path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: kubeblocks.io
+  group: configuration
+  kind: ComponentParameter
+  path: github.com/apecloud/kubeblocks/apis/configuration/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+  controller: true
+  domain: kubeblocks.io
+  group: configuration
+  kind: ParametersDefinition
+  path: github.com/apecloud/kubeblocks/apis/configuration/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: kubeblocks.io
+  group: apps
+  kind: Configuration
   path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
   version: v1alpha1
 version: "3"

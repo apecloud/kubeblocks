@@ -87,6 +87,7 @@ type ComponentTemplateSpec struct {
 }
 
 type ConfigTemplateExtension struct {
+	// Deprecated: Use `templateName` instead.
 	// Specifies the name of the referenced configuration template ConfigMap object.
 	//
 	// +kubebuilder:validation:Required
@@ -133,6 +134,7 @@ type ComponentConfigSpec struct {
 	// +optional
 	Keys []string `json:"keys,omitempty"`
 
+	// Deprecated: legacyRenderedConfigSpec has been deprecated since 1.0.0
 	// Specifies the secondary rendered config spec for pod-specific customization.
 	//
 	// The template is rendered inside the pod (by the "config-manager" sidecar container) and merged with the main
@@ -148,6 +150,8 @@ type ComponentConfigSpec struct {
 	// +optional
 	LegacyRenderedConfigSpec *LegacyRenderedTemplateSpec `json:"legacyRenderedConfigSpec,omitempty"`
 
+	// Deprecated: configConstraint has been deprecated since 1.0.0
+	//
 	// Specifies the name of the referenced configuration constraints object.
 	//
 	// +kubebuilder:validation:MaxLength=63
@@ -186,6 +190,7 @@ type ComponentConfigSpec struct {
 	// +optional
 	InjectEnvTo []string `json:"injectEnvTo,omitempty"`
 
+	// Deprecated: Use `componentConfigDescriptions[*].reRenderResourceTypes` instead.
 	// Specifies whether the configuration needs to be re-rendered after v-scale or h-scale operations to reflect changes.
 	//
 	// In some scenarios, the configuration may need to be updated to reflect the changes in resource allocation

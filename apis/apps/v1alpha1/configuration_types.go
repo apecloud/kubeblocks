@@ -1,17 +1,20 @@
 /*
 Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package v1alpha1
@@ -42,11 +45,6 @@ type ConfigurationItemDetail struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// Deprecated: No longer used. Please use 'Payload' instead. Previously represented the version of the configuration template.
-	//
-	// +optional
-	Version string `json:"version,omitempty"`
-
 	// External controllers can trigger a configuration rerender by modifying this field.
 	//
 	// Note: Currently, the `payload` field is opaque and its content is not interpreted by the system.
@@ -65,7 +63,7 @@ type ConfigurationItemDetail struct {
 	// It ensures that the configuration adheres to certain requirements and limitations.
 	//
 	// +optional
-	ConfigSpec *ComponentConfigSpec `json:"configSpec"`
+	ConfigSpec *ComponentConfigSpec `json:"configSpec,omitempty"`
 
 	// Specifies the user-defined configuration template.
 	//
@@ -74,7 +72,7 @@ type ConfigurationItemDetail struct {
 	// This allows users to customize the configuration template according to their specific requirements.
 	//
 	// +optional
-	ImportTemplateRef *ConfigTemplateExtension `json:"importTemplateRef"`
+	ImportTemplateRef *ConfigTemplateExtension `json:"importTemplateRef,omitempty"`
 
 	// Specifies the user-defined configuration parameters.
 	//
@@ -85,13 +83,16 @@ type ConfigurationItemDetail struct {
 	ConfigFileParams map[string]ConfigParams `json:"configFileParams,omitempty"`
 }
 
-// ConfigurationSpec defines the desired state of a Configuration resource.
+// ConfigurationSpec defines the desired state of ComponentConfiguration
 type ConfigurationSpec struct {
+	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+	// Important: Run "make" to regenerate code after modifying this file
+
 	// Specifies the name of the Cluster that this configuration is associated with.
 	//
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
-	ClusterRef string `json:"clusterRef"`
+	// +optional
+	ClusterName string `json:"clusterName,omitempty"`
 
 	// Represents the name of the Component that this configuration pertains to.
 	//
@@ -196,9 +197,9 @@ type ConfigurationItemDetailStatus struct {
 	ReconcileDetail *ReconcileDetail `json:"reconcileDetail,omitempty"`
 }
 
-// ConfigurationStatus represents the observed state of a Configuration resource.
+// ConfigurationStatus defines the observed state of ComponentConfiguration
 type ConfigurationStatus struct {
-	// This is a placeholder for additional fields that describe the observed state of the cluster.
+	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Provides a description of any abnormal status.
@@ -227,12 +228,17 @@ type ConfigurationStatus struct {
 	ConfigurationItemStatus []ConfigurationItemDetailStatus `json:"configurationStatus"`
 }
 
+// +genclient
+// +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:resource:categories={kubeblocks,all},shortName=config
+// +kubebuilder:printcolumn:name="CLUSTER",type="string",JSONPath=".spec.clusterName",description="cluster name"
+// +kubebuilder:printcolumn:name="COMPONENT",type="string",JSONPath=".spec.componentName",description="component name"
+// +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="config status phase."
+// +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
-// Configuration represents the complete set of configurations for a specific Component of a Cluster.
-// This includes templates for each configuration file, their corresponding ConfigConstraints, volume mounts,
-// and other relevant details.
+// Configuration is the Schema for the configurations API
 type Configuration struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

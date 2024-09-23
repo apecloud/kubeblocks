@@ -21,100 +21,39 @@ package builder
 
 import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 )
 
-type ConfigurationBuilder struct {
-	BaseBuilder[appsv1alpha1.Configuration, *appsv1alpha1.Configuration, ConfigurationBuilder]
+type ConfigurationParameterBuilder struct {
+	BaseBuilder[configurationv1alpha1.ComponentParameter, *configurationv1alpha1.ComponentParameter, ConfigurationParameterBuilder]
 }
 
-func NewConfigurationBuilder(namespace, name string) *ConfigurationBuilder {
-	builder := &ConfigurationBuilder{}
-	builder.init(namespace, name, &appsv1alpha1.Configuration{}, builder)
+func NewConfigurationBuilder(namespace, name string) *ConfigurationParameterBuilder {
+	builder := &ConfigurationParameterBuilder{}
+	builder.init(namespace, name, &configurationv1alpha1.ComponentParameter{}, builder)
 	return builder
 }
 
-func (c *ConfigurationBuilder) ClusterRef(clusterName string) *ConfigurationBuilder {
-	c.get().Spec.ClusterRef = clusterName
+func (c *ConfigurationParameterBuilder) ClusterRef(clusterName string) *ConfigurationParameterBuilder {
+	c.get().Spec.ClusterName = clusterName
 	return c
 }
 
-func (c *ConfigurationBuilder) Component(component string) *ConfigurationBuilder {
+func (c *ConfigurationParameterBuilder) Component(component string) *ConfigurationParameterBuilder {
 	c.get().Spec.ComponentName = component
 	return c
 }
 
-func (c *ConfigurationBuilder) AddConfigurationItem(configSpec appsv1.ComponentConfigSpec) *ConfigurationBuilder {
+func (c *ConfigurationParameterBuilder) AddConfigurationItem(configSpec appsv1.ComponentConfigSpec) *ConfigurationParameterBuilder {
 	c.get().Spec.ConfigItemDetails = append(c.get().Spec.ConfigItemDetails,
-		appsv1alpha1.ConfigurationItemDetail{
+		configurationv1alpha1.ConfigTemplateItemDetail{
 			Name:       configSpec.Name,
-			ConfigSpec: ToV1alpha1ConfigSpec(configSpec.DeepCopy()),
+			ConfigSpec: configSpec.DeepCopy(),
 		})
 	return c
 }
 
-func ToV1ConfigSpec(spec *appsv1alpha1.ComponentConfigSpec) *appsv1.ComponentConfigSpec {
-	v1 := &appsv1.ComponentConfigSpec{
-		ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
-			Name:        spec.Name,
-			TemplateRef: spec.TemplateRef,
-			Namespace:   spec.Namespace,
-			VolumeName:  spec.VolumeName,
-			DefaultMode: spec.DefaultMode,
-		},
-		Keys:                spec.Keys,
-		ConfigConstraintRef: spec.ConfigConstraintRef,
-		AsEnvFrom:           spec.AsEnvFrom,
-		InjectEnvTo:         spec.InjectEnvTo,
-		AsSecret:            spec.AsSecret,
-	}
-	if spec.LegacyRenderedConfigSpec != nil {
-		v1.LegacyRenderedConfigSpec = &appsv1.LegacyRenderedTemplateSpec{
-			ConfigTemplateExtension: appsv1.ConfigTemplateExtension{
-				TemplateRef: spec.LegacyRenderedConfigSpec.TemplateRef,
-				Namespace:   spec.LegacyRenderedConfigSpec.Namespace,
-				Policy:      appsv1.MergedPolicy(spec.LegacyRenderedConfigSpec.Policy),
-			},
-		}
-	}
-	if spec.ReRenderResourceTypes != nil {
-		v1.ReRenderResourceTypes = make([]appsv1.RerenderResourceType, 0)
-		for _, r := range spec.ReRenderResourceTypes {
-			v1.ReRenderResourceTypes = append(v1.ReRenderResourceTypes, appsv1.RerenderResourceType(r))
-		}
-	}
-	return v1
-}
-
-func ToV1alpha1ConfigSpec(spec *appsv1.ComponentConfigSpec) *appsv1alpha1.ComponentConfigSpec {
-	v1 := &appsv1alpha1.ComponentConfigSpec{
-		ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-			Name:        spec.Name,
-			TemplateRef: spec.TemplateRef,
-			Namespace:   spec.Namespace,
-			VolumeName:  spec.VolumeName,
-			DefaultMode: spec.DefaultMode,
-		},
-		Keys:                spec.Keys,
-		ConfigConstraintRef: spec.ConfigConstraintRef,
-		AsEnvFrom:           spec.AsEnvFrom,
-		InjectEnvTo:         spec.InjectEnvTo,
-		AsSecret:            spec.AsSecret,
-	}
-	if spec.LegacyRenderedConfigSpec != nil {
-		v1.LegacyRenderedConfigSpec = &appsv1alpha1.LegacyRenderedTemplateSpec{
-			ConfigTemplateExtension: appsv1alpha1.ConfigTemplateExtension{
-				TemplateRef: spec.LegacyRenderedConfigSpec.TemplateRef,
-				Namespace:   spec.LegacyRenderedConfigSpec.Namespace,
-				Policy:      appsv1alpha1.MergedPolicy(spec.LegacyRenderedConfigSpec.Policy),
-			},
-		}
-	}
-	if spec.ReRenderResourceTypes != nil {
-		v1.ReRenderResourceTypes = make([]appsv1alpha1.RerenderResourceType, 0)
-		for _, r := range spec.ReRenderResourceTypes {
-			v1.ReRenderResourceTypes = append(v1.ReRenderResourceTypes, appsv1alpha1.RerenderResourceType(r))
-		}
-	}
-	return v1
+func (c *ConfigurationParameterBuilder) SetConfigurationItem(items []configurationv1alpha1.ConfigTemplateItemDetail) *ConfigurationParameterBuilder {
+	c.get().Spec.ConfigItemDetails = items
+	return c
 }

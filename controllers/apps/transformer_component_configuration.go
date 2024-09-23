@@ -20,69 +20,119 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"context"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
-	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
+	"github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/plan"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-// componentConfigurationTransformer handles component configuration render
+// clusterServiceTransformer handles cluster services.
 type componentConfigurationTransformer struct {
 	client.Client
 }
 
 var _ graph.Transformer = &componentConfigurationTransformer{}
 
-func (t *componentConfigurationTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (c *componentConfigurationTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
 
-	comp := transCtx.Component
-	cluster := transCtx.Cluster
-	compOrig := transCtx.ComponentOrig
-	synthesizeComp := transCtx.SynthesizeComponent
-
-	if model.IsObjectDeleting(compOrig) {
+	if model.IsObjectDeleting(transCtx.ComponentOrig) {
 		return nil
 	}
-	if common.IsCompactMode(compOrig.Annotations) {
+	if common.IsCompactMode(transCtx.ComponentOrig.Annotations) {
 		transCtx.V(1).Info("Component is in compact mode, no need to create configuration related objects",
 			"component", client.ObjectKeyFromObject(transCtx.ComponentOrig))
 		return nil
 	}
 
-	// get dependOnObjs which will be used in configuration render
-	var dependOnObjs []client.Object
-	for _, vertex := range dag.Vertices() {
-		v, _ := vertex.(*model.ObjectVertex)
-		if cm, ok := v.Obj.(*corev1.ConfigMap); ok {
-			dependOnObjs = append(dependOnObjs, cm)
-			continue
-		}
-		if secret, ok := v.Obj.(*corev1.Secret); ok {
-			dependOnObjs = append(dependOnObjs, secret)
-			continue
-		}
-	}
+	return c.reconcile(transCtx, transCtx.SynthesizeComponent, dag)
+}
 
-	// configuration render
-	if err := plan.RenderConfigNScriptFiles(
-		&configctrl.ResourceCtx{
-			Context:       transCtx.Context,
-			Client:        t.Client,
-			Namespace:     comp.GetNamespace(),
-			ClusterName:   synthesizeComp.ClusterName,
-			ComponentName: synthesizeComp.Name,
-		},
-		cluster,
-		comp,
-		synthesizeComp,
-		synthesizeComp.PodSpec,
-		dependOnObjs); err != nil {
+func (c *componentConfigurationTransformer) reconcile(transCtx *componentTransformContext, component *component.SynthesizedComponent, dag *graph.DAG) error {
+	existingConfig, err := c.runningComponentConfiguration(transCtx, transCtx.GetClient(), component)
+	if err != nil {
 		return err
 	}
+
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	cluster := transCtx.Cluster
+	config, err := buildConfiguration(transCtx, cluster, component)
+	if err != nil {
+		return err
+	}
+	if config == nil {
+		if existingConfig != nil {
+			graphCli.Delete(dag, existingConfig, inDataContext4G())
+		}
+		return nil
+	}
+	if _, err = configuration.UpdateConfigPayload(&config.Spec, component); err != nil {
+		return err
+	}
+	if err := controllerutil.SetOwnerReference(transCtx.Component, config, model.GetScheme()); err != nil {
+		return err
+	}
+	if existingConfig != nil {
+		graphCli.Update(dag, existingConfig, mergeConfigObject(existingConfig, config), inDataContext4G())
+	} else {
+		graphCli.Create(dag, config, inDataContext4G())
+	}
 	return nil
+}
+
+func mergeConfigObject(existing *configurationv1alpha1.ComponentParameter, expected *configurationv1alpha1.ComponentParameter) *configurationv1alpha1.ComponentParameter {
+	deepCopy := existing.DeepCopy()
+	deepCopy.Spec = expected.Spec
+	deepCopy.Labels = intctrlutil.MergeMetadataMaps(existing.Labels, existing.Labels)
+	deepCopy.Annotations = intctrlutil.MergeMetadataMaps(existing.Annotations, existing.Annotations)
+	deepCopy.OwnerReferences = expected.OwnerReferences
+	return deepCopy
+}
+
+func (c *componentConfigurationTransformer) runningComponentConfiguration(ctx context.Context, cli client.Reader, component *component.SynthesizedComponent) (*configurationv1alpha1.ComponentParameter, error) {
+	key := client.ObjectKey{
+		Name:      core.GenerateComponentConfigurationName(component.ClusterName, component.Name),
+		Namespace: component.Namespace,
+	}
+	existingConfig := &configurationv1alpha1.ComponentParameter{}
+	err := cli.Get(ctx, key, existingConfig, inDataContext4C())
+	if err == nil {
+		return existingConfig, nil
+	}
+	if !apierrors.IsNotFound(err) {
+		return nil, err
+	}
+	return nil, nil
+}
+
+func buildConfiguration(transCtx *componentTransformContext, cluster *appsv1.Cluster, component *component.SynthesizedComponent) (*configurationv1alpha1.ComponentParameter, error) {
+	var err error
+	var items []configurationv1alpha1.ConfigTemplateItemDetail
+
+	if len(component.ConfigTemplates) == 0 {
+		return nil, nil
+	}
+	if items, err = configuration.ClassifyParamsFromConfigTemplate(transCtx, transCtx.GetClient(), transCtx.Component, transCtx.CompDef, component); err != nil {
+		return nil, err
+	}
+	return builder.NewConfigurationBuilder(cluster.Namespace,
+		core.GenerateComponentConfigurationName(cluster.Name, component.Name)).
+		AddLabelsInMap(constant.GetComponentWellKnownLabels(cluster.Name, component.Name)).
+		ClusterRef(cluster.Name).
+		Component(component.Name).
+		SetConfigurationItem(items).
+		GetObject(), nil
 }

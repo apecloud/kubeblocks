@@ -29,8 +29,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	configv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/configuration/validate"
@@ -38,10 +38,10 @@ import (
 )
 
 type Result struct {
-	Phase      v1alpha1.ConfigurationPhase `json:"phase"`
-	Revision   string                      `json:"revision"`
-	Policy     string                      `json:"policy"`
-	ExecResult string                      `json:"execResult"`
+	Phase      configv1alpha1.ConfigurationPhase `json:"phase"`
+	Revision   string                            `json:"revision"`
+	Policy     string                            `json:"policy"`
+	ExecResult string                            `json:"execResult"`
 
 	SucceedCount  int32 `json:"succeedCount"`
 	ExpectedCount int32 `json:"expectedCount"`
@@ -115,7 +115,7 @@ func fromUpdatedConfig(m map[string]string, sets *set.LinkedHashSetString) map[s
 }
 
 // IsApplyConfigChanged checks if the configuration is changed
-func IsApplyConfigChanged(configMap *corev1.ConfigMap, item v1alpha1.ConfigurationItemDetail) bool {
+func IsApplyConfigChanged(configMap *corev1.ConfigMap, item configv1alpha1.ConfigTemplateItemDetail) bool {
 	if configMap == nil {
 		return false
 	}
@@ -124,7 +124,7 @@ func IsApplyConfigChanged(configMap *corev1.ConfigMap, item v1alpha1.Configurati
 	if !ok {
 		return false
 	}
-	var target v1alpha1.ConfigurationItemDetail
+	var target configv1alpha1.ConfigTemplateItemDetail
 	if err := json.Unmarshal([]byte(lastAppliedVersion), &target); err != nil {
 		return false
 	}
@@ -133,18 +133,14 @@ func IsApplyConfigChanged(configMap *corev1.ConfigMap, item v1alpha1.Configurati
 }
 
 // IsRerender checks if the configuration template is changed
-func IsRerender(configMap *corev1.ConfigMap, item v1alpha1.ConfigurationItemDetail) bool {
+func IsRerender(configMap *corev1.ConfigMap, item configv1alpha1.ConfigTemplateItemDetail) bool {
 	if configMap == nil {
 		return true
 	}
-	if item.Version == "" && item.Payload.Data == nil && item.ImportTemplateRef == nil {
+	if item.Payload.Data == nil && item.UserConfigTemplates == nil {
 		return false
 	}
-	if version := configMap.Annotations[constant.CMConfigurationTemplateVersion]; version != item.Version {
-		return true
-	}
-
-	var updatedVersion v1alpha1.ConfigurationItemDetail
+	var updatedVersion configv1alpha1.ConfigTemplateItemDetail
 	updatedVersionStr, ok := configMap.Annotations[constant.ConfigAppliedVersionAnnotationKey]
 	if ok && updatedVersionStr != "" {
 		if err := json.Unmarshal([]byte(updatedVersionStr), &updatedVersion); err != nil {
@@ -152,23 +148,23 @@ func IsRerender(configMap *corev1.ConfigMap, item v1alpha1.ConfigurationItemDeta
 		}
 	}
 	return !reflect.DeepEqual(updatedVersion.Payload, item.Payload) ||
-		!reflect.DeepEqual(updatedVersion.ImportTemplateRef, item.ImportTemplateRef)
+		!reflect.DeepEqual(updatedVersion.UserConfigTemplates, item.UserConfigTemplates)
 }
 
 // GetConfigSpecReconcilePhase gets the configuration phase
 func GetConfigSpecReconcilePhase(configMap *corev1.ConfigMap,
-	item v1alpha1.ConfigurationItemDetail,
-	status *v1alpha1.ConfigurationItemDetailStatus) v1alpha1.ConfigurationPhase {
+	item configv1alpha1.ConfigTemplateItemDetail,
+	status *configv1alpha1.ConfigTemplateItemDetailStatus) configv1alpha1.ConfigurationPhase {
 	if status == nil || status.Phase == "" {
-		return v1alpha1.CCreatingPhase
+		return configv1alpha1.CCreatingPhase
 	}
 	if !IsApplyConfigChanged(configMap, item) {
-		return v1alpha1.CPendingPhase
+		return configv1alpha1.CPendingPhase
 	}
 	return status.Phase
 }
 
-func CheckAndPatchPayload(item *v1alpha1.ConfigurationItemDetail, payloadID string, payload interface{}) (bool, error) {
+func CheckAndPatchPayload(item *configv1alpha1.ConfigTemplateItemDetail, payloadID string, payload interface{}) (bool, error) {
 	if item == nil {
 		return false, nil
 	}

@@ -23,15 +23,12 @@ import (
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	configurationv1alpha1 "github.com/apecloud/kubeblocks/apis/configuration/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
-	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -43,27 +40,27 @@ type ReconcileCtx struct {
 	Component            *appsv1.Component
 	SynthesizedComponent *component.SynthesizedComponent
 	PodSpec              *corev1.PodSpec
+	Configuration        *configurationv1alpha1.ComponentParameter
 
 	Cache []client.Object
 }
 
-type pipeline struct {
+type reloadActionBuilderHelper struct {
 	// configuration *appsv1alpha1.Configuration
 	renderWrapper renderWrapper
 
 	ctx ReconcileCtx
-	ResourceFetcher[pipeline]
+	ResourceFetcher[reloadActionBuilderHelper]
 }
 
 type updatePipeline struct {
 	reconcile     bool
 	renderWrapper renderWrapper
 
-	item       appsv1alpha1.ConfigurationItemDetail
-	itemStatus *appsv1alpha1.ConfigurationItemDetailStatus
+	item       configurationv1alpha1.ConfigTemplateItemDetail
+	itemStatus *configurationv1alpha1.ConfigTemplateItemDetailStatus
 	configSpec *appsv1.ComponentConfigSpec
-	// replace of ConfigMapObj
-	// originalCM  *corev1.ConfigMap
+
 	newCM       *corev1.ConfigMap
 	configPatch *core.ConfigPatchInfo
 
@@ -71,12 +68,13 @@ type updatePipeline struct {
 	ResourceFetcher[updatePipeline]
 }
 
-func NewCreatePipeline(ctx ReconcileCtx) *pipeline {
-	p := &pipeline{ctx: ctx}
+func NewReloadActionBuilderHelper(ctx ReconcileCtx) *reloadActionBuilderHelper {
+	p := &reloadActionBuilderHelper{ctx: ctx}
+	p.ConfigurationObj = ctx.Configuration
 	return p.Init(ctx.ResourceCtx, p)
 }
 
-func NewReconcilePipeline(ctx ReconcileCtx, item appsv1alpha1.ConfigurationItemDetail, itemStatus *appsv1alpha1.ConfigurationItemDetailStatus, configSpec *appsv1.ComponentConfigSpec) *updatePipeline {
+func NewReconcilePipeline(ctx ReconcileCtx, item configurationv1alpha1.ConfigTemplateItemDetail, itemStatus *configurationv1alpha1.ConfigTemplateItemDetailStatus, configSpec *appsv1.ComponentConfigSpec) *updatePipeline {
 	p := &updatePipeline{
 		reconcile:  true,
 		item:       item,
@@ -87,7 +85,7 @@ func NewReconcilePipeline(ctx ReconcileCtx, item appsv1alpha1.ConfigurationItemD
 	return p.Init(ctx.ResourceCtx, p)
 }
 
-func (p *pipeline) Prepare() *pipeline {
+func (p *reloadActionBuilderHelper) Prepare() *reloadActionBuilderHelper {
 	buildTemplate := func() (err error) {
 		ctx := p.ctx
 		templateBuilder := newTemplateBuilder(p.ClusterName, p.Namespace, p.Context, p.Client)
@@ -100,61 +98,15 @@ func (p *pipeline) Prepare() *pipeline {
 	return p.Wrap(buildTemplate)
 }
 
-func (p *pipeline) RenderScriptTemplate() *pipeline {
+func (p *reloadActionBuilderHelper) RenderScriptTemplate() *reloadActionBuilderHelper {
 	return p.Wrap(func() error {
 		ctx := p.ctx
 		return p.renderWrapper.renderScriptTemplate(ctx.Cluster, ctx.SynthesizedComponent, ctx.Cache)
 	})
 }
 
-func (p *pipeline) UpdateConfiguration() *pipeline {
-	buildConfiguration := func() (err error) {
-		expectedConfiguration := p.createConfiguration()
-		if intctrlutil.SetControllerReference(p.ctx.Component, expectedConfiguration) != nil {
-			return
-		}
-		_, _ = UpdateConfigPayload(&expectedConfiguration.Spec, p.ctx.SynthesizedComponent)
-
-		existingConfiguration := appsv1alpha1.Configuration{}
-		err = p.ResourceFetcher.Client.Get(p.Context, client.ObjectKeyFromObject(expectedConfiguration), &existingConfiguration)
-		switch {
-		case err == nil:
-			return p.updateConfiguration(expectedConfiguration, &existingConfiguration)
-		case apierrors.IsNotFound(err):
-			return p.ResourceFetcher.Client.Create(p.Context, expectedConfiguration)
-		default:
-			return err
-		}
-	}
-	return p.Wrap(buildConfiguration)
-}
-
-func (p *pipeline) CreateConfigTemplate() *pipeline {
-	return p.Wrap(func() error {
-		ctx := p.ctx
-		return p.renderWrapper.renderConfigTemplate(ctx.Cluster, ctx.SynthesizedComponent, ctx.Cache, p.ConfigurationObj)
-	})
-}
-
-func (p *pipeline) UpdateConfigurationStatus() *pipeline {
-	return p.Wrap(func() error {
-		if p.ConfigurationObj == nil {
-			return nil
-		}
-
-		existing := p.ConfigurationObj
-		reversion := fromConfiguration(existing)
-		patch := client.MergeFrom(existing)
-		updated := existing.DeepCopy()
-		for _, item := range existing.Spec.ConfigItemDetails {
-			CheckAndUpdateItemStatus(updated, item, reversion)
-		}
-		return p.ResourceFetcher.Client.Status().Patch(p.Context, updated, patch)
-	})
-}
-
-func CheckAndUpdateItemStatus(updated *appsv1alpha1.Configuration, item appsv1alpha1.ConfigurationItemDetail, reversion string) {
-	foundStatus := func(name string) *appsv1alpha1.ConfigurationItemDetailStatus {
+func CheckAndUpdateItemStatus(updated *configurationv1alpha1.ComponentParameter, item configurationv1alpha1.ConfigTemplateItemDetail, reversion string) {
+	foundStatus := func(name string) *configurationv1alpha1.ConfigTemplateItemDetailStatus {
 		for i := range updated.Status.ConfigurationItemStatus {
 			status := &updated.Status.ConfigurationItemStatus[i]
 			if status.Name == name {
@@ -166,94 +118,55 @@ func CheckAndUpdateItemStatus(updated *appsv1alpha1.Configuration, item appsv1al
 
 	status := foundStatus(item.Name)
 	if status != nil && status.Phase == "" {
-		status.Phase = appsv1alpha1.CInitPhase
+		status.Phase = configurationv1alpha1.CInitPhase
 	}
 	if status == nil {
 		updated.Status.ConfigurationItemStatus = append(updated.Status.ConfigurationItemStatus,
-			appsv1alpha1.ConfigurationItemDetailStatus{
+			configurationv1alpha1.ConfigTemplateItemDetailStatus{
 				Name:           item.Name,
-				Phase:          appsv1alpha1.CInitPhase,
+				Phase:          configurationv1alpha1.CInitPhase,
 				UpdateRevision: reversion,
 			})
 	}
 }
 
-func (p *pipeline) UpdatePodVolumes() *pipeline {
+func (p *reloadActionBuilderHelper) UpdatePodVolumes() *reloadActionBuilderHelper {
 	return p.Wrap(func() error {
-		return intctrlutil.CreateOrUpdatePodVolumes(p.ctx.PodSpec,
-			p.renderWrapper.volumes,
+		component := p.ctx.SynthesizedComponent
+		volumes := make(map[string]appsv1.ComponentTemplateSpec, len(component.ConfigTemplates))
+		for _, configSpec := range component.ConfigTemplates {
+			cmName := core.GetComponentCfgName(component.ClusterName, component.Name, configSpec.Name)
+			volumes[cmName] = configSpec.ComponentTemplateSpec
+		}
+		for _, configSpec := range component.ScriptTemplates {
+			cmName := core.GetComponentCfgName(component.ClusterName, component.Name, configSpec.Name)
+			volumes[cmName] = configSpec
+		}
+		return intctrlutil.CreateOrUpdatePodVolumes(p.ctx.PodSpec, volumes,
 			configSetFromComponent(p.ctx.SynthesizedComponent.ConfigTemplates))
 	})
 }
 
-func (p *pipeline) BuildConfigManagerSidecar() *pipeline {
+func (p *reloadActionBuilderHelper) BuildConfigManagerSidecar() *reloadActionBuilderHelper {
 	return p.Wrap(func() error {
 		return buildConfigManagerWithComponent(p.ctx.PodSpec, p.ctx.SynthesizedComponent.ConfigTemplates, p.Context, p.Client, p.ctx.Cluster, p.ctx.SynthesizedComponent)
 	})
 }
 
-func (p *pipeline) UpdateConfigRelatedObject() *pipeline {
+func (p *reloadActionBuilderHelper) InitConfigRelatedObject() *reloadActionBuilderHelper {
 	updateMeta := func() error {
-		if err := injectTemplateEnvFrom(p.ctx.Cluster, p.ctx.SynthesizedComponent, p.ctx.PodSpec, p.Client, p.Context, p.renderWrapper.renderedObjs); err != nil {
+		cluster := p.ctx.Cluster
+		component := p.ctx.SynthesizedComponent
+		if err := p.renderWrapper.renderConfigTemplate(cluster, component, p.ctx.Cache, p.ConfigurationObj); err != nil {
+			return err
+		}
+		if err := injectTemplateEnvFrom(cluster, component, p.ctx.PodSpec, p.Client, p.Context, p.renderWrapper.renderedObjs); err != nil {
 			return err
 		}
 		return createConfigObjects(p.Client, p.Context, p.renderWrapper.renderedObjs, p.renderWrapper.renderedSecretObjs)
 	}
 
 	return p.Wrap(updateMeta)
-}
-
-func (p *pipeline) createConfiguration() *appsv1alpha1.Configuration {
-	builder := builder.NewConfigurationBuilder(p.Namespace,
-		core.GenerateComponentConfigurationName(p.ClusterName, p.ComponentName),
-	)
-	for _, template := range p.ctx.SynthesizedComponent.ConfigTemplates {
-		builder.AddConfigurationItem(template)
-	}
-	return builder.Component(p.ComponentName).
-		ClusterRef(p.ClusterName).
-		AddLabelsInMap(constant.GetComponentWellKnownLabels(p.ClusterName, p.ComponentName)).
-		GetObject()
-}
-
-func (p *pipeline) updateConfiguration(expected *appsv1alpha1.Configuration, existing *appsv1alpha1.Configuration) error {
-	fromMap := func(items []appsv1alpha1.ConfigurationItemDetail) *cfgutil.Sets {
-		sets := cfgutil.NewSet()
-		for _, item := range items {
-			sets.Add(item.Name)
-		}
-		return sets
-	}
-
-	updateConfigSpec := func(item appsv1alpha1.ConfigurationItemDetail) appsv1alpha1.ConfigurationItemDetail {
-		if newItem := expected.Spec.GetConfigurationItem(item.Name); newItem != nil {
-			item.ConfigSpec = newItem.ConfigSpec
-		}
-		return item
-	}
-
-	oldSets := fromMap(existing.Spec.ConfigItemDetails)
-	newSets := fromMap(expected.Spec.ConfigItemDetails)
-
-	addSets := cfgutil.Difference(newSets, oldSets)
-	delSets := cfgutil.Difference(oldSets, newSets)
-
-	newConfigItems := make([]appsv1alpha1.ConfigurationItemDetail, 0)
-	for _, item := range existing.Spec.ConfigItemDetails {
-		if !delSets.InArray(item.Name) {
-			newConfigItems = append(newConfigItems, updateConfigSpec(item))
-		}
-	}
-	for _, item := range expected.Spec.ConfigItemDetails {
-		if addSets.InArray(item.Name) {
-			newConfigItems = append(newConfigItems, item)
-		}
-	}
-
-	patch := client.MergeFrom(existing)
-	updated := existing.DeepCopy()
-	updated.Spec.ConfigItemDetails = newConfigItems
-	return p.Client.Patch(p.Context, updated, patch)
 }
 
 func (p *updatePipeline) isDone() bool {
@@ -306,7 +219,7 @@ func (p *updatePipeline) RerenderTemplate() *updatePipeline {
 }
 
 func (p *updatePipeline) ApplyParameters() *updatePipeline {
-	patchMerge := func(p *updatePipeline, spec appsv1.ComponentConfigSpec, cm *corev1.ConfigMap, item appsv1alpha1.ConfigurationItemDetail) error {
+	patchMerge := func(p *updatePipeline, spec appsv1.ComponentConfigSpec, cm *corev1.ConfigMap, item configurationv1alpha1.ConfigTemplateItemDetail) error {
 		if p.isDone() || len(item.ConfigFileParams) == 0 {
 			return nil
 		}
@@ -371,7 +284,7 @@ func (p *updatePipeline) Sync() *updatePipeline {
 				return err
 			}
 		}
-		if InjectEnvEnabled(*p.configSpec) && toSecret(*p.configSpec) {
+		if InjectEnvEnabled(*p.configSpec) && ToSecret(*p.configSpec) {
 			return nil
 		}
 		switch {
@@ -399,7 +312,7 @@ func (p *updatePipeline) SyncStatus() *updatePipeline {
 		if p.configSpec == nil || p.itemStatus == nil {
 			return
 		}
-		p.itemStatus.Phase = appsv1alpha1.CMergedPhase
+		p.itemStatus.Phase = configurationv1alpha1.CMergedPhase
 		return
 	})
 }

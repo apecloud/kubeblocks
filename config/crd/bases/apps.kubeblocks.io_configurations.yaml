@@ -9,19 +9,37 @@ metadata:
 spec:
   group: apps.kubeblocks.io
   names:
+    categories:
+    - kubeblocks
+    - all
     kind: Configuration
     listKind: ConfigurationList
     plural: configurations
+    shortNames:
+    - config
     singular: configuration
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - description: cluster name
+      jsonPath: .spec.clusterName
+      name: CLUSTER
+      type: string
+    - description: component name
+      jsonPath: .spec.componentName
+      name: COMPONENT
+      type: string
+    - description: config status phase.
+      jsonPath: .status.phase
+      name: STATUS
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: |-
-          Configuration represents the complete set of configurations for a specific Component of a Cluster.
-          This includes templates for each configuration file, their corresponding ConfigConstraints, volume mounts,
-          and other relevant details.
+        description: Configuration is the Schema for the configurations API
         properties:
           apiVersion:
             description: |-
@@ -41,10 +59,9 @@ spec:
           metadata:
             type: object
           spec:
-            description: ConfigurationSpec defines the desired state of a Configuration
-              resource.
+            description: ConfigurationSpec defines the desired state of ComponentConfiguration
             properties:
-              clusterRef:
+              clusterName:
                 description: Specifies the name of the Cluster that this configuration
                   is associated with.
                 type: string
@@ -140,8 +157,11 @@ spec:
                             as a secret.
                           type: boolean
                         constraintRef:
-                          description: Specifies the name of the referenced configuration
-                            constraints object.
+                          description: |-
+                            Deprecated: configConstraint has been deprecated since 1.0.0
+
+
+                            Specifies the name of the referenced configuration constraints object.
                           maxLength: 63
                           pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                           type: string
@@ -201,6 +221,7 @@ spec:
                           x-kubernetes-list-type: set
                         legacyRenderedConfigSpec:
                           description: |-
+                            Deprecated: legacyRenderedConfigSpec has been deprecated since 1.0.0
                             Specifies the secondary rendered config spec for pod-specific customization.
 
 
@@ -232,8 +253,9 @@ spec:
                               - none
                               type: string
                             templateRef:
-                              description: Specifies the name of the referenced configuration
-                                template ConfigMap object.
+                              description: |-
+                                Deprecated: Use `templateName` instead.
+                                Specifies the name of the referenced configuration template ConfigMap object.
                               pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                               type: string
                           required:
@@ -254,6 +276,7 @@ spec:
                           type: string
                         reRenderResourceTypes:
                           description: |-
+                            Deprecated: Use `componentConfigDescriptions[*].reRenderResourceTypes` instead.
                             Specifies whether the configuration needs to be re-rendered after v-scale or h-scale operations to reflect changes.
 
 
@@ -317,8 +340,9 @@ spec:
                           - none
                           type: string
                         templateRef:
-                          description: Specifies the name of the referenced configuration
-                            template ConfigMap object.
+                          description: |-
+                            Deprecated: Use `templateName` instead.
+                            Specifies the name of the referenced configuration template ConfigMap object.
                           pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                           type: string
                       required:
@@ -344,11 +368,6 @@ spec:
                         Modifying this field will cause a rerender, regardless of the specific content of this field.
                       type: object
                       x-kubernetes-preserve-unknown-fields: true
-                    version:
-                      description: 'Deprecated: No longer used. Please use ''Payload''
-                        instead. Previously represented the version of the configuration
-                        template.'
-                      type: string
                   required:
                   - name
                   type: object
@@ -357,12 +376,10 @@ spec:
                 - name
                 x-kubernetes-list-type: map
             required:
-            - clusterRef
             - componentName
             type: object
           status:
-            description: ConfigurationStatus represents the observed state of a Configuration
-              resource.
+            description: ConfigurationStatus defines the observed state of ComponentConfiguration
             properties:
               conditions:
                 description: Provides detailed status information for opsRequest.

@@ -453,6 +453,7 @@ func (inPlaceHelper *inplaceRebuildHelper) cleanupTmpPVC(reqCtx intctrlutil.Requ
 	return inPlaceHelper.removePVCFinalizer(reqCtx, cli, tmpPVC)
 }
 
+// recreateSourcePVC recreates the source pvc to bound the restored pv.
 func (inPlaceHelper *inplaceRebuildHelper) recreateSourcePVC(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	tmpPVC,
@@ -500,7 +501,7 @@ func (inPlaceHelper *inplaceRebuildHelper) releasePV(reqCtx intctrlutil.RequestC
 	}
 	pv.Annotations[rebuildFromAnnotation] = opsRequestName
 	if pv.Annotations[sourcePVReclaimPolicyAnnotation] == "" {
-		// obtain the reclaim policy form the source pv.
+		// obtain the reclaim policy from the source pv.
 		sourcePV := &corev1.PersistentVolume{}
 		if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: sourcePvc.Spec.VolumeName}, sourcePV); err != nil {
 			return err

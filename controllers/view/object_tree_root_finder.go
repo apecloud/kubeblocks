@@ -241,8 +241,9 @@ func isSubset(map1, map2 map[string]string) bool {
 func NewObjectTreeRootFinder(cli client.Client) ObjectTreeRootFinder {
 	logger := log.FromContext(context.Background()).WithName("ObjectTreeRootFinder")
 	return &rootFinder{
-		Client: cli,
-		logger: logger,
+		Client:    cli,
+		logger:    logger,
+		eventChan: make(chan event.GenericEvent),
 	}
 }
 

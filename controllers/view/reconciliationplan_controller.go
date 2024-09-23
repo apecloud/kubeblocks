@@ -28,7 +28,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
+
+func init() {
+	model.AddScheme(viewv1.AddToScheme)
+}
 
 // ReconciliationPlanReconciler reconciles a ReconciliationPlan object
 type ReconciliationPlanReconciler struct {

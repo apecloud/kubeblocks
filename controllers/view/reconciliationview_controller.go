@@ -21,16 +21,22 @@ package view
 
 import (
 	"context"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
-	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
+
+func init() {
+	model.AddScheme(viewv1.AddToScheme)
+}
 
 // ReconciliationViewReconciler reconciles a ReconciliationView object
 type ReconciliationViewReconciler struct {

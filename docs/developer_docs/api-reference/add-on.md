@@ -196,7 +196,7 @@ the selector and auto-install settings.</p>
 </tr>
 <tr>
 <td>
-<code>DependentAddons</code><br/>
+<code>dependentAddons</code><br/>
 <em>
 <a href="#extensions.kubeblocks.io/v1alpha1.DependentAddon">
 []DependentAddon
@@ -268,46 +268,6 @@ AddonInstallSpec
 <em>(Optional)</em>
 <p>Indicates the default selectors for add-on installations. If multiple selectors are provided,
 all selectors must evaluate to true.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.DependentAddon">DependentAddon
-</h3>
-<p>
-(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.AddonSpec">AddonSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>The name of the dependent addon.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>version</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>All matching versions of the dependent addon. If empty, defaults to the same version as the current addon.</p>
 </td>
 </tr>
 </tbody>
@@ -680,7 +640,7 @@ the selector and auto-install settings.</p>
 </tr>
 <tr>
 <td>
-<code>DependentAddons</code><br/>
+<code>dependentAddons</code><br/>
 <em>
 <a href="#extensions.kubeblocks.io/v1alpha1.DependentAddon">
 []DependentAddon
@@ -858,6 +818,46 @@ string
 </td>
 <td>
 <p>Specifies the key to be selected.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="extensions.kubeblocks.io/v1alpha1.DependentAddon">DependentAddon
+</h3>
+<p>
+(<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.AddonSpec">AddonSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The name of the dependent addon.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>All matching versions of the dependent addon. If empty, defaults to the same version as the current addon.</p>
 </td>
 </tr>
 </tbody>

@@ -267,10 +267,9 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 		//  needs to wait for the component phase to reach a terminal state.
 		if expectCount != completedCount {
 			opsIsCompleted = false
-		} else {
-			if !pgResource.noWaitComponentCompleted && (!slices.Contains(appsv1.GetComponentTerminalPhases(), componentPhase) || completedCount == 0) {
-				opsIsCompleted = false
-			}
+		} else if !pgResource.noWaitComponentCompleted &&
+			(!slices.Contains(appsv1.GetComponentTerminalPhases(), componentPhase) || completedCount == 0) {
+			opsIsCompleted = false
 		}
 		opsRequest.Status.Components[pgResource.compOps.GetComponentName()] = opsCompStatus
 	}

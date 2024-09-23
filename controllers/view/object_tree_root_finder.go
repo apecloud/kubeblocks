@@ -45,12 +45,12 @@ type ObjectTreeRootFinder interface {
 
 type rootFinder struct {
 	client.Client
-	logger logr.Logger
+	logger    logr.Logger
+	eventChan chan event.GenericEvent
 }
 
 func (f *rootFinder) GetEventChannel() chan event.GenericEvent {
-	//TODO implement me
-	panic("implement me")
+	return f.eventChan
 }
 
 func (f *rootFinder) GetEventHandler() handler.EventHandler {
@@ -240,7 +240,10 @@ func isSubset(map1, map2 map[string]string) bool {
 
 func NewObjectTreeRootFinder(cli client.Client) ObjectTreeRootFinder {
 	logger := log.FromContext(context.Background()).WithName("ObjectTreeRootFinder")
-	return &rootFinder{Client: cli, logger: logger}
+	return &rootFinder{
+		Client: cli,
+		logger: logger,
+	}
 }
 
 var _ ObjectTreeRootFinder = &rootFinder{}

@@ -89,6 +89,7 @@ const (
 	extensionsFlagKey   flagName = "extensions"
 	workloadsFlagKey    flagName = "workloads"
 	experimentalFlagKey flagName = "experimental"
+	viewFlagKey         flagName = "view"
 
 	multiClusterKubeConfigFlagKey       flagName = "multi-cluster-kubeconfig"
 	multiClusterContextsFlagKey         flagName = "multi-cluster-contexts"
@@ -169,14 +170,16 @@ func setupFlags() {
 		"The leader election ID prefix for controller manager. "+
 			"This ID must be unique to controller manager.")
 
-	flag.Bool(appsFlagKey.String(), true,
+	flag.Bool(appsFlagKey.String(), false,
 		"Enable the apps controller manager.")
-	flag.Bool(extensionsFlagKey.String(), true,
+	flag.Bool(extensionsFlagKey.String(), false,
 		"Enable the extensions controller manager.")
-	flag.Bool(workloadsFlagKey.String(), true,
+	flag.Bool(workloadsFlagKey.String(), false,
 		"Enable the workloads controller manager.")
 	flag.Bool(experimentalFlagKey.String(), false,
 		"Enable the experimental controller manager.")
+	flag.Bool(viewFlagKey.String(), true,
+		"Enable the view controller manager.")
 
 	flag.String(multiClusterKubeConfigFlagKey.String(), "", "Paths to the kubeconfig for multi-cluster accessing.")
 	flag.String(multiClusterContextsFlagKey.String(), "", "Kube contexts the manager will talk to.")
@@ -525,20 +528,22 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	if err = (&viewcontrollers.ReconciliationViewReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("reconciliation-view-controller"),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ReconciliationView")
-		os.Exit(1)
-	}
-	if err = (&viewcontrollers.ReconciliationPlanReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ReconciliationPlan")
-		os.Exit(1)
+	if viper.GetBool(viewFlagKey.viperName()) {
+		if err = (&viewcontrollers.ReconciliationViewReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("reconciliation-view-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ReconciliationView")
+			os.Exit(1)
+		}
+		if err = (&viewcontrollers.ReconciliationPlanReconciler{
+			Client: mgr.GetClient(),
+			Scheme: mgr.GetScheme(),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ReconciliationPlan")
+			os.Exit(1)
+		}
 	}
 	// +kubebuilder:scaffold:builder
 

@@ -1915,6 +1915,8 @@ controllers:
     enabled: true
   experimental:
     enabled: false
+  view:
+    enabled: true
 
 featureGates:
   ignoreConfigTemplateDefaultMode:

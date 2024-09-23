@@ -65,6 +65,7 @@ spec:
             - "--apps={{ ne .Values.controllers.apps.enabled false }}"
             - "--workloads={{ ne .Values.controllers.workloads.enabled false }}"
             - "--experimental={{- default "false" .Values.controllers.experimental.enabled }}"
+            - "--view={{- default "true" .Values.controllers.view.enabled }}"
             {{- with .Values.managedNamespaces }}
             - "--managed-namespaces={{ . }}"
             {{- end }}

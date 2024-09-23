@@ -87,9 +87,9 @@ type ObjectChangeSummary struct {
 
 // ObjectTreeNode defines an object tree specified by rules in ReconciliationViewDefinition.
 type ObjectTreeNode struct {
-	// ObjectReference specifies the Object this plan described.
+	// Primary specifies reference of the primary object.
 	//
-	Root corev1.ObjectReference `json:"objectReference"`
+	Primary corev1.ObjectReference `json:"objectReference"`
 
 	// Secondaries describes all the secondary objects of this object, if any.
 	// The secondary objects are collected by the rules specified in ReconciliationViewDefinition.

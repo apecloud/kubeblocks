@@ -21,6 +21,7 @@ package view
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -28,6 +29,7 @@ type ObjectStore interface {
 	Insert(object client.Object) error
 	Get(objKey *corev1.ObjectReference) client.Object
 	Delete(objKey *corev1.ObjectReference)
+	List(gvk *schema.GroupVersionKind) []client.Object
 }
 
 type objectStore struct {

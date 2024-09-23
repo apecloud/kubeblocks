@@ -20,28 +20,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package view
 
 import (
-	"container/list"
 	"context"
 	"fmt"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
-	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
+
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker/decls"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"google.golang.org/protobuf/types/known/structpb"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
 type stateEvaluation struct {
 	ctx    context.Context
 	reader client.Reader
 	store  ObjectStore
+	scheme *runtime.Scheme
 }
 
 func (s *stateEvaluation) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
@@ -117,14 +121,17 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 	if latestReconciliationCycleStart <= 0 {
 		if view.Status.InitialObjectTree == nil {
 			view.Status.InitialObjectTree = &viewv1.ObjectTreeNode{
-				Root: *getObjectReference(root),
+				Primary: *getObjectReference(root),
 			}
 		}
 		return kubebuilderx.Continue, nil
 	}
 
 	// build new InitialObjectTree
-	view.Status.InitialObjectTree = getObjectTreeWithRevision(view, viewDef, s.store, view.Status.View[latestReconciliationCycleStart].Revision)
+	view.Status.InitialObjectTree, err = getObjectTreeWithRevision(root, viewDef.Spec.OwnershipRules, s.store, view.Status.View[latestReconciliationCycleStart].Revision, s.scheme)
+	if err != nil {
+		return kubebuilderx.Commit, err
+	}
 
 	// delete unused object revisions
 	for i := 0; i < latestReconciliationCycleStart; i++ {
@@ -138,8 +145,98 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 	return kubebuilderx.Continue, nil
 }
 
-func getObjectTreeWithRevision(view *viewv1.ReconciliationView, viewDef *viewv1.ReconciliationViewDefinition, store ObjectStore, root client.Object, revision int64) *viewv1.ObjectTreeNode {
+// TODO(free6om): similar as getSecondaryObjectsOf, refactor and merge them
+func getObjectTreeWithRevision(primary client.Object, ownershipRules []viewv1.OwnershipRule, store ObjectStore, revision int64, scheme *runtime.Scheme) (*viewv1.ObjectTreeNode, error) {
+	// find matched rules
+	var matchedRules []*viewv1.OwnershipRule
+	for i := range ownershipRules {
+		rule := &ownershipRules[i]
+		gvk, err := objectTypeToGVK(&rule.Primary)
+		if err != nil {
+			return nil, err
+		}
+		if *gvk == primary.GetObjectKind().GroupVersionKind() {
+			matchedRules = append(matchedRules, rule)
+		}
+	}
 
+	tree := &viewv1.ObjectTreeNode{
+		Primary: *getObjectReference(primary),
+	}
+	// traverse rules, build subtree
+	var secondaries []client.Object
+	for _, rule := range matchedRules {
+		for _, ownedResource := range rule.OwnedResources {
+			gvk, err := objectTypeToGVK(&ownedResource.Secondary)
+			if err != nil {
+				return nil, err
+			}
+			ml, err := parseMatchingLabels(primary, &ownedResource.Criteria)
+			if err != nil {
+				return nil, err
+			}
+			objects, err := getObjectsByRevision(gvk, store, scheme, ml, revision)
+			if err != nil {
+				return nil, err
+			}
+			secondaries = append(secondaries, objects...)
+		}
+	}
+	for _, secondary := range secondaries {
+		subTree, err := getObjectTreeWithRevision(secondary, ownershipRules, store, revision, scheme)
+		if err != nil {
+			return nil, err
+		}
+		tree.Secondaries = append(tree.Secondaries, subTree)
+	}
+
+	return tree, nil
+}
+
+func getObjectsByRevision(gvk *schema.GroupVersionKind, store ObjectStore, scheme *runtime.Scheme, ml client.MatchingLabels, revision int64) ([]client.Object, error) {
+	objects := store.List(gvk)
+	opts := &client.ListOptions{}
+	ml.ApplyToList(opts)
+	objectMap := make(map[model.GVKNObjKey]map[int64]client.Object)
+	for _, object := range objects {
+		if !opts.LabelSelector.Matches(labels.Set(object.GetLabels())) {
+			continue
+		}
+		objectRef, err := getGVKNObjRef(object, scheme)
+		if err != nil {
+			return nil, err
+		}
+		rev := parseRevision(object.GetResourceVersion())
+		revisionMap, ok := objectMap[*objectRef]
+		if !ok {
+			revisionMap = make(map[int64]client.Object)
+		}
+		revisionMap[rev] = object
+	}
+	var matchedObjects []client.Object
+	for _, revisionMap := range objectMap {
+		rev := int64(-1)
+		for r := range revisionMap {
+			if rev < r && r <= revision {
+				rev = r
+			}
+		}
+		if rev > -1 {
+			matchedObjects = append(matchedObjects, revisionMap[rev])
+		}
+	}
+	return matchedObjects, nil
+}
+
+func getGVKNObjRef(object client.Object, scheme *runtime.Scheme) (*model.GVKNObjKey, error) {
+	gvk, err := apiutil.GVKForObject(object, scheme)
+	if err != nil {
+		return nil, err
+	}
+	return &model.GVKNObjKey{
+		GroupVersionKind: gvk,
+		ObjectKey:        client.ObjectKeyFromObject(object),
+	}, nil
 }
 
 func doStateEvaluation(object client.Object, expression viewv1.StateEvaluationExpression) (bool, error) {
@@ -197,11 +294,12 @@ func doStateEvaluation(object client.Object, expression viewv1.StateEvaluationEx
 	return result, nil
 }
 
-func viewStateEvaluation(ctx context.Context, reader client.Reader, store ObjectStore) kubebuilderx.Reconciler {
+func viewStateEvaluation(ctx context.Context, reader client.Reader, store ObjectStore, scheme *runtime.Scheme) kubebuilderx.Reconciler {
 	return &stateEvaluation{
 		ctx:    ctx,
 		reader: reader,
 		store:  store,
+		scheme: scheme,
 	}
 }
 

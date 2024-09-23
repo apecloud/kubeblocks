@@ -152,7 +152,10 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 	}
 
 	// update view.status.currentObjectTree
-	view.Status.CurrentObjectTree = getObjectTreeWithRevision(view, viewDef, c.store, parseRevision(root.ResourceVersion))
+	view.Status.CurrentObjectTree, err = getObjectTreeWithRevision(root, viewDef.Spec.OwnershipRules, c.store, parseRevision(root.ResourceVersion), c.scheme)
+	if err != nil {
+		return kubebuilderx.Commit, err
+	}
 
 	return kubebuilderx.Continue, nil
 }
@@ -262,7 +265,7 @@ func (c *viewCalculator) getAllObjectsFrom(tree *viewv1.ObjectTreeNode) []client
 	if tree == nil {
 		return nil
 	}
-	obj := c.store.Get(&tree.Root)
+	obj := c.store.Get(&tree.Primary)
 	var objects []client.Object
 	if obj != nil {
 		objects = append(objects, obj)

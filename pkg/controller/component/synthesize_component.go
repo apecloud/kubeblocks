@@ -79,6 +79,7 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		ServiceVersion:                   comp.Spec.ServiceVersion,
 		UserDefinedLabels:                comp.Spec.Labels,
 		UserDefinedAnnotations:           comp.Spec.Annotations,
+		Annotations:                      compDef.Spec.Annotations,
 		PodSpec:                          &compDef.Spec.Runtime,
 		HostNetwork:                      compDefObj.Spec.HostNetwork,
 		ComponentServices:                compDefObj.Spec.Services,
@@ -199,15 +200,6 @@ func buildLabelsAndAnnotations(compDef *appsv1.ComponentDefinition, comp *appsv1
 		}
 		// override labels from component
 		synthesizeComp.Labels = mergeMaps(baseLabels, comp.Labels)
-	}
-
-	if compDef.Spec.Annotations != nil || comp.Annotations != nil {
-		baseAnnotations := compDef.Spec.Annotations
-		if baseAnnotations == nil {
-			baseAnnotations = make(map[string]string)
-		}
-		// override annotations from component
-		synthesizeComp.Annotations = mergeMaps(baseAnnotations, comp.Annotations)
 	}
 }
 

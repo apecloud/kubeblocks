@@ -203,6 +203,7 @@ func (t *componentServiceTransformer) buildService(comp *appsv1.Component,
 		AddLabelsInMap(synthesizeComp.Labels).
 		AddAnnotationsInMap(service.Annotations).
 		AddAnnotationsInMap(synthesizeComp.UserDefinedAnnotations).
+		AddAnnotationsInMap(synthesizeComp.Annotations).
 		SetSpec(&service.Spec).
 		AddSelectorsInMap(t.builtinSelector(comp)).
 		Optimize4ExternalTraffic()

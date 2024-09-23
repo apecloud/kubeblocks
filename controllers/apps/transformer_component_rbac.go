@@ -286,8 +286,8 @@ func buildServiceAccount(transCtx *componentTransformContext) (*corev1.ServiceAc
 	return saObj, volumeProtectionEnable, nil
 }
 
-func buildRoleBinding(synthesizeComp *component.SynthesizedComponent, comp *appsv1.Component, serviceAccountName string) (*rbacv1.RoleBinding, error) {
-	roleBinding := factory.BuildRoleBinding(synthesizeComp, serviceAccountName)
+func buildRoleBinding(synthesizedComp *component.SynthesizedComponent, comp *appsv1.Component, serviceAccountName string) (*rbacv1.RoleBinding, error) {
+	roleBinding := factory.BuildRoleBinding(synthesizedComp, serviceAccountName)
 	if err := setCompOwnershipNFinalizer(comp, roleBinding); err != nil {
 		return nil, err
 	}

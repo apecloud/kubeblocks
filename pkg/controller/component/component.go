@@ -65,6 +65,7 @@ func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSp
 		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 		AddAnnotations(constant.KBAppClusterUIDKey, string(cluster.UID)).
 		AddAnnotationsInMap(inheritedAnnotations(cluster)).
+		AddAnnotationsInMap(annotations). // annotations added by the cluster controller
 		AddLabelsInMap(constant.GetCompLabelsWithDef(cluster.Name, compSpec.Name, compSpec.ComponentDef)).
 		SetServiceVersion(compSpec.ServiceVersion).
 		SetLabels(compSpec.Labels).

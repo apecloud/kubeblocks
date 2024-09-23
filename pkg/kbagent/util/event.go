@@ -24,18 +24,17 @@ import (
 	"fmt"
 	"os"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 
-	"k8s.io/apimachinery/pkg/api/errors"
-
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
+	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/record"
 	ctlruntime "sigs.k8s.io/controller-runtime"
 )
 
@@ -46,11 +45,12 @@ const (
 
 var (
 	once      sync.Once
-	counter   int32
 	namespace string
 	podName   string
 	podUID    string
 	nodeName  string
+	recorder  record.EventRecorder
+	clientSet *kubernetes.Clientset
 )
 
 func SendEventWithMessage(logger *logr.Logger, reason string, message string) {
@@ -60,94 +60,81 @@ func SendEventWithMessage(logger *logr.Logger, reason string, message string) {
 			podName = os.Getenv(constant.KBEnvPodName)
 			podUID = os.Getenv(constant.KBEnvPodUID)
 			nodeName = os.Getenv(constant.KBEnvNodeName)
-			atomic.StoreInt32(&counter, int32(time.Now().UnixNano()))
+			err := initEventRecorder()
+			if logger != nil && err != nil {
+				logger.Error(err, "init event recorder failed")
+			}
 		})
-		err := createOrUpdateEvent(reason, message)
+
+		err := sendEvent(reason, message)
 		if logger != nil && err != nil {
-			logger.Error(err, "send or update event failed")
+			logger.Error(err, "send event failed")
 		}
 	}()
 }
 
-func createOrUpdateEvent(reason string, message string) error {
-	clientSet, err := getK8sClientSet()
+func initEventRecorder() error {
+	err := getK8sClientSet()
 	if err != nil {
-		return fmt.Errorf("error getting k8s clientset: %v", err)
-	}
-	lastEvent, err := clientSet.CoreV1().Events(namespace).Get(context.TODO(), string(atomic.LoadInt32(&counter)-1), metav1.GetOptions{})
-	if err != nil {
-		if !errors.IsNotFound(err) {
-			return fmt.Errorf("error getting event: %v", err)
-		}
-	}
-	if lastEvent != nil && lastEvent.Reason == reason && lastEvent.Message == message {
-		return updateEvent(clientSet, lastEvent)
+		return fmt.Errorf("failed to get k8s clientset: %v", err)
 	}
 
-	event := newEvent(reason, message)
-	return createEvent(clientSet, event)
-
-}
-
-func newEvent(reason string, message string) *corev1.Event {
-	return &corev1.Event{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      string(atomic.AddInt32(&counter, 1)),
-			Namespace: namespace,
+	eventBroadcaster := record.NewBroadcasterWithCorrelatorOptions(
+		record.CorrelatorOptions{
+			QPS:       10,
+			BurstSize: 100,
+		})
+	eventBroadcaster.StartRecordingToSink(
+		&typedcorev1.EventSinkImpl{
+			Interface: clientSet.CoreV1().Events(""),
 		},
-		InvolvedObject: corev1.ObjectReference{
-			Kind:      "Pod",
-			Namespace: namespace,
-			Name:      podName,
-			UID:       types.UID(podUID),
-			FieldPath: "spec.containers{kbagent}",
-		},
-		Reason:  reason,
-		Message: message,
-		Source: corev1.EventSource{
+	)
+
+	recorder = eventBroadcaster.NewRecorder(
+		scheme.Scheme,
+		corev1.EventSource{
 			Component: "kbagent",
 			Host:      nodeName,
 		},
-		FirstTimestamp:      metav1.Now(),
-		LastTimestamp:       metav1.Now(),
-		EventTime:           metav1.NowMicro(),
-		ReportingController: "kbagent",
-		ReportingInstance:   podName,
-		Action:              reason,
-		Type:                "Normal",
-	}
+	)
+	return nil
 }
 
-func createEvent(clientSet *kubernetes.Clientset, event *corev1.Event) error {
-	for i := 0; i < sendEventMaxAttempts; i++ {
-		_, err := clientSet.CoreV1().Events(namespace).Create(context.Background(), event, metav1.CreateOptions{})
-		if err == nil {
-			return nil
-		}
-		time.Sleep(sendEventRetryInterval)
-	}
-	return fmt.Errorf("failed to send event after %d attempts", sendEventMaxAttempts)
-}
-
-func updateEvent(clientSet *kubernetes.Clientset, event *corev1.Event) error {
-	event.Count += 1
-	event.LastTimestamp = metav1.Now()
-
-	_, err := clientSet.CoreV1().Events(namespace).Update(context.Background(), event, metav1.UpdateOptions{})
+func sendEvent(reason string, message string) error {
+	pod, err := getPodObject()
 	if err != nil {
-		return fmt.Errorf("error updating event: %v", err)
+		return err
+	}
+	recorder.Event(pod, corev1.EventTypeNormal, reason, message)
+	return nil
+}
+
+func getK8sClientSet() error {
+	if clientSet != nil {
+		return nil
+	}
+	restConfig, err := ctlruntime.GetConfig()
+	if err != nil {
+		return err
+	}
+	clientSet, err = kubernetes.NewForConfig(restConfig)
+	if err != nil {
+		return err
 	}
 	return nil
 }
 
-func getK8sClientSet() (*kubernetes.Clientset, error) {
-	restConfig, err := ctlruntime.GetConfig()
-	if err != nil {
-		return nil, err
+func getPodObject() (*corev1.Pod, error) {
+	if clientSet == nil {
+		err := getK8sClientSet()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get k8s clientset: %v", err)
+		}
 	}
-	clientSet, err := kubernetes.NewForConfig(restConfig)
+
+	pod, err := clientSet.CoreV1().Pods(namespace).Get(context.TODO(), podName, v1.GetOptions{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get pod: %v", err)
 	}
-	return clientSet, nil
+	return pod, nil
 }

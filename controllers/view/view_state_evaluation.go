@@ -28,7 +28,6 @@ import (
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"google.golang.org/protobuf/types/known/structpb"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -56,15 +55,7 @@ func (s *stateEvaluation) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuild
 
 func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	view, _ := tree.GetRoot().(*viewv1.ReconciliationView)
-	o, err := tree.Get(&viewv1.ReconciliationViewDefinition{})
-	if err != nil {
-		return kubebuilderx.Commit, err
-	}
-	viewDef, _ := o.(*viewv1.ReconciliationViewDefinition)
-	o, err = tree.Get(&corev1.ConfigMap{})
-	if err != nil {
-		return kubebuilderx.Commit, err
-	}
+	viewDef, _ := tree.List(&viewv1.ReconciliationViewDefinition{})[0].(*viewv1.ReconciliationViewDefinition)
 
 	// build new object set from cache
 	root := &appsv1alpha1.Cluster{}
@@ -75,7 +66,7 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 			Name:      view.Spec.TargetObject.Name,
 		}
 	}
-	if err = s.reader.Get(s.ctx, objectKey, root); err != nil {
+	if err := s.reader.Get(s.ctx, objectKey, root); err != nil {
 		return kubebuilderx.Commit, err
 	}
 
@@ -134,6 +125,7 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 	}
 
 	// build new InitialObjectTree
+	var err error
 	view.Status.InitialObjectTree, err = getObjectTreeWithRevision(root, viewDef.Spec.OwnershipRules, s.store, view.Status.View[latestReconciliationCycleStart].Revision)
 	if err != nil {
 		return kubebuilderx.Commit, err

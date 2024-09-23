@@ -22,8 +22,8 @@ package view
 import (
 	"context"
 	"fmt"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 
-	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -51,7 +51,7 @@ func (r *resourcesValidator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuild
 	v, _ := tree.GetRoot().(*viewv1.ReconciliationView)
 
 	// view definition object should exist
-	o, err := tree.Get(&viewv1.ReconciliationViewDefinition{})
+	o, err := tree.Get(builder.NewReconciliationViewDefinitionBuilder(v.Spec.ViewDefinition).GetObject())
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
@@ -62,7 +62,7 @@ func (r *resourcesValidator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuild
 	// i18n resources should exist
 	viewDef, _ := o.(*viewv1.ReconciliationViewDefinition)
 	if viewDef.Spec.I18nResourceRef != nil {
-		_, err = tree.Get(&corev1.ConfigMap{})
+		_, err = tree.Get(builder.NewConfigMapBuilder(viewDef.Spec.I18nResourceRef.Namespace, viewDef.Spec.I18nResourceRef.Name).GetObject())
 		if err != nil {
 			return kubebuilderx.Commit, fmt.Errorf("i18n resources %s/%s for view %s/%s, definition %s not found",
 				viewDef.Spec.I18nResourceRef.Namespace, viewDef.Spec.I18nResourceRef.Name, v.Namespace, v.Name, viewDef.Name)

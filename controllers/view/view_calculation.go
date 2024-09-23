@@ -55,18 +55,11 @@ func (c *viewCalculator) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilde
 
 func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	view, _ := tree.GetRoot().(*viewv1.ReconciliationView)
-	o, err := tree.Get(&viewv1.ReconciliationViewDefinition{})
-	if err != nil {
-		return kubebuilderx.Commit, err
-	}
-	viewDef, _ := o.(*viewv1.ReconciliationViewDefinition)
-	o, err = tree.Get(&corev1.ConfigMap{})
-	if err != nil {
-		return kubebuilderx.Commit, err
-	}
+	viewDef := tree.List(&viewv1.ReconciliationViewDefinition{})[0].(*viewv1.ReconciliationViewDefinition)
+	objs := tree.List(&corev1.ConfigMap{})
 	var i18nResource *corev1.ConfigMap
-	if o != nil {
-		i18nResource, _ = o.(*corev1.ConfigMap)
+	if len(objs) > 0 {
+		i18nResource, _ = objs[0].(*corev1.ConfigMap)
 	}
 
 	// build new object set from cache
@@ -78,7 +71,7 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 			Name:      view.Spec.TargetObject.Name,
 		}
 	}
-	if err = c.cli.Get(c.ctx, objectKey, root); err != nil {
+	if err := c.cli.Get(c.ctx, objectKey, root); err != nil {
 		return kubebuilderx.Commit, err
 	}
 	newObjectMap := make(map[model.GVKNObjKey]client.Object)

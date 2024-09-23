@@ -190,8 +190,7 @@ func (r *informerManagerReconciler) PreCondition(tree *kubebuilderx.ObjectTree) 
 
 func (r *informerManagerReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	gvks := sets.New[schema.GroupVersionKind]()
-	o, _ := tree.Get(&viewv1.ReconciliationViewDefinition{})
-	viewDef, _ := o.(*viewv1.ReconciliationViewDefinition)
+	viewDef, _ := tree.List(&viewv1.ReconciliationViewDefinition{})[0].(*viewv1.ReconciliationViewDefinition)
 	parseGVK := func(ot viewv1.ObjectType) error {
 		gvk, err := objectTypeToGVK(&ot)
 		if err != nil {

@@ -86,10 +86,7 @@ func runCommandNonBlocking(ctx context.Context, action *proto.ExecAction, parame
 		return nil, err
 	}
 	resultChan := make(chan *commandResult, 1)
-	errChan := make(chan error, 1)
 	go func() {
-		defer close(errChan)
-
 		// wait for the command to finish
 		execErr, ok := <-execErrorChan
 		if !ok {

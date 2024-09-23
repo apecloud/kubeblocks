@@ -31,7 +31,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
@@ -67,10 +66,6 @@ var _ = Describe("Component", func() {
 		}
 
 		PIt("build serviceReference correctly", func() {
-			reqCtx := intctrlutil.RequestCtx{
-				Ctx: ctx,
-				Log: logger,
-			}
 			const (
 				name    = "nginx"
 				ns      = "default"
@@ -92,7 +87,7 @@ var _ = Describe("Component", func() {
 				testapps.NginxImage: serviceDescriptor,
 			}
 			By("call build")
-			synthesizeComp, err := BuildSynthesizedComponent(reqCtx, testCtx.Cli, cluster, compDef, compObj())
+			synthesizeComp, err := BuildSynthesizedComponent(ctx, testCtx.Cli, compDef, compObj(), cluster)
 			Expect(err).Should(Succeed())
 			Expect(synthesizeComp).ShouldNot(BeNil())
 			Expect(synthesizeComp.ServiceReferences).ShouldNot(BeNil())
@@ -108,7 +103,6 @@ var _ = Describe("Component", func() {
 				_512m  = resource.MustParse("512Mi")
 				_1024m = resource.MustParse("1Gi")
 				_2048m = resource.MustParse("2Gi")
-				reqCtx = intctrlutil.RequestCtx{Ctx: ctx, Log: logger}
 			)
 			compDef.Spec.Runtime.Volumes = append(compDef.Spec.Runtime.Volumes, []corev1.Volume{
 				{
@@ -156,7 +150,7 @@ var _ = Describe("Component", func() {
 			}
 			cluster.Spec.ComponentSpecs[0].Resources.Requests[corev1.ResourceMemory] = _512m
 			cluster.Spec.ComponentSpecs[0].Resources.Limits[corev1.ResourceMemory] = _1024m
-			comp, err := BuildSynthesizedComponent(reqCtx, testCtx.Cli, cluster, compDef.DeepCopy(), compObj())
+			comp, err := BuildSynthesizedComponent(ctx, testCtx.Cli, compDef.DeepCopy(), compObj(), cluster)
 			Expect(err).Should(Succeed())
 			Expect(comp).ShouldNot(BeNil())
 			for _, vol := range comp.PodSpec.Volumes {
@@ -177,7 +171,7 @@ var _ = Describe("Component", func() {
 			By("without memory resource set")
 			delete(cluster.Spec.ComponentSpecs[0].Resources.Requests, corev1.ResourceMemory)
 			delete(cluster.Spec.ComponentSpecs[0].Resources.Limits, corev1.ResourceMemory)
-			comp, err = BuildSynthesizedComponent(reqCtx, testCtx.Cli, cluster, compDef.DeepCopy(), compObj())
+			comp, err = BuildSynthesizedComponent(ctx, testCtx.Cli, compDef.DeepCopy(), compObj(), cluster)
 			Expect(err).Should(Succeed())
 			Expect(comp).ShouldNot(BeNil())
 			for _, vol := range comp.PodSpec.Volumes {

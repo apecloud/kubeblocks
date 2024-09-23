@@ -81,6 +81,7 @@ func (r *Component) incrementConvertTo(dstRaw metav1.Object) (incrementChange, e
 
 	// deleted
 	return &componentConverter{
+		EnabledLogs:            r.Spec.EnabledLogs,
 		Affinity:               r.Spec.Affinity,
 		Tolerations:            r.Spec.Tolerations,
 		InstanceUpdateStrategy: r.Spec.InstanceUpdateStrategy,
@@ -90,6 +91,7 @@ func (r *Component) incrementConvertTo(dstRaw metav1.Object) (incrementChange, e
 func (r *Component) incrementConvertFrom(srcRaw metav1.Object, ic incrementChange) error {
 	// deleted
 	c := ic.(*componentConverter)
+	r.Spec.EnabledLogs = c.EnabledLogs
 	r.Spec.Affinity = c.Affinity
 	r.Spec.Tolerations = c.Tolerations
 	r.Spec.InstanceUpdateStrategy = c.InstanceUpdateStrategy
@@ -102,6 +104,7 @@ func (r *Component) incrementConvertFrom(srcRaw metav1.Object, ic incrementChang
 }
 
 type componentConverter struct {
+	EnabledLogs            []string                `json:"enabledLogs,omitempty"`
 	Affinity               *Affinity               `json:"affinity,omitempty"`
 	Tolerations            []corev1.Toleration     `json:"tolerations,omitempty"`
 	InstanceUpdateStrategy *InstanceUpdateStrategy `json:"instanceUpdateStrategy,omitempty"`

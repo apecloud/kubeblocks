@@ -38,10 +38,6 @@ type Interface interface {
 	ComponentVersions() ComponentVersionInformer
 	// ConfigConstraints returns a ConfigConstraintInformer.
 	ConfigConstraints() ConfigConstraintInformer
-	// OpsDefinitions returns a OpsDefinitionInformer.
-	OpsDefinitions() OpsDefinitionInformer
-	// OpsRequests returns a OpsRequestInformer.
-	OpsRequests() OpsRequestInformer
 	// ServiceDescriptors returns a ServiceDescriptorInformer.
 	ServiceDescriptors() ServiceDescriptorInformer
 }
@@ -90,16 +86,6 @@ func (v *version) ComponentVersions() ComponentVersionInformer {
 // ConfigConstraints returns a ConfigConstraintInformer.
 func (v *version) ConfigConstraints() ConfigConstraintInformer {
 	return &configConstraintInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
-}
-
-// OpsDefinitions returns a OpsDefinitionInformer.
-func (v *version) OpsDefinitions() OpsDefinitionInformer {
-	return &opsDefinitionInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
-}
-
-// OpsRequests returns a OpsRequestInformer.
-func (v *version) OpsRequests() OpsRequestInformer {
-	return &opsRequestInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // ServiceDescriptors returns a ServiceDescriptorInformer.

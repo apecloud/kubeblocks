@@ -79,12 +79,12 @@ var _ = Describe("cluster utils test", func() {
 		})
 
 		It("get original or generated cluster component spec test", func() {
-			compSpec, err := GetOriginalOrGeneratedComponentSpecByName(testCtx.Ctx, k8sClient, cluster, mysqlCompName)
+			compSpec, err := GetComponentSpecByName(testCtx.Ctx, k8sClient, cluster, mysqlCompName)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(compSpec).ShouldNot(BeNil())
 			Expect(compSpec.Name).Should(Equal(mysqlCompName))
 
-			compSpec, err = GetOriginalOrGeneratedComponentSpecByName(testCtx.Ctx, k8sClient, cluster, "fakeCompName")
+			compSpec, err = GetComponentSpecByName(testCtx.Ctx, k8sClient, cluster, "fakeCompName")
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(compSpec).Should(BeNil())
 
@@ -99,7 +99,7 @@ var _ = Describe("cluster utils test", func() {
 			compKey := client.ObjectKeyFromObject(mockCompObj)
 			Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1.Component{}, true)).Should(Succeed())
 
-			compSpec, err = GetOriginalOrGeneratedComponentSpecByName(testCtx.Ctx, k8sClient, cluster, mysqlShardingCompName)
+			compSpec, err = GetComponentSpecByName(testCtx.Ctx, k8sClient, cluster, mysqlShardingCompName)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(compSpec).ShouldNot(BeNil())
 			Expect(compSpec.Name).Should(Equal(mysqlShardingCompName))

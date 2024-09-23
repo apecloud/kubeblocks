@@ -55,7 +55,6 @@ func (t *clusterComponentStatusTransformer) reconcileComponentsStatus(transCtx *
 	if cluster.Status.Components == nil {
 		cluster.Status.Components = make(map[string]appsv1.ClusterComponentStatus)
 	}
-	// We cannot use cluster.status.components here because of simplified API generated component is not in it.
 	for _, compSpec := range transCtx.ComponentSpecs {
 		compKey := types.NamespacedName{
 			Namespace: cluster.Namespace,

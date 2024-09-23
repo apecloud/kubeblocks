@@ -34,6 +34,7 @@ import (
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
+	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
@@ -97,9 +98,9 @@ var ComponentDefinitionSignature = func(appsv1.ComponentDefinition, *appsv1.Comp
 }
 var ComponentVersionSignature = func(appsv1.ComponentVersion, *appsv1.ComponentVersion, appsv1.ComponentVersionList, *appsv1.ComponentVersionList) {
 }
-var OpsDefinitionSignature = func(_ appsv1alpha1.OpsDefinition, _ *appsv1alpha1.OpsDefinition, _ appsv1alpha1.OpsDefinitionList, _ *appsv1alpha1.OpsDefinitionList) {
+var OpsDefinitionSignature = func(_ opsv1alpha1.OpsDefinition, _ *opsv1alpha1.OpsDefinition, _ opsv1alpha1.OpsDefinitionList, _ *opsv1alpha1.OpsDefinitionList) {
 }
-var OpsRequestSignature = func(_ appsv1alpha1.OpsRequest, _ *appsv1alpha1.OpsRequest, _ appsv1alpha1.OpsRequestList, _ *appsv1alpha1.OpsRequestList) {
+var OpsRequestSignature = func(_ opsv1alpha1.OpsRequest, _ *opsv1alpha1.OpsRequest, _ opsv1alpha1.OpsRequestList, _ *opsv1alpha1.OpsRequestList) {
 }
 var ConfigConstraintSignature = func(_ appsv1beta1.ConfigConstraint, _ *appsv1beta1.ConfigConstraint, _ appsv1beta1.ConfigConstraintList, _ *appsv1beta1.ConfigConstraintList) {
 }

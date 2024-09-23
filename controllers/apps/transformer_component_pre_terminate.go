@@ -144,12 +144,7 @@ func (t *componentPreTerminateTransformer) synthesizedComponent(transCtx *compon
 		return nil, newRequeueError(requeueDuration, err.Error())
 	}
 
-	reqCtx := intctrlutil.RequestCtx{
-		Ctx:      ctx,
-		Log:      transCtx.Logger,
-		Recorder: transCtx.EventRecorder,
-	}
-	synthesizedComp, err := component.BuildSynthesizedComponent(reqCtx, cli, cluster, compDef, comp)
+	synthesizedComp, err := component.BuildSynthesizedComponent(ctx, cli, compDef, comp, cluster)
 	if err != nil {
 		return nil, newRequeueError(requeueDuration,
 			fmt.Sprintf("build synthesized component failed at pre-terminate transformer: %s", err.Error()))

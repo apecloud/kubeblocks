@@ -111,7 +111,7 @@ var _ = Describe("clusterDeletionTransformer", func() {
 	})
 
 	It("w/o terminate orders", func() {
-		transCtx.Cluster.Spec.ClusterDefRef = ""
+		transCtx.Cluster.Spec.ClusterDef = ""
 		transCtx.Cluster.Spec.Topology = ""
 
 		transformer := &clusterDeletionTransformer{}

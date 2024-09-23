@@ -33,7 +33,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -86,11 +85,7 @@ var _ = Describe("object rbac transformer test.", func() {
 
 		graphCli = model.NewGraphClient(k8sClient)
 
-		reqCtx := intctrlutil.RequestCtx{
-			Ctx: ctx,
-			Log: logger,
-		}
-		synthesizedComponent, err := component.BuildSynthesizedComponent(reqCtx, k8sClient, cluster, compDefObj, compObj)
+		synthesizedComponent, err := component.BuildSynthesizedComponent(ctx, k8sClient, compDefObj, compObj, cluster)
 		Expect(err).Should(Succeed())
 
 		transCtx = &componentTransformContext{

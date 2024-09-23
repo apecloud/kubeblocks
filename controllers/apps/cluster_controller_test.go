@@ -175,7 +175,7 @@ var _ = Describe("Cluster Controller", func() {
 			GetObject()
 
 		By("Create a bpt obj")
-		createBackupPolicyTpl(compDefObj.Name)
+		testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.Name)
 
 		By("Wait objects available")
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(compDefObj),
@@ -1050,7 +1050,7 @@ var _ = Describe("Cluster Controller", func() {
 					backup: &appsv1.ClusterBackup{
 						Enabled:                 &boolTrue,
 						RetentionPeriod:         retention("1d"),
-						Method:                  vsBackupMethodName,
+						Method:                  testdp.VSBackupMethodName,
 						CronExpression:          "*/1 * * * *",
 						StartingDeadlineMinutes: int64Ptr(int64(10)),
 						PITREnabled:             &boolTrue,
@@ -1062,7 +1062,7 @@ var _ = Describe("Cluster Controller", func() {
 					backup: &appsv1.ClusterBackup{
 						Enabled:                 &boolFalse,
 						RetentionPeriod:         retention("1d"),
-						Method:                  vsBackupMethodName,
+						Method:                  testdp.VSBackupMethodName,
 						CronExpression:          "*/1 * * * *",
 						StartingDeadlineMinutes: int64Ptr(int64(10)),
 						PITREnabled:             &boolTrue,
@@ -1074,7 +1074,7 @@ var _ = Describe("Cluster Controller", func() {
 					backup: &appsv1.ClusterBackup{
 						Enabled:                 &boolTrue,
 						RetentionPeriod:         retention("2d"),
-						Method:                  backupMethodName,
+						Method:                  testdp.BackupMethodName,
 						CronExpression:          "*/1 * * * *",
 						StartingDeadlineMinutes: int64Ptr(int64(10)),
 						RepoName:                backupRepoName,
@@ -1248,22 +1248,3 @@ var _ = Describe("Cluster Controller", func() {
 		})
 	})
 })
-
-func createBackupPolicyTpl(compDef string) {
-	By("create actionSet")
-	fakeActionSet("")
-
-	By("Creating a BackupPolicyTemplate")
-	bpt := testapps.NewBackupPolicyTemplateFactory(backupPolicyTPLName).
-		AddLabels(compDef, compDef)
-
-	ttl := "7d"
-	bpt = bpt.AddBackupPolicy(compDef).
-		AddBackupMethod(backupMethodName, false, actionSetName).
-		SetBackupMethodVolumeMounts("data", "/data").
-		AddBackupMethod(vsBackupMethodName, true, "").
-		SetBackupMethodVolumes([]string{"data"}).
-		AddSchedule(backupMethodName, "0 0 * * *", ttl, true).
-		AddSchedule(vsBackupMethodName, "0 0 * * *", ttl, true)
-	bpt.Create(&testCtx)
-}

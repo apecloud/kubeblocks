@@ -34,8 +34,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dperrors "github.com/apecloud/kubeblocks/pkg/dataprotection/errors"
@@ -359,7 +359,7 @@ type backupReconfigureRef struct {
 	Disable parameterPairs `json:"disable,omitempty"`
 }
 
-type parameterPairs map[string][]appsv1alpha1.ParameterPair
+type parameterPairs map[string][]opsv1alpha1.ParameterPair
 
 func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error {
 	reCfgRef := s.BackupSchedule.Annotations[dptypes.ReconfigureRefAnnotationKey]
@@ -407,7 +407,7 @@ func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 	if !slices.Contains(appsv1.GetReconfiguringRunningPhases(), cluster.Status.Phase) {
 		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting for the cluster %s to be available.", clusterName)
 	}
-	ops := appsv1alpha1.OpsRequest{
+	ops := opsv1alpha1.OpsRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: s.BackupSchedule.Name + "-",
 			Namespace:    s.BackupSchedule.Namespace,
@@ -415,18 +415,18 @@ func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 				dptypes.BackupScheduleLabelKey: s.BackupSchedule.Name,
 			},
 		},
-		Spec: appsv1alpha1.OpsRequestSpec{
-			Type:        appsv1alpha1.ReconfiguringType,
+		Spec: opsv1alpha1.OpsRequestSpec{
+			Type:        opsv1alpha1.ReconfiguringType,
 			ClusterName: clusterName,
-			SpecificOpsRequest: appsv1alpha1.SpecificOpsRequest{
-				Reconfigure: &appsv1alpha1.Reconfigure{
-					ComponentOps: appsv1alpha1.ComponentOps{
+			SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{
+				Reconfigure: &opsv1alpha1.Reconfigure{
+					ComponentOps: opsv1alpha1.ComponentOps{
 						ComponentName: targetPodSelector.MatchLabels[constant.KBAppComponentLabelKey],
 					},
-					Configurations: []appsv1alpha1.ConfigurationItem{
+					Configurations: []opsv1alpha1.ConfigurationItem{
 						{
 							Name: configRef.Name,
-							Keys: []appsv1alpha1.ParameterConfig{
+							Keys: []opsv1alpha1.ParameterConfig{
 								{
 									Key:        configRef.Key,
 									Parameters: parameters,
@@ -454,7 +454,7 @@ func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 }
 
 func (s *Scheduler) reconcileReconfigure(backupSchedule *dpv1alpha1.BackupSchedule) error {
-	opsList := appsv1alpha1.OpsRequestList{}
+	opsList := opsv1alpha1.OpsRequestList{}
 	if err := s.Client.List(s.Ctx, &opsList,
 		client.InNamespace(backupSchedule.Namespace),
 		client.MatchingLabels{dptypes.BackupScheduleLabelKey: backupSchedule.Name}); err != nil {
@@ -465,9 +465,9 @@ func (s *Scheduler) reconcileReconfigure(backupSchedule *dpv1alpha1.BackupSchedu
 			return opsList.Items[j].CreationTimestamp.Before(&opsList.Items[i].CreationTimestamp)
 		})
 		latestOps := opsList.Items[0]
-		if latestOps.Status.Phase == appsv1alpha1.OpsFailedPhase {
+		if latestOps.Status.Phase == opsv1alpha1.OpsFailedPhase {
 			return intctrlutil.NewErrorf(dperrors.ErrorTypeReconfigureFailed, "ops failed %s", latestOps.Name)
-		} else if latestOps.Status.Phase != appsv1alpha1.OpsSucceedPhase {
+		} else if latestOps.Status.Phase != opsv1alpha1.OpsSucceedPhase {
 			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "waiting for ops %s finished.", latestOps.Name)
 		}
 	}

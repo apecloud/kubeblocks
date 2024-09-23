@@ -16,7 +16,7 @@ KubeBlocks supports the management of Elasticsearch.
 
 - [Install kbcli](./../installation/install-with-kbcli/install-kbcli.md).
 - [Install KubeBlocks](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md).
-- [Install and enable the elasticsearch addon](./../overview/supported-addons.md#use-addons).
+- [Install and enable the elasticsearch addon](./../installation/install-with-kbcli/install-addons.md).
 
 ## Create a cluster
 
@@ -112,7 +112,7 @@ curl http://127.0.0.1:9200/_cat/nodes?v
 
 For the testing environment, you can run the command below to open the Grafana monitor web page.
 
-1. View all built-in addons and make sure the monitoring addons are enabled. If the monitoring addons are not enabled, [enable these addons](./../overview/supported-addons.md#use-addons) first.
+1. View all built-in addons and make sure the monitoring addons are enabled. If the monitoring addons are not enabled, [enable these addons](./../installation/install-with-kbcli/install-addons.md#enabledisable-addons) first.
 
    ```bash
    # View all addons supported

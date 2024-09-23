@@ -72,7 +72,7 @@ func (t *componentAccountProvisionTransformer) Transform(ctx graph.TransformCont
 	}
 
 	lifecycleActions := transCtx.CompDef.Spec.LifecycleActions
-	if !component.IsGenerated(transCtx.Component) && (lifecycleActions == nil || lifecycleActions.AccountProvision == nil) {
+	if lifecycleActions == nil || lifecycleActions.AccountProvision == nil {
 		return nil
 	}
 

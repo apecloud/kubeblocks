@@ -29,12 +29,12 @@ type MockClusterFactory struct {
 	BaseFactory[appsv1.Cluster, *appsv1.Cluster, MockClusterFactory]
 }
 
-func NewClusterFactory(namespace, name, cdRef string) *MockClusterFactory {
+func NewClusterFactory(namespace, name, clusterDef string) *MockClusterFactory {
 	f := &MockClusterFactory{}
 	f.Init(namespace, name,
 		&appsv1.Cluster{
 			Spec: appsv1.ClusterSpec{
-				ClusterDefRef:     cdRef,
+				ClusterDef:        clusterDef,
 				ComponentSpecs:    []appsv1.ClusterComponentSpec{},
 				TerminationPolicy: appsv1.WipeOut,
 			},
@@ -161,12 +161,6 @@ func (factory *MockClusterFactory) SetResources(resources corev1.ResourceRequire
 	})
 }
 
-func (factory *MockClusterFactory) SetEnabledLogs(logName ...string) *MockClusterFactory {
-	return factory.lastComponentRef(func(comp *appsv1.ClusterComponentSpec) {
-		comp.EnabledLogs = logName
-	})
-}
-
 func (factory *MockClusterFactory) AddVolumeClaimTemplate(volumeName string,
 	pvcSpec appsv1.PersistentVolumeClaimSpec) *MockClusterFactory {
 	return factory.lastComponentRef(func(comp *appsv1.ClusterComponentSpec) {
@@ -219,50 +213,6 @@ func (factory *MockClusterFactory) SetBackup(backup *appsv1.ClusterBackup) *Mock
 func (factory *MockClusterFactory) SetServiceRefs(serviceRefs []appsv1.ServiceRef) *MockClusterFactory {
 	return factory.lastComponentRef(func(comp *appsv1.ClusterComponentSpec) {
 		comp.ServiceRefs = serviceRefs
-	})
-}
-
-func (factory *MockClusterFactory) AddUserSecretVolume(name, mountPoint, resName, containerName string) *MockClusterFactory {
-	secretResource := appsv1.SecretRef{
-		ResourceMeta: appsv1.ResourceMeta{
-			Name:         name,
-			MountPoint:   mountPoint,
-			AsVolumeFrom: []string{containerName},
-		},
-		Secret: corev1.SecretVolumeSource{
-			SecretName: resName,
-		},
-	}
-	return factory.lastComponentRef(func(comp *appsv1.ClusterComponentSpec) {
-		userResourcesRefs := comp.UserResourceRefs
-		if userResourcesRefs == nil {
-			userResourcesRefs = &appsv1.UserResourceRefs{}
-			comp.UserResourceRefs = userResourcesRefs
-		}
-		userResourcesRefs.SecretRefs = append(userResourcesRefs.SecretRefs, secretResource)
-	})
-}
-
-func (factory *MockClusterFactory) AddUserConfigmapVolume(name, mountPoint, resName, containerName string) *MockClusterFactory {
-	cmResource := appsv1.ConfigMapRef{
-		ResourceMeta: appsv1.ResourceMeta{
-			Name:         name,
-			MountPoint:   mountPoint,
-			AsVolumeFrom: []string{containerName},
-		},
-		ConfigMap: corev1.ConfigMapVolumeSource{
-			LocalObjectReference: corev1.LocalObjectReference{
-				Name: resName,
-			},
-		},
-	}
-	return factory.lastComponentRef(func(comp *appsv1.ClusterComponentSpec) {
-		userResourcesRefs := comp.UserResourceRefs
-		if userResourcesRefs == nil {
-			userResourcesRefs = &appsv1.UserResourceRefs{}
-			comp.UserResourceRefs = userResourcesRefs
-		}
-		userResourcesRefs.ConfigMapRefs = append(userResourcesRefs.ConfigMapRefs, cmResource)
 	})
 }
 

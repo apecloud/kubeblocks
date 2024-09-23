@@ -22,7 +22,6 @@ package util
 import (
 	"context"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -33,8 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
 	ctlruntime "sigs.k8s.io/controller-runtime"
-
-	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 const (
@@ -53,34 +50,29 @@ func SendEventWithMessage(logger *logr.Logger, reason string, message string) {
 }
 
 func createEvent(reason string, message string) *corev1.Event {
-	// TODO(v1.0): pod variables
-	podName := os.Getenv(constant.KBEnvPodName)
-	podUID := os.Getenv(constant.KBEnvPodUID)
-	nodeName := os.Getenv(constant.KBEnvNodeName)
-	namespace := os.Getenv(constant.KBEnvNamespace)
 	return &corev1.Event{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s.%s", podName, rand.String(16)),
-			Namespace: namespace,
+			Name:      fmt.Sprintf("%s.%s", podName(), rand.String(16)),
+			Namespace: namespace(),
 		},
 		InvolvedObject: corev1.ObjectReference{
 			Kind:      "Pod",
-			Namespace: namespace,
-			Name:      podName,
-			UID:       types.UID(podUID),
+			Namespace: namespace(),
+			Name:      podName(),
+			UID:       types.UID(podUID()),
 			FieldPath: "spec.containers{kbagent}",
 		},
 		Reason:  reason,
 		Message: message,
 		Source: corev1.EventSource{
 			Component: "kbagent",
-			Host:      nodeName,
+			Host:      nodeName(),
 		},
 		FirstTimestamp:      metav1.Now(),
 		LastTimestamp:       metav1.Now(),
 		EventTime:           metav1.NowMicro(),
 		ReportingController: "kbagent",
-		ReportingInstance:   podName,
+		ReportingInstance:   podName(),
 		Action:              reason,
 		Type:                "Normal",
 	}
@@ -91,9 +83,8 @@ func sendEvent(event *corev1.Event) error {
 	if err != nil {
 		return err
 	}
-	namespace := os.Getenv(constant.KBEnvNamespace)
 	for i := 0; i < sendEventMaxAttempts; i++ {
-		_, err = clientSet.CoreV1().Events(namespace).Create(context.Background(), event, metav1.CreateOptions{})
+		_, err = clientSet.CoreV1().Events(namespace()).Create(context.Background(), event, metav1.CreateOptions{})
 		if err == nil {
 			return nil
 		}

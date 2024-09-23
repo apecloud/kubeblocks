@@ -105,22 +105,10 @@ type ClusterSpec struct {
 	// Note: Once set, this field cannot be modified; it is immutable.
 	//
 	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="clusterDefinitionRef is immutable"
+	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="clusterDef is immutable"
 	// +optional
-	ClusterDefRef string `json:"clusterDefinitionRef,omitempty"`
-
-	// Refers to the ClusterVersion name.
-	//
-	// Deprecated since v0.9, use ComponentVersion instead.
-	// This field is maintained for backward compatibility and its use is discouraged.
-	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
-	//
-	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
-	// +optional
-	ClusterVersionRef string `json:"clusterVersionRef,omitempty"`
+	ClusterDef string `json:"clusterDef,omitempty"`
 
 	// Specifies the name of the ClusterTopology to be used when creating the Cluster.
 	//
@@ -274,8 +262,6 @@ const (
 )
 
 // ClusterComponentSpec defines the specification of a Component within a Cluster.
-// TODO +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDefRef) || has(self.componentDefRef)", message="componentDefRef is required once set"
-// TODO +kubebuilder:validation:XValidation:rule="!has(oldSelf.componentDef) || has(self.componentDef)", message="componentDef is required once set"
 type ClusterComponentSpec struct {
 	// Specifies the Component's name.
 	// It's part of the Service DNS name and must comply with the IANA service naming rule.
@@ -284,34 +270,19 @@ type ClusterComponentSpec struct {
 	//
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
-	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name is immutable"
 	// +optional
 	Name string `json:"name"`
 
-	// References a ClusterComponentDefinition defined in the `clusterDefinition.spec.componentDef` field.
-	// Must comply with the IANA service naming rule.
+	// Specifies the ComponentDefinition custom resource (CR) that defines the Component's characteristics and behavior.
 	//
-	// Deprecated since v0.9,
-	// because defining Components in `clusterDefinition.spec.componentDef` field has been deprecated.
-	// This field is replaced by the `componentDef` field, use `componentDef` instead.
-	// This field is maintained for backward compatibility and its use is discouraged.
-	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
+	// Supports three different ways to specify the ComponentDefinition:
 	//
-	// +kubebuilder:validation:MaxLength=22
-	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
-	// TODO +kubebuilder:validation:XValidation:rule="self == oldSelf",message="componentDefRef is immutable"
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0, consider using the ComponentDef instead"
-	// +optional
-	ComponentDefRef string `json:"componentDefRef,omitempty"`
-
-	// Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
-	// custom resource (CR) that defines the Component's characteristics and behavior.
-	//
-	// If both `componentDefRef` and `componentDef` are provided,
-	// the `componentDef` will take precedence over `componentDefRef`.
+	// - the regular expression - recommended
+	// - the full name - recommended
+	// - the name prefix
 	//
 	// +kubebuilder:validation:MaxLength=64
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	ComponentDef string `json:"componentDef,omitempty"`
 
@@ -351,23 +322,6 @@ type ClusterComponentSpec struct {
 	//
 	// +optional
 	ServiceRefs []ServiceRef `json:"serviceRefs,omitempty"`
-
-	// Specifies which types of logs should be collected for the Component.
-	// The log types are defined in the `componentDefinition.spec.logConfigs` field with the LogConfig entries.
-	//
-	// The elements in the `enabledLogs` array correspond to the names of the LogConfig entries.
-	// For example, if the `componentDefinition.spec.logConfigs` defines LogConfig entries with
-	// names "slow_query_log" and "error_log",
-	// you can enable the collection of these logs by including their names in the `enabledLogs` array:
-	// ```yaml
-	// enabledLogs:
-	// - slow_query_log
-	// - error_log
-	// ```
-	//
-	// +listType=set
-	// +optional
-	EnabledLogs []string `json:"enabledLogs,omitempty"`
 
 	// Specifies Labels to override or add for underlying Pods.
 	//
@@ -472,16 +426,6 @@ type ClusterComponentSpec struct {
 	// +optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 
-	// Defines the update strategy for the Component.
-	//
-	// Deprecated since v0.9.
-	// This field is maintained for backward compatibility and its use is discouraged.
-	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
-	//
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
-	// +optional
-	UpdateStrategy *UpdateStrategy `json:"updateStrategy,omitempty"`
-
 	// Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
 	// or when scaling down. It only used when `PodManagementPolicy` is set to `Parallel`.
 	// The default Concurrency is 100%.
@@ -500,16 +444,6 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:validation:Enum={StrictInPlace,PreferInPlace}
 	// +optional
 	PodUpdatePolicy *PodUpdatePolicyType `json:"podUpdatePolicy,omitempty"`
-
-	// Allows users to specify custom ConfigMaps and Secrets to be mounted as volumes
-	// in the Cluster's Pods.
-	// This is useful in scenarios where users need to provide additional resources to the Cluster, such as:
-	//
-	// - Mounting custom scripts or configuration files during Cluster startup.
-	// - Mounting Secrets as volumes to provide sensitive information, like S3 AK/SK, to the Cluster.
-	//
-	// +optional
-	UserResourceRefs *UserResourceRefs `json:"userResourceRefs,omitempty"`
 
 	// Allows for the customization of configuration values for each instance within a Component.
 	// An instance represent a single replica (Pod and associated K8s resources like PVCs, Services, and ConfigMaps).
@@ -567,21 +501,6 @@ type ClusterComponentSpec struct {
 	// +optional
 	DisableExporter *bool `json:"disableExporter,omitempty"`
 
-	// Deprecated since v0.9
-	// Determines whether metrics exporter information is annotated on the Component's headless Service.
-	//
-	// If set to true, the following annotations will be patched into the Service:
-	//
-	// - "monitor.kubeblocks.io/path"
-	// - "monitor.kubeblocks.io/port"
-	// - "monitor.kubeblocks.io/scheme"
-	//
-	// These annotations allow the Prometheus installed by KubeBlocks to discover and scrape metrics from the exporter.
-	//
-	// +optional
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.10.0"
-	Monitor *bool `json:"monitor,omitempty"`
-
 	// Stop the Component.
 	// If set, all the computing resources will be released.
 	//
@@ -627,75 +546,6 @@ type ClusterComponentService struct {
 	//
 	// +optional
 	PodService *bool `json:"podService,omitempty"`
-}
-
-// UserResourceRefs defines references to user-defined Secrets and ConfigMaps.
-type UserResourceRefs struct {
-	// SecretRefs defines the user-defined Secrets.
-	//
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
-	// +optional
-	SecretRefs []SecretRef `json:"secretRefs,omitempty"`
-
-	// ConfigMapRefs defines the user-defined ConfigMaps.
-	//
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
-	// +optional
-	ConfigMapRefs []ConfigMapRef `json:"configMapRefs,omitempty"`
-}
-
-// SecretRef defines a reference to a Secret.
-type SecretRef struct {
-	ResourceMeta `json:",inline"`
-
-	// Secret specifies the Secret to be mounted as a volume.
-	//
-	// +kubebuilder:validation:Required
-	Secret corev1.SecretVolumeSource `json:"secret"`
-}
-
-// ConfigMapRef defines a reference to a ConfigMap.
-type ConfigMapRef struct {
-	ResourceMeta `json:",inline"`
-
-	// ConfigMap specifies the ConfigMap to be mounted as a volume.
-	//
-	// +kubebuilder:validation:Required
-	ConfigMap corev1.ConfigMapVolumeSource `json:"configMap"`
-}
-
-// ResourceMeta encapsulates metadata and configuration for referencing ConfigMaps and Secrets as volumes.
-type ResourceMeta struct {
-	// Name is the name of the referenced ConfigMap or Secret object. It must conform to DNS label standards.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	Name string `json:"name"`
-
-	// MountPoint is the filesystem path where the volume will be mounted.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=256
-	// +kubebuilder:validation:Pattern:=`^/[a-z]([a-z0-9\-]*[a-z0-9])?$`
-	MountPoint string `json:"mountPoint"`
-
-	// SubPath specifies a path within the volume from which to mount.
-	//
-	// +optional
-	SubPath string `json:"subPath,omitempty"`
-
-	// AsVolumeFrom lists the names of containers in which the volume should be mounted.
-	//
-	// +listType=set
-	// +optional
-	AsVolumeFrom []string `json:"asVolumeFrom,omitempty"`
 }
 
 // ShardingSpec defines how KubeBlocks manage dynamic provisioned shards.

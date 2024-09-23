@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,66 +42,9 @@ var (
 )
 
 // BuildSynthesizedComponent builds a new SynthesizedComponent object, which is a mixture of component-related configs from ComponentDefinition and Component.
-func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
-	cli client.Reader,
-	cluster *appsv1.Cluster,
-	compDef *appsv1.ComponentDefinition,
-	comp *appsv1.Component) (*SynthesizedComponent, error) {
-	return buildSynthesizedComponent(reqCtx, cli, compDef, comp, cluster, nil)
-}
-
-// BuildSynthesizedComponent4Generated builds SynthesizedComponent for generated Component which w/o ComponentDefinition.
-func BuildSynthesizedComponent4Generated(reqCtx intctrlutil.RequestCtx,
-	cli client.Reader,
-	cluster *appsv1.Cluster,
-	comp *appsv1.Component) (*appsv1.ComponentDefinition, *SynthesizedComponent, error) {
-	clusterCompSpec, err := getClusterCompSpec4Component(reqCtx.Ctx, cli, cluster, comp)
-	if err != nil {
-		return nil, nil, err
-	}
-	if clusterCompSpec == nil {
-		return nil, nil, fmt.Errorf("cluster component spec is not found: %s", comp.Name)
-	}
-	compDef, err := getOrBuildComponentDefinition(reqCtx.Ctx, cli, cluster, clusterCompSpec)
-	if err != nil {
-		return nil, nil, err
-	}
-	synthesizedComp, err := buildSynthesizedComponent(reqCtx, cli, compDef, comp, cluster, clusterCompSpec)
-	if err != nil {
-		return nil, nil, err
-	}
-	return compDef, synthesizedComp, nil
-}
-
-// BuildSynthesizedComponentWrapper builds a new SynthesizedComponent object with a given ClusterComponentSpec.
-// TODO: remove this
-func BuildSynthesizedComponentWrapper(reqCtx intctrlutil.RequestCtx,
-	cli client.Reader,
-	cluster *appsv1.Cluster,
-	clusterCompSpec *appsv1.ClusterComponentSpec) (*SynthesizedComponent, error) {
-	if clusterCompSpec == nil {
-		return nil, fmt.Errorf("cluster component spec is not provided")
-	}
-	compDef, err := getOrBuildComponentDefinition(reqCtx.Ctx, cli, cluster, clusterCompSpec)
-	if err != nil {
-		return nil, err
-	}
-	comp, err := BuildComponent(cluster, clusterCompSpec, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-	return buildSynthesizedComponent(reqCtx, cli, compDef, comp, cluster, clusterCompSpec)
-}
-
-// buildSynthesizedComponent builds a new SynthesizedComponent object, which is a mixture of component-related configs from ComponentDefinition and Component.
-// !!! Do not use @clusterDef, @cluster and @clusterCompSpec since they are used for the backward compatibility only.
-// TODO: remove @reqCtx & @cli
-func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
-	cli client.Reader,
-	compDef *appsv1.ComponentDefinition,
-	comp *appsv1.Component,
-	cluster *appsv1.Cluster,
-	clusterCompSpec *appsv1.ClusterComponentSpec) (*SynthesizedComponent, error) {
+// TODO: remove @ctx & @cli
+func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
+	compDef *appsv1.ComponentDefinition, comp *appsv1.Component, cluster *appsv1.Cluster) (*SynthesizedComponent, error) {
 	if compDef == nil || comp == nil {
 		return nil, nil
 	}
@@ -117,7 +61,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
-	comp2CompDef, err := buildComp2CompDefs(reqCtx.Ctx, cli, cluster, clusterCompSpec)
+	comp2CompDef, err := buildComp2CompDefs(ctx, cli, cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +102,6 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		PodManagementPolicy:              compDef.Spec.PodManagementPolicy,
 		ParallelPodManagementConcurrency: comp.Spec.ParallelPodManagementConcurrency,
 		PodUpdatePolicy:                  comp.Spec.PodUpdatePolicy,
-		EnabledLogs:                      comp.Spec.EnabledLogs,
 	}
 
 	buildCompatibleHorizontalScalePolicy(compDefObj, synthesizeComp)
@@ -198,13 +141,11 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	buildRuntimeClassName(synthesizeComp, comp)
 
 	if err = buildKBAgentContainer(synthesizeComp); err != nil {
-		reqCtx.Log.Error(err, "build kb-agent container failed")
-		return nil, err
+		return nil, errors.Wrap(err, "build kb-agent container failed")
 	}
 
-	if err = buildServiceReferences(reqCtx.Ctx, cli, synthesizeComp, compDef, comp); err != nil {
-		reqCtx.Log.Error(err, "build service references failed.")
-		return nil, err
+	if err = buildServiceReferences(ctx, cli, synthesizeComp, compDef, comp); err != nil {
+		return nil, errors.Wrap(err, "build service references failed")
 	}
 
 	return synthesizeComp, nil
@@ -220,26 +161,20 @@ func clusterGeneration(cluster *appsv1.Cluster, comp *appsv1.Component) string {
 	return strconv.FormatInt(cluster.Generation, 10)
 }
 
-func buildComp2CompDefs(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster, clusterCompSpec *appsv1.ClusterComponentSpec) (map[string]string, error) {
+func buildComp2CompDefs(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster) (map[string]string, error) {
 	if cluster == nil {
 		return nil, nil
 	}
 	mapping := make(map[string]string)
 
-	// Build from ComponentSpecs
-	if len(cluster.Spec.ComponentSpecs) == 0 {
-		if clusterCompSpec != nil && len(clusterCompSpec.ComponentDef) > 0 {
-			mapping[clusterCompSpec.Name] = clusterCompSpec.ComponentDef
-		}
-	} else {
-		for _, comp := range cluster.Spec.ComponentSpecs {
-			if len(comp.ComponentDef) > 0 {
-				mapping[comp.Name] = comp.ComponentDef
-			}
+	// build from componentSpecs
+	for _, comp := range cluster.Spec.ComponentSpecs {
+		if len(comp.ComponentDef) > 0 {
+			mapping[comp.Name] = comp.ComponentDef
 		}
 	}
 
-	// Build from ShardingSpecs
+	// build from shardingSpecs
 	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
 		shardingComps, err := intctrlutil.ListShardingComponents(ctx, cli, cluster, shardingSpec.Name)
 		if err != nil {

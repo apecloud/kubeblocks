@@ -128,8 +128,13 @@ var _ = Describe("OpsUtil functions", func() {
 			// fake to create the source pvc.
 			for i := range podList {
 				pvcName := fmt.Sprintf("%s-%s", testapps.DataVolumeName, podList[i].Name)
+				pvName := fmt.Sprintf("%s-%s", testapps.DataVolumeName, podList[i].Name)
+				testapps.NewPersistentVolumeFactory(podList[i].Namespace, pvName, pvcName).
+					SetStorage("20Gi").
+					SetPersistentVolumeReclaimPolicy(corev1.PersistentVolumeReclaimDelete).
+					Create(&testCtx)
 				testapps.NewPersistentVolumeClaimFactory(podList[i].Namespace, pvcName, clusterName, defaultCompName, testapps.DataVolumeName).
-					SetStorage("20Gi").Create(&testCtx)
+					SetStorage("20Gi").SetVolumeName(pvName).Create(&testCtx)
 			}
 
 			By("Test the functions in ops_util.go")
@@ -153,8 +158,8 @@ var _ = Describe("OpsUtil functions", func() {
 			var pvs []*corev1.PersistentVolume
 			for i := range pvcList.Items {
 				pvc := &pvcList.Items[i]
-				_, ok := pvc.Annotations[rebuildFromAnnotation]
-				if !ok {
+				if _, ok := pvc.Annotations[rebuildFromAnnotation]; !ok {
+					// skip the pvc if it is not a tmp pvc.
 					continue
 				}
 				pvName := pvc.Name + "-pv"
@@ -211,18 +216,27 @@ var _ = Describe("OpsUtil functions", func() {
 		})
 
 		sourcePVCsShouldRebindPVs := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, pvcList *corev1.PersistentVolumeClaimList) {
-			// fake the pvs
+			// fake the pvs and bound them to the tmp pvcs
 			pvs := fakeTmpPVCBoundPV(pvcList)
 
-			// rebind the source pvcs and pvs
 			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			for i := range pvs {
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(pvs[i]), func(g Gomega, pv *corev1.PersistentVolume) {
 					g.Expect(pv.Spec.ClaimRef).Should(BeNil())
-					g.Expect(pv.Spec.PersistentVolumeReclaimPolicy).Should(Equal(corev1.PersistentVolumeReclaimRetain))
+					g.Expect(pv.Spec.PersistentVolumeReclaimPolicy).Should(Equal(corev1.PersistentVolumeReclaimDelete))
 					g.Expect(pv.Annotations[rebuildFromAnnotation]).Should(Equal(opsRes.OpsRequest.Name))
 				}))
 			}
+
+			Expect(k8sClient.List(ctx, pvcList, client.MatchingLabels{constant.KBAppComponentLabelKey: defaultCompName}, client.InNamespace(opsRes.OpsRequest.Namespace))).Should(Succeed())
+			By("mock the restored pvs are bound")
+			for i := range pvs {
+				Expect(testapps.ChangeObjStatus(&testCtx, pvs[i], func() {
+					pvs[i].Status.Phase = corev1.VolumeBound
+				})).Should(Succeed())
+			}
+			// reconcile again to revert the reclaim policy
+			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 
 			Expect(k8sClient.List(ctx, pvcList, client.MatchingLabels{constant.KBAppComponentLabelKey: defaultCompName}, client.InNamespace(opsRes.OpsRequest.Namespace))).Should(Succeed())
 			reCreatePVCCount := 0
@@ -237,6 +251,12 @@ var _ = Describe("OpsUtil functions", func() {
 				Expect(pvc.Spec.VolumeName).Should(ContainSubstring("-pv"))
 			}
 			Expect(reCreatePVCCount).Should(Equal(rebuildInstanceCount))
+			By("expect to revert the reclaim policy to Delete")
+			for i := range pvs {
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(pvs[i]), func(g Gomega, pv *corev1.PersistentVolume) {
+					g.Expect(pv.Spec.PersistentVolumeReclaimPolicy).Should(Equal(corev1.PersistentVolumeReclaimDelete))
+				}))
+			}
 		}
 
 		waitForInstanceToAvailable := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, ignoreRoleCheck bool) {

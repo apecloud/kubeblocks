@@ -44,8 +44,9 @@ import (
 )
 
 const (
-	rebuildFromAnnotation  = "apps.kubeblocks.io/rebuild-from"
-	rebuildTmpPVCNameLabel = "apps.kubeblocks.io/rebuild-tmp-pvc"
+	rebuildFromAnnotation           = "apps.kubeblocks.io/rebuild-from"
+	rebuildTmpPVCNameLabel          = "apps.kubeblocks.io/rebuild-tmp-pvc"
+	sourcePVReclaimPolicyAnnotation = "apps.kubeblocks.io/source-reclaim-policy"
 
 	waitingForInstanceReadyMessage   = "Waiting for the rebuilding instance to be ready"
 	waitingForPostReadyRestorePrefix = "Waiting for postReady Restore"
@@ -341,6 +342,11 @@ func (inPlaceHelper *inplaceRebuildHelper) rebuildSourcePVCsAndRecreateInstance(
 		if err != nil {
 			return err
 		}
+		sourcePvc := &corev1.PersistentVolumeClaim{}
+		if err = cli.Get(reqCtx.Ctx, types.NamespacedName{Name: sourcePVCName, Namespace: tmpPVC.Namespace}, sourcePvc); err != nil {
+			// if not exists, wait for the pvc to be recreated by the external controller.
+			return err
+		}
 		if _, ok := pv.Annotations[rebuildFromAnnotation]; !ok {
 			if pv.Labels[rebuildTmpPVCNameLabel] != tmpPVC.Name {
 				// 2. retain and label the pv with 'rebuildTmpPVCNameLabel'
@@ -352,15 +358,19 @@ func (inPlaceHelper *inplaceRebuildHelper) rebuildSourcePVCsAndRecreateInstance(
 			if err = inPlaceHelper.cleanupTmpPVC(reqCtx, cli, tmpPVC); err != nil {
 				return err
 			}
-			// 4. release the pv and annotate the pv with 'rebuildFromAnnotation'.
-			if err = inPlaceHelper.releasePV(reqCtx, cli, pv, opsRequest.Name); err != nil {
+			// 4. release and annotate the pv with ['rebuildFromAnnotation', 'sourcePVReclaimPolicyAnnotation'].
+			if err = inPlaceHelper.releasePV(reqCtx, cli, sourcePvc, pv, opsRequest.Name); err != nil {
 				return err
 			}
 		}
 		// set volumeName to tmp pvc, it will be used when recreating the source pvc.
 		tmpPVC.Spec.VolumeName = pv.Name
 		// 5. recreate the source pvc.
-		if err = inPlaceHelper.recreateSourcePVC(reqCtx, cli, tmpPVC, sourcePVCName, opsRequest.Name); err != nil {
+		if err = inPlaceHelper.recreateSourcePVC(reqCtx, cli, tmpPVC, sourcePvc, opsRequest.Name); err != nil {
+			return err
+		}
+		// 6. revert the reclaim policy of the pv.
+		if err = inPlaceHelper.revertReclaimPolicy(reqCtx, cli, pv); err != nil {
 			return err
 		}
 	}
@@ -443,21 +453,17 @@ func (inPlaceHelper *inplaceRebuildHelper) cleanupTmpPVC(reqCtx intctrlutil.Requ
 	return inPlaceHelper.removePVCFinalizer(reqCtx, cli, tmpPVC)
 }
 
+// recreateSourcePVC recreates the source pvc to bound the restored pv.
 func (inPlaceHelper *inplaceRebuildHelper) recreateSourcePVC(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
-	tmpPVC *corev1.PersistentVolumeClaim,
-	sourcePVCName,
+	tmpPVC,
+	sourcePvc *corev1.PersistentVolumeClaim,
 	opsRequestName string) error {
-	sourcePvc := &corev1.PersistentVolumeClaim{}
-	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: sourcePVCName, Namespace: tmpPVC.Namespace}, sourcePvc); err != nil {
-		// if not exists, wait for the pvc to recreate by external controller.
-		return err
-	}
 	// if the pvc is rebuilt by current opsRequest, return.
 	if sourcePvc.Annotations[rebuildFromAnnotation] == opsRequestName {
 		return nil
 	}
-	// 1. retain labels of the source pvc.
+	// 1. merge the labels of the source pvc.
 	intctrlutil.MergeMetadataMapInplace(sourcePvc.Labels, &tmpPVC.Labels)
 	// 2. delete the old pvc
 	if err := intctrlutil.BackgroundDeleteObject(cli, reqCtx.Ctx, sourcePvc); err != nil {
@@ -470,7 +476,7 @@ func (inPlaceHelper *inplaceRebuildHelper) recreateSourcePVC(reqCtx intctrlutil.
 	// 3. recreate the pvc with restored PV.
 	newPVC := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      sourcePVCName,
+			Name:      sourcePvc.Name,
 			Namespace: tmpPVC.Namespace,
 			Labels:    tmpPVC.Labels,
 			Annotations: map[string]string{
@@ -479,12 +485,15 @@ func (inPlaceHelper *inplaceRebuildHelper) recreateSourcePVC(reqCtx intctrlutil.
 		},
 		Spec: tmpPVC.Spec,
 	}
+	// merge the annotations of the source pvc.
+	intctrlutil.MergeMetadataMapInplace(sourcePvc.Annotations, &newPVC.Annotations)
 	return cli.Create(reqCtx.Ctx, newPVC)
 }
 
 // releasePV releases the persistentVolume by resetting `claimRef`.
 func (inPlaceHelper *inplaceRebuildHelper) releasePV(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
+	sourcePvc *corev1.PersistentVolumeClaim,
 	pv *corev1.PersistentVolume,
 	opsRequestName string) error {
 	patchPV := client.MergeFrom(pv.DeepCopy())
@@ -493,7 +502,27 @@ func (inPlaceHelper *inplaceRebuildHelper) releasePV(reqCtx intctrlutil.RequestC
 		pv.Annotations = map[string]string{}
 	}
 	pv.Annotations[rebuildFromAnnotation] = opsRequestName
+	if pv.Annotations[sourcePVReclaimPolicyAnnotation] == "" {
+		// obtain the reclaim policy from the source pv.
+		sourcePV := &corev1.PersistentVolume{}
+		if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: sourcePvc.Spec.VolumeName}, sourcePV); err != nil {
+			return err
+		}
+		pv.Annotations[sourcePVReclaimPolicyAnnotation] = string(sourcePV.Spec.PersistentVolumeReclaimPolicy)
+	}
 	return cli.Patch(reqCtx.Ctx, pv, patchPV)
+}
+
+func (inPlaceHelper *inplaceRebuildHelper) revertReclaimPolicy(reqCtx intctrlutil.RequestCtx,
+	cli client.Client, pv *corev1.PersistentVolume) error {
+	if string(pv.Spec.PersistentVolumeReclaimPolicy) == pv.Annotations[sourcePVReclaimPolicyAnnotation] {
+		return nil
+	}
+	if pv.Status.Phase != corev1.VolumeBound {
+		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting, `wait for the PV "%s" to be bound`, pv.GetName())
+	}
+	pv.Spec.PersistentVolumeReclaimPolicy = corev1.PersistentVolumeReclaimPolicy(pv.Annotations[sourcePVReclaimPolicyAnnotation])
+	return cli.Update(reqCtx.Ctx, pv)
 }
 
 func (inPlaceHelper *inplaceRebuildHelper) removePVCFinalizer(reqCtx intctrlutil.RequestCtx,

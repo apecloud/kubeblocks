@@ -24,7 +24,6 @@ import (
 	"path/filepath"
 	"strconv"
 
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -364,14 +363,6 @@ func setToolsScriptsPath(container *corev1.Container, meta cfgcm.ConfigSpecMeta)
 		Name:  cfgcm.KBTOOLSScriptsPathEnv,
 		Value: filepath.Join(cfgcm.KBScriptVolumePath, meta.ConfigSpec.Name),
 	})
-}
-
-func BuildVolumeSnapshotClass(name string, driver string) *snapshotv1.VolumeSnapshotClass {
-	return builder.NewVolumeSnapshotClassBuilder("", name).
-		AddLabels(constant.AppManagedByLabelKey, constant.AppName).
-		SetDriver(driver).
-		SetDeletionPolicy(snapshotv1.VolumeSnapshotContentDelete).
-		GetObject()
 }
 
 func BuildServiceAccount(synthesizedComp *component.SynthesizedComponent, saName string) *corev1.ServiceAccount {

@@ -131,8 +131,8 @@ func createOrUpdateEnvConfigMap(ctx graph.TransformContext, dag *graph.DAG, data
 	if err != nil { // not-found
 		obj := builder.NewConfigMapBuilder(envKey.Namespace, envKey.Name).
 			AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
-			AddLabelsInMap(synthesizedComp.Labels).
-			AddAnnotationsInMap(synthesizedComp.Annotations).
+			AddLabelsInMap(synthesizedComp.StaticLabels).
+			AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 			SetData(data).
 			GetObject()
 		if err := setCompOwnershipNFinalizer(transCtx.Component, obj); err != nil {

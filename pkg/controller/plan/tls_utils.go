@@ -78,8 +78,8 @@ func BuildTLSSecret(synthesizedComp component.SynthesizedComponent) *v1.Secret {
 		AddLabels(constant.AppManagedByLabelKey, constant.AppName).
 		AddLabels(constant.AppInstanceLabelKey, synthesizedComp.ClusterName).
 		AddLabels(constant.KBAppComponentLabelKey, synthesizedComp.Name).
-		AddLabelsInMap(synthesizedComp.UserDefinedLabels).
-		AddAnnotationsInMap(synthesizedComp.UserDefinedAnnotations).
+		AddLabelsInMap(synthesizedComp.DynamicLabels).
+		AddAnnotationsInMap(synthesizedComp.DynamicAnnotations).
 		SetStringData(map[string]string{}).
 		GetObject()
 }

@@ -55,3 +55,13 @@ const (
 	KBAppMultiClusterPlacementKey   = "apps.kubeblocks.io/multi-cluster-placement"
 	MultiClusterServicePlacementKey = "apps.kubeblocks.io/multi-cluster-service-placement"
 )
+
+func InheritedAnnotations() []string {
+	return []string{
+		RestoreFromBackupAnnotationKey,
+		BackupSourceTargetAnnotationKey,
+		HostNetworkAnnotationKey,
+		FeatureReconciliationInCompactModeAnnotationKey,
+		KBAppMultiClusterPlacementKey,
+	}
+}

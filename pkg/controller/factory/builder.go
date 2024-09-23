@@ -56,10 +56,10 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 
 	podBuilder := builder.NewPodBuilder("", "").
 		AddLabelsInMap(constant.GetCompLabels(clusterName, compName)).
-		AddLabelsInMap(synthesizedComp.UserDefinedLabels).
-		AddLabelsInMap(synthesizedComp.Labels). // at last of labels
-		AddAnnotationsInMap(synthesizedComp.UserDefinedAnnotations).
-		AddAnnotationsInMap(synthesizedComp.Annotations) // at last of annotations
+		AddLabelsInMap(synthesizedComp.DynamicLabels).
+		AddLabelsInMap(synthesizedComp.StaticLabels).
+		AddAnnotationsInMap(synthesizedComp.DynamicAnnotations).
+		AddAnnotationsInMap(synthesizedComp.StaticAnnotations)
 	template := corev1.PodTemplateSpec{
 		ObjectMeta: podBuilder.GetObject().ObjectMeta,
 		Spec:       *synthesizedComp.PodSpec.DeepCopy(),
@@ -68,14 +68,14 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 	itsName := constant.GenerateWorkloadNamePattern(clusterName, compName)
 	itsBuilder := builder.NewInstanceSetBuilder(namespace, itsName).
 		AddLabelsInMap(constant.GetCompLabels(clusterName, compName)).
-		AddLabelsInMap(synthesizedComp.Labels). // at last of labels
+		AddLabelsInMap(synthesizedComp.StaticLabels).
 		AddAnnotations(constant.KubeBlocksGenerationKey, synthesizedComp.Generation).
 		AddAnnotationsInMap(map[string]string{
 			constant.AppComponentLabelKey:   compDefName,
 			constant.KBAppServiceVersionKey: synthesizedComp.ServiceVersion,
 		}).
 		AddAnnotationsInMap(getMonitorAnnotations(synthesizedComp, componentDef)).
-		AddAnnotationsInMap(synthesizedComp.Annotations). // at last of annotations
+		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 		SetTemplate(template).
 		AddMatchLabelsInMap(constant.GetCompLabels(clusterName, compName)).
 		SetReplicas(synthesizedComp.Replicas).
@@ -83,8 +83,8 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 
 	var vcts []corev1.PersistentVolumeClaim
 	for _, vct := range synthesizedComp.VolumeClaimTemplates {
-		intctrlutil.MergeMetadataMapInplace(synthesizedComp.UserDefinedLabels, &vct.ObjectMeta.Labels)
-		intctrlutil.MergeMetadataMapInplace(synthesizedComp.UserDefinedAnnotations, &vct.ObjectMeta.Annotations)
+		intctrlutil.MergeMetadataMapInplace(synthesizedComp.DynamicLabels, &vct.ObjectMeta.Labels)
+		intctrlutil.MergeMetadataMapInplace(synthesizedComp.DynamicAnnotations, &vct.ObjectMeta.Annotations)
 		vcts = append(vcts, vctToPVC(vct))
 	}
 	itsBuilder.SetVolumeClaimTemplates(vcts...)
@@ -240,11 +240,11 @@ func BuildPVC(cluster *appsv1.Cluster,
 	snapshotName string) *corev1.PersistentVolumeClaim {
 	pvcBuilder := builder.NewPVCBuilder(pvcKey.Namespace, pvcKey.Name).
 		AddLabelsInMap(constant.GetCompLabels(cluster.Name, synthesizedComp.Name)).
-		AddLabelsInMap(synthesizedComp.UserDefinedLabels).
+		AddLabelsInMap(synthesizedComp.DynamicLabels).
 		AddLabels(constant.VolumeClaimTemplateNameLabelKey, vct.Name).
-		AddLabelsInMap(synthesizedComp.Labels). // at last of labels
-		AddAnnotationsInMap(synthesizedComp.UserDefinedAnnotations).
-		AddAnnotationsInMap(synthesizedComp.Annotations). // at last of annotations
+		AddLabelsInMap(synthesizedComp.StaticLabels).
+		AddAnnotationsInMap(synthesizedComp.DynamicAnnotations).
+		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 		SetAccessModes(vct.Spec.AccessModes).
 		SetResources(vct.Spec.Resources)
 	if vct.Spec.StorageClassName != nil {
@@ -290,9 +290,9 @@ func BuildConfigMapWithTemplate(cluster *appsv1.Cluster,
 		AddLabelsInMap(constant.GetCompLabels(cluster.Name, synthesizedComp.Name)).
 		AddLabels(constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType).
 		AddLabels(constant.CMTemplateNameLabelKey, configTemplateSpec.TemplateRef).
-		AddLabelsInMap(synthesizedComp.Labels). // at last of labels
+		AddLabelsInMap(synthesizedComp.StaticLabels).
 		AddAnnotations(constant.DisableUpgradeInsConfigurationAnnotationKey, strconv.FormatBool(false)).
-		AddAnnotationsInMap(synthesizedComp.Annotations). // at last of annotations
+		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 		SetData(configs).
 		GetObject()
 }
@@ -377,8 +377,8 @@ func BuildVolumeSnapshotClass(name string, driver string) *snapshotv1.VolumeSnap
 func BuildServiceAccount(synthesizedComp *component.SynthesizedComponent, saName string) *corev1.ServiceAccount {
 	return builder.NewServiceAccountBuilder(synthesizedComp.Namespace, saName).
 		AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
-		AddLabelsInMap(synthesizedComp.Labels).
-		AddAnnotationsInMap(synthesizedComp.Annotations).
+		AddLabelsInMap(synthesizedComp.StaticLabels).
+		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 		SetImagePullSecrets(intctrlutil.BuildImagePullSecrets()).
 		GetObject()
 }
@@ -386,8 +386,8 @@ func BuildServiceAccount(synthesizedComp *component.SynthesizedComponent, saName
 func BuildRoleBinding(synthesizedComp *component.SynthesizedComponent, saName string) *rbacv1.RoleBinding {
 	return builder.NewRoleBindingBuilder(synthesizedComp.Namespace, saName).
 		AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
-		AddLabelsInMap(synthesizedComp.Labels).
-		AddAnnotationsInMap(synthesizedComp.Annotations).
+		AddLabelsInMap(synthesizedComp.StaticLabels).
+		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 		SetRoleRef(rbacv1.RoleRef{
 			APIGroup: rbacv1.GroupName,
 			Kind:     "ClusterRole",
@@ -404,8 +404,8 @@ func BuildRoleBinding(synthesizedComp *component.SynthesizedComponent, saName st
 func BuildClusterRoleBinding(synthesizedComp *component.SynthesizedComponent, saName string) *rbacv1.ClusterRoleBinding {
 	return builder.NewClusterRoleBindingBuilder(synthesizedComp.Namespace, saName).
 		AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
-		AddLabelsInMap(synthesizedComp.Labels).
-		AddAnnotationsInMap(synthesizedComp.Annotations).
+		AddLabelsInMap(synthesizedComp.StaticLabels).
+		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 		SetRoleRef(rbacv1.RoleRef{
 			APIGroup: rbacv1.GroupName,
 			Kind:     "ClusterRole",

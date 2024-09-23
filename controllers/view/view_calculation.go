@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
@@ -90,7 +89,7 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 		e := waitingList.Front()
 		waitingList.Remove(e)
 		obj, _ := e.Value.(client.Object)
-		objKey, err := c.getGVKNObjKey(obj)
+		objKey, err := getObjectRef(obj, c.scheme)
 		if err != nil {
 			return kubebuilderx.Commit, err
 		}
@@ -109,9 +108,12 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 	// build old object set from view.status.currentObjectTree
 	oldObjectMap := make(map[model.GVKNObjKey]client.Object)
 	oldObjectSet := sets.New[model.GVKNObjKey]()
-	oldObjects := c.getAllObjectsFrom(view.Status.CurrentObjectTree)
+	oldObjects, err := c.getAllObjectsFrom(view.Status.CurrentObjectTree)
+	if err != nil {
+		return kubebuilderx.Commit, err
+	}
 	for _, obj := range oldObjects {
-		objKey, err := c.getGVKNObjKey(obj)
+		objKey, err := getObjectRef(obj, c.scheme)
 		if err != nil {
 			return kubebuilderx.Commit, err
 		}
@@ -146,13 +148,13 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 
 	// save new version objects to object store.
 	for _, object := range newObjectMap {
-		if err = c.store.Insert(object); err != nil {
+		if err = c.store.Insert(object, view); err != nil {
 			return kubebuilderx.Commit, err
 		}
 	}
 
 	// update view.status.currentObjectTree
-	view.Status.CurrentObjectTree, err = getObjectTreeWithRevision(root, viewDef.Spec.OwnershipRules, c.store, parseRevision(root.ResourceVersion), c.scheme)
+	view.Status.CurrentObjectTree, err = getObjectTreeWithRevision(root, viewDef.Spec.OwnershipRules, c.store, parseRevision(root.ResourceVersion))
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
@@ -214,17 +216,6 @@ func parseRevision(revisionStr string) int64 {
 	return revision
 }
 
-func (c *viewCalculator) getGVKNObjKey(obj client.Object) (*model.GVKNObjKey, error) {
-	gvk, err := apiutil.GVKForObject(obj, c.scheme)
-	if err != nil {
-		return nil, err
-	}
-	return &model.GVKNObjKey{
-		GroupVersionKind: gvk,
-		ObjectKey:        client.ObjectKeyFromObject(obj),
-	}, nil
-}
-
 func (c *viewCalculator) getSecondaryObjectsOf(obj client.Object, ownershipRules []viewv1.OwnershipRule) ([]client.Object, error) {
 	// find matched rules
 	var rules []viewv1.OwnershipRule
@@ -261,19 +252,31 @@ func (c *viewCalculator) getSecondaryObjectsOf(obj client.Object, ownershipRules
 	return secondaries, nil
 }
 
-func (c *viewCalculator) getAllObjectsFrom(tree *viewv1.ObjectTreeNode) []client.Object {
+func (c *viewCalculator) getAllObjectsFrom(tree *viewv1.ObjectTreeNode) ([]client.Object, error) {
 	if tree == nil {
-		return nil
+		return nil, nil
 	}
-	obj := c.store.Get(&tree.Primary)
+	objectRef, err := objectReferenceToRef(&tree.Primary)
+	if err != nil {
+		return nil, err
+	}
+	revision := parseRevision(tree.Primary.ResourceVersion)
+	obj, err := c.store.Get(objectRef, revision)
+	if err != nil {
+		return nil, err
+	}
 	var objects []client.Object
 	if obj != nil {
 		objects = append(objects, obj)
 	}
 	for _, treeNode := range tree.Secondaries {
-		objects = append(objects, c.getAllObjectsFrom(treeNode)...)
+		secondaries, err := c.getAllObjectsFrom(treeNode)
+		if err != nil {
+			return nil, err
+		}
+		objects = append(objects, secondaries...)
 	}
-	return objects
+	return objects, nil
 }
 
 func parseMatchingLabels(obj client.Object, criteria *viewv1.OwnershipCriteria) (client.MatchingLabels, error) {

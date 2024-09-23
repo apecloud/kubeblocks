@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
 func objectTypeToGVK(objectType *viewv1.ObjectType) (*schema.GroupVersionKind, error) {
@@ -49,6 +50,24 @@ func objectRefToType(objectRef *corev1.ObjectReference) *viewv1.ObjectType {
 		APIVersion: objectRef.APIVersion,
 		Kind:       objectRef.Kind,
 	}
+}
+
+func objectReferenceToRef(reference *corev1.ObjectReference) (*model.GVKNObjKey, error) {
+	if reference == nil {
+		return nil, nil
+	}
+	gv, err := schema.ParseGroupVersion(reference.APIVersion)
+	if err != nil {
+		return nil, err
+	}
+	gvk := gv.WithKind(reference.Kind)
+	return &model.GVKNObjKey{
+		GroupVersionKind: gvk,
+		ObjectKey: client.ObjectKey{
+			Namespace: reference.Namespace,
+			Name:      reference.Name,
+		},
+	}, nil
 }
 
 func getObjectsByGVK(ctx context.Context, cli client.Reader, scheme *runtime.Scheme, gvk *schema.GroupVersionKind, opts ...client.ListOption) ([]client.Object, error) {

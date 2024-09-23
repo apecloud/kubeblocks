@@ -45,7 +45,6 @@ type stateEvaluation struct {
 	ctx    context.Context
 	reader client.Reader
 	store  ObjectStore
-	scheme *runtime.Scheme
 }
 
 func (s *stateEvaluation) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
@@ -98,7 +97,14 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 		if *objType != clusterType {
 			continue
 		}
-		obj := s.store.Get(&change.ObjectReference)
+		objectRef, err := objectReferenceToRef(&change.ObjectReference)
+		if err != nil {
+			return kubebuilderx.Commit, err
+		}
+		obj, err := s.store.Get(objectRef, change.Revision)
+		if err != nil {
+			return kubebuilderx.Commit, err
+		}
 		if obj == nil {
 			return kubebuilderx.Commit, fmt.Errorf("object %s not found", change.ObjectReference)
 		}
@@ -128,7 +134,7 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 	}
 
 	// build new InitialObjectTree
-	view.Status.InitialObjectTree, err = getObjectTreeWithRevision(root, viewDef.Spec.OwnershipRules, s.store, view.Status.View[latestReconciliationCycleStart].Revision, s.scheme)
+	view.Status.InitialObjectTree, err = getObjectTreeWithRevision(root, viewDef.Spec.OwnershipRules, s.store, view.Status.View[latestReconciliationCycleStart].Revision)
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
@@ -136,7 +142,11 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 	// delete unused object revisions
 	for i := 0; i < latestReconciliationCycleStart; i++ {
 		change := view.Status.View[i]
-		s.store.Delete(&change.ObjectReference)
+		objectRef, err := objectReferenceToRef(&change.ObjectReference)
+		if err != nil {
+			return kubebuilderx.Commit, err
+		}
+		s.store.Delete(objectRef, view, change.Revision)
 	}
 
 	// truncate view
@@ -146,7 +156,7 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 }
 
 // TODO(free6om): similar as getSecondaryObjectsOf, refactor and merge them
-func getObjectTreeWithRevision(primary client.Object, ownershipRules []viewv1.OwnershipRule, store ObjectStore, revision int64, scheme *runtime.Scheme) (*viewv1.ObjectTreeNode, error) {
+func getObjectTreeWithRevision(primary client.Object, ownershipRules []viewv1.OwnershipRule, store ObjectStore, revision int64) (*viewv1.ObjectTreeNode, error) {
 	// find matched rules
 	var matchedRules []*viewv1.OwnershipRule
 	for i := range ownershipRules {
@@ -175,7 +185,7 @@ func getObjectTreeWithRevision(primary client.Object, ownershipRules []viewv1.Ow
 			if err != nil {
 				return nil, err
 			}
-			objects, err := getObjectsByRevision(gvk, store, scheme, ml, revision)
+			objects, err := getObjectsByRevision(gvk, store, ml, revision)
 			if err != nil {
 				return nil, err
 			}
@@ -183,7 +193,7 @@ func getObjectTreeWithRevision(primary client.Object, ownershipRules []viewv1.Ow
 		}
 	}
 	for _, secondary := range secondaries {
-		subTree, err := getObjectTreeWithRevision(secondary, ownershipRules, store, revision, scheme)
+		subTree, err := getObjectTreeWithRevision(secondary, ownershipRules, store, revision)
 		if err != nil {
 			return nil, err
 		}
@@ -193,30 +203,21 @@ func getObjectTreeWithRevision(primary client.Object, ownershipRules []viewv1.Ow
 	return tree, nil
 }
 
-func getObjectsByRevision(gvk *schema.GroupVersionKind, store ObjectStore, scheme *runtime.Scheme, ml client.MatchingLabels, revision int64) ([]client.Object, error) {
-	objects := store.List(gvk)
+func getObjectsByRevision(gvk *schema.GroupVersionKind, store ObjectStore, ml client.MatchingLabels, revision int64) ([]client.Object, error) {
+	objectMap, err := store.List(gvk)
+	if err != nil {
+		return nil, err
+	}
+
+	var matchedObjects []client.Object
 	opts := &client.ListOptions{}
 	ml.ApplyToList(opts)
-	objectMap := make(map[model.GVKNObjKey]map[int64]client.Object)
-	for _, object := range objects {
-		if !opts.LabelSelector.Matches(labels.Set(object.GetLabels())) {
-			continue
-		}
-		objectRef, err := getGVKNObjRef(object, scheme)
-		if err != nil {
-			return nil, err
-		}
-		rev := parseRevision(object.GetResourceVersion())
-		revisionMap, ok := objectMap[*objectRef]
-		if !ok {
-			revisionMap = make(map[int64]client.Object)
-		}
-		revisionMap[rev] = object
-	}
-	var matchedObjects []client.Object
 	for _, revisionMap := range objectMap {
 		rev := int64(-1)
-		for r := range revisionMap {
+		for r, object := range revisionMap {
+			if !opts.LabelSelector.Matches(labels.Set(object.GetLabels())) {
+				continue
+			}
 			if rev < r && r <= revision {
 				rev = r
 			}
@@ -228,7 +229,7 @@ func getObjectsByRevision(gvk *schema.GroupVersionKind, store ObjectStore, schem
 	return matchedObjects, nil
 }
 
-func getGVKNObjRef(object client.Object, scheme *runtime.Scheme) (*model.GVKNObjKey, error) {
+func getObjectRef(object client.Object, scheme *runtime.Scheme) (*model.GVKNObjKey, error) {
 	gvk, err := apiutil.GVKForObject(object, scheme)
 	if err != nil {
 		return nil, err
@@ -294,12 +295,11 @@ func doStateEvaluation(object client.Object, expression viewv1.StateEvaluationEx
 	return result, nil
 }
 
-func viewStateEvaluation(ctx context.Context, reader client.Reader, store ObjectStore, scheme *runtime.Scheme) kubebuilderx.Reconciler {
+func viewStateEvaluation(ctx context.Context, reader client.Reader, store ObjectStore) kubebuilderx.Reconciler {
 	return &stateEvaluation{
 		ctx:    ctx,
 		reader: reader,
 		store:  store,
-		scheme: scheme,
 	}
 }
 

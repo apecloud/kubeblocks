@@ -46,7 +46,6 @@ const (
 	PVCNameLabelKey                        = "apps.kubeblocks.io/pvc-name"
 	VolumeClaimTemplateNameLabelKey        = "apps.kubeblocks.io/vct-name"
 	KBAppPodNameLabelKey                   = "apps.kubeblocks.io/pod-name"
-	ClusterAccountLabelKey                 = "account.kubeblocks.io/name"
 
 	RoleLabelKey             = "kubeblocks.io/role" // RoleLabelKey consensusSet and replicationSet role label key
 	KBAppServiceVersionKey   = "apps.kubeblocks.io/service-version"

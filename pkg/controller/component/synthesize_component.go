@@ -79,6 +79,7 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		ServiceVersion:                   comp.Spec.ServiceVersion,
 		UserDefinedLabels:                comp.Spec.Labels,
 		UserDefinedAnnotations:           comp.Spec.Annotations,
+		Labels:                           compDef.Spec.Labels,
 		Annotations:                      compDef.Spec.Annotations,
 		PodSpec:                          &compDef.Spec.Runtime,
 		HostNetwork:                      compDefObj.Spec.HostNetwork,
@@ -116,9 +117,6 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 
 	// update resources
 	buildAndUpdateResources(synthesizeComp, comp)
-
-	// build labels and annotations
-	buildLabelsAndAnnotations(compDef, comp, synthesizeComp)
 
 	// build volumes & volumeClaimTemplates
 	buildVolumeClaimTemplates(synthesizeComp, comp)
@@ -183,24 +181,6 @@ func buildComp2CompDefs(ctx context.Context, cli client.Reader, cluster *appsv1.
 	}
 
 	return mapping, nil
-}
-
-func buildLabelsAndAnnotations(compDef *appsv1.ComponentDefinition, comp *appsv1.Component, synthesizeComp *SynthesizedComponent) {
-	mergeMaps := func(baseMap, overrideMap map[string]string) map[string]string {
-		for k, v := range overrideMap {
-			baseMap[k] = v
-		}
-		return baseMap
-	}
-
-	if compDef.Spec.Labels != nil || comp.Labels != nil {
-		baseLabels := compDef.Spec.Labels
-		if baseLabels == nil {
-			baseLabels = make(map[string]string)
-		}
-		// override labels from component
-		synthesizeComp.Labels = mergeMaps(baseLabels, comp.Labels)
-	}
 }
 
 func mergeUserDefinedEnv(synthesizedComp *SynthesizedComponent, comp *appsv1.Component) error {

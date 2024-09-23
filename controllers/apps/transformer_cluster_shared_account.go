@@ -165,7 +165,6 @@ func (t *clusterSharedAccountTransformer) buildAccountSecretWithPassword(cluster
 	account appsv1.ComponentSystemAccount, shardingName, secretName string, password []byte) (*corev1.Secret, error) {
 	secret := builder.NewSecretBuilder(cluster.Namespace, secretName).
 		AddLabelsInMap(constant.GetShardingLabels(cluster.Name, shardingName)).
-		AddLabels(constant.ClusterAccountLabelKey, account.Name).
 		PutData(constant.AccountNameForSecret, []byte(account.Name)).
 		PutData(constant.AccountPasswdForSecret, password).
 		SetImmutable(true).

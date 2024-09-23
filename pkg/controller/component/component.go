@@ -65,6 +65,7 @@ func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSp
 	compBuilder := builder.NewComponentBuilder(cluster.Namespace, FullName(cluster.Name, compSpec.Name), compSpec.ComponentDef).
 		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 		AddAnnotations(constant.KBAppClusterUIDKey, string(cluster.UID)).
+		AddAnnotationsInMap(inheritedAnnotations(cluster)).
 		AddLabelsInMap(constant.GetComponentWellKnownLabels(cluster.Name, compSpec.Name)).
 		SetServiceVersion(compSpec.ServiceVersion).
 		SetLabels(compSpec.Labels).
@@ -91,16 +92,20 @@ func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSp
 	if labels != nil {
 		compBuilder.AddLabelsInMap(labels)
 	}
+	return compBuilder.GetObject(), nil
+}
+
+func inheritedAnnotations(cluster *appsv1.Cluster) map[string]string {
+	m := map[string]string{}
+	annotations := cluster.Annotations
 	if annotations != nil {
-		compBuilder.AddAnnotationsInMap(annotations)
-	}
-	if cluster.Annotations != nil {
-		p, ok := cluster.Annotations[constant.KBAppMultiClusterPlacementKey]
-		if ok {
-			compBuilder.AddAnnotations(constant.KBAppMultiClusterPlacementKey, p)
+		for _, key := range constant.InheritedAnnotations() {
+			if val, ok := annotations[key]; ok {
+				m[key] = val
+			}
 		}
 	}
-	return compBuilder.GetObject(), nil
+	return m
 }
 
 func getCompAnnotationValue(comp *appsv1.Component, annotation string) (string, error) {

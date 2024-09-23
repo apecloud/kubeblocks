@@ -63,10 +63,10 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 		AddLabelsInMap(labels).
 		AddLabelsInMap(compDefLabel).
 		AddLabelsInMap(constant.GetAppVersionLabel(compDefName)).
-		AddLabelsInMap(synthesizedComp.UserDefinedLabels).
+		AddLabelsInMap(synthesizedComp.DynamicLabels).
 		AddLabelsInMap(constant.GetClusterWellKnownLabels(clusterName)).
-		AddAnnotationsInMap(synthesizedComp.UserDefinedAnnotations).
-		AddAnnotationsInMap(synthesizedComp.Annotations) // at last of annotations
+		AddAnnotationsInMap(synthesizedComp.DynamicAnnotations).
+		AddAnnotationsInMap(synthesizedComp.StaticAnnotations)
 	template := corev1.PodTemplateSpec{
 		ObjectMeta: podBuilder.GetObject().ObjectMeta,
 		Spec:       *synthesizedComp.PodSpec.DeepCopy(),
@@ -81,7 +81,7 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 			constant.KBAppServiceVersionKey: synthesizedComp.ServiceVersion,
 		}).
 		AddAnnotationsInMap(getMonitorAnnotations(synthesizedComp, componentDef)).
-		AddAnnotationsInMap(synthesizedComp.Annotations). // at last of annotations
+		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 		SetTemplate(template).
 		AddMatchLabelsInMap(labels).
 		SetReplicas(synthesizedComp.Replicas).
@@ -89,8 +89,8 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 
 	var vcts []corev1.PersistentVolumeClaim
 	for _, vct := range synthesizedComp.VolumeClaimTemplates {
-		intctrlutil.MergeMetadataMapInplace(synthesizedComp.UserDefinedLabels, &vct.ObjectMeta.Labels)
-		intctrlutil.MergeMetadataMapInplace(synthesizedComp.UserDefinedAnnotations, &vct.ObjectMeta.Annotations)
+		intctrlutil.MergeMetadataMapInplace(synthesizedComp.DynamicLabels, &vct.ObjectMeta.Labels)
+		intctrlutil.MergeMetadataMapInplace(synthesizedComp.DynamicAnnotations, &vct.ObjectMeta.Annotations)
 		vcts = append(vcts, vctToPVC(vct))
 	}
 	itsBuilder.SetVolumeClaimTemplates(vcts...)
@@ -247,10 +247,10 @@ func BuildPVC(cluster *appsv1.Cluster,
 	wellKnownLabels := constant.GetKBWellKnownLabels(synthesizedComp.ClusterDefName, cluster.Name, synthesizedComp.Name)
 	pvcBuilder := builder.NewPVCBuilder(pvcKey.Namespace, pvcKey.Name).
 		AddLabelsInMap(wellKnownLabels).
-		AddLabelsInMap(synthesizedComp.UserDefinedLabels).
+		AddLabelsInMap(synthesizedComp.DynamicLabels).
 		AddLabels(constant.VolumeClaimTemplateNameLabelKey, vct.Name).
-		AddAnnotationsInMap(synthesizedComp.UserDefinedAnnotations).
-		AddAnnotationsInMap(synthesizedComp.Annotations). // at last of annotations
+		AddAnnotationsInMap(synthesizedComp.DynamicAnnotations).
+		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 		SetAccessModes(vct.Spec.AccessModes).
 		SetResources(vct.Spec.Resources)
 	if vct.Spec.StorageClassName != nil {
@@ -299,7 +299,7 @@ func BuildConfigMapWithTemplate(cluster *appsv1.Cluster,
 		AddLabels(constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType).
 		AddLabels(constant.CMTemplateNameLabelKey, configTemplateSpec.TemplateRef).
 		AddAnnotations(constant.DisableUpgradeInsConfigurationAnnotationKey, strconv.FormatBool(false)).
-		AddAnnotationsInMap(synthesizedComp.Annotations). // at last of annotations
+		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 		SetData(configs).
 		GetObject()
 }
@@ -385,7 +385,7 @@ func BuildServiceAccount(synthesizedComp *component.SynthesizedComponent, saName
 	wellKnownLabels := constant.GetKBWellKnownLabels("", synthesizedComp.ClusterName, synthesizedComp.Name)
 	return builder.NewServiceAccountBuilder(synthesizedComp.Namespace, saName).
 		AddLabelsInMap(wellKnownLabels).
-		AddAnnotationsInMap(synthesizedComp.Annotations).
+		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 		SetImagePullSecrets(intctrlutil.BuildImagePullSecrets()).
 		GetObject()
 }
@@ -394,7 +394,7 @@ func BuildRoleBinding(synthesizedComp *component.SynthesizedComponent, saName st
 	wellKnownLabels := constant.GetKBWellKnownLabels("", synthesizedComp.ClusterName, synthesizedComp.Name)
 	return builder.NewRoleBindingBuilder(synthesizedComp.Namespace, saName).
 		AddLabelsInMap(wellKnownLabels).
-		AddAnnotationsInMap(synthesizedComp.Annotations).
+		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 		SetRoleRef(rbacv1.RoleRef{
 			APIGroup: rbacv1.GroupName,
 			Kind:     "ClusterRole",
@@ -412,7 +412,7 @@ func BuildClusterRoleBinding(synthesizedComp *component.SynthesizedComponent, sa
 	wellKnownLabels := constant.GetKBWellKnownLabels("", synthesizedComp.ClusterName, synthesizedComp.Name)
 	return builder.NewClusterRoleBindingBuilder(synthesizedComp.Namespace, saName).
 		AddLabelsInMap(wellKnownLabels).
-		AddAnnotationsInMap(synthesizedComp.Annotations).
+		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 		SetRoleRef(rbacv1.RoleRef{
 			APIGroup: rbacv1.GroupName,
 			Kind:     "ClusterRole",

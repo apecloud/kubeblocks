@@ -165,9 +165,9 @@ func (t *componentAccountTransformer) buildAccountSecretWithPassword(ctx *compon
 	labels := constant.GetComponentWellKnownLabels(synthesizeComp.ClusterName, synthesizeComp.Name)
 	secret := builder.NewSecretBuilder(synthesizeComp.Namespace, secretName).
 		AddLabelsInMap(labels).
-		AddLabelsInMap(synthesizeComp.UserDefinedLabels).
+		AddLabelsInMap(synthesizeComp.DynamicLabels).
 		AddLabels(constant.ClusterAccountLabelKey, account.Name).
-		AddAnnotationsInMap(synthesizeComp.UserDefinedAnnotations).
+		AddAnnotationsInMap(synthesizeComp.DynamicAnnotations).
 		PutData(constant.AccountNameForSecret, []byte(account.Name)).
 		PutData(constant.AccountPasswdForSecret, password).
 		SetImmutable(true).

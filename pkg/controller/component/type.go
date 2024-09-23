@@ -50,10 +50,11 @@ type SynthesizedComponent struct {
 	ServiceAccountName               string                                 `json:"serviceAccountName,omitempty"`
 	ServiceReferences                map[string]*kbappsv1.ServiceDescriptor `json:"serviceReferences,omitempty"`
 	Labels                           map[string]string                      `json:"labels,omitempty"`
-	Annotations                      map[string]string                      `json:"annotations,omitempty"`
+	StaticLabels                     map[string]string                      // labels defined by the component definition
 	DynamicLabels                    map[string]string                      // labels defined by the cluster and component API
-	DynamicAnnotations               map[string]string                      // annotations defined by the cluster and component API
+	Annotations                      map[string]string                      `json:"annotations,omitempty"`
 	StaticAnnotations                map[string]string                      // annotations defined by the component definition
+	DynamicAnnotations               map[string]string                      // annotations defined by the cluster and component API
 	TemplateVars                     map[string]any                         `json:"templateVars,omitempty"`
 	EnvVars                          []corev1.EnvVar                        `json:"envVars,omitempty"`
 	EnvFromSources                   []corev1.EnvFromSource                 `json:"envFromSources,omitempty"`

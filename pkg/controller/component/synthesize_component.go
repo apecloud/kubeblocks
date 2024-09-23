@@ -74,13 +74,15 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		Name:                             compName,
 		FullCompName:                     comp.Name,
 		Generation:                       strconv.FormatInt(comp.Generation, 10),
-		Annotations:                      comp.Annotations,
 		CompDefName:                      compDef.Name,
 		ServiceKind:                      compDefObj.Spec.ServiceKind,
 		ServiceVersion:                   comp.Spec.ServiceVersion,
+		Labels:                           comp.Labels,
+		StaticLabels:                     compDef.Spec.Labels,
 		DynamicLabels:                    comp.Spec.Labels,
-		DynamicAnnotations:               comp.Spec.Annotations,
+		Annotations:                      comp.Annotations,
 		StaticAnnotations:                compDef.Spec.Annotations,
+		DynamicAnnotations:               comp.Spec.Annotations,
 		PodSpec:                          &compDef.Spec.Runtime,
 		HostNetwork:                      compDefObj.Spec.HostNetwork,
 		ComponentServices:                compDefObj.Spec.Services,
@@ -117,9 +119,6 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 
 	// update resources
 	buildAndUpdateResources(synthesizeComp, comp)
-
-	// build labels and annotations
-	buildLabelsAndAnnotations(compDef, comp, synthesizeComp)
 
 	// build volumes & volumeClaimTemplates
 	buildVolumeClaimTemplates(synthesizeComp, comp)
@@ -184,24 +183,6 @@ func buildComp2CompDefs(ctx context.Context, cli client.Reader, cluster *appsv1.
 	}
 
 	return mapping, nil
-}
-
-func buildLabelsAndAnnotations(compDef *appsv1.ComponentDefinition, comp *appsv1.Component, synthesizeComp *SynthesizedComponent) {
-	mergeMaps := func(baseMap, overrideMap map[string]string) map[string]string {
-		for k, v := range overrideMap {
-			baseMap[k] = v
-		}
-		return baseMap
-	}
-
-	if compDef.Spec.Labels != nil || comp.Labels != nil {
-		baseLabels := compDef.Spec.Labels
-		if baseLabels == nil {
-			baseLabels = make(map[string]string)
-		}
-		// override labels from component
-		synthesizeComp.Labels = mergeMaps(baseLabels, comp.Labels)
-	}
 }
 
 func mergeUserDefinedEnv(synthesizedComp *SynthesizedComponent, comp *appsv1.Component) error {

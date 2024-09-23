@@ -215,8 +215,9 @@ func mergeMap[K comparable, V any](src, dst *map[K]V) {
 
 func getMatchLabels(name string) map[string]string {
 	return map[string]string{
-		WorkloadsManagedByLabelKey: workloads.Kind,
-		WorkloadsInstanceLabelKey:  name,
+		constant.AppManagedByLabelKey: constant.AppName,
+		WorkloadsManagedByLabelKey:    workloads.Kind,
+		WorkloadsInstanceLabelKey:     name,
 	}
 }
 

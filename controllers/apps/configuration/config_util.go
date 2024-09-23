@@ -125,7 +125,7 @@ func DeleteConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, obj
 
 func validateConfigMapOwners(cli client.Client, ctx intctrlutil.RequestCtx, labels client.MatchingLabels, check func(obj client.Object) bool, objLists ...client.ObjectList) (bool, error) {
 	for _, objList := range objLists {
-		if err := cli.List(ctx.Ctx, objList, labels, client.Limit(2)); err != nil {
+		if err := cli.List(ctx.Ctx, objList, labels, inDataContextUnspecified()); err != nil {
 			return false, err
 		}
 		v, err := conversion.EnforcePtr(objList)
@@ -133,23 +133,41 @@ func validateConfigMapOwners(cli client.Client, ctx intctrlutil.RequestCtx, labe
 			return false, err
 		}
 		items := v.FieldByName("Items")
-		if !items.IsValid() || items.Kind() != reflect.Slice || items.Len() > 1 {
+		if !items.IsValid() || items.Kind() != reflect.Slice {
 			return false, nil
 		}
 		if items.Len() == 0 {
 			continue
 		}
-
-		val := items.Index(0)
-		// fetch object pointer
-		if val.CanAddr() {
-			val = val.Addr()
-		}
-		if !val.CanInterface() || !check(val.Interface().(client.Object)) {
+		if !checkEnabledDelete(items, check) {
 			return false, nil
 		}
 	}
 	return true, nil
+}
+
+func checkEnabledDelete(items reflect.Value, check func(obj client.Object) bool) bool {
+	for i := 0; i < items.Len(); i++ {
+		val := items.Index(i)
+		// fetch object pointer
+		if val.CanAddr() {
+			val = val.Addr()
+		}
+		if !val.CanInterface() {
+			return false
+		}
+		obj, ok := val.Interface().(client.Object)
+		if !ok {
+			return false
+		}
+		if obj.GetDeletionTimestamp() != nil {
+			continue
+		}
+		if !check(obj) {
+			return false
+		}
+	}
+	return true
 }
 
 func batchDeleteConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, configSpecs []appsv1alpha1.ComponentConfigSpec, cr client.Object) error {

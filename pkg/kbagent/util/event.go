@@ -22,11 +22,9 @@ package util
 import (
 	"context"
 	"fmt"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"os"
 	"sync"
-	"time"
-
-	"github.com/apecloud/kubeblocks/pkg/constant"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -39,8 +37,8 @@ import (
 )
 
 const (
-	sendEventMaxAttempts   = 30
-	sendEventRetryInterval = 10 * time.Second
+	sendQPS       = 30
+	sendBurstSize = 25
 )
 
 var (
@@ -81,8 +79,8 @@ func initEventRecorder() error {
 
 	eventBroadcaster := record.NewBroadcasterWithCorrelatorOptions(
 		record.CorrelatorOptions{
-			QPS:       10,
-			BurstSize: 100,
+			QPS:       sendQPS,
+			BurstSize: sendBurstSize,
 		})
 	eventBroadcaster.StartRecordingToSink(
 		&typedcorev1.EventSinkImpl{

@@ -78,7 +78,7 @@ spec:
                 additionalProperties:
                   type: string
                 description: Specifies Annotations to override or add for underlying
-                  Pods.
+                  Pods, PVCs, Account & TLS Secrets, Services Owned by Component.
                 type: object
               compDef:
                 description: Specifies the name of the referenced ComponentDefinition.
@@ -3529,7 +3529,8 @@ spec:
               labels:
                 additionalProperties:
                   type: string
-                description: Specifies Labels to override or add for underlying Pods.
+                description: Specifies Labels to override or add for underlying Pods,
+                  PVCs, Account & TLS Secrets, Services Owned by Component.
                 type: object
               offlineInstances:
                 description: |-

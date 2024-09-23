@@ -485,6 +485,8 @@ func (inPlaceHelper *inplaceRebuildHelper) recreateSourcePVC(reqCtx intctrlutil.
 		},
 		Spec: tmpPVC.Spec,
 	}
+	// merge the annotations of the source pvc.
+	intctrlutil.MergeMetadataMapInplace(sourcePvc.Annotations, &newPVC.Annotations)
 	return cli.Create(reqCtx.Ctx, newPVC)
 }
 

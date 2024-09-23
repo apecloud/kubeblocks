@@ -4815,7 +4815,8 @@ spec:
                     items:
                       properties:
                         componentDefinitionName:
-                          description: Specifies the name of the ComponentDefinition.
+                          description: Specifies the name of the ComponentDefinition,
+                            only exact matches are supported.
                           maxLength: 64
                           type: string
                         componentName:

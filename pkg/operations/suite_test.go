@@ -58,7 +58,9 @@ import (
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 const (
-	defaultCompName = "default"
+	defaultCompName   = "default"
+	secondaryCompName = "secondary"
+	thirdCompName     = "third"
 )
 
 var cfg *rest.Config
@@ -181,6 +183,74 @@ func initOperationsResources(compDefName, clusterName string) (*OpsResource, *ap
 		}
 	})).Should(Succeed())
 	opsRes.Cluster = clusterObject
+
+	return opsRes, compDef, clusterObject
+}
+
+func initOperationsResourcesWithTopology(clusterDefName, compDefName, clusterName string) (*OpsResource, *appsv1.ComponentDefinition, *appsv1.Cluster) {
+	topologyName := "cluster-mode"
+	testapps.NewClusterDefFactory(clusterDefName).
+		AddClusterTopology(appsv1.ClusterTopology{
+			Name: topologyName,
+			Orders: &appsv1.ClusterTopologyOrders{
+				Update: []string{
+					defaultCompName,
+					secondaryCompName,
+					thirdCompName,
+				},
+			},
+			Components: []appsv1.ClusterTopologyComponent{
+				{Name: defaultCompName, CompDef: compDefName},
+				{Name: secondaryCompName, CompDef: compDefName},
+				{Name: thirdCompName, CompDef: compDefName},
+			},
+		}).
+		Create(&testCtx).
+		GetObject()
+
+	compDef := testapps.NewComponentDefinitionFactory(compDefName).
+		SetDefaultSpec().
+		Create(&testCtx).
+		GetObject()
+
+	pvcSpec := testapps.NewPVCSpec("1Gi")
+	clusterObject := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName).
+		AddComponent(defaultCompName, compDef.GetName()).
+		SetReplicas(3).
+		AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
+		AddComponent(secondaryCompName, compDef.GetName()).
+		SetReplicas(3).
+		AddComponent(thirdCompName, compDef.GetName()).
+		SetReplicas(3).
+		SetTopology(topologyName).
+		Create(&testCtx).
+		GetObject()
+
+	opsRes := &OpsResource{
+		Cluster:  clusterObject,
+		Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
+	}
+
+	By("mock cluster is Running and the status operations")
+	Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
+		clusterObject.Status.Phase = appsv1.RunningClusterPhase
+		clusterObject.Status.Components = map[string]appsv1.ClusterComponentStatus{
+			defaultCompName: {
+				Phase: appsv1.RunningClusterCompPhase,
+			},
+			secondaryCompName: {
+				Phase: appsv1.RunningClusterCompPhase,
+			},
+			thirdCompName: {
+				Phase: appsv1.RunningClusterCompPhase,
+			},
+		}
+	})).Should(Succeed())
+	opsRes.Cluster = clusterObject
+
+	testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
+	testapps.MockInstanceSetComponent(&testCtx, clusterName, secondaryCompName)
+	testapps.MockInstanceSetComponent(&testCtx, clusterName, thirdCompName)
 	return opsRes, compDef, clusterObject
 }
 

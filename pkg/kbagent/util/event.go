@@ -45,7 +45,6 @@ var (
 	once      sync.Once
 	namespace string
 	podName   string
-	podUID    string
 	nodeName  string
 	recorder  record.EventRecorder
 	clientSet *kubernetes.Clientset
@@ -56,7 +55,6 @@ func SendEventWithMessage(logger *logr.Logger, reason string, message string) {
 		once.Do(func() {
 			namespace = os.Getenv(constant.KBEnvNamespace)
 			podName = os.Getenv(constant.KBEnvPodName)
-			podUID = os.Getenv(constant.KBEnvPodUID)
 			nodeName = os.Getenv(constant.KBEnvNodeName)
 			err := initEventRecorder()
 			if logger != nil && err != nil {

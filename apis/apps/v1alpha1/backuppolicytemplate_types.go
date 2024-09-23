@@ -68,10 +68,14 @@ type BackupPolicy struct {
 	// +optional
 	ComponentDefRef string `json:"componentDefRef,omitempty"`
 
-	// Specifies a list of names of ComponentDefinitions that the specified ClusterDefinition references.
-	// They should be different versions of definitions of the same component,
-	// thus allowing them to share a single BackupPolicy.
-	// Each name must adhere to the IANA Service Naming rule.
+	// Specifies the name of the ComponentDefinition.
+	// Each name in the list can represent an exact name, a name prefix, or a regular expression pattern.
+	//
+	// For example:
+	//
+	// - "mysql-8.0.30-v1alpha1": Matches the exact name "mysql-8.0.30-v1alpha1"
+	// - "mysql-8.0.30": Matches all names starting with "mysql-8.0.30"
+	// - "^mysql-8.0.\d{1,2}$": Matches all names starting with "mysql-8.0." followed by one or two digits.
 	//
 	// +optional
 	ComponentDefs []string `json:"componentDefs,omitempty"`
@@ -143,18 +147,32 @@ type ValueFrom struct {
 	ClusterVersionRef []ValueMapping `json:"clusterVersionRef,omitempty"`
 
 	// Determine the appropriate version of the backup tool image from ComponentDefinition.
+	// Each name in the list can represent an exact name, a name prefix, or a regular expression pattern.
+	//
+	// For example:
+	//
+	// - "mysql-8.0.30-v1alpha1": Matches the exact name "mysql-8.0.30-v1alpha1"
+	// - "mysql-8.0.30": Matches all names starting with "mysql-8.0.30"
+	// - "^mysql-8.0.\d{1,2}$": Matches all names starting with "mysql-8.0." followed by one or two digits.
 	//
 	// +optional
 	ComponentDef []ValueMapping `json:"componentDef,omitempty"`
 
 	// Determine the appropriate version of the backup tool image from ServiceVersion.
+	// Each service version in the list can represent an exact version, a version prefix, or a regular expression pattern.
+	//
+	// For example:
+	//
+	// - "8.0.33": Matches the exact version "8.0.33"
+	// - "8.0": Matches all versions starting with "8.0"
+	// - "^8.0.\d{1,2}$": Matches all versions starting with "8.0." followed by one or two digits.
 	//
 	// +optional
 	ServiceVersion []ValueMapping `json:"serviceVersion,omitempty"`
 }
 
 type ValueMapping struct {
-	// Represents an array of names of ClusterVersion or ComponentDefinition that can be mapped to
+	// Represents an array of names of ClusterVersion or ComponentDefinition or ServiceVersion that can be mapped to
 	// the appropriate version of the backup tool image.
 	//
 	// This mapping allows different versions of component images to correspond to specific versions of backup tool images.

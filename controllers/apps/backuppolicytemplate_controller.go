@@ -28,6 +28,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -58,10 +59,16 @@ func (r *BackupPolicyTemplateReconciler) Reconcile(ctx context.Context, req reco
 	if backupPolicyTemplate.Spec.ClusterDefRef != "" {
 		backupPolicyTemplate.Labels[constant.ClusterDefLabelKey] = backupPolicyTemplate.Spec.ClusterDefRef
 	}
-
+	compDefList := &appsv1alpha1.ComponentDefinitionList{}
+	if err := r.Client.List(ctx, compDefList); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
 	for _, backupPolicy := range backupPolicyTemplate.Spec.BackupPolicies {
 		for _, compDef := range backupPolicy.ComponentDefs {
-			backupPolicyTemplate.Labels[compDef] = compDef
+			matchedCompDefNames := r.getMatchedComponentDefs(compDefList, compDef)
+			for _, compDefName := range matchedCompDefNames {
+				backupPolicyTemplate.Labels[compDefName] = compDefName
+			}
 		}
 	}
 
@@ -70,6 +77,16 @@ func (r *BackupPolicyTemplateReconciler) Reconcile(ctx context.Context, req reco
 	}
 
 	return intctrlutil.Reconciled()
+}
+
+func (r *BackupPolicyTemplateReconciler) getMatchedComponentDefs(compDefList *appsv1alpha1.ComponentDefinitionList, compDef string) []string {
+	var compDefNames []string
+	for i, item := range compDefList.Items {
+		if component.CompDefMatched(item.Name, compDef) {
+			compDefNames = append(compDefNames, compDefList.Items[i].Name)
+		}
+	}
+	return compDefNames
 }
 
 // SetupWithManager sets up the controller with the Manager.

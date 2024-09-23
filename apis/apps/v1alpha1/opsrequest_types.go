@@ -359,7 +359,7 @@ type UpgradeComponent struct {
 	// Specifies the name of the Component.
 	ComponentOps `json:",inline"`
 
-	// Specifies the name of the ComponentDefinition.
+	// Specifies the name of the ComponentDefinition, only exact matches are supported.
 	// +kubebuilder:validation:MaxLength=64
 	// +optional
 	ComponentDefinitionName *string `json:"componentDefinitionName,omitempty"`

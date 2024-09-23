@@ -83,7 +83,7 @@ type AddonSpec struct {
 
 	// Specify all addons that this addon depends on.
 	// +optional
-	AddonDependencies []AddonDependency `json:"addonDependencies,omitempty"`
+	DependentAddons []DependentAddon `json:"dependentAddons,omitempty"`
 }
 
 // AddonStatus defines the observed state of an add-on.
@@ -323,7 +323,7 @@ type CliPlugin struct {
 	Description string `json:"description,omitempty"`
 }
 
-type AddonDependency struct {
+type DependentAddon struct {
 	// The name of the dependent addon.
 	//
 	// +kubebuilder:validation:Required

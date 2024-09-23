@@ -582,10 +582,10 @@ var _ = Describe("Addon controller", func() {
 			By("By create addon with not installed dependent addon")
 			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
 				newOjb.Spec.Installable.AutoInstall = true
-				newOjb.Spec.AddonDependencies = []extensionsv1alpha1.AddonDependency{
+				newOjb.Spec.DependentAddons = []extensionsv1alpha1.DependentAddon{
 					{
 						Name:    "addon-test-123",
-						Version: []string{"1.0.0"},
+						Version: []string{">=1.0.0"},
 					},
 				}
 			})
@@ -604,7 +604,7 @@ var _ = Describe("Addon controller", func() {
 			modifiers := func(newObj *extensionsv1alpha1.Addon) {
 				newObj.Spec.Installable.AutoInstall = true
 				newObj.Name = "addon-test-123"
-				newObj.SetLabels(map[string]string{AddonVersion: "1.0.0"})
+				newObj.SetLabels(map[string]string{AddonVersion: "2.0.0"})
 			}
 
 			dependAddon = testapps.CreateCustomizedObj(&testCtx, "addon/addon.yaml", &extensionsv1alpha1.Addon{}, modifiers)
@@ -613,10 +613,10 @@ var _ = Describe("Addon controller", func() {
 			By("By enable addon when the dependent addon is installed")
 			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
 				newOjb.Spec.Installable.AutoInstall = true
-				newOjb.Spec.AddonDependencies = []extensionsv1alpha1.AddonDependency{
+				newOjb.Spec.DependentAddons = []extensionsv1alpha1.DependentAddon{
 					{
 						Name:    "addon-test-123",
-						Version: []string{"1.0.0"},
+						Version: []string{">=1.0.0"},
 					},
 				}
 			})

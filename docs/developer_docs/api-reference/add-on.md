@@ -196,10 +196,10 @@ the selector and auto-install settings.</p>
 </tr>
 <tr>
 <td>
-<code>addonDependencies</code><br/>
+<code>DependentAddons</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.AddonDependency">
-[]AddonDependency
+<a href="#extensions.kubeblocks.io/v1alpha1.DependentAddon">
+[]DependentAddon
 </a>
 </em>
 </td>
@@ -272,7 +272,7 @@ all selectors must evaluate to true.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="extensions.kubeblocks.io/v1alpha1.AddonDependency">AddonDependency
+<h3 id="extensions.kubeblocks.io/v1alpha1.DependentAddon">DependentAddon
 </h3>
 <p>
 (<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.AddonSpec">AddonSpec</a>)
@@ -680,10 +680,10 @@ the selector and auto-install settings.</p>
 </tr>
 <tr>
 <td>
-<code>addonDependencies</code><br/>
+<code>DependentAddons</code><br/>
 <em>
-<a href="#extensions.kubeblocks.io/v1alpha1.AddonDependency">
-[]AddonDependency
+<a href="#extensions.kubeblocks.io/v1alpha1.DependentAddon">
+[]DependentAddon
 </a>
 </em>
 </td>
